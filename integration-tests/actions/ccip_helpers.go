@@ -22,12 +22,7 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
-	envclient "github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
-	mockservercfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 
@@ -627,14 +622,14 @@ func (sourceCCIP *SourceCCIPModule) CollectBalanceRequirements() []testhelpers.B
 	var balancesReq []testhelpers.BalanceReq
 	for _, token := range sourceCCIP.Common.BridgeTokens {
 		balancesReq = append(balancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-BridgeToken-%s", testhelpers.Sender, token.Address()),
+			Name:   fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), sourceCCIP.Sender.Hex()),
 			Addr:   sourceCCIP.Sender,
 			Getter: GetterForLinkToken(token, sourceCCIP.Sender.Hex()),
 		})
 	}
 	for i, pool := range sourceCCIP.Common.BridgeTokenPools {
 		balancesReq = append(balancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-TokenPool-%s", testhelpers.Sender, pool.Address()),
+			Name:   fmt.Sprintf("BridgeToken-%s-TokenPool-%s", sourceCCIP.Common.BridgeTokens[i].Address(), pool.Address()),
 			Addr:   pool.EthAddress,
 			Getter: GetterForLinkToken(sourceCCIP.Common.BridgeTokens[i], pool.Address()),
 		})
@@ -642,22 +637,22 @@ func (sourceCCIP *SourceCCIPModule) CollectBalanceRequirements() []testhelpers.B
 
 	if sourceCCIP.Common.FeeToken.Address() != common.HexToAddress("0x0").String() {
 		balancesReq = append(balancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-FeeToken-%s-Address-%s", testhelpers.Sender, sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Sender.Hex()),
+			Name:   fmt.Sprintf("FeeToken-%s-Address-%s", sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Sender.Hex()),
 			Addr:   sourceCCIP.Sender,
 			Getter: GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.Sender.Hex()),
 		})
 		balancesReq = append(balancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-Router-%s", testhelpers.Sender, sourceCCIP.Common.Router.Address()),
+			Name:   fmt.Sprintf("FeeToken-%s-Router-%s", sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Common.Router.Address()),
 			Addr:   sourceCCIP.Common.Router.EthAddress,
 			Getter: GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.Common.Router.Address()),
 		})
 		balancesReq = append(balancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-OnRamp-%s", testhelpers.Sender, sourceCCIP.OnRamp.Address()),
+			Name:   fmt.Sprintf("FeeToken-%s-OnRamp-%s", sourceCCIP.Common.FeeToken.Address(), sourceCCIP.OnRamp.Address()),
 			Addr:   sourceCCIP.OnRamp.EthAddress,
 			Getter: GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.OnRamp.Address()),
 		})
 		balancesReq = append(balancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-Prices-%s", testhelpers.Sender, sourceCCIP.Common.PriceRegistry.Address()),
+			Name:   fmt.Sprintf("FeeToken-%s-Prices-%s", sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Common.PriceRegistry.Address()),
 			Addr:   sourceCCIP.Common.PriceRegistry.EthAddress,
 			Getter: GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.Common.PriceRegistry.Address()),
 		})
@@ -665,58 +660,52 @@ func (sourceCCIP *SourceCCIPModule) CollectBalanceRequirements() []testhelpers.B
 	return balancesReq
 }
 
-func (sourceCCIP *SourceCCIPModule) BalanceAssertions(prevBalances map[string]*big.Int, noOfReq int64, totalFee *big.Int) []testhelpers.BalanceAssertion {
-	var balAssertions []testhelpers.BalanceAssertion
+func (sourceCCIP *SourceCCIPModule) UpdateBalance(
+	noOfReq int64,
+	totalFee *big.Int,
+	balances *BalanceSheet,
+) {
 	for i, token := range sourceCCIP.Common.BridgeTokens {
-		name := fmt.Sprintf("%s-BridgeToken-%s", testhelpers.Sender, token.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
+		name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), sourceCCIP.Sender.Hex())
+		balances.Update(name, BalanceItem{
 			Address:  sourceCCIP.Sender,
 			Getter:   GetterForLinkToken(token, sourceCCIP.Sender.Hex()),
-			Expected: bigmath.Sub(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i])).String(),
+			AmtToSub: bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i]),
 		})
 	}
 	for i, pool := range sourceCCIP.Common.BridgeTokenPools {
-		name := fmt.Sprintf("%s-TokenPool-%s", testhelpers.Sender, pool.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     fmt.Sprintf("%s-TokenPool-%s", testhelpers.Sender, pool.Address()),
+		name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", sourceCCIP.Common.BridgeTokens[i].Address(), pool.Address())
+		balances.Update(name, BalanceItem{
 			Address:  pool.EthAddress,
 			Getter:   GetterForLinkToken(sourceCCIP.Common.BridgeTokens[i], pool.Address()),
-			Expected: bigmath.Add(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i])).String(),
+			AmtToAdd: bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i]),
 		})
 	}
 
 	if sourceCCIP.Common.FeeToken.Address() != common.HexToAddress("0x0").String() {
-		name := fmt.Sprintf("%s-FeeToken-%s-Address-%s", testhelpers.Sender, sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Sender.Hex())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
+		name := fmt.Sprintf("FeeToken-%s-Address-%s", sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Sender.Hex())
+		balances.Update(name, BalanceItem{
 			Address:  sourceCCIP.Sender,
 			Getter:   GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.Sender.Hex()),
-			Expected: bigmath.Sub(prevBalances[name], totalFee).String(),
+			AmtToSub: totalFee,
 		})
-		name = fmt.Sprintf("%s-Prices-%s", testhelpers.Sender, sourceCCIP.Common.PriceRegistry.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
-			Address:  sourceCCIP.Common.PriceRegistry.EthAddress,
-			Getter:   GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.Common.PriceRegistry.Address()),
-			Expected: prevBalances[name].String(),
+		name = fmt.Sprintf("FeeToken-%s-Prices-%s", sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Common.PriceRegistry.Address())
+		balances.Update(name, BalanceItem{
+			Address: sourceCCIP.Common.PriceRegistry.EthAddress,
+			Getter:  GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.Common.PriceRegistry.Address()),
 		})
-		name = fmt.Sprintf("%s-Router-%s", testhelpers.Sender, sourceCCIP.Common.Router.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     fmt.Sprintf("%s-Router-%s", testhelpers.Sender, sourceCCIP.Common.Router.Address()),
-			Address:  sourceCCIP.Common.Router.EthAddress,
-			Getter:   GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.Common.Router.Address()),
-			Expected: prevBalances[name].String(),
+		name = fmt.Sprintf("FeeToken-%s-Router-%s", sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Common.Router.Address())
+		balances.Update(name, BalanceItem{
+			Address: sourceCCIP.Common.Router.EthAddress,
+			Getter:  GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.Common.Router.Address()),
 		})
-		name = fmt.Sprintf("%s-OnRamp-%s", testhelpers.Sender, sourceCCIP.OnRamp.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     fmt.Sprintf("%s-OnRamp-%s", testhelpers.Sender, sourceCCIP.OnRamp.Address()),
+		name = fmt.Sprintf("FeeToken-%s-OnRamp-%s", sourceCCIP.Common.FeeToken.Address(), sourceCCIP.OnRamp.Address())
+		balances.Update(name, BalanceItem{
 			Address:  sourceCCIP.OnRamp.EthAddress,
 			Getter:   GetterForLinkToken(sourceCCIP.Common.FeeToken, sourceCCIP.OnRamp.Address()),
-			Expected: bigmath.Add(prevBalances[name], totalFee).String(),
+			AmtToAdd: totalFee,
 		})
 	}
-	return balAssertions
 }
 
 func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
@@ -1060,31 +1049,31 @@ func (destCCIP *DestCCIPModule) CollectBalanceRequirements() []testhelpers.Balan
 	var destBalancesReq []testhelpers.BalanceReq
 	for _, token := range destCCIP.Common.BridgeTokens {
 		destBalancesReq = append(destBalancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-BridgeToken-%s", testhelpers.Receiver, token.Address()),
+			Name:   fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), destCCIP.ReceiverDapp.Address()),
 			Addr:   destCCIP.ReceiverDapp.EthAddress,
 			Getter: GetterForLinkToken(token, destCCIP.ReceiverDapp.Address()),
 		})
 	}
 	for i, pool := range destCCIP.Common.BridgeTokenPools {
 		destBalancesReq = append(destBalancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-TokenPool-%s", testhelpers.Receiver, pool.Address()),
+			Name:   fmt.Sprintf("BridgeToken-%s-TokenPool-%s", destCCIP.Common.BridgeTokens[i].Address(), pool.Address()),
 			Addr:   pool.EthAddress,
 			Getter: GetterForLinkToken(destCCIP.Common.BridgeTokens[i], pool.Address()),
 		})
 	}
 	if destCCIP.Common.FeeToken.Address() != common.HexToAddress("0x0").String() {
 		destBalancesReq = append(destBalancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-FeeToken-%s-Address-%s", testhelpers.Receiver, destCCIP.Common.FeeToken.Address(), destCCIP.ReceiverDapp.Address()),
+			Name:   fmt.Sprintf("FeeToken-%s-Address-%s", destCCIP.Common.FeeToken.Address(), destCCIP.ReceiverDapp.Address()),
 			Addr:   destCCIP.ReceiverDapp.EthAddress,
 			Getter: GetterForLinkToken(destCCIP.Common.FeeToken, destCCIP.ReceiverDapp.Address()),
 		})
 		destBalancesReq = append(destBalancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-OffRamp-%s", testhelpers.Receiver, destCCIP.OffRamp.Address()),
+			Name:   fmt.Sprintf("FeeToken-%s-OffRamp-%s", destCCIP.Common.FeeToken.Address(), destCCIP.OffRamp.Address()),
 			Addr:   destCCIP.OffRamp.EthAddress,
 			Getter: GetterForLinkToken(destCCIP.Common.FeeToken, destCCIP.OffRamp.Address()),
 		})
 		destBalancesReq = append(destBalancesReq, testhelpers.BalanceReq{
-			Name:   fmt.Sprintf("%s-FeeTokenPool-%s", testhelpers.Receiver, destCCIP.Common.FeeTokenPool.Address()),
+			Name:   fmt.Sprintf("FeeToken-%s-FeeTokenPool-%s", destCCIP.Common.FeeToken.Address(), destCCIP.Common.FeeTokenPool.Address()),
 			Addr:   destCCIP.Common.FeeTokenPool.EthAddress,
 			Getter: GetterForLinkToken(destCCIP.Common.FeeToken, destCCIP.Common.FeeTokenPool.Address()),
 		})
@@ -1092,55 +1081,45 @@ func (destCCIP *DestCCIPModule) CollectBalanceRequirements() []testhelpers.Balan
 	return destBalancesReq
 }
 
-func (destCCIP *DestCCIPModule) BalanceAssertions(
-	prevBalances map[string]*big.Int,
+func (destCCIP *DestCCIPModule) UpdateBalance(
 	transferAmount []*big.Int,
 	noOfReq int64,
-) []testhelpers.BalanceAssertion {
-	var balAssertions []testhelpers.BalanceAssertion
+	balance *BalanceSheet,
+) {
 	for i, token := range destCCIP.Common.BridgeTokens {
-		name := fmt.Sprintf("%s-BridgeToken-%s", testhelpers.Receiver, token.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
+		name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), destCCIP.ReceiverDapp.Address())
+		balance.Update(name, BalanceItem{
 			Address:  destCCIP.ReceiverDapp.EthAddress,
 			Getter:   GetterForLinkToken(token, destCCIP.ReceiverDapp.Address()),
-			Expected: bigmath.Add(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), transferAmount[i])).String(),
+			AmtToAdd: bigmath.Mul(big.NewInt(noOfReq), transferAmount[i]),
 		})
 	}
 	for i, pool := range destCCIP.Common.BridgeTokenPools {
-		name := fmt.Sprintf("%s-TokenPool-%s", testhelpers.Receiver, pool.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     fmt.Sprintf("%s-TokenPool-%s", testhelpers.Receiver, pool.Address()),
+		name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", destCCIP.Common.BridgeTokens[i].Address(), pool.Address())
+		balance.Update(name, BalanceItem{
 			Address:  pool.EthAddress,
 			Getter:   GetterForLinkToken(destCCIP.Common.BridgeTokens[i], pool.Address()),
-			Expected: bigmath.Sub(prevBalances[name], bigmath.Mul(big.NewInt(noOfReq), transferAmount[i])).String(),
+			AmtToSub: bigmath.Mul(big.NewInt(noOfReq), transferAmount[i]),
 		})
 	}
 	if destCCIP.Common.FeeToken.Address() != common.HexToAddress("0x0").String() {
-		name := fmt.Sprintf("%s-OffRamp-%s", testhelpers.Receiver, destCCIP.OffRamp.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
-			Address:  destCCIP.OffRamp.EthAddress,
-			Getter:   GetterForLinkToken(destCCIP.Common.FeeToken, destCCIP.OffRamp.Address()),
-			Expected: prevBalances[name].String(),
+		name := fmt.Sprintf("FeeToken-%s-OffRamp-%s", destCCIP.Common.FeeToken.Address(), destCCIP.OffRamp.Address())
+		balance.Update(name, BalanceItem{
+			Address: destCCIP.OffRamp.EthAddress,
+			Getter:  GetterForLinkToken(destCCIP.Common.FeeToken, destCCIP.OffRamp.Address()),
 		})
-		name = fmt.Sprintf("%s-FeeTokenPool-%s", testhelpers.Receiver, destCCIP.Common.FeeTokenPool.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
-			Address:  destCCIP.Common.FeeTokenPool.EthAddress,
-			Getter:   GetterForLinkToken(destCCIP.Common.FeeToken, destCCIP.Common.FeeTokenPool.Address()),
-			Expected: prevBalances[name].String(),
+		name = fmt.Sprintf("FeeToken-%s-FeeTokenPool-%s", destCCIP.Common.FeeToken.Address(), destCCIP.Common.FeeTokenPool.Address())
+		balance.Update(name, BalanceItem{
+			Address: destCCIP.Common.FeeTokenPool.EthAddress,
+			Getter:  GetterForLinkToken(destCCIP.Common.FeeToken, destCCIP.Common.FeeTokenPool.Address()),
 		})
 
-		name = fmt.Sprintf("%s-FeeToken-%s-Address-%s", testhelpers.Receiver, destCCIP.Common.FeeToken.Address(), destCCIP.ReceiverDapp.Address())
-		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
-			Name:     name,
-			Address:  destCCIP.ReceiverDapp.EthAddress,
-			Getter:   GetterForLinkToken(destCCIP.Common.FeeToken, destCCIP.ReceiverDapp.Address()),
-			Expected: prevBalances[name].String(),
+		name = fmt.Sprintf("FeeToken-%s-Address-%s", destCCIP.Common.FeeToken.Address(), destCCIP.ReceiverDapp.Address())
+		balance.Update(name, BalanceItem{
+			Address: destCCIP.ReceiverDapp.EthAddress,
+			Getter:  GetterForLinkToken(destCCIP.Common.FeeToken, destCCIP.ReceiverDapp.Address()),
 		})
 	}
-	return balAssertions
 }
 
 func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
@@ -1296,8 +1275,7 @@ type CCIPLane struct {
 	TestEnv                 *CCIPTestEnv
 	NumberOfReq             int
 	Reports                 *testreporters.CCIPLaneStats
-	SourceBalances          map[string]*big.Int
-	DestBalances            map[string]*big.Int
+	Balance                 *BalanceSheet
 	StartBlockOnSource      uint64
 	StartBlockOnDestination uint64
 	SentReqs                map[int64]CCIPRequest
@@ -1373,12 +1351,14 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 }
 
 func (lane *CCIPLane) RecordStateBeforeTransfer() {
-	var err error
 	// collect the balance assert.ment to verify balances after transfer
-	lane.SourceBalances, err = testhelpers.GetBalances(lane.Test, lane.Source.CollectBalanceRequirements())
+	bal, err := testhelpers.GetBalances(lane.Test, lane.Source.CollectBalanceRequirements())
 	require.NoError(lane.Test, err, "fetching source balance")
-	lane.DestBalances, err = testhelpers.GetBalances(lane.Test, lane.Dest.CollectBalanceRequirements())
+	lane.Balance.RecordBalance(bal)
+
+	bal, err = testhelpers.GetBalances(lane.Test, lane.Dest.CollectBalanceRequirements())
 	require.NoError(lane.Test, err, "fetching dest balance")
+	lane.Balance.RecordBalance(bal)
 
 	// save the current block numbers to use in various filter log requests
 	lane.StartBlockOnSource, err = lane.Source.Common.ChainClient.LatestBlockNumber(context.Background())
@@ -1445,9 +1425,8 @@ func (lane *CCIPLane) ValidateRequests() {
 	}
 	// Asserting balances reliably work only for simulated private chains. The testnet contract balances might get updated by other transactions
 	// verify the fee amount is deducted from sender, added to receiver token balances and
-	// unused fee is returned to receiver fee token account
-	AssertBalances(lane.Test, lane.Source.BalanceAssertions(lane.SourceBalances, int64(lane.NumberOfReq), lane.TotalFee))
-	AssertBalances(lane.Test, lane.Dest.BalanceAssertions(lane.DestBalances, lane.Source.TransferAmount, int64(lane.NumberOfReq)))
+	lane.Source.UpdateBalance(int64(lane.NumberOfReq), lane.TotalFee, lane.Balance)
+	lane.Dest.UpdateBalance(lane.Source.TransferAmount, int64(lane.NumberOfReq), lane.Balance)
 }
 
 func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmattion time.Time, reqNo int64) error {
@@ -1924,7 +1903,7 @@ type CCIPTestEnv struct {
 	numOfCommitNodes         int
 	numOfExecNodes           int
 	K8Env                    *environment.Environment
-	CLNodeWithKeyReady       *errgroup.Group // denotes if the chainlink nodes are deployed, keys are created and ready to be used for job creation
+	CLNodeWithKeyReady       *errgroup.Group // denotes if keys are created in chainlink node and ready to be used for job creation
 }
 
 func (c *CCIPTestEnv) ChaosLabelForGeth(t *testing.T, srcChain, destChain string) {
@@ -2060,98 +2039,6 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	return nil
 }
 
-// DeployEnvironments deploys K8 env for CCIP tests. For tests running on simulated geth it deploys -
-// 1. two simulated geth network in non-dev mode
-// 2. mockserver ( to set mock price feed details)
-// 3. chainlink nodes
-func DeployEnvironments(
-	t *testing.T,
-	envconfig *environment.Config,
-	clProps map[string]interface{},
-	gethResource map[string]interface{},
-	networks []blockchain.EVMNetwork,
-) *CCIPTestEnv {
-	testEnvironment := environment.New(envconfig)
-	c := &CCIPTestEnv{
-		K8Env: testEnvironment,
-	}
-	numOfTxNodes := 1
-	for _, network := range networks {
-		if network.Simulated {
-			testEnvironment.
-				AddHelm(reorg.New(&reorg.Props{
-					NetworkName: network.Name,
-					NetworkType: "simulated-geth-non-dev",
-					Values: map[string]interface{}{
-						"geth": map[string]interface{}{
-							"genesis": map[string]interface{}{
-								"networkId": fmt.Sprint(network.ChainID),
-							},
-							"tx": map[string]interface{}{
-								"replicas":  strconv.Itoa(numOfTxNodes),
-								"resources": gethResource,
-							},
-							"miner": map[string]interface{}{
-								"replicas":  "0",
-								"resources": gethResource,
-							},
-						},
-						"bootnode": map[string]interface{}{
-							"replicas": "1",
-						},
-					},
-				}))
-		}
-	}
-
-	err := testEnvironment.
-		AddHelm(mockservercfg.New(nil)).
-		AddHelm(mockserver.New(nil)).
-		Run()
-	require.NoError(t, err)
-	if testEnvironment.WillUseRemoteRunner() {
-		return c
-	}
-	urlFinder := func(network blockchain.EVMNetwork) ([]string, []string) {
-		if !network.Simulated {
-			return network.URLs, network.HTTPURLs
-		}
-		networkName := network.Name
-		var internalWsURLs, internalHttpURLs []string
-		for i := 0; i < numOfTxNodes; i++ {
-			podName := fmt.Sprintf("%s-ethereum-geth:%d", networkName, i)
-			txNodeInternalWs, err := testEnvironment.Fwd.FindPort(podName, "geth", "ws-rpc").As(envclient.RemoteConnection, envclient.WS)
-			require.NoError(t, err, "Error finding WS ports")
-			internalWsURLs = append(internalWsURLs, txNodeInternalWs)
-			txNodeInternalHttp, err := testEnvironment.Fwd.FindPort(podName, "geth", "http-rpc").As(envclient.RemoteConnection, envclient.HTTP)
-			require.NoError(t, err, "Error finding HTTP ports")
-			internalHttpURLs = append(internalHttpURLs, txNodeInternalHttp)
-		}
-		return internalWsURLs, internalHttpURLs
-	}
-	var nets []blockchain.EVMNetwork
-	for i := range networks {
-		nets = append(nets, networks[i])
-		nets[i].URLs, nets[i].HTTPURLs = urlFinder(networks[i])
-		// skip adding blockscout for simplified deployments
-		// uncomment the following to debug on-chain transactions
-		/*
-			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-					Name:    fmt.Sprintf("%s-blockscout", networks[i].Name),
-					WsURL:   networks[i].URLs[0],
-					HttpURL: networks[i].HTTPURLs[0],
-				}))
-		*/
-	}
-
-	clProps["toml"] = DefaultCCIPCLNodeEnv(t, nets)
-	err = testEnvironment.
-		AddHelm(chainlink.New(0, clProps)).
-		Run()
-	require.NoError(t, err)
-	return c
-}
-
 func AssertBalances(t *testing.T, bas []testhelpers.BalanceAssertion) {
 	event := log.Info()
 	for _, b := range bas {
@@ -2192,5 +2079,89 @@ func GetterForLinkToken(token *ccip.LinkToken, addr string) func(t *testing.T, _
 		balance, err := token.BalanceOf(context.Background(), addr)
 		assert.NoError(t, err)
 		return balance
+	}
+}
+
+type BalanceItem struct {
+	Address         common.Address
+	Getter          func(t *testing.T, addr common.Address) *big.Int
+	PreviousBalance *big.Int
+	AmtToAdd        *big.Int
+	AmtToSub        *big.Int
+}
+
+type BalanceSheet struct {
+	mu          *sync.Mutex
+	Items       map[string]BalanceItem
+	PrevBalance map[string]*big.Int
+}
+
+func (b *BalanceSheet) Update(key string, item BalanceItem) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	prev, ok := b.Items[key]
+	if !ok {
+		b.Items[key] = item
+		return
+	}
+	amtToAdd, amtToSub := big.NewInt(0), big.NewInt(0)
+	if prev.AmtToAdd != nil {
+		amtToAdd = prev.AmtToAdd
+	}
+	if prev.AmtToSub != nil {
+		amtToSub = prev.AmtToSub
+	}
+	if item.AmtToAdd != nil {
+		amtToAdd = new(big.Int).Add(amtToAdd, item.AmtToAdd)
+	}
+	if item.AmtToSub != nil {
+		amtToSub = new(big.Int).Add(amtToSub, item.AmtToSub)
+	}
+
+	b.Items[key] = BalanceItem{
+		Address:  item.Address,
+		Getter:   item.Getter,
+		AmtToAdd: amtToAdd,
+		AmtToSub: amtToSub,
+	}
+}
+
+func (b *BalanceSheet) RecordBalance(bal map[string]*big.Int) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for key, value := range bal {
+		if _, ok := b.PrevBalance[key]; !ok {
+			b.PrevBalance[key] = value
+		}
+	}
+}
+
+func (b *BalanceSheet) Verify(t *testing.T) {
+	var balAssertions []testhelpers.BalanceAssertion
+	for key, item := range b.Items {
+		prevBalance, ok := b.PrevBalance[key]
+		require.Truef(t, ok, "previous balance is not captured for %s", key)
+		exp := prevBalance
+		if item.AmtToAdd != nil {
+			exp = new(big.Int).Add(exp, item.AmtToAdd)
+		}
+		if item.AmtToSub != nil {
+			exp = new(big.Int).Sub(exp, item.AmtToSub)
+		}
+		balAssertions = append(balAssertions, testhelpers.BalanceAssertion{
+			Name:     key,
+			Address:  item.Address,
+			Getter:   item.Getter,
+			Expected: exp.String(),
+		})
+	}
+	AssertBalances(t, balAssertions)
+}
+
+func NewBalanceSheet() *BalanceSheet {
+	return &BalanceSheet{
+		mu:          &sync.Mutex{},
+		Items:       make(map[string]BalanceItem),
+		PrevBalance: make(map[string]*big.Int),
 	}
 }

@@ -110,17 +110,6 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
 }
 
-func (c *CCIPE2ELoad) AfterAllCall() {
-	c.BalanceStats.DestBalanceAssertions = c.Lane.Dest.BalanceAssertions(
-		c.BalanceStats.DestBalanceReq,
-		c.Lane.Source.TransferAmount,
-		c.NoOfReq,
-	)
-	c.BalanceStats.SourceBalanceAssertions = c.Lane.Source.BalanceAssertions(c.BalanceStats.SourceBalanceReq, c.NoOfReq, c.totalGEFee)
-	actions.AssertBalances(c.t, c.BalanceStats.DestBalanceAssertions)
-	actions.AssertBalances(c.t, c.BalanceStats.SourceBalanceAssertions)
-}
-
 func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 	var res wasp.CallResult
 	sourceCCIP := c.Lane.Source

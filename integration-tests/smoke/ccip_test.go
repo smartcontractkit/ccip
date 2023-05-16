@@ -30,6 +30,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
+		setUpOutput.Balance.Verify(t)
 		setUpOutput.TearDown()
 	})
 	for i := range setUpOutput.Lanes {
@@ -50,6 +51,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	for _, testcase := range tcs {
 		tc := testcase
 		t.Run(tc.testName, func(t *testing.T) {
+			t.Parallel()
 			l.Info().
 				Str("Source", tc.lane.SourceNetworkName).
 				Str("Destination", tc.lane.DestNetworkName).

@@ -12,7 +12,12 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
+	"github.com/smartcontractkit/chainlink-env/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
@@ -384,6 +389,7 @@ type CCIPTestSetUpOutputs struct {
 	LaneConfig     *laneconfig.Lanes
 	TearDown       func()
 	Env            *actions.CCIPTestEnv
+	Balance        *actions.BalanceSheet
 }
 
 func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
@@ -430,8 +436,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		ValidationTimeout: o.Cfg.PhaseTimeout,
 		SentReqs:          make(map[int64]actions.CCIPRequest),
 		TotalFee:          big.NewInt(0),
-		SourceBalances:    make(map[string]*big.Int),
-		DestBalances:      make(map[string]*big.Int),
+		Balance:           o.Balance,
 		Context:           ctx,
 		CommonContractsWg: &sync.WaitGroup{},
 	}
@@ -471,8 +476,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			SourceChain:       sourceChainClientB2A,
 			DestChain:         destChainClientB2A,
 			ValidationTimeout: o.Cfg.PhaseTimeout,
-			SourceBalances:    make(map[string]*big.Int),
-			DestBalances:      make(map[string]*big.Int),
+			Balance:           o.Balance,
 			SentReqs:          make(map[int64]actions.CCIPRequest),
 			TotalFee:          big.NewInt(0),
 			Context:           ctx,
@@ -574,6 +578,7 @@ func CCIPDefaultTestSetUp(
 		Cfg:            inputs,
 		Reporter:       testreporters.NewCCIPTestReporter(t, lggr),
 		LaneConfigFile: filename,
+		Balance:        actions.NewBalanceSheet(),
 	}
 	_, err = os.Stat(setUpArgs.LaneConfigFile)
 	if err == nil {
@@ -596,20 +601,22 @@ func CCIPDefaultTestSetUp(
 	defer cancel()
 
 	configureCLNode := !inputs.ExistingDeployment
+	clNodeDeployed, _ := errgroup.WithContext(parent)
 	if configureCLNode {
 		clProps["db"] = inputs.CLNodeDBResourceProfile
 		clProps["chainlink"] = map[string]interface{}{
 			"resources": inputs.CLNodeResourceProfile,
 		}
+
 		// deploy the env if configureCLNode is true
-		ccipEnv = actions.DeployEnvironments(
+		k8Env = DeployEnvironments(
 			t,
 			&environment.Config{
 				TTL:             inputs.EnvTTL,
 				NamespacePrefix: envName,
 				Test:            t,
-			}, clProps, inputs.GethResourceProfile, inputs.AllNetworks)
-		k8Env = ccipEnv.K8Env
+			}, clProps, inputs.GethResourceProfile, inputs.AllNetworks, clNodeDeployed)
+		ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
 		ccipEnv.CLNodeWithKeyReady, ctx = errgroup.WithContext(parent)
 		setUpArgs.Env = ccipEnv
 		if ccipEnv.K8Env.WillUseRemoteRunner() {
@@ -648,6 +655,11 @@ func CCIPDefaultTestSetUp(
 	})
 	if configureCLNode {
 		ccipEnv.CLNodeWithKeyReady.Go(func() error {
+			// wait for all the CL nodes to be deployed
+			err := clNodeDeployed.Wait()
+			if err != nil {
+				return err
+			}
 			return ccipEnv.SetUpNodesAndKeys(ctx, inputs.NodeFunding, chains)
 		})
 	}
@@ -706,4 +718,97 @@ func CCIPExistingDeploymentTestSetUp(
 ) *CCIPTestSetUpOutputs {
 	return CCIPDefaultTestSetUp(t, lggr, "runner", nil, transferAmounts,
 		0, false, bidirectional, input)
+}
+
+// DeployEnvironments deploys K8 env for CCIP tests. For tests running on simulated geth it deploys -
+// 1. two simulated geth network in non-dev mode
+// 2. mockserver ( to set mock price feed details)
+// 3. chainlink nodes
+func DeployEnvironments(
+	t *testing.T,
+	envconfig *environment.Config,
+	clProps map[string]interface{},
+	gethResource map[string]interface{},
+	networks []blockchain.EVMNetwork,
+	clNodeWg *errgroup.Group,
+) *environment.Environment {
+	testEnvironment := environment.New(envconfig)
+	numOfTxNodes := 1
+	for _, network := range networks {
+		if network.Simulated {
+			testEnvironment.
+				AddHelm(reorg.New(&reorg.Props{
+					NetworkName: network.Name,
+					NetworkType: "simulated-geth-non-dev",
+					Values: map[string]interface{}{
+						"geth": map[string]interface{}{
+							"genesis": map[string]interface{}{
+								"networkId": fmt.Sprint(network.ChainID),
+							},
+							"tx": map[string]interface{}{
+								"replicas":  strconv.Itoa(numOfTxNodes),
+								"resources": gethResource,
+							},
+							"miner": map[string]interface{}{
+								"replicas":  "0",
+								"resources": gethResource,
+							},
+						},
+						"bootnode": map[string]interface{}{
+							"replicas": "1",
+						},
+					},
+				}))
+		}
+	}
+
+	err := testEnvironment.
+		AddHelm(mockserver_cfg.New(nil)).
+		AddHelm(mockserver.New(nil)).
+		Run()
+	require.NoError(t, err)
+	if testEnvironment.WillUseRemoteRunner() {
+		return testEnvironment
+	}
+	urlFinder := func(network blockchain.EVMNetwork) ([]string, []string) {
+		if !network.Simulated {
+			return network.URLs, network.HTTPURLs
+		}
+		networkName := network.Name
+		var internalWsURLs, internalHttpURLs []string
+		for i := 0; i < numOfTxNodes; i++ {
+			podName := fmt.Sprintf("%s-ethereum-geth:%d", networkName, i)
+			txNodeInternalWs, err := testEnvironment.Fwd.FindPort(podName, "geth", "ws-rpc").As(client.RemoteConnection, client.WS)
+			require.NoError(t, err, "Error finding WS ports")
+			internalWsURLs = append(internalWsURLs, txNodeInternalWs)
+			txNodeInternalHttp, err := testEnvironment.Fwd.FindPort(podName, "geth", "http-rpc").As(client.RemoteConnection, client.HTTP)
+			require.NoError(t, err, "Error finding HTTP ports")
+			internalHttpURLs = append(internalHttpURLs, txNodeInternalHttp)
+		}
+		return internalWsURLs, internalHttpURLs
+	}
+	// add chainlink nodes in a goroutine
+	clNodeWg.Go(func() error {
+		var nets []blockchain.EVMNetwork
+		for i := range networks {
+			nets = append(nets, networks[i])
+			nets[i].URLs, nets[i].HTTPURLs = urlFinder(networks[i])
+			// skip adding blockscout for simplified deployments
+			// uncomment the following to debug on-chain transactions
+			/*
+				testEnvironment.AddChart(blockscout.New(&blockscout.Props{
+						Name:    fmt.Sprintf("%s-blockscout", networks[i].Name),
+						WsURL:   networks[i].URLs[0],
+						HttpURL: networks[i].HTTPURLs[0],
+					}))
+			*/
+		}
+
+		clProps["toml"] = actions.DefaultCCIPCLNodeEnv(t, nets)
+		return testEnvironment.
+			AddHelm(chainlink.New(0, clProps)).
+			Run()
+
+	})
+	return testEnvironment
 }
