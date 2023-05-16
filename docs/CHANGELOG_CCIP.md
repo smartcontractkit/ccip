@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Solidity version bumped to 0.8.19
 - AggregateRateLimiter values are now in US dollar amounts with 18 decimals. Previously, it was 36 decimals.
 - _setNops calls payNops 
+- OnRamp and OffRamp contracts emit PoolAdded event from constructor 
+- `EVM2EVMOnRamp.applyAllowListUpdates(address[] calldata removes, address[] calldata adds)` signature changed. Arguments order was `adds`, `removes`
 
 ## [0.2.0] - 2023-04-30
 ## [0.1.0] - 2023-03-14
