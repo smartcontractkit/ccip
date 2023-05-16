@@ -436,12 +436,15 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 	allProdLanes := []*rhea.EvmDeploymentConfig{
 		&deployments.Prod_SepoliaToOptimismGoerli,
 		&deployments.Prod_SepoliaToAvaxFuji,
+		&deployments.Prod_SepoliaToArbitrumGoerli,
 
 		&deployments.Prod_AvaxFujiToSepolia,
 		&deployments.Prod_AvaxFujiToOptimismGoerli,
 
 		&deployments.Prod_OptimismGoerliToAvaxFuji,
 		&deployments.Prod_OptimismGoerliToSepolia,
+
+		&deployments.Prod_ArbitrumGoerliToSepolia,
 	}
 
 	for _, lane := range allProdLanes {
