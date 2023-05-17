@@ -1,0 +1,77 @@
+name: "Build & publish CCIP for (pre)releases"
+
+on:
+  push:
+    tags:
+      # Matches
+      # Release: v0.2.0+core2.0.0
+      # Pre-release: v0.2.0-beta.1+core2.0.0 or v0.2.0-rc.1+core2.0.0
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+jobs:
+  push-chainlink-goreleaser:
+    runs-on:
+      labels: ubuntu20.04-16cores-64GB
+    environment: publish
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@e1e17a757e536f70e52b5a12b2e8d1d1c60e04ef # v2.0.0
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_IAM_ROLE_PROD_PUBLISH_ARN }}
+          role-duration-seconds: ${{ secrets.AWS_ROLE_DURATION_SECONDS }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Check if pre-release
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            # Tags like: v1.2.3 denote an actual release.
+            GORELEASER_PRE_RELEASE=false
+            echo "${GITHUB_REF} matches a release tag."
+          else
+            # Consider other tags a pre-release.
+            GORELEASER_PRE_RELEASE=true
+            echo "${GITHUB_REF} does not match a release tag."
+          fi
+          echo "GORELEASER_PRE_RELEASE=${GORELEASER_PRE_RELEASE}" | tee -a $GITHUB_ENV
+      - name: Set goreleaser config file and nightly flag
+        shell: bash
+        run: |
+          if [[ "${GORELEASER_PRE_RELEASE}" = true ]]; then
+            # Use the GoReleaser --nightly option to create a Docker image
+            # without creating a GitHub Release.
+            GORELEASER_ENABLE_NIGHTLY=true
+            GORELEASER_CONFIG=".goreleaser.ccip.nightly.yaml"
+            echo "Pre-release detected."
+          else
+            GORELEASER_ENABLE_NIGHTLY=false
+            GORELEASER_CONFIG=".goreleaser.ccip.yaml"
+            echo "Release detected"
+          fi
+          echo "GORELEASER_ENABLE_NIGHTLY=${GORELEASER_ENABLE_NIGHTLY}" | tee -a $GITHUB_ENV
+          echo "GORELEASER_CONFIG=${GORELEASER_CONFIG}" | tee -a $GITHUB_ENV
+      - name: Build, sign, and publish image
+        uses: ./.github/actions/goreleaser-build-sign-publish
+        with:
+          enable-docker-publish: "true"
+          docker-registry: ${{ secrets.AWS_ECR_HOSTNAME }}
+          enable-cosign: "false"
+          enable-goreleaser-snapshot: "false"
+          goreleaser-enable-nightly: ${{ env.GORELEASER_ENABLE_NIGHTLY }}
+          goreleaser-config: ${{ env.GORELEASER_CONFIG }}
+          goreleaser-exec: ./tools/bin/goreleaser_wrapper
+          goreleaser-key: ${{ secrets.GORELEASER_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Collect Metrics
+        if: always()
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@808c183d1f5c26a4f3fd50b75d3cf7b58d9aa293
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: push-chainlink-goreleaser
+        continue-on-error: true

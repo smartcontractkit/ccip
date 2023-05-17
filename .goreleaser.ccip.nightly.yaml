@@ -1,0 +1,14 @@
+includes:
+  - from_file:
+      path: ./.goreleaser.ccip.yaml
+
+# This is a GoReleaser Pro feature that we use for pre-releases.
+nightly:
+  name_template: "{{ .Env.IMAGE_PREFIX }}/{{ .ProjectName }}:{{ .Env.CLEAN_VERSION }}"
+
+  # Creates a GitHub Release
+  publish_release: false
+
+  # Whether to delete previous pre-releases for the same `tag_name` when
+  # releasing.
+  keep_single_release: false

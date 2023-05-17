@@ -31,11 +31,28 @@ inputs:
     description: Enable goreleaser build / release snapshot
     default: "false"
     required: false
+  github-token:
+    description: The GitHub CI token for goreleaser (to create GitHub Releases)
+    required: true
   # goreleaser inputs
+  goreleaser-args:
+    description: Additional GoReleaser arguments
+    required: false
+  goreleaser-distribution:
+    description: GoReleaser distribution, either goreleaser or goreleaser-pro
+    default: "goreleaser-pro"
+    required: false
+  goreleaser-enable-nightly:
+    description: Enable nightly builds (for pre-releases)
+    default: "false"
+    required: false
   goreleaser-exec:
     description: "The goreleaser executable, can invoke wrapper script"
     default: "goreleaser"
     required: false
+  goreleaser-key:
+    description: The license key for GoReleaser Pro
+    required: true
   goreleaser-config:
     description: "The goreleaser configuration yaml"
     default: ".goreleaser.yaml"
@@ -68,9 +85,11 @@ runs:
     - name: Setup goreleaser
       uses: goreleaser/goreleaser-action@b508e2e3ef3b19d4e4146d4f8fb3ba9db644a757 # v3.2.0
       with:
-        distribution: goreleaser
+        distribution: ${{ inputs.goreleaser-distribution}}
         install-only: true
         version: ${{ inputs.goreleaser-version }}
+      env:
+        GORELEASER_KEY: ${{ inputs.goreleaser-key }}
     - name: Setup zig
       uses: goto-bus-stop/setup-zig@869a4299cf8ac7db4ebffaec36ad82a682f88acb # v2.0.1
       with:
@@ -92,8 +111,11 @@ runs:
         ENABLE_GORELEASER_SNAPSHOT: ${{ inputs.enable-goreleaser-snapshot }}
         ENABLE_DOCKER_PUBLISH: ${{ inputs.enable-docker-publish }}
         IMAGE_PREFIX: ${{ inputs.docker-registry }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GORELEASER_ENABLE_NIGHTLY: ${{ inputs.goreleaser-enable-nightly }}
         GORELEASER_EXEC: ${{ inputs.goreleaser-exec }}
         GORELEASER_CONFIG: ${{ inputs.goreleaser-config }}
+        GORELEASER_KEY: ${{ inputs.goreleaser-key }}
         COSIGN_PASSWORD: ${{ inputs.cosign-password }}
         COSIGN_PUBLIC_KEY: ${{ inputs.cosign-public-key }}
         COSIGN_PRIVATE_KEY: ${{ inputs.cosign-private-key }}
