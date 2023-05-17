@@ -65,7 +65,8 @@ var Alpha_PolygonMumbai = rhea.EVMChainConfig{
 		DeployedAtBlock:     0,
 	},
 	TunableChainValues: rhea.TunableChainValues{
-		BlockConfirmations:       getBlockConfirmations(rhea.PolygonMumbai),
+		FinalityDepth:            getFinalityDepth(rhea.PolygonMumbai),
+		OptimisticConfirmations:  getOptimisticConfirmations(rhea.PolygonMumbai),
 		BatchGasLimit:            BATCH_GAS_LIMIT,
 		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
@@ -101,7 +102,8 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 	Afn:           gethcommon.HexToAddress("0x89f2a6cc7c7ae55409546f1cc7c58c94d745e884"),
 	PriceRegistry: gethcommon.HexToAddress("0xf0046682ec5a3427cb37fe3e3d2dafea8eb409b4"),
 	TunableChainValues: rhea.TunableChainValues{
-		BlockConfirmations:       getBlockConfirmations(rhea.OptimismGoerli),
+		FinalityDepth:            getFinalityDepth(rhea.OptimismGoerli),
+		OptimisticConfirmations:  getOptimisticConfirmations(rhea.OptimismGoerli),
 		BatchGasLimit:            BATCH_GAS_LIMIT,
 		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
@@ -144,7 +146,8 @@ var Alpha_Sepolia = rhea.EVMChainConfig{
 	Afn:           gethcommon.HexToAddress("0x7a9ee62198b1c3a8f24c5003a078e1195cabdbd5"),
 	PriceRegistry: gethcommon.HexToAddress("0x2052e5e0e6bcdace1bfb133af111a2ca05c0bb37"),
 	TunableChainValues: rhea.TunableChainValues{
-		BlockConfirmations:       getBlockConfirmations(rhea.Sepolia),
+		FinalityDepth:            getFinalityDepth(rhea.Sepolia),
+		OptimisticConfirmations:  getOptimisticConfirmations(rhea.Sepolia),
 		BatchGasLimit:            BATCH_GAS_LIMIT,
 		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
@@ -187,7 +190,8 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 	Afn:           gethcommon.HexToAddress("0x4a6450b7c6d7adfeca673d13d9d1c6ef3c2f69b5"),
 	PriceRegistry: gethcommon.HexToAddress("0x3859c817b9795cb82ced4b1447dc23310e98ce1d"),
 	TunableChainValues: rhea.TunableChainValues{
-		BlockConfirmations:       getBlockConfirmations(rhea.AvaxFuji),
+		FinalityDepth:            getFinalityDepth(rhea.AvaxFuji),
+		OptimisticConfirmations:  getOptimisticConfirmations(rhea.AvaxFuji),
 		BatchGasLimit:            BATCH_GAS_LIMIT,
 		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),

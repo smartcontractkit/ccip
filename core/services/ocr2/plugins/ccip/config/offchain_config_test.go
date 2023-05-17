@@ -16,22 +16,20 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 	}{
 		"encodes and decodes config with all fields set": {
 			want: CommitOffchainConfig{
-				SourceIncomingConfirmations: 3,
-				DestIncomingConfirmations:   6,
-				FeeUpdateHeartBeat:          models.MustMakeDuration(1 * time.Hour),
-				FeeUpdateDeviationPPB:       5e7,
-				MaxGasPrice:                 200e9,
-				InflightCacheExpiry:         models.MustMakeDuration(23456 * time.Second),
+				SourceFinalityDepth:   3,
+				FeeUpdateHeartBeat:    models.MustMakeDuration(1 * time.Hour),
+				FeeUpdateDeviationPPB: 5e7,
+				MaxGasPrice:           200e9,
+				InflightCacheExpiry:   models.MustMakeDuration(23456 * time.Second),
 			},
 		},
 		"fails decoding when all fields present but with 0 values": {
 			want: CommitOffchainConfig{
-				SourceIncomingConfirmations: 0,
-				DestIncomingConfirmations:   0,
-				FeeUpdateHeartBeat:          models.MustMakeDuration(0),
-				FeeUpdateDeviationPPB:       0,
-				MaxGasPrice:                 0,
-				InflightCacheExpiry:         models.MustMakeDuration(0),
+				SourceFinalityDepth:   0,
+				FeeUpdateHeartBeat:    models.MustMakeDuration(0),
+				FeeUpdateDeviationPPB: 0,
+				MaxGasPrice:           0,
+				InflightCacheExpiry:   models.MustMakeDuration(0),
 			},
 			expectErr: true,
 		},
@@ -41,11 +39,10 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 		},
 		"fails decoding when some fields are missing": {
 			want: CommitOffchainConfig{
-				SourceIncomingConfirmations: 3,
-				DestIncomingConfirmations:   6,
-				FeeUpdateHeartBeat:          models.MustMakeDuration(1 * time.Hour),
-				FeeUpdateDeviationPPB:       5e7,
-				MaxGasPrice:                 200e9,
+				SourceFinalityDepth:   3,
+				FeeUpdateHeartBeat:    models.MustMakeDuration(1 * time.Hour),
+				FeeUpdateDeviationPPB: 5e7,
+				MaxGasPrice:           200e9,
 			},
 			expectErr: true,
 		},
@@ -73,8 +70,9 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 	}{
 		"encodes and decodes config with all fields set": {
 			want: ExecOffchainConfig{
-				SourceIncomingConfirmations: 3,
-				DestIncomingConfirmations:   6,
+				SourceFinalityDepth:         3,
+				DestOptimisticConfirmations: 6,
+				DestFinalityDepth:           3,
 				BatchGasLimit:               5_000_000,
 				RelativeBoostPerWaitHour:    0.07,
 				MaxGasPrice:                 200e9,
@@ -84,8 +82,9 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 		},
 		"fails decoding when all fields present but with 0 values": {
 			want: ExecOffchainConfig{
-				SourceIncomingConfirmations: 0,
-				DestIncomingConfirmations:   0,
+				SourceFinalityDepth:         0,
+				DestFinalityDepth:           0,
+				DestOptimisticConfirmations: 0,
 				BatchGasLimit:               0,
 				RelativeBoostPerWaitHour:    0,
 				MaxGasPrice:                 0,
@@ -100,8 +99,8 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 		},
 		"fails decoding when some fields are missing": {
 			want: ExecOffchainConfig{
-				SourceIncomingConfirmations: 99999999,
-				InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
+				SourceFinalityDepth: 99999999,
+				InflightCacheExpiry: models.MustMakeDuration(64 * time.Second),
 			},
 			expectErr: true,
 		},

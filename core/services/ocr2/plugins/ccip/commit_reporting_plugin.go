@@ -43,7 +43,17 @@ var (
 	_ types.ReportingPlugin        = &CommitReportingPlugin{}
 )
 
-type InflightReport struct {
+// InflightCommitReport represents a commit report which has been submitted
+// to the transaction manager and we expect to be included in the chain.
+// By keeping track of the inflight reports, we are able to build subsequent
+// reports "on top" of the inflight ones for improved throughput - for example
+// if seqNrs=[1,2] are inflight, we can build and send [3,4] while [1,2] is still confirming
+// and optimistically assume they will complete in order. If for whatever reason (re-org or
+// RPC timing) leads to [3,4] arriving before [1,2], we'll revert onchain. Once the cache
+// expires we'll then build from the onchain state again and retries. In this manner,
+// we are able to obtain high throughput during happy path yet still naturally recover
+// if a reorg or issue causes onchain reverts.
+type InflightCommitReport struct {
 	report    *commit_store.CommitStoreCommitReport
 	createdAt time.Time
 }
@@ -81,7 +91,7 @@ type CommitReportingPlugin struct {
 	// as reporting plugin methods may be called from separate goroutines,
 	// e.g. reporting vs transmission protocol.
 	inFlightMu              sync.RWMutex
-	inFlight                map[[32]byte]InflightReport
+	inFlight                map[[32]byte]InflightCommitReport
 	inFlightPriceUpdates    []InflightPriceUpdate
 	priceRegistry           price_registry.PriceRegistryInterface
 	offchainConfig          ccipconfig.CommitOffchainConfig
@@ -139,7 +149,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			config:                rf.config,
 			F:                     config.F,
 			lggr:                  rf.config.lggr.Named("CommitReportingPlugin"),
-			inFlight:              make(map[[32]byte]InflightReport),
+			inFlight:              make(map[[32]byte]InflightCommitReport),
 			priceRegistry:         priceRegistry,
 			onchainConfig:         onchainConfig,
 			offchainConfig:        offchainConfig,
@@ -233,7 +243,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		r.config.onRampAddress,
 		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
 		abihelpers.EvmWord(nextMin),
-		int(r.offchainConfig.SourceIncomingConfirmations),
+		int(r.offchainConfig.SourceFinalityDepth),
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
@@ -570,12 +580,31 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 	return true, encodedReport, nil
 }
 
-// Assumed at least f+1 valid observations
+// calculateIntervalConsensus compresses a set of intervals into one interval
+// taking into account f which is the maximum number of faults across the whole DON.
+// OCR itself won't call Report unless there are 2*f+1 observations
+// https://github.com/smartcontractkit/libocr/blob/master/offchainreporting2/internal/protocol/report_generation_follower.go#L415
+// and f of those observations may be either unparseable or adversarially set values. That means
+// we'll either have f+1 parsed honest values here, 2f+1 parsed values with f adversarial values or somewhere
+// in between.
 func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f int) (commit_store.CommitStoreInterval, error) {
+	// We require at least f+1 parsed values. This corresponds to the scenario where f of the 2f+1 are faulty
+	// in the sense that they are unparseable.
 	if len(intervals) <= f {
 		return commit_store.CommitStoreInterval{}, errors.Errorf("Not enough intervals to form consensus: #obs=%d, f=%d", len(intervals), f)
 	}
-	// Extract the min and max
+
+	// To understand min/max selection here, we need to consider an adversary that controls f values
+	// and is intentionally trying to stall the protocol or influence the value returned. For simplicity
+	// consider f=1 and n=4 nodes. In that case adversary may try to bias the min or max high/low.
+	// We could end up (2f+1=3) with sorted_mins=[1,1,1e9] or [-1e9,1,1] as examples. Selecting
+	// sorted_mins[f] ensures:
+	// - At least one honest node has seen this value, so adversary cannot bias the value lower which
+	// would cause reverts
+	// - If an honest oracle reports sorted_min[f] which happens to be stale i.e. that oracle
+	// has a delayed view of the chain, then the report will revert onchain but still succeed upon retry
+	// - We minimize the risk of naturally hitting the error condition minSeqNum > maxSeqNum due to oracles
+	// delayed views of the chain (would be an issue with taking sorted_mins[-f])
 	sort.Slice(intervals, func(i, j int) bool {
 		return intervals[i].Min < intervals[j].Min
 	})
@@ -586,15 +615,23 @@ func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f 
 	if minSeqNum == 0 {
 		return commit_store.CommitStoreInterval{Min: 0, Max: 0}, nil
 	}
-
+	// Consider a similar example to the sorted_mins one above except where they are maxes.
+	// We choose the more "conservative" sorted_maxes[f] so:
+	// - We are ensured that at least one honest oracle has seen the max, so adversary cannot set it lower and
+	// cause the maxSeqNum < minSeqNum errors
+	// - If an honest oracle reports sorted_max[f] which happens to be stale i.e. that oracle
+	// has a delayed view of the source chain, then we simply lose a little bit of throughput.
+	// - If we were to pick sorted_max[-f] i.e. the maximum honest node view (a more "aggressive" setting in terms of throughput),
+	// then an adversary can continually send high values e.g. imagine we have observations from all 4 nodes
+	// [honest 1, honest 1, honest 2, malicious 2], in this case we pick 2, but it's not enough to be able
+	// to build a report since the first 2 honest nodes are unaware of message 2.
 	sort.Slice(intervals, func(i, j int) bool {
 		return intervals[i].Max < intervals[j].Max
 	})
-	// We use a conservative maximum. If we pick a value that some honest oracles might not
-	// have seen they’ll end up not agreeing on a msg, stalling the protocol.
 	maxSeqNum := intervals[f].Max
-	// TODO: Do we for sure want to fail everything here?
 	if maxSeqNum < minSeqNum {
+		// If the consensus report is invalid for onchain acceptance, we do not vote for it as
+		// an early termination step.
 		return commit_store.CommitStoreInterval{}, errors.New("max seq num smaller than min")
 	}
 
@@ -688,7 +725,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
 		logpoller.EvmWord(interval.Min),
 		logpoller.EvmWord(interval.Max),
-		int(r.offchainConfig.SourceIncomingConfirmations),
+		int(r.offchainConfig.SourceFinalityDepth),
 		pg.WithParentCtx(ctx))
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
@@ -756,7 +793,7 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 	if report.MerkleRoot != [32]byte{} {
 		// Set new inflight ones as pending
 		lggr.Infow("Adding to inflight report", "rootOfRoots", hexutil.Encode(report.MerkleRoot[:]))
-		r.inFlight[report.MerkleRoot] = InflightReport{
+		r.inFlight[report.MerkleRoot] = InflightCommitReport{
 			report:    report,
 			createdAt: time.Now(),
 		}

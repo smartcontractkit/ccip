@@ -650,17 +650,16 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 }
 
 func (client *CCIPClient) getCommitStoreOffChainConfig() []byte {
-	if client.Source.TunableValues.BlockConfirmations == 0 || client.Dest.TunableValues.BlockConfirmations == 0 {
+	if client.Source.TunableValues.FinalityDepth == 0 || client.Dest.TunableValues.FinalityDepth == 0 {
 		panic("Please set the tunable chain values")
 	}
 
 	commitPluginConfig := ccipconfig.CommitOffchainConfig{
-		SourceIncomingConfirmations: client.Source.TunableValues.BlockConfirmations,
-		DestIncomingConfirmations:   client.Dest.TunableValues.BlockConfirmations,
-		FeeUpdateHeartBeat:          client.Dest.TunableValues.FeeUpdateHeartBeat,
-		FeeUpdateDeviationPPB:       client.Dest.TunableValues.FeeUpdateDeviationPPB,
-		MaxGasPrice:                 client.Dest.TunableValues.MaxGasPrice,
-		InflightCacheExpiry:         client.Dest.TunableValues.InflightCacheExpiry,
+		SourceFinalityDepth:   client.Source.TunableValues.FinalityDepth,
+		FeeUpdateHeartBeat:    client.Dest.TunableValues.FeeUpdateHeartBeat,
+		FeeUpdateDeviationPPB: client.Dest.TunableValues.FeeUpdateDeviationPPB,
+		MaxGasPrice:           client.Dest.TunableValues.MaxGasPrice,
+		InflightCacheExpiry:   client.Dest.TunableValues.InflightCacheExpiry,
 	}
 
 	encodedOffchainConfig, err := ccipconfig.EncodeOffchainConfig(commitPluginConfig)
@@ -682,12 +681,13 @@ func (client *CCIPClient) getCommitStoreOnchainConfig() []byte {
 }
 
 func (client *CCIPClient) getOffRampOffChainConfig() []byte {
-	if client.Source.TunableValues.BlockConfirmations == 0 || client.Dest.TunableValues.BlockConfirmations == 0 {
+	if client.Source.TunableValues.FinalityDepth == 0 || client.Dest.TunableValues.FinalityDepth == 0 {
 		panic("Please set the tunable chain values")
 	}
 	execPluginConfig := ccipconfig.ExecOffchainConfig{
-		SourceIncomingConfirmations: client.Source.TunableValues.BlockConfirmations,
-		DestIncomingConfirmations:   client.Dest.TunableValues.BlockConfirmations,
+		SourceFinalityDepth:         client.Source.TunableValues.FinalityDepth,
+		DestFinalityDepth:           client.Dest.TunableValues.FinalityDepth,
+		DestOptimisticConfirmations: client.Dest.TunableValues.OptimisticConfirmations,
 		BatchGasLimit:               client.Dest.TunableValues.BatchGasLimit,
 		RelativeBoostPerWaitHour:    client.Dest.TunableValues.RelativeBoostPerWaitHour,
 		MaxGasPrice:                 client.Dest.TunableValues.MaxGasPrice,

@@ -124,6 +124,10 @@ func init() {
 	ExecutionReportArgs = manuallyExecuteMethod.Inputs
 }
 
+func EncodeMessage(msg *evm_2_evm_onramp.InternalEVM2EVMMessage) ([]byte, error) {
+	return MessageArgs.Pack(msg)
+}
+
 func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
 	unpacked, err := MessageArgs.Unpack(b)
 	if err != nil {

@@ -16,10 +16,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
 
 	txmgrMocks "github.com/smartcontractkit/chainlink/v2/common/txmgr/types/mocks"
@@ -54,8 +56,8 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 	).Maybe().Return(gas.EvmFee{Legacy: assets.NewWei(defaultGasPrice)}, uint32(200e3), nil)
 
 	offchainConfig := ccipconfig.ExecOffchainConfig{
-		SourceIncomingConfirmations: 0,
-		DestIncomingConfirmations:   0,
+		SourceFinalityDepth:         0,
+		DestOptimisticConfirmations: 0,
 		MaxGasPrice:                 200e9,
 		BatchGasLimit:               5e6,
 		RootSnoozeTime:              models.MustMakeDuration(10 * time.Minute),
@@ -203,7 +205,8 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 		srcToDstTokenMappingBlock: 0,
 	}
 
-	require.NoError(t, plugin.updateSourceToDestTokenMapping(context.Background()))
+	_, err := plugin.getSourceToDestTokenMapping(context.Background())
+	require.NoError(t, err)
 	assert.Equal(t, expectedNewBlockNumber+1, plugin.srcToDstTokenMappingBlock)
 
 	gotDestToken, ok := plugin.srcToDstTokenMapping[sourceToken]
@@ -405,9 +408,23 @@ func TestExecReport(t *testing.T) {
 }
 
 func TestExecShouldAcceptFinalizedReport(t *testing.T) {
+	msg, err := abihelpers.EncodeMessage(&evm_2_evm_onramp.InternalEVM2EVMMessage{
+		SequenceNumber: 12,
+		FeeTokenAmount: big.NewInt(1e9),
+		Sender:         common.Address{},
+		Nonce:          1,
+		GasLimit:       big.NewInt(1),
+		Strict:         false,
+		Receiver:       common.Address{},
+		Data:           nil,
+		TokenAmounts:   nil,
+		FeeToken:       common.Address{},
+		MessageId:      [32]byte{},
+	})
+	require.NoError(t, err)
 	report := evm_2_evm_offramp.InternalExecutionReport{
 		SequenceNumbers:   []uint64{12},
-		EncodedMessages:   [][]byte{[]byte(`msg12`)},
+		EncodedMessages:   [][]byte{msg},
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
@@ -438,9 +455,23 @@ func TestExecShouldAcceptFinalizedReport(t *testing.T) {
 }
 
 func TestExecShouldTransmitAcceptedReport(t *testing.T) {
+	msg, err := abihelpers.EncodeMessage(&evm_2_evm_onramp.InternalEVM2EVMMessage{
+		SequenceNumber: 12,
+		FeeTokenAmount: big.NewInt(1e9),
+		Sender:         common.Address{},
+		Nonce:          1,
+		GasLimit:       big.NewInt(1),
+		Strict:         false,
+		Receiver:       common.Address{},
+		Data:           nil,
+		TokenAmounts:   nil,
+		FeeToken:       common.Address{},
+		MessageId:      [32]byte{},
+	})
+	require.NoError(t, err)
 	report := evm_2_evm_offramp.InternalExecutionReport{
 		SequenceNumbers:   []uint64{12},
-		EncodedMessages:   [][]byte{[]byte(`msg12`)},
+		EncodedMessages:   [][]byte{msg},
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
@@ -472,4 +503,119 @@ func TestExecShouldTransmitAcceptedReport(t *testing.T) {
 	should, err = plugin.ShouldTransmitAcceptedReport(testutils.Context(t), ocrtypes.ReportTimestamp{}, encodedReport)
 	require.NoError(t, err)
 	assert.Equal(t, false, should)
+}
+
+func TestBuildBatch(t *testing.T) {
+	c, _ := testhelpers.SetupChain(t)
+	mockOffRamp := mock_contracts.EVM2EVMOffRampInterface{}
+	// We do this just to have the parsing available.
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress("0x1"), c)
+	require.NoError(t, err)
+
+	sender1 := common.HexToAddress("0xa")
+	destNative := common.HexToAddress("0xb")
+	srcNative := common.HexToAddress("0xc")
+	plugin := ExecutionReportingPlugin{
+		config: ExecutionPluginConfig{
+			offRamp: &mockOffRamp,
+			// We use a real onRamp for parsing
+			onRamp: onRamp,
+		},
+		destWrappedNative: destNative,
+		offchainConfig: ccipconfig.ExecOffchainConfig{
+			SourceFinalityDepth:         5,
+			DestOptimisticConfirmations: 1,
+			DestFinalityDepth:           5,
+			BatchGasLimit:               100_000,
+			RelativeBoostPerWaitHour:    1,
+			MaxGasPrice:                 1,
+		},
+		lggr: logger.TestLogger(t),
+	}
+
+	msg1 := testhelpers.GenerateCCIPSendLPLog(t, evm_2_evm_onramp.InternalEVM2EVMMessage{
+		SequenceNumber: 1,
+		FeeTokenAmount: big.NewInt(1e9),
+		Sender:         sender1,
+		Nonce:          1,
+		GasLimit:       big.NewInt(1),
+		Strict:         false,
+		Receiver:       common.Address{},
+		Data:           nil,
+		TokenAmounts:   nil,
+		FeeToken:       srcNative,
+		MessageId:      [32]byte{},
+	}, 1)
+	var tt = []struct {
+		name                     string
+		reqs                     []logpoller.Log
+		executed                 map[uint64]bool
+		inflight                 []InflightInternalExecutionReport
+		tokenLimit, destGasPrice *big.Int
+		srcPrices, dstPrices     map[common.Address]*big.Int
+		offRampNoncesBySender    map[common.Address]uint64
+		expectedSeqNrs           []ObservedMessage
+		expectedAllExecuted      bool
+	}{
+		{
+			name:                  "single message no tokens",
+			reqs:                  []logpoller.Log{msg1},
+			executed:              map[uint64]bool{},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ObservedMessage{{SeqNr: uint64(1)}},
+			expectedAllExecuted:   false,
+		},
+		{
+			name:                  "unfinalized executed log",
+			reqs:                  []logpoller.Log{msg1},
+			executed:              map[uint64]bool{uint64(1): false},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ObservedMessage{{SeqNr: uint64(1)}},
+			expectedAllExecuted:   false,
+		},
+		{
+			name:                  "finalized executed log",
+			reqs:                  []logpoller.Log{msg1},
+			executed:              map[uint64]bool{uint64(1): true},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			expectedSeqNrs:        nil,
+			expectedAllExecuted:   true,
+		},
+	}
+
+	for _, tc := range tt {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			for sender, nonce := range tc.offRampNoncesBySender {
+				mockOffRamp.On("GetSenderNonce", mock.Anything, sender).Return(nonce, nil)
+			}
+			seqNrs, allExecuted := plugin.buildBatch(tc.reqs,
+				tc.executed,
+				tc.inflight,
+				tc.tokenLimit,
+				tc.srcPrices,
+				tc.dstPrices,
+				tc.destGasPrice,
+				map[common.Address]common.Address{},
+			)
+			assert.Equal(t, tc.expectedSeqNrs, seqNrs)
+			assert.Equal(t, tc.expectedAllExecuted, allExecuted)
+
+		})
+	}
 }

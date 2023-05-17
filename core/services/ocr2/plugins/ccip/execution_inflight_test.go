@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -13,11 +14,13 @@ func TestInflightReportsContainer_add(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	container := newInflightReportsContainer(time.Second)
 
-	err := container.add(lggr, []uint64{1}, [][]byte{
-		{1, 1, 1, 1}, {2, 2, 2, 2}, {3, 3, 3, 3},
+	err := container.add(lggr, []evm_2_evm_onramp.InternalEVM2EVMMessage{
+		{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3},
 	})
 	require.NoError(t, err)
-	err = container.add(lggr, []uint64{1}, nil)
+	err = container.add(lggr, []evm_2_evm_onramp.InternalEVM2EVMMessage{
+		{SequenceNumber: 1},
+	})
 	require.Error(t, err)
 	require.Equal(t, "report is already in flight", err.Error())
 	require.Equal(t, 1, len(container.getAll()))
@@ -27,8 +30,8 @@ func TestInflightReportsContainer_expire(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	container := newInflightReportsContainer(time.Second)
 
-	err := container.add(lggr, []uint64{1}, [][]byte{
-		{1, 1, 1, 1}, {2, 2, 2, 2}, {3, 3, 3, 3},
+	err := container.add(lggr, []evm_2_evm_onramp.InternalEVM2EVMMessage{
+		{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3},
 	})
 	require.NoError(t, err)
 	container.reports[0].createdAt = time.Now().Add(-time.Second * 5)

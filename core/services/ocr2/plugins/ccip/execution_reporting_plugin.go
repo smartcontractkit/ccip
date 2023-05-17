@@ -66,12 +66,21 @@ func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 	}, nil
 }
 
-func MessagesFromExecutionReport(report types.Report) ([]uint64, [][]byte, error) {
-	decodeExecutionReport, err := abihelpers.DecodeExecutionReport(report)
+func MessagesFromExecutionReport(report types.Report) ([]evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
+	decodedExecutionReport, err := abihelpers.DecodeExecutionReport(report)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return decodeExecutionReport.SequenceNumbers, decodeExecutionReport.EncodedMessages, nil
+	var messages []evm_2_evm_onramp.InternalEVM2EVMMessage
+	for _, encMsg := range decodedExecutionReport.EncodedMessages {
+		msg, err := abihelpers.DecodeMessage(encMsg)
+		if err != nil {
+			return nil, err
+		}
+		// We assume err != nil when msg is nil.
+		messages = append(messages, *msg)
+	}
+	return messages, nil
 }
 
 type ExecutionPluginConfig struct {
@@ -152,7 +161,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			destWrappedNative:         destWrappedNative,
 			onchainConfig:             onchainConfig,
 			offchainConfig:            offchainConfig,
-			srcToDstTokenMappingBlock: latestBlock - int64(offchainConfig.DestIncomingConfirmations),
+			srcToDstTokenMappingBlock: latestBlock - int64(offchainConfig.DestOptimisticConfirmations),
 			srcToDstTokenMapping:      sourceToDestTokenMapping,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
@@ -226,8 +235,8 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	}
 	allowedTokenAmount := rateLimiterState.Tokens
 
-	// Updates or sets the source to dest token mapping if needed
-	if err = r.updateSourceToDestTokenMapping(ctx); err != nil {
+	srcToDstTokens, err := r.getSourceToDestTokenMapping(ctx)
+	if err != nil {
 		return nil, err
 	}
 
@@ -253,6 +262,10 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	destGasPrice := destGasPriceWei.Legacy.ToInt()
 	if destGasPriceWei.DynamicFeeCap != nil {
 		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
+	}
+	latestBlock, err := r.config.destLP.LatestBlock()
+	if err != nil {
+		return nil, err
 	}
 	measureBatchPrepareRPCDuration(timestamp, time.Since(rpcPreprationStart))
 
@@ -287,7 +300,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
 			logpoller.EvmWord(unexpiredReport.Interval.Min),
 			logpoller.EvmWord(unexpiredReport.Interval.Max),
-			int(r.offchainConfig.SourceIncomingConfirmations),
+			int(r.offchainConfig.SourceFinalityDepth),
 		)
 		if err != nil {
 			return nil, err
@@ -295,9 +308,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		if len(srcLogs) != int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1) {
 			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", unexpiredReport.MerkleRoot, len(srcLogs), int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1))
 		}
-		// TODO: Reorg risk here? I.e. 1 message in a batch, we see its executed so we snooze forever,
-		// then it gets reorged out and we'll never retry.
-		executedMp, err := r.getExecutedSeqNrsInRange(unexpiredReport.Interval.Min, unexpiredReport.Interval.Max)
+		executedMp, err := r.getExecutedSeqNrsInRange(unexpiredReport.Interval.Min, unexpiredReport.Interval.Max, latestBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -306,11 +317,11 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 
 		buildBatchDuration := time.Now()
 		batch, allMessagesExecuted := r.buildBatch(srcLogs, executedMp, inflight, allowedTokenAmount,
-			srcTokensPrices, destTokensPrices, destGasPrice)
+			srcTokensPrices, destTokensPrices, destGasPrice, srcToDstTokens)
 		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 
-		// If all messages are already executed, snooze the root for the config.PermissionLessExecutionThresholdSeconds
-		// so it will never be considered again.
+		// If all messages are already executed and finalized, snooze the root for
+		// config.PermissionLessExecutionThresholdSeconds so it will never be considered again.
 		if allMessagesExecuted {
 			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
 			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.onchainConfig.PermissionLessExecutionThresholdDuration())
@@ -325,10 +336,18 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	return []ObservedMessage{}, nil
 }
 
-// Updates the source to dest token mapping only if changes have happened.
+func copyMap[M ~map[K]V, K comparable, V any](m M) M {
+	cpy := make(M)
+	for k, v := range m {
+		cpy[k] = v
+	}
+	return cpy
+}
+
+// Returns a copy of the latest source to dest mapping. Lazily updates the source to dest token mapping only if changes have happened.
 // Uses the logPoller to look for PoolAdded and PoolRemoved logs and if
-// it finds any, it will reload all tokens
-func (r *ExecutionReportingPlugin) updateSourceToDestTokenMapping(ctx context.Context) error {
+// it finds any, it will reload all tokens.
+func (r *ExecutionReportingPlugin) getSourceToDestTokenMapping(ctx context.Context) (map[common.Address]common.Address, error) {
 	r.srcToDstTokenMappingMu.RLock()
 	lastPoolChangeBlock := r.srcToDstTokenMappingBlock
 	r.srcToDstTokenMappingMu.RUnlock()
@@ -337,34 +356,38 @@ func (r *ExecutionReportingPlugin) updateSourceToDestTokenMapping(ctx context.Co
 		lastPoolChangeBlock,
 		[]common.Hash{abihelpers.EventSignatures.PoolAdded, abihelpers.EventSignatures.PoolRemoved},
 		[]common.Address{r.config.offRamp.Address()},
-		int(r.offchainConfig.DestIncomingConfirmations),
+		int(r.offchainConfig.DestOptimisticConfirmations),
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// Update only if token pools have been added/removed
+	// If no new updates, return a copy of the cached map
 	if len(poolEvents) == 0 {
-		return nil
+		r.srcToDstTokenMappingMu.RLock()
+		srcToDestTokenMapping := copyMap(r.srcToDstTokenMapping)
+		r.srcToDstTokenMappingMu.RUnlock()
+		return srcToDestTokenMapping, nil
 	}
+
+	// Otherwise re-generate and update cache.
 	highestBlockNumber := lastPoolChangeBlock
 	for _, poolEvent := range poolEvents {
 		if poolEvent.BlockNumber > highestBlockNumber {
 			highestBlockNumber = poolEvent.BlockNumber
 		}
 	}
-
 	newSrcToDestTokenMapping, err := generateSourceToDestTokenMapping(ctx, r.config.offRamp)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	r.srcToDstTokenMappingMu.Lock()
-	defer r.srcToDstTokenMappingMu.Unlock()
 	r.srcToDstTokenMapping = newSrcToDestTokenMapping
 	r.srcToDstTokenMappingBlock = highestBlockNumber + 1
+	srcToDestTokenMapping := copyMap(newSrcToDestTokenMapping)
+	r.srcToDstTokenMappingMu.Unlock()
 
-	return nil
+	return srcToDestTokenMapping, nil
 }
 
 // Generates the source to dest token mapping based on the offRamp.
@@ -388,26 +411,27 @@ func generateSourceToDestTokenMapping(ctx context.Context, offRamp evm_2_evm_off
 
 // Calculates a map that indicated whether a sequence number has already been executed
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
-// attempts even if they failed.
-func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (map[uint64]struct{}, error) {
+// attempts even if they failed. Value in the map indicates whether the log is finalized or not.
+func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64, latestBlock int64) (map[uint64]bool, error) {
 	executedLogs, err := r.config.destLP.IndexedLogsTopicRange(
 		abihelpers.EventSignatures.ExecutionStateChanged,
 		r.config.offRamp.Address(),
 		abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
 		logpoller.EvmWord(min),
 		logpoller.EvmWord(max),
-		int(r.offchainConfig.DestIncomingConfirmations),
+		int(r.offchainConfig.DestOptimisticConfirmations),
 	)
 	if err != nil {
 		return nil, err
 	}
-	executedMp := make(map[uint64]struct{})
+	executedMp := make(map[uint64]bool)
 	for _, executedLog := range executedLogs {
 		exec, err := r.config.offRamp.ParseExecutionStateChanged(executedLog.GetGethLog())
 		if err != nil {
 			return nil, err
 		}
-		executedMp[exec.SequenceNumber] = struct{}{}
+		finalized := (latestBlock - executedLog.BlockNumber) >= int64(r.offchainConfig.DestFinalityDepth)
+		executedMp[exec.SequenceNumber] = finalized
 	}
 	return executedMp, nil
 }
@@ -417,17 +441,15 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (ma
 // profitability of execution.
 func (r *ExecutionReportingPlugin) buildBatch(
 	srcLogs []logpoller.Log,
-	executedSeq map[uint64]struct{},
+	executedSeq map[uint64]bool,
 	inflight []InflightInternalExecutionReport,
 	aggregateTokenLimit *big.Int,
 	srcTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
 	execGasPriceEstimate *big.Int,
+	srcToDestToken map[common.Address]common.Address,
 ) (executableMessages []ObservedMessage, executedAllMessages bool) {
-	r.srcToDstTokenMappingMu.RLock()
-	defer r.srcToDstTokenMappingMu.RUnlock()
-
-	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := r.inflight(inflight, destTokenPricesUSD, r.srcToDstTokenMapping)
+	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := inflightAggregates(inflight, destTokenPricesUSD, srcToDestToken)
 	if err != nil {
 		r.lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []ObservedMessage{}, false
@@ -449,7 +471,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 		lggr := r.lggr.With("messageID", hexutil.Encode(msg.Message.MessageId[:]))
-		if _, executed := executedSeq[msg.Message.SequenceNumber]; executed {
+		if finalized, executed := executedSeq[msg.Message.SequenceNumber]; executed && finalized {
 			lggr.Infow("Skipping message already executed", "seqNr", msg.Message.SequenceNumber)
 			continue
 		}
@@ -479,7 +501,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			lggr.Warnw("Skipping message invalid nonce", "have", msg.Message.Nonce, "want", expectedNonces[msg.Message.Sender])
 			continue
 		}
-		msgValue, err := aggregateTokenValue(destTokenPricesUSD, r.srcToDstTokenMapping, msg.Message.TokenAmounts)
+		msgValue, err := aggregateTokenValue(destTokenPricesUSD, srcToDestToken, msg.Message.TokenAmounts)
 		if err != nil {
 			lggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
@@ -677,14 +699,13 @@ func calculateObservedMessagesConsensus(lggr logger.Logger, observations []Execu
 
 func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
-	seqNrs, encMsgs, err := MessagesFromExecutionReport(report)
+	messages, err := MessagesFromExecutionReport(report)
 	if err != nil {
 		lggr.Errorw("unable to decode report", "err", err)
 		return false, nil
 	}
-	lggr.Infof("Seq nums %v", seqNrs)
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
-	stale, err := r.isStaleReport(seqNrs)
+	stale, err := r.isStaleReport(messages)
 	if err != nil {
 		return false, err
 	}
@@ -692,7 +713,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		return false, nil
 	}
 	// Else just assume in flight
-	if err = r.inflightReports.add(lggr, seqNrs, encMsgs); err != nil {
+	if err = r.inflightReports.add(lggr, messages); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -702,22 +723,23 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	if isCommitStoreDownNow(ctx, r.config.lggr, r.config.commitStore) {
 		return false, nil
 	}
-	seqNrs, _, err := MessagesFromExecutionReport(report)
+	messages, err := MessagesFromExecutionReport(report)
 	if err != nil {
 		return false, nil
 	}
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
-	stale, err := r.isStaleReport(seqNrs)
+	stale, err := r.isStaleReport(messages)
 	return !stale, err
 }
 
-func (r *ExecutionReportingPlugin) isStaleReport(seqNrs []uint64) (bool, error) {
+func (r *ExecutionReportingPlugin) isStaleReport(messages []evm_2_evm_onramp.InternalEVM2EVMMessage) (bool, error) {
 	// If the first message is executed already, this execution report is stale.
-	msgState, err := r.config.offRamp.GetExecutionState(nil, seqNrs[0])
+	// Note the default execution state, including for arbitrary seq number not yet committed
+	// is ExecutionStateUntouched.
+	msgState, err := r.config.offRamp.GetExecutionState(nil, messages[0].SequenceNumber)
 	if err != nil {
-		// TODO: do we need to check for not present error?
 		return true, err
 	}
 	if state := abihelpers.MessageExecutionState(msgState); state == abihelpers.ExecutionStateFailure || state == abihelpers.ExecutionStateSuccess {
@@ -731,7 +753,7 @@ func (r *ExecutionReportingPlugin) Close() error {
 	return nil
 }
 
-func (r *ExecutionReportingPlugin) inflight(
+func inflightAggregates(
 	inflight []InflightInternalExecutionReport,
 	destTokenPrices map[common.Address]*big.Int,
 	srcToDst map[common.Address]common.Address,
@@ -740,26 +762,16 @@ func (r *ExecutionReportingPlugin) inflight(
 	inflightAggregateValue := big.NewInt(0)
 	maxInflightSenderNonces := make(map[common.Address]uint64)
 	for _, rep := range inflight {
-		for _, seqNr := range rep.seqNrs {
-			inflightSeqNrs[seqNr] = struct{}{}
-		}
-		for _, encMsg := range rep.encMessages {
-			msg, err := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
-				// Note this needs to change if we start indexing things.
-				Topics: []common.Hash{abihelpers.EventSignatures.SendRequested},
-				Data:   encMsg,
-			})
-			if err != nil {
-				return nil, nil, nil, err
-			}
-			msgValue, err := aggregateTokenValue(destTokenPrices, srcToDst, msg.Message.TokenAmounts)
+		for _, message := range rep.messages {
+			inflightSeqNrs[message.SequenceNumber] = struct{}{}
+			msgValue, err := aggregateTokenValue(destTokenPrices, srcToDst, message.TokenAmounts)
 			if err != nil {
 				return nil, nil, nil, err
 			}
 			inflightAggregateValue.Add(inflightAggregateValue, msgValue)
-			maxInflightSenderNonce, ok := maxInflightSenderNonces[msg.Message.Sender]
-			if !ok || msg.Message.Nonce > maxInflightSenderNonce {
-				maxInflightSenderNonces[msg.Message.Sender] = msg.Message.Nonce
+			maxInflightSenderNonce, ok := maxInflightSenderNonces[message.Sender]
+			if !ok || message.Nonce > maxInflightSenderNonce {
+				maxInflightSenderNonces[message.Sender] = message.Nonce
 			}
 		}
 	}
@@ -773,7 +785,7 @@ func (r *ExecutionReportingPlugin) inflight(
 func getTokensPrices(ctx context.Context, priceRegistry price_registry.PriceRegistryInterface, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	prices := make(map[common.Address]*big.Int)
 
-	// TODO cache and only check on changing config
+	// TODO(CCIP-645) cache and only check on changing config.
 	feeTokens, err := priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get source fee tokens")

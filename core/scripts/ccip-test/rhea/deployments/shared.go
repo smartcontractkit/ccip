@@ -16,8 +16,9 @@ const (
 	ROOT_SNOOZE_TIME             = 7 * time.Minute
 )
 
-func getBlockConfirmations(chain rhea.Chain) uint32 {
-	var blockConfirmationPerChain = map[rhea.Chain]uint32{
+func getFinalityDepth(chain rhea.Chain) uint32 {
+	// Note for testnets these are intentionally low to provide quicker testing.
+	var finalityDepthPerChain = map[rhea.Chain]uint32{
 		rhea.Goerli:         4,
 		rhea.Sepolia:        4,
 		rhea.OptimismGoerli: 4,
@@ -26,10 +27,26 @@ func getBlockConfirmations(chain rhea.Chain) uint32 {
 		rhea.ArbitrumGoerli: 1,
 	}
 
-	if val, ok := blockConfirmationPerChain[chain]; ok {
+	if val, ok := finalityDepthPerChain[chain]; ok {
 		return val
 	}
-	panic(fmt.Sprintf("Block confirmation for %s not found", chain))
+	panic(fmt.Sprintf("Finality depth for %s not found", chain))
+}
+
+func getOptimisticConfirmations(chain rhea.Chain) uint32 {
+	var optimisticConfirmations = map[rhea.Chain]uint32{
+		rhea.Goerli:         4,
+		rhea.Sepolia:        4,
+		rhea.OptimismGoerli: 4,
+		rhea.AvaxFuji:       1,
+		rhea.PolygonMumbai:  4,
+		rhea.ArbitrumGoerli: 1,
+	}
+
+	if val, ok := optimisticConfirmations[chain]; ok {
+		return val
+	}
+	panic(fmt.Sprintf("Optimistic confirmations for %s not found", chain))
 }
 
 func getMaxGasPrice(chain rhea.Chain) uint64 {

@@ -30,12 +30,11 @@ func (c *CCIPContracts) CreateDefaultCommitOffchainConfig(t *testing.T) []byte {
 
 func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBeat time.Duration, inflightCacheExpiry time.Duration) []byte {
 	config, err := ccipconfig.EncodeOffchainConfig(ccipconfig.CommitOffchainConfig{
-		SourceIncomingConfirmations: 1,
-		DestIncomingConfirmations:   1,
-		FeeUpdateHeartBeat:          models.MustMakeDuration(feeUpdateHearBeat),
-		FeeUpdateDeviationPPB:       1,
-		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(inflightCacheExpiry),
+		SourceFinalityDepth:   1,
+		FeeUpdateHeartBeat:    models.MustMakeDuration(feeUpdateHearBeat),
+		FeeUpdateDeviationPPB: 1,
+		MaxGasPrice:           200e9,
+		InflightCacheExpiry:   models.MustMakeDuration(inflightCacheExpiry),
 	})
 	require.NoError(t, err)
 	return config
@@ -60,8 +59,9 @@ func (c *CCIPContracts) CreateDefaultExecOffchainConfig(t *testing.T) []byte {
 
 func (c *CCIPContracts) createExecOffchainConfig(t *testing.T, inflightCacheExpiry time.Duration, rootSnoozeTime time.Duration) []byte {
 	config, err := ccipconfig.EncodeOffchainConfig(ccipconfig.ExecOffchainConfig{
-		SourceIncomingConfirmations: 1,
-		DestIncomingConfirmations:   1,
+		SourceFinalityDepth:         1,
+		DestOptimisticConfirmations: 1,
+		DestFinalityDepth:           1,
 		BatchGasLimit:               5_000_000,
 		RelativeBoostPerWaitHour:    0.07,
 		MaxGasPrice:                 200e9,

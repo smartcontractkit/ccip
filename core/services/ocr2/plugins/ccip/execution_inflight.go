@@ -6,13 +6,15 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
+// InflightInternalExecutionReport serves the same purpose as InflightCommitReport
+// see the comment on that struct for context.
 type InflightInternalExecutionReport struct {
-	createdAt   time.Time
-	seqNrs      []uint64
-	encMessages [][]byte
+	createdAt time.Time
+	messages  []evm_2_evm_onramp.InternalEVM2EVMMessage
 }
 
 // inflightReportsContainer holds existing inflight reports.
@@ -52,7 +54,7 @@ func (container *inflightReportsContainer) expire(lggr logger.Logger) {
 		if time.Since(report.createdAt) > container.cacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the change so we retry.
-			lggr.Infow("Inflight report expired", "seqNums", report.seqNrs)
+			lggr.Infow("Inflight report expired", "messages", report.messages)
 		} else {
 			stillInFlight = append(stillInFlight, report)
 		}
@@ -60,23 +62,21 @@ func (container *inflightReportsContainer) expire(lggr logger.Logger) {
 	container.reports = stillInFlight
 }
 
-func (container *inflightReportsContainer) add(lggr logger.Logger, seqNrs []uint64, encMsgs [][]byte) error {
+func (container *inflightReportsContainer) add(lggr logger.Logger, messages []evm_2_evm_onramp.InternalEVM2EVMMessage) error {
 	container.locker.Lock()
 	defer container.locker.Unlock()
 
 	for _, report := range container.reports {
-		// TODO: Think about if this fails in reorgs
-		if (len(report.seqNrs) > 0 && len(seqNrs) > 0) && (report.seqNrs[0] == seqNrs[0]) {
+		if (len(report.messages) > 0) && (report.messages[0].SequenceNumber == messages[0].SequenceNumber) {
 			return errors.Errorf("report is already in flight")
 		}
 	}
 	// Otherwise not already in flight, add it.
 	lggr.Infow("Added report to inflight",
-		"seqNums", seqNrs)
+		"messages", messages)
 	container.reports = append(container.reports, InflightInternalExecutionReport{
-		createdAt:   time.Now(),
-		seqNrs:      seqNrs,
-		encMessages: encMsgs,
+		createdAt: time.Now(),
+		messages:  messages,
 	})
 	return nil
 }

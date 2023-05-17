@@ -13,20 +13,16 @@ type OffchainConfig interface {
 }
 
 type CommitOffchainConfig struct {
-	SourceIncomingConfirmations uint32
-	DestIncomingConfirmations   uint32
-	FeeUpdateHeartBeat          models.Duration
-	FeeUpdateDeviationPPB       uint32
-	MaxGasPrice                 uint64
-	InflightCacheExpiry         models.Duration
+	SourceFinalityDepth   uint32
+	FeeUpdateHeartBeat    models.Duration
+	FeeUpdateDeviationPPB uint32
+	MaxGasPrice           uint64
+	InflightCacheExpiry   models.Duration
 }
 
 func (c CommitOffchainConfig) Validate() error {
-	if c.SourceIncomingConfirmations == 0 {
-		return errors.New("must set SourceIncomingConfirmations")
-	}
-	if c.DestIncomingConfirmations == 0 {
-		return errors.New("must set DestIncomingConfirmations")
+	if c.SourceFinalityDepth == 0 {
+		return errors.New("must set SourceFinalityDepth")
 	}
 	if c.FeeUpdateHeartBeat.Duration() == 0 {
 		return errors.New("must set FeeUpdateHeartBeat")
@@ -45,8 +41,9 @@ func (c CommitOffchainConfig) Validate() error {
 }
 
 type ExecOffchainConfig struct {
-	SourceIncomingConfirmations uint32
-	DestIncomingConfirmations   uint32
+	SourceFinalityDepth         uint32
+	DestOptimisticConfirmations uint32
+	DestFinalityDepth           uint32
 	BatchGasLimit               uint32
 	RelativeBoostPerWaitHour    float64
 	MaxGasPrice                 uint64
@@ -55,11 +52,14 @@ type ExecOffchainConfig struct {
 }
 
 func (c ExecOffchainConfig) Validate() error {
-	if c.SourceIncomingConfirmations == 0 {
-		return errors.New("must set SourceIncomingConfirmations")
+	if c.SourceFinalityDepth == 0 {
+		return errors.New("must set SourceFinalityDepth")
 	}
-	if c.DestIncomingConfirmations == 0 {
-		return errors.New("must set DestIncomingConfirmations")
+	if c.DestFinalityDepth == 0 {
+		return errors.New("must set DestFinalityDepth")
+	}
+	if c.DestOptimisticConfirmations == 0 {
+		return errors.New("must set DestOptimisticConfirmations")
 	}
 	if c.BatchGasLimit == 0 {
 		return errors.New("must set BatchGasLimit")

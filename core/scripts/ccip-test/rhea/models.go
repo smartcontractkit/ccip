@@ -173,7 +173,8 @@ type EVMChainConfig struct {
 }
 
 type TunableChainValues struct {
-	BlockConfirmations       uint32
+	FinalityDepth            uint32
+	OptimisticConfirmations  uint32
 	BatchGasLimit            uint32
 	RelativeBoostPerWaitHour float64
 	FeeUpdateHeartBeat       models.Duration

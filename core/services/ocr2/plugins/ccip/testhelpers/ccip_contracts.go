@@ -1292,3 +1292,24 @@ func GetBalance(t *testing.T, chain bind.ContractBackend, tokenAddr common.Addre
 	require.NoError(t, err)
 	return bal
 }
+
+func GenerateCCIPSendLog(t *testing.T, message evm_2_evm_onramp.InternalEVM2EVMMessage) types.Log {
+	pack, err := abihelpers.MessageArgs.Pack(message)
+	require.NoError(t, err)
+
+	return types.Log{
+		Topics: []common.Hash{abihelpers.EventSignatures.SendRequested},
+		Data:   pack,
+	}
+}
+
+func GenerateCCIPSendLPLog(t *testing.T, message evm_2_evm_onramp.InternalEVM2EVMMessage, block int64) logpoller.Log {
+	pack, err := abihelpers.MessageArgs.Pack(message)
+	require.NoError(t, err)
+
+	return logpoller.Log{
+		Topics:      [][]byte{abihelpers.EventSignatures.SendRequested[:]},
+		Data:        pack,
+		BlockNumber: block,
+	}
+}

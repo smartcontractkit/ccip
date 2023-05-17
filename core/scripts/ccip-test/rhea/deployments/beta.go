@@ -72,7 +72,8 @@ var Beta_Sepolia = rhea.EVMChainConfig{
 	Afn:           gethcommon.HexToAddress("0x82870d40fdc43894631503db91d0df33618dbe66"),
 	PriceRegistry: gethcommon.HexToAddress("0x872638b04acae2acb4cc57fda4c256f1bd5ead9c"),
 	TunableChainValues: rhea.TunableChainValues{
-		BlockConfirmations:       getBlockConfirmations(rhea.Sepolia),
+		FinalityDepth:            getFinalityDepth(rhea.Sepolia),
+		OptimisticConfirmations:  getOptimisticConfirmations(rhea.Sepolia),
 		BatchGasLimit:            BATCH_GAS_LIMIT,
 		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
@@ -120,7 +121,8 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 	Afn:           gethcommon.HexToAddress("0x74479905880a1dee7ba5fb488bd9231be1919530"),
 	PriceRegistry: gethcommon.HexToAddress("0x9bcf41feb8202d1f1fe92c87b4b420444cc7f767"),
 	TunableChainValues: rhea.TunableChainValues{
-		BlockConfirmations:       getBlockConfirmations(rhea.OptimismGoerli),
+		FinalityDepth:            getFinalityDepth(rhea.OptimismGoerli),
+		OptimisticConfirmations:  getOptimisticConfirmations(rhea.OptimismGoerli),
 		BatchGasLimit:            BATCH_GAS_LIMIT,
 		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
@@ -172,7 +174,8 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 	Afn:           gethcommon.HexToAddress("0xb10df23e8cabd0e17d0408abe3e188f673c94e24"),
 	PriceRegistry: gethcommon.HexToAddress("0x462cfca1d2497ab821fb7736a2205c1aeab312dd"),
 	TunableChainValues: rhea.TunableChainValues{
-		BlockConfirmations:       getBlockConfirmations(rhea.AvaxFuji),
+		FinalityDepth:            getFinalityDepth(rhea.AvaxFuji),
+		OptimisticConfirmations:  getOptimisticConfirmations(rhea.AvaxFuji),
 		BatchGasLimit:            BATCH_GAS_LIMIT,
 		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
@@ -224,7 +227,8 @@ var Beta_ArbitrumGoerli = rhea.EVMChainConfig{
 	Afn:           gethcommon.HexToAddress("0xf06230a439b21794569d61c86d3824bc724295fc"),
 	PriceRegistry: gethcommon.HexToAddress("0x4abaadc0cef614149e0722060babcfb99051f0d6"),
 	TunableChainValues: rhea.TunableChainValues{
-		BlockConfirmations:       getBlockConfirmations(rhea.ArbitrumGoerli),
+		FinalityDepth:            getFinalityDepth(rhea.ArbitrumGoerli),
+		OptimisticConfirmations:  getOptimisticConfirmations(rhea.ArbitrumGoerli),
 		BatchGasLimit:            BATCH_GAS_LIMIT,
 		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
 		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),

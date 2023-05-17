@@ -1712,12 +1712,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 // nil value in execNodes denotes commit and execution jobs are to be set up in same DON
 func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) error {
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ccip.NewOffChainAggregatorV2Config(commitNodes, ccipConfig.CommitOffchainConfig{
-		SourceIncomingConfirmations: 1,
-		DestIncomingConfirmations:   1,
-		FeeUpdateHeartBeat:          models.MustMakeDuration(24 * time.Hour),
-		FeeUpdateDeviationPPB:       5e7,
-		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(InflightExpirySimulated),
+		SourceFinalityDepth:   1,
+		FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
+		FeeUpdateDeviationPPB: 5e7,
+		MaxGasPrice:           200e9,
+		InflightCacheExpiry:   models.MustMakeDuration(InflightExpirySimulated),
 	}, ccipConfig.CommitOnchainConfig{
 		PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
 		Afn:           destCCIP.Common.AFN.EthAddress,
@@ -1738,8 +1737,9 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	}
 	if destCCIP.OffRamp != nil {
 		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = ccip.NewOffChainAggregatorV2Config(nodes, ccipConfig.ExecOffchainConfig{
-			SourceIncomingConfirmations: 1,
-			DestIncomingConfirmations:   1,
+			SourceFinalityDepth:         1,
+			DestOptimisticConfirmations: 1,
+			DestFinalityDepth:           1,
 			BatchGasLimit:               5_000_000,
 			RelativeBoostPerWaitHour:    0.7,
 			MaxGasPrice:                 200e9,
