@@ -22,12 +22,16 @@ const (
 	Boostrap  JobType = "bootstrap"
 )
 
-func JobName(jobType JobType, source string, destination string) string {
+func JobName(jobType JobType, source string, destination, version string) string {
+	if version != "" {
+		return fmt.Sprintf("ccip-%s-%s-%s-%s", jobType, source, destination, version)
+	}
 	return fmt.Sprintf("ccip-%s-%s-%s", jobType, source, destination)
 }
 
 type CCIPJobSpecParams struct {
 	Name                   string
+	Version                string
 	OffRamp                common.Address
 	CommitStore            common.Address
 	SourceChainName        string
@@ -103,7 +107,7 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 	return &client.OCR2TaskJobSpec{
 		OCR2OracleSpec: ocrSpec,
 		JobType:        "offchainreporting2",
-		Name:           JobName(Commit, params.SourceChainName, params.DestChainName),
+		Name:           JobName(Commit, params.SourceChainName, params.DestChainName, params.Version),
 	}, nil
 }
 
@@ -138,7 +142,7 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 	return &client.OCR2TaskJobSpec{
 		OCR2OracleSpec: ocrSpec,
 		JobType:        "offchainreporting2",
-		Name:           JobName(Execution, params.SourceChainName, params.DestChainName),
+		Name:           JobName(Execution, params.SourceChainName, params.DestChainName, params.Version),
 	}, err
 }
 

@@ -20,7 +20,7 @@ import (
 )
 
 func TestIntegration_CCIP(t *testing.T) {
-	ccipContracts := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.DestChainID)
+	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.DestChainID)
 	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
 		require.NoError(t, err)
@@ -29,7 +29,7 @@ func TestIntegration_CCIP(t *testing.T) {
 		_, err := w.Write([]byte(`{"UsdPerETH": "1700000000000000000000"}`))
 		require.NoError(t, err)
 	}))
-	wrapped, err := ccipContracts.Source.Router.GetWrappedNative(nil)
+	wrapped, err := ccipTH.Source.Router.GetWrappedNative(nil)
 	require.NoError(t, err)
 	tokenPricesUSDPipeline := fmt.Sprintf(`
 // Price 1
@@ -40,11 +40,11 @@ eth [type=http method=GET url="%s"];
 eth_parse [type=jsonparse path="UsdPerETH"];
 eth->eth_parse;
 merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse)}"];`,
-		linkUSD.URL, ethUSD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped)
+		linkUSD.URL, ethUSD.URL, ccipTH.Dest.LinkToken.Address(), wrapped)
 	defer linkUSD.Close()
 	defer ethUSD.Close()
 
-	nodes, jobParams := ccipContracts.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399)
+	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399)
 
 	geCurrentSeqNum := 1
 
@@ -57,98 +57,98 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		require.NoError(t, err2)
 
 		sourceBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
-			{Name: testhelpers.SourcePool, Addr: ccipContracts.Source.Pool.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: testhelpers.OnRamp, Addr: ccipContracts.Source.OnRamp.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: testhelpers.SourceRouter, Addr: ccipContracts.Source.Router.Address(), Getter: ccipContracts.GetSourceLinkBalance},
-			{Name: testhelpers.SourcePrices, Addr: ccipContracts.Source.PriceRegistry.Address(), Getter: ccipContracts.GetSourceLinkBalance},
+			{Name: testhelpers.SourcePool, Addr: ccipTH.Source.Pool.Address(), Getter: ccipTH.GetSourceLinkBalance},
+			{Name: testhelpers.OnRamp, Addr: ccipTH.Source.OnRamp.Address(), Getter: ccipTH.GetSourceLinkBalance},
+			{Name: testhelpers.SourceRouter, Addr: ccipTH.Source.Router.Address(), Getter: ccipTH.GetSourceLinkBalance},
+			{Name: testhelpers.SourcePrices, Addr: ccipTH.Source.PriceRegistry.Address(), Getter: ccipTH.GetSourceLinkBalance},
 		})
 		require.NoError(t, err2)
 		destBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
-			{Name: testhelpers.Receiver, Addr: ccipContracts.Dest.Receivers[0].Receiver.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: testhelpers.DestPool, Addr: ccipContracts.Dest.Pool.Address(), Getter: ccipContracts.GetDestLinkBalance},
-			{Name: testhelpers.OffRamp, Addr: ccipContracts.Dest.OffRamp.Address(), Getter: ccipContracts.GetDestLinkBalance},
+			{Name: testhelpers.Receiver, Addr: ccipTH.Dest.Receivers[0].Receiver.Address(), Getter: ccipTH.GetDestLinkBalance},
+			{Name: testhelpers.DestPool, Addr: ccipTH.Dest.Pool.Address(), Getter: ccipTH.GetDestLinkBalance},
+			{Name: testhelpers.OffRamp, Addr: ccipTH.Dest.OffRamp.Address(), Getter: ccipTH.GetDestLinkBalance},
 		})
 		require.NoError(t, err2)
 
 		msg := router.ClientEVM2AnyMessage{
-			Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[0].Receiver.Address()),
+			Receiver: testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[0].Receiver.Address()),
 			Data:     []byte("hello"),
 			TokenAmounts: []router.ClientEVMTokenAmount{
 				{
-					Token:  ccipContracts.Source.LinkToken.Address(),
+					Token:  ccipTH.Source.LinkToken.Address(),
 					Amount: tokenAmount,
 				},
 			},
-			FeeToken:  ccipContracts.Source.LinkToken.Address(),
+			FeeToken:  ccipTH.Source.LinkToken.Address(),
 			ExtraArgs: extraArgs,
 		}
-		fee, err2 := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
+		fee, err2 := ccipTH.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 		require.NoError(t, err2)
 		// Currently no overhead and 10gwei dest gas price. So fee is simply (gasLimit * gasPrice)* link/native
 		// require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
 		// Approve the fee amount + the token amount
-		_, err2 = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
+		_, err2 = ccipTH.Source.LinkToken.Approve(ccipTH.Source.User, ccipTH.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
 		require.NoError(t, err2)
-		ccipContracts.Source.Chain.Commit()
-		ccipContracts.SendRequest(t, msg)
+		ccipTH.Source.Chain.Commit()
+		ccipTH.SendRequest(t, msg)
 		// Should eventually see this executed.
-		ccipContracts.AllNodesHaveReqSeqNum(t, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
-		ccipContracts.EventuallyReportCommitted(t, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
+		ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
+		ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum)
 
-		executionLogs := ccipContracts.AllNodesHaveExecutedSeqNums(t, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		ccipContracts.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
+		ccipTH.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
 
 		// Asserts
 		// 1) The total pool input == total pool output
 		// 2) Pool flow equals tokens sent
 		// 3) Sent tokens arrive at the receiver
 
-		ccipContracts.AssertBalances(t, []testhelpers.BalanceAssertion{
+		ccipTH.AssertBalances(t, []testhelpers.BalanceAssertion{
 			{
 				Name:     testhelpers.SourcePool,
-				Address:  ccipContracts.Source.Pool.Address(),
+				Address:  ccipTH.Source.Pool.Address(),
 				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], tokenAmount.String()).String(),
-				Getter:   ccipContracts.GetSourceLinkBalance,
+				Getter:   ccipTH.GetSourceLinkBalance,
 			},
 			{
 				Name:     testhelpers.SourcePrices,
-				Address:  ccipContracts.Source.PriceRegistry.Address(),
+				Address:  ccipTH.Source.PriceRegistry.Address(),
 				Expected: sourceBalances[testhelpers.SourcePrices].String(),
-				Getter:   ccipContracts.GetSourceLinkBalance,
+				Getter:   ccipTH.GetSourceLinkBalance,
 			},
 			{
 				// Fees end up in the onramp.
 				Name:     testhelpers.OnRamp,
-				Address:  ccipContracts.Source.OnRamp.Address(),
+				Address:  ccipTH.Source.OnRamp.Address(),
 				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePrices], fee.String()).String(),
-				Getter:   ccipContracts.GetSourceLinkBalance,
+				Getter:   ccipTH.GetSourceLinkBalance,
 			},
 			{
 				Name:     testhelpers.SourceRouter,
-				Address:  ccipContracts.Source.Router.Address(),
+				Address:  ccipTH.Source.Router.Address(),
 				Expected: sourceBalances[testhelpers.SourceRouter].String(),
-				Getter:   ccipContracts.GetSourceLinkBalance,
+				Getter:   ccipTH.GetSourceLinkBalance,
 			},
 		})
-		ccipContracts.AssertBalances(t, []testhelpers.BalanceAssertion{
+		ccipTH.AssertBalances(t, []testhelpers.BalanceAssertion{
 			{
 				Name:     testhelpers.Receiver,
-				Address:  ccipContracts.Dest.Receivers[0].Receiver.Address(),
+				Address:  ccipTH.Dest.Receivers[0].Receiver.Address(),
 				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], tokenAmount.String()).String(),
-				Getter:   ccipContracts.GetDestLinkBalance,
+				Getter:   ccipTH.GetDestLinkBalance,
 			},
 			{
 				Name:     testhelpers.DestPool,
-				Address:  ccipContracts.Dest.Pool.Address(),
+				Address:  ccipTH.Dest.Pool.Address(),
 				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], tokenAmount.String()).String(),
-				Getter:   ccipContracts.GetDestLinkBalance,
+				Getter:   ccipTH.GetDestLinkBalance,
 			},
 			{
 				Name:     testhelpers.OffRamp,
-				Address:  ccipContracts.Dest.OffRamp.Address(),
+				Address:  ccipTH.Dest.OffRamp.Address(),
 				Expected: destBalances[testhelpers.OffRamp].String(),
-				Getter:   ccipContracts.GetDestLinkBalance,
+				Getter:   ccipTH.GetDestLinkBalance,
 			},
 		})
 		geCurrentSeqNum++
@@ -170,40 +170,40 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			extraArgs, err2 := testhelpers.GetEVMExtraArgsV1(txGasLimit, false)
 			require.NoError(t, err2)
 			msg := router.ClientEVM2AnyMessage{
-				Receiver: testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[0].Receiver.Address()),
+				Receiver: testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[0].Receiver.Address()),
 				Data:     []byte("hello"),
 				TokenAmounts: []router.ClientEVMTokenAmount{
 					{
-						Token:  ccipContracts.Source.LinkToken.Address(),
+						Token:  ccipTH.Source.LinkToken.Address(),
 						Amount: tokenAmount,
 					},
 				},
-				FeeToken:  ccipContracts.Source.LinkToken.Address(),
+				FeeToken:  ccipTH.Source.LinkToken.Address(),
 				ExtraArgs: extraArgs,
 			}
-			fee, err2 := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
+			fee, err2 := ccipTH.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 			require.NoError(t, err2)
 			// Currently no overhead and 1gwei dest gas price. So fee is simply gasLimit * gasPrice.
 			// require.Equal(t, new(big.Int).Mul(txGasLimit, gasPrice).String(), fee.String())
 			// Approve the fee amount + the token amount
-			_, err2 = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
+			_, err2 = ccipTH.Source.LinkToken.Approve(ccipTH.Source.User, ccipTH.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
 			require.NoError(t, err2)
-			tx, err2 := ccipContracts.Source.Router.CcipSend(ccipContracts.Source.User, ccipContracts.Dest.ChainID, msg)
+			tx, err2 := ccipTH.Source.Router.CcipSend(ccipTH.Source.User, ccipTH.Dest.ChainID, msg)
 			require.NoError(t, err2)
 			txs = append(txs, tx)
 		}
 
 		// Send a batch of requests in a single block
-		testhelpers.ConfirmTxs(t, txs, ccipContracts.Source.Chain)
+		testhelpers.ConfirmTxs(t, txs, ccipTH.Source.Chain)
 		for i := 0; i < n; i++ {
-			ccipContracts.AllNodesHaveReqSeqNum(t, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum+i)
+			ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum+i)
 		}
 		// Should see a report with the full range
-		ccipContracts.EventuallyReportCommitted(t, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum+n-1)
+		ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum+n-1)
 		// Should all be executed
-		executionLogs := ccipContracts.AllNodesHaveExecutedSeqNums(t, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum+n-1)
+		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
-			ccipContracts.AssertExecState(t, execLog, abihelpers.ExecutionStateSuccess)
+			ccipTH.AssertExecState(t, execLog, abihelpers.ExecutionStateSuccess)
 		}
 
 		geCurrentSeqNum += n
@@ -212,10 +212,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	t.Run("ge strict sequencing", func(t *testing.T) {
 		// approve the total amount to be sent
 		// set revert to true so that the execution gets reverted
-		_, err = ccipContracts.Dest.Receivers[1].Receiver.SetRevert(ccipContracts.Dest.User, true)
+		_, err = ccipTH.Dest.Receivers[1].Receiver.SetRevert(ccipTH.Dest.User, true)
 		require.NoError(t, err, "setting revert to true on the receiver")
-		ccipContracts.Dest.Chain.Commit()
-		currentBlockNumber := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number.Uint64()
+		ccipTH.Dest.Chain.Commit()
+		currentBlockNumber := ccipTH.Dest.Chain.Blockchain().CurrentBlock().Number.Uint64()
 
 		// Test sequence:
 		// Send msg1: strict reverts
@@ -225,79 +225,77 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		totalMsgs := 2
 		extraArgs, err2 := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
 		require.NoError(t, err2)
-		startNonce, err2 := ccipContracts.Dest.OffRamp.GetSenderNonce(nil, ccipContracts.Source.User.From)
+		startNonce, err2 := ccipTH.Dest.OffRamp.GetSenderNonce(nil, ccipTH.Source.User.From)
 		require.NoError(t, err2)
 		msg := router.ClientEVM2AnyMessage{
-			Receiver:     testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[1].Receiver.Address()),
+			Receiver:     testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[1].Receiver.Address()),
 			Data:         []byte("hello"),
 			TokenAmounts: []router.ClientEVMTokenAmount{},
-			FeeToken:     ccipContracts.Source.LinkToken.Address(),
+			FeeToken:     ccipTH.Source.LinkToken.Address(),
 			ExtraArgs:    extraArgs,
 		}
-		fee, err2 := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
+		fee, err2 := ccipTH.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 		require.NoError(t, err2)
 		// Approve the fee amount
-		_, err2 = ccipContracts.Source.LinkToken.Approve(ccipContracts.Source.User, ccipContracts.Source.Router.Address(), big.NewInt(0).Mul(big.NewInt(int64(totalMsgs)), fee))
+		_, err2 = ccipTH.Source.LinkToken.Approve(ccipTH.Source.User, ccipTH.Source.Router.Address(), big.NewInt(0).Mul(big.NewInt(int64(totalMsgs)), fee))
 		require.NoError(t, err2)
-		ccipContracts.Source.Chain.Commit()
-		txForFailedReq := ccipContracts.SendRequest(t, msg)
-		failedReqLog := ccipContracts.AllNodesHaveReqSeqNum(t, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
-		ccipContracts.EventuallyReportCommitted(t, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
-		ccipContracts.EventuallyCommitReportAccepted(t, currentBlockNumber)
+		ccipTH.Source.Chain.Commit()
+		txForFailedReq := ccipTH.SendRequest(t, msg)
+		failedReqLog := ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
+		ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum)
+		ccipTH.EventuallyCommitReportAccepted(t, currentBlockNumber)
 
 		// execution status should be failed
-		executionLogs := ccipContracts.AllNodesHaveExecutedSeqNums(t, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		ccipContracts.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateFailure)
+		ccipTH.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateFailure)
 		// Nonce should not have incremented
-		afterNonce, err2 := ccipContracts.Dest.OffRamp.GetSenderNonce(nil, ccipContracts.Source.User.From)
+		afterNonce, err2 := ccipTH.Dest.OffRamp.GetSenderNonce(nil, ccipTH.Source.User.From)
 		require.NoError(t, err2)
 		require.Equal(t, startNonce, afterNonce)
 		geCurrentSeqNum++
 
 		// flip the revert settings on receiver
-		_, err2 = ccipContracts.Dest.Receivers[1].Receiver.SetRevert(ccipContracts.Dest.User, false)
+		_, err2 = ccipTH.Dest.Receivers[1].Receiver.SetRevert(ccipTH.Dest.User, false)
 		require.NoError(t, err2, "setting revert to false on the receiver")
-		ccipContracts.Dest.Chain.Commit()
-		ccipContracts.Source.Chain.Commit()
+		ccipTH.Dest.Chain.Commit()
+		ccipTH.Source.Chain.Commit()
 
 		// subsequent requests which should not be executed.
 		var pendingReqNumbers []int
 		for i := 1; i < totalMsgs; i++ {
-			ccipContracts.SendRequest(t, msg)
-			ccipContracts.AllNodesHaveReqSeqNum(t, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
-			ccipContracts.EventuallyReportCommitted(t, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
-			executionLog := ccipContracts.NoNodesHaveExecutedSeqNum(t, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum)
+			ccipTH.SendRequest(t, msg)
+			ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
+			ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum)
+			executionLog := ccipTH.NoNodesHaveExecutedSeqNum(t, geCurrentSeqNum)
 			require.Empty(t, executionLog)
 			pendingReqNumbers = append(pendingReqNumbers, geCurrentSeqNum)
 			geCurrentSeqNum++
 		}
 
 		// manually execute the failed request
-		failedSeqNum := ccipContracts.ExecuteMessage(t, failedReqLog, txForFailedReq.Hash(), currentBlockNumber)
-		currentBlockNumber = ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number.Uint64()
-		ccipContracts.EventuallyExecutionStateChangedToSuccess(t, []uint64{failedSeqNum}, currentBlockNumber)
+		failedSeqNum := ccipTH.ExecuteMessage(t, failedReqLog, txForFailedReq.Hash(), currentBlockNumber)
+		currentBlockNumber = ccipTH.Dest.Chain.Blockchain().CurrentBlock().Number.Uint64()
+		ccipTH.EventuallyExecutionStateChangedToSuccess(t, []uint64{failedSeqNum}, currentBlockNumber)
 
 		// verify all the pending requests should be successfully executed now
 		for _, seqNo := range pendingReqNumbers {
 			t.Logf("Verify execution for pending seqNum %d", seqNo)
-			ccipContracts.EventuallyExecutionStateChangedToSuccess(t, []uint64{uint64(seqNo)}, 1)
+			ccipTH.EventuallyExecutionStateChangedToSuccess(t, []uint64{uint64(seqNo)}, 1)
 		}
 	})
 
 	// Deploy new on ramp,Commit store,off ramp
-	// Delete previous jobs
-	// Enable new contracts
-	// Create new jobs
+	// create new jobs
 	// Send a number of requests
 	// Verify all requests after the contracts are upgraded
 	t.Run("upgrade contracts and verify requests can be sent with upgraded contract", func(t *testing.T) {
-		ccipContracts.DeployNewOnRamp(t)
-		ccipContracts.DeployNewCommitStore(t)
-		ccipContracts.DeployNewOffRamp(t)
-		newConfigBlock := ccipContracts.Dest.Chain.Blockchain().CurrentBlock().Number.Int64()
+		ccipTH.DeployNewOnRamp(t)
+		ccipTH.DeployNewCommitStore(t)
+		ccipTH.DeployNewOffRamp(t)
+		newConfigBlock := ccipTH.Dest.Chain.Blockchain().CurrentBlock().Number.Int64()
 		// delete previous jobs, 1 commit and exec
-		for _, node := range nodes {
+		for _, node := range ccipTH.Nodes {
 			err = node.App.DeleteJob(context.Background(), 1)
 			require.NoError(t, err)
 			err = node.App.DeleteJob(context.Background(), 2)
@@ -305,13 +303,13 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		}
 
 		// enable the newly deployed contracts
-		ccipContracts.EnableOnRamp(t)
-		ccipContracts.EnableOffRamp(t)
-		ccipContracts.EnableCommitStore(t)
+		ccipTH.EnableOnRamp(t)
+		ccipTH.EnableOffRamp(t)
+		ccipTH.EnableCommitStore(t)
 
 		// create updated jobs
-		jobParams = ccipContracts.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock)
-		ccipContracts.AddAllJobs(t, jobParams, nodes)
+		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock)
+		ccipTH.AddAllJobs(t, jobParams)
 
 		startSeq := 1
 		endSeqNum := 3
@@ -320,14 +318,14 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		tokenAmount := big.NewInt(100)
 		for i := startSeq; i <= endSeqNum; i++ {
 			t.Logf("sending request for seqnum %d", i)
-			ccipContracts.SendMessage(t, gasLimit, gasPrice, tokenAmount, ccipContracts.Dest.Receivers[0].Receiver.Address())
-			ccipContracts.Source.Chain.Commit()
-			ccipContracts.Dest.Chain.Commit()
+			ccipTH.SendMessage(t, gasLimit, gasPrice, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
+			ccipTH.Source.Chain.Commit()
+			ccipTH.Dest.Chain.Commit()
 			t.Logf("verifying seqnum %d", i)
-			ccipContracts.AllNodesHaveReqSeqNum(t, ccipContracts.Source.OnRamp.Address(), nodes, i)
-			ccipContracts.EventuallyReportCommitted(t, ccipContracts.Source.OnRamp.Address(), i)
-			executionLog := ccipContracts.AllNodesHaveExecutedSeqNums(t, ccipContracts.Dest.OffRamp.Address(), nodes, i, i)
-			ccipContracts.AssertExecState(t, executionLog[0], abihelpers.ExecutionStateSuccess)
+			ccipTH.AllNodesHaveReqSeqNum(t, i)
+			ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), i)
+			executionLog := ccipTH.AllNodesHaveExecutedSeqNums(t, i, i)
+			ccipTH.AssertExecState(t, executionLog[0], abihelpers.ExecutionStateSuccess)
 		}
 
 		geCurrentSeqNum = endSeqNum + 1
@@ -337,36 +335,37 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		linkToTransferToOnRamp := big.NewInt(1e18)
 
 		// transfer some link to onramp to pay the nops
-		_, err = ccipContracts.Source.LinkToken.Transfer(
-			ccipContracts.Source.User, ccipContracts.Source.OnRamp.Address(), linkToTransferToOnRamp)
+		_, err = ccipTH.Source.LinkToken.Transfer(
+			ccipTH.Source.User, ccipTH.Source.OnRamp.Address(), linkToTransferToOnRamp)
 		require.NoError(t, err)
-		ccipContracts.Source.Chain.Commit()
+		ccipTH.Source.Chain.Commit()
 
 		srcBalReq := []testhelpers.BalanceReq{
 			{
 				Name:   testhelpers.Sender,
-				Addr:   ccipContracts.Source.User.From,
-				Getter: ccipContracts.GetSourceWrappedTokenBalance,
+				Addr:   ccipTH.Source.User.From,
+				Getter: ccipTH.GetSourceWrappedTokenBalance,
 			},
 			{
 				Name:   testhelpers.OnRampNative,
-				Addr:   ccipContracts.Source.OnRamp.Address(),
-				Getter: ccipContracts.GetSourceWrappedTokenBalance,
+				Addr:   ccipTH.Source.OnRamp.Address(),
+				Getter: ccipTH.GetSourceWrappedTokenBalance,
 			},
 			{
 				Name:   testhelpers.OnRamp,
-				Addr:   ccipContracts.Source.OnRamp.Address(),
-				Getter: ccipContracts.GetSourceLinkBalance,
+				Addr:   ccipTH.Source.OnRamp.Address(),
+				Getter: ccipTH.GetSourceLinkBalance,
 			},
 			{
 				Name:   testhelpers.SourceRouter,
-				Addr:   ccipContracts.Source.Router.Address(),
-				Getter: ccipContracts.GetSourceWrappedTokenBalance,
+				Addr:   ccipTH.Source.Router.Address(),
+				Getter: ccipTH.GetSourceWrappedTokenBalance,
 			},
 		}
 
 		var nopsAndWeights []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight
 		var totalWeight uint16
+		nodes := ccipTH.Nodes
 		for i := range nodes {
 			// For now set the transmitter addresses to be the same as the payee addresses
 			nodes[i].PaymentReceiver = nodes[i].Transmitter
@@ -378,14 +377,14 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			srcBalReq = append(srcBalReq, testhelpers.BalanceReq{
 				Name:   fmt.Sprintf("node %d", i),
 				Addr:   nodes[i].PaymentReceiver,
-				Getter: ccipContracts.GetSourceLinkBalance,
+				Getter: ccipTH.GetSourceLinkBalance,
 			})
 		}
 		srcBalances, err := testhelpers.GetBalances(t, srcBalReq)
 		require.NoError(t, err)
 
 		// set nops on the onramp
-		ccipContracts.SetNopsOnRamp(t, nopsAndWeights)
+		ccipTH.SetNopsOnRamp(t, nopsAndWeights)
 
 		// send a message
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
@@ -393,73 +392,73 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 		// FeeToken is empty, therefore it should use native token
 		msg := router.ClientEVM2AnyMessage{
-			Receiver:     testhelpers.MustEncodeAddress(t, ccipContracts.Dest.Receivers[1].Receiver.Address()),
+			Receiver:     testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[1].Receiver.Address()),
 			Data:         []byte("hello"),
 			TokenAmounts: []router.ClientEVMTokenAmount{},
 			ExtraArgs:    extraArgs,
 		}
-		fee, err := ccipContracts.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
+		fee, err := ccipTH.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 		require.NoError(t, err)
 
 		// verify message is sent
-		ccipContracts.Source.User.Value = fee
-		ccipContracts.SendRequest(t, msg)
-		ccipContracts.Source.User.Value = nil
-		ccipContracts.AllNodesHaveReqSeqNum(t, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
-		ccipContracts.EventuallyReportCommitted(t, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
+		ccipTH.Source.User.Value = fee
+		ccipTH.SendRequest(t, msg)
+		ccipTH.Source.User.Value = nil
+		ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
+		ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum)
 
-		executionLogs := ccipContracts.AllNodesHaveExecutedSeqNums(t, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		ccipContracts.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
+		ccipTH.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
 		geCurrentSeqNum++
 
 		// get the nop fee
-		nopFee, err := ccipContracts.Source.OnRamp.GetNopFeesJuels(nil)
+		nopFee, err := ccipTH.Source.OnRamp.GetNopFeesJuels(nil)
 		require.NoError(t, err)
 		t.Log("nopFee", nopFee)
 
 		// withdraw fees and verify there is still fund left for nop payment
-		_, err = ccipContracts.Source.OnRamp.WithdrawNonLinkFees(
-			ccipContracts.Source.User,
-			ccipContracts.Source.WrappedNative.Address(),
-			ccipContracts.Source.User.From,
+		_, err = ccipTH.Source.OnRamp.WithdrawNonLinkFees(
+			ccipTH.Source.User,
+			ccipTH.Source.WrappedNative.Address(),
+			ccipTH.Source.User.From,
 		)
 		require.NoError(t, err)
-		ccipContracts.Source.Chain.Commit()
+		ccipTH.Source.Chain.Commit()
 
 		// pay nops
-		_, err = ccipContracts.Source.OnRamp.PayNops(ccipContracts.Source.User)
+		_, err = ccipTH.Source.OnRamp.PayNops(ccipTH.Source.User)
 		require.NoError(t, err)
-		ccipContracts.Source.Chain.Commit()
+		ccipTH.Source.Chain.Commit()
 
 		srcBalanceAssertions := []testhelpers.BalanceAssertion{
 			{
 				// Onramp should not have any balance left in wrapped native
 				Name:     testhelpers.OnRampNative,
-				Address:  ccipContracts.Source.OnRamp.Address(),
+				Address:  ccipTH.Source.OnRamp.Address(),
 				Expected: big.NewInt(0).String(),
-				Getter:   ccipContracts.GetSourceWrappedTokenBalance,
+				Getter:   ccipTH.GetSourceWrappedTokenBalance,
 			},
 			{
 				// Onramp should have the remaining link after paying nops
 				Name:     testhelpers.OnRamp,
-				Address:  ccipContracts.Source.OnRamp.Address(),
+				Address:  ccipTH.Source.OnRamp.Address(),
 				Expected: new(big.Int).Sub(srcBalances[testhelpers.OnRamp], nopFee).String(),
-				Getter:   ccipContracts.GetSourceLinkBalance,
+				Getter:   ccipTH.GetSourceLinkBalance,
 			},
 			{
 				Name:     testhelpers.SourceRouter,
-				Address:  ccipContracts.Source.Router.Address(),
+				Address:  ccipTH.Source.Router.Address(),
 				Expected: srcBalances[testhelpers.SourceRouter].String(),
-				Getter:   ccipContracts.GetSourceWrappedTokenBalance,
+				Getter:   ccipTH.GetSourceWrappedTokenBalance,
 			},
 			// onRamp's balance (of previously sent fee during message sending) should have been transferred to
 			// the owner as a result of WithdrawNonLinkFees
 			{
 				Name:     testhelpers.Sender,
-				Address:  ccipContracts.Source.User.From,
+				Address:  ccipTH.Source.User.From,
 				Expected: fee.String(),
-				Getter:   ccipContracts.GetSourceWrappedTokenBalance,
+				Getter:   ccipTH.GetSourceWrappedTokenBalance,
 			},
 		}
 
@@ -475,9 +474,9 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 				Name:     fmt.Sprintf("node %d", i),
 				Address:  node.PaymentReceiver,
 				Expected: bal,
-				Getter:   ccipContracts.GetSourceLinkBalance,
+				Getter:   ccipTH.GetSourceLinkBalance,
 			})
 		}
-		ccipContracts.AssertBalances(t, srcBalanceAssertions)
+		ccipTH.AssertBalances(t, srcBalanceAssertions)
 	})
 }

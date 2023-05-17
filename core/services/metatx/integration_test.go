@@ -180,7 +180,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	defer wrappedDestTokenUSD.Close()
 	defer bankERC20USD.Close()
 
-	nodes, _ := ccipContracts.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 29599)
+	ccipContracts.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 29599)
 
 	geCurrentSeqNum := 1
 
@@ -228,10 +228,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			return holder2Balance.Cmp(amount) == 0
 		}, testutils.WaitTimeout(t), 5*time.Second).Should(gomega.BeTrue())
 
-		ccipContracts.AllNodesHaveReqSeqNum(t, ccipContracts.Source.OnRamp.Address(), nodes, geCurrentSeqNum)
+		ccipContracts.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
 		ccipContracts.EventuallyReportCommitted(t, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
 
-		executionLogs := ccipContracts.AllNodesHaveExecutedSeqNums(t, ccipContracts.Dest.OffRamp.Address(), nodes, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := ccipContracts.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		ccipContracts.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
 

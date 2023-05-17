@@ -13,6 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
+const PermissionLessExecutionThresholdSeconds = 2 * 60
+
 func (c *CCIPContracts) CreateDefaultCommitOnchainConfig(t *testing.T) []byte {
 	config, err := abihelpers.EncodeAbiStruct(ccipconfig.CommitOnchainConfig{
 		PriceRegistry: c.Dest.PriceRegistry.Address(),
@@ -41,7 +43,7 @@ func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBe
 
 func (c *CCIPContracts) CreateDefaultExecOnchainConfig(t *testing.T) []byte {
 	config, err := abihelpers.EncodeAbiStruct(ccipconfig.ExecOnchainConfig{
-		PermissionLessExecutionThresholdSeconds: 5 * 60,
+		PermissionLessExecutionThresholdSeconds: PermissionLessExecutionThresholdSeconds,
 		Router:                                  c.Dest.Router.Address(),
 		Afn:                                     c.Dest.AFN.Address(),
 		PriceRegistry:                           c.Dest.PriceRegistry.Address(),
