@@ -188,7 +188,7 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 	logs := []logpoller.Log{{BlockNumber: expectedNewBlockNumber}}
 	mockDestLP := &lpMocks.LogPoller{}
 
-	mockDestLP.On("LatestLogEventSigsAddrsWithConfs", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logs, nil)
+	mockDestLP.On("LatestLogEventSigsAddrsWithConfs", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logs, nil)
 
 	sourceToken, destToken := common.HexToAddress("111111"), common.HexToAddress("222222")
 

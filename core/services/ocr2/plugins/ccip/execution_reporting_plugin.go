@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
@@ -120,6 +121,8 @@ func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) types.Repo
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
+	ctx := context.TODO()
+
 	onchainConfig, err := abihelpers.DecodeAbiStruct[ccipconfig.ExecOnchainConfig](config.OnchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
@@ -136,15 +139,15 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	destWrappedNative, err := destRouter.GetWrappedNative(&bind.CallOpts{})
+	destWrappedNative, err := destRouter.GetWrappedNative(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	sourceToDestTokenMapping, err := generateSourceToDestTokenMapping(context.Background(), rf.config.offRamp)
+	sourceToDestTokenMapping, err := generateSourceToDestTokenMapping(ctx, rf.config.offRamp)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	latestBlock, err := rf.config.destLP.LatestBlock()
+	latestBlock, err := rf.config.destLP.LatestBlock(pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -214,7 +217,12 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
-	unexpiredReports, err := getUnexpiredCommitReports(r.config.destLP, r.config.commitStore, r.onchainConfig.PermissionLessExecutionThresholdDuration())
+	unexpiredReports, err := getUnexpiredCommitReports(
+		ctx,
+		r.config.destLP,
+		r.config.commitStore,
+		r.onchainConfig.PermissionLessExecutionThresholdDuration(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +309,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			logpoller.EvmWord(unexpiredReport.Interval.Min),
 			logpoller.EvmWord(unexpiredReport.Interval.Max),
 			int(r.offchainConfig.SourceFinalityDepth),
+			pg.WithParentCtx(ctx),
 		)
 		if err != nil {
 			return nil, err
@@ -308,7 +317,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		if len(srcLogs) != int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1) {
 			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", unexpiredReport.MerkleRoot, len(srcLogs), int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1))
 		}
-		executedMp, err := r.getExecutedSeqNrsInRange(unexpiredReport.Interval.Min, unexpiredReport.Interval.Max, latestBlock)
+		executedMp, err := r.getExecutedSeqNrsInRange(ctx, unexpiredReport.Interval.Min, unexpiredReport.Interval.Max, latestBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -357,6 +366,7 @@ func (r *ExecutionReportingPlugin) getSourceToDestTokenMapping(ctx context.Conte
 		[]common.Hash{abihelpers.EventSignatures.PoolAdded, abihelpers.EventSignatures.PoolRemoved},
 		[]common.Address{r.config.offRamp.Address()},
 		int(r.offchainConfig.DestOptimisticConfirmations),
+		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
 		return nil, err
@@ -412,7 +422,7 @@ func generateSourceToDestTokenMapping(ctx context.Context, offRamp evm_2_evm_off
 // Calculates a map that indicated whether a sequence number has already been executed
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
-func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64, latestBlock int64) (map[uint64]bool, error) {
+func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
 	executedLogs, err := r.config.destLP.IndexedLogsTopicRange(
 		abihelpers.EventSignatures.ExecutionStateChanged,
 		r.config.offRamp.Address(),
@@ -420,6 +430,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64, lat
 		logpoller.EvmWord(min),
 		logpoller.EvmWord(max),
 		int(r.offchainConfig.DestOptimisticConfirmations),
+		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
 		return nil, err
@@ -578,7 +589,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	if err := validateSeqNumbers(ctx, r.config.commitStore, observedMessages); err != nil {
 		return nil, err
 	}
-	commitReport, err := getCommitReportForSeqNum(r.config.destLP, r.config.commitStore, observedMessages[0].SeqNr)
+	commitReport, err := getCommitReportForSeqNum(ctx, r.config.destLP, r.config.commitStore, observedMessages[0].SeqNr)
 	if err != nil {
 		return nil, err
 	}
@@ -803,8 +814,18 @@ func getTokensPrices(ctx context.Context, priceRegistry price_registry.PriceRegi
 	return prices, nil
 }
 
-func getUnexpiredCommitReports(dstLogPoller logpoller.LogPoller, commitStore commit_store.CommitStoreInterface, permissionExecutionThreshold time.Duration) ([]commit_store.CommitStoreCommitReport, error) {
-	logs, err := dstLogPoller.LogsCreatedAfter(abihelpers.EventSignatures.ReportAccepted, commitStore.Address(), time.Now().Add(-permissionExecutionThreshold))
+func getUnexpiredCommitReports(
+	ctx context.Context,
+	dstLogPoller logpoller.LogPoller,
+	commitStore commit_store.CommitStoreInterface,
+	permissionExecutionThreshold time.Duration,
+) ([]commit_store.CommitStoreCommitReport, error) {
+	logs, err := dstLogPoller.LogsCreatedAfter(
+		abihelpers.EventSignatures.ReportAccepted,
+		commitStore.Address(),
+		time.Now().Add(-permissionExecutionThreshold),
+		pg.WithParentCtx(ctx),
+	)
 	if err != nil {
 		return nil, err
 	}

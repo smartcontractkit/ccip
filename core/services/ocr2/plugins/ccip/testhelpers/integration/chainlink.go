@@ -69,6 +69,7 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPIntegr
 			abihelpers.EvmWord(uint64(seqNum)),
 			abihelpers.EvmWord(uint64(seqNum)),
 			1,
+			pg.WithParentCtx(testutils.Context(t)),
 		)
 		require.NoError(t, err)
 		t.Log("Send requested", len(lgs))
@@ -94,7 +95,9 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts *CCIP
 			abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
 			abihelpers.EvmWord(uint64(minSeqNum)),
 			abihelpers.EvmWord(uint64(maxSeqNum)),
-			1)
+			1,
+			pg.WithParentCtx(testutils.Context(t)),
+		)
 		require.NoError(t, err)
 		t.Logf("Have executed logs %d want %d", len(lgs), maxSeqNum-minSeqNum+1)
 		if len(lgs) == maxSeqNum-minSeqNum+1 {
@@ -120,7 +123,9 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 			abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
 			abihelpers.EvmWord(uint64(seqNum)),
 			abihelpers.EvmWord(uint64(seqNum)),
-			1)
+			1,
+			pg.WithParentCtx(testutils.Context(t)),
+		)
 		require.NoError(t, err)
 		t.Log("Executed logs", lgs)
 		if len(lgs) == 1 {
