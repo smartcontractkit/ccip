@@ -8,6 +8,7 @@ import (
 	geth_types "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
+	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
@@ -102,12 +103,21 @@ func (sc *Sidecar) Run(ctx context.Context) error {
 
 	// Handle txs with status == Submitted
 	// Following transitions are possible:
-	// Submitted -> Finalized: same-chain transfer was finalized
-	// Submitted -> SourceFinalized: cross-chain transfer was finalized on source chain
-	// Submitted -> Failure: same-chain or cross-chain transfer failed
-	err = sc.handleSubmittedTxs(ctx, fromBlock, toBlock)
+	// Submitted -> Confirmed: same-chain or cross-chain transaction has 1 block confirmation
+	// Submitted -> Failed: same-chain or cross-chain transaction failed
+	err = sc.handleSubmittedTxs(ctx)
 	if err != nil {
 		return errors.Wrap(err, "handle submitted transactions")
+	}
+
+	// Handle txs with status == Confirmed
+	// Following transitions are possible:
+	// Confirmed -> Finalized: same-chain transfer was finalized
+	// Confirmed -> SourceFinalized: cross-chain transfer was finalized on source chain
+	// Confirmed -> Failure: same-chain or cross-chain transfer failed
+	err = sc.handleConfirmedTxs(ctx, fromBlock, toBlock)
+	if err != nil {
+		return errors.Wrap(err, "handle confirmed transactions")
 	}
 
 	// Handle txs with status == SourceFinalized
@@ -122,13 +132,37 @@ func (sc *Sidecar) Run(ctx context.Context) error {
 
 }
 
-func (sc *Sidecar) handleSubmittedTxs(ctx context.Context, fromBlock, toBlock int64) error {
+func (sc *Sidecar) handleSubmittedTxs(ctx context.Context) error {
 	submittedTxs, err := sc.orm.SelectBySourceChainIDAndStatus(sc.ccipChainSelector, types.Submitted, pg.WithParentCtx(ctx))
 	if err != nil {
 		return errors.Wrap(err, "find by status")
 	}
 
-	txSenderAddresses := txSenderAddresses(submittedTxs)
+	confirmedTxs, err := sc.orm.SelectEthTxsBySourceChainIDAndStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.EthTxConfirmed, txmgr.EthTxConfirmedMissingReceipt}, pg.WithParentCtx(ctx))
+	if err != nil {
+		return errors.Wrap(err, "confirmed transactions")
+	}
+
+	err = sc.updateConfirmedTxs(submittedTxs, confirmedTxs)
+	if err != nil {
+		return errors.Wrap(err, "update confirmed transactions")
+	}
+
+	failedTxs, err := sc.orm.SelectEthTxsBySourceChainIDAndStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.EthTxFatalError}, pg.WithParentCtx(ctx))
+	if err != nil {
+		return errors.Wrap(err, "failed transactions")
+	}
+
+	return sc.updateFailedTxs(submittedTxs, failedTxs)
+}
+
+func (sc *Sidecar) handleConfirmedTxs(ctx context.Context, fromBlock, toBlock int64) error {
+	confirmedTxs, err := sc.orm.SelectBySourceChainIDAndStatus(sc.ccipChainSelector, types.Confirmed, pg.WithParentCtx(ctx))
+	if err != nil {
+		return errors.Wrap(err, "find by status")
+	}
+
+	txSenderAddresses := txSenderAddresses(confirmedTxs)
 
 	logs, err := sc.lp.IndexedLogsByBlockRange(
 		fromBlock,
@@ -147,7 +181,7 @@ func (sc *Sidecar) handleSubmittedTxs(ctx context.Context, fromBlock, toBlock in
 		return errors.Wrap(err, "unmarshal forward succeeded logs")
 	}
 
-	finalizedLogs, err := finalizedLogs(fsLogs, submittedTxs)
+	finalizedLogs, err := finalizedLogs(fsLogs, confirmedTxs)
 	if err != nil {
 		return errors.Wrap(err, "finalized logs")
 	}
@@ -159,22 +193,40 @@ func (sc *Sidecar) handleSubmittedTxs(ctx context.Context, fromBlock, toBlock in
 		}
 	}
 
-	failedTxs, err := sc.orm.SelectEthTxsBySourceChainIDAndState(sc.ccipChainSelector, txmgr.EthTxFatalError, pg.WithParentCtx(ctx))
+	failedTxs, err := sc.orm.SelectEthTxsBySourceChainIDAndStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.EthTxFatalError}, pg.WithParentCtx(ctx))
 	if err != nil {
 		return errors.Wrap(err, "failed transactions")
 	}
 
-	return sc.updateFailedTxs(submittedTxs, failedTxs)
+	return sc.updateFailedTxs(confirmedTxs, failedTxs)
 }
 
-func (sc *Sidecar) updateFailedTxs(submittedTxs []types.LegacyGaslessTx, failedTxs []txmgr.DbEthTx) error {
+func (sc *Sidecar) updateConfirmedTxs(submittedTxs []types.LegacyGaslessTx, confirmedTxs []txmgr.DbEthTx) error {
+	confirmedTxsMap := make(map[string]txmgr.DbEthTx)
+	for _, ethTx := range confirmedTxs {
+		confirmedTxsMap[strconv.FormatInt(ethTx.ID, 10)] = ethTx
+	}
+
+	for _, tx := range submittedTxs {
+		if _, ok := confirmedTxsMap[tx.EthTxID]; ok {
+			tx.Status = types.Confirmed
+			err := sc.orm.UpdateLegacyGaslessTx(tx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (sc *Sidecar) updateFailedTxs(confirmedTxs []types.LegacyGaslessTx, failedTxs []txmgr.DbEthTx) error {
 	failedTxMap := make(map[string]txmgr.DbEthTx)
 	for _, ethTx := range failedTxs {
 		failedTxMap[strconv.FormatInt(ethTx.ID, 10)] = ethTx
 	}
 
-	for _, tx := range submittedTxs {
-		if ethTx, ok := failedTxMap[tx.ID]; ok {
+	for _, tx := range confirmedTxs {
+		if ethTx, ok := failedTxMap[tx.EthTxID]; ok {
 			tx.Status = types.Failure
 			tx.FailureReason = &ethTx.Error.String
 			err := sc.orm.UpdateLegacyGaslessTx(tx)
@@ -295,7 +347,7 @@ func ccipMessageIDs(txs []types.LegacyGaslessTx) (ccipMessageIDs []common.Hash) 
 }
 
 func finalizedLogs(
-	logs []*forwarder_wrapper.ForwarderForwardSucceeded, submittedTxs []types.LegacyGaslessTx) (finalizedLogs []types.LegacyGaslessTx, err error) {
+	logs []*forwarder_wrapper.ForwarderForwardSucceeded, confirmedTxs []types.LegacyGaslessTx) (finalizedLogs []types.LegacyGaslessTx, err error) {
 	keyToLogs := make(map[string]*forwarder_wrapper.ForwarderForwardSucceeded)
 	for _, log := range logs {
 		gt := types.LegacyGaslessTx{
@@ -312,7 +364,7 @@ func finalizedLogs(
 		keyToLogs[*key] = log
 	}
 
-	for _, tx := range submittedTxs {
+	for _, tx := range confirmedTxs {
 		key, err2 := tx.Key()
 		if err2 != nil {
 			// should not happen

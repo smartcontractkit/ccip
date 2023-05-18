@@ -11,6 +11,8 @@ import (
 	"github.com/test-go/testify/mock"
 	"github.com/test-go/testify/require"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -26,12 +28,18 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types"
 )
 
+type request struct {
+	tx        legacygasstation.TestLegacyGaslessTx
+	confirmed bool
+	failed    bool
+}
+
 type testcase struct {
 	name                 string
 	latestBlock          int64
 	lookbackBlock        int64
 	chainID              uint64
-	requestData          []legacygasstation.TestLegacyGaslessTx
+	requestData          []request
 	forwardSucceededLogs []*forwarder_wrapper.ForwarderForwardSucceeded
 	offrampExecutionLogs []*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged
 	resultData           []legacygasstation.TestLegacyGaslessTx
@@ -40,16 +48,71 @@ type testcase struct {
 var (
 	tests = []testcase{
 		{
-			name:          "submitted transaction finalized",
+			name:          "submitted transaction confirmed",
 			latestBlock:   100,
 			lookbackBlock: 50,
 			chainID:       testutils.SimulatedChainID.Uint64(),
-			requestData: []legacygasstation.TestLegacyGaslessTx{
+			requestData: []request{
+				{
+					tx: legacygasstation.TestLegacyGaslessTx{
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      testutils.SimulatedChainID.Uint64(),
+						DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					},
+					confirmed: true,
+				},
+			},
+			resultData: []legacygasstation.TestLegacyGaslessTx{
 				{
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
 					SourceChainID:      testutils.SimulatedChainID.Uint64(),
 					DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					Status:             types.Confirmed,
+				},
+			},
+		},
+		{
+			name:          "submitted transaction failed",
+			latestBlock:   100,
+			lookbackBlock: 50,
+			chainID:       testutils.SimulatedChainID.Uint64(),
+			requestData: []request{
+				{
+					tx: legacygasstation.TestLegacyGaslessTx{
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      testutils.SimulatedChainID.Uint64(),
+						DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					},
+					failed: true,
+				},
+			},
+			resultData: []legacygasstation.TestLegacyGaslessTx{
+				{
+					Nonce:              big.NewInt(0),
+					Amount:             big.NewInt(1e18),
+					SourceChainID:      testutils.SimulatedChainID.Uint64(),
+					DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					Status:             types.Failure,
+				},
+			},
+		},
+		{
+			name:          "confirmed transaction finalized",
+			latestBlock:   100,
+			lookbackBlock: 50,
+			chainID:       testutils.SimulatedChainID.Uint64(),
+			requestData: []request{
+				{
+					tx: legacygasstation.TestLegacyGaslessTx{
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      testutils.SimulatedChainID.Uint64(),
+						DestinationChainID: testutils.SimulatedChainID.Uint64(),
+						Status:             types.Confirmed,
+					},
 				},
 			},
 			forwardSucceededLogs: []*forwarder_wrapper.ForwarderForwardSucceeded{
@@ -72,23 +135,56 @@ var (
 			},
 		},
 		{
+			name:          "confirmed transaction failed",
+			latestBlock:   100,
+			lookbackBlock: 50,
+			chainID:       testutils.SimulatedChainID.Uint64(),
+			requestData: []request{
+				{
+					tx: legacygasstation.TestLegacyGaslessTx{
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      testutils.SimulatedChainID.Uint64(),
+						DestinationChainID: testutils.SimulatedChainID.Uint64(),
+						Status:             types.Confirmed,
+					},
+					failed: true,
+				},
+			},
+			resultData: []legacygasstation.TestLegacyGaslessTx{
+				{
+					Nonce:              big.NewInt(0),
+					Amount:             big.NewInt(1e18),
+					SourceChainID:      testutils.SimulatedChainID.Uint64(),
+					DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					Status:             types.Failure,
+				},
+			},
+		},
+		{
 			name:          "multiple submitted txs finalized",
 			latestBlock:   100,
 			lookbackBlock: 50,
 			chainID:       testutils.SimulatedChainID.Uint64(),
-			requestData: []legacygasstation.TestLegacyGaslessTx{
+			requestData: []request{
 				{
-					Nonce:              big.NewInt(0),
-					Amount:             big.NewInt(1e18),
-					SourceChainID:      testutils.SimulatedChainID.Uint64(),
-					DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					tx: legacygasstation.TestLegacyGaslessTx{
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      testutils.SimulatedChainID.Uint64(),
+						DestinationChainID: testutils.SimulatedChainID.Uint64(),
+						Status:             types.Confirmed,
+					},
 				},
 				{
-					From:               common.HexToAddress("0x780b3102c62d5DfDCc658B3480B93041Ba46F499"),
-					Nonce:              big.NewInt(0),
-					Amount:             big.NewInt(1e18),
-					SourceChainID:      testutils.SimulatedChainID.Uint64(),
-					DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					tx: legacygasstation.TestLegacyGaslessTx{
+						From:               common.HexToAddress("0x780b3102c62d5DfDCc658B3480B93041Ba46F499"),
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      testutils.SimulatedChainID.Uint64(),
+						DestinationChainID: testutils.SimulatedChainID.Uint64(),
+						Status:             types.Confirmed,
+					},
 				},
 			},
 			forwardSucceededLogs: []*forwarder_wrapper.ForwarderForwardSucceeded{
@@ -130,19 +226,23 @@ var (
 			latestBlock:   100,
 			lookbackBlock: 50,
 			chainID:       testutils.SimulatedChainID.Uint64(),
-			requestData: []legacygasstation.TestLegacyGaslessTx{
+			requestData: []request{
 				{
-					Nonce:              big.NewInt(0),
-					Amount:             big.NewInt(1e18),
-					SourceChainID:      testutils.SimulatedChainID.Uint64(),
-					DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					tx: legacygasstation.TestLegacyGaslessTx{
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      testutils.SimulatedChainID.Uint64(),
+						DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					},
 				},
 				{
-					From:               common.HexToAddress("0x780b3102c62d5DfDCc658B3480B93041Ba46F499"),
-					Nonce:              big.NewInt(0),
-					Amount:             big.NewInt(1e18),
-					SourceChainID:      testutils.SimulatedChainID.Uint64(),
-					DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					tx: legacygasstation.TestLegacyGaslessTx{
+						From:               common.HexToAddress("0x780b3102c62d5DfDCc658B3480B93041Ba46F499"),
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      testutils.SimulatedChainID.Uint64(),
+						DestinationChainID: testutils.SimulatedChainID.Uint64(),
+					},
 				},
 			},
 			forwardSucceededLogs: []*forwarder_wrapper.ForwarderForwardSucceeded{},
@@ -167,12 +267,15 @@ var (
 			latestBlock:   100,
 			lookbackBlock: 50,
 			chainID:       testutils.SimulatedChainID.Uint64(),
-			requestData: []legacygasstation.TestLegacyGaslessTx{
+			requestData: []request{
 				{
-					Nonce:              big.NewInt(0),
-					Amount:             big.NewInt(1e18),
-					SourceChainID:      testutils.SimulatedChainID.Uint64(),
-					DestinationChainID: 1000,
+					tx: legacygasstation.TestLegacyGaslessTx{
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      testutils.SimulatedChainID.Uint64(),
+						DestinationChainID: 1000,
+						Status:             types.Confirmed,
+					},
 				},
 			},
 			forwardSucceededLogs: []*forwarder_wrapper.ForwarderForwardSucceeded{
@@ -200,14 +303,16 @@ var (
 			latestBlock:   100,
 			lookbackBlock: 50,
 			chainID:       1000,
-			requestData: []legacygasstation.TestLegacyGaslessTx{
+			requestData: []request{
 				{
-					Nonce:              big.NewInt(0),
-					Amount:             big.NewInt(1e18),
-					SourceChainID:      1000,
-					DestinationChainID: testutils.SimulatedChainID.Uint64(),
-					CCIPMessageID:      ptr(common.HexToHash("0x30")),
-					Status:             types.SourceFinalized,
+					tx: legacygasstation.TestLegacyGaslessTx{
+						Nonce:              big.NewInt(0),
+						Amount:             big.NewInt(1e18),
+						SourceChainID:      1000,
+						DestinationChainID: testutils.SimulatedChainID.Uint64(),
+						CCIPMessageID:      ptr(common.HexToHash("0x30")),
+						Status:             types.SourceFinalized,
+					},
 				},
 			},
 			offrampExecutionLogs: []*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged{
@@ -248,8 +353,6 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 	})
 	backend := cltest.NewSimulatedBackend(t, core.GenesisAlloc{}, uint32(ethconfig.Defaults.Miner.GasCeil))
 	app := cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, cfg, backend)
-	_, fromAddress := cltest.MustInsertRandomKeyReturningState(t, app.KeyStore.Eth(), 0)
-	ethTx := cltest.MustInsertInProgressEthTxWithAttempt(t, app.TxmStorageService(), 13, fromAddress)
 	forwarder := forwarder_mocks.NewForwarderInterface(t)
 	offramp := mock_contracts.NewEVM2EVMOffRampInterface(t)
 	lggr := logger.TestLogger(t)
@@ -265,6 +368,7 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		fsLpLogs  []logpoller.Log
 		oelLpLogs []logpoller.Log
 	)
+
 	for _, fl := range test.forwardSucceededLogs {
 		forwarder.On("ParseLog", mock.Anything).Return(fl, nil).Once()
 		fsLpLogs = append(fsLpLogs, logpoller.Log{
@@ -307,9 +411,20 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		orm,
 	)
 	require.NoError(t, err)
-	for _, r := range test.requestData {
-		r.EthTxID = ethTx.GetID()
-		tx := legacygasstation.LegacyGaslessTx(t, r)
+	for i, r := range test.requestData {
+		chainID := cltest.FixtureChainID
+		blockNumber := int64(75)
+		_, fromAddress := cltest.MustInsertRandomKeyReturningState(t, app.KeyStore.Eth(), chainID)
+		var ethTx txmgr.EvmTx
+		if r.confirmed {
+			ethTx = cltest.MustInsertConfirmedEthTxBySaveFetchedReceipts(t, app.TxmStorageService(), fromAddress, int64(i), blockNumber, chainID)
+		} else if r.failed {
+			ethTx = cltest.MustInsertFatalErrorEthTx(t, app.TxmStorageService(), fromAddress)
+		} else {
+			ethTx = cltest.MustInsertInProgressEthTxWithAttempt(t, app.TxmStorageService(), int64(i), fromAddress)
+		}
+		r.tx.EthTxID = ethTx.GetID()
+		tx := legacygasstation.LegacyGaslessTx(t, r.tx)
 		err = orm.InsertLegacyGaslessTx(tx)
 		require.NoError(t, err)
 		err = orm.UpdateLegacyGaslessTx(tx) // update populates ccipMessageID and failureReason
@@ -319,9 +434,13 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 }
 
 func assertAfterSidecarRun(t *testing.T, test testcase, orm legacygasstation.ORM) {
-	submittedTxs, finalizedTxs, sourceFinalizedTxs, failedTxs := categorizeTestTxs(t, test.resultData)
+	confirmedTxs, submittedTxs, finalizedTxs, sourceFinalizedTxs, failedTxs := categorizeTestTxs(t, test.resultData)
 
-	txs, err := orm.SelectBySourceChainIDAndStatus(test.chainID, types.Submitted)
+	txs, err := orm.SelectBySourceChainIDAndStatus(test.chainID, types.Confirmed)
+	require.NoError(t, err)
+	require.Equal(t, len(confirmedTxs), len(txs))
+
+	txs, err = orm.SelectBySourceChainIDAndStatus(test.chainID, types.Submitted)
 	require.NoError(t, err)
 	require.Equal(t, len(submittedTxs), len(txs))
 
@@ -339,6 +458,7 @@ func assertAfterSidecarRun(t *testing.T, test testcase, orm legacygasstation.ORM
 }
 
 func categorizeTestTxs(t *testing.T, testTxs []legacygasstation.TestLegacyGaslessTx) (
+	confirmedTxs,
 	submittedTxs,
 	finalizedTxs,
 	sourceFinalizedTxs,
@@ -347,6 +467,8 @@ func categorizeTestTxs(t *testing.T, testTxs []legacygasstation.TestLegacyGasles
 	for _, testTx := range testTxs {
 		tx := legacygasstation.LegacyGaslessTx(t, testTx)
 		switch tx.Status {
+		case types.Confirmed:
+			confirmedTxs = append(confirmedTxs, tx)
 		case types.Submitted:
 			submittedTxs = append(submittedTxs, tx)
 		case types.SourceFinalized:

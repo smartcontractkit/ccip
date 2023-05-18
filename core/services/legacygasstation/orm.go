@@ -1,6 +1,7 @@
 package legacygasstation
 
 import (
+	"github.com/lib/pq"
 	"github.com/smartcontractkit/sqlx"
 
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
@@ -87,12 +88,12 @@ func (o *orm) UpdateLegacyGaslessTx(tx types.LegacyGaslessTx, qopts ...pg.QOpt) 
 	return err
 }
 
-func (o *orm) SelectEthTxsBySourceChainIDAndState(sourceChainID uint64, state txmgrtypes.TxState, qopts ...pg.QOpt) (ethTxs []txmgr.DbEthTx, err error) {
+func (o *orm) SelectEthTxsBySourceChainIDAndStates(sourceChainID uint64, states []txmgrtypes.TxState, qopts ...pg.QOpt) (ethTxs []txmgr.DbEthTx, err error) {
 	q := o.q.WithOpts(qopts...)
 	err = q.Select(&ethTxs, `SELECT eth_txes.* FROM legacy_gasless_txs
 	INNER JOIN eth_txes ON eth_txes.id = legacy_gasless_txs.eth_tx_id
 	WHERE legacy_gasless_txs.source_chain_id = $1 
-	AND eth_txes.state = $2
-	`, sourceChainID, state)
+	AND eth_txes.state = any($2)
+	`, sourceChainID, pq.Array(states))
 	return
 }

@@ -14,6 +14,7 @@ type Status uint8
 
 const (
 	Submitted       Status = iota // meta-transaction is submitted to tx manager
+	Confirmed                     // meta-transaction has 1 block confirmation on the source chain
 	SourceFinalized               // cross-chain meta-transaction is finalized on the source chain
 	Finalized                     // same-chain meta-transaction is finalized on the source chain
 	Failure                       // same-chain or cross-chain meta-transaction failed
@@ -23,6 +24,8 @@ func (s Status) String() string {
 	switch s {
 	case Submitted:
 		return "submitted"
+	case Confirmed:
+		return "confirmed"
 	case SourceFinalized:
 		return "sourceFinalized"
 	case Finalized:
@@ -41,6 +44,8 @@ func (s *Status) Scan(value interface{}) error {
 	switch status {
 	case "submitted":
 		*s = Submitted
+	case "confirmed":
+		*s = Confirmed
 	case "sourceFinalized":
 		*s = SourceFinalized
 	case "finalized":

@@ -9,6 +9,7 @@ import (
 	"github.com/test-go/testify/require"
 	"gopkg.in/guregu/null.v4"
 
+	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	configtest "github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest/v2"
@@ -135,11 +136,11 @@ func TestORM_FailedEthTx(t *testing.T) {
 	err = orm.InsertLegacyGaslessTx(tx)
 	require.NoError(t, err)
 
-	txs, err := orm.SelectEthTxsBySourceChainIDAndState(tx.SourceChainID, txmgr.EthTxInProgress)
+	txs, err := orm.SelectEthTxsBySourceChainIDAndStates(tx.SourceChainID, []txmgrtypes.TxState{txmgr.EthTxInProgress})
 	require.NoError(t, err)
 	require.Equal(t, 0, len(txs))
 
-	txs, err = orm.SelectEthTxsBySourceChainIDAndState(tx.SourceChainID, txmgr.EthTxFatalError)
+	txs, err = orm.SelectEthTxsBySourceChainIDAndStates(tx.SourceChainID, []txmgrtypes.TxState{txmgr.EthTxFatalError})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(txs))
 	require.Equal(t, txs[0].State, txmgr.EthTxFatalError)

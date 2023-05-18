@@ -80,12 +80,26 @@ func TestIntegration_LegacyGasStation_SameChainTransfer(t *testing.T) {
 
 	t.Run("single same-chain meta transfer", func(t *testing.T) {
 		req := generateRequest(t, backend, forwarder, bankERC20Address, senderKey, receiver.From, amount, ccipChainSelector, ccipChainSelector)
-		sendTransaction(t, req, app.Server.URL)
-		verifySameChainTransfer(t, orm, backend, bankERC20, receiver, amount, ccipChainSelector)
+		requestID := sendTransaction(t, req, app.Server.URL)
+		verifySameChainTransfer(t, orm, backend, bankERC20, requestID, receiver, amount, ccipChainSelector)
 	})
 }
 
-func verifySameChainTransfer(t *testing.T, orm legacygasstation.ORM, backend *backends.SimulatedBackend, bankERC20 *bank_erc20.BankERC20, receiver *bind.TransactOpts, amount *big.Int, ccipChainSelector uint64) {
+func verifyTxStatus(t *testing.T, orm legacygasstation.ORM, backend *backends.SimulatedBackend, requestID string, sourceChainCCIPSelector uint64, status types.Status) {
+	gomega.NewWithT(t).Eventually(func() bool {
+		backend.Commit()
+		txs, err := orm.SelectBySourceChainIDAndStatus(sourceChainCCIPSelector, status)
+		require.NoError(t, err)
+		for _, tx := range txs {
+			if tx.Status == status && tx.ID == requestID {
+				return true
+			}
+		}
+		return false
+	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())
+}
+
+func verifySameChainTransfer(t *testing.T, orm legacygasstation.ORM, backend *backends.SimulatedBackend, bankERC20 *bank_erc20.BankERC20, requestID string, receiver *bind.TransactOpts, amount *big.Int, ccipChainSelector uint64) {
 	// verify same-chain meta transaction
 	gomega.NewWithT(t).Eventually(func() bool {
 		backend.Commit()
@@ -95,17 +109,7 @@ func verifySameChainTransfer(t *testing.T, orm legacygasstation.ORM, backend *ba
 	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())
 
 	// verify legacy_gasless_txs has correct status
-	gomega.NewWithT(t).Eventually(func() bool {
-		backend.Commit()
-		txs, err := orm.SelectBySourceChainIDAndStatus(ccipChainSelector, types.Finalized)
-		require.NoError(t, err)
-		for _, tx := range txs {
-			if tx.Status == types.Finalized {
-				return true
-			}
-		}
-		return false
-	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())
+	verifyTxStatus(t, orm, backend, requestID, ccipChainSelector, types.Finalized)
 }
 
 // TestIntegration_LegacyGasStation_CrossChainTransfer_SourceChain tests cross chain transfer
@@ -146,7 +150,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_SourceChain(t *testing.
 	createLegacyGasStationSidecarJob(t, app, forwarderAddress, dummySourceOffRampAddress, sourceChainID, sourceChainID)
 
 	req := generateRequest(t, sourceBackend, forwarder, bankERC20Address, senderKey, receiver.From, amount, sourceChainID, destChainID)
-	sendTransaction(t, req, app.Server.URL)
+	requestID := sendTransaction(t, req, app.Server.URL)
 
 	orm := legacygasstation.NewORM(db, app.GetLogger(), app.GetConfig())
 	// verify that sender balance has been decremented
@@ -159,15 +163,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_SourceChain(t *testing.
 	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())
 
 	// verify legacy_gasless_txs has correct status
-	gomega.NewWithT(t).Eventually(func() bool {
-		ccipContracts.Source.Chain.Commit()
-		txs, err := orm.SelectBySourceChainIDAndStatus(sourceChainID, types.SourceFinalized)
-		require.NoError(t, err)
-		for _, tx := range txs {
-			return tx.Status == types.SourceFinalized
-		}
-		return false
-	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())
+	verifyTxStatus(t, orm, ccipContracts.Source.Chain, requestID, sourceChainID, types.SourceFinalized)
 }
 
 // TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain tests cross chain transfer
@@ -206,23 +202,23 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	require.NoError(t, err)
 
 	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
-		require.NoError(t, err)
+		_, err2 := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
+		require.NoError(t, err2)
 	}))
 	defer linkUSD.Close()
 	ethUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(`{"UsdPerETH": "2000000000000000000000"}`))
-		require.NoError(t, err)
+		_, err2 := w.Write([]byte(`{"UsdPerETH": "2000000000000000000000"}`))
+		require.NoError(t, err2)
 	}))
 	defer ethUSD.Close()
 	wrappedDestTokenUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(`{"UsdPerWrappedDestToken": "500000000000000000"}`))
-		require.NoError(t, err)
+		_, err2 := w.Write([]byte(`{"UsdPerWrappedDestToken": "500000000000000000"}`))
+		require.NoError(t, err2)
 	}))
 	defer wrappedDestTokenUSD.Close()
 	bankERC20USD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(`{"UsdPerBankERC20": "5000000000000000000"}`))
-		require.NoError(t, err)
+		_, err2 := w.Write([]byte(`{"UsdPerBankERC20": "5000000000000000000"}`))
+		require.NoError(t, err2)
 	}))
 	defer bankERC20USD.Close()
 	tokenPricesUSDPipeline := fmt.Sprintf(`
@@ -290,8 +286,8 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	gomega.NewWithT(t).Eventually(func() bool {
 		ccipContracts.Source.Chain.Commit()
 		destBackend.Commit()
-		receiverBal, err := destPool.BalanceOf(nil, receiver.From)
-		require.NoError(t, err)
+		receiverBal, err2 := destPool.BalanceOf(nil, receiver.From)
+		require.NoError(t, err2)
 		return receiverBal.Cmp(amount) == 0
 	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())
 
@@ -494,7 +490,7 @@ func setUpDB(t *testing.T) (cfg chainlink.GeneralConfig, db *sqlx.DB) {
 	return
 }
 
-func sendTransaction(t *testing.T, req types.SendTransactionRequest, url string) {
+func sendTransaction(t *testing.T, req types.SendTransactionRequest, url string) string {
 	body, err := json.Marshal(req)
 	require.NoError(t, err)
 
@@ -515,7 +511,7 @@ func sendTransaction(t *testing.T, req types.SendTransactionRequest, url string)
 	require.NotNil(t, decodedJsonResp["request_id"])
 	requestID, ok := decodedJsonResp["request_id"].(string)
 	require.True(t, ok)
-	uuid.MustParse(requestID)
+	return uuid.MustParse(requestID).String()
 }
 
 func setupTokenAndForwarderContracts(
