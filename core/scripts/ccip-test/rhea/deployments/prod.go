@@ -83,8 +83,9 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x1C4310602DEFc04117980080b1807eac15687649"), // BetaUser - Zaros (ZD Labs)
 		gethcommon.HexToAddress("0x4d2F1C99BCE324B9Ba486d704A0235A754D188a2"), // BetaUser - Aave (BGD Labs)
 		gethcommon.HexToAddress("0x289F4D1e83BE7bb8A493D55622cE09D72D2A16e6"), // BetaUser - Steadefi
-		gethcommon.HexToAddress("0x99138C8773279549922A3A375BB1E49e20AC7Bd0"), // BetaUser - SuperDuper
 		gethcommon.HexToAddress("0x651c84ACc85D7a4506FD5dd6EB94d050c7ED2fe7"), // BetaUser - Lendvest
+		gethcommon.HexToAddress("0xf62FD6119EBAFEdAAa7a75C1713Bca98729f163D"), // BetaUser - Fidelity Digital Assets
+		gethcommon.HexToAddress("0x0D7a3a17E2E160287D3e7e74c4A1B22422156642"), // BetaUser - RiseWorks
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
@@ -277,9 +278,9 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x4986fD36b6b16f49b43282Ee2e24C5cF90ed166d"), // BetaUser - Sommelier Finance
 		gethcommon.HexToAddress("0xc7a5d29248cf53b094106ca1d29634b34ad0fede"), // BetaUser - Tristero
 		gethcommon.HexToAddress("0x4A5D71F7027684d473a1110a412B510354aF33e7"), // BetaUser - Aave (BGD Labs)
-		gethcommon.HexToAddress("0x99138C8773279549922A3A375BB1E49e20AC7Bd0"), // BetaUser - SuperDuper
 		gethcommon.HexToAddress("0x44eb6D97e98CE35eEFBD5764aa786f10121bC5e4"), // BetaUser - ANZ
 		gethcommon.HexToAddress("0xa707480A11f12569b888306F2F118716d3BC29A1"), // BetaUser - Lendvest
+		gethcommon.HexToAddress("0x9344AeA9b3270d51c9603d3054E421386dFaacB8"), // BetaUser - Fidelity Digital Assets
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
