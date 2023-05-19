@@ -65,6 +65,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x4d2bd64a51c84fef0bac9090473fb9b7fe652a66"), // SepoliaToAvaxFuji.PingPongDapp,
 		gethcommon.HexToAddress("0x63142ee8aa67fcfe478c8da84a51380a5510f01b"), // SepoliaToOptimismGoerli.PingPongDapp,
 		gethcommon.HexToAddress("0x6c1b166f191bb923865647320f560cf329fe4839"), // SepoliaToArbitrum.PingPongDapp,
+		gethcommon.HexToAddress("0xc82f067bb4d66a5a878e88ca96b3bc6a40068dc4"), // SepoliaToQuorum.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x25D7214ae75F169263921a1cAaf7E6F033210E24"), // Chris Cushman
