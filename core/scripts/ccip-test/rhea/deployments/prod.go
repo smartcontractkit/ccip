@@ -93,6 +93,8 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xf62FD6119EBAFEdAAa7a75C1713Bca98729f163D"), // BetaUser - Fidelity Digital Assets
 		gethcommon.HexToAddress("0x0D7a3a17E2E160287D3e7e74c4A1B22422156642"), // BetaUser - RiseWorks
 		gethcommon.HexToAddress("0xc5f502Ae5972c938940b33308f8845cbe80211B5"), // BetaUser - Robolabs
+		gethcommon.HexToAddress("0x87F45de79da4c3356591d74619693E372D525F1b"), // BankToken (BANK) - internal testing contract for SWIFT POC
+		gethcommon.HexToAddress("0x844257f146a586dAdD5A3a46cd8c069Bb565a80e"), // BetaUser - SWIFT (BondToken)
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {

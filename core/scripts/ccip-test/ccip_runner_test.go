@@ -448,6 +448,8 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 		&deployments.Prod_SepoliaToOptimismGoerli,
 		&deployments.Prod_SepoliaToAvaxFuji,
 		&deployments.Prod_SepoliaToArbitrumGoerli,
+		// Quorum allowList is turned off for now, do no uncomment
+		//&deployments.Prod_SepoliaToQuorum,
 
 		&deployments.Prod_AvaxFujiToSepolia,
 		&deployments.Prod_AvaxFujiToOptimismGoerli,
