@@ -85,6 +85,8 @@ func TestCCIP(t *testing.T) {
 		client.SetOCR2Config(ENV)
 		clientOtherWayAround := NewCcipClient(t, DESTINATION, SOURCE, ownerKey, seedKey)
 		clientOtherWayAround.SetOCR2Config(ENV)
+	case "reemitEvents": // re-set current onchain config to re-emit deployment events
+		client.reemitEvents(t, DESTINATION)
 	case "setOnRampFeeConfig":
 		client.setOnRampFeeConfig(t, &SOURCE)
 	case "applyFeeTokensUpdates":
