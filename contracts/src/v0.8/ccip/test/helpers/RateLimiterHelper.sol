@@ -13,7 +13,7 @@ contract RateLimiterHelper {
       rate: config.rate,
       capacity: config.capacity,
       tokens: config.capacity,
-      lastUpdated: uint40(block.timestamp),
+      lastUpdated: uint32(block.timestamp),
       isEnabled: config.isEnabled
     });
   }

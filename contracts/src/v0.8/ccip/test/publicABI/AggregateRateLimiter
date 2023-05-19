@@ -4,6 +4,6 @@
   "getTokenLimitAdmin()": "599f6431",
   "owner()": "8da5cb5b",
   "setAdmin(address)": "704b6c02",
-  "setRateLimiterConfig((bool,uint208,uint256))": "3091aee7",
+  "setRateLimiterConfig((bool,uint128,uint128))": "c92b2832",
   "transferOwnership(address)": "f2fde38b"
 }

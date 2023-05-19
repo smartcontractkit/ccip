@@ -141,9 +141,9 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
 		evm_2_evm_offramp.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  LinkUSDValue(100),
 			Rate:      LinkUSDValue(1),
-			IsEnabled: true,
 		},
 	)
 	require.NoError(t, err)
@@ -214,9 +214,9 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		},
 		[]common.Address{}, // allow list
 		evm_2_evm_onramp.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  LinkUSDValue(100),
 			Rate:      LinkUSDValue(1),
-			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -419,9 +419,9 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	wrappedTokenName,
 	wrappedTokenSymbol string) (sourcePoolAddress, wrappedDestTokenPoolAddress common.Address, sourcePool *lock_release_token_pool.LockReleaseTokenPool, destPool *wrapped_token_pool.WrappedTokenPool, err error) {
 	wrappedDestTokenPoolAddress, _, destPool, err = wrapped_token_pool.DeployWrappedTokenPool(c.Dest.User, c.Dest.Chain, wrappedTokenName, wrappedTokenSymbol, 18, wrapped_token_pool.RateLimiterConfig{
+		IsEnabled: true,
 		Capacity:  HundredLink,
 		Rate:      big.NewInt(1e18),
-		IsEnabled: true,
 	})
 	if err != nil {
 		return
@@ -429,9 +429,9 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	c.Source.Chain.Commit()
 
 	sourcePoolAddress, _, sourcePool, err = lock_release_token_pool.DeployLockReleaseTokenPool(c.Source.User, c.Source.Chain, sourceTokenAddress, lock_release_token_pool.RateLimiterConfig{
+		IsEnabled: true,
 		Capacity:  HundredLink,
 		Rate:      big.NewInt(1e18),
-		IsEnabled: true,
 	})
 	if err != nil {
 		return
@@ -611,9 +611,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceChain,
 		sourceLinkTokenAddress,
 		lock_release_token_pool.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  HundredLink,
 			Rate:      big.NewInt(1e18),
-			IsEnabled: true,
 		})
 	require.NoError(t, err)
 	sourceChain.Commit()
@@ -631,9 +631,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destChain,
 		destLinkTokenAddress,
 		lock_release_token_pool.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  HundredLink,
 			Rate:      big.NewInt(1e18),
-			IsEnabled: true,
 		})
 	require.NoError(t, err)
 	destChain.Commit()
@@ -684,9 +684,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceChain,
 		sourceWeth9addr,
 		lock_release_token_pool.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  HundredLink,
 			Rate:      big.NewInt(1e18),
-			IsEnabled: true,
 		})
 	require.NoError(t, err)
 	sourceChain.Commit()
@@ -757,9 +757,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 		[]common.Address{}, // allow list
 		evm_2_evm_onramp.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  LinkUSDValue(100),
 			Rate:      LinkUSDValue(1),
-			IsEnabled: true,
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
@@ -821,9 +821,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destChain,
 		destWeth9addr,
 		lock_release_token_pool.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  HundredLink,
 			Rate:      big.NewInt(1e18),
-			IsEnabled: true,
 		})
 	require.NoError(t, err)
 	destWrappedPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destWrappedPoolAddress, destChain)
@@ -888,9 +888,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
 		evm_2_evm_offramp.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  LinkUSDValue(100),
 			Rate:      LinkUSDValue(1),
-			IsEnabled: true,
 		},
 	)
 	require.NoError(t, err)

@@ -48,7 +48,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
       rate: rateLimiterConfig.rate,
       capacity: rateLimiterConfig.capacity,
       tokens: rateLimiterConfig.capacity,
-      lastUpdated: uint40(block.timestamp),
+      lastUpdated: uint32(block.timestamp),
       isEnabled: rateLimiterConfig.isEnabled
     });
 

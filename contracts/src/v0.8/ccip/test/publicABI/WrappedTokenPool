@@ -17,7 +17,7 @@
   "pause()": "8456cb59",
   "paused()": "5c975abb",
   "releaseOrMint(bytes,address,uint256,uint64,bytes)": "8627fad6",
-  "setRateLimiterConfig((bool,uint208,uint256))": "3091aee7",
+  "setRateLimiterConfig((bool,uint128,uint128))": "c92b2832",
   "supportsInterface(bytes4)": "01ffc9a7",
   "symbol()": "95d89b41",
   "totalSupply()": "18160ddd",

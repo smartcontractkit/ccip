@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {RateLimiter} from "../../libraries/RateLimiter.sol";
-
 import {ERC20} from "../../../vendor/ERC20.sol";
 
 contract MockERC20 is ERC20 {

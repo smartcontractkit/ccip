@@ -124,9 +124,9 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 			backend,
 			token,
 			lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-				IsEnabled: true,
 			})
 	})
 
@@ -472,9 +472,9 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSele
 			sourceToken,
 			pools,
 			evm_2_evm_offramp.RateLimiterConfig{
-				Rate:      opts.Rate,
-				Capacity:  opts.Capacity,
 				IsEnabled: true,
+				Capacity:  opts.Capacity,
+				Rate:      opts.Rate,
 			},
 		)
 	})

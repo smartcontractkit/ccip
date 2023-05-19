@@ -89,19 +89,21 @@ contract TokenPool_currentRateLimiterState is TokenPoolSetup {
     assertEq(bucket.capacity, expectedConfig.capacity);
     assertEq(bucket.rate, expectedConfig.rate);
     assertEq(bucket.tokens, expectedConfig.capacity);
-    assertEq(bucket.lastUpdated, uint40(block.timestamp));
+    assertEq(bucket.lastUpdated, uint32(block.timestamp));
   }
 }
 
 contract TokenPool_setRateLimiterConfig is TokenPoolSetup {
   event ConfigChanged(RateLimiter.Config);
 
-  function testSetRateLimiterConfigSuccess(uint256 capacity, uint208 rate, uint40 newTime) public {
+  function testSetRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
     // Bucket updates only work on increasing time
     vm.assume(newTime >= block.timestamp);
     vm.warp(newTime);
 
     uint256 oldCapacity = rateLimiterConfig().capacity;
+    uint256 oldTokens = s_tokenPool.currentRateLimiterState().tokens;
+
     RateLimiter.Config memory newConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
 
     vm.expectEmit();
@@ -109,13 +111,13 @@ contract TokenPool_setRateLimiterConfig is TokenPoolSetup {
 
     s_tokenPool.setRateLimiterConfig(newConfig);
 
-    uint256 expectedNewCapacity = RateLimiter._min(newConfig.capacity, oldCapacity + rate * (newTime - BLOCK_TIME));
+    uint256 expectedTokens = RateLimiter._min(newConfig.capacity, oldTokens);
 
     RateLimiter.TokenBucket memory bucket = s_tokenPool.currentRateLimiterState();
     assertEq(bucket.capacity, newConfig.capacity);
     assertEq(bucket.rate, newConfig.rate);
-    assertEq(bucket.tokens, expectedNewCapacity);
-    assertEq(bucket.lastUpdated, uint48(newTime));
+    assertEq(bucket.tokens, expectedTokens);
+    assertEq(bucket.lastUpdated, newTime);
   }
 
   // Reverts

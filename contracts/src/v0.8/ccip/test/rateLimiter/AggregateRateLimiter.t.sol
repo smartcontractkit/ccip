@@ -143,7 +143,7 @@ contract AggregateTokenLimiter_setRateLimiterConfig is AggregateTokenLimiterSetu
 
     s_config = RateLimiter.Config({
       isEnabled: !bucket.isEnabled,
-      rate: uint208(bucket.rate * 2),
+      rate: uint128(bucket.rate * 2),
       capacity: bucket.capacity * 8
     });
 
@@ -175,6 +175,9 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
 
   function testRateLimitValueSuccess_gas() public {
     vm.pauseGasMetering();
+    // start from blocktime that does not equal rate limiter init timestamp
+    vm.warp(BLOCK_TIME + 1);
+
     // 15 (tokens) * 4 (price) * 2 (number of times) > 100 (capacity)
     uint256 numberOfTokens = 15;
     uint256 value = (numberOfTokens * TOKEN_PRICE) / 1e18;
@@ -202,7 +205,7 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
     s_rateLimiter.rateLimitValue(tokenAmounts, s_priceRegistry);
 
     // Move the block time forward by 10 so the bucket refills by 10 * rate
-    vm.warp(BLOCK_TIME + waitTime);
+    vm.warp(BLOCK_TIME + 1 + waitTime);
 
     // The bucket has filled up enough so we can take out more tokens
     s_rateLimiter.rateLimitValue(tokenAmounts, s_priceRegistry);

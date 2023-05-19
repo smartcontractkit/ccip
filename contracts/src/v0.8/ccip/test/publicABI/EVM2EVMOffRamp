@@ -22,7 +22,7 @@
   "owner()": "8da5cb5b",
   "setAdmin(address)": "704b6c02",
   "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
-  "setRateLimiterConfig((bool,uint208,uint256))": "3091aee7",
+  "setRateLimiterConfig((bool,uint128,uint128))": "c92b2832",
   "transferOwnership(address)": "f2fde38b",
   "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": "b1dc65a4",
   "typeAndVersion()": "181f5a77"

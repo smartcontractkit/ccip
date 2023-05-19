@@ -163,9 +163,9 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 		tokensAndPools,
 		[]common.Address{}, // allow list
 		evm_2_evm_onramp.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  UsdToRateLimitValue(RATE_LIMIT_CAPACITY_DOLLAR),
 			Rate:      UsdToRateLimitValue(RATE_LIMIT_RATE_DOLLAR),
-			IsEnabled: true,
 		},
 		feeTokenConfig,
 		tokenTransferFeeConfig,
@@ -211,9 +211,9 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainSelecto
 		syncedSourceTokens,
 		syncedDestPools,
 		evm_2_evm_offramp.RateLimiterConfig{
+			IsEnabled: true,
 			Capacity:  UsdToRateLimitValue(RATE_LIMIT_CAPACITY_DOLLAR),
 			Rate:      UsdToRateLimitValue(RATE_LIMIT_RATE_DOLLAR),
-			IsEnabled: true,
 		},
 	)
 	shared.RequireNoError(t, err)

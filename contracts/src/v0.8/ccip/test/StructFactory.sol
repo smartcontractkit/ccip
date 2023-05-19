@@ -7,6 +7,7 @@ import "../interfaces/IRouter.sol";
 import "../offRamp/EVM2EVMOffRamp.sol";
 import "../onRamp/EVM2EVMOnRamp.sol";
 import "../AggregateRateLimiter.sol";
+import {RateLimiter} from "../libraries/RateLimiter.sol";
 
 contract StructFactory {
   // addresses

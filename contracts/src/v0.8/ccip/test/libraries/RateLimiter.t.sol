@@ -39,7 +39,7 @@ contract RateLimiter_setTokenBucketConfig is RateLimiterSetup {
 
     s_config = RateLimiter.Config({
       isEnabled: true,
-      rate: uint208(rateLimiter.rate * 2),
+      rate: uint128(rateLimiter.rate * 2),
       capacity: rateLimiter.capacity * 8
     });
 
@@ -67,7 +67,7 @@ contract RateLimiter_currentTokenBucketState is RateLimiterSetup {
     assertEq(s_config.isEnabled, bucket.isEnabled);
     assertEq(BLOCK_TIME, bucket.lastUpdated);
 
-    s_config = RateLimiter.Config({isEnabled: true, rate: uint208(bucket.rate * 2), capacity: bucket.capacity * 8});
+    s_config = RateLimiter.Config({isEnabled: true, rate: uint128(bucket.rate * 2), capacity: bucket.capacity * 8});
 
     s_helper.setTokenBucketConfig(s_config);
 
@@ -87,7 +87,7 @@ contract RateLimiter_currentTokenBucketState is RateLimiterSetup {
     assertEq(s_config.isEnabled, bucket.isEnabled);
     assertEq(BLOCK_TIME, bucket.lastUpdated);
 
-    s_config = RateLimiter.Config({isEnabled: true, rate: uint208(bucket.rate * 2), capacity: bucket.capacity * 8});
+    s_config = RateLimiter.Config({isEnabled: true, rate: uint128(bucket.rate * 2), capacity: bucket.capacity * 8});
 
     s_helper.setTokenBucketConfig(s_config);
 
@@ -215,6 +215,17 @@ contract RateLimiter_consume is RateLimiterSetup {
     s_helper.consume(rateLimiter.capacity + 1);
   }
 
+  function testConsumingMoreThanUint128Reverts() public {
+    RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
+
+    uint256 request = uint256(type(uint128).max) + 1;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(RateLimiter.ConsumingMoreThanMaxCapacity.selector, rateLimiter.capacity, request)
+    );
+    s_helper.consume(request);
+  }
+
   function testRateLimitReachedReverts() public {
     RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
 
@@ -228,5 +239,25 @@ contract RateLimiter_consume is RateLimiterSetup {
 
     vm.expectRevert(abi.encodeWithSelector(RateLimiter.RateLimitReached.selector, waitInSeconds));
     s_helper.consume(requestTokens2);
+  }
+
+  function testRateLimitReachedOverConsecutiveBlocksReverts() public {
+    uint256 initBlockTime = BLOCK_TIME + 10000;
+    vm.warp(initBlockTime);
+
+    RateLimiter.TokenBucket memory rateLimiter = s_helper.getRateLimiter();
+
+    vm.expectEmit();
+    emit TokensConsumed(rateLimiter.capacity);
+
+    s_helper.consume(rateLimiter.capacity);
+
+    vm.warp(initBlockTime + 1);
+
+    // Over rate limit by 1, force 1 second wait
+    uint256 overLimit = 1;
+
+    vm.expectRevert(abi.encodeWithSelector(RateLimiter.RateLimitReached.selector, 1));
+    s_helper.consume(rateLimiter.rate + overLimit);
   }
 }
