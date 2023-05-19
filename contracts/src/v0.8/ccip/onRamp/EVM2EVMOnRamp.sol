@@ -6,6 +6,7 @@ import {IPool} from "../interfaces/pools/IPool.sol";
 import {IAFN} from "../interfaces/IAFN.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
+import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
@@ -27,7 +28,7 @@ import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts
 /// routers and are always deployed as complete set, even during upgrades.
 /// This means an upgrade to an onRamp will require redeployment of the
 /// commitStore and offRamp as well.
-contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAndVersionInterface {
+contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRateLimiter, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
@@ -641,7 +642,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
 
     uint96 totalFeesToPay = s_nopFeesJuels;
     if (totalFeesToPay < weightsTotal) revert NoFeesToPay();
-    if (IERC20(i_linkToken).balanceOf(address(this)) < totalFeesToPay) revert InsufficientBalance();
+    if (_linkLeftAfterNopFees() < 0) revert InsufficientBalance();
 
     uint96 fundsLeft = totalFeesToPay;
     uint256 numberOfNops = s_nops.length();
@@ -664,13 +665,28 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, Pausable, AggregateRateLimiter, TypeAn
   function withdrawNonLinkFees(address feeToken, address to) external onlyOwner {
     if (feeToken == i_linkToken) revert InvalidFeeToken(feeToken);
     if (to == address(0)) revert InvalidWithdrawalAddress(to);
-    uint256 linkBalance = IERC20(i_linkToken).balanceOf(address(this));
 
     // We require the link balance to be settled before allowing withdrawal
     // of non-link fees.
-    if (linkBalance < s_nopFeesJuels) revert LinkBalanceNotSettled();
+    if (_linkLeftAfterNopFees() < 0) revert LinkBalanceNotSettled();
 
     IERC20(feeToken).safeTransfer(to, IERC20(feeToken).balanceOf(address(this)));
+  }
+
+  // ================================================================
+  // |                        Link monitoring                       |
+  // ================================================================
+
+  /// @notice Calculate remaining LINK balance after paying nops
+  /// @return balance if nops were to be paid
+  function _linkLeftAfterNopFees() private view returns (int256) {
+    // Since LINK caps at uint96, casting to int256 is safe
+    return int256(IERC20(i_linkToken).balanceOf(address(this))) - int256(uint256(s_nopFeesJuels));
+  }
+
+  /// @notice Allow keeper to monitor funds available for paying nops
+  function linkAvailableForPayment() public view returns (int256) {
+    return _linkLeftAfterNopFees();
   }
 
   // ================================================================

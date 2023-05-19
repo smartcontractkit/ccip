@@ -19,6 +19,7 @@
   "getTokenLimitAdmin()": "599f6431",
   "getTokenTransferFeeConfig(address)": "1772047e",
   "isAFNHealthy()": "147809b3",
+  "linkAvailableForPayment()": "d09dc339",
   "owner()": "8da5cb5b",
   "pause()": "8456cb59",
   "paused()": "5c975abb",

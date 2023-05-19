@@ -179,6 +179,34 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
   }
 }
 
+/// @notice #linkAvailableForPayment
+contract EVM2EVMOnRamp_linkAvailableForPayment is EVM2EVMOnRamp_payNops {
+  function testLinkAvailableForPaymentSuccess() public {
+    uint256 totalJuels = s_onRamp.getNopFeesJuels();
+    uint256 linkBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp));
+
+    assertEq(int256(linkBalance - totalJuels), s_onRamp.linkAvailableForPayment());
+
+    changePrank(OWNER);
+    s_onRamp.payNops();
+
+    assertEq(int256(linkBalance - totalJuels), s_onRamp.linkAvailableForPayment());
+  }
+
+  function testInsufficientLinkBalanceSuccess() public {
+    uint256 totalJuels = s_onRamp.getNopFeesJuels();
+    uint256 linkBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp));
+
+    changePrank(address(s_onRamp));
+
+    uint256 linkRemaining = 1;
+    IERC20(s_sourceFeeToken).transfer(OWNER, linkBalance - linkRemaining);
+
+    changePrank(STRANGER);
+    assertEq(int256(linkRemaining) - int256(totalJuels), s_onRamp.linkAvailableForPayment());
+  }
+}
+
 /// @notice #forwardFromRouter
 contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function setUp() public virtual override {

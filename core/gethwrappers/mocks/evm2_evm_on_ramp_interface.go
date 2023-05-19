@@ -956,6 +956,32 @@ func (_m *EVM2EVMOnRampInterface) IsAFNHealthy(opts *bind.CallOpts) (bool, error
 	return r0, r1
 }
 
+// LinkAvailableForPayment provides a mock function with given fields: opts
+func (_m *EVM2EVMOnRampInterface) LinkAvailableForPayment(opts *bind.CallOpts) (*big.Int, error) {
+	ret := _m.Called(opts)
+
+	var r0 *big.Int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (*big.Int, error)); ok {
+		return rf(opts)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) *big.Int); ok {
+		r0 = rf(opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*big.Int)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
+		r1 = rf(opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Owner provides a mock function with given fields: opts
 func (_m *EVM2EVMOnRampInterface) Owner(opts *bind.CallOpts) (common.Address, error) {
 	ret := _m.Called(opts)
