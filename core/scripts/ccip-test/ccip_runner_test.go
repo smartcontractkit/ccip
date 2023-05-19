@@ -132,7 +132,11 @@ func TestRheaDeployLane(t *testing.T) {
 
 	client.startPingPong(t)
 
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+	don := dione.NewDON(env, logger.TestLogger(t))
 	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 
@@ -147,7 +151,12 @@ func TestRheaDeployLane(t *testing.T) {
 func TestDione(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+
+	don := dione.NewDON(env, logger.TestLogger(t))
 	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 
