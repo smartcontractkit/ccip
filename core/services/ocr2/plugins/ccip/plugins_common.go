@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 )
 
 const (
@@ -27,28 +28,28 @@ const (
 
 var ErrCommitStoreIsDown = errors.New("commitStore is down")
 
-func LoadOnRamp(onRampAddress common.Address, client client.Client) (*evm_2_evm_onramp.EVM2EVMOnRamp, error) {
+func LoadOnRamp(onRampAddress common.Address, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampInterface, error) {
 	err := ccipconfig.VerifyTypeAndVersion(onRampAddress, client, ccipconfig.EVM2EVMOnRamp)
 	if err != nil {
 		return nil, errors.Wrap(err, "Invalid onRamp contract")
 	}
-	return evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, client)
+	return observability.NewObservedEVM2EVMnRamp(onRampAddress, client)
 }
 
-func LoadOffRamp(offRampAddress common.Address, client client.Client) (*evm_2_evm_offramp.EVM2EVMOffRamp, error) {
+func LoadOffRamp(offRampAddress common.Address, client client.Client) (evm_2_evm_offramp.EVM2EVMOffRampInterface, error) {
 	err := ccipconfig.VerifyTypeAndVersion(offRampAddress, client, ccipconfig.EVM2EVMOffRamp)
 	if err != nil {
 		return nil, errors.Wrap(err, "Invalid offRamp contract")
 	}
-	return evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, client)
+	return observability.NewObservedEVM2EVMOffRamp(offRampAddress, client)
 }
 
-func LoadCommitStore(commitStoreAddress common.Address, client client.Client) (*commit_store.CommitStore, error) {
+func LoadCommitStore(commitStoreAddress common.Address, client client.Client) (commit_store.CommitStoreInterface, error) {
 	err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
 	if err != nil {
 		return nil, errors.Wrap(err, "Invalid commitStore contract")
 	}
-	return commit_store.NewCommitStore(commitStoreAddress, client)
+	return observability.NewObservedCommitStore(commitStoreAddress, client)
 }
 
 func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {

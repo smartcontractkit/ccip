@@ -121,7 +121,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func getSeqNumFromLog(onRamp *evm_2_evm_onramp.EVM2EVMOnRamp) func(log logpoller.Log) (uint64, error) {
+func getSeqNumFromLog(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) func(log logpoller.Log) (uint64, error) {
 	return func(log logpoller.Log) (uint64, error) {
 		req, err := onRamp.ParseCCIPSendRequested(log.GetGethLog())
 		if err != nil {
