@@ -49,6 +49,8 @@ func ChainName(chainID int64) string {
 		return "polygon-mainnet"
 	case 420:
 		return "ethereum-testnet-goerli-optimism-1"
+	case 1337:
+		return "quorum-testnet-swift"
 	case 4002:
 		return "fantom-testnet"
 	case 42161:

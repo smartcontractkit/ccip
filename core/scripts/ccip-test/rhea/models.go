@@ -56,17 +56,19 @@ const (
 	Goerli         Chain = "ethereum-testnet-goerli"
 	PolygonMumbai  Chain = "polygon-testnet-mumbai"
 	ArbitrumGoerli Chain = "ethereum-testnet-goerli-arbitrum-1"
+	Quorum         Chain = "quorum-testnet-swift"
 )
 
 func GetAllChains() []Chain {
 	return []Chain{
-		Sepolia, AvaxFuji, OptimismGoerli, Goerli, PolygonMumbai, ArbitrumGoerli,
+		Sepolia, AvaxFuji, OptimismGoerli, Goerli, PolygonMumbai, ArbitrumGoerli, Quorum,
 	}
 }
 
 func GetCCIPChainSelector(EVMChainId uint64) uint64 {
 	var evmChainIdToChainSelector = map[uint64]uint64{
 		420:      2664363617261496610,
+		1337:     3379446385462418246,
 		43113:    14767482510784806043,
 		80001:    12532609583862916517,
 		421613:   6101244977088475029,

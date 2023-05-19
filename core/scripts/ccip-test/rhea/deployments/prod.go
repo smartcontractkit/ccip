@@ -13,6 +13,7 @@ var ProdChains = map[rhea.Chain]rhea.EvmDeploymentConfig{
 	rhea.Sepolia:        {ChainConfig: Prod_Sepolia},
 	rhea.ArbitrumGoerli: {ChainConfig: Prod_ArbitrumGoerli},
 	rhea.PolygonMumbai:  {ChainConfig: Prod_PolygonMumbai},
+	rhea.Quorum:         {ChainConfig: Prod_Quorum},
 }
 
 var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
@@ -21,6 +22,7 @@ var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 		rhea.OptimismGoerli: Prod_SepoliaToOptimismGoerli,
 		rhea.ArbitrumGoerli: Prod_SepoliaToArbitrumGoerli,
 		rhea.PolygonMumbai:  Prod_SepoliaToPolygonMumbai,
+		rhea.Quorum:         Prod_SepoliaToQuorum,
 	},
 	rhea.AvaxFuji: {
 		rhea.Sepolia:        Prod_AvaxFujiToSepolia,
@@ -35,6 +37,9 @@ var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 	},
 	rhea.PolygonMumbai: {
 		rhea.Sepolia: Prod_PolygonMumbaiToSepolia,
+	},
+	rhea.Quorum: {
+		rhea.Sepolia: Prod_QuorumToSepolia,
 	},
 }
 
@@ -445,6 +450,49 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 	},
 }
 
+var Prod_Quorum = rhea.EVMChainConfig{
+	EvmChainId: 1337,
+	GasSettings: rhea.EVMGasSettings{
+		EIP1559:   false,
+		GasTipCap: rhea.DefaultGasTipFee,
+	},
+	AllowList: []gethcommon.Address{},
+	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+		rhea.LINK: {
+			Token:         gethcommon.HexToAddress("0x8a710bBd77661D168D5A6725bD2E514ba1bFf59d"),
+			Pool:          gethcommon.HexToAddress("0x3df2913ec50702957ce34f1d22ffe98edd9efefc"),
+			Price:         rhea.LINK.Price(),
+			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.WETH: {
+			Token:         gethcommon.HexToAddress("0xe5BD6BCb6fa8e5236984D5ea127dE5047f93B5fF"),
+			Price:         rhea.WETH.Price(),
+			TokenPoolType: rhea.FeeTokenOnly,
+		},
+	},
+	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
+	WrappedNative: rhea.WETH,
+	Router:        gethcommon.HexToAddress("0xd74033b0466e26ac984c6165dd0dc017ca05ff91"),
+	Afn:           gethcommon.HexToAddress("0x10ea990fc39f4a140f107fc87bf7d4da3fd37095"),
+	PriceRegistry: gethcommon.HexToAddress("0x632ad295b9cb955d70feb33e6a3ee2bddbf0582d"),
+	TunableChainValues: rhea.TunableChainValues{
+		BlockConfirmations:       getBlockConfirmations(rhea.Quorum),
+		BatchGasLimit:            BATCH_GAS_LIMIT,
+		RelativeBoostPerWaitHour: RELATIVE_BOOST_PER_WAIT_HOUR,
+		FeeUpdateHeartBeat:       models.MustMakeDuration(FEE_UPDATE_HEARTBEAT),
+		FeeUpdateDeviationPPB:    FEE_UPDATE_DEVIATION_PPB_FAST_CHAIN,
+		MaxGasPrice:              getMaxGasPrice(rhea.Quorum),
+		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
+		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
+	},
+	DeploySettings: rhea.ChainDeploySettings{
+		DeployAFN:           false,
+		DeployTokenPools:    false,
+		DeployRouter:        false,
+		DeployPriceRegistry: false,
+	},
+}
+
 var Prod_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 	ChainConfig: Prod_Sepolia,
 	LaneConfig: rhea.EVMLaneConfig{
@@ -601,6 +649,38 @@ var Prod_SepoliaToPolygonMumbai = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    3497174,
+		},
+	},
+}
+
+var Prod_QuorumToSepolia = rhea.EvmDeploymentConfig{
+	ChainConfig: Prod_Quorum,
+	LaneConfig: rhea.EVMLaneConfig{
+		OnRamp:       gethcommon.HexToAddress("0x6ea155fc77566d9dce01b8aa5d7968665dc4f0c5"),
+		OffRamp:      gethcommon.HexToAddress("0xb602b6e5caf08ac0c920eae585aed100a8cf6f3b"),
+		CommitStore:  gethcommon.HexToAddress("0x89d5b13908b9063abcc6791dc724bf7b7c93634c"),
+		PingPongDapp: gethcommon.HexToAddress("0x77f10a563eef8996694fb0325ac110a4083b9002"),
+		DeploySettings: rhea.LaneDeploySettings{
+			DeployCommitStore:  false,
+			DeployRamp:         false,
+			DeployPingPongDapp: false,
+			DeployedAtBlock:    77706,
+		},
+	},
+}
+
+var Prod_SepoliaToQuorum = rhea.EvmDeploymentConfig{
+	ChainConfig: Prod_Sepolia,
+	LaneConfig: rhea.EVMLaneConfig{
+		OnRamp:       gethcommon.HexToAddress("0x4f7a6e0045d78630bd49394df292aedbd1631bd6"),
+		OffRamp:      gethcommon.HexToAddress("0x43e9295190e3bfe51d6a8568aaa42d4520fc4476"),
+		CommitStore:  gethcommon.HexToAddress("0x0a5781e8912c0fa09d2029e221ec7ab392edc7f3"),
+		PingPongDapp: gethcommon.HexToAddress("0xc82f067bb4d66a5a878e88ca96b3bc6a40068dc4"),
+		DeploySettings: rhea.LaneDeploySettings{
+			DeployCommitStore:  false,
+			DeployRamp:         false,
+			DeployPingPongDapp: false,
+			DeployedAtBlock:    3515969,
 		},
 	},
 }

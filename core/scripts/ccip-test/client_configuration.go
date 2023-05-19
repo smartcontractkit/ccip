@@ -623,6 +623,9 @@ func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txha
 }
 
 func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
+	if client.Dest.Client.ChainId == 1337 || client.Source.Client.ChainId == 1337 {
+		env = dione.Prod_Swift
+	}
 	verifierOCRConfig, err := client.Dest.CommitStore.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
 	if verifierOCRConfig.BlockNumber != 0 {
