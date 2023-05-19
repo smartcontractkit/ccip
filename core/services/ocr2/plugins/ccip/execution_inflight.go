@@ -17,25 +17,25 @@ type InflightInternalExecutionReport struct {
 	messages  []evm_2_evm_onramp.InternalEVM2EVMMessage
 }
 
-// inflightReportsContainer holds existing inflight reports.
+// inflightExecReportsContainer holds existing inflight reports.
 // it provides a thread-safe access as it is called from multiple goroutines,
 // e.g. reporting and transmission protocols.
-type inflightReportsContainer struct {
-	locker  *sync.RWMutex
+type inflightExecReportsContainer struct {
+	locker  sync.RWMutex
 	reports []InflightInternalExecutionReport
 
 	cacheExpiry time.Duration
 }
 
-func newInflightReportsContainer(inflightCacheExpiry time.Duration) *inflightReportsContainer {
-	return &inflightReportsContainer{
-		locker:      &sync.RWMutex{},
+func newInflightExecReportsContainer(inflightCacheExpiry time.Duration) *inflightExecReportsContainer {
+	return &inflightExecReportsContainer{
+		locker:      sync.RWMutex{},
 		reports:     make([]InflightInternalExecutionReport, 0),
 		cacheExpiry: inflightCacheExpiry,
 	}
 }
 
-func (container *inflightReportsContainer) getAll() []InflightInternalExecutionReport {
+func (container *inflightExecReportsContainer) getAll() []InflightInternalExecutionReport {
 	container.locker.RLock()
 	defer container.locker.RUnlock()
 
@@ -45,7 +45,7 @@ func (container *inflightReportsContainer) getAll() []InflightInternalExecutionR
 	return reports
 }
 
-func (container *inflightReportsContainer) expire(lggr logger.Logger) {
+func (container *inflightExecReportsContainer) expire(lggr logger.Logger) {
 	container.locker.Lock()
 	defer container.locker.Unlock()
 	// Reap old inflight txs and check if any messages in the report are inflight.
@@ -62,7 +62,7 @@ func (container *inflightReportsContainer) expire(lggr logger.Logger) {
 	container.reports = stillInFlight
 }
 
-func (container *inflightReportsContainer) add(lggr logger.Logger, messages []evm_2_evm_onramp.InternalEVM2EVMMessage) error {
+func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages []evm_2_evm_onramp.InternalEVM2EVMMessage) error {
 	container.locker.Lock()
 	defer container.locker.Unlock()
 

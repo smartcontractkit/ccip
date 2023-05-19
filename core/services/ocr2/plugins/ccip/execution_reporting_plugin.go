@@ -21,7 +21,6 @@ import (
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -46,45 +45,6 @@ var (
 	_ types.ReportingPlugin        = &ExecutionReportingPlugin{}
 )
 
-// ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
-// all the message ids will be added to the tx metadata.
-func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
-	execReport, err := abihelpers.DecodeExecutionReport(report)
-	if err != nil {
-		return nil, err
-	}
-
-	msgIDs := make([]string, len(execReport.EncodedMessages))
-	for i, encMsg := range execReport.EncodedMessages {
-		msg, err := abihelpers.DecodeMessage(encMsg)
-		if err != nil {
-			return nil, err
-		}
-		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
-	}
-
-	return &txmgr.EthTxMeta{
-		MessageIDs: msgIDs,
-	}, nil
-}
-
-func MessagesFromExecutionReport(report types.Report) ([]evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
-	decodedExecutionReport, err := abihelpers.DecodeExecutionReport(report)
-	if err != nil {
-		return nil, err
-	}
-	var messages []evm_2_evm_onramp.InternalEVM2EVMMessage
-	for _, encMsg := range decodedExecutionReport.EncodedMessages {
-		msg, err := abihelpers.DecodeMessage(encMsg)
-		if err != nil {
-			return nil, err
-		}
-		// We assume err != nil when msg is nil.
-		messages = append(messages, *msg)
-	}
-	return messages, nil
-}
-
 type ExecutionPluginConfig struct {
 	lggr                  logger.Logger
 	sourceLP, destLP      logpoller.LogPoller
@@ -102,7 +62,7 @@ type ExecutionReportingPlugin struct {
 	config                    ExecutionPluginConfig
 	F                         int
 	lggr                      logger.Logger
-	inflightReports           *inflightReportsContainer
+	inflightReports           *inflightExecReportsContainer
 	snoozedRoots              map[[32]byte]time.Time
 	destPriceRegistry         price_registry.PriceRegistryInterface
 	destWrappedNative         common.Address
@@ -160,7 +120,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			F:                         config.F,
 			lggr:                      rf.config.lggr.Named("ExecutionReportingPlugin"),
 			snoozedRoots:              make(map[[32]byte]time.Time),
-			inflightReports:           newInflightReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
+			inflightReports:           newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
 			destPriceRegistry:         priceRegistry,
 			destWrappedNative:         destWrappedNative,
 			onchainConfig:             onchainConfig,
@@ -364,14 +324,6 @@ func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) 
 		supportedDestTokens = append(supportedDestTokens, destToken)
 	}
 	return srcToDstTokens, supportedDestTokens, nil
-}
-
-func copyMap[M ~map[K]V, K comparable, V any](m M) M {
-	cpy := make(M)
-	for k, v := range m {
-		cpy[k] = v
-	}
-	return cpy
 }
 
 // Returns a copy of the latest source to dest mapping. Lazily updates the source to dest token mapping only if changes have happened.
@@ -736,7 +688,7 @@ func calculateObservedMessagesConsensus(lggr logger.Logger, observations []Execu
 
 func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
-	messages, err := MessagesFromExecutionReport(report)
+	messages, err := abihelpers.MessagesFromExecutionReport(report)
 	if err != nil {
 		lggr.Errorw("unable to decode report", "err", err)
 		return false, nil
@@ -757,10 +709,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 }
 
 func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
-	if isCommitStoreDownNow(ctx, r.config.lggr, r.config.commitStore) {
-		return false, nil
-	}
-	messages, err := MessagesFromExecutionReport(report)
+	messages, err := abihelpers.MessagesFromExecutionReport(report)
 	if err != nil {
 		return false, nil
 	}

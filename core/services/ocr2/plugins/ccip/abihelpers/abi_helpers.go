@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -122,6 +123,23 @@ func init() {
 		panic("missing event 'manuallyExecute'")
 	}
 	ExecutionReportArgs = manuallyExecuteMethod.Inputs
+}
+
+func MessagesFromExecutionReport(report types.Report) ([]evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
+	decodedExecutionReport, err := DecodeExecutionReport(report)
+	if err != nil {
+		return nil, err
+	}
+	var messages []evm_2_evm_onramp.InternalEVM2EVMMessage
+	for _, encMsg := range decodedExecutionReport.EncodedMessages {
+		msg, err := DecodeMessage(encMsg)
+		if err != nil {
+			return nil, err
+		}
+		// We assume err != nil when msg is nil.
+		messages = append(messages, *msg)
+	}
+	return messages, nil
 }
 
 func EncodeMessage(msg *evm_2_evm_onramp.InternalEVM2EVMMessage) ([]byte, error) {

@@ -3,10 +3,12 @@ package ccip
 import (
 	"context"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/constraints"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -117,4 +119,43 @@ func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore c
 		return true
 	}
 	return paused || !healthy
+}
+
+func copyMap[M ~map[K]V, K comparable, V any](m M) M {
+	cpy := make(M)
+	for k, v := range m {
+		cpy[k] = v
+	}
+	return cpy
+}
+
+func max[T constraints.Ordered](first T, rest ...T) T {
+	max := first
+	for _, v := range rest {
+		if v > max {
+			max = v
+		}
+	}
+	return max
+}
+
+func median(vals []*big.Int) *big.Int {
+	valsCopy := make([]*big.Int, len(vals))
+	copy(valsCopy[:], vals[:])
+	sort.Slice(valsCopy, func(i, j int) bool {
+		return valsCopy[i].Cmp(valsCopy[j]) == -1
+	})
+	return valsCopy[len(valsCopy)/2]
+}
+
+// deviation_parts_per_billion = ((x2 - x1) / x1) * 1e9
+func deviates(x1, x2 *big.Int, ppb int64) bool {
+	// if x1 == 0, deviates if x2 != x1, to avoid the relative division by 0 error
+	if x1.BitLen() == 0 {
+		return x1.Cmp(x2) != 0
+	}
+	diff := big.NewInt(0).Sub(x1, x2)
+	diff.Mul(diff, big.NewInt(1e9))
+	diff.Div(diff, x1)
+	return diff.CmpAbs(big.NewInt(ppb)) > 0
 }

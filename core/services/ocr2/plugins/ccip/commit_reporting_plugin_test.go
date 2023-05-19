@@ -1,12 +1,14 @@
 package ccip
 
 import (
+	"context"
 	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
 	"github.com/leanovate/gopter/prop"
@@ -26,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
@@ -72,8 +75,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			leafHasher:          hasher.NewLeafHasher(th.Source.ChainID, th.Dest.ChainID, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
 			getSeqNumFromLog:    getSeqNumFromLog(th.Source.OnRamp),
 		},
-		inFlight:      map[[32]byte]InflightCommitReport{},
-		onchainConfig: th.CommitOnchainConfig,
+		inflightReports: newInflightCommitReportsContainer(time.Hour),
+		onchainConfig:   th.CommitOnchainConfig,
 		offchainConfig: ccipconfig.CommitOffchainConfig{
 			SourceFinalityDepth:   0,
 			FeeUpdateDeviationPPB: 5e7,
@@ -762,5 +765,53 @@ func TestCommitReportToEthTxMeta(t *testing.T) {
 			require.NotNil(t, txMeta)
 			require.EqualValues(t, tc.expectedRange, txMeta.SeqNumbers)
 		})
+	}
+}
+
+func TestNextMin(t *testing.T) {
+	lggr := logger.TestLogger(t)
+	commitStore := mock_contracts.CommitStoreInterface{}
+	cp := CommitReportingPlugin{config: CommitPluginConfig{commitStore: &commitStore}, inflightReports: newInflightCommitReportsContainer(time.Hour)}
+	root1 := utils.Keccak256Fixed(hexutil.MustDecode("0xaa"))
+	var tt = []struct {
+		onChainMin      uint64
+		inflight        []commit_store.CommitStoreCommitReport
+		expectedNextMin uint64
+	}{
+		{
+			onChainMin:      uint64(1),
+			inflight:        nil,
+			expectedNextMin: uint64(1),
+		},
+		{
+			onChainMin: uint64(1),
+			inflight: []commit_store.CommitStoreCommitReport{
+				{Interval: commit_store.CommitStoreInterval{Min: uint64(1), Max: uint64(2)}, MerkleRoot: root1}},
+			expectedNextMin: uint64(3),
+		},
+		{
+			onChainMin: uint64(1),
+			inflight: []commit_store.CommitStoreCommitReport{
+				{Interval: commit_store.CommitStoreInterval{Min: uint64(3), Max: uint64(4)}, MerkleRoot: root1}},
+			expectedNextMin: uint64(5),
+		},
+		{
+			onChainMin: uint64(1),
+			inflight: []commit_store.CommitStoreCommitReport{
+				{Interval: commit_store.CommitStoreInterval{Min: uint64(1), Max: uint64(MaxInflightSeqNumGap + 2)}, MerkleRoot: root1}},
+			expectedNextMin: uint64(1),
+		},
+	}
+	for _, tc := range tt {
+		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.onChainMin, nil)
+		for _, rep := range tc.inflight {
+			rc := rep
+			require.NoError(t, cp.inflightReports.add(lggr, rc))
+		}
+		t.Log("inflight", cp.inflightReports.maxInflightSeqNr())
+		min, err := cp.nextMinSeqNum(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, tc.expectedNextMin, min)
+		cp.inflightReports.reset()
 	}
 }

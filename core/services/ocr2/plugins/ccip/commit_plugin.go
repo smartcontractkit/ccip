@@ -11,10 +11,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
@@ -129,4 +131,21 @@ func getSeqNumFromLog(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) func(log l
 		}
 		return req.Message.SequenceNumber, nil
 	}
+}
+
+// CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
+// sequence numbers of the committed messages will be added to tx metadata
+func CommitReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
+	commitReport, err := abihelpers.DecodeCommitReport(report)
+	if err != nil {
+		return nil, err
+	}
+	n := int(commitReport.Interval.Max-commitReport.Interval.Min) + 1
+	seqRange := make([]uint64, n)
+	for i := 0; i < n; i++ {
+		seqRange[i] = uint64(i) + commitReport.Interval.Min
+	}
+	return &txmgr.EthTxMeta{
+		SeqNumbers: seqRange,
+	}, nil
 }

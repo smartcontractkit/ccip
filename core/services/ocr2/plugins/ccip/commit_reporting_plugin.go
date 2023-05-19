@@ -21,7 +21,6 @@ import (
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -35,33 +34,19 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-// only dynamic field in CommitReport is tokens PriceUpdates, and we don't expect to need to update thousands of tokens in a single tx
-const MaxCommitReportLength = 10_000
+const (
+	// only dynamic field in CommitReport is tokens PriceUpdates, and we don't expect to need to update thousands of tokens in a single tx
+	MaxCommitReportLength = 10_000
+	// Maximum inflight seq number range before we consider reports to be failing to get included entirely
+	// and restart from the chain's minSeqNum. Want to set it high to allow for large throughput,
+	// but low enough to minimize wasted revert cost.
+	MaxInflightSeqNumGap = 500
+)
 
 var (
 	_ types.ReportingPluginFactory = &CommitReportingPluginFactory{}
 	_ types.ReportingPlugin        = &CommitReportingPlugin{}
 )
-
-// InflightCommitReport represents a commit report which has been submitted
-// to the transaction manager and we expect to be included in the chain.
-// By keeping track of the inflight reports, we are able to build subsequent
-// reports "on top" of the inflight ones for improved throughput - for example
-// if seqNrs=[1,2] are inflight, we can build and send [3,4] while [1,2] is still confirming
-// and optimistically assume they will complete in order. If for whatever reason (re-org or
-// RPC timing) leads to [3,4] arriving before [1,2], we'll revert onchain. Once the cache
-// expires we'll then build from the onchain state again and retries. In this manner,
-// we are able to obtain high throughput during happy path yet still naturally recover
-// if a reorg or issue causes onchain reverts.
-type InflightCommitReport struct {
-	report    *commit_store.CommitStoreCommitReport
-	createdAt time.Time
-}
-
-type InflightPriceUpdate struct {
-	priceUpdates commit_store.InternalPriceUpdates
-	createdAt    time.Time
-}
 
 type update struct {
 	timestamp time.Time
@@ -84,15 +69,10 @@ type CommitPluginConfig struct {
 }
 
 type CommitReportingPlugin struct {
-	config CommitPluginConfig
-	F      int
-	lggr   logger.Logger
-	// We need to synchronize access to the inflight structure
-	// as reporting plugin methods may be called from separate goroutines,
-	// e.g. reporting vs transmission protocol.
-	inFlightMu              sync.RWMutex
-	inFlight                map[[32]byte]InflightCommitReport
-	inFlightPriceUpdates    []InflightPriceUpdate
+	config                  CommitPluginConfig
+	F                       int
+	lggr                    logger.Logger
+	inflightReports         *inflightCommitReportsContainer
 	priceRegistry           price_registry.PriceRegistryInterface
 	offchainConfig          ccipconfig.CommitOffchainConfig
 	onchainConfig           ccipconfig.CommitOnchainConfig
@@ -149,7 +129,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			config:                rf.config,
 			F:                     config.F,
 			lggr:                  rf.config.lggr.Named("CommitReportingPlugin"),
-			inFlight:              make(map[[32]byte]InflightCommitReport),
+			inflightReports:       newInflightCommitReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
 			priceRegistry:         priceRegistry,
 			onchainConfig:         onchainConfig,
 			offchainConfig:        offchainConfig,
@@ -180,7 +160,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportT
 	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
-	r.expireInflight(lggr)
+	r.inflightReports.expire(lggr)
 
 	// Will return 0,0 if no messages are found. This is a valid case as the report could
 	// still contain fee updates.
@@ -204,31 +184,6 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportT
 		TokenPricesUSD:    tokenPricesUSD,
 		SourceGasPriceUSD: sourceGasPriceUSD,
 	}.Marshal()
-}
-
-// expireInflight removed any expired entries from the inflight cache.
-func (r *CommitReportingPlugin) expireInflight(lggr logger.Logger) {
-	r.inFlightMu.Lock()
-	defer r.inFlightMu.Unlock()
-	// Reap any expired entries from inflight.
-	for root, inFlightReport := range r.inFlight {
-		if time.Since(inFlightReport.createdAt) > r.offchainConfig.InflightCacheExpiry.Duration() {
-			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
-			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains so we retry.
-			lggr.Infow("Inflight report expired", "rootOfRoots", hexutil.Encode(inFlightReport.report.MerkleRoot[:]))
-			delete(r.inFlight, root)
-		}
-	}
-	var stillInflight []InflightPriceUpdate
-	for _, inFlightFeeUpdate := range r.inFlightPriceUpdates {
-		if time.Since(inFlightFeeUpdate.createdAt) > r.offchainConfig.InflightCacheExpiry.Duration() {
-			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
-			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains, so we retry.
-			lggr.Infow("Inflight price update expired", "updates", inFlightFeeUpdate.priceUpdates)
-			stillInflight = append(stillInflight, inFlightFeeUpdate)
-		}
-	}
-	r.inFlightPriceUpdates = stillInflight
 }
 
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {
@@ -277,20 +232,29 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 }
 
 func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (uint64, error) {
-	nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
+	nextMinOnChain, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return 0, err
 	}
-	// loop through sorted inFlightReports
-	// only increment nextMin if the report build ontop the running nextMin
-	r.inFlightMu.RLock()
-	defer r.inFlightMu.RUnlock()
-	for _, report := range r.inFlight {
-		if report.report.Interval.Max >= nextMin {
-			nextMin = report.report.Interval.Max + 1
-		}
+	// There are several scenarios to consider here for nextMin and inflight intervals.
+	// 1. nextMin=2, inflight=[[2,3],[4,5]]. Node is waiting for [2,3] and [4,5] to be included, should return 6 to build on top.
+	// 2. nextMin=2, inflight=[[4,5]]. [2,3] is expired but not yet visible onchain (means our cache expiry
+	// was too low). In this case still want to return 6.
+	// 3. nextMin=2, inflight=[] but other nodes have inflight=[2,3]. Say our node restarted and lost its cache. In this case
+	// we still return the chain's nextMin, other oracles will ignore our observation. Other nodes however will build [4,5]
+	// and then we'll add that to our cache in ShouldAcceptFinalizedReport, putting us into the previous position at which point
+	// we can start contributing again.
+	// 4. nextMin=4, inflight=[[2,3],[4,5]]. We see the onchain update, but haven't expired from our cache yet. Should happen
+	// regularly and we just return 6.
+	// 5. nextMin=2, inflight=[[4,5]]. [2,3] failed to get onchain for some reason. We'll return 6 and continue building even though
+	// subsequent reports will revert, but eventually they will all expire OR we'll hit MaxInflightSeqNumGap and forcibly
+	// expire them all. This scenario can also occur if there is a reorg which reorders the reports such that one reverts.
+	maxInflight := r.inflightReports.maxInflightSeqNr()
+	if (maxInflight > nextMinOnChain) && ((maxInflight - nextMinOnChain) > MaxInflightSeqNumGap) {
+		r.inflightReports.reset()
+		return nextMinOnChain, nil
 	}
-	return nextMin, nil
+	return max(nextMinOnChain, maxInflight+1), nil
 }
 
 // All prices are USD ($1=1e18) denominated. We only generate prices we think should be updated;
@@ -473,20 +437,12 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 	if skipInflight {
 		return latestUpdates, nil
 	}
-
-	r.inFlightMu.RLock()
-	defer r.inFlightMu.RUnlock()
-	for _, inflight := range r.inFlightPriceUpdates {
-		for _, inflightTokenUpdate := range inflight.priceUpdates.TokenPriceUpdates {
-			if !inflight.createdAt.Before(latestUpdates[inflightTokenUpdate.SourceToken].timestamp) {
-				latestUpdates[inflightTokenUpdate.SourceToken] = update{
-					timestamp: inflight.createdAt,
-					value:     inflightTokenUpdate.UsdPerToken,
-				}
-			}
+	latestInflightTokenPriceUpdates := r.inflightReports.latestInflightTokenPriceUpdates()
+	for inflightToken, latestInflightUpdate := range latestInflightTokenPriceUpdates {
+		if latestInflightUpdate.timestamp.After(latestUpdates[inflightToken].timestamp) {
+			latestUpdates[inflightToken] = latestInflightUpdate
 		}
 	}
-
 	return latestUpdates, nil
 }
 
@@ -522,31 +478,11 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 	if skipInflight {
 		return gasPriceUpdate, nil
 	}
-
-	r.inFlightMu.RLock()
-	defer r.inFlightMu.RUnlock()
-	for _, inflight := range r.inFlightPriceUpdates {
-		if inflight.priceUpdates.DestChainSelector != 0 && !inflight.createdAt.Before(gasPriceUpdate.timestamp) {
-			gasPriceUpdate = update{
-				timestamp: inflight.createdAt,
-				value:     inflight.priceUpdates.UsdPerUnitGas,
-			}
-		}
+	latestInflightGasPriceUpdate := r.inflightReports.getLatestInflightGasPriceUpdate()
+	if latestInflightGasPriceUpdate != nil && latestInflightGasPriceUpdate.timestamp.After(gasPriceUpdate.timestamp) {
+		gasPriceUpdate = *latestInflightGasPriceUpdate
 	}
-
 	return gasPriceUpdate, nil
-}
-
-// deviation_parts_per_billion = ((x2 - x1) / x1) * 1e9
-func deviates(x1, x2 *big.Int, feeUpdateDeviationPPB int64) bool {
-	// if x1 == 0, deviates if x2 != x1, to avoid the relative division by 0 error
-	if x1.BitLen() == 0 {
-		return x1.Cmp(x2) != 0
-	}
-	diff := big.NewInt(0).Sub(x1, x2)
-	diff.Mul(diff, big.NewInt(1e9))
-	diff.Div(diff, x1)
-	return diff.CmpAbs(big.NewInt(feeUpdateDeviationPPB)) > 0
 }
 
 func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
@@ -695,15 +631,6 @@ func calculatePriceUpdates(destChainSelector uint64, observations []CommitObserv
 	}
 }
 
-func median(vals []*big.Int) *big.Int {
-	valsCopy := make([]*big.Int, len(vals))
-	copy(valsCopy[:], vals[:])
-	sort.Slice(valsCopy, func(i, j int) bool {
-		return valsCopy[i].Cmp(valsCopy[j]) == -1
-	})
-	return valsCopy[len(valsCopy)/2]
-}
-
 // buildReport assumes there is at least one message in reqs.
 func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit_store.CommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (commit_store.CommitStoreCommitReport, error) {
 	lggr := r.lggr.Named("BuildReport")
@@ -781,31 +708,11 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		}
 	}
 
-	r.addToInflight(lggr, &parsedReport)
+	if err := r.inflightReports.add(lggr, parsedReport); err != nil {
+		return false, err
+	}
 	lggr.Infow("Accepting finalized report", "merkleRoot", hexutil.Encode(parsedReport.MerkleRoot[:]))
 	return true, nil
-}
-
-func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit_store.CommitStoreCommitReport) {
-	r.inFlightMu.Lock()
-	defer r.inFlightMu.Unlock()
-
-	if report.MerkleRoot != [32]byte{} {
-		// Set new inflight ones as pending
-		lggr.Infow("Adding to inflight report", "rootOfRoots", hexutil.Encode(report.MerkleRoot[:]))
-		r.inFlight[report.MerkleRoot] = InflightCommitReport{
-			report:    report,
-			createdAt: time.Now(),
-		}
-	}
-
-	if report.PriceUpdates.DestChainSelector != 0 || len(report.PriceUpdates.TokenPriceUpdates) != 0 {
-		lggr.Infow("Adding to inflight fee updates", "priceUpdates", report.PriceUpdates)
-		r.inFlightPriceUpdates = append(r.inFlightPriceUpdates, InflightPriceUpdate{
-			priceUpdates: report.PriceUpdates,
-			createdAt:    time.Now(),
-		})
-	}
 }
 
 // ShouldTransmitAcceptedReport checks if the report is stale, if it is it should not be
@@ -886,21 +793,4 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report commit
 
 func (r *CommitReportingPlugin) Close() error {
 	return nil
-}
-
-// CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
-// sequence numbers of the committed messages will be added to tx metadata
-func CommitReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
-	commitReport, err := abihelpers.DecodeCommitReport(report)
-	if err != nil {
-		return nil, err
-	}
-	n := int(commitReport.Interval.Max-commitReport.Interval.Min) + 1
-	seqRange := make([]uint64, n)
-	for i := 0; i < n; i++ {
-		seqRange[i] = uint64(i) + commitReport.Interval.Min
-	}
-	return &txmgr.EthTxMeta{
-		SeqNumbers: seqRange,
-	}, nil
 }

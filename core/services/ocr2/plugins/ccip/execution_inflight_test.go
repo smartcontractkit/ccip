@@ -12,7 +12,7 @@ import (
 
 func TestInflightReportsContainer_add(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	container := newInflightReportsContainer(time.Second)
+	container := newInflightExecReportsContainer(time.Second)
 
 	err := container.add(lggr, []evm_2_evm_onramp.InternalEVM2EVMMessage{
 		{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3},
@@ -28,7 +28,7 @@ func TestInflightReportsContainer_add(t *testing.T) {
 
 func TestInflightReportsContainer_expire(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	container := newInflightReportsContainer(time.Second)
+	container := newInflightExecReportsContainer(time.Second)
 
 	err := container.add(lggr, []evm_2_evm_onramp.InternalEVM2EVMMessage{
 		{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3},

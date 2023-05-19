@@ -6,11 +6,13 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -163,4 +165,26 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		}, nil
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+}
+
+// ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
+// all the message ids will be added to the tx metadata.
+func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
+	execReport, err := abihelpers.DecodeExecutionReport(report)
+	if err != nil {
+		return nil, err
+	}
+
+	msgIDs := make([]string, len(execReport.EncodedMessages))
+	for i, encMsg := range execReport.EncodedMessages {
+		msg, err := abihelpers.DecodeMessage(encMsg)
+		if err != nil {
+			return nil, err
+		}
+		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
+	}
+
+	return &txmgr.EthTxMeta{
+		MessageIDs: msgIDs,
+	}, nil
 }

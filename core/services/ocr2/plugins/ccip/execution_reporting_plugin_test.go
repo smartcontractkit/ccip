@@ -81,7 +81,7 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 		offchainConfig:       offchainConfig,
 		lggr:                 th.Lggr.Named("ExecutionReportingPlugin"),
 		snoozedRoots:         make(map[[32]byte]time.Time),
-		inflightReports:      newInflightReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
+		inflightReports:      newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
 		destPriceRegistry:    th.Dest.PriceRegistry,
 		destWrappedNative:    th.Dest.WrappedNative.Address(),
 		srcToDstTokenMapping: map[common.Address]common.Address{},
@@ -438,7 +438,7 @@ func TestExecShouldAcceptFinalizedReport(t *testing.T) {
 			offRamp: mockOffRamp,
 		},
 		lggr:            logger.TestLogger(t),
-		inflightReports: newInflightReportsContainer(models.MustMakeDuration(1 * time.Hour).Duration()),
+		inflightReports: newInflightExecReportsContainer(models.MustMakeDuration(1 * time.Hour).Duration()),
 	}
 
 	mockedExecState := mockOffRamp.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(abihelpers.ExecutionStateUntouched), nil).Once()
@@ -488,7 +488,7 @@ func TestExecShouldTransmitAcceptedReport(t *testing.T) {
 			commitStore: mockCommitStore,
 		},
 		lggr:            logger.TestLogger(t),
-		inflightReports: newInflightReportsContainer(models.MustMakeDuration(1 * time.Hour).Duration()),
+		inflightReports: newInflightExecReportsContainer(models.MustMakeDuration(1 * time.Hour).Duration()),
 	}
 
 	mockCommitStore.On("Paused", mock.Anything).Return(false, nil)
