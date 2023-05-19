@@ -46,11 +46,6 @@ var (
 		Help:    "Duration of generating Observation in Execution Plugin",
 		Buckets: execPluginDurationBuckets,
 	}, execPluginLabels)
-	execPluginBatchPrepareRPCDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "ccip_execution_batch_prepare_rpc",
-		Help:    "Duration of making all requires RPC calls (token prices, gas prices) before starting batch in Execution Plugin",
-		Buckets: execPluginDurationBuckets,
-	}, execPluginLabels)
 	execPluginBatchBuildDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "ccip_execution_build_single_batch",
 		Help:    "Duration of building single batch in Execution Plugin",
@@ -71,10 +66,6 @@ func measureExecPluginDuration(histogram *prometheus.HistogramVec, timestamp typ
 
 func measureObservationBuildDuration(timestamp types.ReportTimestamp, duration time.Duration) {
 	measureExecPluginDuration(execPluginObservationBuildDuration, timestamp, duration)
-}
-
-func measureBatchPrepareRPCDuration(timestamp types.ReportTimestamp, duration time.Duration) {
-	measureExecPluginDuration(execPluginBatchPrepareRPCDuration, timestamp, duration)
 }
 
 func measureBatchBuildDuration(timestamp types.ReportTimestamp, duration time.Duration) {

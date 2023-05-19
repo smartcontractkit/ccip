@@ -232,51 +232,31 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return []ObservedMessage{}, nil
 	}
 
-	rpcPreprationStart := time.Now()
 	// This could result in slightly different values on each call as
 	// the function returns the allowed amount at the time of the last block.
 	// Since this will only increase over time, the highest observed value will
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
-	rateLimiterState, err := r.config.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
+	allowedTokenAmount := LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+		return r.config.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
+	})
+	srcToDstTokens, supportedDestTokens, err := r.sourceDestinationTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
-	allowedTokenAmount := rateLimiterState.Tokens
-
-	srcToDstTokens, err := r.getSourceToDestTokenMapping(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	r.srcToDstTokenMappingMu.RLock()
-	supportedDestTokens := make([]common.Address, 0, len(r.srcToDstTokenMapping))
-	for _, destToken := range r.srcToDstTokenMapping {
-		supportedDestTokens = append(supportedDestTokens, destToken)
-	}
-	r.srcToDstTokenMappingMu.RUnlock()
-
-	srcTokensPrices, err := getTokensPrices(ctx, r.config.srcPriceRegistry, []common.Address{r.config.srcWrappedNativeToken})
-	if err != nil {
-		return nil, err
-	}
-	destTokensPrices, err := getTokensPrices(ctx, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
-	if err != nil {
-		return nil, err
-	}
-	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
-	if err != nil {
-		return nil, errors.Wrap(err, "could not estimate destination gas price")
-	}
-	destGasPrice := destGasPriceWei.Legacy.ToInt()
-	if destGasPriceWei.DynamicFeeCap != nil {
-		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
-	}
+	srcTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
+		return getTokensPrices(ctx, r.config.srcPriceRegistry, []common.Address{r.config.srcWrappedNativeToken})
+	})
+	destTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
+		return getTokensPrices(ctx, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
+	})
+	destGasPrice := LazyFetch(func() (*big.Int, error) {
+		return r.estimateDestinationGasPrice(ctx)
+	})
 	latestBlock, err := r.config.destLP.LatestBlock()
 	if err != nil {
 		return nil, err
 	}
-	measureBatchPrepareRPCDuration(timestamp, time.Since(rpcPreprationStart))
 
 	r.lggr.Debugw("processing unexpired reports", "n", len(unexpiredReports))
 	measureNumberOfReportsProcessed(timestamp, len(unexpiredReports))
@@ -325,9 +305,24 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 
 		r.lggr.Debugw("building next batch", "executedMp", len(executedMp))
 
+		allowedTokenAmountValue, err := allowedTokenAmount()
+		if err != nil {
+			return nil, err
+		}
+
+		srcTokensPricesValue, err := srcTokensPrices()
+		if err != nil {
+			return nil, err
+		}
+
+		destTokensPricesValue, err := destTokensPrices()
+		if err != nil {
+			return nil, err
+		}
+
 		buildBatchDuration := time.Now()
-		batch, allMessagesExecuted := r.buildBatch(srcLogs, executedMp, inflight, allowedTokenAmount,
-			srcTokensPrices, destTokensPrices, destGasPrice, srcToDstTokens)
+		batch, allMessagesExecuted := r.buildBatch(srcLogs, executedMp, inflight, allowedTokenAmountValue.Tokens,
+			srcTokensPricesValue, destTokensPricesValue, destGasPrice, srcToDstTokens)
 		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 
 		// If all messages are already executed and finalized, snooze the root for
@@ -344,6 +339,31 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.offchainConfig.RootSnoozeTime.Duration())
 	}
 	return []ObservedMessage{}, nil
+}
+
+func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (*big.Int, error) {
+	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
+	if err != nil {
+		return nil, errors.Wrap(err, "could not estimate destination gas price")
+	}
+	destGasPrice := destGasPriceWei.Legacy.ToInt()
+	if destGasPriceWei.DynamicFeeCap != nil {
+		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
+	}
+	return destGasPrice, nil
+}
+
+func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) (map[common.Address]common.Address, []common.Address, error) {
+	srcToDstTokens, err := r.getSourceToDestTokenMapping(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	supportedDestTokens := make([]common.Address, 0, len(srcToDstTokens))
+	for _, destToken := range srcToDstTokens {
+		supportedDestTokens = append(supportedDestTokens, destToken)
+	}
+	return srcToDstTokens, supportedDestTokens, nil
 }
 
 func copyMap[M ~map[K]V, K comparable, V any](m M) M {
@@ -458,7 +478,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	aggregateTokenLimit *big.Int,
 	srcTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
-	execGasPriceEstimate *big.Int,
+	execGasPriceEstimate LazyFunction[*big.Int],
 	srcToDestToken map[common.Address]common.Address,
 ) (executableMessages []ObservedMessage, executedAllMessages bool) {
 	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := inflightAggregates(inflight, destTokenPricesUSD, srcToDestToken)
@@ -524,7 +544,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 		// Fee boosting
-		execCostUsd := computeExecCost(msg.Message.GasLimit, execGasPriceEstimate, destTokenPricesUSD[r.destWrappedNative])
+		execGasPriceEstimateValue, err := execGasPriceEstimate()
+		if err != nil {
+			r.lggr.Errorw("Unexpected error fetching gas price estimate", "err", err)
+			return []ObservedMessage{}, false
+		}
+		execCostUsd := computeExecCost(msg.Message.GasLimit, execGasPriceEstimateValue, destTokenPricesUSD[r.destWrappedNative])
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),

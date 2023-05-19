@@ -610,7 +610,7 @@ func TestBuildBatch(t *testing.T) {
 				tc.tokenLimit,
 				tc.srcPrices,
 				tc.dstPrices,
-				tc.destGasPrice,
+				func() (*big.Int, error) { return tc.destGasPrice, nil },
 				map[common.Address]common.Address{},
 			)
 			assert.Equal(t, tc.expectedSeqNrs, seqNrs)
