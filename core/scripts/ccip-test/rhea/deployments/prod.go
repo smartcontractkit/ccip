@@ -70,6 +70,8 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x25D7214ae75F169263921a1cAaf7E6F033210E24"), // Chris Cushman
 		gethcommon.HexToAddress("0x498533848239DDc6Bb5Cf7aEF63c97f3f5513ed2"), // Pramod - DApp Sepolia->Fuji
+		gethcommon.HexToAddress("0x33Cd75706172f86F81313BCC658e1e8aFa29D4d5"), // Amine (DevRel) 1
+		gethcommon.HexToAddress("0x9d087fC03ae39b088326b67fA3C788236645b717"), // Amine (DevRel) 2
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0xd65113b9B1EeD81113EaF41DC0D2d34fCa31522C"), // BetaUser - Multimedia
@@ -271,6 +273,8 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x594D8E57D8801069C77AAB90222a9162E908AA63"), // Pramod - Dapp Fuji->OptimismGoerli
 		gethcommon.HexToAddress("0xFE5394A63433A3975b1936dEc92DAa161FEE7463"), // Pramod - DApp Fuji->Sepolia
+		gethcommon.HexToAddress("0xe690f9C41858d1Dd908C215495Bf2A9602568264"), // Amine (DevRel) 1
+		gethcommon.HexToAddress("0x9d087fC03ae39b088326b67fA3C788236645b717"), // Amine (DevRel) 2
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0x1b5D803Be089e43110Faf54c6b4eC40409Cc7450"), // BetaUser - Multimedia
