@@ -248,6 +248,8 @@ contract EVM2EVMOffRamp_ccipReceive is EVM2EVMOffRampSetup {
 
 /// @notice #execute
 contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
+  error PausedError();
+
   function testSingleMessageNoTokensSuccess() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
@@ -444,7 +446,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testPausedReverts() public {
     s_mockCommitStore.pause();
-    vm.expectRevert("Pausable: paused");
+    vm.expectRevert(PausedError.selector);
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
   }
 

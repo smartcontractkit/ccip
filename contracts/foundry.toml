@@ -1,6 +1,6 @@
 [profile.default]
 optimizer = true
-optimizer_runs = 15_000
+optimizer_runs = 30_000
 
 src = 'src/v0.8'
 test = 'test/v0.8/foundry'

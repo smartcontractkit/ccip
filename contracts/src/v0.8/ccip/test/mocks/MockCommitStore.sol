@@ -4,8 +4,12 @@ pragma solidity 0.8.19;
 import {ICommitStore} from "../../interfaces/ICommitStore.sol";
 import {Pausable} from "../../../vendor/Pausable.sol";
 
-contract MockCommitStore is ICommitStore, Pausable {
+contract MockCommitStore is ICommitStore {
+  error PausedError();
+
   uint64 private s_expectedNextSequenceNumber = 1;
+
+  bool private s_paused = false;
 
   /// @inheritdoc ICommitStore
   function verify(
@@ -24,7 +28,16 @@ contract MockCommitStore is ICommitStore, Pausable {
     s_expectedNextSequenceNumber = nextSeqNum;
   }
 
+  modifier whenNotPaused() {
+    if (paused()) revert PausedError();
+    _;
+  }
+
+  function paused() public view returns (bool) {
+    return s_paused;
+  }
+
   function pause() external {
-    _pause();
+    s_paused = true;
   }
 }

@@ -8,15 +8,17 @@ import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OCR2Base} from "./ocr/OCR2Base.sol";
 import {Internal} from "./libraries/Internal.sol";
-import {Pausable} from "../vendor/Pausable.sol";
 import {MerkleMultiProof} from "./libraries/MerkleMultiProof.sol";
 
-contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Base {
+contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
+  error PausedError();
   error InvalidInterval(Interval interval);
   error InvalidRoot();
   error InvalidCommitStoreConfig();
   error BadAFNSignal();
 
+  event Paused(address account);
+  event Unpaused(address account);
   event ReportAccepted(CommitReport report);
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event RootRemoved(bytes32 root);
@@ -64,11 +66,13 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
   // STATE
   // The min sequence number expected for future messages
   uint64 private s_minSeqNr = 1;
+  /// @dev Whether this OnRamp is paused or not
+  bool private s_paused = false;
   // merkleRoot => timestamp when received
   mapping(bytes32 => uint256) private s_roots;
 
   /// @param staticConfig Containing the static part of the commitStore config
-  constructor(StaticConfig memory staticConfig) OCR2Base() Pausable() {
+  constructor(StaticConfig memory staticConfig) OCR2Base() {
     if (staticConfig.onRamp == address(0) || staticConfig.chainSelector == 0 || staticConfig.sourceChainSelector == 0)
       revert InvalidCommitStoreConfig();
 
@@ -206,15 +210,28 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, Pausable, OCR2Bas
     _;
   }
 
+  /// @notice Modifier to make a function callable only when the contract is not paused.
+  modifier whenNotPaused() {
+    if (paused()) revert PausedError();
+    _;
+  }
+
+  /// @notice Returns true if the contract is paused, and false otherwise.
+  function paused() public view returns (bool) {
+    return s_paused;
+  }
+
   /// @notice Pause the contract
   /// @dev only callable by the owner
   function pause() external onlyOwner {
-    _pause();
+    s_paused = true;
+    emit Paused(msg.sender);
   }
 
   /// @notice Unpause the contract
   /// @dev only callable by the owner
   function unpause() external onlyOwner {
-    _unpause();
+    s_paused = false;
+    emit Unpaused(msg.sender);
   }
 }

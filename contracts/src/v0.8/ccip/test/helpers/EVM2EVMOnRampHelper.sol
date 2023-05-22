@@ -26,14 +26,11 @@ contract EVM2EVMOnRampHelper is EVM2EVMOnRamp {
     )
   {}
 
-  function getMessageExecutionFee(address feeToken, bytes calldata extraArgs) public view returns (uint256) {
-    return _getMessageExecutionFee(feeToken, extraArgs);
-  }
-
   function getTokenTransferFee(
     address feeToken,
+    uint192 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) public view returns (uint256) {
-    return _getTokenTransferFee(feeToken, tokenAmounts);
+    return _getTokenTransferFee(feeToken, feeTokenPrice, tokenAmounts);
   }
 }

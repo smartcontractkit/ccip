@@ -101,7 +101,6 @@ contract TokenPool_setRateLimiterConfig is TokenPoolSetup {
     vm.assume(newTime >= block.timestamp);
     vm.warp(newTime);
 
-    uint256 oldCapacity = rateLimiterConfig().capacity;
     uint256 oldTokens = s_tokenPool.currentRateLimiterState().tokens;
 
     RateLimiter.Config memory newConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});

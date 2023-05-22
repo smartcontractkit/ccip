@@ -17,7 +17,6 @@ import {EnumerableMapAddresses} from "../../libraries/internal/EnumerableMapAddr
 
 import {SafeERC20} from "../../vendor/SafeERC20.sol";
 import {IERC20} from "../../vendor/IERC20.sol";
-import {Pausable} from "../../vendor/Pausable.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableMap.sol";
 
@@ -28,13 +27,14 @@ import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts
 /// routers and are always deployed as complete set, even during upgrades.
 /// This means an upgrade to an onRamp will require redeployment of the
 /// commitStore and offRamp as well.
-contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRateLimiter, TypeAndVersionInterface {
+contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, TypeAndVersionInterface {
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint192;
 
+  error PausedError();
   error InvalidExtraArgsTag();
   error OnlyCallableByOwnerOrFeeAdmin();
   error OnlyCallableByOwnerOrFeeAdminOrNop();
@@ -60,6 +60,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRat
   error BadAFNSignal();
   error LinkBalanceNotSettled();
 
+  event Paused(address account);
+  event Unpaused(address account);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
   event AllowListEnabledSet(bool enabled);
@@ -160,9 +162,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRat
   EnumerableMap.AddressToUintMap internal s_nops;
   /// @dev source token => token pool
   EnumerableMapAddresses.AddressToAddressMap private s_poolsBySourceToken;
-  /// @dev this allowListing will be removed before public launch
-  /// @dev Whether s_allowList is enabled or not.
-  bool private s_allowlistEnabled;
+
   /// @dev A set of addresses which can make ccipSend calls.
   EnumerableSet.AddressSet private s_allowList;
   /// @dev The execution fee token config that can be set by the owner or fee admin
@@ -181,6 +181,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRat
   /// messages has been sent yet. 0 is not a valid sequence number for any
   /// real transaction.
   uint64 internal s_sequenceNumber;
+  /// @dev Whether this OnRamp is paused or not
+  bool private s_paused = false;
+  /// @dev This allowListing will be removed before public launch
+  /// @dev Whether s_allowList is enabled or not.
+  bool private s_allowlistEnabled;
 
   constructor(
     StaticConfig memory staticConfig,
@@ -191,7 +196,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRat
     FeeTokenConfigArgs[] memory feeTokenConfigs,
     TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs,
     NopAndWeight[] memory nopsAndWeights
-  ) Pausable() AggregateRateLimiter(rateLimiterConfig) {
+  ) AggregateRateLimiter(rateLimiterConfig) {
     if (
       staticConfig.linkToken == address(0) ||
       staticConfig.chainSelector == 0 ||
@@ -258,6 +263,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRat
     // Rate limit on aggregated token value
     _rateLimitValue(message.tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
 
+    // EVM destination addresses should be abi encoded and therefore always 32 bytes long
     if (message.receiver.length != 32) revert InvalidAddress(message.receiver);
     uint256 decodedReceiver = abi.decode(message.receiver, (uint256));
     if (decodedReceiver > type(uint160).max) revert InvalidAddress(message.receiver);
@@ -448,32 +454,31 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRat
 
   /// @inheritdoc IEVM2AnyOnRamp
   function getFee(Client.EVM2AnyMessage calldata message) public view returns (uint256) {
-    // ensure MessageExecutionFee is evaluated strictly before TokenTransferFee
-    // if there are validation reverts, errors from MessageExecutionFee take precedence
-    uint256 executionFee = _getMessageExecutionFee(message.feeToken, message.extraArgs);
-    return executionFee + _getTokenTransferFee(message.feeToken, message.tokenAmounts);
-  }
-
-  /// @notice Returns the fee based on the gas usage and network fee for the
-  /// given message. Fees can be different for different fee tokens.
-  function _getMessageExecutionFee(address feeToken, bytes calldata extraArgs) internal view returns (uint256 fee) {
-    uint256 gasLimit = _fromBytes(extraArgs).gasLimit;
     (uint192 feeTokenPrice, uint192 gasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenAndGasPrices(
-      feeToken,
+      message.feeToken,
       i_destChainSelector
     );
-    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[feeToken];
 
-    uint256 usdFeeValue = gasPrice *
-      (((gasLimit + feeTokenConfig.destGasOverhead) * feeTokenConfig.multiplier) / 1 ether) +
+    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
+
+    // Total tx fee in USD with 18 decimals precision, excluding token bps
+    uint256 executionFeeUsdValue = gasPrice *
+      (((_fromBytes(message.extraArgs).gasLimit + feeTokenConfig.destGasOverhead) * feeTokenConfig.multiplier) /
+        1 ether) +
       feeTokenConfig.networkFeeAmountUSD;
-    return feeTokenPrice._calcTokenAmountFromUSDValue(usdFeeValue);
+
+    // Transform the execution fee into fee token amount and add the token bps fee
+    // which is already priced in fee token
+    return
+      feeTokenPrice._calcTokenAmountFromUSDValue(executionFeeUsdValue) +
+      _getTokenTransferFee(message.feeToken, feeTokenPrice, message.tokenAmounts);
   }
 
   /// @notice Returns the fee based on the tokens transferred. Will always be 0 if
   /// no tokens are transferred. The token fee is calculated based on basis points.
   function _getTokenTransferFee(
     address feeToken,
+    uint192 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) internal view returns (uint256 feeTokenAmount) {
     uint256 numerOfTokens = tokenAmounts.length;
@@ -482,13 +487,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRat
       return 0;
     }
 
-    uint192 feeTokenPrice = IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedTokenPrice(feeToken);
-
     for (uint256 i = 0; i < numerOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAmount = tokenAmounts[i];
       TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];
 
-      uint256 bpsValue;
+      uint256 bpsValue = 0;
       // ratio can be 0, only calculate bps fee if ratio is greater than 0
       if (transferFeeConfig.ratio > 0) {
         uint192 tokenPrice = feeTokenPrice;
@@ -773,15 +776,28 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, Pausable, AggregateRat
     _;
   }
 
+  /// @notice Modifier to make a function callable only when the contract is not paused.
+  modifier whenNotPaused() {
+    if (paused()) revert PausedError();
+    _;
+  }
+
+  /// @notice Returns true if the contract is paused, and false otherwise.
+  function paused() public view returns (bool) {
+    return s_paused;
+  }
+
   /// @notice Pause the contract
   /// @dev only callable by the owner
   function pause() external onlyOwner {
-    _pause();
+    s_paused = true;
+    emit Paused(msg.sender);
   }
 
   /// @notice Unpause the contract
   /// @dev only callable by the owner
   function unpause() external onlyOwner {
-    _unpause();
+    s_paused = false;
+    emit Unpaused(msg.sender);
   }
 }

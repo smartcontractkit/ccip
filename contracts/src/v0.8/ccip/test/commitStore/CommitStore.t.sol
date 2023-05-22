@@ -374,7 +374,7 @@ contract CommitStore_report is CommitStoreSetup {
   function testPausedReverts() public {
     s_commitStore.pause();
     bytes memory report;
-    vm.expectRevert("Pausable: paused");
+    vm.expectRevert(CommitStore.PausedError.selector);
     s_commitStore.report(report);
   }
 
@@ -474,7 +474,7 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
     bytes32[] memory proofs = new bytes32[](0);
     uint256 proofFlagBits = 0;
 
-    vm.expectRevert("Pausable: paused");
+    vm.expectRevert(CommitStore.PausedError.selector);
     s_commitStore.verify(hashedLeaves, proofs, proofFlagBits);
   }
 
