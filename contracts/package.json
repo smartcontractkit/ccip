@@ -1,5 +1,5 @@
 {
-  "name": "@chainlink/contracts",
+  "name": "@chainlink/contracts-ccip",
   "version": "0.6.1",
   "description": "Chainlink smart contracts",
   "author": "Chainlink devs",
