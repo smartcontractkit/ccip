@@ -2,11 +2,11 @@
 pragma solidity 0.8.19;
 
 import "./BaseTest.t.sol";
-import "./mocks/MockERC20.sol";
 import "../../tests/MockV3Aggregator.sol";
 import "../pools/BurnMintTokenPool.sol";
 import "../pools/LockReleaseTokenPool.sol";
 import "../libraries/Client.sol";
+import "../pools/tokens/BurnMintERC677.sol";
 
 contract TokenSetup is BaseTest {
   address[] internal s_sourceTokens;
@@ -24,27 +24,34 @@ contract TokenSetup is BaseTest {
     BaseTest.setUp();
 
     // Source tokens & pools
-    if (s_sourceTokens.length == 0) {
-      s_sourceTokens.push(address(new MockERC20("sLINK", "sLNK", OWNER, 2 ** 256 - 1)));
-      s_sourceTokens.push(address(new MockERC20("sETH", "sETH", OWNER, 2 ** 128)));
-    }
+    if (s_sourceTokens.length == 0 && s_sourcePools.length == 0) {
+      BurnMintERC677 sourceLink = new BurnMintERC677("sLINK", "sLNK", 18);
+      deal(address(sourceLink), OWNER, type(uint256).max);
+      s_sourceTokens.push(address(sourceLink));
+      s_sourcePools.push(address(new LockReleaseTokenPool(sourceLink, rateLimiterConfig())));
 
-    if (s_sourcePools.length == 0) {
-      s_sourcePools.push(address(new LockReleaseTokenPool(IERC20(s_sourceTokens[0]), rateLimiterConfig())));
-      s_sourcePools.push(address(new BurnMintTokenPool(IBurnMintERC20(s_sourceTokens[1]), rateLimiterConfig())));
+      BurnMintERC677 sourceETH = new BurnMintERC677("sETH", "sETH", 18);
+      deal(address(sourceETH), OWNER, 2 ** 128);
+      s_sourceTokens.push(address(sourceETH));
+      s_sourcePools.push(address(new BurnMintTokenPool(sourceETH, rateLimiterConfig())));
+      sourceETH.grantMintAndBurnRoles(s_sourcePools[1]);
     }
 
     s_sourceFeeToken = s_sourceTokens[0];
 
     // Destination tokens & pools
-    if (s_destTokens.length == 0) {
-      s_destTokens.push(address(new MockERC20("dLINK", "dLNK", OWNER, 2 ** 256 - 1)));
-      s_destTokens.push(address(new MockERC20("dETH", "dETH", OWNER, 2 ** 128)));
-    }
+    if (s_destTokens.length == 0 && s_destPools.length == 0) {
+      BurnMintERC677 destLink = new BurnMintERC677("dLINK", "dLNK", 18);
+      deal(address(destLink), OWNER, type(uint256).max);
+      s_destTokens.push(address(destLink));
 
-    if (s_destPools.length == 0) {
-      s_destPools.push(address(new LockReleaseTokenPool(IERC20(s_destTokens[0]), rateLimiterConfig())));
-      s_destPools.push(address(new BurnMintTokenPool(IBurnMintERC20(s_destTokens[1]), rateLimiterConfig())));
+      BurnMintERC677 destEth = new BurnMintERC677("dETH", "dETH", 18);
+      deal(address(destEth), OWNER, 2 ** 128);
+      s_destTokens.push(address(destEth));
+
+      s_destPools.push(address(new LockReleaseTokenPool(destLink, rateLimiterConfig())));
+      s_destPools.push(address(new BurnMintTokenPool(destEth, rateLimiterConfig())));
+      destEth.grantMintAndBurnRoles(s_destPools[1]);
 
       // Float the pools with funds
       IERC20(s_destTokens[0]).transfer(address(s_destPools[0]), POOL_BALANCE);

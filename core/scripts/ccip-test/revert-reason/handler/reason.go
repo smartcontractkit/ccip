@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/wrapped_token_pool"
 )
 
 // RevertReasonFromErrorCodeString attempts to decode an error code string
@@ -115,7 +114,6 @@ func getAllABIs() []string {
 		afn_contract.AFNContractABI,
 		lock_release_token_pool.LockReleaseTokenPoolABI,
 		burn_mint_token_pool.BurnMintTokenPoolABI,
-		wrapped_token_pool.WrappedTokenPoolABI,
 		commit_store.CommitStoreABI,
 		price_registry.PriceRegistryABI,
 		evm_2_evm_onramp.EVM2EVMOnRampABI,

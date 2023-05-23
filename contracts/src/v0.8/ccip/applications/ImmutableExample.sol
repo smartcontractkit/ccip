@@ -5,8 +5,8 @@ import {IAny2EVMMessageReceiver} from "../interfaces/IAny2EVMMessageReceiver.sol
 
 import {Client} from "../libraries/Client.sol";
 
-import {IERC165} from "../../vendor/IERC165.sol";
-import {IERC20} from "../../vendor/IERC20.sol";
+import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/IERC165.sol";
+import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/token/ERC20/IERC20.sol";
 
 // @notice Example of an immutable client example which supports EVM/non-EVM chains
 // @dev If chain specific logic is required for different chain families (e.g. particular

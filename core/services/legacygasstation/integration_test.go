@@ -132,7 +132,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_SourceChain(t *testing.
 	sourceBackend := ccipContracts.Source.Chain
 
 	forwarder, bankERC20, forwarderAddress, bankERC20Address := setupTokenAndForwarderContracts(t, owner, sourceBackend, ccipContracts.Source.Router.Address(), sourceChainID)
-	_, _, _, _, err := ccipContracts.SetupLockAndMintTokenPool(bankERC20Address, "WrappedBankToken", "WBANK")
+	_, _, err := ccipContracts.SetupLockAndMintTokenPool(bankERC20Address, "WrappedBankToken", "WBANK")
 	require.NoError(t, err)
 
 	amount := big.NewInt(1e18)
@@ -184,7 +184,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	destBackend := ccipContracts.Dest.Chain
 
 	forwarder, bankERC20, forwarderAddress, bankERC20Address := setupTokenAndForwarderContracts(t, owner, sourceBackend, ccipContracts.Source.Router.Address(), testhelpers.SourceChainID)
-	_, wrappedDestTokenPoolAddress, _, destPool, err := ccipContracts.SetupLockAndMintTokenPool(bankERC20Address, "WrappedBankToken", "WBANK")
+	_, destToken, err := ccipContracts.SetupLockAndMintTokenPool(bankERC20Address, "WrappedBankToken", "WBANK")
 	require.NoError(t, err)
 
 	amount := big.NewInt(1e18)
@@ -235,7 +235,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	bankERC20_parse [type=jsonparse path="UsdPerBankERC20"];
 	bankERC20->bankERC20_parse
 	merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse), \\\"%s\\\":$(wrapDest_parse), \\\"%s\\\":$(bankERC20_parse)}"];`,
-		linkUSD.URL, ethUSD.URL, wrappedDestTokenUSD.URL, bankERC20USD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped, wrappedDestTokenPoolAddress, bankERC20Address)
+		linkUSD.URL, ethUSD.URL, wrappedDestTokenUSD.URL, bankERC20USD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped, destToken.Address(), bankERC20Address)
 	ccipContracts.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, int64(getFreePort(t)))
 	dummyDestForwarderRouter := common.HexToAddress("0x2")
 	createLegacyGasStationSidecarJob(t, app, dummyDestForwarderRouter, ccipContracts.Dest.OffRamp.Address(), destCCIPChainSelector, ccipContracts.Dest.ChainID)
@@ -286,7 +286,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	gomega.NewWithT(t).Eventually(func() bool {
 		ccipContracts.Source.Chain.Commit()
 		destBackend.Commit()
-		receiverBal, err2 := destPool.BalanceOf(nil, receiver.From)
+		receiverBal, err2 := destToken.BalanceOf(nil, receiver.From)
 		require.NoError(t, err2)
 		return receiverBal.Cmp(amount) == 0
 	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())

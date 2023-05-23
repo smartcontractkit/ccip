@@ -4,20 +4,22 @@ pragma solidity 0.8.19;
 import {IBurnMintERC20} from "../../interfaces/pools/IBurnMintERC20.sol";
 
 import "../BaseTest.t.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
 import {ThirdPartyBurnMintTokenPool} from "../../pools/ThirdPartyBurnMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {Router} from "../../Router.sol";
+import {BurnMintERC677} from "../../pools/tokens/BurnMintERC677.sol";
 
 contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
   ThirdPartyBurnMintTokenPool internal s_thirdPartyPool;
-  address s_routerAllowedOffRamp = address(234);
-  Router s_router;
+  address internal s_routerAllowedOffRamp = address(234);
+  Router internal s_router;
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new MockERC20("LINK", "LNK", OWNER, 2 ** 256 - 1);
+    s_token = new BurnMintERC677("LINK", "LNK", 18);
+    deal(address(s_token), OWNER, type(uint256).max);
+
     s_router = new Router(address(s_token));
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
@@ -33,6 +35,7 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
       rateLimiterConfig(),
       address(s_router)
     );
+    BurnMintERC677(address(s_token)).grantMintAndBurnRoles(address(s_thirdPartyPool));
   }
 }
 

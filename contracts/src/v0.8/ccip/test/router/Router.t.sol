@@ -278,7 +278,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 0);
 
-    vm.expectRevert("ERC20: transfer amount exceeds allowance");
+    vm.expectRevert("ERC20: insufficient allowance");
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }

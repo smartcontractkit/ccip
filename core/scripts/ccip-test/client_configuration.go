@@ -30,10 +30,10 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
@@ -236,9 +236,9 @@ type Client struct {
 	Client           *ethclient.Client
 	ChainId          uint64
 	ChainSelector    uint64
-	LinkToken        *link_token_interface.LinkToken
+	LinkToken        *burn_mint_erc677.BurnMintERC677
 	LinkTokenAddress common.Address
-	WrappedNative    *link_token_interface.LinkToken
+	WrappedNative    *burn_mint_erc677.BurnMintERC677
 	SupportedTokens  map[rhea.Token]EVMBridgedToken
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	Afn              *afn_contract.AFNContract
@@ -264,10 +264,10 @@ type SourceClient struct {
 }
 
 func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient {
-	LinkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
+	LinkToken, err := burn_mint_erc677.NewBurnMintERC677(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
 	shared.RequireNoError(t, err)
 
-	wrappedNative, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[config.ChainConfig.WrappedNative].Token, config.Client)
+	wrappedNative, err := burn_mint_erc677.NewBurnMintERC677(config.ChainConfig.SupportedTokens[config.ChainConfig.WrappedNative].Token, config.Client)
 	shared.RequireNoError(t, err)
 
 	supportedTokens := map[rhea.Token]EVMBridgedToken{}
@@ -323,9 +323,9 @@ type DestClient struct {
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
-	linkToken, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
+	linkToken, err := burn_mint_erc677.NewBurnMintERC677(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
 	shared.RequireNoError(t, err)
-	wrappedNative, err := link_token_interface.NewLinkToken(config.ChainConfig.SupportedTokens[config.ChainConfig.WrappedNative].Token, config.Client)
+	wrappedNative, err := burn_mint_erc677.NewBurnMintERC677(config.ChainConfig.SupportedTokens[config.ChainConfig.WrappedNative].Token, config.Client)
 	shared.RequireNoError(t, err)
 
 	supportedTokens := map[rhea.Token]EVMBridgedToken{}
@@ -1136,7 +1136,7 @@ func (client *CCIPClient) ccipSendBasicTx(t *testing.T) {
 
 		client.Source.logger.Infof("Approving %d %s", AMOUNTS[i], token)
 
-		ERC20, err := link_token_interface.NewLinkToken(client.Source.SupportedTokens[token].Token, client.Source.Client.Client)
+		ERC20, err := burn_mint_erc677.NewBurnMintERC677(client.Source.SupportedTokens[token].Token, client.Source.Client.Client)
 		require.NoError(t, err)
 
 		tx, err := ERC20.Approve(client.Source.Owner, client.Source.Router.Address(), AMOUNTS[i])
@@ -1259,7 +1259,7 @@ func (client *CCIPClient) sendNativeTx(t *testing.T, from *bind.TransactOpts, to
 }
 
 func FundPingPong(t *testing.T, chain rhea.EvmDeploymentConfig, minimumBalance *big.Int) {
-	linkToken, err := link_token_interface.NewLinkToken(chain.ChainConfig.SupportedTokens[rhea.LINK].Token, chain.Client)
+	linkToken, err := burn_mint_erc677.NewBurnMintERC677(chain.ChainConfig.SupportedTokens[rhea.LINK].Token, chain.Client)
 	require.NoError(t, err)
 
 	balance, err := linkToken.BalanceOf(&bind.CallOpts{}, chain.LaneConfig.PingPongDapp)

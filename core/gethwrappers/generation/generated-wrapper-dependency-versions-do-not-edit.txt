@@ -8,7 +8,8 @@ bank_erc20: ../../contracts/solc/v0.8.15/BankERC20.abi ../../contracts/solc/v0.8
 batch_blockhash_store: ../../contracts/solc/v0.8.6/BatchBlockhashStore.abi ../../contracts/solc/v0.8.6/BatchBlockhashStore.bin c5ab26709a01050402615659403f32d5cd1b85f3ad6bb6bfe021692f4233cf19
 batch_vrf_coordinator_v2: ../../contracts/solc/v0.8.6/BatchVRFCoordinatorV2.abi ../../contracts/solc/v0.8.6/BatchVRFCoordinatorV2.bin d0a54963260d8c1f1bbd984b758285e6027cfb5a7e42701bcb562ab123219332
 blockhash_store: ../../contracts/solc/v0.6/BlockhashStore.abi ../../contracts/solc/v0.6/BlockhashStore.bin a0dc60bcc4bf071033d23fddf7ae936c6a4d1dd81488434b7e24b7aa1fabc37c
-burn_mint_token_pool: ../../contracts/solc/v0.8.19/BurnMintTokenPool.abi ../../contracts/solc/v0.8.19/BurnMintTokenPool.bin aab736d3a79b71298b7b1c5f9ce65eff27c3e2a3a30e13a08c03543c8dc1cea5
+burn_mint_erc677: ../../contracts/solc/v0.8.19/BurnMintERC677.abi ../../contracts/solc/v0.8.19/BurnMintERC677.bin ec5836bf52a07dc8950f54f2910490df8db031d375da74dbb68e8e8483ec53b1
+burn_mint_token_pool: ../../contracts/solc/v0.8.19/BurnMintTokenPool.abi ../../contracts/solc/v0.8.19/BurnMintTokenPool.bin 7174760a0b2783ee9da42cfeb369a229d15414b36e6de40dc7b5deb27500baf5
 commit_store: ../../contracts/solc/v0.8.19/CommitStore.abi ../../contracts/solc/v0.8.19/CommitStore.bin 6690f2f09810df9a80fb4687d84ed9442bc8c7d6b10dc86f8455b0d71d57dcb4
 commit_store_helper: ../../contracts/solc/v0.8.19/CommitStoreHelper.abi ../../contracts/solc/v0.8.19/CommitStoreHelper.bin 5ea16973881d73d8acdaa76ed0c95cb0313858384dd1c5112b386ad420841697
 consumer_wrapper: ../../contracts/solc/v0.7/Consumer.abi ../../contracts/solc/v0.7/Consumer.bin 894d1cbd920dccbd36d92918c1037c6ded34f66f417ccb18ec3f33c64ef83ec5
@@ -18,7 +19,7 @@ custom_token_pool: ../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../contra
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 evm_2_evm_offramp: ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.bin ab7b5ea3bbf946e9c8c924ba2458793423c300d57bfed680b099498a37c8e85c
 evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.bin 0288c112d6ef843f4cc341439e3183158a20ffe262abdbe76843734f169fef09
-evm_2_evm_onramp: ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin deade0e2ac00b01f86f31bdd798c1d0f28351a17d5f815fb11e8e772bf34df1f
+evm_2_evm_onramp: ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin 815a64150a9e16bb160a750662d41132c91917816d68a9f39ac130e5b8c45bd3
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
 forwarder: ../../contracts/solc/v0.8.15/Forwarder.abi ../../contracts/solc/v0.8.15/Forwarder.bin 2911ae6bcf6b60b6828320c999bc9dbf94e6e24cf5e31ea42074667d5b88d4e5
@@ -36,7 +37,7 @@ keeper_registry_wrapper2_0: ../../contracts/solc/v0.8.6/KeeperRegistry2_0.abi ..
 keepers_vrf_consumer: ../../contracts/solc/v0.8.6/KeepersVRFConsumer.abi ../../contracts/solc/v0.8.6/KeepersVRFConsumer.bin fa75572e689c9e84705c63e8dbe1b7b8aa1a8fe82d66356c4873d024bb9166e8
 llo_feeds: ../../contracts/solc/v0.8.16/VerifierProxy.abi ../../contracts/solc/v0.8.16/VerifierProxy.bin 1777d8e3584cd6e8280f77f108a615590a7b328daa0e7bc9b0710aa11a745834
 llo_feeds_test: ../../contracts/solc/v0.8.16/ExposedVerifier.abi ../../contracts/solc/v0.8.16/ExposedVerifier.bin 6dcef4089d423fd0031f979bf984e6ef15f263a4daa7be5398e52d1f45aca6a2
-lock_release_token_pool: ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin 32c8a3f8ceca463e9512847d2d2419baee73722d27acfc245a515bbbca8c53a4
+lock_release_token_pool: ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin 4dd8c3f19fc70061439b38789f0ad2416f95d7701616579c62dd9e0d88c66381
 log_emitter: ../../contracts/solc/v0.8.6/LogEmitter.abi ../../contracts/solc/v0.8.6/LogEmitter.bin 375488d19b6ee1c180d42048be10abea9146e2a58347fd180358850d435cb854
 maybe_revert_message_receiver: ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin fbbcad24c4ec3dcf77027496dfd8428fb4de27da4a240549845c0f9cf72f9167
 mercury_exposed_verifier: ../../contracts/solc/v0.8.16/ExposedVerifier.abi ../../contracts/solc/v0.8.16/ExposedVerifier.bin 6dcef4089d423fd0031f979bf984e6ef15f263a4daa7be5398e52d1f45aca6a2
@@ -61,7 +62,7 @@ oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/O
 ping_pong_demo: ../../contracts/solc/v0.8.19/PingPongDemo.abi ../../contracts/solc/v0.8.19/PingPongDemo.bin c6f5dedc53069dd52334f33ce1a8bd7ee2d6f54ef7adc1325d8e0308d41b2b9b
 price_registry: ../../contracts/solc/v0.8.19/PriceRegistry.abi ../../contracts/solc/v0.8.19/PriceRegistry.bin 23c1e8f890933dba5c3488ca4bc423f84e66867ff9d2547609c899cc512c1838
 receiver_dapp: ../../contracts/solc/v0.8.19/ReceiverDapp.abi ../../contracts/solc/v0.8.19/ReceiverDapp.bin 65d8a62eca52f1f40e1043b934c580d5a54516234ade50914684c76f832d51eb
-router: ../../contracts/solc/v0.8.19/Router.abi ../../contracts/solc/v0.8.19/Router.bin 23ed5d98fa4bb28a01e43c57334d32720ccc34680e7b2d1e716796e324cb68a2
+router: ../../contracts/solc/v0.8.19/Router.abi ../../contracts/solc/v0.8.19/Router.bin 3bb9677bc88fa3d07cc095f9d198d915e2fa73d18e01b1a460e2daf874265547
 simple_message_receiver: ../../contracts/solc/v0.8.19/SimpleMessageReceiver.abi ../../contracts/solc/v0.8.19/SimpleMessageReceiver.bin b0bbc1320fcd1d2f74109c82829ecd5f70c07672c243748db51463abe095c8b6
 solidity_vrf_consumer_interface: ../../contracts/solc/v0.6/VRFConsumer.abi ../../contracts/solc/v0.6/VRFConsumer.bin ecc99378aa798014de9db42b2eb81320778b0663dbe208008dad75ccdc1d4366
 solidity_vrf_consumer_interface_v08: ../../contracts/solc/v0.8.6/VRFConsumer.abi ../../contracts/solc/v0.8.6/VRFConsumer.bin b14f9136b15e3dc9d6154d5700f3ed4cf88ddc4f70f20c3bb57fc46050904c8f
@@ -95,4 +96,3 @@ vrfv2_wrapper: ../../contracts/solc/v0.8.6/VRFV2Wrapper.abi ../../contracts/solc
 vrfv2_wrapper_consumer_example: ../../contracts/solc/v0.8.6/VRFV2WrapperConsumerExample.abi ../../contracts/solc/v0.8.6/VRFV2WrapperConsumerExample.bin 8c62ac8da7086c185162e66ec0c382c620cfa79319b621bcede828faac1d7954
 vrfv2_wrapper_interface: ../../contracts/solc/v0.8.6/VRFV2WrapperInterface.abi ../../contracts/solc/v0.8.6/VRFV2WrapperInterface.bin ff8560169de171a68b360b7438d13863682d07040d984fd0fb096b2379421003
 weth9: ../../contracts/solc/v0.8.19/WETH9.abi ../../contracts/solc/v0.8.19/WETH9.bin 5a7d64fb19b62ec523c7667ce4c2983295c05f74935b5f994c06a6f70d440f8b
-wrapped_token_pool: ../../contracts/solc/v0.8.19/WrappedTokenPool.abi ../../contracts/solc/v0.8.19/WrappedTokenPool.bin 5a9d287c83be188219e76b0f7a37c51eeb281c2e280ff5a06053f7efc4fd0475

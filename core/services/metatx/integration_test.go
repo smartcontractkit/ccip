@@ -136,7 +136,7 @@ func TestMetaERC20CrossChain(t *testing.T) {
 	totalTokens := big.NewInt(1e9)
 	sourceTokenAddress, sourceToken := setUpBankERC20(t, ccipContracts.Source.User, ccipContracts.Source.Chain, forwarderAddress, ccipContracts.Source.Router.Address(), ccipFeeProvider.From, totalTokens, testhelpers.SourceChainID)
 
-	sourcePoolAddress, wrappedDestTokenPoolAddress, _, wrappedDestTokenPool, err := ccipContracts.SetupLockAndMintTokenPool(sourceTokenAddress, "WrappedBankToken", "WBANK")
+	sourcePoolAddress, destToken, err := ccipContracts.SetupLockAndMintTokenPool(sourceTokenAddress, "WrappedBankToken", "WBANK")
 	require.NoError(t, err)
 
 	amount := assets.Ether(1).ToInt()
@@ -174,7 +174,7 @@ bankERC20 [type=http method=GET url="%s"];
 bankERC20_parse [type=jsonparse path="UsdPerBankERC20"];
 bankERC20->bankERC20_parse
 merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse), \\\"%s\\\":$(wrapDest_parse), \\\"%s\\\":$(bankERC20_parse)}"];`,
-		linkUSD.URL, ethUSD.URL, wrappedDestTokenUSD.URL, bankERC20USD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped, wrappedDestTokenPoolAddress, sourceTokenAddress)
+		linkUSD.URL, ethUSD.URL, wrappedDestTokenUSD.URL, bankERC20USD.URL, ccipContracts.Dest.LinkToken.Address(), wrapped, destToken.Address(), sourceTokenAddress)
 	defer linkUSD.Close()
 	defer ethUSD.Close()
 	defer wrappedDestTokenUSD.Close()
@@ -223,7 +223,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		gomega.NewWithT(t).Eventually(func() bool {
 			ccipContracts.Source.Chain.Commit()
 			ccipContracts.Dest.Chain.Commit()
-			holder2Balance, err2 := wrappedDestTokenPool.BalanceOf(nil, holder2.From)
+			holder2Balance, err2 := destToken.BalanceOf(nil, holder2.From)
 			require.NoError(t, err2)
 			return holder2Balance.Cmp(amount) == 0
 		}, testutils.WaitTimeout(t), 5*time.Second).Should(gomega.BeTrue())
@@ -246,7 +246,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		require.Equal(t, sourceTotalSupply, big.NewInt(0).Mul(totalTokens, big.NewInt(1e18)))
 
 		// new wrapped tokens minted on dest token
-		destTotalSupply, err := wrappedDestTokenPool.TotalSupply(nil)
+		destTotalSupply, err := destToken.TotalSupply(nil)
 		require.NoError(t, err)
 		require.Equal(t, destTotalSupply, amount)
 	})

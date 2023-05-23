@@ -2,9 +2,9 @@
 pragma solidity 0.8.19;
 
 import "../BaseTest.t.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
 import {TokenPoolHelper} from "../helpers/TokenPoolHelper.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {BurnMintERC677} from "../../pools/tokens/BurnMintERC677.sol";
 
 contract TokenPoolSetup is BaseTest {
   IERC20 internal s_token;
@@ -12,7 +12,9 @@ contract TokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new MockERC20("LINK", "LNK", OWNER, 2 ** 256 - 1);
+    s_token = new BurnMintERC677("LINK", "LNK", 18);
+    deal(address(s_token), OWNER, type(uint256).max);
+
     s_tokenPool = new TokenPoolHelper(s_token, rateLimiterConfig());
   }
 }

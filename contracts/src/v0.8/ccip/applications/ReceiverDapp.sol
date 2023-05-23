@@ -6,7 +6,7 @@ import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 import {Client} from "../libraries/Client.sol";
 
-import {IERC20} from "../../vendor/IERC20.sol";
+import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/token/ERC20/IERC20.sol";
 
 /// @title ReceiverDapp - Application contract for receiving messages from the OffRamp on behalf of an EOA
 /// @dev For test purposes only, not to be used as an example or production code.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.19;
 
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
@@ -7,7 +7,7 @@ import {OwnerIsCreator} from "./OwnerIsCreator.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
-import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.0/utils/structs/EnumerableSet.sol";
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.

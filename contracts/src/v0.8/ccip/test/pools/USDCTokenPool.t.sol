@@ -1,28 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "../BaseTest.t.sol";
 import {IBurnMintERC20} from "../../interfaces/pools/IBurnMintERC20.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
-import {MockUSDC} from "../mocks/MockUSDC.sol";
+
+import "../BaseTest.t.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {Router} from "../../Router.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
+import {BurnMintERC677} from "../../pools/tokens/BurnMintERC677.sol";
+import {MockUSDC} from "../mocks/MockUSDC.sol";
 
-import {IERC165} from "../../../vendor/IERC165.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/IERC165.sol";
 
 contract USDCTokenPoolSetup is BaseTest {
-  IERC20 internal s_token;
+  IBurnMintERC20 internal s_token;
   USDCTokenPool internal s_usdcTokenPool;
-  address s_routerAllowedOnRamp = address(3456);
-  address s_routerAllowedOffRamp = address(234);
-  Router s_router;
+  address internal s_routerAllowedOnRamp = address(3456);
+  address internal s_routerAllowedOffRamp = address(234);
+  Router internal s_router;
 
   MockUSDC internal s_mockUSDC;
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new MockERC20("USDC", "USDC", OWNER, 2 ** 256 - 1);
+    s_token = new BurnMintERC677("LINK", "LNK", 18);
+    deal(address(s_token), OWNER, type(uint256).max);
     setUpRamps();
 
     s_mockUSDC = new MockUSDC(42);
@@ -33,7 +35,7 @@ contract USDCTokenPoolSetup is BaseTest {
       messageTransmitter: address(s_mockUSDC)
     });
 
-    s_usdcTokenPool = new USDCTokenPool(config, IBurnMintERC20(address(s_token)), rateLimiterConfig());
+    s_usdcTokenPool = new USDCTokenPool(config, s_token, rateLimiterConfig());
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
     onRamps[0] = TokenPool.RampUpdate({ramp: s_routerAllowedOnRamp, allowed: true});

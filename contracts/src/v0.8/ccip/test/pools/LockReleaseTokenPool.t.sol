@@ -2,19 +2,20 @@
 pragma solidity 0.8.19;
 
 import "../BaseTest.t.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {BurnMintERC677} from "../../pools/tokens/BurnMintERC677.sol";
 
 contract LockReleaseTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
   LockReleaseTokenPool internal s_lockReleaseTokenPool;
-  address s_allowedOnRamp = address(123);
-  address s_allowedOffRamp = address(234);
+  address internal s_allowedOnRamp = address(123);
+  address internal s_allowedOffRamp = address(234);
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new MockERC20("LINK", "LNK", OWNER, 2 ** 256 - 1);
+    s_token = new BurnMintERC677("LINK", "LNK", 18);
+    deal(address(s_token), OWNER, type(uint256).max);
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, rateLimiterConfig());
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
@@ -83,7 +84,7 @@ contract LockReleaseTokenPool_addLiquidity is LockReleaseTokenPoolSetup {
 
   function testExceedsAllowance(uint256 amount) public {
     vm.assume(amount > 0);
-    vm.expectRevert("ERC20: transfer amount exceeds allowance");
+    vm.expectRevert("ERC20: insufficient allowance");
     s_lockReleaseTokenPool.addLiquidity(amount);
   }
 }

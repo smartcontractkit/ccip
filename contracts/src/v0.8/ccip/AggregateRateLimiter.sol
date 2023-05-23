@@ -9,7 +9,7 @@ import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 
-import {IERC20} from "../vendor/IERC20.sol";
+import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.0/token/ERC20/IERC20.sol";
 
 contract AggregateRateLimiter is OwnerIsCreator {
   using RateLimiter for RateLimiter.TokenBucket;

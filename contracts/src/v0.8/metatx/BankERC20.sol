@@ -2,10 +2,10 @@
 
 pragma solidity ^0.8.0;
 
-import "../vendor/IERC20.sol";
-import "../vendor/IERC20Metadata.sol";
-import "../vendor/Context.sol";
-import "./AbstractCrossChainMetaTransactor.sol";
+import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.0/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "../vendor/openzeppelin-solidity/v4.8.0/token/ERC20/extensions/IERC20Metadata.sol";
+import {Context} from "../vendor/openzeppelin-solidity/v4.8.0/utils/Context.sol";
+import {AbstractCrossChainMetaTransactor} from "./AbstractCrossChainMetaTransactor.sol";
 
 /// @dev Implementation of the {IERC20} interface.
 /// We have followed general OpenZeppelin Contracts guidelines: functions revert

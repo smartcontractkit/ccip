@@ -7,7 +7,7 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {BurnMintTokenPool} from "./BurnMintTokenPool.sol";
 import {Router} from "../Router.sol";
 
-import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.0/utils/structs/EnumerableSet.sol";
 
 /// @notice This pool mints and burns a 3rd-party token. This pool is not owned by the DON
 // and therefor has an additional check on adding offRamps.

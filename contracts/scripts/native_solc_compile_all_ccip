@@ -29,7 +29,7 @@ compileContract ccip/AFN.sol
 compileContract ccip/PriceRegistry.sol
 compileContract ccip/pools/LockReleaseTokenPool.sol
 compileContract ccip/pools/BurnMintTokenPool.sol
-compileContract ccip/pools/WrappedTokenPool.sol
+compileContract ccip/pools/tokens/BurnMintERC677.sol
 compileContract ccip/applications/ReceiverDapp.sol
 compileContract ccip/applications/PingPongDemo.sol
 

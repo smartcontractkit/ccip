@@ -17,11 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
@@ -473,7 +473,7 @@ func printPoolBalances(chain *rhea.EvmDeploymentConfig) {
 		tokenAddress, err := tokenPool.GetToken(&bind.CallOpts{})
 		helpers.PanicErr(err)
 
-		tokenInstance, err := link_token_interface.NewLinkToken(tokenAddress, chain.Client)
+		tokenInstance, err := burn_mint_erc677.NewBurnMintERC677(tokenAddress, chain.Client)
 		helpers.PanicErr(err)
 
 		tokenPrice, err := priceRegistry.GetTokenPrice(&bind.CallOpts{}, tokenAddress)

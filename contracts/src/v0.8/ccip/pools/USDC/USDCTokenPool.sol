@@ -9,7 +9,7 @@ import {IMessageReceiver} from "./IMessageReceiver.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../TokenPool.sol";
 
-import {IERC165} from "../../../vendor/IERC165.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/IERC165.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).

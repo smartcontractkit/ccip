@@ -23,7 +23,7 @@ contract BurnMintTokenPool is TokenPool {
     uint64,
     bytes calldata
   ) external override whenNotPaused onlyOnRamp {
-    IBurnMintERC20(address(i_token)).burn(address(this), amount);
+    IBurnMintERC20(address(i_token)).burn(amount);
     emit Burned(msg.sender, amount);
   }
 

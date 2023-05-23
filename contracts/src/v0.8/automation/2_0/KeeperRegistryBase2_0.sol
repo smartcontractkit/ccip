@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.6;
 
-import "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
+import "../../vendor/openzeppelin-solidity/v4.8.0/utils/structs/EnumerableSet.sol";
 import "../../vendor/@arbitrum/nitro-contracts/src/precompiles/ArbGasInfo.sol";
 import "../../vendor/@eth-optimism/contracts/0.8.6/contracts/L2/predeploys/OVM_GasPriceOracle.sol";
 import {ArbSys} from "../../dev/vendor/@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";

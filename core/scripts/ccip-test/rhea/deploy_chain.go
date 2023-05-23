@@ -9,12 +9,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/wrapped_token_pool"
 )
 
 func DeployToNewChain(client *EvmDeploymentConfig) error {
@@ -77,7 +77,7 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 	// and the deploySetting indicate a new pool should be deployed.
 	if client.ChainConfig.DeploySettings.DeployTokenPools && tokenConfig.Pool == common.HexToAddress("") {
 		client.Logger.Infof("Deploying token pool for %s token", tokenName)
-		var poolAddress common.Address
+		var poolAddress, tokenAddress common.Address
 		var err error
 		switch tokenConfig.TokenPoolType {
 		case LockRelease:
@@ -85,9 +85,9 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 		case BurnMint:
 			poolAddress, err = deployBurnMintTokenPool(client, tokenName, tokenConfig.Token)
 		case Wrapped:
-			poolAddress, err = deployWrappedTokenPool(client, tokenName)
-			// Since the pool is the ERC20 we need to update the token address
-			tokenConfig.Token = poolAddress
+			tokenAddress, poolAddress, err = deployWrappedTokenPool(client, tokenName)
+			// Since we also deployed the token we need to set it
+			tokenConfig.Token = tokenAddress
 		default:
 			return fmt.Errorf("unknown pool type %s", tokenConfig.TokenPoolType)
 		}
@@ -157,30 +157,40 @@ func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, token
 	return tokenPoolAddress, nil
 }
 
-func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenName Token) (common.Address, error) {
+func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenName Token) (common.Address, common.Address, error) {
 	client.Logger.Infof("Deploying token pool for %s token", tokenName)
 	if tokenName.Symbol() == "" {
-		return common.Address{}, fmt.Errorf("no token symbol given for wrapped token pool %s", tokenName)
+		return common.Address{}, common.Address{}, fmt.Errorf("no token symbol given for wrapped token pool %s", tokenName)
 	}
-	tokenPoolAddress, tx, _, err := wrapped_token_pool.DeployWrappedTokenPool(
-		client.Owner,
-		client.Client,
-		string(tokenName),
-		tokenName.Symbol(),
-		tokenName.Decimals(),
-		wrapped_token_pool.RateLimiterConfig{
-			IsEnabled: false,
-			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-		})
+
+	tokenAddress, tx, _, err := burn_mint_erc677.DeployBurnMintERC677(client.Owner, client.Client, string(tokenName), tokenName.Symbol(), tokenName.Decimals())
 	if err != nil {
-		return common.Address{}, err
+		return common.Address{}, common.Address{}, err
 	}
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
-		return common.Address{}, err
+		return common.Address{}, common.Address{}, err
 	}
-	client.Logger.Infof("Wrapped token pool for %s deployed on %s in tx %s", tokenName, tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
-	return tokenPoolAddress, nil
+	client.Logger.Infof("New %s token deployed on %s in tx %s", tokenName, tokenAddress, helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
+
+	poolAddress, err := deployBurnMintTokenPool(client, tokenName, tokenAddress)
+	if err != nil {
+		return common.Address{}, common.Address{}, err
+	}
+
+	token, err := burn_mint_erc677.NewBurnMintERC677(tokenAddress, client.Client)
+	if err != nil {
+		return common.Address{}, common.Address{}, err
+	}
+
+	tx, err = token.GrantMintAndBurnRoles(client.Owner, poolAddress)
+	if err != nil {
+		return common.Address{}, common.Address{}, err
+	}
+	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
+		return common.Address{}, common.Address{}, err
+	}
+
+	return tokenAddress, poolAddress, nil
 }
 
 // deployRouter always uses an empty list of offRamps. Ramps should be set in the offRamp deployment step.

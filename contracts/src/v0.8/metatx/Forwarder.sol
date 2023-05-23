@@ -3,12 +3,12 @@
 pragma solidity ^0.8.15;
 pragma abicoder v2;
 
-import "../vendor/ECDSA.sol";
-import "../vendor/ERC165.sol";
-
 import "./IForwarder.sol";
 import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
-import "../vendor/nomad-xyz/ExcessivelySafeCall.sol";
+
+import {ECDSA} from "../vendor/openzeppelin-solidity/v4.8.0/utils/cryptography/ECDSA.sol";
+import {ERC165} from "../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/ERC165.sol";
+import {ExcessivelySafeCall} from "../vendor/nomad-xyz/ExcessivelySafeCall.sol";
 
 /// @title The Forwarder Implementation
 /// @notice This implementation of the `IForwarder` interface uses ERC-712 signatures and stored nonces for verification.

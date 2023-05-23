@@ -6,7 +6,6 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CommitStoreHelper.abi ../../contracts/solc/v0.8.19/CommitStoreHelper.bin CommitStoreHelper commit_store_helper
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/BurnMintTokenPool.abi ../../contracts/solc/v0.8.19/BurnMintTokenPool.bin BurnMintTokenPool burn_mint_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin LockReleaseTokenPool lock_release_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/WrappedTokenPool.abi ../../contracts/solc/v0.8.19/WrappedTokenPool.bin WrappedTokenPool wrapped_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../contracts/solc/v0.8.19/CustomTokenPool.bin CustomTokenPool custom_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/AFN.abi ../../contracts/solc/v0.8.19/AFN.bin AFNContract afn_contract
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/MockAFN.abi ../../contracts/solc/v0.8.19/MockAFN.bin MockAFNContract mock_afn_contract
@@ -22,6 +21,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/PingPongDemo.abi ../../contracts/solc/v0.8.19/PingPongDemo.bin PingPongDemo ping_pong_demo
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/WETH9.abi ../../contracts/solc/v0.8.19/WETH9.bin WETH9 weth9
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/BurnMintERC677.abi ../../contracts/solc/v0.8.19/BurnMintERC677.bin BurnMintERC677 burn_mint_erc677
 
 // Customer contracts
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../contracts/solc/v0.8.19/USDCTokenPool.bin USDCTokenPool usdc_token_pool

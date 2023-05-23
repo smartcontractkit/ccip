@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/custom_token_pool"
@@ -29,7 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/wrapped_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
@@ -418,24 +419,49 @@ func (c *CCIPContracts) SetupOnchainConfig(t *testing.T, commitOnchainConfig, co
 func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	sourceTokenAddress common.Address,
 	wrappedTokenName,
-	wrappedTokenSymbol string) (sourcePoolAddress, wrappedDestTokenPoolAddress common.Address, sourcePool *lock_release_token_pool.LockReleaseTokenPool, destPool *wrapped_token_pool.WrappedTokenPool, err error) {
-	wrappedDestTokenPoolAddress, _, destPool, err = wrapped_token_pool.DeployWrappedTokenPool(c.Dest.User, c.Dest.Chain, wrappedTokenName, wrappedTokenSymbol, 18, wrapped_token_pool.RateLimiterConfig{
-		IsEnabled: true,
-		Capacity:  HundredLink,
-		Rate:      big.NewInt(1e18),
-	})
+	wrappedTokenSymbol string) (common.Address, *burn_mint_erc677.BurnMintERC677, error) {
+	// Deploy dest token & pool
+	destTokenAddress, _, _, err := burn_mint_erc677.DeployBurnMintERC677(c.Dest.User, c.Dest.Chain, wrappedTokenName, wrappedTokenSymbol, 18)
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
 	}
-	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
 
-	sourcePoolAddress, _, sourcePool, err = lock_release_token_pool.DeployLockReleaseTokenPool(c.Source.User, c.Source.Chain, sourceTokenAddress, lock_release_token_pool.RateLimiterConfig{
+	destToken, err := burn_mint_erc677.NewBurnMintERC677(destTokenAddress, c.Dest.Chain)
+	if err != nil {
+		return [20]byte{}, nil, err
+	}
+
+	destPoolAddress, _, destPool, err := burn_mint_token_pool.DeployBurnMintTokenPool(c.Dest.User, c.Dest.Chain, destTokenAddress, burn_mint_token_pool.RateLimiterConfig{
 		IsEnabled: true,
 		Capacity:  HundredLink,
 		Rate:      big.NewInt(1e18),
 	})
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
+	}
+	c.Dest.Chain.Commit()
+
+	_, err = destToken.GrantMintAndBurnRoles(c.Dest.User, destPoolAddress)
+	if err != nil {
+		return [20]byte{}, nil, err
+	}
+
+	_, err = destPool.ApplyRampUpdates(c.Dest.User, nil, []burn_mint_token_pool.TokenPoolRampUpdate{
+		{Ramp: c.Dest.OffRamp.Address(), Allowed: true},
+	})
+	if err != nil {
+		return [20]byte{}, nil, err
+	}
+	c.Dest.Chain.Commit()
+
+	sourcePoolAddress, _, sourcePool, err := lock_release_token_pool.DeployLockReleaseTokenPool(c.Source.User, c.Source.Chain, sourceTokenAddress, lock_release_token_pool.RateLimiterConfig{
+		IsEnabled: true,
+		Capacity:  HundredLink,
+		Rate:      big.NewInt(1e18),
+	})
+	if err != nil {
+		return [20]byte{}, nil, err
 	}
 	c.Source.Chain.Commit()
 
@@ -447,24 +473,13 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		},
 	}, nil)
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
 	}
 	c.Source.Chain.Commit()
 
-	_, err = destPool.ApplyRampUpdates(c.Dest.User, nil, []wrapped_token_pool.TokenPoolRampUpdate{
-		{
-			Ramp:    c.Dest.OffRamp.Address(),
-			Allowed: true,
-		},
-	})
-	if err != nil {
-		return
-	}
-	c.Dest.Chain.Commit()
-
 	wrappedNativeAddress, err := c.Source.Router.GetWrappedNative(nil)
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
 	}
 
 	// native token is used as fee token
@@ -479,12 +494,12 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9,
 	})
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
 	}
 	c.Source.Chain.Commit()
 	_, err = c.Source.PriceRegistry.ApplyFeeTokensUpdates(c.Source.User, []common.Address{wrappedNativeAddress}, nil)
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
 	}
 	c.Source.Chain.Commit()
 
@@ -496,9 +511,8 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		},
 	})
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
 	}
-	c.Source.Chain.Commit()
 
 	_, err = c.Source.PriceRegistry.UpdatePrices(c.Source.User, price_registry.InternalPriceUpdates{
 		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
@@ -511,25 +525,25 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		UsdPerUnitGas:     big.NewInt(0),
 	})
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
 	}
 	c.Source.Chain.Commit()
 
 	_, err = c.Dest.OffRamp.ApplyPoolUpdates(c.Dest.User, nil, []evm_2_evm_offramp.InternalPoolUpdate{
 		{
 			Token: sourceTokenAddress,
-			Pool:  wrappedDestTokenPoolAddress,
+			Pool:  destPoolAddress,
 		},
 	})
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
 	}
 	c.Dest.Chain.Commit()
 
 	_, err = c.Dest.PriceRegistry.UpdatePrices(c.Dest.User, price_registry.InternalPriceUpdates{
 		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 			{
-				SourceToken: wrappedDestTokenPoolAddress,
+				SourceToken: destPoolAddress,
 				UsdPerToken: big.NewInt(5),
 			},
 		},
@@ -537,11 +551,11 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		UsdPerUnitGas:     big.NewInt(0),
 	})
 	if err != nil {
-		return
+		return [20]byte{}, nil, err
 	}
 	c.Dest.Chain.Commit()
 
-	return
+	return sourcePoolAddress, destToken, err
 }
 
 func (c *CCIPContracts) SendMessage(t *testing.T, gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.Address) {

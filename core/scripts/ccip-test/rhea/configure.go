@@ -11,7 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
@@ -124,7 +124,7 @@ func setPriceRegistryUpdater(t *testing.T, client *EvmDeploymentConfig) {
 }
 
 func fillPoolWithTokens(client *EvmDeploymentConfig, pool *lock_release_token_pool.LockReleaseTokenPool, tokenAddress common.Address, tokenName Token) error {
-	token, err := link_token_interface.NewLinkToken(tokenAddress, client.Client)
+	token, err := burn_mint_erc677.NewBurnMintERC677(tokenAddress, client.Client)
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func fillPoolWithTokens(client *EvmDeploymentConfig, pool *lock_release_token_po
 }
 
 func FundPingPong(client *EvmDeploymentConfig, fundingAmount *big.Int, tokenAddress common.Address) error {
-	linkToken, err := link_token_interface.NewLinkToken(tokenAddress, client.Client)
+	linkToken, err := burn_mint_erc677.NewBurnMintERC677(tokenAddress, client.Client)
 	if err != nil {
 		return err
 	}

@@ -39,9 +39,6 @@ venv/
 .golangci.yml
 .solhint.json
 
-# customer contracts
-src/v0.8/ccip/pools/tokens/*
-
 src/v0.8/mocks/FunctionsOracleEventsMock.sol
 src/v0.8/mocks/FunctionsBillingRegistryEventsMock.sol
 
