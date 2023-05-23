@@ -30,6 +30,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	configv2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -53,6 +55,17 @@ type Node struct {
 	Transmitter     common.Address
 	PaymentReceiver common.Address
 	KeyBundle       ocr2key.KeyBundle
+}
+
+func (node *Node) FindJobIDForContract(t *testing.T, addr common.Address) int32 {
+	jobs := node.App.JobSpawner().ActiveJobs()
+	for _, j := range jobs {
+		if j.Type == job.OffchainReporting2 && j.OCR2OracleSpec.ContractID == addr.Hex() {
+			return j.ID
+		}
+	}
+	t.Fatalf("Could not find job for contract %s", addr.Hex())
+	return 0
 }
 
 func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPIntegrationTestHarness, onRamp common.Address, seqNum int) logpoller.Log {
@@ -321,7 +334,8 @@ func createConfigV2Chain(chainId *big.Int) *v2.EVMConfig {
 
 type CCIPIntegrationTestHarness struct {
 	testhelpers.CCIPContracts
-	Nodes []Node
+	Nodes     []Node
+	Bootstrap Node
 }
 
 func SetupCCIPIntegrationTH(t *testing.T, sourceChainID, destChainID uint64) CCIPIntegrationTestHarness {
@@ -339,50 +353,75 @@ func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobS
 	geExecutionSpec, err := jobParams.ExecutionJobSpec()
 	require.NoError(t, err)
 	nodes := c.Nodes
-	for i, node := range nodes {
-		commitSpec.Name = fmt.Sprintf("ccip-commit-%d", i)
+	for _, node := range nodes {
 		node.AddJobsWithSpec(t, commitSpec)
-
-		geExecutionSpec.Name = fmt.Sprintf("ccip-exec-ge-%d", i)
 		node.AddJobsWithSpec(t, geExecutionSpec)
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) AllNodesHaveReqSeqNum(t *testing.T, seqNum int) logpoller.Log {
-	require.NotEmpty(t, c.Source.OnRamp, "no onramp configured")
+func (c *CCIPIntegrationTestHarness) AllNodesHaveReqSeqNum(t *testing.T, seqNum int, onRampOpts ...common.Address) logpoller.Log {
 	var log logpoller.Log
 	nodes := c.Nodes
+	var onRamp common.Address
+	if len(onRampOpts) > 0 {
+		onRamp = onRampOpts[0]
+	} else {
+		require.NotNil(t, c.Source.OnRamp, "no onramp configured")
+		onRamp = c.Source.OnRamp.Address()
+	}
 	for _, node := range nodes {
-		log = node.EventuallyHasReqSeqNum(t, c, c.Source.OnRamp.Address(), seqNum)
+		log = node.EventuallyHasReqSeqNum(t, c, onRamp, seqNum)
 	}
 	return log
 }
 
-func (c *CCIPIntegrationTestHarness) AllNodesHaveExecutedSeqNums(t *testing.T, minSeqNum int, maxSeqNum int) []logpoller.Log {
-	require.NotEmpty(t, c.Dest.OffRamp, "no offramp configured")
+func (c *CCIPIntegrationTestHarness) AllNodesHaveExecutedSeqNums(t *testing.T, minSeqNum int, maxSeqNum int, offRampOpts ...common.Address) []logpoller.Log {
 	var logs []logpoller.Log
 	nodes := c.Nodes
+	var offRamp common.Address
+
+	if len(offRampOpts) > 0 {
+		offRamp = offRampOpts[0]
+	} else {
+		require.NotNil(t, c.Dest.OffRamp, "no offramp configured")
+		offRamp = c.Dest.OffRamp.Address()
+	}
 	for _, node := range nodes {
-		logs = node.EventuallyHasExecutedSeqNums(t, c, c.Dest.OffRamp.Address(), minSeqNum, maxSeqNum)
+		logs = node.EventuallyHasExecutedSeqNums(t, c, offRamp, minSeqNum, maxSeqNum)
 	}
 	return logs
 }
 
-func (c *CCIPIntegrationTestHarness) NoNodesHaveExecutedSeqNum(t *testing.T, seqNum int) logpoller.Log {
-	require.NotEmpty(t, c.Dest.OffRamp, "no offramp configured")
+func (c *CCIPIntegrationTestHarness) NoNodesHaveExecutedSeqNum(t *testing.T, seqNum int, offRampOpts ...common.Address) logpoller.Log {
 	var log logpoller.Log
 	nodes := c.Nodes
+	var offRamp common.Address
+	if len(offRampOpts) > 0 {
+		offRamp = offRampOpts[0]
+	} else {
+		require.NotNil(t, c.Dest.OffRamp, "no offramp configured")
+		offRamp = c.Dest.OffRamp.Address()
+	}
 	for _, node := range nodes {
-		log = node.ConsistentlySeqNumHasNotBeenExecuted(t, c, c.Dest.OffRamp.Address(), seqNum)
+		log = node.ConsistentlySeqNumHasNotBeenExecuted(t, c, offRamp, seqNum)
 	}
 	return log
 }
 
-func (c *CCIPIntegrationTestHarness) EventuallyCommitReportAccepted(t *testing.T, currentBlock uint64) commit_store.CommitStoreCommitReport {
+func (c *CCIPIntegrationTestHarness) EventuallyCommitReportAccepted(t *testing.T, currentBlock uint64, commitStoreOpts ...common.Address) commit_store.CommitStoreCommitReport {
+	var commitStore *commit_store.CommitStore
+	var err error
+	if len(commitStoreOpts) > 0 {
+		commitStore, err = commit_store.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
+		require.NoError(t, err)
+	} else {
+		require.NotNil(t, c.Dest.CommitStore, "no commitStore configured")
+		commitStore = c.Dest.CommitStore
+	}
 	g := gomega.NewGomegaWithT(t)
 	var report commit_store.CommitStoreCommitReport
 	g.Eventually(func() bool {
-		it, err := c.Dest.CommitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
+		it, err := commitStore.FilterReportAccepted(&bind.FilterOpts{Start: currentBlock})
 		g.Expect(err).NotTo(gomega.HaveOccurred(), "Error filtering ReportAccepted event")
 		g.Expect(it.Next()).To(gomega.BeTrue(), "No ReportAccepted event found")
 		report = it.Event.Report
@@ -393,6 +432,97 @@ func (c *CCIPIntegrationTestHarness) EventuallyCommitReportAccepted(t *testing.T
 		return false
 	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "report has not been committed")
 	return report
+}
+
+func (c *CCIPIntegrationTestHarness) EventuallyExecutionStateChangedToSuccess(t *testing.T, seqNum []uint64, blockNum uint64, offRampOpts ...common.Address) {
+	var offRamp *evm_2_evm_offramp.EVM2EVMOffRamp
+	var err error
+	if len(offRampOpts) > 0 {
+		offRamp, err = evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampOpts[0], c.Dest.Chain)
+		require.NoError(t, err)
+	} else {
+		require.NotNil(t, c.Dest.OffRamp, "no offRamp configured")
+		offRamp = c.Dest.OffRamp
+	}
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		it, err := offRamp.FilterExecutionStateChanged(&bind.FilterOpts{Start: blockNum}, seqNum, [][32]byte{})
+		require.NoError(t, err)
+		for it.Next() {
+			if abihelpers.MessageExecutionState(it.Event.State) == abihelpers.ExecutionStateSuccess {
+				t.Logf("ExecutionStateChanged event found for seqNum %d", it.Event.SequenceNumber)
+				return true
+			}
+		}
+		c.Source.Chain.Commit()
+		c.Dest.Chain.Commit()
+		return false
+	}, testutils.WaitTimeout(t), time.Second).
+		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
+}
+
+func (c *CCIPIntegrationTestHarness) EventuallyReportCommitted(t *testing.T, max int, commitStoreOpts ...common.Address) {
+	var commitStore *commit_store.CommitStore
+	var err error
+	if len(commitStoreOpts) > 0 {
+		commitStore, err = commit_store.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
+		require.NoError(t, err)
+	} else {
+		require.NotNil(t, c.Dest.CommitStore, "no commitStore configured")
+		commitStore = c.Dest.CommitStore
+	}
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		minSeqNum, err := commitStore.GetExpectedNextSequenceNumber(nil)
+		require.NoError(t, err)
+		c.Source.Chain.Commit()
+		c.Dest.Chain.Commit()
+		t.Log("min seq num reported", minSeqNum)
+		return minSeqNum > uint64(max)
+	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue(), "report has not been committed")
+}
+
+func (c *CCIPIntegrationTestHarness) EventuallySendRequested(t *testing.T, seqNum uint64, onRampOpts ...common.Address) {
+	var onRamp *evm_2_evm_onramp.EVM2EVMOnRamp
+	var err error
+	if len(onRampOpts) > 0 {
+		onRamp, err = evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampOpts[0], c.Source.Chain)
+		require.NoError(t, err)
+	} else {
+		require.NotNil(t, c.Source.OnRamp, "no onRamp configured")
+		onRamp = c.Source.OnRamp
+	}
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		it, err := onRamp.FilterCCIPSendRequested(nil)
+		require.NoError(t, err)
+		for it.Next() {
+			if it.Event.Message.SequenceNumber == seqNum {
+				t.Log("sendRequested generated for", seqNum)
+				return true
+			}
+		}
+		c.Source.Chain.Commit()
+		c.Dest.Chain.Commit()
+		return false
+	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue(), "sendRequested has not been generated")
+}
+
+func (c *CCIPIntegrationTestHarness) ConsistentlyReportNotCommitted(t *testing.T, max int, commitStoreOpts ...common.Address) {
+	var commitStore *commit_store.CommitStore
+	var err error
+	if len(commitStoreOpts) > 0 {
+		commitStore, err = commit_store.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
+		require.NoError(t, err)
+	} else {
+		require.NotNil(t, c.Dest.CommitStore, "no commitStore configured")
+		commitStore = c.Dest.CommitStore
+	}
+	gomega.NewGomegaWithT(t).Consistently(func() bool {
+		minSeqNum, err := commitStore.GetExpectedNextSequenceNumber(nil)
+		require.NoError(t, err)
+		c.Source.Chain.Commit()
+		c.Dest.Chain.Commit()
+		t.Log("min seq num reported", minSeqNum)
+		return minSeqNum > uint64(max)
+	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeFalse(), "report has been committed")
 }
 
 func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *testing.T, bootstrapNodePort int64) (Node, []Node, int64) {
@@ -457,6 +587,7 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 
 	configBlock := c.SetupOnchainConfig(t, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig)
 	c.Nodes = nodes
+	c.Bootstrap = bootstrapNode
 	return bootstrapNode, nodes, configBlock
 }
 
@@ -469,7 +600,7 @@ func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeli
 	jobParams := c.NewCCIPJobSpecParams(pricePipeline, configBlock)
 
 	// Add the bootstrap job
-	bootstrapNode.AddBootstrapJob(t, jobParams.BootstrapJob(c.Dest.CommitStore.Address().Hex()))
+	c.Bootstrap.AddBootstrapJob(t, jobParams.BootstrapJob(c.Dest.CommitStore.Address().Hex()))
 	c.AddAllJobs(t, jobParams)
 
 	// Replay for bootstrap.
@@ -479,15 +610,4 @@ func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeli
 	c.Dest.Chain.Commit()
 
 	return jobParams
-}
-
-func FindJobIDForContract(t *testing.T, node Node, addr common.Address) int32 {
-	jobs := node.App.JobSpawner().ActiveJobs()
-	for _, j := range jobs {
-		if j.Type == job.OffchainReporting2 && j.OCR2OracleSpec.ContractID == addr.Hex() {
-			return j.ID
-		}
-	}
-	t.Fatalf("Could not find job for contract %s", addr.Hex())
-	return 0
 }

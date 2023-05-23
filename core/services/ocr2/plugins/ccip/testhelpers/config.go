@@ -54,7 +54,7 @@ func (c *CCIPContracts) CreateDefaultExecOnchainConfig(t *testing.T) []byte {
 }
 
 func (c *CCIPContracts) CreateDefaultExecOffchainConfig(t *testing.T) []byte {
-	return c.createExecOffchainConfig(t, 5*time.Second, 1*time.Second)
+	return c.createExecOffchainConfig(t, 1*time.Minute, 1*time.Minute)
 }
 
 func (c *CCIPContracts) createExecOffchainConfig(t *testing.T, inflightCacheExpiry time.Duration, rootSnoozeTime time.Duration) []byte {

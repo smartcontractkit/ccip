@@ -595,6 +595,21 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
+  function testV2SenderNoncesReadsPreviousRampSucceess() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    uint64 startNonce = s_offRamp.getSenderNonce(messages[0].sender);
+
+    for (uint64 i = 1; i < 4; ++i) {
+      s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+
+      messages[0].nonce++;
+      messages[0].sequenceNumber++;
+      messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+
+      assertEq(startNonce + i, s_offRamp.getSenderNonce(messages[0].sender));
+    }
+  }
+
   function testV2NonceStartsAtV1NonceSuccess() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     vm.expectEmit();
@@ -604,7 +619,11 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
+    uint64 startNonce = s_offRamp.getSenderNonce(messages[0].sender);
+
     s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+
+    assertEq(startNonce + 1, s_offRamp.getSenderNonce(messages[0].sender));
 
     messages[0].nonce++;
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -616,10 +635,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
-    // same sender nonce in new offramp should go from 0 -> 2
-    uint64 nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
     s_offRamp.execute(_generateReportFromMessages(messages), false);
-    assertEq(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore + 2);
+    assertEq(startNonce + 2, s_offRamp.getSenderNonce(messages[0].sender));
 
     messages[0].nonce++;
     messages[0].sequenceNumber++;
@@ -632,9 +649,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
-    nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
     s_offRamp.execute(_generateReportFromMessages(messages), false);
-    assertEq(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore + 1);
+    assertEq(startNonce + 3, s_offRamp.getSenderNonce(messages[0].sender));
   }
 
   function testV2NonceNewSenderStartsAtZeroSuccess() public {
@@ -673,11 +689,14 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     messages[0].nonce = 2;
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
-    // new offramp waits previous offramp to execute
+    uint64 startNonce = s_offRamp.getSenderNonce(messages[0].sender);
+
+    // new offramp sees msg nonce higher than senderNonce
+    // it waits for previous offramp to execute
     vm.expectEmit();
     emit SkippedSenderWithPreviousRampMessageInflight(messages[0].nonce, newSender);
     s_offRamp.execute(_generateReportFromMessages(messages), false);
-    assertEq(s_offRamp.getSenderNonce(newSender), 0);
+    assertEq(startNonce, s_offRamp.getSenderNonce(messages[0].sender));
 
     messages[0].nonce = 1;
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -690,6 +709,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
     s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+    assertEq(startNonce + 1, s_offRamp.getSenderNonce(messages[0].sender));
 
     messages[0].nonce = 2;
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
@@ -702,9 +722,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS
     );
 
-    assertEq(s_offRamp.getSenderNonce(newSender), 0);
     s_offRamp.execute(_generateReportFromMessages(messages), false);
-    assertEq(s_offRamp.getSenderNonce(newSender), 2);
+    assertEq(startNonce + 2, s_offRamp.getSenderNonce(messages[0].sender));
   }
 }
 

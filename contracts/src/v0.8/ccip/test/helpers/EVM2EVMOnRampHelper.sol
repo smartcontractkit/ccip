@@ -30,7 +30,7 @@ contract EVM2EVMOnRampHelper is EVM2EVMOnRamp {
     address feeToken,
     uint192 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
-  ) public view returns (uint256) {
+  ) external view returns (uint256) {
     return _getTokenTransferFee(feeToken, feeTokenPrice, tokenAmounts);
   }
 }

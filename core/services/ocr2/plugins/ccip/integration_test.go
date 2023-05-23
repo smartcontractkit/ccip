@@ -93,7 +93,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipTH.SendRequest(t, msg)
 		// Should eventually see this executed.
 		ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
-		ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum)
+		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum)
 
 		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)
@@ -199,7 +199,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum+i)
 		}
 		// Should see a report with the full range
-		ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum+n-1)
+		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum+n-1)
 		// Should all be executed
 		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum+n-1)
 		for _, execLog := range executionLogs {
@@ -242,7 +242,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipTH.Source.Chain.Commit()
 		txForFailedReq := ccipTH.SendRequest(t, msg)
 		failedReqLog := ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
-		ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum)
+		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum)
 		ccipTH.EventuallyCommitReportAccepted(t, currentBlockNumber)
 
 		// execution status should be failed
@@ -266,7 +266,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		for i := 1; i < totalMsgs; i++ {
 			ccipTH.SendRequest(t, msg)
 			ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
-			ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum)
+			ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum)
 			executionLog := ccipTH.NoNodesHaveExecutedSeqNum(t, geCurrentSeqNum)
 			require.Empty(t, executionLog)
 			pendingReqNumbers = append(pendingReqNumbers, geCurrentSeqNum)
@@ -286,48 +286,97 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	})
 
 	// Deploy new on ramp,Commit store,off ramp
-	// create new jobs
+	// Delete v1 jobs
 	// Send a number of requests
-	// Verify all requests after the contracts are upgraded
+	// Upgrade the router with new contracts
+	// create new jobs
+	// Verify all pending requests are sent after the contracts are upgraded
 	t.Run("upgrade contracts and verify requests can be sent with upgraded contract", func(t *testing.T) {
-		ccipTH.DeployNewOnRamp(t)
-		ccipTH.DeployNewCommitStore(t)
-		ccipTH.DeployNewOffRamp(t)
-		newConfigBlock := ccipTH.Dest.Chain.Blockchain().CurrentBlock().Number.Int64()
-		// delete previous jobs, 1 commit and exec
-		for _, node := range ccipTH.Nodes {
-			err = node.App.DeleteJob(context.Background(), 1)
-			require.NoError(t, err)
-			err = node.App.DeleteJob(context.Background(), 2)
-			require.NoError(t, err)
-		}
-
-		// enable the newly deployed contracts
-		ccipTH.EnableOnRamp(t)
-		ccipTH.EnableOffRamp(t)
-		ccipTH.EnableCommitStore(t)
-
-		// create updated jobs
-		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock)
-		ccipTH.AddAllJobs(t, jobParams)
-
-		startSeq := 1
-		endSeqNum := 3
 		gasLimit := big.NewInt(200_003) // prime number
 		gasPrice := big.NewInt(1e9)     // 1 gwei
 		tokenAmount := big.NewInt(100)
+		commitStoreV1 := ccipTH.Dest.CommitStore
+		offRampV1 := ccipTH.Dest.OffRamp
+		onRampV1 := ccipTH.Source.OnRamp
+		// deploy v2 contracts
+		ccipTH.DeployNewOnRamp(t)
+		ccipTH.DeployNewCommitStore(t)
+		ccipTH.DeployNewOffRamp(t)
+
+		// send a request as the v2 contracts are not enabled in router it should route through the v1 contracts
+		t.Logf("sending request for seqnum %d", geCurrentSeqNum)
+		ccipTH.SendMessage(t, gasLimit, gasPrice, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
+		ccipTH.Source.Chain.Commit()
+		ccipTH.Dest.Chain.Commit()
+		t.Logf("verifying seqnum %d on previous onRamp %s", geCurrentSeqNum, onRampV1.Address().Hex())
+		ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum, onRampV1.Address())
+		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum, commitStoreV1.Address())
+		executionLog := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum, offRampV1.Address())
+		ccipTH.AssertExecState(t, executionLog[0], abihelpers.ExecutionStateSuccess, offRampV1.Address())
+
+		nonceAtOnRampV1, err := onRampV1.GetSenderNonce(nil, ccipTH.Source.User.From)
+		require.NoError(t, err, "getting nonce from onRamp")
+		require.Equal(t, geCurrentSeqNum, int(nonceAtOnRampV1))
+		nonceAtOffRampV1, err := offRampV1.GetSenderNonce(nil, ccipTH.Source.User.From)
+		require.NoError(t, err, "getting nonce from offRamp")
+		require.Equal(t, geCurrentSeqNum, int(nonceAtOffRampV1))
+
+		// enable the newly deployed contracts
+		newConfigBlock := ccipTH.Dest.Chain.Blockchain().CurrentBlock().Number.Int64()
+		ccipTH.EnableOnRamp(t)
+		ccipTH.EnableOffRamp(t)
+		ccipTH.EnableCommitStore(t)
+		srcStartBlock := ccipTH.Source.Chain.Blockchain().CurrentBlock().Number.Uint64()
+
+		// send a number of requests, the requests should not be delivered yet as the previous contracts are not configured
+		// with the router anymore
+		startSeq := 1
+		noOfRequests := 5
+		endSeqNum := startSeq + noOfRequests
 		for i := startSeq; i <= endSeqNum; i++ {
 			t.Logf("sending request for seqnum %d", i)
 			ccipTH.SendMessage(t, gasLimit, gasPrice, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
 			ccipTH.Source.Chain.Commit()
 			ccipTH.Dest.Chain.Commit()
-			t.Logf("verifying seqnum %d", i)
-			ccipTH.AllNodesHaveReqSeqNum(t, i)
-			ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), i)
-			executionLog := ccipTH.AllNodesHaveExecutedSeqNums(t, i, i)
-			ccipTH.AssertExecState(t, executionLog[0], abihelpers.ExecutionStateSuccess)
+		}
+		seqNumAtOnRampV1 := geCurrentSeqNum + 1
+		ccipTH.ConsistentlyReportNotCommitted(t, seqNumAtOnRampV1, commitStoreV1.Address())
+
+		// delete v1 jobs
+		for _, node := range ccipTH.Nodes {
+			id := node.FindJobIDForContract(t, commitStoreV1.Address())
+			require.Greater(t, id, int32(0))
+			t.Logf("deleting job %d", id)
+			err = node.App.DeleteJob(context.Background(), id)
+			require.NoError(t, err)
+			id = node.FindJobIDForContract(t, offRampV1.Address())
+			require.Greater(t, id, int32(0))
+			t.Logf("deleting job %d", id)
+			err = node.App.DeleteJob(context.Background(), id)
+			require.NoError(t, err)
 		}
 
+		// create new jobs
+		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock)
+		jobParams.Version = "v2"
+		jobParams.SourceStartBlock = srcStartBlock
+		ccipTH.AddAllJobs(t, jobParams)
+
+		// Now the requests should be delivered
+		for i := startSeq; i <= endSeqNum; i++ {
+			t.Logf("verifying seqnum %d", i)
+			ccipTH.AllNodesHaveReqSeqNum(t, i)
+			ccipTH.EventuallyReportCommitted(t, i)
+			ccipTH.EventuallyExecutionStateChangedToSuccess(t, []uint64{uint64(i)}, uint64(newConfigBlock))
+		}
+
+		// nonces should be correctly synced from v1 contracts for the sender
+		nonceAtOnRampV2, err := ccipTH.Source.OnRamp.GetSenderNonce(nil, ccipTH.Source.User.From)
+		require.NoError(t, err, "getting nonce from onRamp")
+		nonceAtOffRampV2, err := ccipTH.Dest.OffRamp.GetSenderNonce(nil, ccipTH.Source.User.From)
+		require.NoError(t, err, "getting nonce from offRamp")
+		require.Equal(t, nonceAtOnRampV1+uint64(noOfRequests)+1, nonceAtOnRampV2, "nonce should be synced from v1 onRamps")
+		require.Equal(t, nonceAtOffRampV1+uint64(noOfRequests)+1, nonceAtOffRampV2, "nonce should be synced from v1 offRamps")
 		geCurrentSeqNum = endSeqNum + 1
 	})
 
@@ -405,7 +454,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipTH.SendRequest(t, msg)
 		ccipTH.Source.User.Value = nil
 		ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
-		ccipTH.EventuallyReportCommitted(t, ccipTH.Source.OnRamp.Address(), geCurrentSeqNum)
+		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum)
 
 		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)

@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/onsi/gomega"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	"github.com/stretchr/testify/require"
@@ -31,7 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/wrapped_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
@@ -128,6 +126,10 @@ type CCIPContracts struct {
 }
 
 func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
+	prevOffRamp := common.HexToAddress("")
+	if c.Dest.OffRamp != nil {
+		prevOffRamp = c.Dest.OffRamp.Address()
+	}
 	offRampAddress, _, _, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(
 		c.Dest.User,
 		c.Dest.Chain,
@@ -136,7 +138,7 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 			ChainSelector:       c.Dest.ChainID,
 			SourceChainSelector: c.Source.ChainID,
 			OnRamp:              c.Source.OnRamp.Address(),
-			PrevOffRamp:         common.HexToAddress(""),
+			PrevOffRamp:         prevOffRamp,
 		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
@@ -188,6 +190,11 @@ func (c *CCIPContracts) EnableCommitStore(t *testing.T) {
 
 func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 	t.Log("Deploying new onRamp")
+	// find the last onRamp
+	prevOnRamp := common.HexToAddress("")
+	if c.Source.OnRamp != nil {
+		prevOnRamp = c.Source.OnRamp.Address()
+	}
 	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		c.Source.User,  // user
 		c.Source.Chain, // client
@@ -196,7 +203,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			ChainSelector:     c.Source.ChainID,
 			DestChainSelector: c.Dest.ChainID,
 			DefaultTxGasLimit: 200_000,
-			PrevOnRamp:        common.HexToAddress(""),
+			PrevOnRamp:        prevOnRamp,
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          c.Source.Router.Address(),
@@ -241,8 +248,6 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 	c.Source.OnRamp, err = evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.Source.Chain)
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
-
-	c.Source.Chain.Commit()
 	c.Dest.Chain.Commit()
 }
 
@@ -259,10 +264,6 @@ func (c *CCIPContracts) EnableOnRamp(t *testing.T) {
 	t.Log("Setting onRamp on source router")
 	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.RouterOnRamp{{DestChainSelector: c.Dest.ChainID, OnRamp: c.Source.OnRamp.Address()}}, nil, nil)
 	require.NoError(t, err)
-	c.Source.Chain.Commit()
-
-	t.Log("Enabling onRamp on blob verifier")
-
 	c.Source.Chain.Commit()
 	c.Dest.Chain.Commit()
 }
@@ -976,40 +977,22 @@ func (c *CCIPContracts) SendRequest(t *testing.T, msg router.ClientEVM2AnyMessag
 	return tx
 }
 
-func (c *CCIPContracts) AssertExecState(t *testing.T, log logpoller.Log, state abihelpers.MessageExecutionState) {
-	executionStateChanged, err := c.Dest.OffRamp.ParseExecutionStateChanged(log.GetGethLog())
+func (c *CCIPContracts) AssertExecState(t *testing.T, log logpoller.Log, state abihelpers.MessageExecutionState, offRampOpts ...common.Address) {
+	var offRamp *evm_2_evm_offramp.EVM2EVMOffRamp
+	var err error
+	if len(offRampOpts) > 0 {
+		offRamp, err = evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampOpts[0], c.Dest.Chain)
+		require.NoError(t, err)
+	} else {
+		require.NotNil(t, c.Dest.OffRamp, "no offRamp configured")
+		offRamp = c.Dest.OffRamp
+	}
+	executionStateChanged, err := offRamp.ParseExecutionStateChanged(log.GetGethLog())
 	require.NoError(t, err)
 	if abihelpers.MessageExecutionState(executionStateChanged.State) != state {
 		t.Log("Execution failed")
 		t.Fail()
 	}
-}
-
-func (c *CCIPContracts) EventuallyExecutionStateChangedToSuccess(t *testing.T, seqNum []uint64, blockNum uint64) {
-	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		it, err := c.Dest.OffRamp.FilterExecutionStateChanged(&bind.FilterOpts{Start: blockNum}, seqNum, [][32]byte{})
-		require.NoError(t, err)
-		for it.Next() {
-			if abihelpers.MessageExecutionState(it.Event.State) == abihelpers.ExecutionStateSuccess {
-				return true
-			}
-		}
-		c.Source.Chain.Commit()
-		c.Dest.Chain.Commit()
-		return false
-	}, testutils.WaitTimeout(t), time.Second).
-		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
-}
-
-func (c *CCIPContracts) EventuallyReportCommitted(t *testing.T, onRamp common.Address, max int) {
-	gomega.NewGomegaWithT(t).Eventually(func() bool {
-		minSeqNum, err := c.Dest.CommitStore.GetExpectedNextSequenceNumber(nil)
-		require.NoError(t, err)
-		c.Source.Chain.Commit()
-		c.Dest.Chain.Commit()
-		t.Log("min seq num reported", minSeqNum)
-		return minSeqNum > uint64(max)
-	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue(), "report has not been committed")
 }
 
 func GetEVMExtraArgsV1(gasLimit *big.Int, strict bool) ([]byte, error) {

@@ -248,7 +248,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @inheritdoc IEVM2AnyOnRamp
   function getSenderNonce(address sender) external view returns (uint64) {
-    return s_senderNonce[sender];
+    uint256 senderNonce = s_senderNonce[sender];
+
+    if (senderNonce == 0 && i_prevOnRamp != address(0)) {
+      // If OnRamp was upgraded, check if sender has a nonce from the previous OnRamp.
+      return IEVM2AnyOnRamp(i_prevOnRamp).getSenderNonce(sender);
+    }
+    return uint64(senderNonce);
   }
 
   /// @inheritdoc IEVM2AnyOnRamp
@@ -339,7 +345,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   function _validateMessage(
     uint256 dataLength,
     uint256 gasLimit,
-    Client.EVMTokenAmount[] memory tokenAmounts,
+    Client.EVMTokenAmount[] calldata tokenAmounts,
     address originalSender
   ) internal view {
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
@@ -422,7 +428,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @inheritdoc IEVM2AnyOnRamp
   /// @dev This method can only be called by the owner of the contract.
-  function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) public onlyOwner {
+  function applyPoolUpdates(
+    Internal.PoolUpdate[] calldata removes,
+    Internal.PoolUpdate[] calldata adds
+  ) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
       address token = removes[i].token;
       address pool = removes[i].pool;
@@ -453,7 +462,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getFee(Client.EVM2AnyMessage calldata message) public view returns (uint256) {
+  function getFee(Client.EVM2AnyMessage calldata message) external view returns (uint256) {
     (uint192 feeTokenPrice, uint192 gasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenAndGasPrices(
       message.feeToken,
       i_destChainSelector
@@ -688,7 +697,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @notice Allow keeper to monitor funds available for paying nops
-  function linkAvailableForPayment() public view returns (int256) {
+  function linkAvailableForPayment() external view returns (int256) {
     return _linkLeftAfterNopFees();
   }
 

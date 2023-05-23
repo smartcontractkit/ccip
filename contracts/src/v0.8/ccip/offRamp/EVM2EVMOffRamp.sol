@@ -189,12 +189,18 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   /// @inheritdoc IAny2EVMOffRamp
   function getSenderNonce(address sender) public view returns (uint64 nonce) {
-    return s_senderNonce[sender];
+    uint256 senderNonce = s_senderNonce[sender];
+
+    if (senderNonce == 0 && i_prevOffRamp != address(0)) {
+      // If OffRamp was upgraded, check if sender has a nonce from the previous OffRamp.
+      return IAny2EVMOffRamp(i_prevOffRamp).getSenderNonce(sender);
+    }
+    return uint64(senderNonce);
   }
 
   /// @notice Manually execute a message.
   /// @param report Internal.ExecutionReport.
-  function manuallyExecute(Internal.ExecutionReport memory report) external {
+  function manuallyExecute(Internal.ExecutionReport calldata report) external {
     _execute(report, true);
   }
 
@@ -501,7 +507,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// @notice Adds and removed token pools.
   /// @param removes The tokens and pools to be removed
   /// @param adds The tokens and pools to be added.
-  function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) public onlyOwner {
+  function applyPoolUpdates(
+    Internal.PoolUpdate[] calldata removes,
+    Internal.PoolUpdate[] calldata adds
+  ) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
       address token = removes[i].token;
       address pool = removes[i].pool;

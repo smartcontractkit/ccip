@@ -229,7 +229,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		}, testutils.WaitTimeout(t), 5*time.Second).Should(gomega.BeTrue())
 
 		ccipContracts.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
-		ccipContracts.EventuallyReportCommitted(t, ccipContracts.Source.OnRamp.Address(), geCurrentSeqNum)
+		ccipContracts.EventuallyReportCommitted(t, geCurrentSeqNum)
 
 		executionLogs := ccipContracts.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
 		assert.Len(t, executionLogs, 1)

@@ -505,20 +505,40 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(message, FEE_AMOUNT, OWNER);
   }
 
+  function testV2SenderNoncesReadsPreviousRampSucceess() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    uint64 startNonce = s_onRamp.getSenderNonce(OWNER);
+
+    for (uint64 i = 1; i < 4; ++i) {
+      s_prevOnRamp.forwardFromRouter(message, 0, OWNER);
+
+      assertEq(startNonce + i, s_onRamp.getSenderNonce(OWNER));
+    }
+  }
+
   function testV2NonceStartsAtV1NonceSuccess() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    uint64 startNonce = s_onRamp.getSenderNonce(OWNER);
 
     // send 1 message from previous onramp
     s_prevOnRamp.forwardFromRouter(message, FEE_AMOUNT, OWNER);
 
-    // new onramp nonce should start from 2
+    assertEq(startNonce + 1, s_onRamp.getSenderNonce(OWNER));
+
+    // new onramp nonce should start from 2, while sequence number start from 1
     vm.expectEmit();
-    emit CCIPSendRequested(_messageToEvent(message, 1, 2, FEE_AMOUNT, OWNER));
+    emit CCIPSendRequested(_messageToEvent(message, 1, startNonce + 2, FEE_AMOUNT, OWNER));
     s_onRamp.forwardFromRouter(message, FEE_AMOUNT, OWNER);
 
+    assertEq(startNonce + 2, s_onRamp.getSenderNonce(OWNER));
+
+    // after another send, nonce should be 3, and sequence number be 2
     vm.expectEmit();
-    emit CCIPSendRequested(_messageToEvent(message, 2, 3, FEE_AMOUNT, OWNER));
+    emit CCIPSendRequested(_messageToEvent(message, 2, startNonce + 3, FEE_AMOUNT, OWNER));
     s_onRamp.forwardFromRouter(message, FEE_AMOUNT, OWNER);
+
+    assertEq(startNonce + 3, s_onRamp.getSenderNonce(OWNER));
   }
 
   function testV2NonceNewSenderStartsAtZeroSuccess() public {
