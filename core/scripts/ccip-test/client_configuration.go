@@ -879,7 +879,10 @@ func (client *CCIPClient) syncPoolsOnOnRamp() {
 
 	for _, token := range rhea.GetAllTokens() {
 		if sourceConfig, ok := client.Source.SupportedTokens[token]; ok {
-			if _, ok := client.Dest.SupportedTokens[token]; ok {
+			if destConfig, ok := client.Dest.SupportedTokens[token]; ok {
+				if sourceConfig.TokenPoolType == rhea.FeeTokenOnly || destConfig.TokenPoolType == rhea.FeeTokenOnly {
+					continue
+				}
 				wantedSourceTokens = append(wantedSourceTokens, sourceConfig.Token)
 				wantedSourceTokenConfig = append(wantedSourceTokenConfig, sourceConfig)
 				client.Source.logger.Infof("Wanted token: %s", token)
@@ -914,8 +917,7 @@ func (client *CCIPClient) syncPoolsOnOnRamp() {
 		// Pools to add should be the SECOND argument and poolsToRemove the first
 		// Since our deployments are still based on a swapped order, until we deploy new onRamps
 		// this order needs to be maintained to be compatible with the deployed code.
-		// TODO swap after new deployments
-		tx, err := client.Source.OnRamp.ApplyPoolUpdates(client.Source.Owner, poolsToAdd, poolsToRemove)
+		tx, err := client.Source.OnRamp.ApplyPoolUpdates(client.Source.Owner, poolsToRemove, poolsToAdd)
 		require.NoError(client.Source.t, err)
 		err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 		require.NoError(client.Source.t, err)
@@ -934,6 +936,9 @@ func (client *CCIPClient) syncPoolsOffOnRamp() {
 	for _, token := range rhea.GetAllTokens() {
 		if sourceConfig, ok := client.Source.SupportedTokens[token]; ok {
 			if destConfig, ok := client.Dest.SupportedTokens[token]; ok {
+				if sourceConfig.TokenPoolType == rhea.FeeTokenOnly || destConfig.TokenPoolType == rhea.FeeTokenOnly {
+					continue
+				}
 				wantedSourceTokens = append(wantedSourceTokens, sourceConfig.Token)
 				wantedDestTokenConfig = append(wantedDestTokenConfig, destConfig)
 				client.Dest.logger.Infof("Wanted token: %s", token)
@@ -1025,8 +1030,10 @@ func syncPrices(client *Client, otherChainTokens map[rhea.Token]EVMBridgedToken)
 
 func (client *CCIPClient) syncOnRampOnPools() error {
 	for tokenName, tokenConfig := range client.Source.SupportedTokens {
+
 		// Only add tokens that are supported on both chains
-		if _, ok := client.Dest.SupportedTokens[tokenName]; !ok {
+		// and not marked as feeTokenOnly
+		if destConfig, ok := client.Dest.SupportedTokens[tokenName]; !ok || destConfig.TokenPoolType == rhea.FeeTokenOnly || tokenConfig.TokenPoolType == rhea.FeeTokenOnly {
 			continue
 		}
 
@@ -1060,7 +1067,7 @@ func (client *CCIPClient) syncOnRampOnPools() error {
 func (client *CCIPClient) syncOffRampOnPools() error {
 	for tokenName, tokenConfig := range client.Dest.SupportedTokens {
 		// Only add tokens that are supported on both chains
-		if _, ok := client.Source.SupportedTokens[tokenName]; !ok {
+		if destConfig, ok := client.Source.SupportedTokens[tokenName]; !ok || destConfig.TokenPoolType == rhea.FeeTokenOnly || tokenConfig.TokenPoolType == rhea.FeeTokenOnly {
 			continue
 		}
 		isOffRamp, err := tokenConfig.Pool.IsOffRamp(&bind.CallOpts{}, client.Dest.OffRamp.Address())
