@@ -149,8 +149,8 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			TokenPoolType: rhea.BurnMint,
 		},
 		rhea.BankToken: {
-			Token:         gethcommon.HexToAddress("0x87F45de79da4c3356591d74619693E372D525F1b"),
-			Pool:          gethcommon.HexToAddress("0x5fe8fc5f14bd47576669200caa8aa4d57da6a3a0"),
+			Token:         gethcommon.HexToAddress("0x784c400D6fF625051d2f587dC0276E3A1ffD9cda"),
+			Pool:          gethcommon.HexToAddress("0x314ba6767d54e4eab62733583deeaeaa9c5f9f24"),
 			Price:         rhea.BankToken.Price(),
 			TokenPoolType: rhea.LockRelease,
 		},
@@ -348,8 +348,8 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 			TokenPoolType: rhea.BurnMint,
 		},
 		rhea.BankToken: {
-			Token:         gethcommon.HexToAddress("0x386392aeecbce06252d67ce142cd82750a233989"),
-			Pool:          gethcommon.HexToAddress("0x386392aeecbce06252d67ce142cd82750a233989"),
+			Token:         gethcommon.HexToAddress("0x7130aac4827a8b085ffe701a7d4749e2b452a837"),
+			Pool:          gethcommon.HexToAddress("0x7130aac4827a8b085ffe701a7d4749e2b452a837"),
 			Price:         rhea.BankToken.Price(),
 			TokenPoolType: rhea.Wrapped,
 		},
@@ -503,8 +503,8 @@ var Prod_Quorum = rhea.EVMChainConfig{
 			TokenPoolType: rhea.FeeTokenOnly,
 		},
 		rhea.BankToken: {
-			Token:         gethcommon.HexToAddress("0x1e65be3083be02fef86531205fc68bc17288fe65"),
-			Pool:          gethcommon.HexToAddress("0x1e65be3083be02fef86531205fc68bc17288fe65"),
+			Token:         gethcommon.HexToAddress("0x1041d5b06b9f1e73a4d6ae4f4d2a3d5c9e0aa88e"),
+			Pool:          gethcommon.HexToAddress("0x1041d5b06b9f1e73a4d6ae4f4d2a3d5c9e0aa88e"),
 			Price:         rhea.BankToken.Price(),
 			TokenPoolType: rhea.Wrapped,
 		},
