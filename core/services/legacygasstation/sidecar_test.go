@@ -12,6 +12,7 @@ import (
 	"github.com/test-go/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
@@ -421,7 +422,7 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		} else if r.failed {
 			ethTx = cltest.MustInsertFatalErrorEthTx(t, app.TxmStorageService(), fromAddress)
 		} else {
-			ethTx = cltest.MustInsertInProgressEthTxWithAttempt(t, app.TxmStorageService(), int64(i), fromAddress)
+			ethTx = cltest.MustInsertInProgressEthTxWithAttempt(t, app.TxmStorageService(), evmtypes.Nonce(int64(i)), fromAddress)
 		}
 		r.tx.EthTxID = ethTx.GetID()
 		tx := legacygasstation.LegacyGaslessTx(t, r.tx)

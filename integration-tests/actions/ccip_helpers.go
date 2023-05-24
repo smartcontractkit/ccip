@@ -1668,13 +1668,13 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	} else {
 		bootstrapExecP2PId = bootstrapExec.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
 		p2pBootstrappersExec = &client.P2PData{
-			RemoteIP: bootstrapExec.Node.RemoteIP(),
-			PeerID:   bootstrapExecP2PId,
+			InternalIP: bootstrapExec.Node.InternalIP(),
+			PeerID:     bootstrapExecP2PId,
 		}
 	}
 	p2pBootstrappersCommit = &client.P2PData{
-		RemoteIP: bootstrapCommit.Node.RemoteIP(),
-		PeerID:   bootstrapCommitP2PId,
+		InternalIP: bootstrapCommit.Node.InternalIP(),
+		PeerID:     bootstrapCommitP2PId,
 	}
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
