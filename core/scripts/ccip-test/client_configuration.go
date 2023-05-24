@@ -97,6 +97,21 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T, sourceClient *rhea.Ev
 	shared.RequireNoError(t, err)
 }
 
+func (client *CCIPClient) SetDynamicConfigOnRamp(t *testing.T) {
+	config := evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
+		Router:          client.Source.Router.Address(),
+		PriceRegistry:   client.Source.PriceRegistry.Address(),
+		MaxDataSize:     rhea.MAX_DATA_SIZE,
+		MaxTokensLength: rhea.MAX_TOKEN_LENGTH,
+		MaxGasLimit:     rhea.MAX_TX_GAS_LIMIT,
+		Afn:             client.Source.Afn.Address(),
+	}
+	tx, err := client.Source.OnRamp.SetDynamicConfig(client.Source.Owner, config)
+	shared.RequireNoError(t, err)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+}
+
 func (client *CCIPClient) setAllowListEnabled(t *testing.T) {
 	tx, err := client.Source.OnRamp.SetAllowListEnabled(client.Source.Owner, true)
 	shared.RequireNoError(t, err)
