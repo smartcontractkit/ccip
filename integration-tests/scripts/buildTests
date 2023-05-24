@@ -12,6 +12,8 @@ cd "$SCRIPT_DIR"/../../ || exit 1
 make test_need_operator_assets
 cd ./integration-tests
 
+helm repo update
+
 # parse out quotes if they exist in the string
 temp="${1%\"}"
 tosplit="${temp#\"}"
