@@ -454,3 +454,24 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 		client.setAllowList(t)
 	}
 }
+
+// TestUpdateLaneAFNAddress can be run as a test with the following config
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+// It applies AFN address in all contracts that require it. AFN address is taken from rhea.EVMChainConfig.Afn
+// SourceChain.AFN is applied to
+// * OnRamp (via SetDynamicConfig)
+//
+// DestinationChain.AFN is applied to:
+// * OffRamp (via setOCR2Config)
+// * CommitStore (via setOCR2Config)
+func TestUpdateLaneAFNAddress(t *testing.T) {
+	key := checkOwnerKeyAndSetupChain(t)
+
+	client := NewCcipClient(t, SOURCE, DESTINATION, key, key)
+	client.SetDynamicConfigOnRamp(t)
+	client.SetOCR2Config(ENV)
+
+	clientOtherWayAround := NewCcipClient(t, DESTINATION, SOURCE, key, key)
+	clientOtherWayAround.SetDynamicConfigOnRamp(t)
+	clientOtherWayAround.SetOCR2Config(ENV)
+}
