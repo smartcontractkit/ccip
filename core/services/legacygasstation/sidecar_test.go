@@ -46,6 +46,21 @@ type testcase struct {
 	resultData           []legacygasstation.TestLegacyGaslessTx
 }
 
+type testStatusUpdater struct {
+	statusCounter map[string]int
+}
+
+func newTestStatusUpdater() *testStatusUpdater {
+	return &testStatusUpdater{
+		statusCounter: make(map[string]int),
+	}
+}
+
+func (s *testStatusUpdater) Update(tx types.LegacyGaslessTx) error {
+	s.statusCounter[tx.Status.String()]++
+	return nil
+}
+
 var (
 	tests = []testcase{
 		{
@@ -56,6 +71,7 @@ var (
 			requestData: []request{
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
 						SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -66,6 +82,7 @@ var (
 			},
 			resultData: []legacygasstation.TestLegacyGaslessTx{
 				{
+					ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
 					SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -82,6 +99,7 @@ var (
 			requestData: []request{
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
 						SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -92,6 +110,7 @@ var (
 			},
 			resultData: []legacygasstation.TestLegacyGaslessTx{
 				{
+					ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
 					SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -108,6 +127,7 @@ var (
 			requestData: []request{
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
 						SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -127,6 +147,7 @@ var (
 			},
 			resultData: []legacygasstation.TestLegacyGaslessTx{
 				{
+					ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
 					SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -143,6 +164,7 @@ var (
 			requestData: []request{
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
 						SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -154,6 +176,7 @@ var (
 			},
 			resultData: []legacygasstation.TestLegacyGaslessTx{
 				{
+					ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
 					SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -170,6 +193,7 @@ var (
 			requestData: []request{
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
 						SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -179,6 +203,7 @@ var (
 				},
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "a4efbb8b-ac67-46fb-8ded-c883f7f5fcab",
 						From:               common.HexToAddress("0x780b3102c62d5DfDCc658B3480B93041Ba46F499"),
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
@@ -206,6 +231,7 @@ var (
 			},
 			resultData: []legacygasstation.TestLegacyGaslessTx{
 				{
+					ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
 					SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -213,6 +239,7 @@ var (
 					Status:             types.Finalized,
 				},
 				{
+					ID:                 "a4efbb8b-ac67-46fb-8ded-c883f7f5fcab",
 					From:               common.HexToAddress("0x780b3102c62d5DfDCc658B3480B93041Ba46F499"),
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
@@ -230,6 +257,7 @@ var (
 			requestData: []request{
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
 						SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -238,6 +266,7 @@ var (
 				},
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "a4efbb8b-ac67-46fb-8ded-c883f7f5fcab",
 						From:               common.HexToAddress("0x780b3102c62d5DfDCc658B3480B93041Ba46F499"),
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
@@ -249,12 +278,14 @@ var (
 			forwardSucceededLogs: []*forwarder_wrapper.ForwarderForwardSucceeded{},
 			resultData: []legacygasstation.TestLegacyGaslessTx{
 				{
+					ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
 					SourceChainID:      testutils.SimulatedChainID.Uint64(),
 					DestinationChainID: testutils.SimulatedChainID.Uint64(),
 				},
 				{
+					ID:                 "a4efbb8b-ac67-46fb-8ded-c883f7f5fcab",
 					From:               common.HexToAddress("0x780b3102c62d5DfDCc658B3480B93041Ba46F499"),
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
@@ -271,6 +302,7 @@ var (
 			requestData: []request{
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
 						SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -291,6 +323,7 @@ var (
 			},
 			resultData: []legacygasstation.TestLegacyGaslessTx{
 				{
+					ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
 					SourceChainID:      testutils.SimulatedChainID.Uint64(),
@@ -307,6 +340,7 @@ var (
 			requestData: []request{
 				{
 					tx: legacygasstation.TestLegacyGaslessTx{
+						ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 						Nonce:              big.NewInt(0),
 						Amount:             big.NewInt(1e18),
 						SourceChainID:      1000,
@@ -326,6 +360,7 @@ var (
 			},
 			resultData: []legacygasstation.TestLegacyGaslessTx{
 				{
+					ID:                 "4877f0a6-4b05-49d9-8776-4c50c24bed03",
 					Nonce:              big.NewInt(0),
 					Amount:             big.NewInt(1e18),
 					SourceChainID:      1000,
@@ -340,15 +375,15 @@ var (
 func TestSidecar(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sc, orm := setUp(t, test)
+			sc, orm, su := setUp(t, test)
 			err := sc.Run(testutils.Context(t))
 			require.NoError(t, err)
-			assertAfterSidecarRun(t, test, orm)
+			assertAfterSidecarRun(t, test, orm, su)
 		})
 	}
 }
 
-func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygasstation.ORM) {
+func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygasstation.ORM, *testStatusUpdater) {
 	cfg, db := heavyweight.FullTestDBV2(t, "legacy_gas_station_sidecar_test", func(c *chainlink.Config, s *chainlink.Secrets) {
 		require.Zero(t, testutils.SimulatedChainID.Cmp(c.EVM[0].ChainID.ToInt()))
 	})
@@ -401,6 +436,8 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		mock.Anything,
 	).Return(oelLpLogs, nil).Maybe()
 
+	su := newTestStatusUpdater()
+
 	sc, err := legacygasstation.NewSidecar(
 		lggr,
 		lp,
@@ -410,6 +447,7 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		testutils.SimulatedChainID.Uint64(),
 		uint32(test.lookbackBlock),
 		orm,
+		su,
 	)
 	require.NoError(t, err)
 	for i, r := range test.requestData {
@@ -431,10 +469,10 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		err = orm.UpdateLegacyGaslessTx(tx) // update populates ccipMessageID and failureReason
 		require.NoError(t, err)
 	}
-	return sc, orm
+	return sc, orm, su
 }
 
-func assertAfterSidecarRun(t *testing.T, test testcase, orm legacygasstation.ORM) {
+func assertAfterSidecarRun(t *testing.T, test testcase, orm legacygasstation.ORM, su *testStatusUpdater) {
 	confirmedTxs, submittedTxs, finalizedTxs, sourceFinalizedTxs, failedTxs := categorizeTestTxs(t, test.resultData)
 
 	txs, err := orm.SelectBySourceChainIDAndStatus(test.chainID, types.Confirmed)
@@ -456,6 +494,18 @@ func assertAfterSidecarRun(t *testing.T, test testcase, orm legacygasstation.ORM
 	txs, err = orm.SelectBySourceChainIDAndStatus(test.chainID, types.Failure)
 	require.NoError(t, err)
 	require.Equal(t, len(failedTxs), len(txs))
+
+	expectedStatusUpdates := make(map[string]int)
+	for i, req := range test.requestData {
+		resultStatus := test.resultData[i].Status.String()
+		if req.tx.Status != test.resultData[i].Status {
+			expectedStatusUpdates[resultStatus]++
+		}
+	}
+	require.Equal(t, expectedStatusUpdates[types.Confirmed.String()], su.statusCounter[types.Confirmed.String()])
+	require.Equal(t, expectedStatusUpdates[types.Failure.String()], su.statusCounter[types.Failure.String()])
+	require.Equal(t, expectedStatusUpdates[types.SourceFinalized.String()], su.statusCounter[types.SourceFinalized.String()])
+	require.Equal(t, expectedStatusUpdates[types.Finalized.String()], su.statusCounter[types.Finalized.String()])
 }
 
 func categorizeTestTxs(t *testing.T, testTxs []legacygasstation.TestLegacyGaslessTx) (

@@ -989,6 +989,11 @@ func (r *LegacyGasStationSidecarSpecResolver) CCIPChainSelector() *string {
 	return &ccipChainSelector
 }
 
+// StatusUpdateURL returns the job's StatusUpdateURL param.
+func (r *LegacyGasStationSidecarSpecResolver) StatusUpdateURL() string {
+	return r.spec.StatusUpdateURL
+}
+
 // CreatedAt resolves the spec's created at timestamp.
 func (r *LegacyGasStationSidecarSpecResolver) CreatedAt() graphql.Time {
 	return graphql.Time{Time: r.spec.CreatedAt}

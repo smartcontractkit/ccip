@@ -859,6 +859,7 @@ type LegacyGasStationSidecarSpecParams struct {
 	RunTimeout        time.Duration
 	EVMChainID        uint64
 	CCIPChainSelector uint64
+	StatusUpdateURL   string
 }
 
 // LegacyGasStationSidecarSpec defines a legacy gas station sidecar job spec.
@@ -906,6 +907,10 @@ func GenerateLegacyGasStationSidecarSpec(params LegacyGasStationSidecarSpecParam
 		params.RunTimeout = 10 * time.Second
 	}
 
+	if params.StatusUpdateURL == "" {
+		params.StatusUpdateURL = "http://testurl.com"
+	}
+
 	template := `
 type = "legacygasstationsidecar"
 schemaVersion = 1
@@ -917,10 +922,11 @@ pollPeriod = "%s"
 runTimeout = "%s"
 evmChainID = "%d"
 ccipChainSelector = "%d"
+statusUpdateURL = "%s"
 `
 	toml := fmt.Sprintf(template, params.Name, params.ForwarderAddress,
 		params.OffRampAddress, params.LookbackBlocks, params.PollPeriod,
-		params.RunTimeout, params.EVMChainID, params.CCIPChainSelector)
+		params.RunTimeout, params.EVMChainID, params.CCIPChainSelector, params.StatusUpdateURL)
 
 	return LegacyGasStationSidecarSpec{LegacyGasStationSidecarSpecParams: params, toml: toml}
 }

@@ -1012,6 +1012,7 @@ func TestResolver_LegacyGasStationSidecarSpec(t *testing.T) {
 						PollPeriod:        1 * time.Minute,
 						RunTimeout:        37 * time.Second,
 						LookbackBlocks:    200,
+						StatusUpdateURL:   "https://testurl.com",
 					},
 				}, nil)
 			},
@@ -1029,6 +1030,7 @@ func TestResolver_LegacyGasStationSidecarSpec(t *testing.T) {
 									pollPeriod
 									runTimeout
 									lookbackBlocks
+									statusUpdateURL
 									createdAt
 								}
 							}
@@ -1048,6 +1050,7 @@ func TestResolver_LegacyGasStationSidecarSpec(t *testing.T) {
 							"pollPeriod": "1m0s",
 							"runTimeout": "37s",
 							"lookbackBlocks": 200,
+							"statusUpdateURL": "https://testurl.com",
 							"createdAt": "2021-01-01T00:00:00Z"
 						}
 					}

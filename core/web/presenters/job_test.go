@@ -698,6 +698,7 @@ func TestJob(t *testing.T) {
 					RunTimeout:        10 * time.Second,
 					EVMChainID:        utils.NewBigI(4),
 					CCIPChainSelector: utils.NewBigI(4000),
+					StatusUpdateURL:   "https://testurl.com",
 				},
 				PipelineSpec: &pipeline.Spec{
 					ID:           1,
@@ -740,6 +741,7 @@ func TestJob(t *testing.T) {
 							"runTimeout": 10000000000,
 							"evmChainID": "4",
 							"ccipChainSelector": "4000",
+							"statusUpdateURL": "https://testurl.com",
 							"createdAt": "0001-01-01T00:00:00Z",
 							"updatedAt": "0001-01-01T00:00:00Z"
 						},

@@ -176,5 +176,6 @@ type LegacyGasStationSidecarSpec {
     runTimeout: String!
     evmChainID: String
     ccipChainSelector: String
+    statusUpdateURL: String!
     createdAt: Time!
 }

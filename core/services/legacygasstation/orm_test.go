@@ -136,15 +136,15 @@ func TestORM_FailedEthTx(t *testing.T) {
 	err = orm.InsertLegacyGaslessTx(tx)
 	require.NoError(t, err)
 
-	txs, err := orm.SelectEthTxsBySourceChainIDAndStates(tx.SourceChainID, []txmgrtypes.TxState{txmgr.EthTxInProgress})
+	txs, err := orm.SelectBySourceChainIDAndEthTxStates(tx.SourceChainID, []txmgrtypes.TxState{txmgr.EthTxInProgress})
 	require.NoError(t, err)
 	require.Equal(t, 0, len(txs))
 
-	txs, err = orm.SelectEthTxsBySourceChainIDAndStates(tx.SourceChainID, []txmgrtypes.TxState{txmgr.EthTxFatalError})
+	txs, err = orm.SelectBySourceChainIDAndEthTxStates(tx.SourceChainID, []txmgrtypes.TxState{txmgr.EthTxFatalError})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(txs))
-	require.Equal(t, txs[0].State, txmgr.EthTxFatalError)
-	require.Equal(t, txs[0].Error.String, errorMsg)
+	require.Equal(t, txs[0].EthTxStatus, txmgr.EthTxFatalError)
+	require.Equal(t, *txs[0].EthTxError, errorMsg)
 }
 
 func setup(t *testing.T) (legacygasstation.ORM, *sqlx.DB, txmgr.EvmTxStore, keystore.Eth) {

@@ -2,10 +2,10 @@ package legacygasstation
 
 import (
 	"github.com/lib/pq"
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/sqlx"
 
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -14,7 +14,8 @@ import (
 var _ ORM = &orm{}
 
 type orm struct {
-	q pg.Q
+	q    pg.Q
+	lggr logger.Logger
 }
 
 // NewORM creates an ORM scoped to chainID.
@@ -23,7 +24,8 @@ func NewORM(db *sqlx.DB, lggr logger.Logger, cfg pg.QConfig) ORM {
 	namedLogger := lggr.Named("LegacyGasStation")
 	q := pg.NewQ(db, namedLogger, cfg)
 	return &orm{
-		q: q,
+		q:    q,
+		lggr: namedLogger,
 	}
 }
 
@@ -78,22 +80,53 @@ func (o *orm) UpdateLegacyGaslessTx(tx types.LegacyGaslessTx, qopts ...pg.QOpt) 
 	tx_status = $2,
 	ccip_message_id = $3,
 	failure_reason = $4,
+	tx_hash = $5,
 	updated_at = NOW()
 	WHERE legacy_gasless_tx_id = $1`,
 		tx.ID,
 		tx.Status.String(),
 		tx.CCIPMessageID,
 		tx.FailureReason,
+		tx.TxHash,
 	)
 	return err
 }
 
-func (o *orm) SelectEthTxsBySourceChainIDAndStates(sourceChainID uint64, states []txmgrtypes.TxState, qopts ...pg.QOpt) (ethTxs []txmgr.DbEthTx, err error) {
+func (o *orm) SelectBySourceChainIDAndEthTxStates(sourceChainID uint64, states []txmgrtypes.TxState, qopts ...pg.QOpt) ([]types.LegacyGaslessTxPlus, error) {
+	var lgps []types.LegacyGaslessTxPlus
 	q := o.q.WithOpts(qopts...)
-	err = q.Select(&ethTxs, `SELECT eth_txes.* FROM legacy_gasless_txs
-	INNER JOIN eth_txes ON eth_txes.id = legacy_gasless_txs.eth_tx_id
-	WHERE legacy_gasless_txs.source_chain_id = $1 
-	AND eth_txes.state = any($2)
+	err := q.Select(&lgps, `SELECT 
+		lgt.*,
+		etx.state as etx_state,
+		eta.hash as etx_hash,
+		etx.error as etx_error
+	FROM legacy_gasless_txs lgt
+	LEFT JOIN eth_txes etx ON etx.id = lgt.eth_tx_id
+	LEFT JOIN eth_tx_attempts eta ON etx.id = eta.eth_tx_id
+	WHERE lgt.source_chain_id = $1
+	AND etx.state = any($2)
+	ORDER BY eta.broadcast_before_block_num ASC
 	`, sourceChainID, pq.Array(states))
-	return
+	if err != nil {
+		return nil, errors.Wrap(err, "select eth txs by source chain id and states")
+	}
+
+	// result of the query above is sorted by broadcast_before_block_num in ascending order
+	// this map de-duplicates tx attempts so that only most recent attempt tx attempt for the given tx remains
+	// TODO: current implementation does not guarantee that the tx hash is on the canonical chain
+	recentLgps := make(map[string]types.LegacyGaslessTxPlus)
+	for _, lgp := range lgps {
+		if _, ok := recentLgps[lgp.ID]; ok {
+			// found a transaction with multiple attempts
+			o.lggr.Debugw("found a gasless transaction with multiple attempts", "RequestID", lgp.ID, "txHash", lgp.TxHash)
+		}
+		recentLgps[lgp.ID] = lgp
+	}
+
+	var dedupedLgps []types.LegacyGaslessTxPlus
+	for _, lgp := range recentLgps {
+		dedupedLgps = append(dedupedLgps, lgp)
+	}
+
+	return dedupedLgps, nil
 }
