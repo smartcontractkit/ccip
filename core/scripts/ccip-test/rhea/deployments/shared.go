@@ -22,13 +22,16 @@ const (
 )
 
 func getBlockConfirmations(chain rhea.Chain) uint32 {
+	// NOTE most of these is still way artificially low but we aim for quick iteration on testnet.
+	// Optimism, polygon and arbitrum in particular are known for decent sized reorgs so we set
+	// those higher than others.
 	var blockConfirmationPerChain = map[rhea.Chain]uint32{
 		rhea.Goerli:         4,
 		rhea.Sepolia:        4,
-		rhea.OptimismGoerli: 4,
-		rhea.AvaxFuji:       1,
-		rhea.PolygonMumbai:  4,
-		rhea.ArbitrumGoerli: 1,
+		rhea.OptimismGoerli: 10,
+		rhea.AvaxFuji:       2, // Should be 1 theoretically, air on the side of caution.
+		rhea.PolygonMumbai:  10,
+		rhea.ArbitrumGoerli: 10,
 		rhea.Quorum:         4,
 	}
 
