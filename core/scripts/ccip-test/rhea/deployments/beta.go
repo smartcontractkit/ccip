@@ -69,7 +69,7 @@ var Beta_Sepolia = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0x7cbdb9cf6420dd3fda3ce258e9933b998bbe99ac"),
-	Afn:           gethcommon.HexToAddress("0x82870d40fdc43894631503db91d0df33618dbe66"),
+	Afn:           gethcommon.HexToAddress("0x1df877d5cefb303a94b4fbe3f3c3089fb8332db3"),
 	PriceRegistry: gethcommon.HexToAddress("0x872638b04acae2acb4cc57fda4c256f1bd5ead9c"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Sepolia),
@@ -118,7 +118,7 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0xa76549590250cf2b13acd848db6ae9e398767121"),
-	Afn:           gethcommon.HexToAddress("0x74479905880a1dee7ba5fb488bd9231be1919530"),
+	Afn:           gethcommon.HexToAddress("0xb15fa4de18ae593c8d53520dc7e2679c9d0cd2be"),
 	PriceRegistry: gethcommon.HexToAddress("0x9bcf41feb8202d1f1fe92c87b4b420444cc7f767"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.OptimismGoerli),
@@ -171,7 +171,7 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
 	WrappedNative: rhea.WAVAX,
 	Router:        gethcommon.HexToAddress("0x2b2a31372fc7b8508d8505a7e36c2fd32723c09e"),
-	Afn:           gethcommon.HexToAddress("0xb10df23e8cabd0e17d0408abe3e188f673c94e24"),
+	Afn:           gethcommon.HexToAddress("0x829135c138d7ac262a0504b17cf4176896e491e6"),
 	PriceRegistry: gethcommon.HexToAddress("0x462cfca1d2497ab821fb7736a2205c1aeab312dd"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.AvaxFuji),
@@ -224,7 +224,7 @@ var Beta_ArbitrumGoerli = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0x32bb20f8c8869afdef1db14c54e5dc89738e914a"),
-	Afn:           gethcommon.HexToAddress("0xf06230a439b21794569d61c86d3824bc724295fc"),
+	Afn:           gethcommon.HexToAddress("0xca3186cf799f07c68694737ec45026bee3b4d9c2"),
 	PriceRegistry: gethcommon.HexToAddress("0x4abaadc0cef614149e0722060babcfb99051f0d6"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.ArbitrumGoerli),
