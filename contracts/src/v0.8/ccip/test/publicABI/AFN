@@ -6,6 +6,7 @@
   "isBlessed((address,bytes32))": "4d616771",
   "isCursed()": "397796f7",
   "owner()": "8da5cb5b",
+  "ownerCurse()": "e4bbc05c",
   "ownerResetBlessVotes((address,bytes32)[])": "ba86a1f0",
   "ownerUnvoteToCurse((address,bytes32,bool)[])": "618af128",
   "setConfig(((address,address,address,uint8,uint8)[],uint16,uint16))": "47cf2b60",
