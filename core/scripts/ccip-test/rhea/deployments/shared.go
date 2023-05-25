@@ -28,10 +28,10 @@ func getBlockConfirmations(chain rhea.Chain) uint32 {
 	var blockConfirmationPerChain = map[rhea.Chain]uint32{
 		rhea.Goerli:         4,
 		rhea.Sepolia:        4,
-		rhea.OptimismGoerli: 10,
+		rhea.OptimismGoerli: 5,
 		rhea.AvaxFuji:       2, // Should be 1 theoretically, air on the side of caution.
-		rhea.PolygonMumbai:  10,
-		rhea.ArbitrumGoerli: 10,
+		rhea.PolygonMumbai:  5,
+		rhea.ArbitrumGoerli: 5,
 		rhea.Quorum:         4,
 	}
 
