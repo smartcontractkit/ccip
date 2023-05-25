@@ -38,6 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/directrequest"
 	"github.com/smartcontractkit/chainlink/v2/core/services/feeds"
 	"github.com/smartcontractkit/chainlink/v2/core/services/fluxmonitorv2"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keeper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
@@ -367,6 +368,10 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 				keyStore.Eth(),
 				db,
 			),
+			job.Gateway: gateway.NewDelegate(
+				chains.EVM,
+				keyStore.Eth(),
+				globalLogger),
 		}
 		webhookJobRunner = delegates[job.Webhook].(*webhook.Delegate).WebhookJobRunner()
 		lgsRequestRouter = delegates[job.LegacyGasStationServer].(*legacygasstation.Delegate).RequestRouter()

@@ -25,6 +25,7 @@ var (
 		BlockHeaderFeeder:       {},
 		LegacyGasStationServer:  {},
 		LegacyGasStationSidecar: {},
+		Gateway:                 {},
 	}
 )
 
