@@ -1253,35 +1253,6 @@ func (_m *GeneralConfig) KeystorePassword() string {
 	return r0
 }
 
-<<<<<<< HEAD
-// LeaseLockDuration provides a mock function with given fields:
-func (_m *GeneralConfig) LeaseLockDuration() time.Duration {
-	ret := _m.Called()
-
-	var r0 time.Duration
-	if rf, ok := ret.Get(0).(func() time.Duration); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(time.Duration)
-	}
-
-	return r0
-}
-
-// LeaseLockRefreshInterval provides a mock function with given fields:
-func (_m *GeneralConfig) LeaseLockRefreshInterval() time.Duration {
-	ret := _m.Called()
-
-	var r0 time.Duration
-	if rf, ok := ret.Get(0).(func() time.Duration); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(time.Duration)
-	}
-
-	return r0
-}
-
 // LegacyGasStationAuthConfig provides a mock function with given fields:
 func (_m *GeneralConfig) LegacyGasStationAuthConfig() *types.AuthConfig {
 	ret := _m.Called()
@@ -1298,8 +1269,6 @@ func (_m *GeneralConfig) LegacyGasStationAuthConfig() *types.AuthConfig {
 	return r0
 }
 
-=======
->>>>>>> chainlink/develop
 // LogConfiguration provides a mock function with given fields: log
 func (_m *GeneralConfig) LogConfiguration(log config.LogfFn) {
 	_m.Called(log)
