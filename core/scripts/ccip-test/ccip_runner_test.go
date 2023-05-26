@@ -448,6 +448,7 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 		&deployments.Prod_SepoliaToOptimismGoerli,
 		&deployments.Prod_SepoliaToAvaxFuji,
 		&deployments.Prod_SepoliaToArbitrumGoerli,
+		&deployments.Prod_SepoliaToPolygonMumbai,
 		// Quorum allowList is turned off for now, do no uncomment
 		//&deployments.Prod_SepoliaToQuorum,
 
@@ -458,6 +459,8 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 		&deployments.Prod_OptimismGoerliToSepolia,
 
 		&deployments.Prod_ArbitrumGoerliToSepolia,
+
+		&deployments.Prod_PolygonMumbaiToSepolia,
 	}
 
 	for _, lane := range allProdLanes {
