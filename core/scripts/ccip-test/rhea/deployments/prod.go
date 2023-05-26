@@ -66,6 +66,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x63142ee8aa67fcfe478c8da84a51380a5510f01b"), // SepoliaToOptimismGoerli.PingPongDapp,
 		gethcommon.HexToAddress("0x6c1b166f191bb923865647320f560cf329fe4839"), // SepoliaToArbitrum.PingPongDapp,
 		gethcommon.HexToAddress("0xc82f067bb4d66a5a878e88ca96b3bc6a40068dc4"), // SepoliaToQuorum.PingPongDapp,
+		gethcommon.HexToAddress("0x92edc8d0408d795095015dfdb50aab59f80110ae"), // SepoliaToPolygonMumbai.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x25D7214ae75F169263921a1cAaf7E6F033210E24"), // Chris Cushman
@@ -449,7 +450,15 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		EIP1559:   true,
 		GasTipCap: rhea.DefaultGasTipFee,
 	},
-	AllowList: []gethcommon.Address{},
+	AllowList: []gethcommon.Address{
+		// ==============  INTERNAL ==============
+		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
+		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Test Script 0xEa94AA1318796b5C01a9A37faCBc65423fb2c520
+		// Ping pong
+		gethcommon.HexToAddress("0x56edc4d8367932f0e36b966cbbd95df48e9db40f"), // PolygonMumbaiToSepolia.PingPongDapp,
+		// Personal
+		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
+	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
