@@ -22,9 +22,9 @@ import (
 
 var (
 	// Change these values
-	sourceChain = rhea.ArbitrumGoerli
+	sourceChain = rhea.PolygonMumbai
 	destChain   = rhea.Sepolia
-	ENV         = dione.StagingBeta
+	ENV         = dione.Production
 
 	// These will automatically populate or error if the lane doesn't exist
 	SOURCE      = laneMapping[ENV][sourceChain][destChain]
@@ -244,10 +244,12 @@ func TestUpdateAllLanes(t *testing.T) {
 // **	Add it to the chain config in e.g. prod.go
 // **	Leave the pool address empty
 // ** 	Depending on the pool type fill in the token address or not (wrapped doesn't have a token so leave it empty)
+// **   Set DeployTokenPools to `true` for chains that need the pool deployed
 //
 // Run `TestRheaDeployChains` to deploy the new pools
 // ** 	Run output should be written to console & ./json/deployments/env/chain/....
 // ** 	Modify the chain config to include the new info
+// **   Set DeployTokenPools back to `false` where changed
 //
 // Run TestSyncTokens
 // ** 	This should set the correct config on each ramp and token pool based on previous steps
