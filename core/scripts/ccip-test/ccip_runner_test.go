@@ -24,7 +24,7 @@ var (
 	// Change these values
 	sourceChain = rhea.PolygonMumbai
 	destChain   = rhea.Sepolia
-	ENV         = dione.Production
+	ENV         = dione.StagingBeta
 
 	// These will automatically populate or error if the lane doesn't exist
 	SOURCE      = laneMapping[ENV][sourceChain][destChain]
