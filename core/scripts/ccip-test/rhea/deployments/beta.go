@@ -408,15 +408,15 @@ var Beta_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_ArbitrumGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0xb7eed42a7a27b861dd009fc8d5b45392fd3cb13a"),
-		OffRamp:      gethcommon.HexToAddress("0x15e8c905907bf6342e9b4967abaf451e888df764"),
-		CommitStore:  gethcommon.HexToAddress("0x0fdf09036fd2674841322081f52b2536d2e81af8"),
-		PingPongDapp: gethcommon.HexToAddress("0x363c3a63ab17affcfbb4ed88d08bde29672ef59b"),
+		OnRamp:       gethcommon.HexToAddress("0xcc7318285517149e922052060d4187789c2e112f"),
+		OffRamp:      gethcommon.HexToAddress("0xb2ce4a703528f9333791dc2c78c88288de1f001c"),
+		CommitStore:  gethcommon.HexToAddress("0xb72dbb3d1dc9d77fa89a7e03e08144fc485caf97"),
+		PingPongDapp: gethcommon.HexToAddress("0x7dd4517c4c144792ebee90bce6c0d852a5d2db83"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    22057665,
+			DeployedAtBlock:    22084633,
 		},
 	},
 }
@@ -424,15 +424,15 @@ var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_Sepolia,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0xa55f8707c887b09e3036e7afa7e1d6e15b0902d9"),
-		OffRamp:      gethcommon.HexToAddress("0xcd80d8d9f9630e637e28470fa93f7ba7a1ae8d21"),
-		CommitStore:  gethcommon.HexToAddress("0x01111ff0029c27c28bab310fc8cb08f7ef9ecd65"),
-		PingPongDapp: gethcommon.HexToAddress("0x99b75c6b0159dcdf4649b75e4c01b8195cad6fcb"),
+		OnRamp:       gethcommon.HexToAddress("0x0234c63f3094d54b93541fdff67766a857d5ad4b"),
+		OffRamp:      gethcommon.HexToAddress("0xf727cf577e635b62072a42eac53f6f7e392f78bc"),
+		CommitStore:  gethcommon.HexToAddress("0x55d80cb2c68b24dbcfd96e4881f769d1af0b31a2"),
+		PingPongDapp: gethcommon.HexToAddress("0xdecc2947df09d9d0cc22fa6dbea589d7078c65a6"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3559870,
+			DeployedAtBlock:    3560628,
 		},
 	},
 }
