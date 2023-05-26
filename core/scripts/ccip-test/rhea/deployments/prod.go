@@ -27,6 +27,7 @@ var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 	rhea.AvaxFuji: {
 		rhea.Sepolia:        Prod_AvaxFujiToSepolia,
 		rhea.OptimismGoerli: Prod_AvaxFujiToOptimismGoerli,
+		rhea.PolygonMumbai:  Prod_AvaxFujiToPolygonMumbai,
 	},
 	rhea.OptimismGoerli: {
 		rhea.Sepolia:  Prod_OptimismGoerliToSepolia,
@@ -36,7 +37,8 @@ var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 		rhea.Sepolia: Prod_ArbitrumGoerliToSepolia,
 	},
 	rhea.PolygonMumbai: {
-		rhea.Sepolia: Prod_PolygonMumbaiToSepolia,
+		rhea.Sepolia:  Prod_PolygonMumbaiToSepolia,
+		rhea.AvaxFuji: Prod_PolygonMumbaiToAvaxFuji,
 	},
 	rhea.Quorum: {
 		rhea.Sepolia: Prod_QuorumToSepolia,
@@ -729,6 +731,38 @@ var Prod_SepoliaToQuorum = rhea.EvmDeploymentConfig{
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
 			DeployedAtBlock:    3515969,
+		},
+	},
+}
+
+var Prod_AvaxFujiToPolygonMumbai = rhea.EvmDeploymentConfig{
+	ChainConfig: Prod_AvaxFuji,
+	LaneConfig: rhea.EVMLaneConfig{
+		OnRamp:       gethcommon.HexToAddress("0x4295Ec6054d28CdEC8Ed074A8CC98ec0316609e2"),
+		OffRamp:      gethcommon.HexToAddress("0x8F4A41bB7beA86FFf0A138f7A62a87c20502C728"),
+		CommitStore:  gethcommon.HexToAddress("0x50c947b50C2d9B5a36e2C9D2eb9D3563952c8216"),
+		PingPongDapp: gethcommon.HexToAddress("0x29e6697bc7C34953069C5E06e16385f42473c9a4"),
+		DeploySettings: rhea.LaneDeploySettings{
+			DeployCommitStore:  false,
+			DeployRamp:         false,
+			DeployPingPongDapp: false,
+			DeployedAtBlock:    22289041,
+		},
+	},
+}
+
+var Prod_PolygonMumbaiToAvaxFuji = rhea.EvmDeploymentConfig{
+	ChainConfig: Prod_PolygonMumbai,
+	LaneConfig: rhea.EVMLaneConfig{
+		OnRamp:       gethcommon.HexToAddress("0xa1ed3A3aA29166C9c8448654A8cA6b7916BC8379"),
+		OffRamp:      gethcommon.HexToAddress("0x9940cf4dF8CCb5eD0401A60450BeeDb5e8D8eCA3"),
+		CommitStore:  gethcommon.HexToAddress("0x632ad295b9cb955D70fEB33E6A3EE2BdDbf0582D"),
+		PingPongDapp: gethcommon.HexToAddress("0x6456Ce3C0f0007e75684d2f676B73A5b4363CDEd"),
+		DeploySettings: rhea.LaneDeploySettings{
+			DeployCommitStore:  false,
+			DeployRamp:         false,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    36047942,
 		},
 	},
 }
