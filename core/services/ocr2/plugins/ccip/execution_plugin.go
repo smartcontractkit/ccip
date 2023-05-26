@@ -29,6 +29,8 @@ const (
 	EXEC_EXECUTION_STATE_CHANGES = "Exec execution state changes"
 	EXEC_TOKEN_POOL_ADDED        = "Token pool added"
 	EXEC_TOKEN_POOL_REMOVED      = "Token pool removed"
+	FEE_TOKEN_ADDED              = "Fee token added"
+	FEE_TOKEN_REMOVED            = "Fee token removed"
 )
 
 func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
@@ -140,6 +142,22 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, offRamp.Address().String()),
 		EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved},
 		Addresses: []common.Address{offRamp.Address()},
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{
+		Name:      logpoller.FilterName(FEE_TOKEN_ADDED, srcPriceRegistry.Address().String()),
+		EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenAdded},
+		Addresses: []common.Address{srcPriceRegistry.Address()},
+	})
+	if err != nil {
+		return nil, err
+	}
+	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{
+		Name:      logpoller.FilterName(FEE_TOKEN_REMOVED, srcPriceRegistry.Address().String()),
+		EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenRemoved},
+		Addresses: []common.Address{srcPriceRegistry.Address()},
 	})
 	if err != nil {
 		return nil, err

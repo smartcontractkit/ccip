@@ -123,14 +123,6 @@ func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore c
 	return paused || !healthy
 }
 
-func copyMap[M ~map[K]V, K comparable, V any](m M) M {
-	cpy := make(M)
-	for k, v := range m {
-		cpy[k] = v
-	}
-	return cpy
-}
-
 func max[T constraints.Ordered](first T, rest ...T) T {
 	max := first
 	for _, v := range rest {
