@@ -2,7 +2,7 @@
 pragma solidity 0.8.6;
 
 import "../../vendor/openzeppelin-solidity/v4.7.3/contracts/proxy/Proxy.sol";
-import "../../vendor/openzeppelin-solidity/v4.8.0/utils/structs/EnumerableSet.sol";
+import "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/structs/EnumerableSet.sol";
 import "../../vendor/openzeppelin-solidity/v4.7.3/contracts/utils/Address.sol";
 import "./KeeperRegistryBase2_0.sol";
 import {AutomationRegistryExecutableInterface, UpkeepInfo} from "../../interfaces/automation/2_0/AutomationRegistryInterface2_0.sol";
