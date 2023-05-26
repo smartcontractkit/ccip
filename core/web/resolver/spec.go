@@ -989,6 +989,21 @@ func (r *LegacyGasStationSidecarSpecResolver) CCIPChainSelector() *string {
 	return &ccipChainSelector
 }
 
+// StatusUpdateURL returns the job's StatusUpdateURL param.
+func (r *LegacyGasStationSidecarSpecResolver) StatusUpdateURL() string {
+	return r.spec.StatusUpdateURL
+}
+
+// ClientCertificate returns the job's ClientCertificate param.
+func (r *LegacyGasStationSidecarSpecResolver) ClientCertificate() *string {
+	return r.spec.ClientCertificate
+}
+
+// ClientKey returns the job's ClientKey param.
+func (r *LegacyGasStationSidecarSpecResolver) ClientKey() *string {
+	return r.spec.ClientKey
+}
+
 // CreatedAt resolves the spec's created at timestamp.
 func (r *LegacyGasStationSidecarSpecResolver) CreatedAt() graphql.Time {
 	return graphql.Time{Time: r.spec.CreatedAt}

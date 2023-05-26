@@ -34,6 +34,8 @@ import (
 
 	time "time"
 
+	types "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types"
+
 	url "net/url"
 
 	utils "github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -2039,6 +2041,22 @@ func (_m *ChainScopedConfig) LeaseLockRefreshInterval() time.Duration {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(time.Duration)
+	}
+
+	return r0
+}
+
+// LegacyGasStationAuthConfig provides a mock function with given fields:
+func (_m *ChainScopedConfig) LegacyGasStationAuthConfig() *types.AuthConfig {
+	ret := _m.Called()
+
+	var r0 *types.AuthConfig
+	if rf, ok := ret.Get(0).(func() *types.AuthConfig); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.AuthConfig)
+		}
 	}
 
 	return r0

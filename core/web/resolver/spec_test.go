@@ -1012,6 +1012,9 @@ func TestResolver_LegacyGasStationSidecarSpec(t *testing.T) {
 						PollPeriod:        1 * time.Minute,
 						RunTimeout:        37 * time.Second,
 						LookbackBlocks:    200,
+						StatusUpdateURL:   "https://testurl.com",
+						ClientCertificate: ptr("client-certificate"),
+						ClientKey:         ptr("client-key"),
 					},
 				}, nil)
 			},
@@ -1029,6 +1032,9 @@ func TestResolver_LegacyGasStationSidecarSpec(t *testing.T) {
 									pollPeriod
 									runTimeout
 									lookbackBlocks
+									statusUpdateURL
+									clientCertificate
+									clientKey
 									createdAt
 								}
 							}
@@ -1048,6 +1054,9 @@ func TestResolver_LegacyGasStationSidecarSpec(t *testing.T) {
 							"pollPeriod": "1m0s",
 							"runTimeout": "37s",
 							"lookbackBlocks": 200,
+							"statusUpdateURL": "https://testurl.com",
+							"clientCertificate": "client-certificate",
+							"clientKey": "client-key",
 							"createdAt": "2021-01-01T00:00:00Z"
 						}
 					}
@@ -1130,3 +1139,5 @@ func TestResolver_BootstrapSpec(t *testing.T) {
 
 	RunGQLTests(t, testCases)
 }
+
+func ptr[T any](t T) *T { return &t }

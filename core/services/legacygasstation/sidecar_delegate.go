@@ -77,6 +77,30 @@ func (d *SidecarDelegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) 
 
 	orm := NewORM(d.db, d.logger, chain.Config())
 
+	var (
+		mtlsCertificate string
+		mtlsKey         string
+	)
+
+	if chain.Config().LegacyGasStationAuthConfig() != nil {
+		mtlsCertificate = chain.Config().LegacyGasStationAuthConfig().ClientCertificate
+		mtlsKey = chain.Config().LegacyGasStationAuthConfig().ClientKey
+	} else if jb.LegacyGasStationSidecarSpec.ClientCertificate != nil && jb.LegacyGasStationSidecarSpec.ClientKey != nil {
+		// temporary workaround until mtls auth config can be fetched inside nodes
+		mtlsCertificate = *jb.LegacyGasStationSidecarSpec.ClientCertificate
+		mtlsKey = *jb.LegacyGasStationSidecarSpec.ClientKey
+	}
+
+	su, err := NewStatusUpdater(
+		jb.LegacyGasStationSidecarSpec.StatusUpdateURL,
+		mtlsCertificate,
+		mtlsKey,
+		log,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "new status updater")
+	}
+
 	sidecar, err := NewSidecar(
 		log,
 		chain.LogPoller(),
@@ -86,6 +110,7 @@ func (d *SidecarDelegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) 
 		jb.LegacyGasStationSidecarSpec.CCIPChainSelector.ToInt().Uint64(),
 		uint32(jb.LegacyGasStationSidecarSpec.LookbackBlocks),
 		orm,
+		su,
 	)
 	if err != nil {
 		return nil, err

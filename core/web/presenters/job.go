@@ -420,6 +420,9 @@ type LegacyGasStationSidecarSpec struct {
 	CCIPChainSelector *utils.Big          `json:"ccipChainSelector"`
 	PollPeriod        time.Duration       `json:"pollPeriod"`
 	RunTimeout        time.Duration       `json:"runTimeout"`
+	StatusUpdateURL   string              `json:"statusUpdateURL"`
+	ClientCertificate *string             `json:"clientCertificate"`
+	ClientKey         *string             `json:"clientKey"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -435,6 +438,9 @@ func NewLegacyGasStationSidecarSpec(spec *job.LegacyGasStationSidecarSpec) *Lega
 		CCIPChainSelector: spec.CCIPChainSelector,
 		PollPeriod:        spec.PollPeriod,
 		RunTimeout:        spec.RunTimeout,
+		StatusUpdateURL:   spec.StatusUpdateURL,
+		ClientCertificate: spec.ClientCertificate,
+		ClientKey:         spec.ClientKey,
 	}
 }
 

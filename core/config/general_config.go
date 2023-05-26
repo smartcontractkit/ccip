@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger/audit"
+	"github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types"
 	ocr2models "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
 	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -130,6 +131,7 @@ type BasicConfig interface {
 	LogFileMaxBackups() int64
 	LogUnixTimestamps() bool
 	MercuryCredentials(credName string) *ocr2models.MercuryCredentials
+	LegacyGasStationAuthConfig() *types.AuthConfig
 	MigrateDatabase() bool
 	ORMMaxIdleConns() int
 	ORMMaxOpenConns() int

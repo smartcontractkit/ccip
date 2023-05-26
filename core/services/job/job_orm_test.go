@@ -295,7 +295,10 @@ func TestORM(t *testing.T) {
 
 	t.Run("it creates and deletes records for legacy gas station sidecar jobs", func(t *testing.T) {
 		jb, err := legacygasstation.ValidatedSidecarSpec(
-			testspecs.GenerateLegacyGasStationSidecarSpec(testspecs.LegacyGasStationSidecarSpecParams{}).Toml())
+			testspecs.GenerateLegacyGasStationSidecarSpec(testspecs.LegacyGasStationSidecarSpecParams{
+				ClientCertificate: ptr("clientCertificate"),
+				ClientKey:         ptr("clientKey"),
+			}).Toml())
 		require.NoError(t, err)
 
 		err = orm.CreateJob(&jb)
@@ -312,6 +315,9 @@ func TestORM(t *testing.T) {
 		require.Equal(t, jb.LegacyGasStationSidecarSpec.RunTimeout, savedJob.LegacyGasStationSidecarSpec.RunTimeout)
 		require.Equal(t, jb.LegacyGasStationSidecarSpec.EVMChainID, savedJob.LegacyGasStationSidecarSpec.EVMChainID)
 		require.Equal(t, jb.LegacyGasStationSidecarSpec.CCIPChainSelector, savedJob.LegacyGasStationSidecarSpec.CCIPChainSelector)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.StatusUpdateURL, savedJob.LegacyGasStationSidecarSpec.StatusUpdateURL)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.ClientCertificate, savedJob.LegacyGasStationSidecarSpec.ClientCertificate)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.ClientKey, savedJob.LegacyGasStationSidecarSpec.ClientKey)
 		err = orm.DeleteJob(jb.ID)
 		require.NoError(t, err)
 		_, err = orm.FindJob(testutils.Context(t), jb.ID)
@@ -1451,3 +1457,5 @@ func mustInsertPipelineRun(t *testing.T, orm pipeline.ORM, j job.Job) pipeline.R
 	require.NoError(t, err)
 	return run
 }
+
+func ptr[T any](t T) *T { return &t }
