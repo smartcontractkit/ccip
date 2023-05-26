@@ -47,7 +47,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	if err != nil {
 		return nil, errors.Wrap(err, "get chainset")
 	}
-	commitStore, err := LoadCommitStore(common.HexToAddress(spec.ContractID), destChain.Client())
+	commitStore, err := LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
@@ -59,11 +59,11 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
-	offRamp, err := LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), destChain.Client())
+	offRamp, err := LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), CommitPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
-	onRamp, err := LoadOnRamp(staticConfig.OnRamp, sourceChain.Client())
+	onRamp, err := LoadOnRamp(staticConfig.OnRamp, CommitPluginLabel, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp")
 	}

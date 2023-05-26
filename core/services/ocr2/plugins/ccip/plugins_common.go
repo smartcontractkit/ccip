@@ -26,32 +26,34 @@ const (
 	MaxMessagesPerBatch  = 256     // merkle proof bits need to fit in a uint256
 	MaxQueryLength       = 0       // empty for both plugins
 	MaxObservationLength = 250_000 // plugins's Observation should make sure to cap to this limit
+	CommitPluginLabel    = "commit"
+	ExecPluginLabel      = "exec"
 )
 
 var ErrCommitStoreIsDown = errors.New("commitStore is down")
 
-func LoadOnRamp(onRampAddress common.Address, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampInterface, error) {
+func LoadOnRamp(onRampAddress common.Address, pluginName string, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampInterface, error) {
 	err := ccipconfig.VerifyTypeAndVersion(onRampAddress, client, ccipconfig.EVM2EVMOnRamp)
 	if err != nil {
 		return nil, errors.Wrap(err, "Invalid onRamp contract")
 	}
-	return observability.NewObservedEVM2EVMnRamp(onRampAddress, client)
+	return observability.NewObservedEVM2EVMnRamp(onRampAddress, pluginName, client)
 }
 
-func LoadOffRamp(offRampAddress common.Address, client client.Client) (evm_2_evm_offramp.EVM2EVMOffRampInterface, error) {
+func LoadOffRamp(offRampAddress common.Address, pluginName string, client client.Client) (evm_2_evm_offramp.EVM2EVMOffRampInterface, error) {
 	err := ccipconfig.VerifyTypeAndVersion(offRampAddress, client, ccipconfig.EVM2EVMOffRamp)
 	if err != nil {
 		return nil, errors.Wrap(err, "Invalid offRamp contract")
 	}
-	return observability.NewObservedEVM2EVMOffRamp(offRampAddress, client)
+	return observability.NewObservedEVM2EVMOffRamp(offRampAddress, pluginName, client)
 }
 
-func LoadCommitStore(commitStoreAddress common.Address, client client.Client) (commit_store.CommitStoreInterface, error) {
+func LoadCommitStore(commitStoreAddress common.Address, pluginName string, client client.Client) (commit_store.CommitStoreInterface, error) {
 	err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
 	if err != nil {
 		return nil, errors.Wrap(err, "Invalid commitStore contract")
 	}
-	return observability.NewObservedCommitStore(commitStoreAddress, client)
+	return observability.NewObservedCommitStore(commitStoreAddress, pluginName, client)
 }
 
 func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
