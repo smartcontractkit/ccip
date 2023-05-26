@@ -22,7 +22,7 @@ import (
 
 var (
 	// Change these values
-	sourceChain = rhea.ArbitrumGoerli
+	sourceChain = rhea.PolygonMumbai
 	destChain   = rhea.Sepolia
 	ENV         = dione.StagingBeta
 
@@ -244,10 +244,12 @@ func TestUpdateAllLanes(t *testing.T) {
 // **	Add it to the chain config in e.g. prod.go
 // **	Leave the pool address empty
 // ** 	Depending on the pool type fill in the token address or not (wrapped doesn't have a token so leave it empty)
+// **   Set DeployTokenPools to `true` for chains that need the pool deployed
 //
 // Run `TestRheaDeployChains` to deploy the new pools
 // ** 	Run output should be written to console & ./json/deployments/env/chain/....
 // ** 	Modify the chain config to include the new info
+// **   Set DeployTokenPools back to `false` where changed
 //
 // Run TestSyncTokens
 // ** 	This should set the correct config on each ramp and token pool based on previous steps
@@ -448,6 +450,7 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 		&deployments.Prod_SepoliaToOptimismGoerli,
 		&deployments.Prod_SepoliaToAvaxFuji,
 		&deployments.Prod_SepoliaToArbitrumGoerli,
+		&deployments.Prod_SepoliaToPolygonMumbai,
 		// Quorum allowList is turned off for now, do no uncomment
 		//&deployments.Prod_SepoliaToQuorum,
 
@@ -458,6 +461,8 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 		&deployments.Prod_OptimismGoerliToSepolia,
 
 		&deployments.Prod_ArbitrumGoerliToSepolia,
+
+		&deployments.Prod_PolygonMumbaiToSepolia,
 	}
 
 	for _, lane := range allProdLanes {

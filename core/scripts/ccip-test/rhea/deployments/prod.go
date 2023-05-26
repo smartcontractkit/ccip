@@ -68,6 +68,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x63142ee8aa67fcfe478c8da84a51380a5510f01b"), // SepoliaToOptimismGoerli.PingPongDapp,
 		gethcommon.HexToAddress("0x6c1b166f191bb923865647320f560cf329fe4839"), // SepoliaToArbitrum.PingPongDapp,
 		gethcommon.HexToAddress("0xc82f067bb4d66a5a878e88ca96b3bc6a40068dc4"), // SepoliaToQuorum.PingPongDapp,
+		gethcommon.HexToAddress("0x92edc8d0408d795095015dfdb50aab59f80110ae"), // SepoliaToPolygonMumbai.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x25D7214ae75F169263921a1cAaf7E6F033210E24"), // Chris Cushman
@@ -99,9 +100,10 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xc5f502Ae5972c938940b33308f8845cbe80211B5"), // BetaUser - Robolabs
 		gethcommon.HexToAddress("0x87F45de79da4c3356591d74619693E372D525F1b"), // BankToken 1 (BANK) - internal testing contract for SWIFT POC
 		gethcommon.HexToAddress("0x784c400D6fF625051d2f587dC0276E3A1ffD9cda"), // BankToken 2 (BANK) - internal testing contract for SWIFT POC
-		gethcommon.HexToAddress("0x844257f146a586dAdD5A3a46cd8c069Bb565a80e"), // BetaUser - SWIFT (BondToken)
+		gethcommon.HexToAddress("0xF92E4b278380f39fADc24483C7baC61b73EE93F2"), // BetaUser - SWIFT (BondToken)
 		gethcommon.HexToAddress("0xAa6f663a14b8dA1EB9CF021379f4Ba6BF536268A"), // BetaUser - Fidelity Digital Assets
 		gethcommon.HexToAddress("0xB781A9EFC6bd4Cf0dbE547D20151A405673F4CDe"), // BetaUser - RiseWorks
+		gethcommon.HexToAddress("0xe764C455e3Bd05Eb7Cf53Ec8491dca0e91486D24"), // BetaUser - Synthetix v3 core
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
@@ -159,10 +161,16 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.BondToken: {
-			Token:         gethcommon.HexToAddress("0x844257f146a586dAdD5A3a46cd8c069Bb565a80e"),
-			Pool:          gethcommon.HexToAddress("0x079a6d2f2022bfd0ae58b966efbd3e363391a041"),
+			Token:         gethcommon.HexToAddress("0xF92E4b278380f39fADc24483C7baC61b73EE93F2"),
+			Pool:          gethcommon.HexToAddress("0x3173def68e8445e6f0c83d0a014ea49cc091527f"),
 			Price:         rhea.BondToken.Price(),
 			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.SNXUSD: {
+			Token:         gethcommon.HexToAddress("0x5B33A61Fe23260b55f1Fa9c586001a630C048BF4"),
+			Pool:          gethcommon.HexToAddress("0xd7e7bf07ed9f7c21bd309522df183745151b67a9"),
+			Price:         rhea.SNXUSD.Price(),
+			TokenPoolType: rhea.BurnMint,
 		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
@@ -297,6 +305,7 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xE8Cc2Bd6082387a7AC749176b1Fe19377f420740"), // BetaUser - Multimedia (AA wallet)
 		gethcommon.HexToAddress("0xa78ceF54da82D6279b20457F4D46294AfF59C871"), // BetaUser - Flash Liquidity
 		gethcommon.HexToAddress("0x6613fd61bbfEF3291f2D7C7203Ceab212e880DbB"), // BetaUser - Flash Liquidity
+		gethcommon.HexToAddress("0xa294275E5Bb4A786a3305f4276645290cCC7419B"), // BetaUser - Flash Liquidity
 		gethcommon.HexToAddress("0xcA218DCFD26990223a2eDA70f3A568eaae22c051"), // BetaUser - Cozy Labs
 		gethcommon.HexToAddress("0xD0fB066847d5DBc760E9575f79d9A044385e4079"), // BetaUser - Cozy Labs
 		gethcommon.HexToAddress("0xD93C3Ae0949f905846FdfFc2b5b8A0a047dda59f"), // BetaUser - InsurAce
@@ -358,8 +367,8 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.BondToken: {
-			Token:         gethcommon.HexToAddress("0xc453afac62fa5888c0db5514ff48178a8c443e9e"),
-			Pool:          gethcommon.HexToAddress("0xc453afac62fa5888c0db5514ff48178a8c443e9e"),
+			Token:         gethcommon.HexToAddress("0x56e01ecb119c45ff14248f6ebc27c05d4a72d4f9"),
+			Pool:          gethcommon.HexToAddress("0x56e01ecb119c45ff14248f6ebc27c05d4a72d4f9"),
 			Price:         rhea.BondToken.Price(),
 			TokenPoolType: rhea.Wrapped,
 		},
@@ -451,7 +460,18 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		EIP1559:   true,
 		GasTipCap: rhea.DefaultGasTipFee,
 	},
-	AllowList: []gethcommon.Address{},
+	AllowList: []gethcommon.Address{
+		// ==============  INTERNAL ==============
+		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
+		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Test Script 0xEa94AA1318796b5C01a9A37faCBc65423fb2c520
+		// Ping pong
+		gethcommon.HexToAddress("0x56edc4d8367932f0e36b966cbbd95df48e9db40f"), // PolygonMumbaiToSepolia.PingPongDapp,
+		// Personal
+		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
+		// ==============  EXTERNAL ==============
+		gethcommon.HexToAddress("0xe764C455e3Bd05Eb7Cf53Ec8491dca0e91486D24"), // BetaUser - Synthetix v3 core
+		gethcommon.HexToAddress("0x6De1e981d2137f7839840e2140dBB3A05F05B770"), // BetaUser - Flash Liquidity
+	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
@@ -463,6 +483,12 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 			Token:         gethcommon.HexToAddress("0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889"),
 			Price:         rhea.WMATIC.Price(),
 			TokenPoolType: rhea.FeeTokenOnly,
+		},
+		rhea.SNXUSD: {
+			Token:         gethcommon.HexToAddress("0x5B33A61Fe23260b55f1Fa9c586001a630C048BF4"),
+			Pool:          gethcommon.HexToAddress("0xab0c8ba51e7fa3e5693a4fbb39473520fd85d173"),
+			Price:         rhea.SNXUSD.Price(),
+			TokenPoolType: rhea.BurnMint,
 		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WMATIC},
@@ -514,8 +540,8 @@ var Prod_Quorum = rhea.EVMChainConfig{
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.BondToken: {
-			Token:         gethcommon.HexToAddress("0x89d17571db7c9540eeb36760e3c749c8fb984569"),
-			Pool:          gethcommon.HexToAddress("0x89d17571db7c9540eeb36760e3c749c8fb984569"),
+			Token:         gethcommon.HexToAddress("0x98c73259170aa9bd680ff897eaf93955b2902955"),
+			Pool:          gethcommon.HexToAddress("0x98c73259170aa9bd680ff897eaf93955b2902955"),
 			Price:         rhea.BondToken.Price(),
 			TokenPoolType: rhea.Wrapped,
 		},
