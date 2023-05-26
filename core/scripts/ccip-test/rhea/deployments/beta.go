@@ -312,15 +312,15 @@ var Beta_AvaxFujiToArbitrumGoerli = rhea.EvmDeploymentConfig{
 var Beta_ArbitrumGoerliToOptimismGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_ArbitrumGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0x5ecc9534e041a483da3a1ab87eebefd1a077df6a"),
-		OffRamp:      gethcommon.HexToAddress("0x043901ce30c675ba4f2c68e3552faa0e913f3505"),
-		CommitStore:  gethcommon.HexToAddress("0x140520d62a4464a1cd92ae0029f6719ace24595a"),
-		PingPongDapp: gethcommon.HexToAddress("0x34e5a560e8d1d175bd9207bcb8fed397bcb5fb57"),
+		OnRamp:       gethcommon.HexToAddress("0xf0046682ec5a3427cb37fe3e3d2dafea8eb409b4"),
+		OffRamp:      gethcommon.HexToAddress("0x3a9eb812a299196f2b4e05c62cbeb959c7beab59"),
+		CommitStore:  gethcommon.HexToAddress("0xf987ad0f725b95c7d565ef28a4b5aa441187a14d"),
+		PingPongDapp: gethcommon.HexToAddress("0xc07699e59ef98ae0aa09a9d2cbeb80192b992c5c"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    21800531,
+			DeployedAtBlock:    22063933,
 		},
 	},
 }
@@ -328,15 +328,15 @@ var Beta_ArbitrumGoerliToOptimismGoerli = rhea.EvmDeploymentConfig{
 var Beta_OptimismGoerliToArbitrumGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_OptimismGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0x7d05fd2fa30064542d1246522003fe14d8425918"),
-		OffRamp:      gethcommon.HexToAddress("0x18b711091938f312b2cca5410dd7762293d9f0cc"),
-		CommitStore:  gethcommon.HexToAddress("0x355a2f741145d417534fcd3bdbfa89192cedf1b1"),
-		PingPongDapp: gethcommon.HexToAddress("0x8389cd817b45a2582f2f8bc98822ce363f7a5df8"),
+		OnRamp:       gethcommon.HexToAddress("0xefbad0e7668949704369a7d0e4f9d82bf91093ff"),
+		OffRamp:      gethcommon.HexToAddress("0xc56e536229f73cb711bd546c24ad255665c04047"),
+		CommitStore:  gethcommon.HexToAddress("0xf248de56e32d8f6fe8d8fba42d39020d8bfc89fc"),
+		PingPongDapp: gethcommon.HexToAddress("0x65647829a2d9f4726eb826ee3b5ce1764eb59a93"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    9767995,
+			DeployedAtBlock:    9819412,
 		},
 	},
 }
@@ -408,15 +408,15 @@ var Beta_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_ArbitrumGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0x9b21b50e5cc2bea4eadb31b44a197fb6feb6ffe9"),
-		OffRamp:      gethcommon.HexToAddress("0x2cd1fe9ab96d3e9fa1eb038c660b42f33aee818b"),
-		CommitStore:  gethcommon.HexToAddress("0xb2e8eca2ae3e31b1ba1f2cf9f74b022164c83aac"),
-		PingPongDapp: gethcommon.HexToAddress("0xe2557c59492e06ea2f277f6030b720f9777399e2"),
+		OnRamp:       gethcommon.HexToAddress("0xb7eed42a7a27b861dd009fc8d5b45392fd3cb13a"),
+		OffRamp:      gethcommon.HexToAddress("0x15e8c905907bf6342e9b4967abaf451e888df764"),
+		CommitStore:  gethcommon.HexToAddress("0x0fdf09036fd2674841322081f52b2536d2e81af8"),
+		PingPongDapp: gethcommon.HexToAddress("0x363c3a63ab17affcfbb4ed88d08bde29672ef59b"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    21821955,
+			DeployedAtBlock:    22057665,
 		},
 	},
 }
@@ -424,15 +424,15 @@ var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_Sepolia,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0x23bdcb2584f42d102668f4584fa2e6dd99476f3a"),
-		OffRamp:      gethcommon.HexToAddress("0xad46695312998e6ba199a0cac57502cd98885faf"),
-		CommitStore:  gethcommon.HexToAddress("0xa7c85f92536a29a58fb23acb0ad7471ca2117074"),
-		PingPongDapp: gethcommon.HexToAddress("0x6c6e8a8dd0c7b225116d993c7186f1aae72dca57"),
+		OnRamp:       gethcommon.HexToAddress("0xa55f8707c887b09e3036e7afa7e1d6e15b0902d9"),
+		OffRamp:      gethcommon.HexToAddress("0xcd80d8d9f9630e637e28470fa93f7ba7a1ae8d21"),
+		CommitStore:  gethcommon.HexToAddress("0x01111ff0029c27c28bab310fc8cb08f7ef9ecd65"),
+		PingPongDapp: gethcommon.HexToAddress("0x99b75c6b0159dcdf4649b75e4c01b8195cad6fcb"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3553451,
+			DeployedAtBlock:    3559870,
 		},
 	},
 }
