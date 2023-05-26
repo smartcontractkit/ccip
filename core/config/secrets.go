@@ -8,5 +8,6 @@ import (
 type Secrets interface {
 	MercuryCredentials(credName string) *ocr2models.MercuryCredentials
 	LegacyGasStationAuthConfig() *types.AuthConfig
+	ThresholdKeyShare() string
 	VRFPassword() string
 }

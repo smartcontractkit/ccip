@@ -65,3 +65,10 @@ func (g *generalConfig) LegacyGasStationAuthConfig() *types.AuthConfig {
 		ClientCertificate: string(g.secrets.LegacyGasStation.AuthConfig.ClientCertificate),
 	}
 }
+
+func (g *generalConfig) ThresholdKeyShare() string {
+	if g.secrets.Threshold.ThresholdKeyShare == nil {
+		return ""
+	}
+	return string(*g.secrets.Threshold.ThresholdKeyShare)
+}

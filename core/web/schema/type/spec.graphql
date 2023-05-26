@@ -11,7 +11,8 @@ union JobSpec =
     BlockHeaderFeederSpec |
     BootstrapSpec |
     LegacyGasStationServerSpec |
-    LegacyGasStationSidecarSpec
+    LegacyGasStationSidecarSpec |
+    GatewaySpec
 
 type CronSpec {
     schedule: String!
@@ -177,5 +178,11 @@ type LegacyGasStationSidecarSpec {
     evmChainID: String
     ccipChainSelector: String
     statusUpdateURL: String!
+    createdAt: Time!
+}
+
+type GatewaySpec {
+    id: ID!
+    gatewayConfig: Map!
     createdAt: Time!
 }

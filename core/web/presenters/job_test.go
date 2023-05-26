@@ -119,6 +119,7 @@ func TestJob(t *testing.T) {
 						"legacyGasStationServerSpec": null,
 						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -196,6 +197,7 @@ func TestJob(t *testing.T) {
 						"legacyGasStationServerSpec": null,
 						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -285,6 +287,7 @@ func TestJob(t *testing.T) {
 						"legacyGasStationServerSpec": null,
 						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -349,6 +352,7 @@ func TestJob(t *testing.T) {
 						"legacyGasStationServerSpec": null,
 						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -408,6 +412,7 @@ func TestJob(t *testing.T) {
 						"legacyGasStationServerSpec": null,
 						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
+						"gatewaySpec": null,
                         "errors": []
                     }
                 }
@@ -465,6 +470,7 @@ func TestJob(t *testing.T) {
 						"legacyGasStationServerSpec": null,
 						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -538,6 +544,7 @@ func TestJob(t *testing.T) {
 							"jobID": 0,
 							"dotDagSource": ""
 						},
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -751,6 +758,7 @@ func TestJob(t *testing.T) {
 							"jobID": 0,
 							"dotDagSource": ""
 						},
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -809,6 +817,68 @@ func TestJob(t *testing.T) {
 							"createdAt":"0001-01-01T00:00:00Z", 
 							"relay":"evm", 
 							"relayConfig":{"chainID":1337}, 
+							"updatedAt":"0001-01-01T00:00:00Z"
+						},
+						"pipelineSpec": {
+							"id": 1,
+							"jobID": 0,
+							"dotDagSource": ""
+						},
+						"gatewaySpec": null,
+						"errors": []
+					}
+				}
+			}`,
+		},
+		{
+			name: "gateway spec",
+			job: job.Job{
+				ID: 1,
+				GatewaySpec: &job.GatewaySpec{
+					ID: 3,
+					GatewayConfig: map[string]interface{}{
+						"NodeServerConfig": map[string]interface{}{},
+					},
+				},
+				PipelineSpec: &pipeline.Spec{
+					ID:           1,
+					DotDagSource: "",
+				},
+				ExternalJobID: uuid.MustParse("0eec7e1d-d0d2-476c-a1a8-72dfb6633f46"),
+				Type:          job.Gateway,
+				SchemaVersion: 1,
+				Name:          null.StringFrom("gateway test"),
+			},
+			want: `
+			{
+				"data": {
+					"type": "jobs",
+					"id": "1",
+					"attributes": {
+						"name": "gateway test",
+						"type": "gateway",
+						"schemaVersion": 1,
+						"maxTaskDuration": "0s",
+						"externalJobID": "0eec7e1d-d0d2-476c-a1a8-72dfb6633f46",
+						"directRequestSpec": null,
+						"fluxMonitorSpec": null,
+						"gasLimit": null,
+						"forwardingAllowed": false,
+						"cronSpec": null,
+						"offChainReportingOracleSpec": null,
+						"offChainReporting2OracleSpec": null,
+						"keeperSpec": null,
+						"vrfSpec": null,
+						"webhookSpec": null,
+						"blockhashStoreSpec": null,
+						"blockHeaderFeederSpec": null,
+						"bootstrapSpec": null,
+						"gatewaySpec": {
+							"gatewayConfig": {
+								"NodeServerConfig": {
+								}
+							},
+							"createdAt":"0001-01-01T00:00:00Z",
 							"updatedAt":"0001-01-01T00:00:00Z"
 						},
 						"pipelineSpec": {
@@ -889,6 +959,7 @@ func TestJob(t *testing.T) {
 						"legacyGasStationServerSpec": null,
 						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
+						"gatewaySpec": null,
 						"errors": [{
 							"id": 200,
 							"description": "some error",
