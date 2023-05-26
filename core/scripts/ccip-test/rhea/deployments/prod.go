@@ -101,6 +101,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x844257f146a586dAdD5A3a46cd8c069Bb565a80e"), // BetaUser - SWIFT (BondToken)
 		gethcommon.HexToAddress("0xAa6f663a14b8dA1EB9CF021379f4Ba6BF536268A"), // BetaUser - Fidelity Digital Assets
 		gethcommon.HexToAddress("0xB781A9EFC6bd4Cf0dbE547D20151A405673F4CDe"), // BetaUser - RiseWorks
+		gethcommon.HexToAddress("0xe764C455e3Bd05Eb7Cf53Ec8491dca0e91486D24"), // BetaUser - Synthetix v3 core
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
@@ -458,6 +459,8 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x56edc4d8367932f0e36b966cbbd95df48e9db40f"), // PolygonMumbaiToSepolia.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
+		// ==============  EXTERNAL ==============
+		gethcommon.HexToAddress("0xe764C455e3Bd05Eb7Cf53Ec8491dca0e91486D24"), // BetaUser - Synthetix v3 core
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
