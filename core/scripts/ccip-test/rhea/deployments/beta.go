@@ -267,7 +267,7 @@ var Beta_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 		OnRamp:       gethcommon.HexToAddress("0xe10b47d27fb1aad761356885900299c2c0382cf7"),
 		OffRamp:      gethcommon.HexToAddress("0x56c311f67e522b7530f55d8c859dd3731b358256"),
 		CommitStore:  gethcommon.HexToAddress("0x16c1476f0738500c70ae065ef9cd26beab14dca7"),
-		PingPongDapp: gethcommon.HexToAddress("0xb82a30bd412da9acfb44ecb2fc493f507895fbea"),
+		PingPongDapp: gethcommon.HexToAddress("0x527228541e159f450dac4679033179fa84a49393"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
