@@ -248,15 +248,15 @@ var Beta_ArbitrumGoerli = rhea.EVMChainConfig{
 var Beta_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_OptimismGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0x3681d285e5f7bdbed466fbabe5b046b0feeed8aa"),
-		OffRamp:      gethcommon.HexToAddress("0xd55bbf0df3cbdf777fa7363db2aa567c30ca3200"),
-		CommitStore:  gethcommon.HexToAddress("0x318bb0c6c96cf577236802577ecf267c1ec10704"),
+		OnRamp:       gethcommon.HexToAddress("0x69fcb8a2e8d5bf960a51158a93209107a406ee4f"),
+		OffRamp:      gethcommon.HexToAddress("0x11d1c50b696cf75a50f53a8aed2389d9b7bbc81d"),
+		CommitStore:  gethcommon.HexToAddress("0xf7ba230ac9505564bb0537992929fee10bc3c648"),
 		PingPongDapp: gethcommon.HexToAddress("0x6137397dd70916d1b05bdc10ffebf4710b73dcc0"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    9768275,
+			DeployedAtBlock:    9963744,
 		},
 	},
 }
@@ -264,15 +264,15 @@ var Beta_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 var Beta_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_AvaxFuji,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0x543548325322534bf2eb108bd6e167c2e1a53cd0"),
-		OffRamp:      gethcommon.HexToAddress("0xb770866b1b092eac9a59423c325f76f823cfbc62"),
-		CommitStore:  gethcommon.HexToAddress("0x8b71158cc257f1bb46d76652aa9a37cd726f6ef5"),
+		OnRamp:       gethcommon.HexToAddress("0xe10b47d27fb1aad761356885900299c2c0382cf7"),
+		OffRamp:      gethcommon.HexToAddress("0x56c311f67e522b7530f55d8c859dd3731b358256"),
+		CommitStore:  gethcommon.HexToAddress("0x16c1476f0738500c70ae065ef9cd26beab14dca7"),
 		PingPongDapp: gethcommon.HexToAddress("0xb82a30bd412da9acfb44ecb2fc493f507895fbea"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployCommitStore:  false,
 			DeployRamp:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    22251313,
+			DeployedAtBlock:    22251630,
 		},
 	},
 }
