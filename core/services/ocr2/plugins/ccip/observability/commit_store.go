@@ -27,13 +27,13 @@ func NewObservedCommitStore(address common.Address, pluginName string, backend b
 }
 
 func (o *ObservedCommitStore) GetStaticConfig(opts *bind.CallOpts) (commit_store.CommitStoreStaticConfig, error) {
-	return withObservedContract(o.metric, "Paused", func() (commit_store.CommitStoreStaticConfig, error) {
+	return withObservedContract(o.metric, "GetStaticConfig", func() (commit_store.CommitStoreStaticConfig, error) {
 		return o.CommitStoreInterface.GetStaticConfig(opts)
 	})
 }
 
 func (o *ObservedCommitStore) GetExpectedNextSequenceNumber(opts *bind.CallOpts) (uint64, error) {
-	return withObservedContract(o.metric, "Paused", func() (uint64, error) {
+	return withObservedContract(o.metric, "GetExpectedNextSequenceNumber", func() (uint64, error) {
 		return o.CommitStoreInterface.GetExpectedNextSequenceNumber(opts)
 	})
 }
