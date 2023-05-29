@@ -85,41 +85,43 @@ func GetCCIPChainSelector(EVMChainId uint64) uint64 {
 type Token string
 
 const (
-	LINK      Token = "Link"
-	WETH      Token = "WETH"
-	WAVAX     Token = "WAVAX"
-	WMATIC    Token = "WMATIC"
-	CACHEGOLD Token = "CACHE.gold"
-	ANZ       Token = "ANZ"
-	InsurAce  Token = "InsurAce"
-	ZUSD      Token = "zUSD"
-	STEADY    Token = "STEADY"
-	SUPER     Token = "SUPER"
-	BondToken Token = "BondToken"
-	BankToken Token = "BankToken"
-	SNXUSD    Token = "snxUSD"
+	LINK       Token = "Link"
+	WETH       Token = "WETH"
+	WAVAX      Token = "WAVAX"
+	WMATIC     Token = "WMATIC"
+	CACHEGOLD  Token = "CACHE.gold"
+	ANZ        Token = "ANZ"
+	InsurAce   Token = "InsurAce"
+	ZUSD       Token = "zUSD"
+	STEADY     Token = "STEADY"
+	SUPER      Token = "SUPER"
+	BondToken  Token = "BondToken"
+	BankToken  Token = "BankToken"
+	SNXUSD     Token = "snxUSD"
+	FUGAZIUSDC Token = "FugaziUSDCToken"
 )
 
 func GetAllTokens() []Token {
 	return []Token{
-		LINK, WETH, WAVAX, WMATIC, CACHEGOLD, ANZ, InsurAce, ZUSD, STEADY, SUPER, BondToken, BankToken, SNXUSD,
+		LINK, WETH, WAVAX, WMATIC, CACHEGOLD, ANZ, InsurAce, ZUSD, STEADY, SUPER, BondToken, BankToken, SNXUSD, FUGAZIUSDC,
 	}
 }
 
 var tokenSymbols = map[Token]string{
-	LINK:      "LINK",
-	WETH:      "wETH",
-	WAVAX:     "wAVAX",
-	WMATIC:    "wMATIC",
-	CACHEGOLD: "CGT",
-	ANZ:       "A$DC",
-	InsurAce:  "INSUR",
-	ZUSD:      "zUSD",
-	STEADY:    "Steadefi",
-	SUPER:     "SuperDuper",
-	BondToken: "BondToken",
-	BankToken: "BankToken",
-	SNXUSD:    "snxUSD",
+	LINK:       "LINK",
+	WETH:       "wETH",
+	WAVAX:      "wAVAX",
+	WMATIC:     "wMATIC",
+	CACHEGOLD:  "CGT",
+	ANZ:        "A$DC",
+	InsurAce:   "INSUR",
+	ZUSD:       "zUSD",
+	STEADY:     "Steadefi",
+	SUPER:      "SuperDuper",
+	BondToken:  "BondToken",
+	BankToken:  "BankToken",
+	SNXUSD:     "snxUSD",
+	FUGAZIUSDC: "FUGAZIUSDC",
 }
 
 func (token Token) Symbol() string {
@@ -127,19 +129,20 @@ func (token Token) Symbol() string {
 }
 
 var tokenDecimalMultiplier = map[Token]uint8{
-	LINK:      18,
-	WETH:      18,
-	WAVAX:     18,
-	WMATIC:    18,
-	CACHEGOLD: 8,
-	ANZ:       6,
-	InsurAce:  18,
-	ZUSD:      18,
-	STEADY:    18,
-	SUPER:     18,
-	BondToken: 18,
-	BankToken: 18,
-	SNXUSD:    18,
+	LINK:       18,
+	WETH:       18,
+	WAVAX:      18,
+	WMATIC:     18,
+	CACHEGOLD:  8,
+	ANZ:        6,
+	InsurAce:   18,
+	ZUSD:       18,
+	STEADY:     18,
+	SUPER:      18,
+	BondToken:  18,
+	BankToken:  18,
+	SNXUSD:     18,
+	FUGAZIUSDC: 6,
 }
 
 func (token Token) Decimals() uint8 {
@@ -152,19 +155,20 @@ func (token Token) Decimals() uint8 {
 func (token Token) Price() *big.Int {
 	// Token prices in $ per whole coin
 	var TokenPrices = map[Token]*big.Float{
-		LINK:      big.NewFloat(6.5),
-		WETH:      big.NewFloat(1800),
-		WAVAX:     big.NewFloat(15),
-		WMATIC:    big.NewFloat(0.85),
-		CACHEGOLD: big.NewFloat(60),
-		ANZ:       big.NewFloat(1),
-		InsurAce:  big.NewFloat(0.08),
-		ZUSD:      big.NewFloat(1),
-		STEADY:    big.NewFloat(1),
-		SUPER:     big.NewFloat(1),
-		BondToken: big.NewFloat(1),
-		BankToken: big.NewFloat(1),
-		SNXUSD:    big.NewFloat(1),
+		LINK:       big.NewFloat(6.5),
+		WETH:       big.NewFloat(1800),
+		WAVAX:      big.NewFloat(15),
+		WMATIC:     big.NewFloat(0.85),
+		CACHEGOLD:  big.NewFloat(60),
+		ANZ:        big.NewFloat(1),
+		InsurAce:   big.NewFloat(0.08),
+		ZUSD:       big.NewFloat(1),
+		STEADY:     big.NewFloat(1),
+		SUPER:      big.NewFloat(1),
+		BondToken:  big.NewFloat(1),
+		BankToken:  big.NewFloat(1),
+		SNXUSD:     big.NewFloat(1),
+		FUGAZIUSDC: big.NewFloat(1),
 	}
 
 	tokenValue := big.NewInt(0)
