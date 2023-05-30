@@ -33,10 +33,27 @@ func DeployToNewChain(client *EvmDeploymentConfig) error {
 	if err != nil {
 		return errors.Wrap(err, "router deployment failed")
 	}
+	// Updates client.ChainConfig.UpgradeRouter if any new contracts are deployed
+	err = deployUpgradeRouter(client)
+	if err != nil {
+		return errors.Wrap(err, "upgrade router deployment failed")
+	}
 	// Update client.PriceRegistry if any new contracts are deployed
 	err = deployPriceRegistry(client)
 	if err != nil {
 		return errors.Wrap(err, "price registry deployment failed")
+	}
+	return nil
+}
+
+func DeployUpgradeRouters(source *EvmDeploymentConfig, dest *EvmDeploymentConfig) error {
+	err := deployUpgradeRouter(source)
+	if err != nil {
+		return errors.Wrap(err, "upgrade router in source chain deployment failed")
+	}
+	err = deployUpgradeRouter(dest)
+	if err != nil {
+		return errors.Wrap(err, "upgrade router in dest chain deployment failed")
 	}
 	return nil
 }
@@ -201,7 +218,7 @@ func deployRouter(client *EvmDeploymentConfig) error {
 	}
 
 	client.Logger.Infof("Deploying Router")
-	nativeFeeToken := common.HexToAddress("0x0")
+	nativeFeeToken := common.Address{}
 	if client.ChainConfig.WrappedNative != "" {
 		nativeFeeToken = client.ChainConfig.SupportedTokens[client.ChainConfig.WrappedNative].Token
 	}
@@ -214,6 +231,32 @@ func deployRouter(client *EvmDeploymentConfig) error {
 		return err
 	}
 	client.ChainConfig.Router = routerAddress
+
+	client.Logger.Infof(fmt.Sprintf("Router deployed on %s in tx %s", routerAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
+	return nil
+}
+
+// deployUpgradeRouter always uses an empty list of offRamps. Ramps should be set in the offRamp deployment step.
+func deployUpgradeRouter(client *EvmDeploymentConfig) error {
+	if !client.ChainConfig.DeploySettings.DeployUpgradeRouter {
+		client.Logger.Infof("Skipping Upgrade Router deployment, using Router on %s", client.ChainConfig.UpgradeRouter)
+		return nil
+	}
+
+	client.Logger.Infof("Deploying Router")
+	nativeFeeToken := common.Address{}
+	if client.ChainConfig.WrappedNative != "" {
+		nativeFeeToken = client.ChainConfig.SupportedTokens[client.ChainConfig.WrappedNative].Token
+	}
+
+	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, nativeFeeToken)
+	if err != nil {
+		return err
+	}
+	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
+		return err
+	}
+	client.ChainConfig.UpgradeRouter = routerAddress
 
 	client.Logger.Infof(fmt.Sprintf("Router deployed on %s in tx %s", routerAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
 	return nil

@@ -278,7 +278,7 @@ type SourceClient struct {
 	OnRamp *evm_2_evm_onramp.EVM2EVMOnRamp
 }
 
-func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient {
+func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLaneConfig) SourceClient {
 	LinkToken, err := burn_mint_erc677.NewBurnMintERC677(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
 	shared.RequireNoError(t, err)
 
@@ -299,11 +299,11 @@ func NewSourceClient(t *testing.T, config rhea.EvmDeploymentConfig) SourceClient
 
 	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
 	shared.RequireNoError(t, err)
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(config.LaneConfig.OnRamp, config.Client)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(laneConfig.OnRamp, config.Client)
 	shared.RequireNoError(t, err)
 	router, err := router.NewRouter(config.ChainConfig.Router, config.Client)
 	shared.RequireNoError(t, err)
-	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
+	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(laneConfig.PingPongDapp, config.Client)
 	shared.RequireNoError(t, err)
 	priceRegistry, err := price_registry.NewPriceRegistry(config.ChainConfig.PriceRegistry, config.Client)
 	shared.RequireNoError(t, err)
@@ -337,7 +337,7 @@ type DestClient struct {
 	OffRamp      *evm_2_evm_offramp.EVM2EVMOffRamp
 }
 
-func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestClient {
+func NewDestinationClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLaneConfig) DestClient {
 	linkToken, err := burn_mint_erc677.NewBurnMintERC677(config.ChainConfig.SupportedTokens[rhea.LINK].Token, config.Client)
 	shared.RequireNoError(t, err)
 	wrappedNative, err := burn_mint_erc677.NewBurnMintERC677(config.ChainConfig.SupportedTokens[config.ChainConfig.WrappedNative].Token, config.Client)
@@ -357,15 +357,15 @@ func NewDestinationClient(t *testing.T, config rhea.EvmDeploymentConfig) DestCli
 
 	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
 	shared.RequireNoError(t, err)
-	commitStore, err := commit_store.NewCommitStore(config.LaneConfig.CommitStore, config.Client)
+	commitStore, err := commit_store.NewCommitStore(laneConfig.CommitStore, config.Client)
 	shared.RequireNoError(t, err)
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(config.LaneConfig.OffRamp, config.Client)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(laneConfig.OffRamp, config.Client)
 	shared.RequireNoError(t, err)
-	receiverDapp, err := receiver_dapp.NewReceiverDapp(config.LaneConfig.ReceiverDapp, config.Client)
+	receiverDapp, err := receiver_dapp.NewReceiverDapp(laneConfig.ReceiverDapp, config.Client)
 	shared.RequireNoError(t, err)
 	router, err := router.NewRouter(config.ChainConfig.Router, config.Client)
 	shared.RequireNoError(t, err)
-	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(config.LaneConfig.PingPongDapp, config.Client)
+	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(laneConfig.PingPongDapp, config.Client)
 	shared.RequireNoError(t, err)
 	priceRegistry, err := price_registry.NewPriceRegistry(config.ChainConfig.PriceRegistry, config.Client)
 	shared.RequireNoError(t, err)
@@ -402,16 +402,54 @@ type CCIPClient struct {
 }
 
 // NewCcipClient returns a new CCIPClient with initialised source and destination clients.
-func NewCcipClient(t *testing.T, sourceConfig rhea.EvmDeploymentConfig, destConfig rhea.EvmDeploymentConfig, ownerKey string, seedKey string) CCIPClient {
-	source := NewSourceClient(t, sourceConfig)
+func NewCcipClient(
+	t *testing.T,
+	sourceConfig rhea.EvmDeploymentConfig,
+	destConfig rhea.EvmDeploymentConfig,
+	ownerKey string,
+	seedKey string,
+) CCIPClient {
+	return NewCcipClientByLane(t, sourceConfig.OnlyEvmConfig(), sourceConfig.LaneConfig, destConfig.OnlyEvmConfig(), destConfig.LaneConfig, ownerKey, seedKey)
+}
+
+// NewUpgradeLaneCcipClient creates client that point to Upgrade Lanes and Upgrade Router
+func NewUpgradeLaneCcipClient(
+	t *testing.T,
+	sourceConfig rhea.EvmDeploymentConfig,
+	destConfig rhea.EvmDeploymentConfig,
+	ownerKey string,
+	seedKey string,
+) CCIPClient {
+	client := NewCcipClientByLane(t, sourceConfig.OnlyEvmConfig(), sourceConfig.UpgradeLaneConfig, destConfig.OnlyEvmConfig(), destConfig.UpgradeLaneConfig, ownerKey, seedKey)
+	applyUpgradeRouterAddress(t, sourceConfig, &client.Source.Client)
+	applyUpgradeRouterAddress(t, destConfig, &client.Dest.Client)
+	return client
+}
+
+func NewCcipClientByLane(
+	t *testing.T,
+	sourceConfig rhea.EvmConfig,
+	sourceLane rhea.EVMLaneConfig,
+	destConfig rhea.EvmConfig,
+	destLane rhea.EVMLaneConfig,
+	ownerKey string,
+	seedKey string,
+) CCIPClient {
+	source := NewSourceClient(t, sourceConfig, sourceLane)
 	source.SetOwnerAndUsers(t, ownerKey, seedKey, sourceConfig.ChainConfig.GasSettings)
-	dest := NewDestinationClient(t, destConfig)
+	dest := NewDestinationClient(t, destConfig, destLane)
 	dest.SetOwnerAndUsers(t, ownerKey, seedKey, destConfig.ChainConfig.GasSettings)
 
 	return CCIPClient{
 		Source: source,
 		Dest:   dest,
 	}
+}
+
+func applyUpgradeRouterAddress(t *testing.T, config rhea.EvmDeploymentConfig, client *Client) {
+	upgradeRouter, err := router.NewRouter(config.ChainConfig.UpgradeRouter, config.Client)
+	shared.RequireNoError(t, err)
+	client.Router = upgradeRouter
 }
 
 func GetSetupChain(t *testing.T, ownerPrivateKey string, chain rhea.EvmDeploymentConfig) *rhea.EvmDeploymentConfig {

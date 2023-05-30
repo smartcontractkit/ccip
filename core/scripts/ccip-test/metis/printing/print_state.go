@@ -661,10 +661,10 @@ func generateSeparator(headerLengths []int) string {
 }
 
 // PrintJobSpecs prints the job spec for each node and CCIP spec type, as well as a bootstrap spec.
-func PrintJobSpecs(env dione.Environment, sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) {
+func PrintJobSpecs(env dione.Environment, sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig, version string) {
 	don := dione.NewOfflineDON(env, nil)
 	// jobparams for the lane
-	jobParams := dione.NewCCIPJobSpecParams(sourceClient, destClient)
+	jobParams := dione.NewCCIPJobSpecParams(sourceClient.OnlyEvmConfig(), sourceClient.LaneConfig, destClient.OnlyEvmConfig(), destClient.LaneConfig, version)
 
 	bootstrapSpec := jobParams.BootstrapJob(destClient.LaneConfig.CommitStore.Hex())
 	specString, err := bootstrapSpec.String()

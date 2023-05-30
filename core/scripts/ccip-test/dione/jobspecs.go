@@ -13,23 +13,24 @@ import (
 )
 
 // NewCCIPJobSpecParams returns set of parameters needed for setting up ccip jobs for sourceClient --> destClient
-func NewCCIPJobSpecParams(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) integrationtesthelpers.CCIPJobSpecParams {
+func NewCCIPJobSpecParams(sourceClient rhea.EvmConfig, sourceLane rhea.EVMLaneConfig, destClient rhea.EvmConfig, destLane rhea.EVMLaneConfig, version string) integrationtesthelpers.CCIPJobSpecParams {
 	return integrationtesthelpers.CCIPJobSpecParams{
-		OffRamp:                destClient.LaneConfig.OffRamp,
-		CommitStore:            destClient.LaneConfig.CommitStore,
+		OffRamp:                destLane.OffRamp,
+		CommitStore:            destLane.CommitStore,
 		SourceChainName:        ccip.ChainName(int64(sourceClient.ChainConfig.EvmChainId)),
 		DestChainName:          ccip.ChainName(int64(destClient.ChainConfig.EvmChainId)),
 		TokenPricesUSDPipeline: GetTokenPricesUSDPipeline(getPipelineTokens(sourceClient, destClient)),
-		SourceStartBlock:       sourceClient.LaneConfig.DeploySettings.DeployedAtBlock,
-		DestStartBlock:         destClient.LaneConfig.DeploySettings.DeployedAtBlock,
+		SourceStartBlock:       sourceLane.DeploySettings.DeployedAtBlock,
+		DestStartBlock:         destLane.DeploySettings.DeployedAtBlock,
 		P2PV2Bootstrappers:     []string{}, // Set in env vars
 		SourceEvmChainId:       sourceClient.ChainConfig.EvmChainId,
 		DestEvmChainId:         destClient.ChainConfig.EvmChainId,
+		Version:                version,
 	}
 }
 
 // Gathers all tokens needed for TokenPricesUSDPipeline
-func getPipelineTokens(sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig) []rhea.EVMBridgedToken {
+func getPipelineTokens(sourceClient rhea.EvmConfig, destClient rhea.EvmConfig) []rhea.EVMBridgedToken {
 	var pipelineTokens []rhea.EVMBridgedToken
 
 	for _, token := range destClient.ChainConfig.SupportedTokens {

@@ -22,9 +22,11 @@ import (
 
 var (
 	// Change these values
-	sourceChain = rhea.ArbitrumGoerli
-	destChain   = rhea.Sepolia
-	ENV         = dione.StagingBeta
+	sourceChain        = rhea.ArbitrumGoerli
+	destChain          = rhea.Sepolia
+	ENV                = dione.StagingBeta
+	currentVersion     = ""
+	upgradeLaneVersion = "0.4.0-beta.0+core2.1.0"
 
 	// These will automatically populate or error if the lane doesn't exist
 	SOURCE      = laneMapping[ENV][sourceChain][destChain]
@@ -80,7 +82,7 @@ func TestCCIP(t *testing.T) {
 	case "stopPingPong": // Stops the PingPong dapp by pausing the source chain dapp.
 		client.setPingPongPaused(t, true)
 	case "printSpecs":
-		printing.PrintJobSpecs(ENV, SOURCE, DESTINATION)
+		printing.PrintJobSpecs(ENV, SOURCE, DESTINATION, currentVersion)
 	case "setConfig": // Set the config to the commitStore and the offramp
 		client.SetOCR2Config(ENV)
 		clientOtherWayAround := NewCcipClient(t, DESTINATION, SOURCE, ownerKey, seedKey)
@@ -120,7 +122,7 @@ func TestRheaDeployChains(t *testing.T) {
 	})
 }
 
-// TestDeployLane can be run as a test with the following config
+// TestRheaDeployLane can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
 func TestRheaDeployLane(t *testing.T) {
 	key := checkOwnerKeyAndSetupChain(t)
@@ -140,8 +142,91 @@ func TestRheaDeployLane(t *testing.T) {
 
 	// Sometimes jobs don't get added correctly. This script looks for missing jobs
 	// and attempts to add them.
-	don.AddMissingSpecs(DESTINATION, SOURCE)
-	don.AddMissingSpecs(SOURCE, DESTINATION)
+	don.AddMissingSpecs(DESTINATION, SOURCE, "")
+	don.AddMissingSpecs(SOURCE, DESTINATION, "")
+}
+
+// TestRheaDeployUpgradeLane performs first part of blue-green deployment based on the configuration stored under rhea.EvmDeploymentConfig.UpgradeLaneConfig
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+// IMPORTANT: There has to be additional router deployed and its address saved to rhea.EVMChainConfig.UpgradeRouter
+//
+// Entire process is visualized https://docs.google.com/presentation/d/10Bb9e3naEqqMfbyR_ML343TJd7dGHkQFd66G0I2J5y4/edit#slide=id.g1df2dd79c37_0_0
+// Upgrade deployment includes:
+// * onRamp/offRamp/commitStore deployment if needed (onRamp has set prevOnRamp to the onRamp that is currently deployed)
+// * registering onRamp and offRamp components in upgrade routers
+// * deploy ping pong dapp
+// * setOCR2Config with proper addresses (but job specs are not updated at this point)
+// All contracts' addresses deployed at this point are saved under rhea.EvmDeploymentConfig.UpgradeLaneConfig
+func TestRheaDeployUpgradeLane(t *testing.T) {
+	key := checkOwnerKeyAndSetupChain(t)
+	err := rhea.DeployUpgradeRouters(&SOURCE, &DESTINATION)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	rhea.DeployUpgradeLanes(t, &SOURCE, &DESTINATION)
+	// Print all deployed contracts
+	deployment_io.PrettyPrintLanes(ENV, &SOURCE, &DESTINATION)
+
+	// Set OCR2 & Dynamic configs pointing to upgrade routers
+	client := NewUpgradeLaneCcipClient(t, SOURCE, DESTINATION, key, key)
+	client.SetOCR2Config(ENV)
+	client.SetDynamicConfigOnRamp(t)
+
+	clientOtherWayAround := NewUpgradeLaneCcipClient(t, DESTINATION, SOURCE, key, key)
+	clientOtherWayAround.SetOCR2Config(ENV)
+	clientOtherWayAround.SetDynamicConfigOnRamp(t)
+
+	// At this point PingPong should properly work using Upgrade Routers and Upgrade Lane
+	client.startPingPong(t)
+	// Please go to /deployments/ENV/upgrade_line/SOURCE and /deployments/ENV/upgrade_line/DESTINATION
+	// and replace current UpgradeLaneConfig in ENV.go file with the json content
+	// Also remember to set UpgradeLaneConfig.DeployCommitStore and UpgradeLaneConfig.DeployRamp to false
+
+	// Add new job specs for Upgrade Lanes
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+	don.ClearAllLaneJobsByVersion(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)), upgradeLaneVersion)
+	don.AddTwoWaySpecsByVersion(SOURCE.OnlyEvmConfig(), SOURCE.UpgradeLaneConfig, DESTINATION.OnlyEvmConfig(), DESTINATION.UpgradeLaneConfig, upgradeLaneVersion)
+
+	// Sometimes jobs don't get added correctly. This script looks for missing jobs
+	// and attempts to add them.
+	don.AddMissingSpecsByLanes(DESTINATION.OnlyEvmConfig(), DESTINATION.UpgradeLaneConfig, SOURCE.OnlyEvmConfig(), SOURCE.UpgradeLaneConfig, upgradeLaneVersion)
+	don.AddMissingSpecsByLanes(SOURCE.OnlyEvmConfig(), SOURCE.UpgradeLaneConfig, DESTINATION.OnlyEvmConfig(), DESTINATION.UpgradeLaneConfig, upgradeLaneVersion)
+}
+
+// TestRheaPromoteUpgradeLaneDeployment promotes the deployment from upgrade lane
+// OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
+//
+// Deployment promotion applies following steps:
+// - enables upgrade offRamp by registering it in dest router and updating OCR2 config
+// - enabled upgrade onRamp by setting dynamicConfig and setting it in source router
+// - populating new jobs specs to the NOPs
+//
+// In the meantime it:
+// - populates addresses from rhea.EvmDeploymentConfig.UpgradeLaneConfig to rhea.EvmDeploymentConfig.LaneConfig
+// - sets addresses in rhea.EvmDeploymentConfig.UpgradeLaneConfig to 0 (this is a sign that there is no pending deployment)
+func TestRheaPromoteUpgradeLaneDeployment(t *testing.T) {
+	key := checkOwnerKeyAndSetupChain(t)
+
+	rhea.EnableUpgradeOffRamps(t, &SOURCE, &DESTINATION, func(src *rhea.EvmDeploymentConfig, dst *rhea.EvmDeploymentConfig) {
+		client := NewCcipClient(t, *src, *dst, key, key)
+		client.SetOCR2Config(ENV)
+	})
+	rhea.EnableUpgradeOnRamps(t, &SOURCE, &DESTINATION, func(src *rhea.EvmDeploymentConfig, dst *rhea.EvmDeploymentConfig) {
+		// Points to UpgradeLanes and regular Router
+		client := NewCcipClientByLane(t, src.OnlyEvmConfig(), src.UpgradeLaneConfig, dst.OnlyEvmConfig(), dst.UpgradeLaneConfig, key, key)
+		client.SetDynamicConfigOnRamp(t)
+	})
+	deployment_io.PrettyPrintLanes(ENV, &SOURCE, &DESTINATION)
+}
+
+// TestRheaPostUpgradeDeploymentClean removed job specs with currentVersion. MAKE SURE you bumped this value before running this script
+func TestRheaPostUpgradeDeploymentClean(t *testing.T) {
+	checkOwnerKeyAndSetupChain(t)
+
+	// Remove job specs from previous deployment
+	don := dione.NewDON(ENV, logger.TestLogger(t))
+	don.ClearAllLaneJobsByVersion(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)), currentVersion)
 }
 
 // TestDione can be run as a test with the following config
@@ -155,8 +240,8 @@ func TestDione(t *testing.T) {
 
 	// Sometimes jobs don't get added correctly. This script looks for missing jobs
 	// and attempts to add them.
-	don.AddMissingSpecs(DESTINATION, SOURCE)
-	don.AddMissingSpecs(SOURCE, DESTINATION)
+	don.AddMissingSpecs(DESTINATION, SOURCE, "")
+	don.AddMissingSpecs(SOURCE, DESTINATION, "")
 }
 
 // TestDionePopulateNodeKeys
@@ -448,7 +533,7 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 
 	for _, lane := range allProdLanes {
 		lane.SetupChain(t, ownerKey)
-		client := CCIPClient{Source: NewSourceClient(t, *lane)}
+		client := CCIPClient{Source: NewSourceClient(t, lane.OnlyEvmConfig(), lane.LaneConfig)}
 		client.Source.Owner = rhea.GetOwner(t, ownerKey, client.Source.ChainId, lane.ChainConfig.GasSettings)
 
 		client.setAllowList(t)
