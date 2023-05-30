@@ -29,5 +29,5 @@ type SendTransactionStatusRequest struct {
 	Status        string       `json:"tx_status"`     // Status of request
 	TxHash        *common.Hash `json:"tx_hash"`       // Transaction hash on source chain
 	CCIPMessageID *common.Hash `json:"ccip_msg_id"`   // CCIP message ID
-	FailureReason *string      `json:"tx_error"`      // failure reason of meta-transaction
+	FailureReason string       `json:"tx_error"`      // failure reason of meta-transaction
 }

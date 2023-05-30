@@ -8,10 +8,12 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	geth_types "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/test-go/testify/mock"
 	"github.com/test-go/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
@@ -455,7 +457,17 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		_, fromAddress := cltest.MustInsertRandomKeyReturningState(t, app.KeyStore.Eth(), chainID)
 		var ethTx txmgr.EvmTx
 		if r.confirmed {
-			ethTx = cltest.MustInsertConfirmedEthTxBySaveFetchedReceipts(t, app.TxmStorageService(), fromAddress, int64(i), blockNumber, chainID)
+			ethTx = cltest.MustInsertConfirmedEthTxWithLegacyAttempt(t, app.TxmStorageService(), int64(i), blockNumber, fromAddress)
+			blockHash := utils.NewHash()
+			receipt := evmtypes.Receipt{
+				TxHash:           ethTx.TxAttempts[0].Hash,
+				BlockHash:        blockHash,
+				BlockNumber:      big.NewInt(int64(i)),
+				TransactionIndex: uint(1),
+				Status:           uint64(1), // reverted txs have 0 as status. non-zero other wise
+			}
+			err := app.TxmStorageService().SaveFetchedReceipts([]*evmtypes.Receipt{&receipt}, &chainID)
+			require.NoError(t, err)
 		} else if r.failed {
 			ethTx = cltest.MustInsertFatalErrorEthTx(t, app.TxmStorageService(), fromAddress)
 		} else {

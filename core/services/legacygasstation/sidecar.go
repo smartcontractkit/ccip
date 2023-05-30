@@ -138,18 +138,33 @@ func (sc *Sidecar) Run(ctx context.Context) error {
 
 }
 
+func (sc *Sidecar) findConfirmedTxs(ctx context.Context) (confirmedSuccessfulTxs, confirmedRevertedTxs []types.LegacyGaslessTxPlus, err error) {
+	confirmedTxs, err := sc.orm.SelectBySourceChainIDAndEthTxStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.EthTxConfirmed, txmgr.EthTxConfirmedMissingReceipt}, pg.WithParentCtx(ctx))
+	if err != nil {
+		return
+	}
+
+	for _, confirmedTx := range confirmedTxs {
+		if confirmedTx.Receipt.Status == 0 {
+			confirmedRevertedTxs = append(confirmedRevertedTxs, confirmedTx)
+		} else {
+			confirmedSuccessfulTxs = append(confirmedSuccessfulTxs, confirmedTx)
+		}
+	}
+	return
+}
+
 func (sc *Sidecar) handleSubmittedTxs(ctx context.Context) error {
 	submittedTxs, err := sc.orm.SelectBySourceChainIDAndStatus(sc.ccipChainSelector, types.Submitted, pg.WithParentCtx(ctx))
 	if err != nil {
 		return errors.Wrap(err, "find by status")
 	}
 
-	confirmedTxs, err := sc.orm.SelectBySourceChainIDAndEthTxStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.EthTxConfirmed, txmgr.EthTxConfirmedMissingReceipt}, pg.WithParentCtx(ctx))
+	confirmedSuccessfulTxs, confirmedRevertedTxs, err := sc.findConfirmedTxs(ctx)
 	if err != nil {
-		return errors.Wrap(err, "confirmed transactions")
+		return errors.Wrap(err, "find confirmed txs")
 	}
-
-	err = sc.updateConfirmedTxs(submittedTxs, confirmedTxs)
+	err = sc.updateConfirmedTxs(submittedTxs, confirmedSuccessfulTxs, confirmedRevertedTxs)
 	if err != nil {
 		return errors.Wrap(err, "update confirmed transactions")
 	}
@@ -193,13 +208,9 @@ func (sc *Sidecar) handleConfirmedTxs(ctx context.Context, fromBlock, toBlock in
 	}
 
 	for _, log := range finalizedLogs {
-		err = sc.su.Update(log)
+		err = sc.postStatusAndUpdateStore(log)
 		if err != nil {
-			return err
-		}
-		err = sc.orm.UpdateLegacyGaslessTx(log)
-		if err != nil {
-			return errors.Wrap(err, "update legacy gasless tx")
+			return errors.Wrap(err, "post status and update store")
 		}
 	}
 
@@ -211,23 +222,43 @@ func (sc *Sidecar) handleConfirmedTxs(ctx context.Context, fromBlock, toBlock in
 	return sc.updateFailedTxs(confirmedTxs, failedTxs)
 }
 
-func (sc *Sidecar) updateConfirmedTxs(submittedTxs []types.LegacyGaslessTx, confirmedTxs []types.LegacyGaslessTxPlus) error {
-	confirmedTxsMap := make(map[string]types.LegacyGaslessTxPlus)
-	for _, confirmedTx := range confirmedTxs {
-		confirmedTxsMap[confirmedTx.ID] = confirmedTx
+func (sc *Sidecar) postStatusAndUpdateStore(tx types.LegacyGaslessTx) error {
+	err := sc.su.Update(tx)
+	if err != nil {
+		return err
+	}
+	err = sc.orm.UpdateLegacyGaslessTx(tx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (sc *Sidecar) updateConfirmedTxs(submittedTxs []types.LegacyGaslessTx, confirmedSuccessfulTxs []types.LegacyGaslessTxPlus, confirmedRevertedTxs []types.LegacyGaslessTxPlus) error {
+	confirmedSuccessfulTxsMap := make(map[string]types.LegacyGaslessTxPlus)
+	for _, confirmedSuccessfulTx := range confirmedSuccessfulTxs {
+		confirmedSuccessfulTxsMap[confirmedSuccessfulTx.ID] = confirmedSuccessfulTx
+	}
+	confirmedRevertedTxsMap := make(map[string]types.LegacyGaslessTxPlus)
+	for _, confirmedRevertedTx := range confirmedRevertedTxs {
+		confirmedRevertedTxsMap[confirmedRevertedTx.ID] = confirmedRevertedTx
 	}
 
 	for _, tx := range submittedTxs {
-		if confirmedTx, ok := confirmedTxsMap[tx.ID]; ok {
-			tx.Status = types.Confirmed
-			tx.TxHash = confirmedTx.EthTxHash
-			err := sc.su.Update(tx)
+		if crt, ok := confirmedRevertedTxsMap[tx.ID]; ok {
+			tx.Status = types.Failure
+			tx.TxHash = crt.EthTxHash
+			tx.FailureReason = ptr("execution reverted")
+			err := sc.postStatusAndUpdateStore(tx)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "post status and update store")
 			}
-			err = sc.orm.UpdateLegacyGaslessTx(tx)
+		} else if cst, ok := confirmedSuccessfulTxsMap[tx.ID]; ok {
+			tx.Status = types.Confirmed
+			tx.TxHash = cst.EthTxHash
+			err := sc.postStatusAndUpdateStore(tx)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "post status and update store")
 			}
 		}
 	}
@@ -245,13 +276,9 @@ func (sc *Sidecar) updateFailedTxs(confirmedTxs []types.LegacyGaslessTx, failedT
 			tx.Status = types.Failure
 			tx.FailureReason = failedTx.EthTxError
 			tx.TxHash = failedTx.EthTxHash
-			err := sc.su.Update(tx)
+			err := sc.postStatusAndUpdateStore(tx)
 			if err != nil {
-				return err
-			}
-			err = sc.orm.UpdateLegacyGaslessTx(tx)
-			if err != nil {
-				return err
+				return errors.Wrap(err, "post status and update store")
 			}
 		}
 	}
@@ -289,13 +316,9 @@ func (sc *Sidecar) handleSourceFinalizedTxs(ctx context.Context, fromBlock, toBl
 	}
 
 	for _, log := range finalizedLogs {
-		err = sc.su.Update(log)
+		err := sc.postStatusAndUpdateStore(log)
 		if err != nil {
-			return err
-		}
-		err = sc.orm.UpdateLegacyGaslessTx(log)
-		if err != nil {
-			return err
+			return errors.Wrap(err, "post status and update store")
 		}
 	}
 	return nil
@@ -431,3 +454,5 @@ func destinationFinalizedLogs(
 	}
 	return
 }
+
+func ptr[T any](t T) *T { return &t }

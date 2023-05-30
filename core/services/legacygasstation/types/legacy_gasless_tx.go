@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
+	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -89,7 +90,7 @@ type LegacyGaslessTx struct {
 	ValidUntilTime     *utils.Big     // unix timestamp of meta-transaction expiry in seconds
 	Signature          []byte         `db:"tx_signature"` // EIP712 signature
 	Status             Status         `db:"tx_status"`    // status of meta-transaction
-	FailureReason      *string        // failure reason of meta-transaction
+	FailureReason      *string        // failure reason of meta-transaction TODO: change this to sql.NullString
 	TokenName          string         // name of token used to generate EIP712 domain separator hash
 	TokenVersion       string         // version of token used to generate EIP712 domain separator hash
 	CCIPMessageID      *common.Hash   `db:"ccip_message_id"` // CCIP message ID
@@ -120,6 +121,7 @@ type LegacyGaslessTxPlus struct {
 	EthTxStatus txmgrtypes.TxState `db:"etx_state"`
 	EthTxHash   *common.Hash       `db:"etx_hash"`
 	EthTxError  *string            `db:"etx_error"`
+	Receipt     *evmtypes.Receipt  `db:"etx_receipt"`
 }
 
 func (gt *LegacyGaslessTx) ToSendTransactionStatusRequest() (*SendTransactionStatusRequest, error) {
@@ -127,11 +129,15 @@ func (gt *LegacyGaslessTx) ToSendTransactionStatusRequest() (*SendTransactionSta
 	if err != nil {
 		return nil, err
 	}
+	var failureReason string
+	if gt.FailureReason != nil {
+		failureReason = *gt.FailureReason
+	}
 	return &SendTransactionStatusRequest{
 		RequestID:     gt.ID,
 		Status:        status,
 		TxHash:        gt.TxHash,
 		CCIPMessageID: gt.CCIPMessageID,
-		FailureReason: gt.FailureReason,
+		FailureReason: failureReason,
 	}, nil
 }

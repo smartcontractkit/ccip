@@ -61,6 +61,8 @@ func (s *StatusUpdater) Update(tx types.LegacyGaslessTx) error {
 		return errors.Wrap(err, "json marshal request body")
 	}
 
+	s.lggr.Infof("posting request: %+v", req)
+
 	resp, err := s.client.Post(s.endpointURL, "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
 		return errors.Wrap(err, "post failed")

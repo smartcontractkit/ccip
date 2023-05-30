@@ -99,13 +99,15 @@ func (o *orm) SelectBySourceChainIDAndEthTxStates(sourceChainID uint64, states [
 		lgt.*,
 		etx.state as etx_state,
 		eta.hash as etx_hash,
-		etx.error as etx_error
+		etx.error as etx_error,
+		etr.receipt as etx_receipt
 	FROM legacy_gasless_txs lgt
 	LEFT JOIN eth_txes etx ON etx.id = lgt.eth_tx_id
 	LEFT JOIN eth_tx_attempts eta ON etx.id = eta.eth_tx_id
+	LEFT JOIN eth_receipts etr ON eta.hash = etr.tx_hash
 	WHERE lgt.source_chain_id = $1
 	AND etx.state = any($2)
-	ORDER BY eta.broadcast_before_block_num ASC
+	ORDER BY eta.broadcast_before_block_num ASC, etr.block_number ASC
 	`, sourceChainID, pq.Array(states))
 	if err != nil {
 		return nil, errors.Wrap(err, "select eth txs by source chain id and states")
