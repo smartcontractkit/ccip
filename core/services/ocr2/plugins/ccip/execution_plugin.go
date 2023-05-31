@@ -1,7 +1,9 @@
 package ccip
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -13,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -105,44 +108,12 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			leafHasher:            hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
 		})
 
-	// Subscribe to all relevant logs.
-	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.Address().String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
-		Addresses: []common.Address{onRamp.Address()},
-	})
+	err = registerLpFilters(sourceChain.LogPoller(), getExecutionPluginSourceLpChainFilters(onRamp.Address()))
 	if err != nil {
 		return nil, err
 	}
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, commitStore.Address().String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.ReportAccepted},
-		Addresses: []common.Address{commitStore.Address()},
-	})
-	if err != nil {
-		return nil, err
-	}
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, offRamp.Address().String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.ExecutionStateChanged},
-		Addresses: []common.Address{offRamp.Address()},
-	})
-	if err != nil {
-		return nil, err
-	}
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, offRamp.Address().String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.PoolAdded},
-		Addresses: []common.Address{offRamp.Address()},
-	})
-	if err != nil {
-		return nil, err
-	}
-	err = destChain.LogPoller().RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, offRamp.Address().String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved},
-		Addresses: []common.Address{offRamp.Address()},
-	})
+
+	err = registerLpFilters(destChain.LogPoller(), getExecutionPluginDestLpChainFilters(commitStore.Address(), offRamp.Address()))
 	if err != nil {
 		return nil, err
 	}
@@ -185,10 +156,86 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
+func getExecutionPluginSourceLpChainFilters(onRamp common.Address) []logpoller.Filter {
+	return []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
+			Addresses: []common.Address{onRamp},
+		},
+	}
+}
+
+func getExecutionPluginDestLpChainFilters(commitStore, offRamp common.Address) []logpoller.Filter {
+	return []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, commitStore.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.ReportAccepted},
+			Addresses: []common.Address{commitStore},
+		},
+		{
+			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, offRamp.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.ExecutionStateChanged},
+			Addresses: []common.Address{offRamp},
+		},
+		{
+			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, offRamp.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.PoolAdded},
+			Addresses: []common.Address{offRamp},
+		},
+		{
+			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, offRamp.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved},
+			Addresses: []common.Address{offRamp},
+		},
+	}
+}
+
+// GetExecutionPluginFilterNamesFromSpec returns all the registered filter names, for both source and dest log pollers.
+func GetExecutionPluginFilterNamesFromSpec(ctx context.Context, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) ([]string, error) {
+	if spec == nil {
+		return nil, errors.New("spec is nil")
+	}
+
+	destChainIDInterface, ok := spec.RelayConfig["chainID"]
+	if !ok {
+		return nil, errors.New("chainID must be provided in relay config")
+	}
+	destChainIDf64, is := destChainIDInterface.(float64)
+	if !is {
+		return nil, fmt.Errorf("chain id '%v' is not float64", destChainIDInterface)
+	}
+	destChain, err := chainSet.Get(big.NewInt(int64(destChainIDf64)))
+	if err != nil {
+		return nil, err
+	}
+
+	offRampAddress := common.HexToAddress(spec.ContractID)
+	offRamp, err := LoadOffRamp(offRampAddress, ExecPluginLabel, destChain.Client())
+	if err != nil {
+		return nil, err
+	}
+
+	return getExecutionPluginFilterNames(ctx, offRamp)
+}
+
+func getExecutionPluginFilterNames(ctx context.Context, dstOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface) ([]string, error) {
+	offRampConfig, err := dstOffRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	return append(
+		getLpFilterNames(getExecutionPluginSourceLpChainFilters(offRampConfig.OnRamp)),
+		getLpFilterNames(getExecutionPluginDestLpChainFilters(offRampConfig.CommitStore, dstOffRamp.Address()))...,
+	), nil
+}
+
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
 // all the message ids will be added to the tx metadata.
 func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 	execReport, err := abihelpers.DecodeExecutionReport(report)
+
 	if err != nil {
 		return nil, err
 	}
