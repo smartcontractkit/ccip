@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -108,32 +109,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			leafHasher:            hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
 		})
 
-	err = registerLpFilters(sourceChain.LogPoller(), getExecutionPluginSourceLpChainFilters(onRamp.Address()))
-	if err != nil {
-		return nil, err
-	}
-
-	err = registerLpFilters(destChain.LogPoller(), getExecutionPluginDestLpChainFilters(commitStore.Address(), offRamp.Address()))
-	if err != nil {
-		return nil, err
-	}
-	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(FEE_TOKEN_ADDED, srcPriceRegistry.Address().String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenAdded},
-		Addresses: []common.Address{srcPriceRegistry.Address()},
-	})
-	if err != nil {
-		return nil, err
-	}
-	err = sourceChain.LogPoller().RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(FEE_TOKEN_REMOVED, srcPriceRegistry.Address().String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenRemoved},
-		Addresses: []common.Address{srcPriceRegistry.Address()},
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), destChain.ID())
 	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPExecution").With(
 		"srcChain", ChainName(pluginConfig.SourceEvmChainId), "dstChain", ChainName(destChainID)), true, logError)
@@ -156,17 +131,27 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func getExecutionPluginSourceLpChainFilters(onRamp common.Address) []logpoller.Filter {
+func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address) []logpoller.Filter {
 	return []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.String()),
 			EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
 			Addresses: []common.Address{onRamp},
 		},
+		{
+			Name:      logpoller.FilterName(FEE_TOKEN_ADDED, priceRegistry.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenAdded},
+			Addresses: []common.Address{priceRegistry},
+		},
+		{
+			Name:      logpoller.FilterName(FEE_TOKEN_REMOVED, priceRegistry.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenRemoved},
+			Addresses: []common.Address{priceRegistry},
+		},
 	}
 }
 
-func getExecutionPluginDestLpChainFilters(commitStore, offRamp common.Address) []logpoller.Filter {
+func getExecutionPluginDestLpChainFilters(commitStore, offRamp, priceRegistry common.Address) []logpoller.Filter {
 	return []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, commitStore.String()),
@@ -188,6 +173,16 @@ func getExecutionPluginDestLpChainFilters(commitStore, offRamp common.Address) [
 			EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved},
 			Addresses: []common.Address{offRamp},
 		},
+		{
+			Name:      logpoller.FilterName(FEE_TOKEN_ADDED, priceRegistry.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenAdded},
+			Addresses: []common.Address{priceRegistry},
+		},
+		{
+			Name:      logpoller.FilterName(FEE_TOKEN_REMOVED, priceRegistry.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenRemoved},
+			Addresses: []common.Address{priceRegistry},
+		},
 	}
 }
 
@@ -195,6 +190,12 @@ func getExecutionPluginDestLpChainFilters(commitStore, offRamp common.Address) [
 func GetExecutionPluginFilterNamesFromSpec(ctx context.Context, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) ([]string, error) {
 	if spec == nil {
 		return nil, errors.New("spec is nil")
+	}
+
+	var pluginConfig ccipconfig.ExecutionPluginConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+	if err != nil {
+		return nil, err
 	}
 
 	destChainIDInterface, ok := spec.RelayConfig["chainID"]
@@ -216,18 +217,40 @@ func GetExecutionPluginFilterNamesFromSpec(ctx context.Context, spec *job.OCR2Or
 		return nil, err
 	}
 
-	return getExecutionPluginFilterNames(ctx, offRamp)
+	offRampConfig, err := offRamp.GetStaticConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, err
+	}
+	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(uint64(pluginConfig.SourceEvmChainId)))
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to open source chain")
+	}
+	srcOnRamp, err := LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed loading onRamp")
+	}
+
+	return getExecutionPluginFilterNames(ctx, offRamp, offRampConfig, srcOnRamp)
 }
 
-func getExecutionPluginFilterNames(ctx context.Context, dstOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface) ([]string, error) {
-	offRampConfig, err := dstOffRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
+func getExecutionPluginFilterNames(
+	ctx context.Context,
+	dstOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
+	dstOffRampConfig evm_2_evm_offramp.EVM2EVMOffRampStaticConfig,
+	srcOnRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) ([]string, error) {
+	dstOffRampDynCfg, err := dstOffRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	onRampDynCfg, err := srcOnRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, err
 	}
 
 	return append(
-		getLpFilterNames(getExecutionPluginSourceLpChainFilters(offRampConfig.OnRamp)),
-		getLpFilterNames(getExecutionPluginDestLpChainFilters(offRampConfig.CommitStore, dstOffRamp.Address()))...,
+		getLpFilterNames(getExecutionPluginSourceLpChainFilters(dstOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry)),
+		getLpFilterNames(getExecutionPluginDestLpChainFilters(dstOffRampConfig.CommitStore, dstOffRamp.Address(), dstOffRampDynCfg.PriceRegistry))...,
 	), nil
 }
 
