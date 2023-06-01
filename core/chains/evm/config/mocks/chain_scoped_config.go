@@ -682,34 +682,6 @@ func (_m *ChainScopedConfig) DatabaseDefaultQueryTimeout() time.Duration {
 	return r0
 }
 
-// DatabaseListenerMaxReconnectDuration provides a mock function with given fields:
-func (_m *ChainScopedConfig) DatabaseListenerMaxReconnectDuration() time.Duration {
-	ret := _m.Called()
-
-	var r0 time.Duration
-	if rf, ok := ret.Get(0).(func() time.Duration); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(time.Duration)
-	}
-
-	return r0
-}
-
-// DatabaseListenerMinReconnectInterval provides a mock function with given fields:
-func (_m *ChainScopedConfig) DatabaseListenerMinReconnectInterval() time.Duration {
-	ret := _m.Called()
-
-	var r0 time.Duration
-	if rf, ok := ret.Get(0).(func() time.Duration); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(time.Duration)
-	}
-
-	return r0
-}
-
 // DatabaseURL provides a mock function with given fields:
 func (_m *ChainScopedConfig) DatabaseURL() url.URL {
 	ret := _m.Called()
@@ -1113,6 +1085,22 @@ func (_m *ChainScopedConfig) EvmGasLimitMultiplier() float32 {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(float32)
+	}
+
+	return r0
+}
+
+// EvmGasLimitOCR2JobType provides a mock function with given fields:
+func (_m *ChainScopedConfig) EvmGasLimitOCR2JobType() *uint32 {
+	ret := _m.Called()
+
+	var r0 *uint32
+	if rf, ok := ret.Get(0).(func() *uint32); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*uint32)
+		}
 	}
 
 	return r0
@@ -2309,6 +2297,20 @@ func (_m *ChainScopedConfig) OCR2DatabaseTimeout() time.Duration {
 	return r0
 }
 
+// OCR2DefaultTransactionQueueDepth provides a mock function with given fields:
+func (_m *ChainScopedConfig) OCR2DefaultTransactionQueueDepth() uint32 {
+	ret := _m.Called()
+
+	var r0 uint32
+	if rf, ok := ret.Get(0).(func() uint32); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint32)
+	}
+
+	return r0
+}
+
 // OCR2KeyBundleID provides a mock function with given fields:
 func (_m *ChainScopedConfig) OCR2KeyBundleID() (string, error) {
 	ret := _m.Called()
@@ -2331,6 +2333,20 @@ func (_m *ChainScopedConfig) OCR2KeyBundleID() (string, error) {
 	}
 
 	return r0, r1
+}
+
+// OCR2SimulateTransactions provides a mock function with given fields:
+func (_m *ChainScopedConfig) OCR2SimulateTransactions() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
 }
 
 // OCR2TraceLogging provides a mock function with given fields:
@@ -3462,20 +3478,6 @@ func (_m *ChainScopedConfig) ThresholdKeyShare() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// TriggerFallbackDBPollInterval provides a mock function with given fields:
-func (_m *ChainScopedConfig) TriggerFallbackDBPollInterval() time.Duration {
-	ret := _m.Called()
-
-	var r0 time.Duration
-	if rf, ok := ret.Get(0).(func() time.Duration); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(time.Duration)
 	}
 
 	return r0
