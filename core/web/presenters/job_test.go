@@ -619,6 +619,7 @@ func TestJob(t *testing.T) {
 						"legacyGasStationServerSpec": null,
 						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
+						"gatewaySpec": null,
 						"pipelineSpec": {
 							"id": 1,
 							"jobID": 0,
@@ -667,6 +668,7 @@ func TestJob(t *testing.T) {
 						"cronSpec": null,
 						"offChainReportingOracleSpec": null,
 						"offChainReporting2OracleSpec": null,
+						"gatewaySpec": null,
 						"keeperSpec": null,
 						"vrfSpec": null,
 						"webhookSpec": null,
@@ -881,6 +883,8 @@ func TestJob(t *testing.T) {
 							"createdAt":"0001-01-01T00:00:00Z",
 							"updatedAt":"0001-01-01T00:00:00Z"
 						},
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"pipelineSpec": {
 							"id": 1,
 							"jobID": 0,
