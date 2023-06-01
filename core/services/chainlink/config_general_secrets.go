@@ -3,6 +3,7 @@ package chainlink
 import (
 	"net/url"
 
+	lgsconfig "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
 )
 
@@ -53,6 +54,16 @@ func (g *generalConfig) MercuryCredentials(credName string) *models.MercuryCrede
 		}
 	}
 	return nil
+}
+
+func (g *generalConfig) LegacyGasStationAuthConfig() *lgsconfig.AuthConfig {
+	if g.secrets.LegacyGasStation.AuthConfig == nil {
+		return nil
+	}
+	return &lgsconfig.AuthConfig{
+		ClientKey:         string(g.secrets.LegacyGasStation.AuthConfig.ClientKey),
+		ClientCertificate: string(g.secrets.LegacyGasStation.AuthConfig.ClientCertificate),
+	}
 }
 
 func (g *generalConfig) ThresholdKeyShare() string {

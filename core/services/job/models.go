@@ -248,7 +248,7 @@ type OCROracleSpec struct {
 	ContractConfigTrackerPollIntervalEnv      bool
 	ContractConfigConfirmations               uint16 `toml:"contractConfigConfirmations"`
 	ContractConfigConfirmationsEnv            bool
-	EVMChainID                                *utils.Big       `toml:"evmChainID" db:"evm_chain_id"`
+	EVMChainID                                *utils.Big       `toml:"evmChainID"                             db:"evm_chain_id"`
 	DatabaseTimeout                           *models.Interval `toml:"databaseTimeout"`
 	DatabaseTimeoutEnv                        bool
 	ObservationGracePeriod                    *models.Interval `toml:"observationGracePeriod"`
@@ -326,7 +326,7 @@ func (r JSONConfig) MercuryCredentialName() (string, error) {
 type OCR2PluginType string
 
 const (
-	// Median refers to the median.Median type
+	// Median refers to the median.Median plugin
 	Median OCR2PluginType = "median"
 
 	DKG OCR2PluginType = "dkg"
@@ -339,6 +339,11 @@ const (
 	OCR2Keeper OCR2PluginType = "ocr2automation"
 
 	OCR2Functions OCR2PluginType = "functions"
+
+	// CCIPCommit refers to the ccip.CCIPCommit plugin
+	CCIPCommit OCR2PluginType = "ccip-commit"
+	// CCIPExecution refers to the ccip.CCIPExecution plugin
+	CCIPExecution OCR2PluginType = "ccip-execution"
 
 	Mercury OCR2PluginType = "mercury"
 )
@@ -391,8 +396,8 @@ type ExternalInitiatorWebhookSpec struct {
 type WebhookSpec struct {
 	ID                            int32 `toml:"-"`
 	ExternalInitiatorWebhookSpecs []ExternalInitiatorWebhookSpec
-	CreatedAt                     time.Time `json:"createdAt" toml:"-"`
-	UpdatedAt                     time.Time `json:"updatedAt" toml:"-"`
+	CreatedAt                     time.Time `toml:"-"`
+	UpdatedAt                     time.Time `toml:"-"`
 }
 
 func (w WebhookSpec) GetID() string {
@@ -661,6 +666,9 @@ type LegacyGasStationSidecarSpec struct {
 
 	// CCIPChainSelector is the CCIP chain selector that corresponds to EVMChainID param
 	CCIPChainSelector *utils.Big `toml:"ccipChainSelector"`
+
+	// StatusUpdateURL is the endpoint URL where the sidecar posts status updates
+	StatusUpdateURL string `toml:"statusUpdateURL"`
 
 	// CreatedAt is the time this job was created.
 	CreatedAt time.Time `toml:"-"`

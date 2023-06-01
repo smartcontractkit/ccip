@@ -1,0 +1,17 @@
+{
+  "acceptOwnership()": "79ba5097",
+  "applyRampUpdates((address,bool)[],(address,bool)[])": "af519112",
+  "currentRateLimiterState()": "546719cd",
+  "getToken()": "21df0da7",
+  "isOffRamp(address)": "1d7a74a0",
+  "isOnRamp(address)": "6f32b872",
+  "lockOrBurn(address,bytes,uint256,uint64,bytes)": "96875445",
+  "owner()": "8da5cb5b",
+  "pause()": "8456cb59",
+  "paused()": "5c975abb",
+  "releaseOrMint(bytes,address,uint256,uint64,bytes)": "8627fad6",
+  "setRateLimiterConfig((bool,uint128,uint128))": "c92b2832",
+  "supportsInterface(bytes4)": "01ffc9a7",
+  "transferOwnership(address)": "f2fde38b",
+  "unpause()": "3f4ba83a"
+}

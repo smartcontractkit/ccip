@@ -1,0 +1,16 @@
+{
+  "acceptOwnership()": "79ba5097",
+  "ccipReceive((bytes32,uint64,bytes,bytes,(address,uint256)[]))": "85572ffb",
+  "getCounterpartAddress()": "2b6e5d63",
+  "getCounterpartChainSelector()": "bee518a4",
+  "getRouter()": "b0f479a1",
+  "isPaused()": "b187bd26",
+  "owner()": "8da5cb5b",
+  "setCounterpart(uint64,address)": "b5a11011",
+  "setCounterpartAddress(address)": "9d2aede5",
+  "setCounterpartChainSelector(uint64)": "1892b906",
+  "setPaused(bool)": "16c38b3c",
+  "startPingPong()": "2874d8bf",
+  "supportsInterface(bytes4)": "01ffc9a7",
+  "transferOwnership(address)": "f2fde38b"
+}

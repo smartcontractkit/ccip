@@ -14,13 +14,14 @@ install-git-hooks: ## Install git hooks.
 
 .PHONY: install-chainlink-autoinstall
 install-chainlink-autoinstall: | pnpmdep gomod install-chainlink ## Autoinstall chainlink.
+
 .PHONY: operator-ui-autoinstall
 operator-ui-autoinstall: | operator-ui ## Autoinstall frontend UI.
 
 .PHONY: pnpmdep
 pnpmdep: ## Install solidity contract dependencies through pnpm
 	(cd contracts && pnpm i)
-	
+
 .PHONY: gomod
 gomod: ## Ensure chainlink's go dependencies are installed.
 	@if [ -z "`which gencodec`" ]; then \
@@ -77,12 +78,24 @@ docker-plugins:
 operator-ui: ## Fetch the frontend
 	./operator_ui/install.sh
 
+.PHONY: ccip-abi-generate
+ccip-abi-generate: ## Generate Public ABI file for a contract
+	./tools/bin/ccip_public_abi_generate $(c)
+
+.PHONY: ccip-abi-fix
+ccip-abi-fix: ## Fix contract ABIs that don't match their expected public ABIs
+	./tools/bin/ccip_public_abi_fix
+
+.PHONY: ccip-abi-check
+ccip-abi-check: ## Check contract ABIs against their expected public ABIs
+	./tools/ci/ccip_public_abi_check
+
 .PHONY: abigen
 abigen: ## Build & install abigen.
 	./tools/bin/build_abigen
 
 .PHONY: go-solidity-wrappers
-go-solidity-wrappers: pnpmdep abigen ## Recompiles solidity contracts and their go wrappers.
+go-solidity-wrappers: pnpmdep abigen mockery ## Recompiles solidity contracts and their go wrappers.
 	./contracts/scripts/native_solc_compile_all
 	go generate ./core/gethwrappers
 

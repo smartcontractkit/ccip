@@ -122,3 +122,9 @@ $SCRIPTPATH/native_solc8_6_compile mocks/FunctionsBillingRegistryEventsMock.sol
 
 # Transmission
 $SCRIPTPATH/transmission/native_solc_compile_all_transmission
+
+# Meta Transaction
+$SCRIPTPATH/native_solc_compile_all_metatx
+
+# CCIP
+$SCRIPTPATH/native_solc_compile_all_ccip

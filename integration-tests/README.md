@@ -130,6 +130,42 @@ Currently, all performance tests are only run on simulated blockchains.
 make test_perf
 ```
 
+## CCIP Tests
+
+CCIP tests follow some additional set up as it needs multi-chain set-up to run the tests. 
+To run any kind of CCIP tests you need to provide the following env variables:
+
+```bash
+# The network provided in index 0(SIMULATED in this example) 
+# is overlooked by ccip tests. The tests are run with networks provided 
+# in index 1 and 2 ( AVALANCHE_FUJI,SEPOLIA in this example)
+export SELECTED_NETWORKS="SIMULATED,AVALANCHE_FUJI,SEPOLIA", 
+ # if run on live network and REUSE_CCIP_CONTRACTS var is set to true 
+ # the test will read already deployed contract addresses and 
+ # reuse contracts in tests instead of deploying the contracts.
+ # This saves on execution time and comes handy for stable contracts.
+ # The contract addresses need to be specified in ./contracts/ccip/laneconfig/contracts.json.
+ # All ccip tests running on live networks will save the contracts 
+ # used/deployed as part of tests in a file named tmp_<testname>.json 
+ # under working dir of tests.The contents of tmp_<testname>.json 
+ # can be copied into ./contracts/ccip/laneconfig/contracts.json
+ # if these are needed for future test runs
+export REUSE_CCIP_CONTRACTS="True" 
+# Along with the above tests will rely on
+# all the other variables as mentioned in Configure Environment section.
+# At this point you might need to change
+# the following variable values:  
+# CHAINLINK_IMAGE  
+# CHAINLINK_VERSION
+# (from the one set for chainlink main repo to 
+# CCIP specific image and tag)
+# CCIP integration-tests do not use DATABASE_URL, but it needs to be set 
+# This can be set to any valid DB URL and the name should be suffixed with _test. 
+# Using the following would work just fine
+export DATABASE_URL="postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable"
+```
+
+
 ## Common Issues
 
 When upgrading to a new version, it's possible the helm charts have changed. There are a myriad of errors that can result from this, so it's best to just try running `helm repo update` when encountering an error you're unsure of.

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -e
+
+FILES="./src/v0.8/ccip/test/publicABI/*"
+
+for f in $FILES
+do
+  (
+  expectedAbi=$( cat $f | tr -d " \t\n\r" )
+
+  fileName=$( echo "$f" | sed "s/.*\///" )
+  echo "Checking $fileName"
+  
+  actualAbi=$( forge inspect $fileName methods | tr -d " \t\n\r" )
+
+  if [[ "$expectedAbi" != "$actualAbi" ]]; then
+    printf "$fileName ABI does not match expected ABI. Fixing...\n"
+    make ccip-abi-generate c=$fileName
+    printf "Fixed.\n"
+  fi
+  ) &
+done
+
+wait
+
+echo "ABI fix successful, don't forget to commit!"

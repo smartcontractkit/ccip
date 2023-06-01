@@ -1,13 +1,15 @@
 package v2
 
 import (
+	"crypto/tls"
 	_ "embed"
-	"errors"
 	"fmt"
 	"log"
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/google/uuid"
 	"go.uber.org/multierr"
@@ -121,13 +123,14 @@ func (c *Core) ValidateConfig() (err error) {
 }
 
 type Secrets struct {
-	Database   DatabaseSecrets          `toml:",omitempty"`
-	Explorer   ExplorerSecrets          `toml:",omitempty"`
-	Password   Passwords                `toml:",omitempty"`
-	Pyroscope  PyroscopeSecrets         `toml:",omitempty"`
-	Prometheus PrometheusSecrets        `toml:",omitempty"`
-	Mercury    MercurySecrets           `toml:",omitempty"`
-	Threshold  ThresholdKeyShareSecrets `toml:",omitempty"`
+	Database         DatabaseSecrets          `toml:",omitempty"`
+	Explorer         ExplorerSecrets          `toml:",omitempty"`
+	Password         Passwords                `toml:",omitempty"`
+	Pyroscope        PyroscopeSecrets         `toml:",omitempty"`
+	Prometheus       PrometheusSecrets        `toml:",omitempty"`
+	Mercury          MercurySecrets           `toml:",omitempty"`
+	LegacyGasStation LegacyGasStationSecrets  `toml:",omitempty"`
+	Threshold        ThresholdKeyShareSecrets `toml:",omitempty"`
 }
 
 func dbURLPasswordComplexity(err error) string {
@@ -209,9 +212,11 @@ type PrometheusSecrets struct {
 	AuthToken *models.Secret
 }
 type Feature struct {
-	FeedsManager *bool
-	LogPoller    *bool
-	UICSAKeys    *bool
+	FeedsManager     *bool
+	LogPoller        *bool
+	UICSAKeys        *bool
+	CCIP             *bool
+	LegacyGasStation *bool
 }
 
 func (f *Feature) setFrom(f2 *Feature) {
@@ -223,6 +228,12 @@ func (f *Feature) setFrom(f2 *Feature) {
 	}
 	if v := f2.UICSAKeys; v != nil {
 		f.UICSAKeys = v
+	}
+	if v := f2.CCIP; v != nil {
+		f.CCIP = v
+	}
+	if v := f2.LegacyGasStation; v != nil {
+		f.LegacyGasStation = v
 	}
 }
 
@@ -1077,6 +1088,27 @@ func (m *MercurySecrets) ValidateConfig() (err error) {
 		}
 		urls[s] = struct{}{}
 	}
+	return err
+}
+
+type LegacyGasStationAuthConfig struct {
+	// ClientKey is the X.509 private key used for mTLS in PEM (base64-encoding) format
+	ClientKey models.Secret
+	// ClientCertificate is the X.509 certificate for mTLS in PEM (base64-encoding) format
+	ClientCertificate models.Secret
+}
+
+type LegacyGasStationSecrets struct {
+	AuthConfig *LegacyGasStationAuthConfig
+}
+
+func (l *LegacyGasStationSecrets) ValidateConfig() (err error) {
+	if l.AuthConfig == nil {
+		// no validation needed
+		return nil
+	}
+	// validates private key and certificate match
+	_, err = tls.X509KeyPair([]byte(l.AuthConfig.ClientCertificate), []byte(l.AuthConfig.ClientKey))
 	return err
 }
 

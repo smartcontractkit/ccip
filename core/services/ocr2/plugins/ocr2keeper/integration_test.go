@@ -228,7 +228,7 @@ func TestIntegration_KeeperPluginBasic(t *testing.T) {
 	registry := deployKeeper20Registry(t, steve, backend, linkAddr, linkFeedAddr, gasFeedAddr)
 
 	// Setup bootstrap + oracle nodes
-	bootstrapNodePort := int64(19599)
+	bootstrapNodePort := int64(19499)
 	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := setupNode(t, bootstrapNodePort, "bootstrap_keeper_ocr", nodeKeys[0], backend, nil)
 	bootstrapNode := Node{
 		appBootstrap, bootstrapTransmitter, bootstrapKb,

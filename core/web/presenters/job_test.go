@@ -116,6 +116,8 @@ func TestJob(t *testing.T) {
 						"webhookSpec": null,
 						"blockhashStoreSpec": null,
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
 						"gatewaySpec": null,
 						"errors": []
@@ -192,6 +194,8 @@ func TestJob(t *testing.T) {
 						"webhookSpec": null,
 						"blockhashStoreSpec": null,
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
 						"gatewaySpec": null,
 						"errors": []
@@ -280,6 +284,8 @@ func TestJob(t *testing.T) {
 						"webhookSpec": null,
 						"blockhashStoreSpec": null,
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
 						"gatewaySpec": null,
 						"errors": []
@@ -343,6 +349,8 @@ func TestJob(t *testing.T) {
                         "vrfSpec": null,
 						"blockhashStoreSpec": null,
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
 						"gatewaySpec": null,
 						"errors": []
@@ -401,6 +409,8 @@ func TestJob(t *testing.T) {
                         "webhookSpec": null,
 						"blockhashStoreSpec": null,
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
 						"gatewaySpec": null,
                         "errors": []
@@ -457,6 +467,8 @@ func TestJob(t *testing.T) {
                         "vrfSpec": null,
 						"blockhashStoreSpec": null,
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
 						"gatewaySpec": null,
 						"errors": []
@@ -524,6 +536,8 @@ func TestJob(t *testing.T) {
 							"updatedAt": "0001-01-01T00:00:00Z"
 						},
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
 						"pipelineSpec": {
 							"id": 1,
@@ -602,6 +616,144 @@ func TestJob(t *testing.T) {
 							"createdAt": "0001-01-01T00:00:00Z",
 							"updatedAt": "0001-01-01T00:00:00Z"
 						},
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
+						"bootstrapSpec": null,
+						"gatewaySpec": null,
+						"pipelineSpec": {
+							"id": 1,
+							"jobID": 0,
+							"dotDagSource": ""
+						},
+						"errors": []
+					}
+				}
+			}`,
+		},
+		{
+			name: "legacy gas station server spec",
+			job: job.Job{
+				ID: 1,
+				LegacyGasStationServerSpec: &job.LegacyGasStationServerSpec{
+					ID:                1,
+					ForwarderAddress:  "0x16988483b46e695f6c8D58e6e1461DC703e008e1",
+					EVMChainID:        utils.NewBigI(4),
+					CCIPChainSelector: utils.NewBigI(4000),
+					FromAddresses:     []ethkey.EIP55Address{fromAddress},
+				},
+				PipelineSpec: &pipeline.Spec{
+					ID:           1,
+					DotDagSource: "",
+				},
+				ExternalJobID: uuid.MustParse("0eec7e1d-d0d2-476c-a1a8-72dfb6633f46"),
+				Type:          job.LegacyGasStationServer,
+				SchemaVersion: 1,
+				Name:          null.StringFrom("test"),
+			},
+			want: `
+			{
+				"data": {
+					"type": "jobs",
+					"id": "1",
+					"attributes": {
+						"name": "test",
+						"type": "legacygasstationserver",
+						"schemaVersion": 1,
+						"maxTaskDuration": "0s",
+						"externalJobID": "0eec7e1d-d0d2-476c-a1a8-72dfb6633f46",
+						"directRequestSpec": null,
+						"fluxMonitorSpec": null,
+						"gasLimit": null,
+						"forwardingAllowed": false,
+						"cronSpec": null,
+						"offChainReportingOracleSpec": null,
+						"offChainReporting2OracleSpec": null,
+						"gatewaySpec": null,
+						"keeperSpec": null,
+						"vrfSpec": null,
+						"webhookSpec": null,
+						"blockhashStoreSpec": null,
+						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": {
+							"forwarderAddress": "0x16988483b46e695f6c8D58e6e1461DC703e008e1",
+							"evmChainID": "4",
+							"ccipChainSelector": "4000",
+							"fromAddresses": ["0xa8037A20989AFcBC51798de9762b351D63ff462e"],
+							"createdAt": "0001-01-01T00:00:00Z",
+							"updatedAt": "0001-01-01T00:00:00Z"
+						},
+						"legacyGasStationSidecarSpec": null,
+						"bootstrapSpec": null,
+						"pipelineSpec": {
+							"id": 1,
+							"jobID": 0,
+							"dotDagSource": ""
+						},
+						"errors": []
+					}
+				}
+			}`,
+		},
+		{
+			name: "legacy gas station sidecar spec",
+			job: job.Job{
+				ID: 1,
+				LegacyGasStationSidecarSpec: &job.LegacyGasStationSidecarSpec{
+					ID:                1,
+					ForwarderAddress:  "0x16988483b46e695f6c8D58e6e1461DC703e008e1",
+					OffRampAddress:    "0x8FDa6fb845B0eB1e14E3f9d855467b8aa5D3F551",
+					LookbackBlocks:    223,
+					PollPeriod:        25 * time.Second,
+					RunTimeout:        10 * time.Second,
+					EVMChainID:        utils.NewBigI(4),
+					CCIPChainSelector: utils.NewBigI(4000),
+					StatusUpdateURL:   "https://testurl.com",
+				},
+				PipelineSpec: &pipeline.Spec{
+					ID:           1,
+					DotDagSource: "",
+				},
+				ExternalJobID: uuid.MustParse("0eec7e1d-d0d2-476c-a1a8-72dfb6633f46"),
+				Type:          job.LegacyGasStationSidecar,
+				SchemaVersion: 1,
+				Name:          null.StringFrom("test"),
+			},
+			want: `
+			{
+				"data": {
+					"type": "jobs",
+					"id": "1",
+					"attributes": {
+						"name": "test",
+						"type": "legacygasstationsidecar",
+						"schemaVersion": 1,
+						"maxTaskDuration": "0s",
+						"externalJobID": "0eec7e1d-d0d2-476c-a1a8-72dfb6633f46",
+						"directRequestSpec": null,
+						"fluxMonitorSpec": null,
+						"gasLimit": null,
+						"forwardingAllowed": false,
+						"cronSpec": null,
+						"offChainReportingOracleSpec": null,
+						"offChainReporting2OracleSpec": null,
+						"keeperSpec": null,
+						"vrfSpec": null,
+						"webhookSpec": null,
+						"blockhashStoreSpec": null,
+						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": {
+							"forwarderAddress": "0x16988483b46e695f6c8D58e6e1461DC703e008e1",
+							"offRampAddress": "0x8FDa6fb845B0eB1e14E3f9d855467b8aa5D3F551",
+							"lookbackBlocks": 223,
+							"pollPeriod": 25000000000,
+							"runTimeout": 10000000000,
+							"evmChainID": "4",
+							"ccipChainSelector": "4000",
+							"statusUpdateURL": "https://testurl.com",
+							"createdAt": "0001-01-01T00:00:00Z",
+							"updatedAt": "0001-01-01T00:00:00Z"
+						},
 						"bootstrapSpec": null,
 						"pipelineSpec": {
 							"id": 1,
@@ -656,6 +808,8 @@ func TestJob(t *testing.T) {
 						"webhookSpec": null,
 						"blockhashStoreSpec": null,
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": {
 							"blockchainTimeout":"0s", 
 							"contractConfigConfirmations":0, 
@@ -729,6 +883,8 @@ func TestJob(t *testing.T) {
 							"createdAt":"0001-01-01T00:00:00Z",
 							"updatedAt":"0001-01-01T00:00:00Z"
 						},
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"pipelineSpec": {
 							"id": 1,
 							"jobID": 0,
@@ -804,6 +960,8 @@ func TestJob(t *testing.T) {
 						"vrfSpec": null,
 						"blockhashStoreSpec": null,
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
 						"gatewaySpec": null,
 						"errors": [{

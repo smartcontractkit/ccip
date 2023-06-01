@@ -35,6 +35,8 @@ import (
 
 	time "time"
 
+	typesconfig "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types/config"
+
 	url "net/url"
 
 	utils "github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -759,6 +761,20 @@ func (_m *GeneralConfig) FMSimulateTransactions() bool {
 	return r0
 }
 
+// FeatureCCIP provides a mock function with given fields:
+func (_m *GeneralConfig) FeatureCCIP() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // FeatureExternalInitiators provides a mock function with given fields:
 func (_m *GeneralConfig) FeatureExternalInitiators() bool {
 	ret := _m.Called()
@@ -775,6 +791,20 @@ func (_m *GeneralConfig) FeatureExternalInitiators() bool {
 
 // FeatureFeedsManager provides a mock function with given fields:
 func (_m *GeneralConfig) FeatureFeedsManager() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// FeatureLegacyGasStation provides a mock function with given fields:
+func (_m *GeneralConfig) FeatureLegacyGasStation() bool {
 	ret := _m.Called()
 
 	var r0 bool
@@ -1146,6 +1176,22 @@ func (_m *GeneralConfig) KeystorePassword() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// LegacyGasStationAuthConfig provides a mock function with given fields:
+func (_m *GeneralConfig) LegacyGasStationAuthConfig() *typesconfig.AuthConfig {
+	ret := _m.Called()
+
+	var r0 *typesconfig.AuthConfig
+	if rf, ok := ret.Get(0).(func() *typesconfig.AuthConfig); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*typesconfig.AuthConfig)
+		}
 	}
 
 	return r0

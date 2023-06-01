@@ -20,10 +20,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
 	"github.com/smartcontractkit/chainlink-relay/pkg/types"
+
+	"github.com/smartcontractkit/chainlink/v2/plugins"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/dkg"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/dkg/persistence"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/functions"
@@ -46,7 +51,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/synchronization"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
-	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
 
 type Delegate struct {
@@ -173,6 +177,16 @@ func (d *Delegate) OnDeleteJob(jb job.Job, q pg.Queryer) error {
 		if err != nil {
 			d.lggr.Errorw("failed to derive ocr2keeper filter names from spec", "err", err, "spec", spec)
 		}
+	case job.CCIPCommit:
+		filters, err = ccip.GetCommitPluginFilterNamesFromSpec(context.TODO(), spec, d.chainSet)
+		if err != nil {
+			d.lggr.Errorw("failed to derive ccip commit plugin filter names from spec", "err", err, "spec", spec)
+		}
+	case job.CCIPExecution:
+		filters, err = ccip.GetExecutionPluginFilterNamesFromSpec(context.TODO(), spec, d.chainSet)
+		if err != nil {
+			d.lggr.Errorw("failed to derive ccip execution plugin filter names from spec", "err", err, "spec", spec)
+		}
 	default:
 		return nil
 	}
@@ -285,10 +299,10 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		return nil, errors.New("peerWrapper is not started. OCR2 jobs require a started and running p2p v2 peer")
 	}
 
-	ocrLogger := logger.NewOCRWrapper(lggr, true, func(msg string) {
+	logError := func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
-	})
-
+	}
+	ocrLogger := logger.NewOCRWrapper(lggr, true, logError)
 	lc := validate.ToLocalConfig(d.cfg, *spec)
 	if err := libocr2.SanityCheckLocalConfig(lc); err != nil {
 		return nil, err
@@ -767,6 +781,72 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 		)
 
 		return append([]job.ServiceCtx{runResultSaver, functionsProvider}, functionsServices...), nil
+	case job.CCIPCommit:
+		if spec.Relay != relay.EVM {
+			return nil, errors.New("Non evm chains are not supported for CCIP commit")
+		}
+		ccipProvider, err2 := evmrelay.NewCCIPCommitProvider(
+			lggr.Named("CCIPCommit"),
+			d.chainSet,
+			types.RelayArgs{
+				ExternalJobID: jb.ExternalJobID,
+				JobID:         spec.ID,
+				ContractID:    spec.ContractID,
+				RelayConfig:   spec.RelayConfig.Bytes(),
+				New:           d.isNewlyCreatedJob,
+			},
+			transmitterID,
+			d.ethKs,
+		)
+		if err2 != nil {
+			return nil, err2
+		}
+		oracleArgsNoPlugin := libocr2.OracleArgs{
+			BinaryNetworkEndpointFactory: peerWrapper.Peer2,
+			V2Bootstrappers:              bootstrapPeers,
+			ContractTransmitter:          ccipProvider.ContractTransmitter(),
+			ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
+			Database:                     ocrDB,
+			LocalConfig:                  lc,
+			MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID, synchronization.OCR2CCIP),
+			OffchainConfigDigester:       ccipProvider.OffchainConfigDigester(),
+			OffchainKeyring:              kb,
+			OnchainKeyring:               kb,
+		}
+		return ccip.NewCommitServices(lggr, jb, d.chainSet, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError)
+	case job.CCIPExecution:
+		if spec.Relay != relay.EVM {
+			return nil, errors.New("Non evm chains are not supported for CCIP execution")
+		}
+		ccipProvider, err2 := evmrelay.NewCCIPExecutionProvider(
+			lggr.Named("CCIPExec"),
+			d.chainSet,
+			types.RelayArgs{
+				ExternalJobID: jb.ExternalJobID,
+				JobID:         spec.ID,
+				ContractID:    spec.ContractID,
+				RelayConfig:   spec.RelayConfig.Bytes(),
+				New:           d.isNewlyCreatedJob,
+			},
+			transmitterID,
+			d.ethKs,
+		)
+		if err2 != nil {
+			return nil, err2
+		}
+		oracleArgsNoPlugin := libocr2.OracleArgs{
+			BinaryNetworkEndpointFactory: peerWrapper.Peer2,
+			V2Bootstrappers:              bootstrapPeers,
+			ContractTransmitter:          ccipProvider.ContractTransmitter(),
+			ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
+			Database:                     ocrDB,
+			LocalConfig:                  lc,
+			MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID, synchronization.OCR2CCIP),
+			OffchainConfigDigester:       ccipProvider.OffchainConfigDigester(),
+			OffchainKeyring:              kb,
+			OnchainKeyring:               kb,
+		}
+		return ccip.NewExecutionServices(lggr, jb, d.chainSet, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}

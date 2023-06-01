@@ -4,10 +4,10 @@ name: Integration Tests Publish
 on:
   push:
     branches:
-      - develop
+      - ccip-develop
 
 env:
-  ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-tests:develop
+  ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:develop
 
 jobs:
   publish-integration-test-image:

@@ -58,6 +58,7 @@ core/web/assets
 
 # Integration Tests
 integration-tests/**/logs/
+integration-tests/**/tmp_*.json
 tests-*.xml
 *.test
 tmp-manifest-*.yaml
@@ -69,6 +70,17 @@ __debug_bin
 cosign.*
 dist/
 MacOSX*
+
+cache
+core/services/ocr2/plugins/ccip/transactions.rlp
+lcov.info
+core/scripts/ccip-test/secrets/secrets.go
+!core/services/ocr2/plugins/ccip/cache/
+
+
+core/scripts/ccip-test/json/credentials
+core/scripts/ccip-test/json/deployments
+core/scripts/ccip-test/csv/node-wallets
 
 # Test & linter reports
 *report.xml

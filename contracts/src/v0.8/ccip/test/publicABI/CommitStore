@@ -1,0 +1,23 @@
+{
+  "acceptOwnership()": "79ba5097",
+  "getDynamicConfig()": "7437ff9f",
+  "getExpectedNextSequenceNumber()": "4120fccd",
+  "getMerkleRoot(bytes32)": "a7206cd6",
+  "getStaticConfig()": "06285c69",
+  "getTransmitters()": "666cab8d",
+  "isAFNHealthy()": "147809b3",
+  "isBlessed(bytes32)": "ff888fb1",
+  "latestConfigDetails()": "81ff7048",
+  "latestConfigDigestAndEpoch()": "afcb95d7",
+  "owner()": "8da5cb5b",
+  "pause()": "8456cb59",
+  "paused()": "5c975abb",
+  "resetUnblessedRoots(bytes32[])": "f47a8690",
+  "setMinSeqNr(uint64)": "ad7a22f8",
+  "setOCR2Config(address[],address[],uint8,bytes,uint64,bytes)": "1ef38174",
+  "transferOwnership(address)": "f2fde38b",
+  "transmit(bytes32[3],bytes,bytes32[],bytes32[],bytes32)": "b1dc65a4",
+  "typeAndVersion()": "181f5a77",
+  "unpause()": "3f4ba83a",
+  "verify(bytes32[],bytes32[],uint256)": "32048875"
+}

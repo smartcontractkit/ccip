@@ -9,7 +9,8 @@ type FeatureFlags interface {
 	FeatureOffchainReporting2() bool
 	FeatureUICSAKeys() bool
 	FeatureLogPoller() bool
-
+	FeatureCCIP() bool
+	FeatureLegacyGasStation() bool
 	AutoPprofEnabled() bool
 	EVMEnabled() bool
 	EVMRPCEnabled() bool
