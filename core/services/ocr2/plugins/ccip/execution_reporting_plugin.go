@@ -2,7 +2,6 @@ package ccip
 
 import (
 	"context"
-	"encoding/hex"
 	"math/big"
 	"reflect"
 	"sort"
@@ -138,7 +137,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	rf.config.lggr.Infow("Starting exec plugin", "offchainConfig", offchainConfig, "onchainConfig", onchainConfig)
+	rf.config.lggr.Infow("Starting exec plugin",
+		"offchainConfig", offchainConfig,
+		"onchainConfig", onchainConfig)
 
 	return &ExecutionReportingPlugin{
 			config:                    rf.config,
@@ -177,23 +178,22 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 
 	batchBuilderStart := time.Now()
 	// IMPORTANT: We build executable set based on the leaders token prices, ensuring consistency across followers.
-	executableObservations, err := r.getExecutableObservations(ctx, inFlight)
+	executableObservations, err := r.getExecutableObservations(ctx, lggr, inFlight)
 	lggr.Infof("Batch building took %d ms", time.Since(batchBuilderStart).Milliseconds())
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infof("executable observations %+v %v", executableObservations, abihelpers.EventSignatures.SendRequested)
-
+	lggr.Infow("Observation", "executableMessages", executableObservations)
 	// Note can be empty
 	return ExecutionObservation{Messages: executableObservations}.Marshal()
 }
 
-func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
+func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(r.config.destLP, r.config.commitStore, r.onchainConfig.PermissionLessExecutionThresholdDuration())
 	if err != nil {
 		return nil, err
 	}
-	r.lggr.Infow("unexpired roots", "n", len(unexpiredReports))
+	lggr.Infow("Unexpired roots", "n", len(unexpiredReports))
 	if len(unexpiredReports) == 0 {
 		return []ObservedMessage{}, nil
 	}
@@ -231,20 +231,23 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	}
 	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
 	if err != nil {
-		return nil, errors.Wrap(err, "could not estimate destination gas price")
+		return nil, err
 	}
 	destGasPrice := destGasPriceWei.Legacy.ToInt()
 	if destGasPriceWei.DynamicFeeCap != nil {
 		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
 	}
 
-	r.lggr.Debugw("processing unexpired reports", "n", len(unexpiredReports))
-
+	lggr.Infow("Processing unexpired roots", "n", len(unexpiredReports))
 	for _, unexpiredReport := range unexpiredReports {
 		if ctx.Err() != nil {
-			r.lggr.Warn("killed by context")
+			lggr.Warn("Processing of roots killed by context")
 			break
 		}
+		lggr = lggr.With("root", hexutil.Encode(unexpiredReport.MerkleRoot[:]),
+			"minSeqNr", unexpiredReport.Interval.Min,
+			"maxSeqNr", unexpiredReport.Interval.Max,
+		)
 		snoozeUntil, haveSnoozed := r.snoozedRoots[unexpiredReport.MerkleRoot]
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
 			continue
@@ -254,7 +257,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			return nil, err
 		}
 		if !blessed {
-			r.lggr.Infow("report is accepted but not blessed", "report", hexutil.Encode(unexpiredReport.MerkleRoot[:]))
+			lggr.Infow("Report is accepted but not blessed")
 			incSkippedRequests(reasonNotBlessed)
 			continue
 		}
@@ -271,7 +274,11 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			return nil, err
 		}
 		if len(srcLogs) != int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1) {
-			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", unexpiredReport.MerkleRoot, len(srcLogs), int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1))
+			lggr.Warn("Missing messages in root, if this persists for the same root it may indicate an inability to get logs from the source chain",
+				"have", len(srcLogs),
+				"want", int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1),
+			)
+			continue
 		}
 		// TODO: Reorg risk here? I.e. 1 message in a batch, we see its executed so we snooze forever,
 		// then it gets reorged out and we'll never retry.
@@ -280,15 +287,13 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			return nil, err
 		}
 
-		r.lggr.Debugw("building next batch", "executedMp", len(executedMp))
-
-		batch, allMessagesExecuted := r.buildBatch(srcLogs, executedMp, inflight, allowedTokenAmount,
+		batch, allMessagesExecuted := r.buildBatch(lggr, srcLogs, executedMp, inflight, allowedTokenAmount,
 			srcTokensPrices, destTokensPrices, destGasPrice)
 
 		// If all messages are already executed, snooze the root for the config.PermissionLessExecutionThresholdSeconds
 		// so it will never be considered again.
 		if allMessagesExecuted {
-			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
+			lggr.Infof("Snoozing root forever since there are no executable txs anymore", "executedMp", executedMp)
 			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.onchainConfig.PermissionLessExecutionThresholdDuration())
 			incSkippedRequests(reasonAllExecuted)
 			continue
@@ -392,6 +397,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(min, max uint64) (ma
 // the available gas, rate limiting, execution state, nonce state, and
 // profitability of execution.
 func (r *ExecutionReportingPlugin) buildBatch(
+	lggr logger.Logger,
 	srcLogs []logpoller.Log,
 	executedSeq map[uint64]struct{},
 	inflight []InflightInternalExecutionReport,
@@ -405,7 +411,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := r.inflight(inflight, destTokenPricesUSD, r.srcToDstTokenMapping)
 	if err != nil {
-		r.lggr.Errorw("Unexpected error computing inflight values", "err", err)
+		lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []ObservedMessage{}, false
 	}
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
@@ -419,12 +425,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			Data:   srcLog.Data,
 		})
 		if err2 != nil {
-			r.lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
+			lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
 			// Unable to parse so don't mark as executed
 			executedAllMessages = false
 			continue
 		}
-		lggr := r.lggr.With("messageID", hexutil.Encode(msg.Message.MessageId[:]))
+		lggr := lggr.With("messageID", hexutil.Encode(msg.Message.MessageId[:]))
 		if _, executed := executedSeq[msg.Message.SequenceNumber]; executed {
 			lggr.Infow("Skipping message already executed", "seqNr", msg.Message.SequenceNumber)
 			continue
@@ -548,11 +554,11 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
-	lggr := r.lggr.Named("Report")
+	lggr := r.lggr.Named("ExecutionReport")
 	parsableObservations := getParsableObservations[ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
 	if len(parsableObservations) <= r.F {
-		lggr.Tracew("Non-empty observations <= F, need at least F+1 to continue")
+		lggr.Warn("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
 
@@ -565,7 +571,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if err != nil {
 		return false, nil, err
 	}
-	lggr.Infow("Built report", "onRampAddr", r.config.onRamp.Address(), "observations", observedMessages)
+	lggr.Infow("Report", "executableObservations", observedMessages)
 	return true, report, nil
 }
 
@@ -616,27 +622,29 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
 	seqNrs, encMsgs, err := MessagesFromExecutionReport(report)
 	if err != nil {
-		lggr.Errorw("unable to decode report", "err", err)
+		lggr.Errorw("Unable to decode report", "err", err)
 		return false, nil
 	}
-	lggr.Infof("Seq nums %v", seqNrs)
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(seqNrs)
 	if err != nil {
 		return false, err
 	}
 	if stale {
+		lggr.Infow("Execution report is stale", "seqNrs", seqNrs)
 		return false, nil
 	}
 	// Else just assume in flight
 	if err = r.inflightReports.add(lggr, seqNrs, encMsgs); err != nil {
 		return false, err
 	}
+	lggr.Infow("Accepting finalized report")
 	return true, nil
 }
 
 func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
-	if isCommitStoreDownNow(ctx, r.config.lggr, r.config.commitStore) {
+	lggr := r.lggr.Named("ExecutionShouldTransmitAcceptedReport")
+	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return false, nil
 	}
 	seqNrs, _, err := MessagesFromExecutionReport(report)

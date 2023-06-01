@@ -52,7 +52,7 @@ func (container *inflightReportsContainer) expire(lggr logger.Logger) {
 		if time.Since(report.createdAt) > container.cacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the change so we retry.
-			lggr.Infow("Inflight report expired", "seqNums", report.seqNrs)
+			lggr.Infow("Inflight report expired", "seqNrs", report.seqNrs)
 		} else {
 			stillInFlight = append(stillInFlight, report)
 		}
@@ -71,8 +71,8 @@ func (container *inflightReportsContainer) add(lggr logger.Logger, seqNrs []uint
 		}
 	}
 	// Otherwise not already in flight, add it.
-	lggr.Infow("Added report to inflight",
-		"seqNums", seqNrs)
+	lggr.Infow("Inflight report added",
+		"seqNrs", seqNrs)
 	container.reports = append(container.reports, InflightInternalExecutionReport{
 		createdAt:   time.Now(),
 		seqNrs:      seqNrs,
