@@ -86,3 +86,5 @@ core/scripts/ccip-test/csv/node-wallets
 *report.xml
 *report.json
 *.out
+
+contracts/yarn.lock
