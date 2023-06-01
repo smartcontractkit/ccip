@@ -79,6 +79,8 @@ var chainIdToRPC = map[uint64]string{
 }
 ```
 
+## Deploying to the new chain
+
 We need to go to `core/scripts/ccip-test/rhea/deployments/` and create two new `EvmChainConfig` objects in one of environments files (alpha/beta/prod). When naming them please use the Environment name as well as the blockchain. This chain config will contain information about both the blockchain and the deployed contracts.
 
 Set `ChainId`, `GasSettings`, `SupportedTokens` and `DeploySettings` `FeeTokens` , `WrappedNative` - reuse them if there is configuration for specific chain already. Example for Sepolia on Beta:
@@ -178,6 +180,131 @@ Now populate `rhea.EvmDeploymentConfig` for specific lane you just set up.
 We can now also put in the `DeployedAt` value. This is only used in the jobspecs to make sure we replay all txs until contract creation. Any block number around the deployment will work.
 
 Whole deployment data is saved into the file for specific environment `/json/deployments/env` with all contracts deployed per lane and chain.
+
+## Blue-green deployment
+
+Blue-green (aka zero downtime deployment) is split into three phases:
+* **Deploy Upgrade Lane** - deploys CommitStore, OnRamp and OffRamp contracts and attach them to the UpgradeRouter, but without any changes to the current deployment. After this step, "Upgrade Lane" should be fully operational and work in parallel to the current deployment.
+* **Promote Upgrade Lane** - registers contracts from Upgrade Lane in [Prod/Non-Upgrade] Routers on both ends. This is the point in which we switch routing from current deployment to the upgrade/new deployment.
+* **(optional) Clean up** - removes old jobspecs (after pending requests are processed)
+
+### How to deploy
+
+#### Deploy Upgrade Lane
+
+Start by making sure that you have proper source/destination chains, environment and version in place
+```go
+var (
+	sourceChain        = rhea.ArbitrumGoerli
+	destChain          = rhea.Sepolia
+	ENV                = dione.StagingBeta
+	currentVersion     = "0.3.0+core2.1.0"        // Current Version of jobspecs. You can find it by logging to the NOP and listing jobs. If there is no suffix, then currentVersion is empty
+	upgradeLaneVersion = "0.4.0-beta.0+core2.1.0" // Version that will be used to differentiate current deployment from upgrade deployment.  
+)
+```
+At this point `currentVersion` should point to the currently deployed lane's version. `upgradeLaneVersion` should point to next version what will be created during deployment.
+Please follow [this guide](https://github.com/smartcontractkit/releng/blob/9f7154b48d0a1f74e6f1ddf65fd0b76bc4c0a5aa/docs/vault/notes/guides.release-processes.ccip.ccip-core-node.md) to generate a new version. Once created, just copy it to the `upgradeLaneVersion` variable.
+
+We need to let scripts know that we want to deploy Upgrade Lane by adding `EVMLaneConfig` under `UpgradeLaneConfig` field for each end. 
+For instance, Sepolia <> Arbitrum deployment requires adding `UpgradeLaneConfig` to both `$ENV_SepoliaToArbitrumGoerli` and `$ENV_ArbitrumGoerliToSepolia`
+```go
+var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
+	ChainConfig: Beta_Sepolia,
+	LaneConfig: rhea.EVMLaneConfig{
+		// No changes ...
+	},
+	UpgradeLaneConfig: rhea.EVMLaneConfig{
+		OnRamp:       gethcommon.HexToAddress("0x0"),
+		OffRamp:      gethcommon.HexToAddress("0x0"),
+		CommitStore:  gethcommon.HexToAddress("0x0"),
+		PingPongDapp: gethcommon.HexToAddress("0x0"),
+		DeploySettings: rhea.LaneDeploySettings{
+			DeployCommitStore:  true,
+			DeployRamp:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    0,
+		},
+	},
+}
+```
+
+We are ready to deploy Upgrade Lane by calling `TestRheaDeployUpgradeLane` from [ccip_runner_test.go](ccip_runner_test.go). This might take a couple of minutes to finish.
+Run output should be written to console & `./json/deployments/env/upgrade-lane/....`. We need to populate the `UpgradeLaneConfig` with the contracts created during deployment. 
+Make sure you set deployment options to false to avoid accidental redeployment.
+```go
+var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
+	ChainConfig: Beta_Sepolia,
+	LaneConfig: rhea.EVMLaneConfig{
+		// No changes ...
+	},
+	UpgradeLaneConfig: rhea.EVMLaneConfig{
+		OnRamp:       gethcommon.HexToAddress("0xABC"),
+		OffRamp:      gethcommon.HexToAddress("0xDEF"),
+		CommitStore:  gethcommon.HexToAddress("0xGHI"),
+		PingPongDapp: gethcommon.HexToAddress("0xJKL"),
+		DeploySettings: rhea.LaneDeploySettings{
+			DeployCommitStore:  false,
+			DeployRamp:         false,
+			DeployPingPongDapp: false,
+			DeployedAtBlock:    123456,
+		},
+	},
+}
+```
+
+So far so good. At this point we should have a fully operational Upgrade Lane working on a real environment! Let's verify if everything is up and running. 
+I recommend doing the following steps:
+* Go to the NOP and verify if there are jobspecs for both current deployment and upgrade deployment. Jobs' names contain version.
+* Check PingPongDaaps in block explorer and verify if traffic flows between them - you might need around ~20 minutes to observe it on both ends
+* Verify OffRamps in block explorer, you should be able to see DON executing there
+* Logs and dashboard similar to the classic deployment
+
+Great! You are ready to move on and promote your deployment!
+
+### Promote Upgrade Lane
+
+Second phase of deployment includes attaching new contracts (OnRamp and OffRamp) to the Router and switching real traffic there. 
+We will use `TestRheaPromoteUpgradeLaneDeployment` from [ccip_runner_test.go](ccip_runner_test.go).
+Run output should be written to console &  `./json/deployments/env/lane/....`. We need to replace `LaneConfig` with `UpgradeLaneConfig`, it's better to copy those values from `json` files generated as they are source of the truth in this case.
+Also, please set `UpgradeLaneConfig` to zeros to avoid confusion, stating that there is nothing waiting to promoted on the Upgrade Lane.
+```go
+var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
+	ChainConfig: Beta_Sepolia,
+	LaneConfig: rhea.EVMLaneConfig{
+            OnRamp:       gethcommon.HexToAddress("0xABC"),
+            OffRamp:      gethcommon.HexToAddress("0xDEF"),
+            CommitStore:  gethcommon.HexToAddress("0xGHI"),
+            PingPongDapp: gethcommon.HexToAddress("0xPreviousAddressProbably"),
+            DeploySettings: rhea.LaneDeploySettings{
+                DeployCommitStore:  false,
+                DeployRamp:         false,
+                DeployPingPongDapp: false,
+                DeployedAtBlock:    123456,
+            },       
+	},
+	UpgradeLaneConfig: rhea.EVMLaneConfig{
+		OnRamp:       gethcommon.HexToAddress("0x0"),
+		OffRamp:      gethcommon.HexToAddress("0x0"),
+		CommitStore:  gethcommon.HexToAddress("0x0"),
+		PingPongDapp: gethcommon.HexToAddress("0x0"),
+		DeploySettings: rhea.LaneDeploySettings{
+			DeployCommitStore:  false,
+			DeployRamp:         false,
+			DeployPingPongDapp: false,
+			DeployedAtBlock:    0,
+		},
+	},
+}
+```
+
+Verify if everything is okay. If so, then you can apply the same steps to all lanes.
+Once all lanes are upgraded and using the same versions of contracts you can upgrade versions and commit them.
+```go
+var (
+    currentVersion     = upgradeLaneVersion
+    upgradeLaneVersion = "" // Will be filled during next deployment
+)
+```
 
 ## Checking the deployment
 

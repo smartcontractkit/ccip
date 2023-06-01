@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"reflect"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -14,6 +15,8 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/pkg/errors"
+
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
@@ -33,8 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
 // exec Report should make sure to cap returned payload to this limit
@@ -74,10 +75,18 @@ type ExecutionReportingPlugin struct {
 
 type ExecutionReportingPluginFactory struct {
 	config ExecutionPluginConfig
+
+	// We keep track of the registered filters
+	srcChainFilters []logpoller.Filter
+	dstChainFilters []logpoller.Filter
+	filtersMu       *sync.Mutex
 }
 
 func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) types.ReportingPluginFactory {
-	return &ExecutionReportingPluginFactory{config: config}
+	return &ExecutionReportingPluginFactory{
+		config:    config,
+		filtersMu: &sync.Mutex{},
+	}
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
@@ -104,20 +113,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	err = rf.config.destLP.RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(FEE_TOKEN_ADDED, priceRegistry.Address().String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenAdded},
-		Addresses: []common.Address{priceRegistry.Address()},
-	})
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
-	err = rf.config.destLP.RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(FEE_TOKEN_REMOVED, priceRegistry.Address().String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenRemoved},
-		Addresses: []common.Address{priceRegistry.Address()},
-	})
-	if err != nil {
+	if err = rf.updateLogPollerFilters(onchainConfig); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
@@ -185,6 +181,32 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 
 	// Note can be empty
 	return ExecutionObservation{Messages: executableObservations}.Marshal()
+}
+
+func (rf *ExecutionReportingPluginFactory) updateLogPollerFilters(onChainConfig ccipconfig.ExecOnchainConfig) error {
+	rf.filtersMu.Lock()
+	defer rf.filtersMu.Unlock()
+
+	if err := unregisterLpFilters(rf.config.destLP, rf.dstChainFilters); err != nil {
+		return err
+	}
+	if err := unregisterLpFilters(rf.config.sourceLP, rf.srcChainFilters); err != nil {
+		return err
+	}
+
+	dstFilters := getExecutionPluginDestLpChainFilters(rf.config.commitStore.Address(), rf.config.offRamp.Address(), onChainConfig.PriceRegistry)
+	if err := registerLpFilters(rf.config.destLP, dstFilters); err != nil {
+		return err
+	}
+	rf.dstChainFilters = dstFilters
+
+	srcFilters := getExecutionPluginSourceLpChainFilters(rf.config.onRamp.Address(), rf.config.srcPriceRegistry.Address())
+	if err := registerLpFilters(rf.config.sourceLP, srcFilters); err != nil {
+		return err
+	}
+	rf.srcChainFilters = srcFilters
+
+	return nil
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {

@@ -172,9 +172,22 @@ func (don *DON) PopulateEthKeys() {
 	}
 }
 
+func (don *DON) ClearUpgradeJobSpecs(jobType JobType, source string, destination string, version string) {
+	var jobToDelete string
+	if version == "" {
+		jobToDelete = fmt.Sprintf("ccip-%s-%s-%s", jobType, source, destination)
+	} else {
+		jobToDelete = fmt.Sprintf("ccip-%s-%s-%s-%s", jobType, source, destination, version)
+	}
+	don.clearJobSpecsByName(jobToDelete)
+}
+
 func (don *DON) ClearJobSpecs(jobType JobType, source string, destination string) {
 	jobToDelete := fmt.Sprintf("ccip-%s-%s-%s", jobType, source, destination)
+	don.clearJobSpecsByName(jobToDelete)
+}
 
+func (don *DON) clearJobSpecsByName(jobToDelete string) {
 	var wg sync.WaitGroup
 	for i, n := range don.Nodes {
 		wg.Add(1)
@@ -263,8 +276,15 @@ func (don *DON) ClearAllJobs(chainA string, chainB string) {
 	don.ClearJobSpecs(Execution, chainB, chainA)
 }
 
-func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
-	jobParamsAB := NewCCIPJobSpecParams(chainA, chainB)
+func (don *DON) ClearAllLaneJobsByVersion(chainA string, chainB string, version string) {
+	don.ClearUpgradeJobSpecs(Commit, chainA, chainB, version)
+	don.ClearUpgradeJobSpecs(Execution, chainA, chainB, version)
+	don.ClearUpgradeJobSpecs(Commit, chainB, chainA, version)
+	don.ClearUpgradeJobSpecs(Execution, chainB, chainA, version)
+}
+
+func (don *DON) AddTwoWaySpecsByVersion(chainA rhea.EvmConfig, laneA rhea.EVMLaneConfig, chainB rhea.EvmConfig, laneB rhea.EVMLaneConfig, version string) {
+	jobParamsAB := NewCCIPJobSpecParams(chainA, laneA, chainB, laneB, version)
 	relaySpecAB, err := jobParamsAB.CommitJobSpec()
 	if err != nil {
 		don.lggr.Errorf("commit jobspec error %v", err)
@@ -278,7 +298,7 @@ func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmD
 	}
 	don.AddJobSpec(executionSpecAB)
 	time.Sleep(time.Second * 5)
-	jobParamsBA := NewCCIPJobSpecParams(chainB, chainA)
+	jobParamsBA := NewCCIPJobSpecParams(chainB, laneB, chainA, laneA, version)
 	relaySpecBA, err := jobParamsBA.CommitJobSpec()
 	if err != nil {
 		don.lggr.Errorf("commit jobspec error %v", err)
@@ -293,11 +313,22 @@ func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmD
 
 	// Sometimes jobs don't get added correctly. This script looks for missing jobs
 	// and attempts to add them.
-	don.AddMissingSpecs(chainB, chainA)
-	don.AddMissingSpecs(chainA, chainB)
+	don.AddMissingSpecsByLanes(chainB, laneB, chainA, laneA, version)
+	don.AddMissingSpecsByLanes(chainA, laneA, chainB, laneB, version)
 }
 
-func (don *DON) AddMissingSpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
+func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
+	don.AddTwoWaySpecsByVersion(chainA.OnlyEvmConfig(), chainA.LaneConfig, chainB.OnlyEvmConfig(), chainB.LaneConfig, "")
+}
+
+func generateJobName(plugin JobType, chainA rhea.EvmConfig, chainB rhea.EvmConfig, version string) string {
+	if version == "" {
+		return fmt.Sprintf("ccip-%s-%s-%s", plugin, ccip.ChainName(int64(chainA.ChainConfig.EvmChainId)), ccip.ChainName(int64(chainB.ChainConfig.EvmChainId)))
+	}
+	return fmt.Sprintf("ccip-%s-%s-%s-%s", plugin, ccip.ChainName(int64(chainA.ChainConfig.EvmChainId)), ccip.ChainName(int64(chainB.ChainConfig.EvmChainId)), version)
+}
+
+func (don *DON) AddMissingSpecsByLanes(chainA rhea.EvmConfig, laneA rhea.EVMLaneConfig, chainB rhea.EvmConfig, laneB rhea.EVMLaneConfig, version string) {
 	jobsAdded := 0
 	for i, node := range don.Nodes {
 		jobs, http, err := node.ReadJobs()
@@ -306,8 +337,8 @@ func (don *DON) AddMissingSpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.Evm
 			don.lggr.Infof("Node [%2d] status %d", i, http.StatusCode)
 		}
 
-		lookingForCommit := fmt.Sprintf("ccip-%s-%s-%s", Commit, ccip.ChainName(int64(chainA.ChainConfig.EvmChainId)), ccip.ChainName(int64(chainB.ChainConfig.EvmChainId)))
-		lookingForExec := fmt.Sprintf("ccip-%s-%s-%s", Execution, ccip.ChainName(int64(chainA.ChainConfig.EvmChainId)), ccip.ChainName(int64(chainB.ChainConfig.EvmChainId)))
+		lookingForCommit := generateJobName(Commit, chainA, chainB, version)
+		lookingForExec := generateJobName(Execution, chainA, chainB, version)
 		don.lggr.Infof("Checking node #%d for [%s] and ", i, lookingForCommit)
 
 		commitFound, execFound := false, false
@@ -322,7 +353,7 @@ func (don *DON) AddMissingSpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.Evm
 				execFound = true
 			}
 		}
-		jobParamsAB := NewCCIPJobSpecParams(chainA, chainB)
+		jobParamsAB := NewCCIPJobSpecParams(chainA, laneA, chainB, laneB, version)
 
 		if !commitFound {
 			don.lggr.Infof("Found missing job [%s] on node #%d", lookingForCommit, i)
@@ -347,6 +378,10 @@ func (don *DON) AddMissingSpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.Evm
 	}
 	don.lggr.Infof("Added %d missing jobs", jobsAdded)
 
+}
+
+func (don *DON) AddMissingSpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig, version string) {
+	don.AddMissingSpecsByLanes(chainA.OnlyEvmConfig(), chainA.LaneConfig, chainB.OnlyEvmConfig(), chainB.LaneConfig, version)
 }
 
 func (don *DON) AddJobSpec(spec *client.OCR2TaskJobSpec) {

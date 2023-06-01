@@ -177,6 +177,16 @@ func (d *Delegate) OnDeleteJob(jb job.Job, q pg.Queryer) error {
 		if err != nil {
 			d.lggr.Errorw("failed to derive ocr2keeper filter names from spec", "err", err, "spec", spec)
 		}
+	case job.CCIPCommit:
+		filters, err = ccip.GetCommitPluginFilterNamesFromSpec(context.TODO(), spec, d.chainSet)
+		if err != nil {
+			d.lggr.Errorw("failed to derive ccip commit plugin filter names from spec", "err", err, "spec", spec)
+		}
+	case job.CCIPExecution:
+		filters, err = ccip.GetExecutionPluginFilterNamesFromSpec(context.TODO(), spec, d.chainSet)
+		if err != nil {
+			d.lggr.Errorw("failed to derive ccip execution plugin filter names from spec", "err", err, "spec", spec)
+		}
 	default:
 		return nil
 	}

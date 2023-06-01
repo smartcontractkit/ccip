@@ -47,33 +47,102 @@ func DeployLanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDepl
 
 	// Deploy commitStores and offRamps on both chains
 	deployDestinationContracts(t, destination, sourceChainSelector, source.LaneConfig.OnRamp, source.ChainConfig.SupportedTokens)
-	deployDestinationContracts(t, source, destChainSelector, destination.LaneConfig.OnRamp, destination.ChainConfig.SupportedTokens)
+	deployDestinationContracts(t, source, destChainSelector, destination.LaneConfig.OffRamp, destination.ChainConfig.SupportedTokens)
 
-	SetPriceRegistryPrices(t, source, destChainSelector)
-	SetPriceRegistryPrices(t, destination, sourceChainSelector)
+	setPriceRegistryPrices(t, source, destChainSelector)
+	setPriceRegistryPrices(t, destination, sourceChainSelector)
 
 	DeployPingPongDapps(t, source, destination)
 
 	UpdateDeployedAt(t, source, destination)
 }
 
+func DeployUpgradeLanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDeploymentConfig) {
+	if !source.UpgradeLaneConfig.DeploySettings.DeployRamp && !source.UpgradeLaneConfig.DeploySettings.DeployCommitStore &&
+		!destination.UpgradeLaneConfig.DeploySettings.DeployRamp && !destination.UpgradeLaneConfig.DeploySettings.DeployCommitStore {
+		t.Log("No deployment needed")
+		return
+	}
+	sourceChainSelector, destChainSelector := GetCCIPChainSelector(source.ChainConfig.EvmChainId), GetCCIPChainSelector(destination.ChainConfig.EvmChainId)
+
+	// After running this code please update the configuration to reflect the newly
+	// deployed contract addresses.
+	// Deploy onRamps on both chains
+	deployUpgradeSourceContracts(t, source, destChainSelector, destination.ChainConfig.SupportedTokens)
+	deployUpgradeSourceContracts(t, destination, sourceChainSelector, source.ChainConfig.SupportedTokens)
+
+	// Deploy commitStores and offRamps on both chains
+	deployUpgradeDestinationContracts(t, destination, sourceChainSelector, source.UpgradeLaneConfig.OnRamp, source.ChainConfig.SupportedTokens)
+	deployUpgradeDestinationContracts(t, source, destChainSelector, destination.UpgradeLaneConfig.OnRamp, destination.ChainConfig.SupportedTokens)
+
+	setPriceRegistryPrices(t, source, destChainSelector)
+	setPriceRegistryPrices(t, destination, sourceChainSelector)
+
+	DeployUpgradePingPongDapps(t, source, destination)
+
+	UpdateDeployedAtUpgradeLane(t, source, destination)
+}
+
+func EnableUpgradeOffRamps(t *testing.T, source *EvmDeploymentConfig, destination *EvmDeploymentConfig, ocr2Update func(*EvmDeploymentConfig, *EvmDeploymentConfig)) {
+	sourceChainSelector, destChainSelector := GetCCIPChainSelector(source.ChainConfig.EvmChainId), GetCCIPChainSelector(destination.ChainConfig.EvmChainId)
+
+	// Attach Upgrade OffRamp to the current Router
+	attachUpgradeOffRampsToRouter(t, source, destChainSelector)
+	attachUpgradeOffRampsToRouter(t, destination, sourceChainSelector)
+
+	// Allowing price registries to be used by new commit stores
+	setPriceRegistryUpdater(t, source)
+	setPriceRegistryUpdater(t, destination)
+
+	// Update OCR2 configs with proper Router addresses
+	ocr2Update(source, destination)
+	ocr2Update(destination, source)
+}
+
+func EnableUpgradeOnRamps(t *testing.T, source *EvmDeploymentConfig, destination *EvmDeploymentConfig, dynamicConfig func(src *EvmDeploymentConfig, dst *EvmDeploymentConfig)) {
+	// Update DynamicConfig to OnRamps (via setDynamicConfig) - sets router address to the new one
+	dynamicConfig(source, destination)
+	dynamicConfig(destination, source)
+
+	sourceChainSelector, destChainSelector := GetCCIPChainSelector(source.ChainConfig.EvmChainId), GetCCIPChainSelector(destination.ChainConfig.EvmChainId)
+	// Attach Upgrade OnRamp to the current Router
+	attachUpgradeOnRampsToRouter(t, source, destChainSelector)
+	attachUpgradeOnRampsToRouter(t, destination, sourceChainSelector)
+}
+
 func deploySourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainSelector uint64, destSupportedTokens map[Token]EVMBridgedToken) {
 	if source.LaneConfig.DeploySettings.DeployRamp {
 		// Updates source.OnRamp if any new contracts are deployed
-		deployOnRamp(t, source, destChainSelector, destSupportedTokens)
-		setOnRampOnRouter(t, source, destChainSelector)
+		deployOnRamp(t, source.OnlyEvmConfig(), &source.LaneConfig, destChainSelector, destSupportedTokens, common.HexToAddress(""))
+		setOnRampRouter(t, source.ChainConfig.Router, source.LaneConfig.OnRamp, source, destChainSelector)
 	}
 
 	// Skip if we reuse both the onRamp and the token pools
 	if source.LaneConfig.DeploySettings.DeployRamp || source.ChainConfig.DeploySettings.DeployTokenPools {
-		setOnRampOnTokenPools(t, source)
+		setOnRampOnTokenPools(t, source, source.LaneConfig.OnRamp)
+	}
+	source.Logger.Infof("%s contracts deployed as source chain", ccip.ChainName(int64(source.ChainConfig.EvmChainId)))
+}
+
+func deployUpgradeSourceContracts(t *testing.T, source *EvmDeploymentConfig, destChainSelector uint64, destSupportedTokens map[Token]EVMBridgedToken) {
+	sourceUpgradeLane := &source.UpgradeLaneConfig
+
+	if sourceUpgradeLane.DeploySettings.DeployRamp {
+		// Updates source.OnRamp if any new contracts are deployed
+		deployOnRamp(t, source.OnlyEvmConfig(), sourceUpgradeLane, destChainSelector, destSupportedTokens, source.LaneConfig.OnRamp)
+		setOnRampRouter(t, source.ChainConfig.UpgradeRouter, sourceUpgradeLane.OnRamp, source, destChainSelector)
+	}
+
+	// Skip if we reuse both the onRamp and the token pools
+	if sourceUpgradeLane.DeploySettings.DeployRamp || source.ChainConfig.DeploySettings.DeployTokenPools {
+		setOnRampOnTokenPools(t, source, sourceUpgradeLane.OnRamp)
 	}
 	source.Logger.Infof("%s contracts deployed as source chain", ccip.ChainName(int64(source.ChainConfig.EvmChainId)))
 }
 
 func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourceChainSelector uint64, onRamp common.Address, supportedTokens map[Token]EVMBridgedToken) {
 	// Updates destClient.LaneConfig.CommitStore if any new contracts are deployed
-	deployCommitStore(t, client, sourceChainSelector, onRamp)
+	deployCommitStore(t, client.OnlyEvmConfig(), &client.LaneConfig, sourceChainSelector, onRamp)
 
 	if client.LaneConfig.DeploySettings.DeployCommitStore || client.ChainConfig.DeploySettings.DeployPriceRegistry {
 		setPriceRegistryUpdater(t, client)
@@ -81,23 +150,47 @@ func deployDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourc
 
 	if client.LaneConfig.DeploySettings.DeployRamp {
 		// Updates destClient.LaneConfig.OffRamp if any new contracts are deployed
-		deployOffRamp(t, client, sourceChainSelector, supportedTokens, onRamp)
+		deployOffRamp(t, client.OnlyEvmConfig(), sourceChainSelector, supportedTokens, &client.LaneConfig, onRamp, common.HexToAddress(""))
 	}
 
 	if client.LaneConfig.DeploySettings.DeployRamp || client.ChainConfig.DeploySettings.DeployTokenPools {
-		setOffRampOnTokenPools(t, client)
+		setOffRampOnTokenPools(t, client.OnlyEvmConfig(), &client.LaneConfig)
 	}
 
 	if client.LaneConfig.DeploySettings.DeployRamp || client.ChainConfig.DeploySettings.DeployRouter {
-		setOffRampOnRouter(t, sourceChainSelector, client)
+		setOffRampOnRouter(t, client.ChainConfig.Router, client.LaneConfig.OffRamp, client, sourceChainSelector)
 	}
 
 	client.Logger.Infof("%s contracts fully deployed as destination chain", ccip.ChainName(int64(client.ChainConfig.EvmChainId)))
 }
 
-func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector uint64, destSupportedTokens map[Token]EVMBridgedToken) {
-	if !client.LaneConfig.DeploySettings.DeployRamp {
-		client.Logger.Infof("Skipping OnRamp deployment, using onRamp on %s", client.LaneConfig.OnRamp)
+func deployUpgradeDestinationContracts(t *testing.T, client *EvmDeploymentConfig, sourceChainSelector uint64, onRamp common.Address, supportedTokens map[Token]EVMBridgedToken) {
+	laneConfig := &client.UpgradeLaneConfig
+	deployCommitStore(t, client.OnlyEvmConfig(), laneConfig, sourceChainSelector, onRamp)
+
+	if laneConfig.DeploySettings.DeployCommitStore || client.ChainConfig.DeploySettings.DeployPriceRegistry {
+		setPriceRegistryUpdater(t, client)
+	}
+
+	if laneConfig.DeploySettings.DeployRamp {
+		// Updates destClient.LaneConfig.OffRamp if any new contracts are deployed
+		deployOffRamp(t, client.OnlyEvmConfig(), sourceChainSelector, supportedTokens, laneConfig, onRamp, client.LaneConfig.OffRamp)
+	}
+
+	if laneConfig.DeploySettings.DeployRamp || client.ChainConfig.DeploySettings.DeployTokenPools {
+		setOffRampOnTokenPools(t, client.OnlyEvmConfig(), laneConfig)
+	}
+
+	if laneConfig.DeploySettings.DeployRamp || client.ChainConfig.DeploySettings.DeployRouter {
+		setOffRampOnRouter(t, client.ChainConfig.UpgradeRouter, laneConfig.OffRamp, client, sourceChainSelector)
+	}
+
+	client.Logger.Infof("%s contracts fully deployed as destination chain", ccip.ChainName(int64(client.ChainConfig.EvmChainId)))
+}
+
+func deployOnRamp(t *testing.T, client EvmConfig, laneConfig *EVMLaneConfig, destChainSelector uint64, destSupportedTokens map[Token]EVMBridgedToken, prevOnRamp common.Address) {
+	if !laneConfig.DeploySettings.DeployRamp {
+		client.Logger.Infof("Skipping OnRamp deployment, using onRamp on %s", laneConfig.OnRamp)
 		return
 	}
 
@@ -150,7 +243,7 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 			ChainSelector:     GetCCIPChainSelector(client.ChainConfig.EvmChainId),
 			DestChainSelector: destChainSelector,
 			DefaultTxGasLimit: DEFAULT_GAS_LIMIT,
-			PrevOnRamp:        common.HexToAddress(""),
+			PrevOnRamp:        prevOnRamp,
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          client.ChainConfig.Router,
@@ -176,12 +269,12 @@ func deployOnRamp(t *testing.T, client *EvmDeploymentConfig, destChainSelector u
 	shared.RequireNoError(t, err)
 
 	client.Logger.Infof(fmt.Sprintf("Onramp deployed on %s in tx %s", onRampAddress.String(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
-	client.LaneConfig.OnRamp = onRampAddress
+	laneConfig.OnRamp = onRampAddress
 }
 
-func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainSelector uint64, sourceTokens map[Token]EVMBridgedToken, onRamp common.Address) {
-	if !client.LaneConfig.DeploySettings.DeployRamp {
-		client.Logger.Infof("Skipping OffRamp deployment, using offRamp on %s", client.LaneConfig.OnRamp)
+func deployOffRamp(t *testing.T, client EvmConfig, sourceChainSelector uint64, sourceTokens map[Token]EVMBridgedToken, laneConfig *EVMLaneConfig, onRamp common.Address, prevOffRamp common.Address) {
+	if !laneConfig.DeploySettings.DeployRamp {
+		client.Logger.Infof("Skipping OffRamp deployment, using offRamp on %s", laneConfig.OnRamp)
 		return
 	}
 
@@ -202,11 +295,11 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainSelecto
 		client.Owner,
 		client.Client,
 		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-			CommitStore:         client.LaneConfig.CommitStore,
+			CommitStore:         laneConfig.CommitStore,
 			ChainSelector:       GetCCIPChainSelector(client.ChainConfig.EvmChainId),
 			SourceChainSelector: sourceChainSelector,
 			OnRamp:              onRamp,
-			PrevOffRamp:         common.HexToAddress(""),
+			PrevOffRamp:         prevOffRamp,
 		},
 		syncedSourceTokens,
 		syncedDestPools,
@@ -221,14 +314,14 @@ func deployOffRamp(t *testing.T, client *EvmDeploymentConfig, sourceChainSelecto
 	shared.RequireNoError(t, err)
 
 	client.Logger.Infof("OffRamp contract deployed on %s in tx: %s", offRampAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
-	client.LaneConfig.OffRamp = offRampAddress
+	laneConfig.OffRamp = offRampAddress
 
 	client.Logger.Infof(fmt.Sprintf("Offramp configured for already deployed router in tx %s", helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash())))
 }
 
-func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainSelector uint64, onRamp common.Address) {
-	if !client.LaneConfig.DeploySettings.DeployCommitStore {
-		client.Logger.Infof("Skipping CommitStore deployment, using CommitStore on %s", client.LaneConfig.CommitStore)
+func deployCommitStore(t *testing.T, client EvmConfig, lane *EVMLaneConfig, sourceChainSelector uint64, onRamp common.Address) {
+	if !lane.DeploySettings.DeployCommitStore {
+		client.Logger.Infof("Skipping CommitStore deployment, using CommitStore on %s", lane.CommitStore)
 		return
 	}
 
@@ -246,75 +339,71 @@ func deployCommitStore(t *testing.T, client *EvmDeploymentConfig, sourceChainSel
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
 	client.Logger.Infof("CommitStore deployed on %s in tx: %s", commitStoreAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
-	client.LaneConfig.CommitStore = commitStoreAddress
+	lane.CommitStore = commitStoreAddress
+}
+
+func deployPingPongDapp(t *testing.T, router common.Address, client EvmConfig, lane *EVMLaneConfig) {
+	fundingAmount := big.NewInt(1e18)
+
+	if !lane.DeploySettings.DeployPingPongDapp {
+		return
+	}
+
+	feeToken := client.ChainConfig.SupportedTokens[LINK].Token
+	client.Logger.Infof("Deploying source chain ping pong dapp")
+
+	pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(
+		client.Owner,
+		client.Client,
+		router,
+		feeToken,
+	)
+	shared.RequireNoError(t, err)
+
+	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+	client.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
+
+	lane.PingPongDapp = pingPongDappAddress
+	err = FundPingPong(client, lane, fundingAmount, feeToken)
+	shared.RequireNoError(t, err)
+}
+
+func finalizePingPongDaapDeployment(t *testing.T, sourceClient EvmConfig, sourceLane *EVMLaneConfig, destClient EvmConfig, destLane *EVMLaneConfig) {
+	if !sourceLane.DeploySettings.DeployPingPongDapp && !destLane.DeploySettings.DeployPingPongDapp {
+		sourceClient.Logger.Infof("Skipping ping pong deployment")
+		return
+	}
+
+	pingDapp, err := ping_pong_demo.NewPingPongDemo(sourceLane.PingPongDapp, sourceClient.Client)
+	shared.RequireNoError(t, err)
+
+	tx, err := pingDapp.SetCounterpart(sourceClient.Owner, GetCCIPChainSelector(destClient.ChainConfig.EvmChainId), destLane.PingPongDapp)
+	shared.RequireNoError(t, err)
+	err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+	sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.EvmChainId), tx.Hash()))
+
+	pongDapp, err := ping_pong_demo.NewPingPongDemo(destLane.PingPongDapp, destClient.Client)
+	shared.RequireNoError(t, err)
+
+	tx, err = pongDapp.SetCounterpart(destClient.Owner, GetCCIPChainSelector(sourceClient.ChainConfig.EvmChainId), sourceLane.PingPongDapp)
+	shared.RequireNoError(t, err)
+	err = shared.WaitForMined(destClient.Logger, destClient.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+	destClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(int64(destClient.ChainConfig.EvmChainId), tx.Hash()))
 }
 
 func DeployPingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
-	fundingAmount := big.NewInt(1e18)
+	deployPingPongDapp(t, sourceClient.ChainConfig.Router, sourceClient.OnlyEvmConfig(), &sourceClient.LaneConfig)
+	deployPingPongDapp(t, destClient.ChainConfig.Router, destClient.OnlyEvmConfig(), &destClient.LaneConfig)
+	finalizePingPongDaapDeployment(t, sourceClient.OnlyEvmConfig(), &sourceClient.LaneConfig, destClient.OnlyEvmConfig(), &destClient.LaneConfig)
+}
 
-	if sourceClient.LaneConfig.DeploySettings.DeployPingPongDapp {
-		feeToken := sourceClient.ChainConfig.SupportedTokens[LINK].Token
-		sourceClient.Logger.Infof("Deploying source chain ping pong dapp")
-
-		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(
-			sourceClient.Owner,
-			sourceClient.Client,
-			sourceClient.ChainConfig.Router,
-			feeToken,
-		)
-		shared.RequireNoError(t, err)
-
-		err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-		shared.RequireNoError(t, err)
-		sourceClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(int64(sourceClient.ChainConfig.EvmChainId), tx.Hash()))
-
-		sourceClient.LaneConfig.PingPongDapp = pingPongDappAddress
-		err = FundPingPong(sourceClient, fundingAmount, feeToken)
-		shared.RequireNoError(t, err)
-	}
-
-	if destClient.LaneConfig.DeploySettings.DeployPingPongDapp {
-		feeToken := destClient.ChainConfig.SupportedTokens[LINK].Token
-		destClient.Logger.Infof("Deploying destination chain ping pong dapp")
-
-		pingPongDappAddress, tx, _, err := ping_pong_demo.DeployPingPongDemo(
-			destClient.Owner,
-			destClient.Client,
-			destClient.ChainConfig.Router,
-			feeToken,
-		)
-		shared.RequireNoError(t, err)
-
-		err = shared.WaitForMined(destClient.Logger, destClient.Client, tx.Hash(), true)
-		shared.RequireNoError(t, err)
-		destClient.Logger.Infof("Ping pong deployed on %s in tx: %s", pingPongDappAddress.Hex(), helpers.ExplorerLink(int64(destClient.ChainConfig.EvmChainId), tx.Hash()))
-
-		destClient.LaneConfig.PingPongDapp = pingPongDappAddress
-		err = FundPingPong(destClient, fundingAmount, feeToken)
-		shared.RequireNoError(t, err)
-	}
-
-	if sourceClient.LaneConfig.DeploySettings.DeployPingPongDapp || destClient.LaneConfig.DeploySettings.DeployPingPongDapp {
-		pingDapp, err := ping_pong_demo.NewPingPongDemo(sourceClient.LaneConfig.PingPongDapp, sourceClient.Client)
-		shared.RequireNoError(t, err)
-
-		tx, err := pingDapp.SetCounterpart(sourceClient.Owner, GetCCIPChainSelector(destClient.ChainConfig.EvmChainId), destClient.LaneConfig.PingPongDapp)
-		shared.RequireNoError(t, err)
-		err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
-		shared.RequireNoError(t, err)
-		sourceClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(int64(sourceClient.ChainConfig.EvmChainId), tx.Hash()))
-
-		pongDapp, err := ping_pong_demo.NewPingPongDemo(destClient.LaneConfig.PingPongDapp, destClient.Client)
-		shared.RequireNoError(t, err)
-
-		tx, err = pongDapp.SetCounterpart(destClient.Owner, GetCCIPChainSelector(sourceClient.ChainConfig.EvmChainId), sourceClient.LaneConfig.PingPongDapp)
-		shared.RequireNoError(t, err)
-		err = shared.WaitForMined(destClient.Logger, destClient.Client, tx.Hash(), true)
-		shared.RequireNoError(t, err)
-		destClient.Logger.Infof("Ping pong dapp configured in tx: %s", helpers.ExplorerLink(int64(destClient.ChainConfig.EvmChainId), tx.Hash()))
-	} else {
-		sourceClient.Logger.Infof("Skipping ping pong deployment")
-	}
+func DeployUpgradePingPongDapps(t *testing.T, sourceClient *EvmDeploymentConfig, destClient *EvmDeploymentConfig) {
+	deployPingPongDapp(t, sourceClient.ChainConfig.UpgradeRouter, sourceClient.OnlyEvmConfig(), &sourceClient.UpgradeLaneConfig)
+	deployPingPongDapp(t, destClient.ChainConfig.UpgradeRouter, destClient.OnlyEvmConfig(), &destClient.UpgradeLaneConfig)
+	finalizePingPongDaapDeployment(t, sourceClient.OnlyEvmConfig(), &sourceClient.UpgradeLaneConfig, destClient.OnlyEvmConfig(), &destClient.UpgradeLaneConfig)
 }
 
 func UsdToRateLimitValue(usd int64) *big.Int {

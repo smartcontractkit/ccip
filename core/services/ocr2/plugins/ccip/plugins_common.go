@@ -123,6 +123,32 @@ func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore c
 	return paused || !healthy
 }
 
+func getLpFilterNames(filters []logpoller.Filter) []string {
+	filterNames := make([]string, 0, len(filters))
+	for _, f := range filters {
+		filterNames = append(filterNames, f.Name)
+	}
+	return filterNames
+}
+
+func registerLpFilters(lp logpoller.LogPoller, filters []logpoller.Filter) error {
+	for _, lpFilter := range filters {
+		if err := lp.RegisterFilter(lpFilter); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func unregisterLpFilters(lp logpoller.LogPoller, filters []logpoller.Filter) error {
+	for _, lpFilter := range filters {
+		if err := lp.UnregisterFilter(lpFilter.Name, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func max[T constraints.Ordered](first T, rest ...T) T {
 	max := first
 	for _, v := range rest {

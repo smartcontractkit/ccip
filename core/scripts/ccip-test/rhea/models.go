@@ -31,6 +31,7 @@ type ChainDeploySettings struct {
 	DeployAFN           bool
 	DeployTokenPools    bool
 	DeployRouter        bool
+	DeployUpgradeRouter bool
 	DeployPriceRegistry bool
 	DeployedAtBlock     uint64
 }
@@ -164,6 +165,7 @@ type EVMChainConfig struct {
 	FeeTokens          []Token
 	WrappedNative      Token
 	Router             gethcommon.Address
+	UpgradeRouter      gethcommon.Address
 	Afn                gethcommon.Address
 	PriceRegistry      gethcommon.Address
 	AllowList          []gethcommon.Address
@@ -221,8 +223,25 @@ type EvmDeploymentConfig struct {
 	Client *ethclient.Client
 	Logger logger.Logger
 
-	ChainConfig EVMChainConfig
-	LaneConfig  EVMLaneConfig
+	ChainConfig       EVMChainConfig
+	LaneConfig        EVMLaneConfig
+	UpgradeLaneConfig EVMLaneConfig
+}
+
+type EvmConfig struct {
+	Owner       *bind.TransactOpts
+	Client      *ethclient.Client
+	Logger      logger.Logger
+	ChainConfig *EVMChainConfig
+}
+
+func (chain *EvmDeploymentConfig) OnlyEvmConfig() EvmConfig {
+	return EvmConfig{
+		Owner:       chain.Owner,
+		Client:      chain.Client,
+		Logger:      chain.Logger,
+		ChainConfig: &chain.ChainConfig,
+	}
 }
 
 func (chain *EvmDeploymentConfig) SetupChain(t *testing.T, ownerPrivateKey string) {

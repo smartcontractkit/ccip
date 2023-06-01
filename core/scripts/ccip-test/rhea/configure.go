@@ -17,26 +17,30 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 )
 
-func setOffRampOnTokenPools(t *testing.T, destClient *EvmDeploymentConfig) {
-	for _, tokenConfig := range destClient.ChainConfig.SupportedTokens {
-		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, destClient.Client)
+var (
+	zeroAddress = common.HexToAddress("0x0")
+)
+
+func setOffRampOnTokenPools(t *testing.T, client EvmConfig, lane *EVMLaneConfig) {
+	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
+		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, client.Client)
 		shared.RequireNoError(t, err)
 
 		rampUpdate := lock_release_token_pool.TokenPoolRampUpdate{
-			Ramp:    destClient.LaneConfig.OffRamp,
+			Ramp:    lane.OffRamp,
 			Allowed: true,
 		}
 
 		// Configure offramp address on pool
-		tx, err := pool.ApplyRampUpdates(destClient.Owner, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{rampUpdate})
+		tx, err := pool.ApplyRampUpdates(client.Owner, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{rampUpdate})
 		shared.RequireNoError(t, err)
-		err = shared.WaitForMined(destClient.Logger, destClient.Client, tx.Hash(), true)
+		err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 		shared.RequireNoError(t, err)
-		destClient.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(destClient.ChainConfig.EvmChainId), tx.Hash()))
+		client.Logger.Infof("Offramp pool configured with offramp address: %s", helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	}
 }
 
-func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChainSelector uint64) {
+func setPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChainSelector uint64) {
 	priceRegistry, err := price_registry.NewPriceRegistry(client.ChainConfig.PriceRegistry, client.Client)
 	shared.RequireNoError(t, err)
 
@@ -61,19 +65,67 @@ func SetPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChain
 	shared.RequireNoError(t, err)
 }
 
-func setOnRampOnRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainSelector uint64) {
+func attachUpgradeOnRampsToRouter(t *testing.T, sourceClient *EvmDeploymentConfig, destChainSelector uint64) {
+	if sourceClient.UpgradeLaneConfig.OnRamp == zeroAddress {
+		sourceClient.Logger.Infof("There is no OnRamp on upgrade lane (pending deployment). Skipping")
+		return
+	}
+
+	routerAddress := sourceClient.ChainConfig.Router
+	upgradeOnRampAddress := sourceClient.UpgradeLaneConfig.OnRamp
+	// Source Router --xxx--> OnRamp
+	// Source Router ---> Upgrade OnRamp
+	setOnRampRouter(t, routerAddress, upgradeOnRampAddress, sourceClient, destChainSelector)
+
+	upgradeRouterAddress := sourceClient.ChainConfig.UpgradeRouter
+	// Upgrade Source Router ---> nil
+	setOnRampRouter(t, upgradeRouterAddress, zeroAddress, sourceClient, destChainSelector)
+
+	// Updating configuration after finishing deployment
+	sourceClient.LaneConfig.OnRamp = upgradeOnRampAddress
+	sourceClient.UpgradeLaneConfig.OnRamp = zeroAddress
+	sourceClient.LaneConfig.DeploySettings.DeployedAtBlock = sourceClient.UpgradeLaneConfig.DeploySettings.DeployedAtBlock
+}
+
+func attachUpgradeOffRampsToRouter(t *testing.T, destinationClient *EvmDeploymentConfig, sourceChainSelector uint64) {
+	if destinationClient.UpgradeLaneConfig.OffRamp == zeroAddress {
+		destinationClient.Logger.Infof("There is no OffRamp on upgrade lane (pending deployment). Skipping")
+		return
+	}
+
+	routerAddress := destinationClient.ChainConfig.Router
+	upgradeOffRampAddress := destinationClient.UpgradeLaneConfig.OffRamp
+	// Upgrade OffRamp ----> Router
+	setOffRampOnRouter(t, routerAddress, upgradeOffRampAddress, destinationClient, sourceChainSelector)
+
+	upgradeRouterAddress := destinationClient.ChainConfig.UpgradeRouter
+	// Upgrade OffRamp --XXX--> Upgrade Router
+	removeOffRampFromRouter(t, upgradeRouterAddress, upgradeOffRampAddress, destinationClient, sourceChainSelector)
+
+	// Updating configuration after finishing deployment
+	destinationClient.LaneConfig.OffRamp = upgradeOffRampAddress
+	destinationClient.UpgradeLaneConfig.OffRamp = zeroAddress
+
+	// Updating CommitStore config as well
+	if destinationClient.UpgradeLaneConfig.CommitStore != zeroAddress {
+		destinationClient.LaneConfig.CommitStore = destinationClient.UpgradeLaneConfig.CommitStore
+		destinationClient.UpgradeLaneConfig.CommitStore = zeroAddress
+	}
+}
+
+func setOnRampRouter(t *testing.T, routerAddress common.Address, onRampAddress common.Address, sourceClient *EvmDeploymentConfig, destChainSelector uint64) {
 	sourceClient.Logger.Infof("Setting the onRamp on the Router")
-	routerContract, err := router.NewRouter(sourceClient.ChainConfig.Router, sourceClient.Client)
+	routerContract, err := router.NewRouter(routerAddress, sourceClient.Client)
 	shared.RequireNoError(t, err)
 	sourceClient.Logger.Infof("Registering new onRamp")
 	tx, err := routerContract.ApplyRampUpdates(sourceClient.Owner, []router.RouterOnRamp{
-		{DestChainSelector: destChainSelector, OnRamp: sourceClient.LaneConfig.OnRamp}}, nil, nil)
+		{DestChainSelector: destChainSelector, OnRamp: onRampAddress}}, nil, nil)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(sourceClient.Logger, sourceClient.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
 }
 
-func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
+func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig, onRampAddress common.Address) {
 	for _, tokenConfig := range sourceClient.ChainConfig.SupportedTokens {
 		pool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, sourceClient.Client)
 		shared.RequireNoError(t, err)
@@ -92,22 +144,49 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig) {
 	}
 }
 
-func setOffRampOnRouter(t *testing.T, sourceChainSelector uint64, client *EvmDeploymentConfig) {
+func setOffRampOnRouter(t *testing.T, routerAddress common.Address, offRampAddress common.Address, client *EvmDeploymentConfig, sourceChainSelector uint64) {
 	client.Logger.Infof("Setting the offRamp on the Router")
-	routerContract, err := router.NewRouter(client.ChainConfig.Router, client.Client)
+	routerContract, err := router.NewRouter(routerAddress, client.Client)
 	shared.RequireNoError(t, err)
 
 	offRamps, err := routerContract.GetOffRamps(&bind.CallOpts{})
 	shared.RequireNoError(t, err)
 	for _, offRamp := range offRamps {
-		if offRamp.OffRamp == client.LaneConfig.OffRamp {
+		if offRamp.OffRamp == offRampAddress {
 			client.Logger.Infof("OffRamp already configured on router. Skipping")
 			return
 		}
 	}
 
 	tx, err := routerContract.ApplyRampUpdates(client.Owner, nil, nil, []router.RouterOffRamp{
-		{SourceChainSelector: sourceChainSelector, OffRamp: client.LaneConfig.OffRamp}})
+		{SourceChainSelector: sourceChainSelector, OffRamp: offRampAddress}})
+	shared.RequireNoError(t, err)
+	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+}
+
+func removeOffRampFromRouter(t *testing.T, routerAddress common.Address, offRampAddress common.Address, client *EvmDeploymentConfig, sourceChainSelector uint64) {
+	client.Logger.Infof("Removing the offRamp freom the Router")
+	routerContract, err := router.NewRouter(routerAddress, client.Client)
+	shared.RequireNoError(t, err)
+
+	offRamps, err := routerContract.GetOffRamps(&bind.CallOpts{})
+	shared.RequireNoError(t, err)
+
+	offRampRegistered := false
+	for _, offRamp := range offRamps {
+		if offRamp.OffRamp == offRampAddress {
+			offRampRegistered = true
+		}
+	}
+
+	if !offRampRegistered {
+		client.Logger.Infof("OffRamp not configured on router. Skipping")
+		return
+	}
+
+	tx, err := routerContract.ApplyRampUpdates(client.Owner, nil, []router.RouterOffRamp{
+		{SourceChainSelector: sourceChainSelector, OffRamp: client.LaneConfig.OffRamp}}, nil)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
@@ -151,13 +230,13 @@ func fillPoolWithTokens(client *EvmDeploymentConfig, pool *lock_release_token_po
 	return nil
 }
 
-func FundPingPong(client *EvmDeploymentConfig, fundingAmount *big.Int, tokenAddress common.Address) error {
+func FundPingPong(client EvmConfig, lane *EVMLaneConfig, fundingAmount *big.Int, tokenAddress common.Address) error {
 	linkToken, err := burn_mint_erc677.NewBurnMintERC677(tokenAddress, client.Client)
 	if err != nil {
 		return err
 	}
 
-	tx, err := linkToken.Transfer(client.Owner, client.LaneConfig.PingPongDapp, fundingAmount)
+	tx, err := linkToken.Transfer(client.Owner, lane.PingPongDapp, fundingAmount)
 	if err != nil {
 		return err
 	}
@@ -180,4 +259,16 @@ func UpdateDeployedAt(t *testing.T, source *EvmDeploymentConfig, dest *EvmDeploy
 
 	dest.ChainConfig.DeploySettings.DeployedAtBlock = destBlock
 	dest.LaneConfig.DeploySettings.DeployedAtBlock = destBlock
+}
+
+func UpdateDeployedAtUpgradeLane(t *testing.T, source *EvmDeploymentConfig, dest *EvmDeploymentConfig) {
+	sourceBlock, err := source.Client.BlockNumber(context.Background())
+	require.NoError(t, err)
+
+	source.UpgradeLaneConfig.DeploySettings.DeployedAtBlock = sourceBlock
+
+	destBlock, err := dest.Client.BlockNumber(context.Background())
+	require.NoError(t, err)
+
+	dest.UpgradeLaneConfig.DeploySettings.DeployedAtBlock = destBlock
 }

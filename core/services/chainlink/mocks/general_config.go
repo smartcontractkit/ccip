@@ -4,12 +4,8 @@ package mocks
 
 import (
 	big "math/big"
-	net "net"
-	url "net/url"
-	time "time"
 
 	audit "github.com/smartcontractkit/chainlink/v2/core/logger/audit"
-	types "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types/config"
 
 	commontypes "github.com/smartcontractkit/libocr/commontypes"
 
@@ -25,6 +21,8 @@ import (
 
 	models "github.com/smartcontractkit/chainlink/v2/core/store/models"
 
+	net "net"
+
 	networking "github.com/smartcontractkit/libocr/networking"
 
 	ocr2models "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
@@ -36,6 +34,12 @@ import (
 	solana "github.com/smartcontractkit/chainlink/v2/core/chains/solana"
 
 	starknet "github.com/smartcontractkit/chainlink/v2/core/chains/starknet"
+
+	time "time"
+
+	typesconfig "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types/config"
+
+	url "net/url"
 
 	utils "github.com/smartcontractkit/chainlink/v2/core/utils"
 
@@ -1250,15 +1254,15 @@ func (_m *GeneralConfig) KeystorePassword() string {
 }
 
 // LegacyGasStationAuthConfig provides a mock function with given fields:
-func (_m *GeneralConfig) LegacyGasStationAuthConfig() *types.AuthConfig {
+func (_m *GeneralConfig) LegacyGasStationAuthConfig() *typesconfig.AuthConfig {
 	ret := _m.Called()
 
-	var r0 *types.AuthConfig
-	if rf, ok := ret.Get(0).(func() *types.AuthConfig); ok {
+	var r0 *typesconfig.AuthConfig
+	if rf, ok := ret.Get(0).(func() *typesconfig.AuthConfig); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.AuthConfig)
+			r0 = ret.Get(0).(*typesconfig.AuthConfig)
 		}
 	}
 

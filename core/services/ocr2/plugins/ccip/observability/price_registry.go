@@ -3,6 +3,7 @@ package observability
 import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 )
@@ -36,5 +37,17 @@ func (o *ObservedPriceRegistry) GetFeeTokens(opts *bind.CallOpts) ([]common.Addr
 func (o *ObservedPriceRegistry) GetTokenPrices(opts *bind.CallOpts, tokens []common.Address) ([]price_registry.InternalTimestampedUint192Value, error) {
 	return withObservedContract(o.metric, "GetTokenPrices", func() ([]price_registry.InternalTimestampedUint192Value, error) {
 		return o.PriceRegistryInterface.GetTokenPrices(opts, tokens)
+	})
+}
+
+func (o *ObservedPriceRegistry) ParseUsdPerUnitGasUpdated(log types.Log) (*price_registry.PriceRegistryUsdPerUnitGasUpdated, error) {
+	return withObservedContract(o.metric, "ParseUsdPerUnitGasUpdated", func() (*price_registry.PriceRegistryUsdPerUnitGasUpdated, error) {
+		return o.PriceRegistryInterface.ParseUsdPerUnitGasUpdated(log)
+	})
+}
+
+func (o *ObservedPriceRegistry) ParseUsdPerTokenUpdated(log types.Log) (*price_registry.PriceRegistryUsdPerTokenUpdated, error) {
+	return withObservedContract(o.metric, "ParseUsdPerTokenUpdated", func() (*price_registry.PriceRegistryUsdPerTokenUpdated, error) {
+		return o.PriceRegistryInterface.ParseUsdPerTokenUpdated(log)
 	})
 }

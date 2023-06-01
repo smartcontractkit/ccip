@@ -1,7 +1,9 @@
 package ccip
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -12,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -148,4 +151,72 @@ func CommitReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 	return &txmgr.EthTxMeta{
 		SeqNumbers: seqRange,
 	}, nil
+}
+
+func getCommitPluginSourceLpFilters(onRamp common.Address) []logpoller.Filter {
+	return []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
+			Addresses: []common.Address{onRamp},
+		},
+	}
+}
+
+func getCommitPluginDestLpFilters(priceRegistry common.Address) []logpoller.Filter {
+	return []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistry.String()),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.UsdPerUnitGasUpdated, abihelpers.EventSignatures.UsdPerTokenUpdated},
+			Addresses: []common.Address{priceRegistry},
+		},
+	}
+}
+
+// GetCommitPluginFilterNamesFromSpec returns all the registered filter names, for both source and dest log pollers.
+func GetCommitPluginFilterNamesFromSpec(ctx context.Context, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) ([]string, error) {
+	if spec == nil {
+		return nil, errors.New("spec is nil")
+	}
+	if !common.IsHexAddress(spec.ContractID) {
+		return nil, fmt.Errorf("invalid contract id address: %s", spec.ContractID)
+	}
+
+	destChainIDInterface, ok := spec.RelayConfig["chainID"]
+	if !ok {
+		return nil, errors.New("chainID must be provided in relay config")
+	}
+	destChainIDf64, is := destChainIDInterface.(float64)
+	if !is {
+		return nil, fmt.Errorf("chain id '%v' is not float64", destChainIDInterface)
+	}
+	destChainID := int64(destChainIDf64)
+	destChain, err := chainSet.Get(big.NewInt(destChainID))
+	if err != nil {
+		return nil, err
+	}
+
+	commitStore, err := LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
+	if err != nil {
+		return nil, err
+	}
+
+	return getCommitPluginFilterNames(ctx, commitStore)
+}
+
+func getCommitPluginFilterNames(ctx context.Context, dstCommitStore commit_store.CommitStoreInterface) ([]string, error) {
+	staticCfg, err := dstCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	dynamicCfg, err := dstCommitStore.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	return append(
+		getLpFilterNames(getCommitPluginSourceLpFilters(staticCfg.OnRamp)),
+		getLpFilterNames(getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry))...,
+	), nil
 }
