@@ -134,15 +134,20 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
 	startTime := time.Now()
+	destChainSelector, err := actions.EvmChainIdToChainSelector(sourceCCIP.DestinationChainId, c.Lane.Dest.Common.ChainClient.NetworkSimulated())
+	if err != nil {
+		res.Error = err.Error()
+		return res
+	}
 	if feeToken != common.HexToAddress("0x0") {
-		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, nil)
+		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, nil)
 	} else {
-		fee, err := sourceCCIP.Common.Router.GetFee(sourceCCIP.DestinationChainId, msg)
+		fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 		if err != nil {
 			res.Error = err.Error()
 			return res
 		}
-		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, fee)
+		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, fee)
 	}
 
 	if err != nil {

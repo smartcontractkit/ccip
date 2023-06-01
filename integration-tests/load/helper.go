@@ -175,6 +175,7 @@ func (l *loadArgs) Start() {
 
 				loadRunner, err := wasp.NewGenerator(&wasp.Config{
 					T:                     l.TestCfg.Test,
+					GenName:               fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
 					Schedule:              schedule,
 					LoadType:              wasp.RPS,
 					RateLimitUnitDuration: l.TestCfg.Load.TimeUnit,

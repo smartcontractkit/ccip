@@ -194,7 +194,7 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChainSelector uint64, afn, onRamp, priceRegistry common.Address) (*CommitStore, error) {
+func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChainSelector uint64, onRamp common.Address) (*CommitStore, error) {
 	address, _, instance, err := e.evmClient.DeployContract("CommitStore Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -454,7 +454,7 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSelector uint64, commitStore, onRamp, afn, destRouter common.Address, sourceToken, pools []common.Address, opts RateLimiterConfig) (*OffRamp, error) {
+func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSelector uint64, commitStore, onRamp common.Address, sourceToken, pools []common.Address, opts RateLimiterConfig) (*OffRamp, error) {
 	address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
