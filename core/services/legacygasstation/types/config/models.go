@@ -1,4 +1,4 @@
-package types
+package config
 
 type AuthConfig struct {
 	ClientKey         string

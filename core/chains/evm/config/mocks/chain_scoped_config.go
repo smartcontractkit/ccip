@@ -3,10 +3,14 @@
 package mocks
 
 import (
+	big "math/big"
+	net "net"
+	url "net/url"
+	time "time"
+
 	assets "github.com/smartcontractkit/chainlink/v2/core/assets"
 	audit "github.com/smartcontractkit/chainlink/v2/core/logger/audit"
-
-	big "math/big"
+	types "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types/config"
 
 	common "github.com/ethereum/go-ethereum/common"
 
@@ -22,8 +26,6 @@ import (
 
 	models "github.com/smartcontractkit/chainlink/v2/core/store/models"
 
-	net "net"
-
 	networking "github.com/smartcontractkit/libocr/networking"
 
 	ocr2models "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
@@ -31,12 +33,6 @@ import (
 	p2pkey "github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 
 	sessions "github.com/gin-contrib/sessions"
-
-	time "time"
-
-	types "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types"
-
-	url "net/url"
 
 	utils "github.com/smartcontractkit/chainlink/v2/core/utils"
 
