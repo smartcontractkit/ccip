@@ -205,7 +205,7 @@ func (rh *RequestHandler) SendTransaction(ctx *gin.Context, req types.SendTransa
 	// Creation of eth transaction and persistence of data are done in a transaction
 	// to avoid partial failures, which would leave the persistence layer in inconsistent state
 	err = rh.q.Transaction(func(tx pg.Queryer) error {
-		ethTx, err2 := rh.txm.CreateEthTransaction(txmgr.EvmNewTx{
+		ethTx, err2 := rh.txm.CreateTransaction(txmgr.EvmNewTx{
 			FromAddress:    fromAddress,
 			ToAddress:      rh.forwarder.Address(),
 			EncodedPayload: payload,

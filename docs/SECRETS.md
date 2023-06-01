@@ -176,3 +176,16 @@ ClientCertificate = "client-certificate" # Example
 ```
 ClientCertificate is the client certificate used for mTLS authentication
 
+## Threshold
+```toml
+[Threshold]
+ThresholdDecryptionKeyShare = "A-Threshold-Decryption-Key-Share" # Example
+```
+
+
+### ThresholdDecryptionKeyShare
+```toml
+ThresholdDecryptionKeyShare = "A-Threshold-Decryption-Key-Share" # Example
+```
+ThresholdDecryptionKeyShare used by the threshold decryption OCR plugin
+
