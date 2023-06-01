@@ -48,7 +48,7 @@ func getParsableObservations[O CommitObservation | ExecutionObservation](l logge
 	for _, ao := range observations {
 		if len(ao.Observation) == 0 {
 			// Empty observation
-			l.Tracew("Discarded empty observation %+v", ao)
+			l.Infow("Discarded empty observation %+v", ao)
 			continue
 		}
 		var ob O

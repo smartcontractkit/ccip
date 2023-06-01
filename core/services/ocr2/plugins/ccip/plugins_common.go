@@ -50,7 +50,7 @@ func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {
 	}
 	for i, j := min, 0; i <= max && j < len(seqNrs); i, j = i+1, j+1 {
 		if seqNrs[j] != i {
-			lggr.Errorw("unexpected gap in seq nums", "seq", i)
+			lggr.Errorw("unexpected gap in seq nums", "seqNr", i, "minSeqNr", min, "maxSeqNr", max)
 			return false
 		}
 	}

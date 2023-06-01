@@ -543,7 +543,7 @@ func (eb *EthBroadcaster[CHAIN_ID, HEAD, ADDR, TX_HASH, BLOCK_HASH, R, SEQ, FEE,
 		return errors.Wrapf(err, "failed to do address format conversion"), true
 	}
 
-	lgr.Debugw("Sending transaction", "ethTxAttemptID", attempt.ID, "txHash", attempt.Hash, "err", err, "meta", etx.Meta, "feeLimit", etx.FeeLimit, "attempt", attempt, "etx", etx)
+	lgr.Infow("Sending transaction", "ethTxAttemptID", attempt.ID, "txHash", attempt.Hash, "err", err, "meta", etx.Meta, "feeLimit", etx.FeeLimit, "attempt", attempt, "etx", etx)
 	errType, err := eb.ethClient.SendTransactionReturnCode(ctx, signedTx, fromAddress)
 
 	if errType != clienttypes.Fatal {
