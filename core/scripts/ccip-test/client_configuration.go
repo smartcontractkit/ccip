@@ -808,20 +808,20 @@ func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, pluginOffchainCon
 		transmissionSchedule = append(transmissionSchedule, 1)
 	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocrconfighelper.ContractSetConfigArgsForTests(
-		70*time.Second, // deltaProgress
-		5*time.Second,  // deltaResend
-		30*time.Second, // deltaRound
-		2*time.Second,  // deltaGrace
-		40*time.Second, // deltaStage
+		2*time.Minute, // deltaProgress
+		5*time.Second, // deltaResend
+		1*time.Minute, // deltaRound
+		5*time.Second, // deltaGrace
+		client.Dest.TunableValues.InflightCacheExpiry.Duration(), // deltaStage
 		3,
 		transmissionSchedule,
 		identities,
 		pluginOffchainConfig,
-		5*time.Second,
-		32*time.Second,
-		20*time.Second,
-		10*time.Second,
-		10*time.Second,
+		100*time.Millisecond, // query not used
+		35*time.Second,       // observation TODO: shorten once db issues resolved
+		10*time.Second,       // report TODO: shorten once db issues resolved
+		5*time.Second,        // shouldAccept
+		10*time.Second,       // shouldTransmit TODO: shorten once db issues resolved
 		faults,
 		onchainConfig,
 	)
