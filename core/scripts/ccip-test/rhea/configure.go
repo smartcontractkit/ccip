@@ -2,12 +2,14 @@ package rhea
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
@@ -228,6 +230,55 @@ func fillPoolWithTokens(client *EvmDeploymentConfig, pool *lock_release_token_po
 	}
 	client.Logger.Infof("Pool filled with tokens: %s", helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	return nil
+}
+
+func setPoolAllowList(client *EvmDeploymentConfig, poolAddress common.Address, poolAllowList []common.Address, tokenName Token) error {
+	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(poolAddress, client.Client)
+	if err != nil {
+		return err
+	}
+
+	isEnabled, err := pool.GetAllowListEnabled(&bind.CallOpts{})
+	if err != nil {
+		return err
+	}
+
+	if !isEnabled {
+		if len(poolAllowList) > 0 {
+			return fmt.Errorf("%s pool does not have allowList enabled, but has allowList defined in config", tokenName)
+		}
+		return nil
+	}
+
+	currentAllowList, err := pool.GetAllowList(&bind.CallOpts{})
+	if err != nil {
+		return err
+	}
+
+	toRemove := []common.Address{}
+	for _, addr := range currentAllowList {
+		if !slices.Contains(poolAllowList, addr) {
+			toRemove = append(toRemove, addr)
+		}
+	}
+	toAdd := []common.Address{}
+	for _, addr := range poolAllowList {
+		if !slices.Contains(currentAllowList, addr) {
+			toAdd = append(toAdd, addr)
+		}
+	}
+	if len(toRemove) == 0 && len(toAdd) == 0 {
+		client.Logger.Infof("Nothing to add or remove from allowlist for %s pool", tokenName)
+		return nil
+	}
+
+	client.Logger.Infof("ApplyAllowListUpdates for %s pool: toRemove=%v, toAdd=%v", tokenName, toRemove, toAdd)
+
+	tx, err := pool.ApplyAllowListUpdates(client.Owner, toRemove, toAdd)
+	if err != nil {
+		return err
+	}
+	return shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true)
 }
 
 func FundPingPong(client EvmConfig, lane *EVMLaneConfig, fundingAmount *big.Int, tokenAddress common.Address) error {

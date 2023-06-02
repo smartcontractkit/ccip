@@ -22,7 +22,11 @@ contract LockReleaseTokenPool is TokenPool {
 
   mapping(address => uint256) internal s_liquidityProviderBalances;
 
-  constructor(IERC20 token, RateLimiter.Config memory rateLimiterConfig) TokenPool(token, rateLimiterConfig) {}
+  constructor(
+    IERC20 token,
+    address[] memory allowlist,
+    RateLimiter.Config memory rateLimiterConfig
+  ) TokenPool(token, allowlist, rateLimiterConfig) {}
 
   /// @notice Locks the token in the pool
   /// @dev Locks are not rate limited at per-pool level. Each pool is shared across lanes,
@@ -30,12 +34,12 @@ contract LockReleaseTokenPool is TokenPool {
   /// Benefits of rate limiting here does not justify the extra gas cost.
   /// @param amount Amount to lock
   function lockOrBurn(
-    address,
+    address originalSender,
     bytes calldata,
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp {
+  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) {
     emit Locked(msg.sender, amount);
   }
 

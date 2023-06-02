@@ -58,7 +58,7 @@ contract BurnMintERC677_mint is BurnMintERC677Setup {
   function testPoolMintSuccess() public {
     uint256 amount = 1e19;
     address offRamp = address(238323465456);
-    BurnMintTokenPool pool = new BurnMintTokenPool(s_burnMintERC20, rateLimiterConfig());
+    BurnMintTokenPool pool = new BurnMintTokenPool(s_burnMintERC20, new address[](0), rateLimiterConfig());
     s_burnMintERC20.grantMintAndBurnRoles(address(pool));
 
     TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
@@ -101,7 +101,7 @@ contract BurnMintERC677_burn is BurnMintERC677Setup {
   function testPoolBurnSuccess() public {
     uint256 burnAmount = 1e19;
     address onRamp = address(238323465456);
-    BurnMintTokenPool pool = new BurnMintTokenPool(s_burnMintERC20, rateLimiterConfig());
+    BurnMintTokenPool pool = new BurnMintTokenPool(s_burnMintERC20, new address[](0), rateLimiterConfig());
     s_burnMintERC20.grantMintAndBurnRoles(address(pool));
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);

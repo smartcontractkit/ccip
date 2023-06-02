@@ -10,7 +10,10 @@ contract CustomTokenPool is TokenPool {
   event SynthBurned(uint256 amount);
   event SynthMinted(uint256 amount);
 
-  constructor(IERC20 token, RateLimiter.Config memory rateLimiterConfig) TokenPool(token, rateLimiterConfig) {}
+  constructor(
+    IERC20 token,
+    RateLimiter.Config memory rateLimiterConfig
+  ) TokenPool(token, new address[](0), rateLimiterConfig) {}
 
   /// @notice Locks the token in the pool
   /// @param amount Amount to lock

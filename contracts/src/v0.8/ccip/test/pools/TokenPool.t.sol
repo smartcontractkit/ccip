@@ -15,7 +15,7 @@ contract TokenPoolSetup is BaseTest {
     s_token = new BurnMintERC677("LINK", "LNK", 18);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_tokenPool = new TokenPoolHelper(s_token, rateLimiterConfig());
+    s_tokenPool = new TokenPoolHelper(s_token, new address[](0), rateLimiterConfig());
   }
 }
 
@@ -24,7 +24,7 @@ contract TokenPool_constructor is TokenPoolSetup {
   function testNullAddressNotAllowedReverts() public {
     vm.expectRevert(TokenPool.NullAddressNotAllowed.selector);
 
-    s_tokenPool = new TokenPoolHelper(IERC20(address(0)), rateLimiterConfig());
+    s_tokenPool = new TokenPoolHelper(IERC20(address(0)), new address[](0), rateLimiterConfig());
   }
 }
 
@@ -169,5 +169,114 @@ contract TokenPool_unpause is TokenPoolSetup {
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_tokenPool.unpause();
+  }
+}
+
+contract TokenPoolWithAllowListSetup is TokenPoolSetup {
+  address[] internal s_allowedSenders;
+
+  function setUp() public virtual override {
+    TokenPoolSetup.setUp();
+
+    s_allowedSenders.push(STRANGER);
+    s_allowedSenders.push(DUMMY_CONTRACT_ADDRESS);
+
+    s_tokenPool = new TokenPoolHelper(s_token, s_allowedSenders, rateLimiterConfig());
+  }
+}
+
+/// @notice #getAllowListEnabled
+contract TokenPoolWithAllowList_getAllowListEnabled is TokenPoolWithAllowListSetup {
+  function testGetAllowListEnabledSuccess() public {
+    assertTrue(s_tokenPool.getAllowListEnabled());
+  }
+}
+
+/// @notice #getAllowList
+contract TokenPoolWithAllowList_getAllowList is TokenPoolWithAllowListSetup {
+  function testGetAllowListSuccess() public {
+    address[] memory setAddresses = s_tokenPool.getAllowList();
+    assertEq(2, setAddresses.length);
+    assertEq(s_allowedSenders[0], setAddresses[0]);
+    assertEq(s_allowedSenders[1], setAddresses[1]);
+  }
+}
+
+/// @notice #setAllowList
+contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListSetup {
+  event AllowListAdd(address sender);
+  event AllowListRemove(address sender);
+
+  function testSetAllowListSuccess() public {
+    address[] memory newAddresses = new address[](2);
+    newAddresses[0] = address(1);
+    newAddresses[1] = address(2);
+
+    for (uint256 i = 0; i < 2; ++i) {
+      vm.expectEmit();
+      emit AllowListAdd(newAddresses[i]);
+    }
+
+    s_tokenPool.applyAllowListUpdates(new address[](0), newAddresses);
+    address[] memory setAddresses = s_tokenPool.getAllowList();
+
+    assertEq(s_allowedSenders[0], setAddresses[0]);
+    assertEq(s_allowedSenders[1], setAddresses[1]);
+    assertEq(address(1), setAddresses[2]);
+    assertEq(address(2), setAddresses[3]);
+
+    // address(2) exists noop, add address(3), remove address(1)
+    newAddresses = new address[](2);
+    newAddresses[0] = address(2);
+    newAddresses[1] = address(3);
+
+    address[] memory removeAddresses = new address[](1);
+    removeAddresses[0] = address(1);
+
+    vm.expectEmit();
+    emit AllowListRemove(address(1));
+
+    vm.expectEmit();
+    emit AllowListAdd(address(3));
+
+    s_tokenPool.applyAllowListUpdates(removeAddresses, newAddresses);
+    setAddresses = s_tokenPool.getAllowList();
+
+    assertEq(s_allowedSenders[0], setAddresses[0]);
+    assertEq(s_allowedSenders[1], setAddresses[1]);
+    assertEq(address(2), setAddresses[2]);
+    assertEq(address(3), setAddresses[3]);
+
+    // remove all from allowList
+    for (uint256 i = 0; i < setAddresses.length; ++i) {
+      vm.expectEmit();
+      emit AllowListRemove(setAddresses[i]);
+    }
+
+    s_tokenPool.applyAllowListUpdates(setAddresses, new address[](0));
+    setAddresses = s_tokenPool.getAllowList();
+
+    assertEq(0, setAddresses.length);
+  }
+
+  function testSetAllowListSkipsZeroSuccess() public {
+    uint256 setAddressesLength = s_tokenPool.getAllowList().length;
+
+    address[] memory newAddresses = new address[](1);
+    newAddresses[0] = address(0);
+
+    s_tokenPool.applyAllowListUpdates(new address[](0), newAddresses);
+    address[] memory setAddresses = s_tokenPool.getAllowList();
+
+    assertEq(setAddresses.length, setAddressesLength);
+  }
+
+  // Reverts
+
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    address[] memory newAddresses = new address[](2);
+    s_tokenPool.applyAllowListUpdates(new address[](0), newAddresses);
   }
 }

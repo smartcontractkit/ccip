@@ -13,7 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.5.0 - Unreleased
 
-<!-- unreleasedstop -->
+## Changed
+
+- TokenPools have changed to require an `allowList` parameter in constructor
+  - If `allowList` is non-empty
+    - only addresses in allowList can be `originalSender` when invoking lockOrBurn
+    - addresses can be added to or removed from `allowList` by owner
+    - allowList cannot be disabled later now
+  - If `allowList` is empty
+    - pool is constructed with allowList disabled
+    - allowList cannot be enabled later on
 
 ## 0.4.0 - 2023-05-24
 
