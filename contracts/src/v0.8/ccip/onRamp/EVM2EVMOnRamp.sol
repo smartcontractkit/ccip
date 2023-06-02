@@ -59,6 +59,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error InvalidAddress(bytes encodedAddress);
   error BadAFNSignal();
   error LinkBalanceNotSettled();
+  error LinkTokenCannotBeNop();
 
   event Paused(address account);
   event Unpaused(address account);
@@ -637,8 +638,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // a single nop being of type uint16. This ensures nopWeightsTotal will
     // always fit into the uint32 type.
     for (uint256 i = 0; i < numberOfNops; ++i) {
-      s_nops.set(nopsAndWeights[i].nop, nopsAndWeights[i].weight);
-      nopWeightsTotal += nopsAndWeights[i].weight;
+      // Make sure the LINK token is not a nop because the link token doesn't allow
+      // self transfers. If set as nop, payNops would always revert. Since setNops
+      // calls payNops, we can never remove the LINK token as a nop.
+      address nop = nopsAndWeights[i].nop;
+      uint16 weight = nopsAndWeights[i].weight;
+      if (nop == i_linkToken) revert LinkTokenCannotBeNop();
+      s_nops.set(nop, weight);
+      nopWeightsTotal += weight;
     }
     s_nopWeightsTotal = nopWeightsTotal;
     emit NopsSet(nopWeightsTotal, nopsAndWeights);

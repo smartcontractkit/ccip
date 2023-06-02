@@ -2,8 +2,9 @@
 pragma solidity 0.8.19;
 
 import "../../onRamp/EVM2EVMOnRamp.sol";
+import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 
-contract EVM2EVMOnRampHelper is EVM2EVMOnRamp {
+contract EVM2EVMOnRampHelper is EVM2EVMOnRamp, IgnoreContractSize {
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,

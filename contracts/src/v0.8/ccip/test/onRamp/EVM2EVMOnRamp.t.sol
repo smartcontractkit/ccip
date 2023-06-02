@@ -997,6 +997,15 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     s_onRamp.setNops(nopsAndWeights);
   }
 
+  function testLinkTokenCannotBeNopReverts() public {
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
+    nopsAndWeights[0].nop = address(s_sourceTokens[0]);
+
+    vm.expectRevert(EVM2EVMOnRamp.LinkTokenCannotBeNop.selector);
+
+    s_onRamp.setNops(nopsAndWeights);
+  }
+
   function testTooManyNopsReverts() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](257);
 
