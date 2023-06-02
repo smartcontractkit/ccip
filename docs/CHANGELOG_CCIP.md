@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- unreleasedstop -->
 
+## 0.4.1 - 2023-06-02
+
+## Added
+
+## Changed
+- db migrations scripts aligned with the main repo. This might be breaking, as we had a clash - there were two different migrations scripts using the same version.
+
+## Removed
+
 ## 0.4.0 - 2023-05-24
 
 ## Added
