@@ -327,6 +327,7 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x44eb6D97e98CE35eEFBD5764aa786f10121bC5e4"), // BetaUser - ANZ
 		gethcommon.HexToAddress("0xa707480A11f12569b888306F2F118716d3BC29A1"), // BetaUser - Lendvest
 		gethcommon.HexToAddress("0xbcFA8eAB1fCe576F1Ef71772E46519e0ADC06623"), // BetaUser - Lendvest
+		gethcommon.HexToAddress("0xd35468ab2547a5ba9c9b809e67a35bcc5b89d2fe"), // BetaUser - Lendvest
 		gethcommon.HexToAddress("0x9344AeA9b3270d51c9603d3054E421386dFaacB8"), // BetaUser - Fidelity Digital Assets
 		gethcommon.HexToAddress("0x89Eccc61B2d35eACCe08284CF22c2D6487B80A3A"), // BetaUser - Robolabs
 		gethcommon.HexToAddress("0xAa6f663a14b8dA1EB9CF021379f4Ba6BF536268A"), // BetaUser - Fidelity Digital Assets
