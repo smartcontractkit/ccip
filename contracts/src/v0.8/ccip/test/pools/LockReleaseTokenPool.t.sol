@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import "../BaseTest.t.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {BurnMintERC677} from "../../pools/tokens/BurnMintERC677.sol";
+import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 
 contract LockReleaseTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
@@ -17,7 +17,7 @@ contract LockReleaseTokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new BurnMintERC677("LINK", "LNK", 18);
+    s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, new address[](0), rateLimiterConfig());
 
@@ -80,6 +80,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     // Since the owner already has tokens this would break the checks
     vm.assume(recipient != OWNER);
     vm.assume(recipient != address(0));
+    vm.assume(recipient != address(s_token));
 
     // Makes sure the pool always has enough funds
     deal(address(s_token), address(s_lockReleaseTokenPool), amount);

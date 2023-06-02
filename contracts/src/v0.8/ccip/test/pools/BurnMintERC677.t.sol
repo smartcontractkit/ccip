@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import "../BaseTest.t.sol";
-import {BurnMintERC677} from "../../pools/tokens/BurnMintERC677.sol";
+import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
@@ -15,46 +15,11 @@ contract BurnMintERC677Setup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_burnMintERC20 = new BurnMintERC677("Chainlink Token", "LINK", 18);
-  }
-
-  function generateAccessControlError(address caller, bytes32 role) public pure returns (bytes memory) {
-    return
-      abi.encodePacked(
-        "AccessControl: account ",
-        Strings.toHexString(caller),
-        " is missing role ",
-        Strings.toHexString(uint256(role), 32)
-      );
-  }
-}
-
-contract BurnMintERC677_constructor is BurnMintERC677Setup {
-  function testConstructorSuccess() public {
-    string memory name = "Chainlink token v2";
-    string memory symbol = "LINK2";
-    uint8 decimals = 19;
-    s_burnMintERC20 = new BurnMintERC677(name, symbol, decimals);
-
-    assertEq(name, s_burnMintERC20.name());
-    assertEq(symbol, s_burnMintERC20.symbol());
-    assertEq(decimals, s_burnMintERC20.decimals());
+    s_burnMintERC20 = new BurnMintERC677("Chainlink Token", "LINK", 18, 0);
   }
 }
 
 contract BurnMintERC677_mint is BurnMintERC677Setup {
-  function testBasicMintSuccess() public {
-    s_burnMintERC20.grantMintAndBurnRoles(OWNER);
-    uint256 amount = 1e18;
-
-    vm.expectEmit();
-    emit Transfer(address(0), OWNER, amount);
-
-    s_burnMintERC20.mint(OWNER, amount);
-
-    assertEq(s_burnMintERC20.balanceOf(OWNER), amount);
-  }
-
   function testPoolMintSuccess() public {
     uint256 amount = 1e19;
     address offRamp = address(238323465456);
@@ -75,29 +40,9 @@ contract BurnMintERC677_mint is BurnMintERC677Setup {
 
     assertEq(s_burnMintERC20.balanceOf(OWNER), amount);
   }
-
-  // Revert
-
-  function testWrongRoleReverts() public {
-    vm.expectRevert(generateAccessControlError(OWNER, s_burnMintERC20.getMinterRole()));
-    s_burnMintERC20.mint(STRANGER, 1e18);
-  }
 }
 
 contract BurnMintERC677_burn is BurnMintERC677Setup {
-  function testBasicBurnSuccess() public {
-    s_burnMintERC20.grantMintAndBurnRoles(OWNER);
-    uint256 burnAmount = 1e20;
-    deal(address(s_burnMintERC20), OWNER, burnAmount);
-
-    vm.expectEmit();
-    emit Transfer(OWNER, address(0), burnAmount);
-
-    s_burnMintERC20.burn(burnAmount);
-
-    assertEq(s_burnMintERC20.balanceOf(OWNER), 0);
-  }
-
   function testPoolBurnSuccess() public {
     uint256 burnAmount = 1e19;
     address onRamp = address(238323465456);
@@ -118,24 +63,5 @@ contract BurnMintERC677_burn is BurnMintERC677Setup {
     pool.lockOrBurn(OWNER, bytes(""), burnAmount, 0, bytes(""));
 
     assertEq(s_burnMintERC20.balanceOf(address(pool)), 0);
-  }
-
-  // Revert
-
-  function testWrongRoleReverts() public {
-    vm.expectRevert(generateAccessControlError(OWNER, s_burnMintERC20.getBurnerRole()));
-    s_burnMintERC20.burnFrom(STRANGER, 1e18);
-  }
-}
-
-contract BurnMintERC677_grantMintAndBurnRoles is BurnMintERC677Setup {
-  function testGrantMintAndBurnRolesSuccess() public {
-    assertFalse(s_burnMintERC20.hasRole(s_burnMintERC20.getMinterRole(), STRANGER));
-    assertFalse(s_burnMintERC20.hasRole(s_burnMintERC20.getBurnerRole(), STRANGER));
-
-    s_burnMintERC20.grantMintAndBurnRoles(STRANGER);
-
-    assertTrue(s_burnMintERC20.hasRole(s_burnMintERC20.getMinterRole(), STRANGER));
-    assertTrue(s_burnMintERC20.hasRole(s_burnMintERC20.getBurnerRole(), STRANGER));
   }
 }

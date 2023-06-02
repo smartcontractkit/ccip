@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
-import {OwnerIsCreator} from "./OwnerIsCreator.sol";
+import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
 

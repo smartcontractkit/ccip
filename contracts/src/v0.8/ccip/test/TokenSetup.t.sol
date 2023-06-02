@@ -6,7 +6,7 @@ import "../../tests/MockV3Aggregator.sol";
 import "../pools/BurnMintTokenPool.sol";
 import "../pools/LockReleaseTokenPool.sol";
 import "../libraries/Client.sol";
-import "../pools/tokens/BurnMintERC677.sol";
+import {BurnMintERC677} from "../../shared/token/ERC677/BurnMintERC677.sol";
 
 contract TokenSetup is BaseTest {
   address[] internal s_sourceTokens;
@@ -25,12 +25,12 @@ contract TokenSetup is BaseTest {
 
     // Source tokens & pools
     if (s_sourceTokens.length == 0 && s_sourcePools.length == 0) {
-      BurnMintERC677 sourceLink = new BurnMintERC677("sLINK", "sLNK", 18);
+      BurnMintERC677 sourceLink = new BurnMintERC677("sLINK", "sLNK", 18, 0);
       deal(address(sourceLink), OWNER, type(uint256).max);
       s_sourceTokens.push(address(sourceLink));
       s_sourcePools.push(address(new LockReleaseTokenPool(sourceLink, new address[](0), rateLimiterConfig())));
 
-      BurnMintERC677 sourceETH = new BurnMintERC677("sETH", "sETH", 18);
+      BurnMintERC677 sourceETH = new BurnMintERC677("sETH", "sETH", 18, 0);
       deal(address(sourceETH), OWNER, 2 ** 128);
       s_sourceTokens.push(address(sourceETH));
       s_sourcePools.push(address(new BurnMintTokenPool(sourceETH, new address[](0), rateLimiterConfig())));
@@ -41,11 +41,11 @@ contract TokenSetup is BaseTest {
 
     // Destination tokens & pools
     if (s_destTokens.length == 0 && s_destPools.length == 0) {
-      BurnMintERC677 destLink = new BurnMintERC677("dLINK", "dLNK", 18);
+      BurnMintERC677 destLink = new BurnMintERC677("dLINK", "dLNK", 18, 0);
       deal(address(destLink), OWNER, type(uint256).max);
       s_destTokens.push(address(destLink));
 
-      BurnMintERC677 destEth = new BurnMintERC677("dETH", "dETH", 18);
+      BurnMintERC677 destEth = new BurnMintERC677("dETH", "dETH", 18, 0);
       deal(address(destEth), OWNER, 2 ** 128);
       s_destTokens.push(address(destEth));
 

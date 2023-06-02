@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
 import {IAFN} from "./interfaces/IAFN.sol";
 
-import {OwnerIsCreator} from "./OwnerIsCreator.sol";
+import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 
 contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   // STATIC CONFIG

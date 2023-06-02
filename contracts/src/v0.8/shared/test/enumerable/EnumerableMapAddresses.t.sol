@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {BaseTest} from "../BaseTest.t.sol";
-import {EnumerableMapAddressesHelper} from "../helpers/EnumerableMapAddressesHelper.sol";
+import {EnumerableMapAddressesHelper} from "./EnumerableMapAddressesHelper.sol";
 
 contract EnumerableMapAddressesTest is BaseTest {
   EnumerableMapAddressesHelper internal s_helper;

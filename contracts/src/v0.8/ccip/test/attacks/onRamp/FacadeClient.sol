@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {IRouterClient} from "../../../interfaces/IRouterClient.sol";
 
-import {OwnerIsCreator} from "../../../OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../../../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../../../libraries/Client.sol";
 import {CCIPReceiver} from "../../../applications/CCIPReceiver.sol";
 

@@ -12,6 +12,7 @@ set -e
 lcov --remove $1 -o $2 \
   '*/ccip/test/*' \
   '*/vendor/*' \
+  '*/shared/*' \
   'src/v0.8/ccip/ocr/OCR2Abstract.sol' \
   'src/v0.8/ccip/libraries/Internal.sol' \
   'src/v0.8/ccip/libraries/RateLimiter.sol' \

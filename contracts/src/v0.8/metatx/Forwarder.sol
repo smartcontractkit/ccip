@@ -4,7 +4,7 @@ pragma solidity ^0.8.15;
 pragma abicoder v2;
 
 import "./IForwarder.sol";
-import {OwnerIsCreator} from "../ccip/OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../shared/access/OwnerIsCreator.sol";
 
 import {ECDSA} from "../vendor/openzeppelin-solidity/v4.8.0/utils/cryptography/ECDSA.sol";
 import {ERC165} from "../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/ERC165.sol";

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {IBurnMintERC20} from "../../interfaces/pools/IBurnMintERC20.sol";
+import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
 import {ITokenMessenger} from "./ITokenMessenger.sol";
 import {IMessageReceiver} from "./IMessageReceiver.sol";

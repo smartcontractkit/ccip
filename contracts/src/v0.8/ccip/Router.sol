@@ -10,7 +10,7 @@ import {IAny2EVMMessageReceiver} from "./interfaces/IAny2EVMMessageReceiver.sol"
 
 import {Client} from "./libraries/Client.sol";
 import {Internal} from "./libraries/Internal.sol";
-import {OwnerIsCreator} from "./OwnerIsCreator.sol";
+import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 
 import {EnumerableMap} from "../vendor/openzeppelin-solidity/v4.8.0/utils/structs/EnumerableMap.sol";
 import {SafeERC20} from "../vendor/openzeppelin-solidity/v4.8.0/token/ERC20/utils/SafeERC20.sol";

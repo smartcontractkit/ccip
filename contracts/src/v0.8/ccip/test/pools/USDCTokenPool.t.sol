@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {IBurnMintERC20} from "../../interfaces/pools/IBurnMintERC20.sol";
+import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
 import "../BaseTest.t.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {Router} from "../../Router.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
-import {BurnMintERC677} from "../../pools/tokens/BurnMintERC677.sol";
+import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {MockUSDC} from "../mocks/MockUSDC.sol";
 
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/IERC165.sol";
@@ -26,7 +26,7 @@ contract USDCTokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new BurnMintERC677("LINK", "LNK", 18);
+    s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
     setUpRamps();
 

@@ -184,7 +184,7 @@ func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenName Token, poolAl
 		return common.Address{}, common.Address{}, fmt.Errorf("no token symbol given for wrapped token pool %s", tokenName)
 	}
 
-	tokenAddress, tx, _, err := burn_mint_erc677.DeployBurnMintERC677(client.Owner, client.Client, string(tokenName), tokenName.Symbol(), tokenName.Decimals())
+	tokenAddress, tx, _, err := burn_mint_erc677.DeployBurnMintERC677(client.Owner, client.Client, string(tokenName), tokenName.Symbol(), tokenName.Decimals(), big.NewInt(0))
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}

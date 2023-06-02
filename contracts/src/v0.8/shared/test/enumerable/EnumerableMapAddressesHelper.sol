@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {EnumerableMapAddresses} from "../../../libraries/internal/EnumerableMapAddresses.sol";
+import {EnumerableMapAddresses} from "../../enumerable/EnumerableMapAddresses.sol";
 
 contract EnumerableMapAddressesHelper {
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;

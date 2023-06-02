@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {IPool} from "../interfaces/pools/IPool.sol";
 
-import {OwnerIsCreator} from "../OwnerIsCreator.sol";
+import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
 
 import {Pausable} from "../../vendor/Pausable.sol";

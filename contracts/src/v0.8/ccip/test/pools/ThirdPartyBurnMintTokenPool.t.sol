@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {IBurnMintERC20} from "../../interfaces/pools/IBurnMintERC20.sol";
+import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
 import "../BaseTest.t.sol";
 import {ThirdPartyBurnMintTokenPool} from "../../pools/ThirdPartyBurnMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {Router} from "../../Router.sol";
-import {BurnMintERC677} from "../../pools/tokens/BurnMintERC677.sol";
+import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 
 contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
@@ -21,7 +21,7 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new BurnMintERC677("LINK", "LNK", 18);
+    s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
     s_router = new Router(address(s_token));
