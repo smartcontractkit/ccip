@@ -233,7 +233,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
     if (allowlist.length > 0) {
       s_allowlistEnabled = true;
-      _applyAllowListUpdates(allowlist, new address[](0));
+      _applyAllowListUpdates(new address[](0), allowlist);
     }
   }
 

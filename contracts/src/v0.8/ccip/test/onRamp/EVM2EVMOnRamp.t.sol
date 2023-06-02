@@ -30,11 +30,15 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     vm.expectEmit();
     emit PoolAdded(tokensAndPools[0].token, tokensAndPools[0].pool);
 
+    address[] memory allowList = new address[](2);
+    allowList[0] = OWNER;
+    allowList[1] = STRANGER;
+
     s_onRamp = new EVM2EVMOnRampHelper(
       staticConfig,
       dynamicConfig,
       tokensAndPools,
-      new address[](0),
+      allowList,
       rateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
@@ -63,6 +67,14 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq("EVM2EVMOnRamp 1.0.0", s_onRamp.typeAndVersion());
     assertEq(OWNER, s_onRamp.owner());
     assertEq(1, s_onRamp.getExpectedNextSequenceNumber());
+
+    assertEq(true, s_onRamp.getAllowListEnabled());
+
+    address[] memory setAllowList = s_onRamp.getAllowList();
+    assertEq(allowList.length, setAllowList.length);
+    for (uint256 i = 0; i < allowList.length; ++i) {
+      assertEq(allowList[i], setAllowList[i]);
+    }
   }
 }
 
