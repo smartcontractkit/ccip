@@ -21,9 +21,10 @@ contract ThirdPartyBurnMintTokenPool is BurnMintTokenPool {
 
   constructor(
     IBurnMintERC20 token,
+    address[] memory allowlist,
     RateLimiter.Config memory rateLimiterConfig,
     address router
-  ) BurnMintTokenPool(token, rateLimiterConfig) {
+  ) BurnMintTokenPool(token, allowlist, rateLimiterConfig) {
     s_router = router;
   }
 

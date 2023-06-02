@@ -7,8 +7,16 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 /// @notice This pool mints and burns a 3rd-party token.
+/// @dev Pool whitelisting mode is set in the constructor and cannot be modified later.
+/// It either accepts any address as originalSender, or only accepts whitelisted originalSender.
+/// The only way to change whitelisting mode is to deploy a new pool.
+/// If that is expected, please make sure the token's burner/minter roles are adjustable.
 contract BurnMintTokenPool is TokenPool {
-  constructor(IBurnMintERC20 token, RateLimiter.Config memory rateLimiterConfig) TokenPool(token, rateLimiterConfig) {
+  constructor(
+    IBurnMintERC20 token,
+    address[] memory allowlist,
+    RateLimiter.Config memory rateLimiterConfig
+  ) TokenPool(token, allowlist, rateLimiterConfig) {
     token.approve(address(this), 2 ** 256 - 1);
   }
 
@@ -17,12 +25,12 @@ contract BurnMintTokenPool is TokenPool {
   /// Benefits of rate limiting here does not justify the extra gas cost.
   /// @param amount Amount to burn
   function lockOrBurn(
-    address,
+    address originalSender,
     bytes calldata,
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp {
+  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) {
     IBurnMintERC20(address(i_token)).burn(amount);
     emit Burned(msg.sender, amount);
   }

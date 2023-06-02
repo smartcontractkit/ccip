@@ -247,6 +247,7 @@ type EVMBridgedToken struct {
 	Price *big.Int
 	PriceFeed
 	TokenPoolType
+	PoolAllowList []gethcommon.Address // empty slice indicates allowList is not enabled
 }
 
 type TokenPriceType string

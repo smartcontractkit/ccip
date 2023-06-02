@@ -19,6 +19,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
 
   error PermissionsError();
   error NullAddressNotAllowed();
+  error SenderNotAllowed(address sender);
+  error AllowListNotEnabled();
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
@@ -26,6 +28,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
   event OnRampAllowanceSet(address onRamp, bool allowed);
   event OffRampAllowanceSet(address onRamp, bool allowed);
+  event AllowListAdd(address sender);
+  event AllowListRemove(address sender);
 
   struct RampUpdate {
     address ramp;
@@ -34,14 +38,18 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
 
   // The immutable token that belongs to this pool.
   IERC20 internal immutable i_token;
+  // The immutable flag that indicates if the pool is access-controled.
+  bool internal immutable i_allowlistEnabled;
   // A set of allowed onRamps.
   EnumerableSet.AddressSet internal s_onRamps;
   // A set of allowed offRamps.
   EnumerableSet.AddressSet internal s_offRamps;
+  // A set of addresses allowed to trigger lockOrBurn as original senders.
+  EnumerableSet.AddressSet internal s_allowList;
   // The token bucket object that contains the bucket state.
   RateLimiter.TokenBucket private s_rateLimiter;
 
-  constructor(IERC20 token, RateLimiter.Config memory rateLimiterConfig) {
+  constructor(IERC20 token, address[] memory allowlist, RateLimiter.Config memory rateLimiterConfig) {
     if (address(token) == address(0)) revert NullAddressNotAllowed();
 
     s_rateLimiter = RateLimiter.TokenBucket({
@@ -53,6 +61,12 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
     });
 
     i_token = token;
+
+    // pool can be set as permissioned or permissionless at deployment time
+    i_allowlistEnabled = allowlist.length > 0;
+    if (i_allowlistEnabled) {
+      _applyAllowListUpdates(new address[](0), allowlist);
+    }
   }
 
   /// @inheritdoc IPool
@@ -151,5 +165,59 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
   /// @notice Unpauses the token pool.
   function unpause() external onlyOwner {
     _unpause();
+  }
+
+  // ================================================================
+  // |                          Allowlist                           |
+  // ================================================================
+
+  modifier checkAllowList(address sender) {
+    if (i_allowlistEnabled && !s_allowList.contains(sender)) revert SenderNotAllowed(sender);
+    _;
+  }
+
+  /// @notice Gets whether the allowList functionality is enabled.
+  /// @return true is enabled, false if not.
+  function getAllowListEnabled() external view returns (bool) {
+    return i_allowlistEnabled;
+  }
+
+  /// @notice Gets the allowed addresses.
+  /// @return The allowed addresses.
+  function getAllowList() external view returns (address[] memory) {
+    address[] memory allowList = new address[](s_allowList.length());
+    for (uint256 i = 0; i < s_allowList.length(); ++i) {
+      allowList[i] = s_allowList.at(i);
+    }
+    return allowList;
+  }
+
+  /// @notice Apply updates to the allow list.
+  /// @param removes The addresses to be removed.
+  /// @param adds The addresses to be added.
+  /// @dev allowListing will be removed before public launch
+  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
+    _applyAllowListUpdates(removes, adds);
+  }
+
+  /// @notice Internal version of applyAllowListUpdates to allow for reuse in the constructor.
+  function _applyAllowListUpdates(address[] memory removes, address[] memory adds) internal {
+    if (!i_allowlistEnabled) revert AllowListNotEnabled();
+
+    for (uint256 i = 0; i < removes.length; ++i) {
+      address toRemove = removes[i];
+      if (s_allowList.remove(toRemove)) {
+        emit AllowListRemove(toRemove);
+      }
+    }
+    for (uint256 i = 0; i < adds.length; ++i) {
+      address toAdd = adds[i];
+      if (toAdd == address(0)) {
+        continue;
+      }
+      if (s_allowList.add(toAdd)) {
+        emit AllowListAdd(toAdd);
+      }
+    }
   }
 }

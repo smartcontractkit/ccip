@@ -14,12 +14,15 @@ import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/intros
 
 contract USDCTokenPoolSetup is BaseTest {
   IBurnMintERC20 internal s_token;
-  USDCTokenPool internal s_usdcTokenPool;
+  MockUSDC internal s_mockUSDC;
+
   address internal s_routerAllowedOnRamp = address(3456);
   address internal s_routerAllowedOffRamp = address(234);
   Router internal s_router;
 
-  MockUSDC internal s_mockUSDC;
+  USDCTokenPool internal s_usdcTokenPool;
+  USDCTokenPool internal s_usdcTokenPoolWithAllowList;
+  address[] internal s_allowedList;
 
   function setUp() public virtual override {
     BaseTest.setUp();
@@ -35,7 +38,10 @@ contract USDCTokenPoolSetup is BaseTest {
       messageTransmitter: address(s_mockUSDC)
     });
 
-    s_usdcTokenPool = new USDCTokenPool(config, s_token, rateLimiterConfig());
+    s_usdcTokenPool = new USDCTokenPool(config, s_token, new address[](0), rateLimiterConfig());
+
+    s_allowedList.push(USER_1);
+    s_usdcTokenPoolWithAllowList = new USDCTokenPool(config, s_token, s_allowedList, rateLimiterConfig());
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
     onRamps[0] = TokenPool.RampUpdate({ramp: s_routerAllowedOnRamp, allowed: true});
@@ -44,6 +50,7 @@ contract USDCTokenPoolSetup is BaseTest {
     offRamps[0] = TokenPool.RampUpdate({ramp: s_routerAllowedOffRamp, allowed: true});
 
     s_usdcTokenPool.applyRampUpdates(onRamps, offRamps);
+    s_usdcTokenPoolWithAllowList.applyRampUpdates(onRamps, offRamps);
 
     USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](1);
     domains[0] = USDCTokenPool.DomainUpdate({
@@ -53,6 +60,7 @@ contract USDCTokenPoolSetup is BaseTest {
     });
 
     s_usdcTokenPool.setDomains(domains);
+    s_usdcTokenPoolWithAllowList.setDomains(domains);
   }
 
   function setUpRamps() internal {
@@ -70,6 +78,7 @@ contract USDCTokenPoolSetup is BaseTest {
 }
 
 contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
+  error SenderNotAllowed(address sender);
   event DepositForBurn(
     uint64 indexed nonce,
     address indexed burnToken,
@@ -84,7 +93,6 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
   function testLockOrBurnSuccess(bytes32 destinationReceiver, uint256 amount) public {
     changePrank(s_routerAllowedOnRamp);
-    deal(address(s_token), s_routerAllowedOnRamp, amount);
     s_token.approve(address(s_usdcTokenPool), amount);
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_ID);
@@ -107,6 +115,36 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_ID, bytes(""));
   }
 
+  function testLockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
+    changePrank(s_routerAllowedOnRamp);
+    s_token.approve(address(s_usdcTokenPoolWithAllowList), amount);
+
+    USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPoolWithAllowList.getDomain(DEST_CHAIN_ID);
+
+    vm.expectEmit();
+    emit DepositForBurn(
+      s_mockUSDC.s_nonce(),
+      address(s_token),
+      amount,
+      address(s_usdcTokenPoolWithAllowList),
+      destinationReceiver,
+      expectedDomain.domainIdentifier,
+      s_mockUSDC.i_destinationTokenMessenger(),
+      expectedDomain.allowedCaller
+    );
+
+    vm.expectEmit();
+    emit Burned(s_routerAllowedOnRamp, amount);
+
+    s_usdcTokenPoolWithAllowList.lockOrBurn(
+      s_allowedList[0],
+      abi.encodePacked(destinationReceiver),
+      amount,
+      DEST_CHAIN_ID,
+      bytes("")
+    );
+  }
+
   // Reverts
   function testUnknownDomainReverts() public {
     uint256 amount = 1000;
@@ -125,6 +163,14 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectRevert(TokenPool.PermissionsError.selector);
 
     s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(address(0)), 0, DEST_CHAIN_ID, bytes(""));
+  }
+
+  function testLockOrBurnWithAllowListReverts() public {
+    changePrank(s_routerAllowedOnRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
+
+    s_usdcTokenPoolWithAllowList.lockOrBurn(STRANGER, abi.encodePacked(address(0)), 1000, DEST_CHAIN_ID, bytes(""));
   }
 }
 

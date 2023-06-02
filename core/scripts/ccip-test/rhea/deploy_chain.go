@@ -102,11 +102,11 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 		var err error
 		switch tokenConfig.TokenPoolType {
 		case LockRelease:
-			poolAddress, err = deployLockReleaseTokenPool(client, tokenName, tokenConfig.Token)
+			poolAddress, err = deployLockReleaseTokenPool(client, tokenName, tokenConfig.Token, tokenConfig.PoolAllowList)
 		case BurnMint:
-			poolAddress, err = deployBurnMintTokenPool(client, tokenName, tokenConfig.Token)
+			poolAddress, err = deployBurnMintTokenPool(client, tokenName, tokenConfig.Token, tokenConfig.PoolAllowList)
 		case Wrapped:
-			tokenAddress, poolAddress, err = deployWrappedTokenPool(client, tokenName)
+			tokenAddress, poolAddress, err = deployWrappedTokenPool(client, tokenName, tokenConfig.PoolAllowList)
 			// Since we also deployed the token we need to set it
 			tokenConfig.Token = tokenAddress
 		default:
@@ -120,6 +120,7 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 			Pool:          poolAddress,
 			Price:         tokenConfig.Price,
 			TokenPoolType: tokenConfig.TokenPoolType,
+			PoolAllowList: tokenConfig.PoolAllowList,
 		}
 		return nil
 	}
@@ -129,14 +130,16 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 		return fmt.Errorf("deploy new %s pool set to false but no %s pool given in config", tokenName, tokenConfig.TokenPoolType)
 	}
 	client.Logger.Infof("Skipping %s Pool deployment, using Pool on %s", tokenName, tokenConfig.Pool)
-	return nil
+
+	return setPoolAllowList(client, tokenConfig.Pool, tokenConfig.PoolAllowList, tokenName)
 }
 
-func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address) (common.Address, error) {
+func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address, poolAllowList []common.Address) (common.Address, error) {
 	tokenPoolAddress, tx, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
 		client.Owner,
 		client.Client,
 		tokenAddress,
+		poolAllowList,
 		lock_release_token_pool.RateLimiterConfig{
 			IsEnabled: false,
 			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e9)),
@@ -157,12 +160,13 @@ func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, to
 	return tokenPoolAddress, err
 }
 
-func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address) (common.Address, error) {
+func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address, poolAllowList []common.Address) (common.Address, error) {
 	client.Logger.Infof("Deploying token pool for %s token", tokenName)
 	tokenPoolAddress, tx, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(
 		client.Owner,
 		client.Client,
 		tokenAddress,
+		poolAllowList,
 		burn_mint_token_pool.RateLimiterConfig{
 			IsEnabled: false,
 			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e9)),
@@ -178,7 +182,7 @@ func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, token
 	return tokenPoolAddress, nil
 }
 
-func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenName Token) (common.Address, common.Address, error) {
+func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenName Token, poolAllowList []common.Address) (common.Address, common.Address, error) {
 	client.Logger.Infof("Deploying token pool for %s token", tokenName)
 	if tokenName.Symbol() == "" {
 		return common.Address{}, common.Address{}, fmt.Errorf("no token symbol given for wrapped token pool %s", tokenName)
@@ -193,7 +197,7 @@ func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenName Token) (commo
 	}
 	client.Logger.Infof("New %s token deployed on %s in tx %s", tokenName, tokenAddress, helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 
-	poolAddress, err := deployBurnMintTokenPool(client, tokenName, tokenAddress)
+	poolAddress, err := deployBurnMintTokenPool(client, tokenName, tokenAddress, poolAllowList)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}

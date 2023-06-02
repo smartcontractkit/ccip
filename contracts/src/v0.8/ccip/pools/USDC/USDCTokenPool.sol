@@ -61,8 +61,9 @@ contract USDCTokenPool is TokenPool {
   constructor(
     USDCConfig memory config,
     IBurnMintERC20 token,
+    address[] memory allowlist,
     RateLimiter.Config memory rateLimiterConfig
-  ) TokenPool(token, rateLimiterConfig) {
+  ) TokenPool(token, allowlist, rateLimiterConfig) {
     _setConfig(config);
 
     i_token.approve(config.tokenMessenger, type(uint256).max);
@@ -84,12 +85,12 @@ contract USDCTokenPool is TokenPool {
   /// @param amount Amount to burn
   /// @dev emits ITokenMessenger.DepositForBurn
   function lockOrBurn(
-    address,
+    address originalSender,
     bytes calldata destinationReceiver,
     uint256 amount,
     uint64 destChainSelector,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp {
+  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) {
     Domain memory domain = s_chainToDomain[destChainSelector];
     if (domain.domainIdentifier == 0) revert UnknownDomain(destChainSelector);
     bytes32 receiver = bytes32(destinationReceiver[0:32]);

@@ -9,6 +9,9 @@ import {BurnMintERC677} from "../../pools/tokens/BurnMintERC677.sol";
 contract LockReleaseTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
   LockReleaseTokenPool internal s_lockReleaseTokenPool;
+  LockReleaseTokenPool internal s_lockReleaseTokenPoolWithAllowList;
+  address[] internal s_allowedList;
+
   address internal s_allowedOnRamp = address(123);
   address internal s_allowedOffRamp = address(234);
 
@@ -16,7 +19,11 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     BaseTest.setUp();
     s_token = new BurnMintERC677("LINK", "LNK", 18);
     deal(address(s_token), OWNER, type(uint256).max);
-    s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, rateLimiterConfig());
+    s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, new address[](0), rateLimiterConfig());
+
+    s_allowedList.push(USER_1);
+    s_allowedList.push(DUMMY_CONTRACT_ADDRESS);
+    s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(s_token, s_allowedList, rateLimiterConfig());
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
     onRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true});
@@ -24,6 +31,44 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     offRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOffRamp, allowed: true});
 
     s_lockReleaseTokenPool.applyRampUpdates(onRamps, offRamps);
+    s_lockReleaseTokenPoolWithAllowList.applyRampUpdates(onRamps, offRamps);
+  }
+}
+
+contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
+  error SenderNotAllowed(address sender);
+  event Locked(address indexed sender, uint256 amount);
+
+  function testLockOrBurnNoAllowListSuccess(uint256 amount) public {
+    changePrank(s_allowedOnRamp);
+
+    vm.expectEmit();
+    emit Locked(s_allowedOnRamp, amount);
+
+    s_lockReleaseTokenPool.lockOrBurn(STRANGER, bytes(""), amount, DEST_CHAIN_ID, bytes(""));
+  }
+
+  function testLockOrBurnWithAllowListSuccess() public {
+    uint256 amount = 100;
+    changePrank(s_allowedOnRamp);
+
+    vm.expectEmit();
+    emit Locked(s_allowedOnRamp, amount);
+
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), amount, DEST_CHAIN_ID, bytes(""));
+
+    vm.expectEmit();
+    emit Locked(s_allowedOnRamp, amount);
+
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[1], bytes(""), amount, DEST_CHAIN_ID, bytes(""));
+  }
+
+  function testLockOrBurnWithAllowListReverts() public {
+    changePrank(s_allowedOnRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
+
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(STRANGER, bytes(""), 100, DEST_CHAIN_ID, bytes(""));
   }
 }
 

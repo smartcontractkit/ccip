@@ -432,11 +432,17 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		return [20]byte{}, nil, err
 	}
 
-	destPoolAddress, _, destPool, err := burn_mint_token_pool.DeployBurnMintTokenPool(c.Dest.User, c.Dest.Chain, destTokenAddress, burn_mint_token_pool.RateLimiterConfig{
-		IsEnabled: true,
-		Capacity:  HundredLink,
-		Rate:      big.NewInt(1e18),
-	})
+	destPoolAddress, _, destPool, err := burn_mint_token_pool.DeployBurnMintTokenPool(
+		c.Dest.User,
+		c.Dest.Chain,
+		destTokenAddress,
+		[]common.Address{}, // pool originalSender allowList
+		burn_mint_token_pool.RateLimiterConfig{
+			IsEnabled: true,
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+		},
+	)
 	if err != nil {
 		return [20]byte{}, nil, err
 	}
@@ -455,11 +461,17 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	}
 	c.Dest.Chain.Commit()
 
-	sourcePoolAddress, _, sourcePool, err := lock_release_token_pool.DeployLockReleaseTokenPool(c.Source.User, c.Source.Chain, sourceTokenAddress, lock_release_token_pool.RateLimiterConfig{
-		IsEnabled: true,
-		Capacity:  HundredLink,
-		Rate:      big.NewInt(1e18),
-	})
+	sourcePoolAddress, _, sourcePool, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+		c.Source.User,
+		c.Source.Chain,
+		sourceTokenAddress,
+		[]common.Address{}, // empty allowList at deploy time indicates pool has no original sender restrictions
+		lock_release_token_pool.RateLimiterConfig{
+			IsEnabled: true,
+			Capacity:  HundredLink,
+			Rate:      big.NewInt(1e18),
+		},
+	)
 	if err != nil {
 		return [20]byte{}, nil, err
 	}
@@ -625,6 +637,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceUser,
 		sourceChain,
 		sourceLinkTokenAddress,
+		[]common.Address{},
 		lock_release_token_pool.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  HundredLink,
@@ -645,6 +658,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destUser,
 		destChain,
 		destLinkTokenAddress,
+		[]common.Address{},
 		lock_release_token_pool.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  HundredLink,
@@ -698,6 +712,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceUser,
 		sourceChain,
 		sourceWeth9addr,
+		[]common.Address{},
 		lock_release_token_pool.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  HundredLink,
@@ -835,6 +850,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destUser,
 		destChain,
 		destWeth9addr,
+		[]common.Address{},
 		lock_release_token_pool.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  HundredLink,

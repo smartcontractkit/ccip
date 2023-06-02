@@ -23,7 +23,7 @@ func DeployCacheGoldTokenAndPool(t *testing.T, client *EvmDeploymentConfig) {
 	shared.RequireNoError(t, err)
 	client.Logger.Infof("CACHE.gold token instance deployed on %s in tx: %s", tokenAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 
-	poolAddress, err := deployBurnMintTokenPool(client, CACHEGOLD, tokenAddress)
+	poolAddress, err := deployBurnMintTokenPool(client, CACHEGOLD, tokenAddress, []common.Address{})
 	shared.RequireNoError(t, err)
 
 	cacheGoldToken, err := cache_gold_child.NewCacheGoldChild(tokenAddress, client.Client)

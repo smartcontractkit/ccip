@@ -16,7 +16,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
     address facade,
     IERC20 token,
     RateLimiter.Config memory rateLimiterConfig
-  ) TokenPool(token, rateLimiterConfig) {
+  ) TokenPool(token, new address[](0), rateLimiterConfig) {
     i_facade = facade;
   }
 
