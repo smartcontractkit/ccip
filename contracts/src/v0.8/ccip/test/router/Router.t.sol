@@ -424,7 +424,13 @@ contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
 
 /// @notice #routeMessage
 contract Router_routeMessage is EVM2EVMOffRampSetup {
-  event MessageExecuted(bytes32 indexed messageId, bool success, bytes data);
+  event MessageExecuted(
+    bytes32 indexed messageId,
+    uint64 sourceChainSelector,
+    address offRamp,
+    bool success,
+    bytes data
+  );
 
   function setUp() public virtual override {
     EVM2EVMOffRampSetup.setUp();
@@ -455,6 +461,8 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     vm.expectEmit();
     emit MessageExecuted(
       message.messageId,
+      message.sourceChainSelector,
+      address(s_offRamp),
       false,
       abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, realError1)
     );
@@ -476,6 +484,8 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     vm.expectEmit();
     emit MessageExecuted(
       message.messageId,
+      message.sourceChainSelector,
+      address(s_offRamp),
       false,
       abi.encodeWithSelector(
         MaybeRevertMessageReceiver.CustomError.selector,
@@ -495,7 +505,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     );
     // Should emit success
     vm.expectEmit();
-    emit MessageExecuted(message.messageId, true, new bytes(0));
+    emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp), true, new bytes(0));
 
     assertTrue(
       s_destRouter.routeMessage(
@@ -516,6 +526,8 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       vm.expectEmit();
       emit MessageExecuted(
         message.messageId,
+        message.sourceChainSelector,
+        address(s_offRamp),
         false,
         abi.encodeWithSelector(
           MaybeRevertMessageReceiver.CustomError.selector,
@@ -529,6 +541,8 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       vm.expectEmit();
       emit MessageExecuted(
         message.messageId,
+        message.sourceChainSelector,
+        address(s_offRamp),
         false,
         abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, error)
       );

@@ -26,7 +26,13 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
   event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
   event OffRampRemoved(uint64 indexed sourceChainSelector, address offRamp);
-  event MessageExecuted(bytes32 indexed messageId, bool success, bytes data);
+  event MessageExecuted(
+    bytes32 indexed messageId,
+    uint64 sourceChainSelector,
+    address offRamp,
+    bool success,
+    bytes data
+  );
 
   struct OnRamp {
     uint64 destChainSelector;
@@ -151,7 +157,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     );
     // Execution message is emitted here so clients have a static address to monitor for results,
     // for example to detect failures and retry manually or to notify upon success.
-    emit MessageExecuted(message.messageId, success, retBytes);
+    emit MessageExecuted(message.messageId, message.sourceChainSelector, msg.sender, success, retBytes);
     return success;
   }
 

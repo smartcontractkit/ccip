@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - If `allowList` is empty
     - pool is constructed with allowList disabled
     - allowList cannot be enabled later on
+- Added source chain selector and offramp address to `MessageExecuted` event emitted by Router
 
 ## 0.4.0 - 2023-05-24
 
