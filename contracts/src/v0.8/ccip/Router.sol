@@ -170,7 +170,10 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     uint256 gasAmount,
     address target,
     bytes memory data
-  ) internal returns (bool success, bytes memory retData) {
+  ) internal returns (bool, bytes memory) {
+    // allocate retData memory ahead of time
+    bytes memory retData = new bytes(MAX_RET_BYTES);
+    bool success;
     // solhint-disable-next-line no-inline-assembly
     assembly {
       let g := gas()
