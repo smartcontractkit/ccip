@@ -116,7 +116,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
       // Note we take the whole msg.value regardless if its larger.
       feeTokenAmount = msg.value;
       IWrappedNative(message.feeToken).deposit{value: feeTokenAmount}();
-      IERC20(message.feeToken).safeTransferFrom(address(this), onRamp, feeTokenAmount);
+      IERC20(message.feeToken).safeTransfer(onRamp, feeTokenAmount);
     } else {
       if (msg.value > 0) revert InvalidMsgValue();
       feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(message);
