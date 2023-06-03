@@ -135,7 +135,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
-			UniqueReports: true,
+			UniqueReports: false, // See comment in CommitStore constructor.
 			Limits: types.ReportingPluginLimits{
 				MaxQueryLength:       MaxQueryLength,
 				MaxObservationLength: MaxObservationLength,

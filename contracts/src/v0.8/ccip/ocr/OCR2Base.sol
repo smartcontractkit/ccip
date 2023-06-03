@@ -79,6 +79,12 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       32 + // word containing length rs
       32; // word containing length of ss
 
+  bool internal immutable i_uniqueReports;
+
+  constructor(bool uniqueReports) {
+    i_uniqueReports = uniqueReports;
+  }
+
   // Reverts transaction if config args are invalid
   modifier checkConfigValid(
     uint256 numSigners,
@@ -197,7 +203,13 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
 
     emit Transmitted(configDigest, uint32(uint256(reportContext[1]) >> 8));
 
-    if (rs.length != (configInfo.n + configInfo.f) / 2 + 1) revert WrongNumberOfSignatures();
+    uint256 expectedNumSignatures;
+    if (i_uniqueReports) {
+      expectedNumSignatures = (configInfo.n + configInfo.f) / 2 + 1;
+    } else {
+      expectedNumSignatures = configInfo.f + 1;
+    }
+    if (rs.length != expectedNumSignatures) revert WrongNumberOfSignatures();
     if (rs.length != ss.length) revert SignaturesOutOfRegistration();
 
     // Scoping this reduces stack pressure and gas usage

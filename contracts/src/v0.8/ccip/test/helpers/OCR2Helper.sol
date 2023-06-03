@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {OCR2Base} from "../../ocr/OCR2Base.sol";
 
-contract OCR2Helper is OCR2Base {
+contract OCR2Helper is OCR2Base(false) {
   function configDigestFromConfigData(
     uint256 chainSelector,
     address contractAddress,

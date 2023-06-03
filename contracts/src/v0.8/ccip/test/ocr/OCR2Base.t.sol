@@ -30,7 +30,7 @@ contract OCR2BaseSetup is BaseTest {
 
   bytes32[] s_rs;
   bytes32[] s_ss;
-  bytes32 constant s_rawVs = bytes32(uint256(1 << (256 - 8)));
+  bytes32 s_rawVs;
 
   uint64 constant s_offchainConfigVersion = 3;
   uint8 constant s_f = 1;
@@ -50,18 +50,21 @@ contract OCR2BaseSetup is BaseTest {
     s_valid_signers[2] = 0xc110fdF6e8fD679C7Cc11602d1cd829211A18e9b;
     s_valid_signers[3] = 0xc11028017c9b445B6bF8aE7da951B5cC28B326C0;
 
-    bytes32[] memory rs = new bytes32[](3);
-    bytes32[] memory ss = new bytes32[](3);
+    bytes32[] memory rs = new bytes32[](2);
+    bytes32[] memory ss = new bytes32[](2);
 
-    rs[0] = 0x63b66c6cf62c3c79cb705c3d59d6c88a2116e496fcf40ce5247717768ea7ad45;
-    ss[0] = 0x2fb845202d90ab3cfe5938e45b63d85217bf4df010a811744994cfa58e9a048f;
-
+    // Signer 2
     rs[1] = 0x60f64b8490d0b3621f0b5258fb5dbe342cec2e0d31cbeb35169a52b7900657d7;
     ss[1] = 0x76719ca79072761168cfe0da7a0dcab92e97762c55e19f539a88bb9b4a0482b4;
 
-    rs[2] = 0x7b34fcc75f34ee5072739531b8062c7ad3e72164d54484dea7a3b85a0b3dae29;
-    ss[2] = 0x32086d9355be3832f0cc969153c8926e3677c7ebd4990acd2f16a2b75681bad0;
+    // Signer 1
+    rs[0] = 0x7b34fcc75f34ee5072739531b8062c7ad3e72164d54484dea7a3b85a0b3dae29;
+    ss[0] = 0x32086d9355be3832f0cc969153c8926e3677c7ebd4990acd2f16a2b75681bad0;
 
+    // s_rawVs stores the Vs for each signature (up to 32) concatenated, i.e.
+    // 00000001 || 00000000 || ... || 00000001
+    // V for the both these canned signature is 0 so rawVs is zero.
+    s_rawVs = bytes32(uint256(0));
     s_rs = rs;
     s_ss = ss;
   }
@@ -121,7 +124,7 @@ contract OCR2Base_transmit is OCR2BaseSetup {
     );
   }
 
-  function testTransmit3SignersSuccess_gas() public {
+  function testTransmit2SignersSuccess_gas() public {
     vm.pauseGasMetering();
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
     bytes memory report = abi.encode("testReport");
@@ -154,8 +157,8 @@ contract OCR2Base_transmit is OCR2BaseSetup {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
     bytes memory report = abi.encode("testReport");
 
-    bytes32[] memory rs = new bytes32[](3);
-    bytes32[] memory ss = new bytes32[](2);
+    bytes32[] memory rs = new bytes32[](2);
+    bytes32[] memory ss = new bytes32[](1);
 
     vm.expectRevert(OCR2Base.SignaturesOutOfRegistration.selector);
     s_OCR2Base.transmit(reportContext, report, rs, ss, s_rawVs);
@@ -164,8 +167,8 @@ contract OCR2Base_transmit is OCR2BaseSetup {
   function testUnAuthorizedTransmitterReverts() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
     bytes memory report = abi.encode("testReport");
-    bytes32[] memory rs = new bytes32[](3);
-    bytes32[] memory ss = new bytes32[](3);
+    bytes32[] memory rs = new bytes32[](2);
+    bytes32[] memory ss = new bytes32[](2);
 
     vm.expectRevert(OCR2Base.UnauthorizedTransmitter.selector);
     s_OCR2Base.transmit(reportContext, report, rs, ss, s_rawVs);
@@ -176,19 +179,22 @@ contract OCR2Base_transmit is OCR2BaseSetup {
     bytes memory report = abi.encode("testReport");
     bytes32[] memory rs = s_rs;
     bytes32[] memory ss = s_ss;
+    bytes32 rawVs = s_rawVs;
 
-    rs[2] = rs[1];
-    ss[2] = ss[1];
+    // Copy first signature to the second
+    // They both have 0 v values, so no need to copy that.
+    rs[1] = rs[0];
+    ss[1] = ss[0];
 
     changePrank(s_valid_transmitters[0]);
     vm.expectRevert(OCR2Base.NonUniqueSignatures.selector);
-    s_OCR2Base.transmit(reportContext, report, rs, ss, s_rawVs);
+    s_OCR2Base.transmit(reportContext, report, rs, ss, rawVs);
   }
 
   function testUnauthorizedSignerReverts() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
     bytes memory report = abi.encode("testReport");
-    bytes32[] memory rs = new bytes32[](3);
+    bytes32[] memory rs = new bytes32[](2);
     rs[0] = s_configDigest;
     bytes32[] memory ss = rs;
 

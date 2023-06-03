@@ -134,8 +134,10 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			cachedDstTokens:    cachedDstTokens,
 			cachedSrcFeeTokens: cachedSrcFeeTokens,
 		}, types.ReportingPluginInfo{
-			Name:          "CCIPExecution",
-			UniqueReports: true,
+			Name: "CCIPExecution",
+			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
+			// (OffRamp is only able to execute committed messages).
+			UniqueReports: false,
 			Limits: types.ReportingPluginLimits{
 				MaxObservationLength: MaxObservationLength,
 				MaxReportLength:      MaxExecutionReportLength,
