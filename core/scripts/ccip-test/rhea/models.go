@@ -56,22 +56,25 @@ const (
 	Goerli         Chain = "ethereum-testnet-goerli"
 	PolygonMumbai  Chain = "polygon-testnet-mumbai"
 	ArbitrumGoerli Chain = "ethereum-testnet-goerli-arbitrum-1"
+	Quorum         Chain = "quorum-testnet-swift"
 )
 
 func GetAllChains() []Chain {
 	return []Chain{
-		Sepolia, AvaxFuji, OptimismGoerli, Goerli, PolygonMumbai, ArbitrumGoerli,
+		Sepolia, AvaxFuji, OptimismGoerli, Goerli, PolygonMumbai, ArbitrumGoerli, Quorum,
 	}
 }
 
-var evmChainIdToChainSelector = map[uint64]uint64{
-	11155111: 16015286601757825753,
-	420:      2664363617261496610,
-	421613:   6101244977088475029,
-	43113:    14767482510784806043,
-}
-
 func GetCCIPChainSelector(EVMChainId uint64) uint64 {
+	var evmChainIdToChainSelector = map[uint64]uint64{
+		420:      2664363617261496610,
+		1337:     3379446385462418246,
+		43113:    14767482510784806043,
+		80001:    12532609583862916517,
+		421613:   6101244977088475029,
+		11155111: 16015286601757825753,
+	}
+
 	selector, ok := evmChainIdToChainSelector[EVMChainId]
 	if !ok {
 		panic(fmt.Sprintf("no chain selector for %d", EVMChainId))
@@ -82,27 +85,43 @@ func GetCCIPChainSelector(EVMChainId uint64) uint64 {
 type Token string
 
 const (
-	LINK      Token = "Link"
-	WETH      Token = "WETH"
-	WAVAX     Token = "WAVAX"
-	CACHEGOLD Token = "CACHE.gold"
-	ANZ       Token = "ANZ"
-	InsurAce  Token = "InsurAce"
+	LINK       Token = "Link"
+	WETH       Token = "WETH"
+	WAVAX      Token = "WAVAX"
+	WMATIC     Token = "WMATIC"
+	CACHEGOLD  Token = "CACHE.gold"
+	ANZ        Token = "ANZ"
+	InsurAce   Token = "InsurAce"
+	ZUSD       Token = "zUSD"
+	STEADY     Token = "STEADY"
+	SUPER      Token = "SUPER"
+	BondToken  Token = "BondToken"
+	BankToken  Token = "BankToken"
+	SNXUSD     Token = "snxUSD"
+	FUGAZIUSDC Token = "FugaziUSDCToken"
 )
 
 func GetAllTokens() []Token {
 	return []Token{
-		LINK, WETH, WAVAX, CACHEGOLD, ANZ, InsurAce,
+		LINK, WETH, WAVAX, WMATIC, CACHEGOLD, ANZ, InsurAce, ZUSD, STEADY, SUPER, BondToken, BankToken, SNXUSD, FUGAZIUSDC,
 	}
 }
 
 var tokenSymbols = map[Token]string{
-	LINK:      "LINK",
-	WETH:      "wETH",
-	WAVAX:     "wAVAX",
-	CACHEGOLD: "CGT",
-	ANZ:       "A$DC",
-	InsurAce:  "INSUR",
+	LINK:       "LINK",
+	WETH:       "wETH",
+	WAVAX:      "wAVAX",
+	WMATIC:     "wMATIC",
+	CACHEGOLD:  "CGT",
+	ANZ:        "A$DC",
+	InsurAce:   "INSUR",
+	ZUSD:       "zUSD",
+	STEADY:     "Steadefi",
+	SUPER:      "SuperDuper",
+	BondToken:  "BondToken",
+	BankToken:  "BankToken",
+	SNXUSD:     "snxUSD",
+	FUGAZIUSDC: "FUGAZIUSDC",
 }
 
 func (token Token) Symbol() string {
@@ -110,12 +129,20 @@ func (token Token) Symbol() string {
 }
 
 var tokenDecimalMultiplier = map[Token]uint8{
-	LINK:      18,
-	WETH:      18,
-	WAVAX:     18,
-	CACHEGOLD: 8,
-	ANZ:       6,
-	InsurAce:  18,
+	LINK:       18,
+	WETH:       18,
+	WAVAX:      18,
+	WMATIC:     18,
+	CACHEGOLD:  8,
+	ANZ:        6,
+	InsurAce:   18,
+	ZUSD:       18,
+	STEADY:     18,
+	SUPER:      18,
+	BondToken:  18,
+	BankToken:  18,
+	SNXUSD:     18,
+	FUGAZIUSDC: 6,
 }
 
 func (token Token) Decimals() uint8 {
@@ -128,12 +155,20 @@ func (token Token) Decimals() uint8 {
 func (token Token) Price() *big.Int {
 	// Token prices in $ per whole coin
 	var TokenPrices = map[Token]*big.Float{
-		LINK:      big.NewFloat(10),
-		WETH:      big.NewFloat(1500),
-		WAVAX:     big.NewFloat(25),
-		CACHEGOLD: big.NewFloat(60),
-		ANZ:       big.NewFloat(1),
-		InsurAce:  big.NewFloat(0.08),
+		LINK:       big.NewFloat(6.5),
+		WETH:       big.NewFloat(1800),
+		WAVAX:      big.NewFloat(15),
+		WMATIC:     big.NewFloat(0.85),
+		CACHEGOLD:  big.NewFloat(60),
+		ANZ:        big.NewFloat(1),
+		InsurAce:   big.NewFloat(0.08),
+		ZUSD:       big.NewFloat(1),
+		STEADY:     big.NewFloat(1),
+		SUPER:      big.NewFloat(1),
+		BondToken:  big.NewFloat(1),
+		BankToken:  big.NewFloat(1),
+		SNXUSD:     big.NewFloat(1),
+		FUGAZIUSDC: big.NewFloat(1),
 	}
 
 	tokenValue := big.NewInt(0)
@@ -151,9 +186,10 @@ func (token Token) Multiplier() *big.Int {
 type TokenPoolType string
 
 const (
-	LockRelease TokenPoolType = "lockRelease"
-	BurnMint    TokenPoolType = "burnMint"
-	Wrapped     TokenPoolType = "wrapped"
+	LockRelease  TokenPoolType = "lockRelease"
+	BurnMint     TokenPoolType = "burnMint"
+	Wrapped      TokenPoolType = "wrapped"
+	FeeTokenOnly TokenPoolType = "feeTokenOnly"
 )
 
 type EVMChainConfig struct {

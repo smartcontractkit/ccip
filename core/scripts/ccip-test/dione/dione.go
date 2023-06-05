@@ -27,6 +27,7 @@ const (
 	StagingAlpha Environment = "staging-alpha"
 	StagingBeta  Environment = "staging-beta"
 	Production   Environment = "prod"
+	Prod_Swift   Environment = "prod-swift"
 )
 
 type JobType string
@@ -35,16 +36,6 @@ const (
 	Commit    JobType = "commit"
 	Execution JobType = "exec"
 	Boostrap  JobType = "bootstrap"
-)
-
-type Chain string
-
-const (
-	Rinkeby        Chain = "Rinkeby"
-	Goerli         Chain = "Goerli"
-	OptimismGoerli Chain = "420"
-	Sepolia        Chain = "Sepolia"
-	AvaxFuji       Chain = "Avax Fuji"
 )
 
 type ChainConfig struct {

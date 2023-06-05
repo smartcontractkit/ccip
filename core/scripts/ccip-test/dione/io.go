@@ -62,22 +62,6 @@ func ReadNodeConfig(env Environment) (NodesConfig, error) {
 	return config, err
 }
 
-func ReadChainConfig(chain Chain) (ChainConfig, error) {
-	path := fmt.Sprintf("%s/%s/%s.json", JSON_FOLDER, CHAIN_FOLDER, chain)
-	jsonFile, err := os.Open(path)
-	if err != nil {
-		return ChainConfig{}, err
-	}
-	byteValue, err := io.ReadAll(jsonFile)
-	if err != nil {
-		return ChainConfig{}, err
-	}
-
-	var config ChainConfig
-	err = json.Unmarshal(byteValue, &config)
-	return config, err
-}
-
 func WriteJSON(path string, file []byte) error {
 	return os.WriteFile(path, file, 0600)
 }

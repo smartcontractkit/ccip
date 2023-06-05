@@ -22,7 +22,7 @@ import (
 
 var (
 	// Change these values
-	sourceChain = rhea.ArbitrumGoerli
+	sourceChain = rhea.PolygonMumbai
 	destChain   = rhea.Sepolia
 	ENV         = dione.StagingBeta
 
@@ -62,7 +62,7 @@ func TestCCIP(t *testing.T) {
 	// first character of the given seed with the digits 0-9
 	seedKey := os.Getenv("SEED_KEY")
 	if seedKey == "" {
-		t.Error("must set seed key")
+		seedKey = ownerKey
 	}
 
 	// Configures a client to run tests with using the network defaults and given keys.
@@ -85,6 +85,8 @@ func TestCCIP(t *testing.T) {
 		client.SetOCR2Config(ENV)
 		clientOtherWayAround := NewCcipClient(t, DESTINATION, SOURCE, ownerKey, seedKey)
 		clientOtherWayAround.SetOCR2Config(ENV)
+	case "reemitEvents": // re-set current onchain config to re-emit deployment events
+		client.reemitEvents(t, DESTINATION)
 	case "setOnRampFeeConfig":
 		client.setOnRampFeeConfig(t, &SOURCE)
 	case "applyFeeTokensUpdates":
@@ -132,7 +134,11 @@ func TestRheaDeployLane(t *testing.T) {
 
 	client.startPingPong(t)
 
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+	don := dione.NewDON(env, logger.TestLogger(t))
 	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 
@@ -147,7 +153,12 @@ func TestRheaDeployLane(t *testing.T) {
 func TestDione(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+
+	don := dione.NewDON(env, logger.TestLogger(t))
 	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 
@@ -233,10 +244,12 @@ func TestUpdateAllLanes(t *testing.T) {
 // **	Add it to the chain config in e.g. prod.go
 // **	Leave the pool address empty
 // ** 	Depending on the pool type fill in the token address or not (wrapped doesn't have a token so leave it empty)
+// **   Set DeployTokenPools to `true` for chains that need the pool deployed
 //
 // Run `TestRheaDeployChains` to deploy the new pools
 // ** 	Run output should be written to console & ./json/deployments/env/chain/....
 // ** 	Modify the chain config to include the new info
+// **   Set DeployTokenPools back to `false` where changed
 //
 // Run TestSyncTokens
 // ** 	This should set the correct config on each ramp and token pool based on previous steps
@@ -436,12 +449,20 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 	allProdLanes := []*rhea.EvmDeploymentConfig{
 		&deployments.Prod_SepoliaToOptimismGoerli,
 		&deployments.Prod_SepoliaToAvaxFuji,
+		&deployments.Prod_SepoliaToArbitrumGoerli,
+		&deployments.Prod_SepoliaToPolygonMumbai,
+		// Quorum allowList is turned off for now, do no uncomment
+		//&deployments.Prod_SepoliaToQuorum,
 
 		&deployments.Prod_AvaxFujiToSepolia,
 		&deployments.Prod_AvaxFujiToOptimismGoerli,
 
 		&deployments.Prod_OptimismGoerliToAvaxFuji,
 		&deployments.Prod_OptimismGoerliToSepolia,
+
+		&deployments.Prod_ArbitrumGoerliToSepolia,
+
+		&deployments.Prod_PolygonMumbaiToSepolia,
 	}
 
 	for _, lane := range allProdLanes {

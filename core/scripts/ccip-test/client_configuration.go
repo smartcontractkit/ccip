@@ -110,8 +110,28 @@ func (client *CCIPClient) setAllowList(t *testing.T) {
 	if !isEnabled {
 		client.setAllowListEnabled(t)
 	}
+	currentAllowList, err := client.Source.OnRamp.GetAllowList(&bind.CallOpts{})
+	shared.RequireNoError(t, err)
 
-	tx, err := client.Source.OnRamp.ApplyAllowListUpdates(client.Source.Owner, client.Source.AllowList, nil)
+	toRemove := []common.Address{}
+	for _, addr := range currentAllowList {
+		if !slices.Contains(client.Source.AllowList, addr) {
+			toRemove = append(toRemove, addr)
+		}
+	}
+	toAdd := []common.Address{}
+	for _, addr := range client.Source.AllowList {
+		if !slices.Contains(currentAllowList, addr) {
+			toAdd = append(toAdd, addr)
+		}
+	}
+	if len(toRemove) == 0 && len(toAdd) == 0 {
+		t.Logf("Nothing to add or remove from allowlist: chainId=%d", client.Source.ChainId)
+		return
+	}
+	t.Logf("ApplyAllowListUpdates: chainId=%d, toRemove=%v, toAdd=%v", client.Source.ChainId, toRemove, toAdd)
+
+	tx, err := client.Source.OnRamp.ApplyAllowListUpdates(client.Source.Owner, toRemove, toAdd)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
@@ -147,6 +167,66 @@ func (client *CCIPClient) setPingPongPaused(t *testing.T, paused bool) {
 	tx, err := client.Source.PingPongDapp.SetPaused(client.Source.Owner, paused)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+}
+
+func (client *CCIPClient) reemitEvents(t *testing.T, destConfig rhea.EvmDeploymentConfig) {
+	currentOnRamp, err := client.Source.Router.GetOnRamp(nil, client.Dest.ChainSelector)
+	shared.RequireNoError(t, err)
+	require.NotEqual(t, common.Address{}, currentOnRamp)
+	// reemit Router.OnRampSet (feeds Atlas's `ccip_onramps` table)
+	tx, err := client.Source.Router.ApplyRampUpdates(
+		client.Source.Owner,
+		[]router.RouterOnRamp{{DestChainSelector: client.Dest.ChainSelector, OnRamp: currentOnRamp}},
+		[]router.RouterOffRamp{}, []router.RouterOffRamp{},
+	)
+	shared.RequireNoError(t, err)
+	client.Source.logger.Infof("Router.OnRampSet %v for destChainSelector=%d in tx %s", currentOnRamp, client.Dest.ChainSelector, helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+
+	// reemit OffRamp.ConfigSet (feeds Atlas's `ccip_offramps` table)
+	offRampConfigIt, err := client.Dest.OffRamp.FilterConfigSet0(&bind.FilterOpts{Context: context.Background(), Start: destConfig.LaneConfig.DeploySettings.DeployedAtBlock - 100})
+	shared.RequireNoError(t, err)
+	var offRampConfigEvent *evm_2_evm_offramp.EVM2EVMOffRampConfigSet0
+	for offRampConfigIt.Next() {
+		offRampConfigEvent = offRampConfigIt.Event
+	}
+	require.NotEqual(t, nil, offRampConfigEvent)
+	tx, err = client.Dest.OffRamp.SetOCR2Config(
+		client.Dest.Owner,
+		offRampConfigEvent.Signers,
+		offRampConfigEvent.Transmitters,
+		offRampConfigEvent.F,
+		offRampConfigEvent.OnchainConfig,
+		offRampConfigEvent.OffchainConfigVersion,
+		offRampConfigEvent.OffchainConfig,
+	)
+	shared.RequireNoError(t, err)
+	client.Dest.logger.Infof("OffRamp.SetOCR2Config %+v in tx %s", offRampConfigEvent, helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
+	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+
+	// reemit CommitStore.ConfigSet (feeds Atlas's `ccip_afns` table)
+	commitStoreConfigIt, err := client.Dest.CommitStore.FilterConfigSet0(&bind.FilterOpts{Context: context.Background(), Start: destConfig.LaneConfig.DeploySettings.DeployedAtBlock - 100})
+	shared.RequireNoError(t, err)
+	var commitStoreConfigEvent *commit_store.CommitStoreConfigSet0
+	for commitStoreConfigIt.Next() {
+		commitStoreConfigEvent = commitStoreConfigIt.Event
+	}
+	require.NotEqual(t, nil, commitStoreConfigEvent)
+	tx, err = client.Dest.CommitStore.SetOCR2Config(
+		client.Dest.Owner,
+		commitStoreConfigEvent.Signers,
+		commitStoreConfigEvent.Transmitters,
+		commitStoreConfigEvent.F,
+		commitStoreConfigEvent.OnchainConfig,
+		commitStoreConfigEvent.OffchainConfigVersion,
+		commitStoreConfigEvent.OffchainConfig,
+	)
+	shared.RequireNoError(t, err)
+	client.Dest.logger.Infof("CommitStore.SetOCR2Config %+v in tx %s", commitStoreConfigEvent, helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
+	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
 }
 
@@ -623,6 +703,9 @@ func WaitForCrossChainSendRequest(source SourceClient, fromBlockNum uint64, txha
 }
 
 func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
+	if client.Dest.Client.ChainId == 1337 || client.Source.Client.ChainId == 1337 {
+		env = dione.Prod_Swift
+	}
 	verifierOCRConfig, err := client.Dest.CommitStore.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
 	if verifierOCRConfig.BlockNumber != 0 {
@@ -725,20 +808,20 @@ func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, pluginOffchainCon
 		transmissionSchedule = append(transmissionSchedule, 1)
 	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocrconfighelper.ContractSetConfigArgsForTests(
-		70*time.Second, // deltaProgress
-		5*time.Second,  // deltaResend
-		30*time.Second, // deltaRound
-		2*time.Second,  // deltaGrace
-		40*time.Second, // deltaStage
+		2*time.Minute, // deltaProgress
+		5*time.Second, // deltaResend
+		1*time.Minute, // deltaRound
+		5*time.Second, // deltaGrace
+		client.Dest.TunableValues.InflightCacheExpiry.Duration(), // deltaStage
 		3,
 		transmissionSchedule,
 		identities,
 		pluginOffchainConfig,
-		5*time.Second,
-		32*time.Second,
-		20*time.Second,
-		10*time.Second,
-		10*time.Second,
+		100*time.Millisecond, // query not used
+		35*time.Second,       // observation TODO: shorten once db issues resolved
+		10*time.Second,       // report TODO: shorten once db issues resolved
+		5*time.Second,        // shouldAccept
+		10*time.Second,       // shouldTransmit TODO: shorten once db issues resolved
 		faults,
 		onchainConfig,
 	)
@@ -796,7 +879,10 @@ func (client *CCIPClient) syncPoolsOnOnRamp() {
 
 	for _, token := range rhea.GetAllTokens() {
 		if sourceConfig, ok := client.Source.SupportedTokens[token]; ok {
-			if _, ok := client.Dest.SupportedTokens[token]; ok {
+			if destConfig, ok := client.Dest.SupportedTokens[token]; ok {
+				if sourceConfig.TokenPoolType == rhea.FeeTokenOnly || destConfig.TokenPoolType == rhea.FeeTokenOnly {
+					continue
+				}
 				wantedSourceTokens = append(wantedSourceTokens, sourceConfig.Token)
 				wantedSourceTokenConfig = append(wantedSourceTokenConfig, sourceConfig)
 				client.Source.logger.Infof("Wanted token: %s", token)
@@ -831,8 +917,7 @@ func (client *CCIPClient) syncPoolsOnOnRamp() {
 		// Pools to add should be the SECOND argument and poolsToRemove the first
 		// Since our deployments are still based on a swapped order, until we deploy new onRamps
 		// this order needs to be maintained to be compatible with the deployed code.
-		// TODO swap after new deployments
-		tx, err := client.Source.OnRamp.ApplyPoolUpdates(client.Source.Owner, poolsToAdd, poolsToRemove)
+		tx, err := client.Source.OnRamp.ApplyPoolUpdates(client.Source.Owner, poolsToRemove, poolsToAdd)
 		require.NoError(client.Source.t, err)
 		err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 		require.NoError(client.Source.t, err)
@@ -851,6 +936,9 @@ func (client *CCIPClient) syncPoolsOffOnRamp() {
 	for _, token := range rhea.GetAllTokens() {
 		if sourceConfig, ok := client.Source.SupportedTokens[token]; ok {
 			if destConfig, ok := client.Dest.SupportedTokens[token]; ok {
+				if sourceConfig.TokenPoolType == rhea.FeeTokenOnly || destConfig.TokenPoolType == rhea.FeeTokenOnly {
+					continue
+				}
 				wantedSourceTokens = append(wantedSourceTokens, sourceConfig.Token)
 				wantedDestTokenConfig = append(wantedDestTokenConfig, destConfig)
 				client.Dest.logger.Infof("Wanted token: %s", token)
@@ -942,8 +1030,10 @@ func syncPrices(client *Client, otherChainTokens map[rhea.Token]EVMBridgedToken)
 
 func (client *CCIPClient) syncOnRampOnPools() error {
 	for tokenName, tokenConfig := range client.Source.SupportedTokens {
+
 		// Only add tokens that are supported on both chains
-		if _, ok := client.Dest.SupportedTokens[tokenName]; !ok {
+		// and not marked as feeTokenOnly
+		if destConfig, ok := client.Dest.SupportedTokens[tokenName]; !ok || destConfig.TokenPoolType == rhea.FeeTokenOnly || tokenConfig.TokenPoolType == rhea.FeeTokenOnly {
 			continue
 		}
 
@@ -973,10 +1063,11 @@ func (client *CCIPClient) syncOnRampOnPools() error {
 	}
 	return nil
 }
+
 func (client *CCIPClient) syncOffRampOnPools() error {
 	for tokenName, tokenConfig := range client.Dest.SupportedTokens {
 		// Only add tokens that are supported on both chains
-		if _, ok := client.Source.SupportedTokens[tokenName]; !ok {
+		if destConfig, ok := client.Source.SupportedTokens[tokenName]; !ok || destConfig.TokenPoolType == rhea.FeeTokenOnly || tokenConfig.TokenPoolType == rhea.FeeTokenOnly {
 			continue
 		}
 		isOffRamp, err := tokenConfig.Pool.IsOffRamp(&bind.CallOpts{}, client.Dest.OffRamp.Address())
