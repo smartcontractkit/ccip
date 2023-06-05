@@ -624,6 +624,7 @@ func TestJob(t *testing.T) {
 							"jobID": 0,
 							"dotDagSource": ""
 						},
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -687,6 +688,7 @@ func TestJob(t *testing.T) {
 							"jobID": 0,
 							"dotDagSource": ""
 						},
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -870,6 +872,8 @@ func TestJob(t *testing.T) {
 						"webhookSpec": null,
 						"blockhashStoreSpec": null,
 						"blockHeaderFeederSpec": null,
+						"legacyGasStationServerSpec": null,
+						"legacyGasStationSidecarSpec": null,
 						"bootstrapSpec": null,
 						"gatewaySpec": {
 							"gatewayConfig": {
