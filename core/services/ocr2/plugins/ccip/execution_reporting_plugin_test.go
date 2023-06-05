@@ -514,6 +514,7 @@ func TestBuildBatch(t *testing.T) {
 	// We do this just to have the parsing available.
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress("0x1"), c)
 	require.NoError(t, err)
+	lggr := logger.TestLogger(t)
 
 	sender1 := common.HexToAddress("0xa")
 	destNative := common.HexToAddress("0xb")
@@ -607,7 +608,9 @@ func TestBuildBatch(t *testing.T) {
 			for sender, nonce := range tc.offRampNoncesBySender {
 				mockOffRamp.On("GetSenderNonce", mock.Anything, sender).Return(nonce, nil)
 			}
-			seqNrs, allExecuted := plugin.buildBatch(tc.reqs,
+			seqNrs, allExecuted := plugin.buildBatch(
+				lggr,
+				tc.reqs,
 				tc.executed,
 				tc.inflight,
 				tc.tokenLimit,

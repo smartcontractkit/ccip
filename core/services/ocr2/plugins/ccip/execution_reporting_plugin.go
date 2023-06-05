@@ -2,7 +2,6 @@ package ccip
 
 import (
 	"context"
-	"encoding/hex"
 	"math/big"
 	"reflect"
 	"sort"
@@ -119,7 +118,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 
 	cachedSrcFeeTokens := cache.NewCachedFeeTokens(rf.config.sourceLP, rf.config.srcPriceRegistry, int64(offchainConfig.SourceFinalityDepth))
 	cachedDstTokens := cache.NewCachedTokens(rf.config.destLP, rf.config.offRamp, priceRegistry, int64(offchainConfig.DestOptimisticConfirmations))
-	rf.config.lggr.Infow("Starting exec plugin", "offchainConfig", offchainConfig, "onchainConfig", onchainConfig)
+	rf.config.lggr.Infow("Starting exec plugin",
+		"offchainConfig", offchainConfig,
+		"onchainConfig", onchainConfig)
 
 	return &ExecutionReportingPlugin{
 			config:             rf.config,
@@ -160,7 +161,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 
 	observationBuildStart := time.Now()
 	// IMPORTANT: We build executable set based on the leaders token prices, ensuring consistency across followers.
-	executableObservations, err := r.getExecutableObservations(ctx, timestamp, inFlight)
+	executableObservations, err := r.getExecutableObservations(ctx, lggr, timestamp, inFlight)
 	measureObservationBuildDuration(timestamp, time.Since(observationBuildStart))
 	if err != nil {
 		return nil, err
@@ -179,8 +180,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 		return nil, err
 	}
 	executableObservations = executableObservations[:capped]
-	lggr.Infof("executable observations %+v %v", executableObservations, abihelpers.EventSignatures.SendRequested)
-
+	lggr.Infow("Observation", "executableMessages", executableObservations)
 	// Note can be empty
 	return ExecutionObservation{Messages: executableObservations}.Marshal()
 }
@@ -211,7 +211,7 @@ func (rf *ExecutionReportingPluginFactory) updateLogPollerFilters(onChainConfig 
 	return nil
 }
 
-func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
+func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(
 		ctx,
 		r.config.destLP,
@@ -221,7 +221,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	r.lggr.Infow("unexpired roots", "n", len(unexpiredReports))
+	lggr.Infow("Unexpired roots", "n", len(unexpiredReports))
 	if len(unexpiredReports) == 0 {
 		return []ObservedMessage{}, nil
 	}
@@ -260,7 +260,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return nil, err
 	}
 
-	r.lggr.Debugw("processing unexpired reports", "n", len(unexpiredReports))
+	lggr.Infow("Processing unexpired reports", "n", len(unexpiredReports))
 	measureNumberOfReportsProcessed(timestamp, len(unexpiredReports))
 	reportIterationStart := time.Now()
 	defer func() {
@@ -268,9 +268,13 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	}()
 	for _, unexpiredReport := range unexpiredReports {
 		if ctx.Err() != nil {
-			r.lggr.Warn("killed by context")
+			lggr.Warn("Processing of roots killed by context")
 			break
 		}
+		rootLggr := lggr.With("root", hexutil.Encode(unexpiredReport.MerkleRoot[:]),
+			"minSeqNr", unexpiredReport.Interval.Min,
+			"maxSeqNr", unexpiredReport.Interval.Max,
+		)
 		snoozeUntil, haveSnoozed := r.snoozedRoots[unexpiredReport.MerkleRoot]
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
 			continue
@@ -280,7 +284,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			return nil, err
 		}
 		if !blessed {
-			r.lggr.Infow("report is accepted but not blessed", "report", hexutil.Encode(unexpiredReport.MerkleRoot[:]))
+			rootLggr.Infow("Report is accepted but not blessed")
 			incSkippedRequests(reasonNotBlessed)
 			continue
 		}
@@ -298,20 +302,21 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			return nil, err
 		}
 		if len(srcLogs) != int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1) {
-			return nil, errors.Errorf("unexpected missing msgs in committed root %x have %d want %d", unexpiredReport.MerkleRoot, len(srcLogs), int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1))
+			rootLggr.Warnw("Missing messages in root, if this persists for the same root it may indicate an inability to get logs from the source chain",
+				"have", len(srcLogs),
+				"want", int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1),
+			)
+			continue
 		}
 		executedMp, err := r.getExecutedSeqNrsInRange(ctx, unexpiredReport.Interval.Min, unexpiredReport.Interval.Max, latestBlock)
 		if err != nil {
 			return nil, err
 		}
 
-		r.lggr.Debugw("building next batch", "executedMp", len(executedMp))
-
 		allowedTokenAmountValue, err := allowedTokenAmount()
 		if err != nil {
 			return nil, err
 		}
-
 		srcTokensPricesValue, err := srcTokensPrices()
 		if err != nil {
 			return nil, err
@@ -323,14 +328,14 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 
 		buildBatchDuration := time.Now()
-		batch, allMessagesExecuted := r.buildBatch(srcLogs, executedMp, inflight, allowedTokenAmountValue.Tokens,
+		batch, allMessagesExecuted := r.buildBatch(rootLggr, srcLogs, executedMp, inflight, allowedTokenAmountValue.Tokens,
 			srcTokensPricesValue, destTokensPricesValue, destGasPrice, srcToDstTokens)
 		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 
 		// If all messages are already executed and finalized, snooze the root for
 		// config.PermissionLessExecutionThresholdSeconds so it will never be considered again.
 		if allMessagesExecuted {
-			r.lggr.Infof("Snoozing root %s forever since there are no executable txs anymore %v", hex.EncodeToString(unexpiredReport.MerkleRoot[:]), executedMp)
+			rootLggr.Infow("Snoozing root forever since there are no executable txs anymore", "executedMp", executedMp)
 			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.onchainConfig.PermissionLessExecutionThresholdDuration())
 			incSkippedRequests(reasonAllExecuted)
 			continue
@@ -401,6 +406,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context,
 // the available gas, rate limiting, execution state, nonce state, and
 // profitability of execution.
 func (r *ExecutionReportingPlugin) buildBatch(
+	lggr logger.Logger,
 	srcLogs []logpoller.Log,
 	executedSeq map[uint64]bool,
 	inflight []InflightInternalExecutionReport,
@@ -412,7 +418,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 ) (executableMessages []ObservedMessage, executedAllMessages bool) {
 	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := inflightAggregates(inflight, destTokenPricesUSD, srcToDestToken)
 	if err != nil {
-		r.lggr.Errorw("Unexpected error computing inflight values", "err", err)
+		lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []ObservedMessage{}, false
 	}
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
@@ -426,19 +432,19 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			Data:   srcLog.Data,
 		})
 		if err2 != nil {
-			r.lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
+			lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
 			// Unable to parse so don't mark as executed
 			executedAllMessages = false
 			continue
 		}
-		lggr := r.lggr.With("messageID", hexutil.Encode(msg.Message.MessageId[:]))
+		msgLggr := lggr.With("messageID", hexutil.Encode(msg.Message.MessageId[:]))
 		if finalized, executed := executedSeq[msg.Message.SequenceNumber]; executed && finalized {
-			lggr.Infow("Skipping message already executed", "seqNr", msg.Message.SequenceNumber)
+			msgLggr.Infow("Skipping message already executed", "seqNr", msg.Message.SequenceNumber)
 			continue
 		}
 		executedAllMessages = false
 		if _, inflight := inflightSeqNrs[msg.Message.SequenceNumber]; inflight {
-			lggr.Infow("Skipping message already inflight", "seqNr", msg.Message.SequenceNumber)
+			msgLggr.Infow("Skipping message already inflight", "seqNr", msg.Message.SequenceNumber)
 			continue
 		}
 		if _, ok := expectedNonces[msg.Message.Sender]; !ok {
@@ -459,23 +465,23 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		}
 		// Check expected nonce is valid
 		if msg.Message.Nonce != expectedNonces[msg.Message.Sender] {
-			lggr.Warnw("Skipping message invalid nonce", "have", msg.Message.Nonce, "want", expectedNonces[msg.Message.Sender])
+			msgLggr.Warnw("Skipping message invalid nonce", "have", msg.Message.Nonce, "want", expectedNonces[msg.Message.Sender])
 			continue
 		}
 		msgValue, err := aggregateTokenValue(destTokenPricesUSD, srcToDestToken, msg.Message.TokenAmounts)
 		if err != nil {
-			lggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
+			msgLggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
 		}
 		// if token limit is smaller than message value skip message
 		if aggregateTokenLimit.Cmp(msgValue) == -1 {
-			lggr.Warnw("token limit is smaller than message value", "aggregateTokenLimit", aggregateTokenLimit.String(), "msgValue", msgValue.String())
+			msgLggr.Warnw("token limit is smaller than message value", "aggregateTokenLimit", aggregateTokenLimit.String(), "msgValue", msgValue.String())
 			continue
 		}
 		// Fee boosting
 		execGasPriceEstimateValue, err := execGasPriceEstimate()
 		if err != nil {
-			r.lggr.Errorw("Unexpected error fetching gas price estimate", "err", err)
+			msgLggr.Errorw("Unexpected error fetching gas price estimate", "err", err)
 			return []ObservedMessage{}, false
 		}
 		execCostUsd := computeExecCost(msg.Message.GasLimit, execGasPriceEstimateValue, destTokenPricesUSD[r.destWrappedNative])
@@ -487,7 +493,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
 		availableFeeUsd := waitBoostedFee(time.Since(srcLog.BlockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
 		if availableFeeUsd.Cmp(execCostUsd) < 0 {
-			lggr.Infow("Insufficient remaining fee", "availableFeeUsd", availableFeeUsd, "execCostUsd", execCostUsd,
+			msgLggr.Infow("Insufficient remaining fee", "availableFeeUsd", availableFeeUsd, "execCostUsd", execCostUsd,
 				"srcBlockTimestamp", srcLog.BlockTimestamp, "waitTime", time.Since(srcLog.BlockTimestamp), "boost", r.offchainConfig.RelativeBoostPerWaitHour)
 			continue
 		}
@@ -495,7 +501,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		messageMaxGas := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(srcLogs), len(msg.Message.Data), len(msg.Message.TokenAmounts))
 		// Check sufficient gas in batch
 		if availableGas < messageMaxGas {
-			lggr.Infow("Insufficient remaining gas in batch limit", "availableGas", availableGas, "messageMaxGas", messageMaxGas)
+			msgLggr.Infow("Insufficient remaining gas in batch limit", "availableGas", availableGas, "messageMaxGas", messageMaxGas)
 			continue
 		}
 		availableGas -= messageMaxGas
@@ -508,7 +514,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			tokenData = append(tokenData, []byte{})
 		}
 
-		lggr.Infow("Adding msg to batch", "seqNum", msg.Message.SequenceNumber, "nonce", msg.Message.Nonce)
+		msgLggr.Infow("Adding msg to batch", "seqNum", msg.Message.SequenceNumber, "nonce", msg.Message.Nonce)
 		executableMessages = append(executableMessages, ObservedMessage{
 			SeqNr:     msg.Message.SequenceNumber,
 			TokenData: tokenData,
@@ -599,11 +605,11 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
-	lggr := r.lggr.Named("Report")
+	lggr := r.lggr.Named("ExecutionReport")
 	parsableObservations := getParsableObservations[ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
 	if len(parsableObservations) <= r.F {
-		lggr.Tracew("Non-empty observations <= F, need at least F+1 to continue")
+		lggr.Warn("Non-empty observations <= F, need at least F+1 to continue")
 		return false, nil, nil
 	}
 
@@ -616,7 +622,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if err != nil {
 		return false, nil, err
 	}
-	lggr.Infow("Built report", "onRampAddr", r.config.onRamp.Address(), "observations", observedMessages)
+	lggr.Infow("Report", "executableObservations", observedMessages)
 	return true, report, nil
 }
 
@@ -667,8 +673,8 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
 	messages, err := abihelpers.MessagesFromExecutionReport(report)
 	if err != nil {
-		lggr.Errorw("unable to decode report", "err", err)
-		return false, nil
+		lggr.Errorw("Unable to decode report", "err", err)
+		return false, err
 	}
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(messages)
@@ -676,12 +682,14 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		return false, err
 	}
 	if stale {
+		lggr.Infow("Execution report is stale", "messages", messages)
 		return false, nil
 	}
 	// Else just assume in flight
 	if err = r.inflightReports.add(lggr, messages); err != nil {
 		return false, err
 	}
+	lggr.Info("Accepting finalized report")
 	return true, nil
 }
 

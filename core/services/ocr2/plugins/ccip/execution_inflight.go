@@ -72,7 +72,7 @@ func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages 
 		}
 	}
 	// Otherwise not already in flight, add it.
-	lggr.Infow("Added report to inflight",
+	lggr.Infow("Inflight report added",
 		"messages", messages)
 	container.reports = append(container.reports, InflightInternalExecutionReport{
 		createdAt: time.Now(),
