@@ -133,7 +133,10 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	rf.config.lggr.Infow("Starting commit plugin", "offchainConfig", offchainConfig, "onchainConfig", onchainConfig)
+	rf.config.lggr.Infow("NewReportingPlugin",
+		"offchainConfig", offchainConfig,
+		"onchainConfig", onchainConfig,
+	)
 
 	return &CommitReportingPlugin{
 			config:                rf.config,
@@ -179,11 +182,16 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportT
 		return nil, err
 	}
 
-	sourceGasPriceUSD, tokenPricesUSD, err := r.generatePriceUpdates(ctx, time.Now())
+	sourceGasPriceUSD, tokenPricesUSD, err := r.generatePriceUpdates(ctx, lggr, time.Now())
 	if err != nil {
 		return nil, err
 	}
 
+	lggr.Infow("Observation",
+		"minSeqNr", min,
+		"maxSeqNr", max,
+		"sourceGasPriceUSD", sourceGasPriceUSD,
+		"tokenPricesUSD", tokenPricesUSD)
 	// Even if all values are empty we still want to communicate our observation
 	// with the other nodes, therefore, we always return the observed values.
 	return CommitObservation{
@@ -205,7 +213,11 @@ func (r *CommitReportingPlugin) expireInflight(lggr logger.Logger) {
 		if time.Since(inFlightReport.createdAt) > r.offchainConfig.InflightCacheExpiry.Duration() {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains so we retry.
-			lggr.Infow("Inflight report expired", "rootOfRoots", hexutil.Encode(inFlightReport.report.MerkleRoot[:]))
+			lggr.Infow("Inflight root expired",
+				"root", hexutil.Encode(inFlightReport.report.MerkleRoot[:]),
+				"minSeqNr", inFlightReport.report.Interval.Min,
+				"maxSeqNr", inFlightReport.report.Interval.Max,
+			)
 			delete(r.inFlight, root)
 		}
 	}
@@ -214,7 +226,11 @@ func (r *CommitReportingPlugin) expireInflight(lggr logger.Logger) {
 		if time.Since(inFlightFeeUpdate.createdAt) > r.offchainConfig.InflightCacheExpiry.Duration() {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains, so we retry.
-			lggr.Infow("Inflight price update expired", "updates", inFlightFeeUpdate.priceUpdates)
+			lggr.Infow("Inflight price update expired",
+				"tokenPriceUpdates", inFlightFeeUpdate.priceUpdates.TokenPriceUpdates,
+				"usdPerUnitGas", inFlightFeeUpdate.priceUpdates.UsdPerUnitGas,
+				"destChainSelector", inFlightFeeUpdate.priceUpdates.DestChainSelector,
+			)
 			stillInflight = append(stillInflight, inFlightFeeUpdate)
 		}
 	}
@@ -227,7 +243,6 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 	// All available messages that have not been committed yet and have sufficient confirmations.
-	lggr.Infof("Looking for requests with sig %v and nextMin %d on onRampAddr %v", abihelpers.EventSignatures.SendRequested, nextMin, r.config.onRampAddress)
 	reqs, err := r.config.sourceLP.LogsDataWordGreaterThan(
 		abihelpers.EventSignatures.SendRequested,
 		r.config.onRampAddress,
@@ -239,15 +254,15 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	if err != nil {
 		return 0, 0, err
 	}
-	lggr.Infof("%d requests found for onRampAddr %v", len(reqs), r.config.onRampAddress)
 	if len(reqs) == 0 {
+		lggr.Infow("No new requests", "minSeqNr", nextMin)
 		return 0, 0, nil
 	}
 	var seqNrs []uint64
 	for _, req := range reqs {
 		seqNr, err2 := r.config.getSeqNumFromLog(req)
 		if err2 != nil {
-			lggr.Errorw("error parsing seq num", "err", err2)
+			lggr.Errorw("Error parsing seq num", "err", err2)
 			continue
 		}
 		seqNrs = append(seqNrs, seqNr)
@@ -257,12 +272,11 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	if min != nextMin {
 		// Still report the observation as even partial reports have value e.g. all nodes are
 		// missing a single, different log each, they would still be able to produce a valid report.
-		lggr.Warnf("Missing sequence number range [%d-%d] for onRamp %v", nextMin, min, r.config.onRampAddress)
+		lggr.Warnf("Missing sequence number range [%d-%d]", nextMin, min)
 	}
 	if !contiguousReqs(lggr, min, max, seqNrs) {
 		return 0, 0, errors.New("unexpected gap in seq nums")
 	}
-	lggr.Infof("OnRamp %v: min %v max %v", r.config.onRampAddress, min, max)
 	return min, max, nil
 }
 
@@ -287,6 +301,7 @@ func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (uint64, erro
 // otherwise, omitting values means voting to skip updating them
 func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
+	lggr logger.Logger,
 	now time.Time,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[common.Address]*big.Int, err error) {
 	// Detect token changes and update decimals mapping if needed, so we are up-to-date with supported tokens
@@ -320,6 +335,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	for token := range rawTokenPricesUSD {
 		if !slices.Contains(tokensWithDecimal, token) {
 			// do not include any address which isn't a supported token on dest chain, including sourceNative
+			lggr.Infow("Skipping token not supported on dest chain", "token", token)
 			continue
 		}
 
@@ -351,6 +367,9 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		return nil, nil, err
 	}
 
+	lggr.Infow("Observing gas price",
+		"latestGasPriceUSD", gasPriceUpdate.value,
+		"observedGasPriceUSD", sourceGasPriceUSD)
 	if gasPriceUpdate.value != nil && now.Sub(gasPriceUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !deviates(sourceGasPriceUSD, gasPriceUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
 		// vote skip gasPrice update by leaving it nil
 		sourceGasPriceUSD = nil
@@ -361,6 +380,9 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		return nil, nil, err
 	}
 
+	lggr.Infow("Observing token prices",
+		"latestTokenPricesUSD", tokenPriceUpdates,
+		"observedTokenPricesUSD", tokenPricesUSD)
 	for token, price := range tokenPricesUSD {
 		tokenUpdate := tokenPriceUpdates[token]
 		if tokenUpdate.value != nil && now.Sub(tokenUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !deviates(price, tokenUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
@@ -540,7 +562,7 @@ func deviates(x1, x2 *big.Int, feeUpdateDeviationPPB int64) bool {
 }
 
 func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
-	lggr := r.lggr.Named("Report")
+	lggr := r.lggr.Named("CommitReport")
 	parsableObservations := getParsableObservations[CommitObservation](lggr, observations)
 	var intervals []commit_store.CommitStoreInterval
 	for _, obs := range parsableObservations {
@@ -555,10 +577,11 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 	priceUpdates := calculatePriceUpdates(r.config.sourceChainSelector, parsableObservations, r.F)
 	// If there are no fee updates and the interval is zero there is no report to produce.
 	if len(priceUpdates.TokenPriceUpdates) == 0 && priceUpdates.DestChainSelector == 0 && agreedInterval.Min == 0 {
+		lggr.Warnw("Empty report, skipping")
 		return false, nil, nil
 	}
 
-	report, err := r.buildReport(ctx, agreedInterval, priceUpdates)
+	report, err := r.buildReport(ctx, lggr, agreedInterval, priceUpdates)
 	if err != nil {
 		return false, nil, err
 	}
@@ -566,7 +589,14 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 	if err != nil {
 		return false, nil, err
 	}
-	lggr.Infow("Built report", "interval", agreedInterval)
+	lggr.Infow("Report",
+		"merkleRoot", report.MerkleRoot,
+		"minSeqNr", report.Interval.Min,
+		"maxSeqNr", report.Interval.Max,
+		"tokenPriceUpdates", report.PriceUpdates.TokenPriceUpdates,
+		"destChainSelector", report.PriceUpdates.DestChainSelector,
+		"sourceUsdPerUnitGas", report.PriceUpdates.UsdPerUnitGas,
+	)
 	return true, encodedReport, nil
 }
 
@@ -668,9 +698,7 @@ func median(vals []*big.Int) *big.Int {
 }
 
 // buildReport assumes there is at least one message in reqs.
-func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit_store.CommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (commit_store.CommitStoreCommitReport, error) {
-	lggr := r.lggr.Named("BuildReport")
-
+func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, interval commit_store.CommitStoreInterval, priceUpdates commit_store.InternalPriceUpdates) (commit_store.CommitStoreCommitReport, error) {
 	// If no messages are needed only include fee updates
 	if interval.Min == 0 {
 		return commit_store.CommitStoreCommitReport{
@@ -699,7 +727,10 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 	}
 
 	if len(leaves) == 0 {
-		return commit_store.CommitStoreCommitReport{}, fmt.Errorf("tried building a tree without leaves for onRampAddr %v. %+v", r.config.onRampAddress, leaves)
+		lggr.Warn("No leaves found in interval",
+			"minSeqNr", interval.Min,
+			"maxSeqNr", interval.Max)
+		return commit_store.CommitStoreCommitReport{}, fmt.Errorf("tried building a tree without leaves")
 	}
 	tree, err := merklemulti.NewTree(hasher.NewKeccakCtx(), leaves)
 	if err != nil {
@@ -714,13 +745,21 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, interval commit
 }
 
 func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
-	lggr := r.lggr.Named("ShouldAcceptFinalizedReport")
 	parsedReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
 		return false, err
 	}
+	lggr := r.lggr.Named("CommitShouldAcceptFinalizedReport").With(
+		"merkleRoot", parsedReport.MerkleRoot,
+		"minSeqNum", parsedReport.Interval.Min,
+		"maxSeqNum", parsedReport.Interval.Max,
+		"destChainSelector", parsedReport.PriceUpdates.DestChainSelector,
+		"usdPerUnitGas", parsedReport.PriceUpdates.UsdPerUnitGas,
+		"tokenPriceUpdates", parsedReport.PriceUpdates.TokenPriceUpdates,
+	)
 	// Empty report, should not be put on chain
 	if parsedReport.MerkleRoot == [32]byte{} && parsedReport.PriceUpdates.DestChainSelector == 0 && len(parsedReport.PriceUpdates.TokenPriceUpdates) == 0 {
+		lggr.Warn("Empty report, should not be put on chain")
 		return false, nil
 	}
 
@@ -739,13 +778,13 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 			// could happen for various reasons, e.g. a reboot of the node emptying the caches, and should be self-healing.
 			// We do not submit a tx and wait for the protocol to self-heal by updating the caches or invalidating
 			// inflight caches over time.
-			lggr.Errorw("Next inflight min is not equal to the proposed min of the report", "nextInflightMin", nextInflightMin, "proposed min", parsedReport.Interval.Min)
+			lggr.Errorw("Next inflight min is not equal to the proposed min of the report", "nextInflightMin", nextInflightMin)
 			return false, errors.New("Next inflight min is not equal to the proposed min of the report")
 		}
 	}
 
 	r.addToInflight(lggr, &parsedReport)
-	lggr.Infow("Accepting finalized report", "merkleRoot", hexutil.Encode(parsedReport.MerkleRoot[:]))
+	lggr.Infow("Accepting finalized report")
 	return true, nil
 }
 
@@ -755,7 +794,7 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 
 	if report.MerkleRoot != [32]byte{} {
 		// Set new inflight ones as pending
-		lggr.Infow("Adding to inflight report", "rootOfRoots", hexutil.Encode(report.MerkleRoot[:]))
+		lggr.Infow("Inflight root added")
 		r.inFlight[report.MerkleRoot] = InflightReport{
 			report:    report,
 			createdAt: time.Now(),
@@ -763,7 +802,7 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 	}
 
 	if report.PriceUpdates.DestChainSelector != 0 || len(report.PriceUpdates.TokenPriceUpdates) != 0 {
-		lggr.Infow("Adding to inflight fee updates", "priceUpdates", report.PriceUpdates)
+		lggr.Infow("Inflight price update added")
 		r.inFlightPriceUpdates = append(r.inFlightPriceUpdates, InflightPriceUpdate{
 			priceUpdates: report.PriceUpdates,
 			createdAt:    time.Now(),
@@ -774,6 +813,7 @@ func (r *CommitReportingPlugin) addToInflight(lggr logger.Logger, report *commit
 // ShouldTransmitAcceptedReport checks if the report is stale, if it is it should not be
 // transmitted.
 func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
+	lggr := r.lggr.Named("CommitShouldTransmitAcceptedReport")
 	parsedReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
 		return false, err
@@ -781,7 +821,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for tx manager,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
-	return !r.isStaleReport(ctx, parsedReport), nil
+	return !r.isStaleReport(ctx, lggr, parsedReport), nil
 }
 
 // isStaleReport checks a report to see if the contents have become stale.
@@ -797,7 +837,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 // for staleness checks.
 // If only price updates are included, only price updates are used for staleness
 // If nothing is included the report is always considered stale.
-func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report commit_store.CommitStoreCommitReport) bool {
+func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.Logger, report commit_store.CommitStoreCommitReport) bool {
 	// There could be a report with only price updates, in that case ignore sequence number staleness
 	if report.MerkleRoot != [32]byte{} {
 		nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
@@ -808,7 +848,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report commit
 		}
 		// If the next min is already greater than this reports min, this report is stale.
 		if nextMin > report.Interval.Min {
-			r.lggr.Infow("report is stale", "onchain min", nextMin, "report min", report.Interval.Min)
+			lggr.Infow("Report is stale because of root", "onchain min", nextMin, "report min", report.Interval.Min)
 			return true
 		}
 		return false
@@ -821,7 +861,10 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report commit
 		}
 
 		if gasPriceUpdate.value != nil && gasPriceUpdate.value.Cmp(report.PriceUpdates.UsdPerUnitGas) == 0 {
-			r.lggr.Infow("gasPriceUpdate-only report is stale", "latest gasPrice", gasPriceUpdate.value, "destChainSelector", report.PriceUpdates.DestChainSelector)
+			lggr.Infow("Report is stale because of gas price",
+				"latestGasPriceUpdate", gasPriceUpdate.value,
+				"usdPerUnitGas", gasPriceUpdate.value,
+				"destChainSelector", report.PriceUpdates.DestChainSelector)
 			return true
 		}
 		return false
@@ -837,7 +880,10 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, report commit
 		// check first token
 		tokenUpdate := report.PriceUpdates.TokenPriceUpdates[0]
 		if latestUpdate, ok := tokenPriceUpdates[tokenUpdate.SourceToken]; ok && latestUpdate.value.Cmp(tokenUpdate.UsdPerToken) == 0 {
-			r.lggr.Infow("tokenPriceUpdate-only report is stale", "latest tokenPrice", latestUpdate.value, "token", tokenUpdate.SourceToken)
+			lggr.Infow("Report is stale because of token price",
+				"latestTokenPrice", latestUpdate.value,
+				"usdPerToken", tokenUpdate.UsdPerToken,
+				"token", tokenUpdate.SourceToken)
 			return true
 		}
 		return false

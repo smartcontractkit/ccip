@@ -511,7 +511,7 @@ func TestGeneratePriceUpdates(t *testing.T) {
 				th.mockedGetFee.Return(gas.EvmFee{Legacy: assets.NewWei(tt.updateGasPrice)}, uint32(200e3), nil)
 			}
 
-			gotGasPriceUSD, gotTokenPricesUSD, err := th.plugin.generatePriceUpdates(testutils.Context(t), time.Unix(int64((i+1)*10), 0))
+			gotGasPriceUSD, gotTokenPricesUSD, err := th.plugin.generatePriceUpdates(testutils.Context(t), th.Lggr, time.Unix(int64((i+1)*10), 0))
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedGasPriceUSD, gotGasPriceUSD)

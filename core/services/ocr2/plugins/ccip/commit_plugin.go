@@ -34,8 +34,6 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infof("CCIP commit plugin initialized with offchainConfig: %+v", pluginConfig)
-
 	chainIDInterface, ok := spec.RelayConfig["chainID"]
 	if !ok {
 		return nil, errors.New("chainID must be provided in relay config")
@@ -73,17 +71,20 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	if err != nil {
 		return nil, err
 	}
-	router, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
+	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}
-	sourceNative, err := router.GetWrappedNative(nil)
+	sourceNative, err := sourceRouter.GetWrappedNative(nil)
 	if err != nil {
 		return nil, err
 	}
 
 	leafHasher := hasher.NewLeafHasher(staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx())
-
+	// Note that lggr already has the jobName and contractID (commit store)
+	lggr = lggr.Named("CCIPCommit").With(
+		"sourceChain", ChainName(pluginConfig.SourceEvmChainId),
+		"destChain", ChainName(destChainID))
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
 			lggr:                lggr,
@@ -101,12 +102,17 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			getSeqNumFromLog:    getSeqNumFromLog(onRamp),
 		})
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), destChain.ID())
-	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPCommit").With(
-		"srcChain", ChainName(pluginConfig.SourceEvmChainId), "dstChain", ChainName(destChainID)), true, logError)
+	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
 	}
+	lggr.Infow("NewCommitServices",
+		"pluginConfig", pluginConfig,
+		"staticConfig", staticConfig,
+		"dynamicOnRampConfig", dynamicOnRampConfig,
+		"sourceNative", sourceNative,
+		"sourceRouter", sourceRouter.Address())
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
 		return []job.ServiceCtx{NewBackfilledOracle(

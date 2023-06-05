@@ -36,7 +36,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infof("CCIP execution plugin initialized with offchainConfig: %+v", pluginConfig)
 
 	chainIDInterface, ok := spec.RelayConfig["chainID"]
 	if !ok {
@@ -84,7 +83,8 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 		return nil, errors.Wrap(err, "could not create source price registry")
 	}
 
-	lggr = lggr.With("srcChain", ChainName(int64(pluginConfig.SourceEvmChainId)), "dstChain", ChainName(destChainID))
+	lggr.Named("CCIPExecution").With(
+		"srcChain", ChainName(pluginConfig.SourceEvmChainId), "dstChain", ChainName(destChainID))
 
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
@@ -144,12 +144,18 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), destChain.ID())
-	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr.Named("CCIPExecution").With(
-		"srcChain", ChainName(pluginConfig.SourceEvmChainId), "dstChain", ChainName(destChainID)), true, logError)
+	argsNoPlugin.Logger = logger.NewOCRWrapper(lggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
 	}
+	lggr.Infof("Initialized exec plugin",
+		"pluginConfig", pluginConfig,
+		"onRampAddress", onRamp.Address(),
+		"sourcePriceRegistry", srcPriceRegistry.Address(),
+		"dynamicOnRampConfig", dynamicOnRampConfig,
+		"sourceNative", sourceWrappedNative,
+		"sourceRouter", srcRouter.Address())
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
 		return []job.ServiceCtx{
