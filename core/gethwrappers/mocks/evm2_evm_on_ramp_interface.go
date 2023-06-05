@@ -932,8 +932,8 @@ func (_m *EVM2EVMOnRampInterface) GetTokenTransferFeeConfig(opts *bind.CallOpts,
 	return r0, r1
 }
 
-// IsAFNHealthy provides a mock function with given fields: opts
-func (_m *EVM2EVMOnRampInterface) IsAFNHealthy(opts *bind.CallOpts) (bool, error) {
+// IsARMHealthy provides a mock function with given fields: opts
+func (_m *EVM2EVMOnRampInterface) IsARMHealthy(opts *bind.CallOpts) (bool, error) {
 	ret := _m.Called(opts)
 
 	var r0 bool

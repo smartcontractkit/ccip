@@ -21,8 +21,8 @@ var authToken = os.Getenv("CLO_AUTH_TOKEN")
 func SetChainConfig(contracts []ContractC, deploymentConfig *rhea.EvmDeploymentConfig) {
 	for _, c := range contracts {
 		switch c.Name {
-		case "MockAFNContract":
-			deploymentConfig.ChainConfig.Afn = common.HexToAddress(c.Address)
+		case "MockARMContract":
+			deploymentConfig.ChainConfig.ARM = common.HexToAddress(c.Address)
 		case "Router":
 			deploymentConfig.ChainConfig.Router = common.HexToAddress(c.Address)
 		case "PriceRegistry":

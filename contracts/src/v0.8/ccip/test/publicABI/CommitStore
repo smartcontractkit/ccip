@@ -5,7 +5,7 @@
   "getMerkleRoot(bytes32)": "a7206cd6",
   "getStaticConfig()": "06285c69",
   "getTransmitters()": "666cab8d",
-  "isAFNHealthy()": "147809b3",
+  "isARMHealthy()": "0a6cd30d",
   "isBlessed(bytes32)": "ff888fb1",
   "latestConfigDetails()": "81ff7048",
   "latestConfigDigestAndEpoch()": "afcb95d7",

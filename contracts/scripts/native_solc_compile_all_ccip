@@ -25,7 +25,7 @@ compileContract ccip/Router.sol
 compileContract ccip/onRamp/EVM2EVMOnRamp.sol
 compileContract ccip/CommitStore.sol
 compileContract ccip/offRamp/EVM2EVMOffRamp.sol
-compileContract ccip/AFN.sol
+compileContract ccip/ARM.sol
 compileContract ccip/PriceRegistry.sol
 compileContract ccip/pools/LockReleaseTokenPool.sol
 compileContract ccip/pools/BurnMintTokenPool.sol
@@ -39,7 +39,7 @@ compileContract ccip/test/helpers/EVM2EVMOffRampHelper.sol
 compileContract ccip/test/helpers/CustomTokenPool.sol
 compileContract ccip/test/helpers/receivers/SimpleMessageReceiver.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
-compileContract ccip/test/mocks/MockAFN.sol
+compileContract ccip/test/mocks/MockARM.sol
 compileContract ccip/test/WETH9.sol
 
 # Customer contracts

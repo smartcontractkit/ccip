@@ -44,9 +44,9 @@ func (o *ObservedCommitStore) Paused(opts *bind.CallOpts) (bool, error) {
 	})
 }
 
-func (o *ObservedCommitStore) IsAFNHealthy(opts *bind.CallOpts) (bool, error) {
-	return withObservedContract(o.metric, "IsAFNHealthy", func() (bool, error) {
-		return o.CommitStoreInterface.IsAFNHealthy(opts)
+func (o *ObservedCommitStore) IsARMHealthy(opts *bind.CallOpts) (bool, error) {
+	return withObservedContract(o.metric, "IsARMHealthy", func() (bool, error) {
+		return o.CommitStoreInterface.IsARMHealthy(opts)
 	})
 }
 

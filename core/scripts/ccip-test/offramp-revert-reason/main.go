@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -114,7 +114,7 @@ func DecodeErrorStringFromABI(errorString string, contractABIs []string) {
 
 func getAllABIs() []string {
 	return []string{
-		afn_contract.AFNContractABI,
+		arm_contract.ARMContractABI,
 		lock_release_token_pool.LockReleaseTokenPoolABI,
 		burn_mint_token_pool.BurnMintTokenPoolABI,
 		commit_store.CommitStoreABI,

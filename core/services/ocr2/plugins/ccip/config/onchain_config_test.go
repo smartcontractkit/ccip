@@ -25,7 +25,7 @@ func TestCommitOnchainConfig(t *testing.T) {
 			name: "encodes and decodes config with all fields set",
 			want: CommitOnchainConfig{
 				PriceRegistry: randomAddress(),
-				Afn:           randomAddress(),
+				Arm:           randomAddress(),
 			},
 			expectErr: false,
 		},
@@ -65,7 +65,7 @@ func TestExecOnchainConfig(t *testing.T) {
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  randomAddress(),
 				PriceRegistry:                           randomAddress(),
-				Afn:                                     randomAddress(),
+				Arm:                                     randomAddress(),
 				MaxTokensLength:                         uint16(rand.Uint32()),
 				MaxDataSize:                             rand.Uint32(),
 			},

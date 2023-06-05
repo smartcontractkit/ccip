@@ -248,6 +248,8 @@ func TestDione(t *testing.T) {
 // 1. gets the keys from the nodes based upon ENV (OCR2Keys EthKeys PeerId) using json/credentials/ for auth
 // 2. writes the node keys into a file in json/nodes/
 func TestDionePopulateNodeKeys(t *testing.T) {
+	checkOwnerKey(t)
+
 	don := dione.NewDON(ENV, logger.TestLogger(t))
 	don.LoadCurrentNodeParams()
 	don.WriteToFile()
@@ -540,16 +542,16 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 	}
 }
 
-// TestUpdateLaneAFNAddress can be run as a test with the following config
+// TestUpdateLaneARMAddress can be run as a test with the following config
 // OWNER_KEY  private key used to deploy all contracts and is used as default in all single user tests.
-// It applies AFN address in all contracts that require it. AFN address is taken from rhea.EVMChainConfig.Afn
-// SourceChain.AFN is applied to
+// It applies ARM address in all contracts that require it. ARM address is taken from rhea.EVMChainConfig.ARM
+// SourceChain.ARM is applied to
 // * OnRamp (via SetDynamicConfig)
 //
-// DestinationChain.AFN is applied to:
+// DestinationChain.ARM is applied to:
 // * OffRamp (via setOCR2Config)
 // * CommitStore (via setOCR2Config)
-func TestUpdateLaneAFNAddress(t *testing.T) {
+func TestUpdateLaneARMAddress(t *testing.T) {
 	key := checkOwnerKeyAndSetupChain(t)
 
 	client := NewCcipClient(t, SOURCE, DESTINATION, key, key)

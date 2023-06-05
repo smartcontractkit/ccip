@@ -18,7 +18,7 @@
   "getSupportedTokens()": "d3c7c2c7",
   "getTokenLimitAdmin()": "599f6431",
   "getTokenTransferFeeConfig(address)": "1772047e",
-  "isAFNHealthy()": "147809b3",
+  "isARMHealthy()": "0a6cd30d",
   "linkAvailableForPayment()": "d09dc339",
   "owner()": "8da5cb5b",
   "pause()": "8456cb59",

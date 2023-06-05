@@ -424,8 +424,8 @@ func (_m *CommitStoreInterface) GetTransmitters(opts *bind.CallOpts) ([]common.A
 	return r0, r1
 }
 
-// IsAFNHealthy provides a mock function with given fields: opts
-func (_m *CommitStoreInterface) IsAFNHealthy(opts *bind.CallOpts) (bool, error) {
+// IsARMHealthy provides a mock function with given fields: opts
+func (_m *CommitStoreInterface) IsARMHealthy(opts *bind.CallOpts) (bool, error) {
 	ret := _m.Called(opts)
 
 	var r0 bool

@@ -2,13 +2,13 @@
 pragma solidity 0.8.19;
 
 import "forge-std/Test.sol";
-import "./mocks/MockAFN.sol";
+import "./mocks/MockARM.sol";
 import "./StructFactory.sol";
 
 contract BaseTest is Test, StructFactory {
   bool private s_baseTestInitialized;
 
-  MockAFN internal s_mockAFN;
+  MockARM internal s_mockARM;
 
   function setUp() public virtual {
     // BaseTest.setUp is often called multiple times from tests' setUp due to inheritance.
@@ -22,6 +22,6 @@ contract BaseTest is Test, StructFactory {
     // Set the block time to a constant known value
     vm.warp(BLOCK_TIME);
 
-    s_mockAFN = new MockAFN();
+    s_mockARM = new MockARM();
   }
 }

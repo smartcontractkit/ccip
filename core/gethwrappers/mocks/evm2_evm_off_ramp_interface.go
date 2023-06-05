@@ -718,8 +718,8 @@ func (_m *EVM2EVMOffRampInterface) GetTransmitters(opts *bind.CallOpts) ([]commo
 	return r0, r1
 }
 
-// IsAFNHealthy provides a mock function with given fields: opts
-func (_m *EVM2EVMOffRampInterface) IsAFNHealthy(opts *bind.CallOpts) (bool, error) {
+// IsARMHealthy provides a mock function with given fields: opts
+func (_m *EVM2EVMOffRampInterface) IsARMHealthy(opts *bind.CallOpts) (bool, error) {
 	ret := _m.Called(opts)
 
 	var r0 bool

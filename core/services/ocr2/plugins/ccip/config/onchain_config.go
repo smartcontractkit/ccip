@@ -18,7 +18,7 @@ func (d CommitOnchainConfig) AbiString() string {
 		{
 			"components": [
 				{"name": "priceRegistry", "type": "address"},
-				{"name": "afn", "type": "address"}
+				{"name": "arm", "type": "address"}
 			],
 			"type": "tuple"
 		}
@@ -26,8 +26,8 @@ func (d CommitOnchainConfig) AbiString() string {
 }
 
 func (d CommitOnchainConfig) Validate() error {
-	if d.Afn == (common.Address{}) {
-		return errors.New("must set Afn address")
+	if d.Arm == (common.Address{}) {
+		return errors.New("must set ARM address")
 	}
 	if d.PriceRegistry == (common.Address{}) {
 		return errors.New("must set Price Registry address")
@@ -45,7 +45,7 @@ func (d ExecOnchainConfig) AbiString() string {
 				{"name": "permissionLessExecutionThresholdSeconds", "type": "uint32"},
 				{"name": "router", "type": "address"},
 				{"name": "priceRegistry", "type": "address"},
-				{"name": "afn", "type": "address"},
+				{"name": "arm", "type": "address"},
 				{"name": "maxTokensLength", "type": "uint16"},
 				{"name": "maxDataSize", "type": "uint32"}
 			],
@@ -64,8 +64,8 @@ func (d ExecOnchainConfig) Validate() error {
 	if d.PriceRegistry == (common.Address{}) {
 		return errors.New("must set PriceRegistry address")
 	}
-	if d.Afn == (common.Address{}) {
-		return errors.New("must set Afn address")
+	if d.Arm == (common.Address{}) {
+		return errors.New("must set ARM address")
 	}
 	if d.MaxTokensLength == 0 {
 		return errors.New("must set MaxTokensLength")

@@ -284,7 +284,7 @@ func (don *DON) ClearAllLaneJobsByVersion(chainA string, chainB string, version 
 }
 
 func (don *DON) AddTwoWaySpecsByVersion(chainA rhea.EvmConfig, laneA rhea.EVMLaneConfig, chainB rhea.EvmConfig, laneB rhea.EVMLaneConfig, version string) {
-	jobParamsAB := NewCCIPJobSpecParams(chainA, laneA, chainB, laneB, version)
+	jobParamsAB := NewCCIPJobSpecParams(chainA.ChainConfig, laneA, chainB.ChainConfig, laneB, version)
 	relaySpecAB, err := jobParamsAB.CommitJobSpec()
 	if err != nil {
 		don.lggr.Errorf("commit jobspec error %v", err)
@@ -298,7 +298,7 @@ func (don *DON) AddTwoWaySpecsByVersion(chainA rhea.EvmConfig, laneA rhea.EVMLan
 	}
 	don.AddJobSpec(executionSpecAB)
 	time.Sleep(time.Second * 5)
-	jobParamsBA := NewCCIPJobSpecParams(chainB, laneB, chainA, laneA, version)
+	jobParamsBA := NewCCIPJobSpecParams(chainB.ChainConfig, laneB, chainA.ChainConfig, laneA, version)
 	relaySpecBA, err := jobParamsBA.CommitJobSpec()
 	if err != nil {
 		don.lggr.Errorf("commit jobspec error %v", err)
@@ -353,7 +353,7 @@ func (don *DON) AddMissingSpecsByLanes(chainA rhea.EvmConfig, laneA rhea.EVMLane
 				execFound = true
 			}
 		}
-		jobParamsAB := NewCCIPJobSpecParams(chainA, laneA, chainB, laneB, version)
+		jobParamsAB := NewCCIPJobSpecParams(chainA.ChainConfig, laneA, chainB.ChainConfig, laneB, version)
 
 		if !commitFound {
 			don.lggr.Infof("Found missing job [%s] on node #%d", lookingForCommit, i)

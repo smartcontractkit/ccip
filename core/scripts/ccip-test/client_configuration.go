@@ -29,7 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -104,7 +104,7 @@ func (client *CCIPClient) SetDynamicConfigOnRamp(t *testing.T) {
 		MaxDataSize:     rhea.MAX_DATA_SIZE,
 		MaxTokensLength: rhea.MAX_TOKEN_LENGTH,
 		MaxGasLimit:     rhea.MAX_TX_GAS_LIMIT,
-		Afn:             client.Source.Afn.Address(),
+		Arm:             client.Source.ARM.Address(),
 	}
 	tx, err := client.Source.OnRamp.SetDynamicConfig(client.Source.Owner, config)
 	shared.RequireNoError(t, err)
@@ -222,7 +222,7 @@ func (client *CCIPClient) reemitEvents(t *testing.T, destConfig rhea.EvmDeployme
 	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
 
-	// reemit CommitStore.ConfigSet (feeds Atlas's `ccip_afns` table)
+	// reemit CommitStore.ConfigSet (feeds Atlas's `ccip_arms` table)
 	commitStoreConfigIt, err := client.Dest.CommitStore.FilterConfigSet0(&bind.FilterOpts{Context: context.Background(), Start: destConfig.LaneConfig.DeploySettings.DeployedAtBlock - 100})
 	shared.RequireNoError(t, err)
 	var commitStoreConfigEvent *commit_store.CommitStoreConfigSet0
@@ -256,7 +256,7 @@ type Client struct {
 	WrappedNative    *burn_mint_erc677.BurnMintERC677
 	SupportedTokens  map[rhea.Token]EVMBridgedToken
 	PingPongDapp     *ping_pong_demo.PingPongDemo
-	Afn              *afn_contract.AFNContract
+	ARM              *arm_contract.ARMContract
 	PriceRegistry    *price_registry.PriceRegistry
 	Router           *router.Router
 	TunableValues    rhea.TunableChainValues
@@ -297,7 +297,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLan
 		}
 	}
 
-	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
+	arm, err := arm_contract.NewARMContract(config.ChainConfig.ARM, config.Client)
 	shared.RequireNoError(t, err)
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(laneConfig.OnRamp, config.Client)
 	shared.RequireNoError(t, err)
@@ -316,7 +316,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLan
 			LinkTokenAddress: config.ChainConfig.SupportedTokens[rhea.LINK].Token,
 			LinkToken:        LinkToken,
 			WrappedNative:    wrappedNative,
-			Afn:              afn,
+			ARM:              arm,
 			PriceRegistry:    priceRegistry,
 			SupportedTokens:  supportedTokens,
 			PingPongDapp:     pingPongDapp,
@@ -355,7 +355,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.E
 		}
 	}
 
-	afn, err := afn_contract.NewAFNContract(config.ChainConfig.Afn, config.Client)
+	arm, err := arm_contract.NewARMContract(config.ChainConfig.ARM, config.Client)
 	shared.RequireNoError(t, err)
 	commitStore, err := commit_store.NewCommitStore(laneConfig.CommitStore, config.Client)
 	shared.RequireNoError(t, err)
@@ -380,7 +380,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.E
 			WrappedNative:    wrappedNative,
 			SupportedTokens:  supportedTokens,
 			PingPongDapp:     pingPongDapp,
-			Afn:              afn,
+			ARM:              arm,
 			PriceRegistry:    priceRegistry,
 			logger:           config.Logger,
 			Router:           router,
@@ -804,7 +804,7 @@ func (client *CCIPClient) getCommitStoreOffChainConfig() []byte {
 func (client *CCIPClient) getCommitStoreOnchainConfig() []byte {
 	commitStoreOnchainConfig := ccipconfig.CommitOnchainConfig{
 		PriceRegistry: client.Dest.PriceRegistry.Address(),
-		Afn:           client.Dest.Afn.Address(),
+		Arm:           client.Dest.ARM.Address(),
 	}
 
 	encodedCommitStoreOnchainConfig, err := abihelpers.EncodeAbiStruct(commitStoreOnchainConfig)
@@ -838,7 +838,7 @@ func (client *CCIPClient) getOffRampOnchainConfig() []byte {
 	offRampOnchainConfig := ccipconfig.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: rhea.PERMISSIONLESS_EXEC_THRESHOLD_SEC,
 		Router:                                  client.Dest.Router.Address(),
-		Afn:                                     client.Dest.Afn.Address(),
+		Arm:                                     client.Dest.ARM.Address(),
 		PriceRegistry:                           client.Dest.PriceRegistry.Address(),
 		MaxTokensLength:                         rhea.MAX_TOKEN_LENGTH,
 		MaxDataSize:                             rhea.MAX_DATA_SIZE,

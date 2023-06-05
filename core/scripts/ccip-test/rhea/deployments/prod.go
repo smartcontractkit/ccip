@@ -57,7 +57,7 @@ var Prod_Goerli = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0x7d870741ca453ed5fa6808f8197664566d80c39e"),
-	Afn:           gethcommon.HexToAddress("0xb192F3b22f24d6DaD266DA5ECd7361D6e6534B49"),
+	ARM:           gethcommon.HexToAddress("0xb192F3b22f24d6DaD266DA5ECd7361D6e6534B49"),
 	PriceRegistry: gethcommon.HexToAddress("0x99d13D346f4D35F5139A5D51671563eb9a7e09a6"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Goerli),
@@ -71,7 +71,7 @@ var Prod_Goerli = rhea.EVMChainConfig{
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           false,
+		DeployARM:           false,
 		DeployTokenPools:    false,
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
@@ -120,7 +120,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0x0a36795b3006f50088c11ea45b960a1b0406f03b"),
-	Afn:           gethcommon.HexToAddress("0xDB81c131193263314762CfCE59B9A057ae7dbB41"),
+	ARM:           gethcommon.HexToAddress("0xDB81c131193263314762CfCE59B9A057ae7dbB41"),
 	PriceRegistry: gethcommon.HexToAddress("0xd824DA3583F02183FaC25669315B004E977780FD"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Sepolia),
@@ -134,7 +134,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           false,
+		DeployARM:           false,
 		DeployTokenPools:    false,
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
@@ -171,7 +171,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0xec6d1ec94d518be47da1cb35f5d43286558d8b62"),
-	Afn:           gethcommon.HexToAddress("0x8E8cD3608AFce92b902B74F577B1429Ce7BcCa96"),
+	ARM:           gethcommon.HexToAddress("0x8E8cD3608AFce92b902B74F577B1429Ce7BcCa96"),
 	PriceRegistry: gethcommon.HexToAddress("0x737bbAEb317993e4450fD19E844bDC145aef5adA"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.OptimismGoerli),
@@ -189,7 +189,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 		CacheGoldFeeEnforcer: gethcommon.HexToAddress("0x194E7a932663f11AC0790bfC44dBdd8339f0ED65"),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           false,
+		DeployARM:           false,
 		DeployTokenPools:    false,
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
@@ -238,7 +238,7 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
 	WrappedNative: rhea.WAVAX,
 	Router:        gethcommon.HexToAddress("0xb352e636f4093e4f5a4ac903064881491926aaa9"),
-	Afn:           gethcommon.HexToAddress("0x5fCC6941D1685C7115e257CDcBda258aF85F0C83"),
+	ARM:           gethcommon.HexToAddress("0x5fCC6941D1685C7115e257CDcBda258aF85F0C83"),
 	PriceRegistry: gethcommon.HexToAddress("0x8D8cEE7D59D967b12A40330AE9F6CC15578073bb"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.AvaxFuji),
@@ -256,7 +256,7 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		CacheGoldFeeEnforcer: gethcommon.HexToAddress("0x194E7a932663f11AC0790bfC44dBdd8339f0ED65"),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           false,
+		DeployARM:           false,
 		DeployTokenPools:    false,
 		DeployRouter:        false,
 		DeployPriceRegistry: false,

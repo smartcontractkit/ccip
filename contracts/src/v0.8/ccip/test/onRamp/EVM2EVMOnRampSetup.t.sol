@@ -90,7 +90,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         defaultTxGasLimit: GAS_LIMIT,
         prevOnRamp: address(0)
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_mockAFN)),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_mockARM)),
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
       new address[](0),
       rateLimiterConfig(),

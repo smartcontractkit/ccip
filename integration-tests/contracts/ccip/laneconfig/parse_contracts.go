@@ -23,7 +23,7 @@ type CommonContracts struct {
 	FeeTokenPool     string   `json:"fee_token_pool"`
 	BridgeTokens     []string `json:"bridge_tokens"`
 	BridgeTokenPools []string `json:"bridge_tokens_pools"`
-	AFN              string   `json:"afn"`
+	ARM              string   `json:"arm"`
 	Router           string   `json:"router"`
 	PriceRegistry    string   `json:"price_registry"`
 	WrappedNative    string   `json:"wrapped_native"`
@@ -49,8 +49,8 @@ type LaneConfig struct {
 func (l *LaneConfig) Validate() error {
 	var laneConfigError error
 
-	if l.AFN == "" || !common.IsHexAddress(l.AFN) {
-		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for afn"))
+	if l.ARM == "" || !common.IsHexAddress(l.ARM) {
+		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for arm"))
 	}
 	if l.FeeTokenPool == "" || !common.IsHexAddress(l.FeeTokenPool) {
 		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for fee_token_pool"))

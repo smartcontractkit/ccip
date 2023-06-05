@@ -251,7 +251,7 @@ func deployOnRamp(t *testing.T, client EvmConfig, laneConfig *EVMLaneConfig, des
 			MaxDataSize:     MAX_DATA_SIZE,
 			MaxTokensLength: MAX_TOKEN_LENGTH,
 			MaxGasLimit:     MAX_TX_GAS_LIMIT,
-			Afn:             client.ChainConfig.Afn,
+			Arm:             client.ChainConfig.ARM,
 		},
 		tokensAndPools,
 		[]common.Address{}, // allow list

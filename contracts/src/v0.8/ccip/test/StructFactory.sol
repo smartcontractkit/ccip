@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import "../interfaces/ICommitStore.sol";
-import {AFN} from "../AFN.sol";
+import {ARM} from "../ARM.sol";
 import "../interfaces/IRouter.sol";
 import "../offRamp/EVM2EVMOffRamp.sol";
 import "../onRamp/EVM2EVMOnRamp.sol";
@@ -34,32 +34,32 @@ contract StructFactory {
   address internal constant USER_3 = address(3);
   address internal constant USER_4 = address(4);
 
-  // afn
+  // arm
 
-  function afnConstructorArgs() internal pure returns (AFN.Config memory) {
-    AFN.Voter[] memory voters = new AFN.Voter[](4);
-    voters[0] = AFN.Voter({
+  function armConstructorArgs() internal pure returns (ARM.Config memory) {
+    ARM.Voter[] memory voters = new ARM.Voter[](4);
+    voters[0] = ARM.Voter({
       blessVoteAddr: BLESS_VOTER_1,
       curseVoteAddr: CURSE_VOTER_1,
       curseUnvoteAddr: CURSE_UNVOTER_1,
       blessWeight: WEIGHT_1,
       curseWeight: WEIGHT_1
     });
-    voters[1] = AFN.Voter({
+    voters[1] = ARM.Voter({
       blessVoteAddr: BLESS_VOTER_2,
       curseVoteAddr: CURSE_VOTER_2,
       curseUnvoteAddr: CURSE_UNVOTER_2,
       blessWeight: WEIGHT_10,
       curseWeight: WEIGHT_10
     });
-    voters[2] = AFN.Voter({
+    voters[2] = ARM.Voter({
       blessVoteAddr: BLESS_VOTER_3,
       curseVoteAddr: CURSE_VOTER_3,
       curseUnvoteAddr: CURSE_UNVOTER_3,
       blessWeight: WEIGHT_20,
       curseWeight: WEIGHT_20
     });
-    voters[3] = AFN.Voter({
+    voters[3] = ARM.Voter({
       blessVoteAddr: BLESS_VOTER_4,
       curseVoteAddr: CURSE_VOTER_4,
       curseUnvoteAddr: CURSE_UNVOTER_4,
@@ -67,7 +67,7 @@ contract StructFactory {
       curseWeight: WEIGHT_40
     });
     return
-      AFN.Config({
+      ARM.Config({
         voters: voters,
         blessWeightThreshold: WEIGHT_10 + WEIGHT_20 + WEIGHT_40,
         curseWeightThreshold: WEIGHT_1 + WEIGHT_10 + WEIGHT_20 + WEIGHT_40
@@ -105,14 +105,14 @@ contract StructFactory {
   function generateDynamicOffRampConfig(
     address router,
     address priceRegistry,
-    address afn
+    address arm
   ) internal pure returns (EVM2EVMOffRamp.DynamicConfig memory) {
     return
       EVM2EVMOffRamp.DynamicConfig({
         router: router,
         maxDataSize: MAX_DATA_SIZE,
         priceRegistry: priceRegistry,
-        afn: afn,
+        arm: arm,
         maxTokensLength: MAX_TOKENS_LENGTH,
         permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS
       });
@@ -121,7 +121,7 @@ contract StructFactory {
   function generateDynamicOnRampConfig(
     address router,
     address priceRegistry,
-    address afn
+    address arm
   ) internal pure returns (EVM2EVMOnRamp.DynamicConfig memory) {
     return
       EVM2EVMOnRamp.DynamicConfig({
@@ -130,7 +130,7 @@ contract StructFactory {
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
         maxGasLimit: MAX_GAS_LIMIT,
-        afn: afn
+        arm: arm
       });
   }
 

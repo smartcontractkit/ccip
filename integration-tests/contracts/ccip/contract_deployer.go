@@ -17,16 +17,15 @@ import (
 	ocrtypes2 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"golang.org/x/crypto/curve25519"
 
+	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
@@ -141,38 +140,38 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployAFNContract() (*AFN, error) {
-	address, _, instance, err := e.evmClient.DeployContract("Mock AFN Contract", func(
+func (e *CCIPContractsDeployer) DeployARMContract() (*ARM, error) {
+	address, _, instance, err := e.evmClient.DeployContract("Mock ARM Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return mock_afn_contract.DeployMockAFNContract(auth, backend)
+		return mock_arm_contract.DeployMockARMContract(auth, backend)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &AFN{
+	return &ARM{
 		client:     e.evmClient,
-		instance:   instance.(*mock_afn_contract.MockAFNContract),
+		instance:   instance.(*mock_arm_contract.MockARMContract),
 		EthAddress: *address,
 	}, err
 }
 
-func (e *CCIPContractsDeployer) NewAFNContract(addr common.Address) (*AFN, error) {
-	afn, err := mock_afn_contract.NewMockAFNContract(addr, e.evmClient.Backend())
+func (e *CCIPContractsDeployer) NewARMContract(addr common.Address) (*ARM, error) {
+	arm, err := mock_arm_contract.NewMockARMContract(addr, e.evmClient.Backend())
 	if err != nil {
 		return nil, err
 	}
 	log.Info().
 		Str("Contract Address", addr.Hex()).
-		Str("Contract Name", "Mock AFN Contract").
+		Str("Contract Name", "Mock ARM Contract").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
 
-	return &AFN{
+	return &ARM{
 		client:     e.evmClient,
-		instance:   afn,
+		instance:   arm,
 		EthAddress: addr,
 	}, err
 }
@@ -385,7 +384,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 	sourceChainSelector, destChainSelector uint64,
 	allowList []common.Address,
 	tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool,
-	afn, router, priceRegistry common.Address,
+	arm, router, priceRegistry common.Address,
 	opts RateLimiterConfig,
 	feeTokenConfig []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs,
 	tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs,
@@ -414,7 +413,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				MaxDataSize:     1e5,
 				MaxTokensLength: 5,
 				MaxGasLimit:     4_000_000,
-				Afn:             afn,
+				Arm:             arm,
 			},
 			tokensAndPools,
 			allowList,

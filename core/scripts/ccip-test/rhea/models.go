@@ -28,7 +28,7 @@ type EVMGasSettings struct {
 }
 
 type ChainDeploySettings struct {
-	DeployAFN           bool
+	DeployARM           bool
 	DeployTokenPools    bool
 	DeployRouter        bool
 	DeployUpgradeRouter bool
@@ -166,7 +166,7 @@ type EVMChainConfig struct {
 	WrappedNative      Token
 	Router             gethcommon.Address
 	UpgradeRouter      gethcommon.Address
-	Afn                gethcommon.Address
+	ARM                gethcommon.Address
 	PriceRegistry      gethcommon.Address
 	AllowList          []gethcommon.Address
 	DeploySettings     ChainDeploySettings

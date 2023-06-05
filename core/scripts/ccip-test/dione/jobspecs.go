@@ -13,43 +13,43 @@ import (
 )
 
 // NewCCIPJobSpecParams returns set of parameters needed for setting up ccip jobs for sourceClient --> destClient
-func NewCCIPJobSpecParams(sourceClient rhea.EvmConfig, sourceLane rhea.EVMLaneConfig, destClient rhea.EvmConfig, destLane rhea.EVMLaneConfig, version string) integrationtesthelpers.CCIPJobSpecParams {
+func NewCCIPJobSpecParams(sourceChainConfig *rhea.EVMChainConfig, sourceLane rhea.EVMLaneConfig, destChainConfig *rhea.EVMChainConfig, destLane rhea.EVMLaneConfig, version string) integrationtesthelpers.CCIPJobSpecParams {
 	return integrationtesthelpers.CCIPJobSpecParams{
 		OffRamp:                destLane.OffRamp,
 		CommitStore:            destLane.CommitStore,
-		SourceChainName:        ccip.ChainName(int64(sourceClient.ChainConfig.EvmChainId)),
-		DestChainName:          ccip.ChainName(int64(destClient.ChainConfig.EvmChainId)),
-		TokenPricesUSDPipeline: GetTokenPricesUSDPipeline(getPipelineTokens(sourceClient, destClient)),
+		SourceChainName:        ccip.ChainName(int64(sourceChainConfig.EvmChainId)),
+		DestChainName:          ccip.ChainName(int64(destChainConfig.EvmChainId)),
+		TokenPricesUSDPipeline: GetTokenPricesUSDPipeline(getPipelineTokens(sourceChainConfig, destChainConfig)),
 		SourceStartBlock:       sourceLane.DeploySettings.DeployedAtBlock,
 		DestStartBlock:         destLane.DeploySettings.DeployedAtBlock,
 		P2PV2Bootstrappers:     []string{}, // Set in env vars
-		SourceEvmChainId:       sourceClient.ChainConfig.EvmChainId,
-		DestEvmChainId:         destClient.ChainConfig.EvmChainId,
+		SourceEvmChainId:       sourceChainConfig.EvmChainId,
+		DestEvmChainId:         destChainConfig.EvmChainId,
 		Version:                version,
 	}
 }
 
 // Gathers all tokens needed for TokenPricesUSDPipeline
-func getPipelineTokens(sourceClient rhea.EvmConfig, destClient rhea.EvmConfig) []rhea.EVMBridgedToken {
+func getPipelineTokens(sourceChainConfig *rhea.EVMChainConfig, destChainConfig *rhea.EVMChainConfig) []rhea.EVMBridgedToken {
 	var pipelineTokens []rhea.EVMBridgedToken
 
-	for _, token := range destClient.ChainConfig.SupportedTokens {
-		token.ChainId = destClient.ChainConfig.EvmChainId
+	for _, token := range destChainConfig.SupportedTokens {
+		token.ChainId = destChainConfig.EvmChainId
 		pipelineTokens = append(pipelineTokens, token)
 	}
-	for _, feeTokenName := range destClient.ChainConfig.FeeTokens {
-		if _, ok := destClient.ChainConfig.SupportedTokens[feeTokenName]; !ok {
-			panic(fmt.Errorf("FeeToken is not a supported token for chain: %d", sourceClient.ChainConfig.EvmChainId))
+	for _, feeTokenName := range destChainConfig.FeeTokens {
+		if _, ok := destChainConfig.SupportedTokens[feeTokenName]; !ok {
+			panic(fmt.Errorf("FeeToken is not a supported token for chain: %d", sourceChainConfig.EvmChainId))
 		}
 	}
-	if sourceClient.ChainConfig.WrappedNative == "" {
-		panic(fmt.Errorf("WrappedNative is nil for chain: %d", sourceClient.ChainConfig.EvmChainId))
+	if sourceChainConfig.WrappedNative == "" {
+		panic(fmt.Errorf("WrappedNative is nil for chain: %d", sourceChainConfig.EvmChainId))
 	}
-	if _, ok := sourceClient.ChainConfig.SupportedTokens[sourceClient.ChainConfig.WrappedNative]; !ok {
-		panic(fmt.Errorf("SupportedTokens does not contain WrappedNative: %s on chain: %d", sourceClient.ChainConfig.WrappedNative, sourceClient.ChainConfig.EvmChainId))
+	if _, ok := sourceChainConfig.SupportedTokens[sourceChainConfig.WrappedNative]; !ok {
+		panic(fmt.Errorf("SupportedTokens does not contain WrappedNative: %s on chain: %d", sourceChainConfig.WrappedNative, sourceChainConfig.EvmChainId))
 	}
-	sourceWrappedNative := sourceClient.ChainConfig.SupportedTokens[sourceClient.ChainConfig.WrappedNative]
-	sourceWrappedNative.ChainId = sourceClient.ChainConfig.EvmChainId
+	sourceWrappedNative := sourceChainConfig.SupportedTokens[sourceChainConfig.WrappedNative]
+	sourceWrappedNative.ChainId = sourceChainConfig.EvmChainId
 	pipelineTokens = append(pipelineTokens, sourceWrappedNative)
 
 	return pipelineTokens

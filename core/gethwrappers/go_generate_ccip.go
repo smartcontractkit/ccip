@@ -7,8 +7,8 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/BurnMintTokenPool.abi ../../contracts/solc/v0.8.19/BurnMintTokenPool.bin BurnMintTokenPool burn_mint_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin LockReleaseTokenPool lock_release_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../contracts/solc/v0.8.19/CustomTokenPool.bin CustomTokenPool custom_token_pool
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/AFN.abi ../../contracts/solc/v0.8.19/AFN.bin AFNContract afn_contract
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/MockAFN.abi ../../contracts/solc/v0.8.19/MockAFN.bin MockAFNContract mock_afn_contract
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/ARM.abi ../../contracts/solc/v0.8.19/ARM.bin ARMContract arm_contract
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/MockARM.abi ../../contracts/solc/v0.8.19/MockARM.bin MockARMContract mock_arm_contract
 
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin EVM2EVMOnRamp evm_2_evm_onramp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.bin EVM2EVMOffRamp evm_2_evm_offramp

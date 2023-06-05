@@ -123,7 +123,7 @@ type CCIPCommon struct {
 	TokenPrices        []*big.Int
 	BridgeTokenPools   []*ccip.LockReleaseTokenPool
 	RateLimiterConfig  ccip.RateLimiterConfig
-	AFN                *ccip.AFN
+	ARM                *ccip.ARM
 	Router             *ccip.Router
 	PriceRegistry      *ccip.PriceRegistry
 	WrappedNative      common.Address
@@ -158,8 +158,8 @@ func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blo
 		TokenPrices:       ccipModule.TokenPrices,
 		BridgeTokenPools:  pools,
 		RateLimiterConfig: ccipModule.RateLimiterConfig,
-		AFN: &ccip.AFN{
-			EthAddress: ccipModule.AFN.EthAddress,
+		ARM: &ccip.ARM{
+			EthAddress: ccipModule.ARM.EthAddress,
 		},
 		Router: &ccip.Router{
 			EthAddress: ccipModule.Router.EthAddress,
@@ -193,9 +193,9 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 				EthAddress: common.HexToAddress(conf.Router),
 			}
 		}
-		if common.IsHexAddress(conf.AFN) {
-			ccipModule.AFN = &ccip.AFN{
-				EthAddress: common.HexToAddress(conf.AFN),
+		if common.IsHexAddress(conf.ARM) {
+			ccipModule.ARM = &ccip.ARM{
+				EthAddress: common.HexToAddress(conf.ARM),
 			}
 		}
 		if common.IsHexAddress(conf.PriceRegistry) {
@@ -397,17 +397,17 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	for range ccipModule.BridgeTokens {
 		ccipModule.TokenPrices = append(ccipModule.TokenPrices, big.NewInt(1))
 	}
-	if ccipModule.AFN == nil {
-		ccipModule.AFN, err = cd.DeployAFNContract()
+	if ccipModule.ARM == nil {
+		ccipModule.ARM, err = cd.DeployARMContract()
 		if err != nil {
-			return fmt.Errorf("deploying AFN shouldn't fail %+v", err)
+			return fmt.Errorf("deploying ARM shouldn't fail %+v", err)
 		}
 	} else {
-		afn, err := cd.NewAFNContract(ccipModule.AFN.EthAddress)
+		arm, err := cd.NewARMContract(ccipModule.ARM.EthAddress)
 		if err != nil {
-			return fmt.Errorf("getting new AFN contract shouldn't fail %+v", err)
+			return fmt.Errorf("getting new ARM contract shouldn't fail %+v", err)
 		}
-		ccipModule.AFN = afn
+		ccipModule.ARM = arm
 	}
 	if ccipModule.Router == nil {
 		weth9addr, err := cd.DeployWrappedNative()
@@ -611,7 +611,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			destChainSelector,
 			[]common.Address{},
 			tokensAndPools,
-			sourceCCIP.Common.AFN.EthAddress,
+			sourceCCIP.Common.ARM.EthAddress,
 			sourceCCIP.Common.Router.EthAddress,
 			sourceCCIP.Common.PriceRegistry.EthAddress,
 			sourceCCIP.Common.RateLimiterConfig,
@@ -1365,7 +1365,7 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		FeeTokenPool:     lane.Source.Common.FeeTokenPool.Address(),
 		BridgeTokens:     btAddresses,
 		BridgeTokenPools: btpAddresses,
-		AFN:              lane.Source.Common.AFN.Address(),
+		ARM:              lane.Source.Common.ARM.Address(),
 		Router:           lane.Source.Common.Router.Address(),
 		PriceRegistry:    lane.Source.Common.PriceRegistry.Address(),
 		WrappedNative:    lane.Source.Common.WrappedNative.Hex(),
@@ -1393,7 +1393,7 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		FeeTokenPool:     lane.Dest.Common.FeeTokenPool.Address(),
 		BridgeTokens:     btAddresses,
 		BridgeTokenPools: btpAddresses,
-		AFN:              lane.Dest.Common.AFN.Address(),
+		ARM:              lane.Dest.Common.ARM.Address(),
 		Router:           lane.Dest.Common.Router.Address(),
 		PriceRegistry:    lane.Dest.Common.PriceRegistry.Address(),
 		WrappedNative:    lane.Dest.Common.WrappedNative.Hex(),
@@ -1794,7 +1794,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		InflightCacheExpiry:   inflightExpiry,
 	}, ccipConfig.CommitOnchainConfig{
 		PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
-		Afn:           destCCIP.Common.AFN.EthAddress,
+		Arm:           destCCIP.Common.ARM.EthAddress,
 	})
 	if err != nil {
 		return errors.WithStack(err)
@@ -1824,7 +1824,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			PermissionLessExecutionThresholdSeconds: 60 * 30,
 			Router:                                  destCCIP.Common.Router.EthAddress,
 			PriceRegistry:                           destCCIP.Common.PriceRegistry.EthAddress,
-			Afn:                                     destCCIP.Common.AFN.EthAddress,
+			Arm:                                     destCCIP.Common.ARM.EthAddress,
 			MaxTokensLength:                         5,
 			MaxDataSize:                             1e5,
 		})

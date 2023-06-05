@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
@@ -30,8 +30,8 @@ type RateLimiterConfig struct {
 	Capacity *big.Int
 }
 
-type AFNConfig struct {
-	AFNWeightsByParticipants map[string]*big.Int // mapping : AFN participant address => weight
+type ARMConfig struct {
+	ARMWeightsByParticipants map[string]*big.Int // mapping : ARM participant address => weight
 	ThresholdForBlessing     *big.Int
 	ThresholdForBadSignal    *big.Int
 }
@@ -203,14 +203,14 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 	return pool.client.ProcessTransaction(tx)
 }
 
-type AFN struct {
+type ARM struct {
 	client     blockchain.EVMClient
-	instance   *mock_afn_contract.MockAFNContract
+	instance   *mock_arm_contract.MockARMContract
 	EthAddress common.Address
 }
 
-func (afn *AFN) Address() string {
-	return afn.EthAddress.Hex()
+func (arm *ARM) Address() string {
+	return arm.EthAddress.Hex()
 }
 
 type CommitStore struct {

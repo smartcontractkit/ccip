@@ -2,8 +2,8 @@
 pragma solidity 0.8.19;
 
 import "../helpers/CommitStoreHelper.sol";
-import {AFN} from "../../AFN.sol";
-import {IAFN} from "../../interfaces/IAFN.sol";
+import {ARM} from "../../ARM.sol";
+import {IARM} from "../../interfaces/IARM.sol";
 import "../../PriceRegistry.sol";
 import "../priceRegistry/PriceRegistry.t.sol";
 import "../ocr/OCR2Base.t.sol";
@@ -27,7 +27,7 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
     );
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(s_priceRegistry),
-      afn: address(s_mockAFN)
+      arm: address(s_mockARM)
     });
     s_commitStore.setOCR2Config(
       s_valid_signers,
@@ -44,10 +44,10 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   }
 }
 
-contract CommitStoreRealAFNSetup is PriceRegistrySetup, OCR2BaseSetup {
+contract CommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
   CommitStoreHelper s_commitStore;
 
-  AFN internal s_afn;
+  ARM internal s_arm;
 
   address constant BLESS_VOTE_ADDR = address(8888);
 
@@ -55,16 +55,16 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup, OCR2BaseSetup {
     PriceRegistrySetup.setUp();
     OCR2BaseSetup.setUp();
 
-    AFN.Voter[] memory voters = new AFN.Voter[](1);
-    voters[0] = AFN.Voter({
+    ARM.Voter[] memory voters = new ARM.Voter[](1);
+    voters[0] = ARM.Voter({
       blessVoteAddr: BLESS_VOTE_ADDR,
       curseVoteAddr: address(9999),
       curseUnvoteAddr: address(19999),
       blessWeight: 1,
       curseWeight: 1
     });
-    // Overwrite base mock afn with real.
-    s_afn = new AFN(AFN.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
+    // Overwrite base mock arm with real.
+    s_arm = new ARM(ARM.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
     s_commitStore = new CommitStoreHelper(
       CommitStore.StaticConfig({
         chainSelector: DEST_CHAIN_ID,
@@ -74,7 +74,7 @@ contract CommitStoreRealAFNSetup is PriceRegistrySetup, OCR2BaseSetup {
     );
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(s_priceRegistry),
-      afn: address(s_afn)
+      arm: address(s_arm)
     });
     s_commitStore.setOCR2Config(
       s_valid_signers,
@@ -104,7 +104,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     });
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(s_priceRegistry),
-      afn: address(s_mockAFN)
+      arm: address(s_mockARM)
     });
 
     vm.expectEmit();
@@ -129,7 +129,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     CommitStore.DynamicConfig memory gotDynamicConfig = commitStore.getDynamicConfig();
 
     assertEq(dynamicConfig.priceRegistry, gotDynamicConfig.priceRegistry);
-    assertEq(dynamicConfig.afn, gotDynamicConfig.afn);
+    assertEq(dynamicConfig.arm, gotDynamicConfig.arm);
 
     // CommitStore initial values
     assertEq(1, commitStore.getExpectedNextSequenceNumber());
@@ -156,12 +156,12 @@ contract CommitStore_setMinSeqNr is CommitStoreSetup {
 
 /// @notice #setDynamicConfig
 contract CommitStore_setDynamicConfig is CommitStoreSetup {
-  function testSetMinSeqNrSuccess(address priceRegistry, address afn) public {
-    vm.assume(priceRegistry != address(0) && afn != address(0));
+  function testSetMinSeqNrSuccess(address priceRegistry, address arm) public {
+    vm.assume(priceRegistry != address(0) && arm != address(0));
     CommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: priceRegistry,
-      afn: afn
+      arm: arm
     });
     bytes memory onchainConfig = abi.encode(dynamicConfig);
 
@@ -200,7 +200,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
   function testOnlyOwnerReverts() public {
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(23784264),
-      afn: address(s_mockAFN)
+      arm: address(s_mockARM)
     });
 
     vm.stopPrank();
@@ -218,7 +218,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
   function testInvalidCommitStoreConfigReverts() public {
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
       priceRegistry: address(0),
-      afn: address(1)
+      arm: address(1)
     });
 
     vm.expectRevert(CommitStore.InvalidCommitStoreConfig.selector);
@@ -232,7 +232,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
     );
 
     dynamicConfig.priceRegistry = address(1);
-    dynamicConfig.afn = address(0);
+    dynamicConfig.arm = address(0);
 
     vm.expectRevert(CommitStore.InvalidCommitStoreConfig.selector);
     s_commitStore.setOCR2Config(
@@ -247,7 +247,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 }
 
 /// @notice #resetUnblessedRoots
-contract CommitStore_resetUnblessedRoots is CommitStoreRealAFNSetup {
+contract CommitStore_resetUnblessedRoots is CommitStoreRealARMSetup {
   event RootRemoved(bytes32 root);
 
   function testResetUnblessedRootsSuccess() public {
@@ -280,11 +280,11 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealAFNSetup {
 
     s_commitStore.report(abi.encode(report));
 
-    IAFN.TaggedRoot[] memory blessedTaggedRoots = new IAFN.TaggedRoot[](1);
-    blessedTaggedRoots[0] = IAFN.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
+    IARM.TaggedRoot[] memory blessedTaggedRoots = new IARM.TaggedRoot[](1);
+    blessedTaggedRoots[0] = IARM.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
 
     changePrank(BLESS_VOTE_ADDR);
-    s_afn.voteToBless(blessedTaggedRoots);
+    s_arm.voteToBless(blessedTaggedRoots);
 
     vm.expectEmit(false, false, false, true);
     emit RootRemoved(rootsToReset[0]);
@@ -379,8 +379,8 @@ contract CommitStore_report is CommitStoreSetup {
   }
 
   function testUnhealthyReverts() public {
-    s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    vm.expectRevert(CommitStore.BadAFNSignal.selector);
+    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    vm.expectRevert(CommitStore.BadARMSignal.selector);
     bytes memory report;
     s_commitStore.report(report);
   }
@@ -424,7 +424,7 @@ contract CommitStore_report is CommitStoreSetup {
 }
 
 /// @notice #verify
-contract CommitStore_verify is CommitStoreRealAFNSetup {
+contract CommitStore_verify is CommitStoreRealARMSetup {
   function testNotBlessedSuccess() public {
     bytes32[] memory leaves = new bytes32[](1);
     leaves[0] = "root";
@@ -456,10 +456,10 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
       )
     );
     // Bless that root.
-    IAFN.TaggedRoot[] memory taggedRoots = new IAFN.TaggedRoot[](1);
-    taggedRoots[0] = IAFN.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
+    IARM.TaggedRoot[] memory taggedRoots = new IARM.TaggedRoot[](1);
+    taggedRoots[0] = IARM.TaggedRoot({commitStore: address(s_commitStore), root: leaves[0]});
     changePrank(BLESS_VOTE_ADDR);
-    s_afn.voteToBless(taggedRoots);
+    s_arm.voteToBless(taggedRoots);
     bytes32[] memory proofs = new bytes32[](0);
     uint256 timestamp = s_commitStore.verify(leaves, proofs, 0);
     assertEq(BLOCK_TIME, timestamp);
@@ -488,8 +488,8 @@ contract CommitStore_verify is CommitStoreRealAFNSetup {
   }
 }
 
-contract CommitStore_afn is CommitStoreSetup {
-  function testAFN() public {
+contract CommitStore_arm is CommitStoreSetup {
+  function testARM() public {
     // Test pausing
     assertEq(s_commitStore.paused(), false);
     s_commitStore.pause();
@@ -497,13 +497,13 @@ contract CommitStore_afn is CommitStoreSetup {
     s_commitStore.unpause();
     assertEq(s_commitStore.paused(), false);
 
-    // Test afn
-    assertEq(s_commitStore.isAFNHealthy(), true);
-    s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertEq(s_commitStore.isAFNHealthy(), false);
-    AFN.UnvoteToCurseRecord[] memory records = new AFN.UnvoteToCurseRecord[](1);
-    records[0] = AFN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockAFN.ownerUnvoteToCurse(records);
-    assertEq(s_commitStore.isAFNHealthy(), true);
+    // Test arm
+    assertEq(s_commitStore.isARMHealthy(), true);
+    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    assertEq(s_commitStore.isARMHealthy(), false);
+    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
+    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockARM.ownerUnvoteToCurse(records);
+    assertEq(s_commitStore.isARMHealthy(), true);
   }
 }

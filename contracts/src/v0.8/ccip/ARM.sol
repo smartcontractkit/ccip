@@ -2,14 +2,14 @@
 pragma solidity 0.8.19;
 
 import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
-import {IAFN} from "./interfaces/IAFN.sol";
+import {IARM} from "./interfaces/IARM.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 
-contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
+contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
-  string public constant override typeAndVersion = "AFN 1.0.0";
+  string public constant override typeAndVersion = "ARM 1.0.0";
 
   uint256 private constant MAX_NUM_VOTERS = 128;
 
@@ -33,7 +33,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     // or exceeds blessWeightThreshold, the tagged root becomes blessed.
     uint16 blessWeightThreshold;
     // When the total weight of voters that have voted to curse reaches or
-    // exceeds curseWeightThreshold, the AFN enters the cursed state.
+    // exceeds curseWeightThreshold, the ARM enters the cursed state.
     uint16 curseWeightThreshold;
   }
 
@@ -117,9 +117,9 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   event ConfigSet(uint32 indexed configVersion, Config config);
   error InvalidConfig();
 
-  event TaggedRootBlessed(uint32 indexed configVersion, IAFN.TaggedRoot taggedRoot, uint16 accumulatedWeight);
-  event TaggedRootBlessVotesReset(uint32 indexed configVersion, IAFN.TaggedRoot taggedRoot, bool wasBlessed);
-  event VotedToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot, uint8 weight);
+  event TaggedRootBlessed(uint32 indexed configVersion, IARM.TaggedRoot taggedRoot, uint16 accumulatedWeight);
+  event TaggedRootBlessVotesReset(uint32 indexed configVersion, IARM.TaggedRoot taggedRoot, bool wasBlessed);
+  event VotedToBless(uint32 indexed configVersion, address indexed voter, IARM.TaggedRoot taggedRoot, uint8 weight);
 
   event VotedToCurse(
     uint32 indexed configVersion,
@@ -151,8 +151,8 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
   // These events make it easier for offchain logic to discover that it performs
   // the same actions multiple times.
-  event AlreadyVotedToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot);
-  event AlreadyBlessed(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot);
+  event AlreadyVotedToBless(uint32 indexed configVersion, address indexed voter, IARM.TaggedRoot taggedRoot);
+  event AlreadyBlessed(uint32 indexed configVersion, address indexed voter, IARM.TaggedRoot taggedRoot);
 
   event RecoveredFromCurse();
 
@@ -189,13 +189,13 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     }
   }
 
-  function _taggedRootHash(IAFN.TaggedRoot memory taggedRoot) internal pure returns (bytes32) {
+  function _taggedRootHash(IARM.TaggedRoot memory taggedRoot) internal pure returns (bytes32) {
     return keccak256(abi.encode(taggedRoot.commitStore, taggedRoot.root));
   }
 
   /// @param taggedRoots A tagged root is hashed as `keccak256(abi.encode(taggedRoot.commitStore
   /// /* address */, taggedRoot.root /* bytes32 */))`.
-  function voteToBless(IAFN.TaggedRoot[] calldata taggedRoots) external {
+  function voteToBless(IARM.TaggedRoot[] calldata taggedRoots) external {
     // If we have an active curse, something is really wrong. Let's err on the
     // side of caution and not accept further blessings during this time of
     // uncertainty.
@@ -206,7 +206,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     if (blesserRecord.configVersion != configVersion) revert InvalidVoter(msg.sender);
 
     for (uint256 i = 0; i < taggedRoots.length; ++i) {
-      IAFN.TaggedRoot memory taggedRoot = taggedRoots[i];
+      IARM.TaggedRoot memory taggedRoot = taggedRoots[i];
       bytes32 taggedRootHash = _taggedRootHash(taggedRoots[i]);
       BlessVoteProgress memory voteProgress = s_blessVoteProgressByTaggedRootHash[taggedRootHash];
       if (voteProgress.weightThresholdMet) {
@@ -250,10 +250,10 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   }
 
   /// @notice Can be called by the owner to remove unintentionally voted or even blessed tagged roots in a recovery
-  /// scenario. The owner must ensure that there are no in-flight transactions by AFN nodes voting for any of the
+  /// scenario. The owner must ensure that there are no in-flight transactions by ARM nodes voting for any of the
   /// taggedRoots before calling this function, as such in-flight transactions could lead to the roots becoming
   /// re-blessed shortly after the call to this function, contrary to the original intention.
-  function ownerResetBlessVotes(IAFN.TaggedRoot[] memory taggedRoots) external onlyOwner {
+  function ownerResetBlessVotes(IARM.TaggedRoot[] memory taggedRoots) external onlyOwner {
     for (uint256 i = 0; i < taggedRoots.length; ++i) {
       bytes32 taggedRootHash = _taggedRootHash(taggedRoots[i]);
       BlessVoteProgress memory voteProgress = s_blessVoteProgressByTaggedRootHash[taggedRootHash];
@@ -387,12 +387,12 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     _setConfig(config);
   }
 
-  /// @inheritdoc IAFN
-  function isBlessed(IAFN.TaggedRoot calldata taggedRoot) public view override returns (bool) {
+  /// @inheritdoc IARM
+  function isBlessed(IARM.TaggedRoot calldata taggedRoot) public view override returns (bool) {
     return s_blessVoteProgressByTaggedRootHash[_taggedRootHash(taggedRoot)].weightThresholdMet;
   }
 
-  /// @inheritdoc IAFN
+  /// @inheritdoc IARM
   function isCursed() public view override returns (bool) {
     return s_curseVoteProgress.curseActive;
   }
@@ -410,7 +410,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   /// @return blessed will be accurate regardless of when voting took place
   /// @dev This is a helper method for offchain code so efficiency is not really a concern.
   function getBlessProgress(
-    IAFN.TaggedRoot calldata taggedRoot
+    IARM.TaggedRoot calldata taggedRoot
   ) external view returns (address[] memory blessVoteAddrs, uint16 accumulatedWeight, bool blessed) {
     bytes32 taggedRootHash = _taggedRootHash(taggedRoot);
     BlessVoteProgress memory progress = s_blessVoteProgressByTaggedRootHash[taggedRootHash];

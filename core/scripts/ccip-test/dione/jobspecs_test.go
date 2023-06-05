@@ -13,41 +13,37 @@ import (
 )
 
 func TestGetPipelineTokens(t *testing.T) {
-	sourceClient := rhea.EvmDeploymentConfig{
-		ChainConfig: rhea.EVMChainConfig{
-			EvmChainId: 1,
-			SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
-				rhea.WAVAX: {
-					Token: common.HexToAddress("0x1"),
-					Price: rhea.WAVAX.Price(),
-				},
+	sourceChainConfig := rhea.EVMChainConfig{
+		EvmChainId: 1,
+		SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+			rhea.WAVAX: {
+				Token: common.HexToAddress("0x1"),
+				Price: rhea.WAVAX.Price(),
 			},
-			FeeTokens:     []rhea.Token{rhea.WAVAX},
-			WrappedNative: rhea.WAVAX,
 		},
+		FeeTokens:     []rhea.Token{rhea.WAVAX},
+		WrappedNative: rhea.WAVAX,
 	}
-	destClient := rhea.EvmDeploymentConfig{
-		ChainConfig: rhea.EVMChainConfig{
-			EvmChainId: 2,
-			SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
-				rhea.LINK: {
-					Token: common.HexToAddress("0x2"),
-					Price: rhea.LINK.Price(),
-				},
-				rhea.WETH: {
-					Token: common.HexToAddress("0x3"),
-					Price: rhea.WETH.Price(),
-				},
+	destChainConfig := rhea.EVMChainConfig{
+		EvmChainId: 2,
+		SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+			rhea.LINK: {
+				Token: common.HexToAddress("0x2"),
+				Price: rhea.LINK.Price(),
 			},
-			FeeTokens:     []rhea.Token{rhea.LINK},
-			WrappedNative: rhea.LINK,
+			rhea.WETH: {
+				Token: common.HexToAddress("0x3"),
+				Price: rhea.WETH.Price(),
+			},
 		},
+		FeeTokens:     []rhea.Token{rhea.LINK},
+		WrappedNative: rhea.LINK,
 	}
 
-	pipelineTokens := getPipelineTokens(sourceClient, destClient)
+	pipelineTokens := getPipelineTokens(&sourceChainConfig, &destChainConfig)
 
-	expected := []rhea.EVMBridgedToken{sourceClient.ChainConfig.SupportedTokens[sourceClient.ChainConfig.WrappedNative]}
-	for _, token := range destClient.ChainConfig.SupportedTokens {
+	expected := []rhea.EVMBridgedToken{sourceChainConfig.SupportedTokens[sourceChainConfig.WrappedNative]}
+	for _, token := range destChainConfig.SupportedTokens {
 		expected = append(expected, token)
 	}
 
@@ -62,10 +58,10 @@ func TestGetPipelineTokens(t *testing.T) {
 	for i := 0; i < len(expected); i++ {
 		assert.Equal(t, expected[i].Token, pipelineTokens[i].Token)
 		assert.True(t, expected[i].Price.Cmp(pipelineTokens[i].Price) == 0)
-		if expected[i].Token == sourceClient.ChainConfig.SupportedTokens[sourceClient.ChainConfig.WrappedNative].Token {
-			assert.Equal(t, sourceClient.ChainConfig.EvmChainId, pipelineTokens[i].ChainId)
+		if expected[i].Token == sourceChainConfig.SupportedTokens[sourceChainConfig.WrappedNative].Token {
+			assert.Equal(t, sourceChainConfig.EvmChainId, pipelineTokens[i].ChainId)
 		} else {
-			assert.Equal(t, destClient.ChainConfig.EvmChainId, pipelineTokens[i].ChainId)
+			assert.Equal(t, destChainConfig.EvmChainId, pipelineTokens[i].ChainId)
 		}
 	}
 }

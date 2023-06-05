@@ -7,7 +7,7 @@ import "../../Router.sol";
 import "../helpers/receivers/ConformingReceiver.sol";
 import "../helpers/receivers/MaybeRevertMessageReceiverNo165.sol";
 import "../helpers/receivers/ReentrancyAbuser.sol";
-import {AFN} from "../../AFN.sol";
+import {ARM} from "../../ARM.sol";
 import "../../offRamp/EVM2EVMOffRamp.sol";
 import "../mocks/MockCommitStore.sol";
 import "../ocr/OCR2Base.t.sol";
@@ -28,7 +28,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
       address(s_destRouter),
       address(s_priceRegistry),
-      address(s_mockAFN)
+      address(s_mockARM)
     );
     IERC20[] memory sourceTokens = getCastedSourceTokens();
     IPool[] memory castedPools = getCastedDestinationPools();
@@ -151,7 +151,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
       USER_3,
       address(s_priceRegistry),
-      address(s_mockAFN)
+      address(s_mockARM)
     );
     bytes memory onchainConfig = abi.encode(dynamicConfig);
 
@@ -451,8 +451,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   }
 
   function testUnhealthyReverts() public {
-    s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    vm.expectRevert(EVM2EVMOffRamp.BadAFNSignal.selector);
+    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
   }
 
@@ -1075,14 +1075,14 @@ contract EVM2EVMOffRamp_getDestinationTokens is EVM2EVMOffRampSetup {
   }
 }
 
-contract EVM2EVMOffRamp_afn is EVM2EVMOffRampSetup {
-  function testAFN() public {
-    assertEq(s_offRamp.isAFNHealthy(), true);
-    s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertEq(s_offRamp.isAFNHealthy(), false);
-    AFN.UnvoteToCurseRecord[] memory records = new AFN.UnvoteToCurseRecord[](1);
-    records[0] = AFN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockAFN.ownerUnvoteToCurse(records);
-    assertEq(s_offRamp.isAFNHealthy(), true);
+contract EVM2EVMOffRamp_arm is EVM2EVMOffRampSetup {
+  function testARM() public {
+    assertEq(s_offRamp.isARMHealthy(), true);
+    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    assertEq(s_offRamp.isARMHealthy(), false);
+    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
+    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockARM.ownerUnvoteToCurse(records);
+    assertEq(s_offRamp.isARMHealthy(), true);
   }
 }

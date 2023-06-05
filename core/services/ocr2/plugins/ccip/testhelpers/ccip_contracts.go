@@ -27,7 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/maybe_revert_message_receiver"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
@@ -75,7 +75,7 @@ type Common struct {
 	CustomToken       *link_token_interface.LinkToken
 	WrappedNative     *weth9.WETH9
 	WrappedNativePool *lock_release_token_pool.LockReleaseTokenPool
-	AFN               *mock_afn_contract.MockAFNContract
+	ARM               *mock_arm_contract.MockARMContract
 	PriceRegistry     *price_registry.PriceRegistry
 }
 
@@ -212,7 +212,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     4_000_000,
-			Afn:             c.Source.AFN.Address(), // AFN
+			Arm:             c.Source.ARM.Address(), // ARM
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
 			{
@@ -694,13 +694,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	destChain.Commit()
 
-	afnSourceAddress, _, _, err := mock_afn_contract.DeployMockAFNContract(
+	armSourceAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
 		sourceUser,
 		sourceChain,
 	)
 	require.NoError(t, err)
 	sourceChain.Commit()
-	sourceAFN, err := mock_afn_contract.NewMockAFNContract(afnSourceAddress, sourceChain)
+	sourceARM, err := mock_arm_contract.NewMockARMContract(armSourceAddress, sourceChain)
 	require.NoError(t, err)
 
 	// Create router
@@ -773,7 +773,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     4_000_000,
-			Afn:             afnSourceAddress, // AFN
+			Arm:             armSourceAddress, // ARM
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
 			{
@@ -833,13 +833,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	sourceChain.Commit()
 
-	afnDestAddress, _, _, err := mock_afn_contract.DeployMockAFNContract(
+	armDestAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
 		destUser,
 		destChain,
 	)
 	require.NoError(t, err)
 	destChain.Commit()
-	destAFN, err := mock_afn_contract.NewMockAFNContract(afnDestAddress, destChain)
+	destARM, err := mock_arm_contract.NewMockARMContract(armDestAddress, destChain)
 	require.NoError(t, err)
 
 	destWeth9addr, _, _, err := weth9.DeployWETH9(destUser, destChain)
@@ -965,7 +965,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			Pool:              sourcePool,
 			CustomPool:        nil,
 			CustomToken:       sourceCustomToken,
-			AFN:               sourceAFN,
+			ARM:               sourceARM,
 			PriceRegistry:     srcPriceRegistry,
 			WrappedNative:     sourceWrapped,
 			WrappedNativePool: sourceWeth9Pool,
@@ -982,7 +982,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			Pool:              destPool,
 			CustomPool:        nil,
 			CustomToken:       destCustomToken,
-			AFN:               destAFN,
+			ARM:               destARM,
 			PriceRegistry:     destPriceRegistry,
 			WrappedNative:     destWrapped,
 			WrappedNativePool: destWrappedPool,

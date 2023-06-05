@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
@@ -294,12 +294,12 @@ func printRampSanityCheck(chain *rhea.EvmDeploymentConfig, sourceOnRamp common.A
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
-	afn, err := afn_contract.NewAFNContract(chain.ChainConfig.Afn, chain.Client)
+	arm, err := arm_contract.NewARMContract(chain.ChainConfig.ARM, chain.Client)
 	helpers.PanicErr(err)
-	badSignal, err := afn.IsCursed(&bind.CallOpts{})
+	badSignal, err := arm.IsCursed(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
-	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "AFN healthy", printBool(!badSignal)))
+	sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "ARM healthy", printBool(!badSignal)))
 
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
 	helpers.PanicErr(err)
@@ -664,7 +664,7 @@ func generateSeparator(headerLengths []int) string {
 func PrintJobSpecs(env dione.Environment, sourceClient rhea.EvmDeploymentConfig, destClient rhea.EvmDeploymentConfig, version string) {
 	don := dione.NewOfflineDON(env, nil)
 	// jobparams for the lane
-	jobParams := dione.NewCCIPJobSpecParams(sourceClient.OnlyEvmConfig(), sourceClient.LaneConfig, destClient.OnlyEvmConfig(), destClient.LaneConfig, version)
+	jobParams := dione.NewCCIPJobSpecParams(&sourceClient.ChainConfig, sourceClient.LaneConfig, &destClient.ChainConfig, destClient.LaneConfig, version)
 
 	bootstrapSpec := jobParams.BootstrapJob(destClient.LaneConfig.CommitStore.Hex())
 	specString, err := bootstrapSpec.String()

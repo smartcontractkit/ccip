@@ -15,7 +15,7 @@
   "getSupportedTokens()": "d3c7c2c7",
   "getTokenLimitAdmin()": "599f6431",
   "getTransmitters()": "666cab8d",
-  "isAFNHealthy()": "147809b3",
+  "isARMHealthy()": "0a6cd30d",
   "latestConfigDetails()": "81ff7048",
   "latestConfigDigestAndEpoch()": "afcb95d7",
   "manuallyExecute((uint64[],bytes[],bytes[][],bytes32[],uint256))": "8fa4f53b",

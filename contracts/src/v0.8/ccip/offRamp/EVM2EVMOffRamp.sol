@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
-import {IAFN} from "../interfaces/IAFN.sol";
+import {IARM} from "../interfaces/IARM.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
@@ -49,7 +49,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   error CanOnlySelfCall();
   error ReceiverError();
   error EmptyReport();
-  error BadAFNSignal();
+  error BadARMSignal();
   error InvalidMessageId();
   error InvalidTokenPoolConfig();
   error PoolAlreadyAdded();
@@ -84,7 +84,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     uint32 permissionLessExecutionThresholdSeconds; // -┐ Waiting time before manual execution is enabled
     address router; // ---------------------------------┘ Router address
     address priceRegistry; //        Price registry address
-    address afn; // ---------------┐ AFN address
+    address arm; // ---------------┐ ARM address
     uint16 maxTokensLength; //     | Maximum number of distinct ERC20 tokens that can be sent per message
     uint32 maxDataSize; // --------┘ Maximum payload data size
   }
@@ -436,7 +436,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   function _beforeSetConfig(bytes memory onchainConfig) internal override {
     DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
-    if (dynamicConfig.router == address(0) || dynamicConfig.afn == address(0))
+    if (dynamicConfig.router == address(0) || dynamicConfig.arm == address(0))
       revert InvalidOffRampConfig(dynamicConfig);
 
     s_dynamicConfig = dynamicConfig;
@@ -570,7 +570,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   }
 
   // ================================================================
-  // |                        Access and AFN                        |
+  // |                        Access and ARM                        |
   // ================================================================
 
   /// @notice Reverts as this contract should not access CCIP messages
@@ -580,13 +580,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   }
 
   /// @notice Support querying whether health checker is healthy.
-  function isAFNHealthy() external view returns (bool) {
-    return !IAFN(s_dynamicConfig.afn).isCursed();
+  function isARMHealthy() external view returns (bool) {
+    return !IARM(s_dynamicConfig.arm).isCursed();
   }
 
-  /// @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
+  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IAFN(s_dynamicConfig.afn).isCursed()) revert BadAFNSignal();
+    if (IARM(s_dynamicConfig.arm).isCursed()) revert BadARMSignal();
     _;
   }
 }

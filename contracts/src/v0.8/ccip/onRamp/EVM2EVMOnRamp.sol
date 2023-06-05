@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
-import {IAFN} from "../interfaces/IAFN.sol";
+import {IARM} from "../interfaces/IARM.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
@@ -57,7 +57,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error SenderNotAllowed(address sender);
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
-  error BadAFNSignal();
+  error BadARMSignal();
   error LinkBalanceNotSettled();
   error LinkTokenCannotBeNop();
 
@@ -91,7 +91,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint32 maxDataSize; //      | Maximum payload data size
     uint64 maxGasLimit; // -----┘ Maximum gas limit for messages targeting EVMs
     uint16 maxTokensLength; // -┐ Maximum number of distinct ERC20 tokens that can be sent per message
-    address afn; // ------------┘ AFN address
+    address arm; // ------------┘ ARM address
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -391,7 +391,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
     if (
-      dynamicConfig.router == address(0) || dynamicConfig.priceRegistry == address(0) || dynamicConfig.afn == address(0)
+      dynamicConfig.router == address(0) || dynamicConfig.priceRegistry == address(0) || dynamicConfig.arm == address(0)
     ) revert InvalidConfig();
 
     s_dynamicConfig = dynamicConfig;
@@ -765,7 +765,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // |                        Access and AFN                        |
+  // |                        Access and ARM                        |
   // ================================================================
 
   /// @dev Require that the sender is the owner or the fee admin or a nop
@@ -782,13 +782,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @notice Support querying whether health checker is healthy.
-  function isAFNHealthy() external view returns (bool) {
-    return !IAFN(s_dynamicConfig.afn).isCursed();
+  function isARMHealthy() external view returns (bool) {
+    return !IARM(s_dynamicConfig.arm).isCursed();
   }
 
-  /// @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
+  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IAFN(s_dynamicConfig.afn).isCursed()) revert BadAFNSignal();
+    if (IARM(s_dynamicConfig.arm).isCursed()) revert BadARMSignal();
     _;
   }
 

@@ -12,16 +12,16 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 )
 
 func DeployToNewChain(client *EvmDeploymentConfig) error {
-	// Updates client.AFN if any new contracts are deployed
-	err := deployAFN(client)
+	// Updates client.ARM if any new contracts are deployed
+	err := deployARM(client)
 	if err != nil {
-		return errors.Wrap(err, "afn deployment failed")
+		return errors.Wrap(err, "arm deployment failed")
 	}
 	// Updates client.TokenPools if any new contracts are deployed
 	err = DeployTokenPools(client)
@@ -58,25 +58,25 @@ func DeployUpgradeRouters(source *EvmDeploymentConfig, dest *EvmDeploymentConfig
 	return nil
 }
 
-func deployAFN(client *EvmDeploymentConfig) error {
-	if !client.ChainConfig.DeploySettings.DeployAFN {
-		if client.ChainConfig.Afn.Hex() == "0x0000000000000000000000000000000000000000" {
-			return fmt.Errorf("deploy new afn set to false but no afn given in config")
+func deployARM(client *EvmDeploymentConfig) error {
+	if !client.ChainConfig.DeploySettings.DeployARM {
+		if client.ChainConfig.ARM.Hex() == "0x0000000000000000000000000000000000000000" {
+			return fmt.Errorf("deploy new arm set to false but no arm given in config")
 		}
-		client.Logger.Infof("Skipping AFN deployment, using AFN on %s", client.ChainConfig.Afn)
+		client.Logger.Infof("Skipping ARM deployment, using ARM on %s", client.ChainConfig.ARM)
 		return nil
 	}
 
-	client.Logger.Infof("Deploying AFN")
-	address, tx, _, err := mock_afn_contract.DeployMockAFNContract(client.Owner, client.Client)
+	client.Logger.Infof("Deploying ARM")
+	address, tx, _, err := mock_arm_contract.DeployMockARMContract(client.Owner, client.Client)
 	if err != nil {
 		return err
 	}
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return err
 	}
-	client.Logger.Infof("AFN deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
-	client.ChainConfig.Afn = address
+	client.Logger.Infof("ARM deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
+	client.ChainConfig.ARM = address
 	return nil
 }
 

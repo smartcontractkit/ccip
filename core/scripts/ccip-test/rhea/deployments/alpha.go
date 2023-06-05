@@ -55,10 +55,10 @@ var Alpha_PolygonMumbai = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress(""),
-	Afn:           gethcommon.HexToAddress(""),
+	ARM:           gethcommon.HexToAddress(""),
 	PriceRegistry: gethcommon.HexToAddress(""),
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           false,
+		DeployARM:           false,
 		DeployTokenPools:    false,
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
@@ -99,7 +99,7 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0x012c1cb7a6f54dc0bcb6cc8955f54ddf5f178084"),
-	Afn:           gethcommon.HexToAddress("0x89f2a6cc7c7ae55409546f1cc7c58c94d745e884"),
+	ARM:           gethcommon.HexToAddress("0x89f2a6cc7c7ae55409546f1cc7c58c94d745e884"),
 	PriceRegistry: gethcommon.HexToAddress("0xf0046682ec5a3427cb37fe3e3d2dafea8eb409b4"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.OptimismGoerli),
@@ -113,7 +113,7 @@ var Alpha_OptimismGoerli = rhea.EVMChainConfig{
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           false,
+		DeployARM:           false,
 		DeployTokenPools:    false,
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
@@ -143,7 +143,7 @@ var Alpha_Sepolia = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0x8e56b840df6b01d9220a3f3f557aadf3a8024b9d"),
-	Afn:           gethcommon.HexToAddress("0x7a9ee62198b1c3a8f24c5003a078e1195cabdbd5"),
+	ARM:           gethcommon.HexToAddress("0x7a9ee62198b1c3a8f24c5003a078e1195cabdbd5"),
 	PriceRegistry: gethcommon.HexToAddress("0x2052e5e0e6bcdace1bfb133af111a2ca05c0bb37"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Sepolia),
@@ -157,7 +157,7 @@ var Alpha_Sepolia = rhea.EVMChainConfig{
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           false,
+		DeployARM:           false,
 		DeployTokenPools:    false,
 		DeployRouter:        false,
 		DeployPriceRegistry: false,
@@ -187,7 +187,7 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
 	WrappedNative: rhea.WAVAX,
 	Router:        gethcommon.HexToAddress("0x3356246ced3cd50085e0acc1b081a4d138f7b9e0"),
-	Afn:           gethcommon.HexToAddress("0x4a6450b7c6d7adfeca673d13d9d1c6ef3c2f69b5"),
+	ARM:           gethcommon.HexToAddress("0x4a6450b7c6d7adfeca673d13d9d1c6ef3c2f69b5"),
 	PriceRegistry: gethcommon.HexToAddress("0x3859c817b9795cb82ced4b1447dc23310e98ce1d"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.AvaxFuji),
@@ -201,7 +201,7 @@ var Alpha_AvaxFuji = rhea.EVMChainConfig{
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployAFN:           false,
+		DeployARM:           false,
 		DeployTokenPools:    false,
 		DeployRouter:        false,
 		DeployPriceRegistry: false,

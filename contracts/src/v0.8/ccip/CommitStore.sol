@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
 import {ICommitStore} from "./interfaces/ICommitStore.sol";
-import {IAFN} from "./interfaces/IAFN.sol";
+import {IARM} from "./interfaces/IARM.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OCR2Base} from "./ocr/OCR2Base.sol";
@@ -15,7 +15,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   error InvalidInterval(Interval interval);
   error InvalidRoot();
   error InvalidCommitStoreConfig();
-  error BadAFNSignal();
+  error BadARMSignal();
 
   event Paused(address account);
   event Unpaused(address account);
@@ -33,7 +33,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   /// @notice Dynamic commit store config
   struct DynamicConfig {
     address priceRegistry; // Price registry address on the destination chain
-    address afn; // AFN
+    address arm; // ARM
   }
 
   /// @notice a sequenceNumber interval
@@ -115,7 +115,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   /// @param root The merkle root to check the blessing status for.
   /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) public view returns (bool) {
-    return IAFN(s_dynamicConfig.afn).isBlessed(IAFN.TaggedRoot({commitStore: address(this), root: root}));
+    return IARM(s_dynamicConfig.arm).isBlessed(IARM.TaggedRoot({commitStore: address(this), root: root}));
   }
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
@@ -190,7 +190,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   function _beforeSetConfig(bytes memory onchainConfig) internal override {
     DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
-    if (dynamicConfig.afn == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();
+    if (dynamicConfig.arm == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();
 
     s_dynamicConfig = dynamicConfig;
 
@@ -201,17 +201,17 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   }
 
   // ================================================================
-  // |                        Access and AFN                        |
+  // |                        Access and ARM                        |
   // ================================================================
 
   /// @notice Support querying whether health checker is healthy.
-  function isAFNHealthy() external view returns (bool) {
-    return !IAFN(s_dynamicConfig.afn).isCursed();
+  function isARMHealthy() external view returns (bool) {
+    return !IARM(s_dynamicConfig.arm).isCursed();
   }
 
-  /// @notice Ensure that the AFN has not emitted a bad signal, and that the latest heartbeat is not stale.
+  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IAFN(s_dynamicConfig.afn).isCursed()) revert BadAFNSignal();
+    if (IARM(s_dynamicConfig.arm).isCursed()) revert BadARMSignal();
     _;
   }
 

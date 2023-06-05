@@ -21,7 +21,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = generateDynamicOnRampConfig(
       address(s_sourceRouter),
       address(s_priceRegistry),
-      address(s_mockAFN)
+      address(s_mockARM)
     );
     EVM2EVMOnRamp.TokenAndPool[] memory tokensAndPools = getTokensAndPools(s_sourceTokens, getCastedSourcePools());
 
@@ -58,7 +58,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq(dynamicConfig.maxDataSize, gotDynamicConfig.maxDataSize);
     assertEq(dynamicConfig.maxTokensLength, gotDynamicConfig.maxTokensLength);
     assertEq(dynamicConfig.maxGasLimit, gotDynamicConfig.maxGasLimit);
-    assertEq(dynamicConfig.afn, gotDynamicConfig.afn);
+    assertEq(dynamicConfig.arm, gotDynamicConfig.arm);
 
     // Tokens
     assertEq(s_sourceTokens, s_onRamp.getSupportedTokens());
@@ -349,8 +349,8 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   }
 
   function testUnhealthyReverts() public {
-    s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    vm.expectRevert(EVM2EVMOnRamp.BadAFNSignal.selector);
+    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, OWNER);
   }
 
@@ -488,7 +488,7 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
         defaultTxGasLimit: GAS_LIMIT,
         prevOnRamp: address(s_prevOnRamp)
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_mockAFN)),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_mockARM)),
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
       new address[](0),
       rateLimiterConfig(),
@@ -1337,7 +1337,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxDataSize: 400,
       maxTokensLength: 14,
       maxGasLimit: MAX_GAS_LIMIT / 2,
-      afn: address(11)
+      arm: address(11)
     });
 
     vm.expectEmit();
@@ -1362,7 +1362,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxDataSize: 400,
       maxTokensLength: 14,
       maxGasLimit: MAX_GAS_LIMIT / 2,
-      afn: address(11)
+      arm: address(11)
     });
 
     vm.expectRevert(EVM2EVMOnRamp.InvalidConfig.selector);
@@ -1377,7 +1377,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
     s_onRamp.setDynamicConfig(newConfig);
 
     newConfig.priceRegistry = address(23423);
-    newConfig.afn = address(0);
+    newConfig.arm = address(0);
 
     vm.expectRevert(EVM2EVMOnRamp.InvalidConfig.selector);
 
@@ -1503,8 +1503,8 @@ contract EVM2EVMOnRamp_getAllowList is EVM2EVMOnRampWithAllowListSetup {
   }
 }
 
-contract EVM2EVMOnRamp_afn is EVM2EVMOnRampSetup {
-  function testAFN() public {
+contract EVM2EVMOnRamp_arm is EVM2EVMOnRampSetup {
+  function testARM() public {
     // Test pausing
     assertEq(s_onRamp.paused(), false);
     s_onRamp.pause();
@@ -1512,13 +1512,13 @@ contract EVM2EVMOnRamp_afn is EVM2EVMOnRampSetup {
     s_onRamp.unpause();
     assertEq(s_onRamp.paused(), false);
 
-    // Test afn
-    assertEq(s_onRamp.isAFNHealthy(), true);
-    s_mockAFN.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertEq(s_onRamp.isAFNHealthy(), false);
-    AFN.UnvoteToCurseRecord[] memory records = new AFN.UnvoteToCurseRecord[](1);
-    records[0] = AFN.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockAFN.ownerUnvoteToCurse(records);
-    assertEq(s_onRamp.isAFNHealthy(), true);
+    // Test arm
+    assertEq(s_onRamp.isARMHealthy(), true);
+    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    assertEq(s_onRamp.isARMHealthy(), false);
+    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
+    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockARM.ownerUnvoteToCurse(records);
+    assertEq(s_onRamp.isARMHealthy(), true);
   }
 }

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {IAFN} from "../../interfaces/IAFN.sol";
-import {AFN} from "../../AFN.sol";
+import {IARM} from "../../interfaces/IARM.sol";
+import {ARM} from "../../ARM.sol";
 
-contract MockAFN is IAFN {
+contract MockARM is IARM {
   bool private s_curse;
 
   function isCursed() external view override returns (bool) {
@@ -15,11 +15,11 @@ contract MockAFN is IAFN {
     s_curse = true;
   }
 
-  function ownerUnvoteToCurse(AFN.UnvoteToCurseRecord[] memory) external {
+  function ownerUnvoteToCurse(ARM.UnvoteToCurseRecord[] memory) external {
     s_curse = false;
   }
 
-  function isBlessed(IAFN.TaggedRoot calldata) external view override returns (bool) {
+  function isBlessed(IARM.TaggedRoot calldata) external view override returns (bool) {
     return !s_curse;
   }
 }
