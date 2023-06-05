@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - _setNops calls payNops 
 - OnRamp and OffRamp contracts emit PoolAdded event from constructor 
 - `EVM2EVMOnRamp.applyAllowListUpdates(address[] calldata removes, address[] calldata adds)` signature changed. Arguments order was `adds`, `removes`
+- DB migrations ordering. Version 0.3.2 has proper sequential migration ids, aligned with the main repo 
 
 ## [0.2.0] - 2023-04-30
 ## [0.1.0] - 2023-03-14
