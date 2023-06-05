@@ -23,6 +23,8 @@ import (
 
 	keystore "github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 
+	legacygasstation "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation"
+
 	logger "github.com/smartcontractkit/chainlink/v2/core/logger"
 
 	mock "github.com/stretchr/testify/mock"
@@ -30,6 +32,8 @@ import (
 	pg "github.com/smartcontractkit/chainlink/v2/core/services/pg"
 
 	pipeline "github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
+
+	plugins "github.com/smartcontractkit/chainlink/v2/plugins"
 
 	services "github.com/smartcontractkit/chainlink/v2/core/services"
 
@@ -257,6 +261,22 @@ func (_m *Application) GetLogger() logger.SugaredLogger {
 	return r0
 }
 
+// GetLoopRegistry provides a mock function with given fields:
+func (_m *Application) GetLoopRegistry() *plugins.LoopRegistry {
+	ret := _m.Called()
+
+	var r0 *plugins.LoopRegistry
+	if rf, ok := ret.Get(0).(func() *plugins.LoopRegistry); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*plugins.LoopRegistry)
+		}
+	}
+
+	return r0
+}
+
 // GetSqlxDB provides a mock function with given fields:
 func (_m *Application) GetSqlxDB() *sqlx.DB {
 	ret := _m.Called()
@@ -329,6 +349,22 @@ func (_m *Application) JobSpawner() job.Spawner {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(job.Spawner)
+		}
+	}
+
+	return r0
+}
+
+// LegacyGasStationRequestRouter provides a mock function with given fields:
+func (_m *Application) LegacyGasStationRequestRouter() legacygasstation.RequestRouter {
+	ret := _m.Called()
+
+	var r0 legacygasstation.RequestRouter
+	if rf, ok := ret.Get(0).(func() legacygasstation.RequestRouter); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(legacygasstation.RequestRouter)
 		}
 	}
 

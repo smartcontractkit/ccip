@@ -35,11 +35,6 @@ const (
 		100 //# SLOAD_GAS = WARM_STORAGE_READ_COST for rewriting from non-zero (in-progress) to non-zero (success/failure)
 )
 
-const (
-	MaxPayloadLength    = 1000
-	MaxTokensPerMessage = 5
-)
-
 // Offchain: we compute the max overhead gas to determine msg executability.
 func overheadGas(dataLength, numTokens int) uint64 {
 	messageBytes := CONSTANT_MESSAGE_PART_BYTES +

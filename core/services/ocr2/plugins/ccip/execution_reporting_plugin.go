@@ -31,10 +31,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
+
+// exec Report should make sure to cap returned payload to this limit
+const MaxExecutionReportLength = 250_000
 
 var (
 	_ types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
@@ -176,19 +178,33 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	r.inflightReports.expire(lggr)
 	inFlight := r.inflightReports.getAll()
 
-	batchBuilderStart := time.Now()
+	observationBuildStart := time.Now()
 	// IMPORTANT: We build executable set based on the leaders token prices, ensuring consistency across followers.
-	executableObservations, err := r.getExecutableObservations(ctx, lggr, inFlight)
-	lggr.Infof("Batch building took %d ms", time.Since(batchBuilderStart).Milliseconds())
+	executableObservations, err := r.getExecutableObservations(ctx, timestamp, lggr, inFlight)
+	measureObservationBuildDuration(timestamp, time.Since(observationBuildStart))
 	if err != nil {
 		return nil, err
 	}
+	// cap observations which fits MaxObservationLength (after serialized)
+	capped := sort.Search(len(executableObservations), func(i int) bool {
+		var encoded []byte
+		encoded, err = ExecutionObservation{Messages: executableObservations[:i+1]}.Marshal()
+		if err != nil {
+			// false makes Search keep looking to the right, always including any "erroring" ObservedMessage and allowing us to detect in the bottom
+			return false
+		}
+		return len(encoded) > MaxObservationLength
+	})
+	if err != nil {
+		return nil, err
+	}
+	executableObservations = executableObservations[:capped]
 	lggr.Infow("Observation", "executableMessages", executableObservations)
 	// Note can be empty
 	return ExecutionObservation{Messages: executableObservations}.Marshal()
 }
 
-func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
+func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, timestamp types.ReportTimestamp, lggr logger.Logger, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(r.config.destLP, r.config.commitStore, r.onchainConfig.PermissionLessExecutionThresholdDuration())
 	if err != nil {
 		return nil, err
@@ -198,6 +214,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return []ObservedMessage{}, nil
 	}
 
+	rpcPreprationStart := time.Now()
 	// This could result in slightly different values on each call as
 	// the function returns the allowed amount at the time of the last block.
 	// Since this will only increase over time, the highest observed value will
@@ -237,8 +254,14 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	if destGasPriceWei.DynamicFeeCap != nil {
 		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
 	}
+	measureBatchPrepareRPCDuration(timestamp, time.Since(rpcPreprationStart))
 
 	lggr.Infow("Processing unexpired roots", "n", len(unexpiredReports))
+	measureNumberOfReportsProcessed(timestamp, len(unexpiredReports))
+	reportIterationStart := time.Now()
+	defer func() {
+		measureReportsIterationDuration(timestamp, time.Since(reportIterationStart))
+	}()
 	for _, unexpiredReport := range unexpiredReports {
 		if ctx.Err() != nil {
 			lggr.Warn("Processing of roots killed by context")
@@ -287,8 +310,12 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			return nil, err
 		}
 
+		r.lggr.Debugw("building next batch", "executedMp", len(executedMp))
+
+		buildBatchDuration := time.Now()
 		batch, allMessagesExecuted := r.buildBatch(lggr, srcLogs, executedMp, inflight, allowedTokenAmount,
 			srcTokensPrices, destTokensPrices, destGasPrice)
+		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 
 		// If all messages are already executed, snooze the root for the config.PermissionLessExecutionThresholdSeconds
 		// so it will never be considered again.
@@ -535,22 +562,61 @@ func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error)
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
 func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ObservedMessage) ([]byte, error) {
-	getMsgLogs := func(min, max uint64) ([]logpoller.Log, error) {
-		return r.config.sourceLP.LogsDataWordRange(
-			abihelpers.EventSignatures.SendRequested,
-			r.config.onRamp.Address(),
-			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-			abihelpers.EvmWord(min),
-			abihelpers.EvmWord(max),
-			int(r.offchainConfig.SourceIncomingConfirmations),
-			pg.WithParentCtx(ctx))
+	if err := validateSeqNumbers(ctx, r.config.commitStore, observedMessages); err != nil {
+		return nil, err
 	}
-
-	execReport, err := buildExecutionReport(ctx, lggr, r.config.destLP, observedMessages, r.config.commitStore, r.parseSeqNr, r.config.leafHasher, getMsgLogs)
+	commitReport, err := getCommitReportForSeqNum(r.config.destLP, r.config.commitStore, observedMessages[0].SeqNr)
 	if err != nil {
 		return nil, err
 	}
-	return abihelpers.EncodeExecutionReport(execReport)
+	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
+
+	msgsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.parseSeqNr, r.config.onRamp.Address(), r.config.sourceLP, commitReport.Interval)
+	if err != nil {
+		return nil, err
+	}
+
+	// cap messages which fits MaxExecutionReportLength (after serialized)
+	capped := sort.Search(len(observedMessages), func(i int) bool {
+		report, _ := buildExecutionReportForMessages(msgsInRoot, leaves, tree, commitReport.Interval, observedMessages[:i+1])
+		var encoded []byte
+		encoded, err = abihelpers.EncodeExecutionReport(report)
+		if err != nil {
+			// false makes Search keep looking to the right, always including any "erroring" ObservedMessage and allowing us to detect in the bottom
+			return false
+		}
+		return len(encoded) > MaxObservationLength
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	execReport, hashes := buildExecutionReportForMessages(msgsInRoot, leaves, tree, commitReport.Interval, observedMessages[:capped])
+	encodedReport, err := abihelpers.EncodeExecutionReport(execReport)
+	if err != nil {
+		return nil, err
+	}
+
+	if capped < len(observedMessages) {
+		lggr.Warnf(
+			"Capping report to fit MaxExecutionReportLength: msgsCount %d -> %d, bytes %d, bytesLimit %d",
+			len(observedMessages), capped, len(encodedReport), MaxExecutionReportLength,
+		)
+	}
+
+	// Double check this verifies before sending.
+	res, err := r.config.commitStore.Verify(&bind.CallOpts{Context: ctx}, hashes, execReport.Proofs, execReport.ProofFlagBits)
+	if err != nil {
+		lggr.Errorw("Unable to call verify", "observations", observedMessages[:capped], "root", commitReport.MerkleRoot[:], "seqRange", commitReport.Interval, "err", err)
+		return nil, err
+	}
+	// No timestamp, means failed to verify root.
+	if res.Cmp(big.NewInt(0)) == 0 {
+		root := tree.Root()
+		lggr.Errorf("Root does not verify for messages: %v, our inner root 0x%x", observedMessages[:capped], root)
+		return nil, errors.New("root does not verify")
+	}
+	return encodedReport, nil
 }
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {

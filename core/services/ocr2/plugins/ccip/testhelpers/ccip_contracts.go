@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/wrapped_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -411,6 +412,135 @@ func (c *CCIPContracts) SetupOnchainConfig(t *testing.T, commitOnchainConfig, co
 	c.SetupExecOCR2Config(t, execOnchainConfig, execOffchainConfig)
 
 	return blockBeforeConfig.Number().Int64()
+}
+
+func (c *CCIPContracts) SetupLockAndMintTokenPool(
+	sourceTokenAddress common.Address,
+	wrappedTokenName,
+	wrappedTokenSymbol string) (sourcePoolAddress, wrappedDestTokenPoolAddress common.Address, sourcePool *lock_release_token_pool.LockReleaseTokenPool, destPool *wrapped_token_pool.WrappedTokenPool, err error) {
+	wrappedDestTokenPoolAddress, _, destPool, err = wrapped_token_pool.DeployWrappedTokenPool(c.Dest.User, c.Dest.Chain, wrappedTokenName, wrappedTokenSymbol, 18, wrapped_token_pool.RateLimiterConfig{
+		Capacity:  HundredLink,
+		Rate:      big.NewInt(1e18),
+		IsEnabled: true,
+	})
+	if err != nil {
+		return
+	}
+	c.Source.Chain.Commit()
+
+	sourcePoolAddress, _, sourcePool, err = lock_release_token_pool.DeployLockReleaseTokenPool(c.Source.User, c.Source.Chain, sourceTokenAddress, lock_release_token_pool.RateLimiterConfig{
+		Capacity:  HundredLink,
+		Rate:      big.NewInt(1e18),
+		IsEnabled: true,
+	})
+	if err != nil {
+		return
+	}
+	c.Source.Chain.Commit()
+
+	// set onRamp as valid caller for source pool
+	_, err = sourcePool.ApplyRampUpdates(c.Source.User, []lock_release_token_pool.TokenPoolRampUpdate{
+		{
+			Ramp:    c.Source.OnRamp.Address(),
+			Allowed: true,
+		},
+	}, nil)
+	if err != nil {
+		return
+	}
+	c.Source.Chain.Commit()
+
+	_, err = destPool.ApplyRampUpdates(c.Dest.User, nil, []wrapped_token_pool.TokenPoolRampUpdate{
+		{
+			Ramp:    c.Dest.OffRamp.Address(),
+			Allowed: true,
+		},
+	})
+	if err != nil {
+		return
+	}
+	c.Dest.Chain.Commit()
+
+	wrappedNativeAddress, err := c.Source.Router.GetWrappedNative(nil)
+	if err != nil {
+		return
+	}
+
+	// native token is used as fee token
+	_, err = c.Source.PriceRegistry.UpdatePrices(c.Source.User, price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: wrappedNativeAddress,
+				UsdPerToken: big.NewInt(1e18), // 1usd
+			},
+		},
+		DestChainSelector: c.Dest.ChainID,
+		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9,
+	})
+	if err != nil {
+		return
+	}
+	c.Source.Chain.Commit()
+	_, err = c.Source.PriceRegistry.ApplyFeeTokensUpdates(c.Source.User, []common.Address{wrappedNativeAddress}, nil)
+	if err != nil {
+		return
+	}
+	c.Source.Chain.Commit()
+
+	// add new token pool created above
+	_, err = c.Source.OnRamp.ApplyPoolUpdates(c.Source.User, nil, []evm_2_evm_onramp.InternalPoolUpdate{
+		{
+			Token: sourceTokenAddress,
+			Pool:  sourcePoolAddress,
+		},
+	})
+	if err != nil {
+		return
+	}
+	c.Source.Chain.Commit()
+
+	_, err = c.Source.PriceRegistry.UpdatePrices(c.Source.User, price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: sourceTokenAddress,
+				UsdPerToken: big.NewInt(5),
+			},
+		},
+		DestChainSelector: 0,
+		UsdPerUnitGas:     big.NewInt(0),
+	})
+	if err != nil {
+		return
+	}
+	c.Source.Chain.Commit()
+
+	_, err = c.Dest.OffRamp.ApplyPoolUpdates(c.Dest.User, nil, []evm_2_evm_offramp.InternalPoolUpdate{
+		{
+			Token: sourceTokenAddress,
+			Pool:  wrappedDestTokenPoolAddress,
+		},
+	})
+	if err != nil {
+		return
+	}
+	c.Dest.Chain.Commit()
+
+	_, err = c.Dest.PriceRegistry.UpdatePrices(c.Dest.User, price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: wrappedDestTokenPoolAddress,
+				UsdPerToken: big.NewInt(5),
+			},
+		},
+		DestChainSelector: 0,
+		UsdPerUnitGas:     big.NewInt(0),
+	})
+	if err != nil {
+		return
+	}
+	c.Dest.Chain.Commit()
+
+	return
 }
 
 func (c *CCIPContracts) SendMessage(t *testing.T, gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.Address) {

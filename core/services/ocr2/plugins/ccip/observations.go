@@ -11,12 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-const (
-	MaxQueryLength           = 500         // empty for both plugins
-	MaxObservationLength     = 14 + 256*46 // ExecutionObservation encoded JSON with 256 max-length uint64 seqNrs
-	MaxExecutionReportLength = 150_000     // TODO
-)
-
 type CommitObservation struct {
 	Interval          commit_store.CommitStoreInterval `json:"interval"`
 	TokenPricesUSD    map[common.Address]*big.Int      `json:"tokensPerFeeCoin"`

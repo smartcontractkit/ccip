@@ -4,16 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/txpool"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/eth/ethconfig"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
@@ -34,11 +28,12 @@ import (
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
+
+var MaxPayloadLength = 100_000
 
 type execTestHarness = struct {
 	plugintesthelpers.CCIPPluginTestHarness
@@ -95,13 +90,31 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 	}
 }
 
-func TestMaxInternalExecutionReportSize(t *testing.T) {
+func TestMaxExecutionReportSize(t *testing.T) {
 	// Ensure that given max payload size and max num tokens,
 	// Our report size is under the tx size limit.
-	c := plugintesthelpers.SetupCCIPTestHarness(t)
-	mb := c.GenerateAndSendMessageBatch(t, 50, MaxPayloadLength, MaxTokensPerMessage)
-	// Ensure execution report size is valid
-	executorReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
+	th := setupExecTestHarness(t)
+	th.plugin.F = 1
+	mb := th.GenerateAndSendMessageBatch(t, 50, MaxPayloadLength, MaxTokensPerMessage)
+
+	// commit root
+	encoded, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
+		Interval:   mb.Interval,
+		MerkleRoot: mb.Root,
+		PriceUpdates: commit_store.InternalPriceUpdates{
+			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+			DestChainSelector: 0,
+			UsdPerUnitGas:     big.NewInt(0),
+		},
+	})
+	require.NoError(t, err)
+	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded)
+	require.NoError(t, err)
+	// double commit to ensure enough confirmations
+	th.CommitAndPollLogs(t)
+	th.CommitAndPollLogs(t)
+
+	fullReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
 		SequenceNumbers:   mb.SeqNums,
 		EncodedMessages:   mb.AllMsgBytes,
 		OffchainTokenData: mb.TokenData,
@@ -109,27 +122,18 @@ func TestMaxInternalExecutionReportSize(t *testing.T) {
 		ProofFlagBits:     mb.ProofBits,
 	})
 	require.NoError(t, err)
-	t.Log("execution report length", len(executorReport), MaxExecutionReportLength)
-	require.True(t, len(executorReport) <= MaxExecutionReportLength)
+	// ensure "naive" full report would be bigger than limit
+	require.Greater(t, len(fullReport), MaxExecutionReportLength, "full execution report length")
 
-	// Check can get into mempool i.e. tx size limit is respected.
-	a := c.Dest.OffRamp.Address()
-	bi, _ := abi.JSON(strings.NewReader(evm_2_evm_offramp_helper.EVM2EVMOffRampHelperABI))
-	b, err := bi.Pack("report", []byte(executorReport))
+	observations := make([]ObservedMessage, len(mb.SeqNums))
+	for i, seqNr := range mb.SeqNums {
+		observations[i] = ObservedMessage{SeqNr: seqNr, TokenData: mb.TokenData[i]}
+	}
+
+	// buildReport should cap the built report to fit in MaxExecutionReportLength
+	execReport, err := th.plugin.buildReport(testutils.Context(t), th.Lggr, observations)
 	require.NoError(t, err)
-	n, err := c.Dest.Chain.NonceAt(testutils.Context(t), c.Dest.User.From, nil)
-	require.NoError(t, err)
-	signedTx, err := c.Dest.User.Signer(c.Dest.User.From, types.NewTx(&types.LegacyTx{
-		To:       &a,
-		Nonce:    n,
-		GasPrice: big.NewInt(1e9),
-		Gas:      ethconfig.Defaults.Miner.GasCeil, // Massive gas limit
-		Value:    big.NewInt(0),
-		Data:     b,
-	}))
-	require.NoError(t, err)
-	pool := txpool.NewTxPool(txpool.DefaultConfig, params.AllEthashProtocolChanges, c.Dest.Chain.Blockchain())
-	require.NoError(t, pool.AddLocal(signedTx))
+	require.LessOrEqual(t, len(execReport), MaxExecutionReportLength, "built execution report length")
 }
 
 func TestExecutionReportToEthTxMetadata(t *testing.T) {

@@ -173,10 +173,11 @@ type PrometheusSecrets struct {
 	AuthToken *models.Secret
 }
 type Feature struct {
-	FeedsManager *bool
-	LogPoller    *bool
-	UICSAKeys    *bool
-	CCIP         *bool
+	FeedsManager     *bool
+	LogPoller        *bool
+	UICSAKeys        *bool
+	CCIP             *bool
+	LegacyGasStation *bool
 }
 
 func (f *Feature) setFrom(f2 *Feature) {
@@ -191,6 +192,9 @@ func (f *Feature) setFrom(f2 *Feature) {
 	}
 	if v := f2.CCIP; v != nil {
 		f.CCIP = v
+	}
+	if v := f2.LegacyGasStation; v != nil {
+		f.LegacyGasStation = v
 	}
 }
 

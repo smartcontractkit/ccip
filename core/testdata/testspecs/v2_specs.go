@@ -768,3 +768,159 @@ storeBlockhashesBatchSize = %d
 
 	return BlockHeaderFeederSpec{BlockHeaderFeederSpecParams: params, toml: toml}
 }
+
+// LegacyGasStationServerSpecParams defines params for building a legacy gas station server job spec.
+type LegacyGasStationServerSpecParams struct {
+	JobID             string
+	Name              string
+	ForwarderAddress  string
+	EVMChainID        uint64
+	CCIPChainSelector uint64
+	FromAddresses     []string
+}
+
+// LegacyGasStationServerSpec defines a legacy gas station server job spec.
+type LegacyGasStationServerSpec struct {
+	LegacyGasStationServerSpecParams
+	toml string
+}
+
+// Toml returns the LegacyGasStationServerSpec in TOML string form.
+func (l LegacyGasStationServerSpec) Toml() string {
+	return l.toml
+}
+
+// GenerateLegacyGasStationServerSpec creates a LegacyGasStationServerSpec from the given params.
+func GenerateLegacyGasStationServerSpec(params LegacyGasStationServerSpecParams) LegacyGasStationServerSpec {
+	if params.JobID == "" {
+		params.JobID = "123e4567-e89b-12d3-a456-426655442211"
+	}
+
+	if params.Name == "" {
+		params.Name = "legacygasstationserver"
+	}
+
+	if params.ForwarderAddress == "" {
+		params.ForwarderAddress = "0xb078DA5cDa45Ee0f5D2007C03fCf8d9461395e6c"
+	}
+
+	if params.CCIPChainSelector == 0 {
+		params.CCIPChainSelector = 125500
+	}
+
+	var formattedFromAddresses string
+	if params.FromAddresses == nil {
+		formattedFromAddresses = `["0xBe0b739f841bC113D4F4e4CdD16086ffAbB5f39f"]`
+	} else {
+		var addresses []string
+		for _, address := range params.FromAddresses {
+			addresses = append(addresses, fmt.Sprintf("%q", address))
+		}
+		formattedFromAddresses = fmt.Sprintf("[%s]", strings.Join(addresses, ", "))
+	}
+
+	template := `
+type = "legacygasstationserver"
+schemaVersion = 1
+name = "%s"
+forwarderAddress = "%s"
+evmChainID = "%d"
+ccipChainSelector = "%d"
+fromAddresses = %s
+observationSource = """
+estimate_gas [type=estimategaslimit
+              to="%s"
+              multiplier="1.1"
+              data="$(jobRun.payload)"]
+simulate [type=ethcall
+          to="%s"
+          gas="$(estimate_gas)"
+          gasPrice="$(jobSpec.maxGasPrice)"
+          extractRevertReason=true
+          contract="%s"
+          data="$(jobRun.payload)"]
+estimate_gas->simulate
+"""
+`
+	toml := fmt.Sprintf(template, params.Name, params.ForwarderAddress, params.EVMChainID, params.CCIPChainSelector,
+		formattedFromAddresses, params.ForwarderAddress, params.ForwarderAddress, params.ForwarderAddress)
+
+	return LegacyGasStationServerSpec{LegacyGasStationServerSpecParams: params, toml: toml}
+}
+
+// LegacyGasStationSidecarSpecParams defines params for building a legacy gas station sidecar job spec.
+type LegacyGasStationSidecarSpecParams struct {
+	JobID             string
+	Name              string
+	ForwarderAddress  string
+	OffRampAddress    string
+	LookbackBlocks    int
+	PollPeriod        time.Duration
+	RunTimeout        time.Duration
+	EVMChainID        uint64
+	CCIPChainSelector uint64
+}
+
+// LegacyGasStationSidecarSpec defines a legacy gas station sidecar job spec.
+type LegacyGasStationSidecarSpec struct {
+	LegacyGasStationSidecarSpecParams
+	toml string
+}
+
+// Toml returns the LegacyGasStationSidecarSpec in TOML string form.
+func (l LegacyGasStationSidecarSpec) Toml() string {
+	return l.toml
+}
+
+// GenerateLegacyGasStationSidecarSpec creates a LegacyGasStationSidecarSpec from the given params.
+func GenerateLegacyGasStationSidecarSpec(params LegacyGasStationSidecarSpecParams) LegacyGasStationSidecarSpec {
+	if params.JobID == "" {
+		params.JobID = "123e4567-e89b-12d3-a456-426655442211"
+	}
+
+	if params.Name == "" {
+		params.Name = "legacygasstationsidecar"
+	}
+
+	if params.ForwarderAddress == "" {
+		params.ForwarderAddress = "0x2d7F888fE0dD469bd81A12f77e6291508f714d4B"
+	}
+
+	if params.OffRampAddress == "" {
+		params.OffRampAddress = "0x016D54091ee83D42aF46e4F2d7177D0A232D2bDa"
+	}
+
+	if params.CCIPChainSelector == 0 {
+		params.CCIPChainSelector = 125500
+	}
+
+	if params.LookbackBlocks == 0 {
+		params.LookbackBlocks = 10000
+	}
+
+	if params.PollPeriod == 0 {
+		params.PollPeriod = 10 * time.Second
+	}
+
+	if params.RunTimeout == 0 {
+		params.RunTimeout = 10 * time.Second
+	}
+
+	template := `
+type = "legacygasstationsidecar"
+schemaVersion = 1
+name = "%s"
+forwarderAddress = "%s"
+offRampAddress = "%s"
+lookbackBlocks = %d
+pollPeriod = "%s"
+runTimeout = "%s"
+evmChainID = "%d"
+ccipChainSelector = "%d"
+`
+	toml := fmt.Sprintf(template, params.Name, params.ForwarderAddress,
+		params.OffRampAddress, params.LookbackBlocks, params.PollPeriod,
+		params.RunTimeout, params.EVMChainID, params.CCIPChainSelector)
+
+	return LegacyGasStationSidecarSpec{LegacyGasStationSidecarSpecParams: params, toml: toml}
+}

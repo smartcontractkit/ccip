@@ -9,7 +9,9 @@ union JobSpec =
     WebhookSpec |
     BlockhashStoreSpec |
     BlockHeaderFeederSpec |
-    BootstrapSpec
+    BootstrapSpec |
+    LegacyGasStationServerSpec |
+    LegacyGasStationSidecarSpec
 
 type CronSpec {
     schedule: String!
@@ -155,5 +157,24 @@ type BootstrapSpec {
     blockchainTimeout: String
     contractConfigTrackerPollInterval: String
     contractConfigConfirmations: Int
+    createdAt: Time!
+}
+
+type LegacyGasStationServerSpec {
+    forwarderAddress: String!
+    evmChainID: String
+    ccipChainSelector: String
+    fromAddresses: [String!]
+    createdAt: Time!
+}
+
+type LegacyGasStationSidecarSpec {
+    forwarderAddress: String!
+    offRampAddress: String!
+    lookbackBlocks: Int!
+    pollPeriod: String!
+    runTimeout: String!
+    evmChainID: String
+    ccipChainSelector: String
     createdAt: Time!
 }

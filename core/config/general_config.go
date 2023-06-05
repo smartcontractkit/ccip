@@ -33,6 +33,7 @@ type FeatureFlags interface {
 	FeatureUICSAKeys() bool
 	FeatureLogPoller() bool
 	FeatureCCIP() bool
+	FeatureLegacyGasStation() bool
 
 	AutoPprofEnabled() bool
 	EVMEnabled() bool
