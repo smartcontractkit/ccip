@@ -456,6 +456,7 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 
 		&deployments.Prod_AvaxFujiToSepolia,
 		&deployments.Prod_AvaxFujiToOptimismGoerli,
+		&deployments.Prod_AvaxFujiToPolygonMumbai,
 
 		&deployments.Prod_OptimismGoerliToAvaxFuji,
 		&deployments.Prod_OptimismGoerliToSepolia,
@@ -463,6 +464,7 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 		&deployments.Prod_ArbitrumGoerliToSepolia,
 
 		&deployments.Prod_PolygonMumbaiToSepolia,
+		&deployments.Prod_PolygonMumbaiToAvaxFuji,
 	}
 
 	for _, lane := range allProdLanes {

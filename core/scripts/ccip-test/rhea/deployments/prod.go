@@ -75,6 +75,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x498533848239DDc6Bb5Cf7aEF63c97f3f5513ed2"), // Pramod - DApp Sepolia->Fuji
 		gethcommon.HexToAddress("0x8e5267453b0aa137Be1Fc976755E6A9bD2a2E029"), // Amine (DevRel) 1
 		gethcommon.HexToAddress("0x9d087fC03ae39b088326b67fA3C788236645b717"), // Amine (DevRel) 2
+		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0xd65113b9B1EeD81113EaF41DC0D2d34fCa31522C"), // BetaUser - Multimedia
@@ -216,6 +217,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x63a646443180ba96888e2e3f1a047658612c9d67"), // OptimismGoerliToSepolia.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
+		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0x3FcFF7d9f88C64905e2cD9960c7452b5E6690E13"), // BetaUser - AAVE
@@ -300,12 +302,14 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		// Ping pong
 		gethcommon.HexToAddress("0x01d45e872d24f3ffa4693c0a4aaeb3008ed972ae"), // AvaxFujiToSepolia.PingPongDapp,
 		gethcommon.HexToAddress("0x8ec5ad6cb5496dae52d2e80cd59fa78d066626d6"), // AvaxFujiToOptimismGoerli.PingPongDapp,
+		gethcommon.HexToAddress("0x29e6697bc7C34953069C5E06e16385f42473c9a4"), // AvaxFujiToPolygonMumbai.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x594D8E57D8801069C77AAB90222a9162E908AA63"), // Pramod - Dapp Fuji->OptimismGoerli
 		gethcommon.HexToAddress("0xFE5394A63433A3975b1936dEc92DAa161FEE7463"), // Pramod - DApp Fuji->Sepolia
 		gethcommon.HexToAddress("0x912519a7E5e2e2309b1e60F540683c6661757A0C"), // Amine (DevRel) 1
 		gethcommon.HexToAddress("0x9d087fC03ae39b088326b67fA3C788236645b717"), // Amine (DevRel) 2
+		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0x1b5D803Be089e43110Faf54c6b4eC40409Cc7450"), // BetaUser - Multimedia
@@ -426,7 +430,8 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
 		// Ping pong
 		gethcommon.HexToAddress("0x13c2d66a8023e2feb9cbe28e26f32b8d2dae3bd0"), // ArbitrumGoerliToSepolia.PingPongDapp,
-
+		// Personal
+		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0xF5022eDd1B827E6EA4bBdb961212ECD7F315ed88"), // BetaUser - RiseWorks
 		gethcommon.HexToAddress("0x0D7a3a17E2E160287D3e7e74c4A1B22422156642"), // BetaUser - RiseWorks
@@ -481,8 +486,10 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Test Script 0xEa94AA1318796b5C01a9A37faCBc65423fb2c520
 		// Ping pong
 		gethcommon.HexToAddress("0x56edc4d8367932f0e36b966cbbd95df48e9db40f"), // PolygonMumbaiToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0x6456Ce3C0f0007e75684d2f676B73A5b4363CDEd"), // PolygonMumbaiToAvax.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
+		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0xe764C455e3Bd05Eb7Cf53Ec8491dca0e91486D24"), // BetaUser - Synthetix v3 core
 		gethcommon.HexToAddress("0x8e52262f91ef7049adfD8d1E608172fAC57995c3"), // BetaUser - Synthetix v3 core
