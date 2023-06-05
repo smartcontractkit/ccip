@@ -41,6 +41,7 @@ const (
 	LegacyGasStationSidecar Type = (Type)(pipeline.LegacyGasStationSidecarJobType)
 	Webhook                 Type = (Type)(pipeline.WebhookJobType)
 	Bootstrap               Type = (Type)(pipeline.BootstrapJobType)
+	Gateway                 Type = (Type)(pipeline.GatewayJobType)
 )
 
 //revive:disable:redefines-builtin-id
@@ -77,6 +78,7 @@ var (
 		LegacyGasStationServer:  false,
 		LegacyGasStationSidecar: false,
 		Bootstrap:               false,
+		Gateway:                 false,
 	}
 	supportsAsync = map[Type]bool{
 		Cron:                    true,
@@ -92,6 +94,7 @@ var (
 		LegacyGasStationServer:  false,
 		LegacyGasStationSidecar: false,
 		Bootstrap:               false,
+		Gateway:                 false,
 	}
 	schemaVersions = map[Type]uint32{
 		Cron:                    1,
@@ -107,6 +110,7 @@ var (
 		LegacyGasStationServer:  1,
 		LegacyGasStationSidecar: 1,
 		Bootstrap:               1,
+		Gateway:                 1,
 	}
 )
 
@@ -139,6 +143,8 @@ type Job struct {
 	LegacyGasStationSidecarSpec   *LegacyGasStationSidecarSpec
 	BootstrapSpec                 *BootstrapSpec
 	BootstrapSpecID               *int32
+	GatewaySpec                   *GatewaySpec
+	GatewaySpecID                 *int32
 	PipelineSpecID                int32
 	PipelineSpec                  *pipeline.Spec
 	JobSpecErrors                 []SpecError
@@ -390,8 +396,8 @@ type ExternalInitiatorWebhookSpec struct {
 type WebhookSpec struct {
 	ID                            int32 `toml:"-"`
 	ExternalInitiatorWebhookSpecs []ExternalInitiatorWebhookSpec
-	CreatedAt                     time.Time `toml:"-"`
-	UpdatedAt                     time.Time `toml:"-"`
+	CreatedAt                     time.Time `json:"createdAt" toml:"-"`
+	UpdatedAt                     time.Time `json:"updatedAt" toml:"-"`
 }
 
 func (w WebhookSpec) GetID() string {
@@ -698,4 +704,24 @@ func (s BootstrapSpec) AsOCR2Spec() OCR2OracleSpec {
 		UpdatedAt:                         s.UpdatedAt,
 		P2PV2Bootstrappers:                pq.StringArray{},
 	}
+}
+
+type GatewaySpec struct {
+	ID            int32      `toml:"-"`
+	GatewayConfig JSONConfig `toml:"gatewayConfig"`
+	CreatedAt     time.Time  `toml:"-"`
+	UpdatedAt     time.Time  `toml:"-"`
+}
+
+func (s GatewaySpec) GetID() string {
+	return fmt.Sprintf("%v", s.ID)
+}
+
+func (s *GatewaySpec) SetID(value string) error {
+	ID, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		return err
+	}
+	s.ID = int32(ID)
+	return nil
 }
