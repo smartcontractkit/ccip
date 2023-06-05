@@ -12,7 +12,6 @@ import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {MockCommitStore} from "../mocks/MockCommitStore.sol";
 import {Router} from "../../Router.sol";
 import {EVM2EVMOffRamp} from "../../offRamp/EVM2EVMOffRamp.sol";
-import {SimpleMessageReceiver} from "../helpers/receivers/SimpleMessageReceiver.sol";
 import {AggregateRateLimiter} from "../../AggregateRateLimiter.sol";
 import {EVM2EVMOffRampHelper} from "../helpers/EVM2EVMOffRampHelper.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
@@ -47,8 +46,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     OCR2BaseSetup.setUp();
 
     s_mockCommitStore = new MockCommitStore();
-    s_receiver = new SimpleMessageReceiver();
-    s_secondary_receiver = new SimpleMessageReceiver();
+    s_receiver = new MaybeRevertMessageReceiver(false);
+    s_secondary_receiver = new MaybeRevertMessageReceiver(false);
     s_reverting_receiver = new MaybeRevertMessageReceiver(true);
 
     deployOffRamp(s_mockCommitStore, s_destRouter, address(0));

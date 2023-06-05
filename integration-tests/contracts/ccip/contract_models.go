@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
 )
 
 var HundredCoins = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
@@ -258,12 +257,6 @@ func (b *CommitStore) SetOCR2Config(
 		return err
 	}
 	return b.client.ProcessTransaction(tx)
-}
-
-type MessageReceiver struct {
-	client     blockchain.EVMClient
-	instance   *simple_message_receiver.SimpleMessageReceiver
-	EthAddress common.Address
 }
 
 type ReceiverDapp struct {

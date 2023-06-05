@@ -46,7 +46,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399)
 
-	geCurrentSeqNum := 1
+	currentSeqNum := 1
 
 	t.Run("single ge", func(t *testing.T) {
 		tokenAmount := big.NewInt(500000003) // prime number
@@ -92,10 +92,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipTH.Source.Chain.Commit()
 		ccipTH.SendRequest(t, msg)
 		// Should eventually see this executed.
-		ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
-		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum)
+		ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum)
+		ccipTH.EventuallyReportCommitted(t, currentSeqNum)
 
-		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		ccipTH.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
 
@@ -151,7 +151,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 				Getter:   ccipTH.GetDestLinkBalance,
 			},
 		})
-		geCurrentSeqNum++
+		currentSeqNum++
 	})
 
 	t.Run("multiple batches ge", func(t *testing.T) {
@@ -196,17 +196,17 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		// Send a batch of requests in a single block
 		testhelpers.ConfirmTxs(t, txs, ccipTH.Source.Chain)
 		for i := 0; i < n; i++ {
-			ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum+i)
+			ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum+i)
 		}
 		// Should see a report with the full range
-		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum+n-1)
+		ccipTH.EventuallyReportCommitted(t, currentSeqNum+n-1)
 		// Should all be executed
-		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum+n-1)
+		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum+n-1)
 		for _, execLog := range executionLogs {
 			ccipTH.AssertExecState(t, execLog, abihelpers.ExecutionStateSuccess)
 		}
 
-		geCurrentSeqNum += n
+		currentSeqNum += n
 	})
 
 	t.Run("ge strict sequencing", func(t *testing.T) {
@@ -241,19 +241,19 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		require.NoError(t, err2)
 		ccipTH.Source.Chain.Commit()
 		txForFailedReq := ccipTH.SendRequest(t, msg)
-		failedReqLog := ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
-		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum)
+		failedReqLog := ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum)
+		ccipTH.EventuallyReportCommitted(t, currentSeqNum)
 		ccipTH.EventuallyCommitReportAccepted(t, currentBlockNumber)
 
 		// execution status should be failed
-		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		ccipTH.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateFailure)
 		// Nonce should not have incremented
 		afterNonce, err2 := ccipTH.Dest.OffRamp.GetSenderNonce(nil, ccipTH.Source.User.From)
 		require.NoError(t, err2)
 		require.Equal(t, startNonce, afterNonce)
-		geCurrentSeqNum++
+		currentSeqNum++
 
 		// flip the revert settings on receiver
 		_, err2 = ccipTH.Dest.Receivers[1].Receiver.SetRevert(ccipTH.Dest.User, false)
@@ -265,12 +265,12 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		var pendingReqNumbers []int
 		for i := 1; i < totalMsgs; i++ {
 			ccipTH.SendRequest(t, msg)
-			ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
-			ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum)
-			executionLog := ccipTH.NoNodesHaveExecutedSeqNum(t, geCurrentSeqNum)
+			ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum)
+			ccipTH.EventuallyReportCommitted(t, currentSeqNum)
+			executionLog := ccipTH.NoNodesHaveExecutedSeqNum(t, currentSeqNum)
 			require.Empty(t, executionLog)
-			pendingReqNumbers = append(pendingReqNumbers, geCurrentSeqNum)
-			geCurrentSeqNum++
+			pendingReqNumbers = append(pendingReqNumbers, currentSeqNum)
+			currentSeqNum++
 		}
 
 		// manually execute the failed request
@@ -304,22 +304,22 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipTH.DeployNewOffRamp(t)
 
 		// send a request as the v2 contracts are not enabled in router it should route through the v1 contracts
-		t.Logf("sending request for seqnum %d", geCurrentSeqNum)
+		t.Logf("sending request for seqnum %d", currentSeqNum)
 		ccipTH.SendMessage(t, gasLimit, gasPrice, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
 		ccipTH.Source.Chain.Commit()
 		ccipTH.Dest.Chain.Commit()
-		t.Logf("verifying seqnum %d on previous onRamp %s", geCurrentSeqNum, onRampV1.Address().Hex())
-		ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum, onRampV1.Address())
-		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum, commitStoreV1.Address())
-		executionLog := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum, offRampV1.Address())
+		t.Logf("verifying seqnum %d on previous onRamp %s", currentSeqNum, onRampV1.Address().Hex())
+		ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum, onRampV1.Address())
+		ccipTH.EventuallyReportCommitted(t, currentSeqNum, commitStoreV1.Address())
+		executionLog := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum, offRampV1.Address())
 		ccipTH.AssertExecState(t, executionLog[0], abihelpers.ExecutionStateSuccess, offRampV1.Address())
 
 		nonceAtOnRampV1, err := onRampV1.GetSenderNonce(nil, ccipTH.Source.User.From)
 		require.NoError(t, err, "getting nonce from onRamp")
-		require.Equal(t, geCurrentSeqNum, int(nonceAtOnRampV1))
+		require.Equal(t, currentSeqNum, int(nonceAtOnRampV1))
 		nonceAtOffRampV1, err := offRampV1.GetSenderNonce(nil, ccipTH.Source.User.From)
 		require.NoError(t, err, "getting nonce from offRamp")
-		require.Equal(t, geCurrentSeqNum, int(nonceAtOffRampV1))
+		require.Equal(t, currentSeqNum, int(nonceAtOffRampV1))
 
 		// enable the newly deployed contracts
 		newConfigBlock := ccipTH.Dest.Chain.Blockchain().CurrentBlock().Number.Int64()
@@ -339,7 +339,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			ccipTH.Source.Chain.Commit()
 			ccipTH.Dest.Chain.Commit()
 		}
-		seqNumAtOnRampV1 := geCurrentSeqNum + 1
+		seqNumAtOnRampV1 := currentSeqNum + 1
 		ccipTH.ConsistentlyReportNotCommitted(t, seqNumAtOnRampV1, commitStoreV1.Address())
 
 		// delete v1 jobs
@@ -377,7 +377,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		require.NoError(t, err, "getting nonce from offRamp")
 		require.Equal(t, nonceAtOnRampV1+uint64(noOfRequests)+1, nonceAtOnRampV2, "nonce should be synced from v1 onRamps")
 		require.Equal(t, nonceAtOffRampV1+uint64(noOfRequests)+1, nonceAtOffRampV2, "nonce should be synced from v1 offRamps")
-		geCurrentSeqNum = endSeqNum + 1
+		currentSeqNum = endSeqNum + 1
 	})
 
 	t.Run("pay nops", func(t *testing.T) {
@@ -453,13 +453,13 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipTH.Source.User.Value = fee
 		ccipTH.SendRequest(t, msg)
 		ccipTH.Source.User.Value = nil
-		ccipTH.AllNodesHaveReqSeqNum(t, geCurrentSeqNum)
-		ccipTH.EventuallyReportCommitted(t, geCurrentSeqNum)
+		ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum)
+		ccipTH.EventuallyReportCommitted(t, currentSeqNum)
 
-		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, geCurrentSeqNum, geCurrentSeqNum)
+		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum)
 		assert.Len(t, executionLogs, 1)
 		ccipTH.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
-		geCurrentSeqNum++
+		currentSeqNum++
 
 		// get the nop fee
 		nopFee, err := ccipTH.Source.OnRamp.GetNopFeesJuels(nil)

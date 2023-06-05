@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/simple_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -215,26 +214,6 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChain
 	return &CommitStore{
 		client:     e.evmClient,
 		Instance:   instance.(*commit_store.CommitStore),
-		EthAddress: *address,
-	}, err
-}
-
-func (e *CCIPContractsDeployer) DeploySimpleMessageReceiver() (
-	*MessageReceiver,
-	error,
-) {
-	address, _, instance, err := e.evmClient.DeployContract("SimpleMessageReceiver Contract", func(
-		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
-	) (common.Address, *types.Transaction, interface{}, error) {
-		return simple_message_receiver.DeploySimpleMessageReceiver(auth, backend)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &MessageReceiver{
-		client:     e.evmClient,
-		instance:   instance.(*simple_message_receiver.SimpleMessageReceiver),
 		EthAddress: *address,
 	}, err
 }

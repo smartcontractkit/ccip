@@ -7,7 +7,7 @@ import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 import {IRouterClient} from "../../interfaces/IRouterClient.sol";
 
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
-import "../helpers/receivers/SimpleMessageReceiver.sol";
+import {MaybeRevertMessageReceiver} from "../helpers/receivers/MaybeRevertMessageReceiver.sol";
 import "../offRamp/EVM2EVMOffRampSetup.t.sol";
 
 /// @notice #constructor
@@ -315,11 +315,11 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 }
 
 contract Router_applyRampUpdates is RouterSetup {
-  SimpleMessageReceiver s_receiver;
+  MaybeRevertMessageReceiver internal s_receiver;
 
   function setUp() public virtual override(RouterSetup) {
     RouterSetup.setUp();
-    s_receiver = new SimpleMessageReceiver();
+    s_receiver = new MaybeRevertMessageReceiver(false);
   }
 
   function testOffRampDisable() public {
