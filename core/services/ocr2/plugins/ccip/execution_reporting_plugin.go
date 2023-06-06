@@ -16,6 +16,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
+
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -29,12 +31,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 )
 
 // exec Report should make sure to cap returned payload to this limit
@@ -59,26 +60,33 @@ type ExecutionPluginConfig struct {
 }
 
 type ExecutionReportingPlugin struct {
-	config                    ExecutionPluginConfig
-	F                         int
-	lggr                      logger.Logger
-	inflightReports           *inflightExecReportsContainer
-	snoozedRoots              map[[32]byte]time.Time
-	destPriceRegistry         price_registry.PriceRegistryInterface
-	destWrappedNative         common.Address
-	onchainConfig             ccipconfig.ExecOnchainConfig
-	offchainConfig            ccipconfig.ExecOffchainConfig
-	srcToDstTokenMappingMu    sync.RWMutex
-	srcToDstTokenMappingBlock int64
-	srcToDstTokenMapping      map[common.Address]common.Address
+	config             ExecutionPluginConfig
+	F                  int
+	lggr               logger.Logger
+	inflightReports    *inflightExecReportsContainer
+	snoozedRoots       map[[32]byte]time.Time
+	destPriceRegistry  price_registry.PriceRegistryInterface
+	destWrappedNative  common.Address
+	onchainConfig      ccipconfig.ExecOnchainConfig
+	offchainConfig     ccipconfig.ExecOffchainConfig
+	cachedSrcFeeTokens *cache.CachedChain[[]common.Address]
+	cachedDstTokens    *cache.CachedChain[cache.CachedTokens]
 }
 
 type ExecutionReportingPluginFactory struct {
 	config ExecutionPluginConfig
+
+	// We keep track of the registered filters
+	srcChainFilters []logpoller.Filter
+	dstChainFilters []logpoller.Filter
+	filtersMu       *sync.Mutex
 }
 
 func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) types.ReportingPluginFactory {
-	return &ExecutionReportingPluginFactory{config: config}
+	return &ExecutionReportingPluginFactory{
+		config:    config,
+		filtersMu: &sync.Mutex{},
+	}
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
@@ -92,7 +100,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	priceRegistry, err := observability.NewObservedPriceRegistry(onchainConfig.PriceRegistry, rf.config.destClient)
+	priceRegistry, err := observability.NewObservedPriceRegistry(onchainConfig.PriceRegistry, ExecPluginLabel, rf.config.destClient)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -104,29 +112,27 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	sourceToDestTokenMapping, err := generateSourceToDestTokenMapping(ctx, rf.config.offRamp)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
-	latestBlock, err := rf.config.destLP.LatestBlock(pg.WithParentCtx(ctx))
-	if err != nil {
+
+	if err = rf.updateLogPollerFilters(onchainConfig); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
+	cachedSrcFeeTokens := cache.NewCachedFeeTokens(rf.config.sourceLP, rf.config.srcPriceRegistry, int64(offchainConfig.SourceFinalityDepth))
+	cachedDstTokens := cache.NewCachedTokens(rf.config.destLP, rf.config.offRamp, priceRegistry, int64(offchainConfig.DestOptimisticConfirmations))
 	rf.config.lggr.Infow("Starting exec plugin", "offchainConfig", offchainConfig, "onchainConfig", onchainConfig)
 
 	return &ExecutionReportingPlugin{
-			config:                    rf.config,
-			F:                         config.F,
-			lggr:                      rf.config.lggr.Named("ExecutionReportingPlugin"),
-			snoozedRoots:              make(map[[32]byte]time.Time),
-			inflightReports:           newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			destPriceRegistry:         priceRegistry,
-			destWrappedNative:         destWrappedNative,
-			onchainConfig:             onchainConfig,
-			offchainConfig:            offchainConfig,
-			srcToDstTokenMappingBlock: latestBlock - int64(offchainConfig.DestOptimisticConfirmations),
-			srcToDstTokenMapping:      sourceToDestTokenMapping,
+			config:             rf.config,
+			F:                  config.F,
+			lggr:               rf.config.lggr.Named("ExecutionReportingPlugin"),
+			snoozedRoots:       make(map[[32]byte]time.Time),
+			inflightReports:    newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
+			destPriceRegistry:  priceRegistry,
+			destWrappedNative:  destWrappedNative,
+			onchainConfig:      onchainConfig,
+			offchainConfig:     offchainConfig,
+			cachedDstTokens:    cachedDstTokens,
+			cachedSrcFeeTokens: cachedSrcFeeTokens,
 		}, types.ReportingPluginInfo{
 			Name:          "CCIPExecution",
 			UniqueReports: true,
@@ -177,6 +183,32 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	return ExecutionObservation{Messages: executableObservations}.Marshal()
 }
 
+func (rf *ExecutionReportingPluginFactory) updateLogPollerFilters(onChainConfig ccipconfig.ExecOnchainConfig) error {
+	rf.filtersMu.Lock()
+	defer rf.filtersMu.Unlock()
+
+	if err := unregisterLpFilters(rf.config.destLP, rf.dstChainFilters); err != nil {
+		return err
+	}
+	if err := unregisterLpFilters(rf.config.sourceLP, rf.srcChainFilters); err != nil {
+		return err
+	}
+
+	dstFilters := getExecutionPluginDestLpChainFilters(rf.config.commitStore.Address(), rf.config.offRamp.Address(), onChainConfig.PriceRegistry)
+	if err := registerLpFilters(rf.config.destLP, dstFilters); err != nil {
+		return err
+	}
+	rf.dstChainFilters = dstFilters
+
+	srcFilters := getExecutionPluginSourceLpChainFilters(rf.config.onRamp.Address(), rf.config.srcPriceRegistry.Address())
+	if err := registerLpFilters(rf.config.sourceLP, srcFilters); err != nil {
+		return err
+	}
+	rf.srcChainFilters = srcFilters
+
+	return nil
+}
+
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(
 		ctx,
@@ -205,10 +237,18 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return nil, err
 	}
 	srcTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
-		return getTokensPrices(ctx, r.config.srcPriceRegistry, []common.Address{r.config.srcWrappedNativeToken})
+		srcFeeTokens, err1 := r.cachedSrcFeeTokens.Get(ctx)
+		if err1 != nil {
+			return nil, err1
+		}
+		return getTokensPrices(ctx, srcFeeTokens, r.config.srcPriceRegistry, []common.Address{r.config.srcWrappedNativeToken})
 	})
 	destTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
-		return getTokensPrices(ctx, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
+		dstTokens, err1 := r.cachedDstTokens.Get(ctx)
+		if err1 != nil {
+			return nil, err1
+		}
+		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	})
 	destGasPrice := LazyFetch(func() (*big.Int, error) {
 		return r.estimateDestinationGasPrice(ctx)
@@ -314,82 +354,17 @@ func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Conte
 }
 
 func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) (map[common.Address]common.Address, []common.Address, error) {
-	srcToDstTokens, err := r.getSourceToDestTokenMapping(ctx)
+	dstTokens, err := r.cachedDstTokens.Get(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	srcToDstTokens := dstTokens.SupportedTokens
 	supportedDestTokens := make([]common.Address, 0, len(srcToDstTokens))
 	for _, destToken := range srcToDstTokens {
 		supportedDestTokens = append(supportedDestTokens, destToken)
 	}
 	return srcToDstTokens, supportedDestTokens, nil
-}
-
-// Returns a copy of the latest source to dest mapping. Lazily updates the source to dest token mapping only if changes have happened.
-// Uses the logPoller to look for PoolAdded and PoolRemoved logs and if
-// it finds any, it will reload all tokens.
-func (r *ExecutionReportingPlugin) getSourceToDestTokenMapping(ctx context.Context) (map[common.Address]common.Address, error) {
-	r.srcToDstTokenMappingMu.RLock()
-	lastPoolChangeBlock := r.srcToDstTokenMappingBlock
-	r.srcToDstTokenMappingMu.RUnlock()
-
-	poolEvents, err := r.config.destLP.LatestLogEventSigsAddrsWithConfs(
-		lastPoolChangeBlock,
-		[]common.Hash{abihelpers.EventSignatures.PoolAdded, abihelpers.EventSignatures.PoolRemoved},
-		[]common.Address{r.config.offRamp.Address()},
-		int(r.offchainConfig.DestOptimisticConfirmations),
-		pg.WithParentCtx(ctx),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// If no new updates, return a copy of the cached map
-	if len(poolEvents) == 0 {
-		r.srcToDstTokenMappingMu.RLock()
-		srcToDestTokenMapping := copyMap(r.srcToDstTokenMapping)
-		r.srcToDstTokenMappingMu.RUnlock()
-		return srcToDestTokenMapping, nil
-	}
-
-	// Otherwise re-generate and update cache.
-	highestBlockNumber := lastPoolChangeBlock
-	for _, poolEvent := range poolEvents {
-		if poolEvent.BlockNumber > highestBlockNumber {
-			highestBlockNumber = poolEvent.BlockNumber
-		}
-	}
-	newSrcToDestTokenMapping, err := generateSourceToDestTokenMapping(ctx, r.config.offRamp)
-	if err != nil {
-		return nil, err
-	}
-	r.srcToDstTokenMappingMu.Lock()
-	r.srcToDstTokenMapping = newSrcToDestTokenMapping
-	r.srcToDstTokenMappingBlock = highestBlockNumber + 1
-	srcToDestTokenMapping := copyMap(newSrcToDestTokenMapping)
-	r.srcToDstTokenMappingMu.Unlock()
-
-	return srcToDestTokenMapping, nil
-}
-
-// Generates the source to dest token mapping based on the offRamp.
-// NOTE: this queries the offRamp n+1 times, where n is the number of
-// enabled tokens.
-func generateSourceToDestTokenMapping(ctx context.Context, offRamp evm_2_evm_offramp.EVM2EVMOffRampInterface) (map[common.Address]common.Address, error) {
-	srcToDstTokenMapping := make(map[common.Address]common.Address)
-	sourceTokens, err := offRamp.GetSupportedTokens(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, err
-	}
-	for _, sourceToken := range sourceTokens {
-		dst, err2 := offRamp.GetDestinationToken(&bind.CallOpts{Context: ctx}, sourceToken)
-		if err2 != nil {
-			return nil, err2
-		}
-		srcToDstTokenMapping[sourceToken] = dst
-	}
-	return srcToDstTokenMapping, nil
 }
 
 // Calculates a map that indicated whether a sequence number has already been executed
@@ -768,14 +743,8 @@ func inflightAggregates(
 // results include feeTokens and passed-in tokens
 // price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
-func getTokensPrices(ctx context.Context, priceRegistry price_registry.PriceRegistryInterface, tokens []common.Address) (map[common.Address]*big.Int, error) {
+func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegistry price_registry.PriceRegistryInterface, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	prices := make(map[common.Address]*big.Int)
-
-	// TODO(CCIP-645) cache and only check on changing config.
-	feeTokens, err := priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, errors.Wrap(err, "could not get source fee tokens")
-	}
 
 	wantedTokens := append(feeTokens, tokens...)
 	wantedPrices, err := priceRegistry.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)

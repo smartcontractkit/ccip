@@ -41,6 +41,7 @@ const (
 	LegacyGasStationSidecar Type = (Type)(pipeline.LegacyGasStationSidecarJobType)
 	Webhook                 Type = (Type)(pipeline.WebhookJobType)
 	Bootstrap               Type = (Type)(pipeline.BootstrapJobType)
+	Gateway                 Type = (Type)(pipeline.GatewayJobType)
 )
 
 //revive:disable:redefines-builtin-id
@@ -77,6 +78,7 @@ var (
 		LegacyGasStationServer:  false,
 		LegacyGasStationSidecar: false,
 		Bootstrap:               false,
+		Gateway:                 false,
 	}
 	supportsAsync = map[Type]bool{
 		Cron:                    true,
@@ -92,6 +94,7 @@ var (
 		LegacyGasStationServer:  false,
 		LegacyGasStationSidecar: false,
 		Bootstrap:               false,
+		Gateway:                 false,
 	}
 	schemaVersions = map[Type]uint32{
 		Cron:                    1,
@@ -107,6 +110,7 @@ var (
 		LegacyGasStationServer:  1,
 		LegacyGasStationSidecar: 1,
 		Bootstrap:               1,
+		Gateway:                 1,
 	}
 )
 
@@ -139,6 +143,8 @@ type Job struct {
 	LegacyGasStationSidecarSpec   *LegacyGasStationSidecarSpec
 	BootstrapSpec                 *BootstrapSpec
 	BootstrapSpecID               *int32
+	GatewaySpec                   *GatewaySpec
+	GatewaySpecID                 *int32
 	PipelineSpecID                int32
 	PipelineSpec                  *pipeline.Spec
 	JobSpecErrors                 []SpecError
@@ -661,6 +667,9 @@ type LegacyGasStationSidecarSpec struct {
 	// CCIPChainSelector is the CCIP chain selector that corresponds to EVMChainID param
 	CCIPChainSelector *utils.Big `toml:"ccipChainSelector"`
 
+	// StatusUpdateURL is the endpoint URL where the sidecar posts status updates
+	StatusUpdateURL string `toml:"statusUpdateURL"`
+
 	// CreatedAt is the time this job was created.
 	CreatedAt time.Time `toml:"-"`
 
@@ -698,4 +707,24 @@ func (s BootstrapSpec) AsOCR2Spec() OCR2OracleSpec {
 		UpdatedAt:                         s.UpdatedAt,
 		P2PV2Bootstrappers:                pq.StringArray{},
 	}
+}
+
+type GatewaySpec struct {
+	ID            int32      `toml:"-"`
+	GatewayConfig JSONConfig `toml:"gatewayConfig"`
+	CreatedAt     time.Time  `toml:"-"`
+	UpdatedAt     time.Time  `toml:"-"`
+}
+
+func (s GatewaySpec) GetID() string {
+	return fmt.Sprintf("%v", s.ID)
+}
+
+func (s *GatewaySpec) SetID(value string) error {
+	ID, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		return err
+	}
+	s.ID = int32(ID)
+	return nil
 }

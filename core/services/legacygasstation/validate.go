@@ -97,6 +97,10 @@ func ValidatedSidecarSpec(tomlString string) (job.Job, error) {
 		return jb, notSet("ccipChainSelector")
 	}
 
+	if spec.StatusUpdateURL == "" {
+		return jb, notSet("statusUpdateURL")
+	}
+
 	// Defaults
 	if spec.LookbackBlocks == 0 {
 		spec.LookbackBlocks = 10000

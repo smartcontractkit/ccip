@@ -2,6 +2,10 @@
 LogPoller = true
 CCIP = true
 
+[Database]
+MaxIdleConns = 50
+MaxOpenConns = 50
+
 [OCR2]
 Enabled = true
 
@@ -28,6 +32,9 @@ LogPollInterval = '1s'
 [EVM.HeadTracker]
 HistoryDepth = 100
 
+[EVM.BalanceMonitor]
+Enabled = false
+
 [EVM.GasEstimator]
 {{if eq .ChainID 421613}}
 LimitDefault = 100_000_000
@@ -49,7 +56,7 @@ FeeCapDefault = '200 gwei'
 
 {{range $i,$url := .URLs }}
 [[EVM.Nodes]]
-Name = 'node-{{$networkIndex}}-{{$i}}'
+Name = 'primary-{{$networkIndex}}-{{$i}}'
 WSURL = '{{$url}}'
 HTTPURL = '{{ index (index $.Networks $networkIndex).HTTPURLs $i}}'
 {{end}}

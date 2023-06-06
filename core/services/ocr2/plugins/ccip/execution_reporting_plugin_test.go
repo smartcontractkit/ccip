@@ -20,6 +20,7 @@ import (
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
@@ -77,14 +78,15 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 			leafHasher:            hasher.NewLeafHasher(th.Source.ChainID, th.Dest.ChainID, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
 			destGasEstimator:      destFeeEstimator,
 		},
-		onchainConfig:        th.ExecOnchainConfig,
-		offchainConfig:       offchainConfig,
-		lggr:                 th.Lggr.Named("ExecutionReportingPlugin"),
-		snoozedRoots:         make(map[[32]byte]time.Time),
-		inflightReports:      newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-		destPriceRegistry:    th.Dest.PriceRegistry,
-		destWrappedNative:    th.Dest.WrappedNative.Address(),
-		srcToDstTokenMapping: map[common.Address]common.Address{},
+		onchainConfig:      th.ExecOnchainConfig,
+		offchainConfig:     offchainConfig,
+		lggr:               th.Lggr.Named("ExecutionReportingPlugin"),
+		snoozedRoots:       make(map[[32]byte]time.Time),
+		inflightReports:    newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
+		destPriceRegistry:  th.Dest.PriceRegistry,
+		destWrappedNative:  th.Dest.WrappedNative.Address(),
+		cachedSrcFeeTokens: cache.NewCachedFeeTokens(th.SourceLP, th.Source.PriceRegistry, int64(offchainConfig.SourceFinalityDepth)),
+		cachedDstTokens:    cache.NewCachedTokens(th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, int64(offchainConfig.DestOptimisticConfirmations)),
 	}
 	return execTestHarness{
 		CCIPPluginTestHarness: th,
@@ -189,6 +191,7 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 	mockDestLP := &lpMocks.LogPoller{}
 
 	mockDestLP.On("LatestLogEventSigsAddrsWithConfs", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(logs, nil)
+	mockDestLP.On("LatestBlock", mock.Anything).Return(expectedNewBlockNumber, nil)
 
 	sourceToken, destToken := common.HexToAddress("111111"), common.HexToAddress("222222")
 
@@ -197,21 +200,21 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 	mockOffRamp.On("GetSupportedTokens", mock.Anything).Return([]common.Address{sourceToken}, nil)
 	mockOffRamp.On("GetDestinationToken", mock.Anything, sourceToken).Return(destToken, nil)
 
+	mockPriceRegistry := &mock_contracts.PriceRegistryInterface{}
+	mockPriceRegistry.On("Address").Return(common.HexToAddress("0x02"))
+	mockPriceRegistry.On("GetFeeTokens", mock.Anything).Return([]common.Address{}, nil)
+
 	plugin := ExecutionReportingPlugin{
 		config: ExecutionPluginConfig{
 			destLP:  mockDestLP,
 			offRamp: mockOffRamp,
 		},
-		srcToDstTokenMappingBlock: 0,
+		cachedDstTokens: cache.NewCachedTokens(mockDestLP, mockOffRamp, mockPriceRegistry, 0),
 	}
 
-	_, err := plugin.getSourceToDestTokenMapping(context.Background())
+	value, err := plugin.cachedDstTokens.Get(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, expectedNewBlockNumber+1, plugin.srcToDstTokenMappingBlock)
-
-	gotDestToken, ok := plugin.srcToDstTokenMapping[sourceToken]
-	require.True(t, ok)
-	require.Equal(t, destToken, gotDestToken)
+	require.Equal(t, destToken, value.SupportedTokens[sourceToken])
 }
 
 func TestExecObservation(t *testing.T) {

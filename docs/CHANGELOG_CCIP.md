@@ -10,14 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ...
 
-
 ## 0.5.0 - Unreleased
 
 <!-- unreleasedstop -->
 
+## 0.4.1 - 2023-06-02
+
+## Added
+
+## Changed
+- Db migrations scripts aligned with the main repo. This might be breaking, as we had a clash - there were two different migrations scripts using the same version.
+
+## Removed
+
 ## 0.4.0 - 2023-05-24
 
 ## Added
+
+- BurnMintERC677 is the new default token that should be deployed whenever there is a need for a burn/mint token
+  - Supports ERC677
+  - OZ AccessControlEnumerable
+  - OZ ERC20Burnable
+  - OZ ERC20
+  - Compatible with IBurnMintERC20 (CCIP interface)
+
+## Changed
 
 - BurnMintERC677 is the new default token that should be deployed whenever there is a need for a burn/mint token
   - Supports ERC677

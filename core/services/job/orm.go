@@ -420,8 +420,8 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 			jb.LegacyGasStationServerSpecID = &specID
 		case LegacyGasStationSidecar:
 			var specID int32
-			sql := `INSERT INTO legacy_gas_station_sidecar_specs (forwarder_address, off_ramp_address, lookback_blocks, poll_period, run_timeout, evm_chain_id, ccip_chain_selector, created_at, updated_at)
-			VALUES (:forwarder_address, :off_ramp_address, :lookback_blocks, :poll_period, :run_timeout, :evm_chain_id, :ccip_chain_selector, NOW(), NOW())
+			sql := `INSERT INTO legacy_gas_station_sidecar_specs (forwarder_address, off_ramp_address, lookback_blocks, poll_period, run_timeout, evm_chain_id, ccip_chain_selector, status_update_url, created_at, updated_at)
+			VALUES (:forwarder_address, :off_ramp_address, :lookback_blocks, :poll_period, :run_timeout, :evm_chain_id, :ccip_chain_selector, :status_update_url, NOW(), NOW())
 			RETURNING id;`
 			if err := pg.PrepareQueryRowx(tx, sql, &specID, jb.LegacyGasStationSidecarSpec); err != nil {
 				return errors.Wrap(err, "failed to create LegacyGasStationSidecar spec")
@@ -440,6 +440,15 @@ func (o *orm) CreateJob(jb *Job, qopts ...pg.QOpt) error {
 				return errors.Wrap(err, "failed to create BootstrapSpec for jobSpec")
 			}
 			jb.BootstrapSpecID = &specID
+		case Gateway:
+			var specID int32
+			sql := `INSERT INTO gateway_specs (gateway_config, created_at, updated_at)
+			VALUES (:gateway_config, NOW(), NOW())
+			RETURNING id;`
+			if err := pg.PrepareQueryRowx(tx, sql, &specID, jb.GatewaySpec); err != nil {
+				return errors.Wrap(err, "failed to create GatewaySpec for jobSpec")
+			}
+			jb.GatewaySpecID = &specID
 		default:
 			o.lggr.Panicf("Unsupported jb.Type: %v", jb.Type)
 		}
@@ -478,19 +487,19 @@ func (o *orm) InsertJob(job *Job, qopts ...pg.QOpt) error {
 	if job.ID == 0 {
 		query = `INSERT INTO jobs (pipeline_spec_id, name, schema_version, type, max_task_duration, ocr_oracle_spec_id, ocr2_oracle_spec_id, direct_request_spec_id, flux_monitor_spec_id,
 				keeper_spec_id, cron_spec_id, vrf_spec_id, webhook_spec_id, blockhash_store_spec_id, bootstrap_spec_id, block_header_feeder_spec_id, legacy_gas_station_server_spec_id, 
-				legacy_gas_station_sidecar_spec_id, external_job_id, gas_limit, forwarding_allowed, created_at)
+				legacy_gas_station_sidecar_spec_id, gateway_spec_id, external_job_id, gas_limit, forwarding_allowed, created_at)
 		VALUES (:pipeline_spec_id, :name, :schema_version, :type, :max_task_duration, :ocr_oracle_spec_id, :ocr2_oracle_spec_id, :direct_request_spec_id, :flux_monitor_spec_id,
 				:keeper_spec_id, :cron_spec_id, :vrf_spec_id, :webhook_spec_id, :blockhash_store_spec_id, :bootstrap_spec_id, :block_header_feeder_spec_id, :legacy_gas_station_server_spec_id, 
-				:legacy_gas_station_sidecar_spec_id, :external_job_id, :gas_limit, :forwarding_allowed, NOW())
+				:legacy_gas_station_sidecar_spec_id, :gateway_spec_id, :external_job_id, :gas_limit, :forwarding_allowed, NOW())
 		RETURNING *;`
 	} else {
 		query = `INSERT INTO jobs (id, pipeline_spec_id, name, schema_version, type, max_task_duration, ocr_oracle_spec_id, ocr2_oracle_spec_id, direct_request_spec_id, flux_monitor_spec_id,
 			keeper_spec_id, cron_spec_id, vrf_spec_id, webhook_spec_id, blockhash_store_spec_id, bootstrap_spec_id, block_header_feeder_spec_id, legacy_gas_station_server_spec_id, 
-			legacy_gas_station_sidecar_spec_id, external_job_id, gas_limit, forwarding_allowed, created_at)
-	VALUES (:id, :pipeline_spec_id, :name, :schema_version, :type, :max_task_duration, :ocr_oracle_spec_id, :ocr2_oracle_spec_id, :direct_request_spec_id, :flux_monitor_spec_id,
-			:keeper_spec_id, :cron_spec_id, :vrf_spec_id, :webhook_spec_id, :blockhash_store_spec_id, :bootstrap_spec_id, :block_header_feeder_spec_id, :legacy_gas_station_server_spec_id, 
-			:legacy_gas_station_sidecar_spec_id,:external_job_id, :gas_limit, :forwarding_allowed, NOW())
-	RETURNING *;`
+			legacy_gas_station_sidecar_spec_id, gateway_spec_id, external_job_id, gas_limit, forwarding_allowed, created_at)
+		VALUES (:id, :pipeline_spec_id, :name, :schema_version, :type, :max_task_duration, :ocr_oracle_spec_id, :ocr2_oracle_spec_id, :direct_request_spec_id, :flux_monitor_spec_id,
+				:keeper_spec_id, :cron_spec_id, :vrf_spec_id, :webhook_spec_id, :blockhash_store_spec_id, :bootstrap_spec_id, :block_header_feeder_spec_id, :legacy_gas_station_server_spec_id, 
+			:legacy_gas_station_sidecar_spec_id, :gateway_spec_id, :external_job_id, :gas_limit, :forwarding_allowed, NOW())
+		RETURNING *;`
 	}
 	return q.GetNamed(query, job, job)
 }
@@ -517,7 +526,8 @@ func (o *orm) DeleteJob(id int32, qopts ...pg.QOpt) error {
 				direct_request_spec_id,
 				blockhash_store_spec_id,
 				bootstrap_spec_id,
-				block_header_feeder_spec_id
+				block_header_feeder_spec_id,
+				gateway_spec_id
 		),
 		deleted_oracle_specs AS (
 			DELETE FROM ocr_oracle_specs WHERE id IN (SELECT ocr_oracle_spec_id FROM deleted_jobs)
@@ -551,6 +561,9 @@ func (o *orm) DeleteJob(id int32, qopts ...pg.QOpt) error {
 		),
 		deleted_block_header_feeder_specs AS (
 			DELETE FROM block_header_feeder_specs WHERE id IN (SELECT block_header_feeder_spec_id FROM deleted_jobs)
+		),
+		deleted_gateway_specs AS (
+			DELETE FROM gateway_specs WHERE id IN (SELECT gateway_spec_id FROM deleted_jobs)
 		)
 		DELETE FROM pipeline_specs WHERE id IN (SELECT pipeline_spec_id FROM deleted_jobs)`
 	res, cancel, err := q.ExecQIter(query, id)
@@ -1227,6 +1240,7 @@ func LoadAllJobTypes(tx pg.Queryer, job *Job) error {
 		loadLegacyGasStationServerJob(tx, job, job.LegacyGasStationServerSpecID),
 		loadJobType(tx, job, "LegacyGasStationSidecarSpec", "legacy_gas_station_sidecar_specs", job.LegacyGasStationSidecarSpecID),
 		loadJobType(tx, job, "BootstrapSpec", "bootstrap_specs", job.BootstrapSpecID),
+		loadJobType(tx, job, "GatewaySpec", "gateway_specs", job.GatewaySpecID),
 	)
 }
 

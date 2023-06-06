@@ -63,6 +63,7 @@ func (l *LinkToken) Approve(to string, amount *big.Int) error {
 	if err != nil {
 		return err
 	}
+	opts.GasLimit = 100000
 	log.Info().
 		Str("From", l.client.GetDefaultWallet().Address()).
 		Str("To", to).
@@ -390,7 +391,7 @@ func (r *Router) SetOnRamp(chainID uint64, onRamp common.Address) error {
 	return r.client.ProcessTransaction(tx)
 }
 
-func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage, valueForNative *big.Int) (*types.Transaction, error) {
+func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMessage, valueForNative *big.Int) (*types.Transaction, error) {
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
 		return nil, err
@@ -404,7 +405,7 @@ func (r *Router) CCIPSend(destChainId uint64, msg router.ClientEVM2AnyMessage, v
 		opts.GasLimit = 100000000
 	}
 
-	tx, err := r.Instance.CcipSend(opts, destChainId, msg)
+	tx, err := r.Instance.CcipSend(opts, destChainSelector, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -449,8 +450,8 @@ func (r *Router) SetWrappedNative(wNative common.Address) (*types.Transaction, e
 	return tx, r.client.ProcessTransaction(tx)
 }
 
-func (r *Router) GetFee(destinationChainId uint64, message router.ClientEVM2AnyMessage) (*big.Int, error) {
-	return r.Instance.GetFee(nil, destinationChainId, message)
+func (r *Router) GetFee(destChainSelector uint64, message router.ClientEVM2AnyMessage) (*big.Int, error) {
+	return r.Instance.GetFee(nil, destChainSelector, message)
 }
 
 type OnRamp struct {

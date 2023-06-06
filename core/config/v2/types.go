@@ -1,13 +1,15 @@
 package v2
 
 import (
+	"crypto/tls"
 	_ "embed"
-	"errors"
 	"fmt"
 	"log"
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/google/uuid"
 	"go.uber.org/multierr"
@@ -18,6 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
+	"github.com/smartcontractkit/chainlink/v2/core/config/parse"
 	"github.com/smartcontractkit/chainlink/v2/core/logger/audit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink/cfgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ethkey"
@@ -110,13 +113,24 @@ func (c *Core) SetFrom(f *Core) {
 	c.Insecure.setFrom(&f.Insecure)
 }
 
+func (c *Core) ValidateConfig() (err error) {
+	_, verr := parse.HomeDir(*c.RootDir)
+	if err != nil {
+		err = multierr.Append(err, ErrInvalid{Name: "RootDir", Value: true, Msg: fmt.Sprintf("Failed to expand RootDir. Please use an explicit path: %s", verr)})
+	}
+
+	return err
+}
+
 type Secrets struct {
-	Database   DatabaseSecrets   `toml:",omitempty"`
-	Explorer   ExplorerSecrets   `toml:",omitempty"`
-	Password   Passwords         `toml:",omitempty"`
-	Pyroscope  PyroscopeSecrets  `toml:",omitempty"`
-	Prometheus PrometheusSecrets `toml:",omitempty"`
-	Mercury    MercurySecrets    `toml:",omitempty"`
+	Database         DatabaseSecrets          `toml:",omitempty"`
+	Explorer         ExplorerSecrets          `toml:",omitempty"`
+	Password         Passwords                `toml:",omitempty"`
+	Pyroscope        PyroscopeSecrets         `toml:",omitempty"`
+	Prometheus       PrometheusSecrets        `toml:",omitempty"`
+	Mercury          MercurySecrets           `toml:",omitempty"`
+	LegacyGasStation LegacyGasStationSecrets  `toml:",omitempty"`
+	Threshold        ThresholdKeyShareSecrets `toml:",omitempty"`
 }
 
 func dbURLPasswordComplexity(err error) string {
@@ -129,6 +143,31 @@ type DatabaseSecrets struct {
 	AllowSimplePasswords bool
 }
 
+func validateDBURL(dbURI url.URL) error {
+	if strings.Contains(dbURI.Redacted(), "_test") {
+		return nil
+	}
+
+	// url params take priority if present, multiple params are ignored by postgres (it picks the first)
+	q := dbURI.Query()
+	// careful, this is a raw database password
+	pw := q.Get("password")
+	if pw == "" {
+		// fallback to user info
+		userInfo := dbURI.User
+		if userInfo == nil {
+			return fmt.Errorf("DB URL must be authenticated; plaintext URLs are not allowed")
+		}
+		var pwSet bool
+		pw, pwSet = userInfo.Password()
+		if !pwSet {
+			return fmt.Errorf("DB URL must be authenticated; password is required")
+		}
+	}
+
+	return utils.VerifyPasswordComplexity(pw)
+}
+
 func (d *DatabaseSecrets) ValidateConfig() (err error) {
 	if d.AllowSimplePasswords && build.IsProd() {
 		err = multierr.Append(err, ErrInvalid{Name: "AllowSimplePasswords", Value: true, Msg: "insecure configs are not allowed on secure builds"})
@@ -136,12 +175,12 @@ func (d *DatabaseSecrets) ValidateConfig() (err error) {
 	if d.URL == nil || (*url.URL)(d.URL).String() == "" {
 		err = multierr.Append(err, ErrEmpty{Name: "URL", Msg: "must be provided and non-empty"})
 	} else if !d.AllowSimplePasswords {
-		if verr := config.ValidateDBURL((url.URL)(*d.URL)); verr != nil {
+		if verr := validateDBURL((url.URL)(*d.URL)); verr != nil {
 			err = multierr.Append(err, ErrInvalid{Name: "URL", Value: "*****", Msg: dbURLPasswordComplexity(verr)})
 		}
 	}
 	if d.BackupURL != nil && !d.AllowSimplePasswords {
-		if verr := config.ValidateDBURL((url.URL)(*d.BackupURL)); verr != nil {
+		if verr := validateDBURL((url.URL)(*d.BackupURL)); verr != nil {
 			err = multierr.Append(err, ErrInvalid{Name: "BackupURL", Value: "*****", Msg: dbURLPasswordComplexity(verr)})
 		}
 	}
@@ -213,13 +252,6 @@ type Database struct {
 	Lock     DatabaseLock     `toml:",omitempty"`
 }
 
-func (d *Database) LockingMode() string {
-	if *d.Lock.Enabled {
-		return "lease"
-	}
-	return "none"
-}
-
 func (d *Database) setFrom(f *Database) {
 	if v := f.DefaultIdleInTxSessionTimeout; v != nil {
 		d.DefaultIdleInTxSessionTimeout = v
@@ -270,6 +302,13 @@ type DatabaseLock struct {
 	Enabled              *bool
 	LeaseDuration        *models.Duration
 	LeaseRefreshInterval *models.Duration
+}
+
+func (l *DatabaseLock) Mode() string {
+	if *l.Enabled {
+		return "lease"
+	}
+	return "none"
 }
 
 func (l *DatabaseLock) ValidateConfig() (err error) {
@@ -614,6 +653,8 @@ type OCR2 struct {
 	DatabaseTimeout                    *models.Duration
 	KeyBundleID                        *models.Sha256Hash
 	CaptureEATelemetry                 *bool
+	DefaultTransactionQueueDepth       *uint32
+	SimulateTransactions               *bool
 }
 
 func (o *OCR2) setFrom(f *OCR2) {
@@ -643,6 +684,12 @@ func (o *OCR2) setFrom(f *OCR2) {
 	}
 	if v := f.CaptureEATelemetry; v != nil {
 		o.CaptureEATelemetry = v
+	}
+	if v := f.DefaultTransactionQueueDepth; v != nil {
+		o.DefaultTransactionQueueDepth = v
+	}
+	if v := f.SimulateTransactions; v != nil {
+		o.SimulateTransactions = v
 	}
 }
 
@@ -1042,4 +1089,29 @@ func (m *MercurySecrets) ValidateConfig() (err error) {
 		urls[s] = struct{}{}
 	}
 	return err
+}
+
+type LegacyGasStationAuthConfig struct {
+	// ClientKey is the X.509 private key used for mTLS in PEM (base64-encoding) format
+	ClientKey models.Secret
+	// ClientCertificate is the X.509 certificate for mTLS in PEM (base64-encoding) format
+	ClientCertificate models.Secret
+}
+
+type LegacyGasStationSecrets struct {
+	AuthConfig *LegacyGasStationAuthConfig
+}
+
+func (l *LegacyGasStationSecrets) ValidateConfig() (err error) {
+	if l.AuthConfig == nil {
+		// no validation needed
+		return nil
+	}
+	// validates private key and certificate match
+	_, err = tls.X509KeyPair([]byte(l.AuthConfig.ClientCertificate), []byte(l.AuthConfig.ClientKey))
+	return err
+}
+
+type ThresholdKeyShareSecrets struct {
+	ThresholdKeyShare *models.Secret
 }

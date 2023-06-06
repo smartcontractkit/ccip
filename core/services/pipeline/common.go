@@ -42,6 +42,7 @@ const (
 	BootstrapJobType               string = "bootstrap"
 	LegacyGasStationServerJobType  string = "legacygasstationserver"
 	LegacyGasStationSidecarJobType string = "legacygasstationsidecar"
+	GatewayJobType                 string = "gateway"
 )
 
 //go:generate mockery --quiet --name Config --output ./mocks/ --case=underscore
@@ -68,7 +69,6 @@ type (
 		DatabaseURL() url.URL
 		DefaultHTTPLimit() int64
 		DefaultHTTPTimeout() models.Duration
-		TriggerFallbackDBPollInterval() time.Duration
 		JobPipelineMaxRunDuration() time.Duration
 		JobPipelineReaperInterval() time.Duration
 		JobPipelineReaperThreshold() time.Duration
@@ -565,6 +565,8 @@ func SelectGasLimit(cfg config.ChainScopedConfig, jobType string, specGasLimit *
 		jobTypeGasLimit = cfg.EvmGasLimitFMJobType()
 	case OffchainReportingJobType:
 		jobTypeGasLimit = cfg.EvmGasLimitOCRJobType()
+	case OffchainReporting2JobType:
+		jobTypeGasLimit = cfg.EvmGasLimitOCR2JobType()
 	case KeeperJobType:
 		jobTypeGasLimit = cfg.EvmGasLimitKeeperJobType()
 	case VRFJobType:

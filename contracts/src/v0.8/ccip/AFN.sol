@@ -97,7 +97,11 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
   struct CurseVoteProgress {
     uint16 curseWeightThreshold;
     uint16 accumulatedWeight;
-    bool weightThresholdMet;
+    // A curse becomes active after:
+    // - accumulatedWeight becomes greater or equal than curseWeightThreshold; or
+    // - the owner curses.
+    // Once a curse is active, only the owner can lift it.
+    bool curseActive;
   }
 
   CurseVoteProgress private s_curseVoteProgress;
@@ -115,9 +119,9 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
   event TaggedRootBlessed(uint32 indexed configVersion, IAFN.TaggedRoot taggedRoot, uint16 accumulatedWeight);
   event TaggedRootBlessVotesReset(uint32 indexed configVersion, IAFN.TaggedRoot taggedRoot, bool wasBlessed);
-  event VoteToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot, uint8 weight);
+  event VotedToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot, uint8 weight);
 
-  event VoteToCurse(
+  event VotedToCurse(
     uint32 indexed configVersion,
     address indexed voter,
     uint8 weight,
@@ -134,7 +138,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     bytes32 cursesHash,
     uint16 accumulatedWeight
   );
-  event UnvoteToCurse(
+  event UnvotedToCurse(
     uint32 indexed configVersion,
     address indexed voter,
     uint8 weight,
@@ -142,6 +146,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     bytes32 cursesHash
   );
   event SkippedUnvoteToCurse(address indexed voter, bytes32 expectedCursesHash, bytes32 actualCursesHash);
+  event OwnerCursed(uint256 timestamp);
   event Cursed(uint32 indexed configVersion, uint256 timestamp);
 
   // These events make it easier for offchain logic to discover that it performs
@@ -235,7 +240,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
       }
       voteProgress.voterBitmap = _bitmapSet(voteProgress.voterBitmap, blesserRecord.index);
       voteProgress.accumulatedWeight += blesserRecord.weight;
-      emit VoteToBless(configVersion, msg.sender, taggedRoot, blesserRecord.weight);
+      emit VotedToBless(configVersion, msg.sender, taggedRoot, blesserRecord.weight);
       if (voteProgress.accumulatedWeight >= s_versionedConfig.config.blessWeightThreshold) {
         voteProgress.weightThresholdMet = true;
         emit TaggedRootBlessed(configVersion, taggedRoot, voteProgress.accumulatedWeight);
@@ -275,7 +280,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     if (!curserRecord.active || curserRecord.voteCount == 0) return;
     if (curserRecord.cursesHash != cursesHash) revert InvalidCursesHash(curserRecord.cursesHash, cursesHash);
 
-    emit UnvoteToCurse(
+    emit UnvotedToCurse(
       s_versionedConfig.configVersion,
       curseVoteAddr,
       curserRecord.weight,
@@ -303,7 +308,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
       // avoid the following extra storage read for it, but since voteToCurse is not on the hot path we'd rather keep
       // things simple.
       uint32 configVersion = s_versionedConfig.configVersion;
-      emit VoteToCurse(
+      emit VotedToCurse(
         configVersion,
         msg.sender,
         curserRecord.weight,
@@ -312,17 +317,27 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
         curserRecord.cursesHash,
         s_curseVoteProgress.accumulatedWeight
       );
-      if (!s_curseVoteProgress.weightThresholdMet) {
+      if (!s_curseVoteProgress.curseActive) {
         if (s_curseVoteProgress.accumulatedWeight >= s_curseVoteProgress.curseWeightThreshold) {
-          s_curseVoteProgress.weightThresholdMet = true;
+          s_curseVoteProgress.curseActive = true;
           emit Cursed(configVersion, block.timestamp);
         }
       }
     }
   }
 
+  /// @notice Enables the owner to immediately have the system enter the cursed state.
+  function ownerCurse() external onlyOwner {
+    emit OwnerCursed(block.timestamp);
+    if (!s_curseVoteProgress.curseActive) {
+      s_curseVoteProgress.curseActive = true;
+      emit Cursed(s_versionedConfig.configVersion, block.timestamp);
+    }
+  }
+
   /// @notice Enables the owner to remove curse votes. After the curse votes are removed,
   /// this function will check whether the curse is still valid and restore the uncursed state if possible.
+  /// This function also enables the owner to lift a curse created through ownerCurse.
   function ownerUnvoteToCurse(UnvoteToCurseRecord[] memory unvoteRecords) external onlyOwner {
     for (uint256 i = 0; i < unvoteRecords.length; ++i) {
       UnvoteToCurseRecord memory unvoteRecord = unvoteRecords[i];
@@ -337,7 +352,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
       if (!curserRecord.active || curserRecord.voteCount == 0) continue;
 
-      emit UnvoteToCurse(
+      emit UnvotedToCurse(
         s_versionedConfig.configVersion,
         unvoteRecord.curseVoteAddr,
         curserRecord.weight,
@@ -351,10 +366,10 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     }
 
     if (
-      s_curseVoteProgress.weightThresholdMet &&
+      s_curseVoteProgress.curseActive &&
       s_curseVoteProgress.accumulatedWeight < s_curseVoteProgress.curseWeightThreshold
     ) {
-      s_curseVoteProgress.weightThresholdMet = false;
+      s_curseVoteProgress.curseActive = false;
       emit RecoveredFromCurse();
       // Invalidate all in-progress votes to bless by bumping the config version.
       // They might have been based on false information about the source chain
@@ -379,7 +394,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
 
   /// @inheritdoc IAFN
   function isCursed() public view override returns (bool) {
-    return s_curseVoteProgress.weightThresholdMet;
+    return s_curseVoteProgress.curseActive;
   }
 
   /// @notice Config version might be incremented for many reasons, including
@@ -428,7 +443,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     )
   {
     accumulatedWeight = s_curseVoteProgress.accumulatedWeight;
-    cursed = s_curseVoteProgress.weightThresholdMet;
+    cursed = s_curseVoteProgress.curseActive;
     uint256 numCursers;
     Voter[] memory voters = s_versionedConfig.config.voters;
     for (uint256 i = 0; i < voters.length; ++i) {
@@ -539,7 +554,7 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
     CurseVoteProgress memory newCurseVoteProgress = CurseVoteProgress({
       curseWeightThreshold: config.curseWeightThreshold,
       accumulatedWeight: 0,
-      weightThresholdMet: false
+      curseActive: false
     });
 
     // Retain votes for the cursers who are still part of the new config and delete records for the cursers who are not.
@@ -562,9 +577,9 @@ contract AFN is IAFN, OwnerIsCreator, TypeAndVersionInterface {
         );
       }
     }
-    newCurseVoteProgress.weightThresholdMet =
+    newCurseVoteProgress.curseActive =
       newCurseVoteProgress.accumulatedWeight >= newCurseVoteProgress.curseWeightThreshold;
-    if (newCurseVoteProgress.weightThresholdMet) {
+    if (newCurseVoteProgress.curseActive) {
       emit Cursed(configVersion, block.timestamp);
     }
     s_curseVoteProgress = newCurseVoteProgress;

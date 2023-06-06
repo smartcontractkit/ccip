@@ -38,6 +38,7 @@ const (
 	BootstrapJobSpec               JobSpecType = "bootstrap"
 	LegacyGasStationServerJobSpec  JobSpecType = "legacygasstationserver"
 	LegacyGasStationSidecarJobSpec JobSpecType = "legacygasstationsidecar"
+	GatewayJobSpec                 JobSpecType = "gateway"
 )
 
 // DirectRequestSpec defines the spec details of a DirectRequest Job
@@ -420,6 +421,7 @@ type LegacyGasStationSidecarSpec struct {
 	CCIPChainSelector *utils.Big          `json:"ccipChainSelector"`
 	PollPeriod        time.Duration       `json:"pollPeriod"`
 	RunTimeout        time.Duration       `json:"runTimeout"`
+	StatusUpdateURL   string              `json:"statusUpdateURL"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -435,6 +437,7 @@ func NewLegacyGasStationSidecarSpec(spec *job.LegacyGasStationSidecarSpec) *Lega
 		CCIPChainSelector: spec.CCIPChainSelector,
 		PollPeriod:        spec.PollPeriod,
 		RunTimeout:        spec.RunTimeout,
+		StatusUpdateURL:   spec.StatusUpdateURL,
 	}
 }
 
@@ -462,6 +465,20 @@ func NewBootstrapSpec(spec *job.BootstrapSpec) *BootstrapSpec {
 		ContractConfigConfirmations:       spec.ContractConfigConfirmations,
 		CreatedAt:                         spec.CreatedAt,
 		UpdatedAt:                         spec.UpdatedAt,
+	}
+}
+
+type GatewaySpec struct {
+	GatewayConfig map[string]interface{} `json:"gatewayConfig"`
+	CreatedAt     time.Time              `json:"createdAt"`
+	UpdatedAt     time.Time              `json:"updatedAt"`
+}
+
+func NewGatewaySpec(spec *job.GatewaySpec) *GatewaySpec {
+	return &GatewaySpec{
+		GatewayConfig: spec.GatewayConfig,
+		CreatedAt:     spec.CreatedAt,
+		UpdatedAt:     spec.UpdatedAt,
 	}
 }
 
@@ -507,6 +524,7 @@ type JobResource struct {
 	LegacyGasStationServerSpec  *LegacyGasStationServerSpec  `json:"legacyGasStationServerSpec"`
 	LegacyGasStationSidecarSpec *LegacyGasStationSidecarSpec `json:"legacyGasStationSidecarSpec"`
 	BootstrapSpec               *BootstrapSpec               `json:"bootstrapSpec"`
+	GatewaySpec                 *GatewaySpec                 `json:"gatewaySpec"`
 	PipelineSpec                PipelineSpec                 `json:"pipelineSpec"`
 	Errors                      []JobError                   `json:"errors"`
 }
@@ -552,6 +570,8 @@ func NewJobResource(j job.Job) *JobResource {
 		resource.LegacyGasStationSidecarSpec = NewLegacyGasStationSidecarSpec(j.LegacyGasStationSidecarSpec)
 	case job.Bootstrap:
 		resource.BootstrapSpec = NewBootstrapSpec(j.BootstrapSpec)
+	case job.Gateway:
+		resource.GatewaySpec = NewGatewaySpec(j.GatewaySpec)
 	}
 
 	jes := []JobError{}

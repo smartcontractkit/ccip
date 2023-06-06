@@ -82,11 +82,19 @@ type CommitReportingPlugin struct {
 
 type CommitReportingPluginFactory struct {
 	config CommitPluginConfig
+
+	// We keep track of the registered filters
+	srcChainFilters []logpoller.Filter
+	dstChainFilters []logpoller.Filter
+	filtersMu       *sync.Mutex
 }
 
 // NewCommitReportingPluginFactory return a new CommitReportingPluginFactory.
 func NewCommitReportingPluginFactory(config CommitPluginConfig) types.ReportingPluginFactory {
-	return &CommitReportingPluginFactory{config: config}
+	return &CommitReportingPluginFactory{
+		config:    config,
+		filtersMu: &sync.Mutex{},
+	}
 }
 
 // NewReportingPlugin returns the ccip CommitReportingPlugin and satisfies the ReportingPluginFactory interface.
@@ -104,20 +112,10 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	err = rf.config.destLP.RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, onchainConfig.PriceRegistry.String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.UsdPerUnitGasUpdated, abihelpers.EventSignatures.UsdPerTokenUpdated},
-		Addresses: []common.Address{onchainConfig.PriceRegistry}})
-	if err != nil {
+	if err = rf.updateLogPollerFilters(onchainConfig); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	err = rf.config.sourceLP.RegisterFilter(logpoller.Filter{
-		Name:      logpoller.FilterName(COMMIT_CCIP_SENDS, rf.config.onRampAddress.String()),
-		EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
-		Addresses: []common.Address{rf.config.onRampAddress}})
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
+
 	tokenToDecimalMapping, err := generateTokenToDecimalMapping(context.Background(), rf.config, map[common.Address]uint8{}, priceRegistry)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
@@ -184,6 +182,34 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportT
 		TokenPricesUSD:    tokenPricesUSD,
 		SourceGasPriceUSD: sourceGasPriceUSD,
 	}.Marshal()
+}
+
+// updateLogPollerFilters unregister existing log poller filters and register the new ones.
+func (rf *CommitReportingPluginFactory) updateLogPollerFilters(onChainCfg ccipconfig.CommitOnchainConfig) error {
+	rf.filtersMu.Lock()
+	defer rf.filtersMu.Unlock()
+
+	// todo: when the LP architecture allows perform all the following operations atomically
+	if err := unregisterLpFilters(rf.config.destLP, rf.dstChainFilters); err != nil {
+		return err
+	}
+	if err := unregisterLpFilters(rf.config.sourceLP, rf.srcChainFilters); err != nil {
+		return err
+	}
+
+	dstFilters := getCommitPluginDestLpFilters(onChainCfg.PriceRegistry)
+	if err := registerLpFilters(rf.config.destLP, dstFilters); err != nil {
+		return err
+	}
+	rf.dstChainFilters = dstFilters
+
+	srcFilters := getCommitPluginSourceLpFilters(rf.config.onRampAddress)
+	if err := registerLpFilters(rf.config.sourceLP, srcFilters); err != nil {
+		return err
+	}
+	rf.srcChainFilters = srcFilters
+
+	return nil
 }
 
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {

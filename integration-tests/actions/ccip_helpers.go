@@ -62,6 +62,29 @@ type CCIPTOMLEnv struct {
 	Networks []blockchain.EVMNetwork
 }
 
+var EvmChainIdToChainSelector = func(chainId uint64, simulated bool) (uint64, error) {
+	if simulated {
+		return chainId, nil
+	}
+	mapSelector := map[uint64]uint64{
+		11155111: 16015286601757825753,
+		420:      2664363617261496610,
+		421613:   6101244977088475029,
+		43113:    14767482510784806043,
+		80001:    12532609583862916517,
+		137:      4051577828743386545,
+		1:        5009297550715157269,
+		42161:    4949039107694359620,
+		10:       3734403246176062136,
+		43114:    6433500567565415381,
+	}
+	chainSelector, ok := mapSelector[chainId]
+	if !ok {
+		return 0, fmt.Errorf("chain id %d not found in chain selector", chainId)
+	}
+	return chainSelector, nil
+}
+
 var (
 	//go:embed clconfig/ccip-default.txt
 	CLConfig             string
@@ -212,7 +235,14 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 // to be triggered by the test
 func (ccipModule *CCIPCommon) ApproveTokens() error {
 	for _, token := range ccipModule.BridgeTokens {
-		err := token.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
+		bal, err := token.BalanceOf(context.Background(), ccipModule.Router.Address())
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if bal.Cmp(ApprovedAmountToRouter) >= 0 {
+			continue
+		}
+		err = token.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -225,12 +255,22 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 				break
 			}
 		}
+		bal, err := ccipModule.FeeToken.BalanceOf(context.Background(), ccipModule.Router.Address())
+		if err != nil {
+			return errors.WithStack(err)
+		}
 		if !isApproved {
-			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), ApprovedFeeAmountToRouter)
+			if bal.Cmp(ApprovedFeeAmountToRouter) >= 0 {
+				return nil
+			}
+			err = ccipModule.FeeToken.Approve(ccipModule.Router.Address(), ApprovedFeeAmountToRouter)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 		} else {
+			if bal.Cmp(new(big.Int).Add(ApprovedAmountToRouter, ApprovedFeeAmountToRouter)) >= 0 {
+				return nil
+			}
 			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), new(big.Int).Add(ApprovedAmountToRouter, ApprovedFeeAmountToRouter))
 			if err != nil {
 				return errors.WithStack(err)
@@ -307,7 +347,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 		ccipModule.FeeTokenPool = pool
 	}
 
-	if len(ccipModule.BridgeTokens) < noOfTokens {
+	if len(ccipModule.BridgeTokens) == 0 {
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
 			token, err := cd.DeployLinkTokenContract()
@@ -331,7 +371,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 		}
 		ccipModule.BridgeTokens = tokens
 	}
-	if len(ccipModule.BridgeTokenPools) < noOfTokens {
+	if len(ccipModule.BridgeTokenPools) == 0 {
 		// deploy native token pool
 		for i := len(ccipModule.BridgeTokenPools); i < noOfTokens; i++ {
 			token := ccipModule.BridgeTokens[i]
@@ -474,9 +514,24 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		return errors.WithStack(err)
 	}
 
-	sourceCCIP.Common.ApproveTokens()
+	err = sourceCCIP.Common.ApproveTokens()
+	if err != nil {
+		return err
+	}
 	sourceCCIP.LoadContracts(lane)
-
+	// update transfer amount array length to be equal to the number of tokens
+	// each index in TransferAmount array corresponds to the amount to be transferred for the token at the same index in BridgeTokens array
+	if len(sourceCCIP.TransferAmount) != len(sourceCCIP.Common.BridgeTokens) {
+		sourceCCIP.TransferAmount = sourceCCIP.TransferAmount[:len(sourceCCIP.Common.BridgeTokens)]
+	}
+	sourceChainSelector, err := EvmChainIdToChainSelector(sourceCCIP.Common.ChainClient.GetChainID().Uint64(), sourceCCIP.Common.ChainClient.NetworkSimulated())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	destChainSelector, err := EvmChainIdToChainSelector(sourceCCIP.DestinationChainId, sourceCCIP.Common.ChainClient.NetworkSimulated())
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	if !sourceCCIP.Common.ExistingDeployment {
 		// ensure token is a feeToken
 		err = sourceCCIP.Common.PriceRegistry.AddFeeToken(common.HexToAddress(sourceCCIP.Common.FeeToken.Address()))
@@ -490,7 +545,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 
 		// update PriceRegistry
 		priceUpdates := price_registry.InternalPriceUpdates{
-			DestChainSelector: sourceCCIP.DestinationChainId,
+			DestChainSelector: destChainSelector,
 			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
@@ -552,8 +607,8 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		}
 
 		sourceCCIP.OnRamp, err = contractDeployer.DeployOnRamp(
-			sourceCCIP.Common.ChainClient.GetChainID().Uint64(),
-			sourceCCIP.DestinationChainId,
+			sourceChainSelector,
+			destChainSelector,
 			[]common.Address{},
 			tokensAndPools,
 			sourceCCIP.Common.AFN.EthAddress,
@@ -762,7 +817,10 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed encoding the options field: %+v", err)
 	}
-
+	destChainSelector, err := EvmChainIdToChainSelector(sourceCCIP.DestinationChainId, sourceCCIP.Common.ChainClient.NetworkSimulated())
+	if err != nil {
+		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %+v", err)
+	}
 	// form the message for transfer
 	msg := router.ClientEVM2AnyMessage{
 		Receiver:     receiverAddr,
@@ -772,7 +830,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		ExtraArgs:    extraArgsV1,
 	}
 	log.Info().Interface("ge msg details", msg).Msg("ccip message to be sent")
-	fee, err := sourceCCIP.Common.Router.GetFee(sourceCCIP.DestinationChainId, msg)
+	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the fee: %+v", err)
 	}
@@ -780,15 +838,16 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 
 	var sendTx *types.Transaction
 	timeNow := time.Now()
+
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
 	if feeToken != common.HexToAddress("0x0") {
-		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, nil)
+		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, nil)
 		if err != nil {
 			return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %+v", err)
 		}
 	} else {
-		sendTx, err = sourceCCIP.Common.Router.CCIPSend(sourceCCIP.DestinationChainId, msg, fee)
+		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, fee)
 		if err != nil {
 			return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %+v", err)
 		}
@@ -873,6 +932,14 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	}
 
 	destCCIP.LoadContracts(lane)
+	sourceChainSelector, err := EvmChainIdToChainSelector(destCCIP.SourceChainId, sourceCCIP.Common.ChainClient.NetworkSimulated())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	destChainSelector, err := EvmChainIdToChainSelector(destCCIP.Common.ChainClient.GetChainID().Uint64(), destCCIP.Common.ChainClient.NetworkSimulated())
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	if !destCCIP.Common.ExistingDeployment {
 		// ensure token is a feeToken
 		err = destCCIP.Common.PriceRegistry.AddFeeToken(common.HexToAddress(destCCIP.Common.FeeToken.Address()))
@@ -886,7 +953,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 
 		// update PriceRegistry
 		priceUpdates := price_registry.InternalPriceUpdates{
-			DestChainSelector: destCCIP.SourceChainId,
+			DestChainSelector: sourceChainSelector,
 			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 				{
@@ -922,9 +989,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	if destCCIP.CommitStore == nil {
 		// commitStore responsible for validating the transfer message
 		destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
-			destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID().Uint64(),
-			destCCIP.Common.AFN.EthAddress, sourceCCIP.OnRamp.EthAddress,
-			destCCIP.Common.PriceRegistry.EthAddress,
+			sourceChainSelector, destChainSelector, sourceCCIP.OnRamp.EthAddress,
 		)
 		if err != nil {
 			return fmt.Errorf("deploying commitstore shouldn't fail %+v", err)
@@ -981,9 +1046,9 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	pools = append(pools, destCCIP.Common.FeeTokenPool.EthAddress)
 
 	if destCCIP.OffRamp == nil {
-		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(destCCIP.SourceChainId, sourceCCIP.DestinationChainId,
+		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(
+			sourceChainSelector, destChainSelector,
 			destCCIP.CommitStore.EthAddress, sourceCCIP.OnRamp.EthAddress,
-			destCCIP.Common.AFN.EthAddress, destCCIP.Common.Router.EthAddress,
 			sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
 		if err != nil {
 			return fmt.Errorf("deploying offramp shouldn't fail %+v", err)
@@ -1580,6 +1645,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	lane.UpdateLaneConfig()
 
+	// start event watchers
+	err = lane.StartEventWatchers()
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	// if lane is being set up for already configured CL nodes and contracts
 	// no further action is necessary
 	if !configureCLNodes {
@@ -1656,7 +1726,10 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	if newBootstrap {
-		CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
+		err := CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 
 	bootstrapCommitP2PId := bootstrapCommit.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
@@ -1668,13 +1741,13 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	} else {
 		bootstrapExecP2PId = bootstrapExec.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
 		p2pBootstrappersExec = &client.P2PData{
-			RemoteIP: bootstrapExec.Node.RemoteIP(),
-			PeerID:   bootstrapExecP2PId,
+			InternalIP: bootstrapExec.Node.InternalIP(),
+			PeerID:     bootstrapExecP2PId,
 		}
 	}
 	p2pBootstrappersCommit = &client.P2PData{
-		RemoteIP: bootstrapCommit.Node.RemoteIP(),
-		PeerID:   bootstrapCommitP2PId,
+		InternalIP: bootstrapCommit.Node.InternalIP(),
+		PeerID:     bootstrapCommitP2PId,
 	}
 
 	jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersCommit.P2PV2Bootstrapper()}
@@ -1700,23 +1773,25 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	// start event watchers
-	err = lane.StartEventWatchers()
-	if err != nil {
-		return errors.WithStack(err)
-	}
+
 	return nil
 }
 
 // SetOCR2Configs sets the oracle config in ocr2 contracts
 // nil value in execNodes denotes commit and execution jobs are to be set up in same DON
 func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP DestCCIPModule) error {
+	rootSnooze := models.MustMakeDuration(7 * time.Minute)
+	inflightExpiry := models.MustMakeDuration(3 * time.Minute)
+	if destCCIP.Common.ChainClient.NetworkSimulated() {
+		rootSnooze = models.MustMakeDuration(RootSnoozeTimeSimulated)
+		inflightExpiry = models.MustMakeDuration(InflightExpirySimulated)
+	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ccip.NewOffChainAggregatorV2Config(commitNodes, ccipConfig.CommitOffchainConfig{
 		SourceFinalityDepth:   1,
 		FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
 		FeeUpdateDeviationPPB: 5e7,
 		MaxGasPrice:           200e9,
-		InflightCacheExpiry:   models.MustMakeDuration(InflightExpirySimulated),
+		InflightCacheExpiry:   inflightExpiry,
 	}, ccipConfig.CommitOnchainConfig{
 		PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
 		Afn:           destCCIP.Common.AFN.EthAddress,
@@ -1743,8 +1818,8 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			BatchGasLimit:               5_000_000,
 			RelativeBoostPerWaitHour:    0.7,
 			MaxGasPrice:                 200e9,
-			InflightCacheExpiry:         models.MustMakeDuration(InflightExpirySimulated),
-			RootSnoozeTime:              models.MustMakeDuration(RootSnoozeTimeSimulated),
+			InflightCacheExpiry:         inflightExpiry,
+			RootSnoozeTime:              rootSnooze,
 		}, ccipConfig.ExecOnchainConfig{
 			PermissionLessExecutionThresholdSeconds: 60 * 30,
 			Router:                                  destCCIP.Common.Router.EthAddress,
@@ -2040,13 +2115,13 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 }
 
 func AssertBalances(t *testing.T, bas []testhelpers.BalanceAssertion) {
-	event := log.Info()
+	logEvent := log.Info()
 	for _, b := range bas {
 		actual := b.Getter(t, b.Address)
 		assert.NotNil(t, actual, "%v getter return nil", b.Name)
 		if b.Within == "" {
 			assert.Equal(t, b.Expected, actual.String(), "wrong balance for %s got %s want %s", b.Name, actual, b.Expected)
-			event.Interface(b.Name, struct {
+			logEvent.Interface(b.Name, struct {
 				Exp    string
 				Actual string
 			}{
@@ -2062,7 +2137,7 @@ func AssertBalances(t *testing.T, bas []testhelpers.BalanceAssertion) {
 				"wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
 			assert.Equal(t, 1, actual.Cmp(low),
 				"wrong balance for %s got %s outside expected range [%s, %s]", b.Name, actual, low, high)
-			event.Interface(b.Name, struct {
+			logEvent.Interface(b.Name, struct {
 				ExpRange string
 				Actual   string
 			}{
@@ -2071,7 +2146,7 @@ func AssertBalances(t *testing.T, bas []testhelpers.BalanceAssertion) {
 			})
 		}
 	}
-	event.Msg("balance assertions succeeded")
+	logEvent.Msg("balance assertions succeeded")
 }
 
 func GetterForLinkToken(token *ccip.LinkToken, addr string) func(t *testing.T, _ common.Address) *big.Int {

@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
+	mockserver_cfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
@@ -651,6 +651,11 @@ func CCIPDefaultTestSetUp(
 			err = actions.TeardownSuite(t, ccipEnv.K8Env, utils.ProjectRoot, ccipEnv.CLNodes, setUpArgs.Reporter,
 				zapcore.ErrorLevel, chains...)
 			require.NoError(t, err, "Environment teardown shouldn't fail")
+		} else {
+			//just print
+			for k, _ := range setUpArgs.Reporter.LaneStats {
+				setUpArgs.Reporter.LaneStats[k].Finalize(k)
+			}
 		}
 	})
 	if configureCLNode {
@@ -685,9 +690,9 @@ func CCIPDefaultTestSetUp(
 			transferAmounts, numOfCommitNodes, commitAndExecOnSameDON,
 			bidirectional, newBootstrap)
 		require.NoError(t, err)
+		err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
+		require.NoError(t, err)
 	}
-	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
-	require.NoError(t, err)
 
 	setUpArgs.TearDown = func() {
 		for _, lanes := range setUpArgs.Lanes {

@@ -41,6 +41,8 @@ var EventSignatures struct {
 	// PriceRegistry
 	UsdPerUnitGasUpdated common.Hash
 	UsdPerTokenUpdated   common.Hash
+	FeeTokenAdded        common.Hash
+	FeeTokenRemoved      common.Hash
 
 	// offset || sourceChainID || seqNum || ...
 	SendRequestedSequenceNumberWord int
@@ -107,6 +109,8 @@ func init() {
 	}
 	EventSignatures.UsdPerUnitGasUpdated = getIDOrPanic("UsdPerUnitGasUpdated", priceRegistryABI)
 	EventSignatures.UsdPerTokenUpdated = getIDOrPanic("UsdPerTokenUpdated", priceRegistryABI)
+	EventSignatures.FeeTokenAdded = getIDOrPanic("FeeTokenAdded", priceRegistryABI)
+	EventSignatures.FeeTokenRemoved = getIDOrPanic("FeeTokenRemoved", priceRegistryABI)
 
 	// arguments
 	MessageArgs = onRampABI.Events["CCIPSendRequested"].Inputs

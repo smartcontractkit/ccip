@@ -312,6 +312,7 @@ func TestORM(t *testing.T) {
 		require.Equal(t, jb.LegacyGasStationSidecarSpec.RunTimeout, savedJob.LegacyGasStationSidecarSpec.RunTimeout)
 		require.Equal(t, jb.LegacyGasStationSidecarSpec.EVMChainID, savedJob.LegacyGasStationSidecarSpec.EVMChainID)
 		require.Equal(t, jb.LegacyGasStationSidecarSpec.CCIPChainSelector, savedJob.LegacyGasStationSidecarSpec.CCIPChainSelector)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.StatusUpdateURL, savedJob.LegacyGasStationSidecarSpec.StatusUpdateURL)
 		err = orm.DeleteJob(jb.ID)
 		require.NoError(t, err)
 		_, err = orm.FindJob(testutils.Context(t), jb.ID)

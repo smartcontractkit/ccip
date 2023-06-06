@@ -3,12 +3,17 @@ package legacygasstation
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"math/big"
+	"net"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/test-go/testify/assert"
 	"github.com/test-go/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types"
@@ -159,4 +164,58 @@ func AssertTxEquals(t *testing.T, expected, actual types.LegacyGaslessTx) {
 	} else {
 		require.True(t, bytes.Equal(expected.CCIPMessageID.Bytes(), actual.CCIPMessageID.Bytes()))
 	}
+}
+
+type TestStatusUpdateServer struct {
+	Server *http.Server
+	Port   uint16
+}
+
+func NewUnstartedStatusUpdateServer(t *testing.T) TestStatusUpdateServer {
+	router := gin.Default()
+	router.POST("/return_success", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"jsonrpc": "2.0",
+		})
+	})
+	router.POST("/return_not_found", func(c *gin.Context) {
+		c.AbortWithStatus(404)
+	})
+	router.POST("/return_error", func(c *gin.Context) {
+		c.AbortWithStatus(404)
+		c.JSON(http.StatusOK, gin.H{
+			"jsonrpc": "2.0",
+		})
+	})
+
+	port := GetFreePort(t)
+	server := &http.Server{
+		Addr:        fmt.Sprintf(":%d", port),
+		Handler:     router,
+		ReadTimeout: 30 * time.Second,
+	}
+
+	return TestStatusUpdateServer{
+		Server: server,
+		Port:   port,
+	}
+}
+
+func (s *TestStatusUpdateServer) Start() error {
+	return s.Server.ListenAndServe()
+}
+
+func (s *TestStatusUpdateServer) Stop() error {
+	return s.Server.Close()
+}
+
+func GetFreePort(t *testing.T) uint16 {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	require.NoError(t, err)
+
+	l, err := net.ListenTCP("tcp", addr)
+	require.NoError(t, err)
+	defer func() { assert.NoError(t, l.Close()) }()
+
+	return uint16(l.Addr().(*net.TCPAddr).Port)
 }

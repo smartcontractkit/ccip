@@ -129,6 +129,14 @@ func (r *SpecResolver) ToBootstrapSpec() (*BootstrapSpecResolver, bool) {
 	return &BootstrapSpecResolver{spec: *r.j.BootstrapSpec}, true
 }
 
+func (r *SpecResolver) ToGatewaySpec() (*GatewaySpecResolver, bool) {
+	if r.j.Type != job.Gateway {
+		return nil, false
+	}
+
+	return &GatewaySpecResolver{spec: *r.j.GatewaySpec}, true
+}
+
 type CronSpecResolver struct {
 	spec job.CronSpec
 }
@@ -989,6 +997,11 @@ func (r *LegacyGasStationSidecarSpecResolver) CCIPChainSelector() *string {
 	return &ccipChainSelector
 }
 
+// StatusUpdateURL returns the job's StatusUpdateURL param.
+func (r *LegacyGasStationSidecarSpecResolver) StatusUpdateURL() string {
+	return r.spec.StatusUpdateURL
+}
+
 // CreatedAt resolves the spec's created at timestamp.
 func (r *LegacyGasStationSidecarSpecResolver) CreatedAt() graphql.Time {
 	return graphql.Time{Time: r.spec.CreatedAt}
@@ -1064,5 +1077,21 @@ func (r *BootstrapSpecResolver) ContractConfigConfirmations() *int32 {
 
 // CreatedAt resolves the spec's created at timestamp.
 func (r *BootstrapSpecResolver) CreatedAt() graphql.Time {
+	return graphql.Time{Time: r.spec.CreatedAt}
+}
+
+type GatewaySpecResolver struct {
+	spec job.GatewaySpec
+}
+
+func (r *GatewaySpecResolver) ID() graphql.ID {
+	return graphql.ID(stringutils.FromInt32(r.spec.ID))
+}
+
+func (r *GatewaySpecResolver) GatewayConfig() gqlscalar.Map {
+	return gqlscalar.Map(r.spec.GatewayConfig)
+}
+
+func (r *GatewaySpecResolver) CreatedAt() graphql.Time {
 	return graphql.Time{Time: r.spec.CreatedAt}
 }

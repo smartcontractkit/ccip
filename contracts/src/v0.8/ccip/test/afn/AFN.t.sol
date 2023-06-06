@@ -29,7 +29,7 @@ contract AFN_constructor is ConfigCompare, AFNSetup {
 }
 
 contract AFN_voteToBlessRoots is AFNSetup {
-  event VoteToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot, uint8 weight);
+  event VotedToBless(uint32 indexed configVersion, address indexed voter, IAFN.TaggedRoot taggedRoot, uint8 weight);
 
   // Success
 
@@ -43,7 +43,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
     (address voter, uint8 voterWeight) = _getFirstBlessVoterAndWeight();
 
     vm.expectEmit();
-    emit VoteToBless(1, voter, makeTaggedRoot(1), voterWeight);
+    emit VotedToBless(1, voter, makeTaggedRoot(1), voterWeight);
 
     changePrank(voter);
     vm.resumeGasMetering();
@@ -62,7 +62,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
 
     for (uint256 i = 1; i <= 3; ++i) {
       vm.expectEmit();
-      emit VoteToBless(1, voter, makeTaggedRoot(i), voterWeight);
+      emit VotedToBless(1, voter, makeTaggedRoot(i), voterWeight);
     }
 
     changePrank(voter);
@@ -84,7 +84,7 @@ contract AFN_voteToBlessRoots is AFNSetup {
 
     for (uint256 i = 1; i <= 5; ++i) {
       vm.expectEmit();
-      emit VoteToBless(1, voter, makeTaggedRoot(i), voterWeight);
+      emit VotedToBless(1, voter, makeTaggedRoot(i), voterWeight);
     }
 
     changePrank(voter);
@@ -277,7 +277,7 @@ contract AFN_unvoteToCurse is AFNSetup {
 }
 
 contract AFN_voteToCurse is AFNSetup {
-  event VoteToCurse(
+  event VotedToCurse(
     uint32 indexed configVersion,
     address indexed voter,
     uint8 weight,
@@ -287,6 +287,8 @@ contract AFN_voteToCurse is AFNSetup {
     uint16 accumulatedWeight
   );
   event Cursed(uint32 indexed configVersion, uint256 timestamp);
+  event OwnerCursed(uint256 timestamp);
+  event RecoveredFromCurse();
 
   function _getFirstCurseVoterAndWeight() internal pure returns (address, uint8) {
     AFN.Config memory cfg = afnConstructorArgs();
@@ -301,7 +303,7 @@ contract AFN_voteToCurse is AFNSetup {
     (address voter, uint8 weight) = _getFirstCurseVoterAndWeight();
     changePrank(voter);
     vm.expectEmit();
-    emit VoteToCurse(
+    emit VotedToCurse(
       1,
       voter,
       weight,
@@ -353,6 +355,45 @@ contract AFN_voteToCurse is AFNSetup {
     // Asserts that this call to vote with a new curse id goes through with no
     // reverts even when the AFN contract is cursed.
     s_afn.voteToCurse(makeCurseId(cfg.voters.length + 1));
+  }
+
+  function testOwnerCanCurseAndUncurse() public {
+    changePrank(OWNER);
+    vm.expectEmit();
+    emit OwnerCursed(block.timestamp);
+    vm.expectEmit();
+    emit Cursed(1, block.timestamp);
+    s_afn.ownerCurse();
+
+    {
+      (address[] memory voters, , , uint24 accWeight, bool cursed) = s_afn.getCurseProgress();
+      assertEq(voters.length, 0);
+      assertEq(accWeight, 0);
+      assertTrue(cursed);
+    }
+
+    // ownerCurse again, this time we only get OwnerCursed, but not Cursed
+    vm.expectEmit();
+    emit OwnerCursed(block.timestamp);
+    s_afn.ownerCurse();
+
+    {
+      (address[] memory voters, , , uint24 accWeight, bool cursed) = s_afn.getCurseProgress();
+      assertEq(voters.length, 0);
+      assertEq(accWeight, 0);
+      assertTrue(cursed);
+    }
+
+    AFN.UnvoteToCurseRecord[] memory unvoteRecords = new AFN.UnvoteToCurseRecord[](0);
+    vm.expectEmit();
+    emit RecoveredFromCurse();
+    s_afn.ownerUnvoteToCurse(unvoteRecords);
+    {
+      (address[] memory voters, , , uint24 accWeight, bool cursed) = s_afn.getCurseProgress();
+      assertEq(voters.length, 0);
+      assertEq(accWeight, 0);
+      assertFalse(cursed);
+    }
   }
 
   // Reverts
