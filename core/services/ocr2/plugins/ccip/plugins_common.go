@@ -106,21 +106,15 @@ func leavesFromIntervals(
 	return leaves, nil
 }
 
-// Checks whether the commit store is down by doing an onchain check for
-// Paused and ARM status
+// Checks whether the commit store is down by doing an onchain check for Paused and ARM status
 func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore commit_store.CommitStoreInterface) bool {
-	paused, err := commitStore.Paused(&bind.CallOpts{Context: ctx})
+	unPausedAndHealthy, err := commitStore.IsUnpausedAndARMHealthy(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		// Air on side of caution by halting if we cannot read the state?
-		lggr.Errorw("Unable to read CommitStore paused", "err", err)
+		// If we cannot read the state, assume the worst
+		lggr.Errorw("Unable to read CommitStore IsUnpausedAndARMHealthy", "err", err)
 		return true
 	}
-	healthy, err := commitStore.IsARMHealthy(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		lggr.Errorw("Unable to read CommitStore ARM state", "err", err)
-		return true
-	}
-	return paused || !healthy
+	return !unPausedAndHealthy
 }
 
 func getLpFilterNames(filters []logpoller.Filter) []string {

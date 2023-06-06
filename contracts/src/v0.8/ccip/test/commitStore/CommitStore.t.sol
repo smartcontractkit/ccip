@@ -45,11 +45,11 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
 }
 
 contract CommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
-  CommitStoreHelper s_commitStore;
+  CommitStoreHelper internal s_commitStore;
 
   ARM internal s_arm;
 
-  address constant BLESS_VOTE_ADDR = address(8888);
+  address internal constant BLESS_VOTE_ADDR = address(8888);
 
   function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
     PriceRegistrySetup.setUp();
@@ -135,6 +135,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     assertEq(1, commitStore.getExpectedNextSequenceNumber());
     assertEq(commitStore.typeAndVersion(), "CommitStore 1.0.0");
     assertEq(OWNER, commitStore.owner());
+    assertTrue(commitStore.isUnpausedAndARMHealthy());
   }
 }
 
@@ -488,22 +489,31 @@ contract CommitStore_verify is CommitStoreRealARMSetup {
   }
 }
 
-contract CommitStore_arm is CommitStoreSetup {
-  function testARM() public {
+contract CommitStore_isUnpausedAndARMHealthy is CommitStoreSetup {
+  function testARMSuccess() public {
     // Test pausing
-    assertEq(s_commitStore.paused(), false);
+    assertFalse(s_commitStore.paused());
+    assertTrue(s_commitStore.isUnpausedAndARMHealthy());
     s_commitStore.pause();
-    assertEq(s_commitStore.paused(), true);
+    assertTrue(s_commitStore.paused());
+    assertFalse(s_commitStore.isUnpausedAndARMHealthy());
     s_commitStore.unpause();
-    assertEq(s_commitStore.paused(), false);
+    assertFalse(s_commitStore.paused());
+    assertTrue(s_commitStore.isUnpausedAndARMHealthy());
 
     // Test arm
-    assertEq(s_commitStore.isARMHealthy(), true);
+    assertTrue(s_commitStore.isARMHealthy());
     s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertEq(s_commitStore.isARMHealthy(), false);
+    assertFalse(s_commitStore.isARMHealthy());
+    assertFalse(s_commitStore.isUnpausedAndARMHealthy());
     ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
     records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
     s_mockARM.ownerUnvoteToCurse(records);
-    assertEq(s_commitStore.isARMHealthy(), true);
+    assertTrue(s_commitStore.isARMHealthy());
+    assertTrue(s_commitStore.isUnpausedAndARMHealthy());
+
+    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
+    s_commitStore.pause();
+    assertFalse(s_commitStore.isUnpausedAndARMHealthy());
   }
 }

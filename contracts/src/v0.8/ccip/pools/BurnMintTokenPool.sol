@@ -16,9 +16,7 @@ contract BurnMintTokenPool is TokenPool {
     IBurnMintERC20 token,
     address[] memory allowlist,
     RateLimiter.Config memory rateLimiterConfig
-  ) TokenPool(token, allowlist, rateLimiterConfig) {
-    token.approve(address(this), 2 ** 256 - 1);
-  }
+  ) TokenPool(token, allowlist, rateLimiterConfig) {}
 
   /// @notice Burn the token in the pool
   /// @dev Burn is not rate limited at per-pool level. Burn does not contribute to honey pot risk.

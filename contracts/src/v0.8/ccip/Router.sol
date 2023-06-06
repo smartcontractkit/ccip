@@ -296,7 +296,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
       payable(to).transfer(amount);
       return;
     }
-    IERC20(tokenAddress).transfer(to, amount);
+    IERC20(tokenAddress).safeTransfer(to, amount);
   }
 
   // ================================================================

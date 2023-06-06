@@ -38,6 +38,11 @@ func (o *ObservedCommitStore) GetExpectedNextSequenceNumber(opts *bind.CallOpts)
 	})
 }
 
+func (o *ObservedCommitStore) IsUnpausedAndARMHealthy(opts *bind.CallOpts) (bool, error) {
+	return withObservedContract(o.metric, "IsUnpausedAndARMHealthy", func() (bool, error) {
+		return o.CommitStoreInterface.IsUnpausedAndARMHealthy(opts)
+	})
+}
 func (o *ObservedCommitStore) Paused(opts *bind.CallOpts) (bool, error) {
 	return withObservedContract(o.metric, "Paused", func() (bool, error) {
 		return o.CommitStoreInterface.Paused(opts)

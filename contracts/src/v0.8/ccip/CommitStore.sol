@@ -204,6 +204,11 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   // |                        Access and ARM                        |
   // ================================================================
 
+  /// @notice Single function to check the status of the commitStore.
+  function isUnpausedAndARMHealthy() external view returns (bool) {
+    return !IARM(s_dynamicConfig.arm).isCursed() && !s_paused;
+  }
+
   /// @notice Support querying whether health checker is healthy.
   function isARMHealthy() external view returns (bool) {
     return !IARM(s_dynamicConfig.arm).isCursed();

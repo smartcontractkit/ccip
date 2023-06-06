@@ -78,8 +78,8 @@ contract LockReleaseTokenPool is TokenPool {
   function removeLiquidity(uint256 amount) external {
     if (s_liquidityProviderBalances[msg.sender] < amount) revert WithdrawalTooHigh();
     if (i_token.balanceOf(address(this)) < amount) revert InsufficientLiquidity();
-    i_token.safeTransfer(msg.sender, amount);
     s_liquidityProviderBalances[msg.sender] -= amount;
+    i_token.safeTransfer(msg.sender, amount);
     emit LiquidityRemoved(msg.sender, amount);
   }
 }

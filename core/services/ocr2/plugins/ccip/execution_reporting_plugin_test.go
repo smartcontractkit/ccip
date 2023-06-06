@@ -495,8 +495,6 @@ func TestExecShouldTransmitAcceptedReport(t *testing.T) {
 		inflightReports: newInflightExecReportsContainer(models.MustMakeDuration(1 * time.Hour).Duration()),
 	}
 
-	mockCommitStore.On("Paused", mock.Anything).Return(false, nil)
-	mockCommitStore.On("IsARMHealthy", mock.Anything).Return(true, nil)
 	mockedExecState := mockOffRamp.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(abihelpers.ExecutionStateUntouched), nil).Once()
 
 	should, err := plugin.ShouldTransmitAcceptedReport(testutils.Context(t), ocrtypes.ReportTimestamp{}, encodedReport)
