@@ -15,11 +15,11 @@ func PrettyPrintLanes(env dione.Environment, source *rhea.EvmDeploymentConfig, d
 	WriteChainConfigToFile(env, source)
 	WriteChainConfigToFile(env, destination)
 
-	writeLaneConfigToFile(env, source, source.LaneConfig, "lane")
-	writeLaneConfigToFile(env, destination, destination.LaneConfig, "lane")
+	writeLaneConfigToFile(env, source, source.LaneConfig, "lane", destination.ChainConfig.EvmChainId)
+	writeLaneConfigToFile(env, destination, destination.LaneConfig, "lane", source.ChainConfig.EvmChainId)
 
-	writeLaneConfigToFile(env, source, source.UpgradeLaneConfig, "upgrade_lane")
-	writeLaneConfigToFile(env, destination, destination.UpgradeLaneConfig, "upgrade_lane")
+	writeLaneConfigToFile(env, source, source.UpgradeLaneConfig, "upgrade_lane", destination.ChainConfig.EvmChainId)
+	writeLaneConfigToFile(env, destination, destination.UpgradeLaneConfig, "upgrade_lane", source.ChainConfig.EvmChainId)
 }
 
 func WriteChainConfigToFile(env dione.Environment, chain *rhea.EvmDeploymentConfig) {
@@ -29,10 +29,10 @@ func WriteChainConfigToFile(env dione.Environment, chain *rhea.EvmDeploymentConf
 	attemptWriteToFile(sourceChainConfig, chainName, "chain", string(env))
 }
 
-func writeLaneConfigToFile(env dione.Environment, chain *rhea.EvmDeploymentConfig, config rhea.EVMLaneConfig, configType string) {
+func writeLaneConfigToFile(env dione.Environment, chain *rhea.EvmDeploymentConfig, config rhea.EVMLaneConfig, configType string, otherEvmId uint64) {
 	destLaneConfig := prettyPrint(config)
 	chain.Logger.Info(string(destLaneConfig))
-	chainName := ccip.ChainName(int64(chain.ChainConfig.EvmChainId))
+	chainName := ccip.ChainName(int64(chain.ChainConfig.EvmChainId)) + "/" + ccip.ChainName(int64(otherEvmId))
 	attemptWriteToFile(destLaneConfig, chainName, configType, string(env))
 }
 

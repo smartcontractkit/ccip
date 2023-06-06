@@ -64,7 +64,7 @@ func TestCCIP(t *testing.T) {
 	// first character of the given seed with the digits 0-9
 	seedKey := os.Getenv("SEED_KEY")
 	if seedKey == "" {
-		t.Error("must set seed key")
+		seedKey = ownerKey
 	}
 
 	// Configures a client to run tests with using the network defaults and given keys.
@@ -136,7 +136,11 @@ func TestRheaDeployLane(t *testing.T) {
 
 	client.startPingPong(t)
 
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+	don := dione.NewDON(env, logger.TestLogger(t))
 	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 
@@ -184,7 +188,12 @@ func TestRheaDeployUpgradeLane(t *testing.T) {
 	// Also remember to set UpgradeLaneConfig.DeployCommitStore and UpgradeLaneConfig.DeployRamp to false
 
 	// Add new job specs for Upgrade Lanes
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+
+	don := dione.NewDON(env, logger.TestLogger(t))
 	don.ClearAllLaneJobsByVersion(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)), upgradeLaneVersion)
 	don.AddTwoWaySpecsByVersion(SOURCE.OnlyEvmConfig(), SOURCE.UpgradeLaneConfig, DESTINATION.OnlyEvmConfig(), DESTINATION.UpgradeLaneConfig, upgradeLaneVersion)
 
@@ -225,7 +234,12 @@ func TestRheaPostUpgradeDeploymentClean(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
 	// Remove job specs from previous deployment
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+
+	don := dione.NewDON(env, logger.TestLogger(t))
 	don.ClearAllLaneJobsByVersion(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)), currentVersion)
 }
 
@@ -234,7 +248,12 @@ func TestRheaPostUpgradeDeploymentClean(t *testing.T) {
 func TestDione(t *testing.T) {
 	checkOwnerKeyAndSetupChain(t)
 
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+
+	don := dione.NewDON(env, logger.TestLogger(t))
 	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)))
 	don.AddTwoWaySpecs(SOURCE, DESTINATION)
 
@@ -250,7 +269,12 @@ func TestDione(t *testing.T) {
 func TestDionePopulateNodeKeys(t *testing.T) {
 	checkOwnerKey(t)
 
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+
+	don := dione.NewDON(env, logger.TestLogger(t))
 	don.LoadCurrentNodeParams()
 	don.WriteToFile()
 }
@@ -266,7 +290,12 @@ func TestUpdateAllLanes(t *testing.T) {
 		t.Error("set environment not supported")
 	}
 
-	don := dione.NewDON(ENV, logger.TestLogger(t))
+	env := ENV
+	if SOURCE.ChainConfig.EvmChainId == 1337 || DESTINATION.ChainConfig.EvmChainId == 1337 {
+		env = dione.Prod_Swift
+	}
+
+	don := dione.NewDON(env, logger.TestLogger(t))
 
 	// Potential todo: remove old deployment artifact permissions
 	// Optimizations:
@@ -322,10 +351,12 @@ func TestUpdateAllLanes(t *testing.T) {
 // **	Add it to the chain config in e.g. prod.go
 // **	Leave the pool address empty
 // ** 	Depending on the pool type fill in the token address or not (wrapped doesn't have a token so leave it empty)
+// **   Set DeployTokenPools to `true` for chains that need the pool deployed
 //
 // Run `TestRheaDeployChains` to deploy the new pools
 // ** 	Run output should be written to console & ./json/deployments/env/chain/....
 // ** 	Modify the chain config to include the new info
+// **   Set DeployTokenPools back to `false` where changed
 //
 // Run TestSyncTokens
 // ** 	This should set the correct config on each ramp and token pool based on previous steps
@@ -525,12 +556,22 @@ func Test__PROD__SetAllowListAllLanes(t *testing.T) {
 	allProdLanes := []*rhea.EvmDeploymentConfig{
 		&deployments.Prod_SepoliaToOptimismGoerli,
 		&deployments.Prod_SepoliaToAvaxFuji,
+		&deployments.Prod_SepoliaToArbitrumGoerli,
+		&deployments.Prod_SepoliaToPolygonMumbai,
+		// Quorum allowList is turned off for now, do not uncomment
+		//&deployments.Prod_SepoliaToQuorum,
 
 		&deployments.Prod_AvaxFujiToSepolia,
 		&deployments.Prod_AvaxFujiToOptimismGoerli,
+		&deployments.Prod_AvaxFujiToPolygonMumbai,
 
 		&deployments.Prod_OptimismGoerliToAvaxFuji,
 		&deployments.Prod_OptimismGoerliToSepolia,
+
+		&deployments.Prod_ArbitrumGoerliToSepolia,
+
+		&deployments.Prod_PolygonMumbaiToSepolia,
+		&deployments.Prod_PolygonMumbaiToAvaxFuji,
 	}
 
 	for _, lane := range allProdLanes {

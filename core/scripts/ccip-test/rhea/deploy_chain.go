@@ -90,6 +90,10 @@ func DeployTokenPools(client *EvmDeploymentConfig) error {
 }
 
 func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBridgedToken) error {
+	if tokenConfig.TokenPoolType == FeeTokenOnly {
+		client.Logger.Infof("Skipping pool deployment for fee only token")
+		return nil
+	}
 	// Only deploy a new pool if there is no current pool address given
 	// and the deploySetting indicate a new pool should be deployed.
 	if client.ChainConfig.DeploySettings.DeployTokenPools && tokenConfig.Pool == common.HexToAddress("") {
@@ -138,8 +142,8 @@ func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, to
 		poolAllowList,
 		lock_release_token_pool.RateLimiterConfig{
 			IsEnabled: false,
-			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e5)),
 		})
 	if err != nil {
 		return common.Address{}, err
@@ -165,8 +169,8 @@ func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, token
 		poolAllowList,
 		burn_mint_token_pool.RateLimiterConfig{
 			IsEnabled: false,
-			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e5)),
 		})
 	if err != nil {
 		return common.Address{}, err
