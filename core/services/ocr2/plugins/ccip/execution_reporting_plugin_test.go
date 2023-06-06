@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
@@ -537,23 +538,36 @@ func TestBuildBatch(t *testing.T) {
 		lggr: logger.TestLogger(t),
 	}
 
-	msg1 := testhelpers.GenerateCCIPSendLPLog(t, evm_2_evm_onramp.InternalEVM2EVMMessage{
-		SequenceNumber: 1,
-		FeeTokenAmount: big.NewInt(1e9),
-		Sender:         sender1,
-		Nonce:          1,
-		GasLimit:       big.NewInt(1),
-		Strict:         false,
-		Receiver:       common.Address{},
-		Data:           nil,
-		TokenAmounts:   nil,
-		FeeToken:       srcNative,
-		MessageId:      [32]byte{},
-	}, 1)
+	msg1 := evm2EVMOnRampCCIPSendRequestedWithMeta{
+		EVM2EVMOnRampCCIPSendRequested: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{
+			Message: evm_2_evm_onramp.InternalEVM2EVMMessage{
+				SequenceNumber: 1,
+				FeeTokenAmount: big.NewInt(1e9),
+				Sender:         sender1,
+				Nonce:          1,
+				GasLimit:       big.NewInt(1),
+				Strict:         false,
+				Receiver:       common.Address{},
+				Data:           nil,
+				TokenAmounts:   nil,
+				FeeToken:       srcNative,
+				MessageId:      [32]byte{},
+			},
+			Raw: gethtypes.Log{},
+		},
+		blockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+	}
+
+	msg2 := msg1
+	msg2.executed = true
+
+	msg3 := msg1
+	msg3.executed = true
+	msg3.finalized = true
+
 	var tt = []struct {
 		name                     string
-		reqs                     []logpoller.Log
-		executed                 map[uint64]bool
+		reqs                     []evm2EVMOnRampCCIPSendRequestedWithMeta
 		inflight                 []InflightInternalExecutionReport
 		tokenLimit, destGasPrice *big.Int
 		srcPrices, dstPrices     map[common.Address]*big.Int
@@ -563,8 +577,7 @@ func TestBuildBatch(t *testing.T) {
 	}{
 		{
 			name:                  "single message no tokens",
-			reqs:                  []logpoller.Log{msg1},
-			executed:              map[uint64]bool{},
+			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg1},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
@@ -576,8 +589,7 @@ func TestBuildBatch(t *testing.T) {
 		},
 		{
 			name:                  "unfinalized executed log",
-			reqs:                  []logpoller.Log{msg1},
-			executed:              map[uint64]bool{uint64(1): false},
+			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg2},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
@@ -589,8 +601,7 @@ func TestBuildBatch(t *testing.T) {
 		},
 		{
 			name:                  "finalized executed log",
-			reqs:                  []logpoller.Log{msg1},
-			executed:              map[uint64]bool{uint64(1): true},
+			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg3},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
@@ -608,10 +619,10 @@ func TestBuildBatch(t *testing.T) {
 			for sender, nonce := range tc.offRampNoncesBySender {
 				mockOffRamp.On("GetSenderNonce", mock.Anything, sender).Return(nonce, nil)
 			}
-			seqNrs, allExecuted := plugin.buildBatch(
+
+			seqNrs := plugin.buildBatch(
 				lggr,
-				tc.reqs,
-				tc.executed,
+				commitReportWithSendRequests{sendRequestsWithMeta: tc.reqs},
 				tc.inflight,
 				tc.tokenLimit,
 				tc.srcPrices,
@@ -620,8 +631,6 @@ func TestBuildBatch(t *testing.T) {
 				map[common.Address]common.Address{},
 			)
 			assert.Equal(t, tc.expectedSeqNrs, seqNrs)
-			assert.Equal(t, tc.expectedAllExecuted, allExecuted)
-
 		})
 	}
 }

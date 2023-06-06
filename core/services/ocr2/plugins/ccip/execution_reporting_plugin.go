@@ -2,6 +2,7 @@ package ccip
 
 import (
 	"context"
+	"encoding/hex"
 	"math/big"
 	"reflect"
 	"sort"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/pkg/errors"
 
@@ -211,6 +213,14 @@ func (rf *ExecutionReportingPluginFactory) updateLogPollerFilters(onChainConfig 
 	return nil
 }
 
+// helper struct to hold the send request and some metadata
+type evm2EVMOnRampCCIPSendRequestedWithMeta struct {
+	evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
+	blockTimestamp time.Time
+	executed       bool
+	finalized      bool
+}
+
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(
 		ctx,
@@ -255,10 +265,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	destGasPrice := LazyFetch(func() (*big.Int, error) {
 		return r.estimateDestinationGasPrice(ctx)
 	})
-	latestBlock, err := r.config.destLP.LatestBlock()
-	if err != nil {
-		return nil, err
-	}
 
 	lggr.Infow("Processing unexpired reports", "n", len(unexpiredReports))
 	measureNumberOfReportsProcessed(timestamp, len(unexpiredReports))
@@ -266,20 +272,44 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	defer func() {
 		measureReportsIterationDuration(timestamp, time.Since(reportIterationStart))
 	}()
-	for _, unexpiredReport := range unexpiredReports {
+
+	unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReports)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, rep := range unexpiredReportsWithSendReqs {
 		if ctx.Err() != nil {
 			lggr.Warn("Processing of roots killed by context")
 			break
 		}
-		rootLggr := lggr.With("root", hexutil.Encode(unexpiredReport.MerkleRoot[:]),
-			"minSeqNr", unexpiredReport.Interval.Min,
-			"maxSeqNr", unexpiredReport.Interval.Max,
+
+		merkleRoot := rep.commitReport.MerkleRoot
+
+		rootLggr := lggr.With("root", hexutil.Encode(merkleRoot[:]),
+			"minSeqNr", rep.commitReport.Interval.Min,
+			"maxSeqNr", rep.commitReport.Interval.Max,
 		)
-		snoozeUntil, haveSnoozed := r.snoozedRoots[unexpiredReport.MerkleRoot]
+
+		if err := rep.validate(); err != nil {
+			rootLggr.Errorw("Skipping invalid report", "err", err)
+			continue
+		}
+
+		// If all messages are already executed and finalized, snooze the root for
+		// config.PermissionLessExecutionThresholdSeconds so it will never be considered again.
+		if allMsgsExecutedAndFinalized := rep.allRequestsAreExecutedAndFinalized(); allMsgsExecutedAndFinalized {
+			rootLggr.Infof("Snoozing root %s forever since there are no executable txs anymore", hex.EncodeToString(merkleRoot[:]))
+			r.snoozedRoots[merkleRoot] = time.Now().Add(r.onchainConfig.PermissionLessExecutionThresholdDuration())
+			incSkippedRequests(reasonAllExecuted)
+			continue
+		}
+
+		snoozeUntil, haveSnoozed := r.snoozedRoots[merkleRoot]
 		if haveSnoozed && time.Now().Before(snoozeUntil) {
 			continue
 		}
-		blessed, err := r.config.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, unexpiredReport.MerkleRoot)
+		blessed, err := r.config.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, merkleRoot)
 		if err != nil {
 			return nil, err
 		}
@@ -287,30 +317,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			rootLggr.Infow("Report is accepted but not blessed")
 			incSkippedRequests(reasonNotBlessed)
 			continue
-		}
-		// Check this root for executable messages
-		srcLogs, err := r.config.sourceLP.LogsDataWordRange(
-			abihelpers.EventSignatures.SendRequested,
-			r.config.onRamp.Address(),
-			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-			logpoller.EvmWord(unexpiredReport.Interval.Min),
-			logpoller.EvmWord(unexpiredReport.Interval.Max),
-			int(r.offchainConfig.SourceFinalityDepth),
-			pg.WithParentCtx(ctx),
-		)
-		if err != nil {
-			return nil, err
-		}
-		if len(srcLogs) != int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1) {
-			rootLggr.Warnw("Missing messages in root, if this persists for the same root it may indicate an inability to get logs from the source chain",
-				"have", len(srcLogs),
-				"want", int(unexpiredReport.Interval.Max-unexpiredReport.Interval.Min+1),
-			)
-			continue
-		}
-		executedMp, err := r.getExecutedSeqNrsInRange(ctx, unexpiredReport.Interval.Min, unexpiredReport.Interval.Max, latestBlock)
-		if err != nil {
-			return nil, err
 		}
 
 		allowedTokenAmountValue, err := allowedTokenAmount()
@@ -328,22 +334,13 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 
 		buildBatchDuration := time.Now()
-		batch, allMessagesExecuted := r.buildBatch(rootLggr, srcLogs, executedMp, inflight, allowedTokenAmountValue.Tokens,
+		batch := r.buildBatch(rootLggr, rep, inflight, allowedTokenAmountValue.Tokens,
 			srcTokensPricesValue, destTokensPricesValue, destGasPrice, srcToDstTokens)
 		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
-
-		// If all messages are already executed and finalized, snooze the root for
-		// config.PermissionLessExecutionThresholdSeconds so it will never be considered again.
-		if allMessagesExecuted {
-			rootLggr.Infow("Snoozing root forever since there are no executable txs anymore", "executedMp", executedMp)
-			r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.onchainConfig.PermissionLessExecutionThresholdDuration())
-			incSkippedRequests(reasonAllExecuted)
-			continue
-		}
 		if len(batch) != 0 {
 			return batch, nil
 		}
-		r.snoozedRoots[unexpiredReport.MerkleRoot] = time.Now().Add(r.offchainConfig.RootSnoozeTime.Duration())
+		r.snoozedRoots[merkleRoot] = time.Now().Add(r.offchainConfig.RootSnoozeTime.Duration())
 	}
 	return []ObservedMessage{}, nil
 }
@@ -407,43 +404,29 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context,
 // profitability of execution.
 func (r *ExecutionReportingPlugin) buildBatch(
 	lggr logger.Logger,
-	srcLogs []logpoller.Log,
-	executedSeq map[uint64]bool,
+	report commitReportWithSendRequests,
 	inflight []InflightInternalExecutionReport,
 	aggregateTokenLimit *big.Int,
 	srcTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
 	execGasPriceEstimate LazyFunction[*big.Int],
 	srcToDestToken map[common.Address]common.Address,
-) (executableMessages []ObservedMessage, executedAllMessages bool) {
+) (executableMessages []ObservedMessage) {
 	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := inflightAggregates(inflight, destTokenPricesUSD, srcToDestToken)
 	if err != nil {
 		lggr.Errorw("Unexpected error computing inflight values", "err", err)
-		return []ObservedMessage{}, false
+		return []ObservedMessage{}
 	}
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
-	executedAllMessages = true
 	expectedNonces := make(map[common.Address]uint64)
-	for _, srcLog := range srcLogs {
-		msg, err2 := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
-			// Note this needs to change if we start indexing things.
-			Topics: srcLog.GetTopics(),
-			Data:   srcLog.Data,
-		})
-		if err2 != nil {
-			lggr.Errorw("unable to parse message", "err", err2, "msg", msg)
-			// Unable to parse so don't mark as executed
-			executedAllMessages = false
-			continue
-		}
+	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.Message.MessageId[:]))
-		if finalized, executed := executedSeq[msg.Message.SequenceNumber]; executed && finalized {
+		if msg.executed && msg.finalized {
 			msgLggr.Infow("Skipping message already executed", "seqNr", msg.Message.SequenceNumber)
 			continue
 		}
-		executedAllMessages = false
-		if _, inflight := inflightSeqNrs[msg.Message.SequenceNumber]; inflight {
+		if _, isInflight := inflightSeqNrs[msg.Message.SequenceNumber]; isInflight {
 			msgLggr.Infow("Skipping message already inflight", "seqNr", msg.Message.SequenceNumber)
 			continue
 		}
@@ -482,7 +465,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		execGasPriceEstimateValue, err := execGasPriceEstimate()
 		if err != nil {
 			msgLggr.Errorw("Unexpected error fetching gas price estimate", "err", err)
-			return []ObservedMessage{}, false
+			return []ObservedMessage{}
 		}
 		execCostUsd := computeExecCost(msg.Message.GasLimit, execGasPriceEstimateValue, destTokenPricesUSD[r.destWrappedNative])
 		// calculating the source chain fee, dividing by 1e18 for denomination.
@@ -491,14 +474,14 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		// availableFee is 1e17*6e18/1e18 = 6e17 = 0.6 USD
 		availableFee := big.NewInt(0).Mul(msg.Message.FeeTokenAmount, srcTokenPricesUSD[msg.Message.FeeToken])
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
-		availableFeeUsd := waitBoostedFee(time.Since(srcLog.BlockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
+		availableFeeUsd := waitBoostedFee(time.Since(msg.blockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
 		if availableFeeUsd.Cmp(execCostUsd) < 0 {
 			msgLggr.Infow("Insufficient remaining fee", "availableFeeUsd", availableFeeUsd, "execCostUsd", execCostUsd,
-				"srcBlockTimestamp", srcLog.BlockTimestamp, "waitTime", time.Since(srcLog.BlockTimestamp), "boost", r.offchainConfig.RelativeBoostPerWaitHour)
+				"srcBlockTimestamp", msg.blockTimestamp, "waitTime", time.Since(msg.blockTimestamp), "boost", r.offchainConfig.RelativeBoostPerWaitHour)
 			continue
 		}
 
-		messageMaxGas := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(srcLogs), len(msg.Message.Data), len(msg.Message.TokenAmounts))
+		messageMaxGas := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(report.sendRequestsWithMeta), len(msg.Message.Data), len(msg.Message.TokenAmounts))
 		// Check sufficient gas in batch
 		if availableGas < messageMaxGas {
 			msgLggr.Infow("Insufficient remaining gas in batch limit", "availableGas", availableGas, "messageMaxGas", messageMaxGas)
@@ -521,7 +504,140 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		})
 		expectedNonces[msg.Message.Sender] = msg.Message.Nonce + 1
 	}
-	return executableMessages, executedAllMessages
+	return executableMessages
+}
+
+// helper struct to hold the commitReport and the related send requests
+type commitReportWithSendRequests struct {
+	commitReport         commit_store.CommitStoreCommitReport
+	sendRequestsWithMeta []evm2EVMOnRampCCIPSendRequestedWithMeta
+}
+
+func (r *commitReportWithSendRequests) validate() error {
+	// make sure that number of messages is the expected
+	if exp := int(r.commitReport.Interval.Max - r.commitReport.Interval.Min + 1); len(r.sendRequestsWithMeta) != exp {
+		return errors.Errorf(
+			"unexpected missing sendRequestsWithMeta in committed root %x have %d want %d", r.commitReport.MerkleRoot, len(r.sendRequestsWithMeta), exp)
+	}
+
+	return nil
+}
+
+func (r *commitReportWithSendRequests) allRequestsAreExecutedAndFinalized() bool {
+	for _, req := range r.sendRequestsWithMeta {
+		if !req.executed || !req.finalized {
+			return false
+		}
+	}
+	return true
+}
+
+// checks if the send request fits the commit report interval
+func (r *commitReportWithSendRequests) sendReqFits(sendReq evm2EVMOnRampCCIPSendRequestedWithMeta) bool {
+	return sendReq.Message.SequenceNumber >= r.commitReport.Interval.Min &&
+		sendReq.Message.SequenceNumber <= r.commitReport.Interval.Max
+}
+
+// getReportsWithSendRequests returns the target reports with populated send requests.
+func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
+	ctx context.Context,
+	reports []commit_store.CommitStoreCommitReport,
+) ([]commitReportWithSendRequests, error) {
+	if len(reports) == 0 {
+		return nil, nil
+	}
+
+	// find interval from all the reports
+	intervalMin := reports[0].Interval.Min
+	intervalMax := reports[0].Interval.Max
+	for _, report := range reports[1:] {
+		if report.Interval.Max > intervalMax {
+			intervalMax = report.Interval.Max
+		}
+		if report.Interval.Min < intervalMin {
+			intervalMin = report.Interval.Min
+		}
+	}
+
+	// use errgroup to fetch send request logs and executed sequence numbers in parallel
+	eg := &errgroup.Group{}
+
+	var sendRequestLogs []logpoller.Log
+	eg.Go(func() error {
+		// get logs from all the reports
+		rawLogs, err := r.config.sourceLP.LogsDataWordRange(
+			abihelpers.EventSignatures.SendRequested,
+			r.config.onRamp.Address(),
+			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
+			logpoller.EvmWord(intervalMin),
+			logpoller.EvmWord(intervalMax),
+			int(r.offchainConfig.SourceFinalityDepth),
+			pg.WithParentCtx(ctx),
+		)
+		if err != nil {
+			return err
+		}
+		sendRequestLogs = rawLogs
+		return nil
+	})
+
+	var executedSeqNums map[uint64]bool
+	eg.Go(func() error {
+		latestBlock, err := r.config.destLP.LatestBlock()
+		if err != nil {
+			return err
+		}
+		// get executable sequence numbers
+		executedMp, err := r.getExecutedSeqNrsInRange(ctx, intervalMin, intervalMax, latestBlock)
+		if err != nil {
+			return err
+		}
+		executedSeqNums = executedMp
+		return nil
+	})
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
+	reportsWithSendReqs := make([]commitReportWithSendRequests, len(reports))
+	for i, report := range reports {
+		reportsWithSendReqs[i] = commitReportWithSendRequests{
+			commitReport:         report,
+			sendRequestsWithMeta: make([]evm2EVMOnRampCCIPSendRequestedWithMeta, 0, len(sendRequestLogs)),
+		}
+	}
+
+	for _, rawLog := range sendRequestLogs {
+		msg, err := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
+			Topics: rawLog.GetTopics(),
+			Data:   rawLog.Data,
+		})
+		if err != nil {
+			r.lggr.Errorw("unable to parse message", "err", err, "tx", rawLog.TxHash, "logIdx", rawLog.LogIndex)
+			continue
+		}
+
+		// if value exists in the map then it's executed
+		// if value exists, and it's true then it's considered finalized
+		finalized, executed := executedSeqNums[msg.Message.SequenceNumber]
+
+		sendReq := evm2EVMOnRampCCIPSendRequestedWithMeta{
+			EVM2EVMOnRampCCIPSendRequested: *msg,
+			blockTimestamp:                 rawLog.BlockTimestamp,
+			executed:                       executed,
+			finalized:                      finalized,
+		}
+
+		// attach the msg to the appropriate reports
+		for i := range reportsWithSendReqs {
+			if reportsWithSendReqs[i].sendReqFits(sendReq) {
+				reportsWithSendReqs[i].sendRequestsWithMeta = append(reportsWithSendReqs[i].sendRequestsWithMeta, sendReq)
+			}
+		}
+	}
+
+	return reportsWithSendReqs, nil
 }
 
 func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokensAndAmount []evm_2_evm_onramp.ClientEVMTokenAmount) (*big.Int, error) {
