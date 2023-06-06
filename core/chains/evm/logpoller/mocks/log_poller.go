@@ -150,54 +150,32 @@ func (_m *LogPoller) IndexedLogsByBlockRange(start int64, end int64, eventSig co
 	return r0, r1
 }
 
-<<<<<<< HEAD
-// IndexedLogsCreatedAfter provides a mock function with given fields: eventSig, address, topicIndex, topicValues, after, qopts
-func (_m *LogPoller) IndexedLogsCreatedAfter(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, after time.Time, qopts ...pg.QOpt) ([]logpoller.Log, error) {
-=======
 // IndexedLogsCreatedAfter provides a mock function with given fields: eventSig, address, topicIndex, topicValues, after, confs, qopts
 func (_m *LogPoller) IndexedLogsCreatedAfter(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, after time.Time, confs int, qopts ...pg.QOpt) ([]logpoller.Log, error) {
->>>>>>> chainlink/develop
 	_va := make([]interface{}, len(qopts))
 	for _i := range qopts {
 		_va[_i] = qopts[_i]
 	}
 	var _ca []interface{}
-<<<<<<< HEAD
-	_ca = append(_ca, eventSig, address, topicIndex, topicValues, after)
-=======
 	_ca = append(_ca, eventSig, address, topicIndex, topicValues, after, confs)
->>>>>>> chainlink/develop
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	var r0 []logpoller.Log
 	var r1 error
-<<<<<<< HEAD
-	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, int, []common.Hash, time.Time, ...pg.QOpt) ([]logpoller.Log, error)); ok {
-		return rf(eventSig, address, topicIndex, topicValues, after, qopts...)
-	}
-	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, int, []common.Hash, time.Time, ...pg.QOpt) []logpoller.Log); ok {
-		r0 = rf(eventSig, address, topicIndex, topicValues, after, qopts...)
-=======
 	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, int, []common.Hash, time.Time, int, ...pg.QOpt) ([]logpoller.Log, error)); ok {
 		return rf(eventSig, address, topicIndex, topicValues, after, confs, qopts...)
 	}
 	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, int, []common.Hash, time.Time, int, ...pg.QOpt) []logpoller.Log); ok {
 		r0 = rf(eventSig, address, topicIndex, topicValues, after, confs, qopts...)
->>>>>>> chainlink/develop
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]logpoller.Log)
 		}
 	}
 
-<<<<<<< HEAD
-	if rf, ok := ret.Get(1).(func(common.Hash, common.Address, int, []common.Hash, time.Time, ...pg.QOpt) error); ok {
-		r1 = rf(eventSig, address, topicIndex, topicValues, after, qopts...)
-=======
 	if rf, ok := ret.Get(1).(func(common.Hash, common.Address, int, []common.Hash, time.Time, int, ...pg.QOpt) error); ok {
 		r1 = rf(eventSig, address, topicIndex, topicValues, after, confs, qopts...)
->>>>>>> chainlink/develop
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -433,54 +411,32 @@ func (_m *LogPoller) Logs(start int64, end int64, eventSig common.Hash, address 
 	return r0, r1
 }
 
-<<<<<<< HEAD
-// LogsCreatedAfter provides a mock function with given fields: eventSig, address, _a2, qopts
-func (_m *LogPoller) LogsCreatedAfter(eventSig common.Hash, address common.Address, _a2 time.Time, qopts ...pg.QOpt) ([]logpoller.Log, error) {
-=======
 // LogsCreatedAfter provides a mock function with given fields: eventSig, address, _a2, confs, qopts
 func (_m *LogPoller) LogsCreatedAfter(eventSig common.Hash, address common.Address, _a2 time.Time, confs int, qopts ...pg.QOpt) ([]logpoller.Log, error) {
->>>>>>> chainlink/develop
 	_va := make([]interface{}, len(qopts))
 	for _i := range qopts {
 		_va[_i] = qopts[_i]
 	}
 	var _ca []interface{}
-<<<<<<< HEAD
-	_ca = append(_ca, eventSig, address, _a2)
-=======
 	_ca = append(_ca, eventSig, address, _a2, confs)
->>>>>>> chainlink/develop
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	var r0 []logpoller.Log
 	var r1 error
-<<<<<<< HEAD
-	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, time.Time, ...pg.QOpt) ([]logpoller.Log, error)); ok {
-		return rf(eventSig, address, _a2, qopts...)
-	}
-	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, time.Time, ...pg.QOpt) []logpoller.Log); ok {
-		r0 = rf(eventSig, address, _a2, qopts...)
-=======
 	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, time.Time, int, ...pg.QOpt) ([]logpoller.Log, error)); ok {
 		return rf(eventSig, address, _a2, confs, qopts...)
 	}
 	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, time.Time, int, ...pg.QOpt) []logpoller.Log); ok {
 		r0 = rf(eventSig, address, _a2, confs, qopts...)
->>>>>>> chainlink/develop
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]logpoller.Log)
 		}
 	}
 
-<<<<<<< HEAD
-	if rf, ok := ret.Get(1).(func(common.Hash, common.Address, time.Time, ...pg.QOpt) error); ok {
-		r1 = rf(eventSig, address, _a2, qopts...)
-=======
 	if rf, ok := ret.Get(1).(func(common.Hash, common.Address, time.Time, int, ...pg.QOpt) error); ok {
 		r1 = rf(eventSig, address, _a2, confs, qopts...)
->>>>>>> chainlink/develop
 	} else {
 		r1 = ret.Error(1)
 	}

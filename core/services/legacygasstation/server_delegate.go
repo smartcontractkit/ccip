@@ -114,7 +114,7 @@ func (s *gasStationService) Start(context.Context) error {
 		return err
 	}
 
-	orm := NewORM(s.db, l, chain.Config())
+	orm := NewORM(s.db, l, chain.Config().Database())
 
 	reqHandler, err := NewRequestHandler(
 		l,

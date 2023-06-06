@@ -19,10 +19,6 @@ type disabled struct{}
 
 func (disabled) Name() string { return "disabledLogPoller" }
 
-func (d disabled) LogsCreatedAfter(eventSig common.Hash, address common.Address, time time.Time, qopts ...pg.QOpt) ([]Log, error) {
-	return nil, ErrDisabled
-}
-
 func (disabled) Start(ctx context.Context) error { return ErrDisabled }
 
 func (disabled) Close() error { return ErrDisabled }
@@ -64,10 +60,6 @@ func (disabled) LatestLogEventSigsAddrsWithConfs(fromBlock int64, eventSigs []co
 }
 
 func (disabled) IndexedLogs(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error) {
-	return nil, ErrDisabled
-}
-
-func (disabled) IndexedLogsCreatedAfter(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error) {
 	return nil, ErrDisabled
 }
 

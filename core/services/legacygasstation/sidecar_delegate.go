@@ -75,7 +75,7 @@ func (d *SidecarDelegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) 
 			chain.Config().EvmFinalityDepth(), jb.LegacyGasStationSidecarSpec.LookbackBlocks)
 	}
 
-	orm := NewORM(d.db, d.logger, chain.Config())
+	orm := NewORM(d.db, d.logger, chain.Config().Database())
 
 	var (
 		mtlsCertificate string

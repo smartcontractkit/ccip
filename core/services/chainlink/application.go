@@ -359,7 +359,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 				chains.EVM,
 				keyStore.Eth(),
 				db,
-				cfg,
+				cfg.Database(),
 				pipelineRunner,
 			),
 			job.LegacyGasStationSidecar: legacygasstation.NewSidecarDelegate(
