@@ -128,13 +128,13 @@ func (client *CCIPClient) setAllowList(t *testing.T) {
 	currentAllowList, err := client.Source.OnRamp.GetAllowList(&bind.CallOpts{})
 	shared.RequireNoError(t, err)
 
-	toRemove := []common.Address{}
+	var toRemove []common.Address
 	for _, addr := range currentAllowList {
 		if !slices.Contains(client.Source.AllowList, addr) {
 			toRemove = append(toRemove, addr)
 		}
 	}
-	toAdd := []common.Address{}
+	var toAdd []common.Address
 	for _, addr := range client.Source.AllowList {
 		if !slices.Contains(currentAllowList, addr) {
 			toAdd = append(toAdd, addr)
@@ -769,7 +769,9 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 		client.Dest.logger.Infof("OffRamp OCR config already found: %+v", rampOCRConfig.ConfigDigest)
 		client.Dest.logger.Infof("The new config will overwrite the current one.")
 	}
-
+	if client.Dest.Client.ChainId == 1337 || client.Source.Client.ChainId == 1337 {
+		env = dione.Prod_Swift
+	}
 	don := dione.NewOfflineDON(env, client.Dest.logger)
 	faults := len(don.Config.Nodes) / 3
 
@@ -858,20 +860,20 @@ func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, pluginOffchainCon
 		transmissionSchedule = append(transmissionSchedule, 1)
 	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocrconfighelper.ContractSetConfigArgsForTests(
-		70*time.Second, // deltaProgress
-		5*time.Second,  // deltaResend
-		30*time.Second, // deltaRound
-		2*time.Second,  // deltaGrace
-		40*time.Second, // deltaStage
+		2*time.Minute, // deltaProgress
+		5*time.Second, // deltaResend
+		1*time.Minute, // deltaRound
+		5*time.Second, // deltaGrace
+		client.Dest.TunableValues.InflightCacheExpiry.Duration(), // deltaStage
 		3,
 		transmissionSchedule,
 		identities,
 		pluginOffchainConfig,
-		5*time.Second,
-		32*time.Second,
-		20*time.Second,
-		10*time.Second,
-		10*time.Second,
+		100*time.Millisecond, // query not used
+		35*time.Second,       // observation TODO: shorten once db issues resolved
+		10*time.Second,       // report TODO: shorten once db issues resolved
+		5*time.Second,        // shouldAccept
+		10*time.Second,       // shouldTransmit TODO: shorten once db issues resolved
 		faults,
 		onchainConfig,
 	)
@@ -929,7 +931,10 @@ func (client *CCIPClient) syncPoolsOnOnRamp() {
 
 	for _, token := range rhea.GetAllTokens() {
 		if sourceConfig, ok := client.Source.SupportedTokens[token]; ok {
-			if _, ok := client.Dest.SupportedTokens[token]; ok {
+			if destConfig, ok := client.Dest.SupportedTokens[token]; ok {
+				if sourceConfig.TokenPoolType == rhea.FeeTokenOnly || destConfig.TokenPoolType == rhea.FeeTokenOnly {
+					continue
+				}
 				wantedSourceTokens = append(wantedSourceTokens, sourceConfig.Token)
 				wantedSourceTokenConfig = append(wantedSourceTokenConfig, sourceConfig)
 				client.Source.logger.Infof("Wanted token: %s", token)
@@ -964,8 +969,7 @@ func (client *CCIPClient) syncPoolsOnOnRamp() {
 		// Pools to add should be the SECOND argument and poolsToRemove the first
 		// Since our deployments are still based on a swapped order, until we deploy new onRamps
 		// this order needs to be maintained to be compatible with the deployed code.
-		// TODO swap after new deployments
-		tx, err := client.Source.OnRamp.ApplyPoolUpdates(client.Source.Owner, poolsToAdd, poolsToRemove)
+		tx, err := client.Source.OnRamp.ApplyPoolUpdates(client.Source.Owner, poolsToRemove, poolsToAdd)
 		require.NoError(client.Source.t, err)
 		err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 		require.NoError(client.Source.t, err)
@@ -984,6 +988,9 @@ func (client *CCIPClient) syncPoolsOffOnRamp() {
 	for _, token := range rhea.GetAllTokens() {
 		if sourceConfig, ok := client.Source.SupportedTokens[token]; ok {
 			if destConfig, ok := client.Dest.SupportedTokens[token]; ok {
+				if sourceConfig.TokenPoolType == rhea.FeeTokenOnly || destConfig.TokenPoolType == rhea.FeeTokenOnly {
+					continue
+				}
 				wantedSourceTokens = append(wantedSourceTokens, sourceConfig.Token)
 				wantedDestTokenConfig = append(wantedDestTokenConfig, destConfig)
 				client.Dest.logger.Infof("Wanted token: %s", token)
@@ -1076,7 +1083,8 @@ func syncPrices(client *Client, otherChainTokens map[rhea.Token]EVMBridgedToken)
 func (client *CCIPClient) syncOnRampOnPools() error {
 	for tokenName, tokenConfig := range client.Source.SupportedTokens {
 		// Only add tokens that are supported on both chains
-		if _, ok := client.Dest.SupportedTokens[tokenName]; !ok {
+		// and not marked as feeTokenOnly
+		if destConfig, ok := client.Dest.SupportedTokens[tokenName]; !ok || destConfig.TokenPoolType == rhea.FeeTokenOnly || tokenConfig.TokenPoolType == rhea.FeeTokenOnly {
 			continue
 		}
 
@@ -1110,7 +1118,7 @@ func (client *CCIPClient) syncOnRampOnPools() error {
 func (client *CCIPClient) syncOffRampOnPools() error {
 	for tokenName, tokenConfig := range client.Dest.SupportedTokens {
 		// Only add tokens that are supported on both chains
-		if _, ok := client.Source.SupportedTokens[tokenName]; !ok {
+		if destConfig, ok := client.Source.SupportedTokens[tokenName]; !ok || destConfig.TokenPoolType == rhea.FeeTokenOnly || tokenConfig.TokenPoolType == rhea.FeeTokenOnly {
 			continue
 		}
 		isOffRamp, err := tokenConfig.Pool.IsOffRamp(&bind.CallOpts{}, client.Dest.OffRamp.Address())
