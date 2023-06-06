@@ -41,8 +41,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Restricted scope of the Evm.GasEstimator.LimitJobType.OCR, OCR.DefaultTransactionQueueDepth, and OCR.SimulateTransactions settings so they
   apply only to OCR. Previously these settings would apply to OCR2 as well as OCR. You must use the OCR2 equivalents added above if you
   want your settings to apply to OCR2.
+- Updated Docker image's PostgreSQL client (used for backups) to v15 in order to support PostgreSQL v15 servers.
 
 <!-- unreleasedstop -->
+
+## 1.13.3 - 2023-06-06
+
+### Fixed
+
+- The 1.13.2 release showed the 1.13.1 version in its VERSION file. This updates the VERSION file to now show 1.13.3.
+
+## 1.13.2 - 2023-06-05
+
+### Fixed
+
+- Made logging level improvements for the Solana Transaction Manager to reduce excessive noise
+- Fixed race condition in Solana TXM for sanity check and preventing misfired errors
 
 ## 2.1.1 - 2023-05-22
 

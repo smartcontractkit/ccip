@@ -16,10 +16,12 @@ import (
 // Config contains OCR2 configurations for a job.
 type Config interface {
 	config.OCR2Config
+
 	pg.QConfig
 	JobPipelineMaxSuccessfulRuns() uint64
 	JobPipelineResultWriteQueueDepth() uint64
 	LogSQL() bool
+
 	OCRDevelopmentMode() bool
 	MercuryCredentials(credName string) *models.MercuryCredentials
 	ThresholdKeyShare() string
