@@ -71,7 +71,7 @@ func TestIntegration_LegacyGasStation_SameChainTransfer(t *testing.T) {
 	config, db := setUpDB(t)
 	app := cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, config, backend, relayKey)
 	require.NoError(t, app.Start(testutils.Context(t)))
-	orm := legacygasstation.NewORM(db, app.Logger, app.Config)
+	orm := legacygasstation.NewORM(db, app.Logger, app.Config.Database())
 
 	createLegacyGasStationServerJob(t, app, forwarderAddress, testutils.SimulatedChainID.Uint64(), ccipChainSelector, relayKey)
 	statusUpdateServer := legacygasstation.NewUnstartedStatusUpdateServer(t)
@@ -156,7 +156,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_SourceChain(t *testing.
 	req := generateRequest(t, sourceBackend, forwarder, bankERC20Address, senderKey, receiver.From, amount, sourceChainID, destChainID)
 	requestID := sendTransaction(t, req, app.Server.URL)
 
-	orm := legacygasstation.NewORM(db, app.GetLogger(), app.GetConfig())
+	orm := legacygasstation.NewORM(db, app.GetLogger(), app.GetConfig().Database())
 	// verify that sender balance has been decremented
 	// the tokens are transferred to token pool
 	gomega.NewWithT(t).Eventually(func() bool {
@@ -262,7 +262,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 		ValidUntilTime: deadline,
 	}
 
-	orm := legacygasstation.NewORM(db, app.GetLogger(), app.GetConfig())
+	orm := legacygasstation.NewORM(db, app.GetLogger(), app.GetConfig().Database())
 
 	// send meta transaction to forwarder
 	_, err = forwarder.Execute(relay, forwardRequest, domainSeparatorHash, typeHash, []byte{}, signature)

@@ -53,7 +53,7 @@ func TestDataSource(t *testing.T) {
 `, linkEth.URL, usdcEth.URL, linkTokenAddress, usdcTokenAddress)
 	lggr, _ := logger.NewLogger()
 	cfg := pipelinemocks.NewConfig(t)
-	cfg.On("JobPipelineMaxRunDuration").Return(time.Second)
+	cfg.On("MaxRunDuration").Return(time.Second)
 	cfg.On("DefaultHTTPTimeout").Return(models.MakeDuration(time.Second))
 	cfg.On("DefaultHTTPLimit").Return(int64(1024 * 10))
 	db := pgtest.NewSqlxDB(t)
