@@ -894,6 +894,7 @@ func getUnexpiredCommitReports(
 		abihelpers.EventSignatures.ReportAccepted,
 		commitStore.Address(),
 		time.Now().Add(-permissionExecutionThreshold),
+		0,
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {

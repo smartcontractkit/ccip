@@ -220,7 +220,7 @@ func setupNodeCCIP(
 
 	lggr := logger.TestLogger(t)
 
-	eventBroadcaster := pg.NewEventBroadcaster(config.DatabaseURL(), 0, 0, lggr, uuid.New())
+	eventBroadcaster := pg.NewEventBroadcaster(config.Database().URL(), 0, 0, lggr, uuid.New())
 
 	// The in-memory geth sim does not let you create a custom ChainID, it will always be 1337.
 	// In particular this means that if you sign an eip155 tx, the chainID used MUST be 1337
@@ -228,11 +228,11 @@ func setupNodeCCIP(
 	// test, we fake different chainIDs using the wrapped sim cltest.SimulatedBackend so the RPC
 	// appears to operate on different chainIDs and we use an EthKeyStoreSim wrapper which always
 	// signs 1337 see https://github.com/smartcontractkit/chainlink-ccip/blob/a24dd436810250a458d27d8bb3fb78096afeb79c/core/services/ocr2/plugins/ccip/testhelpers/simulated_backend.go#L35
-	err := evm.EnsureChains(db, lggr, config, []utils.Big{*utils.NewBig(sourceChainID), *utils.NewBig(destChainID)})
+	err := evm.EnsureChains(db, lggr, config.Database(), []utils.Big{*utils.NewBig(sourceChainID), *utils.NewBig(destChainID)})
 	require.NoError(t, err)
 	sourceClient := client.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := client.NewSimulatedBackendClient(t, destChain, destChainID)
-	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config)
+	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config.Database())
 	simEthKeyStore := testhelpers.EthKeyStoreSim{Eth: keyStore.Eth()}
 	mailMon := utils.NewMailboxMonitor("CCIP")
 

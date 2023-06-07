@@ -19,10 +19,6 @@ type disabled struct{}
 
 func (disabled) Name() string { return "disabledLogPoller" }
 
-func (d disabled) LogsCreatedAfter(eventSig common.Hash, address common.Address, time time.Time, qopts ...pg.QOpt) ([]Log, error) {
-	return nil, ErrDisabled
-}
-
 func (disabled) Start(ctx context.Context) error { return ErrDisabled }
 
 func (disabled) Close() error { return ErrDisabled }
@@ -67,10 +63,6 @@ func (disabled) IndexedLogs(eventSig common.Hash, address common.Address, topicI
 	return nil, ErrDisabled
 }
 
-func (disabled) IndexedLogsCreatedAfter(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error) {
-	return nil, ErrDisabled
-}
-
 func (disabled) IndexedLogsByBlockRange(start, end int64, eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, qopts ...pg.QOpt) ([]Log, error) {
 	return nil, ErrDisabled
 }
@@ -92,5 +84,14 @@ func (disabled) LogsDataWordGreaterThan(eventSig common.Hash, address common.Add
 }
 
 func (d disabled) IndexedLogsWithSigsExcluding(address common.Address, eventSigA, eventSigB common.Hash, topicIndex int, fromBlock, toBlock int64, confs int, qopts ...pg.QOpt) ([]Log, error) {
+	return nil, ErrDisabled
+}
+
+func (d disabled) LogsCreatedAfter(eventSig common.Hash, address common.Address, time time.Time, confs int, qopts ...pg.QOpt) ([]Log, error) {
+	return nil, ErrDisabled
+
+}
+
+func (d disabled) IndexedLogsCreatedAfter(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, after time.Time, confs int, qopts ...pg.QOpt) ([]Log, error) {
 	return nil, ErrDisabled
 }

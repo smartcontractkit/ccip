@@ -392,7 +392,7 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 	forwarder := forwarder_mocks.NewForwarderInterface(t)
 	offramp := mock_contracts.NewEVM2EVMOffRampInterface(t)
 	lggr := logger.TestLogger(t)
-	orm := legacygasstation.NewORM(db, lggr, cfg)
+	orm := legacygasstation.NewORM(db, lggr, cfg.Database())
 	chain, err := app.Chains.EVM.Get(testutils.SimulatedChainID)
 	require.NoError(t, err)
 	lp := mocks.NewLogPoller(t)

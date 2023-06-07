@@ -454,7 +454,7 @@ func generateTokenToDecimalMapping(ctx context.Context, config CommitPluginConfi
 
 // Gets the latest token price updates based on logs within the heartbeat
 func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, skipInflight bool) (map[common.Address]update, error) {
-	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(abihelpers.EventSignatures.UsdPerTokenUpdated, r.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), pg.WithParentCtx(ctx))
+	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(abihelpers.EventSignatures.UsdPerTokenUpdated, r.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), 0, pg.WithParentCtx(ctx))
 	latestUpdates := make(map[common.Address]update)
 
 	if err != nil {
@@ -494,6 +494,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 		1,
 		[]common.Hash{abihelpers.EvmWord(r.config.sourceChainSelector)},
 		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
+		0,
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
