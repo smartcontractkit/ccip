@@ -8,11 +8,10 @@ import (
 	"testing"
 	"time"
 
+	geth "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
-	goeath "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/rs/zerolog/log"
 	"github.com/slack-go/slack"
@@ -339,7 +338,7 @@ func (k *KeeperBenchmarkTest) subscribeToUpkeepPerformedEvent(
 	}
 
 	require.NoError(t, err, "Getting contract abi for registry shouldn't fail")
-	query := goeath.FilterQuery{
+	query := geth.FilterQuery{
 		Addresses: []common.Address{common.HexToAddress(k.keeperRegistries[rIndex].Address())},
 	}
 	eventLogs := make(chan types.Log)
