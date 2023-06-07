@@ -288,6 +288,7 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
       cursesHash
     );
     curserRecord.voteCount = 0;
+    curserRecord.cursesHash = 0;
     s_curserRecords[curseVoteAddr] = curserRecord;
     s_curseVoteProgress.accumulatedWeight -= curserRecord.weight;
   }
