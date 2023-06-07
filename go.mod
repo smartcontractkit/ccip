@@ -435,6 +435,6 @@ replace (
 	github.com/hashicorp/go-plugin => github.com/jmank88/go-plugin v0.0.0-20230604120638-7bb12ec27e75
 
 	// K8s imports are weird
-	k8s.io/api => k8s.io/api v0.26.2
-	k8s.io/client-go => k8s.io/client-go v0.26.2
+	k8s.io/api => k8s.io/api v0.25.4
+	k8s.io/client-go => k8s.io/client-go v0.25.4
 )
