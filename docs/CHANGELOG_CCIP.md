@@ -10,10 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ...
 
+## 0.6.0 - Unreleased
 
-## 0.5.0 - Unreleased
+### Added
 
-## Changed
+### Changed
+
+### Removed
+
+## 0.5.0 - 2023-06-07
+
+### Added
+
+- Commitstore: added isUnpausedAndARMHealthy as a single health check RPC call
+
+### Changed
 
 - TokenPools have changed to require an `allowList` parameter in constructor
   - If `allowList` is non-empty
@@ -24,10 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - pool is constructed with allowList disabled
     - allowList cannot be enabled later on
 - Added source chain selector and offramp address to `MessageExecuted` event emitted by Router
+- AFN renamed to ARM
+- Fixed onRamp allowList constructor args
+- Disallow the linktoken to be a NOP
+- Rework of the BurnMintERC677
 
 ## 0.4.0 - 2023-05-24
 
-## Added
+### Added
 
 - BurnMintERC677 is the new default token that should be deployed whenever there is a need for a burn/mint token
   - Supports ERC677
@@ -36,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - OZ ERC20
   - Compatible with IBurnMintERC20 (CCIP interface)
 
-## Changed
+### Changed
 
 - IBurnMintERC20 interface has changed to follow OZ Burnable tokens
   - New interface
@@ -57,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - DestIncomingConfirmations -> DestFinalityDepth
     - NEW DestOptimisticConfirmations (required, cannot be 0. Can be DestFinalityDepth)
 
-## Removed
+### Removed
 
 - wrapped token pools
   - Pools should be deployed as burn/mint together with a newly introduced token: BurnMintERC677.
