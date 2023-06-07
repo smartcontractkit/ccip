@@ -11,6 +11,7 @@ import (
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/legacy_burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_afn_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
@@ -105,6 +106,8 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 			poolAddress, err = deployLockReleaseTokenPool(client, tokenName, tokenConfig.Token, tokenConfig.PoolAllowList)
 		case BurnMint:
 			poolAddress, err = deployBurnMintTokenPool(client, tokenName, tokenConfig.Token, tokenConfig.PoolAllowList)
+		case Legacy:
+			poolAddress, err = deployLegacyBurnMintTokenPool(client, tokenName, tokenConfig.Token, tokenConfig.PoolAllowList)
 		case Wrapped:
 			tokenAddress, poolAddress, err = deployWrappedTokenPool(client, tokenName, tokenConfig.PoolAllowList)
 			// Since we also deployed the token we need to set it
@@ -158,6 +161,28 @@ func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, to
 	}
 	err = fillPoolWithTokens(client, pool, tokenAddress, tokenName)
 	return tokenPoolAddress, err
+}
+
+func deployLegacyBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address, poolAllowList []common.Address) (common.Address, error) {
+	client.Logger.Infof("Deploying token pool for %s token", tokenName)
+	tokenPoolAddress, tx, _, err := legacy_burn_mint_token_pool.DeployLegacyBurnMintTokenPool(
+		client.Owner,
+		client.Client,
+		tokenAddress,
+		poolAllowList,
+		legacy_burn_mint_token_pool.RateLimiterConfig{
+			IsEnabled: false,
+			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+		})
+	if err != nil {
+		return common.Address{}, err
+	}
+	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
+		return common.Address{}, err
+	}
+	client.Logger.Infof("Legacy burn/mint pool for %s deployed on %s in tx %s", tokenName, tokenPoolAddress, helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
+	return tokenPoolAddress, nil
 }
 
 func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address, poolAllowList []common.Address) (common.Address, error) {

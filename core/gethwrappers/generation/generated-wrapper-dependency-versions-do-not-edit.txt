@@ -40,6 +40,7 @@ keeper_registry_wrapper1_3: ../../contracts/solc/v0.8.6/KeeperRegistry1_3.abi ..
 keeper_registry_wrapper2_0: ../../contracts/solc/v0.8.6/KeeperRegistry2_0.abi ../../contracts/solc/v0.8.6/KeeperRegistry2_0.bin c32dea7d5ef66b7c58ddc84ddf69aa44df1b3ae8601fbc271c95be4ff5853056
 keeper_registry_wrapper_2_1: ../../contracts/solc/v0.8.6/KeeperRegistry2_1.abi ../../contracts/solc/v0.8.6/KeeperRegistry2_1.bin 9c7b672ab1ff3d3b84d72511e545f8a0e40f4e680cbc013a536cbd5c94ef5a26
 keepers_vrf_consumer: ../../contracts/solc/v0.8.6/KeepersVRFConsumer.abi ../../contracts/solc/v0.8.6/KeepersVRFConsumer.bin fa75572e689c9e84705c63e8dbe1b7b8aa1a8fe82d66356c4873d024bb9166e8
+legacy_burn_mint_token_pool: ../../contracts/solc/v0.8.19/LegacyBurnMintTokenPool.abi ../../contracts/solc/v0.8.19/LegacyBurnMintTokenPool.bin 011f250e8008a159f79b05c032b1416a153e3eccc71cd1f240fdc6397ba32de6
 llo_feeds: ../../contracts/solc/v0.8.16/VerifierProxy.abi ../../contracts/solc/v0.8.16/VerifierProxy.bin 3b69ffe9c694e8551b5375c02b9e960adc985e2390566740e7fea70c89e436f1
 llo_feeds_test: ../../contracts/solc/v0.8.16/ExposedVerifier.abi ../../contracts/solc/v0.8.16/ExposedVerifier.bin 6932cea8f2738e874d3ec9e1a4231d2421704030c071d9e15dd2f7f08482c246
 lock_release_token_pool: ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin 507c8a0419e809c7674c68dd4b32b2fc5fad83ea8e6e5ff174283b3f26e03745

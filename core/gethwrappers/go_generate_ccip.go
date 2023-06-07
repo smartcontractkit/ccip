@@ -5,6 +5,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CommitStore.abi ../../contracts/solc/v0.8.19/CommitStore.bin CommitStore commit_store
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CommitStoreHelper.abi ../../contracts/solc/v0.8.19/CommitStoreHelper.bin CommitStoreHelper commit_store_helper
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/BurnMintTokenPool.abi ../../contracts/solc/v0.8.19/BurnMintTokenPool.bin BurnMintTokenPool burn_mint_token_pool
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/LegacyBurnMintTokenPool.abi ../../contracts/solc/v0.8.19/LegacyBurnMintTokenPool.bin LegacyBurnMintTokenPool legacy_burn_mint_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin LockReleaseTokenPool lock_release_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../contracts/solc/v0.8.19/CustomTokenPool.bin CustomTokenPool custom_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/AFN.abi ../../contracts/solc/v0.8.19/AFN.bin AFNContract afn_contract

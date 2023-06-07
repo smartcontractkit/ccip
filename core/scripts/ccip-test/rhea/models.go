@@ -208,6 +208,7 @@ const (
 	BurnMint     TokenPoolType = "burnMint"
 	Wrapped      TokenPoolType = "wrapped"
 	FeeTokenOnly TokenPoolType = "feeTokenOnly"
+	Legacy       TokenPoolType = "legacy"
 )
 
 type EVMChainConfig struct {
