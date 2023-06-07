@@ -41,6 +41,9 @@ const (
 	// and restart from the chain's minSeqNum. Want to set it high to allow for large throughput,
 	// but low enough to minimize wasted revert cost.
 	MaxInflightSeqNumGap = 500
+
+	// Maximum number of leaves in a Merkle tree. This is a limitation of the contract.
+	maxNumberOfMerkleTreeLeaves = 256
 )
 
 var (
@@ -534,7 +537,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 		intervals = append(intervals, obs.Interval)
 	}
 
-	agreedInterval, err := calculateIntervalConsensus(intervals, r.F)
+	agreedInterval, err := calculateIntervalConsensus(intervals, r.F, maxNumberOfMerkleTreeLeaves)
 	if err != nil {
 		return false, nil, err
 	}
@@ -572,7 +575,8 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 // and f of those observations may be either unparseable or adversarially set values. That means
 // we'll either have f+1 parsed honest values here, 2f+1 parsed values with f adversarial values or somewhere
 // in between.
-func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f int) (commit_store.CommitStoreInterval, error) {
+// rangeLimit is the maximum range of the interval. If the interval is larger than this, it will be truncated. Zero means no limit.
+func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f int, rangeLimit uint64) (commit_store.CommitStoreInterval, error) {
 	// We require at least f+1 parsed values. This corresponds to the scenario where f of the 2f+1 are faulty
 	// in the sense that they are unparseable.
 	if len(intervals) <= f {
@@ -618,6 +622,11 @@ func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f 
 		// If the consensus report is invalid for onchain acceptance, we do not vote for it as
 		// an early termination step.
 		return commit_store.CommitStoreInterval{}, errors.New("max seq num smaller than min")
+	}
+
+	// If the range is too large, truncate it.
+	if rangeLimit > 0 && maxSeqNum-minSeqNum+1 > rangeLimit {
+		maxSeqNum = minSeqNum + rangeLimit - 1
 	}
 
 	return commit_store.CommitStoreInterval{
@@ -715,6 +724,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 			"maxSeqNr", interval.Max)
 		return commit_store.CommitStoreCommitReport{}, fmt.Errorf("tried building a tree without leaves")
 	}
+
 	tree, err := merklemulti.NewTree(hasher.NewKeccakCtx(), leaves)
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err

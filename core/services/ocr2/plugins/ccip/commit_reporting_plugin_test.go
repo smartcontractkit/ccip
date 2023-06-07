@@ -392,29 +392,36 @@ func TestCalculateIntervalConsensus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		intervals []commit_store.CommitStoreInterval
-		f         int
-		wantMin   uint64
-		wantMax   uint64
-		wantErr   bool
+		name       string
+		intervals  []commit_store.CommitStoreInterval
+		rangeLimit uint64
+		f          int
+		wantMin    uint64
+		wantMax    uint64
+		wantErr    bool
 	}{
-		{"no obs", []commit_store.CommitStoreInterval{{Min: 0, Max: 0}}, 0, 0, 0, false},
+		{"no obs", []commit_store.CommitStoreInterval{{Min: 0, Max: 0}}, 0, 0, 0, 0, false},
 		{"basic", []commit_store.CommitStoreInterval{
 			{Min: 9, Max: 14},
 			{Min: 10, Max: 12},
 			{Min: 10, Max: 14},
-		}, 1, 10, 14, false},
-		{"not enough intervals", []commit_store.CommitStoreInterval{}, 1, 0, 0, true},
+		}, 0, 1, 10, 14, false},
+		{"not enough intervals", []commit_store.CommitStoreInterval{}, 0, 1, 0, 0, true},
 		{"min > max", []commit_store.CommitStoreInterval{
 			{Min: 9, Max: 4},
 			{Min: 10, Max: 4},
 			{Min: 10, Max: 6},
-		}, 1, 0, 0, true},
+		}, 0, 1, 0, 0, true},
+		{
+			"range limit", []commit_store.CommitStoreInterval{
+				{Min: 10, Max: 100},
+				{Min: 1, Max: 1000},
+			}, 256, 1, 10, 265, false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := calculateIntervalConsensus(tt.intervals, tt.f)
+			got, err := calculateIntervalConsensus(tt.intervals, tt.f, tt.rangeLimit)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
