@@ -61,7 +61,7 @@ var Prod_Ethereum = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0x879FbE2c7943FdBDD4c14d71aED9FF65959ADDb9"),
-	ARM:           gethcommon.HexToAddress("0x582d8f851fDc129901020E3F73aFAA8cb00423Eb"),
+	Afn:           gethcommon.HexToAddress("0x582d8f851fDc129901020E3F73aFAA8cb00423Eb"),
 	PriceRegistry: gethcommon.HexToAddress("0xbE7C0Cf5C1464b33E24CE6244249D3AB76aCB0C3"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Ethereum),
@@ -99,7 +99,7 @@ var Prod_Optimism = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0xDDfdfe69fD50aD26D3C7377623C04676CDB87555"),
-	ARM:           gethcommon.HexToAddress("0x86034fb1Cc53dDF2CAD9622Ae829E9E2Fd47BDB8"),
+	Afn:           gethcommon.HexToAddress("0x86034fb1Cc53dDF2CAD9622Ae829E9E2Fd47BDB8"),
 	PriceRegistry: gethcommon.HexToAddress("0x2A2b7883bCBA00eB55702a939aE894709E89f589"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Optimism),
@@ -137,7 +137,7 @@ var Prod_Avax = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
 	WrappedNative: rhea.WAVAX,
 	Router:        gethcommon.HexToAddress("0xb05844B1a7acE6b522F9733Fc67821f9E2b83601"),
-	ARM:           gethcommon.HexToAddress("0x49911558C7D3496fA8bbf3Aa3D9A459236E09948"),
+	Afn:           gethcommon.HexToAddress("0x49911558C7D3496fA8bbf3Aa3D9A459236E09948"),
 	PriceRegistry: gethcommon.HexToAddress("0xd76Bc4A633A2a56aE1F042b07F42EB9bdCbd2377"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Avax),
@@ -176,7 +176,7 @@ var Prod_Arbitrum = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0x9d7F8743c24aCFb88Bf862E1276820BEd8C9792b"),
-	ARM:           gethcommon.HexToAddress("0x6Fe76e54A1AC4dd90acc44b09C43447F79d1b0bD"),
+	Afn:           gethcommon.HexToAddress("0x6Fe76e54A1AC4dd90acc44b09C43447F79d1b0bD"),
 	PriceRegistry: gethcommon.HexToAddress("0x8A93719a3BAed1D1537AEB247194199B5704f2d8"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Arbitrum),
@@ -215,7 +215,7 @@ var Prod_Polygon = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WMATIC},
 	WrappedNative: rhea.WMATIC,
 	Router:        gethcommon.HexToAddress("0x75C682287ff98881dbD2ACB00F9E788658afbB0d"),
-	ARM:           gethcommon.HexToAddress("0xC94EcD6A8b0190F2CaDb9097F68DE9372610701f"),
+	Afn:           gethcommon.HexToAddress("0xC94EcD6A8b0190F2CaDb9097F68DE9372610701f"),
 	PriceRegistry: gethcommon.HexToAddress("0xC6F837904da7CF1f46ADcB6ced39697d3B49ec90"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Polygon),

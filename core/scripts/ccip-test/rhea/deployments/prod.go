@@ -13,7 +13,6 @@ var ProdChains = map[rhea.Chain]rhea.EvmDeploymentConfig{
 	rhea.Sepolia:        {ChainConfig: Prod_Sepolia},
 	rhea.ArbitrumGoerli: {ChainConfig: Prod_ArbitrumGoerli},
 	rhea.PolygonMumbai:  {ChainConfig: Prod_PolygonMumbai},
-	rhea.Quorum:         {ChainConfig: Prod_Quorum},
 }
 
 var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
@@ -22,7 +21,6 @@ var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 		rhea.OptimismGoerli: Prod_SepoliaToOptimismGoerli,
 		rhea.ArbitrumGoerli: Prod_SepoliaToArbitrumGoerli,
 		rhea.PolygonMumbai:  Prod_SepoliaToPolygonMumbai,
-		rhea.Quorum:         Prod_SepoliaToQuorum,
 	},
 	rhea.AvaxFuji: {
 		rhea.Sepolia:        Prod_AvaxFujiToSepolia,
@@ -39,9 +37,6 @@ var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 	rhea.PolygonMumbai: {
 		rhea.Sepolia:  Prod_PolygonMumbaiToSepolia,
 		rhea.AvaxFuji: Prod_PolygonMumbaiToAvaxFuji,
-	},
-	rhea.Quorum: {
-		rhea.Sepolia: Prod_QuorumToSepolia,
 	},
 }
 
@@ -172,9 +167,10 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		},
 		rhea.SNXUSD: {
 			Token:         gethcommon.HexToAddress("0x5B33A61Fe23260b55f1Fa9c586001a630C048BF4"),
-			Pool:          gethcommon.HexToAddress("0xd7e7bf07ed9f7c21bd309522df183745151b67a9"),
+			Pool:          gethcommon.HexToAddress("0xCCd34b2A4496eB6b764134bD509d04E8261C6242"),
 			Price:         rhea.SNXUSD.Price(),
 			TokenPoolType: rhea.BurnMint,
+			PoolAllowList: []gethcommon.Address{gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75")},
 		},
 		rhea.FUGAZIUSDC: {
 			Token:         gethcommon.HexToAddress("0x832bA6abcAdC68812be372F4ef20aAC268bA20B7"),
@@ -523,9 +519,10 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		},
 		rhea.SNXUSD: {
 			Token:         gethcommon.HexToAddress("0x5B33A61Fe23260b55f1Fa9c586001a630C048BF4"),
-			Pool:          gethcommon.HexToAddress("0xab0c8ba51e7fa3e5693a4fbb39473520fd85d173"),
+			Pool:          gethcommon.HexToAddress("0x4D5F14561e949127Bf435d2Ac884f512F4C058FC"),
 			Price:         rhea.SNXUSD.Price(),
 			TokenPoolType: rhea.BurnMint,
+			PoolAllowList: []gethcommon.Address{gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75")},
 		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WMATIC},
