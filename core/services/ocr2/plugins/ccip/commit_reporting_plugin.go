@@ -93,7 +93,7 @@ type CommitReportingPluginFactory struct {
 }
 
 // NewCommitReportingPluginFactory return a new CommitReportingPluginFactory.
-func NewCommitReportingPluginFactory(config CommitPluginConfig) types.ReportingPluginFactory {
+func NewCommitReportingPluginFactory(config CommitPluginConfig) *CommitReportingPluginFactory {
 	return &CommitReportingPluginFactory{
 		config:    config,
 		filtersMu: &sync.Mutex{},
@@ -115,7 +115,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	if err = rf.updateLogPollerFilters(onchainConfig); err != nil {
+	if err = rf.UpdateLogPollerFilters(onchainConfig.PriceRegistry); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
@@ -195,30 +195,33 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportT
 	}.Marshal()
 }
 
-// updateLogPollerFilters unregister existing log poller filters and register the new ones.
-func (rf *CommitReportingPluginFactory) updateLogPollerFilters(onChainCfg ccipconfig.CommitOnchainConfig) error {
+// UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
+// pass zeroAddress if dstPriceRegistry is unknown, filters with zero address are omitted.
+func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(dstPriceRegistry common.Address) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
 
-	// todo: when the LP architecture allows perform all the following operations atomically
-	if err := unregisterLpFilters(rf.config.destLP, rf.dstChainFilters); err != nil {
+	// source chain filters
+	srcFiltersBefore, srcFiltersNow := rf.srcChainFilters, getCommitPluginSourceLpFilters(rf.config.onRampAddress)
+	created, deleted := filtersDiff(srcFiltersBefore, srcFiltersNow)
+	if err := unregisterLpFilters(nilQueryer, rf.config.sourceLP, deleted); err != nil {
 		return err
 	}
-	if err := unregisterLpFilters(rf.config.sourceLP, rf.srcChainFilters); err != nil {
+	if err := registerLpFilters(nilQueryer, rf.config.sourceLP, created); err != nil {
 		return err
 	}
+	rf.srcChainFilters = srcFiltersNow
 
-	dstFilters := getCommitPluginDestLpFilters(onChainCfg.PriceRegistry)
-	if err := registerLpFilters(rf.config.destLP, dstFilters); err != nil {
+	// destination chain filters
+	dstFiltersBefore, dstFiltersNow := rf.dstChainFilters, getCommitPluginDestLpFilters(dstPriceRegistry)
+	created, deleted = filtersDiff(dstFiltersBefore, dstFiltersNow)
+	if err := unregisterLpFilters(nilQueryer, rf.config.destLP, deleted); err != nil {
 		return err
 	}
-	rf.dstChainFilters = dstFilters
-
-	srcFilters := getCommitPluginSourceLpFilters(rf.config.onRampAddress)
-	if err := registerLpFilters(rf.config.sourceLP, srcFilters); err != nil {
+	if err := registerLpFilters(nilQueryer, rf.config.destLP, created); err != nil {
 		return err
 	}
-	rf.srcChainFilters = srcFilters
+	rf.dstChainFilters = dstFiltersNow
 
 	return nil
 }

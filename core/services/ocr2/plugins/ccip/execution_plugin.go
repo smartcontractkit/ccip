@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -109,6 +110,11 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			leafHasher:            hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
 		})
 
+	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)
+	if err != nil {
+		return nil, err
+	}
+
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), destChain.ID())
 	argsNoPlugin.Logger = logger.NewOCRWrapper(execLggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
@@ -192,72 +198,84 @@ func getExecutionPluginDestLpChainFilters(commitStore, offRamp, priceRegistry co
 	}
 }
 
-// GetExecutionPluginFilterNamesFromSpec returns all the registered filter names, for both source and dest log pollers.
-func GetExecutionPluginFilterNamesFromSpec(ctx context.Context, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) ([]string, error) {
+// UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
+func UnregisterExecPluginLpFilters(ctx context.Context, q pg.Queryer, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) error {
 	if spec == nil {
-		return nil, errors.New("spec is nil")
+		return errors.New("spec is nil")
 	}
 
 	var pluginConfig ccipconfig.ExecutionPluginConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	destChainIDInterface, ok := spec.RelayConfig["chainID"]
 	if !ok {
-		return nil, errors.New("chainID must be provided in relay config")
+		return errors.New("chainID must be provided in relay config")
 	}
 	destChainIDf64, is := destChainIDInterface.(float64)
 	if !is {
-		return nil, fmt.Errorf("chain id '%v' is not float64", destChainIDInterface)
+		return fmt.Errorf("chain id '%v' is not float64", destChainIDInterface)
 	}
 	destChain, err := chainSet.Get(big.NewInt(int64(destChainIDf64)))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	offRampAddress := common.HexToAddress(spec.ContractID)
 	offRamp, err := LoadOffRamp(offRampAddress, ExecPluginLabel, destChain.Client())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	offRampConfig, err := offRamp.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(uint64(pluginConfig.SourceEvmChainId)))
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open source chain")
+		return errors.Wrap(err, "unable to open source chain")
 	}
 	srcOnRamp, err := LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed loading onRamp")
+		return errors.Wrap(err, "failed loading onRamp")
 	}
 
-	return getExecutionPluginFilterNames(ctx, offRamp, offRampConfig, srcOnRamp)
+	return unregisterExecutionPluginLpFilters(ctx, q, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, srcOnRamp)
 }
 
-func getExecutionPluginFilterNames(
+func unregisterExecutionPluginLpFilters(
 	ctx context.Context,
+	q pg.Queryer,
+	srcLp logpoller.LogPoller,
+	dstLp logpoller.LogPoller,
 	dstOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
 	dstOffRampConfig evm_2_evm_offramp.EVM2EVMOffRampStaticConfig,
-	srcOnRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) ([]string, error) {
+	srcOnRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) error {
 	dstOffRampDynCfg, err := dstOffRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	onRampDynCfg, err := srcOnRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return append(
-		getLpFilterNames(getExecutionPluginSourceLpChainFilters(dstOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry)),
-		getLpFilterNames(getExecutionPluginDestLpChainFilters(dstOffRampConfig.CommitStore, dstOffRamp.Address(), dstOffRampDynCfg.PriceRegistry))...,
-	), nil
+	if err := unregisterLpFilters(
+		q,
+		srcLp,
+		getExecutionPluginSourceLpChainFilters(dstOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry),
+	); err != nil {
+		return err
+	}
+
+	return unregisterLpFilters(
+		q,
+		dstLp,
+		getExecutionPluginDestLpChainFilters(dstOffRampConfig.CommitStore, dstOffRamp.Address(), dstOffRampDynCfg.PriceRegistry),
+	)
 }
 
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.

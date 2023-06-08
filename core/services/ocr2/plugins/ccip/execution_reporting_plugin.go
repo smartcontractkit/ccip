@@ -83,7 +83,7 @@ type ExecutionReportingPluginFactory struct {
 	filtersMu       *sync.Mutex
 }
 
-func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) types.ReportingPluginFactory {
+func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) *ExecutionReportingPluginFactory {
 	return &ExecutionReportingPluginFactory{
 		config:    config,
 		filtersMu: &sync.Mutex{},
@@ -114,7 +114,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	if err = rf.updateLogPollerFilters(onchainConfig); err != nil {
+	if err = rf.UpdateLogPollerFilters(onchainConfig.PriceRegistry); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
@@ -187,28 +187,33 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	return ExecutionObservation{Messages: executableObservations}.Marshal()
 }
 
-func (rf *ExecutionReportingPluginFactory) updateLogPollerFilters(onChainConfig ccipconfig.ExecOnchainConfig) error {
+// UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
+// pass zeroAddress if dstPriceRegistry is unknown, filters with zero address are omitted.
+func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(dstPriceRegistry common.Address) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
 
-	if err := unregisterLpFilters(rf.config.destLP, rf.dstChainFilters); err != nil {
+	// source chain filters
+	srcFiltersBefore, srcFiltersNow := rf.srcChainFilters, getExecutionPluginSourceLpChainFilters(rf.config.onRamp.Address(), rf.config.srcPriceRegistry.Address())
+	created, deleted := filtersDiff(srcFiltersBefore, srcFiltersNow)
+	if err := unregisterLpFilters(nilQueryer, rf.config.sourceLP, deleted); err != nil {
 		return err
 	}
-	if err := unregisterLpFilters(rf.config.sourceLP, rf.srcChainFilters); err != nil {
+	if err := registerLpFilters(nilQueryer, rf.config.sourceLP, created); err != nil {
 		return err
 	}
+	rf.srcChainFilters = srcFiltersNow
 
-	dstFilters := getExecutionPluginDestLpChainFilters(rf.config.commitStore.Address(), rf.config.offRamp.Address(), onChainConfig.PriceRegistry)
-	if err := registerLpFilters(rf.config.destLP, dstFilters); err != nil {
+	// destination chain filters
+	dstFiltersBefore, dstFiltersNow := rf.dstChainFilters, getExecutionPluginDestLpChainFilters(rf.config.commitStore.Address(), rf.config.offRamp.Address(), dstPriceRegistry)
+	created, deleted = filtersDiff(dstFiltersBefore, dstFiltersNow)
+	if err := unregisterLpFilters(nilQueryer, rf.config.destLP, deleted); err != nil {
 		return err
 	}
-	rf.dstChainFilters = dstFilters
-
-	srcFilters := getExecutionPluginSourceLpChainFilters(rf.config.onRamp.Address(), rf.config.srcPriceRegistry.Address())
-	if err := registerLpFilters(rf.config.sourceLP, srcFilters); err != nil {
+	if err := registerLpFilters(nilQueryer, rf.config.destLP, created); err != nil {
 		return err
 	}
-	rf.srcChainFilters = srcFilters
+	rf.dstChainFilters = dstFiltersNow
 
 	return nil
 }

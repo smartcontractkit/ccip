@@ -2,6 +2,8 @@ package ccip
 
 import (
 	"context"
+	"fmt"
+	"math/big"
 	"sync"
 	"testing"
 
@@ -15,25 +17,23 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
 func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
 	testCases := []struct {
-		description   string
-		spec          *job.OCR2OracleSpec
-		expectedNames []string
-		expectingErr  bool
+		description  string
+		spec         *job.OCR2OracleSpec
+		expectingErr bool
 	}{
 		{
-			description:   "should not panic with nil spec",
-			spec:          nil,
-			expectedNames: nil,
-			expectingErr:  true,
+			description:  "should not panic with nil spec",
+			spec:         nil,
+			expectingErr: true,
 		},
 		{
 			description: "invalid config",
 			spec: &job.OCR2OracleSpec{
+				ContractID:   zeroAddress.String(),
 				PluginConfig: map[string]interface{}{},
 			},
 			expectingErr: true,
@@ -45,18 +45,39 @@ func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
 			},
 			expectingErr: true,
 		},
+		{
+			description: "valid config",
+			spec: &job.OCR2OracleSpec{
+				ContractID:   zeroAddress.String(),
+				PluginConfig: map[string]interface{}{},
+				RelayConfig: map[string]interface{}{
+					"chainID": 1234.0,
+				},
+			},
+			expectingErr: true,
+		},
 	}
 
 	for _, tc := range testCases {
-		chainSet := &evmmocks.ChainSet{}
 		t.Run(tc.description, func(t *testing.T) {
-			names, err := GetCommitPluginFilterNamesFromSpec(context.Background(), tc.spec, chainSet)
-			assert.Equal(t, tc.expectedNames, names)
+			chainSet := &evmmocks.ChainSet{}
+
+			if tc.spec != nil {
+				if chainID, ok := tc.spec.RelayConfig["chainID"]; ok {
+					chainIdBigInt := big.NewInt(int64(chainID.(float64)))
+					chainSet.On("Get", chainIdBigInt).
+						Return(nil, fmt.Errorf("chain %d not found", chainID))
+				}
+			}
+
+			err := UnregisterCommitPluginLpFilters(context.Background(), nil, tc.spec, chainSet)
 			if tc.expectingErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
+
+			chainSet.AssertExpectations(t)
 		})
 	}
 
@@ -73,20 +94,28 @@ func TestGetCommitPluginFilterNames(t *testing.T) {
 		PriceRegistry: priceRegAddr,
 	}, nil)
 
-	filterNames, err := getCommitPluginFilterNames(context.Background(), mockCommitStore)
+	srcLP := mocklp.NewLogPoller(t)
+	dstLP := mocklp.NewLogPoller(t)
+
+	srcLP.On("UnregisterFilter", "Commit ccip sends - 0xdafea492D9c6733aE3d56B7ED1aDb60692C98bc2", mock.Anything).Return(nil)
+	dstLP.On("UnregisterFilter", "Commit price updates - 0xdafEa492d9C6733aE3D56b7eD1aDb60692c98bc3", mock.Anything).Return(nil)
+
+	err := unregisterCommitPluginFilters(context.Background(), nil, srcLP, dstLP, mockCommitStore)
 	assert.NoError(t, err)
-	assert.Equal(t, []string{
-		"Commit ccip sends - 0xdafea492D9c6733aE3d56B7ED1aDb60692C98bc2",
-		"Commit price updates - 0xdafEa492d9C6733aE3D56b7eD1aDb60692c98bc3",
-	}, filterNames)
+
+	srcLP.AssertExpectations(t)
+	dstLP.AssertExpectations(t)
 }
 
-func Test_updateLogPollerFilters(t *testing.T) {
+func Test_updateCommitPluginLogPollerFilters(t *testing.T) {
 	srcLP := &mocklp.LogPoller{}
 	dstLP := &mocklp.LogPoller{}
 
 	onRampAddr := common.HexToAddress("0xdafea492d9c6733ae3d56b7ed1adb60692c98bc2")
 	priceRegAddr := common.HexToAddress("0xdafea492d9c6733ae3d56b7ed1adb60692c98bc3")
+
+	newDestFilters := getCommitPluginDestLpFilters(priceRegAddr)
+	newSrcFilters := getCommitPluginSourceLpFilters(onRampAddr)
 
 	rf := &CommitReportingPluginFactory{
 		config: CommitPluginConfig{
@@ -95,10 +124,13 @@ func Test_updateLogPollerFilters(t *testing.T) {
 			onRampAddress: onRampAddr,
 		},
 		dstChainFilters: []logpoller.Filter{
-			{Name: "a"}, {Name: "b"},
+			{Name: "a"},
+			{Name: "b"},
 		},
 		srcChainFilters: []logpoller.Filter{
-			{Name: "c"}, {Name: "d"},
+			{Name: newSrcFilters[0].Name}, // should not be touched, since it's already registered
+			{Name: "c"},
+			{Name: "d"},
 		},
 		filtersMu: &sync.Mutex{},
 	}
@@ -107,21 +139,19 @@ func Test_updateLogPollerFilters(t *testing.T) {
 	for _, f := range rf.dstChainFilters {
 		dstLP.On("UnregisterFilter", f.Name, nil).Return(nil)
 	}
-	for _, f := range rf.srcChainFilters {
+	for _, f := range rf.srcChainFilters[1:] { // skip the first one, which should not be unregistered
 		srcLP.On("UnregisterFilter", f.Name, nil).Return(nil)
 	}
 
 	// make sure new filters are registered
-	for _, f := range getCommitPluginDestLpFilters(priceRegAddr) {
+	for _, f := range newDestFilters {
 		dstLP.On("RegisterFilter", f).Return(nil)
 	}
-	for _, f := range getCommitPluginSourceLpFilters(onRampAddr) {
+	for _, f := range newSrcFilters[1:] { // skip the first one, which should not be registered
 		srcLP.On("RegisterFilter", f).Return(nil)
 	}
 
-	err := rf.updateLogPollerFilters(ccipconfig.CommitOnchainConfig{
-		PriceRegistry: priceRegAddr,
-	})
+	err := rf.UpdateLogPollerFilters(priceRegAddr)
 	assert.NoError(t, err)
 
 	srcLP.AssertExpectations(t)

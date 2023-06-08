@@ -23,6 +23,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
@@ -106,6 +107,12 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			leafHasher:          leafHasher,
 			getSeqNumFromLog:    getSeqNumFromLog(onRamp),
 		})
+
+	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)
+	if err != nil {
+		return nil, err
+	}
+
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), destChain.ID())
 	argsNoPlugin.Logger = logger.NewOCRWrapper(commitLggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
@@ -179,50 +186,70 @@ func getCommitPluginDestLpFilters(priceRegistry common.Address) []logpoller.Filt
 	}
 }
 
-// GetCommitPluginFilterNamesFromSpec returns all the registered filter names, for both source and dest log pollers.
-func GetCommitPluginFilterNamesFromSpec(ctx context.Context, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) ([]string, error) {
+// UnregisterCommitPluginLpFilters unregisters all the registered filters for both source and dest chains.
+func UnregisterCommitPluginLpFilters(ctx context.Context, q pg.Queryer, spec *job.OCR2OracleSpec, chainSet evm.ChainSet) error {
 	if spec == nil {
-		return nil, errors.New("spec is nil")
+		return errors.New("spec is nil")
 	}
 	if !common.IsHexAddress(spec.ContractID) {
-		return nil, fmt.Errorf("invalid contract id address: %s", spec.ContractID)
+		return fmt.Errorf("invalid contract id address: %s", spec.ContractID)
+	}
+
+	var pluginConfig ccipconfig.CommitPluginConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+	if err != nil {
+		return err
 	}
 
 	destChainIDInterface, ok := spec.RelayConfig["chainID"]
 	if !ok {
-		return nil, errors.New("chainID must be provided in relay config")
+		return errors.New("chainID must be provided in relay config")
 	}
 	destChainIDf64, is := destChainIDInterface.(float64)
 	if !is {
-		return nil, fmt.Errorf("chain id '%v' is not float64", destChainIDInterface)
+		return fmt.Errorf("chain id '%v' is not float64", destChainIDInterface)
 	}
 	destChainID := int64(destChainIDf64)
 	destChain, err := chainSet.Get(big.NewInt(destChainID))
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(uint64(pluginConfig.SourceEvmChainId)))
+	if err != nil {
+		return err
 	}
 
 	commitStore, err := LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return getCommitPluginFilterNames(ctx, commitStore)
+	return unregisterCommitPluginFilters(ctx, q, sourceChain.LogPoller(), destChain.LogPoller(), commitStore)
 }
 
-func getCommitPluginFilterNames(ctx context.Context, dstCommitStore commit_store.CommitStoreInterface) ([]string, error) {
+func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, srcLP, dstLP logpoller.LogPoller, dstCommitStore commit_store.CommitStoreInterface) error {
 	staticCfg, err := dstCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	dynamicCfg, err := dstCommitStore.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return append(
-		getLpFilterNames(getCommitPluginSourceLpFilters(staticCfg.OnRamp)),
-		getLpFilterNames(getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry))...,
-	), nil
+	if err := unregisterLpFilters(
+		q,
+		srcLP,
+		getCommitPluginSourceLpFilters(staticCfg.OnRamp),
+	); err != nil {
+		return err
+	}
+
+	return unregisterLpFilters(
+		q,
+		dstLP,
+		getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry),
+	)
 }

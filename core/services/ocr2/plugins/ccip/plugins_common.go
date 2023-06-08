@@ -19,6 +19,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -29,6 +30,10 @@ const (
 	CommitPluginLabel    = "commit"
 	ExecPluginLabel      = "exec"
 )
+
+var zeroAddress = common.HexToAddress("0")
+
+var nilQueryer pg.Queryer
 
 var ErrCommitStoreIsDown = errors.New("commitStore is down")
 
@@ -117,16 +122,20 @@ func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore c
 	return !unPausedAndHealthy
 }
 
-func getLpFilterNames(filters []logpoller.Filter) []string {
-	filterNames := make([]string, 0, len(filters))
-	for _, f := range filters {
-		filterNames = append(filterNames, f.Name)
+func filterContainsZeroAddress(addrs []common.Address) bool {
+	for _, addr := range addrs {
+		if addr == zeroAddress {
+			return true
+		}
 	}
-	return filterNames
+	return false
 }
 
-func registerLpFilters(lp logpoller.LogPoller, filters []logpoller.Filter) error {
+func registerLpFilters(q pg.Queryer, lp logpoller.LogPoller, filters []logpoller.Filter) error {
 	for _, lpFilter := range filters {
+		if filterContainsZeroAddress(lpFilter.Addresses) {
+			continue
+		}
 		if err := lp.RegisterFilter(lpFilter); err != nil {
 			return err
 		}
@@ -134,13 +143,44 @@ func registerLpFilters(lp logpoller.LogPoller, filters []logpoller.Filter) error
 	return nil
 }
 
-func unregisterLpFilters(lp logpoller.LogPoller, filters []logpoller.Filter) error {
+func unregisterLpFilters(q pg.Queryer, lp logpoller.LogPoller, filters []logpoller.Filter) error {
 	for _, lpFilter := range filters {
-		if err := lp.UnregisterFilter(lpFilter.Name, nil); err != nil {
+		if filterContainsZeroAddress(lpFilter.Addresses) {
+			continue
+		}
+		if err := lp.UnregisterFilter(lpFilter.Name, q); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func containsFilter(filters []logpoller.Filter, f logpoller.Filter) bool {
+	for _, existing := range filters {
+		if existing.Name == f.Name {
+			return true
+		}
+	}
+	return false
+}
+
+func filtersDiff(filtersBefore, filtersNow []logpoller.Filter) (created, deleted []logpoller.Filter) {
+	created = make([]logpoller.Filter, 0, len(filtersNow))
+	deleted = make([]logpoller.Filter, 0, len(filtersBefore))
+
+	for _, f := range filtersNow {
+		if !containsFilter(filtersBefore, f) {
+			created = append(created, f)
+		}
+	}
+
+	for _, f := range filtersBefore {
+		if !containsFilter(filtersNow, f) {
+			deleted = append(deleted, f)
+		}
+	}
+
+	return created, deleted
 }
 
 func max[T constraints.Ordered](first T, rest ...T) T {
