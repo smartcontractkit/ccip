@@ -1,2 +1,1 @@
-./src/v0.8/ccip/test/**
-./src/v0.8/ccip/pools/tokens/**
+./src/v0.8/ccip/test/**/*

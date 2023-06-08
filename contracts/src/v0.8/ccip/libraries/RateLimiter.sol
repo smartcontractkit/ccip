@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Client} from "./Client.sol";
-
 /// @notice Implements Token Bucket rate limiting.
 /// @dev uint128 is safe for rate limiter state.
 /// For USD value rate limiting, it can adequately store USD value in 18 decimals.

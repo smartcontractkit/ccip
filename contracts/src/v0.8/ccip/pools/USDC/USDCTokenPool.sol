@@ -2,14 +2,11 @@
 pragma solidity 0.8.19;
 
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
-import {IPool} from "../../interfaces/pools/IPool.sol";
 import {ITokenMessenger} from "./ITokenMessenger.sol";
 import {IMessageReceiver} from "./IMessageReceiver.sol";
 
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {TokenPool} from "../TokenPool.sol";
-
-import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/IERC165.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).

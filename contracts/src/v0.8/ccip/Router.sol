@@ -9,7 +9,6 @@ import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 import {IAny2EVMMessageReceiver} from "./interfaces/IAny2EVMMessageReceiver.sol";
 
 import {Client} from "./libraries/Client.sol";
-import {Internal} from "./libraries/Internal.sol";
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 
 import {EnumerableMap} from "../vendor/openzeppelin-solidity/v4.8.0/utils/structs/EnumerableMap.sol";

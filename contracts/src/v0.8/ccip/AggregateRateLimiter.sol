@@ -4,12 +4,9 @@ pragma solidity 0.8.19;
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
-import {Internal} from "./libraries/Internal.sol";
 import {Client} from "./libraries/Client.sol";
 import {RateLimiter} from "./libraries/RateLimiter.sol";
 import {USDPriceWith18Decimals} from "./libraries/USDPriceWith18Decimals.sol";
-
-import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.0/token/ERC20/IERC20.sol";
 
 contract AggregateRateLimiter is OwnerIsCreator {
   using RateLimiter for RateLimiter.TokenBucket;
