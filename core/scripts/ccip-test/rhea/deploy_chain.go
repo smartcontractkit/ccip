@@ -134,7 +134,7 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 	}
 	client.Logger.Infof("Skipping %s Pool deployment, using Pool on %s", tokenName, tokenConfig.Pool)
 
-	return setPoolAllowList(client, tokenConfig.Pool, tokenConfig.PoolAllowList, tokenName)
+	return nil //setPoolAllowList(client, tokenConfig.Pool, tokenConfig.PoolAllowList, tokenName)
 }
 
 func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address, poolAllowList []common.Address) (common.Address, error) {
