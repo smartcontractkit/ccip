@@ -47,7 +47,7 @@ func DeployLanes(t *testing.T, source *EvmDeploymentConfig, destination *EvmDepl
 
 	// Deploy commitStores and offRamps on both chains
 	deployDestinationContracts(t, destination, sourceChainSelector, source.LaneConfig.OnRamp, source.ChainConfig.SupportedTokens)
-	deployDestinationContracts(t, source, destChainSelector, destination.LaneConfig.OffRamp, destination.ChainConfig.SupportedTokens)
+	deployDestinationContracts(t, source, destChainSelector, destination.LaneConfig.OnRamp, destination.ChainConfig.SupportedTokens)
 
 	setPriceRegistryPrices(t, source, destChainSelector)
 	setPriceRegistryPrices(t, destination, sourceChainSelector)
