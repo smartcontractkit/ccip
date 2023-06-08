@@ -300,6 +300,8 @@ func TestConfig_Marshal(t *testing.T) {
 		SecureCookies:           ptr(true),
 		SessionTimeout:          models.MustNewDuration(time.Hour),
 		SessionReaperExpiration: models.MustNewDuration(7 * 24 * time.Hour),
+		HTTPMaxSize:             ptr(utils.FileSize(uint64(32770))),
+		StartTimeout:            models.MustNewDuration(15 * time.Second),
 		MFA: config.WebServerMFA{
 			RPID:     ptr("test-rpid"),
 			RPOrigin: ptr("test-rp-origin"),
@@ -706,6 +708,8 @@ HTTPPort = 56
 SecureCookies = true
 SessionTimeout = '1h0m0s'
 SessionReaperExpiration = '168h0m0s'
+HTTPMaxSize = '32.77kb'
+StartTimeout = '15s'
 
 [WebServer.MFA]
 RPID = 'test-rpid'
@@ -1038,6 +1042,9 @@ func TestConfig_full(t *testing.T) {
 			}
 			if got.EVM[c].Nodes[n].SendOnly == nil {
 				got.EVM[c].Nodes[n].SendOnly = ptr(true)
+			}
+			if got.EVM[c].Nodes[n].Order == nil {
+				got.EVM[c].Nodes[n].Order = ptr(int32(100))
 			}
 		}
 	}
