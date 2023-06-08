@@ -7,8 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
+	evmtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
@@ -68,7 +70,16 @@ func deployARM(client *EvmDeploymentConfig) error {
 	}
 
 	client.Logger.Infof("Deploying ARM")
-	address, tx, _, err := mock_arm_contract.DeployMockARMContract(client.Owner, client.Client)
+	var address common.Address
+	var tx *evmtypes.Transaction
+	var err error
+	armConfig := client.ChainConfig.ARMConfig
+	switch armConfig {
+	case nil:
+		address, tx, _, err = mock_arm_contract.DeployMockARMContract(client.Owner, client.Client)
+	default:
+		address, tx, _, err = arm_contract.DeployARMContract(client.Owner, client.Client, *armConfig)
+	}
 	if err != nil {
 		return err
 	}

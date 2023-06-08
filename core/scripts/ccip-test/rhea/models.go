@@ -12,6 +12,7 @@ import (
 	"github.com/test-go/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -222,6 +223,7 @@ type EVMChainConfig struct {
 	ARM                gethcommon.Address
 	PriceRegistry      gethcommon.Address
 	AllowList          []gethcommon.Address
+	ARMConfig          *arm_contract.ARMConfig // Setting ARMConfig to nil will deploy MockARM
 	DeploySettings     ChainDeploySettings
 	TunableChainValues TunableChainValues
 	CustomerSettings

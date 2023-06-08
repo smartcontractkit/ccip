@@ -97,6 +97,8 @@ func TestCCIP(t *testing.T) {
 		client.ScalingAndBatching(t)
 	case "gas":
 		client.TestGasVariousTxs(t)
+	case "uncurseSourceARM":
+		client.uncurseSourceARM(t)
 	case "executeManually":
 		client.ExecuteManually(t, &DESTINATION)
 	case "wip":

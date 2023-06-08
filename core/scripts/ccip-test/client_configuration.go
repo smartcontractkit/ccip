@@ -245,6 +245,31 @@ func (client *CCIPClient) reemitEvents(t *testing.T, destConfig rhea.EvmDeployme
 	shared.RequireNoError(t, err)
 }
 
+// Uncurses the ARM contract on the source chain.
+func (client *CCIPClient) uncurseSourceARM(t *testing.T) {
+	owner := client.Source.Owner
+	arm := client.Source.ARM
+
+	configDetails, err := arm.GetConfigDetails(nil)
+	shared.RequireNoError(t, err)
+
+	// Quite the hack, doesn't look at the curses hash, suffers from TOCTOU, etc.
+	var forceUncurseRecords []arm_contract.ARMUnvoteToCurseRecord
+	for _, voter := range configDetails.Config.Voters {
+		forceUncurseRecords = append(forceUncurseRecords, arm_contract.ARMUnvoteToCurseRecord{
+			CurseVoteAddr: voter.CurseVoteAddr,
+			CursesHash:    [32]byte{},
+			ForceUnvote:   true,
+		})
+	}
+
+	tx, err := arm.OwnerUnvoteToCurse(owner, forceUncurseRecords)
+	shared.RequireNoError(t, err)
+	client.Source.logger.Infof("ARM.OwnerUnvoteToCurse %+v in tx %s", forceUncurseRecords, helpers.ExplorerLink(int64(client.Source.ChainId), tx.Hash()))
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+}
+
 type Client struct {
 	Owner            *bind.TransactOpts
 	Users            []*bind.TransactOpts
