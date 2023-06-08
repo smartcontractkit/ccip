@@ -16,13 +16,13 @@ import (
 	types3 "github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
 	"github.com/onsi/gomega"
+	ctfClient "github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	types4 "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-
-	ctfClient "github.com/smartcontractkit/chainlink/integration-tests/client"
+	"k8s.io/utils/pointer"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -196,6 +196,7 @@ func setupNodeCCIP(
 		c.Log.Level = &loglevel
 		c.Feature.CCIP = &trueRef
 		c.OCR.Enabled = &falseRef
+		c.OCR.DefaultTransactionQueueDepth = pointer.Uint32(200)
 		c.OCR2.Enabled = &trueRef
 		c.Feature.LogPoller = &trueRef
 		c.P2P.V2.Enabled = &trueRef

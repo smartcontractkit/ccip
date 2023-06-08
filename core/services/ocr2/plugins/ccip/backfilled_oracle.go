@@ -56,7 +56,7 @@ func (r *BackfilledOracle) Run() {
 		go func() {
 			defer wg.Done()
 			s := time.Now()
-			r.lggr.Infow("start replaying src chain", "fromBlock", r.dstStartBlock)
+			r.lggr.Infow("start replaying src chain", "fromBlock", r.srcStartBlock)
 			srcReplayErr := r.src.Replay(ctx, r.srcStartBlock)
 			errMu.Lock()
 			err = multierr.Combine(err, srcReplayErr)

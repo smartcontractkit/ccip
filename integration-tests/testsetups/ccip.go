@@ -601,7 +601,6 @@ func CCIPDefaultTestSetUp(
 	defer cancel()
 
 	configureCLNode := !inputs.ExistingDeployment
-	clNodeDeployed, _ := errgroup.WithContext(parent)
 	if configureCLNode {
 		clProps["db"] = inputs.CLNodeDBResourceProfile
 		clProps["chainlink"] = map[string]interface{}{
@@ -615,7 +614,7 @@ func CCIPDefaultTestSetUp(
 				TTL:             inputs.EnvTTL,
 				NamespacePrefix: envName,
 				Test:            t,
-			}, clProps, inputs.GethResourceProfile, inputs.AllNetworks, clNodeDeployed)
+			}, clProps, inputs.GethResourceProfile, inputs.AllNetworks)
 		ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
 		ccipEnv.CLNodeWithKeyReady, ctx = errgroup.WithContext(parent)
 		setUpArgs.Env = ccipEnv
@@ -660,11 +659,6 @@ func CCIPDefaultTestSetUp(
 	})
 	if configureCLNode {
 		ccipEnv.CLNodeWithKeyReady.Go(func() error {
-			// wait for all the CL nodes to be deployed
-			err := clNodeDeployed.Wait()
-			if err != nil {
-				return err
-			}
 			return ccipEnv.SetUpNodesAndKeys(ctx, inputs.NodeFunding, chains)
 		})
 	}
@@ -735,7 +729,6 @@ func DeployEnvironments(
 	clProps map[string]interface{},
 	gethResource map[string]interface{},
 	networks []blockchain.EVMNetwork,
-	clNodeWg *errgroup.Group,
 ) *environment.Environment {
 	testEnvironment := environment.New(envconfig)
 	numOfTxNodes := 1
@@ -792,28 +785,25 @@ func DeployEnvironments(
 		}
 		return internalWsURLs, internalHttpURLs
 	}
-	// add chainlink nodes in a goroutine
-	clNodeWg.Go(func() error {
-		var nets []blockchain.EVMNetwork
-		for i := range networks {
-			nets = append(nets, networks[i])
-			nets[i].URLs, nets[i].HTTPURLs = urlFinder(networks[i])
-			// skip adding blockscout for simplified deployments
-			// uncomment the following to debug on-chain transactions
-			/*
-				testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-						Name:    fmt.Sprintf("%s-blockscout", networks[i].Name),
-						WsURL:   networks[i].URLs[0],
-						HttpURL: networks[i].HTTPURLs[0],
-					}))
-			*/
-		}
+	var nets []blockchain.EVMNetwork
+	for i := range networks {
+		nets = append(nets, networks[i])
+		nets[i].URLs, nets[i].HTTPURLs = urlFinder(networks[i])
+		// skip adding blockscout for simplified deployments
+		// uncomment the following to debug on-chain transactions
+		/*
+			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
+					Name:    fmt.Sprintf("%s-blockscout", networks[i].Name),
+					WsURL:   networks[i].URLs[0],
+					HttpURL: networks[i].HTTPURLs[0],
+				}))
+		*/
+	}
 
-		clProps["toml"] = actions.DefaultCCIPCLNodeEnv(t, nets)
-		return testEnvironment.
-			AddHelm(chainlink.New(0, clProps)).
-			Run()
-
-	})
+	clProps["toml"] = actions.DefaultCCIPCLNodeEnv(t, nets)
+	err = testEnvironment.
+		AddHelm(chainlink.New(0, clProps)).
+		Run()
+	require.NoError(t, err)
 	return testEnvironment
 }

@@ -338,6 +338,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			ccipTH.SendMessage(t, gasLimit, gasPrice, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
 			ccipTH.Source.Chain.Commit()
 			ccipTH.Dest.Chain.Commit()
+			ccipTH.EventuallySendRequested(t, uint64(i))
 		}
 		seqNumAtOnRampV1 := currentSeqNum + 1
 		ccipTH.ConsistentlyReportNotCommitted(t, seqNumAtOnRampV1, commitStoreV1.Address())
