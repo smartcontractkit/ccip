@@ -86,6 +86,9 @@ encode_call_token%[1]d_usd -> call_token%[1]d_usd -> decode_result_token%[1]d_us
 		if token.TokenPriceType == rhea.PriceFeeds {
 			tokenPricesUSDPipeline += fmt.Sprintf(`\\\"%s\\\":$(multiply_token%d_usd),`, token.Token, i+1)
 		} else if token.TokenPriceType == rhea.TokenPrices || token.TokenPriceType == "" {
+			// to be consistent with prices in real price feeds
+			// job spec prices use price per token
+			// committing don will translate this value into price per 1e18 token nits
 			tokenPricesUSDPipeline += fmt.Sprintf(`\\\"%s\\\":\\\"%s\\\",`, token.Token.Hex(), token.Price)
 		}
 	}

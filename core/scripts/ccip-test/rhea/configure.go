@@ -58,9 +58,11 @@ func setPriceRegistryPrices(t *testing.T, client *EvmDeploymentConfig, destChain
 	}
 
 	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
+
 		priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
 			SourceToken: tokenConfig.Token,
-			UsdPerToken: tokenConfig.Price,
+			// Use price per 1e18 units when updating PriceRegistry to embed decimal info into price
+			UsdPerToken: GetPricePer1e18Units(tokenConfig.Price, tokenConfig.Decimals),
 		})
 	}
 

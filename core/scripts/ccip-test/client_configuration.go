@@ -294,6 +294,7 @@ type EVMBridgedToken struct {
 	Token                common.Address
 	Pool                 *lock_release_token_pool.LockReleaseTokenPool
 	Price                *big.Int
+	Decimals             uint8
 	PriceFeedsAggregator common.Address
 	rhea.TokenPoolType
 }
@@ -318,6 +319,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLan
 			Token:         tokenConfig.Token,
 			Pool:          tokenPool,
 			Price:         tokenConfig.Price,
+			Decimals:      tokenConfig.Decimals,
 			TokenPoolType: tokenConfig.TokenPoolType,
 		}
 	}
@@ -376,6 +378,7 @@ func NewDestinationClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.E
 			Token:         tokenConfig.Token,
 			Pool:          tokenPool,
 			Price:         tokenConfig.Price,
+			Decimals:      tokenConfig.Decimals,
 			TokenPoolType: tokenConfig.TokenPoolType,
 		}
 	}
@@ -1064,7 +1067,7 @@ func syncPrices(client *Client, otherChainTokens map[rhea.Token]EVMBridgedToken)
 		if sourceConfig, ok := client.SupportedTokens[token]; ok {
 			if _, ok := otherChainTokens[token]; ok {
 				wantedTokens = append(wantedTokens, sourceConfig.Token)
-				prices = append(prices, sourceConfig.Price)
+				prices = append(prices, rhea.GetPricePer1e18Units(sourceConfig.Price, sourceConfig.Decimals))
 				client.logger.Infof("Wanted token: %s", token)
 			}
 		}
@@ -1089,7 +1092,6 @@ func syncPrices(client *Client, otherChainTokens map[rhea.Token]EVMBridgedToken)
 			for i, token := range wantedTokens {
 				priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
 					SourceToken: token,
-					// USD per Token.
 					UsdPerToken: prices[i],
 				})
 			}

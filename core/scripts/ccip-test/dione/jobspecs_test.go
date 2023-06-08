@@ -17,8 +17,9 @@ func TestGetPipelineTokens(t *testing.T) {
 		EvmChainId: 1,
 		SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 			rhea.WAVAX: {
-				Token: common.HexToAddress("0x1"),
-				Price: rhea.WAVAX.Price(),
+				Token:    common.HexToAddress("0x1"),
+				Price:    rhea.WAVAX.Price(),
+				Decimals: rhea.WAVAX.Decimals(),
 			},
 		},
 		FeeTokens:     []rhea.Token{rhea.WAVAX},
@@ -28,12 +29,14 @@ func TestGetPipelineTokens(t *testing.T) {
 		EvmChainId: 2,
 		SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 			rhea.LINK: {
-				Token: common.HexToAddress("0x2"),
-				Price: rhea.LINK.Price(),
+				Token:    common.HexToAddress("0x2"),
+				Price:    rhea.LINK.Price(),
+				Decimals: rhea.LINK.Decimals(),
 			},
 			rhea.WETH: {
-				Token: common.HexToAddress("0x3"),
-				Price: rhea.WETH.Price(),
+				Token:    common.HexToAddress("0x3"),
+				Price:    rhea.WETH.Price(),
+				Decimals: rhea.WETH.Decimals(),
 			},
 		},
 		FeeTokens:     []rhea.Token{rhea.LINK},
@@ -68,16 +71,19 @@ func TestGetPipelineTokens(t *testing.T) {
 
 func TestGetTokenPricesUSDPipeline(t *testing.T) {
 	srcWeth := rhea.EVMBridgedToken{
-		Token: common.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
-		Price: new(big.Int).Mul(big.NewInt(1500), big.NewInt(1e18)),
+		Token:    common.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"),
+		Price:    new(big.Int).Mul(big.NewInt(1500), big.NewInt(1e18)),
+		Decimals: 18,
 	}
 	dstLink := rhea.EVMBridgedToken{
-		Token: common.HexToAddress("0x514910771af9ca656af840dff83e8264ecf986ca"),
-		Price: new(big.Int).Mul(big.NewInt(10), big.NewInt(1e18)),
+		Token:    common.HexToAddress("0x514910771af9ca656af840dff83e8264ecf986ca"),
+		Price:    new(big.Int).Mul(big.NewInt(10), big.NewInt(1e18)),
+		Decimals: 18,
 	}
 	dstWeth := rhea.EVMBridgedToken{
-		Token: common.HexToAddress("0x4200000000000000000000000000000000000006"),
-		Price: new(big.Int).Mul(big.NewInt(1500), big.NewInt(1e18)),
+		Token:    common.HexToAddress("0x4200000000000000000000000000000000000006"),
+		Price:    new(big.Int).Mul(big.NewInt(1500), big.NewInt(1e18)),
+		Decimals: 18,
 	}
 	var tt = []struct {
 		pipelineTokens []rhea.EVMBridgedToken
@@ -117,11 +123,13 @@ func TestGetTokenRealPricesUSDPipeline(t *testing.T) {
 		ChainId:        11155111,
 		TokenPriceType: rhea.TokenPrices,
 		Price:          new(big.Int).Mul(big.NewInt(1500), big.NewInt(1e18)),
+		Decimals:       18,
 	}
 	dstCustom := rhea.EVMBridgedToken{
-		Token:   common.HexToAddress("0x779877A7B0D9E8603169DdbDS836e478b4624789"),
-		ChainId: 11155111,
-		Price:   new(big.Int).Mul(big.NewInt(1000), big.NewInt(1e18)),
+		Token:    common.HexToAddress("0x779877A7B0D9E8603169DdbDS836e478b4624789"),
+		ChainId:  11155111,
+		Price:    new(big.Int).Mul(big.NewInt(1000), big.NewInt(1e18)),
+		Decimals: 18,
 	}
 	srcWrappedNative := rhea.EVMBridgedToken{
 		Token:          common.HexToAddress("0xd00ae08403B9bbb9124bB305C09058E32C39A48c"),

@@ -130,6 +130,7 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 			Token:         tokenConfig.Token,
 			Pool:          poolAddress,
 			Price:         tokenConfig.Price,
+			Decimals:      tokenConfig.Decimals,
 			TokenPoolType: tokenConfig.TokenPoolType,
 			PoolAllowList: tokenConfig.PoolAllowList,
 		}

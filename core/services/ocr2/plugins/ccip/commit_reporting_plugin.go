@@ -390,8 +390,8 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	return sourceGasPriceUSD, tokenPricesUSD, nil
 }
 
-// Input price is USD per full token, in base units 1e18
-// Result price is USD per 1e18 of smallest token denomination, in base units 1e18
+// Input price is USD per full token, with 18 decimal precision
+// Result price is USD per 1e18 of smallest token denomination, with 18 decimal precision
 // Example: 1 USDC = 1.00 USD per full token, each full token is 6 decimals -> 1 * 1e18 * 1e18 / 1e6 = 1e30
 func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 	tmp := big.NewInt(0).Mul(price, big.NewInt(1e18))

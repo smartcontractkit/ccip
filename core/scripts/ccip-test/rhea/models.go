@@ -168,9 +168,8 @@ func (token Token) Decimals() uint8 {
 	return tokenDecimalMultiplier[token]
 }
 
-// Price is a mapping from Token to (dollar/1e18) price per wei
-// This means a coin that costs $2000 and has 18 decimals precision
-// will have a value of 2000e18
+// Price is a mapping from a whole Token to dollar with 18 decimals precision
+// This means a coin that costs $1 will have a price of 1e18 per whole token
 func (token Token) Price() *big.Int {
 	// Token prices in $ per whole coin
 	var TokenPrices = map[Token]*big.Float{
@@ -193,9 +192,7 @@ func (token Token) Price() *big.Int {
 	tokenValue := big.NewInt(0)
 	new(big.Float).Mul(TokenPrices[token], big.NewFloat(1e18)).Int(tokenValue)
 
-	// Multiply by 1e18 and divide by the token multiplier so a token with fewer decimals
-	// becomes worth more per base unit if the full token price is the same.
-	return new(big.Int).Quo(new(big.Int).Mul(tokenValue, big.NewInt(1e18)), token.Multiplier())
+	return tokenValue
 }
 
 func (token Token) Multiplier() *big.Int {
@@ -246,7 +243,8 @@ type EVMBridgedToken struct {
 	Token   gethcommon.Address
 	Pool    gethcommon.Address
 	TokenPriceType
-	Price *big.Int
+	Price    *big.Int
+	Decimals uint8
 	PriceFeed
 	TokenPoolType
 	PoolAllowList []gethcommon.Address // empty slice indicates allowList is not enabled
@@ -348,4 +346,16 @@ func SetGasFees(owner *bind.TransactOpts, config EVMGasSettings) {
 	} else {
 		owner.GasPrice = config.GasPrice
 	}
+}
+
+// GetPricePer1e18Units returns the price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
+// For example,
+//
+//	1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
+//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
+//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
+func GetPricePer1e18Units(price *big.Int, decimals uint8) *big.Int {
+	multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
+
+	return new(big.Int).Quo(new(big.Int).Mul(price, big.NewInt(1e18)), multiplier)
 }
