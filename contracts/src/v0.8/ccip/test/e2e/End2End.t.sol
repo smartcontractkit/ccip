@@ -75,21 +75,24 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     vm.expectEmit();
     emit ExecutionStateChanged(
       messages[1].sequenceNumber,
       messages[1].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     vm.expectEmit();
     emit ExecutionStateChanged(
       messages[2].sequenceNumber,
       messages[2].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     Internal.ExecutionReport memory execReport = _generateReportFromMessages(messages);

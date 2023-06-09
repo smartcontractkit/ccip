@@ -70,5 +70,6 @@ type EVM2EVMOffRampExecutionStateChanged struct {
 	SequenceNumber uint64
 	MessageId      [32]byte
 	State          uint8
+	ReturnData     []byte
 	Raw            types.Log
 }

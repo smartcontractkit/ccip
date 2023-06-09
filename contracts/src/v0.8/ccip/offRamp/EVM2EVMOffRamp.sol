@@ -47,7 +47,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   error InvalidOffRampConfig(DynamicConfig config);
   error UnsupportedToken(IERC20 token);
   error CanOnlySelfCall();
-  error ReceiverError();
+  error ReceiverError(bytes error);
   error EmptyReport();
   error BadARMSignal();
   error InvalidMessageId();
@@ -66,7 +66,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
-    Internal.MessageExecutionState state
+    Internal.MessageExecutionState state,
+    bytes returnData
   );
 
   /// @notice Static offRamp config
@@ -299,7 +300,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
       _isWellFormed(message, offchainTokenData.length);
 
       _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-      Internal.MessageExecutionState newState = _trialExecute(message, offchainTokenData, manualExecution);
+      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(
+        message,
+        offchainTokenData,
+        manualExecution
+      );
       _setExecutionState(message.sequenceNumber, newState);
 
       // The only valid prior states are UNTOUCHED and FAILURE (checked above)
@@ -325,7 +330,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
         s_senderNonce[message.sender]++;
       }
 
-      emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState);
+      emit ExecutionStateChanged(message.sequenceNumber, message.messageId, newState, returnData);
     }
   }
 
@@ -345,19 +350,25 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// @param message Client.Any2EVMMessage memory message.
   /// @param manualExecution bool to indicate manual instead of DON execution.
   /// @return the new state of the message, being either SUCCESS or FAILURE.
+  /// @return revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
     Internal.EVM2EVMMessage memory message,
     bytes[] memory offchainTokenData,
     bool manualExecution
-  ) internal returns (Internal.MessageExecutionState) {
+  ) internal returns (Internal.MessageExecutionState, bytes memory) {
     try this.executeSingleMessage(message, offchainTokenData, manualExecution) {} catch (bytes memory err) {
       if (ReceiverError.selector == bytes4(err)) {
-        return Internal.MessageExecutionState.FAILURE;
+        // If CCIP receiver execution is not successful, bubble up receiver revert data,
+        // prepended by the 4 bytes of ReceiverError.selector
+        // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
+        return (Internal.MessageExecutionState.FAILURE, err);
       } else {
+        // If revert is not caused by CCIP receiver, it is unexpected, bubble up the revert.
         revert ExecutionError(err);
       }
     }
-    return Internal.MessageExecutionState.SUCCESS;
+    // If message execution succeeded, no CCIP receiver return data is expected, return with empty bytes.
+    return (Internal.MessageExecutionState.SUCCESS, "");
   }
 
   /// @notice Execute a single message.
@@ -394,14 +405,15 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
       // If this underflows and reverts that's ok because its manual execution.
       gasLimit = ((gasleft() - 2 * (16 * message.data.length + GAS_FOR_CALL_EXACT_CHECK)) * 62) / 64;
     }
-    if (
-      !IRouter(s_dynamicConfig.router).routeMessage(
-        Internal._toAny2EVMMessage(message, destTokenAmounts),
-        GAS_FOR_CALL_EXACT_CHECK,
-        gasLimit,
-        message.receiver
-      )
-    ) revert ReceiverError();
+
+    (bool success, bytes memory returnData) = IRouter(s_dynamicConfig.router).routeMessage(
+      Internal._toAny2EVMMessage(message, destTokenAmounts),
+      GAS_FOR_CALL_EXACT_CHECK,
+      gasLimit,
+      message.receiver
+    );
+    // If CCIP receiver execution is not successful, revert the call including token transfers
+    if (!success) revert ReceiverError(returnData);
   }
 
   /// @notice creates a unique hash to be used in message hashing.

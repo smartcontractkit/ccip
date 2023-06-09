@@ -25,13 +25,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
   event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
   event OffRampRemoved(uint64 indexed sourceChainSelector, address offRamp);
-  event MessageExecuted(
-    bytes32 indexed messageId,
-    uint64 sourceChainSelector,
-    address offRamp,
-    bool success,
-    bytes data
-  );
+  event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp);
 
   struct OnRamp {
     uint64 destChainSelector;
@@ -145,7 +139,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     uint16 gasForCallExactCheck,
     uint256 gasLimit,
     address receiver
-  ) external override onlyOffRamp(message.sourceChainSelector) returns (bool) {
+  ) external override onlyOffRamp(message.sourceChainSelector) returns (bool, bytes memory) {
     // We encode here instead of the offRamps to constrain specifically what functions
     // can be called from the router.
     (bool success, bytes memory retBytes) = _callWithExactGas(
@@ -154,10 +148,10 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
       receiver,
       abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message)
     );
-    // Execution message is emitted here so clients have a static address to monitor for results,
-    // for example to detect failures and retry manually or to notify upon success.
-    emit MessageExecuted(message.messageId, message.sourceChainSelector, msg.sender, success, retBytes);
-    return success;
+    // MessageExecuted is emitted here for close proximity to the actual call,
+    // it can be used to confidently track successful message executions.
+    emit MessageExecuted(message.messageId, message.sourceChainSelector, msg.sender);
+    return (success, retBytes);
   }
 
   /// @dev Calls target address with exactly gasAmount gas and data as calldata.

@@ -256,7 +256,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -269,7 +270,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     uint64 nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
@@ -288,12 +290,43 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.FAILURE
+      Internal.MessageExecutionState.FAILURE,
+      abi.encodeWithSelector(
+        EVM2EVMOffRamp.ReceiverError.selector,
+        abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, "")
+      )
     );
     // Nonce should not increment on a strict revert.
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
     s_offRamp.execute(_generateReportFromMessages(messages), false);
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
+  }
+
+  function testReceiverErrorSuccess() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    bytes memory realError1 = new bytes(2);
+    realError1[0] = 0xbe;
+    realError1[1] = 0xef;
+    s_reverting_receiver.setErr(realError1);
+
+    messages[0].receiver = address(s_reverting_receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.FAILURE,
+      abi.encodeWithSelector(
+        EVM2EVMOffRamp.ReceiverError.selector,
+        abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, realError1)
+      )
+    );
+    // Nonce should increment on non-strict
+    assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
+    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)));
   }
 
   function testStrictUntouchedToSuccessSuccess() public {
@@ -307,7 +340,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
     // Nonce should increment on a strict untouched -> success.
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
@@ -337,7 +371,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     vm.expectEmit();
@@ -358,7 +393,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -372,7 +408,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
@@ -392,14 +429,16 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     vm.expectEmit();
     emit ExecutionStateChanged(
       messages[1].sequenceNumber,
       messages[1].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
@@ -418,14 +457,16 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     vm.expectEmit();
     emit ExecutionStateChanged(
       messages[1].sequenceNumber,
       messages[1].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     assertEq(uint64(0), s_offRamp.getSenderNonce(OWNER));
@@ -567,6 +608,20 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     );
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
+
+  function testRouterYULCallReverts() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    // gas limit too high, Router's external call should revert
+    messages[0].gasLimit = 1e36;
+    messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+
+    Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.ExecutionError.selector, ""));
+    s_offRamp.execute(executionReport, false);
+  }
 }
 
 /// @notice #execute with ramp upgrade
@@ -589,7 +644,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -616,7 +672,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     uint64 startNonce = s_offRamp.getSenderNonce(messages[0].sender);
@@ -632,7 +689,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -646,7 +704,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -659,7 +718,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
@@ -672,7 +732,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     // new sender nonce in new offramp should go from 0 -> 1
@@ -706,7 +767,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
     s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
     assertEq(startNonce + 1, s_offRamp.getSenderNonce(messages[0].sender));
@@ -719,7 +781,8 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
 
     s_offRamp.execute(_generateReportFromMessages(messages), false);
@@ -757,7 +820,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     message.gasLimit = 1;
     message.receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
     message.messageId = Internal._hash(message, s_offRamp.metadataHash());
-    vm.expectRevert(EVM2EVMOffRamp.ReceiverError.selector);
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.ReceiverError.selector, ""));
     s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
     vm.expectEmit();
     emit MessageReceived();
@@ -801,7 +864,8 @@ contract EVM2EVMOffRamp__report is EVM2EVMOffRampSetup {
     emit ExecutionStateChanged(
       messages[0].sequenceNumber,
       messages[0].messageId,
-      Internal.MessageExecutionState.SUCCESS
+      Internal.MessageExecutionState.SUCCESS,
+      ""
     );
     s_offRamp.report(abi.encode(report));
   }

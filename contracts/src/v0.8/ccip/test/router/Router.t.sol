@@ -424,13 +424,7 @@ contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
 
 /// @notice #routeMessage
 contract Router_routeMessage is EVM2EVMOffRampSetup {
-  event MessageExecuted(
-    bytes32 indexed messageId,
-    uint64 sourceChainSelector,
-    address offRamp,
-    bool success,
-    bytes data
-  );
+  event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp);
 
   function setUp() public virtual override {
     EVM2EVMOffRampSetup.setUp();
@@ -440,14 +434,15 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
   function testManualExecSuccess() public {
     Client.Any2EVMMessage memory message = generateReceiverMessage(SOURCE_CHAIN_ID);
     // Manuel execution cannot run out of gas
-    assertTrue(
-      s_destRouter.routeMessage(
-        generateReceiverMessage(SOURCE_CHAIN_ID),
-        GAS_FOR_CALL_EXACT_CHECK,
-        generateManualGasLimit(message.data.length),
-        address(s_receiver)
-      )
+
+    (bool success, bytes memory retData) = s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      generateManualGasLimit(message.data.length),
+      address(s_receiver)
     );
+    assertTrue(success);
+    assertEq("", retData);
   }
 
   function testExecutionEventSuccess() public {
@@ -459,21 +454,18 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     s_reverting_receiver.setErr(realError1);
 
     vm.expectEmit();
-    emit MessageExecuted(
-      message.messageId,
-      message.sourceChainSelector,
-      address(s_offRamp),
-      false,
-      abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, realError1)
+    emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
+
+    (bool success, bytes memory retData) = s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      generateManualGasLimit(message.data.length),
+      address(s_reverting_receiver)
     );
-    assertFalse(
-      s_destRouter.routeMessage(
-        generateReceiverMessage(SOURCE_CHAIN_ID),
-        GAS_FOR_CALL_EXACT_CHECK,
-        generateManualGasLimit(message.data.length),
-        address(s_reverting_receiver)
-      )
-    );
+
+    assertFalse(success);
+    assertEq(abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, realError1), retData);
+
     // Reason is truncated
     // Over the MAX_RET_BYTES limit (including offset and length word since we have a dynamic values), should be ignored
     bytes memory realError2 = new bytes(32 * 2 + 1);
@@ -482,100 +474,95 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     s_reverting_receiver.setErr(realError2);
 
     vm.expectEmit();
-    emit MessageExecuted(
-      message.messageId,
-      message.sourceChainSelector,
-      address(s_offRamp),
-      false,
+    emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
+
+    (success, retData) = s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      generateManualGasLimit(message.data.length),
+      address(s_reverting_receiver)
+    );
+
+    assertFalse(success);
+    assertEq(
       abi.encodeWithSelector(
         MaybeRevertMessageReceiver.CustomError.selector,
         uint256(32),
         uint256(realError2.length),
         uint256(0),
         uint256(0xAA)
-      )
+      ),
+      retData
     );
-    assertFalse(
-      s_destRouter.routeMessage(
-        generateReceiverMessage(SOURCE_CHAIN_ID),
-        GAS_FOR_CALL_EXACT_CHECK,
-        generateManualGasLimit(message.data.length),
-        address(s_reverting_receiver)
-      )
-    );
+
     // Should emit success
     vm.expectEmit();
-    emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp), true, new bytes(0));
+    emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
 
-    assertTrue(
-      s_destRouter.routeMessage(
-        generateReceiverMessage(SOURCE_CHAIN_ID),
-        GAS_FOR_CALL_EXACT_CHECK,
-        generateManualGasLimit(message.data.length),
-        address(s_receiver)
-      )
+    (success, retData) = s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      generateManualGasLimit(message.data.length),
+      address(s_receiver)
     );
+
+    assertTrue(success);
+    assertEq("", retData);
   }
 
   function test_fuzz_ExecutionEventSuccess(bytes calldata error) public {
     Client.Any2EVMMessage memory message = generateReceiverMessage(SOURCE_CHAIN_ID);
     s_reverting_receiver.setErr(error);
 
+    bytes memory expectedRetData;
+
     if (error.length >= 33) {
       uint256 cutOff = error.length > 64 ? 64 : error.length;
       vm.expectEmit();
-      emit MessageExecuted(
-        message.messageId,
-        message.sourceChainSelector,
-        address(s_offRamp),
-        false,
-        abi.encodeWithSelector(
-          MaybeRevertMessageReceiver.CustomError.selector,
-          uint256(32),
-          uint256(error.length),
-          bytes32(error[:32]),
-          bytes32(error[32:cutOff])
-        )
+      emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
+      expectedRetData = abi.encodeWithSelector(
+        MaybeRevertMessageReceiver.CustomError.selector,
+        uint256(32),
+        uint256(error.length),
+        bytes32(error[:32]),
+        bytes32(error[32:cutOff])
       );
     } else {
       vm.expectEmit();
-      emit MessageExecuted(
-        message.messageId,
-        message.sourceChainSelector,
-        address(s_offRamp),
-        false,
-        abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, error)
-      );
+      emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
+      expectedRetData = abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, error);
     }
 
-    assertFalse(
-      s_destRouter.routeMessage(
-        generateReceiverMessage(SOURCE_CHAIN_ID),
-        GAS_FOR_CALL_EXACT_CHECK,
-        generateManualGasLimit(message.data.length),
-        address(s_reverting_receiver)
-      )
+    (bool success, bytes memory retData) = s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      generateManualGasLimit(message.data.length),
+      address(s_reverting_receiver)
     );
+
+    assertFalse(success);
+    assertEq(expectedRetData, retData);
   }
 
   function testAutoExecSuccess() public {
-    assertTrue(
-      s_destRouter.routeMessage(
-        generateReceiverMessage(SOURCE_CHAIN_ID),
-        GAS_FOR_CALL_EXACT_CHECK,
-        100_000,
-        address(s_receiver)
-      )
+    (bool success, ) = s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      100_000,
+      address(s_receiver)
     );
+
+    assertTrue(success);
+
+    (success, ) = s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      1,
+      address(s_receiver)
+    );
+
     // Can run out of gas, should return false
-    assertFalse(
-      s_destRouter.routeMessage(
-        generateReceiverMessage(SOURCE_CHAIN_ID),
-        GAS_FOR_CALL_EXACT_CHECK,
-        1,
-        address(s_receiver)
-      )
-    );
+    assertFalse(success);
   }
 
   // Reverts

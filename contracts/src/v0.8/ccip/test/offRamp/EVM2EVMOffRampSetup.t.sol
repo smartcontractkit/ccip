@@ -36,7 +36,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
-    Internal.MessageExecutionState state
+    Internal.MessageExecutionState state,
+    bytes returnData
   );
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
 
