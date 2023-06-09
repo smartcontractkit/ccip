@@ -167,8 +167,8 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.SNXUSD: {
-			Token:         gethcommon.HexToAddress("0x5B33A61Fe23260b55f1Fa9c586001a630C048BF4"),
-			Pool:          gethcommon.HexToAddress("0xCCd34b2A4496eB6b764134bD509d04E8261C6242"),
+			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
+			Pool:          gethcommon.HexToAddress("0x6bb8d729c35f29df532eb3998ddace336187c84b"),
 			Price:         rhea.SNXUSD.Price(),
 			TokenPoolType: rhea.BurnMint,
 			PoolAllowList: []gethcommon.Address{
@@ -181,6 +181,12 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			Pool:          gethcommon.HexToAddress("0x72d33705441b03c85a715e2c9a452a1d18ec6b25"),
 			Price:         rhea.FUGAZIUSDC.Price(),
 			TokenPoolType: rhea.Legacy,
+		},
+		rhea.Alongside: {
+			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
+			Pool:          gethcommon.HexToAddress("0x8f4a41bb7bea86fff0a138f7a62a87c20502c728"),
+			Price:         rhea.Alongside.Price(),
+			TokenPoolType: rhea.LockRelease,
 		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
@@ -267,6 +273,12 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 			Pool:          gethcommon.HexToAddress("0xaa9c6a9dd369a4c2ff83661acfb23c3be993ae3e"),
 			Price:         rhea.STEADY.Price(),
 			TokenPoolType: rhea.Legacy,
+		},
+		rhea.Alongside: {
+			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
+			Pool:          gethcommon.HexToAddress("0x1095d1aa07731ab3917feba3c7fba652de5b8991"),
+			Price:         rhea.Alongside.Price(),
+			TokenPoolType: rhea.BurnMint,
 		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
@@ -401,6 +413,12 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 			Price:         rhea.FUGAZIUSDC.Price(),
 			TokenPoolType: rhea.Legacy,
 		},
+		rhea.Alongside: {
+			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
+			Pool:          gethcommon.HexToAddress("0xae5d9214e1558314c4fe2e1fa9e6c5d24e77ee37"),
+			Price:         rhea.Alongside.Price(),
+			TokenPoolType: rhea.BurnMint,
+		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
 	WrappedNative: rhea.WAVAX,
@@ -525,8 +543,8 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 			TokenPoolType: rhea.FeeTokenOnly,
 		},
 		rhea.SNXUSD: {
-			Token:         gethcommon.HexToAddress("0x5B33A61Fe23260b55f1Fa9c586001a630C048BF4"),
-			Pool:          gethcommon.HexToAddress("0x4D5F14561e949127Bf435d2Ac884f512F4C058FC"),
+			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
+			Pool:          gethcommon.HexToAddress("0xddbfcc4308b238bf7fcb69ced2a4ac5fea6001af"),
 			Price:         rhea.SNXUSD.Price(),
 			TokenPoolType: rhea.BurnMint,
 			PoolAllowList: []gethcommon.Address{

@@ -65,6 +65,22 @@ type ocr2Configurer interface {
 func (client *CCIPClient) wip(t *testing.T, sourceClient *rhea.EvmDeploymentConfig, destClient *rhea.EvmDeploymentConfig) {
 }
 
+func (client *CCIPClient) applyTokenPoolAllowList(t *testing.T, sourceClient *rhea.EvmDeploymentConfig) {
+	token := rhea.SNXUSD
+	tx, err := client.Source.SupportedTokens[token].Pool.ApplyAllowListUpdates(
+		client.Source.Owner,
+		[]common.Address{},
+		sourceClient.ChainConfig.SupportedTokens[token].PoolAllowList,
+	)
+	shared.RequireNoError(t, err)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+
+	allowList, err := client.Source.SupportedTokens[token].Pool.GetAllowList(&bind.CallOpts{})
+	shared.RequireNoError(t, err)
+	client.Source.logger.Infof("AllowList: %+v", allowList)
+}
+
 func (client *CCIPClient) applyFeeTokensUpdates(t *testing.T, sourceClient *rhea.EvmDeploymentConfig) {
 	var feeTokens []common.Address
 

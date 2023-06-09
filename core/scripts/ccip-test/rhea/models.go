@@ -117,11 +117,12 @@ const (
 	BankToken  Token = "BankToken"
 	SNXUSD     Token = "snxUSD"
 	FUGAZIUSDC Token = "FugaziUSDCToken"
+	Alongside  Token = "Alongside"
 )
 
 func GetAllTokens() []Token {
 	return []Token{
-		LINK, WETH, WAVAX, WMATIC, CACHEGOLD, ANZ, InsurAce, ZUSD, STEADY, SUPER, BondToken, BankToken, SNXUSD, FUGAZIUSDC,
+		LINK, WETH, WAVAX, WMATIC, CACHEGOLD, ANZ, InsurAce, ZUSD, STEADY, SUPER, BondToken, BankToken, SNXUSD, FUGAZIUSDC, Alongside,
 	}
 }
 
@@ -140,6 +141,7 @@ var tokenSymbols = map[Token]string{
 	BankToken:  "BankToken",
 	SNXUSD:     "snxUSD",
 	FUGAZIUSDC: "FUGAZIUSDC",
+	Alongside:  "AMKT",
 }
 
 func (token Token) Symbol() string {
@@ -161,6 +163,7 @@ var tokenDecimalMultiplier = map[Token]uint8{
 	BankToken:  18,
 	SNXUSD:     18,
 	FUGAZIUSDC: 6,
+	Alongside:  18,
 }
 
 func (token Token) Decimals() uint8 {
@@ -187,6 +190,7 @@ func (token Token) Price() *big.Int {
 		BankToken:  big.NewFloat(1),
 		SNXUSD:     big.NewFloat(1),
 		FUGAZIUSDC: big.NewFloat(1),
+		Alongside:  big.NewFloat(1),
 	}
 
 	tokenValue := big.NewInt(0)
