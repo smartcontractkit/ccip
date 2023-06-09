@@ -21,7 +21,9 @@
     "lint:ccip": "solhint --config ./src/v0.8/ccip/.solhint.json --ignore-path .ccip-solhint-ignore --max-warnings 0 \"./src/v0.8/ccip/**/*.sol\""
   },
   "files": [
-    "src/",
+    "src/v0.8/ccip/**/*.sol",
+    "!src/v0.8/ccip/tests/**/*",
+    "!src/v0.8/ccip/pools/USDC/**/*",
     "abi/"
   ],
   "pnpm": {
