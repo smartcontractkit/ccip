@@ -18,12 +18,15 @@ import (
 )
 
 const (
-	RATE_LIMIT_CAPACITY_DOLLAR        = 1e9
-	RATE_LIMIT_RATE_DOLLAR            = 1e6
-	MAX_DATA_SIZE                     = 100_000
-	MAX_TOKEN_LENGTH                  = 5
-	MAX_TX_GAS_LIMIT                  = 4e6
-	PERMISSIONLESS_EXEC_THRESHOLD_SEC = 24 * 3600
+	RATE_LIMIT_CAPACITY_DOLLAR = 1e9
+	RATE_LIMIT_RATE_DOLLAR     = 1e6
+	MAX_DATA_SIZE              = 100_000
+	MAX_TOKEN_LENGTH           = 5
+	MAX_TX_GAS_LIMIT           = 4e6
+	// For testnet we set this high to maximize self-healing
+	// (e.g. for some reason a message doesn't get executed or is a strict seq failure and blocks a sequence
+	// it may take a couple days to unblock)
+	PERMISSIONLESS_EXEC_THRESHOLD_SEC = 7 * 24 * 3600
 	DEST_GAS_OVERHEAD                 = 5000
 	DEFAULT_GAS_LIMIT                 = 200_000
 )
