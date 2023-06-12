@@ -32,6 +32,26 @@ const (
 	COMMIT_CCIP_SENDS    = "Commit ccip sends"
 )
 
+// TODO: Once core exposes EvmFinalityTag() for a given chain we can use that instead.
+var checkFinalityTags = map[int64]bool{
+	// Testnets
+	420:      true,  // Optimism goerli
+	421613:   true,  // Arbitrum goerli
+	43113:    true,  // Avax fuji
+	11155111: true,  // Sepolia
+	80001:    false, // Polygon mumbia does NOT support finality tags
+	1337:     false, // Local evm / Quorum
+	2337:     false, // Local evm integration test
+	1000:     false, // Local evm2
+
+	// Mainnets
+	1:     true,  // Mainnet
+	10:    true,  // Optimism
+	42161: true,  // Arbitrum
+	43114: true,  // Avax
+	137:   false, // Polygon
+}
+
 func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 
@@ -91,6 +111,10 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(pluginConfig.SourceEvmChainId),
 		"destChain", ChainName(destChainID))
+	checkFinalityTags, ok := checkFinalityTags[pluginConfig.SourceEvmChainId]
+	if !ok {
+		return nil, errors.Errorf("chain %d not supported", pluginConfig.SourceEvmChainId)
+	}
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
 			lggr:                commitLggr,
@@ -103,9 +127,11 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			sourceFeeEstimator:  sourceChain.GasEstimator(),
 			sourceChainSelector: staticConfig.SourceChainSelector,
 			destClient:          destChain.Client(),
+			sourceClient:        sourceChain.Client(),
 			commitStore:         commitStore,
 			leafHasher:          leafHasher,
 			getSeqNumFromLog:    getSeqNumFromLog(onRamp),
+			checkFinalityTags:   checkFinalityTags,
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)

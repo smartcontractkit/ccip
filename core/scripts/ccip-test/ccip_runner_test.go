@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/big"
@@ -9,6 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/clo"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/csv"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/dione"
@@ -16,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployment_io"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/rhea/deployments"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/secrets"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 )
@@ -604,4 +610,16 @@ func TestUpdateLaneARMAddress(t *testing.T) {
 	clientOtherWayAround := NewCcipClient(t, DESTINATION, SOURCE, key, key)
 	clientOtherWayAround.SetDynamicConfigOnRamp(t)
 	clientOtherWayAround.SetOCR2Config(ENV)
+}
+
+func TestFinalityTags(t *testing.T) {
+	// Ensure that HeaderByBlockNumber using finality tag works.
+	finalityTagChains := []uint64{420, 43113, 421613, 11155111, 1, 10, 43114, 42161}
+	for _, chainID := range finalityTagChains {
+		client, err := ethclient.Dial(secrets.GetRPC(chainID))
+		require.NoError(t, err)
+		f, err := client.HeaderByNumber(context.Background(), big.NewInt(rpc.FinalizedBlockNumber.Int64()))
+		require.NoError(t, err, "chainID: %d", chainID)
+		fmt.Println(f.Number.String())
+	}
 }

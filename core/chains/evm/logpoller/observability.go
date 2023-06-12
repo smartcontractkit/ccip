@@ -121,6 +121,12 @@ func (o *ObservedLogPoller) LogsDataWordGreaterThan(eventSig common.Hash, addres
 	})
 }
 
+func (o *ObservedLogPoller) LogsUntilBlockHashDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, untilBlockHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	return withObservedQuery(o.histogram, "LogsUntilBlockHashDataWordGreaterThan", address, func() ([]Log, error) {
+		return o.LogPoller.LogsUntilBlockHashDataWordGreaterThan(eventSig, address, wordIndex, wordValueMin, untilBlockHash, qopts...)
+	})
+}
+
 func withObservedQuery[T any](histogram *prometheus.HistogramVec, queryName string, address common.Address, query func() (T, error)) (T, error) {
 	queryStarted := time.Now()
 	defer func() {

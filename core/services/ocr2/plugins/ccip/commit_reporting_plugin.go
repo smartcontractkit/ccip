@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"golang.org/x/exp/slices"
@@ -57,18 +58,19 @@ type update struct {
 }
 
 type CommitPluginConfig struct {
-	lggr                logger.Logger
-	sourceLP, destLP    logpoller.LogPoller
-	offRamp             evm_2_evm_offramp.EVM2EVMOffRampInterface
-	onRampAddress       common.Address
-	commitStore         commit_store.CommitStoreInterface
-	priceGetter         PriceGetter
-	sourceChainSelector uint64
-	sourceNative        common.Address
-	sourceFeeEstimator  txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
-	destClient          evmclient.Client
-	leafHasher          hasher.LeafHasherInterface[[32]byte]
-	getSeqNumFromLog    func(log logpoller.Log) (uint64, error)
+	lggr                     logger.Logger
+	sourceLP, destLP         logpoller.LogPoller
+	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
+	onRampAddress            common.Address
+	commitStore              commit_store.CommitStoreInterface
+	priceGetter              PriceGetter
+	sourceChainSelector      uint64
+	sourceNative             common.Address
+	sourceFeeEstimator       txmgrtypes.FeeEstimator[*evmtypes.Head, gas.EvmFee, *assets.Wei, common.Hash]
+	sourceClient, destClient evmclient.Client
+	leafHasher               hasher.LeafHasherInterface[[32]byte]
+	getSeqNumFromLog         func(log logpoller.Log) (uint64, error)
+	checkFinalityTags        bool
 }
 
 type CommitReportingPlugin struct {
@@ -226,20 +228,48 @@ func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(dstPriceRegistry 
 	return nil
 }
 
+func (r *CommitReportingPlugin) finalizedLogsGreaterThanMinSeq(ctx context.Context, nextMin uint64) ([]logpoller.Log, error) {
+	if !r.config.checkFinalityTags {
+		return r.config.sourceLP.LogsDataWordGreaterThan(
+			abihelpers.EventSignatures.SendRequested,
+			r.config.onRampAddress,
+			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
+			abihelpers.EvmWord(nextMin),
+			int(r.offchainConfig.SourceFinalityDepth),
+			pg.WithParentCtx(ctx),
+		)
+	}
+	// If the chain is based on explicit finality we only examine logs less than or equal to the latest finalized block number.
+	// NOTE: there appears to be a bug in ethclient whereby BlockByNumber fails with "unsupported txtype" when trying to parse the block
+	// when querying L2s, headers however work.
+	// TODO (CCIP-778): Migrate to core finalized tags, below doesn't work for some chains e.g. Celo.
+	latestFinalizedHeader, err := r.config.sourceClient.HeaderByNumber(ctx, big.NewInt(rpc.FinalizedBlockNumber.Int64()))
+	if err != nil {
+		return nil, err
+	}
+	if latestFinalizedHeader == nil {
+		return nil, errors.New("latest finalized header is nil")
+	}
+	if latestFinalizedHeader.Number == nil {
+		return nil, errors.New("latest finalized number is nil")
+	}
+	return r.config.sourceLP.LogsUntilBlockHashDataWordGreaterThan(
+		abihelpers.EventSignatures.SendRequested,
+		r.config.onRampAddress,
+		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
+		abihelpers.EvmWord(nextMin),
+		latestFinalizedHeader.Hash(),
+		pg.WithParentCtx(ctx),
+	)
+}
+
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {
 	nextMin, err := r.nextMinSeqNum(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
-	// All available messages that have not been committed yet and have sufficient confirmations.
-	reqs, err := r.config.sourceLP.LogsDataWordGreaterThan(
-		abihelpers.EventSignatures.SendRequested,
-		r.config.onRampAddress,
-		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-		abihelpers.EvmWord(nextMin),
-		int(r.offchainConfig.SourceFinalityDepth),
-		pg.WithParentCtx(ctx),
-	)
+	// Gather only finalized logs.
+	reqs, err := r.finalizedLogsGreaterThanMinSeq(ctx, nextMin)
 	if err != nil {
 		return 0, 0, err
 	}
