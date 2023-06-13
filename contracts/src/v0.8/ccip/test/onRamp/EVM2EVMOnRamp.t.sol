@@ -312,6 +312,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function test_fuzz_ForwardFromRouterSuccess(address originalSender, address receiver, uint96 feeTokenAmount) public {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
+    vm.assume(uint160(receiver) >= 10);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encode(receiver);
@@ -467,6 +468,19 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidAddress.selector, message.receiver));
 
     s_onRamp.forwardFromRouter(message, 1, OWNER);
+  }
+
+  // We disallow sending to addresses 0-9.
+  function testZeroAddressReceiverReverts() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    for (uint160 i = 0; i < 10; ++i) {
+      message.receiver = abi.encode(address(i));
+
+      vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidAddress.selector, message.receiver));
+
+      s_onRamp.forwardFromRouter(message, 1, OWNER);
+    }
   }
 }
 

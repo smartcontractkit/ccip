@@ -56,7 +56,7 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     tokenAmounts[0].amount = amount;
 
     Client.EVM2AnyMessage memory message1 = Client.EVM2AnyMessage({
-      receiver: abi.encode(address(1)),
+      receiver: abi.encode(address(100)),
       data: abi.encodePacked(uint256(1)), // message 1 contains data 1
       tokenAmounts: tokenAmounts,
       extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),
@@ -64,7 +64,7 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     });
 
     Client.EVM2AnyMessage memory message2 = Client.EVM2AnyMessage({
-      receiver: abi.encode(address(1)),
+      receiver: abi.encode(address(100)),
       data: abi.encodePacked(uint256(2)), // message 2 contains data 2
       tokenAmounts: tokenAmounts,
       extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000, strict: false})),

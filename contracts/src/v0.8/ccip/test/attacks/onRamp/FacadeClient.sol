@@ -36,7 +36,7 @@ contract FacadeClient {
     tokenAmounts[0].amount = amount;
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(address(1)),
+      receiver: abi.encode(address(100)),
       data: abi.encodePacked(s_msg_sequence),
       tokenAmounts: tokenAmounts,
       extraArgs: "",
