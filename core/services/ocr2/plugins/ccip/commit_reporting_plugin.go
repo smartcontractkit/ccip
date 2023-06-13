@@ -264,17 +264,18 @@ func (r *CommitReportingPlugin) finalizedLogsGreaterThanMinSeq(ctx context.Conte
 }
 
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {
-	nextMin, err := r.nextMinSeqNum(ctx)
+	nextInflightMin, _, err := r.nextMinSeqNum(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
+
 	// Gather only finalized logs.
-	reqs, err := r.finalizedLogsGreaterThanMinSeq(ctx, nextMin)
+	reqs, err := r.finalizedLogsGreaterThanMinSeq(ctx, nextInflightMin)
 	if err != nil {
 		return 0, 0, err
 	}
 	if len(reqs) == 0 {
-		lggr.Infow("No new requests", "minSeqNr", nextMin)
+		lggr.Infow("No new requests", "minSeqNr", nextInflightMin)
 		return 0, 0, nil
 	}
 	var seqNrs []uint64
@@ -288,10 +289,10 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	}
 	min := seqNrs[0]
 	max := seqNrs[len(seqNrs)-1]
-	if min != nextMin {
+	if min != nextInflightMin {
 		// Still report the observation as even partial reports have value e.g. all nodes are
 		// missing a single, different log each, they would still be able to produce a valid report.
-		lggr.Warnf("Missing sequence number range [%d-%d]", nextMin, min)
+		lggr.Warnf("Missing sequence number range [%d-%d]", nextInflightMin, min)
 	}
 	if !contiguousReqs(lggr, min, max, seqNrs) {
 		return 0, 0, errors.New("unexpected gap in seq nums")
@@ -299,10 +300,10 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	return min, max, nil
 }
 
-func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (uint64, error) {
+func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (inflightMin, onChainMin uint64, err error) {
 	nextMinOnChain, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	// There are several scenarios to consider here for nextMin and inflight intervals.
 	// 1. nextMin=2, inflight=[[2,3],[4,5]]. Node is waiting for [2,3] and [4,5] to be included, should return 6 to build on top.
@@ -320,9 +321,9 @@ func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (uint64, erro
 	maxInflight := r.inflightReports.maxInflightSeqNr()
 	if (maxInflight > nextMinOnChain) && ((maxInflight - nextMinOnChain) > MaxInflightSeqNumGap) {
 		r.inflightReports.reset()
-		return nextMinOnChain, nil
+		return nextMinOnChain, nextMinOnChain, nil
 	}
-	return max(nextMinOnChain, maxInflight+1), nil
+	return max(nextMinOnChain, maxInflight+1), nextMinOnChain, nil
 }
 
 // All prices are USD ($1=1e18) denominated. We only generate prices we think should be updated;
@@ -789,24 +790,9 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		return false, nil
 	}
 
-	if parsedReport.MerkleRoot != [32]byte{} {
-		// Note it's ok to leave the unstarted requests behind, since the
-		// 'Observe' is always based on the last reports onchain min seq num.
-		// This is a stricter isStaleReport, which considers inFlight requests and accepts only
-		// reports starting at nextMinSeqNum
-		nextInflightMin, err := r.nextMinSeqNum(ctx)
-		if err != nil {
-			return false, err
-		}
-		if nextInflightMin != parsedReport.Interval.Min {
-			// There are sequence numbers missing between the commitStore/inflight txs and the proposed report.
-			// The report will fail onchain unless the inflight cache is in an incorrect state. A state like this
-			// could happen for various reasons, e.g. a reboot of the node emptying the caches, and should be self-healing.
-			// We do not submit a tx and wait for the protocol to self-heal by updating the caches or invalidating
-			// inflight caches over time.
-			lggr.Errorw("Next inflight min is not equal to the proposed min of the report", "nextInflightMin", nextInflightMin)
-			return false, errors.New("Next inflight min is not equal to the proposed min of the report")
-		}
+	if r.isStaleReport(ctx, lggr, parsedReport, true) {
+		lggr.Infow("Rejecting stale report")
+		return false, nil
 	}
 
 	if err := r.inflightReports.add(lggr, parsedReport); err != nil {
@@ -827,7 +813,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for tx manager,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
-	return !r.isStaleReport(ctx, lggr, parsedReport), nil
+	return !r.isStaleReport(ctx, lggr, parsedReport, false), nil
 }
 
 // isStaleReport checks a report to see if the contents have become stale.
@@ -843,25 +829,39 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 // for staleness checks.
 // If only price updates are included, only price updates are used for staleness
 // If nothing is included the report is always considered stale.
-func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.Logger, report commit_store.CommitStoreCommitReport) bool {
+func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.Logger, report commit_store.CommitStoreCommitReport, checkInflight bool) bool {
 	// There could be a report with only price updates, in that case ignore sequence number staleness
 	if report.MerkleRoot != [32]byte{} {
-		nextMin, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
+		nextInflightMin, nextOnChainMin, err := r.nextMinSeqNum(ctx)
 		if err != nil {
 			// Assume it's a transient issue getting the last report
 			// Will try again on the next round
 			return true
 		}
-		// If the next min is already greater than this reports min, this report is stale.
-		if nextMin > report.Interval.Min {
-			lggr.Infow("Report is stale because of root", "onchain min", nextMin, "report min", report.Interval.Min)
-			return true
+
+		if checkInflight {
+			if nextInflightMin != report.Interval.Min {
+				// There are sequence numbers missing between the commitStore/inflight txs and the proposed report.
+				// The report will fail onchain unless the inflight cache is in an incorrect state. A state like this
+				// could happen for various reasons, e.g. a reboot of the node emptying the caches, and should be self-healing.
+				// We do not submit a tx and wait for the protocol to self-heal by updating the caches or invalidating
+				// inflight caches over time.
+				lggr.Errorw("Next inflight min is not equal to the proposed min of the report", "nextInflightMin", nextInflightMin)
+				return true
+			}
+		} else {
+			// If the next min is already greater than this reports min, this report is stale.
+			if nextOnChainMin > report.Interval.Min {
+				lggr.Infow("Report is stale because of root", "onchain min", nextOnChainMin, "report min", report.Interval.Min)
+				return true
+			}
 		}
+
 		return false
 	}
 
 	if report.PriceUpdates.DestChainSelector != 0 {
-		gasPriceUpdate, err := r.getLatestGasPriceUpdate(ctx, time.Now(), true)
+		gasPriceUpdate, err := r.getLatestGasPriceUpdate(ctx, time.Now(), !checkInflight)
 		if err != nil {
 			return true
 		}
@@ -879,7 +879,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 	if len(report.PriceUpdates.TokenPriceUpdates) > 0 {
 		// getting the last price updates without including inflight is like querying
 		// current prices onchain, but uses logpoller's data to save on the RPC requests
-		tokenPriceUpdates, err := r.getLatestTokenPriceUpdates(ctx, time.Now(), true)
+		tokenPriceUpdates, err := r.getLatestTokenPriceUpdates(ctx, time.Now(), !checkInflight)
 		if err != nil {
 			return true
 		}

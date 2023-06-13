@@ -696,11 +696,11 @@ func TestShouldAcceptFinalizedReport(t *testing.T) {
 		expected bool
 		err      bool
 	}{
-		{"future", nextMinSeqNr * 2, false, true},
+		{"future", nextMinSeqNr * 2, false, false},
 		{"empty", 0, false, false},
-		{"stale", nextMinSeqNr - 1, false, true},
-		{"base", nextMinSeqNr, true, false},          // accepted is not side-effects-free: it adds to inFlight cache
-		{"base inFlight", nextMinSeqNr, false, true}, // this one is like future, but caused by previous test added to inFlight
+		{"stale", nextMinSeqNr - 1, false, false},
+		{"base", nextMinSeqNr, true, false},           // accepted is not side-effects-free: it adds to inFlight cache
+		{"base inFlight", nextMinSeqNr, false, false}, // this one is like future, but caused by previous test added to inFlight
 	}
 
 	for _, tt := range tests {
@@ -782,32 +782,37 @@ func TestNextMin(t *testing.T) {
 	cp := CommitReportingPlugin{config: CommitPluginConfig{commitStore: &commitStore}, inflightReports: newInflightCommitReportsContainer(time.Hour)}
 	root1 := utils.Keccak256Fixed(hexutil.MustDecode("0xaa"))
 	var tt = []struct {
-		onChainMin      uint64
-		inflight        []commit_store.CommitStoreCommitReport
-		expectedNextMin uint64
+		onChainMin          uint64
+		inflight            []commit_store.CommitStoreCommitReport
+		expectedOnChainMin  uint64
+		expectedInflightMin uint64
 	}{
 		{
-			onChainMin:      uint64(1),
-			inflight:        nil,
-			expectedNextMin: uint64(1),
+			onChainMin:          uint64(1),
+			inflight:            nil,
+			expectedInflightMin: uint64(1),
+			expectedOnChainMin:  uint64(1),
 		},
 		{
 			onChainMin: uint64(1),
 			inflight: []commit_store.CommitStoreCommitReport{
 				{Interval: commit_store.CommitStoreInterval{Min: uint64(1), Max: uint64(2)}, MerkleRoot: root1}},
-			expectedNextMin: uint64(3),
+			expectedInflightMin: uint64(3),
+			expectedOnChainMin:  uint64(1),
 		},
 		{
 			onChainMin: uint64(1),
 			inflight: []commit_store.CommitStoreCommitReport{
 				{Interval: commit_store.CommitStoreInterval{Min: uint64(3), Max: uint64(4)}, MerkleRoot: root1}},
-			expectedNextMin: uint64(5),
+			expectedInflightMin: uint64(5),
+			expectedOnChainMin:  uint64(1),
 		},
 		{
 			onChainMin: uint64(1),
 			inflight: []commit_store.CommitStoreCommitReport{
 				{Interval: commit_store.CommitStoreInterval{Min: uint64(1), Max: uint64(MaxInflightSeqNumGap + 2)}, MerkleRoot: root1}},
-			expectedNextMin: uint64(1),
+			expectedInflightMin: uint64(1),
+			expectedOnChainMin:  uint64(1),
 		},
 	}
 	for _, tc := range tt {
@@ -817,9 +822,10 @@ func TestNextMin(t *testing.T) {
 			require.NoError(t, cp.inflightReports.add(lggr, rc))
 		}
 		t.Log("inflight", cp.inflightReports.maxInflightSeqNr())
-		min, err := cp.nextMinSeqNum(context.Background())
+		inflightMin, onchainMin, err := cp.nextMinSeqNum(context.Background())
 		require.NoError(t, err)
-		assert.Equal(t, tc.expectedNextMin, min)
+		assert.Equal(t, tc.expectedInflightMin, inflightMin)
+		assert.Equal(t, tc.expectedOnChainMin, onchainMin)
 		cp.inflightReports.reset()
 	}
 }
