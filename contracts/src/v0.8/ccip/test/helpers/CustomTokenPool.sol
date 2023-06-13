@@ -23,8 +23,9 @@ contract CustomTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp {
+  ) external override whenNotPaused onlyOnRamp returns (bytes memory) {
     emit SynthBurned(amount);
+    return "";
   }
 
   /// @notice Release tokens from the pool to the recipient

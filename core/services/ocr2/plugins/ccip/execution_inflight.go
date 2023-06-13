@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -14,7 +14,7 @@ import (
 // see the comment on that struct for context.
 type InflightInternalExecutionReport struct {
 	createdAt time.Time
-	messages  []evm_2_evm_onramp.InternalEVM2EVMMessage
+	messages  []evm_2_evm_offramp.InternalEVM2EVMMessage
 }
 
 // inflightExecReportsContainer holds existing inflight reports.
@@ -62,7 +62,7 @@ func (container *inflightExecReportsContainer) expire(lggr logger.Logger) {
 	container.reports = stillInFlight
 }
 
-func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages []evm_2_evm_onramp.InternalEVM2EVMMessage) error {
+func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages []evm_2_evm_offramp.InternalEVM2EVMMessage) error {
 	container.locker.Lock()
 	defer container.locker.Unlock()
 

@@ -11,14 +11,17 @@ interface IPool {
   /// @param receiver Receiver of the tokens on destination chain.
   /// @param amount Amount to lock or burn.
   /// @param destChainSelector Destination chain Id.
-  /// @param extraArgs Additional data passed in by sender for lockOrBurn processing in custom pools on source chain.
+  /// @param extraArgs Additional data passed in by sender for lockOrBurn processing
+  /// in custom pools on source chain.
+  /// @return retData Optional field that contains bytes. Unused for now but already
+  /// implemented to allow future upgrades while preserving the interface.
   function lockOrBurn(
     address originalSender,
     bytes calldata receiver,
     uint256 amount,
     uint64 destChainSelector,
     bytes calldata extraArgs
-  ) external;
+  ) external returns (bytes memory);
 
   /// @notice Releases or mints tokens to the receiver address.
   /// @param originalSender Original sender of the tokens.

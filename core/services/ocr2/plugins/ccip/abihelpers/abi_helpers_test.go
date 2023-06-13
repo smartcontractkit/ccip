@@ -60,21 +60,19 @@ func TestExecutionReportEncoding(t *testing.T) {
 	// but I think that would essentially be testing geth's abi library
 	// as our encode/decode is a thin wrapper around that.
 	report := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   []uint64{0x1},
-		EncodedMessages:   [][]byte{[]byte("test")},
+		Messages:          []evm_2_evm_offramp.InternalEVM2EVMMessage{},
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{testutils.Random32Byte()},
 		ProofFlagBits:     big.NewInt(133),
 	}
-	encodeCommitReport, err := EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   report.SequenceNumbers,
-		EncodedMessages:   report.EncodedMessages,
+	encodeExecutionReport, err := EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
+		Messages:          report.Messages,
 		OffchainTokenData: report.OffchainTokenData,
 		Proofs:            report.Proofs,
 		ProofFlagBits:     report.ProofFlagBits,
 	})
 	require.NoError(t, err)
-	decodeCommitReport, err := DecodeExecutionReport(encodeCommitReport)
+	decodeCommitReport, err := DecodeExecutionReport(encodeExecutionReport)
 	require.NoError(t, err)
 	require.Equal(t, report, decodeCommitReport)
 }

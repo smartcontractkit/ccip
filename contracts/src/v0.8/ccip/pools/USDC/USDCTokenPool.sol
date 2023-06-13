@@ -87,12 +87,12 @@ contract USDCTokenPool is TokenPool {
     uint256 amount,
     uint64 destChainSelector,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) {
+  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) returns (bytes memory) {
     Domain memory domain = s_chainToDomain[destChainSelector];
     if (domain.domainIdentifier == 0) revert UnknownDomain(destChainSelector);
     bytes32 receiver = bytes32(destinationReceiver[0:32]);
 
-    ITokenMessenger(s_config.tokenMessenger).depositForBurnWithCaller(
+    uint64 nonce = ITokenMessenger(s_config.tokenMessenger).depositForBurnWithCaller(
       amount,
       domain.domainIdentifier,
       receiver,
@@ -100,6 +100,7 @@ contract USDCTokenPool is TokenPool {
       domain.allowedCaller
     );
     emit Burned(msg.sender, amount);
+    return abi.encode(nonce);
   }
 
   /// @notice Mint tokens from the pool to the recipient

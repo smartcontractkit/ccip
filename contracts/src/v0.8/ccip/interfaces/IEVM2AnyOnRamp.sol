@@ -33,9 +33,9 @@ interface IEVM2AnyOnRamp {
   function getSenderNonce(address sender) external view returns (uint64 nonce);
 
   /// @notice Adds and removed token pools.
-  /// @param adds The tokens and pools to be added.
   /// @param removes The tokens and pools to be removed
-  function applyPoolUpdates(Internal.PoolUpdate[] memory adds, Internal.PoolUpdate[] memory removes) external;
+  /// @param adds The tokens and pools to be added.
+  function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) external;
 
   /// @notice Send a message to the remote chain
   /// @dev only callable by the Router

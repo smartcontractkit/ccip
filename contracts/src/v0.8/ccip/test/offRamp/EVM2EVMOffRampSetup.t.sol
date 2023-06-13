@@ -174,23 +174,17 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
   function _generateReportFromMessages(
     Internal.EVM2EVMMessage[] memory messages
   ) internal pure returns (Internal.ExecutionReport memory) {
-    bytes[] memory encodedMessages = new bytes[](messages.length);
-    uint64[] memory sequenceNumbers = new uint64[](messages.length);
     bytes[][] memory offchainTokenData = new bytes[][](messages.length);
 
     for (uint256 i = 0; i < messages.length; ++i) {
-      Internal.EVM2EVMMessage memory message = messages[i];
-      encodedMessages[i] = abi.encode(message);
-      sequenceNumbers[i] = message.sequenceNumber;
-      offchainTokenData[i] = new bytes[](message.tokenAmounts.length);
+      offchainTokenData[i] = new bytes[](messages[i].tokenAmounts.length);
     }
 
     return
       Internal.ExecutionReport({
-        sequenceNumbers: sequenceNumbers,
         proofs: new bytes32[](0),
         proofFlagBits: 2 ** 256 - 1,
-        encodedMessages: encodedMessages,
+        messages: messages,
         offchainTokenData: offchainTokenData
       });
   }

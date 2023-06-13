@@ -112,7 +112,15 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_ID, bytes(""));
+    bytes memory encodedNonce = s_usdcTokenPool.lockOrBurn(
+      OWNER,
+      abi.encodePacked(destinationReceiver),
+      amount,
+      DEST_CHAIN_ID,
+      bytes("")
+    );
+    uint64 nonce = abi.decode(encodedNonce, (uint64));
+    assertEq(s_mockUSDC.s_nonce() - 1, nonce);
   }
 
   function testLockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
@@ -136,13 +144,15 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    s_usdcTokenPoolWithAllowList.lockOrBurn(
+    bytes memory encodedNonce = s_usdcTokenPoolWithAllowList.lockOrBurn(
       s_allowedList[0],
       abi.encodePacked(destinationReceiver),
       amount,
       DEST_CHAIN_ID,
       bytes("")
     );
+    uint64 nonce = abi.decode(encodedNonce, (uint64));
+    assertEq(s_mockUSDC.s_nonce() - 1, nonce);
   }
 
   // Reverts

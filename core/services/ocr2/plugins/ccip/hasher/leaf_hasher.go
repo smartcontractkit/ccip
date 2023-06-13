@@ -37,7 +37,7 @@ func NewLeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Add
 var _ LeafHasherInterface[[32]byte] = &LeafHasher{}
 
 func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
-	message, err := abihelpers.DecodeMessage(log.Data)
+	message, err := abihelpers.DecodeOffRampMessage(log.Data)
 	if err != nil {
 		return [32]byte{}, err
 	}

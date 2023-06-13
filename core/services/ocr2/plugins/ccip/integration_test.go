@@ -51,7 +51,6 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	t.Run("single ge", func(t *testing.T) {
 		tokenAmount := big.NewInt(500000003) // prime number
 		gasLimit := big.NewInt(200_003)      // prime number
-		// gasPrice := big.NewInt(1e9)          // 1 gwei
 
 		extraArgs, err2 := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
 		require.NoError(t, err2)
@@ -157,7 +156,6 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	t.Run("multiple batches ge", func(t *testing.T) {
 		tokenAmount := big.NewInt(500000003)
 		gasLimit := big.NewInt(250_000)
-		// gasPrice := big.NewInt(1e9) // 1 gwei
 
 		var txs []*gethtypes.Transaction
 		// Enough to require batched executions as gasLimit per tx is 250k -> 500k -> 750k ....
@@ -293,7 +291,6 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	// Verify all pending requests are sent after the contracts are upgraded
 	t.Run("upgrade contracts and verify requests can be sent with upgraded contract", func(t *testing.T) {
 		gasLimit := big.NewInt(200_003) // prime number
-		gasPrice := big.NewInt(1e9)     // 1 gwei
 		tokenAmount := big.NewInt(100)
 		commitStoreV1 := ccipTH.Dest.CommitStore
 		offRampV1 := ccipTH.Dest.OffRamp
@@ -305,7 +302,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 		// send a request as the v2 contracts are not enabled in router it should route through the v1 contracts
 		t.Logf("sending request for seqnum %d", currentSeqNum)
-		ccipTH.SendMessage(t, gasLimit, gasPrice, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
+		ccipTH.SendMessage(t, gasLimit, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
 		ccipTH.Source.Chain.Commit()
 		ccipTH.Dest.Chain.Commit()
 		t.Logf("verifying seqnum %d on previous onRamp %s", currentSeqNum, onRampV1.Address().Hex())
@@ -335,7 +332,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		endSeqNum := startSeq + noOfRequests
 		for i := startSeq; i <= endSeqNum; i++ {
 			t.Logf("sending request for seqnum %d", i)
-			ccipTH.SendMessage(t, gasLimit, gasPrice, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
+			ccipTH.SendMessage(t, gasLimit, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
 			ccipTH.Source.Chain.Commit()
 			ccipTH.Dest.Chain.Commit()
 			ccipTH.EventuallySendRequested(t, uint64(i))
@@ -385,8 +382,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		linkToTransferToOnRamp := big.NewInt(1e18)
 
 		// transfer some link to onramp to pay the nops
-		_, err = ccipTH.Source.LinkToken.Transfer(
-			ccipTH.Source.User, ccipTH.Source.OnRamp.Address(), linkToTransferToOnRamp)
+		_, err = ccipTH.Source.LinkToken.Transfer(ccipTH.Source.User, ccipTH.Source.OnRamp.Address(), linkToTransferToOnRamp)
 		require.NoError(t, err)
 		ccipTH.Source.Chain.Commit()
 

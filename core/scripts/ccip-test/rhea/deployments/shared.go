@@ -58,6 +58,7 @@ func getOptimisticConfirmations(chain rhea.Chain) uint32 {
 		rhea.AvaxFuji:       1,
 		rhea.PolygonMumbai:  4,
 		rhea.ArbitrumGoerli: 1,
+		rhea.Quorum:         1,
 		// Mainnets
 		rhea.Ethereum: 2,
 		rhea.Avax:     1,

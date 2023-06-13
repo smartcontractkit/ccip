@@ -334,7 +334,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (extraArgs.length == 0) {
       return Client.EVMExtraArgsV1({gasLimit: i_defaultTxGasLimit, strict: false});
     }
-    if (bytes4(extraArgs[:4]) != Client.EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag();
+    if (bytes4(extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG) revert InvalidExtraArgsTag();
     return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
   }
 
@@ -501,7 +501,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       Client.EVMTokenAmount memory tokenAmount = tokenAmounts[i];
       TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];
 
-      uint256 bpsValue = 0;
+      uint256 feeValue = 0;
       // ratio can be 0, only calculate bps fee if ratio is greater than 0
       if (transferFeeConfig.ratio > 0) {
         uint192 tokenPrice = feeTokenPrice;
@@ -512,20 +512,20 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         uint256 tokenValue = tokenPrice._calcUSDValueFromTokenAmount(tokenAmount.amount);
 
         // ratio represents multiples of 0.1bps, or 10e-5
-        bpsValue = (tokenValue * transferFeeConfig.ratio) / 1e5;
+        feeValue = (tokenValue * transferFeeConfig.ratio) / 1e5;
       }
 
       // convert USD values with 2 decimals to 18 decimals
       uint256 minFeeValue = uint256(transferFeeConfig.minFee) * 1e16;
       uint256 maxFeeValue = uint256(transferFeeConfig.maxFee) * 1e16;
 
-      if (bpsValue < minFeeValue) {
-        feeTokenAmount += feeTokenPrice._calcTokenAmountFromUSDValue(minFeeValue);
-      } else if (bpsValue > maxFeeValue) {
-        feeTokenAmount += feeTokenPrice._calcTokenAmountFromUSDValue(maxFeeValue);
-      } else {
-        feeTokenAmount += feeTokenPrice._calcTokenAmountFromUSDValue(bpsValue);
+      if (feeValue < minFeeValue) {
+        feeValue = minFeeValue;
+      } else if (feeValue > maxFeeValue) {
+        feeValue = maxFeeValue;
       }
+
+      feeTokenAmount += feeTokenPrice._calcTokenAmountFromUSDValue(feeValue);
     }
 
     return feeTokenAmount;
@@ -539,22 +539,24 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @notice Sets the fee configuration for a token
-  /// @param feeTokenConfigs Array of FeeTokenConfigArgs structs
-  function setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) external onlyOwnerOrAdmin {
-    _setFeeTokenConfig(feeTokenConfigs);
+  /// @param feeTokenConfigArgs Array of FeeTokenConfigArgs structs
+  function setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigArgs) external onlyOwnerOrAdmin {
+    _setFeeTokenConfig(feeTokenConfigArgs);
   }
 
   /// @dev Set the fee config
-  /// @param feeTokenConfigs The fee token configs
-  function _setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigs) internal {
-    for (uint256 i = 0; i < feeTokenConfigs.length; ++i) {
-      s_feeTokenConfig[feeTokenConfigs[i].token] = FeeTokenConfig({
-        networkFeeAmountUSD: feeTokenConfigs[i].networkFeeAmountUSD,
-        multiplier: feeTokenConfigs[i].multiplier,
-        destGasOverhead: feeTokenConfigs[i].destGasOverhead
+  /// @param feeTokenConfigArgs The fee token configs
+  function _setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigArgs) internal {
+    for (uint256 i = 0; i < feeTokenConfigArgs.length; ++i) {
+      FeeTokenConfigArgs memory configArg = feeTokenConfigArgs[i];
+
+      s_feeTokenConfig[configArg.token] = FeeTokenConfig({
+        networkFeeAmountUSD: configArg.networkFeeAmountUSD,
+        multiplier: configArg.multiplier,
+        destGasOverhead: configArg.destGasOverhead
       });
     }
-    emit FeeConfigSet(feeTokenConfigs);
+    emit FeeConfigSet(feeTokenConfigArgs);
   }
 
   /// @notice Gets the transfer fee config for a given token.
@@ -574,13 +576,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @notice internal helper to set the token transfer fee config.
   function _setTokenTransferFeeConfig(TokenTransferFeeConfigArgs[] memory tokenTransferFeeConfigArgs) internal {
-    uint256 numerOfTokens = tokenTransferFeeConfigArgs.length;
+    for (uint256 i = 0; i < tokenTransferFeeConfigArgs.length; ++i) {
+      TokenTransferFeeConfigArgs memory configArg = tokenTransferFeeConfigArgs[i];
 
-    for (uint256 i = 0; i < numerOfTokens; ++i) {
-      s_tokenTransferFeeConfig[tokenTransferFeeConfigArgs[i].token] = TokenTransferFeeConfig({
-        minFee: tokenTransferFeeConfigArgs[i].minFee,
-        maxFee: tokenTransferFeeConfigArgs[i].maxFee,
-        ratio: tokenTransferFeeConfigArgs[i].ratio
+      s_tokenTransferFeeConfig[configArg.token] = TokenTransferFeeConfig({
+        minFee: configArg.minFee,
+        maxFee: configArg.maxFee,
+        ratio: configArg.ratio
       });
     }
     emit TokenTransferFeeConfigSet(tokenTransferFeeConfigArgs);

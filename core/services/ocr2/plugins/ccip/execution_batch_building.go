@@ -49,22 +49,21 @@ func getProofData(
 }
 
 func buildExecutionReportForMessages(
-	msgsInRoot []logpoller.Log,
+	msgsInRoot []*evm_2_evm_offramp.InternalEVM2EVMMessage,
 	leaves [][32]byte,
 	tree *merklemulti.Tree[[32]byte],
 	commitInterval commit_store.CommitStoreInterval,
 	observedMessages []ObservedMessage,
 ) (report evm_2_evm_offramp.InternalExecutionReport, hashes [][32]byte) {
 	innerIdxs := make([]int, 0, len(observedMessages))
+	report.Messages = []evm_2_evm_offramp.InternalEVM2EVMMessage{}
 	for _, observedMessage := range observedMessages {
 		if observedMessage.SeqNr < commitInterval.Min || observedMessage.SeqNr > commitInterval.Max {
 			// We only return messages from a single root (the root of the first message).
 			continue
 		}
 		innerIdx := int(observedMessage.SeqNr - commitInterval.Min)
-
-		report.SequenceNumbers = append(report.SequenceNumbers, observedMessage.SeqNr)
-		report.EncodedMessages = append(report.EncodedMessages, msgsInRoot[innerIdx].Data)
+		report.Messages = append(report.Messages, *msgsInRoot[innerIdx])
 		report.OffchainTokenData = append(report.OffchainTokenData, observedMessage.TokenData)
 
 		innerIdxs = append(innerIdxs, innerIdx)

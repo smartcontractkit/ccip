@@ -14,7 +14,7 @@ func TestTokenPrice(t *testing.T) {
 	}{
 		{
 			LINK,
-			new(big.Int).Mul(big.NewInt(10), big.NewInt(1e18)),
+			new(big.Int).Mul(big.NewInt(65), big.NewInt(1e17)),
 		},
 		{
 			ANZ,

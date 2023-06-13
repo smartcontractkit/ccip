@@ -499,7 +499,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
   function testUnexpectedTokenDataReverts() public {
     Internal.ExecutionReport memory report = _generateReportFromMessages(_generateBasicMessages());
-    report.offchainTokenData = new bytes[][](report.encodedMessages.length + 1);
+    report.offchainTokenData = new bytes[][](report.messages.length + 1);
 
     vm.expectRevert(EVM2EVMOffRamp.UnexpectedTokenData.selector);
 
@@ -510,10 +510,9 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.expectRevert(EVM2EVMOffRamp.EmptyReport.selector);
     s_offRamp.execute(
       Internal.ExecutionReport({
-        sequenceNumbers: new uint64[](0),
         proofs: new bytes32[](0),
         proofFlagBits: 2 ** 256 - 1,
-        encodedMessages: new bytes[](0),
+        messages: new Internal.EVM2EVMMessage[](0),
         offchainTokenData: new bytes[][](0)
       }),
       true
@@ -541,11 +540,10 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   }
 
   function testAlreadyExecutedReverts() public {
-    Internal.ExecutionReport memory executionReport = _generateReportFromMessages(_generateBasicMessages());
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
     s_offRamp.execute(executionReport, false);
-    vm.expectRevert(
-      abi.encodeWithSelector(EVM2EVMOffRamp.AlreadyExecuted.selector, executionReport.sequenceNumbers[0])
-    );
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.AlreadyExecuted.selector, messages[0].sequenceNumber));
     s_offRamp.execute(executionReport, false);
   }
 
@@ -651,7 +649,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     s_offRamp.execute(_generateReportFromMessages(messages), false);
   }
 
-  function testV2SenderNoncesReadsPreviousRampSucceess() public {
+  function testV2SenderNoncesReadsPreviousRampSuccess() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     uint64 startNonce = s_offRamp.getSenderNonce(messages[0].sender);
 
@@ -915,7 +913,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
 
 /// @notice #getExecutionState
 contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
-  mapping(uint64 => Internal.MessageExecutionState) s_differentialExecutionState;
+  mapping(uint64 => Internal.MessageExecutionState) internal s_differentialExecutionState;
 
   function testDifferentialSuccess(uint16[500] memory seqNums, uint8[500] memory values) public {
     for (uint256 i = 0; i < seqNums.length; ++i) {

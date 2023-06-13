@@ -9,9 +9,9 @@ import {Internal} from "../../../libraries/Internal.sol";
 contract ReentrancyAbuser is CCIPReceiver {
   event ReentrancySucceeded();
 
-  bool s_ReentrancyDone = false;
-  Internal.ExecutionReport s_payload;
-  EVM2EVMOffRamp s_offRamp;
+  bool internal s_ReentrancyDone = false;
+  Internal.ExecutionReport internal s_payload;
+  EVM2EVMOffRamp internal s_offRamp;
 
   constructor(address router, EVM2EVMOffRamp offRamp) CCIPReceiver(router) {
     s_offRamp = offRamp;

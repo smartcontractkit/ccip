@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
@@ -158,21 +157,18 @@ func SetupCCIPTestHarness(t *testing.T) CCIPPluginTestHarness {
 }
 
 type MessageBatch struct {
-	AllMsgBytes [][]byte
-	TokenData   [][][]byte
-	SeqNums     []uint64
-	Messages    []evm_2_evm_onramp.InternalEVM2EVMMessage
-	Interval    commit_store.CommitStoreInterval
-	Root        [32]byte
-	Proof       merklemulti.Proof[[32]byte]
-	ProofBits   *big.Int
-	Tree        *merklemulti.Tree[[32]byte]
+	TokenData [][][]byte
+	Messages  []evm_2_evm_offramp.InternalEVM2EVMMessage
+	Interval  commit_store.CommitStoreInterval
+	Root      [32]byte
+	Proof     merklemulti.Proof[[32]byte]
+	ProofBits *big.Int
+	Tree      *merklemulti.Tree[[32]byte]
 }
 
 func (mb MessageBatch) ToExecutionReport() evm_2_evm_offramp.InternalExecutionReport {
 	return evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   mb.SeqNums,
-		EncodedMessages:   mb.AllMsgBytes,
+		Messages:          mb.Messages,
 		OffchainTokenData: mb.TokenData,
 		Proofs:            mb.Proof.Hashes,
 		ProofFlagBits:     mb.ProofBits,
@@ -222,9 +218,8 @@ func (th *CCIPPluginTestHarness) GenerateAndSendMessageBatch(t *testing.T, nMess
 	leafHashes := make([][32]byte, nMessages)
 	tokenData := make([][][]byte, nMessages)
 	indices := make([]int, nMessages)
-	messages := make([]evm_2_evm_onramp.InternalEVM2EVMMessage, nMessages)
+	messages := make([]evm_2_evm_offramp.InternalEVM2EVMMessage, nMessages)
 	seqNums := make([]uint64, nMessages)
-	allMsgBytes := make([][]byte, nMessages)
 
 	sendEvents, err := th.Source.OnRamp.FilterCCIPSendRequested(&bind.FilterOpts{Start: startBlock.Uint64(), Context: testutils.Context(t)})
 	require.NoError(t, err)
@@ -232,8 +227,7 @@ func (th *CCIPPluginTestHarness) GenerateAndSendMessageBatch(t *testing.T, nMess
 	for ; sendEvents.Next(); i++ {
 		indices[i] = i
 		tokenData[i] = offchainTokenData
-		messages[i] = sendEvents.Event.Message
-		allMsgBytes[i] = sendEvents.Event.Raw.Data
+		messages[i] = abihelpers.OnRampMessageToOffRampMessage(sendEvents.Event.Message)
 		leafHash, err2 := leafHasher.HashLeaf(sendEvents.Event.Raw)
 		require.NoError(t, err2)
 		leafHashes[i] = leafHash
@@ -250,14 +244,12 @@ func (th *CCIPPluginTestHarness) GenerateAndSendMessageBatch(t *testing.T, nMess
 	require.Equal(t, root, rootLocal)
 
 	return MessageBatch{
-		Messages:    messages,
-		AllMsgBytes: allMsgBytes,
-		SeqNums:     seqNums,
-		Interval:    commit_store.CommitStoreInterval{Min: seqNums[0], Max: seqNums[len(seqNums)-1]},
-		TokenData:   tokenData,
-		Root:        root,
-		Proof:       proof,
-		ProofBits:   abihelpers.ProofFlagsToBits(proof.SourceFlags),
-		Tree:        tree,
+		Messages:  messages,
+		Interval:  commit_store.CommitStoreInterval{Min: seqNums[0], Max: seqNums[len(seqNums)-1]},
+		TokenData: tokenData,
+		Root:      root,
+		Proof:     proof,
+		ProofBits: abihelpers.ProofFlagsToBits(proof.SourceFlags),
+		Tree:      tree,
 	}
 }

@@ -287,12 +287,8 @@ func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 		return nil, err
 	}
 
-	msgIDs := make([]string, len(execReport.EncodedMessages))
-	for i, encMsg := range execReport.EncodedMessages {
-		msg, err := abihelpers.DecodeMessage(encMsg)
-		if err != nil {
-			return nil, err
-		}
+	msgIDs := make([]string, len(execReport.Messages))
+	for i, msg := range execReport.Messages {
 		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
 	}
 

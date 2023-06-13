@@ -39,8 +39,9 @@ contract LockReleaseTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) {
+  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) returns (bytes memory) {
     emit Locked(msg.sender, amount);
+    return "";
   }
 
   /// @notice Release tokens from the pool to the recipient

@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -14,11 +14,11 @@ func TestInflightReportsContainer_add(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	container := newInflightExecReportsContainer(time.Second)
 
-	err := container.add(lggr, []evm_2_evm_onramp.InternalEVM2EVMMessage{
+	err := container.add(lggr, []evm_2_evm_offramp.InternalEVM2EVMMessage{
 		{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3},
 	})
 	require.NoError(t, err)
-	err = container.add(lggr, []evm_2_evm_onramp.InternalEVM2EVMMessage{
+	err = container.add(lggr, []evm_2_evm_offramp.InternalEVM2EVMMessage{
 		{SequenceNumber: 1},
 	})
 	require.Error(t, err)
@@ -30,7 +30,7 @@ func TestInflightReportsContainer_expire(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	container := newInflightExecReportsContainer(time.Second)
 
-	err := container.add(lggr, []evm_2_evm_onramp.InternalEVM2EVMMessage{
+	err := container.add(lggr, []evm_2_evm_offramp.InternalEVM2EVMMessage{
 		{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3},
 	})
 	require.NoError(t, err)

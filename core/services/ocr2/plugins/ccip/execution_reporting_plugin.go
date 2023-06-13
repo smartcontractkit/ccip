@@ -220,7 +220,7 @@ func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(dstPriceRegist
 
 // helper struct to hold the send request and some metadata
 type evm2EVMOnRampCCIPSendRequestedWithMeta struct {
-	evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
+	evm_2_evm_offramp.InternalEVM2EVMMessage
 	blockTimestamp time.Time
 	executed       bool
 	finalized      bool
@@ -426,37 +426,37 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
 	expectedNonces := make(map[common.Address]uint64)
 	for _, msg := range report.sendRequestsWithMeta {
-		msgLggr := lggr.With("messageID", hexutil.Encode(msg.Message.MessageId[:]))
+		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
 		if msg.executed && msg.finalized {
-			msgLggr.Infow("Skipping message already executed", "seqNr", msg.Message.SequenceNumber)
+			msgLggr.Infow("Skipping message already executed", "seqNr", msg.SequenceNumber)
 			continue
 		}
-		if _, isInflight := inflightSeqNrs[msg.Message.SequenceNumber]; isInflight {
-			msgLggr.Infow("Skipping message already inflight", "seqNr", msg.Message.SequenceNumber)
+		if _, isInflight := inflightSeqNrs[msg.SequenceNumber]; isInflight {
+			msgLggr.Infow("Skipping message already inflight", "seqNr", msg.SequenceNumber)
 			continue
 		}
-		if _, ok := expectedNonces[msg.Message.Sender]; !ok {
+		if _, ok := expectedNonces[msg.Sender]; !ok {
 			// First message in batch, need to populate expected nonce
-			if maxInflight, ok := maxInflightSenderNonces[msg.Message.Sender]; ok {
+			if maxInflight, ok := maxInflightSenderNonces[msg.Sender]; ok {
 				// Sender already has inflight nonce, populate from there
-				expectedNonces[msg.Message.Sender] = maxInflight + 1
+				expectedNonces[msg.Sender] = maxInflight + 1
 			} else {
 				// Nothing inflight take from chain.
 				// Chain holds existing nonce.
-				nonce, err := r.config.offRamp.GetSenderNonce(nil, msg.Message.Sender)
+				nonce, err := r.config.offRamp.GetSenderNonce(nil, msg.Sender)
 				if err != nil {
 					lggr.Errorw("unable to get sender nonce", "err", err)
 					continue
 				}
-				expectedNonces[msg.Message.Sender] = nonce + 1
+				expectedNonces[msg.Sender] = nonce + 1
 			}
 		}
 		// Check expected nonce is valid
-		if msg.Message.Nonce != expectedNonces[msg.Message.Sender] {
-			msgLggr.Warnw("Skipping message invalid nonce", "have", msg.Message.Nonce, "want", expectedNonces[msg.Message.Sender])
+		if msg.Nonce != expectedNonces[msg.Sender] {
+			msgLggr.Warnw("Skipping message invalid nonce", "have", msg.Nonce, "want", expectedNonces[msg.Sender])
 			continue
 		}
-		msgValue, err := aggregateTokenValue(destTokenPricesUSD, srcToDestToken, msg.Message.TokenAmounts)
+		msgValue, err := aggregateTokenValue(destTokenPricesUSD, srcToDestToken, msg.TokenAmounts)
 		if err != nil {
 			msgLggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
@@ -472,12 +472,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			msgLggr.Errorw("Unexpected error fetching gas price estimate", "err", err)
 			return []ObservedMessage{}
 		}
-		execCostUsd := computeExecCost(msg.Message.GasLimit, execGasPriceEstimateValue, destTokenPricesUSD[r.destWrappedNative])
+		execCostUsd := computeExecCost(msg.GasLimit, execGasPriceEstimateValue, destTokenPricesUSD[r.destWrappedNative])
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),
 		// availableFee is 1e17*6e18/1e18 = 6e17 = 0.6 USD
-		availableFee := big.NewInt(0).Mul(msg.Message.FeeTokenAmount, srcTokenPricesUSD[msg.Message.FeeToken])
+		availableFee := big.NewInt(0).Mul(msg.FeeTokenAmount, srcTokenPricesUSD[msg.FeeToken])
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
 		availableFeeUsd := waitBoostedFee(time.Since(msg.blockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
 		if availableFeeUsd.Cmp(execCostUsd) < 0 {
@@ -486,7 +486,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		messageMaxGas := msg.Message.GasLimit.Uint64() + maxGasOverHeadGas(len(report.sendRequestsWithMeta), len(msg.Message.Data), len(msg.Message.TokenAmounts))
+		messageMaxGas := msg.GasLimit.Uint64() + maxGasOverHeadGas(len(report.sendRequestsWithMeta), len(msg.Data), len(msg.TokenAmounts))
 		// Check sufficient gas in batch
 		if availableGas < messageMaxGas {
 			msgLggr.Infow("Insufficient remaining gas in batch limit", "availableGas", availableGas, "messageMaxGas", messageMaxGas)
@@ -498,16 +498,16 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		var tokenData [][]byte
 
 		// TODO add attestation data for USDC here
-		for range msg.Message.TokenAmounts {
+		for range msg.TokenAmounts {
 			tokenData = append(tokenData, []byte{})
 		}
 
-		msgLggr.Infow("Adding msg to batch", "seqNum", msg.Message.SequenceNumber, "nonce", msg.Message.Nonce)
+		msgLggr.Infow("Adding msg to batch", "seqNum", msg.SequenceNumber, "nonce", msg.Nonce)
 		executableMessages = append(executableMessages, ObservedMessage{
-			SeqNr:     msg.Message.SequenceNumber,
+			SeqNr:     msg.SequenceNumber,
 			TokenData: tokenData,
 		})
-		expectedNonces[msg.Message.Sender] = msg.Message.Nonce + 1
+		expectedNonces[msg.Sender] = msg.Nonce + 1
 	}
 	return executableMessages
 }
@@ -539,8 +539,8 @@ func (r *commitReportWithSendRequests) allRequestsAreExecutedAndFinalized() bool
 
 // checks if the send request fits the commit report interval
 func (r *commitReportWithSendRequests) sendReqFits(sendReq evm2EVMOnRampCCIPSendRequestedWithMeta) bool {
-	return sendReq.Message.SequenceNumber >= r.commitReport.Interval.Min &&
-		sendReq.Message.SequenceNumber <= r.commitReport.Interval.Max
+	return sendReq.SequenceNumber >= r.commitReport.Interval.Min &&
+		sendReq.SequenceNumber <= r.commitReport.Interval.Max
 }
 
 // getReportsWithSendRequests returns the target reports with populated send requests.
@@ -614,7 +614,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	}
 
 	for _, rawLog := range sendRequestLogs {
-		msg, err := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
+		ccipSendRequested, err := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
 			Topics: rawLog.GetTopics(),
 			Data:   rawLog.Data,
 		})
@@ -622,16 +622,17 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 			r.lggr.Errorw("unable to parse message", "err", err, "tx", rawLog.TxHash, "logIdx", rawLog.LogIndex)
 			continue
 		}
+		msg := abihelpers.OnRampMessageToOffRampMessage(ccipSendRequested.Message)
 
 		// if value exists in the map then it's executed
 		// if value exists, and it's true then it's considered finalized
-		finalized, executed := executedSeqNums[msg.Message.SequenceNumber]
+		finalized, executed := executedSeqNums[msg.SequenceNumber]
 
 		sendReq := evm2EVMOnRampCCIPSendRequestedWithMeta{
-			EVM2EVMOnRampCCIPSendRequested: *msg,
-			blockTimestamp:                 rawLog.BlockTimestamp,
-			executed:                       executed,
-			finalized:                      finalized,
+			InternalEVM2EVMMessage: msg,
+			blockTimestamp:         rawLog.BlockTimestamp,
+			executed:               executed,
+			finalized:              finalized,
 		}
 
 		// attach the msg to the appropriate reports
@@ -645,7 +646,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	return reportsWithSendReqs, nil
 }
 
-func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokensAndAmount []evm_2_evm_onramp.ClientEVMTokenAmount) (*big.Int, error) {
+func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, srcToDst map[common.Address]common.Address, tokensAndAmount []evm_2_evm_offramp.ClientEVMTokenAmount) (*big.Int, error) {
 	sum := big.NewInt(0)
 	for i := 0; i < len(tokensAndAmount); i++ {
 		price, ok := destTokenPricesUSD[srcToDst[tokensAndAmount[i].Token]]
@@ -682,9 +683,18 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		return nil, err
 	}
 
+	messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(msgsInRoot))
+	for i, msg := range msgsInRoot {
+		decodedMessage, err2 := abihelpers.DecodeOffRampMessage(msg.Data)
+		if err2 != nil {
+			return nil, err
+		}
+		messages[i] = decodedMessage
+	}
+
 	// cap messages which fits MaxExecutionReportLength (after serialized)
 	capped := sort.Search(len(observedMessages), func(i int) bool {
-		report, _ := buildExecutionReportForMessages(msgsInRoot, leaves, tree, commitReport.Interval, observedMessages[:i+1])
+		report, _ := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:i+1])
 		var encoded []byte
 		encoded, err = abihelpers.EncodeExecutionReport(report)
 		if err != nil {
@@ -697,7 +707,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		return nil, err
 	}
 
-	execReport, hashes := buildExecutionReportForMessages(msgsInRoot, leaves, tree, commitReport.Interval, observedMessages[:capped])
+	execReport, hashes := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:capped])
 	encodedReport, err := abihelpers.EncodeExecutionReport(execReport)
 	if err != nil {
 		return nil, err
@@ -826,7 +836,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	return !stale, err
 }
 
-func (r *ExecutionReportingPlugin) isStaleReport(messages []evm_2_evm_onramp.InternalEVM2EVMMessage) (bool, error) {
+func (r *ExecutionReportingPlugin) isStaleReport(messages []evm_2_evm_offramp.InternalEVM2EVMMessage) (bool, error) {
 	// If the first message is executed already, this execution report is stale.
 	// Note the default execution state, including for arbitrary seq number not yet committed
 	// is ExecutionStateUntouched.

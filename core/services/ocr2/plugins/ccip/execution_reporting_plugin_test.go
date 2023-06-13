@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/pkg/errors"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -120,8 +118,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	th.CommitAndPollLogs(t)
 
 	fullReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   mb.SeqNums,
-		EncodedMessages:   mb.AllMsgBytes,
+		Messages:          mb.Messages,
 		OffchainTokenData: mb.TokenData,
 		Proofs:            mb.Proof.Hashes,
 		ProofFlagBits:     mb.ProofBits,
@@ -130,9 +127,9 @@ func TestMaxExecutionReportSize(t *testing.T) {
 	// ensure "naive" full report would be bigger than limit
 	require.Greater(t, len(fullReport), MaxExecutionReportLength, "full execution report length")
 
-	observations := make([]ObservedMessage, len(mb.SeqNums))
-	for i, seqNr := range mb.SeqNums {
-		observations[i] = ObservedMessage{SeqNr: seqNr, TokenData: mb.TokenData[i]}
+	observations := make([]ObservedMessage, len(mb.Messages))
+	for i, msg := range mb.Messages {
+		observations[i] = ObservedMessage{SeqNr: msg.SequenceNumber, TokenData: mb.TokenData[i]}
 	}
 
 	// buildReport should cap the built report to fit in MaxExecutionReportLength
@@ -153,22 +150,11 @@ func TestExecutionReportToEthTxMetadata(t *testing.T) {
 			c.GenerateAndSendMessageBatch(t, 5, MaxPayloadLength, MaxTokensPerMessage),
 			nil,
 		},
-		{
-			"invalid msgs",
-			func() plugintesthelpers.MessageBatch {
-				mb := c.GenerateAndSendMessageBatch(t, 5, MaxPayloadLength, MaxTokensPerMessage)
-				mb.AllMsgBytes[0] = []byte{1, 1, 1, 1}
-				return mb
-			}(),
-			errors.New("abi: cannot marshal in to go type: length insufficient 4 require 32"),
-		},
 	}
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			encExecReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
-				SequenceNumbers:   tc.msgBatch.SeqNums,
-				EncodedMessages:   tc.msgBatch.AllMsgBytes,
+				Messages:          tc.msgBatch.Messages,
 				OffchainTokenData: tc.msgBatch.TokenData,
 				Proofs:            tc.msgBatch.Proof.Hashes,
 				ProofFlagBits:     tc.msgBatch.ProofBits,
@@ -181,7 +167,7 @@ func TestExecutionReportToEthTxMetadata(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.NotNil(t, txMeta)
-			require.Len(t, txMeta.MessageIDs, len(tc.msgBatch.AllMsgBytes))
+			require.Len(t, txMeta.MessageIDs, len(tc.msgBatch.Messages))
 		})
 	}
 }
@@ -349,8 +335,7 @@ func TestExecReport(t *testing.T) {
 			func() *evm_2_evm_offramp.InternalExecutionReport {
 				mb2 := mb
 				mb2.Messages = mb.Messages[:1]
-				mb2.SeqNums = mb.SeqNums[:1]
-				mb2.AllMsgBytes = mb.AllMsgBytes[:1]
+				mb2.Messages = mb.Messages[:1]
 				mb2.TokenData = mb.TokenData[:1]
 				mb2.Interval = commit_store.CommitStoreInterval{Min: 1, Max: 1}
 				mb2.Proof = mb2.Tree.Prove([]int{0})
@@ -412,7 +397,7 @@ func TestExecReport(t *testing.T) {
 }
 
 func TestExecShouldAcceptFinalizedReport(t *testing.T) {
-	msg, err := abihelpers.EncodeMessage(&evm_2_evm_onramp.InternalEVM2EVMMessage{
+	msg := evm_2_evm_offramp.InternalEVM2EVMMessage{
 		SequenceNumber: 12,
 		FeeTokenAmount: big.NewInt(1e9),
 		Sender:         common.Address{},
@@ -424,11 +409,9 @@ func TestExecShouldAcceptFinalizedReport(t *testing.T) {
 		TokenAmounts:   nil,
 		FeeToken:       common.Address{},
 		MessageId:      [32]byte{},
-	})
-	require.NoError(t, err)
+	}
 	report := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   []uint64{12},
-		EncodedMessages:   [][]byte{msg},
+		Messages:          []evm_2_evm_offramp.InternalEVM2EVMMessage{msg},
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
@@ -459,7 +442,7 @@ func TestExecShouldAcceptFinalizedReport(t *testing.T) {
 }
 
 func TestExecShouldTransmitAcceptedReport(t *testing.T) {
-	msg, err := abihelpers.EncodeMessage(&evm_2_evm_onramp.InternalEVM2EVMMessage{
+	msg := evm_2_evm_offramp.InternalEVM2EVMMessage{
 		SequenceNumber: 12,
 		FeeTokenAmount: big.NewInt(1e9),
 		Sender:         common.Address{},
@@ -471,11 +454,9 @@ func TestExecShouldTransmitAcceptedReport(t *testing.T) {
 		TokenAmounts:   nil,
 		FeeToken:       common.Address{},
 		MessageId:      [32]byte{},
-	})
-	require.NoError(t, err)
+	}
 	report := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   []uint64{12},
-		EncodedMessages:   [][]byte{msg},
+		Messages:          []evm_2_evm_offramp.InternalEVM2EVMMessage{msg},
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
@@ -537,21 +518,18 @@ func TestBuildBatch(t *testing.T) {
 	}
 
 	msg1 := evm2EVMOnRampCCIPSendRequestedWithMeta{
-		EVM2EVMOnRampCCIPSendRequested: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{
-			Message: evm_2_evm_onramp.InternalEVM2EVMMessage{
-				SequenceNumber: 1,
-				FeeTokenAmount: big.NewInt(1e9),
-				Sender:         sender1,
-				Nonce:          1,
-				GasLimit:       big.NewInt(1),
-				Strict:         false,
-				Receiver:       common.Address{},
-				Data:           nil,
-				TokenAmounts:   nil,
-				FeeToken:       srcNative,
-				MessageId:      [32]byte{},
-			},
-			Raw: gethtypes.Log{},
+		InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+			SequenceNumber: 1,
+			FeeTokenAmount: big.NewInt(1e9),
+			Sender:         sender1,
+			Nonce:          1,
+			GasLimit:       big.NewInt(1),
+			Strict:         false,
+			Receiver:       common.Address{},
+			Data:           nil,
+			TokenAmounts:   nil,
+			FeeToken:       srcNative,
+			MessageId:      [32]byte{},
 		},
 		blockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 	}

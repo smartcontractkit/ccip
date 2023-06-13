@@ -570,7 +570,7 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	return sourcePoolAddress, destToken, err
 }
 
-func (c *CCIPContracts) SendMessage(t *testing.T, gasLimit, gasPrice, tokenAmount *big.Int, receiverAddr common.Address) {
+func (c *CCIPContracts) SendMessage(t *testing.T, gasLimit, tokenAmount *big.Int, receiverAddr common.Address) {
 	extraArgs, err := GetEVMExtraArgsV1(gasLimit, false)
 	require.NoError(t, err)
 	msg := router.ClientEVM2AnyMessage{
@@ -1204,7 +1204,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	}
 	var leaves [][32]byte
 	var curr, prove int
-	var encodedMsg []byte
+	var msgs []evm_2_evm_offramp.InternalEVM2EVMMessage
 	var tokenData [][][]byte
 	sendRequestedIterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
 		Start: args.SourceStartBlock.Uint64(),
@@ -1223,7 +1223,11 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 			leaves = append(leaves, hash)
 			if sendRequestedIterator.Event.Message.SequenceNumber == seqNr {
 				fmt.Printf("Found proving %d %+v\n", curr, sendRequestedIterator.Event.Message)
-				encodedMsg = sendRequestedIterator.Event.Raw.Data
+				msg, err2 := abihelpers.DecodeOffRampMessage(sendRequestedIterator.Event.Raw.Data)
+				if err2 != nil {
+					return nil, err2
+				}
+				msgs = append(msgs, *msg)
 				var msgTokenData [][]byte
 				for range sendRequestedIterator.Event.Message.TokenAmounts {
 					msgTokenData = append(msgTokenData, []byte{})
@@ -1236,7 +1240,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 		}
 	}
 	sendRequestedIterator.Close()
-	if encodedMsg == nil {
+	if msgs == nil {
 		return nil, fmt.Errorf("unable to find msg with seqNr %d", seqNr)
 	}
 	tree, err := merklemulti.NewTree(mctx, leaves)
@@ -1249,8 +1253,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 
 	proof := tree.Prove([]int{prove})
 	offRampProof := evm_2_evm_offramp.InternalExecutionReport{
-		SequenceNumbers:   []uint64{seqNr},
-		EncodedMessages:   [][]byte{encodedMsg},
+		Messages:          msgs,
 		OffchainTokenData: tokenData,
 		Proofs:            proof.Hashes,
 		ProofFlagBits:     abihelpers.ProofFlagsToBits(proof.SourceFlags),

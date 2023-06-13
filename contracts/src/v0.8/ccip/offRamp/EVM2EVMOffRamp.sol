@@ -216,23 +216,21 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// @param manualExecution A boolean value indication whether this function is called
   /// from the DON (false) or manually (true).
   function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenHealthy {
-    uint256 numMsgs = report.encodedMessages.length;
+    uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
 
     bytes32[] memory hashedLeaves = new bytes32[](numMsgs);
-    Internal.EVM2EVMMessage[] memory decodedMessages = new Internal.EVM2EVMMessage[](numMsgs);
 
     for (uint256 i = 0; i < numMsgs; ++i) {
-      Internal.EVM2EVMMessage memory decodedMessage = abi.decode(report.encodedMessages[i], (Internal.EVM2EVMMessage));
+      Internal.EVM2EVMMessage memory message = report.messages[i];
       // We do this hash here instead of in _verifyMessages to avoid two separate loops
       // over the same data, which increases gas cost
-      hashedLeaves[i] = Internal._hash(decodedMessage, i_metadataHash);
+      hashedLeaves[i] = Internal._hash(message, i_metadataHash);
       // For EVM2EVM offramps, the messageID is the leaf hash.
       // Asserting that this is true ensures we don't accidentally commit and then execute
       // a message with an unexpected hash.
-      if (hashedLeaves[i] != decodedMessage.messageId) revert InvalidMessageId();
-      decodedMessages[i] = decodedMessage;
+      if (hashedLeaves[i] != message.messageId) revert InvalidMessageId();
     }
 
     // SECURITY CRITICAL CHECK
@@ -241,7 +239,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
     // Execute messages
     for (uint256 i = 0; i < numMsgs; ++i) {
-      Internal.EVM2EVMMessage memory message = decodedMessages[i];
+      Internal.EVM2EVMMessage memory message = report.messages[i];
       Internal.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
       // Two valid cases here, we either have never touched this message before, or we tried to execute
       // and failed. This check protects against reentry and re-execution because the other states are

@@ -28,9 +28,10 @@ contract BurnMintTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) {
+  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) returns (bytes memory) {
     IBurnMintERC20(address(i_token)).burn(amount);
     emit Burned(msg.sender, amount);
+    return "";
   }
 
   /// @notice Mint tokens from the pool to the recipient

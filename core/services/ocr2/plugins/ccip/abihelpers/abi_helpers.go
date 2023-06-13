@@ -129,28 +129,15 @@ func init() {
 	ExecutionReportArgs = manuallyExecuteMethod.Inputs
 }
 
-func MessagesFromExecutionReport(report types.Report) ([]evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
+func MessagesFromExecutionReport(report types.Report) ([]evm_2_evm_offramp.InternalEVM2EVMMessage, error) {
 	decodedExecutionReport, err := DecodeExecutionReport(report)
 	if err != nil {
 		return nil, err
 	}
-	var messages []evm_2_evm_onramp.InternalEVM2EVMMessage
-	for _, encMsg := range decodedExecutionReport.EncodedMessages {
-		msg, err := DecodeMessage(encMsg)
-		if err != nil {
-			return nil, err
-		}
-		// We assume err != nil when msg is nil.
-		messages = append(messages, *msg)
-	}
-	return messages, nil
+	return decodedExecutionReport.Messages, nil
 }
 
-func EncodeMessage(msg *evm_2_evm_onramp.InternalEVM2EVMMessage) ([]byte, error) {
-	return MessageArgs.Pack(msg)
-}
-
-func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
+func DecodeOffRampMessage(b []byte) (*evm_2_evm_offramp.InternalEVM2EVMMessage, error) {
 	unpacked, err := MessageArgs.Unpack(b)
 	if err != nil {
 		return nil, err
@@ -180,15 +167,15 @@ func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
 	}
-	var tokensAndAmounts []evm_2_evm_onramp.ClientEVMTokenAmount
+	var tokensAndAmounts []evm_2_evm_offramp.ClientEVMTokenAmount
 	for _, tokenAndAmount := range receivedCp.TokenAmounts {
-		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_onramp.ClientEVMTokenAmount{
+		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_offramp.ClientEVMTokenAmount{
 			Token:  tokenAndAmount.Token,
 			Amount: tokenAndAmount.Amount,
 		})
 	}
 
-	return &evm_2_evm_onramp.InternalEVM2EVMMessage{
+	return &evm_2_evm_offramp.InternalEVM2EVMMessage{
 		SourceChainSelector: receivedCp.SourceChainSelector,
 		SequenceNumber:      receivedCp.SequenceNumber,
 		FeeTokenAmount:      receivedCp.FeeTokenAmount,
@@ -202,6 +189,31 @@ func DecodeMessage(b []byte) (*evm_2_evm_onramp.InternalEVM2EVMMessage, error) {
 		FeeToken:            receivedCp.FeeToken,
 		MessageId:           receivedCp.MessageId,
 	}, nil
+}
+
+func OnRampMessageToOffRampMessage(msg evm_2_evm_onramp.InternalEVM2EVMMessage) evm_2_evm_offramp.InternalEVM2EVMMessage {
+	var tokensAndAmounts []evm_2_evm_offramp.ClientEVMTokenAmount
+	for _, tokenAndAmount := range msg.TokenAmounts {
+		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_offramp.ClientEVMTokenAmount{
+			Token:  tokenAndAmount.Token,
+			Amount: tokenAndAmount.Amount,
+		})
+	}
+
+	return evm_2_evm_offramp.InternalEVM2EVMMessage{
+		SourceChainSelector: msg.SourceChainSelector,
+		SequenceNumber:      msg.SequenceNumber,
+		FeeTokenAmount:      msg.FeeTokenAmount,
+		Sender:              msg.Sender,
+		Nonce:               msg.Nonce,
+		GasLimit:            msg.GasLimit,
+		Strict:              msg.Strict,
+		Receiver:            msg.Receiver,
+		Data:                msg.Data,
+		TokenAmounts:        tokensAndAmounts,
+		FeeToken:            msg.FeeToken,
+		MessageId:           msg.MessageId,
+	}
 }
 
 // ProofFlagsToBits transforms a list of boolean proof flags to a *big.Int
@@ -231,8 +243,23 @@ func DecodeExecutionReport(report []byte) (evm_2_evm_offramp.InternalExecutionRe
 
 	// Must be anonymous struct here
 	erStruct, ok := unpacked[0].(struct {
-		SequenceNumbers   []uint64    `json:"sequenceNumbers"`
-		EncodedMessages   [][]byte    `json:"encodedMessages"`
+		Messages []struct {
+			SourceChainSelector uint64         `json:"sourceChainSelector"`
+			SequenceNumber      uint64         `json:"sequenceNumber"`
+			FeeTokenAmount      *big.Int       `json:"feeTokenAmount"`
+			Sender              common.Address `json:"sender"`
+			Nonce               uint64         `json:"nonce"`
+			GasLimit            *big.Int       `json:"gasLimit"`
+			Strict              bool           `json:"strict"`
+			Receiver            common.Address `json:"receiver"`
+			Data                []uint8        `json:"data"`
+			TokenAmounts        []struct {
+				Token  common.Address `json:"token"`
+				Amount *big.Int       `json:"amount"`
+			} `json:"tokenAmounts"`
+			FeeToken  common.Address `json:"feeToken"`
+			MessageId [32]byte       `json:"messageId"`
+		} `json:"messages"`
 		OffchainTokenData [][][]byte  `json:"offchainTokenData"`
 		Proofs            [][32]uint8 `json:"proofs"`
 		ProofFlagBits     *big.Int    `json:"proofFlagBits"`
@@ -241,9 +268,33 @@ func DecodeExecutionReport(report []byte) (evm_2_evm_offramp.InternalExecutionRe
 		return evm_2_evm_offramp.InternalExecutionReport{}, fmt.Errorf("got %T", unpacked[0])
 	}
 	var er evm_2_evm_offramp.InternalExecutionReport
-	er.EncodedMessages = erStruct.EncodedMessages
+	er.Messages = []evm_2_evm_offramp.InternalEVM2EVMMessage{}
+
+	for _, msg := range erStruct.Messages {
+		var tokensAndAmounts []evm_2_evm_offramp.ClientEVMTokenAmount
+		for _, tokenAndAmount := range msg.TokenAmounts {
+			tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_offramp.ClientEVMTokenAmount{
+				Token:  tokenAndAmount.Token,
+				Amount: tokenAndAmount.Amount,
+			})
+		}
+		er.Messages = append(er.Messages, evm_2_evm_offramp.InternalEVM2EVMMessage{
+			SourceChainSelector: msg.SourceChainSelector,
+			SequenceNumber:      msg.SequenceNumber,
+			FeeTokenAmount:      msg.FeeTokenAmount,
+			Sender:              msg.Sender,
+			Nonce:               msg.Nonce,
+			GasLimit:            msg.GasLimit,
+			Strict:              msg.Strict,
+			Receiver:            msg.Receiver,
+			Data:                msg.Data,
+			TokenAmounts:        tokensAndAmounts,
+			FeeToken:            msg.FeeToken,
+			MessageId:           msg.MessageId,
+		})
+	}
+
 	er.OffchainTokenData = erStruct.OffchainTokenData
-	er.SequenceNumbers = erStruct.SequenceNumbers
 	er.Proofs = append(er.Proofs, erStruct.Proofs...)
 	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
 	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.

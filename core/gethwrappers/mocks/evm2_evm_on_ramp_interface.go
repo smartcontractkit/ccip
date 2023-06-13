@@ -1604,17 +1604,17 @@ func (_m *EVM2EVMOnRampInterface) SetDynamicConfig(opts *bind.TransactOpts, dyna
 	return r0, r1
 }
 
-// SetFeeTokenConfig provides a mock function with given fields: opts, feeTokenConfigs
-func (_m *EVM2EVMOnRampInterface) SetFeeTokenConfig(opts *bind.TransactOpts, feeTokenConfigs []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs) (*types.Transaction, error) {
-	ret := _m.Called(opts, feeTokenConfigs)
+// SetFeeTokenConfig provides a mock function with given fields: opts, feeTokenConfigArgs
+func (_m *EVM2EVMOnRampInterface) SetFeeTokenConfig(opts *bind.TransactOpts, feeTokenConfigArgs []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs) (*types.Transaction, error) {
+	ret := _m.Called(opts, feeTokenConfigArgs)
 
 	var r0 *types.Transaction
 	var r1 error
 	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs) (*types.Transaction, error)); ok {
-		return rf(opts, feeTokenConfigs)
+		return rf(opts, feeTokenConfigArgs)
 	}
 	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs) *types.Transaction); ok {
-		r0 = rf(opts, feeTokenConfigs)
+		r0 = rf(opts, feeTokenConfigArgs)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
@@ -1622,7 +1622,7 @@ func (_m *EVM2EVMOnRampInterface) SetFeeTokenConfig(opts *bind.TransactOpts, fee
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs) error); ok {
-		r1 = rf(opts, feeTokenConfigs)
+		r1 = rf(opts, feeTokenConfigArgs)
 	} else {
 		r1 = ret.Error(1)
 	}
