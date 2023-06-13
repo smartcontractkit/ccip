@@ -129,7 +129,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 
 	observations := make([]ObservedMessage, len(mb.Messages))
 	for i, msg := range mb.Messages {
-		observations[i] = ObservedMessage{SeqNr: msg.SequenceNumber, TokenData: mb.TokenData[i]}
+		observations[i] = NewObservedMessage(msg.SequenceNumber, mb.TokenData[i])
 	}
 
 	// buildReport should cap the built report to fit in MaxExecutionReportLength
@@ -226,6 +226,10 @@ func TestExecObservation(t *testing.T) {
 	th.CommitAndPollLogs(t)
 	th.CommitAndPollLogs(t)
 
+	expectedObservations := NewExecutionObservation([]ObservedMessage{
+		{SeqNr: 1, MsgData: MsgData{TokenData: [][]byte{{}}}},
+		{SeqNr: 2, MsgData: MsgData{TokenData: [][]byte{{}}}},
+	})
 	tests := []struct {
 		name            string
 		commitStoreDown bool
@@ -235,10 +239,7 @@ func TestExecObservation(t *testing.T) {
 		{
 			"base",
 			false,
-			&ExecutionObservation{Messages: []ObservedMessage{
-				{SeqNr: 1, TokenData: [][]byte{{}}},
-				{SeqNr: 2, TokenData: [][]byte{{}}},
-			}},
+			&expectedObservations,
 			false,
 		},
 		{
@@ -317,8 +318,8 @@ func TestExecReport(t *testing.T) {
 			"base",
 			false,
 			[][]ObservedMessage{
-				{{SeqNr: 1, TokenData: [][]byte{{}}}, {SeqNr: 2, TokenData: [][]byte{{}}}},
-				{{SeqNr: 1, TokenData: [][]byte{{}}}, {SeqNr: 2, TokenData: [][]byte{{}}}},
+				{NewObservedMessage(1, [][]byte{{}}), NewObservedMessage(2, [][]byte{{}})},
+				{NewObservedMessage(1, [][]byte{{}}), NewObservedMessage(2, [][]byte{{}})},
 			},
 			true,
 			&execReport,
@@ -328,8 +329,8 @@ func TestExecReport(t *testing.T) {
 			"partial observation",
 			false,
 			[][]ObservedMessage{
-				{{SeqNr: 1, TokenData: [][]byte{{}}}, {SeqNr: 2, TokenData: [][]byte{{}}}},
-				{{SeqNr: 1, TokenData: [][]byte{{}}}},
+				{NewObservedMessage(1, [][]byte{{}}), NewObservedMessage(2, [][]byte{{}})},
+				{NewObservedMessage(1, [][]byte{{}})},
 			},
 			true,
 			func() *evm_2_evm_offramp.InternalExecutionReport {
@@ -349,7 +350,7 @@ func TestExecReport(t *testing.T) {
 			"empty",
 			false,
 			[][]ObservedMessage{
-				{{SeqNr: 1, TokenData: [][]byte{{}}}, {SeqNr: 2, TokenData: [][]byte{{}}}},
+				{NewObservedMessage(1, [][]byte{{}}), NewObservedMessage(2, [][]byte{{}})},
 				{},
 			},
 			false,
@@ -360,8 +361,8 @@ func TestExecReport(t *testing.T) {
 			"unknown seqNr",
 			false,
 			[][]ObservedMessage{
-				{{SeqNr: 1, TokenData: [][]byte{{}}}, {SeqNr: 2, TokenData: [][]byte{{}}}, {SeqNr: 3, TokenData: [][]byte{{}}}},
-				{{SeqNr: 1, TokenData: [][]byte{{}}}, {SeqNr: 2, TokenData: [][]byte{{}}}, {SeqNr: 3, TokenData: [][]byte{{}}}},
+				{NewObservedMessage(1, [][]byte{{}}), NewObservedMessage(2, [][]byte{{}}), NewObservedMessage(3, [][]byte{{}})},
+				{NewObservedMessage(1, [][]byte{{}}), NewObservedMessage(2, [][]byte{{}}), NewObservedMessage(3, [][]byte{{}})},
 			},
 			false,
 			nil,
@@ -373,7 +374,7 @@ func TestExecReport(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var obs []ocrtypes.AttributedObservation
 			for _, o := range tt.observations {
-				encoded, err := ExecutionObservation{Messages: o}.Marshal()
+				encoded, err := NewExecutionObservation(o).Marshal()
 				require.NoError(t, err)
 				obs = append(obs, ocrtypes.AttributedObservation{Observation: encoded})
 			}

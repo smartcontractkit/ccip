@@ -171,7 +171,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	// cap observations which fits MaxObservationLength (after serialized)
 	capped := sort.Search(len(executableObservations), func(i int) bool {
 		var encoded []byte
-		encoded, err = ExecutionObservation{Messages: executableObservations[:i+1]}.Marshal()
+		encoded, err = NewExecutionObservation(executableObservations[:i+1]).Marshal()
 		if err != nil {
 			// false makes Search keep looking to the right, always including any "erroring" ObservedMessage and allowing us to detect in the bottom
 			return false
@@ -184,7 +184,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	executableObservations = executableObservations[:capped]
 	lggr.Infow("Observation", "executableMessages", executableObservations)
 	// Note can be empty
-	return ExecutionObservation{Messages: executableObservations}.Marshal()
+	return NewExecutionObservation(executableObservations).Marshal()
 }
 
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
@@ -503,10 +503,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		}
 
 		msgLggr.Infow("Adding msg to batch", "seqNum", msg.SequenceNumber, "nonce", msg.Nonce)
-		executableMessages = append(executableMessages, ObservedMessage{
-			SeqNr:     msg.SequenceNumber,
-			TokenData: tokenData,
-		})
+		executableMessages = append(executableMessages, NewObservedMessage(msg.SequenceNumber, tokenData))
 		expectedNonces[msg.Sender] = msg.Nonce + 1
 	}
 	return executableMessages
@@ -765,20 +762,20 @@ type seqNumTally struct {
 func calculateObservedMessagesConsensus(lggr logger.Logger, observations []ExecutionObservation, f int) []ObservedMessage {
 	tally := make(map[uint64]seqNumTally)
 	for _, obs := range observations {
-		for _, message := range obs.Messages {
-			if val, ok := tally[message.SeqNr]; ok {
+		for seqNr, msgData := range obs.Messages {
+			if val, ok := tally[seqNr]; ok {
 				// If we've already seen the seqNum we check if the token data is the same
-				if !reflect.DeepEqual(message.TokenData, val.TokenData) {
-					lggr.Warnf("Nodes reported different offchain token data [%v] [%v]", message.TokenData, val.TokenData)
+				if !reflect.DeepEqual(msgData.TokenData, val.TokenData) {
+					lggr.Warnf("Nodes reported different offchain token data [%v] [%v]", msgData.TokenData, val.TokenData)
 				}
 				val.Tally++
-				tally[message.SeqNr] = val
+				tally[seqNr] = val
 				continue
 			}
 			// If we have not seen the seqNum we save a tally with the token data
-			tally[message.SeqNr] = seqNumTally{
+			tally[seqNr] = seqNumTally{
 				Tally:     1,
-				TokenData: message.TokenData,
+				TokenData: msgData.TokenData,
 			}
 		}
 	}
@@ -787,10 +784,7 @@ func calculateObservedMessagesConsensus(lggr logger.Logger, observations []Execu
 		// Note spec deviation - I think it's ok to rely on the batch builder for
 		// capping the number of messages vs capping in two places/ways?
 		if tallyInfo.Tally > f {
-			finalSequenceNumbers = append(finalSequenceNumbers, ObservedMessage{
-				SeqNr:     seqNr,
-				TokenData: tallyInfo.TokenData,
-			})
+			finalSequenceNumbers = append(finalSequenceNumbers, NewObservedMessage(seqNr, tallyInfo.TokenData))
 		}
 	}
 	// buildReport expects sorted sequence numbers (tally map is non-deterministic).

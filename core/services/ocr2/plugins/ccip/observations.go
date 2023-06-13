@@ -21,13 +21,39 @@ func (o CommitObservation) Marshal() ([]byte, error) {
 	return json.Marshal(&o)
 }
 
+// ExecutionObservation stores messages as a map pointing from a sequence number (uint) to the message payload (MsgData)
+// Having it structured this way is critical because:
+// * it prevents having duplicated sequence numbers within a single ExecutionObservation (compared to the list representation)
+// * prevents malicious actors from passing multiple messages with the same sequence number
 type ExecutionObservation struct {
-	Messages []ObservedMessage `json:"messages"`
+	Messages map[uint64]MsgData `json:"messages"`
 }
 
-type ObservedMessage struct {
-	SeqNr     uint64   `json:"seqNr"`
+type MsgData struct {
 	TokenData [][]byte `json:"tokenData"`
+}
+
+// ObservedMessage is a transient struct used for processing convenience within the plugin. It's easier to process observed messages
+// when all properties are flattened into a single structure.
+// It should not be serialized and returned from types.ReportingPlugin functions, please serialize/deserialize to/from ExecutionObservation instead using NewObservedMessage
+type ObservedMessage struct {
+	SeqNr uint64
+	MsgData
+}
+
+func NewExecutionObservation(observations []ObservedMessage) ExecutionObservation {
+	denormalized := make(map[uint64]MsgData, len(observations))
+	for _, o := range observations {
+		denormalized[o.SeqNr] = MsgData{TokenData: o.TokenData}
+	}
+	return ExecutionObservation{Messages: denormalized}
+}
+
+func NewObservedMessage(seqNr uint64, tokenData [][]byte) ObservedMessage {
+	return ObservedMessage{
+		SeqNr:   seqNr,
+		MsgData: MsgData{TokenData: tokenData},
+	}
 }
 
 func (o ExecutionObservation) Marshal() ([]byte, error) {
