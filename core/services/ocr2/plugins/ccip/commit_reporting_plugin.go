@@ -362,15 +362,11 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	sourceNativePriceUSD := rawTokenPricesUSD[r.config.sourceNative]
 	tokenPricesUSD = make(map[common.Address]*big.Int, len(rawTokenPricesUSD))
 	for token := range rawTokenPricesUSD {
-		if !slices.Contains(tokensWithDecimal, token) {
+		decimals, exists := r.tokenToDecimalMapping[token]
+		if !exists {
 			// do not include any address which isn't a supported token on dest chain, including sourceNative
 			lggr.Infow("Skipping token not supported on dest chain", "token", token)
 			continue
-		}
-
-		decimals, ok := r.tokenToDecimalMapping[token]
-		if !ok {
-			return nil, nil, errors.Errorf("missing token decimals: %+v", token)
 		}
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], decimals)
 	}
@@ -482,7 +478,8 @@ func generateTokenToDecimalMapping(ctx context.Context, config CommitPluginConfi
 
 		decimal, err := tokenContract.Decimals(&bind.CallOpts{Context: ctx})
 		if err != nil {
-			return nil, err
+			config.lggr.Errorf("Error while getting token %s decimals, token skipped: %s", token.String(), err)
+			continue
 		}
 		newMapping[token] = decimal
 	}
