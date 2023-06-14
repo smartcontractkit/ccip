@@ -166,4 +166,12 @@ contract MerkleMultiProofTest is BaseTest {
     bytes32[] memory proofs = new bytes32[](0);
     assertEq(MerkleMultiProof.merkleRoot(leaves, proofs, 0), leaves[0]);
   }
+
+  function testEmptyLeafReverts() public {
+    bytes32[] memory leaves = new bytes32[](0);
+    bytes32[] memory proofs = new bytes32[](0);
+
+    vm.expectRevert(abi.encodeWithSelector(MerkleMultiProof.LeavesCannotBeEmpty.selector));
+    MerkleMultiProof.merkleRoot(leaves, proofs, 0);
+  }
 }

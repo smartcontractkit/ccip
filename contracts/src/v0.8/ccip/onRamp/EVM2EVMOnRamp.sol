@@ -473,9 +473,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
 
     // Total tx fee in USD with 18 decimals precision, excluding token bps
-    uint256 executionFeeUsdValue = gasPrice *
-      (((_fromBytes(message.extraArgs).gasLimit + feeTokenConfig.destGasOverhead) * feeTokenConfig.multiplier) /
-        1 ether) +
+    uint256 executionFeeUsdValue = (gasPrice *
+      ((_fromBytes(message.extraArgs).gasLimit + feeTokenConfig.destGasOverhead) * feeTokenConfig.multiplier)) /
+      1 ether +
       feeTokenConfig.networkFeeAmountUSD;
 
     // Transform the execution fee into fee token amount and add the token bps fee

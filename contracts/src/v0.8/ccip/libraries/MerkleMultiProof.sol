@@ -9,6 +9,7 @@ library MerkleMultiProof {
     0x0000000000000000000000000000000000000000000000000000000000000001;
 
   error InvalidProof();
+  error LeavesCannotBeEmpty();
 
   /// @notice Computes the root based on provided pre-hashed leaf nodes in
   /// leaves, internal nodes in proofs, and using proofFlagBits' i-th bit to
@@ -51,6 +52,7 @@ library MerkleMultiProof {
   ) internal pure returns (bytes32) {
     unchecked {
       uint256 leavesLen = leaves.length;
+      if (leavesLen == 0) revert LeavesCannotBeEmpty();
       // As of Solidity 0.6.5, overflow is not possible here because in-memory arrays are limited to
       // a max length of 2**64-1. Two uint64 values will not overflow a uint256.
       // See: https://blog.soliditylang.org/2020/04/06/memory-creation-overflow-bug/
