@@ -6,7 +6,9 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
@@ -15,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
@@ -337,8 +340,6 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			ccipTH.Dest.Chain.Commit()
 			ccipTH.EventuallySendRequested(t, uint64(i))
 		}
-		seqNumAtOnRampV1 := currentSeqNum + 1
-		ccipTH.ConsistentlyReportNotCommitted(t, seqNumAtOnRampV1, commitStoreV1.Address())
 
 		// delete v1 jobs
 		for _, node := range ccipTH.Nodes {
@@ -359,12 +360,14 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		jobParams.Version = "v2"
 		jobParams.SourceStartBlock = srcStartBlock
 		ccipTH.AddAllJobs(t, jobParams)
-
+		committedSeqNum := uint64(0)
 		// Now the requests should be delivered
 		for i := startSeq; i <= endSeqNum; i++ {
 			t.Logf("verifying seqnum %d", i)
 			ccipTH.AllNodesHaveReqSeqNum(t, i)
-			ccipTH.EventuallyReportCommitted(t, i)
+			if committedSeqNum < uint64(i+1) {
+				committedSeqNum = ccipTH.EventuallyReportCommitted(t, i)
+			}
 			ccipTH.EventuallyExecutionStateChangedToSuccess(t, []uint64{uint64(i)}, uint64(newConfigBlock))
 		}
 
@@ -524,5 +527,78 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			})
 		}
 		ccipTH.AssertBalances(t, srcBalanceAssertions)
+	})
+
+	// Keep on sending a bunch of messages
+	// In the meantime update onchainConfig with new price registry address
+	// Verify if the jobs can pick up updated config
+	// Verify if all the messages are sent
+	t.Run("config change or price registry update while requests are inflight", func(t *testing.T) {
+		gasLimit := big.NewInt(200_003) // prime number
+		tokenAmount := big.NewInt(100)
+		msgWg := &sync.WaitGroup{}
+		msgWg.Add(1)
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		startSeq := currentSeqNum
+		endSeq := currentSeqNum + 20
+
+		// send message with the old configs
+		ccipTH.SendMessage(t, gasLimit, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
+		ccipTH.Source.Chain.Commit()
+
+		go func(ccipContracts testhelpers.CCIPContracts, currentSeqNum int) {
+			seqNumber := currentSeqNum + 1
+			defer msgWg.Done()
+			for {
+				select {
+				case <-ticker.C:
+					t.Logf("sending request for seqnum %d", seqNumber)
+					ccipContracts.SendMessage(t, gasLimit, tokenAmount, ccipTH.Dest.Receivers[0].Receiver.Address())
+					ccipContracts.Source.Chain.Commit()
+					seqNumber++
+					if seqNumber == endSeq {
+						return
+					}
+				}
+			}
+		}(ccipTH.CCIPContracts, currentSeqNum)
+
+		ccipTH.DeployNewPriceRegistry(t)
+		commitOnchainConfig := ccipTH.CreateDefaultCommitOnchainConfig(t)
+		commitOffchainConfig := ccipTH.CreateDefaultCommitOffchainConfig(t)
+		execOnchainConfig := ccipTH.CreateDefaultExecOnchainConfig(t)
+		execOffchainConfig := ccipTH.CreateDefaultExecOffchainConfig(t)
+
+		ccipTH.SetupOnchainConfig(t, commitOnchainConfig, commitOffchainConfig, execOnchainConfig, execOffchainConfig)
+
+		// wait for all requests to be complete
+		msgWg.Wait()
+		for i := startSeq; i < endSeq; i++ {
+			ccipTH.AllNodesHaveReqSeqNum(t, i)
+			ccipTH.EventuallyReportCommitted(t, i)
+
+			executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, i, i)
+			assert.Len(t, executionLogs, 1)
+			ccipTH.AssertExecState(t, executionLogs[0], abihelpers.ExecutionStateSuccess)
+		}
+
+		for i, node := range ccipTH.Nodes {
+			t.Logf("verifying node %d", i)
+			node.EventuallyNodeUsesNewCommitConfig(t, ccipTH, ccipconfig.CommitOnchainConfig{
+				PriceRegistry: ccipTH.Dest.PriceRegistry.Address(),
+				Arm:           ccipTH.Dest.ARM.Address(),
+			})
+			node.EventuallyNodeUsesNewExecConfig(t, ccipTH, ccipconfig.ExecOnchainConfig{
+				PermissionLessExecutionThresholdSeconds: testhelpers.PermissionLessExecutionThresholdSeconds,
+				Router:                                  ccipTH.Dest.Router.Address(),
+				Arm:                                     ccipTH.Dest.ARM.Address(),
+				PriceRegistry:                           ccipTH.Dest.PriceRegistry.Address(),
+				MaxDataSize:                             1e5,
+				MaxTokensLength:                         5,
+			})
+			node.EventuallyNodeUsesUpdatedPriceRegistry(t, ccipTH)
+		}
+		currentSeqNum = endSeq
 	})
 }

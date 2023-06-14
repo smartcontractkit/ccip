@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
@@ -390,4 +391,18 @@ func EvmWord(i uint64) common.Hash {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, i)
 	return common.BigToHash(big.NewInt(0).SetBytes(b))
+}
+
+func DecodeOCR2Config(encoded []byte) (*ocr2aggregator.OCR2AggregatorConfigSet, error) {
+	unpacked := new(ocr2aggregator.OCR2AggregatorConfigSet)
+	abiPointer, err := ocr2aggregator.OCR2AggregatorMetaData.GetAbi()
+	if err != nil {
+		return unpacked, err
+	}
+	defaultABI := *abiPointer
+	err = defaultABI.UnpackIntoInterface(unpacked, "ConfigSet", encoded)
+	if err != nil {
+		return unpacked, errors.Wrap(err, "failed to unpack log data")
+	}
+	return unpacked, nil
 }

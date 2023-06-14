@@ -246,6 +246,8 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 	)
 
 	require.NoError(t, err)
+	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
 	c.Source.OnRamp, err = evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.Source.Chain)
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
@@ -286,6 +288,35 @@ func (c *CCIPContracts) DeployNewCommitStore(t *testing.T) {
 	// since CommitStoreHelper derives from CommitStore, it's safe to instantiate both on same address
 	c.Dest.CommitStore, err = commit_store.NewCommitStore(commitStoreAddress, c.Dest.Chain)
 	require.NoError(t, err)
+}
+
+func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
+	t.Log("Deploying new Price Registry")
+	destPricesAddress, _, _, err := price_registry.DeployPriceRegistry(
+		c.Dest.User,
+		c.Dest.Chain,
+		price_registry.InternalPriceUpdates{
+			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+				{
+					SourceToken: c.Dest.LinkToken.Address(),
+					UsdPerToken: big.NewInt(8e18), // 8usd
+				},
+			},
+			DestChainSelector: c.Source.ChainID,
+			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+		},
+		[]common.Address{c.Dest.CommitStore.Address()},
+		[]common.Address{c.Dest.LinkToken.Address()},
+		60*60*24*14, // two weeks
+	)
+	require.NoError(t, err)
+	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
+	c.Dest.PriceRegistry, err = price_registry.NewPriceRegistry(destPricesAddress, c.Dest.Chain)
+	require.NoError(t, err)
+	t.Logf("New Price Registry deployed at %s", destPricesAddress.String())
+	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
 }
 
 func (c *CCIPContracts) SetNopsOnRamp(t *testing.T, nopsAndWeights []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight) {

@@ -16,6 +16,8 @@ import (
 	types3 "github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
 	"github.com/onsi/gomega"
+	"github.com/pkg/errors"
+
 	ctfClient "github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
@@ -42,10 +44,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
+	evmrelay "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -66,6 +70,75 @@ func (node *Node) FindJobIDForContract(t *testing.T, addr common.Address) int32 
 	}
 	t.Fatalf("Could not find job for contract %s", addr.Hex())
 	return 0
+}
+
+func (node *Node) EventuallyNodeUsesUpdatedPriceRegistry(t *testing.T, ccipContracts CCIPIntegrationTestHarness) logpoller.Log {
+	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
+	require.NoError(t, err)
+	var log logpoller.Log
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		ccipContracts.Source.Chain.Commit()
+		ccipContracts.Dest.Chain.Commit()
+		log, err := c.LogPoller().LatestLogByEventSigWithConfs(
+			abihelpers.EventSignatures.UsdPerUnitGasUpdated,
+			ccipContracts.Dest.PriceRegistry.Address(),
+			0,
+			pg.WithParentCtx(testutils.Context(t)),
+		)
+		require.NoError(t, err)
+		return log != nil
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "node is not using updated price registry %s", ccipContracts.Dest.PriceRegistry.Address().Hex())
+	return log
+}
+
+func (node *Node) EventuallyNodeUsesNewCommitConfig(t *testing.T, ccipContracts CCIPIntegrationTestHarness, commitCfg ccipconfig.CommitOnchainConfig) logpoller.Log {
+	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
+	require.NoError(t, err)
+	var log logpoller.Log
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		ccipContracts.Source.Chain.Commit()
+		ccipContracts.Dest.Chain.Commit()
+		log, err := c.LogPoller().LatestLogByEventSigWithConfs(
+			evmrelay.ConfigSet,
+			ccipContracts.Dest.CommitStore.Address(),
+			0,
+			pg.WithParentCtx(testutils.Context(t)),
+		)
+		require.NoError(t, err)
+		var latestCfg ccipconfig.CommitOnchainConfig
+		if log != nil {
+			latestCfg, err = DecodeCommitOnChainConfig(log.Data)
+			require.NoError(t, err)
+			return latestCfg == commitCfg
+		}
+		return false
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "node is using old cfg")
+	return log
+}
+
+func (node *Node) EventuallyNodeUsesNewExecConfig(t *testing.T, ccipContracts CCIPIntegrationTestHarness, execCfg ccipconfig.ExecOnchainConfig) logpoller.Log {
+	c, err := node.App.GetChains().EVM.Get(big.NewInt(0).SetUint64(ccipContracts.Dest.ChainID))
+	require.NoError(t, err)
+	var log logpoller.Log
+	gomega.NewGomegaWithT(t).Eventually(func() bool {
+		ccipContracts.Source.Chain.Commit()
+		ccipContracts.Dest.Chain.Commit()
+		log, err := c.LogPoller().LatestLogByEventSigWithConfs(
+			evmrelay.ConfigSet,
+			ccipContracts.Dest.OffRamp.Address(),
+			0,
+			pg.WithParentCtx(testutils.Context(t)),
+		)
+		require.NoError(t, err)
+		var latestCfg ccipconfig.ExecOnchainConfig
+		if log != nil {
+			latestCfg, err = DecodeExecOnChainConfig(log.Data)
+			require.NoError(t, err)
+			return latestCfg == execCfg
+		}
+		return false
+	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "node is using old cfg")
+	return log
 }
 
 func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPIntegrationTestHarness, onRamp common.Address, seqNum int) logpoller.Log {
@@ -461,9 +534,10 @@ func (c *CCIPIntegrationTestHarness) EventuallyExecutionStateChangedToSuccess(t 
 		Should(gomega.BeTrue(), "ExecutionStateChanged Event")
 }
 
-func (c *CCIPIntegrationTestHarness) EventuallyReportCommitted(t *testing.T, max int, commitStoreOpts ...common.Address) {
+func (c *CCIPIntegrationTestHarness) EventuallyReportCommitted(t *testing.T, max int, commitStoreOpts ...common.Address) uint64 {
 	var commitStore *commit_store.CommitStore
 	var err error
+	var committedSeqNum uint64
 	if len(commitStoreOpts) > 0 {
 		commitStore, err = commit_store.NewCommitStore(commitStoreOpts[0], c.Dest.Chain)
 		require.NoError(t, err)
@@ -476,9 +550,11 @@ func (c *CCIPIntegrationTestHarness) EventuallyReportCommitted(t *testing.T, max
 		require.NoError(t, err)
 		c.Source.Chain.Commit()
 		c.Dest.Chain.Commit()
-		t.Log("min seq num reported", minSeqNum)
+		t.Log("next expected seq num reported", minSeqNum)
+		committedSeqNum = minSeqNum
 		return minSeqNum > uint64(max)
 	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue(), "report has not been committed")
+	return committedSeqNum
 }
 
 func (c *CCIPIntegrationTestHarness) EventuallySendRequested(t *testing.T, seqNum uint64, onRampOpts ...common.Address) {
@@ -611,4 +687,31 @@ func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeli
 	c.Dest.Chain.Commit()
 
 	return jobParams
+}
+func DecodeCommitOnChainConfig(encoded []byte) (ccipconfig.CommitOnchainConfig, error) {
+	var onchainConfig ccipconfig.CommitOnchainConfig
+	unpacked, err := abihelpers.DecodeOCR2Config(encoded)
+	if err != nil {
+		return onchainConfig, err
+	}
+	onChainCfg := unpacked.OnchainConfig
+	onchainConfig, err = abihelpers.DecodeAbiStruct[ccipconfig.CommitOnchainConfig](onChainCfg)
+	if err != nil {
+		return onchainConfig, err
+	}
+	return onchainConfig, nil
+}
+
+func DecodeExecOnChainConfig(encoded []byte) (ccipconfig.ExecOnchainConfig, error) {
+	var onchainConfig ccipconfig.ExecOnchainConfig
+	unpacked, err := abihelpers.DecodeOCR2Config(encoded)
+	if err != nil {
+		return onchainConfig, errors.Wrap(err, "failed to unpack log data")
+	}
+	onChainCfg := unpacked.OnchainConfig
+	onchainConfig, err = abihelpers.DecodeAbiStruct[ccipconfig.ExecOnchainConfig](onChainCfg)
+	if err != nil {
+		return onchainConfig, err
+	}
+	return onchainConfig, nil
 }
