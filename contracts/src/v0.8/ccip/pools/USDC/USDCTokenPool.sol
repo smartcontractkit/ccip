@@ -53,7 +53,7 @@ contract USDCTokenPool is TokenPool {
   }
 
   // A mapping of CCIP chain identifiers to destination domains
-  mapping(uint64 => Domain) private s_chainToDomain;
+  mapping(uint64 chainSelector => Domain CCTPDomain) private s_chainToDomain;
 
   constructor(
     USDCConfig memory config,

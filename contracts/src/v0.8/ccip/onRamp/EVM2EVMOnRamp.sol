@@ -96,7 +96,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @dev Struct to hold the execution fee configuration for a fee token
   struct FeeTokenConfig {
-    uint96 networkFeeAmountUSD; // -┐ Flat network fee in USD
+    uint96 networkFeeAmountUSD; // -┐ Flat network fee in 1e18 USD
     uint64 multiplier; //           | Price multiplier for gas costs
     uint32 destGasOverhead; // -----┘ Extra gas charged on top of the gasLimit
   }
@@ -106,7 +106,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   struct FeeTokenConfigArgs {
     address token; // --------------┐ Token address
     uint64 multiplier; // ----------┘ Price multiplier for gas costs
-    uint96 networkFeeAmountUSD; // -┐ Flat network fee in USD
+    uint96 networkFeeAmountUSD; // -┐ Flat network fee in 1e18 USD
     uint32 destGasOverhead; // -----┘ Extra gas charged on top of the gasLimit
   }
 
@@ -167,13 +167,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev A set of addresses which can make ccipSend calls.
   EnumerableSet.AddressSet private s_allowList;
   /// @dev The execution fee token config that can be set by the owner or fee admin
-  mapping(address => FeeTokenConfig) internal s_feeTokenConfig;
+  mapping(address token => FeeTokenConfig feeTokenConfig) internal s_feeTokenConfig;
   /// @dev The token transfer fee config that can be set by the owner or fee admin
-  mapping(address => TokenTransferFeeConfig) internal s_tokenTransferFeeConfig;
+  mapping(address token => TokenTransferFeeConfig tranferFeeConfig) internal s_tokenTransferFeeConfig;
 
   // STATE
   /// @dev The current nonce per sender
-  mapping(address => uint64) internal s_senderNonce;
+  mapping(address sender => uint64 nonce) internal s_senderNonce;
   /// @dev The amount of LINK available to pay NOPS
   uint96 internal s_nopFeesJuels;
   /// @dev The combined weight of all NOPs weights

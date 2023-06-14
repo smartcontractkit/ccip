@@ -53,7 +53,7 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
   uint32 internal s_latestConfigBlockNumber;
 
   // Transmitter address
-  mapping(address => Oracle) internal s_oracles;
+  mapping(address transmitter => Oracle oracle) internal s_oracles;
 
   // s_transmitters contains the transmission address of each oracle,
   // i.e. the address the oracle actually sends transactions to the contract from

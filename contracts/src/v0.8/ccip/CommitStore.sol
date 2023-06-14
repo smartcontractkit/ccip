@@ -70,7 +70,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   /// @dev Whether this OnRamp is paused or not
   bool private s_paused = false;
   // merkleRoot => timestamp when received
-  mapping(bytes32 => uint256) private s_roots;
+  mapping(bytes32 merkleRoot => uint256 timestamp) private s_roots;
 
   /// @param staticConfig Containing the static part of the commitStore config
   /// @dev When instantiating OCR2Base we set UNIQUE_REPORTS to false, which means

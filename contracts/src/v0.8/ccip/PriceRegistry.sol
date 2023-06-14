@@ -35,14 +35,15 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   ///     Very Expensive:   1 unit of gas costs 1 USD                  -> 1e18
   ///     Expensive:        1 unit of gas costs 0.1 USD                -> 1e17
   ///     Cheap:            1 unit of gas costs 0.000001 USD           -> 1e12
-  mapping(uint64 => Internal.TimestampedUint192Value) private s_usdPerUnitGasByDestChainSelector;
+  mapping(uint64 destChainSelector => Internal.TimestampedUint192Value price)
+    private s_usdPerUnitGasByDestChainSelector;
 
   /// @dev The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
   /// @dev Price of 1e18 represents 1 USD per 1e18 token amount.
   ///     1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
   ///     1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
   ///     1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
-  mapping(address => Internal.TimestampedUint192Value) private s_usdPerToken;
+  mapping(address token => Internal.TimestampedUint192Value price) private s_usdPerToken;
 
   // Price updaters are allowed to update the prices.
   EnumerableSet.AddressSet private s_priceUpdaters;

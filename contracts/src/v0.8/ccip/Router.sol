@@ -49,7 +49,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   address private s_wrappedNative;
   // destChainSelector => onRamp address
   // Only ever one onRamp enabled at a time for a given destChainSelector.
-  mapping(uint256 => address) private s_onRamps;
+  mapping(uint256 destChainSelector => address onRamp) private s_onRamps;
   // Mapping of offRamps to source chain ids
   // Can be multiple offRamps enabled at a time for a given sourceChainSelector,
   // for example during an no downtime upgrade while v1 messages are being flushed.

@@ -45,7 +45,7 @@ contract ImmutableExample is IAny2EVMMessageReceiver, IERC165 {
   // and update storage with the new args.
   // If different options are required for different messages, for example different gas limits,
   // one can simply key based on (chainSelector, messageType) instead of only chainSelector.
-  mapping(uint64 => bytes) public s_chains;
+  mapping(uint64 destChainSelector => bytes extraArgsBytes) public s_chains;
 
   constructor(IRouterClient router, IERC20 feeToken) {
     i_router = router;

@@ -56,7 +56,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   uint32 internal s_latestConfigBlockNumber;
 
   // signer OR transmitter address
-  mapping(address => Oracle) internal s_oracles;
+  mapping(address signerOrTransmitter => Oracle oracle) internal s_oracles;
 
   // s_signers contains the signing address of each oracle
   address[] internal s_signers;

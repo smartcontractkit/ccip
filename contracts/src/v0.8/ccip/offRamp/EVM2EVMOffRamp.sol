@@ -117,11 +117,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   // STATE
   // The expected nonce for a given sender.
-  mapping(address => uint64) internal s_senderNonce;
+  mapping(address sender => uint64 nonce) internal s_senderNonce;
   // A mapping of sequence numbers to execution state using a bitmap with each execution
   // state only taking up 2 bits of the uint256, packing 128 states into a single slot.
   // This state makes sure we never execute a message twice.
-  mapping(uint64 => uint256) internal s_executionStates;
+  mapping(uint64 seqNum => uint256 executionStateBitmap) internal s_executionStates;
 
   constructor(
     StaticConfig memory staticConfig,

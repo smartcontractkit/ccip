@@ -926,7 +926,7 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
   event NopPaid(address indexed nop, uint256 amount);
 
   // Used because EnumerableMap doesn't guarantee order
-  mapping(address => uint256) internal s_nopsToWeights;
+  mapping(address nop => uint256 weight) internal s_nopsToWeights;
 
   function testSetNopsSuccess() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();

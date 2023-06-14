@@ -20,7 +20,7 @@ contract LockReleaseTokenPool is TokenPool {
   error InsufficientLiquidity();
   error WithdrawalTooHigh();
 
-  mapping(address => uint256) internal s_liquidityProviderBalances;
+  mapping(address provider => uint256 balance) internal s_liquidityProviderBalances;
 
   constructor(
     IERC20 token,

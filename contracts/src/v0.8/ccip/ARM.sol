@@ -60,7 +60,7 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
     uint8 index;
   }
 
-  mapping(address => BlesserRecord) private s_blesserRecords;
+  mapping(address blessVoteAddr => BlesserRecord blesserRecord) private s_blesserRecords;
 
   struct BlessVoteProgress {
     // A BlessVoteProgress is considered invalid if weightThresholdMet is false when
@@ -74,7 +74,7 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
     bool weightThresholdMet;
   }
 
-  mapping(bytes32 => BlessVoteProgress) private s_blessVoteProgressByTaggedRootHash;
+  mapping(bytes32 taggedRootHash => BlessVoteProgress blessVoteProgress) private s_blessVoteProgressByTaggedRootHash;
 
   // voteCount and cursesHash can be reset through unvoteToCurse, and ownerUnvoteToCurse, and may be reset through
   // setConfig if the curser is not part of the new config.
@@ -86,13 +86,13 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
     bytes32 cursesHash;
   }
 
-  mapping(address => CurserRecord) private s_curserRecords;
+  mapping(address curseVoteAddr => CurserRecord curserRecord) private s_curserRecords;
 
   // Maintains a per-curser set of curseIds. Entries from this mapping are
   // never cleared. Once a curseId is used it can never be reused, even after
   // an unvoteToCurse or ownerUnvoteToCurse. This is to prevent accidental
   // re-votes to curse, e.g. caused by TOCTOU issues.
-  mapping(address => mapping(bytes32 => bool)) private s_curseVotes;
+  mapping(address curseVoteAddr => mapping(bytes32 curseId => bool voted)) private s_curseVotes;
 
   struct CurseVoteProgress {
     uint16 curseWeightThreshold;

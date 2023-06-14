@@ -247,7 +247,7 @@ contract USDCTokenPool_supportsInterface is USDCTokenPoolSetup {
 contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
   event DomainsSet(USDCTokenPool.DomainUpdate[]);
 
-  mapping(uint64 => USDCTokenPool.Domain) private s_chainToDomain;
+  mapping(uint64 destChainSelector => USDCTokenPool.Domain domain) private s_chainToDomain;
 
   function testSetDomainsSuccess(
     bytes32[10] calldata allowedCallers,

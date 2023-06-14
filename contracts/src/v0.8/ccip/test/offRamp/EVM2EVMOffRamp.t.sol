@@ -913,7 +913,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
 
 /// @notice #getExecutionState
 contract EVM2EVMOffRamp_getExecutionState is EVM2EVMOffRampSetup {
-  mapping(uint64 => Internal.MessageExecutionState) internal s_differentialExecutionState;
+  mapping(uint64 seqNum => Internal.MessageExecutionState state) internal s_differentialExecutionState;
 
   function testDifferentialSuccess(uint16[500] memory seqNums, uint8[500] memory values) public {
     for (uint256 i = 0; i < seqNums.length; ++i) {
