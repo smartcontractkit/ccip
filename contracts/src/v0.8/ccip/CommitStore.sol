@@ -16,6 +16,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   error InvalidRoot();
   error InvalidCommitStoreConfig();
   error BadARMSignal();
+  error RootAlreadyCommitted();
 
   event Paused(address account);
   event Unpaused(address account);
@@ -164,6 +165,9 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
       revert InvalidInterval(report.interval);
 
     if (report.merkleRoot == bytes32(0)) revert InvalidRoot();
+    // Disallow duplicate roots as that would reset the timestamp and
+    // delay potential manual execution.
+    if (s_roots[report.merkleRoot] != 0) revert RootAlreadyCommitted();
 
     s_minSeqNr = report.interval.max + 1;
     s_roots[report.merkleRoot] = block.timestamp;

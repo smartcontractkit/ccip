@@ -14,6 +14,7 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
   error WrongMessageLength(uint256 expected, uint256 actual);
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
   error UnauthorizedTransmitter();
+  error OracleCannotBeZeroAddress();
 
   // Storing these fields used on the hot path in a ConfigInfo variable reduces the
   // retrieval of all of them to a single SLOAD. If any further fields are
@@ -104,6 +105,7 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
     for (uint256 i = 0; i < newTransmitterLength; ++i) {
       address transmitter = transmitters[i];
       if (s_oracles[transmitter].role != Role.Unset) revert InvalidConfig("repeated transmitter address");
+      if (transmitter == address(0)) revert OracleCannotBeZeroAddress();
       s_oracles[transmitter] = Oracle(uint8(i), Role.Transmitter);
     }
 

@@ -12,7 +12,7 @@ import "../../ocr/OCR2Abstract.sol";
 contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
 
-  CommitStoreHelper s_commitStore;
+  CommitStoreHelper internal s_commitStore;
 
   function setUp() public virtual override(PriceRegistrySetup, OCR2BaseSetup) {
     PriceRegistrySetup.setUp();
@@ -419,6 +419,25 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectRevert(abi.encodeWithSelector(CommitStore.InvalidInterval.selector, interval));
+
+    s_commitStore.report(abi.encode(report));
+  }
+
+  function testRootAlreadyCommittedReverts() public {
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
+      priceUpdates: getEmptyPriceUpdates(),
+      interval: CommitStore.Interval(1, 2),
+      merkleRoot: "Only a single root"
+    });
+    s_commitStore.report(abi.encode(report));
+
+    report = CommitStore.CommitReport({
+      priceUpdates: getEmptyPriceUpdates(),
+      interval: CommitStore.Interval(3, 3),
+      merkleRoot: "Only a single root"
+    });
+
+    vm.expectRevert(CommitStore.RootAlreadyCommitted.selector);
 
     s_commitStore.report(abi.encode(report));
   }

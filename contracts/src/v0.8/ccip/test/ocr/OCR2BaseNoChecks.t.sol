@@ -1,57 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {BaseTest} from "../BaseTest.t.sol";
-import {OCR2Base} from "../../ocr/OCR2Base.sol";
+import {OCR2Setup} from "./OCR2Setup.t.sol";
+import {OCR2BaseNoChecks} from "../../ocr/OCR2BaseNoChecks.sol";
 import {OCR2NoChecksHelper} from "../helpers/OCR2NoChecksHelper.sol";
 
-contract OCR2BasNoChecksSetup is BaseTest {
-  // Signer private keys used for these test
-  // Private 0: 7b2e97fe057e6de99d6872a2ef2abf52c9b4469bc848c2465ac3fcd8d336e81d
-  // Private 1: ab56160806b05ef1796789248e1d7f34a6465c5280899159d645218cd216cee6
-  // Private 2: 6ec7caa8406a49b76736602810e0a2871959fbbb675e23a8590839e4717f1f7f
-  // Private 3: 80f14b11da94ae7f29d9a7713ea13dc838e31960a5c0f2baf45ed458947b730a
+contract OCR2BasNoChecksSetup is OCR2Setup {
+  OCR2NoChecksHelper internal s_OCR2Base;
 
-  OCR2NoChecksHelper s_OCR2Base;
-  address[] s_valid_signers;
-  address[] s_valid_transmitters;
-
-  bytes32[] s_rs;
-  bytes32[] s_ss;
-  bytes32 constant s_rawVs = bytes32(uint256(1 << (256 - 8)));
-
-  uint64 constant s_offchainConfigVersion = 3;
-  uint8 constant s_f = 1;
+  bytes32[] internal s_rs;
+  bytes32[] internal s_ss;
+  bytes32 internal s_rawVs;
 
   function setUp() public virtual override {
-    BaseTest.setUp();
+    OCR2Setup.setUp();
     s_OCR2Base = new OCR2NoChecksHelper();
-    s_valid_signers = new address[](4);
-    s_valid_transmitters = new address[](4);
-
-    for (uint160 i = 0; i < 4; ++i) {
-      s_valid_transmitters[i] = address(4 + i);
-    }
-
-    s_valid_signers[0] = 0xc110458BE52CaA6bB68E66969C3218A4D9Db0211;
-    s_valid_signers[1] = 0xc110a19c08f1da7F5FfB281dc93630923F8E3719;
-    s_valid_signers[2] = 0xc110fdF6e8fD679C7Cc11602d1cd829211A18e9b;
-    s_valid_signers[3] = 0xc11028017c9b445B6bF8aE7da951B5cC28B326C0;
-
-    bytes32[] memory rs = new bytes32[](3);
-    bytes32[] memory ss = new bytes32[](3);
-
-    rs[0] = 0x63b66c6cf62c3c79cb705c3d59d6c88a2116e496fcf40ce5247717768ea7ad45;
-    ss[0] = 0x2fb845202d90ab3cfe5938e45b63d85217bf4df010a811744994cfa58e9a048f;
-
-    rs[1] = 0x60f64b8490d0b3621f0b5258fb5dbe342cec2e0d31cbeb35169a52b7900657d7;
-    ss[1] = 0x76719ca79072761168cfe0da7a0dcab92e97762c55e19f539a88bb9b4a0482b4;
-
-    rs[2] = 0x7b34fcc75f34ee5072739531b8062c7ad3e72164d54484dea7a3b85a0b3dae29;
-    ss[2] = 0x32086d9355be3832f0cc969153c8926e3677c7ebd4990acd2f16a2b75681bad0;
-
-    s_rs = rs;
-    s_ss = ss;
   }
 
   function getBasicConfigDigest(uint8 f, uint64 currentConfigCount) internal view returns (bytes32) {
@@ -72,7 +35,7 @@ contract OCR2BasNoChecksSetup is BaseTest {
 }
 
 contract OCR2BaseNoChecks_transmit is OCR2BasNoChecksSetup {
-  bytes32 s_configDigest;
+  bytes32 internal s_configDigest;
 
   function setUp() public virtual override {
     OCR2BasNoChecksSetup.setUp();
@@ -89,14 +52,13 @@ contract OCR2BaseNoChecks_transmit is OCR2BasNoChecksSetup {
     );
   }
 
-  function testTransmit3SignersSuccess_gas() public {
+  function testTransmitSuccess_gas() public {
     vm.pauseGasMetering();
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
-    bytes memory report = abi.encode("testReport");
 
     changePrank(s_valid_transmitters[0]);
     vm.resumeGasMetering();
-    s_OCR2Base.transmit(reportContext, report, s_rs, s_ss, s_rawVs);
+    s_OCR2Base.transmit(reportContext, REPORT, s_rs, s_ss, s_rawVs);
   }
 
   // Reverts
@@ -105,20 +67,20 @@ contract OCR2BaseNoChecks_transmit is OCR2BasNoChecksSetup {
     bytes32 configDigest;
 
     bytes32[3] memory reportContext = [configDigest, configDigest, configDigest];
-    bytes memory report = abi.encode("testReport");
 
-    vm.expectRevert(abi.encodeWithSelector(OCR2Base.ConfigDigestMismatch.selector, s_configDigest, configDigest));
-    s_OCR2Base.transmit(reportContext, report, new bytes32[](0), new bytes32[](0), s_rawVs);
+    vm.expectRevert(
+      abi.encodeWithSelector(OCR2BaseNoChecks.ConfigDigestMismatch.selector, s_configDigest, configDigest)
+    );
+    s_OCR2Base.transmit(reportContext, REPORT, new bytes32[](0), new bytes32[](0), s_rawVs);
   }
 
   function testUnAuthorizedTransmitterReverts() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
-    bytes memory report = abi.encode("testReport");
     bytes32[] memory rs = new bytes32[](3);
     bytes32[] memory ss = new bytes32[](3);
 
-    vm.expectRevert(OCR2Base.UnauthorizedTransmitter.selector);
-    s_OCR2Base.transmit(reportContext, report, rs, ss, s_rawVs);
+    vm.expectRevert(OCR2BaseNoChecks.UnauthorizedTransmitter.selector);
+    s_OCR2Base.transmit(reportContext, REPORT, rs, ss, s_rawVs);
   }
 }
 
@@ -196,19 +158,37 @@ contract OCR2BaseNoChecks_setOCR2Config is OCR2BasNoChecksSetup {
   }
 
   // Reverts
-
   function testRepeatAddressReverts() public {
-    address[] memory signers = new address[](10);
-    address[] memory oracles = new address[](10);
+    address[] memory signers = new address[](4);
+    address[] memory transmitters = new address[](4);
+    transmitters[0] = address(1245678);
+    transmitters[1] = address(1245678);
+    transmitters[2] = address(1245678);
+    transmitters[3] = address(1245678);
 
-    vm.expectRevert(abi.encodeWithSelector(OCR2Base.InvalidConfig.selector, "repeated transmitter address"));
-    s_OCR2Base.setOCR2Config(signers, oracles, 2, abi.encode(""), 100, abi.encode(""));
+    vm.expectRevert(abi.encodeWithSelector(OCR2BaseNoChecks.InvalidConfig.selector, "repeated transmitter address"));
+    s_OCR2Base.setOCR2Config(signers, transmitters, 1, abi.encode(""), 100, abi.encode(""));
   }
 
   function testFMustBePositiveReverts() public {
     uint8 f = 0;
 
-    vm.expectRevert(abi.encodeWithSelector(OCR2Base.InvalidConfig.selector, "f must be positive"));
+    vm.expectRevert(abi.encodeWithSelector(OCR2BaseNoChecks.InvalidConfig.selector, "f must be positive"));
     s_OCR2Base.setOCR2Config(new address[](0), new address[](0), f, abi.encode(""), 100, abi.encode(""));
+  }
+
+  function testTransmitterCannotBeZeroAddressReverts() public {
+    uint256 f = 1;
+    address[] memory signers = new address[](3 * f + 1);
+    address[] memory transmitters = new address[](3 * f + 1);
+    for (uint160 i = 0; i < 3 * f + 1; ++i) {
+      signers[i] = address(i + 1);
+      transmitters[i] = address(i + 1000);
+    }
+
+    transmitters[0] = address(0);
+
+    vm.expectRevert(OCR2BaseNoChecks.OracleCannotBeZeroAddress.selector);
+    s_OCR2Base.setOCR2Config(signers, transmitters, uint8(f), abi.encode(""), 100, abi.encode(""));
   }
 }

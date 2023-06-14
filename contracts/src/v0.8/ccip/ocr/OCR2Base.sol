@@ -16,6 +16,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   error UnauthorizedTransmitter();
   error UnauthorizedSigner();
   error NonUniqueSignatures();
+  error OracleCannotBeZeroAddress();
 
   // Storing these fields used on the hot path in a ConfigInfo variable reduces the
   // retrieval of all of them to a single SLOAD. If any further fields are
@@ -125,10 +126,12 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       // add new signer/transmitter addresses
       address signer = signers[i];
       if (s_oracles[signer].role != Role.Unset) revert InvalidConfig("repeated signer address");
+      if (signer == address(0)) revert OracleCannotBeZeroAddress();
       s_oracles[signer] = Oracle(uint8(i), Role.Signer);
 
       address transmitter = transmitters[i];
       if (s_oracles[transmitter].role != Role.Unset) revert InvalidConfig("repeated transmitter address");
+      if (transmitter == address(0)) revert OracleCannotBeZeroAddress();
       s_oracles[transmitter] = Oracle(uint8(i), Role.Transmitter);
     }
 
@@ -237,6 +240,8 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     uint256 numberOfSignatures = rs.length;
     for (uint256 i = 0; i < numberOfSignatures; ++i) {
       address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
+      // Since we disallow address(0) as a valid signer address, it can
+      // never have a signer role.
       Oracle memory oracle = s_oracles[signer];
       if (oracle.role != Role.Signer) revert UnauthorizedSigner();
       if (signed[oracle.index]) revert NonUniqueSignatures();
