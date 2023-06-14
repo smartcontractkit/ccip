@@ -40,15 +40,26 @@ contract Router_recoverTokens is EVM2EVMOnRampSetup {
     assertEq(address(s_sourceRouter).balance, 0);
   }
 
-  function testRecoverTokensReverts() public {
+  function testRecoverTokensNonOwnerReverts() public {
     // Reverts if not owner
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_sourceRouter.recoverTokens(address(0), STRANGER, 1);
+  }
 
+  function testRecoverTokensNoFundsReverts() public {
     // Reverts if no funds present
-    vm.expectRevert("Only callable by owner");
+    vm.expectRevert();
     s_sourceRouter.recoverTokens(address(0), OWNER, 10);
+  }
+
+  function testRecoverTokensValueReceiverReverts() public {
+    MaybeRevertMessageReceiver revertingValueReceiver = new MaybeRevertMessageReceiver(true);
+    deal(address(s_sourceRouter), 10);
+
+    // Value receiver reverts
+    vm.expectRevert(Router.FailedToSendValue.selector);
+    s_sourceRouter.recoverTokens(address(0), address(revertingValueReceiver), 10);
   }
 }
 

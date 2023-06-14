@@ -22,6 +22,8 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   using SafeERC20 for IERC20;
   using EnumerableMap for EnumerableMap.AddressToUintMap;
 
+  error FailedToSendValue();
+
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
   event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
   event OffRampRemoved(uint64 indexed sourceChainSelector, address offRamp);
@@ -286,7 +288,8 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   /// @param to Destination address to send the tokens to.
   function recoverTokens(address tokenAddress, address to, uint256 amount) external onlyOwner {
     if (tokenAddress == address(0)) {
-      payable(to).transfer(amount);
+      (bool success, ) = to.call{value: amount}("");
+      if (!success) revert FailedToSendValue();
       return;
     }
     IERC20(tokenAddress).safeTransfer(to, amount);

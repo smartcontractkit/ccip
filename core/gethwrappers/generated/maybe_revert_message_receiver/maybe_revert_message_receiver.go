@@ -44,8 +44,8 @@ type ClientEVMTokenAmount struct {
 }
 
 var MaybeRevertMessageReceiverMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"CustomError\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structClient.EVMTokenAmount[]\",\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structClient.Any2EVMMessage\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_toRevert\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"setErr\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5060405161071938038061071983398101604081905261002f9161005d565b600080546001600160a81b0319163360ff60a01b191617600160a01b92151592909202919091179055610086565b60006020828403121561006f57600080fd5b8151801515811461007f57600080fd5b9392505050565b610684806100956000396000f3fe608060405234801561001057600080fd5b50600436106100675760003560e01c806377f5b0e61161005057806377f5b0e6146100b857806385572ffb146100cd5780638fb5f171146100e057600080fd5b806301ffc9a71461006c5780635100fc2114610093575b600080fd5b61007f61007a36600461026e565b610138565b604051901515815260200160405180910390f35b60005461007f9074010000000000000000000000000000000000000000900460ff1681565b6100cb6100c63660046102e6565b6101d1565b005b6100cb6100db3660046103b5565b6101e1565b6100cb6100ee3660046103f0565b6000805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b60007fffffffff0000000000000000000000000000000000000000000000000000000082167f85572ffb0000000000000000000000000000000000000000000000000000000014806101cb57507fffffffff0000000000000000000000000000000000000000000000000000000082167f01ffc9a700000000000000000000000000000000000000000000000000000000145b92915050565b60016101dd82826104b4565b5050565b60005474010000000000000000000000000000000000000000900460ff16156102425760016040517f5a4ff67100000000000000000000000000000000000000000000000000000000815260040161023991906105ce565b60405180910390fd5b6040517fd82ce31e3523f6eeb2d24317b2b4133001e8472729657f663b68624c45f8f3e890600090a150565b60006020828403121561028057600080fd5b81357fffffffff00000000000000000000000000000000000000000000000000000000811681146102b057600080fd5b9392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6000602082840312156102f857600080fd5b813567ffffffffffffffff8082111561031057600080fd5b818401915084601f83011261032457600080fd5b813581811115610336576103366102b7565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0908116603f0116810190838211818310171561037c5761037c6102b7565b8160405282815287602084870101111561039557600080fd5b826020860160208301376000928101602001929092525095945050505050565b6000602082840312156103c757600080fd5b813567ffffffffffffffff8111156103de57600080fd5b820160a081850312156102b057600080fd5b60006020828403121561040257600080fd5b813580151581146102b057600080fd5b600181811c9082168061042657607f821691505b60208210810361045f577f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b50919050565b601f8211156104af57600081815260208120601f850160051c8101602086101561048c5750805b601f850160051c820191505b818110156104ab57828155600101610498565b5050505b505050565b815167ffffffffffffffff8111156104ce576104ce6102b7565b6104e2816104dc8454610412565b84610465565b602080601f83116001811461053557600084156104ff5750858301515b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600386901b1c1916600185901b1785556104ab565b6000858152602081207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08616915b8281101561058257888601518255948401946001909101908401610563565b50858210156105be57878501517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600388901b60f8161c191681555b5050505050600190811b01905550565b60006020808352600084546105e281610412565b80848701526040600180841660008114610603576001811461063b57610669565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff008516838a01528284151560051b8a01019550610669565b896000528660002060005b858110156106615781548b8201860152908301908801610646565b8a0184019650505b50939897505050505050505056fea164736f6c6343000813000a",
+	ABI: "[{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"CustomError\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"ReceiveRevert\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"MessageReceived\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"ValueReceived\",\"type\":\"event\"},{\"inputs\":[{\"components\":[{\"internalType\":\"bytes32\",\"name\":\"messageId\",\"type\":\"bytes32\"},{\"internalType\":\"uint64\",\"name\":\"sourceChainSelector\",\"type\":\"uint64\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"},{\"components\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"internalType\":\"structClient.EVMTokenAmount[]\",\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\"}],\"internalType\":\"structClient.Any2EVMMessage\",\"name\":\"\",\"type\":\"tuple\"}],\"name\":\"ccipReceive\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"s_toRevert\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"err\",\"type\":\"bytes\"}],\"name\":\"setErr\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"toRevert\",\"type\":\"bool\"}],\"name\":\"setRevert\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes4\",\"name\":\"interfaceId\",\"type\":\"bytes4\"}],\"name\":\"supportsInterface\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}]",
+	Bin: "0x608060405234801561001057600080fd5b506040516107e03803806107e083398101604081905261002f9161005d565b600080546001600160a81b0319163360ff60a01b191617600160a01b92151592909202919091179055610086565b60006020828403121561006f57600080fd5b8151801515811461007f57600080fd5b9392505050565b61074b806100956000396000f3fe60806040526004361061005e5760003560e01c806377f5b0e61161004357806377f5b0e61461015857806385572ffb1461017a5780638fb5f1711461019a57600080fd5b806301ffc9a7146100f25780635100fc211461012657600080fd5b366100ed5760005474010000000000000000000000000000000000000000900460ff16156100b8576040517f3085b8db00000000000000000000000000000000000000000000000000000000815260040160405180910390fd5b6040513481527fe12e3b7047ff60a2dd763cf536a43597e5ce7fe7aa7476345bd4cd079912bcef9060200160405180910390a1005b600080fd5b3480156100fe57600080fd5b5061011261010d366004610335565b6101ff565b604051901515815260200160405180910390f35b34801561013257600080fd5b506000546101129074010000000000000000000000000000000000000000900460ff1681565b34801561016457600080fd5b506101786101733660046103ad565b610298565b005b34801561018657600080fd5b5061017861019536600461047c565b6102a8565b3480156101a657600080fd5b506101786101b53660046104b7565b6000805491151574010000000000000000000000000000000000000000027fffffffffffffffffffffff00ffffffffffffffffffffffffffffffffffffffff909216919091179055565b60007fffffffff0000000000000000000000000000000000000000000000000000000082167f85572ffb00000000000000000000000000000000000000000000000000000000148061029257507fffffffff0000000000000000000000000000000000000000000000000000000082167f01ffc9a700000000000000000000000000000000000000000000000000000000145b92915050565b60016102a4828261057b565b5050565b60005474010000000000000000000000000000000000000000900460ff16156103095760016040517f5a4ff6710000000000000000000000000000000000000000000000000000000081526004016103009190610695565b60405180910390fd5b6040517fd82ce31e3523f6eeb2d24317b2b4133001e8472729657f663b68624c45f8f3e890600090a150565b60006020828403121561034757600080fd5b81357fffffffff000000000000000000000000000000000000000000000000000000008116811461037757600080fd5b9392505050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b6000602082840312156103bf57600080fd5b813567ffffffffffffffff808211156103d757600080fd5b818401915084601f8301126103eb57600080fd5b8135818111156103fd576103fd61037e565b604051601f82017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0908116603f011681019083821181831017156104435761044361037e565b8160405282815287602084870101111561045c57600080fd5b826020860160208301376000928101602001929092525095945050505050565b60006020828403121561048e57600080fd5b813567ffffffffffffffff8111156104a557600080fd5b820160a0818503121561037757600080fd5b6000602082840312156104c957600080fd5b8135801515811461037757600080fd5b600181811c908216806104ed57607f821691505b602082108103610526577f4e487b7100000000000000000000000000000000000000000000000000000000600052602260045260246000fd5b50919050565b601f82111561057657600081815260208120601f850160051c810160208610156105535750805b601f850160051c820191505b818110156105725782815560010161055f565b5050505b505050565b815167ffffffffffffffff8111156105955761059561037e565b6105a9816105a384546104d9565b8461052c565b602080601f8311600181146105fc57600084156105c65750858301515b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600386901b1c1916600185901b178555610572565b6000858152602081207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe08616915b828110156106495788860151825594840194600190910190840161062a565b508582101561068557878501517fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff600388901b60f8161c191681555b5050505050600190811b01905550565b60006020808352600084546106a9816104d9565b808487015260406001808416600081146106ca576001811461070257610730565b7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff008516838a01528284151560051b8a01019550610730565b896000528660002060005b858110156107285781548b820186015290830190880161070d565b8a0184019650505b50939897505050505050505056fea164736f6c6343000813000a",
 }
 
 var MaybeRevertMessageReceiverABI = MaybeRevertMessageReceiverMetaData.ABI
@@ -264,6 +264,18 @@ func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactorSession) 
 	return _MaybeRevertMessageReceiver.Contract.SetRevert(&_MaybeRevertMessageReceiver.TransactOpts, toRevert)
 }
 
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactor) Receive(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _MaybeRevertMessageReceiver.contract.RawTransact(opts, nil)
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverSession) Receive() (*types.Transaction, error) {
+	return _MaybeRevertMessageReceiver.Contract.Receive(&_MaybeRevertMessageReceiver.TransactOpts)
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverTransactorSession) Receive() (*types.Transaction, error) {
+	return _MaybeRevertMessageReceiver.Contract.Receive(&_MaybeRevertMessageReceiver.TransactOpts)
+}
+
 type MaybeRevertMessageReceiverMessageReceivedIterator struct {
 	Event *MaybeRevertMessageReceiverMessageReceived
 
@@ -380,10 +392,129 @@ func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverFilterer) ParseMess
 	return event, nil
 }
 
+type MaybeRevertMessageReceiverValueReceivedIterator struct {
+	Event *MaybeRevertMessageReceiverValueReceived
+
+	contract *bind.BoundContract
+	event    string
+
+	logs chan types.Log
+	sub  ethereum.Subscription
+	done bool
+	fail error
+}
+
+func (it *MaybeRevertMessageReceiverValueReceivedIterator) Next() bool {
+
+	if it.fail != nil {
+		return false
+	}
+
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(MaybeRevertMessageReceiverValueReceived)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+
+	select {
+	case log := <-it.logs:
+		it.Event = new(MaybeRevertMessageReceiverValueReceived)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+func (it *MaybeRevertMessageReceiverValueReceivedIterator) Error() error {
+	return it.fail
+}
+
+func (it *MaybeRevertMessageReceiverValueReceivedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+type MaybeRevertMessageReceiverValueReceived struct {
+	Amount *big.Int
+	Raw    types.Log
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverFilterer) FilterValueReceived(opts *bind.FilterOpts) (*MaybeRevertMessageReceiverValueReceivedIterator, error) {
+
+	logs, sub, err := _MaybeRevertMessageReceiver.contract.FilterLogs(opts, "ValueReceived")
+	if err != nil {
+		return nil, err
+	}
+	return &MaybeRevertMessageReceiverValueReceivedIterator{contract: _MaybeRevertMessageReceiver.contract, event: "ValueReceived", logs: logs, sub: sub}, nil
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverFilterer) WatchValueReceived(opts *bind.WatchOpts, sink chan<- *MaybeRevertMessageReceiverValueReceived) (event.Subscription, error) {
+
+	logs, sub, err := _MaybeRevertMessageReceiver.contract.WatchLogs(opts, "ValueReceived")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+
+				event := new(MaybeRevertMessageReceiverValueReceived)
+				if err := _MaybeRevertMessageReceiver.contract.UnpackLog(event, "ValueReceived", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiverFilterer) ParseValueReceived(log types.Log) (*MaybeRevertMessageReceiverValueReceived, error) {
+	event := new(MaybeRevertMessageReceiverValueReceived)
+	if err := _MaybeRevertMessageReceiver.contract.UnpackLog(event, "ValueReceived", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
+}
+
 func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiver) ParseLog(log types.Log) (generated.AbigenLog, error) {
 	switch log.Topics[0] {
 	case _MaybeRevertMessageReceiver.abi.Events["MessageReceived"].ID:
 		return _MaybeRevertMessageReceiver.ParseMessageReceived(log)
+	case _MaybeRevertMessageReceiver.abi.Events["ValueReceived"].ID:
+		return _MaybeRevertMessageReceiver.ParseValueReceived(log)
 
 	default:
 		return nil, fmt.Errorf("abigen wrapper received unknown log topic: %v", log.Topics[0])
@@ -392,6 +523,10 @@ func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiver) ParseLog(log type
 
 func (MaybeRevertMessageReceiverMessageReceived) Topic() common.Hash {
 	return common.HexToHash("0xd82ce31e3523f6eeb2d24317b2b4133001e8472729657f663b68624c45f8f3e8")
+}
+
+func (MaybeRevertMessageReceiverValueReceived) Topic() common.Hash {
+	return common.HexToHash("0xe12e3b7047ff60a2dd763cf536a43597e5ce7fe7aa7476345bd4cd079912bcef")
 }
 
 func (_MaybeRevertMessageReceiver *MaybeRevertMessageReceiver) Address() common.Address {
@@ -409,11 +544,19 @@ type MaybeRevertMessageReceiverInterface interface {
 
 	SetRevert(opts *bind.TransactOpts, toRevert bool) (*types.Transaction, error)
 
+	Receive(opts *bind.TransactOpts) (*types.Transaction, error)
+
 	FilterMessageReceived(opts *bind.FilterOpts) (*MaybeRevertMessageReceiverMessageReceivedIterator, error)
 
 	WatchMessageReceived(opts *bind.WatchOpts, sink chan<- *MaybeRevertMessageReceiverMessageReceived) (event.Subscription, error)
 
 	ParseMessageReceived(log types.Log) (*MaybeRevertMessageReceiverMessageReceived, error)
+
+	FilterValueReceived(opts *bind.FilterOpts) (*MaybeRevertMessageReceiverValueReceivedIterator, error)
+
+	WatchValueReceived(opts *bind.WatchOpts, sink chan<- *MaybeRevertMessageReceiverValueReceived) (event.Subscription, error)
+
+	ParseValueReceived(log types.Log) (*MaybeRevertMessageReceiverValueReceived, error)
 
 	ParseLog(log types.Log) (generated.AbigenLog, error)
 

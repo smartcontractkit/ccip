@@ -44,7 +44,7 @@ llo_feeds: ../../contracts/solc/v0.8.16/VerifierProxy.abi ../../contracts/solc/v
 llo_feeds_test: ../../contracts/solc/v0.8.16/ExposedVerifier.abi ../../contracts/solc/v0.8.16/ExposedVerifier.bin 6932cea8f2738e874d3ec9e1a4231d2421704030c071d9e15dd2f7f08482c246
 lock_release_token_pool: ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin b58850a6fbb3d97711d68cc3d94646f4b2e87fb185e72ad3bf7fdbfbfccb57dd
 log_emitter: ../../contracts/solc/v0.8.6/LogEmitter.abi ../../contracts/solc/v0.8.6/LogEmitter.bin 375488d19b6ee1c180d42048be10abea9146e2a58347fd180358850d435cb854
-maybe_revert_message_receiver: ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin fbbcad24c4ec3dcf77027496dfd8428fb4de27da4a240549845c0f9cf72f9167
+maybe_revert_message_receiver: ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin aaa90eac8cc555ee4b0fbe57d1fb8d72d6689b29510b238177c97ab9b7979ac5
 mercury_exposed_verifier: ../../contracts/solc/v0.8.16/ExposedVerifier.abi ../../contracts/solc/v0.8.16/ExposedVerifier.bin 6932cea8f2738e874d3ec9e1a4231d2421704030c071d9e15dd2f7f08482c246
 mercury_lookup_compatible_interface: ../../contracts/solc/v0.8.15/MercuryLookupCompatibleInterface.abi ../../contracts/solc/v0.8.15/MercuryLookupCompatibleInterface.bin 0af449d077047786c0dfc1fa30fa2a24604986bbec47f938597eef6ba5969ca3
 mercury_upkeep_wrapper: ../../contracts/solc/v0.8.15/MercuryUpkeep.abi ../../contracts/solc/v0.8.15/MercuryUpkeep.bin 912cf6189c4f3adf6480006ccafdcd1168a2653f88cacc54961675891d133693
@@ -67,7 +67,7 @@ oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/O
 ping_pong_demo: ../../contracts/solc/v0.8.19/PingPongDemo.abi ../../contracts/solc/v0.8.19/PingPongDemo.bin c6f5dedc53069dd52334f33ce1a8bd7ee2d6f54ef7adc1325d8e0308d41b2b9b
 price_registry: ../../contracts/solc/v0.8.19/PriceRegistry.abi ../../contracts/solc/v0.8.19/PriceRegistry.bin 23c1e8f890933dba5c3488ca4bc423f84e66867ff9d2547609c899cc512c1838
 receiver_dapp: ../../contracts/solc/v0.8.19/ReceiverDapp.abi ../../contracts/solc/v0.8.19/ReceiverDapp.bin 65d8a62eca52f1f40e1043b934c580d5a54516234ade50914684c76f832d51eb
-router: ../../contracts/solc/v0.8.19/Router.abi ../../contracts/solc/v0.8.19/Router.bin b154e06ad9f72a172839ed3a5cc9d4d51f166d8a86da13d1f74c9a2d48e87843
+router: ../../contracts/solc/v0.8.19/Router.abi ../../contracts/solc/v0.8.19/Router.bin e2de9a1ac0b69a9589c5d927a9d1aa58caebf41dfbcbb547e1fb7aa6f002d4eb
 solidity_vrf_consumer_interface: ../../contracts/solc/v0.6/VRFConsumer.abi ../../contracts/solc/v0.6/VRFConsumer.bin ecc99378aa798014de9db42b2eb81320778b0663dbe208008dad75ccdc1d4366
 solidity_vrf_consumer_interface_v08: ../../contracts/solc/v0.8.6/VRFConsumer.abi ../../contracts/solc/v0.8.6/VRFConsumer.bin b14f9136b15e3dc9d6154d5700f3ed4cf88ddc4f70f20c3bb57fc46050904c8f
 solidity_vrf_coordinator_interface: ../../contracts/solc/v0.6/VRFCoordinator.abi ../../contracts/solc/v0.6/VRFCoordinator.bin a23d3c395156804788c7f6fbda2994e8f7184304c0f0c9f2c4ddeaf073d346d2

@@ -6,11 +6,15 @@ import "../../../interfaces/IAny2EVMMessageReceiver.sol";
 import "../../../../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/IERC165.sol";
 
 contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
+  error ReceiveRevert();
+  error CustomError(bytes err);
+
+  event ValueReceived(uint256 amount);
+  event MessageReceived();
+
   address private s_manager;
   bool public s_toRevert;
   bytes private s_err;
-  event MessageReceived();
-  error CustomError(bytes err);
 
   constructor(bool toRevert) {
     s_manager = msg.sender;
@@ -37,5 +41,13 @@ contract MaybeRevertMessageReceiver is IAny2EVMMessageReceiver, IERC165 {
       revert CustomError(s_err);
     }
     emit MessageReceived();
+  }
+
+  receive() external payable {
+    if (s_toRevert) {
+      revert ReceiveRevert();
+    }
+
+    emit ValueReceived(msg.value);
   }
 }
