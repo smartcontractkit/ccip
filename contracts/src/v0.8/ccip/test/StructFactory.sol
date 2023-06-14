@@ -8,6 +8,7 @@ import "../offRamp/EVM2EVMOffRamp.sol";
 import "../onRamp/EVM2EVMOnRamp.sol";
 import "../AggregateRateLimiter.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
+import {Internal} from "../libraries/Internal.sol";
 
 contract StructFactory {
   // addresses
@@ -137,10 +138,10 @@ contract StructFactory {
   function getTokensAndPools(
     address[] memory sourceTokens,
     IPool[] memory pools
-  ) internal pure returns (EVM2EVMOnRamp.TokenAndPool[] memory) {
-    EVM2EVMOnRamp.TokenAndPool[] memory tokensAndPools = new EVM2EVMOnRamp.TokenAndPool[](sourceTokens.length);
+  ) internal pure returns (Internal.PoolUpdate[] memory) {
+    Internal.PoolUpdate[] memory tokensAndPools = new Internal.PoolUpdate[](sourceTokens.length);
     for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      tokensAndPools[i] = EVM2EVMOnRamp.TokenAndPool({token: sourceTokens[i], pool: address(pools[i])});
+      tokensAndPools[i] = Internal.PoolUpdate({token: sourceTokens[i], pool: address(pools[i])});
     }
     return tokensAndPools;
   }

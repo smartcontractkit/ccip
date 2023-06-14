@@ -214,7 +214,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			MaxGasLimit:     4_000_000,
 			Arm:             c.Source.ARM.Address(), // ARM
 		},
-		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
+		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
 				Token: c.Source.LinkToken.Address(),
 				Pool:  c.Source.Pool.Address(),
@@ -806,7 +806,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			MaxGasLimit:     4_000_000,
 			Arm:             armSourceAddress, // ARM
 		},
-		[]evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
+		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
 				Token: sourceLinkTokenAddress,
 				Pool:  sourcePoolAddress,

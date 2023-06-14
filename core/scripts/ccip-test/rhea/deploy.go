@@ -197,7 +197,7 @@ func deployOnRamp(t *testing.T, client EvmConfig, laneConfig *EVMLaneConfig, des
 		return
 	}
 
-	var tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool
+	var tokensAndPools []evm_2_evm_onramp.InternalPoolUpdate
 	var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
 		// Don't add tokens that are only configured for paying fees
@@ -211,7 +211,7 @@ func deployOnRamp(t *testing.T, client EvmConfig, laneConfig *EVMLaneConfig, des
 			continue
 		}
 
-		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
+		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.InternalPoolUpdate{
 			Token: tokenConfig.Token,
 			Pool:  tokenConfig.Pool,
 		})

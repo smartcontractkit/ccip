@@ -153,12 +153,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   // ================================================================
 
   /// @notice Get the list of fee tokens.
-  /// @return feeTokens The tokens set as fee tokens.
-  function getFeeTokens() external view returns (address[] memory feeTokens) {
-    feeTokens = new address[](s_feeTokens.length());
-    for (uint256 i = 0; i < s_feeTokens.length(); ++i) {
-      feeTokens[i] = s_feeTokens.at(i);
-    }
+  /// @return The tokens set as fee tokens.
+  function getFeeTokens() external view returns (address[] memory) {
+    return s_feeTokens.values();
   }
 
   /// @notice Add and remove tokens from feeTokens set.
@@ -226,12 +223,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   // ================================================================
 
   /// @notice Get the list of price updaters.
-  /// @return priceUpdaters The price updaters.
-  function getPriceUpdaters() external view returns (address[] memory priceUpdaters) {
-    priceUpdaters = new address[](s_priceUpdaters.length());
-    for (uint256 i = 0; i < s_priceUpdaters.length(); ++i) {
-      priceUpdaters[i] = s_priceUpdaters.at(i);
-    }
+  /// @return The price updaters.
+  function getPriceUpdaters() external view returns (address[] memory) {
+    return s_priceUpdaters.values();
   }
 
   /// @notice Adds new priceUpdaters and remove existing ones.

@@ -8,7 +8,7 @@ contract EVM2EVMOnRampHelper is EVM2EVMOnRamp, IgnoreContractSize {
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
-    TokenAndPool[] memory tokensAndPools,
+    Internal.PoolUpdate[] memory tokensAndPools,
     address[] memory allowlist,
     RateLimiter.Config memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,

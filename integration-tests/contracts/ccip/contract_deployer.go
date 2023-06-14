@@ -362,7 +362,7 @@ func (e *CCIPContractsDeployer) NewOnRamp(addr common.Address) (
 func (e *CCIPContractsDeployer) DeployOnRamp(
 	sourceChainSelector, destChainSelector uint64,
 	allowList []common.Address,
-	tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool,
+	tokensAndPools []evm_2_evm_onramp.InternalPoolUpdate,
 	arm, router, priceRegistry common.Address,
 	opts RateLimiterConfig,
 	feeTokenConfig []evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs,

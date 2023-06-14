@@ -398,9 +398,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
       // Want to pass the maximum that routeExternalCall will permit given the current gas value.
       // It will revert if gasAmount <= (gasleft() - GAS_FOR_CALL_EXACT_CHECK)*63/64.
       // However making the call to routeExternalMessage will also use some gas and itself only pass all but
-      // 1/64th. We air on the side of caution and  instead of passing ((gasleft() - approx cost of call)*63/64) - approx cost of call)*63/64
+      // 1/64th. We err on the side of caution and  instead of passing ((gasleft() - approx cost of call)*63/64) - approx cost of call)*63/64
       // we just pass (gasleft() - approx of call)*62/64.
-      // If this underflows and reverts that's ok because its manual execution.
+      // If this underflows and reverts that's ok because it's manual execution.
       gasLimit = ((gasleft() - 2 * (16 * message.data.length + GAS_FOR_CALL_EXACT_CHECK)) * 62) / 64;
     }
 

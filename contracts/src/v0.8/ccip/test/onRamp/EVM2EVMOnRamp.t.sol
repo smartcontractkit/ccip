@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import "./EVM2EVMOnRampSetup.t.sol";
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {USDPriceWith18Decimals} from "../../libraries/USDPriceWith18Decimals.sol";
+import {MockTokenPool} from "../mocks/MockTokenPool.sol";
 
 /// @notice #constructor
 contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
@@ -23,7 +24,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       address(s_priceRegistry),
       address(s_mockARM)
     );
-    EVM2EVMOnRamp.TokenAndPool[] memory tokensAndPools = getTokensAndPools(s_sourceTokens, getCastedSourcePools());
+    Internal.PoolUpdate[] memory tokensAndPools = getTokensAndPools(s_sourceTokens, getCastedSourcePools());
 
     vm.expectEmit();
     emit ConfigSet(staticConfig, dynamicConfig);
@@ -1211,8 +1212,11 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
   event PoolRemoved(address token, address pool);
 
   function testApplyPoolUpdatesSuccess() public {
+    address token = address(1);
+    MockTokenPool mockPool = new MockTokenPool(token);
+
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
-    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
+    adds[0] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
 
     vm.expectEmit();
     emit PoolAdded(adds[0].token, adds[0].pool);
@@ -1232,9 +1236,10 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
   function testAtomicPoolReplacementSuccess() public {
     address token = address(1);
+    MockTokenPool mockPool = new MockTokenPool(token);
 
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
-    adds[0] = Internal.PoolUpdate({token: token, pool: address(2)});
+    adds[0] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
 
     vm.expectEmit();
     emit PoolAdded(token, adds[0].pool);
@@ -1243,8 +1248,10 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
     assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(IERC20(token))));
 
+    MockTokenPool newMockPool = new MockTokenPool(token);
+
     Internal.PoolUpdate[] memory updates = new Internal.PoolUpdate[](1);
-    updates[0] = Internal.PoolUpdate({token: token, pool: address(3)});
+    updates[0] = Internal.PoolUpdate({token: token, pool: address(newMockPool)});
 
     vm.expectEmit();
     emit PoolRemoved(token, adds[0].pool);
@@ -1266,9 +1273,12 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
   }
 
   function testPoolAlreadyExistsReverts() public {
+    address token = address(1);
+    MockTokenPool mockPool = new MockTokenPool(token);
+
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](2);
-    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
-    adds[1] = Internal.PoolUpdate({token: address(1), pool: address(2)});
+    adds[0] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
+    adds[1] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
 
     vm.expectRevert(EVM2EVMOnRamp.PoolAlreadyAdded.selector);
 
@@ -1291,21 +1301,42 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
   }
 
   function testPoolDoesNotExistReverts() public {
+    address token = address(1);
+    MockTokenPool mockPool = new MockTokenPool(token);
+
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
-    removes[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
+    removes[0] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.PoolDoesNotExist.selector, removes[0].token));
 
     s_onRamp.applyPoolUpdates(removes, new Internal.PoolUpdate[](0));
   }
 
-  function testTokenPoolMismatchReverts() public {
+  function testRemoveTokenPoolMismatchReverts() public {
+    address token = address(1);
+    MockTokenPool[] memory mockPools = new MockTokenPool[](2);
+    mockPools[0] = new MockTokenPool(token);
+    mockPools[1] = new MockTokenPool(token);
+
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
-    adds[0] = Internal.PoolUpdate({token: address(1), pool: address(2)});
+    adds[0] = Internal.PoolUpdate({token: token, pool: address(mockPools[0])});
     s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
-    removes[0] = Internal.PoolUpdate({token: address(1), pool: address(20)});
+    removes[0] = Internal.PoolUpdate({token: token, pool: address(mockPools[1])});
+
+    vm.expectRevert(EVM2EVMOnRamp.TokenPoolMismatch.selector);
+
+    s_onRamp.applyPoolUpdates(removes, adds);
+  }
+
+  function testAddTokenPoolMismatchReverts() public {
+    address token = address(1);
+    MockTokenPool mockPool = new MockTokenPool(address(2));
+
+    Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](0);
+    Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
+    adds[0] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
 
     vm.expectRevert(EVM2EVMOnRamp.TokenPoolMismatch.selector);
 

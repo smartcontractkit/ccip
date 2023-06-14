@@ -576,10 +576,10 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 	}
 
 	if sourceCCIP.OnRamp == nil {
-		var tokensAndPools []evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool
+		var tokensAndPools []evm_2_evm_onramp.InternalPoolUpdate
 		var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 		for i, token := range sourceCCIP.Common.BridgeTokens {
-			tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
+			tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.InternalPoolUpdate{
 				Token: token.EthAddress,
 				Pool:  sourceCCIP.Common.BridgeTokenPools[i].EthAddress,
 			})
@@ -590,7 +590,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 				Ratio:  5_0, // 5 bps
 			})
 		}
-		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.EVM2EVMOnRampTokenAndPool{
+		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.InternalPoolUpdate{
 			Token: common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 			Pool:  sourceCCIP.Common.FeeTokenPool.EthAddress,
 		})

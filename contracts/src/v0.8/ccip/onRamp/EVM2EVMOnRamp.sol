@@ -132,11 +132,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint16 weight; // ---┘ Weight for nop rewards
   }
 
-  struct TokenAndPool {
-    address token;
-    address pool;
-  }
-
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMOnRamp 1.0.0";
@@ -191,7 +186,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   constructor(
     StaticConfig memory staticConfig,
     DynamicConfig memory dynamicConfig,
-    TokenAndPool[] memory tokensAndPools,
+    Internal.PoolUpdate[] memory tokensAndPools,
     address[] memory allowlist,
     RateLimiter.Config memory rateLimiterConfig,
     FeeTokenConfigArgs[] memory feeTokenConfigs,
@@ -225,12 +220,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     _setNops(nopsAndWeights);
 
     // Set new tokens and pools
-    for (uint256 i = 0; i < tokensAndPools.length; ++i) {
-      if (tokensAndPools[i].token == address(0) || address(tokensAndPools[i].pool) == address(0))
-        revert InvalidConfig();
-      s_poolsBySourceToken.set(tokensAndPools[i].token, tokensAndPools[i].pool);
-      emit PoolAdded(tokensAndPools[i].token, tokensAndPools[i].pool);
-    }
+    _applyPoolUpdates(new Internal.PoolUpdate[](0), tokensAndPools);
 
     if (allowlist.length > 0) {
       s_allowlistEnabled = true;
@@ -266,7 +256,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   ) external whenNotPaused whenHealthy returns (bytes32) {
     Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
-    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts, originalSender);
+    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts.length, originalSender);
     // Rate limit on aggregated token value
     _rateLimitValue(message.tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
 
@@ -342,12 +332,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @notice Validate the forwarded message with various checks.
   /// @param dataLength The length of the data field of the message
   /// @param gasLimit The gasLimit set in message for destination execution
-  /// @param tokenAmounts The token payload to be sent. They will be locked into pools by this function.
+  /// @param tokenAmountsLength The number of token payload entires to be sent.
   /// @param originalSender The original sender of the message on the router.
   function _validateMessage(
     uint256 dataLength,
     uint256 gasLimit,
-    Client.EVMTokenAmount[] calldata tokenAmounts,
+    uint256 tokenAmountsLength,
     address originalSender
   ) internal view {
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
@@ -356,7 +346,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (dataLength > uint256(s_dynamicConfig.maxDataSize))
       revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), dataLength);
     if (gasLimit > uint256(s_dynamicConfig.maxGasLimit)) revert MessageGasLimitTooHigh();
-    if (tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
+    if (tokenAmountsLength > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
   }
 
@@ -431,9 +421,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @inheritdoc IEVM2AnyOnRamp
   /// @dev This method can only be called by the owner of the contract.
   function applyPoolUpdates(
-    Internal.PoolUpdate[] calldata removes,
-    Internal.PoolUpdate[] calldata adds
+    Internal.PoolUpdate[] memory removes,
+    Internal.PoolUpdate[] memory adds
   ) external onlyOwner {
+    _applyPoolUpdates(removes, adds);
+  }
+
+  function _applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) internal {
     for (uint256 i = 0; i < removes.length; ++i) {
       address token = removes[i].token;
       address pool = removes[i].pool;
@@ -452,6 +446,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
       if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
       if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
+      if (token != address(IPool(pool).getToken())) revert TokenPoolMismatch();
 
       if (s_poolsBySourceToken.set(token, pool)) {
         emit PoolAdded(token, pool);
@@ -492,13 +487,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint192 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts
   ) internal view returns (uint256 feeTokenAmount) {
-    uint256 numerOfTokens = tokenAmounts.length;
+    uint256 numberOfTokens = tokenAmounts.length;
     // short-circuit with 0 transfer fee if no token is being transferred
-    if (numerOfTokens == 0) {
+    if (numberOfTokens == 0) {
       return 0;
     }
 
-    for (uint256 i = 0; i < numerOfTokens; ++i) {
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAmount = tokenAmounts[i];
       TokenTransferFeeConfig memory transferFeeConfig = s_tokenTransferFeeConfig[tokenAmount.token];
 
@@ -732,18 +727,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @return The allowed addresses.
   /// @dev May not work if allow list gets too large. Use events in that case to compute the set.
   function getAllowList() external view returns (address[] memory) {
-    address[] memory allowList = new address[](s_allowList.length());
-    for (uint256 i = 0; i < s_allowList.length(); ++i) {
-      allowList[i] = s_allowList.at(i);
-    }
-    return allowList;
+    return s_allowList.values();
   }
 
   /// @notice Apply updates to the allow list.
   /// @param removes The addresses to be removed.
   /// @param adds The addresses to be added.
   /// @dev allowListing will be removed before public launch
-  function applyAllowListUpdates(address[] calldata removes, address[] calldata adds) external onlyOwner {
+  function applyAllowListUpdates(address[] memory removes, address[] memory adds) external onlyOwner {
     _applyAllowListUpdates(removes, adds);
   }
 
@@ -785,13 +776,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @notice Support querying whether health checker is healthy.
-  function isARMHealthy() external view returns (bool) {
+  function isARMHealthy() public view returns (bool) {
     return !IARM(s_dynamicConfig.arm).isCursed();
   }
 
   /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IARM(s_dynamicConfig.arm).isCursed()) revert BadARMSignal();
+    if (!isARMHealthy()) revert BadARMSignal();
     _;
   }
 
