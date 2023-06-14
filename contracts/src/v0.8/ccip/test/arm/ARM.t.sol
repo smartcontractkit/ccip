@@ -342,9 +342,11 @@ contract ARM_voteToCurse is ARMSetup {
 
   function testEvenIfAlreadyCursedSuccess() public {
     ARM.Config memory cfg = armConstructorArgs();
+    uint16 weightSum = 0;
     for (uint256 i = 0; i < cfg.voters.length; ++i) {
       changePrank(cfg.voters[i].curseVoteAddr);
       s_arm.voteToCurse(makeCurseId(i));
+      weightSum += cfg.voters[i].curseWeight;
     }
 
     // Not part of the assertion of this test but good to have as a sanity
@@ -352,6 +354,21 @@ contract ARM_voteToCurse is ARMSetup {
     // to make sense.
     assert(s_arm.isCursed());
 
+    vm.expectEmit();
+    emit VotedToCurse(
+      1, // configVersion
+      cfg.voters[cfg.voters.length - 1].curseVoteAddr,
+      cfg.voters[cfg.voters.length - 1].curseWeight,
+      2, // voteCount
+      makeCurseId(cfg.voters.length + 1), // this curse id
+      keccak256(
+        abi.encode(
+          keccak256(abi.encode(bytes32(0), makeCurseId(cfg.voters.length - 1))),
+          makeCurseId(cfg.voters.length + 1)
+        )
+      ), // cursesHash
+      weightSum // accumulatedWeight
+    );
     // Asserts that this call to vote with a new curse id goes through with no
     // reverts even when the ARM contract is cursed.
     s_arm.voteToCurse(makeCurseId(cfg.voters.length + 1));

@@ -303,28 +303,33 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
     ++curserRecord.voteCount;
     curserRecord.cursesHash = keccak256(abi.encode(curserRecord.cursesHash, curseId));
     s_curserRecords[msg.sender] = curserRecord;
+
+    CurseVoteProgress memory curseVoteProgress = s_curseVoteProgress;
+
     if (curserRecord.voteCount == 1) {
-      s_curseVoteProgress.accumulatedWeight += curserRecord.weight;
-      // NOTE: We could pack configVersion into CurserRecord that we already load in the beginning of this function to
-      // avoid the following extra storage read for it, but since voteToCurse is not on the hot path we'd rather keep
-      // things simple.
-      uint32 configVersion = s_versionedConfig.configVersion;
-      emit VotedToCurse(
-        configVersion,
-        msg.sender,
-        curserRecord.weight,
-        curserRecord.voteCount,
-        curseId,
-        curserRecord.cursesHash,
-        s_curseVoteProgress.accumulatedWeight
-      );
-      if (!s_curseVoteProgress.curseActive) {
-        if (s_curseVoteProgress.accumulatedWeight >= s_curseVoteProgress.curseWeightThreshold) {
-          s_curseVoteProgress.curseActive = true;
-          emit Cursed(configVersion, block.timestamp);
-        }
-      }
+      curseVoteProgress.accumulatedWeight += curserRecord.weight;
     }
+
+    // NOTE: We could pack configVersion into CurserRecord that we already load in the beginning of this function to
+    // avoid the following extra storage read for it, but since voteToCurse is not on the hot path we'd rather keep
+    // things simple.
+    uint32 configVersion = s_versionedConfig.configVersion;
+    emit VotedToCurse(
+      configVersion,
+      msg.sender,
+      curserRecord.weight,
+      curserRecord.voteCount,
+      curseId,
+      curserRecord.cursesHash,
+      curseVoteProgress.accumulatedWeight
+    );
+    if (
+      !curseVoteProgress.curseActive && curseVoteProgress.accumulatedWeight >= curseVoteProgress.curseWeightThreshold
+    ) {
+      curseVoteProgress.curseActive = true;
+      emit Cursed(configVersion, block.timestamp);
+    }
+    s_curseVoteProgress = curseVoteProgress;
   }
 
   /// @notice Enables the owner to immediately have the system enter the cursed state.
