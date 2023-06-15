@@ -296,6 +296,12 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			"maxSeqNr", rep.commitReport.Interval.Max,
 		)
 
+		snoozeUntil, haveSnoozed := r.snoozedRoots[merkleRoot]
+		if haveSnoozed && time.Now().Before(snoozeUntil) {
+			rootLggr.Debug("Skipping snoozed root")
+			continue
+		}
+
 		if err := rep.validate(); err != nil {
 			rootLggr.Errorw("Skipping invalid report", "err", err)
 			continue
@@ -310,10 +316,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			continue
 		}
 
-		snoozeUntil, haveSnoozed := r.snoozedRoots[merkleRoot]
-		if haveSnoozed && time.Now().Before(snoozeUntil) {
-			continue
-		}
 		blessed, err := r.config.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, merkleRoot)
 		if err != nil {
 			return nil, err
