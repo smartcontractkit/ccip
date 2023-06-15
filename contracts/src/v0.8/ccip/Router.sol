@@ -29,7 +29,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
   event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
   event OffRampRemoved(uint64 indexed sourceChainSelector, address offRamp);
-  event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp);
+  event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
 
   struct OnRamp {
     uint64 destChainSelector;
@@ -58,7 +58,8 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   EnumerableMap.AddressToUintMap private s_offRamps;
 
   constructor(address wrappedNative) {
-    // Zero address indicates unsupported auto-wrapping.
+    // Zero address indicates unsupported auto-wrapping, therefore, unsupported
+    // native fee token payments.
     s_wrappedNative = wrappedNative;
   }
 
@@ -138,47 +139,34 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   // ================================================================
 
   /// @inheritdoc IRouter
+  /// @dev Handles the edge case where we want to pass a specific amount of gas,
+  /// @dev but EIP-150 sends all but 1/64 of the remaining gas instead so the user gets
+  /// @dev less gas than they paid for. The other 2 parts of EIP-150 do not apply since
+  /// @dev a) we hard code value=0 and b) we ensure code already exists.
+  /// @dev If we revert instead, then that will never happen.
+  /// @dev Separately we capture the return data up to a maximum size to avoid return bombs,
+  /// @dev borrowed from https://github.com/nomad-xyz/ExcessivelySafeCall/blob/main/src/ExcessivelySafeCall.sol.
   function routeMessage(
     Client.Any2EVMMessage calldata message,
     uint16 gasForCallExactCheck,
     uint256 gasLimit,
     address receiver
-  ) external override onlyOffRamp(message.sourceChainSelector) returns (bool, bytes memory) {
+  ) external override onlyOffRamp(message.sourceChainSelector) returns (bool success, bytes memory retData) {
     // We encode here instead of the offRamps to constrain specifically what functions
     // can be called from the router.
-    (bool success, bytes memory retBytes) = _callWithExactGas(
-      gasForCallExactCheck,
-      gasLimit,
-      receiver,
-      abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message)
-    );
-    // MessageExecuted is emitted here for close proximity to the actual call,
-    // it can be used to confidently track successful message executions.
-    emit MessageExecuted(message.messageId, message.sourceChainSelector, msg.sender);
-    return (success, retBytes);
-  }
-
-  /// @dev Calls target address with exactly gasAmount gas and data as calldata.
-  /// @dev Handles the edge case where we want to pass a specific amount of gas,
-  /// @dev but EIP-150 sends all but 1/64 of the remaining gas instead so the user gets
-  /// @dev less gas than they paid for. If we revert instead, then that will never happen.
-  /// @dev Separately we capture the return data up to a maximum size to avoid return bombs,
-  /// @dev borrowed from https://github.com/nomad-xyz/ExcessivelySafeCall/blob/main/src/ExcessivelySafeCall.sol.
-  /// @param gasForCallExactCheck amount to check before gas call
-  /// @param gasAmount gas limit for this call
-  /// @param target target address
-  /// @param data calldata
-  function _callWithExactGas(
-    uint16 gasForCallExactCheck,
-    uint256 gasAmount,
-    address target,
-    bytes memory data
-  ) internal returns (bool, bytes memory) {
+    bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
     // allocate retData memory ahead of time
-    bytes memory retData = new bytes(MAX_RET_BYTES);
-    bool success;
+    retData = new bytes(MAX_RET_BYTES);
+
     // solhint-disable-next-line no-inline-assembly
     assembly {
+      // solidity calls check that a contract actually exists at the destination, so we do the same
+      // Note we do this check prior to measuring gas so gasForCallExactCheck (our "cushion")
+      // doesn't need to account for it.
+      if iszero(extcodesize(receiver)) {
+        revert(0, 0)
+      }
+
       let g := gas()
       // Compute g -= gasForCallExactCheck and check for underflow
       // The gas actually passed to the callee is _min(gasAmount, 63//64*gas available).
@@ -192,16 +180,13 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
       g := sub(g, gasForCallExactCheck)
       // if g - g//64 <= gasAmount, revert
       // (we subtract g//64 because of EIP-150)
-      if iszero(gt(sub(g, div(g, 64)), gasAmount)) {
-        revert(0, 0)
-      }
-      // solidity calls check that a contract actually exists at the destination, so we do the same
-      if iszero(extcodesize(target)) {
+      if iszero(gt(sub(g, div(g, 64)), gasLimit)) {
         revert(0, 0)
       }
       // call and return whether we succeeded. ignore return data
       // call(gas,addr,value,argsOffset,argsLength,retOffset,retLength)
-      success := call(gasAmount, target, 0, add(data, 0x20), mload(data), 0, 0)
+      success := call(gasLimit, receiver, 0, add(data, 0x20), mload(data), 0, 0)
+
       // limit our copy to MAX_RET_BYTES bytes
       let toCopy := returndatasize()
       if gt(toCopy, MAX_RET_BYTES) {
@@ -212,6 +197,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
       // copy the bytes from retData[0:_toCopy]
       returndatacopy(add(retData, 0x20), 0, toCopy)
     }
+    emit MessageExecuted(message.messageId, message.sourceChainSelector, msg.sender, keccak256(data));
     return (success, retData);
   }
 

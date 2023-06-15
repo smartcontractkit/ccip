@@ -459,7 +459,7 @@ contract Router_getSupportedTokens is EVM2EVMOnRampSetup {
 
 /// @notice #routeMessage
 contract Router_routeMessage is EVM2EVMOffRampSetup {
-  event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp);
+  event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
 
   function setUp() public virtual override {
     EVM2EVMOffRampSetup.setUp();
@@ -489,7 +489,12 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     s_reverting_receiver.setErr(realError1);
 
     vm.expectEmit();
-    emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
+    emit MessageExecuted(
+      message.messageId,
+      message.sourceChainSelector,
+      address(s_offRamp),
+      keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
+    );
 
     (bool success, bytes memory retData) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
@@ -509,7 +514,12 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     s_reverting_receiver.setErr(realError2);
 
     vm.expectEmit();
-    emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
+    emit MessageExecuted(
+      message.messageId,
+      message.sourceChainSelector,
+      address(s_offRamp),
+      keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
+    );
 
     (success, retData) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
@@ -532,7 +542,12 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
 
     // Should emit success
     vm.expectEmit();
-    emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
+    emit MessageExecuted(
+      message.messageId,
+      message.sourceChainSelector,
+      address(s_offRamp),
+      keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
+    );
 
     (success, retData) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
@@ -554,7 +569,12 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     if (error.length >= 33) {
       uint256 cutOff = error.length > 64 ? 64 : error.length;
       vm.expectEmit();
-      emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
+      emit MessageExecuted(
+        message.messageId,
+        message.sourceChainSelector,
+        address(s_offRamp),
+        keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
+      );
       expectedRetData = abi.encodeWithSelector(
         MaybeRevertMessageReceiver.CustomError.selector,
         uint256(32),
@@ -564,7 +584,12 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       );
     } else {
       vm.expectEmit();
-      emit MessageExecuted(message.messageId, message.sourceChainSelector, address(s_offRamp));
+      emit MessageExecuted(
+        message.messageId,
+        message.sourceChainSelector,
+        address(s_offRamp),
+        keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
+      );
       expectedRetData = abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, error);
     }
 
