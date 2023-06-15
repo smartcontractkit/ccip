@@ -205,6 +205,26 @@ var (
 At this point `currentVersion` should point to the currently deployed lane's version. `upgradeLaneVersion` should point to next version what will be created during deployment.
 Please follow [this guide](https://github.com/smartcontractkit/releng/blob/9f7154b48d0a1f74e6f1ddf65fd0b76bc4c0a5aa/docs/vault/notes/guides.release-processes.ccip.ccip-core-node.md) to generate a new version. Once created, just copy it to the `upgradeLaneVersion` variable.
 
+**Notice** At this moment, ARM doesn't support blue-green deployments / multiple contracts instances per single lane. Therefore, we need to deploy MockARM and use it in `UpgradeLane`.
+You can do it by setting following options on every chain we are deploying.
+```go
+var Beta_Sepolia = rhea.EVMChainConfig{
+        // ...
+	ARMConfig: nil,
+	DeploySettings: rhea.ChainDeploySettings{
+		DeployARM:           true,
+                // ...
+	},
+}
+```
+Now you can deploy mocked ARM contracts by calling `TestRheaDeployChains`. If current configuration points to the real ARM, back it up - you are going to need it later, because at the end of the day, promoted lane has to use real ARM.
+Please update `$env.go` file with updated arm addresses like this:
+```go
+var Beta_Sepolia = rhea.EVMChainConfig{
+	ARM:           gethcommon.HexToAddress("0xAddressFromJsonFile"),
+}
+```
+
 We need to let scripts know that we want to deploy Upgrade Lane by adding `EVMLaneConfig` under `UpgradeLaneConfig` field for each end. 
 For instance, Sepolia <> Arbitrum deployment requires adding `UpgradeLaneConfig` to both `$ENV_SepoliaToArbitrumGoerli` and `$ENV_ArbitrumGoerliToSepolia`
 ```go
@@ -266,7 +286,7 @@ Great! You are ready to move on and promote your deployment!
 Second phase of deployment includes attaching new contracts (OnRamp and OffRamp) to the Router and switching real traffic there. 
 We will use `TestRheaPromoteUpgradeLaneDeployment` from [ccip_runner_test.go](ccip_runner_test.go).
 Run output should be written to console &  `./json/deployments/env/lane/....`. We need to replace `LaneConfig` with `UpgradeLaneConfig`, it's better to copy those values from `json` files generated as they are source of the truth in this case.
-Also, please set `UpgradeLaneConfig` to zeros to avoid confusion, stating that there is nothing waiting to promoted on the Upgrade Lane.
+Also, please remove `UpgradeLaneConfig` to avoid confusion, stating that there is nothing waiting to promoted on the Upgrade Lane.
 ```go
 var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_Sepolia,
@@ -281,19 +301,7 @@ var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
                 DeployPingPongDapp: false,
                 DeployedAtBlock:    123456,
             },       
-	},
-	UpgradeLaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0x0"),
-		OffRamp:      gethcommon.HexToAddress("0x0"),
-		CommitStore:  gethcommon.HexToAddress("0x0"),
-		PingPongDapp: gethcommon.HexToAddress("0x0"),
-		DeploySettings: rhea.LaneDeploySettings{
-			DeployCommitStore:  false,
-			DeployRamp:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    0,
-		},
-	},
+	}
 }
 ```
 
@@ -305,6 +313,21 @@ var (
     upgradeLaneVersion = "" // Will be filled during next deployment
 )
 ```
+
+
+### Switch back to the Real ARM
+
+This has to be coordinated with the research team. Start with bringing back values of the real ARM contracts to the chain config
+
+```go
+var Beta_Sepolia = rhea.EVMChainConfig{
+	ARM:           gethcommon.HexToAddress("0xPointingToTheRealARM"),
+	ARMConfig:     "previousValue"
+}
+```
+
+Run `TestUpdateLaneARMAddress` and let know research team about newly deployed contracts' addresses - they have to update those in the offchain part of the ARM. Once it's done you might need ~30 minutes for ARM start blessing roots. 
+In case of ARM cursing lanes, you might need to use `TestCCIP.uncurseSourceARM` to remove curse on a particular lane.
 
 ## Checking the deployment
 
