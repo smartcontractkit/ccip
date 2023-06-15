@@ -141,7 +141,7 @@ func setOnRampOnTokenPools(t *testing.T, sourceClient *EvmDeploymentConfig, onRa
 		shared.RequireNoError(t, err)
 
 		rampUpdate := lock_release_token_pool.TokenPoolRampUpdate{
-			Ramp:    sourceClient.LaneConfig.OnRamp,
+			Ramp:    onRampAddress,
 			Allowed: true,
 		}
 
