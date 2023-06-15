@@ -263,13 +263,13 @@ func setPoolAllowList(client *EvmDeploymentConfig, poolAddress common.Address, p
 		return err
 	}
 
-	toRemove := []common.Address{}
+	var toRemove []common.Address
 	for _, addr := range currentAllowList {
 		if !slices.Contains(poolAllowList, addr) {
 			toRemove = append(toRemove, addr)
 		}
 	}
-	toAdd := []common.Address{}
+	var toAdd []common.Address
 	for _, addr := range poolAllowList {
 		if !slices.Contains(currentAllowList, addr) {
 			toAdd = append(toAdd, addr)

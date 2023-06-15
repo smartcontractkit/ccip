@@ -5,9 +5,9 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	evmtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
-	evmtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip-test/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
@@ -143,7 +143,7 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 	}
 	client.Logger.Infof("Skipping %s Pool deployment, using Pool on %s", tokenName, tokenConfig.Pool)
 
-	return setPoolAllowList(client, tokenConfig.Pool, tokenConfig.PoolAllowList, tokenName)
+	return nil
 }
 
 func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address, poolAllowList []common.Address) (common.Address, error) {
@@ -154,8 +154,8 @@ func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, to
 		poolAllowList,
 		lock_release_token_pool.RateLimiterConfig{
 			IsEnabled: false,
-			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e9)),
-			Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e5)),
+			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(RATE_LIMIT_CAPACITY_DOLLAR)),
+			Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(RATE_LIMIT_RATE_DOLLAR)),
 		})
 	if err != nil {
 		return common.Address{}, err
@@ -181,8 +181,8 @@ func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, token
 		poolAllowList,
 		burn_mint_token_pool.RateLimiterConfig{
 			IsEnabled: false,
-			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e9)),
-			Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(1e5)),
+			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(RATE_LIMIT_CAPACITY_DOLLAR)),
+			Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(RATE_LIMIT_RATE_DOLLAR)),
 		})
 	if err != nil {
 		return common.Address{}, err

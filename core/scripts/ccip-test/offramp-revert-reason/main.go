@@ -38,7 +38,7 @@ func main() {
 	if errorCodeString == "" {
 		// Need a node URL
 		// NOTE: this node needs to run in archive mode
-		ethUrl := secrets.GetRPC(5)
+		ethUrl := secrets.GetRPC(420)
 		txHash := "0x97be8559164442595aba46b5f849c23257905b78e72ee43d9b998b28eee78b84"
 		requester := "0xe88ff73814fb891bb0e149f5578796fa41f20242"
 
@@ -65,12 +65,21 @@ func DecodeErrorStringFromABI(errorString string, contractABIs []string) {
 		parsedAbi, err2 := abi.JSON(strings.NewReader(contractABI))
 		panicErr(err2)
 
-		for k, abiError := range parsedAbi.Errors {
+		for errorName, abiError := range parsedAbi.Errors {
 			if bytes.Equal(data[:4], abiError.ID.Bytes()[:4]) {
 				// Found a matching error
 				v, err3 := abiError.Unpack(data)
 				panicErr(err3)
-				fmt.Printf("Error is \"%v\" args %v\n", k, v)
+
+				// If exec error, the actual error is within the revert reason
+				if errorName == "ExecutionError" {
+					// Get the inner type, which is `bytes`
+					fmt.Printf("Error is \"%v\" inner error: ", errorName)
+					errorBytes := v.([]interface{})[0].([]byte)
+					DecodeErrorStringFromABI(hex.EncodeToString(errorBytes), contractABIs)
+					return
+				}
+				fmt.Printf("Error is \"%v\" args %v\n", errorName, v)
 				return
 			}
 		}
@@ -104,8 +113,8 @@ func DecodeErrorStringFromABI(errorString string, contractABIs []string) {
 
 	stringErr, err := abi.UnpackRevert(data)
 	if err == nil {
-		fmt.Println("String error thrown")
-		fmt.Printf("error: %s", stringErr)
+		fmt.Print("string error: ")
+		fmt.Printf("%s\n", stringErr)
 		return
 	}
 
