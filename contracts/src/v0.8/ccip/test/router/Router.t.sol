@@ -326,6 +326,8 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 }
 
 contract Router_applyRampUpdates is RouterSetup {
+  event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
+
   MaybeRevertMessageReceiver internal s_receiver;
 
   function setUp() public virtual override(RouterSetup) {
@@ -402,6 +404,23 @@ contract Router_applyRampUpdates is RouterSetup {
     vm.expectRevert("Only callable by owner");
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](0);
+    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
+  }
+
+  function testOffRampMismatchReverts() public {
+    address offRamp = address(uint160(2));
+
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    offRampUpdates[0] = Router.OffRamp(DEST_CHAIN_ID, offRamp);
+
+    vm.expectEmit();
+    emit OffRampAdded(DEST_CHAIN_ID, offRamp);
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+
+    offRampUpdates[0] = Router.OffRamp(SOURCE_CHAIN_ID, offRamp);
+
+    vm.expectRevert(Router.OffRampMismatch.selector);
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
   }
 }

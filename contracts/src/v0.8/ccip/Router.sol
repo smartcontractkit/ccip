@@ -23,6 +23,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   using EnumerableMap for EnumerableMap.AddressToUintMap;
 
   error FailedToSendValue();
+  error OffRampMismatch();
 
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
   event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
@@ -270,13 +271,21 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     // Apply ingress updates.
     // We permit an empty list as a way to disable ingress.
     for (uint256 i = 0; i < offRampRemoves.length; ++i) {
-      if (s_offRamps.remove(offRampRemoves[i].offRamp)) {
-        emit OffRampRemoved(offRampRemoves[i].sourceChainSelector, offRampRemoves[i].offRamp);
+      uint64 rampSelector = offRampRemoves[i].sourceChainSelector;
+      address rampAddress = offRampRemoves[i].offRamp;
+
+      if (s_offRamps.get(rampAddress) != uint256(rampSelector)) revert OffRampMismatch();
+
+      if (s_offRamps.remove(rampAddress)) {
+        emit OffRampRemoved(rampSelector, rampAddress);
       }
     }
     for (uint256 i = 0; i < offRampAdds.length; ++i) {
-      if (s_offRamps.set(offRampAdds[i].offRamp, offRampAdds[i].sourceChainSelector)) {
-        emit OffRampAdded(offRampAdds[i].sourceChainSelector, offRampAdds[i].offRamp);
+      uint64 rampSelector = offRampAdds[i].sourceChainSelector;
+      address rampAddress = offRampAdds[i].offRamp;
+
+      if (s_offRamps.set(rampAddress, rampSelector)) {
+        emit OffRampAdded(rampSelector, rampAddress);
       }
     }
   }
