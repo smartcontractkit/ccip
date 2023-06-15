@@ -23,6 +23,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   using EnumerableMap for EnumerableMap.AddressToUintMap;
 
   error FailedToSendValue();
+  error InvalidRecipientAddress(address to);
   error OffRampMismatch();
 
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
@@ -296,6 +297,8 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   /// @param tokenAddress ERC20-token to recover
   /// @param to Destination address to send the tokens to.
   function recoverTokens(address tokenAddress, address to, uint256 amount) external onlyOwner {
+    if (to == address(0)) revert InvalidRecipientAddress(to);
+
     if (tokenAddress == address(0)) {
       (bool success, ) = to.call{value: amount}("");
       if (!success) revert FailedToSendValue();

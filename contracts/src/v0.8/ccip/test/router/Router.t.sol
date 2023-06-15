@@ -47,6 +47,11 @@ contract Router_recoverTokens is EVM2EVMOnRampSetup {
     s_sourceRouter.recoverTokens(address(0), STRANGER, 1);
   }
 
+  function testRecoverTokensInvalidRecipientReverts() public {
+    vm.expectRevert(abi.encodeWithSelector(Router.InvalidRecipientAddress.selector, address(0)));
+    s_sourceRouter.recoverTokens(address(0), address(0), 1);
+  }
+
   function testRecoverTokensNoFundsReverts() public {
     // Reverts if no funds present
     vm.expectRevert();
