@@ -101,7 +101,7 @@ contract EVM2EVMOnRamp_payNops_fuzz is EVM2EVMOnRampSetup {
   }
 }
 
-contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
+contract EVM2EVMNopsFeeSetup is EVM2EVMOnRampSetup {
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
 
@@ -122,7 +122,9 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
     assertEq(s_onRamp.getNopFeesJuels(), feeAmount * numberOfMessages);
     assertEq(IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp)), feeAmount * numberOfMessages);
   }
+}
 
+contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
   function testOwnerPayNopsSuccess() public {
     changePrank(OWNER);
 
@@ -159,6 +161,33 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
     }
   }
 
+  function testPayNopsSuccessAfterSetNops() public {
+    changePrank(OWNER);
+
+    // set 2 nops, 1 from previous, 1 new
+    address prevNop = getNopsAndWeights()[0].nop;
+    address newNop = STRANGER;
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](2);
+    nopsAndWeights[0] = EVM2EVMOnRamp.NopAndWeight({nop: prevNop, weight: 1});
+    nopsAndWeights[1] = EVM2EVMOnRamp.NopAndWeight({nop: newNop, weight: 1});
+    s_onRamp.setNops(nopsAndWeights);
+
+    // refill OnRamp nops fees
+    changePrank(address(s_sourceRouter));
+    uint256 feeAmount = 1234567890;
+    IERC20(s_sourceFeeToken).transferFrom(OWNER, address(s_onRamp), feeAmount);
+    s_onRamp.forwardFromRouter(_generateEmptyMessage(), feeAmount, OWNER);
+
+    changePrank(newNop);
+    uint256 prevNopBalance = IERC20(s_sourceFeeToken).balanceOf(prevNop);
+    uint256 totalJuels = s_onRamp.getNopFeesJuels();
+
+    s_onRamp.payNops();
+
+    assertEq(totalJuels / 2 + prevNopBalance, IERC20(s_sourceFeeToken).balanceOf(prevNop));
+    assertEq(totalJuels / 2, IERC20(s_sourceFeeToken).balanceOf(newNop));
+  }
+
   // Reverts
 
   function testInsufficientBalanceReverts() public {
@@ -193,7 +222,7 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMOnRampSetup {
 }
 
 /// @notice #linkAvailableForPayment
-contract EVM2EVMOnRamp_linkAvailableForPayment is EVM2EVMOnRamp_payNops {
+contract EVM2EVMOnRamp_linkAvailableForPayment is EVM2EVMNopsFeeSetup {
   function testLinkAvailableForPaymentSuccess() public {
     uint256 totalJuels = s_onRamp.getNopFeesJuels();
     uint256 linkBalance = IERC20(s_sourceFeeToken).balanceOf(address(s_onRamp));
@@ -986,6 +1015,13 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     (EVM2EVMOnRamp.NopAndWeight[] memory actual, uint256 totalWeight) = s_onRamp.getNops();
     assertEq(actual.length, 0);
     assertEq(totalWeight, 0);
+
+    address prevNop = getNopsAndWeights()[0].nop;
+    changePrank(prevNop);
+
+    // prev nop should not have permission to call payNops
+    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrFeeAdminOrNop.selector);
+    s_onRamp.payNops();
   }
 
   // Reverts

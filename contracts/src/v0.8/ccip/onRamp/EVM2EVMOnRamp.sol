@@ -343,8 +343,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Check that payload is formed correctly
-    if (dataLength > uint256(s_dynamicConfig.maxDataSize))
-      revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), dataLength);
+    uint256 maxDataSize = uint256(s_dynamicConfig.maxDataSize);
+    if (dataLength > maxDataSize) revert MessageTooLarge(maxDataSize, dataLength);
     if (gasLimit > uint256(s_dynamicConfig.maxGasLimit)) revert MessageGasLimitTooHigh();
     if (tokenAmountsLength > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
@@ -445,11 +445,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       address pool = adds[i].pool;
 
       if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
-      if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
       if (token != address(IPool(pool).getToken())) revert TokenPoolMismatch();
 
       if (s_poolsBySourceToken.set(token, pool)) {
         emit PoolAdded(token, pool);
+      } else {
+        revert PoolAlreadyAdded();
       }
     }
   }
@@ -614,8 +615,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     _setNops(nopsAndWeights);
   }
 
-  /// @dev Set the nops and weights
-  /// @param nopsAndWeights The nops and weights
+  /// @dev Clears existing nops, sets new nops and weights
+  /// @param nopsAndWeights New set of nops and weights
   function _setNops(NopAndWeight[] memory nopsAndWeights) internal {
     // Make sure all nops have been paid before removing nops
     // We only have to pay when there are nops and there is enough
@@ -627,8 +628,11 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 numberOfNops = nopsAndWeights.length;
     if (numberOfNops > MAX_NUMBER_OF_NOPS) revert TooManyNops();
 
-    // Remove previous
-    delete s_nops;
+    // Remove all previous nops, move from end to start to avoid shifting
+    for (uint256 i = s_nops.length(); i > 0; --i) {
+      (address nop, ) = s_nops.at(i - 1);
+      s_nops.remove(nop);
+    }
 
     // Add new
     uint32 nopWeightsTotal = 0;
@@ -654,7 +658,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// of the weight of all nops. Since nop weights are uint16s and we can have at
   /// most MAX_NUMBER_OF_NOPS NOPs, the highest possible value is 2**22 or 0.04 gjuels.
   function payNops() public onlyOwnerOrAdminOrNop {
-    uint32 weightsTotal = s_nopWeightsTotal;
+    uint256 weightsTotal = s_nopWeightsTotal;
     if (weightsTotal == 0) revert NoNopsToPay();
 
     uint96 totalFeesToPay = s_nopFeesJuels;
