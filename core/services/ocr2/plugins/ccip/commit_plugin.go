@@ -35,9 +35,10 @@ const (
 // TODO: Once core exposes EvmFinalityTag() for a given chain we can use that instead.
 var checkFinalityTags = map[int64]bool{
 	// Testnets
-	420:      true,  // Optimism goerli
-	421613:   true,  // Arbitrum goerli
-	43113:    true,  // Avax fuji
+	420:    true, // Optimism goerli
+	421613: true, // Arbitrum goerli
+	// TODO Temporarily disabling Avax until we figure out issues there
+	43113:    false, // Avax fuji
 	11155111: true,  // Sepolia
 	80001:    false, // Polygon mumbia does NOT support finality tags
 	1337:     false, // Local evm / Quorum
@@ -45,10 +46,11 @@ var checkFinalityTags = map[int64]bool{
 	1000:     false, // Local evm2
 
 	// Mainnets
-	1:     true,  // Mainnet
-	10:    true,  // Optimism
-	42161: true,  // Arbitrum
-	43114: true,  // Avax
+	1:     true, // Mainnet
+	10:    true, // Optimism
+	42161: true, // Arbitrum
+	// TODO Temporarily disabling Avax until we figure out issues there
+	43114: false, // Avax
 	137:   false, // Polygon
 }
 

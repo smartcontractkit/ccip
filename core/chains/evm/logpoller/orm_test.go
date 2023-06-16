@@ -564,9 +564,9 @@ func TestORM_DataWords(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, len(lgs))
 
-	// Unknown hash should not an error
+	// Unknown hash should an error
 	lgs, err = o1.SelectUntilBlockHashDataWordGreaterThan(addr, eventSig, 0, logpoller.EvmWord(1), common.HexToHash("0x3"))
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Equal(t, 0, len(lgs))
 
 	// 1 block should include first log
