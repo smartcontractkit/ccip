@@ -108,7 +108,8 @@ func (c *inflightCommitReportsContainer) latestInflightTokenPriceUpdates() map[c
 	return latestTokenPriceUpdates
 }
 
-func (c *inflightCommitReportsContainer) reset() {
+func (c *inflightCommitReportsContainer) reset(lggr logger.Logger) {
+	lggr.Infow("Inflight report reset")
 	c.locker.Lock()
 	defer c.locker.Unlock()
 	c.inFlight = make(map[[32]byte]InflightCommitReport)
@@ -127,6 +128,9 @@ func (c *inflightCommitReportsContainer) expire(lggr logger.Logger) {
 			delete(c.inFlight, root)
 		}
 	}
+
+	lggr.Infow("Inflight expire with price count", "count", len(c.inFlightPriceUpdates))
+
 	var stillInflight []InflightPriceUpdate
 	for _, inFlightFeeUpdate := range c.inFlightPriceUpdates {
 		if time.Since(inFlightFeeUpdate.createdAt) > c.cacheExpiry {

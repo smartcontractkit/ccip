@@ -262,7 +262,7 @@ func (r *CommitReportingPlugin) finalizedLogsGreaterThanMinSeq(ctx context.Conte
 }
 
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {
-	nextInflightMin, _, err := r.nextMinSeqNum(ctx)
+	nextInflightMin, _, err := r.nextMinSeqNum(ctx, lggr)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -298,7 +298,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	return min, max, nil
 }
 
-func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (inflightMin, onChainMin uint64, err error) {
+func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context, lggr logger.Logger) (inflightMin, onChainMin uint64, err error) {
 	nextMinOnChain, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return 0, 0, err
@@ -318,7 +318,7 @@ func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context) (inflightMin,
 	// expire them all. This scenario can also occur if there is a reorg which reorders the reports such that one reverts.
 	maxInflight := r.inflightReports.maxInflightSeqNr()
 	if (maxInflight > nextMinOnChain) && ((maxInflight - nextMinOnChain) > MaxInflightSeqNumGap) {
-		r.inflightReports.reset()
+		r.inflightReports.reset(lggr)
 		return nextMinOnChain, nextMinOnChain, nil
 	}
 	return max(nextMinOnChain, maxInflight+1), nextMinOnChain, nil
@@ -838,7 +838,7 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.Logger, report commit_store.CommitStoreCommitReport, checkInflight bool) bool {
 	// There could be a report with only price updates, in that case ignore sequence number staleness
 	if report.MerkleRoot != [32]byte{} {
-		nextInflightMin, nextOnChainMin, err := r.nextMinSeqNum(ctx)
+		nextInflightMin, nextOnChainMin, err := r.nextMinSeqNum(ctx, lggr)
 		if err != nil {
 			// Assume it's a transient issue getting the last report
 			// Will try again on the next round

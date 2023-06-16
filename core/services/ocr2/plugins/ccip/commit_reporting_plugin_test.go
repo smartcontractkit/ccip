@@ -821,10 +821,10 @@ func TestNextMin(t *testing.T) {
 			require.NoError(t, cp.inflightReports.add(lggr, rc))
 		}
 		t.Log("inflight", cp.inflightReports.maxInflightSeqNr())
-		inflightMin, onchainMin, err := cp.nextMinSeqNum(context.Background())
+		inflightMin, onchainMin, err := cp.nextMinSeqNum(context.Background(), lggr)
 		require.NoError(t, err)
 		assert.Equal(t, tc.expectedInflightMin, inflightMin)
 		assert.Equal(t, tc.expectedOnChainMin, onchainMin)
-		cp.inflightReports.reset()
+		cp.inflightReports.reset(lggr)
 	}
 }
