@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
+	txmgrcommon "github.com/smartcontractkit/chainlink/v2/common/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/forwarder"
@@ -205,7 +206,7 @@ func (rh *RequestHandler) SendTransaction(ctx *gin.Context, req types.SendTransa
 	// Creation of eth transaction and persistence of data are done in a transaction
 	// to avoid partial failures, which would leave the persistence layer in inconsistent state
 	err = rh.q.Transaction(func(tx pg.Queryer) error {
-		ethTx, err2 := rh.txm.CreateTransaction(txmgr.EvmNewTx{
+		ethTx, err2 := rh.txm.CreateTransaction(txmgr.EvmTxRequest{
 			FromAddress:    fromAddress,
 			ToAddress:      rh.forwarder.Address(),
 			EncodedPayload: payload,
@@ -214,7 +215,7 @@ func (rh *RequestHandler) SendTransaction(ctx *gin.Context, req types.SendTransa
 			//Meta: &txmgr.EthTxMeta{
 			//	RequestID: requestID,
 			//},
-			Strategy: txmgr.NewSendEveryStrategy(),
+			Strategy: txmgrcommon.NewSendEveryStrategy(),
 		}, pg.WithQueryer(tx), pg.WithParentCtx(ctx))
 		if err2 != nil {
 			return err2

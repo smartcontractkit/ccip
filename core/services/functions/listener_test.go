@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -24,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
+	"github.com/smartcontractkit/chainlink/v2/core/services/functions"
 	functions_service "github.com/smartcontractkit/chainlink/v2/core/services/functions"
 	functions_mocks "github.com/smartcontractkit/chainlink/v2/core/services/functions/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -40,6 +42,7 @@ import (
 
 type FunctionsListenerUniverse struct {
 	service        *functions_service.FunctionsListener
+	bridgeAccessor *functions_mocks.BridgeAccessor
 	eaClient       *functions_mocks.ExternalAdapterClient
 	pluginORM      *functions_mocks.ORM
 	logBroadcaster *log_mocks.Broadcaster
@@ -91,6 +94,7 @@ func NewFunctionsListenerUniverse(t *testing.T, timeoutSec int, pruneFrequencySe
 		},
 	}
 	eaClient := functions_mocks.NewExternalAdapterClient(t)
+	bridgeAccessor := functions_mocks.NewBridgeAccessor(t)
 
 	var pluginConfig config.PluginConfig
 	err := json.Unmarshal(jsonConfig.Bytes(), &pluginConfig)
@@ -103,10 +107,11 @@ func NewFunctionsListenerUniverse(t *testing.T, timeoutSec int, pruneFrequencySe
 	ingressAgent := telemetry.NewIngressAgentWrapper(ingressClient)
 	monEndpoint := ingressAgent.GenMonitoringEndpoint("0xa", synchronization.FunctionsRequests)
 
-	functionsListener := functions_service.NewFunctionsListener(oracleContract, jb, eaClient, pluginORM, pluginConfig, broadcaster, lggr, mailMon, monEndpoint)
+	functionsListener := functions_service.NewFunctionsListener(oracleContract, jb, bridgeAccessor, pluginORM, pluginConfig, broadcaster, lggr, mailMon, monEndpoint)
 
 	return &FunctionsListenerUniverse{
 		service:        functionsListener,
+		bridgeAccessor: bridgeAccessor,
 		eaClient:       eaClient,
 		pluginORM:      pluginORM,
 		logBroadcaster: broadcaster,
@@ -144,6 +149,7 @@ func TestFunctionsListener_HandleOracleRequestSuccess(t *testing.T) {
 
 	uni.pluginORM.On("CreateRequest", RequestID, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	uni.logBroadcaster.On("MarkConsumed", mock.Anything, mock.Anything).Return(nil)
+	uni.bridgeAccessor.On("NewExternalAdapterClient").Return(uni.eaClient, nil)
 	uni.eaClient.On("RunComputation", mock.Anything, RequestIDStr, mock.Anything, SubscriptionOwner.Hex(), SubscriptionID, mock.Anything, mock.Anything).Return(ResultBytes, nil, nil, nil)
 	uni.pluginORM.On("SetResult", RequestID, mock.Anything, ResultBytes, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		close(doneCh)
@@ -162,6 +168,7 @@ func TestFunctionsListener_ReportSourceCodeDomains(t *testing.T) {
 
 	uni.pluginORM.On("CreateRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	uni.logBroadcaster.On("MarkConsumed", mock.Anything, mock.Anything).Return(nil)
+	uni.bridgeAccessor.On("NewExternalAdapterClient").Return(uni.eaClient, nil)
 	uni.eaClient.On("RunComputation", mock.Anything, RequestIDStr, mock.Anything, SubscriptionOwner.Hex(), SubscriptionID, mock.Anything, mock.Anything).Return(ResultBytes, nil, Domains, nil)
 	uni.pluginORM.On("SetResult", RequestID, mock.Anything, ResultBytes, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		close(doneCh)
@@ -193,6 +200,7 @@ func TestFunctionsListener_HandleOracleRequestComputationError(t *testing.T) {
 
 	uni.pluginORM.On("CreateRequest", RequestID, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	uni.logBroadcaster.On("MarkConsumed", mock.Anything, mock.Anything).Return(nil)
+	uni.bridgeAccessor.On("NewExternalAdapterClient").Return(uni.eaClient, nil)
 	uni.eaClient.On("RunComputation", mock.Anything, RequestIDStr, mock.Anything, SubscriptionOwner.Hex(), SubscriptionID, mock.Anything, mock.Anything).Return(nil, ErrorBytes, nil, nil)
 	uni.pluginORM.On("SetError", RequestID, mock.Anything, functions_service.USER_ERROR, ErrorBytes, mock.Anything, true, mock.Anything).Run(func(args mock.Arguments) {
 		close(doneCh)
@@ -214,6 +222,74 @@ func TestFunctionsListener_HandleOracleRequestCBORParsingError(t *testing.T) {
 	uni.pluginORM.On("SetError", RequestID, mock.Anything, functions_service.USER_ERROR, []byte("CBOR parsing error"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		close(doneCh)
 	})
+
+	uni.service.HandleLog(log)
+	<-doneCh
+	uni.service.Close()
+}
+
+func TestFunctionsListener_HandleOracleRequestCBORParsingErrorInvalidFieldType(t *testing.T) {
+	testutils.SkipShortDB(t)
+	t.Parallel()
+
+	incomingData := &struct {
+		Source       string `cbor:"source"`
+		CodeLocation string `cbor:"codeLocation"` // incorrect type
+	}{
+		Source:       "abcd",
+		CodeLocation: "inline",
+	}
+	cborBytes, err := cbor.Marshal(incomingData)
+	require.NoError(t, err)
+	// Remove first byte (map header) to make it "diet" CBOR
+	cborBytes = cborBytes[1:]
+	uni, log, doneCh := PrepareAndStartFunctionsListener(t, cborBytes)
+
+	uni.pluginORM.On("CreateRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	uni.logBroadcaster.On("MarkConsumed", mock.Anything, mock.Anything).Return(nil)
+	uni.pluginORM.On("SetError", RequestID, mock.Anything, functions_service.USER_ERROR, []byte("CBOR parsing error"), mock.Anything, mock.Anything, mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		close(doneCh)
+	})
+
+	uni.service.HandleLog(log)
+	<-doneCh
+	uni.service.Close()
+}
+
+func TestFunctionsListener_HandleOracleRequestCBORParsingCorrect(t *testing.T) {
+	testutils.SkipShortDB(t)
+	t.Parallel()
+
+	incomingData := &struct {
+		Source             string   `cbor:"source"`
+		Language           int      `cbor:"language"`
+		Args               []string `cbor:"args"`
+		ExtraUnwantedParam string   `cbor:"extraUnwantedParam"`
+	}{
+		Source:             "abcd",
+		Language:           3,
+		Args:               []string{"a", "b"},
+		ExtraUnwantedParam: "spam",
+	}
+	cborBytes, err := cbor.Marshal(incomingData)
+	require.NoError(t, err)
+	// Remove first byte (map header) to make it "diet" CBOR
+	cborBytes = cborBytes[1:]
+
+	uni, log, doneCh := PrepareAndStartFunctionsListener(t, cborBytes)
+
+	uni.pluginORM.On("CreateRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	uni.logBroadcaster.On("MarkConsumed", mock.Anything, mock.Anything).Return(nil)
+	uni.bridgeAccessor.On("NewExternalAdapterClient").Return(uni.eaClient, nil)
+	uni.eaClient.On("RunComputation", mock.Anything, RequestIDStr, mock.Anything, SubscriptionOwner.Hex(), SubscriptionID, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		reqData := args.Get(6).(*functions.RequestData)
+		assert.Equal(t, incomingData.Source, reqData.Source)
+		assert.Equal(t, incomingData.Language, reqData.Language)
+		assert.Equal(t, incomingData.Args, reqData.Args)
+	}).Return(ResultBytes, nil, nil, nil)
+	uni.pluginORM.On("SetResult", RequestID, mock.Anything, ResultBytes, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		close(doneCh)
+	}).Return(nil)
 
 	uni.service.HandleLog(log)
 	<-doneCh

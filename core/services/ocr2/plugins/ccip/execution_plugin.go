@@ -10,7 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
+
+	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
+	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -38,7 +41,7 @@ const (
 	FEE_TOKEN_REMOVED            = "Fee token removed"
 )
 
-func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	var pluginConfig ccipconfig.ExecutionPluginConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
@@ -116,7 +119,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	}
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), destChain.ID())
-	argsNoPlugin.Logger = logger.NewOCRWrapper(execLggr, true, logError)
+	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(execLggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -280,7 +283,7 @@ func unregisterExecutionPluginLpFilters(
 
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
 // all the message ids will be added to the tx metadata.
-func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
+func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EvmTxMeta, error) {
 	execReport, err := abihelpers.DecodeExecutionReport(report)
 
 	if err != nil {
@@ -292,7 +295,7 @@ func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
 	}
 
-	return &txmgr.EthTxMeta{
+	return &txmgr.EvmTxMeta{
 		MessageIDs: msgIDs,
 	}, nil
 }

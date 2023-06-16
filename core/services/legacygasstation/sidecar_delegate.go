@@ -81,9 +81,9 @@ func (d *SidecarDelegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) 
 		mtlsCertificate string
 		mtlsKey         string
 	)
-	if chain.Config().LegacyGasStationAuthConfig() != nil {
-		mtlsCertificate = chain.Config().LegacyGasStationAuthConfig().ClientCertificate
-		mtlsKey = chain.Config().LegacyGasStationAuthConfig().ClientKey
+	if chain.Config().LegacyGasStation() != nil {
+		mtlsCertificate = chain.Config().LegacyGasStation().AuthConfig().ClientCertificate
+		mtlsKey = chain.Config().LegacyGasStation().AuthConfig().ClientKey
 	}
 
 	su, err := NewStatusUpdater(

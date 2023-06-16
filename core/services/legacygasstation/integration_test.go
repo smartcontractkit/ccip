@@ -299,7 +299,8 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeTrue())
 
 	_, fromAddress := cltest.MustInsertRandomKeyReturningState(t, app.KeyStore.Eth(), 0)
-	ethTx := cltest.MustInsertInProgressEthTxWithAttempt(t, app.TxmStorageService(), 13, fromAddress)
+	txStore := cltest.NewTestTxStore(t, app.GetSqlxDB(), app.Config.Database())
+	ethTx := cltest.MustInsertInProgressEthTxWithAttempt(t, txStore, 13, fromAddress)
 
 	tx := types.LegacyGaslessTx{
 		ID:                 "ID",

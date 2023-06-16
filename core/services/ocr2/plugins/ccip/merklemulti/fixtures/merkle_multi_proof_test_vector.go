@@ -9,7 +9,7 @@ type TestVector struct {
 }
 
 var TestVectors = []TestVector{
-	TestVector{
+	{
 		ProofLeaves: []string{
 			"82c6612178aec035e331a9ae7d9ae1a456b84aa887e67e62443afa74000ec385",
 			"207fc4b038934fc11c627eb9ec716dac3fb174a072c4ff793bd5378d8ef7d643",
@@ -45,7 +45,7 @@ var TestVectors = []TestVector{
 		},
 		ExpectedRoot: "cd92df41b37185db7c3fe8b4b91ba25e6328cf0b0b6e4a3c2117f68fb1d8820e",
 	},
-	TestVector{
+	{
 		ProofLeaves: []string{
 			"a20c0244af79697a4ef4e2378c9d5d14cbd49ddab3427b12594c7cfa67a7f240",
 			"3de96afb24ce2ac45a5595aa13d1a5163ae0b3c94cef6b2dc306b5966f32dfa5",

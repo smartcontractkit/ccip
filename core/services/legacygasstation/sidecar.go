@@ -145,7 +145,7 @@ func (sc *Sidecar) handleSubmittedTxs(ctx context.Context) error {
 		return errors.Wrap(err, "find by status")
 	}
 
-	confirmedTxs, err := sc.orm.SelectBySourceChainIDAndEthTxStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.EthTxConfirmed, txmgr.EthTxConfirmedMissingReceipt}, pg.WithParentCtx(ctx))
+	confirmedTxs, err := sc.orm.SelectBySourceChainIDAndEthTxStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.TxConfirmed, txmgr.TxConfirmedMissingReceipt}, pg.WithParentCtx(ctx))
 	if err != nil {
 		return errors.Wrap(err, "confirmed transactions")
 	}
@@ -155,7 +155,7 @@ func (sc *Sidecar) handleSubmittedTxs(ctx context.Context) error {
 		return errors.Wrap(err, "update confirmed transactions")
 	}
 
-	failedTxs, err := sc.orm.SelectBySourceChainIDAndEthTxStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.EthTxFatalError}, pg.WithParentCtx(ctx))
+	failedTxs, err := sc.orm.SelectBySourceChainIDAndEthTxStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.TxFatalError}, pg.WithParentCtx(ctx))
 	if err != nil {
 		return errors.Wrap(err, "failed transactions")
 	}
@@ -204,7 +204,7 @@ func (sc *Sidecar) handleConfirmedTxs(ctx context.Context, fromBlock, toBlock in
 		}
 	}
 
-	failedTxs, err := sc.orm.SelectBySourceChainIDAndEthTxStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.EthTxFatalError}, pg.WithParentCtx(ctx))
+	failedTxs, err := sc.orm.SelectBySourceChainIDAndEthTxStates(sc.ccipChainSelector, []txmgrtypes.TxState{txmgr.TxFatalError}, pg.WithParentCtx(ctx))
 	if err != nil {
 		return errors.Wrap(err, "failed transactions")
 	}

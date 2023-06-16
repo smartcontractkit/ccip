@@ -9,7 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2"
+
+	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
+	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -54,7 +57,7 @@ var checkFinalityTags = map[int64]bool{
 	137:   false, // Polygon
 }
 
-func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 
 	var pluginConfig ccipconfig.CommitPluginConfig
@@ -142,7 +145,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 	}
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), destChain.ID())
-	argsNoPlugin.Logger = logger.NewOCRWrapper(commitLggr, true, logError)
+	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(commitLggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
 		return nil, err
@@ -179,7 +182,7 @@ func getSeqNumFromLog(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) func(log l
 
 // CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
 // sequence numbers of the committed messages will be added to tx metadata
-func CommitReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
+func CommitReportToEthTxMeta(report []byte) (*txmgr.EvmTxMeta, error) {
 	commitReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
 		return nil, err
@@ -189,7 +192,7 @@ func CommitReportToEthTxMeta(report []byte) (*txmgr.EthTxMeta, error) {
 	for i := 0; i < n; i++ {
 		seqRange[i] = uint64(i) + commitReport.Interval.Min
 	}
-	return &txmgr.EthTxMeta{
+	return &txmgr.EvmTxMeta{
 		SeqNumbers: seqRange,
 	}, nil
 }

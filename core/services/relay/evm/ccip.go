@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 
 	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 )
@@ -26,8 +27,8 @@ type ccipCommitProvider struct {
 	contractTransmitter *contractTransmitter
 }
 
-func NewCCIPCommitProvider(lggr logger.Logger, chainSet evm.ChainSet, rargs relaytypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPCommitProvider, error) {
-	configWatcher, err := newConfigProvider(lggr, chainSet, rargs)
+func NewCCIPCommitProvider(lggr logger.Logger, chainSet evm.ChainSet, rargs relaytypes.RelayArgs, transmitterID string, ks keystore.Eth, eventBroadcaster pg.EventBroadcaster) (CCIPCommitProvider, error) {
+	configWatcher, err := newConfigProvider(lggr, chainSet, rargs, eventBroadcaster)
 	if err != nil {
 		return nil, err
 	}
@@ -52,8 +53,8 @@ type ccipExecutionProvider struct {
 
 var _ relaytypes.Plugin = (*ccipExecutionProvider)(nil)
 
-func NewCCIPExecutionProvider(lggr logger.Logger, chainSet evm.ChainSet, rargs relaytypes.RelayArgs, transmitterID string, ks keystore.Eth) (CCIPExecutionProvider, error) {
-	configWatcher, err := newConfigProvider(lggr, chainSet, rargs)
+func NewCCIPExecutionProvider(lggr logger.Logger, chainSet evm.ChainSet, rargs relaytypes.RelayArgs, transmitterID string, ks keystore.Eth, eventBroadcaster pg.EventBroadcaster) (CCIPExecutionProvider, error) {
+	configWatcher, err := newConfigProvider(lggr, chainSet, rargs, eventBroadcaster)
 	if err != nil {
 		return nil, err
 	}

@@ -11,8 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
+	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/network"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -23,7 +22,7 @@ type GatewayConnector interface {
 	job.ServiceCtx
 	network.ConnectionInitiator
 
-	SendToGateway(ctx context.Context, gatewayId string, msg *gateway.Message) error
+	SendToGateway(ctx context.Context, gatewayId string, msg *api.Message) error
 }
 
 // Signer implementation needs to be provided by a GatewayConnector user (node)
@@ -39,15 +38,17 @@ type Signer interface {
 
 //go:generate mockery --quiet --name GatewayConnectorHandler --output ./mocks/ --case=underscore
 type GatewayConnectorHandler interface {
-	HandleGatewayMessage(gatewayId string, msg *gateway.Message)
+	job.ServiceCtx
+
+	HandleGatewayMessage(gatewayId string, msg *api.Message)
 }
 
 type gatewayConnector struct {
 	utils.StartStopOnce
 
 	config      *ConnectorConfig
-	codec       gateway.Codec
-	clock       common.Clock
+	codec       api.Codec
+	clock       utils.Clock
 	nodeAddress []byte
 	signer      Signer
 	handler     GatewayConnectorHandler
@@ -64,7 +65,7 @@ type gatewayState struct {
 	wsClient network.WebSocketClient
 }
 
-func NewGatewayConnector(config *ConnectorConfig, signer Signer, handler GatewayConnectorHandler, clock common.Clock, lggr logger.Logger) (GatewayConnector, error) {
+func NewGatewayConnector(config *ConnectorConfig, signer Signer, handler GatewayConnectorHandler, clock utils.Clock, lggr logger.Logger) (GatewayConnector, error) {
 	if signer == nil || handler == nil || clock == nil {
 		return nil, errors.New("nil dependency")
 	}
@@ -77,7 +78,7 @@ func NewGatewayConnector(config *ConnectorConfig, signer Signer, handler Gateway
 	}
 	connector := &gatewayConnector{
 		config:      config,
-		codec:       &gateway.JsonRPCCodec{},
+		codec:       &api.JsonRPCCodec{},
 		clock:       clock,
 		nodeAddress: addressBytes,
 		signer:      signer,
@@ -107,7 +108,7 @@ func NewGatewayConnector(config *ConnectorConfig, signer Signer, handler Gateway
 	return connector, nil
 }
 
-func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayId string, msg *gateway.Message) error {
+func (c *gatewayConnector) SendToGateway(ctx context.Context, gatewayId string, msg *api.Message) error {
 	data, err := c.codec.EncodeResponse(msg)
 	if err != nil {
 		return fmt.Errorf("error encoding response for gateway %s: %v", gatewayId, err)
@@ -166,6 +167,9 @@ func (c *gatewayConnector) reconnectLoop(gatewayState *gatewayState) {
 func (c *gatewayConnector) Start(ctx context.Context) error {
 	return c.StartOnce("GatewayConnector", func() error {
 		c.lggr.Info("starting gateway connector")
+		if err := c.handler.Start(ctx); err != nil {
+			return err
+		}
 		c.closeWait.Add(2 * len(c.gateways))
 		for _, gatewayState := range c.gateways {
 			gatewayState := gatewayState
@@ -185,7 +189,7 @@ func (c *gatewayConnector) Close() error {
 			gatewayState.conn.Close()
 		}
 		c.closeWait.Wait()
-		return nil
+		return c.handler.Close()
 	})
 }
 

@@ -395,7 +395,7 @@ func DoForEachChain(t *testing.T, f func(chain rhea.EvmDeploymentConfig)) {
 func DoForEachLane(t *testing.T, f func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig)) {
 	ownerKey := checkOwnerKey(t)
 	for sourceChain, sourceMap := range laneMapping[ENV] {
-		for destChain, _ := range sourceMap {
+		for destChain := range sourceMap {
 			t.Logf("Running function for lane %s -> %s", sourceChain, destChain)
 
 			source := laneMapping[ENV][sourceChain][destChain]
@@ -414,7 +414,7 @@ func DoForEachBidirectionalLane(t *testing.T, f func(source rhea.EvmDeploymentCo
 	completed := make(map[rhea.Chain]map[rhea.Chain]interface{})
 
 	for sourceChain, sourceMap := range laneMapping[ENV] {
-		for destChain, _ := range sourceMap {
+		for destChain := range sourceMap {
 			// Skip if we already processed the lane from the other side
 			if destMap, ok := completed[destChain]; ok {
 				if _, ok := destMap[sourceChain]; ok {

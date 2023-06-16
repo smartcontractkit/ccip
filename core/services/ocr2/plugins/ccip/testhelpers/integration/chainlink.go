@@ -21,7 +21,7 @@ import (
 	ctfClient "github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
-	types4 "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	types4 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"k8s.io/utils/pointer"
@@ -226,7 +226,7 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 func (node *Node) AddJob(t *testing.T, spec *ctfClient.OCR2TaskJobSpec) {
 	specString, err := spec.String()
 	require.NoError(t, err)
-	ccipJob, err := validate.ValidatedOracleSpecToml(node.App.GetConfig(), specString)
+	ccipJob, err := validate.ValidatedOracleSpecToml(node.App.GetConfig().OCR2(), node.App.GetConfig().Insecure(), specString)
 	require.NoError(t, err)
 	err = node.App.AddJobV2(context.Background(), &ccipJob)
 	require.NoError(t, err)

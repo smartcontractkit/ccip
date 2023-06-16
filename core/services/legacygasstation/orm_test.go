@@ -128,7 +128,7 @@ func TestORM_FailedEthTx(t *testing.T) {
 	etx := cltest.MustInsertInProgressEthTxWithAttempt(t, txStore, 13, fromAddress)
 	errorMsg := "execution reverted"
 	etx.Error = null.StringFrom(errorMsg)
-	err := txStore.UpdateEthTxFatalError(&etx)
+	err := txStore.UpdateTxFatalError(&etx)
 	require.NoError(t, err)
 
 	tx := legacygasstation.LegacyGaslessTx(t, legacygasstation.TestLegacyGaslessTx{
@@ -137,22 +137,22 @@ func TestORM_FailedEthTx(t *testing.T) {
 	err = orm.InsertLegacyGaslessTx(tx)
 	require.NoError(t, err)
 
-	txs, err := orm.SelectBySourceChainIDAndEthTxStates(tx.SourceChainID, []txmgrtypes.TxState{txmgrstate.EthTxInProgress})
+	txs, err := orm.SelectBySourceChainIDAndEthTxStates(tx.SourceChainID, []txmgrtypes.TxState{txmgrstate.TxInProgress})
 	require.NoError(t, err)
 	require.Equal(t, 0, len(txs))
 
-	txs, err = orm.SelectBySourceChainIDAndEthTxStates(tx.SourceChainID, []txmgrtypes.TxState{txmgrstate.EthTxFatalError})
+	txs, err = orm.SelectBySourceChainIDAndEthTxStates(tx.SourceChainID, []txmgrtypes.TxState{txmgrstate.TxFatalError})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(txs))
-	require.Equal(t, txs[0].EthTxStatus, txmgrstate.EthTxFatalError)
+	require.Equal(t, txs[0].EthTxStatus, txmgrstate.TxFatalError)
 	require.Equal(t, *txs[0].EthTxError, errorMsg)
 }
 
-func setup(t *testing.T) (legacygasstation.ORM, *sqlx.DB, txmgr.EvmTxStore, keystore.Eth) {
+func setup(t *testing.T) (legacygasstation.ORM, *sqlx.DB, txmgr.TestEvmTxStore, keystore.Eth) {
 	cfg := configtest.NewTestGeneralConfig(t)
 	db := pgtest.NewSqlxDB(t)
 	evmtest.NewChainScopedConfig(t, cfg)
-	txStore := cltest.NewTxStore(t, db, cfg.Database())
+	txStore := cltest.NewTestTxStore(t, db, cfg.Database())
 	ethKeyStore := cltest.NewKeyStore(t, db, cfg.Database()).Eth()
 	orm := legacygasstation.NewORM(db, logger.TestLogger(t), cfg.Database())
 	return orm, db, txStore, ethKeyStore
