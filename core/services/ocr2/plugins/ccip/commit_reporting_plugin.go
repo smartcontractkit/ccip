@@ -863,7 +863,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 			return true
 		}
 
-		if gasPriceUpdate.value != nil && gasPriceUpdate.value.Cmp(report.PriceUpdates.UsdPerUnitGas) == 0 {
+		if gasPriceUpdate.value != nil && !deviates(report.PriceUpdates.UsdPerUnitGas, gasPriceUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
 			lggr.Infow("Report is stale because of gas price",
 				"latestGasPriceUpdate", gasPriceUpdate.value,
 				"usdPerUnitGas", gasPriceUpdate.value,
@@ -882,7 +882,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 		}
 		// check first token
 		tokenUpdate := report.PriceUpdates.TokenPriceUpdates[0]
-		if latestUpdate, ok := tokenPriceUpdates[tokenUpdate.SourceToken]; ok && latestUpdate.value.Cmp(tokenUpdate.UsdPerToken) == 0 {
+		if latestUpdate, ok := tokenPriceUpdates[tokenUpdate.SourceToken]; ok && !deviates(tokenUpdate.UsdPerToken, latestUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
 			lggr.Infow("Report is stale because of token price",
 				"latestTokenPrice", latestUpdate.value,
 				"usdPerToken", tokenUpdate.UsdPerToken,
