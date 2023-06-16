@@ -12,6 +12,8 @@ type OffchainConfig interface {
 	Validate() error
 }
 
+// Do not change the JSON format of this struct without consulting with
+// the RDD people first.
 type CommitOffchainConfig struct {
 	SourceFinalityDepth   uint32
 	FeeUpdateHeartBeat    models.Duration
@@ -40,6 +42,8 @@ func (c CommitOffchainConfig) Validate() error {
 	return nil
 }
 
+// Do not change the JSON format of this struct without consulting with
+// the RDD people first.
 type ExecOffchainConfig struct {
 	SourceFinalityDepth         uint32
 	DestOptimisticConfirmations uint32
