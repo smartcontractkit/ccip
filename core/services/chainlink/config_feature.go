@@ -6,6 +6,14 @@ type featureConfig struct {
 	c v2.Feature
 }
 
+func (f *featureConfig) CCIP() bool {
+	return *f.c.CCIP
+}
+
+func (f *featureConfig) LegacyGasStation() bool {
+	return *f.c.LegacyGasStation
+}
+
 func (f *featureConfig) FeedsManager() bool {
 	return *f.c.FeedsManager
 }

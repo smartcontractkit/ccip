@@ -454,13 +454,14 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		chainID := cltest.FixtureChainID
 		blockNumber := int64(75)
 		_, fromAddress := cltest.MustInsertRandomKeyReturningState(t, app.KeyStore.Eth(), chainID)
+		txStore := cltest.NewTestTxStore(t, app.GetSqlxDB(), app.Config.Database())
 		var ethTx txmgr.EvmTx
 		if r.confirmed {
-			ethTx = cltest.MustInsertConfirmedEthTxBySaveFetchedReceipts(t, app.TxmStorageService(), fromAddress, int64(i), blockNumber, chainID)
+			ethTx = cltest.MustInsertConfirmedEthTxBySaveFetchedReceipts(t, txStore, fromAddress, int64(i), blockNumber, chainID)
 		} else if r.failed {
-			ethTx = cltest.MustInsertFatalErrorEthTx(t, app.TxmStorageService(), fromAddress)
+			ethTx = cltest.MustInsertFatalErrorEthTx(t, txStore, fromAddress)
 		} else {
-			ethTx = cltest.MustInsertInProgressEthTxWithAttempt(t, app.TxmStorageService(), evmtypes.Nonce(int64(i)), fromAddress)
+			ethTx = cltest.MustInsertInProgressEthTxWithAttempt(t, txStore, evmtypes.Nonce(int64(i)), fromAddress)
 		}
 		r.tx.EthTxID = ethTx.GetID()
 		tx := legacygasstation.LegacyGaslessTx(t, r.tx)

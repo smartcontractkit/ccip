@@ -91,17 +91,17 @@ func TestMercury_Observe(t *testing.T) {
 	ds.fetcher = fetcher
 
 	trrs := []pipeline.TaskRunResult{
-		pipeline.TaskRunResult{
+		{
 			// benchmark price
 			Result: pipeline.Result{Value: "122.345"},
 			Task:   &mockTask{},
 		},
-		pipeline.TaskRunResult{
+		{
 			// bid
 			Result: pipeline.Result{Value: "121.993"},
 			Task:   &mockTask{},
 		},
-		pipeline.TaskRunResult{
+		{
 			// ask
 			Result: pipeline.Result{Value: "123.111"},
 			Task:   &mockTask{},

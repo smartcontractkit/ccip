@@ -809,6 +809,22 @@ func (_m *ChainScopedConfig) KeySpecificMaxGasPriceWei(addr common.Address) *ass
 	return r0
 }
 
+// LegacyGasStation provides a mock function with given fields:
+func (_m *ChainScopedConfig) LegacyGasStation() coreconfig.LegacyGasStation {
+	ret := _m.Called()
+
+	var r0 coreconfig.LegacyGasStation
+	if rf, ok := ret.Get(0).(func() coreconfig.LegacyGasStation); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(coreconfig.LegacyGasStation)
+		}
+	}
+
+	return r0
+}
+
 // LinkContractAddress provides a mock function with given fields:
 func (_m *ChainScopedConfig) LinkContractAddress() string {
 	ret := _m.Called()

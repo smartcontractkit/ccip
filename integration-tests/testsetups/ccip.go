@@ -652,7 +652,7 @@ func CCIPDefaultTestSetUp(
 			require.NoError(t, err, "Environment teardown shouldn't fail")
 		} else {
 			//just print
-			for k, _ := range setUpArgs.Reporter.LaneStats {
+			for k := range setUpArgs.Reporter.LaneStats {
 				setUpArgs.Reporter.LaneStats[k].Finalize(k)
 			}
 		}

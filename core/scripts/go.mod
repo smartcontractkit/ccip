@@ -7,16 +7,27 @@ replace github.com/smartcontractkit/chainlink/v2 => ../../
 
 require (
 	github.com/ava-labs/coreth v0.12.1
+	github.com/bytedance/sonic v1.9.1 // indirect
+	github.com/cdk8s-team/cdk8s-core-go/cdk8s/v2 v2.7.5 // indirect
 	github.com/docker/docker v23.0.4+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.12.0
+	github.com/gin-gonic/gin v1.9.1 // indirect
+	github.com/go-errors/errors v1.4.2 // indirect
+	github.com/go-playground/validator/v10 v10.14.0 // indirect
+	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/google/go-cmp v0.5.9
+	github.com/google/pprof v0.0.0-20230510103437-eeec1cb781c3 // indirect
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.3.0
+	github.com/kelseyhightower/envconfig v1.4.0 // indirect
 	github.com/manyminds/api2go v0.0.0-20171030193247-e7b693844a6f
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pelletier/go-toml/v2 v2.0.8
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
+	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230601080524-3d8186742482 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework v1.11.6 // indirect
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230601092347-ed7c04f0085f
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20230606215712-82b910bef5c1
@@ -29,24 +40,15 @@ require (
 	github.com/test-go/testify v1.1.4
 	github.com/umbracle/ethgo v0.1.3
 	github.com/urfave/cli v1.22.13
-	github.com/bytedance/sonic v1.9.1 // indirect
-	github.com/cdk8s-team/cdk8s-core-go/cdk8s/v2 v2.7.5 // indirect
-	github.com/gin-gonic/gin v1.9.1 // indirect
-	github.com/go-errors/errors v1.4.2 // indirect
-	github.com/go-playground/validator/v10 v10.14.0 // indirect
-	github.com/go-resty/resty/v2 v2.7.0 // indirect
-	github.com/google/pprof v0.0.0-20230510103437-eeec1cb781c3 // indirect
-	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/kelseyhightower/envconfig v1.4.0 // indirect
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230601080524-3d8186742482 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework v1.11.6 // indirect
+	go.dedis.ch/kyber/v3 v3.1.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/tools v0.9.2 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	gonum.org/v1/gonum v0.13.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	go.dedis.ch/kyber/v3 v3.1.0
 )
+
+require golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 
 require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.5 // indirect
@@ -335,9 +337,9 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/caigo v0.0.0-20230530082629-53a5a4bdb25e // indirect
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20230525203711-20bed74ac906 // indirect
+	github.com/smartcontractkit/chainlink-env v0.32.5 // indirect
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230615205306-31dec2180682 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230612131011-369bfb503592 // indirect
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230601080524-3d8186742482 // indirect
 	github.com/smartcontractkit/wsrpc v0.7.2 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
@@ -370,6 +372,10 @@ require (
 	github.com/whyrusleeping/go-keyspace v0.0.0-20160322163242-5b898ac5add1 // indirect
 	github.com/whyrusleeping/multiaddr-filter v0.0.0-20160516205228-e903e4adabd7 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/xlab/treeprint v1.1.0 // indirect
+	github.com/yuin/goldmark v1.4.13 // indirect
+	github.com/yusufpapurcu/wmi v1.2.3 // indirect
+	github.com/zondax/hid v0.9.1 // indirect
 	go.dedis.ch/fixbuf v1.0.3 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.24.0 // indirect
@@ -430,10 +436,10 @@ replace (
 	// replicating the replace directive on cosmos SDK
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 
+	// until merged upstream: https://github.com/hashicorp/go-plugin/pull/257
+	github.com/hashicorp/go-plugin => github.com/jmank88/go-plugin v0.0.0-20230604120638-7bb12ec27e75
+
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.4
 	k8s.io/client-go => k8s.io/client-go v0.25.4
-
-	// until merged upstream: https://github.com/hashicorp/go-plugin/pull/257
-	github.com/hashicorp/go-plugin => github.com/jmank88/go-plugin v0.0.0-20230604120638-7bb12ec27e75
 )

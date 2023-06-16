@@ -104,7 +104,7 @@ func NewRouter(app chainlink.Application, prometheus *ginprom.Prometheus) (*gin.
 }
 
 func legacyGasStationRoutes(config chainlink.GeneralConfig, app chainlink.Application, r *gin.RouterGroup) {
-	if config.FeatureLegacyGasStation() {
+	if config.Feature().LegacyGasStation() {
 		group := r.Group("/gasstation")
 		lgsc := LegacyGasStationController{
 			requestRouter: app.LegacyGasStationRequestRouter(),

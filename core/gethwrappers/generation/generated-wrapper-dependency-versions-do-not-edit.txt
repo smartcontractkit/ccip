@@ -18,13 +18,10 @@ cron_upkeep_factory_wrapper: ../../contracts/solc/v0.8.6/CronUpkeepFactory.abi -
 cron_upkeep_wrapper: ../../contracts/solc/v0.8.6/CronUpkeep.abi - 362fcfcf30a6ab3acff83095ea4b2b9056dd5e9dcb94bc5411aae58995d22709
 custom_token_pool: ../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../contracts/solc/v0.8.19/CustomTokenPool.bin edbfdd09c46f847d1959605812bebda9b3c846be2613b74369b3ae3cbf13274f
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
-<<<<<<< HEAD
 evm_2_evm_offramp: ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.bin 9089a8337313a6eb37a414eab3c12d53b280969dcfc097f50af0a5b36ef4f183
 evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.bin 9811a4c3573c3132927fb72c79339a8749b40007546ec5642b149c39575d061b
 evm_2_evm_onramp: ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin 98131a76a1682738e251ffce721bd19251a96b54d11f4a2caa54d1f53acc3fec
-=======
 feed_lookup_compatible_interface: ../../contracts/solc/v0.8.15/FeedLookupCompatibleInterface.abi ../../contracts/solc/v0.8.15/FeedLookupCompatibleInterface.bin 2c5c2cb669a666ab6f14e7fdbd11ea019997e3860f56ccfaf112156e412f1b15
->>>>>>> chainlink/develop
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
 forwarder: ../../contracts/solc/v0.8.15/Forwarder.abi ../../contracts/solc/v0.8.15/Forwarder.bin 2911ae6bcf6b60b6828320c999bc9dbf94e6e24cf5e31ea42074667d5b88d4e5
@@ -48,8 +45,8 @@ llo_feeds: ../../contracts/solc/v0.8.16/VerifierProxy.abi ../../contracts/solc/v
 llo_feeds_test: ../../contracts/solc/v0.8.16/ExposedVerifier.abi ../../contracts/solc/v0.8.16/ExposedVerifier.bin 6932cea8f2738e874d3ec9e1a4231d2421704030c071d9e15dd2f7f08482c246
 lock_release_token_pool: ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin b58850a6fbb3d97711d68cc3d94646f4b2e87fb185e72ad3bf7fdbfbfccb57dd
 log_emitter: ../../contracts/solc/v0.8.6/LogEmitter.abi ../../contracts/solc/v0.8.6/LogEmitter.bin 375488d19b6ee1c180d42048be10abea9146e2a58347fd180358850d435cb854
-maybe_revert_message_receiver: ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin aaa90eac8cc555ee4b0fbe57d1fb8d72d6689b29510b238177c97ab9b7979ac5
 log_upkeep_counter_wrapper: ../../contracts/solc/v0.8.6/LogUpkeepCounter.abi ../../contracts/solc/v0.8.6/LogUpkeepCounter.bin f53538fb7ec780a8d5e18f3a7c11b917ce9eba0020a60f5b113b6bf8b16ddf2f
+maybe_revert_message_receiver: ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin aaa90eac8cc555ee4b0fbe57d1fb8d72d6689b29510b238177c97ab9b7979ac5
 mercury_exposed_verifier: ../../contracts/solc/v0.8.16/ExposedVerifier.abi ../../contracts/solc/v0.8.16/ExposedVerifier.bin 6932cea8f2738e874d3ec9e1a4231d2421704030c071d9e15dd2f7f08482c246
 mercury_upkeep_wrapper: ../../contracts/solc/v0.8.15/MercuryUpkeep.abi ../../contracts/solc/v0.8.15/MercuryUpkeep.bin 1d04b39da592474086c2fcaa0daebb75aa55d39562f208c6ca799a7525670dba
 mercury_verifier: ../../contracts/solc/v0.8.16/Verifier.abi ../../contracts/solc/v0.8.16/Verifier.bin 24b2db0d5db8e0198bb7eae2ecde65f2596df4bcc7b17d604d25300546c1694e

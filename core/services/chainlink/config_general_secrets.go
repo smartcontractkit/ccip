@@ -2,8 +2,6 @@ package chainlink
 
 import (
 	"net/url"
-
-	lgsconfig "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types/config"
 )
 
 func (g *generalConfig) DatabaseURL() url.URL {
@@ -29,14 +27,4 @@ func (g *generalConfig) ExplorerSecret() string {
 		return ""
 	}
 	return string(*g.secrets.Explorer.Secret)
-}
-
-func (g *generalConfig) LegacyGasStationAuthConfig() *lgsconfig.AuthConfig {
-	if g.secrets.LegacyGasStation.AuthConfig == nil {
-		return nil
-	}
-	return &lgsconfig.AuthConfig{
-		ClientKey:         string(g.secrets.LegacyGasStation.AuthConfig.ClientKey),
-		ClientCertificate: string(g.secrets.LegacyGasStation.AuthConfig.ClientCertificate),
-	}
 }

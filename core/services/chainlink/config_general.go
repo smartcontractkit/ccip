@@ -476,6 +476,13 @@ func (g *generalConfig) Password() coreconfig.Password {
 	return &passwordConfig{keystore: g.keystorePassword, vrf: g.vrfPassword}
 }
 
+func (g *generalConfig) LegacyGasStation() coreconfig.LegacyGasStation {
+	if g.secrets.LegacyGasStation.AuthConfig == nil {
+		return nil
+	}
+	return &legacyGasStationConfig{s: g.secrets.LegacyGasStation}
+}
+
 func (g *generalConfig) Prometheus() coreconfig.Prometheus {
 	return &prometheusConfig{s: g.secrets.Prometheus}
 }

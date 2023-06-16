@@ -449,6 +449,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			},
 			transmitterID,
 			d.ethKs,
+			d.eventBroadcaster,
 		)
 		if err2 != nil {
 			return nil, err2
@@ -482,6 +483,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 			},
 			transmitterID,
 			d.ethKs,
+			d.eventBroadcaster,
 		)
 		if err2 != nil {
 			return nil, err2

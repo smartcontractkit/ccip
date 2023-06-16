@@ -137,7 +137,7 @@ func (testStats *CCIPLaneStats) Finalize(lane string) {
 	defer testStats.mu.Unlock()
 	phases := []Phase{E2E, TX, CCIPSendRe, Commit, ExecStateChanged}
 	events := make(map[Phase]*zerolog.Event)
-	for reqNo, _ := range testStats.StatusByPhaseByRequests {
+	for reqNo := range testStats.StatusByPhaseByRequests {
 		if reqNo > testStats.TotalRequests {
 			testStats.TotalRequests = reqNo
 		}
@@ -265,7 +265,7 @@ func (r *CCIPTestReporter) WriteReport(folderPath string) error {
 	if err != nil {
 		return err
 	}
-	for k, _ := range r.LaneStats {
+	for k := range r.LaneStats {
 		r.LaneStats[k].Finalize(k)
 	}
 	stats, err := json.MarshalIndent(r, "", "  ")

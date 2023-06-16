@@ -734,11 +734,11 @@ func TestBlockHistoryEstimator_Recalculate_NoEIP1559(t *testing.T) {
 		gas.SetRollingBlockHistory(bhe, blocks)
 		bhe.Recalculate(cltest.Head(1))
 
-		blocks = []evmtypes.Block{evmtypes.Block{}}
+		blocks = []evmtypes.Block{{}}
 		gas.SetRollingBlockHistory(bhe, blocks)
 		bhe.Recalculate(cltest.Head(1))
 
-		blocks = []evmtypes.Block{evmtypes.Block{Transactions: []evmtypes.Transaction{}}}
+		blocks = []evmtypes.Block{{Transactions: []evmtypes.Transaction{}}}
 		gas.SetRollingBlockHistory(bhe, blocks)
 		bhe.Recalculate(cltest.Head(1))
 	})
@@ -755,12 +755,12 @@ func TestBlockHistoryEstimator_Recalculate_NoEIP1559(t *testing.T) {
 		bhe := newBlockHistoryEstimator(t, ethClient, cfg, bhCfg)
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				Number:       0,
 				Hash:         utils.NewHash(),
 				Transactions: cltest.LegacyTransactionsFromGasPrices(9001),
 			},
-			evmtypes.Block{
+			{
 				Number:       1,
 				Hash:         utils.NewHash(),
 				Transactions: cltest.LegacyTransactionsFromGasPrices(9002),
@@ -787,12 +787,12 @@ func TestBlockHistoryEstimator_Recalculate_NoEIP1559(t *testing.T) {
 		bhe := newBlockHistoryEstimator(t, ethClient, cfg, bhCfg)
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				Number:       0,
 				Hash:         utils.NewHash(),
 				Transactions: cltest.LegacyTransactionsFromGasPrices(5),
 			},
-			evmtypes.Block{
+			{
 				Number:       1,
 				Hash:         utils.NewHash(),
 				Transactions: cltest.LegacyTransactionsFromGasPrices(7),
@@ -832,13 +832,13 @@ func TestBlockHistoryEstimator_Recalculate_NoEIP1559(t *testing.T) {
 				Number:       1,
 				Hash:         b2Hash,
 				ParentHash:   b1Hash,
-				Transactions: []evmtypes.Transaction{evmtypes.Transaction{GasPrice: assets.NewWeiI(70), GasLimit: 42}},
+				Transactions: []evmtypes.Transaction{{GasPrice: assets.NewWeiI(70), GasLimit: 42}},
 			},
 			{
 				Number:       2,
 				Hash:         utils.NewHash(),
 				ParentHash:   b2Hash,
-				Transactions: []evmtypes.Transaction{evmtypes.Transaction{GasPrice: assets.NewWeiI(90), GasLimit: 0}},
+				Transactions: []evmtypes.Transaction{{GasPrice: assets.NewWeiI(90), GasLimit: 0}},
 			},
 		}
 
@@ -865,7 +865,7 @@ func TestBlockHistoryEstimator_Recalculate_NoEIP1559(t *testing.T) {
 		b1Hash := utils.NewHash()
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				Number:       0,
 				Hash:         b1Hash,
 				ParentHash:   common.Hash{},
@@ -898,7 +898,7 @@ func TestBlockHistoryEstimator_Recalculate_NoEIP1559(t *testing.T) {
 		b1Hash := utils.NewHash()
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				Number:       0,
 				Hash:         b1Hash,
 				ParentHash:   common.Hash{},
@@ -934,20 +934,20 @@ func TestBlockHistoryEstimator_Recalculate_NoEIP1559(t *testing.T) {
 		b1Hash := utils.NewHash()
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				Number:     0,
 				Hash:       b1Hash,
 				ParentHash: common.Hash{},
 				Transactions: []evmtypes.Transaction{
-					evmtypes.Transaction{GasPrice: assets.NewWeiI(50), GasLimit: 42},
-					evmtypes.Transaction{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
-					evmtypes.Transaction{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
-					evmtypes.Transaction{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
-					evmtypes.Transaction{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
-					evmtypes.Transaction{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
-					evmtypes.Transaction{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
-					evmtypes.Transaction{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
-					evmtypes.Transaction{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
+					{GasPrice: assets.NewWeiI(50), GasLimit: 42},
+					{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
+					{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
+					{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
+					{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
+					{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
+					{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
+					{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
+					{GasPrice: unreasonablyHugeGasPrice, GasLimit: 42},
 				},
 			},
 		}
@@ -974,7 +974,7 @@ func TestBlockHistoryEstimator_Recalculate_NoEIP1559(t *testing.T) {
 		b1Hash := utils.NewHash()
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				Number:     0,
 				Hash:       b1Hash,
 				ParentHash: common.Hash{},
@@ -1017,7 +1017,7 @@ func TestBlockHistoryEstimator_Recalculate_EIP1559(t *testing.T) {
 		gas.SetRollingBlockHistory(bhe, blocks)
 		bhe.Recalculate(cltest.Head(1))
 
-		blocks = []evmtypes.Block{evmtypes.Block{}} // No base fee (doesn't crash)
+		blocks = []evmtypes.Block{{}} // No base fee (doesn't crash)
 		gas.SetRollingBlockHistory(bhe, blocks)
 		bhe.Recalculate(cltest.Head(1))
 
@@ -1051,13 +1051,13 @@ func TestBlockHistoryEstimator_Recalculate_EIP1559(t *testing.T) {
 		bhe := newBlockHistoryEstimator(t, ethClient, cfg, bhCfg)
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				BaseFeePerGas: assets.NewWeiI(1),
 				Number:        0,
 				Hash:          utils.NewHash(),
 				Transactions:  cltest.DynamicFeeTransactionsFromTipCaps(9001),
 			},
-			evmtypes.Block{
+			{
 				BaseFeePerGas: assets.NewWeiI(1),
 				Number:        1,
 				Hash:          utils.NewHash(),
@@ -1086,13 +1086,13 @@ func TestBlockHistoryEstimator_Recalculate_EIP1559(t *testing.T) {
 		bhe := newBlockHistoryEstimator(t, ethClient, cfg, bhCfg)
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				BaseFeePerGas: assets.NewWeiI(1),
 				Number:        0,
 				Hash:          utils.NewHash(),
 				Transactions:  cltest.DynamicFeeTransactionsFromTipCaps(5),
 			},
-			evmtypes.Block{
+			{
 				BaseFeePerGas: assets.NewWeiI(1),
 				Number:        1,
 				Hash:          utils.NewHash(),
@@ -1135,13 +1135,13 @@ func TestBlockHistoryEstimator_Recalculate_EIP1559(t *testing.T) {
 				Number:        1,
 				Hash:          b2Hash,
 				ParentHash:    b1Hash,
-				Transactions:  []evmtypes.Transaction{evmtypes.Transaction{Type: 0x2, MaxFeePerGas: assets.NewWeiI(1000), MaxPriorityFeePerGas: assets.NewWeiI(60), GasLimit: 42}},
+				Transactions:  []evmtypes.Transaction{{Type: 0x2, MaxFeePerGas: assets.NewWeiI(1000), MaxPriorityFeePerGas: assets.NewWeiI(60), GasLimit: 42}},
 			},
 			{
 				Number:       2,
 				Hash:         utils.NewHash(),
 				ParentHash:   b2Hash,
-				Transactions: []evmtypes.Transaction{evmtypes.Transaction{Type: 0x2, MaxFeePerGas: assets.NewWeiI(1000), MaxPriorityFeePerGas: assets.NewWeiI(80), GasLimit: 0}},
+				Transactions: []evmtypes.Transaction{{Type: 0x2, MaxFeePerGas: assets.NewWeiI(1000), MaxPriorityFeePerGas: assets.NewWeiI(80), GasLimit: 0}},
 			},
 		}
 
@@ -1168,7 +1168,7 @@ func TestBlockHistoryEstimator_Recalculate_EIP1559(t *testing.T) {
 		b1Hash := utils.NewHash()
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				BaseFeePerGas: assets.NewWeiI(10),
 				Number:        0,
 				Hash:          b1Hash,
@@ -1201,7 +1201,7 @@ func TestBlockHistoryEstimator_Recalculate_EIP1559(t *testing.T) {
 		b1Hash := utils.NewHash()
 
 		blocks := []evmtypes.Block{
-			evmtypes.Block{
+			{
 				BaseFeePerGas: assets.NewWeiI(10),
 				Number:        0,
 				Hash:          b1Hash,
@@ -1837,13 +1837,13 @@ func TestBlockHistoryEstimator_GetDynamicFee(t *testing.T) {
 	bhe := newBlockHistoryEstimator(t, nil, cfg, bhCfg)
 
 	blocks := []evmtypes.Block{
-		evmtypes.Block{
+		{
 			BaseFeePerGas: assets.NewWeiI(88889),
 			Number:        0,
 			Hash:          utils.NewHash(),
 			Transactions:  cltest.DynamicFeeTransactionsFromTipCaps(5000, 6000, 6000),
 		},
-		evmtypes.Block{
+		{
 			BaseFeePerGas: assets.NewWeiI(100000),
 			Number:        1,
 			Hash:          utils.NewHash(),
