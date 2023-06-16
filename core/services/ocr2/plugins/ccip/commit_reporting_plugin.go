@@ -353,6 +353,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	if err != nil {
 		return nil, nil, err
 	}
+	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 	for _, token := range queryTokens {
 		if rawTokenPricesUSD[token] == nil {
 			return nil, nil, errors.Errorf("missing token price: %+v", token)
@@ -370,6 +371,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		}
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], decimals)
 	}
+	lggr.Infow("Token prices", "tokenPrices", tokenPricesUSD, "sourceNativePriceUSD", sourceNativePriceUSD)
 
 	// Observe a source chain price for pricing.
 	sourceGasPriceWei, _, err := r.config.sourceFeeEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
@@ -394,6 +396,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 
 	lggr.Infow("Observing gas price",
 		"latestGasPriceUSD", gasPriceUpdate.value,
+		"observedGasPriceWei", gasPrice,
 		"observedGasPriceUSD", sourceGasPriceUSD)
 	if gasPriceUpdate.value != nil && now.Sub(gasPriceUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !deviates(sourceGasPriceUSD, gasPriceUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
 		// vote skip gasPrice update by leaving it nil
