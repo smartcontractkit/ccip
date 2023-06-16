@@ -13,7 +13,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-env/chaos"
 	"github.com/smartcontractkit/chainlink-env/environment"
-	"github.com/smartcontractkit/chainlink-env/logging"
 	a "github.com/smartcontractkit/chainlink-env/pkg/alias"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/ethereum"
@@ -53,7 +52,6 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	logging.Init()
 	defaultOCRSettings["toml"] = client.AddNetworksConfig(config.BaseOCRP2PV1Config, networks.SelectedNetwork)
 	os.Exit(m.Run())
 }
@@ -186,7 +184,7 @@ func TestOCRChaos(t *testing.T) {
 			require.NoError(t, err)
 			err = chainClient.WaitForEvents()
 			require.NoError(t, err)
-			err = actions.CreateOCRJobs(ocrInstances, bootstrapNode, workerNodes, "ocr_chaos", 5, ms)
+			err = actions.CreateOCRJobs(ocrInstances, bootstrapNode, workerNodes, 5, ms)
 			require.NoError(t, err)
 
 			chaosApplied := false

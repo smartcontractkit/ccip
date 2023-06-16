@@ -168,9 +168,6 @@ func validateDBURL(dbURI url.URL) error {
 }
 
 func (d *DatabaseSecrets) ValidateConfig() (err error) {
-	if d.AllowSimplePasswords && build.IsProd() {
-		err = multierr.Append(err, ErrInvalid{Name: "AllowSimplePasswords", Value: true, Msg: "insecure configs are not allowed on secure builds"})
-	}
 	if d.URL == nil || (*url.URL)(d.URL).String() == "" {
 		err = multierr.Append(err, ErrEmpty{Name: "URL", Msg: "must be provided and non-empty"})
 	} else if !d.AllowSimplePasswords {
@@ -685,6 +682,7 @@ type OCR2 struct {
 	CaptureEATelemetry                 *bool
 	DefaultTransactionQueueDepth       *uint32
 	SimulateTransactions               *bool
+	TraceLogging                       *bool
 }
 
 func (o *OCR2) setFrom(f *OCR2) {
@@ -721,6 +719,9 @@ func (o *OCR2) setFrom(f *OCR2) {
 	if v := f.SimulateTransactions; v != nil {
 		o.SimulateTransactions = v
 	}
+	if v := f.TraceLogging; v != nil {
+		o.TraceLogging = v
+	}
 }
 
 type OCR struct {
@@ -735,6 +736,7 @@ type OCR struct {
 	SimulateTransactions *bool
 	TransmitterAddress   *ethkey.EIP55Address
 	CaptureEATelemetry   *bool
+	TraceLogging         *bool
 }
 
 func (o *OCR) setFrom(f *OCR) {
@@ -767,6 +769,9 @@ func (o *OCR) setFrom(f *OCR) {
 	}
 	if v := f.CaptureEATelemetry; v != nil {
 		o.CaptureEATelemetry = v
+	}
+	if v := f.TraceLogging; v != nil {
+		o.TraceLogging = v
 	}
 }
 

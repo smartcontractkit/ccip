@@ -47,7 +47,7 @@ import (
 //
 // This gives us re-org protection up to EVM.FinalityDepth deep in the
 // worst case, which is in line with our other guarantees.
-var _ txmgr.NonceSyncer[common.Address, common.Hash, common.Hash] = &nonceSyncerImpl{}
+var _ txmgr.SequenceSyncer[common.Address, common.Hash, common.Hash] = &nonceSyncerImpl{}
 
 type nonceSyncerImpl struct {
 	txStore EvmTxStore
@@ -125,7 +125,7 @@ func (s nonceSyncerImpl) fastForwardNonceIfNecessary(ctx context.Context, addres
 		newNextNonce--
 	}
 
-	err = s.txStore.UpdateEthKeyNextNonce(evmtypes.Nonce(newNextNonce), keyNextNonce, address, s.chainID, pg.WithParentCtx(ctx))
+	err = s.txStore.UpdateKeyNextSequence(evmtypes.Nonce(newNextNonce), keyNextNonce, address, s.chainID, pg.WithParentCtx(ctx))
 
 	if errors.Is(err, ErrKeyNotUpdated) {
 		return errors.Errorf("NonceSyncer#fastForwardNonceIfNecessary optimistic lock failure fastforwarding nonce %v to %v for key %s", localNonce, chainNonce, address.String())
@@ -136,6 +136,6 @@ func (s nonceSyncerImpl) fastForwardNonceIfNecessary(ctx context.Context, addres
 }
 
 func (s nonceSyncerImpl) pendingNonceFromEthClient(ctx context.Context, account common.Address) (uint64, error) {
-	nextNonce, err := s.client.PendingNonceAt(ctx, account)
+	nextNonce, err := s.client.PendingSequenceAt(ctx, account)
 	return uint64(nextNonce), errors.WithStack(err)
 }

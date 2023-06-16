@@ -26,7 +26,7 @@ func TestInMemoryORM(t *testing.T) {
 		Payload:    payload[:],
 		Version:    3,
 		Expiration: expiration,
-		Confirmed:  true,
+		Confirmed:  false,
 		Signature:  signature[:],
 	}
 
@@ -47,10 +47,15 @@ func TestInMemoryORM(t *testing.T) {
 	})
 
 	t.Run("update and get", func(t *testing.T) {
+		row.Version = 5
 		err := orm.Update(row)
 		assert.NoError(t, err)
 
-		row.Version = 5
+		// unconfirmed row requires greater version
+		err = orm.Update(row)
+		assert.ErrorIs(t, err, s4.ErrVersionTooLow)
+
+		row.Confirmed = true
 		err = orm.Update(row)
 		assert.NoError(t, err)
 
@@ -84,8 +89,9 @@ func TestInMemoryORM_DeleteExpired(t *testing.T) {
 	}
 
 	deadline := baseTime.Add(100 * time.Second)
-	err := orm.DeleteExpired(200, deadline)
+	count, err := orm.DeleteExpired(200, deadline)
 	assert.NoError(t, err)
+	assert.Equal(t, int64(100), count)
 
 	rows, err := orm.GetUnconfirmedRows(200)
 	assert.NoError(t, err)
