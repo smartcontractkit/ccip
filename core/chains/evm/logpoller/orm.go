@@ -362,22 +362,14 @@ func (o *ORM) SelectDataWordGreaterThan(address common.Address, eventSig common.
 func (o *ORM) SelectUntilBlockHashDataWordGreaterThan(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, untilBlockHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
 	var logs []Log
 	q := o.q.WithOpts(qopts...)
-	err := q.Transaction(func(tx pg.Queryer) error {
-		// We want to mimic the behaviour of the ETH RPC which errors if blockhash not found.
-		var block LogPollerBlock
-		if err := tx.Get(&block,
-			`SELECT * FROM evm_log_poller_blocks 
-					WHERE evm_chain_id = $1 AND block_hash = $2`, utils.NewBig(o.chainID), untilBlockHash); err != nil {
-			return err
-		}
-		return q.Select(&logs,
-			`SELECT * FROM evm_logs 
-			WHERE evm_chain_id = $1
-			AND address = $2 AND event_sig = $3
+	err := q.Select(&logs,
+		`SELECT * FROM evm_logs 
+			WHERE evm_logs.evm_chain_id = $1
+			AND address = $2 
+			AND event_sig = $3
 			AND substring(data from 32*$4+1 for 32) >= $5
-			AND block_number <= $6 
-			ORDER BY (block_number, log_index)`, utils.NewBig(o.chainID), address, eventSig.Bytes(), wordIndex, wordValueMin.Bytes(), block.BlockNumber)
-	})
+			AND block_number <= (SELECT COALESCE(block_number, 0) FROM evm_log_poller_blocks WHERE evm_chain_id = $1 AND block_hash = $6)
+			ORDER BY (evm_logs.block_number, evm_logs.log_index)`, utils.NewBig(o.chainID), address, eventSig.Bytes(), wordIndex, wordValueMin.Bytes(), untilBlockHash)
 	if err != nil {
 		return nil, err
 	}
