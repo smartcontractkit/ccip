@@ -551,12 +551,20 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 		}
 	}
 
+	if gasPriceUpdate.value != nil {
+		r.lggr.Infow("Latest gas price from log poller", "gasPriceUpdateVal", gasPriceUpdate.value, "gasPriceUpdateTs", gasPriceUpdate.timestamp)
+	}
+
 	if skipInflight {
 		return gasPriceUpdate, nil
 	}
 	latestInflightGasPriceUpdate := r.inflightReports.getLatestInflightGasPriceUpdate()
 	if latestInflightGasPriceUpdate != nil && latestInflightGasPriceUpdate.timestamp.After(gasPriceUpdate.timestamp) {
 		gasPriceUpdate = *latestInflightGasPriceUpdate
+	}
+
+	if gasPriceUpdate.value != nil {
+		r.lggr.Infow("Latest gas price including inflight", "gasPriceUpdateVal", gasPriceUpdate.value, "gasPriceUpdateTs", gasPriceUpdate.timestamp)
 	}
 	return gasPriceUpdate, nil
 }
@@ -867,7 +875,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 		if gasPriceUpdate.value != nil && !deviates(report.PriceUpdates.UsdPerUnitGas, gasPriceUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
 			lggr.Infow("Report is stale because of gas price",
 				"latestGasPriceUpdate", gasPriceUpdate.value,
-				"usdPerUnitGas", gasPriceUpdate.value,
+				"usdPerUnitGas", report.PriceUpdates.UsdPerUnitGas,
 				"destChainSelector", report.PriceUpdates.DestChainSelector)
 			return true
 		}
