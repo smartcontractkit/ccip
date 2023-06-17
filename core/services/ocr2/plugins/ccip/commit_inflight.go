@@ -133,10 +133,14 @@ func (c *inflightCommitReportsContainer) expire(lggr logger.Logger) {
 
 	var stillInflight []InflightPriceUpdate
 	for _, inFlightFeeUpdate := range c.inFlightPriceUpdates {
-		if time.Since(inFlightFeeUpdate.createdAt) > c.cacheExpiry {
+		timeSinceUpdate := time.Since(inFlightFeeUpdate.createdAt)
+		// If time passed since the update is greater than the cache expiry, we remove it from the inflight list.
+		if timeSinceUpdate > c.cacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains, so we retry.
 			lggr.Infow("Inflight price update expired", "updates", inFlightFeeUpdate.priceUpdates)
+		} else {
+			// If the update is still valid, we keep it in the inflight list.
 			stillInflight = append(stillInflight, inFlightFeeUpdate)
 		}
 	}
