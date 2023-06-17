@@ -387,33 +387,50 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 
 	sourceGasPriceUSD = calculateUsdPerUnitGas(gasPrice, sourceNativePriceUSD)
 
-	gasPriceUpdate, err := r.getLatestGasPriceUpdate(ctx, now, false)
-	if err != nil {
-		return nil, nil, err
+	if !r.inflightReports.hasPriceUpdates() {
+		gasPriceUpdate, err := r.getLatestGasPriceUpdate(ctx, now, false)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		lggr.Infow("Observing gas price",
+			"latestGasPriceUSD", gasPriceUpdate.value,
+			"observedGasPriceWei", gasPrice,
+			"observedGasPriceUSD", sourceGasPriceUSD)
+		if gasPriceUpdate.value != nil && now.Sub(gasPriceUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !deviates(sourceGasPriceUSD, gasPriceUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
+			// vote skip gasPrice update by leaving it nil
+			sourceGasPriceUSD = nil
+		}
+	} else {
+		if r.inflightReports.containsGasFeeUsdApprox(sourceGasPriceUSD, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
+			lggr.Infow("Similar gas price update already in flight, skipping", "gasPriceUSD", sourceGasPriceUSD)
+			sourceGasPriceUSD = nil
+		}
 	}
 
-	lggr.Infow("Observing gas price",
-		"latestGasPriceUSD", gasPriceUpdate.value,
-		"observedGasPriceWei", gasPrice,
-		"observedGasPriceUSD", sourceGasPriceUSD)
-	if gasPriceUpdate.value != nil && now.Sub(gasPriceUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !deviates(sourceGasPriceUSD, gasPriceUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
-		// vote skip gasPrice update by leaving it nil
-		sourceGasPriceUSD = nil
-	}
+	if !r.inflightReports.hasPriceUpdates() {
+		tokenPriceUpdates, err := r.getLatestTokenPriceUpdates(ctx, now, false)
+		if err != nil {
+			return nil, nil, err
+		}
 
-	tokenPriceUpdates, err := r.getLatestTokenPriceUpdates(ctx, now, false)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	lggr.Infow("Observing token prices",
-		"latestTokenPricesUSD", tokenPriceUpdates,
-		"observedTokenPricesUSD", tokenPricesUSD)
-	for token, price := range tokenPricesUSD {
-		tokenUpdate := tokenPriceUpdates[token]
-		if tokenUpdate.value != nil && now.Sub(tokenUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !deviates(price, tokenUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
-			// vote skip tokenPrice update by not including it in price map
-			delete(tokenPricesUSD, token)
+		lggr.Infow("Observing token prices",
+			"latestTokenPricesUSD", tokenPriceUpdates,
+			"observedTokenPricesUSD", tokenPricesUSD)
+		for token, price := range tokenPricesUSD {
+			tokenUpdate := tokenPriceUpdates[token]
+			if tokenUpdate.value != nil && now.Sub(tokenUpdate.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration() && !deviates(price, tokenUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
+				// vote skip tokenPrice update by not including it in price map
+				delete(tokenPricesUSD, token)
+			}
+		}
+	} else {
+		for token, price := range tokenPricesUSD {
+			if r.inflightReports.containsTokenPriceUsdApprox(token, price, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
+				// vote skip tokenPrice update by not including it in price map
+				lggr.Infow("Similar token price update already in flight, skipping", "token", token, "price", price)
+				delete(tokenPricesUSD, token)
+			}
 		}
 	}
 
@@ -816,10 +833,17 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	if err != nil {
 		return false, err
 	}
+
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for tx manager,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
-	return !r.isStaleReport(ctx, lggr, parsedReport, false), nil
+	isStale := r.isStaleReport(ctx, lggr, parsedReport, false)
+
+	if isStale {
+		lggr.Infow("Stale report is not transmitted")
+		return false, nil
+	}
+	return true, nil
 }
 
 // isStaleReport checks a report to see if the contents have become stale.
@@ -879,18 +903,21 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 				"destChainSelector", report.PriceUpdates.DestChainSelector)
 			return true
 		}
+
 		return false
 	}
 
 	if len(report.PriceUpdates.TokenPriceUpdates) > 0 {
+		// check first token
+		tokenUpdate := report.PriceUpdates.TokenPriceUpdates[0]
+
 		// getting the last price updates without including inflight is like querying
 		// current prices onchain, but uses logpoller's data to save on the RPC requests
 		tokenPriceUpdates, err := r.getLatestTokenPriceUpdates(ctx, time.Now(), !checkInflight)
 		if err != nil {
 			return true
 		}
-		// check first token
-		tokenUpdate := report.PriceUpdates.TokenPriceUpdates[0]
+
 		if latestUpdate, ok := tokenPriceUpdates[tokenUpdate.SourceToken]; ok && !deviates(tokenUpdate.UsdPerToken, latestUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
 			lggr.Infow("Report is stale because of token price",
 				"latestTokenPrice", latestUpdate.value,
@@ -898,6 +925,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 				"token", tokenUpdate.SourceToken)
 			return true
 		}
+
 		return false
 	}
 	// Can only get here if there is no merkle root, no gas price update and no token price update

@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"math/big"
 	"sync"
 	"time"
 
@@ -168,4 +169,44 @@ func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report commit_s
 		})
 	}
 	return nil
+}
+
+func (c *inflightCommitReportsContainer) containsGasFeeUsdApprox(feeUsd *big.Int, ppb int64) bool {
+	c.locker.RLock()
+	defer c.locker.RUnlock()
+
+	for _, pu := range c.inFlightPriceUpdates {
+		if pu.priceUpdates.UsdPerUnitGas == nil {
+			continue
+		}
+		if !deviates(pu.priceUpdates.UsdPerUnitGas, feeUsd, ppb) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *inflightCommitReportsContainer) containsTokenPriceUsdApprox(token common.Address, priceUsd *big.Int, ppb int64) bool {
+	c.locker.RLock()
+	defer c.locker.RUnlock()
+
+	for _, pu := range c.inFlightPriceUpdates {
+		for _, tokenUpdate := range pu.priceUpdates.TokenPriceUpdates {
+			if tokenUpdate.UsdPerToken == nil {
+				continue
+			}
+			if tokenUpdate.SourceToken == token && !deviates(tokenUpdate.UsdPerToken, priceUsd, ppb) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (c *inflightCommitReportsContainer) hasPriceUpdates() bool {
+	c.locker.RLock()
+	defer c.locker.RUnlock()
+	return len(c.inFlightPriceUpdates) > 0
 }
