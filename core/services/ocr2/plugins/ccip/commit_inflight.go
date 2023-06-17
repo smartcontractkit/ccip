@@ -1,7 +1,6 @@
 package ccip
 
 import (
-	"math/big"
 	"sync"
 	"time"
 
@@ -10,6 +9,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+)
+
+const (
+	PRICE_EXPIRY_MULTIPLIER = 3 // Keep price update cache longer and use it as source of truth
 )
 
 // InflightCommitReport represents a commit report which has been submitted
@@ -135,8 +138,8 @@ func (c *inflightCommitReportsContainer) expire(lggr logger.Logger) {
 	var stillInflight []InflightPriceUpdate
 	for _, inFlightFeeUpdate := range c.inFlightPriceUpdates {
 		timeSinceUpdate := time.Since(inFlightFeeUpdate.createdAt)
-		// If time passed since the update is greater than the cache expiry, we remove it from the inflight list.
-		if timeSinceUpdate > c.cacheExpiry {
+		// If time passed since the price update is greater than multiplier * cache expiry, we remove it from the inflight list.
+		if timeSinceUpdate > c.cacheExpiry*PRICE_EXPIRY_MULTIPLIER {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
 			// Sad path: inflight report reverts onchain, we remove it from inflight, onchain state does not reflect the chains, so we retry.
 			lggr.Infow("Inflight price update expired", "updates", inFlightFeeUpdate.priceUpdates)
@@ -169,40 +172,6 @@ func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report commit_s
 		})
 	}
 	return nil
-}
-
-func (c *inflightCommitReportsContainer) containsGasFeeUsdApprox(feeUsd *big.Int, ppb int64) bool {
-	c.locker.RLock()
-	defer c.locker.RUnlock()
-
-	for _, pu := range c.inFlightPriceUpdates {
-		if pu.priceUpdates.UsdPerUnitGas == nil {
-			continue
-		}
-		if !deviates(pu.priceUpdates.UsdPerUnitGas, feeUsd, ppb) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (c *inflightCommitReportsContainer) containsTokenPriceUsdApprox(token common.Address, priceUsd *big.Int, ppb int64) bool {
-	c.locker.RLock()
-	defer c.locker.RUnlock()
-
-	for _, pu := range c.inFlightPriceUpdates {
-		for _, tokenUpdate := range pu.priceUpdates.TokenPriceUpdates {
-			if tokenUpdate.UsdPerToken == nil {
-				continue
-			}
-			if tokenUpdate.SourceToken == token && !deviates(tokenUpdate.UsdPerToken, priceUsd, ppb) {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 func (c *inflightCommitReportsContainer) hasPriceUpdates() bool {
