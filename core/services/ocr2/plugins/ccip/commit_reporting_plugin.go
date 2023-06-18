@@ -787,7 +787,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 	}, nil
 }
 
-func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, epochAndRound types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, reportTimestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	parsedReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
 		return false, err
@@ -799,7 +799,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		"destChainSelector", parsedReport.PriceUpdates.DestChainSelector,
 		"usdPerUnitGas", parsedReport.PriceUpdates.UsdPerUnitGas,
 		"tokenPriceUpdates", parsedReport.PriceUpdates.TokenPriceUpdates,
-		"epochAndRound", epochAndRound,
+		"reportTimestamp", reportTimestamp,
 	)
 	// Empty report, should not be put on chain
 	if parsedReport.MerkleRoot == [32]byte{} && parsedReport.PriceUpdates.DestChainSelector == 0 && len(parsedReport.PriceUpdates.TokenPriceUpdates) == 0 {
@@ -807,7 +807,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		return false, nil
 	}
 
-	if r.isStaleReport(ctx, lggr, parsedReport, true) {
+	if r.isStaleReport(ctx, lggr, parsedReport, true, reportTimestamp) {
 		lggr.Infow("Rejecting stale report")
 		return false, nil
 	}
@@ -821,7 +821,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 
 // ShouldTransmitAcceptedReport checks if the report is stale, if it is it should not be
 // transmitted.
-func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, epochAndRound types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, reportTimestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("CommitShouldTransmitAcceptedReport")
 	parsedReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
@@ -830,11 +830,11 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for tx manager,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
-	shouldTransmit := !r.isStaleReport(ctx, lggr, parsedReport, false)
+	shouldTransmit := !r.isStaleReport(ctx, lggr, parsedReport, false, reportTimestamp)
 
 	lggr.Infow("ShouldTransmitAcceptedReport",
 		"shouldTransmit", shouldTransmit,
-		"epochAndRound", epochAndRound)
+		"reportTimestamp", reportTimestamp)
 	return shouldTransmit, nil
 }
 
@@ -851,7 +851,18 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 // for staleness checks.
 // If only price updates are included, only price updates are used for staleness
 // If nothing is included the report is always considered stale.
-func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.Logger, report commit_store.CommitStoreCommitReport, checkInflight bool) bool {
+func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.Logger, report commit_store.CommitStoreCommitReport, checkInflight bool, reportTimestamp types.ReportTimestamp) bool {
+	lastEpochAndRound, err := r.config.commitStore.GetLatestEpochAndRound(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		// Assume it's a transient issue getting the last report
+		// Will try again on the next round
+		return true
+	}
+	thisEpochAndRound := uint64(reportTimestamp.Epoch)<<8 + uint64(reportTimestamp.Round)
+	if lastEpochAndRound >= thisEpochAndRound {
+		return true
+	}
+
 	// There could be a report with only price updates, in that case ignore sequence number staleness
 	if report.MerkleRoot != [32]byte{} {
 		nextInflightMin, nextOnChainMin, err := r.nextMinSeqNum(ctx, lggr)

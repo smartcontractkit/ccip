@@ -24,6 +24,8 @@ contract OCR2BaseSetup is OCR2Setup {
   bytes32[] internal s_ss;
   bytes32 internal s_rawVs;
 
+  uint40 internal s_latestEpochAndRound;
+
   function setUp() public virtual override {
     OCR2Setup.setUp();
     s_OCR2Base = new OCR2Helper();

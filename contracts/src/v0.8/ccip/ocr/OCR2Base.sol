@@ -192,7 +192,11 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
   ) external override {
-    _report(report);
+    // Scoping this reduces stack pressure and gas usage
+    {
+      // report and epochAndRound
+      _report(report, uint40(uint256(reportContext[1])));
+    }
 
     // reportContext consists of:
     // reportContext[0]: ConfigDigest
@@ -273,5 +277,5 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     return (true, bytes32(0), uint32(0));
   }
 
-  function _report(bytes memory report) internal virtual;
+  function _report(bytes memory report, uint40 epochAndRound) internal virtual;
 }

@@ -59,7 +59,7 @@ contract E2E is EVM2EVMOnRampSetup, CommitStoreSetup, EVM2EVMOffRampSetup {
     );
 
     vm.resumeGasMetering();
-    s_commitStore.report(commitReport);
+    s_commitStore.report(commitReport, ++s_latestEpochAndRound);
     vm.pauseGasMetering();
 
     bytes32[] memory proofs = new bytes32[](0);

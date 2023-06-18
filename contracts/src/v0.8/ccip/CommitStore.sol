@@ -11,6 +11,7 @@ import {Internal} from "./libraries/Internal.sol";
 import {MerkleMultiProof} from "./libraries/MerkleMultiProof.sol";
 
 contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
+  error StaleReport();
   error PausedError();
   error InvalidInterval(Interval interval);
   error InvalidRoot();
@@ -67,6 +68,8 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   // STATE
   // The min sequence number expected for future messages
   uint64 private s_minSeqNr = 1;
+  /// @dev The epoch and round of the last report
+  uint40 private s_latestEpochAndRound;
   /// @dev Whether this OnRamp is paused or not
   bool private s_paused = false;
   // merkleRoot => timestamp when received
@@ -101,6 +104,18 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   /// @param minSeqNr The new minimum sequence number
   function setMinSeqNr(uint64 minSeqNr) external onlyOwner {
     s_minSeqNr = minSeqNr;
+  }
+
+  /// @notice Returns the epoch and round of the last report.
+  /// @return the latest epoch and round.
+  function getLatestEpochAndRound() public view returns (uint64) {
+    return s_latestEpochAndRound;
+  }
+
+  /// @notice Sets the latest epoch and round.
+  /// @param latestEpochAndRound The new epoch and round
+  function setLatestEpochAndRound(uint40 latestEpochAndRound) external onlyOwner {
+    s_latestEpochAndRound = latestEpochAndRound;
   }
 
   /// @notice Returns the timestamp of a potentially previously committed merkle root.
@@ -148,7 +163,10 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   }
 
   /// @inheritdoc OCR2Base
-  function _report(bytes memory encodedReport) internal override whenNotPaused whenHealthy {
+  function _report(bytes memory encodedReport, uint40 epochAndRound) internal override whenNotPaused whenHealthy {
+    if (s_latestEpochAndRound >= epochAndRound) revert StaleReport();
+    s_latestEpochAndRound = epochAndRound;
+
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.destChainSelector != 0) {

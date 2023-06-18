@@ -7,7 +7,7 @@ contract CommitStoreHelper is CommitStore {
   constructor(StaticConfig memory staticConfig) CommitStore(staticConfig) {}
 
   /// @dev Expose _report for tests
-  function report(bytes memory commitReport) external {
-    _report(commitReport);
+  function report(bytes memory commitReport, uint40 epochAndRound) external {
+    _report(commitReport, epochAndRound);
   }
 }

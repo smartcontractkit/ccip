@@ -144,7 +144,10 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, report, decodedReport)
 
-	tx, err := th.Dest.CommitStoreHelper.Report(th.Dest.User, out)
+	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestEpochAndRound(nil)
+	require.NoError(t, err)
+
+	tx, err := th.Dest.CommitStoreHelper.Report(th.Dest.User, out, big.NewInt(int64(latestEpocAndRound+1)))
 	require.NoError(t, err)
 	th.CommitAndPollLogs(t)
 	res, err := th.Dest.Chain.TransactionReceipt(testutils.Context(t), tx.Hash())
@@ -623,6 +626,7 @@ func TestShouldTransmitAcceptedReport(t *testing.T) {
 	})
 	require.NoError(t, err)
 	th.CommitAndPollLogs(t)
+	round := uint8(1)
 
 	tests := []struct {
 		name       string
@@ -674,7 +678,8 @@ func TestShouldTransmitAcceptedReport(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			got, err := th.plugin.ShouldTransmitAcceptedReport(testutils.Context(t), types.ReportTimestamp{}, report)
+			got, err := th.plugin.ShouldTransmitAcceptedReport(testutils.Context(t), types.ReportTimestamp{Epoch: 1, Round: round}, report)
+			round++
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
@@ -688,6 +693,7 @@ func TestShouldAcceptFinalizedReport(t *testing.T) {
 	_, err := th.Dest.CommitStore.SetMinSeqNr(th.Dest.User, nextMinSeqNr)
 	require.NoError(t, err)
 	th.CommitAndPollLogs(t)
+	round := uint8(1)
 
 	tests := []struct {
 		name     string
@@ -720,7 +726,8 @@ func TestShouldAcceptFinalizedReport(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			got, err := th.plugin.ShouldAcceptFinalizedReport(testutils.Context(t), types.ReportTimestamp{}, report)
+			got, err := th.plugin.ShouldAcceptFinalizedReport(testutils.Context(t), types.ReportTimestamp{Epoch: 1, Round: round}, report)
+			round++
 			if tt.err {
 				require.Error(t, err)
 			} else {

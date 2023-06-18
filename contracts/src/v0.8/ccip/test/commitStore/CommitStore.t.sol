@@ -263,7 +263,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealARMSetup {
       merkleRoot: rootsToReset[0]
     });
 
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
@@ -271,7 +271,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealARMSetup {
       merkleRoot: rootsToReset[1]
     });
 
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
@@ -279,7 +279,7 @@ contract CommitStore_resetUnblessedRoots is CommitStoreRealARMSetup {
       merkleRoot: rootsToReset[2]
     });
 
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     IARM.TaggedRoot[] memory blessedTaggedRoots = new IARM.TaggedRoot[](1);
     blessedTaggedRoots[0] = IARM.TaggedRoot({commitStore: address(s_commitStore), root: rootsToReset[1]});
@@ -332,7 +332,7 @@ contract CommitStore_report is CommitStoreSetup {
     bytes memory encodedReport = abi.encode(report);
 
     vm.resumeGasMetering();
-    s_commitStore.report(encodedReport);
+    s_commitStore.report(encodedReport, ++s_latestEpochAndRound);
     vm.pauseGasMetering();
 
     assertEq(max1 + 1, s_commitStore.getExpectedNextSequenceNumber());
@@ -352,7 +352,7 @@ contract CommitStore_report is CommitStoreSetup {
     vm.expectEmit();
     emit ReportAccepted(report);
 
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     assertEq(max1 + 1, s_commitStore.getExpectedNextSequenceNumber());
   }
@@ -367,7 +367,7 @@ contract CommitStore_report is CommitStoreSetup {
     vm.expectEmit();
     emit UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
   }
 
   // Reverts
@@ -376,14 +376,14 @@ contract CommitStore_report is CommitStoreSetup {
     s_commitStore.pause();
     bytes memory report;
     vm.expectRevert(CommitStore.PausedError.selector);
-    s_commitStore.report(report);
+    s_commitStore.report(report, ++s_latestEpochAndRound);
   }
 
   function testUnhealthyReverts() public {
     s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     vm.expectRevert(CommitStore.BadARMSignal.selector);
     bytes memory report;
-    s_commitStore.report(report);
+    s_commitStore.report(report, ++s_latestEpochAndRound);
   }
 
   function testInvalidRootRevert() public {
@@ -394,7 +394,7 @@ contract CommitStore_report is CommitStoreSetup {
     });
 
     vm.expectRevert(CommitStore.InvalidRoot.selector);
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
   }
 
   function testInvalidIntervalReverts() public {
@@ -407,7 +407,7 @@ contract CommitStore_report is CommitStoreSetup {
 
     vm.expectRevert(abi.encodeWithSelector(CommitStore.InvalidInterval.selector, interval));
 
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
   }
 
   function testInvalidIntervalMinLargerThanMaxReverts() public {
@@ -420,7 +420,34 @@ contract CommitStore_report is CommitStoreSetup {
 
     vm.expectRevert(abi.encodeWithSelector(CommitStore.InvalidInterval.selector, interval));
 
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
+  }
+
+  function testZeroEpochAndRoundReverts() public {
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
+      priceUpdates: getEmptyPriceUpdates(),
+      interval: CommitStore.Interval(0, 0),
+      merkleRoot: bytes32(0)
+    });
+
+    vm.expectRevert(CommitStore.StaleReport.selector);
+
+    s_commitStore.report(abi.encode(report), 0);
+  }
+
+  function testStaleReportReverts() public {
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
+      priceUpdates: getSinglePriceUpdateStruct(s_sourceFeeToken, 4e18),
+      interval: CommitStore.Interval(0, 0),
+      merkleRoot: bytes32(0)
+    });
+
+    vm.expectEmit();
+    emit UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
+
+    vm.expectRevert(CommitStore.StaleReport.selector);
+    s_commitStore.report(abi.encode(report), s_latestEpochAndRound);
   }
 
   function testRootAlreadyCommittedReverts() public {
@@ -429,7 +456,7 @@ contract CommitStore_report is CommitStoreSetup {
       interval: CommitStore.Interval(1, 2),
       merkleRoot: "Only a single root"
     });
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     report = CommitStore.CommitReport({
       priceUpdates: getEmptyPriceUpdates(),
@@ -439,7 +466,7 @@ contract CommitStore_report is CommitStoreSetup {
 
     vm.expectRevert(CommitStore.RootAlreadyCommitted.selector);
 
-    s_commitStore.report(abi.encode(report));
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
   }
 }
 
@@ -455,7 +482,8 @@ contract CommitStore_verify is CommitStoreRealARMSetup {
           interval: CommitStore.Interval(1, 2),
           merkleRoot: leaves[0]
         })
-      )
+      ),
+      ++s_latestEpochAndRound
     );
     bytes32[] memory proofs = new bytes32[](0);
     // We have not blessed this root, should return 0.
@@ -473,7 +501,8 @@ contract CommitStore_verify is CommitStoreRealARMSetup {
           interval: CommitStore.Interval(1, 2),
           merkleRoot: leaves[0]
         })
-      )
+      ),
+      ++s_latestEpochAndRound
     );
     // Bless that root.
     IARM.TaggedRoot[] memory taggedRoots = new IARM.TaggedRoot[](1);

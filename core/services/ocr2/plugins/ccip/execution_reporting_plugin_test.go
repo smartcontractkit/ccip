@@ -110,7 +110,9 @@ func TestMaxExecutionReportSize(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded)
+	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestEpochAndRound(nil)
+	require.NoError(t, err)
+	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded, big.NewInt(int64(latestEpocAndRound+1)))
 	require.NoError(t, err)
 	// double commit to ensure enough confirmations
 	th.CommitAndPollLogs(t)
@@ -219,7 +221,9 @@ func TestExecObservation(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded)
+	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestEpochAndRound(nil)
+	require.NoError(t, err)
+	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded, big.NewInt(int64(latestEpocAndRound+1)))
 	require.NoError(t, err)
 	// double commit to ensure enough confirmations
 	th.CommitAndPollLogs(t)
@@ -299,7 +303,9 @@ func TestExecReport(t *testing.T) {
 	require.NoError(t, err)
 	execReport := mb.ToExecutionReport()
 
-	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded)
+	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestEpochAndRound(nil)
+	require.NoError(t, err)
+	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded, big.NewInt(int64(latestEpocAndRound+1)))
 	require.NoError(t, err)
 	// double commit to ensure enough confirmations
 	th.CommitAndPollLogs(t)

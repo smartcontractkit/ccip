@@ -348,6 +348,30 @@ func (_m *CommitStoreInterface) GetExpectedNextSequenceNumber(opts *bind.CallOpt
 	return r0, r1
 }
 
+// GetLatestEpochAndRound provides a mock function with given fields: opts
+func (_m *CommitStoreInterface) GetLatestEpochAndRound(opts *bind.CallOpts) (uint64, error) {
+	ret := _m.Called(opts)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (uint64, error)); ok {
+		return rf(opts)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) uint64); ok {
+		r0 = rf(opts)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
+		r1 = rf(opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetMerkleRoot provides a mock function with given fields: opts, root
 func (_m *CommitStoreInterface) GetMerkleRoot(opts *bind.CallOpts, root [32]byte) (*big.Int, error) {
 	ret := _m.Called(opts, root)
@@ -899,6 +923,32 @@ func (_m *CommitStoreInterface) ResetUnblessedRoots(opts *bind.TransactOpts, roo
 
 	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, [][32]byte) error); ok {
 		r1 = rf(opts, rootToReset)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SetLatestEpochAndRound provides a mock function with given fields: opts, latestEpochAndRound
+func (_m *CommitStoreInterface) SetLatestEpochAndRound(opts *bind.TransactOpts, latestEpochAndRound *big.Int) (*types.Transaction, error) {
+	ret := _m.Called(opts, latestEpochAndRound)
+
+	var r0 *types.Transaction
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, *big.Int) (*types.Transaction, error)); ok {
+		return rf(opts, latestEpochAndRound)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, *big.Int) *types.Transaction); ok {
+		r0 = rf(opts, latestEpochAndRound)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Transaction)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, *big.Int) error); ok {
+		r1 = rf(opts, latestEpochAndRound)
 	} else {
 		r1 = ret.Error(1)
 	}
