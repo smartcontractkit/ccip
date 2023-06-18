@@ -158,7 +158,7 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 // Observation calculates the sequence number interval ready to be committed and
 // the token and gas price updates required. A valid report could contain a merkle
 // root and/or price updates.
-func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportTimestamp, _ types.Query) (types.Observation, error) {
+func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
 	// If the commit store is down the protocol should halt.
 	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
@@ -182,7 +182,8 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, _ types.ReportT
 		"minSeqNr", min,
 		"maxSeqNr", max,
 		"sourceGasPriceUSD", sourceGasPriceUSD,
-		"tokenPricesUSD", tokenPricesUSD)
+		"tokenPricesUSD", tokenPricesUSD,
+		"epochAndRound", epochAndRound)
 	// Even if all values are empty we still want to communicate our observation
 	// with the other nodes, therefore, we always return the observed values.
 	return CommitObservation{
@@ -489,19 +490,8 @@ func generateTokenToDecimalMapping(ctx context.Context, config CommitPluginConfi
 
 // Gets the latest token price updates based on logs within the heartbeat
 func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, skipInflight bool) (map[common.Address]update, error) {
-	latestUpdates := make(map[common.Address]update)
-
-	if !skipInflight && r.inflightReports.hasPriceUpdates() {
-		latestInflightTokenPriceUpdates := r.inflightReports.latestInflightTokenPriceUpdates()
-		for inflightToken, latestInflightUpdate := range latestInflightTokenPriceUpdates {
-			if latestInflightUpdate.timestamp.After(latestUpdates[inflightToken].timestamp) {
-				latestUpdates[inflightToken] = latestInflightUpdate
-			}
-		}
-		return latestUpdates, nil
-	}
-
 	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(abihelpers.EventSignatures.UsdPerTokenUpdated, r.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), 0, pg.WithParentCtx(ctx))
+	latestUpdates := make(map[common.Address]update)
 
 	if err != nil {
 		return nil, err
@@ -520,13 +510,25 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 			}
 		}
 	}
+	if skipInflight {
+		return latestUpdates, nil
+	}
 
+	// todo this comparison is faulty, as a previously-sent update's onchain timestamp can be higher than inflight timestamp
+	// to properly fix, need a solution to map from onchain request to offchain timestamp
+	// leaving it as is, as token prices are updated infrequently, so this should not cause many issues
+	latestInflightTokenPriceUpdates := r.inflightReports.latestInflightTokenPriceUpdates()
+	for inflightToken, latestInflightUpdate := range latestInflightTokenPriceUpdates {
+		if latestInflightUpdate.timestamp.After(latestUpdates[inflightToken].timestamp) {
+			latestUpdates[inflightToken] = latestInflightUpdate
+		}
+	}
 	return latestUpdates, nil
 }
 
 // Gets the latest gas price updates based on logs within the heartbeat
 func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, skipInflight bool) (gasPriceUpdate update, error error) {
-	if !skipInflight && r.inflightReports.hasPriceUpdates() {
+	if !skipInflight {
 		latestInflightGasPriceUpdate := r.inflightReports.getLatestInflightGasPriceUpdate()
 		if latestInflightGasPriceUpdate != nil && latestInflightGasPriceUpdate.timestamp.After(gasPriceUpdate.timestamp) {
 			gasPriceUpdate = *latestInflightGasPriceUpdate
@@ -534,9 +536,10 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 
 		if gasPriceUpdate.value != nil {
 			r.lggr.Infow("Latest gas price from inflight", "gasPriceUpdateVal", gasPriceUpdate.value, "gasPriceUpdateTs", gasPriceUpdate.timestamp)
+			// Gas price can fluctuate frequently, many updates may be in flight.
+			// If there is gas price update inflight, use it as source of truth, no need to check onchain.
+			return gasPriceUpdate, nil
 		}
-		// If there is price update inflight, use it as source of truth.
-		return gasPriceUpdate, nil
 	}
 
 	// If there are no price updates inflight, check latest prices onchain
@@ -575,7 +578,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 	return gasPriceUpdate, nil
 }
 
-func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
+func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("CommitReport")
 	parsableObservations := getParsableObservations[CommitObservation](lggr, observations)
 	var intervals []commit_store.CommitStoreInterval
@@ -610,6 +613,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, _ types.ReportTimest
 		"tokenPriceUpdates", report.PriceUpdates.TokenPriceUpdates,
 		"destChainSelector", report.PriceUpdates.DestChainSelector,
 		"sourceUsdPerUnitGas", report.PriceUpdates.UsdPerUnitGas,
+		"epochAndRound", epochAndRound,
 	)
 	return true, encodedReport, nil
 }
@@ -783,7 +787,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 	}, nil
 }
 
-func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, epochAndRound types.ReportTimestamp, report types.Report) (bool, error) {
 	parsedReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
 		return false, err
@@ -795,6 +799,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		"destChainSelector", parsedReport.PriceUpdates.DestChainSelector,
 		"usdPerUnitGas", parsedReport.PriceUpdates.UsdPerUnitGas,
 		"tokenPriceUpdates", parsedReport.PriceUpdates.TokenPriceUpdates,
+		"epochAndRound", epochAndRound,
 	)
 	// Empty report, should not be put on chain
 	if parsedReport.MerkleRoot == [32]byte{} && parsedReport.PriceUpdates.DestChainSelector == 0 && len(parsedReport.PriceUpdates.TokenPriceUpdates) == 0 {
@@ -816,7 +821,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 
 // ShouldTransmitAcceptedReport checks if the report is stale, if it is it should not be
 // transmitted.
-func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, _ types.ReportTimestamp, report types.Report) (bool, error) {
+func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, epochAndRound types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("CommitShouldTransmitAcceptedReport")
 	parsedReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
@@ -825,7 +830,12 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	// If report is not stale we transmit.
 	// When the commitTransmitter enqueues the tx for tx manager,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
-	return !r.isStaleReport(ctx, lggr, parsedReport, false), nil
+	shouldTransmit := !r.isStaleReport(ctx, lggr, parsedReport, false)
+
+	lggr.Infow("ShouldTransmitAcceptedReport",
+		"shouldTransmit", shouldTransmit,
+		"epochAndRound", epochAndRound)
+	return shouldTransmit, nil
 }
 
 // isStaleReport checks a report to see if the contents have become stale.

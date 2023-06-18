@@ -173,9 +173,3 @@ func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report commit_s
 	}
 	return nil
 }
-
-func (c *inflightCommitReportsContainer) hasPriceUpdates() bool {
-	c.locker.RLock()
-	defer c.locker.RUnlock()
-	return len(c.inFlightPriceUpdates) > 0
-}
