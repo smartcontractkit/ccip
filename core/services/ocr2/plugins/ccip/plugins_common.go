@@ -213,3 +213,7 @@ func deviates(x1, x2 *big.Int, ppb int64) bool {
 	diff.Div(diff, x1)
 	return diff.CmpAbs(big.NewInt(ppb)) > 0
 }
+
+func mergeEpochAndRound(epoch uint32, round uint8) uint64 {
+	return uint64(epoch)<<8 + uint64(round)
+}

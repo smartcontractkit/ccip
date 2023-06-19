@@ -348,8 +348,8 @@ func (_m *CommitStoreInterface) GetExpectedNextSequenceNumber(opts *bind.CallOpt
 	return r0, r1
 }
 
-// GetLatestEpochAndRound provides a mock function with given fields: opts
-func (_m *CommitStoreInterface) GetLatestEpochAndRound(opts *bind.CallOpts) (uint64, error) {
+// GetLatestPriceEpochAndRound provides a mock function with given fields: opts
+func (_m *CommitStoreInterface) GetLatestPriceEpochAndRound(opts *bind.CallOpts) (uint64, error) {
 	ret := _m.Called(opts)
 
 	var r0 uint64
@@ -930,17 +930,17 @@ func (_m *CommitStoreInterface) ResetUnblessedRoots(opts *bind.TransactOpts, roo
 	return r0, r1
 }
 
-// SetLatestEpochAndRound provides a mock function with given fields: opts, latestEpochAndRound
-func (_m *CommitStoreInterface) SetLatestEpochAndRound(opts *bind.TransactOpts, latestEpochAndRound *big.Int) (*types.Transaction, error) {
-	ret := _m.Called(opts, latestEpochAndRound)
+// SetLatestPriceEpochAndRound provides a mock function with given fields: opts, latestPriceEpochAndRound
+func (_m *CommitStoreInterface) SetLatestPriceEpochAndRound(opts *bind.TransactOpts, latestPriceEpochAndRound *big.Int) (*types.Transaction, error) {
+	ret := _m.Called(opts, latestPriceEpochAndRound)
 
 	var r0 *types.Transaction
 	var r1 error
 	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, *big.Int) (*types.Transaction, error)); ok {
-		return rf(opts, latestEpochAndRound)
+		return rf(opts, latestPriceEpochAndRound)
 	}
 	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, *big.Int) *types.Transaction); ok {
-		r0 = rf(opts, latestEpochAndRound)
+		r0 = rf(opts, latestPriceEpochAndRound)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
@@ -948,7 +948,7 @@ func (_m *CommitStoreInterface) SetLatestEpochAndRound(opts *bind.TransactOpts, 
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, *big.Int) error); ok {
-		r1 = rf(opts, latestEpochAndRound)
+		r1 = rf(opts, latestPriceEpochAndRound)
 	} else {
 		r1 = ret.Error(1)
 	}

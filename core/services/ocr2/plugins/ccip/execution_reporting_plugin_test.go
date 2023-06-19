@@ -110,7 +110,7 @@ func TestMaxExecutionReportSize(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestEpochAndRound(nil)
+	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestPriceEpochAndRound(nil)
 	require.NoError(t, err)
 	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded, big.NewInt(int64(latestEpocAndRound+1)))
 	require.NoError(t, err)
@@ -221,7 +221,7 @@ func TestExecObservation(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestEpochAndRound(nil)
+	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestPriceEpochAndRound(nil)
 	require.NoError(t, err)
 	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded, big.NewInt(int64(latestEpocAndRound+1)))
 	require.NoError(t, err)
@@ -303,7 +303,7 @@ func TestExecReport(t *testing.T) {
 	require.NoError(t, err)
 	execReport := mb.ToExecutionReport()
 
-	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestEpochAndRound(nil)
+	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestPriceEpochAndRound(nil)
 	require.NoError(t, err)
 	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded, big.NewInt(int64(latestEpocAndRound+1)))
 	require.NoError(t, err)

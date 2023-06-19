@@ -812,15 +812,15 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		return false, nil
 	}
 
-	if err := r.inflightReports.add(lggr, parsedReport); err != nil {
+	epochAndRound := mergeEpochAndRound(reportTimestamp.Epoch, reportTimestamp.Round)
+	if err := r.inflightReports.add(lggr, parsedReport, epochAndRound); err != nil {
 		return false, err
 	}
 	lggr.Infow("Accepting finalized report", "merkleRoot", hexutil.Encode(parsedReport.MerkleRoot[:]))
 	return true, nil
 }
 
-// ShouldTransmitAcceptedReport checks if the report is stale, if it is it should not be
-// transmitted.
+// ShouldTransmitAcceptedReport checks if the report is stale, if it is it should not be transmitted.
 func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, reportTimestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("CommitShouldTransmitAcceptedReport")
 	parsedReport, err := abihelpers.DecodeCommitReport(report)
@@ -839,36 +839,24 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 }
 
 // isStaleReport checks a report to see if the contents have become stale.
-// It does so in three ways:
+// It does so in four ways:
 //  1. if there is a merkle root, check if the sequence numbers match up with onchain data
-//  2. if there is a gas price update check to see if the value is different from the last
+//  2. if there is no merkle root, check if current price's epoch and round is after onchain epoch and round
+//  3. if there is a gas price update check to see if the value is different from the last
 //     reported value
-//  3. if there are token prices check to see if the values are different from the last
+//  4. if there are token prices check to see if the values are different from the last
 //     reported values.
 //
 // If there is a merkle root present, staleness is only measured based on the merkle root
-// If there is no merkle root but there is a gas update, only this gas update is used
-// for staleness checks.
-// If only price updates are included, only price updates are used for staleness
+// If there is no merkle root but there is a gas update, only this gas update is used for staleness checks.
+// If only price updates are included, the price updates are used to check for staleness
 // If nothing is included the report is always considered stale.
 func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.Logger, report commit_store.CommitStoreCommitReport, checkInflight bool, reportTimestamp types.ReportTimestamp) bool {
-	lastEpochAndRound, err := r.config.commitStore.GetLatestEpochAndRound(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		// Assume it's a transient issue getting the last report
-		// Will try again on the next round
-		return true
-	}
-	thisEpochAndRound := uint64(reportTimestamp.Epoch)<<8 + uint64(reportTimestamp.Round)
-	if lastEpochAndRound >= thisEpochAndRound {
-		return true
-	}
-
-	// There could be a report with only price updates, in that case ignore sequence number staleness
+	// If there is a merkle root, ignore all other staleness checks and only check for sequence number staleness
 	if report.MerkleRoot != [32]byte{} {
 		nextInflightMin, nextOnChainMin, err := r.nextMinSeqNum(ctx, lggr)
 		if err != nil {
-			// Assume it's a transient issue getting the last report
-			// Will try again on the next round
+			// Assume it's a transient issue getting the last report and try again on the next round
 			return true
 		}
 
@@ -890,7 +878,20 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 			}
 		}
 
+		// If a report has root and valid sequence number, the report should be submitted, regardless of price staleness
 		return false
+	}
+
+	// If report only has price update, check if its epoch and round lags behind the latest onchain
+	lastPriceEpochAndRound, err := r.config.commitStore.GetLatestPriceEpochAndRound(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		// Assume it's a transient issue getting the last report and try again on the next round
+		return true
+	}
+
+	thisEpochAndRound := mergeEpochAndRound(reportTimestamp.Epoch, reportTimestamp.Round)
+	if lastPriceEpochAndRound >= thisEpochAndRound {
+		return true
 	}
 
 	if report.PriceUpdates.DestChainSelector != 0 {

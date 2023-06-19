@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -151,6 +152,47 @@ func Test_filterContainsZeroAddress(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t, tt.want, filterContainsZeroAddress(tt.args.addrs), "filterContainsZeroAddress(%v)", tt.args.addrs)
+		})
+	}
+}
+
+func Test_mergeEpochAndRound(t *testing.T) {
+	type args struct {
+		epoch uint32
+		round uint8
+	}
+	tests := []struct {
+		name string
+		args args
+		want uint64
+	}{
+		{
+			name: "zero round and epoch",
+			args: args{epoch: 0, round: 0},
+			want: 0,
+		},
+		{
+			name: "avg case",
+			args: args{
+				epoch: 243,
+				round: 15,
+			},
+			want: 62223,
+		},
+		{
+			name: "largest epoch and round",
+			args: args{
+				epoch: math.MaxUint32,
+				round: math.MaxUint8,
+			},
+			want: 1099511627775,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want,
+				mergeEpochAndRound(tt.args.epoch, tt.args.round),
+				"mergeEpochAndRound(%v, %v)", tt.args.epoch, tt.args.round)
 		})
 	}
 }

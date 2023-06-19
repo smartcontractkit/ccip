@@ -69,7 +69,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   // The min sequence number expected for future messages
   uint64 private s_minSeqNr = 1;
   /// @dev The epoch and round of the last report
-  uint40 private s_latestEpochAndRound;
+  uint40 private s_latestPriceEpochAndRound;
   /// @dev Whether this OnRamp is paused or not
   bool private s_paused = false;
   // merkleRoot => timestamp when received
@@ -101,21 +101,21 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   }
 
   /// @notice Sets the minimum sequence number.
-  /// @param minSeqNr The new minimum sequence number
+  /// @param minSeqNr The new minimum sequence number.
   function setMinSeqNr(uint64 minSeqNr) external onlyOwner {
     s_minSeqNr = minSeqNr;
   }
 
-  /// @notice Returns the epoch and round of the last report.
-  /// @return the latest epoch and round.
-  function getLatestEpochAndRound() public view returns (uint64) {
-    return s_latestEpochAndRound;
+  /// @notice Returns the epoch and round of the last price update.
+  /// @return the latest price epoch and round.
+  function getLatestPriceEpochAndRound() public view returns (uint64) {
+    return s_latestPriceEpochAndRound;
   }
 
-  /// @notice Sets the latest epoch and round.
-  /// @param latestEpochAndRound The new epoch and round
-  function setLatestEpochAndRound(uint40 latestEpochAndRound) external onlyOwner {
-    s_latestEpochAndRound = latestEpochAndRound;
+  /// @notice Sets the latest epoch and round for price update.
+  /// @param latestPriceEpochAndRound The new epoch and round for prices.
+  function setLatestPriceEpochAndRound(uint40 latestPriceEpochAndRound) external onlyOwner {
+    s_latestPriceEpochAndRound = latestPriceEpochAndRound;
   }
 
   /// @notice Returns the timestamp of a potentially previously committed merkle root.
@@ -163,22 +163,40 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   }
 
   /// @inheritdoc OCR2Base
+  /// @dev A commitReport can have two distinct parts:
+  /// 1. Price updates
+  /// 2. A merkle root and sequence number interval
+  /// Both have their own, separate, staleness checks, with price updates using the epoch and round
+  /// number of the latest price update. The merkle root checks for staleness based on the seqNums.
+  /// They need to be separate because a price report for round t+2 might be included before a report
+  /// containing a merkle root for round t+1. This merkle root report for round t+1 is still valid
+  /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
+  /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
+  /// If that happens, prices will be updates in later rounds.
   function _report(bytes memory encodedReport, uint40 epochAndRound) internal override whenNotPaused whenHealthy {
-    if (s_latestEpochAndRound >= epochAndRound) revert StaleReport();
-    s_latestEpochAndRound = epochAndRound;
-
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
+    // Check if the report contains price updates
     if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.destChainSelector != 0) {
-      IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
-      // If there is no root, the report only contained fee updated and
-      // we return to not revert on the empty root check below.
-      if (report.merkleRoot == bytes32(0)) {
-        return;
+      // Check for price staleness based on the epoch and round
+      if (s_latestPriceEpochAndRound < epochAndRound) {
+        // If prices are not stale, update the latest epoch and round
+        s_latestPriceEpochAndRound = epochAndRound;
+        // And update the prices in the price registry
+        IPriceRegistry(s_dynamicConfig.priceRegistry).updatePrices(report.priceUpdates);
+
+        // If there is no root, the report only contained fee updated and
+        // we return to not revert on the empty root check below.
+        if (report.merkleRoot == bytes32(0)) return;
+      } else {
+        // If prices are stale and the report doesn't contain a root, this report
+        // does not have any valid information and we revert.
+        // If it does contain a merkle root, continue to the root checking section.
+        if (report.merkleRoot == bytes32(0)) revert StaleReport();
       }
     }
 
-    // If we reached this code the report should also contain a valid root
+    // If we reached this section, the report should contain a valid root
     if (s_minSeqNr != report.interval.min || report.interval.min > report.interval.max)
       revert InvalidInterval(report.interval);
 

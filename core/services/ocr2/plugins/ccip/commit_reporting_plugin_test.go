@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -144,7 +145,7 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, report, decodedReport)
 
-	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestEpochAndRound(nil)
+	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestPriceEpochAndRound(nil)
 	require.NoError(t, err)
 
 	tx, err := th.Dest.CommitStoreHelper.Report(th.Dest.User, out, big.NewInt(int64(latestEpocAndRound+1)))
@@ -687,53 +688,111 @@ func TestShouldTransmitAcceptedReport(t *testing.T) {
 }
 
 func TestShouldAcceptFinalizedReport(t *testing.T) {
-	th := setupCommitTestHarness(t)
-
 	nextMinSeqNr := uint64(10)
-	_, err := th.Dest.CommitStore.SetMinSeqNr(th.Dest.User, nextMinSeqNr)
-	require.NoError(t, err)
-	th.CommitAndPollLogs(t)
-	round := uint8(1)
 
 	tests := []struct {
-		name     string
-		seq      uint64
-		expected bool
-		err      bool
+		name                     string
+		seq                      uint64
+		latestPriceEpochAndRound int64
+		epoch                    uint32
+		round                    uint8
+		destChainSelector        int
+		skipRoot                 bool
+		expected                 bool
+		err                      bool
 	}{
-		{"future", nextMinSeqNr * 2, false, false},
-		{"empty", 0, false, false},
-		{"stale", nextMinSeqNr - 1, false, false},
-		{"base", nextMinSeqNr, true, false},           // accepted is not side-effects-free: it adds to inFlight cache
-		{"base inFlight", nextMinSeqNr, false, false}, // this one is like future, but caused by previous test added to inFlight
+		{
+			name:  "future",
+			seq:   nextMinSeqNr * 2,
+			epoch: 1,
+			round: 1,
+		},
+		{
+			name:  "empty",
+			epoch: 1,
+			round: 2,
+		},
+		{
+			name:  "stale",
+			seq:   nextMinSeqNr - 1,
+			epoch: 1,
+			round: 3,
+		},
+		{
+			name:     "base",
+			seq:      nextMinSeqNr,
+			epoch:    1,
+			round:    4,
+			expected: true,
+		},
+		{
+			name:                     "price update - epoch and round is ok",
+			seq:                      nextMinSeqNr,
+			latestPriceEpochAndRound: int64(mergeEpochAndRound(2, 10)),
+			epoch:                    2,
+			round:                    11,
+			destChainSelector:        rand.Int(),
+			skipRoot:                 true,
+			expected:                 true,
+		},
+		{
+			name:                     "price update - epoch and round is behind",
+			seq:                      nextMinSeqNr,
+			latestPriceEpochAndRound: int64(mergeEpochAndRound(2, 10)),
+			epoch:                    2,
+			round:                    9,
+			destChainSelector:        rand.Int(),
+			skipRoot:                 true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			th := setupCommitTestHarness(t)
+			_, err := th.Dest.CommitStore.SetMinSeqNr(th.Dest.User, nextMinSeqNr)
+			require.NoError(t, err)
+
+			_, err = th.Dest.CommitStoreHelper.SetLatestPriceEpochAndRound(th.Dest.User, big.NewInt(tt.latestPriceEpochAndRound))
+			require.NoError(t, err)
+
+			th.CommitAndPollLogs(t)
+
 			var root [32]byte
 			if tt.seq > 0 {
 				root = testutils.Random32Byte()
 			}
 
-			report, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
+			r := commit_store.CommitStoreCommitReport{
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-					DestChainSelector: 0,
+					DestChainSelector: uint64(tt.destChainSelector),
 					UsdPerUnitGas:     new(big.Int),
 				},
-				MerkleRoot: root,
-				Interval:   commit_store.CommitStoreInterval{Min: tt.seq, Max: tt.seq},
-			})
+				Interval: commit_store.CommitStoreInterval{Min: tt.seq, Max: tt.seq},
+			}
+			if !tt.skipRoot {
+				r.MerkleRoot = root
+			}
+			report, err := abihelpers.EncodeCommitReport(r)
 			require.NoError(t, err)
 
-			got, err := th.plugin.ShouldAcceptFinalizedReport(testutils.Context(t), types.ReportTimestamp{Epoch: 1, Round: round}, report)
-			round++
+			got, err := th.plugin.ShouldAcceptFinalizedReport(
+				testutils.Context(t),
+				types.ReportTimestamp{Epoch: tt.epoch, Round: tt.round}, report)
 			if tt.err {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
 			assert.Equal(t, tt.expected, got)
+
+			if got { // already added to inflight, should not be accepted again
+				got, err = th.plugin.ShouldAcceptFinalizedReport(
+					testutils.Context(t),
+					types.ReportTimestamp{Epoch: tt.epoch, Round: tt.round}, report)
+				require.NoError(t, err)
+				assert.False(t, got)
+			}
 		})
 	}
 }
@@ -823,9 +882,11 @@ func TestNextMin(t *testing.T) {
 	}
 	for _, tc := range tt {
 		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.onChainMin, nil)
+		epochAndRound := uint64(1)
 		for _, rep := range tc.inflight {
 			rc := rep
-			require.NoError(t, cp.inflightReports.add(lggr, rc))
+			require.NoError(t, cp.inflightReports.add(lggr, rc, epochAndRound))
+			epochAndRound++
 		}
 		t.Log("inflight", cp.inflightReports.maxInflightSeqNr())
 		inflightMin, onchainMin, err := cp.nextMinSeqNum(context.Background(), lggr)

@@ -85,7 +85,10 @@ func (node *Node) EventuallyNodeUsesUpdatedPriceRegistry(t *testing.T, ccipContr
 			0,
 			pg.WithParentCtx(testutils.Context(t)),
 		)
-		require.NoError(t, err)
+		// err can be transient errors such as sql row set empty
+		if err != nil {
+			return false
+		}
 		return log != nil
 	}, testutils.WaitTimeout(t), 1*time.Second).Should(gomega.BeTrue(), "node is not using updated price registry %s", ccipContracts.Dest.PriceRegistry.Address().Hex())
 	return log

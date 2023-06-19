@@ -23,26 +23,31 @@ func TestCommitInflight(t *testing.T) {
 	assert.Nil(t, c.getLatestInflightGasPriceUpdate())
 	assert.Equal(t, uint64(0), c.maxInflightSeqNr())
 
+	epochAndRound := uint64(1)
+
 	// Add a single report inflight
 	root1 := utils.Keccak256Fixed(hexutil.MustDecode("0xaa"))
-	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 2}, MerkleRoot: root1}))
+	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 2}, MerkleRoot: root1}, epochAndRound))
 	assert.Nil(t, c.getLatestInflightGasPriceUpdate())
 	assert.Equal(t, uint64(2), c.maxInflightSeqNr())
+	epochAndRound++
 
 	// Add another price report
 	root2 := utils.Keccak256Fixed(hexutil.MustDecode("0xab"))
-	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{Interval: commit_store.CommitStoreInterval{Min: 3, Max: 4}, MerkleRoot: root2}))
+	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{Interval: commit_store.CommitStoreInterval{Min: 3, Max: 4}, MerkleRoot: root2}, epochAndRound))
 	assert.Nil(t, c.getLatestInflightGasPriceUpdate())
 	assert.Equal(t, uint64(4), c.maxInflightSeqNr())
+	epochAndRound++
 
 	// Add gas price updates
 	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{PriceUpdates: commit_store.InternalPriceUpdates{
 		DestChainSelector: uint64(1),
 		UsdPerUnitGas:     big.NewInt(1),
-	}}))
+	}}, epochAndRound))
 	latest := c.getLatestInflightGasPriceUpdate()
 	assert.Equal(t, big.NewInt(1), latest.value)
 	assert.Equal(t, uint64(4), c.maxInflightSeqNr())
+	epochAndRound++
 
 	// Add a token price update
 	token := common.HexToAddress("0xa")
@@ -53,7 +58,7 @@ func TestCommitInflight(t *testing.T) {
 				UsdPerToken: big.NewInt(10),
 			},
 		},
-	}}))
+	}}, epochAndRound))
 	// Apply cache price to existing
 	latestInflightTokenPriceUpdates := c.latestInflightTokenPriceUpdates()
 	require.Equal(t, len(latestInflightTokenPriceUpdates), 1)

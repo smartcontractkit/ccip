@@ -6,8 +6,6 @@ import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 
-import {Strings} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/Strings.sol";
-
 contract BurnMintERC677Setup is BaseTest {
   event Transfer(address indexed from, address indexed to, uint256 value);
 

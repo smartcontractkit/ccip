@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
-
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {Router} from "../../Router.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
-import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {Client} from "../../libraries/Client.sol";
 import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
-import "../../offRamp/EVM2EVMOffRamp.sol";
 import "../TokenSetup.t.sol";
 
 contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {

@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import "../helpers/CommitStoreHelper.sol";
-import {ARM} from "../../ARM.sol";
 import {IARM} from "../../interfaces/IARM.sol";
+
+import {CommitStore} from "../../CommitStore.sol";
 import "../../PriceRegistry.sol";
-import "../priceRegistry/PriceRegistry.t.sol";
-import "../ocr/OCR2Base.t.sol";
-import "../../ocr/OCR2Abstract.sol";
+import {ARM} from "../../ARM.sol";
+import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
+
+import {CommitStoreHelper} from "../helpers/CommitStoreHelper.sol";
+import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
+import {OCR2BaseSetup} from "../ocr/OCR2Base.t.sol";
 
 contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
   event ConfigSet(CommitStore.StaticConfig, CommitStore.DynamicConfig);
@@ -355,6 +358,44 @@ contract CommitStore_report is CommitStoreSetup {
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
 
     assertEq(max1 + 1, s_commitStore.getExpectedNextSequenceNumber());
+    assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
+  }
+
+  function testStaleReportWithRootSuccess() public {
+    uint64 maxSeq = 12;
+    uint192 tokenStartPrice = IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry)
+      .getTokenPrice(s_sourceFeeToken)
+      .value;
+
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
+      priceUpdates: getSinglePriceUpdateStruct(s_sourceFeeToken, 4e18),
+      interval: CommitStore.Interval(1, maxSeq),
+      merkleRoot: "stale report 1"
+    });
+
+    vm.expectEmit();
+    emit ReportAccepted(report);
+
+    s_commitStore.report(abi.encode(report), s_latestEpochAndRound);
+    assertEq(maxSeq + 1, s_commitStore.getExpectedNextSequenceNumber());
+    assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
+
+    report = CommitStore.CommitReport({
+      priceUpdates: getEmptyPriceUpdates(),
+      interval: CommitStore.Interval(maxSeq + 1, maxSeq * 2),
+      merkleRoot: "stale report 2"
+    });
+
+    vm.expectEmit();
+    emit ReportAccepted(report);
+
+    s_commitStore.report(abi.encode(report), s_latestEpochAndRound);
+    assertEq(maxSeq * 2 + 1, s_commitStore.getExpectedNextSequenceNumber());
+    assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
+    assertEq(
+      tokenStartPrice,
+      IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
+    );
   }
 
   function testOnlyPriceUpdatesSuccess() public {
@@ -368,6 +409,43 @@ contract CommitStore_report is CommitStoreSetup {
     emit UsdPerTokenUpdated(s_sourceFeeToken, 4e18, block.timestamp);
 
     s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
+    assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
+  }
+
+  function testValidPriceUpdateThenStaleReportWithRootSuccess() public {
+    uint64 maxSeq = 12;
+    uint192 tokenPrice1 = 4e18;
+    uint192 tokenPrice2 = 5e18;
+
+    CommitStore.CommitReport memory report = CommitStore.CommitReport({
+      priceUpdates: getSinglePriceUpdateStruct(s_sourceFeeToken, tokenPrice1),
+      interval: CommitStore.Interval(0, 0),
+      merkleRoot: ""
+    });
+
+    vm.expectEmit();
+    emit UsdPerTokenUpdated(s_sourceFeeToken, tokenPrice1, block.timestamp);
+
+    s_commitStore.report(abi.encode(report), ++s_latestEpochAndRound);
+    assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
+
+    report = CommitStore.CommitReport({
+      priceUpdates: getSinglePriceUpdateStruct(s_sourceFeeToken, tokenPrice2),
+      interval: CommitStore.Interval(1, maxSeq),
+      merkleRoot: "stale report"
+    });
+
+    vm.expectEmit();
+    emit ReportAccepted(report);
+
+    s_commitStore.report(abi.encode(report), s_latestEpochAndRound);
+
+    assertEq(maxSeq + 1, s_commitStore.getExpectedNextSequenceNumber());
+    assertEq(
+      tokenPrice1,
+      IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry).getTokenPrice(s_sourceFeeToken).value
+    );
+    assertEq(s_latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
   }
 
   // Reverts
@@ -425,7 +503,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testZeroEpochAndRoundReverts() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
-      priceUpdates: getEmptyPriceUpdates(),
+      priceUpdates: getSinglePriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(0, 0),
       merkleRoot: bytes32(0)
     });
@@ -435,7 +513,7 @@ contract CommitStore_report is CommitStoreSetup {
     s_commitStore.report(abi.encode(report), 0);
   }
 
-  function testStaleReportReverts() public {
+  function testOnlyPriceUpdateStaleReportReverts() public {
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getSinglePriceUpdateStruct(s_sourceFeeToken, 4e18),
       interval: CommitStore.Interval(0, 0),
@@ -563,5 +641,22 @@ contract CommitStore_isUnpausedAndARMHealthy is CommitStoreSetup {
     s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     s_commitStore.pause();
     assertFalse(s_commitStore.isUnpausedAndARMHealthy());
+  }
+}
+
+/// @notice #setLatestPriceEpochAndRound
+contract CommitStore_setLatestPriceEpochAndRound is CommitStoreSetup {
+  function testsetLatestPriceEpochAndRoundSuccess() public {
+    uint40 latestRoundAndEpoch = 1782155;
+    s_commitStore.setLatestPriceEpochAndRound(latestRoundAndEpoch);
+
+    assertEq(s_commitStore.getLatestPriceEpochAndRound(), latestRoundAndEpoch);
+  }
+
+  // Reverts
+  function testOnlyOwnerReverts() public {
+    vm.stopPrank();
+    vm.expectRevert("Only callable by owner");
+    s_commitStore.setLatestPriceEpochAndRound(6723);
   }
 }

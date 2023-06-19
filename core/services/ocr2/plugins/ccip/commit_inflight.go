@@ -31,8 +31,9 @@ type InflightCommitReport struct {
 }
 
 type InflightPriceUpdate struct {
-	priceUpdates commit_store.InternalPriceUpdates
-	createdAt    time.Time
+	priceUpdates  commit_store.InternalPriceUpdates
+	createdAt     time.Time
+	epochAndRound uint64
 }
 
 // inflightExecReportsContainer holds existing inflight reports.
@@ -71,17 +72,19 @@ func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *upda
 	c.locker.RLock()
 	defer c.locker.RUnlock()
 	var latestGasPriceUpdate *update
+	var latestEpochAndRound uint64
 	for _, inflight := range c.inFlightPriceUpdates {
 		if inflight.priceUpdates.DestChainSelector == 0 {
 			// Price updates did not include a gas price
 			continue
 		}
-		if latestGasPriceUpdate == nil || inflight.createdAt.After(latestGasPriceUpdate.timestamp) {
+		if latestGasPriceUpdate == nil || inflight.epochAndRound > latestEpochAndRound {
 			// First price found or found later update, set it
 			latestGasPriceUpdate = &update{
 				timestamp: inflight.createdAt,
 				value:     inflight.priceUpdates.UsdPerUnitGas,
 			}
+			latestEpochAndRound = inflight.epochAndRound
 			continue
 		}
 	}
@@ -93,6 +96,7 @@ func (c *inflightCommitReportsContainer) latestInflightTokenPriceUpdates() map[c
 	c.locker.RLock()
 	defer c.locker.RUnlock()
 	latestTokenPriceUpdates := make(map[common.Address]update)
+	latestEpochAndRounds := make(map[common.Address]uint64)
 	for _, inflight := range c.inFlightPriceUpdates {
 		for _, inflightTokenUpdate := range inflight.priceUpdates.TokenPriceUpdates {
 			if _, ok := latestTokenPriceUpdates[inflightTokenUpdate.SourceToken]; !ok {
@@ -100,12 +104,14 @@ func (c *inflightCommitReportsContainer) latestInflightTokenPriceUpdates() map[c
 					value:     inflightTokenUpdate.UsdPerToken,
 					timestamp: inflight.createdAt,
 				}
+				latestEpochAndRounds[inflightTokenUpdate.SourceToken] = inflight.epochAndRound
 			}
-			if inflight.createdAt.After(latestTokenPriceUpdates[inflightTokenUpdate.SourceToken].timestamp) {
+			if inflight.epochAndRound > latestEpochAndRounds[inflightTokenUpdate.SourceToken] {
 				latestTokenPriceUpdates[inflightTokenUpdate.SourceToken] = update{
-					timestamp: inflight.createdAt,
 					value:     inflightTokenUpdate.UsdPerToken,
+					timestamp: inflight.createdAt,
 				}
+				latestEpochAndRounds[inflightTokenUpdate.SourceToken] = inflight.epochAndRound
 			}
 		}
 	}
@@ -151,7 +157,7 @@ func (c *inflightCommitReportsContainer) expire(lggr logger.Logger) {
 	c.inFlightPriceUpdates = stillInflight
 }
 
-func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report commit_store.CommitStoreCommitReport) error {
+func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report commit_store.CommitStoreCommitReport, epochAndRound uint64) error {
 	c.locker.Lock()
 	defer c.locker.Unlock()
 
@@ -167,8 +173,9 @@ func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report commit_s
 	if report.PriceUpdates.DestChainSelector != 0 || len(report.PriceUpdates.TokenPriceUpdates) != 0 {
 		lggr.Infow("Adding to inflight fee updates", "priceUpdates", report.PriceUpdates)
 		c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
-			priceUpdates: report.PriceUpdates,
-			createdAt:    time.Now(),
+			priceUpdates:  report.PriceUpdates,
+			createdAt:     time.Now(),
+			epochAndRound: epochAndRound,
 		})
 	}
 	return nil

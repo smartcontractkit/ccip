@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
-
 import {Internal} from "../../libraries/Internal.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
-
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.0/token/ERC20/IERC20.sol";
 
 contract PriceRegistrySetup is TokenSetup, RouterSetup {
   uint192 internal constant USD_PER_GAS = 1e6;
