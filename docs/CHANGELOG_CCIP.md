@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
-## 0.6.0 - 2023-06-15
+## 0.6.0 - 2023-06-19
 
 ### Added
 
@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ExecutionStateChanged` event now contains revert data
 - ARM emits `VotedToCurse` events even if it's someone's second time voting to curse in a row, or if the contract is already cursed.
 - Temporary fix for finality tag support
+  - CCIP uses real finality based on the finality tag for chains that support it. For other chains we use a block number based approach for finality.
+  - Expect finality times >10 minutes on most chains, which some significantly longer.  
 
 ### Removed
 
