@@ -286,6 +286,11 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		}
 		seqNrs = append(seqNrs, seqNr)
 	}
+
+	if len(seqNrs) == 0 {
+		lggr.Infow("Could not parse any sequence number", "minSeqNr", nextInflightMin, "reqs", len(reqs))
+		return 0, 0, nil
+	}
 	min := seqNrs[0]
 	max := seqNrs[len(seqNrs)-1]
 	if min != nextInflightMin {
