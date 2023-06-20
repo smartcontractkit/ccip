@@ -843,6 +843,15 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
 
   // Reverts
 
+  function testZeroGasDONExecutionReverts() public {
+    Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
+    message.gasLimit = 0;
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.ReceiverError.selector, ""));
+
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
+  }
+
   function testMessageSenderReverts() public {
     vm.stopPrank();
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
