@@ -38,8 +38,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error InvalidExtraArgsTag();
   error OnlyCallableByOwnerOrFeeAdmin();
   error OnlyCallableByOwnerOrFeeAdminOrNop();
-  error InvalidWithdrawalAddress(address addr);
-  error InvalidFeeToken(address token);
+  error InvalidWithdrawParams();
   error NoFeesToPay();
   error NoNopsToPay();
   error InsufficientBalance();
@@ -59,7 +58,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error InvalidAddress(bytes encodedAddress);
   error BadARMSignal();
   error LinkBalanceNotSettled();
-  error LinkTokenCannotBeNop();
+  error InvalidNopAddress(address nop);
 
   event Paused(address account);
   event Unpaused(address account);
@@ -506,10 +505,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
           tokenPrice = IPriceRegistry(s_dynamicConfig.priceRegistry).getValidatedTokenPrice(tokenAmount.token);
         }
 
-        uint256 tokenValue = tokenPrice._calcUSDValueFromTokenAmount(tokenAmount.amount);
-
+        // calculate token transfer value, then apply fee ratio
         // ratio represents multiples of 0.1bps, or 10e-5
-        feeValue = (tokenValue * transferFeeConfig.ratio) / 1e5;
+        feeValue = (tokenPrice._calcUSDValueFromTokenAmount(tokenAmount.amount) * transferFeeConfig.ratio) / 1e5;
       }
 
       // convert USD values with 2 decimals to 18 decimals
@@ -536,13 +534,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @notice Sets the fee configuration for a token
-  /// @param feeTokenConfigArgs Array of FeeTokenConfigArgs structs
+  /// @param feeTokenConfigArgs Array of FeeTokenConfigArgs structs.
   function setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigArgs) external onlyOwnerOrAdmin {
     _setFeeTokenConfig(feeTokenConfigArgs);
   }
 
   /// @dev Set the fee config
-  /// @param feeTokenConfigArgs The fee token configs
+  /// @param feeTokenConfigArgs The fee token configs.
   function _setFeeTokenConfig(FeeTokenConfigArgs[] memory feeTokenConfigArgs) internal {
     for (uint256 i = 0; i < feeTokenConfigArgs.length; ++i) {
       FeeTokenConfigArgs memory configArg = feeTokenConfigArgs[i];
@@ -645,7 +643,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // calls payNops, we can never remove the LINK token as a nop.
       address nop = nopsAndWeights[i].nop;
       uint16 weight = nopsAndWeights[i].weight;
-      if (nop == i_linkToken) revert LinkTokenCannotBeNop();
+      if (nop == i_linkToken || nop == address(0)) revert InvalidNopAddress(nop);
       s_nops.set(nop, weight);
       nopWeightsTotal += weight;
     }
@@ -684,8 +682,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @param feeToken The token to withdraw
   /// @param to The address to send the tokens to
   function withdrawNonLinkFees(address feeToken, address to) external onlyOwner {
-    if (feeToken == i_linkToken) revert InvalidFeeToken(feeToken);
-    if (to == address(0)) revert InvalidWithdrawalAddress(to);
+    if (feeToken == i_linkToken || to == address(0)) revert InvalidWithdrawParams();
 
     // We require the link balance to be settled before allowing withdrawal
     // of non-link fees.

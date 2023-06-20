@@ -1052,7 +1052,16 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
     nopsAndWeights[0].nop = address(s_sourceTokens[0]);
 
-    vm.expectRevert(EVM2EVMOnRamp.LinkTokenCannotBeNop.selector);
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidNopAddress.selector, address(s_sourceTokens[0])));
+
+    s_onRamp.setNops(nopsAndWeights);
+  }
+
+  function testZeroAddressCannotBeNopReverts() public {
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
+    nopsAndWeights[0].nop = address(0);
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidNopAddress.selector, address(0)));
 
     s_onRamp.setNops(nopsAndWeights);
   }
@@ -1123,13 +1132,13 @@ contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
     s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
   }
 
-  function testInvalidWithdrawalAddressReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidWithdrawalAddress.selector, address(0)));
+  function testWithdrawToZeroAddressReverts() public {
+    vm.expectRevert(EVM2EVMOnRamp.InvalidWithdrawParams.selector);
     s_onRamp.withdrawNonLinkFees(address(s_token), address(0));
   }
 
   function testInvalidTokenReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidFeeToken.selector, s_sourceTokens[0]));
+    vm.expectRevert(EVM2EVMOnRamp.InvalidWithdrawParams.selector);
     s_onRamp.withdrawNonLinkFees(s_sourceTokens[0], address(this));
   }
 }

@@ -75,7 +75,8 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
       32; // word containing length of ss
 
   // Reverts transaction if config args are invalid
-  modifier checkConfigValid(uint256 f) {
+  modifier checkConfigValid(uint256 numTransmitters, uint256 f) {
+    if (numTransmitters > MAX_NUM_ORACLES) revert InvalidConfig("too many transmitters");
     if (f == 0) revert InvalidConfig("f must be positive");
     _;
   }
@@ -94,7 +95,7 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
     bytes memory onchainConfig,
     uint64 offchainConfigVersion,
     bytes memory offchainConfig
-  ) external override checkConfigValid(f) onlyOwner {
+  ) external override checkConfigValid(transmitters.length, f) onlyOwner {
     _beforeSetConfig(onchainConfig);
     uint256 oldTransmitterLength = s_transmitters.length;
     for (uint256 i = 0; i < oldTransmitterLength; ++i) {

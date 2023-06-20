@@ -191,4 +191,11 @@ contract OCR2BaseNoChecks_setOCR2Config is OCR2BasNoChecksSetup {
     vm.expectRevert(OCR2BaseNoChecks.OracleCannotBeZeroAddress.selector);
     s_OCR2Base.setOCR2Config(signers, transmitters, uint8(f), abi.encode(""), 100, abi.encode(""));
   }
+
+  function testTooManyTransmitterReverts() public {
+    address[] memory transmitters = new address[](100);
+
+    vm.expectRevert(abi.encodeWithSelector(OCR2BaseNoChecks.InvalidConfig.selector, "too many transmitters"));
+    s_OCR2Base.setOCR2Config(new address[](0), transmitters, 0, abi.encode(""), 100, abi.encode(""));
+  }
 }
