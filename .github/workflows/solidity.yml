@@ -12,6 +12,22 @@ defaults:
     shell: bash
 
 jobs:
+  initialize:
+    name: Initialize
+    runs-on: ubuntu-latest
+    outputs:
+      is-release: ${{ steps.release-tag-check.outputs.is-release }}
+      is-pre-release: ${{ steps.release-tag-check.outputs.is-pre-release }}
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # v3.1.0
+      - name: Check release tag
+        id: release-tag-check
+        uses: smartcontractkit/chainlink-github-actions/release/release-tag-check@main
+        env:
+          # Match semver git tags with a "contracts-ccip/" prefix.
+          RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+$'
+          PRE_RELEASE_REGEX: '^contracts-ccip/v[0-9]+\.[0-9]+\.[0-9]+-(.+)$'
+
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
@@ -306,4 +322,52 @@ jobs:
           basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
           this-job-name: Prettier Formatting
+        continue-on-error: true
+
+  publish-beta:
+    needs: [initialize, changes, native-compile, lint, prettier]
+    name: Publish Beta NPM
+    runs-on: ubuntu-latest
+    if: needs.initialize.outputs.is-pre-release == 'true' && needs.changes.outputs.changes == 'true'
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - name: Setup NodeJS
+        uses: ./.github/actions/setup-nodejs
+      - name: Publish Beta
+        run: pnpm publish-beta --publish-branch "${GITHUB_REF_NAME}" --no-git-checks
+        working-directory: contracts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@90fcbaac8ebf86da9c4d55dba24f6fe3029f0e0b
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: Publish-Beta
+        continue-on-error: true
+
+  publish-prod:
+    needs: [initialize, changes, native-compile, lint, prettier]
+    name: Publish Prod NPM
+    runs-on: ubuntu-latest
+    if: needs.initialize.outputs.is-release == 'true' && needs.changes.outputs.changes == 'true'
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
+      - name: Setup NodeJS
+        uses: ./.github/actions/setup-nodejs
+      - name: Publish Prod
+        run: pnpm publish-prod --publish-branch "${GITHUB_REF_NAME}" --no-git-checks
+        working-directory: contracts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Collect Metrics
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@90fcbaac8ebf86da9c4d55dba24f6fe3029f0e0b
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: Publish-Prod
         continue-on-error: true
