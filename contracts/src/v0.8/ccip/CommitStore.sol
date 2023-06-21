@@ -118,6 +118,17 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
     s_latestPriceEpochAndRound = latestPriceEpochAndRound;
   }
 
+  /// @inheritdoc OCR2Base
+  function latestConfigDigestAndEpoch()
+    external
+    view
+    virtual
+    override
+    returns (bool scanLogs, bytes32 configDigest, uint32 epoch)
+  {
+    return (true, s_configInfo.latestConfigDigest, uint32(s_latestPriceEpochAndRound >> 8));
+  }
+
   /// @notice Returns the timestamp of a potentially previously committed merkle root.
   /// If the root was never committed 0 will be returned.
   /// @param root The merkle root to check the commit status for.

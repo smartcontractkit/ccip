@@ -646,7 +646,7 @@ contract CommitStore_isUnpausedAndARMHealthy is CommitStoreSetup {
 
 /// @notice #setLatestPriceEpochAndRound
 contract CommitStore_setLatestPriceEpochAndRound is CommitStoreSetup {
-  function testsetLatestPriceEpochAndRoundSuccess() public {
+  function testSetLatestPriceEpochAndRoundSuccess() public {
     uint40 latestRoundAndEpoch = 1782155;
     s_commitStore.setLatestPriceEpochAndRound(latestRoundAndEpoch);
 
@@ -658,5 +658,36 @@ contract CommitStore_setLatestPriceEpochAndRound is CommitStoreSetup {
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
     s_commitStore.setLatestPriceEpochAndRound(6723);
+  }
+}
+
+/// @notice #latestConfigDigestAndEpoch
+contract CommitStore_latestConfigDigestAndEpoch is CommitStoreSetup {
+  function testLatestConfigDigestAndEpochSuccess() public {
+    uint32 expectedEpoch = 100;
+    uint8 round = 4;
+    s_commitStore.setLatestPriceEpochAndRound((uint40(expectedEpoch) << 8) + round);
+
+    (bool scanLogs, bytes32 configDigest, uint32 epoch) = s_commitStore.latestConfigDigestAndEpoch();
+
+    (, , bytes32 expectedConfigDigest) = s_commitStore.latestConfigDetails();
+    assertEq(true, scanLogs);
+    assertEq(expectedConfigDigest, configDigest);
+    assertEq(expectedEpoch, epoch);
+  }
+
+  function testZeroStateSuccess() public {
+    s_commitStore = new CommitStoreHelper(
+      CommitStore.StaticConfig({
+        chainSelector: DEST_CHAIN_ID,
+        sourceChainSelector: SOURCE_CHAIN_ID,
+        onRamp: ON_RAMP_ADDRESS
+      })
+    );
+
+    (bool scanLogs, bytes32 configDigest, uint32 epoch) = s_commitStore.latestConfigDigestAndEpoch();
+    assertEq(true, scanLogs);
+    assertEq("", configDigest);
+    assertEq(0, epoch);
   }
 }
