@@ -17,6 +17,7 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 		"encodes and decodes config with all fields set": {
 			want: CommitOffchainConfig{
 				SourceFinalityDepth:   3,
+				DestFinalityDepth:     3,
 				FeeUpdateHeartBeat:    models.MustMakeDuration(1 * time.Hour),
 				FeeUpdateDeviationPPB: 5e7,
 				MaxGasPrice:           200e9,
@@ -26,6 +27,7 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 		"fails decoding when all fields present but with 0 values": {
 			want: CommitOffchainConfig{
 				SourceFinalityDepth:   0,
+				DestFinalityDepth:     0,
 				FeeUpdateHeartBeat:    models.MustMakeDuration(0),
 				FeeUpdateDeviationPPB: 0,
 				MaxGasPrice:           0,

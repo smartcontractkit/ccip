@@ -6,10 +6,14 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"golang.org/x/exp/slices"
 
+	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
@@ -39,9 +43,9 @@ type CachedTokens struct {
 	FeeTokens       []common.Address
 }
 
-// NewCachedTokens cache both fee tokens and supported tokens. Therefore, it uses 4 different events
+// NewCachedSupportedTokens cache both fee tokens and supported tokens. Therefore, it uses 4 different events
 // when checking for changes in logpoller.LogPoller
-func NewCachedTokens(
+func NewCachedSupportedTokens(
 	lp logpoller.LogPoller,
 	offRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
 	priceRegistry price_registry.PriceRegistryInterface,
@@ -63,6 +67,38 @@ func NewCachedTokens(
 		origin: &feeAndSupportedTokensOrigin{
 			feeTokensOrigin:       feeTokensOrigin{priceRegistry: priceRegistry},
 			supportedTokensOrigin: supportedTokensOrigin{offRamp: offRamp}},
+	}
+}
+
+func NewTokenToDecimals(
+	lggr logger.Logger,
+	lp logpoller.LogPoller,
+	offRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
+	priceRegistry price_registry.PriceRegistryInterface,
+	client evmclient.Client,
+	optimisticConfirmations int64,
+) *CachedChain[map[common.Address]uint8] {
+	return &CachedChain[map[common.Address]uint8]{
+		observedEvents: []common.Hash{
+			abihelpers.EventSignatures.FeeTokenAdded,
+			abihelpers.EventSignatures.FeeTokenRemoved,
+			abihelpers.EventSignatures.PoolAdded,
+			abihelpers.EventSignatures.PoolRemoved,
+		},
+		logPoller:               lp,
+		address:                 []common.Address{priceRegistry.Address(), offRamp.Address()},
+		optimisticConfirmations: optimisticConfirmations,
+		lock:                    &sync.RWMutex{},
+		value:                   make(map[common.Address]uint8),
+		lastChangeBlock:         0,
+		origin: &tokenToDecimals{
+			lggr:          lggr,
+			priceRegistry: priceRegistry,
+			offRamp:       offRamp,
+			tokenFactory: func(token common.Address) (link_token_interface.LinkTokenInterface, error) {
+				return link_token_interface.NewLinkToken(token, client)
+			},
+		},
 	}
 }
 
@@ -143,4 +179,53 @@ func copyMap[M ~map[K]V, K comparable, V any](m M) M {
 		cpy[k] = v
 	}
 	return cpy
+}
+
+type tokenToDecimals struct {
+	lggr          logger.Logger
+	offRamp       evm_2_evm_offramp.EVM2EVMOffRampInterface
+	priceRegistry price_registry.PriceRegistryInterface
+	tokenFactory  func(address common.Address) (link_token_interface.LinkTokenInterface, error)
+}
+
+func (t *tokenToDecimals) Copy(value map[common.Address]uint8) map[common.Address]uint8 {
+	return copyMap(value)
+}
+
+// CallOrigin Generates the token to decimal mapping for dest tokens and fee tokens.
+// NOTE: this queries token decimals n times, where n is the number of tokens whose decimals are not already cached.
+func (t *tokenToDecimals) CallOrigin(ctx context.Context) (map[common.Address]uint8, error) {
+	mapping := make(map[common.Address]uint8)
+
+	destTokens, err := t.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	feeTokens, err := t.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	// In case if a fee token is not an offramp dest token, we still want to update its decimals and price
+	for _, feeToken := range feeTokens {
+		if !slices.Contains(destTokens, feeToken) {
+			destTokens = append(destTokens, feeToken)
+		}
+	}
+
+	for _, token := range destTokens {
+		tokenContract, err := t.tokenFactory(token)
+		if err != nil {
+			return nil, err
+		}
+
+		decimal, err := tokenContract.Decimals(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			t.lggr.Errorf("Error while getting token %s decimals, token skipped: %s", token.String(), err)
+			continue
+		}
+		mapping[token] = decimal
+	}
+	return mapping, nil
 }

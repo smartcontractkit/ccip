@@ -16,6 +16,7 @@ type OffchainConfig interface {
 // the RDD people first.
 type CommitOffchainConfig struct {
 	SourceFinalityDepth   uint32
+	DestFinalityDepth     uint32
 	FeeUpdateHeartBeat    models.Duration
 	FeeUpdateDeviationPPB uint32
 	MaxGasPrice           uint64
@@ -25,6 +26,9 @@ type CommitOffchainConfig struct {
 func (c CommitOffchainConfig) Validate() error {
 	if c.SourceFinalityDepth == 0 {
 		return errors.New("must set SourceFinalityDepth")
+	}
+	if c.DestFinalityDepth == 0 {
+		return errors.New("must set DestFinalityDepth")
 	}
 	if c.FeeUpdateHeartBeat.Duration() == 0 {
 		return errors.New("must set FeeUpdateHeartBeat")

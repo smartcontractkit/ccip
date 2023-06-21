@@ -819,6 +819,7 @@ func (client *CCIPClient) getCommitStoreOffChainConfig() []byte {
 
 	commitPluginConfig := ccipconfig.CommitOffchainConfig{
 		SourceFinalityDepth:   client.Source.TunableValues.FinalityDepth,
+		DestFinalityDepth:     client.Dest.TunableValues.FinalityDepth,
 		FeeUpdateHeartBeat:    client.Dest.TunableValues.FeeUpdateHeartBeat,
 		FeeUpdateDeviationPPB: client.Dest.TunableValues.FeeUpdateDeviationPPB,
 		MaxGasPrice:           client.Dest.TunableValues.MaxGasPrice,

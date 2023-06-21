@@ -117,7 +117,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	}
 
 	cachedSrcFeeTokens := cache.NewCachedFeeTokens(rf.config.sourceLP, rf.config.srcPriceRegistry, int64(offchainConfig.SourceFinalityDepth))
-	cachedDstTokens := cache.NewCachedTokens(rf.config.destLP, rf.config.offRamp, priceRegistry, int64(offchainConfig.DestOptimisticConfirmations))
+	cachedDstTokens := cache.NewCachedSupportedTokens(rf.config.destLP, rf.config.offRamp, priceRegistry, int64(offchainConfig.DestOptimisticConfirmations))
 	rf.config.lggr.Infow("Starting exec plugin",
 		"offchainConfig", offchainConfig,
 		"onchainConfig", onchainConfig)

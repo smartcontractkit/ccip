@@ -207,12 +207,32 @@ func getCommitPluginSourceLpFilters(onRamp common.Address) []logpoller.Filter {
 	}
 }
 
-func getCommitPluginDestLpFilters(priceRegistry common.Address) []logpoller.Filter {
+func getCommitPluginDestLpFilters(priceRegistry common.Address, offRamp common.Address) []logpoller.Filter {
 	return []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistry.String()),
 			EventSigs: []common.Hash{abihelpers.EventSignatures.UsdPerUnitGasUpdated, abihelpers.EventSignatures.UsdPerTokenUpdated},
 			Addresses: []common.Address{priceRegistry},
+		},
+		{
+			Name:      logpoller.FilterName(FEE_TOKEN_ADDED, priceRegistry),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenAdded},
+			Addresses: []common.Address{priceRegistry},
+		},
+		{
+			Name:      logpoller.FilterName(FEE_TOKEN_REMOVED, priceRegistry),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenRemoved},
+			Addresses: []common.Address{priceRegistry},
+		},
+		{
+			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, offRamp),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.PoolAdded},
+			Addresses: []common.Address{offRamp},
+		},
+		{
+			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, offRamp),
+			EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved},
+			Addresses: []common.Address{offRamp},
 		},
 	}
 }
@@ -256,10 +276,10 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, q pg.Queryer, spec *jo
 		return err
 	}
 
-	return unregisterCommitPluginFilters(ctx, q, sourceChain.LogPoller(), destChain.LogPoller(), commitStore)
+	return unregisterCommitPluginFilters(ctx, q, sourceChain.LogPoller(), destChain.LogPoller(), commitStore, common.HexToAddress(pluginConfig.OffRamp))
 }
 
-func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, srcLP, dstLP logpoller.LogPoller, dstCommitStore commit_store.CommitStoreInterface) error {
+func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, srcLP, dstLP logpoller.LogPoller, dstCommitStore commit_store.CommitStoreInterface, offRamp common.Address) error {
 	staticCfg, err := dstCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
@@ -281,6 +301,6 @@ func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, srcLP, dst
 	return unregisterLpFilters(
 		q,
 		dstLP,
-		getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry),
+		getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry, offRamp),
 	)
 }

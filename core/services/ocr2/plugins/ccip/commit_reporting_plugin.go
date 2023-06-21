@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/exp/slices"
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -23,10 +22,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
@@ -72,15 +71,14 @@ type CommitPluginConfig struct {
 }
 
 type CommitReportingPlugin struct {
-	config                  CommitPluginConfig
-	F                       int
-	lggr                    logger.Logger
-	inflightReports         *inflightCommitReportsContainer
-	priceRegistry           price_registry.PriceRegistryInterface
-	offchainConfig          ccipconfig.CommitOffchainConfig
-	onchainConfig           ccipconfig.CommitOnchainConfig
-	tokenToDecimalMappingMu sync.RWMutex
-	tokenToDecimalMapping   map[common.Address]uint8
+	config                CommitPluginConfig
+	F                     int
+	lggr                  logger.Logger
+	inflightReports       *inflightCommitReportsContainer
+	destPriceRegistry     price_registry.PriceRegistryInterface
+	offchainConfig        ccipconfig.CommitOffchainConfig
+	onchainConfig         ccipconfig.CommitOnchainConfig
+	tokenToDecimalMapping *cache.CachedChain[map[common.Address]uint8]
 }
 
 type CommitReportingPluginFactory struct {
@@ -110,17 +108,12 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	priceRegistry, err := price_registry.NewPriceRegistry(onchainConfig.PriceRegistry, rf.config.destClient)
+	destPriceRegistry, err := price_registry.NewPriceRegistry(onchainConfig.PriceRegistry, rf.config.destClient)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
 	if err = rf.UpdateLogPollerFilters(onchainConfig.PriceRegistry); err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
-
-	tokenToDecimalMapping, err := generateTokenToDecimalMapping(context.Background(), rf.config, map[common.Address]uint8{}, priceRegistry)
-	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
@@ -130,14 +123,21 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 	)
 
 	return &CommitReportingPlugin{
-			config:                rf.config,
-			F:                     config.F,
-			lggr:                  rf.config.lggr.Named("CommitReportingPlugin"),
-			inflightReports:       newInflightCommitReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			priceRegistry:         priceRegistry,
-			onchainConfig:         onchainConfig,
-			offchainConfig:        offchainConfig,
-			tokenToDecimalMapping: tokenToDecimalMapping,
+			config:            rf.config,
+			F:                 config.F,
+			lggr:              rf.config.lggr.Named("CommitReportingPlugin"),
+			inflightReports:   newInflightCommitReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
+			destPriceRegistry: destPriceRegistry,
+			onchainConfig:     onchainConfig,
+			offchainConfig:    offchainConfig,
+			tokenToDecimalMapping: cache.NewTokenToDecimals(
+				rf.config.lggr,
+				rf.config.destLP,
+				rf.config.offRamp,
+				destPriceRegistry,
+				rf.config.destClient,
+				int64(offchainConfig.DestFinalityDepth),
+			),
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -214,7 +214,7 @@ func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(dstPriceRegistry 
 	rf.srcChainFilters = srcFiltersNow
 
 	// destination chain filters
-	dstFiltersBefore, dstFiltersNow := rf.dstChainFilters, getCommitPluginDestLpFilters(dstPriceRegistry)
+	dstFiltersBefore, dstFiltersNow := rf.dstChainFilters, getCommitPluginDestLpFilters(dstPriceRegistry, rf.config.offRamp.Address())
 	created, deleted = filtersDiff(dstFiltersBefore, dstFiltersNow)
 	if err := unregisterLpFilters(nilQueryer, rf.config.destLP, deleted); err != nil {
 		return err
@@ -337,16 +337,13 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	lggr logger.Logger,
 	now time.Time,
 ) (sourceGasPriceUSD *big.Int, tokenPricesUSD map[common.Address]*big.Int, err error) {
-	// Detect token changes and update decimals mapping if needed, so we are up-to-date with supported tokens
-	if err = r.updateTokenToDecimalMapping(ctx); err != nil {
+	tokenToDecimalMappingValue, err := r.tokenToDecimalMapping.Get(ctx)
+	if err != nil {
 		return nil, nil, err
 	}
 
-	r.tokenToDecimalMappingMu.RLock()
-	defer r.tokenToDecimalMappingMu.RUnlock()
-
-	tokensWithDecimal := make([]common.Address, 0, len(r.tokenToDecimalMapping))
-	for token := range r.tokenToDecimalMapping {
+	tokensWithDecimal := make([]common.Address, 0, len(tokenToDecimalMappingValue))
+	for token := range tokenToDecimalMappingValue {
 		tokensWithDecimal = append(tokensWithDecimal, token)
 	}
 
@@ -367,7 +364,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	sourceNativePriceUSD := rawTokenPricesUSD[r.config.sourceNative]
 	tokenPricesUSD = make(map[common.Address]*big.Int, len(rawTokenPricesUSD))
 	for token := range rawTokenPricesUSD {
-		decimals, exists := r.tokenToDecimalMapping[token]
+		decimals, exists := tokenToDecimalMappingValue[token]
 		if !exists {
 			// do not include any address which isn't a supported token on dest chain, including sourceNative
 			lggr.Infow("Skipping token not supported on dest chain", "token", token)
@@ -435,67 +432,9 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 	return tmp.Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
 }
 
-// Checks for updates, updates the token to decimal mapping.
-func (r *CommitReportingPlugin) updateTokenToDecimalMapping(ctx context.Context) error {
-	newTokenToDecimalMapping, err := generateTokenToDecimalMapping(ctx, r.config, r.tokenToDecimalMapping, r.priceRegistry)
-	if err != nil {
-		return err
-	}
-
-	// Pre-emptively guarding plugin state changes
-	// Going forward, it may be possible for Should* OCR2 functions for call this from another thread
-	r.tokenToDecimalMappingMu.Lock()
-	r.tokenToDecimalMapping = newTokenToDecimalMapping
-	r.tokenToDecimalMappingMu.Unlock()
-
-	return nil
-}
-
-// Generates the token to decimal mapping for dest tokens and fee tokens.
-// NOTE: this queries token decimals n times, where n is the number of tokens whose decimals are not already cached.
-func generateTokenToDecimalMapping(ctx context.Context, config CommitPluginConfig, curMapping map[common.Address]uint8, priceRegistry price_registry.PriceRegistryInterface) (map[common.Address]uint8, error) {
-	newMapping := make(map[common.Address]uint8)
-
-	destTokens, err := config.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, err
-	}
-
-	feeTokens, err := priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, err
-	}
-	// In case if a fee token is not an offramp dest token, we still want to update its decimals and price
-	for _, feeToken := range feeTokens {
-		if !slices.Contains(destTokens, feeToken) {
-			destTokens = append(destTokens, feeToken)
-		}
-	}
-
-	for _, token := range destTokens {
-		if curDecimal, ok := curMapping[token]; ok {
-			// If token already in mapping, no need to call decimals again, decimals should be immutable
-			newMapping[token] = curDecimal
-			continue
-		}
-		tokenContract, err := link_token_interface.NewLinkToken(token, config.destClient)
-		if err != nil {
-			return nil, err
-		}
-
-		decimal, err := tokenContract.Decimals(&bind.CallOpts{Context: ctx})
-		if err != nil {
-			config.lggr.Errorf("Error while getting token %s decimals, token skipped: %s", token.String(), err)
-			continue
-		}
-		newMapping[token] = decimal
-	}
-	return newMapping, nil
-}
-
 // Gets the latest token price updates based on logs within the heartbeat
 func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, skipInflight bool) (map[common.Address]update, error) {
-	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(abihelpers.EventSignatures.UsdPerTokenUpdated, r.priceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), 0, pg.WithParentCtx(ctx))
+	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(abihelpers.EventSignatures.UsdPerTokenUpdated, r.destPriceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), 0, pg.WithParentCtx(ctx))
 	latestUpdates := make(map[common.Address]update)
 
 	if err != nil {
@@ -503,7 +442,7 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 	}
 	for _, log := range tokenUpdatesWithinHeartBeat {
 		// Ordered by ascending timestamps
-		tokenUpdate, err := r.priceRegistry.ParseUsdPerTokenUpdated(log.GetGethLog())
+		tokenUpdate, err := r.destPriceRegistry.ParseUsdPerTokenUpdated(log.GetGethLog())
 		if err != nil {
 			return nil, err
 		}
@@ -550,7 +489,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 	// If there are no price updates inflight, check latest prices onchain
 	gasUpdatesWithinHeartBeat, err := r.config.destLP.IndexedLogsCreatedAfter(
 		abihelpers.EventSignatures.UsdPerUnitGasUpdated,
-		r.priceRegistry.Address(),
+		r.destPriceRegistry.Address(),
 		1,
 		[]common.Hash{abihelpers.EvmWord(r.config.sourceChainSelector)},
 		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
@@ -563,7 +502,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 
 	for _, log := range gasUpdatesWithinHeartBeat {
 		// Ordered by ascending timestamps
-		priceUpdate, err2 := r.priceRegistry.ParseUsdPerUnitGasUpdated(log.GetGethLog())
+		priceUpdate, err2 := r.destPriceRegistry.ParseUsdPerUnitGasUpdated(log.GetGethLog())
 		if err2 != nil {
 			return update{}, err2
 		}

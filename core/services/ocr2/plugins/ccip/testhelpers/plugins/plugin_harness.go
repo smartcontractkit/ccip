@@ -134,6 +134,14 @@ func SetupCCIPTestHarness(t *testing.T) CCIPPluginTestHarness {
 		Name:      logpoller.FilterName("Token pool removed", c.Dest.OffRamp.Address().String()),
 		EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved}, Addresses: []common.Address{c.Dest.OffRamp.Address()},
 	}))
+	require.NoError(t, destLP.RegisterFilter(logpoller.Filter{
+		Name:      logpoller.FilterName("Fee token added", c.Dest.PriceRegistry.Address().String()),
+		EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenAdded}, Addresses: []common.Address{c.Dest.PriceRegistry.Address()},
+	}))
+	require.NoError(t, destLP.RegisterFilter(logpoller.Filter{
+		Name:      logpoller.FilterName("Fee token removed", c.Dest.PriceRegistry.Address().String()),
+		EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenRemoved}, Addresses: []common.Address{c.Dest.PriceRegistry.Address()},
+	}))
 
 	// start and backfill logpollers
 	require.NoError(t, sourceLP.Start(testutils.Context(t)))

@@ -1788,6 +1788,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ccip.NewOffChainAggregatorV2Config(commitNodes, ccipConfig.CommitOffchainConfig{
 		SourceFinalityDepth:   1,
+		DestFinalityDepth:     1,
 		FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
 		FeeUpdateDeviationPPB: 5e7,
 		MaxGasPrice:           200e9,

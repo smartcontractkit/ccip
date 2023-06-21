@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
@@ -60,6 +61,7 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 		mock.Anything,
 	).Maybe().Return(gas.EvmFee{Legacy: assets.NewWei(defaultGasPrice)}, uint32(200e3), nil)
 
+	backendClient := client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID))
 	plugin := CommitReportingPlugin{
 		config: CommitPluginConfig{
 			lggr:                th.Lggr,
@@ -72,7 +74,7 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			sourceNative:        utils.RandomAddress(),
 			sourceFeeEstimator:  sourceFeeEstimator,
 			sourceChainSelector: th.Source.ChainID,
-			destClient:          client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID)),
+			destClient:          backendClient,
 			leafHasher:          hasher.NewLeafHasher(th.Source.ChainID, th.Dest.ChainID, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
 			getSeqNumFromLog:    getSeqNumFromLog(th.Source.OnRamp),
 		},
@@ -80,12 +82,14 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 		onchainConfig:   th.CommitOnchainConfig,
 		offchainConfig: ccipconfig.CommitOffchainConfig{
 			SourceFinalityDepth:   0,
+			DestFinalityDepth:     0,
 			FeeUpdateDeviationPPB: 5e7,
 			FeeUpdateHeartBeat:    models.MustMakeDuration(12 * time.Hour),
 			MaxGasPrice:           200e9,
 		},
-		lggr:          th.Lggr,
-		priceRegistry: th.Dest.PriceRegistry,
+		lggr:                  th.Lggr,
+		destPriceRegistry:     th.Dest.PriceRegistry,
+		tokenToDecimalMapping: cache.NewTokenToDecimals(th.Lggr, th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, backendClient, 0),
 	}
 	return commitTestHarness{
 		CCIPPluginTestHarness: th,
@@ -511,7 +515,7 @@ func TestGeneratePriceUpdates(t *testing.T) {
 						tokenPriceUpdates = append(tokenPriceUpdates, price_registry.InternalTokenPriceUpdate{SourceToken: token, UsdPerToken: value})
 					}
 				}
-				// update gasPrice in priceRegistry
+				// update gasPrice in destPriceRegistry
 				_, err = th.Dest.PriceRegistry.UpdatePrices(th.Dest.User, price_registry.InternalPriceUpdates{
 					TokenPriceUpdates: tokenPriceUpdates,
 					DestChainSelector: destChainID,
@@ -549,23 +553,27 @@ func TestUpdateTokenToDecimalMapping(t *testing.T) {
 
 	mockOffRamp := &mock_contracts.EVM2EVMOffRampInterface{}
 	mockOffRamp.On("GetDestinationTokens", mock.Anything).Return([]common.Address{destToken}, nil)
+	mockOffRamp.On("Address").Return(common.Address{})
 
 	mockPriceRegistry := &mock_contracts.PriceRegistryInterface{}
 	mockPriceRegistry.On("GetFeeTokens", mock.Anything).Return([]common.Address{feeToken}, nil)
+	mockPriceRegistry.On("Address").Return(common.Address{})
 
+	backendClient := client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID))
 	plugin := CommitReportingPlugin{
 		config: CommitPluginConfig{
 			offRamp:    mockOffRamp,
-			destClient: client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID)),
+			destClient: backendClient,
 		},
-		priceRegistry:         mockPriceRegistry,
-		tokenToDecimalMapping: map[common.Address]uint8{},
+		destPriceRegistry:     mockPriceRegistry,
+		tokenToDecimalMapping: cache.NewTokenToDecimals(th.Lggr, th.DestLP, mockOffRamp, mockPriceRegistry, backendClient, 0),
 	}
 
-	require.NoError(t, plugin.updateTokenToDecimalMapping(testutils.Context(t)))
-	assert.Equal(t, len(tokens), len(plugin.tokenToDecimalMapping))
-	assert.Equal(t, uint8(18), plugin.tokenToDecimalMapping[destToken])
-	assert.Equal(t, uint8(18), plugin.tokenToDecimalMapping[feeToken])
+	tokenMapping, err := plugin.tokenToDecimalMapping.Get(testutils.Context(t))
+	require.NoError(t, err)
+	assert.Equal(t, len(tokens), len(tokenMapping))
+	assert.Equal(t, uint8(18), tokenMapping[destToken])
+	assert.Equal(t, uint8(18), tokenMapping[feeToken])
 }
 
 func TestCalculateUsdPer1e18TokenAmount(t *testing.T) {

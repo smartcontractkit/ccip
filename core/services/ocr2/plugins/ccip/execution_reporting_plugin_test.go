@@ -84,7 +84,7 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 		destPriceRegistry:  th.Dest.PriceRegistry,
 		destWrappedNative:  th.Dest.WrappedNative.Address(),
 		cachedSrcFeeTokens: cache.NewCachedFeeTokens(th.SourceLP, th.Source.PriceRegistry, int64(offchainConfig.SourceFinalityDepth)),
-		cachedDstTokens:    cache.NewCachedTokens(th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, int64(offchainConfig.DestOptimisticConfirmations)),
+		cachedDstTokens:    cache.NewCachedSupportedTokens(th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, int64(offchainConfig.DestOptimisticConfirmations)),
 	}
 	return execTestHarness{
 		CCIPPluginTestHarness: th,
@@ -197,7 +197,7 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 			destLP:  mockDestLP,
 			offRamp: mockOffRamp,
 		},
-		cachedDstTokens: cache.NewCachedTokens(mockDestLP, mockOffRamp, mockPriceRegistry, 0),
+		cachedDstTokens: cache.NewCachedSupportedTokens(mockDestLP, mockOffRamp, mockPriceRegistry, 0),
 	}
 
 	value, err := plugin.cachedDstTokens.Get(context.Background())
