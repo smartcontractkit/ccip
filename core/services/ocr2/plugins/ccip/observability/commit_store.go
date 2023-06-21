@@ -60,3 +60,9 @@ func (o *ObservedCommitStore) IsBlessed(opts *bind.CallOpts, root [32]byte) (boo
 		return o.CommitStoreInterface.IsBlessed(opts, root)
 	})
 }
+
+func (o *ObservedCommitStore) GetLatestPriceEpochAndRound(opts *bind.CallOpts) (uint64, error) {
+	return withObservedContract(o.metric, "GetLatestPriceEpochAndRound", func() (uint64, error) {
+		return o.CommitStoreInterface.GetLatestPriceEpochAndRound(opts)
+	})
+}
