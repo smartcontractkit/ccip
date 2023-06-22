@@ -74,13 +74,13 @@ MacOSX*
 cache
 core/services/ocr2/plugins/ccip/transactions.rlp
 lcov.info
-core/scripts/ccip-test/secrets/secrets.go
+core/scripts/ccip/secrets/secrets.go
 !core/services/ocr2/plugins/ccip/cache/
 
 
-core/scripts/ccip-test/json/credentials
-core/scripts/ccip-test/json/deployments
-core/scripts/ccip-test/csv/node-wallets
+core/scripts/ccip/json/credentials
+core/scripts/ccip/json/deployments
+core/scripts/ccip/csv/node-wallets
 
 # Test & linter reports
 *report.xml
