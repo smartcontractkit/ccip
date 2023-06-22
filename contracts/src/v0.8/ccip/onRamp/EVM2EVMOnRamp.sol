@@ -59,6 +59,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error BadARMSignal();
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
+  error NotAFeeToken(address token);
 
   event Paused(address account);
   event Unpaused(address account);
@@ -95,18 +96,22 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @dev Struct to hold the execution fee configuration for a fee token
   struct FeeTokenConfig {
-    uint96 networkFeeAmountUSD; // -┐ Flat network fee in 1e18 USD
-    uint64 multiplier; //           | Price multiplier for gas costs
-    uint32 destGasOverhead; // -----┘ Extra gas charged on top of the gasLimit
+    uint96 networkFeeAmountUSD; // --┐ Flat network fee in 1e18 USD
+    uint64 gasMultiplier; //         | Price multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
+    uint32 destGasOverhead; //       | Extra gas charged on top of the gasLimit
+    uint16 destGasPerPayloadByte; // | Destination chain gas charged per byte of `data` payload
+    bool enabled; // ----------------┘ Whether this fee token is enabled
   }
 
   /// @dev Struct to hold the fee configuration for a fee token, same as the FeeTokenConfig but with
   /// token included so that an array of these can be passed in to setFeeTokenConfig to set the mapping
   struct FeeTokenConfigArgs {
-    address token; // --------------┐ Token address
-    uint64 multiplier; // ----------┘ Price multiplier for gas costs
-    uint96 networkFeeAmountUSD; // -┐ Flat network fee in 1e18 USD
-    uint32 destGasOverhead; // -----┘ Extra gas charged on top of the gasLimit
+    address token; // ---------------┐ Token address
+    uint64 gasMultiplier; // --------┘ Price multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
+    uint96 networkFeeAmountUSD; // --┐ Flat network fee in 1e18 USD
+    uint32 destGasOverhead; //       | Extra gas charged on top of the gasLimit
+    uint16 destGasPerPayloadByte; // | Destination chain gas charged per byte of `data` payload
+    bool enabled; // ----------------┘ Whether this fee token is enabled
   }
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
@@ -331,12 +336,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @notice Validate the forwarded message with various checks.
   /// @param dataLength The length of the data field of the message
   /// @param gasLimit The gasLimit set in message for destination execution
-  /// @param tokenAmountsLength The number of token payload entires to be sent.
+  /// @param numberOfTokens The number of tokens to be sent.
   /// @param originalSender The original sender of the message on the router.
   function _validateMessage(
     uint256 dataLength,
     uint256 gasLimit,
-    uint256 tokenAmountsLength,
+    uint256 numberOfTokens,
     address originalSender
   ) internal view {
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
@@ -345,7 +350,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 maxDataSize = uint256(s_dynamicConfig.maxDataSize);
     if (dataLength > maxDataSize) revert MessageTooLarge(maxDataSize, dataLength);
     if (gasLimit > uint256(s_dynamicConfig.maxGasLimit)) revert MessageGasLimitTooHigh();
-    if (tokenAmountsLength > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
+    if (numberOfTokens > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens();
     if (s_allowlistEnabled && !s_allowList.contains(originalSender)) revert SenderNotAllowed(originalSender);
   }
 
@@ -460,16 +465,23 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @inheritdoc IEVM2AnyOnRamp
   function getFee(Client.EVM2AnyMessage calldata message) external view returns (uint256) {
-    (uint192 feeTokenPrice, uint192 gasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry).getFeeTokenAndGasPrices(
+    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
+    if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
+
+    (uint192 feeTokenPrice, uint192 gasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry).getTokenAndGasPrices(
       message.feeToken,
       i_destChainSelector
     );
 
-    FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
-
     // Total tx fee in USD with 18 decimals precision, excluding token bps
+    // We add the message gas limit, the overhead gas and the calldata gas together.
+    // We then multiple this destination chain gas total with the gas multiplier and
+    // convert it into USD.
     uint256 executionFeeUsdValue = (gasPrice *
-      ((_fromBytes(message.extraArgs).gasLimit + feeTokenConfig.destGasOverhead) * feeTokenConfig.multiplier)) /
+      ((_fromBytes(message.extraArgs).gasLimit +
+        feeTokenConfig.destGasOverhead +
+        message.data.length *
+        feeTokenConfig.destGasPerPayloadByte) * feeTokenConfig.gasMultiplier)) /
       1 ether +
       feeTokenConfig.networkFeeAmountUSD;
 
@@ -547,8 +559,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
       s_feeTokenConfig[configArg.token] = FeeTokenConfig({
         networkFeeAmountUSD: configArg.networkFeeAmountUSD,
-        multiplier: configArg.multiplier,
-        destGasOverhead: configArg.destGasOverhead
+        gasMultiplier: configArg.gasMultiplier,
+        destGasOverhead: configArg.destGasOverhead,
+        destGasPerPayloadByte: configArg.destGasPerPayloadByte,
+        enabled: configArg.enabled
       });
     }
     emit FeeConfigSet(feeTokenConfigArgs);

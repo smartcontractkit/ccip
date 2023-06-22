@@ -40,16 +40,20 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMOnRamp.FeeTokenConfigArgs({
         token: s_sourceFeeToken,
         networkFeeAmountUSD: 1e10,
-        multiplier: 1e18,
-        destGasOverhead: 100_000
+        gasMultiplier: 1e18,
+        destGasOverhead: 100_000,
+        destGasPerPayloadByte: 16,
+        enabled: true
       })
     );
     s_feeTokenConfigArgs.push(
       EVM2EVMOnRamp.FeeTokenConfigArgs({
         token: WETH,
         networkFeeAmountUSD: 5e8,
-        multiplier: 2e18,
-        destGasOverhead: 200_000
+        gasMultiplier: 2e18,
+        destGasOverhead: 200_000,
+        destGasPerPayloadByte: 16,
+        enabled: true
       })
     );
 

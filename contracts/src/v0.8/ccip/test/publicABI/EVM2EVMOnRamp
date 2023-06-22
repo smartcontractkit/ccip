@@ -27,7 +27,7 @@
   "setAdmin(address)": "704b6c02",
   "setAllowListEnabled(bool)": "efeadb6d",
   "setDynamicConfig((address,address,uint32,uint64,uint16,address))": "3b1a1403",
-  "setFeeTokenConfig((address,uint64,uint96,uint32)[])": "3913d5a3",
+  "setFeeTokenConfig((address,uint64,uint96,uint32,uint16,bool)[])": "799c3a67",
   "setNops((address,uint16)[])": "76f6ae76",
   "setRateLimiterConfig((bool,uint128,uint128))": "c92b2832",
   "setTokenTransferFeeConfig((address,uint32,uint32,uint16)[])": "5ebbd9f8",

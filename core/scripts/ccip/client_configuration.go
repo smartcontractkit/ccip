@@ -285,10 +285,12 @@ func (client *CCIPClient) setOnRampFeeConfig(t *testing.T, sourceClient *rhea.Ev
 
 	for _, feeToken := range sourceClient.ChainConfig.FeeTokens {
 		feeTokenConfig = append(feeTokenConfig, evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
-			Token:               sourceClient.ChainConfig.SupportedTokens[feeToken].Token,
-			Multiplier:          1e18,
-			NetworkFeeAmountUSD: big.NewInt(1e18),
-			DestGasOverhead:     0,
+			Token:                 sourceClient.ChainConfig.SupportedTokens[feeToken].Token,
+			GasMultiplier:         1e18,
+			NetworkFeeAmountUSD:   big.NewInt(1e18),
+			DestGasOverhead:       0,
+			DestGasPerPayloadByte: 16,
+			Enabled:               true,
 		})
 	}
 

@@ -859,11 +859,11 @@ contract EVM2EVMOnRamp_getTokenTransferFee is EVM2EVMOnRamp_getFeeSetup {
 contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
   using USDPriceWith18Decimals for uint192;
 
-  function getEmptyMessageExecutionFeeInLink() internal view returns (uint256) {
+  function getEmptyMessageExecutionFeeInLink(uint256 payloadLength) internal view returns (uint256) {
     EVM2EVMOnRamp.FeeTokenConfigArgs memory feeConfig = s_feeTokenConfigArgs[0];
 
-    uint256 totalGasUsed = (GAS_LIMIT + feeConfig.destGasOverhead);
-    uint256 totalGasIncMP = (totalGasUsed * feeConfig.multiplier) / 1 ether;
+    uint256 totalGasUsed = (GAS_LIMIT + feeConfig.destGasOverhead + feeConfig.destGasPerPayloadByte * payloadLength);
+    uint256 totalGasIncMP = (totalGasUsed * feeConfig.gasMultiplier) / 1 ether;
     uint256 totalUSDValue = totalGasIncMP * USD_PER_GAS + feeConfig.networkFeeAmountUSD;
 
     return calcTokenAmountFromUSDValue(s_feeTokenPrice, totalUSDValue);
@@ -880,7 +880,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
       uint256 feeAmount = s_onRamp.getFee(message);
 
       uint256 totalGasUsed = (GAS_LIMIT + feeConfig.destGasOverhead);
-      uint256 totalGasIncMP = (totalGasUsed * feeConfig.multiplier) / 1 ether;
+      uint256 totalGasIncMP = (totalGasUsed * feeConfig.gasMultiplier) / 1 ether;
       uint256 totalUSDPrice = totalGasIncMP * USD_PER_GAS + feeConfig.networkFeeAmountUSD;
       uint256 totalPriceInFeeToken = (totalUSDPrice * 1e18) / feeTokenPrices[feeTokenIndex];
 
@@ -902,7 +902,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
     uint256 feeAmount = s_onRamp.getFee(message);
 
     uint256 totalGasUsed = (customGasLimit + feeConfig.destGasOverhead);
-    uint256 totalGasIncMP = (totalGasUsed * feeConfig.multiplier) / 1 ether;
+    uint256 totalGasIncMP = (totalGasUsed * feeConfig.gasMultiplier) / 1 ether;
     uint256 totalUSDPrice = totalGasIncMP * USD_PER_GAS + feeConfig.networkFeeAmountUSD;
     uint256 totalPriceInFeeToken = (totalUSDPrice * 1e18) / s_feeTokenPrice;
 
@@ -913,13 +913,16 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
     uint256 tokenAmount = 10000e18;
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
+    message.data = "test data to be paid for with the destGasPerPayloadByte";
+
     uint256 feeAmount = s_onRamp.getFee(message);
 
     uint256 usdValue = calcUSDValueFromTokenAmount(s_feeTokenPrice, tokenAmount);
     uint256 bpsUSDValue = applyBpsRatio(usdValue, s_tokenTransferFeeConfigArgs[0].ratio);
     uint256 expectedTransferFeeAmountInLink = calcTokenAmountFromUSDValue(s_feeTokenPrice, bpsUSDValue);
 
-    uint256 expectedTotalFeeAmount = getEmptyMessageExecutionFeeInLink() + expectedTransferFeeAmountInLink;
+    uint256 expectedTotalFeeAmount = getEmptyMessageExecutionFeeInLink(message.data.length) +
+      expectedTransferFeeAmountInLink;
     assertEq(expectedTotalFeeAmount, feeAmount);
   }
 
@@ -933,6 +936,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
     tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: feeTokenAmount});
     tokenAmounts[1] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: customTokenAmount});
     message.tokenAmounts = tokenAmounts;
+    message.data = "random bits and bytes that should be factored into the cost of the message";
 
     uint256 feeAmount = s_onRamp.getFee(message);
 
@@ -947,8 +951,21 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
     );
     uint256 expectedTransferFeeAmountInLink = calcTokenAmountFromUSDValue(s_feeTokenPrice, usdFeeValue);
 
-    uint256 expectedTotalFeeAmount = getEmptyMessageExecutionFeeInLink() + expectedTransferFeeAmountInLink;
+    uint256 expectedTotalFeeAmount = getEmptyMessageExecutionFeeInLink(message.data.length) +
+      expectedTransferFeeAmountInLink;
     assertEq(expectedTotalFeeAmount, feeAmount);
+  }
+
+  // Reverts
+
+  function testNotAFeeTokenReverts() public {
+    address notAFeeToken = address(0x111111);
+    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(notAFeeToken, 1);
+    message.feeToken = notAFeeToken;
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.NotAFeeToken.selector, notAFeeToken));
+
+    s_onRamp.getFee(message);
   }
 }
 

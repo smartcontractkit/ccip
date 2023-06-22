@@ -355,12 +355,9 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
   }
 }
 
-contract PriceRegistry_getFeeTokenAndGasPrices is PriceRegistrySetup {
+contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
   function testGetFeeTokenAndGasPricesSuccess() public {
-    (uint192 feeTokenPrice, uint192 gasPrice) = s_priceRegistry.getFeeTokenAndGasPrices(
-      s_sourceFeeToken,
-      DEST_CHAIN_ID
-    );
+    (uint192 feeTokenPrice, uint192 gasPrice) = s_priceRegistry.getTokenAndGasPrices(s_sourceFeeToken, DEST_CHAIN_ID);
 
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
 
@@ -377,26 +374,21 @@ contract PriceRegistry_getFeeTokenAndGasPrices is PriceRegistrySetup {
     });
     s_priceRegistry.updatePrices(priceUpdates);
 
-    (, uint192 gasPrice) = s_priceRegistry.getFeeTokenAndGasPrices(s_sourceFeeToken, zeroGasDestChainSelector);
+    (, uint192 gasPrice) = s_priceRegistry.getTokenAndGasPrices(s_sourceFeeToken, zeroGasDestChainSelector);
 
     assertEq(gasPrice, priceUpdates.usdPerUnitGas);
   }
 
-  function testUnsupportedTokenReverts() public {
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.NotAFeeToken.selector, DUMMY_CONTRACT_ADDRESS));
-    s_priceRegistry.getFeeTokenAndGasPrices(DUMMY_CONTRACT_ADDRESS, DEST_CHAIN_ID);
-  }
-
   function testUnsupportedChainReverts() public {
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.ChainNotSupported.selector, DEST_CHAIN_ID + 1));
-    s_priceRegistry.getFeeTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_ID + 1);
+    s_priceRegistry.getTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_ID + 1);
   }
 
   function testStaleGasPriceReverts() public {
     uint256 diff = TWELVE_HOURS + 1;
     vm.warp(block.timestamp + diff);
     vm.expectRevert(abi.encodeWithSelector(PriceRegistry.StaleGasPrice.selector, DEST_CHAIN_ID, TWELVE_HOURS, diff));
-    s_priceRegistry.getFeeTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_ID);
+    s_priceRegistry.getTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_ID);
   }
 
   function testStaleTokenPriceReverts() public {
@@ -413,6 +405,6 @@ contract PriceRegistry_getFeeTokenAndGasPrices is PriceRegistrySetup {
     vm.expectRevert(
       abi.encodeWithSelector(PriceRegistry.StaleTokenPrice.selector, s_sourceTokens[0], TWELVE_HOURS, diff)
     );
-    s_priceRegistry.getFeeTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_ID);
+    s_priceRegistry.getTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_ID);
   }
 }

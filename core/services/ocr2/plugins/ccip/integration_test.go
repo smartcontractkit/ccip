@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 	"github.com/test-go/testify/assert"
@@ -51,7 +52,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 	currentSeqNum := 1
 
-	t.Run("single ge", func(t *testing.T) {
+	t.Run("single", func(t *testing.T) {
 		tokenAmount := big.NewInt(500000003) // prime number
 		gasLimit := big.NewInt(200_003)      // prime number
 
@@ -156,7 +157,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		currentSeqNum++
 	})
 
-	t.Run("multiple batches ge", func(t *testing.T) {
+	t.Run("multiple batches", func(t *testing.T) {
 		tokenAmount := big.NewInt(500000003)
 		gasLimit := big.NewInt(250_000)
 
@@ -210,7 +211,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		currentSeqNum += n
 	})
 
-	t.Run("ge strict sequencing", func(t *testing.T) {
+	t.Run("strict sequencing", func(t *testing.T) {
 		// approve the total amount to be sent
 		// set revert to true so that the execution gets reverted
 		_, err = ccipTH.Dest.Receivers[1].Receiver.SetRevert(ccipTH.Dest.User, true)
@@ -439,12 +440,13 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		extraArgs, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(200_000), true)
 		require.NoError(t, err)
 
-		// FeeToken is empty, therefore it should use native token
+		// FeeToken is empty, indicating it should use native token
 		msg := router.ClientEVM2AnyMessage{
 			Receiver:     testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[1].Receiver.Address()),
 			Data:         []byte("hello"),
 			TokenAmounts: []router.ClientEVMTokenAmount{},
 			ExtraArgs:    extraArgs,
+			FeeToken:     common.Address{},
 		}
 		fee, err := ccipTH.Source.Router.GetFee(nil, testhelpers.DestChainID, msg)
 		require.NoError(t, err)

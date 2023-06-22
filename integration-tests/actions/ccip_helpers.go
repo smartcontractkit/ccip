@@ -108,8 +108,8 @@ var (
 	}
 	// ApprovedAmountToRouter is the default amount which gets approved for router so that it can transfer token and use the fee token for fee payment
 	ApprovedAmountToRouter           = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
-	ApprovedFeeAmountToRouter        = new(big.Int).Mul(big.NewInt(int64(FeeMultiplier)), big.NewInt(1e9))
-	FeeMultiplier             uint64 = 12e17
+	ApprovedFeeAmountToRouter        = new(big.Int).Mul(big.NewInt(int64(GasFeeMultiplier)), big.NewInt(1e9))
+	GasFeeMultiplier          uint64 = 12e17
 	LinkToUSD                        = big.NewInt(8e18)
 	WrappedNativeToUSD               = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1.7e3))
 )
@@ -617,10 +617,12 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			sourceCCIP.Common.RateLimiterConfig,
 			[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 				{
-					Token:               common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-					NetworkFeeAmountUSD: big.NewInt(0),
-					DestGasOverhead:     0,
-					Multiplier:          FeeMultiplier, // the low multiplier is for testing purposes. This keeps accounts from running out of funds
+					Token:                 common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+					NetworkFeeAmountUSD:   big.NewInt(0),
+					DestGasOverhead:       0,
+					DestGasPerPayloadByte: 16,
+					GasMultiplier:         GasFeeMultiplier, // the low multiplier is for testing purposes. This keeps accounts from running out of funds
+					Enabled:               true,
 				},
 			},
 			tokenTransferFeeConfig,

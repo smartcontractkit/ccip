@@ -234,10 +234,12 @@ func deployOnRamp(t *testing.T, client EvmConfig, laneConfig *EVMLaneConfig, des
 		}
 
 		feeTokenConfig = append(feeTokenConfig, evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
-			Token:               tokenConfig.Token,
-			Multiplier:          multiplier,
-			NetworkFeeAmountUSD: big.NewInt(1e16),
-			DestGasOverhead:     DEST_GAS_OVERHEAD,
+			Token:                 tokenConfig.Token,
+			GasMultiplier:         multiplier,
+			NetworkFeeAmountUSD:   big.NewInt(1e16),
+			DestGasOverhead:       DEST_GAS_OVERHEAD,
+			DestGasPerPayloadByte: 16,
+			Enabled:               true,
 		})
 	}
 

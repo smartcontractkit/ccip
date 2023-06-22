@@ -610,7 +610,7 @@ func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.E
 
 	for _, tokenName := range source.ChainConfig.FeeTokens {
 		token := source.ChainConfig.SupportedTokens[tokenName].Token
-		_, err = feeManager.GetFeeTokenAndGasPrices(&bind.CallOpts{}, token, rhea.GetCCIPChainSelector(destination.ChainConfig.EvmChainId))
+		_, err = feeManager.GetTokenAndGasPrices(&bind.CallOpts{}, token, rhea.GetCCIPChainSelector(destination.ChainConfig.EvmChainId))
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, destination.ChainConfig.EvmChainId, printBool(false)))
 		}
@@ -625,7 +625,7 @@ func checkPriceRegistrySet(source *rhea.EvmDeploymentConfig, destination *rhea.E
 
 	for _, tokenName := range destination.ChainConfig.FeeTokens {
 		token := destination.ChainConfig.SupportedTokens[tokenName].Token
-		_, err = feeManager.GetFeeTokenAndGasPrices(&bind.CallOpts{}, token, rhea.GetCCIPChainSelector(source.ChainConfig.EvmChainId))
+		_, err = feeManager.GetTokenAndGasPrices(&bind.CallOpts{}, token, rhea.GetCCIPChainSelector(source.ChainConfig.EvmChainId))
 		if err != nil {
 			sb.WriteString(fmt.Sprintf("| %-20s | %14d | %9s |\n", tokenName, source.ChainConfig.EvmChainId, printBool(false)))
 		}

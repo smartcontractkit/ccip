@@ -376,30 +376,6 @@ func (_m *PriceRegistryInterface) GetDestinationChainGasPrice(opts *bind.CallOpt
 	return r0, r1
 }
 
-// GetFeeTokenAndGasPrices provides a mock function with given fields: opts, feeToken, destChainSelector
-func (_m *PriceRegistryInterface) GetFeeTokenAndGasPrices(opts *bind.CallOpts, feeToken common.Address, destChainSelector uint64) (price_registry.GetFeeTokenAndGasPrices, error) {
-	ret := _m.Called(opts, feeToken, destChainSelector)
-
-	var r0 price_registry.GetFeeTokenAndGasPrices
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address, uint64) (price_registry.GetFeeTokenAndGasPrices, error)); ok {
-		return rf(opts, feeToken, destChainSelector)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address, uint64) price_registry.GetFeeTokenAndGasPrices); ok {
-		r0 = rf(opts, feeToken, destChainSelector)
-	} else {
-		r0 = ret.Get(0).(price_registry.GetFeeTokenAndGasPrices)
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts, common.Address, uint64) error); ok {
-		r1 = rf(opts, feeToken, destChainSelector)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetFeeTokens provides a mock function with given fields: opts
 func (_m *PriceRegistryInterface) GetFeeTokens(opts *bind.CallOpts) ([]common.Address, error) {
 	ret := _m.Called(opts)
@@ -471,6 +447,30 @@ func (_m *PriceRegistryInterface) GetStalenessThreshold(opts *bind.CallOpts) (*b
 
 	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
 		r1 = rf(opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetTokenAndGasPrices provides a mock function with given fields: opts, token, destChainSelector
+func (_m *PriceRegistryInterface) GetTokenAndGasPrices(opts *bind.CallOpts, token common.Address, destChainSelector uint64) (price_registry.GetTokenAndGasPrices, error) {
+	ret := _m.Called(opts, token, destChainSelector)
+
+	var r0 price_registry.GetTokenAndGasPrices
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address, uint64) (price_registry.GetTokenAndGasPrices, error)); ok {
+		return rf(opts, token, destChainSelector)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address, uint64) price_registry.GetTokenAndGasPrices); ok {
+		r0 = rf(opts, token, destChainSelector)
+	} else {
+		r0 = ret.Get(0).(price_registry.GetTokenAndGasPrices)
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts, common.Address, uint64) error); ok {
+		r1 = rf(opts, token, destChainSelector)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -199,8 +199,10 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     feeTokenConfigArgs[0] = EVM2EVMOnRamp.FeeTokenConfigArgs({
       token: s_sourceTokens[1],
       networkFeeAmountUSD: 2,
-      multiplier: 108e16,
-      destGasOverhead: 2
+      gasMultiplier: 108e16,
+      destGasOverhead: 2,
+      destGasPerPayloadByte: 16,
+      enabled: true
     });
     s_onRamp.setFeeTokenConfig(feeTokenConfigArgs);
 
@@ -247,21 +249,47 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 
+  // Since sending with zero fees is a legitimate use case for some destination
+  // chains, e.g. private chains, we want to make sure that we can still send even
+  // when the configured fee is 0.
   function testZeroFeeAndGasPriceSuccess() public {
+    // Configure a new fee token that has zero gas and zero fees but is still
+    // enabled and valid to pay with.
+    address feeTokenWithZeroFeeAndGas = s_sourceTokens[1];
+
+    // Set the new token as feeToken
     address[] memory feeTokens = new address[](1);
-    feeTokens[0] = s_sourceTokens[1];
+    feeTokens[0] = feeTokenWithZeroFeeAndGas;
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
 
-    Internal.PriceUpdates memory priceUpdates = getSinglePriceUpdateStruct(s_sourceTokens[1], 2_000 ether);
+    // Update the price of the newly set feeToken
+    Internal.PriceUpdates memory priceUpdates = getSinglePriceUpdateStruct(feeTokenWithZeroFeeAndGas, 2_000 ether);
     priceUpdates.destChainSelector = DEST_CHAIN_ID;
     priceUpdates.usdPerUnitGas = 0;
 
     s_priceRegistry.updatePrices(priceUpdates);
 
+    // Set the feeToken args on the onRamp
+    EVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new EVM2EVMOnRamp.FeeTokenConfigArgs[](1);
+    feeTokenConfigArgs[0] = EVM2EVMOnRamp.FeeTokenConfigArgs({
+      token: s_sourceTokens[1],
+      networkFeeAmountUSD: 2,
+      gasMultiplier: 108e16,
+      destGasOverhead: 2,
+      destGasPerPayloadByte: 16,
+      enabled: true
+    });
+
+    s_onRamp.setFeeTokenConfig(feeTokenConfigArgs);
+
+    // Send a message with the new feeToken
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.feeToken = s_sourceTokens[1];
+    message.feeToken = feeTokenWithZeroFeeAndGas;
+
+    // Fee should be 0 and sending should not revert
     uint256 fee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
     assertEq(fee, 0);
+
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 
@@ -285,7 +313,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.feeToken = wrongFeeToken;
 
-    vm.expectRevert(abi.encodeWithSelector(PriceRegistry.NotAFeeToken.selector, wrongFeeToken));
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.NotAFeeToken.selector, wrongFeeToken));
 
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }

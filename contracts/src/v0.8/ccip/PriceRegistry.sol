@@ -16,7 +16,6 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   using USDPriceWith18Decimals for uint192;
 
   error TokenNotSupported(address token);
-  error NotAFeeToken(address token);
   error ChainNotSupported(uint64 chain);
   error OnlyCallableByUpdaterOrOwner();
   error StaleGasPrice(uint64 destChainSelector, uint256 threshold, uint256 timePassed);
@@ -104,19 +103,17 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
-  function getFeeTokenAndGasPrices(
-    address feeToken,
+  function getTokenAndGasPrices(
+    address token,
     uint64 destChainSelector
-  ) external view override returns (uint192 feeTokenPrice, uint192 gasPriceValue) {
-    if (!s_feeTokens.contains(feeToken)) revert NotAFeeToken(feeToken);
-
+  ) external view override returns (uint192 tokenPrice, uint192 gasPriceValue) {
     Internal.TimestampedUint192Value memory gasPrice = s_usdPerUnitGasByDestChainSelector[destChainSelector];
     // We do allow a gas price of 0, but no stale or unset gas prices
     if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainSelector);
     uint256 timePassed = block.timestamp - gasPrice.timestamp;
     if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainSelector, i_stalenessThreshold, timePassed);
 
-    return (_getValidatedTokenPrice(feeToken), gasPrice.value);
+    return (_getValidatedTokenPrice(token), gasPrice.value);
   }
 
   /// @inheritdoc IPriceRegistry

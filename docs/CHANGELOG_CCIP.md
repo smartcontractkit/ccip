@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- FeeTokenConfigArgs & FeeTokenConfig have two new fields and one renamed field
+  - added
+    - destGasPerPayloadByte - gas cost per payload byte on destination chain
+    - enabled - whether the fee token is enabled
+  - renamed
+    - multiplier -> gasMultiplier
+
 ### Removed
 
 

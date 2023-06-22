@@ -228,10 +228,20 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
-				Token:               c.Source.LinkToken.Address(),
-				Multiplier:          1e18,
-				NetworkFeeAmountUSD: big.NewInt(0),
-				DestGasOverhead:     0,
+				Token:                 c.Source.LinkToken.Address(),
+				GasMultiplier:         1e18,
+				NetworkFeeAmountUSD:   big.NewInt(0),
+				DestGasOverhead:       0,
+				DestGasPerPayloadByte: 16,
+				Enabled:               true,
+			},
+			{
+				Token:                 c.Source.WrappedNative.Address(),
+				GasMultiplier:         1e18,
+				NetworkFeeAmountUSD:   big.NewInt(0),
+				DestGasOverhead:       0,
+				DestGasPerPayloadByte: 16,
+				Enabled:               true,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
@@ -824,16 +834,20 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
-				Token:               sourceLinkTokenAddress,
-				Multiplier:          1e18,
-				NetworkFeeAmountUSD: big.NewInt(0),
-				DestGasOverhead:     0,
+				Token:                 sourceLinkTokenAddress,
+				GasMultiplier:         1e18,
+				NetworkFeeAmountUSD:   big.NewInt(0),
+				DestGasOverhead:       0,
+				DestGasPerPayloadByte: 16,
+				Enabled:               true,
 			},
 			{
-				Token:               sourceWeth9addr,
-				Multiplier:          1e18,
-				NetworkFeeAmountUSD: big.NewInt(0),
-				DestGasOverhead:     0,
+				Token:                 sourceWeth9addr,
+				GasMultiplier:         1e18,
+				NetworkFeeAmountUSD:   big.NewInt(0),
+				DestGasOverhead:       0,
+				DestGasPerPayloadByte: 16,
+				Enabled:               true,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
