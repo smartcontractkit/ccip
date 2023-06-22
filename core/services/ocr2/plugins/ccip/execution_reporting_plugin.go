@@ -3,8 +3,8 @@ package ccip
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/big"
-	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -741,7 +741,10 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	observedMessages := calculateObservedMessagesConsensus(lggr, parsableObservations, r.F)
+	observedMessages, err := calculateObservedMessagesConsensus(parsableObservations, r.F)
+	if err != nil {
+		return false, nil, err
+	}
 	if len(observedMessages) == 0 {
 		return false, nil, nil
 	}
@@ -754,44 +757,53 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	return true, report, nil
 }
 
-type seqNumTally struct {
-	Tally     int
-	TokenData [][]byte
+type tallyKey struct {
+	seqNr         uint64
+	tokenDataHash [32]byte
 }
 
-func calculateObservedMessagesConsensus(lggr logger.Logger, observations []ExecutionObservation, f int) []ObservedMessage {
-	tally := make(map[uint64]seqNumTally)
+type tallyVal struct {
+	tally     int
+	tokenData [][]byte
+}
+
+func calculateObservedMessagesConsensus(observations []ExecutionObservation, f int) ([]ObservedMessage, error) {
+	tally := make(map[tallyKey]tallyVal)
 	for _, obs := range observations {
 		for seqNr, msgData := range obs.Messages {
-			if val, ok := tally[seqNr]; ok {
-				// If we've already seen the seqNum we check if the token data is the same
-				if !reflect.DeepEqual(msgData.TokenData, val.TokenData) {
-					lggr.Warnf("Nodes reported different offchain token data [%v] [%v]", msgData.TokenData, val.TokenData)
-				}
-				val.Tally++
-				tally[seqNr] = val
-				continue
+			tokenDataHash, err := bytesOfBytesKeccak(msgData.TokenData)
+			if err != nil {
+				return nil, fmt.Errorf("bytes of bytes keccak: %w", err)
 			}
-			// If we have not seen the seqNum we save a tally with the token data
-			tally[seqNr] = seqNumTally{
-				Tally:     1,
-				TokenData: msgData.TokenData,
+
+			key := tallyKey{seqNr: seqNr, tokenDataHash: tokenDataHash}
+			if val, ok := tally[key]; ok {
+				tally[key] = tallyVal{tally: val.tally + 1, tokenData: msgData.TokenData}
+			} else {
+				tally[key] = tallyVal{tally: 1, tokenData: msgData.TokenData}
 			}
 		}
 	}
-	var finalSequenceNumbers []ObservedMessage
-	for seqNr, tallyInfo := range tally {
-		// Note spec deviation - I think it's ok to rely on the batch builder for
-		// capping the number of messages vs capping in two places/ways?
-		if tallyInfo.Tally > f {
-			finalSequenceNumbers = append(finalSequenceNumbers, NewObservedMessage(seqNr, tallyInfo.TokenData))
+
+	// We might have different token data for the same sequence number.
+	// For that purpose we want to keep the token data with the most occurrences.
+	seqNumTally := make(map[uint64]tallyVal)
+	for key, tallyInfo := range tally {
+		existingTally, exists := seqNumTally[key.seqNr]
+		if tallyInfo.tally > f && (!exists || tallyInfo.tally > existingTally.tally) {
+			seqNumTally[key.seqNr] = tallyInfo
 		}
+	}
+
+	finalSequenceNumbers := make([]ObservedMessage, 0, len(seqNumTally))
+	for seqNr, tallyInfo := range seqNumTally {
+		finalSequenceNumbers = append(finalSequenceNumbers, NewObservedMessage(seqNr, tallyInfo.tokenData))
 	}
 	// buildReport expects sorted sequence numbers (tally map is non-deterministic).
 	sort.Slice(finalSequenceNumbers, func(i, j int) bool {
 		return finalSequenceNumbers[i].SeqNr < finalSequenceNumbers[j].SeqNr
 	})
-	return finalSequenceNumbers
+	return finalSequenceNumbers, nil
 }
 
 func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {

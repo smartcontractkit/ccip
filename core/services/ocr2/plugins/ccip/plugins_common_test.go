@@ -196,3 +196,15 @@ func Test_mergeEpochAndRound(t *testing.T) {
 		})
 	}
 }
+
+func Test_bytesOfBytesKeccak(t *testing.T) {
+	h, err := bytesOfBytesKeccak(nil)
+	assert.NoError(t, err)
+	assert.Equal(t, [32]byte{}, h)
+
+	h1, err := bytesOfBytesKeccak([][]byte{{0x1}, {0x1}})
+	assert.NoError(t, err)
+	h2, err := bytesOfBytesKeccak([][]byte{{0x1, 0x1}})
+	assert.NoError(t, err)
+	assert.NotEqual(t, h1, h2)
+}

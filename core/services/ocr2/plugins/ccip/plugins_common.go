@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 const (
@@ -212,6 +213,18 @@ func deviates(x1, x2 *big.Int, ppb int64) bool {
 	diff.Mul(diff, big.NewInt(1e9))
 	diff.Div(diff, x1)
 	return diff.CmpAbs(big.NewInt(ppb)) > 0
+}
+
+func bytesOfBytesKeccak(b [][]byte) ([32]byte, error) {
+	if len(b) == 0 {
+		return [32]byte{}, nil
+	}
+
+	h := utils.Keccak256Fixed(b[0])
+	for _, v := range b[1:] {
+		h = utils.Keccak256Fixed(append(h[:], v...))
+	}
+	return h, nil
 }
 
 func mergeEpochAndRound(epoch uint32, round uint8) uint64 {

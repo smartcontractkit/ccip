@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"sort"
 	"testing"
 	"time"
 
@@ -613,6 +614,98 @@ func TestBuildBatch(t *testing.T) {
 				map[common.Address]common.Address{},
 			)
 			assert.Equal(t, tc.expectedSeqNrs, seqNrs)
+		})
+	}
+}
+
+func Test_calculateObservedMessagesConsensus(t *testing.T) {
+	type args struct {
+		observations []ExecutionObservation
+		f            int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []ObservedMessage
+	}{
+		{
+			name: "no observations",
+			args: args{
+				observations: nil,
+				f:            0,
+			},
+			want: []ObservedMessage{},
+		},
+		{
+			name: "common path",
+			args: args{
+				observations: []ExecutionObservation{
+					{
+						Messages: map[uint64]MsgData{
+							1: {TokenData: [][]byte{{0x1}, {0x1}, {0x1}}},
+							2: {TokenData: [][]byte{{0x2}, {0x2}, {0x2}}},
+						},
+					},
+					{
+						Messages: map[uint64]MsgData{
+							1: {TokenData: [][]byte{{0x1}, {0x1}, {0xff}}}, // different token data - should not be picked
+							2: {TokenData: [][]byte{{0x2}, {0x2}, {0x2}}},
+							3: {TokenData: [][]byte{{0x3}, {0x3}, {0x3}}},
+						},
+					},
+					{
+						Messages: map[uint64]MsgData{
+							1: {TokenData: [][]byte{{0x1}, {0x1}, {0x1}}},
+							2: {TokenData: [][]byte{{0x2}, {0x2}, {0x2}}},
+						},
+					},
+				},
+				f: 1,
+			},
+			want: []ObservedMessage{
+				{SeqNr: 1, MsgData: MsgData{TokenData: [][]byte{{0x1}, {0x1}, {0x1}}}},
+				{SeqNr: 2, MsgData: MsgData{TokenData: [][]byte{{0x2}, {0x2}, {0x2}}}},
+			},
+		},
+		{
+			name: "similar token data",
+			args: args{
+				observations: []ExecutionObservation{
+					{
+						Messages: map[uint64]MsgData{
+							1: {TokenData: [][]byte{{0x1}, {0x1}, {0x1}}},
+						},
+					},
+					{
+						Messages: map[uint64]MsgData{
+							1: {TokenData: [][]byte{{0x1}, {0x1, 0x1}}},
+						},
+					},
+					{
+						Messages: map[uint64]MsgData{
+							1: {TokenData: [][]byte{{0x1}, {0x1, 0x1}}},
+						},
+					},
+				},
+				f: 1,
+			},
+			want: []ObservedMessage{
+				{SeqNr: 1, MsgData: MsgData{TokenData: [][]byte{{0x1}, {0x1, 0x1}}}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := calculateObservedMessagesConsensus(
+				tt.args.observations,
+				tt.args.f,
+			)
+			assert.NoError(t, err)
+			sort.Slice(res, func(i, j int) bool {
+				return res[i].SeqNr < res[j].SeqNr
+			})
+			assert.Equalf(t, tt.want, res, "calculateObservedMessagesConsensus(%v, %v)", tt.args.observations, tt.args.f)
 		})
 	}
 }
