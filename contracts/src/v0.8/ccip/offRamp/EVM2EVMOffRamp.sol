@@ -469,7 +469,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   /// @notice Get all supported source tokens
   /// @return sourceTokens of supported source tokens
-  function getSupportedTokens() public view returns (IERC20[] memory sourceTokens) {
+  function getSupportedTokens() external view returns (IERC20[] memory sourceTokens) {
     sourceTokens = new IERC20[](s_poolsBySourceToken.length());
     for (uint256 i = 0; i < sourceTokens.length; ++i) {
       (address token, ) = s_poolsBySourceToken.at(i);
@@ -489,16 +489,16 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// @notice Get the destination token from the pool based on a given source token.
   /// @param sourceToken The source token
   /// @return the destination token
-  function getDestinationToken(IERC20 sourceToken) public view returns (IERC20) {
+  function getDestinationToken(IERC20 sourceToken) external view returns (IERC20) {
     (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
-    if (!success) revert PoolDoesNotExist();
+    if (!success) revert UnsupportedToken(sourceToken);
     return IPool(pool).getToken();
   }
 
   /// @notice Get a token pool by its dest token
   /// @param destToken token
   /// @return Token Pool
-  function getPoolByDestToken(IERC20 destToken) public view returns (IPool) {
+  function getPoolByDestToken(IERC20 destToken) external view returns (IPool) {
     (bool success, address pool) = s_poolsByDestToken.tryGet(address(destToken));
     if (!success) revert UnsupportedToken(destToken);
     return IPool(pool);

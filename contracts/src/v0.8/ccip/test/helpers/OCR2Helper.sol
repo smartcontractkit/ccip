@@ -29,7 +29,7 @@ contract OCR2Helper is OCR2Base(false) {
       );
   }
 
-  function _report(bytes memory report, uint40 epochAndRound) internal override {}
+  function _report(bytes calldata report, uint40 epochAndRound) internal override {}
 
   function typeAndVersion() public pure override returns (string memory) {
     return "OCR2BaseHelper 1.0.0";

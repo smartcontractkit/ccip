@@ -403,7 +403,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
-  function getSupportedTokens() public view returns (address[] memory) {
+  function getSupportedTokens() external view returns (address[] memory) {
     address[] memory sourceTokens = new address[](s_poolsBySourceToken.length());
     for (uint256 i = 0; i < sourceTokens.length; ++i) {
       (sourceTokens[i], ) = s_poolsBySourceToken.at(i);

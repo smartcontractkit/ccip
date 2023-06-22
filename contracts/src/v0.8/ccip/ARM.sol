@@ -394,7 +394,7 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
   }
 
   /// @inheritdoc IARM
-  function isBlessed(IARM.TaggedRoot calldata taggedRoot) public view override returns (bool) {
+  function isBlessed(IARM.TaggedRoot calldata taggedRoot) external view override returns (bool) {
     return s_blessVoteProgressByTaggedRootHash[_taggedRootHash(taggedRoot)].weightThresholdMet;
   }
 

@@ -32,7 +32,7 @@ contract ThirdPartyBurnMintTokenPool is BurnMintTokenPool {
   /// @dev Only callable by the owner
   /// @param onRamps A list of onRamps and their new permission status
   /// @param offRamps A list of offRamps and their new permission status
-  function applyRampUpdates(RampUpdate[] memory onRamps, RampUpdate[] memory offRamps) public override onlyOwner {
+  function applyRampUpdates(RampUpdate[] calldata onRamps, RampUpdate[] calldata offRamps) external override onlyOwner {
     for (uint256 i = 0; i < onRamps.length; ++i) {
       RampUpdate memory update = onRamps[i];
 

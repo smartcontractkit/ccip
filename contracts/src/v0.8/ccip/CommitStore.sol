@@ -96,7 +96,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
 
   /// @notice Returns the next expected sequence number.
   /// @return the next expected sequenceNumber.
-  function getExpectedNextSequenceNumber() public view returns (uint64) {
+  function getExpectedNextSequenceNumber() external view returns (uint64) {
     return s_minSeqNr;
   }
 
@@ -173,7 +173,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   /// and should not be rejected. When a report with a stale root but valid price updates is submitted,
   /// we are OK to revert to preserve the invariant that we always revert on invalid sequence number ranges.
   /// If that happens, prices will be updates in later rounds.
-  function _report(bytes memory encodedReport, uint40 epochAndRound) internal override whenNotPaused whenHealthy {
+  function _report(bytes calldata encodedReport, uint40 epochAndRound) internal override whenNotPaused whenHealthy {
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     // Check if the report contains price updates

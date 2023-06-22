@@ -98,7 +98,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
   /// @dev Only callable by the owner
   /// @param onRamps A list of onRamps and their new permission status
   /// @param offRamps A list of offRamps and their new permission status
-  function applyRampUpdates(RampUpdate[] memory onRamps, RampUpdate[] memory offRamps) public virtual onlyOwner {
+  function applyRampUpdates(RampUpdate[] calldata onRamps, RampUpdate[] calldata offRamps) external virtual onlyOwner {
     for (uint256 i = 0; i < onRamps.length; ++i) {
       RampUpdate memory update = onRamps[i];
 
@@ -127,14 +127,14 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentRateLimiterState() public view returns (RateLimiter.TokenBucket memory) {
+  function currentRateLimiterState() external view returns (RateLimiter.TokenBucket memory) {
     return s_rateLimiter._currentTokenBucketState();
   }
 
   /// @notice Sets the rate limited config.
   /// @param config The new rate limiter config.
   /// @dev should only be callable by the owner or token limit admin.
-  function setRateLimiterConfig(RateLimiter.Config memory config) public onlyOwner {
+  function setRateLimiterConfig(RateLimiter.Config memory config) external onlyOwner {
     s_rateLimiter._setTokenBucketConfig(config);
   }
 

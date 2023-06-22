@@ -251,7 +251,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     // Apply egress updates.
     // We permit zero address as way to disable egress.
     for (uint256 i = 0; i < onRampUpdates.length; ++i) {
-      OnRamp calldata onRampUpdate = onRampUpdates[i];
+      OnRamp memory onRampUpdate = onRampUpdates[i];
       s_onRamps[onRampUpdate.destChainSelector] = onRampUpdate.onRamp;
       emit OnRampSet(onRampUpdate.destChainSelector, onRampUpdate.onRamp);
     }

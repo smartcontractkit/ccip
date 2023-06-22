@@ -1134,6 +1134,11 @@ contract EVM2EVMOffRamp_getDestinationToken is EVM2EVMOffRampSetup {
 
     assertEq(expectedToken, actualToken);
   }
+
+  function testUnsupportedTokenReverts() public {
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.UnsupportedToken.selector, DUMMY_CONTRACT_ADDRESS));
+    s_offRamp.getDestinationToken(IERC20(DUMMY_CONTRACT_ADDRESS));
+  }
 }
 
 contract EVM2EVMOffRamp_getDestinationTokens is EVM2EVMOffRampSetup {

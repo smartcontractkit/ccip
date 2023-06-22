@@ -18,9 +18,8 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   error NonUniqueSignatures();
   error OracleCannotBeZeroAddress();
 
-  // Storing these fields used on the hot path in a ConfigInfo variable reduces the
-  // retrieval of all of them to a single SLOAD. If any further fields are
-  // added, make sure that storage of the struct still takes at most 32 bytes.
+  // Packing these fields used on the hot path in a ConfigInfo variable reduces the
+  // retrieval of all of them to a minimum number of SLOADs.
   struct ConfigInfo {
     bytes32 latestConfigDigest;
     uint8 f;
@@ -277,5 +276,5 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
     return (true, bytes32(0), uint32(0));
   }
 
-  function _report(bytes memory report, uint40 epochAndRound) internal virtual;
+  function _report(bytes calldata report, uint40 epochAndRound) internal virtual;
 }

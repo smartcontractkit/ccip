@@ -52,14 +52,14 @@ contract AggregateRateLimiter is OwnerIsCreator {
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentRateLimiterState() public view returns (RateLimiter.TokenBucket memory) {
+  function currentRateLimiterState() external view returns (RateLimiter.TokenBucket memory) {
     return s_rateLimiter._currentTokenBucketState();
   }
 
   /// @notice Sets the rate limited config.
   /// @param config The new rate limiter config.
   /// @dev should only be callable by the owner or token limit admin.
-  function setRateLimiterConfig(RateLimiter.Config memory config) public requireAdminOrOwner {
+  function setRateLimiterConfig(RateLimiter.Config memory config) external requireAdminOrOwner {
     s_rateLimiter._setTokenBucketConfig(config);
   }
 
@@ -69,14 +69,14 @@ contract AggregateRateLimiter is OwnerIsCreator {
 
   /// @notice Gets the token limit admin address.
   /// @return the token limit admin address.
-  function getTokenLimitAdmin() public view returns (address) {
+  function getTokenLimitAdmin() external view returns (address) {
     return s_admin;
   }
 
   /// @notice Sets the token limit admin address.
   /// @param newAdmin the address of the new admin.
   /// @dev setting this to address(0) indicates there is no active admin.
-  function setAdmin(address newAdmin) public requireAdminOrOwner {
+  function setAdmin(address newAdmin) external requireAdminOrOwner {
     s_admin = newAdmin;
     emit AdminSet(newAdmin);
   }
