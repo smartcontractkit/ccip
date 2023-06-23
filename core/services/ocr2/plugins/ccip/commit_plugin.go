@@ -182,7 +182,7 @@ func getSeqNumFromLog(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) func(log l
 
 // CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
 // sequence numbers of the committed messages will be added to tx metadata
-func CommitReportToEthTxMeta(report []byte) (*txmgr.EvmTxMeta, error) {
+func CommitReportToEthTxMeta(report []byte) (*txmgr.TxMeta, error) {
 	commitReport, err := abihelpers.DecodeCommitReport(report)
 	if err != nil {
 		return nil, err
@@ -192,7 +192,7 @@ func CommitReportToEthTxMeta(report []byte) (*txmgr.EvmTxMeta, error) {
 	for i := 0; i < n; i++ {
 		seqRange[i] = uint64(i) + commitReport.Interval.Min
 	}
-	return &txmgr.EvmTxMeta{
+	return &txmgr.TxMeta{
 		SeqNumbers: seqRange,
 	}, nil
 }

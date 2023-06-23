@@ -95,7 +95,6 @@ func (r *EvmRegistry) feedLookup(ctx context.Context, upkeepResults []EVMAutomat
 			r.lggr.Errorf("[FeedLookup] upkeep %s block %d NOT allowed to time Mercury server", upkeepId, block)
 			continue
 		}
-		r.lggr.Debugf("[FeedLookup] upkeep %s block %d perform data: %v", upkeepId, block, upkeepResults[i].PerformData)
 
 		feedLookup, err := r.decodeFeedLookup(upkeepResults[i].PerformData)
 		if err != nil {
@@ -106,8 +105,7 @@ func (r *EvmRegistry) feedLookup(ctx context.Context, upkeepResults []EVMAutomat
 
 		values, retryable, err := r.doMercuryRequest(ctx, feedLookup, upkeepId)
 		if err != nil {
-			r.lggr.Errorf("[FeedLookup] upkeep %s block %d doMercuryRequest: %v", upkeepId, block, err)
-			r.lggr.Infof("[FeedLookup] upkeep %s block %d retryable: %s", upkeepId, block, retryable)
+			r.lggr.Errorf("[FeedLookup] upkeep %s block %d retryable %v doMercuryRequest: %v", upkeepId, block, retryable, err)
 			upkeepResults[i].Retryable = retryable
 			continue
 		}
@@ -119,13 +117,11 @@ func (r *EvmRegistry) feedLookup(ctx context.Context, upkeepResults []EVMAutomat
 			continue
 		}
 
-		r.lggr.Infof("FeedLookup checkCallback b=%v", mercuryBytes)
-		needed, performData, failureReason, gasUsed, err := r.packer.UnpackCheckCallbackResult(mercuryBytes)
+		needed, performData, failureReason, _, err := r.packer.UnpackCheckCallbackResult(mercuryBytes)
 		if err != nil {
 			r.lggr.Errorf("[FeedLookup] upkeep %s block %d UnpackCheckCallbackResult err: %v", upkeepId, block, err)
 			continue
 		}
-		r.lggr.Debugf("[FeedLookup] upkeep %s block %d needed %v\nperformData: %v\nfailureReason: %d\ngasUsed: %s\nperformData: %s", upkeepId, block, needed, performData, failureReason, gasUsed.String(), hexutil.Encode(performData))
 
 		if int(failureReason) == UPKEEP_FAILURE_REASON_MERCURY_CALLBACK_REVERTED {
 			upkeepResults[i].FailureReason = UPKEEP_FAILURE_REASON_MERCURY_CALLBACK_REVERTED
@@ -156,15 +152,15 @@ func (r *EvmRegistry) allowedToUseMercury(opts *bind.CallOpts, upkeepId *big.Int
 		return allowed.(bool), nil
 	}
 
-	cfg, err := r.registry.GetUpkeepAdminOffchainConfig(opts, upkeepId)
+	cfg, err := r.registry.GetUpkeepPrivilegeConfig(opts, upkeepId)
 	if err != nil {
-		return false, fmt.Errorf("failed to get upkeep admin offchain config for upkeep ID %s: %v", upkeepId, err)
+		return false, fmt.Errorf("failed to get upkeep privilege config for upkeep ID %s: %v", upkeepId, err)
 	}
 
 	var a AdminOffchainConfig
 	err = json.Unmarshal(cfg, &a)
 	if err != nil {
-		return false, fmt.Errorf("failed to unmarshal admin offchain config for upkeep ID %s: %v", upkeepId, err)
+		return false, fmt.Errorf("failed to unmarshal privilege config for upkeep ID %s: %v", upkeepId, err)
 	}
 	r.mercury.allowListCache.Set(upkeepId.String(), a.MercuryEnabled, cache.DefaultExpiration)
 	return a.MercuryEnabled, nil

@@ -283,7 +283,7 @@ func unregisterExecutionPluginLpFilters(
 
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
 // all the message ids will be added to the tx metadata.
-func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EvmTxMeta, error) {
+func ExecutionReportToEthTxMeta(report []byte) (*txmgr.TxMeta, error) {
 	execReport, err := abihelpers.DecodeExecutionReport(report)
 
 	if err != nil {
@@ -295,7 +295,7 @@ func ExecutionReportToEthTxMeta(report []byte) (*txmgr.EvmTxMeta, error) {
 		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
 	}
 
-	return &txmgr.EvmTxMeta{
+	return &txmgr.TxMeta{
 		MessageIDs: msgIDs,
 	}, nil
 }

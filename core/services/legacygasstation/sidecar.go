@@ -98,7 +98,7 @@ func (sc *Sidecar) Run(ctx context.Context) error {
 	}
 
 	// we only care about logs that have passed finality depth
-	toBlock := latestBlock - int64(sc.cfg.EvmFinalityDepth())
+	toBlock := latestBlock - int64(sc.cfg.FinalityDepth())
 	if toBlock < 0 {
 		return errors.Errorf("negative toBlock: %d", toBlock)
 	}

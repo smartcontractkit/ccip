@@ -62,7 +62,7 @@ type RequestHandler struct {
 	forwarder         forwarder.ForwarderInterface
 	chainID           uint64
 	ccipChainSelector uint64
-	txm               txmgr.EvmTxManager
+	txm               txmgr.TxManager
 	domainTypeHash    common.Hash
 	typeHash          common.Hash
 	gethks            keystore.Eth
@@ -81,7 +81,7 @@ func NewRequestHandler(
 	forwarder forwarder.ForwarderInterface,
 	chainID uint64,
 	ccipChainSelector uint64,
-	txm txmgr.EvmTxManager,
+	txm txmgr.TxManager,
 	gethks keystore.Eth,
 	q pg.Q,
 	job job.Job,
@@ -206,7 +206,7 @@ func (rh *RequestHandler) SendTransaction(ctx *gin.Context, req types.SendTransa
 	// Creation of eth transaction and persistence of data are done in a transaction
 	// to avoid partial failures, which would leave the persistence layer in inconsistent state
 	err = rh.q.Transaction(func(tx pg.Queryer) error {
-		ethTx, err2 := rh.txm.CreateTransaction(txmgr.EvmTxRequest{
+		ethTx, err2 := rh.txm.CreateTransaction(txmgr.TxRequest{
 			FromAddress:    fromAddress,
 			ToAddress:      rh.forwarder.Address(),
 			EncodedPayload: payload,
@@ -288,7 +288,7 @@ func (rh *RequestHandler) executePipline(ctx *gin.Context, l logger.Logger, payl
 			"databaseID":    rh.jb.ID,
 			"externalJobID": rh.jb.ExternalJobID,
 			"name":          rh.jb.Name.ValueOrZero(),
-			"maxGasPrice":   rh.cfg.EvmMaxGasPriceWei().ToInt().String(),
+			"maxGasPrice":   rh.cfg.PriceMax().ToInt().String(),
 		},
 		"jobRun": map[string]interface{}{
 			"payload": payload[:],
@@ -317,7 +317,7 @@ func (rh *RequestHandler) executePipline(ctx *gin.Context, l logger.Logger, payl
 		}
 	}
 
-	gas := rh.cfg.EvmGasLimitDefault()
+	gas := rh.cfg.LimitDefault()
 	for _, trr := range trrs {
 		if trr.Task.Type() == pipeline.TaskTypeEstimateGasLimit {
 			gas = trr.Result.Value.(uint32)
