@@ -42,8 +42,7 @@ contract USDCTokenPool is TokenPool {
   // The local USDC config
   USDCConfig private s_config;
 
-  // The unique USDC pool flag to signal through EIP 165 that
-  // this is a USDC token pool.
+  // The unique USDC pool flag to signal through EIP 165 that this is a USDC token pool.
   bytes4 private constant USDC_INTERFACE_ID = bytes4(keccak256("USDC"));
 
   // A domain is a USDC representation of a chain.
@@ -66,14 +65,14 @@ contract USDCTokenPool is TokenPool {
     i_token.approve(config.tokenMessenger, type(uint256).max);
   }
 
-  // @inheritdoc
-  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
-    return interfaceId == USDC_INTERFACE_ID || super.supportsInterface(interfaceId);
-  }
-
   /// @notice returns the USDC interface flag used for EIP165 identification.
   function getUSDCInterfaceId() public pure returns (bytes4) {
     return USDC_INTERFACE_ID;
+  }
+
+  // @inheritdoc IERC165
+  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
+    return interfaceId == USDC_INTERFACE_ID || super.supportsInterface(interfaceId);
   }
 
   /// @notice Burn the token in the pool

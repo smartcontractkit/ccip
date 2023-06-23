@@ -20,6 +20,9 @@ contract LockReleaseTokenPool is TokenPool {
   error InsufficientLiquidity();
   error WithdrawalTooHigh();
 
+  // The unique lock release pool flag to signal through EIP 165.
+  bytes4 private constant LOCK_RELEASE_INTERFACE_ID = bytes4(keccak256("LockReleaseTokenPool"));
+
   mapping(address provider => uint256 balance) internal s_liquidityProviderBalances;
 
   constructor(
@@ -57,6 +60,16 @@ contract LockReleaseTokenPool is TokenPool {
     _consumeRateLimit(amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, amount);
+  }
+
+  /// @notice returns the lock release interface flag used for EIP165 identification.
+  function getLockReleaseInterfaceId() public pure returns (bytes4) {
+    return LOCK_RELEASE_INTERFACE_ID;
+  }
+
+  // @inheritdoc IERC165
+  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
+    return interfaceId == LOCK_RELEASE_INTERFACE_ID || super.supportsInterface(interfaceId);
   }
 
   /// @notice Gets the amount of provided liquidity for a given address.

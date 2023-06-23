@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
+import {IPool} from "../../interfaces/pools/IPool.sol";
+
 import "../BaseTest.t.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
+
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/IERC165.sol";
 
 contract LockReleaseTokenPoolSetup is BaseTest {
   IERC20 internal s_token;
@@ -167,5 +171,13 @@ contract LockReleaseTokenPool_removeLiquidity is LockReleaseTokenPoolSetup {
 
     vm.expectRevert(LockReleaseTokenPool.InsufficientLiquidity.selector);
     s_lockReleaseTokenPool.removeLiquidity(1);
+  }
+}
+
+contract LockReleaseTokenPool_supportsInterface is LockReleaseTokenPoolSetup {
+  function testRemoveLiquiditySuccess(uint256 amount) public {
+    assertTrue(s_lockReleaseTokenPool.supportsInterface(s_lockReleaseTokenPool.getLockReleaseInterfaceId()));
+    assertTrue(s_lockReleaseTokenPool.supportsInterface(type(IPool).interfaceId));
+    assertTrue(s_lockReleaseTokenPool.supportsInterface(type(IERC165).interfaceId));
   }
 }
