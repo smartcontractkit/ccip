@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/chainlink-env/chaos"
 	"github.com/smartcontractkit/wasp"
@@ -155,6 +156,7 @@ func (l *loadArgs) Start() {
 	go func() {
 		defer l.LoadStarterWg.Done()
 		loadCount := 0
+		namespace := fmt.Sprintf("Existing-Deployment-%s", uuid.NewString()[0:5])
 		for {
 			select {
 			case cfg := <-l.LaneLoadCfg:
@@ -167,8 +169,7 @@ func (l *loadArgs) Start() {
 
 				schedule := cfg.schedule
 				ccipLoad := NewCCIPLoad(l.TestCfg.Test, lane, l.TestCfg.PhaseTimeout, 100000, lane.Reports)
-				ccipLoad.BeforeAllCall(testsetups.DataOnlyTransfer)
-				var namespace string
+				ccipLoad.BeforeAllCall(l.TestCfg.MsgType)
 				if lane.TestEnv != nil && lane.TestEnv.K8Env != nil && lane.TestEnv.K8Env.Cfg != nil {
 					namespace = lane.TestEnv.K8Env.Cfg.Namespace
 				}

@@ -41,8 +41,8 @@ const (
 	DefaultNoOfNetworks             int    = 2
 	DefaultLoadRPS                  int64  = 2
 	DefaultLoadTimeOut                     = 30 * time.Minute
-	DefaultPhaseTimeoutForLongTests        = 30 * time.Minute
-	DefaultPhaseTimeout                    = 5 * time.Minute
+	DefaultPhaseTimeoutForLongTests        = 50 * time.Minute
+	DefaultPhaseTimeout                    = 10 * time.Minute
 	DefaultTestDuration                    = 10 * time.Minute
 )
 
@@ -630,7 +630,7 @@ func CCIPDefaultTestSetUp(
 				Test:            t,
 			})
 		err = k8Env.Run()
-		require.NoErrorf(t, err, "error creating environment remote runner %s", k8Env.Cfg.Namespace)
+		require.NoErrorf(t, err, "error creating environment remote runner")
 		setUpArgs.Env = ccipEnv
 		if k8Env.WillUseRemoteRunner() {
 			return setUpArgs

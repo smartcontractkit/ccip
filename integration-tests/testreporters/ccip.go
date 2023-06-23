@@ -20,28 +20,38 @@ type Phase string
 type Status string
 
 const (
-	E2E              Phase  = "CommitAndExecute"
-	TX               Phase  = "CCIP-Send Transaction"
-	CCIPSendRe       Phase  = "CCIPSendRequested"
-	Commit           Phase  = "Commit-ReportAccepted"
-	ExecStateChanged Phase  = "ExecutionStateChanged"
-	Success          Status = "✅"
-	Failure          Status = "❌"
-	slackFile        string = "payload_ccip.json"
+	E2E                Phase  = "CommitAndExecute"
+	TX                 Phase  = "CCIP-Send Transaction"
+	CCIPSendRe         Phase  = "CCIPSendRequested"
+	SourceLogFinalized Phase  = "SourceLogFinalizedTentatively"
+	Commit             Phase  = "Commit-ReportAccepted"
+	ExecStateChanged   Phase  = "ExecutionStateChanged"
+	ReportBlessed      Phase  = "ReportBlessedByARM"
+	Success            Status = "✅"
+	Failure            Status = "❌"
+	slackFile          string = "payload_ccip.json"
 )
 
-type DurationStat struct {
+type AggregatorMetrics struct {
 	Min   float64 `json:"min_duration_for_successful_requests(s),omitempty"`
 	Max   float64 `json:"max_duration_for_successful_requests(s),omitempty"`
 	Avg   float64 `json:"avg_duration_for_successful_requests(s),omitempty"`
 	sum   float64
 	count int
 }
+type SendTransactionStats struct {
+	Fee                string `json:"fee,omitempty"`
+	GasUsed            uint64 `json:"gas_used,omitempty"`
+	TxHash             string `json:"tx_hash,omitempty"`
+	NoOfTokensSent     int    `json:"no_of_tokens_sent,omitempty"`
+	MessageBytesLength int    `json:"message_bytes_length,omitempty"`
+}
 
 type PhaseStat struct {
-	SeqNum   uint64  `json:"seq_num,omitempty"`
-	Duration float64 `json:"duration,omitempty"`
-	Status   Status  `json:"success"`
+	SeqNum               uint64               `json:"seq_num,omitempty"`
+	Duration             float64              `json:"duration,omitempty"`
+	Status               Status               `json:"success"`
+	SendTransactionStats SendTransactionStats `json:"ccip_send_data,omitempty"`
 }
 
 type CCIPLaneStats struct {
@@ -50,7 +60,7 @@ type CCIPLaneStats struct {
 	TotalRequests           int64                         `json:"total_requests,omitempty"`              // TotalRequests is the total number of requests made
 	SuccessCountsByPhase    map[Phase]int64               `json:"success_counts_by_phase,omitempty"`     // SuccessCountsByPhase is the number of requests that succeeded in each phase
 	FailedCountsByPhase     map[Phase]int64               `json:"failed_counts_by_phase,omitempty"`      // FailedCountsByPhase is the number of requests that failed in each phase
-	DurationStatByPhase     map[Phase]DurationStat        `json:"duration_stat_by_phase,omitempty"`      // DurationStatByPhase is the duration statistics for each phase
+	DurationStatByPhase     map[Phase]AggregatorMetrics   `json:"duration_stat_by_phase,omitempty"`      // DurationStatByPhase is the duration statistics for each phase
 	StatusByPhaseByRequests map[int64]map[Phase]PhaseStat `json:"status_by_phase_by_requests,omitempty"` // StatusByPhaseByRequests is the status of each phase for each request
 	mu                      *sync.Mutex
 }
@@ -61,7 +71,7 @@ func (testStats *CCIPLaneStats) GetPhaseStatsForRequest(reqNo int64) map[Phase]P
 	return testStats.StatusByPhaseByRequests[reqNo]
 }
 
-func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, step Phase, duration time.Duration, state Status) {
+func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, step Phase, duration time.Duration, state Status, sendTransactionStats ...SendTransactionStats) {
 	testStats.mu.Lock()
 	defer testStats.mu.Unlock()
 	durationInSec := duration.Seconds()
@@ -69,11 +79,16 @@ func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, ste
 		testStats.StatusByPhaseByRequests[reqNo] = make(map[Phase]PhaseStat)
 	}
 
-	testStats.StatusByPhaseByRequests[reqNo][step] = PhaseStat{
+	stat := PhaseStat{
 		SeqNum:   seqNum,
 		Duration: durationInSec,
 		Status:   state,
 	}
+	if len(sendTransactionStats) > 0 {
+		stat.SendTransactionStats = sendTransactionStats[0]
+	}
+
+	testStats.StatusByPhaseByRequests[reqNo][step] = stat
 	event := testStats.lggr.Info()
 	if seqNum != 0 {
 		event.Uint64("seq num", seqNum)
@@ -93,8 +108,8 @@ func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, ste
 	} else {
 		event.Str(fmt.Sprint(step), fmt.Sprintf("%s", Success)).Msgf("reqNo %d", reqNo)
 		testStats.SuccessCountsByPhase[step]++
-		testStats.consolidateDuration(step, durationInSec)
-		if step == Commit || step == ExecStateChanged {
+		testStats.Aggregate(step, durationInSec)
+		if step == Commit || step == ReportBlessed || step == ExecStateChanged {
 			testStats.StatusByPhaseByRequests[reqNo][E2E] = PhaseStat{
 				SeqNum:   seqNum,
 				Status:   state,
@@ -105,15 +120,15 @@ func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, ste
 					Str(fmt.Sprint(E2E), fmt.Sprintf("%s", Success)).
 					Msgf("reqNo %d", reqNo)
 				testStats.SuccessCountsByPhase[E2E]++
-				testStats.consolidateDuration(E2E, testStats.StatusByPhaseByRequests[reqNo][E2E].Duration)
+				testStats.Aggregate(E2E, testStats.StatusByPhaseByRequests[reqNo][E2E].Duration)
 			}
 		}
 	}
 }
 
-func (testStats *CCIPLaneStats) consolidateDuration(phase Phase, durationInSec float64) {
+func (testStats *CCIPLaneStats) Aggregate(phase Phase, durationInSec float64) {
 	if prevDur, ok := testStats.DurationStatByPhase[phase]; !ok {
-		testStats.DurationStatByPhase[phase] = DurationStat{
+		testStats.DurationStatByPhase[phase] = AggregatorMetrics{
 			Min:   durationInSec,
 			Max:   durationInSec,
 			sum:   durationInSec,
@@ -135,7 +150,7 @@ func (testStats *CCIPLaneStats) consolidateDuration(phase Phase, durationInSec f
 func (testStats *CCIPLaneStats) Finalize(lane string) {
 	testStats.mu.Lock()
 	defer testStats.mu.Unlock()
-	phases := []Phase{E2E, TX, CCIPSendRe, Commit, ExecStateChanged}
+	phases := []Phase{E2E, TX, CCIPSendRe, SourceLogFinalized, Commit, ReportBlessed, ExecStateChanged}
 	events := make(map[Phase]*zerolog.Event)
 	for reqNo := range testStats.StatusByPhaseByRequests {
 		if reqNo > testStats.TotalRequests {
@@ -146,7 +161,7 @@ func (testStats *CCIPLaneStats) Finalize(lane string) {
 	for _, phase := range phases {
 		events[phase] = testStats.lggr.Info().Str("Phase", string(phase))
 		if phaseStat, ok := testStats.DurationStatByPhase[phase]; ok {
-			testStats.DurationStatByPhase[phase] = DurationStat{
+			testStats.DurationStatByPhase[phase] = AggregatorMetrics{
 				Min: phaseStat.Min,
 				Max: phaseStat.Max,
 				Avg: phaseStat.sum / float64(phaseStat.count),
@@ -307,7 +322,7 @@ func (r *CCIPTestReporter) AddNewLane(name string, lggr zerolog.Logger) *CCIPLan
 		lggr:                    lggr,
 		FailedCountsByPhase:     make(map[Phase]int64),
 		SuccessCountsByPhase:    make(map[Phase]int64),
-		DurationStatByPhase:     make(map[Phase]DurationStat),
+		DurationStatByPhase:     make(map[Phase]AggregatorMetrics),
 		StatusByPhaseByRequests: make(map[int64]map[Phase]PhaseStat),
 		mu:                      &sync.Mutex{},
 	}

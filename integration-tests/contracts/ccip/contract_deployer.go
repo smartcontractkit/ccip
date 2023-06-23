@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
@@ -139,25 +140,18 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployARMContract() (*ARM, error) {
-	address, _, instance, err := e.evmClient.DeployContract("Mock ARM Contract", func(
+func (e *CCIPContractsDeployer) DeployMockARMContract() (*common.Address, error) {
+	address, _, _, err := e.evmClient.DeployContract("Mock ARM Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
 		return mock_arm_contract.DeployMockARMContract(auth, backend)
 	})
-	if err != nil {
-		return nil, err
-	}
-	return &ARM{
-		client:     e.evmClient,
-		instance:   instance.(*mock_arm_contract.MockARMContract),
-		EthAddress: *address,
-	}, err
+	return address, err
 }
 
 func (e *CCIPContractsDeployer) NewARMContract(addr common.Address) (*ARM, error) {
-	arm, err := mock_arm_contract.NewMockARMContract(addr, e.evmClient.Backend())
+	arm, err := arm_contract.NewARMContract(addr, e.evmClient.Backend())
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +164,7 @@ func (e *CCIPContractsDeployer) NewARMContract(addr common.Address) (*ARM, error
 
 	return &ARM{
 		client:     e.evmClient,
-		instance:   arm,
+		Instance:   arm,
 		EthAddress: addr,
 	}, err
 }

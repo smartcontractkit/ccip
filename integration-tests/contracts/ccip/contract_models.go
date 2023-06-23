@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/networks"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
@@ -62,7 +63,12 @@ func (l *LinkToken) Approve(to string, amount *big.Int) error {
 	if err != nil {
 		return err
 	}
-	opts.GasLimit = 100000
+	opts.GasLimit = 500000
+	chain := l.client.GetNetworkConfig().Name
+	if chain == networks.ArbitrumGoerli.Name || chain == networks.ArbitrumMainnet.Name {
+		opts.GasLimit = 100000000
+	}
+
 	log.Info().
 		Str("From", l.client.GetDefaultWallet().Address()).
 		Str("To", to).
@@ -204,7 +210,13 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 
 type ARM struct {
 	client     blockchain.EVMClient
-	instance   *mock_arm_contract.MockARMContract
+	Instance   *arm_contract.ARMContract
+	EthAddress common.Address
+}
+
+type MockARM struct {
+	client     blockchain.EVMClient
+	Instance   *mock_arm_contract.MockARMContract
 	EthAddress common.Address
 }
 
@@ -392,9 +404,9 @@ func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMess
 	if valueForNative != nil {
 		opts.Value = valueForNative
 	}
-	opts.GasLimit = 500000
+	opts.GasLimit = 600000
 	chain := r.client.GetNetworkConfig().Name
-	if chain == networks.ArbitrumGoerli.Name {
+	if chain == networks.ArbitrumGoerli.Name || chain == networks.ArbitrumMainnet.Name {
 		opts.GasLimit = 100000000
 	}
 

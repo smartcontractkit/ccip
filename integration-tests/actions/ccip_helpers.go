@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
@@ -56,6 +57,9 @@ const (
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
 	RootSnoozeTimeSimulated       = 1 * time.Minute
 	InflightExpirySimulated       = 1 * time.Minute
+	DefaultFinalityTimeOnChain    = 10 * time.Minute
+	// we keep the finality timeout high as it's out of our control
+	FinalityTimeout = 1 * time.Hour
 )
 
 type CCIPTOMLEnv struct {
@@ -115,21 +119,23 @@ var (
 )
 
 type CCIPCommon struct {
-	ChainClient        blockchain.EVMClient
-	Deployer           *ccip.CCIPContractsDeployer
-	FeeToken           *ccip.LinkToken
-	FeeTokenPool       *ccip.LockReleaseTokenPool
-	BridgeTokens       []*ccip.LinkToken // as of now considering the bridge token is same as link token
-	TokenPrices        []*big.Int
-	BridgeTokenPools   []*ccip.LockReleaseTokenPool
-	RateLimiterConfig  ccip.RateLimiterConfig
-	ARM                *ccip.ARM
-	Router             *ccip.Router
-	PriceRegistry      *ccip.PriceRegistry
-	WrappedNative      common.Address
-	ExistingDeployment bool
-	deploy             *errgroup.Group
-	poolFunds          *big.Int
+	ChainClient         blockchain.EVMClient
+	Deployer            *ccip.CCIPContractsDeployer
+	FeeToken            *ccip.LinkToken
+	FeeTokenPool        *ccip.LockReleaseTokenPool
+	BridgeTokens        []*ccip.LinkToken // as of now considering the bridge token is same as link token
+	TokenPrices         []*big.Int
+	BridgeTokenPools    []*ccip.LockReleaseTokenPool
+	RateLimiterConfig   ccip.RateLimiterConfig
+	ARMContract         *common.Address
+	ARM                 *ccip.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events
+	Router              *ccip.Router
+	PriceRegistry       *ccip.PriceRegistry
+	WrappedNative       common.Address
+	ExistingDeployment  bool
+	deploy              *errgroup.Group
+	poolFunds           *big.Int
+	FinalityTimeOnChain time.Duration
 }
 
 func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blockchain.EVMClient, existingDeployment bool) *CCIPCommon {
@@ -144,7 +150,7 @@ func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blo
 		})
 	}
 	grp, _ := errgroup.WithContext(ctx)
-	return &CCIPCommon{
+	c := &CCIPCommon{
 		ChainClient: chainClient,
 		Deployer:    nil,
 		FeeToken: &ccip.LinkToken{
@@ -158,16 +164,21 @@ func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blo
 		TokenPrices:       ccipModule.TokenPrices,
 		BridgeTokenPools:  pools,
 		RateLimiterConfig: ccipModule.RateLimiterConfig,
-		ARM: &ccip.ARM{
-			EthAddress: ccipModule.ARM.EthAddress,
-		},
+		ARMContract:       ccipModule.ARMContract,
 		Router: &ccip.Router{
 			EthAddress: ccipModule.Router.EthAddress,
 		},
-		WrappedNative: ccipModule.WrappedNative,
-		deploy:        grp,
-		poolFunds:     ccipModule.poolFunds,
+		WrappedNative:       ccipModule.WrappedNative,
+		deploy:              grp,
+		poolFunds:           ccipModule.poolFunds,
+		FinalityTimeOnChain: ccipModule.FinalityTimeOnChain,
 	}
+	if ccipModule.ARM != nil {
+		c.ARM = &ccip.ARM{
+			EthAddress: ccipModule.ARM.EthAddress,
+		}
+	}
+	return c
 }
 
 func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig) {
@@ -182,6 +193,9 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 				EthAddress: common.HexToAddress("0x0"),
 			}
 		}
+		if conf.TimeToReachFinality > 0 {
+			ccipModule.FinalityTimeOnChain = conf.TimeToReachFinality
+		}
 
 		if common.IsHexAddress(conf.FeeTokenPool) {
 			ccipModule.FeeTokenPool = &ccip.LockReleaseTokenPool{
@@ -194,8 +208,12 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 			}
 		}
 		if common.IsHexAddress(conf.ARM) {
-			ccipModule.ARM = &ccip.ARM{
-				EthAddress: common.HexToAddress(conf.ARM),
+			addr := common.HexToAddress(conf.ARM)
+			ccipModule.ARMContract = &addr
+			if !conf.IsMockARM {
+				ccipModule.ARM = &ccip.ARM{
+					EthAddress: addr,
+				}
 			}
 		}
 		if common.IsHexAddress(conf.PriceRegistry) {
@@ -234,43 +252,23 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 // ApproveTokens approve tokens for router - usually a massive amount of tokens enough to cover all the ccip transfers
 // to be triggered by the test
 func (ccipModule *CCIPCommon) ApproveTokens() error {
+	isApproved := false
 	for _, token := range ccipModule.BridgeTokens {
-		bal, err := token.BalanceOf(context.Background(), ccipModule.Router.Address())
+		err := token.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		if bal.Cmp(ApprovedAmountToRouter) >= 0 {
-			continue
-		}
-		err = token.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
-		if err != nil {
-			return errors.WithStack(err)
+		if token.EthAddress == ccipModule.FeeToken.EthAddress {
+			isApproved = true
 		}
 	}
 	if ccipModule.FeeToken.EthAddress != common.HexToAddress("0x0") {
-		isApproved := false
-		for _, token := range ccipModule.BridgeTokens {
-			if token.EthAddress == ccipModule.FeeToken.EthAddress {
-				isApproved = true
-				break
-			}
-		}
-		bal, err := ccipModule.FeeToken.BalanceOf(context.Background(), ccipModule.Router.Address())
-		if err != nil {
-			return errors.WithStack(err)
-		}
 		if !isApproved {
-			if bal.Cmp(ApprovedFeeAmountToRouter) >= 0 {
-				return nil
-			}
-			err = ccipModule.FeeToken.Approve(ccipModule.Router.Address(), ApprovedFeeAmountToRouter)
+			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), ApprovedFeeAmountToRouter)
 			if err != nil {
 				return errors.WithStack(err)
 			}
 		} else {
-			if bal.Cmp(new(big.Int).Add(ApprovedAmountToRouter, ApprovedFeeAmountToRouter)) >= 0 {
-				return nil
-			}
 			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), new(big.Int).Add(ApprovedAmountToRouter, ApprovedFeeAmountToRouter))
 			if err != nil {
 				return errors.WithStack(err)
@@ -305,6 +303,26 @@ func (ccipModule *CCIPCommon) CleanUp() error {
 		}
 	}
 	return nil
+}
+
+func (ccipModule *CCIPCommon) FinalityTime(done chan<- struct{}) {
+	defer func() {
+		done <- struct{}{}
+	}()
+	if ccipModule.FinalityTimeOnChain > 0 {
+		return
+	}
+	if ccipModule.ChainClient.NetworkSimulated() {
+		ccipModule.FinalityTimeOnChain = time.Second
+		return
+	}
+	var err error
+	ccipModule.FinalityTimeOnChain, err = ccipModule.ChainClient.EstimatedFinalizationTime(context.Background())
+	if err != nil {
+		log.Info().Str("default Finality", fmt.Sprintf("%s", DefaultFinalityTimeOnChain)).
+			Msgf("error in getting finality time %+v. Setting default finality time", err)
+		ccipModule.FinalityTimeOnChain = DefaultFinalityTimeOnChain
+	}
 }
 
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
@@ -397,18 +415,19 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	for range ccipModule.BridgeTokens {
 		ccipModule.TokenPrices = append(ccipModule.TokenPrices, big.NewInt(1))
 	}
-	if ccipModule.ARM == nil {
-		ccipModule.ARM, err = cd.DeployARMContract()
-		if err != nil {
-			return fmt.Errorf("deploying ARM shouldn't fail %+v", err)
-		}
-	} else {
+	if ccipModule.ARM != nil {
 		arm, err := cd.NewARMContract(ccipModule.ARM.EthAddress)
 		if err != nil {
 			return fmt.Errorf("getting new ARM contract shouldn't fail %+v", err)
 		}
 		ccipModule.ARM = arm
+	} else {
+		// deploy a mock ARM contract
+		if ccipModule.ARMContract == nil {
+			ccipModule.ARMContract, err = cd.DeployMockARMContract()
+		}
 	}
+
 	if ccipModule.Router == nil {
 		weth9addr, err := cd.DeployWrappedNative()
 		if err != nil {
@@ -607,7 +626,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			destChainSelector,
 			[]common.Address{},
 			tokensAndPools,
-			sourceCCIP.Common.ARM.EthAddress,
+			*sourceCCIP.Common.ARMContract,
 			sourceCCIP.Common.Router.EthAddress,
 			sourceCCIP.Common.PriceRegistry.EthAddress,
 			sourceCCIP.Common.RateLimiterConfig,
@@ -760,6 +779,52 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 		})
 	}
 }
+func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
+	lggr zerolog.Logger,
+	reqNo int64,
+	seqNum uint64,
+	SendRequested *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
+	prevEventAt time.Time,
+	reports *testreporters.CCIPLaneStats,
+) (time.Time, error) {
+	if sourceCCIP.Common.ChainClient.NetworkSimulated() {
+		return prevEventAt, nil
+	}
+	lggr.Info().
+		Str("Estimated Finality time", fmt.Sprintf("%s", sourceCCIP.Common.FinalityTimeOnChain)).
+		Msg("Waiting for CCIPSendRequested event log to be finalized")
+	hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(SendRequested.Raw.BlockNumber)))
+	if err != nil {
+		return time.Time{}, err
+	}
+	// poll for finalized block after estimated finality time
+	ticker := time.NewTicker(sourceCCIP.Common.FinalityTimeOnChain)
+	defer ticker.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), FinalityTimeout)
+	defer cancel()
+	for {
+		select {
+		case <-ticker.C:
+			finalizedHdr, err := sourceCCIP.Common.ChainClient.GetLatestFinalizedBlockHeader(context.Background())
+			if err != nil {
+				return time.Time{}, err
+			}
+			if finalizedHdr.Number.Cmp(hdr.Number) >= 0 {
+				finalizedAt := time.Unix(int64(finalizedHdr.Time), 0)
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(prevEventAt), testreporters.Success)
+				return finalizedAt, nil
+			} else {
+				lggr.Info().
+					Str("Finalized Block", finalizedHdr.Number.String()).
+					Str("Tx block", hdr.Number.String()).
+					Msg("Still Waiting for CCIPSendRequested event log to be finalized")
+			}
+		case <-ctx.Done():
+			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
+			return time.Time{}, fmt.Errorf("timeout waiting for CCIPSendRequested event log to be finalized")
+		}
+	}
+}
 
 func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 	lggr zerolog.Logger,
@@ -768,7 +833,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 	timeout time.Duration,
 	prevEventAt time.Time,
 	reports *testreporters.CCIPLaneStats,
-) (*evm_2_evm_onramp.InternalEVM2EVMMessage, time.Time, error) {
+) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, time.Time, error) {
 	lggr.Info().Msg("Waiting for CCIPSendRequested event")
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -790,7 +855,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 				sentMsg := sendRequested.Message
 				seqNum := sentMsg.SequenceNumber
 				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.CCIPSendRe, receivedAt.Sub(prevEventAt), testreporters.Success)
-				return &sentMsg, receivedAt, nil
+				return sendRequested, receivedAt, nil
 			}
 		case <-ctx.Done():
 			reports.UpdatePhaseStats(reqNo, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure)
@@ -832,7 +897,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the fee: %+v", err)
 	}
-	log.Info().Int64("fee", fee.Int64()).Msg("calculated fee")
+	log.Info().Str("fee", fee.String()).Msg("calculated fee")
 
 	var sendTx *types.Transaction
 	timeNow := time.Now()
@@ -885,9 +950,11 @@ type DestCCIPModule struct {
 	OffRamp                 *ccip.OffRamp
 	WrappedNative           common.Address
 	ReportAcceptedWatcherMu *sync.Mutex
-	ReportAcceptedWatcher   map[uint64]*types.Log
+	ReportAcceptedWatcher   map[uint64]*commit_store.CommitStoreReportAccepted
 	ExecStateChangedMu      *sync.Mutex
 	ExecStateChangedWatcher map[uint64]*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged
+	ReportBlessedWatcherMu  *sync.Mutex
+	ReportBlessedWatcher    map[[32]byte]*types.Log
 	NextSeqNumToCommit      *atomic.Uint64
 }
 
@@ -1235,7 +1302,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 	timeout time.Duration,
 	prevEventAt time.Time,
 	reports *testreporters.CCIPLaneStats,
-) (time.Time, error) {
+) (*commit_store.CommitStoreCommitReport, time.Time, error) {
 	lggr.Info().Int64("seqNum", int64(seqNum)).Msg("Waiting for ReportAccepted event")
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1244,8 +1311,54 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 		select {
 		case <-ticker.C:
 			destCCIP.ReportAcceptedWatcherMu.Lock()
-			vLogs, ok := destCCIP.ReportAcceptedWatcher[seqNum]
+			reportAccepted, ok := destCCIP.ReportAcceptedWatcher[seqNum]
 			destCCIP.ReportAcceptedWatcherMu.Unlock()
+			receivedAt := time.Now().UTC()
+			if ok && reportAccepted != nil {
+				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(
+					context.Background(), big.NewInt(int64(reportAccepted.Raw.BlockNumber)))
+				if err == nil {
+					receivedAt = hdr.Timestamp
+				}
+
+				totalTime := receivedAt.Sub(prevEventAt)
+				if totalTime < 0 {
+					totalTime = 0
+				}
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, totalTime, testreporters.Success)
+				return &reportAccepted.Report, receivedAt, nil
+			}
+		case <-ctx.Done():
+			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
+			return nil, time.Now().UTC(), fmt.Errorf("ReportAccepted is not found for seq num %d lane %d-->%d",
+				seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+		}
+	}
+}
+
+func (destCCIP *DestCCIPModule) AssertReportBlessed(
+	lggr zerolog.Logger,
+	reqNo int64,
+	seqNum uint64,
+	timeout time.Duration,
+	CommitReport commit_store.CommitStoreCommitReport,
+	prevEventAt time.Time,
+	reports *testreporters.CCIPLaneStats,
+) (time.Time, error) {
+	if destCCIP.Common.ARM == nil {
+		lggr.Info().Interface("commit store interval", CommitReport.Interval).Hex("Root", CommitReport.MerkleRoot[:]).Msg("Skipping ReportBlessed check for mock ARM")
+		return prevEventAt, nil
+	}
+	lggr.Info().Interface("commit store interval", CommitReport.Interval).Msg("Waiting for Report To be blessed")
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			destCCIP.ReportBlessedWatcherMu.Lock()
+			vLogs, ok := destCCIP.ReportBlessedWatcher[CommitReport.MerkleRoot]
+			destCCIP.ReportBlessedWatcherMu.Unlock()
 			receivedAt := time.Now().UTC()
 			if ok && vLogs != nil {
 				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(
@@ -1254,13 +1367,13 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 					receivedAt = hdr.Timestamp
 				}
 
-				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, receivedAt.Sub(prevEventAt), testreporters.Success)
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ReportBlessed, receivedAt.Sub(prevEventAt), testreporters.Success)
 				return receivedAt, nil
 			}
 		case <-ctx.Done():
-			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, time.Since(prevEventAt), testreporters.Failure)
-			return time.Now().UTC(), fmt.Errorf("ReportAccepted is not found for seq num %d lane %d-->%d",
-				seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ReportBlessed, time.Since(prevEventAt), testreporters.Failure)
+			return time.Now().UTC(), fmt.Errorf("ReportBlessed is not found for interval %+v lane %d-->%d",
+				CommitReport.Interval, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 		}
 	}
 }
@@ -1306,9 +1419,11 @@ func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain 
 		Common:                  ccipCommon,
 		SourceChainId:           sourceChain,
 		ReportAcceptedWatcherMu: &sync.Mutex{},
-		ReportAcceptedWatcher:   make(map[uint64]*types.Log),
+		ReportAcceptedWatcher:   make(map[uint64]*commit_store.CommitStoreReportAccepted),
 		ExecStateChangedMu:      &sync.Mutex{},
 		ExecStateChangedWatcher: make(map[uint64]*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged),
+		ReportBlessedWatcherMu:  &sync.Mutex{},
+		ReportBlessedWatcher:    make(map[[32]byte]*types.Log),
 		NextSeqNumToCommit:      atomic.NewUint64(1),
 	}
 
@@ -1349,6 +1464,8 @@ type CCIPLane struct {
 	SrcNetworkLaneCfg       *laneconfig.LaneConfig
 	DstNetworkLaneCfg       *laneconfig.LaneConfig
 	Subscriptions           []event.Subscription
+	LaneUnderUpgrade        bool
+	LaneUpgraded            chan bool
 }
 
 func (lane *CCIPLane) UpdateLaneConfig() {
@@ -1359,14 +1476,18 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		btpAddresses = append(btpAddresses, lane.Source.Common.BridgeTokenPools[i].Address())
 	}
 	lane.SrcNetworkLaneCfg.CommonContracts = laneconfig.CommonContracts{
-		FeeToken:         lane.Source.Common.FeeToken.Address(),
-		FeeTokenPool:     lane.Source.Common.FeeTokenPool.Address(),
-		BridgeTokens:     btAddresses,
-		BridgeTokenPools: btpAddresses,
-		ARM:              lane.Source.Common.ARM.Address(),
-		Router:           lane.Source.Common.Router.Address(),
-		PriceRegistry:    lane.Source.Common.PriceRegistry.Address(),
-		WrappedNative:    lane.Source.Common.WrappedNative.Hex(),
+		FeeToken:            lane.Source.Common.FeeToken.Address(),
+		FeeTokenPool:        lane.Source.Common.FeeTokenPool.Address(),
+		BridgeTokens:        btAddresses,
+		BridgeTokenPools:    btpAddresses,
+		ARM:                 lane.Source.Common.ARMContract.Hex(),
+		Router:              lane.Source.Common.Router.Address(),
+		PriceRegistry:       lane.Source.Common.PriceRegistry.Address(),
+		WrappedNative:       lane.Source.Common.WrappedNative.Hex(),
+		TimeToReachFinality: lane.Source.Common.FinalityTimeOnChain,
+	}
+	if lane.Source.Common.ARM == nil {
+		lane.SrcNetworkLaneCfg.CommonContracts.IsMockARM = true
 	}
 	if lane.SrcNetworkLaneCfg.SrcContracts == nil {
 		lane.SrcNetworkLaneCfg.SrcContracts = map[uint64]laneconfig.SourceContracts{
@@ -1391,10 +1512,13 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		FeeTokenPool:     lane.Dest.Common.FeeTokenPool.Address(),
 		BridgeTokens:     btAddresses,
 		BridgeTokenPools: btpAddresses,
-		ARM:              lane.Dest.Common.ARM.Address(),
+		ARM:              lane.Dest.Common.ARMContract.Hex(),
 		Router:           lane.Dest.Common.Router.Address(),
 		PriceRegistry:    lane.Dest.Common.PriceRegistry.Address(),
 		WrappedNative:    lane.Dest.Common.WrappedNative.Hex(),
+	}
+	if lane.Dest.Common.ARM == nil {
+		lane.DstNetworkLaneCfg.CommonContracts.IsMockARM = true
 	}
 	if lane.DstNetworkLaneCfg.DestContracts == nil {
 		lane.DstNetworkLaneCfg.DestContracts = map[uint64]laneconfig.DestContracts{
@@ -1448,10 +1572,10 @@ func (lane *CCIPLane) SendRequests(noOfRequests int) (map[int64]CCIPRequest, err
 
 	txMap := make(map[int64]CCIPRequest)
 	for i := 1; i <= noOfRequests; i++ {
+		msg := fmt.Sprintf("msg %d", i)
 		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
-			tokenAndAmounts,
-			fmt.Sprintf("msg %d", i),
+			tokenAndAmounts, msg,
 			common.HexToAddress(lane.Source.Common.FeeToken.Address()),
 		)
 		if err != nil {
@@ -1473,7 +1597,13 @@ func (lane *CCIPLane) SendRequests(noOfRequests int) (map[int64]CCIPRequest, err
 		}
 		lane.SentReqs[int64(lane.NumberOfReq+i)] = txMap[int64(lane.NumberOfReq+i)]
 		lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
-			testreporters.TX, txConfirmationDur, testreporters.Success)
+			testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.SendTransactionStats{
+				Fee:                fee.String(),
+				GasUsed:            rcpt.CumulativeGasUsed,
+				TxHash:             txHash.Hex(),
+				NoOfTokensSent:     len(tokenAndAmounts),
+				MessageBytesLength: len([]byte(msg)),
+			})
 		lane.TotalFee = bigmath.Add(lane.TotalFee, fee)
 	}
 	lane.NumberOfReq += noOfRequests
@@ -1493,29 +1623,34 @@ func (lane *CCIPLane) ValidateRequests() {
 }
 
 func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmattion time.Time, reqNo int64) error {
-	// Verify if
-	// - CCIPSendRequested Event log generated,
-	// - NextSeqNumber from commitStore got increased
-	msg, receivedAt, err := lane.Source.AssertEventCCIPSendRequested(
+	msgLog, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
 		lane.Logger, reqNo, txHash, lane.ValidationTimeout, txConfirmattion, lane.Reports)
-	if err != nil || msg == nil {
+	if err != nil || msgLog == nil {
 		return fmt.Errorf("could not validate CCIPSendRequested event: %+v", err)
 	}
-	seqNumber := msg.SequenceNumber
+	seqNumber := msgLog.Message.SequenceNumber
 
-	err = lane.Dest.AssertSeqNumberExecuted(lane.Logger, reqNo, seqNumber, lane.ValidationTimeout, receivedAt, lane.Reports)
+	sourceLogFinalizedAt, err := lane.Source.AssertSendRequestedLogFinalized(lane.Logger, reqNo, seqNumber, msgLog, ccipSendReqGenAt, lane.Reports)
+	if err != nil {
+		return fmt.Errorf("could not finalize CCIPSendRequested event: %+v", err)
+	}
+	err = lane.Dest.AssertSeqNumberExecuted(lane.Logger, reqNo, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, lane.Reports)
 	if err != nil {
 		return fmt.Errorf("could not validate seq number increase at commit store: %+v", err)
 	}
 
 	// Verify whether commitStore has accepted the report
-	receivedAt, err = lane.Dest.AssertEventReportAccepted(lane.Logger, reqNo, seqNumber, lane.ValidationTimeout, receivedAt, lane.Reports)
-	if err != nil {
+	commitReport, reportAcceptedAt, err := lane.Dest.AssertEventReportAccepted(lane.Logger, reqNo, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, lane.Reports)
+	if err != nil || commitReport == nil {
 		return fmt.Errorf("could not validate ReportAccepted event: %+v", err)
 	}
 
+	reportBlessedAt, err := lane.Dest.AssertReportBlessed(lane.Logger, reqNo, seqNumber, lane.ValidationTimeout, *commitReport, reportAcceptedAt, lane.Reports)
+	if err != nil {
+		return fmt.Errorf("could not validate ReportBlessed event: %+v", err)
+	}
 	// Verify whether the execution state is changed and the transfer is successful
-	err = lane.Dest.AssertEventExecutionStateChanged(lane.Logger, reqNo, seqNumber, lane.ValidationTimeout, receivedAt, lane.Reports)
+	err = lane.Dest.AssertEventExecutionStateChanged(lane.Logger, reqNo, seqNumber, lane.ValidationTimeout, reportBlessedAt, lane.Reports)
 	if err != nil {
 		return fmt.Errorf("could not validate ExecutionStateChanged event: %+v", err)
 	}
@@ -1532,6 +1667,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	go func() {
 		for {
 			e := <-sendReqEvent
+			lane.Logger.Info().Msgf("CCIPSendRequested event received for seq number %d", e.Message.SequenceNumber)
 			lane.Source.CCIPSendRequestedWatcherMu.Lock()
 			lane.Source.CCIPSendRequestedWatcher[e.Raw.TxHash.Hex()] = e
 			lane.Source.CCIPSendRequestedWatcherMu.Unlock()
@@ -1550,12 +1686,33 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			e := <-reportAcceptedEvent
 			lane.Dest.ReportAcceptedWatcherMu.Lock()
 			for i := e.Report.Interval.Min; i <= e.Report.Interval.Max; i++ {
-				lane.Dest.ReportAcceptedWatcher[i] = &e.Raw
+				lane.Dest.ReportAcceptedWatcher[i] = e
 			}
 			lane.Dest.ReportAcceptedWatcherMu.Unlock()
 		}
 	}()
 
+	if lane.Dest.Common.ARM != nil {
+		reportBlessedEvent := make(chan *arm_contract.ARMContractTaggedRootBlessed)
+		sub, err = lane.Dest.Common.ARM.Instance.WatchTaggedRootBlessed(nil, reportBlessedEvent, nil)
+		if err != nil {
+			return err
+		}
+
+		lane.Subscriptions = append(lane.Subscriptions, sub)
+
+		go func() {
+			for {
+				e := <-reportBlessedEvent
+				lane.Logger.Info().Msgf("TaggedRootBlessed event received for root %x", e.TaggedRoot.Root)
+				lane.Dest.ReportBlessedWatcherMu.Lock()
+				if e.TaggedRoot.CommitStore == lane.Dest.CommitStore.EthAddress {
+					lane.Dest.ReportBlessedWatcher[e.TaggedRoot.Root] = &e.Raw
+				}
+				lane.Dest.ReportBlessedWatcherMu.Unlock()
+			}
+		}()
+	}
 	execStateChangedEvent := make(chan *evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged)
 	sub, err = lane.Dest.OffRamp.Instance.WatchExecutionStateChanged(nil, execStateChangedEvent, nil, nil)
 	if err != nil {
@@ -1567,6 +1724,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 	go func() {
 		for {
 			e := <-execStateChangedEvent
+			lane.Logger.Info().Msgf("Execution state changed event received for seq number %d", e.SequenceNumber)
 			lane.Dest.ExecStateChangedMu.Lock()
 			lane.Dest.ExecStateChangedWatcher[e.SequenceNumber] = e
 			lane.Dest.ExecStateChangedMu.Unlock()
@@ -1627,6 +1785,9 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return lane.Source.Common.DeployContracts(len(lane.Source.TransferAmount), srcConf)
 	})
 
+	finalityCalculated := make(chan struct{})
+	go lane.Source.Common.FinalityTime(finalityCalculated)
+
 	lane.Dest.Common.deploy.Go(func() error {
 		return lane.Dest.Common.DeployContracts(len(lane.Source.TransferAmount), destConf)
 	})
@@ -1641,6 +1802,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if err != nil {
 		return errors.WithStack(err)
 	}
+	// wait for the finality time to be set
+	<-finalityCalculated
 	lane.UpdateLaneConfig()
 
 	// start event watchers
@@ -1793,7 +1956,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		InflightCacheExpiry:   inflightExpiry,
 	}, ccipConfig.CommitOnchainConfig{
 		PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
-		Arm:           destCCIP.Common.ARM.EthAddress,
+		Arm:           *destCCIP.Common.ARMContract,
 	})
 	if err != nil {
 		return errors.WithStack(err)
@@ -1823,7 +1986,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			PermissionLessExecutionThresholdSeconds: 60 * 30,
 			Router:                                  destCCIP.Common.Router.EthAddress,
 			PriceRegistry:                           destCCIP.Common.PriceRegistry.EthAddress,
-			Arm:                                     destCCIP.Common.ARM.EthAddress,
+			Arm:                                     *destCCIP.Common.ARMContract,
 			MaxTokensLength:                         5,
 			MaxDataSize:                             1e5,
 		})
@@ -2013,11 +2176,11 @@ func (c *CCIPTestEnv) ChaosLabelForCLNodes(t *testing.T) {
 		}
 		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfAllowedFaultyCommit+1 {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommitFaultyPlus)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfAllowedFaultyCommit {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommitFaulty)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfExecNodes {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecution)
@@ -2025,11 +2188,11 @@ func (c *CCIPTestEnv) ChaosLabelForCLNodes(t *testing.T) {
 		}
 		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfAllowedFaultyExec+1 {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecutionFaultyPlus)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfAllowedFaultyExec {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecutionFaulty)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}
 	}
 }

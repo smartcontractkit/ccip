@@ -18,12 +18,12 @@ require (
 	github.com/rs/zerolog v1.29.1
 	github.com/slack-go/slack v0.12.2
 	github.com/smartcontractkit/chainlink-env v0.32.10-0.20230615204346-0067ac7c683f
-	github.com/smartcontractkit/chainlink-testing-framework v1.11.8
+	github.com/smartcontractkit/chainlink-testing-framework v1.11.9
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20230606215712-82b910bef5c1
 	github.com/smartcontractkit/ocr2keepers v0.7.0
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230607140106-3de6d0aed120
-	github.com/smartcontractkit/wasp v0.2.3
+	github.com/smartcontractkit/wasp v0.2.4-0.20230621180253-1b141aa1fd55
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	github.com/umbracle/ethgo v0.1.3

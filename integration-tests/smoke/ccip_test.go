@@ -52,6 +52,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 		tc := testcase
 		t.Run(tc.testName, func(t *testing.T) {
 			t.Parallel()
+			tc.lane.Test = t
 			l.Info().
 				Str("Source", tc.lane.SourceNetworkName).
 				Str("Destination", tc.lane.DestNetworkName).
