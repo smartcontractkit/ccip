@@ -904,3 +904,50 @@ func TestNextMin(t *testing.T) {
 		cp.inflightReports.reset(lggr)
 	}
 }
+
+func Test_isStaleReport(t *testing.T) {
+	ctx := context.Background()
+	lggr := logger.TestLogger(t)
+	merkleRoot1 := utils.Keccak256Fixed([]byte("some merkle root 1"))
+	merkleRoot2 := utils.Keccak256Fixed([]byte("some merkle root 2"))
+
+	t.Run("empty report", func(t *testing.T) {
+		commitStore := mock_contracts.NewCommitStoreInterface(t)
+		r := &CommitReportingPlugin{config: CommitPluginConfig{commitStore: commitStore}}
+		isStale := r.isStaleReport(ctx, lggr, commit_store.CommitStoreCommitReport{}, false, types.ReportTimestamp{})
+		assert.True(t, isStale)
+	})
+
+	t.Run("merkle root", func(t *testing.T) {
+		const expNextSeqNum = uint64(9)
+
+		commitStore := mock_contracts.NewCommitStoreInterface(t)
+		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(expNextSeqNum, nil)
+
+		r := &CommitReportingPlugin{
+			config: CommitPluginConfig{commitStore: commitStore},
+			inflightReports: &inflightCommitReportsContainer{
+				inFlight: map[[32]byte]InflightCommitReport{
+					merkleRoot2: {
+						report: commit_store.CommitStoreCommitReport{
+							Interval: commit_store.CommitStoreInterval{Min: expNextSeqNum + 1, Max: expNextSeqNum + 10},
+						},
+					},
+				},
+			},
+		}
+
+		assert.False(t, r.isStaleReport(ctx, lggr, commit_store.CommitStoreCommitReport{
+			MerkleRoot: merkleRoot1,
+			Interval:   commit_store.CommitStoreInterval{Min: expNextSeqNum + 1, Max: expNextSeqNum + 10},
+		}, false, types.ReportTimestamp{}))
+
+		assert.True(t, r.isStaleReport(ctx, lggr, commit_store.CommitStoreCommitReport{
+			MerkleRoot: merkleRoot1,
+			Interval:   commit_store.CommitStoreInterval{Min: expNextSeqNum + 1, Max: expNextSeqNum + 10},
+		}, true, types.ReportTimestamp{}))
+
+		assert.True(t, r.isStaleReport(ctx, lggr, commit_store.CommitStoreCommitReport{
+			MerkleRoot: merkleRoot1}, false, types.ReportTimestamp{}))
+	})
+}

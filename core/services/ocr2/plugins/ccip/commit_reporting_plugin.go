@@ -390,7 +390,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 
 	sourceGasPriceUSD = calculateUsdPerUnitGas(gasPrice, sourceNativePriceUSD)
 
-	gasPriceUpdate, err := r.getLatestGasPriceUpdate(ctx, now, false)
+	gasPriceUpdate, err := r.getLatestGasPriceUpdate(ctx, now, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -404,7 +404,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		sourceGasPriceUSD = nil
 	}
 
-	tokenPriceUpdates, err := r.getLatestTokenPriceUpdates(ctx, now, false)
+	tokenPriceUpdates, err := r.getLatestTokenPriceUpdates(ctx, now, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -433,7 +433,7 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 }
 
 // Gets the latest token price updates based on logs within the heartbeat
-func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, skipInflight bool) (map[common.Address]update, error) {
+func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, checkInflight bool) (map[common.Address]update, error) {
 	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(abihelpers.EventSignatures.UsdPerTokenUpdated, r.destPriceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), 0, pg.WithParentCtx(ctx))
 	latestUpdates := make(map[common.Address]update)
 
@@ -454,7 +454,7 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 			}
 		}
 	}
-	if skipInflight {
+	if !checkInflight {
 		return latestUpdates, nil
 	}
 
@@ -471,8 +471,8 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 }
 
 // Gets the latest gas price updates based on logs within the heartbeat
-func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, skipInflight bool) (gasPriceUpdate update, error error) {
-	if !skipInflight {
+func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasPriceUpdate update, error error) {
+	if checkInflight {
 		latestInflightGasPriceUpdate := r.inflightReports.getLatestInflightGasPriceUpdate()
 		if latestInflightGasPriceUpdate != nil && latestInflightGasPriceUpdate.timestamp.After(gasPriceUpdate.timestamp) {
 			gasPriceUpdate = *latestInflightGasPriceUpdate
@@ -798,32 +798,26 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.Logger, report commit_store.CommitStoreCommitReport, checkInflight bool, reportTimestamp types.ReportTimestamp) bool {
 	// If there is a merkle root, ignore all other staleness checks and only check for sequence number staleness
 	if report.MerkleRoot != [32]byte{} {
-		nextInflightMin, nextOnChainMin, err := r.nextMinSeqNum(ctx, lggr)
-		if err != nil {
-			// Assume it's a transient issue getting the last report and try again on the next round
-			return true
-		}
+		return r.isStaleMerkleRoot(ctx, lggr, report.Interval, checkInflight)
+	}
 
-		if checkInflight {
-			if nextInflightMin != report.Interval.Min {
-				// There are sequence numbers missing between the commitStore/inflight txs and the proposed report.
-				// The report will fail onchain unless the inflight cache is in an incorrect state. A state like this
-				// could happen for various reasons, e.g. a reboot of the node emptying the caches, and should be self-healing.
-				// We do not submit a tx and wait for the protocol to self-heal by updating the caches or invalidating
-				// inflight caches over time.
-				lggr.Errorw("Next inflight min is not equal to the proposed min of the report", "nextInflightMin", nextInflightMin)
-				return true
-			}
-		} else {
-			// If the next min is already greater than this reports min, this report is stale.
-			if nextOnChainMin > report.Interval.Min {
-				lggr.Infow("Report is stale because of root", "onchain min", nextOnChainMin, "report min", report.Interval.Min)
-				return true
-			}
-		}
+	hasGasPriceUpdate := report.PriceUpdates.DestChainSelector != 0
+	hasTokenPriceUpdates := len(report.PriceUpdates.TokenPriceUpdates) > 0
 
-		// If a report has root and valid sequence number, the report should be submitted, regardless of price staleness
-		return false
+	// If there is no merkle root, no gas price update and no token price update
+	// we don't want to write anything on-chain, so we consider this report stale.
+	if !hasGasPriceUpdate && !hasTokenPriceUpdates {
+		return true
+	}
+
+	gasPriceStale := hasGasPriceUpdate && r.isStaleGasPrice(ctx, lggr, report.PriceUpdates, checkInflight)
+	if gasPriceStale {
+		return true
+	}
+
+	tokenPricesStale := hasTokenPriceUpdates && r.isStaleTokenPrices(ctx, lggr, report.PriceUpdates.TokenPriceUpdates, checkInflight)
+	if tokenPricesStale {
+		return true
 	}
 
 	// If report only has price update, check if its epoch and round lags behind the latest onchain
@@ -838,42 +832,73 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 		return true
 	}
 
-	if report.PriceUpdates.DestChainSelector != 0 {
-		gasPriceUpdate, err := r.getLatestGasPriceUpdate(ctx, time.Now(), !checkInflight)
-		if err != nil {
-			return true
-		}
+	return false
+}
 
-		if gasPriceUpdate.value != nil && !deviates(report.PriceUpdates.UsdPerUnitGas, gasPriceUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
-			lggr.Infow("Report is stale because of gas price",
-				"latestGasPriceUpdate", gasPriceUpdate.value,
-				"usdPerUnitGas", report.PriceUpdates.UsdPerUnitGas,
-				"destChainSelector", report.PriceUpdates.DestChainSelector)
-			return true
-		}
-		return false
+func (r *CommitReportingPlugin) isStaleMerkleRoot(ctx context.Context, lggr logger.Logger, reportInterval commit_store.CommitStoreInterval, checkInflight bool) bool {
+	nextInflightMin, nextOnChainMin, err := r.nextMinSeqNum(ctx, lggr)
+	if err != nil {
+		// Assume it's a transient issue getting the last report and try again on the next round
+		return true
 	}
 
-	if len(report.PriceUpdates.TokenPriceUpdates) > 0 {
-		// getting the last price updates without including inflight is like querying
-		// current prices onchain, but uses logpoller's data to save on the RPC requests
-		tokenPriceUpdates, err := r.getLatestTokenPriceUpdates(ctx, time.Now(), !checkInflight)
-		if err != nil {
-			return true
-		}
-		// check first token
-		tokenUpdate := report.PriceUpdates.TokenPriceUpdates[0]
-		if latestUpdate, ok := tokenPriceUpdates[tokenUpdate.SourceToken]; ok && !deviates(tokenUpdate.UsdPerToken, latestUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
-			lggr.Infow("Report is stale because of token price",
-				"latestTokenPrice", latestUpdate.value,
-				"usdPerToken", tokenUpdate.UsdPerToken,
-				"token", tokenUpdate.SourceToken)
-			return true
-		}
-		return false
+	if checkInflight && nextInflightMin != reportInterval.Min {
+		// There are sequence numbers missing between the commitStore/inflight txs and the proposed report.
+		// The report will fail onchain unless the inflight cache is in an incorrect state. A state like this
+		// could happen for various reasons, e.g. a reboot of the node emptying the caches, and should be self-healing.
+		// We do not submit a tx and wait for the protocol to self-heal by updating the caches or invalidating
+		// inflight caches over time.
+		lggr.Errorw("Next inflight min is not equal to the proposed min of the report", "nextInflightMin", nextInflightMin)
+		return true
 	}
-	// Can only get here if there is no merkle root, no gas price update and no token price update
-	// If so, we don't want to write anything onchain, so we consider this report stale.
+
+	if !checkInflight && nextOnChainMin > reportInterval.Min {
+		// If the next min is already greater than this reports min, this report is stale.
+		lggr.Infow("Report is stale because of root", "onchain min", nextOnChainMin, "report min", reportInterval.Min)
+		return true
+	}
+
+	// If a report has root and valid sequence number, the report should be submitted, regardless of price staleness
+	return false
+}
+
+func (r *CommitReportingPlugin) isStaleGasPrice(ctx context.Context, lggr logger.Logger, priceUpdates commit_store.InternalPriceUpdates, checkInflight bool) bool {
+	gasPriceUpdate, err := r.getLatestGasPriceUpdate(ctx, time.Now(), checkInflight)
+	if err != nil {
+		return true
+	}
+
+	if gasPriceUpdate.value != nil && !deviates(priceUpdates.UsdPerUnitGas, gasPriceUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB)) {
+		lggr.Infow("Report is stale because of gas price",
+			"latestGasPriceUpdate", gasPriceUpdate.value,
+			"usdPerUnitGas", priceUpdates.UsdPerUnitGas,
+			"destChainSelector", priceUpdates.DestChainSelector)
+		return true
+	}
+
+	return false
+}
+
+func (r *CommitReportingPlugin) isStaleTokenPrices(ctx context.Context, lggr logger.Logger, priceUpdates []commit_store.InternalTokenPriceUpdate, checkInflight bool) bool {
+	// getting the last price updates without including inflight is like querying
+	// current prices onchain, but uses logpoller's data to save on the RPC requests
+	latestTokenPriceUpdates, err := r.getLatestTokenPriceUpdates(ctx, time.Now(), checkInflight)
+	if err != nil {
+		return true
+	}
+
+	for _, tokenUpdate := range priceUpdates {
+		latestUpdate, ok := latestTokenPriceUpdates[tokenUpdate.SourceToken]
+		priceEqual := ok && !deviates(tokenUpdate.UsdPerToken, latestUpdate.value, int64(r.offchainConfig.FeeUpdateDeviationPPB))
+
+		if !priceEqual {
+			lggr.Infow("Found non-stale token price", "token", tokenUpdate.SourceToken, "usdPerToken", tokenUpdate.UsdPerToken, "latestUpdate", latestUpdate.value)
+			return false
+		}
+		lggr.Infow("Token price is stale", "latestTokenPrice", latestUpdate.value, "usdPerToken", tokenUpdate.UsdPerToken, "token", tokenUpdate.SourceToken)
+	}
+
+	lggr.Infow("All token prices are stale")
 	return true
 }
 
