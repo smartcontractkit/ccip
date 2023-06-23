@@ -315,21 +315,13 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployPriceRegistry(
-	priceUpdates price_registry.InternalPriceUpdates,
-) (
-	*PriceRegistry,
-	error,
-) {
+func (e *CCIPContractsDeployer) DeployPriceRegistry() (*PriceRegistry, error) {
 	address, _, instance, err := e.evmClient.DeployContract("PriceRegistry", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		tokens := []common.Address{}
-		if len(priceUpdates.TokenPriceUpdates) > 0 {
-			tokens = append(tokens, priceUpdates.TokenPriceUpdates[0].SourceToken)
-		}
-		return price_registry.DeployPriceRegistry(auth, backend, priceUpdates, nil, tokens, 60*60*24*14)
+		var tokens []common.Address
+		return price_registry.DeployPriceRegistry(auth, backend, nil, tokens, 60*60*24*14)
 	})
 	if err != nil {
 		return nil, err

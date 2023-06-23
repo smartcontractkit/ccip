@@ -51,13 +51,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   // The amount of time a price can be stale before it is considered invalid.
   uint32 private immutable i_stalenessThreshold;
 
-  constructor(
-    Internal.PriceUpdates memory priceUpdates,
-    address[] memory priceUpdaters,
-    address[] memory feeTokens,
-    uint32 stalenessThreshold
-  ) {
-    _updatePrices(priceUpdates);
+  constructor(address[] memory priceUpdaters, address[] memory feeTokens, uint32 stalenessThreshold) {
     _applyPriceUpdatersUpdates(priceUpdaters, new address[](0));
     _applyFeeTokensUpdates(feeTokens, new address[](0));
     if (stalenessThreshold == 0) revert InvalidStalenessThreshold();
@@ -188,13 +182,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   // ================================================================
 
   // @inheritdoc IPriceRegistry
-  function updatePrices(Internal.PriceUpdates memory priceUpdates) external override requireUpdaterOrOwner {
-    _updatePrices(priceUpdates);
-  }
-
-  /// @notice Updates all prices in the priceUpdates struct.
-  /// @param priceUpdates The struct containing all the price updates.
-  function _updatePrices(Internal.PriceUpdates memory priceUpdates) private {
+  function updatePrices(Internal.PriceUpdates calldata priceUpdates) external override requireUpdaterOrOwner {
     uint256 priceUpdatesLength = priceUpdates.tokenPriceUpdates.length;
 
     for (uint256 i = 0; i < priceUpdatesLength; ++i) {

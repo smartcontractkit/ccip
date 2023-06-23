@@ -305,16 +305,6 @@ func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 	destPricesAddress, _, _, err := price_registry.DeployPriceRegistry(
 		c.Dest.User,
 		c.Dest.Chain,
-		price_registry.InternalPriceUpdates{
-			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-				{
-					SourceToken: c.Dest.LinkToken.Address(),
-					UsdPerToken: big.NewInt(8e18), // 8usd
-				},
-			},
-			DestChainSelector: c.Source.ChainID,
-			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-		},
 		[]common.Address{c.Dest.CommitStore.Address()},
 		[]common.Address{c.Dest.LinkToken.Address()},
 		60*60*24*14, // two weeks
@@ -325,6 +315,20 @@ func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 	c.Dest.PriceRegistry, err = price_registry.NewPriceRegistry(destPricesAddress, c.Dest.Chain)
 	require.NoError(t, err)
 	t.Logf("New Price Registry deployed at %s", destPricesAddress.String())
+
+	priceUpdates := price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: c.Dest.LinkToken.Address(),
+				UsdPerToken: big.NewInt(8e18), // 8usd
+			},
+		},
+		DestChainSelector: c.Source.ChainID,
+		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+	}
+	_, err = c.Dest.PriceRegistry.UpdatePrices(c.Dest.User, priceUpdates)
+	require.NoError(t, err)
+
 	c.Source.Chain.Commit()
 	c.Dest.Chain.Commit()
 }
@@ -775,20 +779,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourcePricesAddress, _, _, err := price_registry.DeployPriceRegistry(
 		sourceUser,
 		sourceChain,
-		price_registry.InternalPriceUpdates{
-			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-				{
-					SourceToken: sourceLinkTokenAddress,
-					UsdPerToken: big.NewInt(8e18), // 8usd
-				},
-				{
-					SourceToken: sourceWeth9addr,
-					UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)), // 2000usd
-				},
-			},
-			DestChainSelector: destChainID,
-			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-		},
 		nil,
 		[]common.Address{sourceLinkTokenAddress, sourceWeth9addr},
 		60*60*24*14, // two weeks
@@ -796,6 +786,24 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	srcPriceRegistry, err := price_registry.NewPriceRegistry(sourcePricesAddress, sourceChain)
+	require.NoError(t, err)
+
+	prices := price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: sourceLinkTokenAddress,
+				UsdPerToken: big.NewInt(8e18), // 8usd
+			},
+			{
+				SourceToken: sourceWeth9addr,
+				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)), // 2000usd
+			},
+		},
+		DestChainSelector: destChainID,
+		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+	}
+
+	_, err = srcPriceRegistry.UpdatePrices(sourceUser, prices)
 	require.NoError(t, err)
 
 	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
@@ -909,22 +917,26 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	destPricesAddress, _, _, err := price_registry.DeployPriceRegistry(
 		destUser,
 		destChain,
-		price_registry.InternalPriceUpdates{
-			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-				{
-					SourceToken: destLinkTokenAddress,
-					UsdPerToken: big.NewInt(8e18), // 8usd
-				},
-			},
-			DestChainSelector: sourceChainID,
-			UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-		},
 		nil,
 		[]common.Address{destLinkTokenAddress},
 		60*60*24*14, // two weeks
 	)
 	require.NoError(t, err)
 	destPriceRegistry, err := price_registry.NewPriceRegistry(destPricesAddress, destChain)
+	require.NoError(t, err)
+
+	destPrices := price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: destLinkTokenAddress,
+				UsdPerToken: big.NewInt(8e18), // 8usd
+			},
+		},
+		DestChainSelector: sourceChainID,
+		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+	}
+
+	_, err = destPriceRegistry.UpdatePrices(destUser, destPrices)
 	require.NoError(t, err)
 
 	// Deploy commit store.

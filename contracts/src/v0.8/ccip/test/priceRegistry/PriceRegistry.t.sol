@@ -71,26 +71,30 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
     address[] memory feeTokens = new address[](2);
     feeTokens[0] = s_sourceTokens[0];
     feeTokens[1] = s_weth;
-    s_priceRegistry = new PriceRegistry(priceUpdates, priceUpdaters, feeTokens, uint32(TWELVE_HOURS));
+    s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS));
+    s_priceRegistry.updatePrices(priceUpdates);
   }
 }
 
 contract PriceRegistry_constructor is PriceRegistrySetup {
   function testSetupSuccess() public virtual {
-    assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[0]).value, 5e18);
-    assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[1]).value, 2000e18);
-    assertEq(s_priceRegistry.getDestinationChainGasPrice(DEST_CHAIN_ID).value, USD_PER_GAS);
+    address[] memory priceUpdaters = new address[](2);
+    priceUpdaters[0] = STRANGER;
+    priceUpdaters[1] = OWNER;
+    address[] memory feeTokens = new address[](2);
+    feeTokens[0] = s_sourceTokens[0];
+    feeTokens[1] = s_weth;
+
+    s_priceRegistry = new PriceRegistry(priceUpdaters, feeTokens, uint32(TWELVE_HOURS));
+
+    assertEq(feeTokens, s_priceRegistry.getFeeTokens());
+    assertEq(uint32(TWELVE_HOURS), s_priceRegistry.getStalenessThreshold());
+    assertEq(priceUpdaters, s_priceRegistry.getPriceUpdaters());
   }
 
   function testInvalidStalenessThresholdReverts() public {
-    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
-      destChainSelector: DEST_CHAIN_ID,
-      usdPerUnitGas: USD_PER_GAS
-    });
-
     vm.expectRevert(PriceRegistry.InvalidStalenessThreshold.selector);
-    s_priceRegistry = new PriceRegistry(priceUpdates, new address[](0), new address[](0), 0);
+    s_priceRegistry = new PriceRegistry(new address[](0), new address[](0), 0);
   }
 }
 

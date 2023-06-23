@@ -175,7 +175,7 @@ contract LockReleaseTokenPool_removeLiquidity is LockReleaseTokenPoolSetup {
 }
 
 contract LockReleaseTokenPool_supportsInterface is LockReleaseTokenPoolSetup {
-  function testRemoveLiquiditySuccess(uint256 amount) public {
+  function testSupportsInterfaceSuccess() public {
     assertTrue(s_lockReleaseTokenPool.supportsInterface(s_lockReleaseTokenPool.getLockReleaseInterfaceId()));
     assertTrue(s_lockReleaseTokenPool.supportsInterface(type(IPool).interfaceId));
     assertTrue(s_lockReleaseTokenPool.supportsInterface(type(IERC165).interfaceId));

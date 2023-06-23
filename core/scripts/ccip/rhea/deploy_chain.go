@@ -298,15 +298,6 @@ func deployPriceRegistry(client *EvmDeploymentConfig) error {
 	priceRegistry, tx, _, err := price_registry.DeployPriceRegistry(
 		client.Owner,
 		client.Client,
-		price_registry.InternalPriceUpdates{
-			// No updates needed, these should all be done by the DON upon
-			// starting OCR.
-			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
-			// 0 signals that the UsdPerUnitGas should not be used and this is
-			// not an update for gas fee prices.
-			DestChainSelector: 0,
-			UsdPerUnitGas:     big.NewInt(0),
-		},
 		[]common.Address{},
 		feeTokens,
 		60*60*24*14, // two weeks

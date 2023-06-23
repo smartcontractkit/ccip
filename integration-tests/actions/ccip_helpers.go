@@ -438,11 +438,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	}
 	if ccipModule.PriceRegistry == nil {
 		// we will update the price updates later based on source and dest PriceUpdates
-		ccipModule.PriceRegistry, err = cd.DeployPriceRegistry(price_registry.InternalPriceUpdates{
-			TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
-			DestChainSelector: 0,
-			UsdPerUnitGas:     big.NewInt(0),
-		})
+		ccipModule.PriceRegistry, err = cd.DeployPriceRegistry()
 		if err != nil {
 			return fmt.Errorf("deploying PriceRegistry shouldn't fail %+v", err)
 		}
