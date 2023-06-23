@@ -437,13 +437,15 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 	).Return(oelLpLogs, nil).Maybe()
 
 	su := newTestStatusUpdater()
-
+	evmcfg := legacygasstation.EVMConfig{
+		EVM: chain.Config().EVM(),
+	}
 	sc, err := legacygasstation.NewSidecar(
 		lggr,
 		lp,
 		forwarder,
 		offramp,
-		chain.Config(),
+		evmcfg,
 		testutils.SimulatedChainID.Uint64(),
 		uint32(test.lookbackBlock),
 		orm,
@@ -455,7 +457,7 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		blockNumber := int64(75)
 		_, fromAddress := cltest.MustInsertRandomKeyReturningState(t, app.KeyStore.Eth(), chainID)
 		txStore := cltest.NewTestTxStore(t, app.GetSqlxDB(), app.Config.Database())
-		var ethTx txmgr.EvmTx
+		var ethTx txmgr.Tx
 		if r.confirmed {
 			ethTx = cltest.MustInsertConfirmedEthTxBySaveFetchedReceipts(t, txStore, fromAddress, int64(i), blockNumber, chainID)
 		} else if r.failed {
