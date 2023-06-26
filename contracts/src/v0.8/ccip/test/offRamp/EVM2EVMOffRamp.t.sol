@@ -882,6 +882,18 @@ contract EVM2EVMOffRamp__report is EVM2EVMOffRampSetup {
 contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
   event ReentrancySucceeded();
 
+  function testManualExecForkedChainReverts() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    //messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+
+    Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
+    uint256 chain1 = block.chainid;
+    uint256 chain2 = chain1 + 1;
+    vm.chainId(chain2);
+    vm.expectRevert(abi.encodeWithSelector(OCR2BaseNoChecks.ForkedChain.selector, chain1, chain2));
+    s_offRamp.manuallyExecute(report);
+  }
+
   function testReentrancyManualExecuteFAILS() public {
     uint256 tokenAmount = 1e9;
     IERC20 tokenToAbuse = IERC20(s_destFeeToken);

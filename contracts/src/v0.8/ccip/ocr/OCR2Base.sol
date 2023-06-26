@@ -11,6 +11,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
   error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
+  error ForkedChain(uint256 expected, uint256 actual);
   error WrongNumberOfSignatures();
   error SignaturesOutOfRegistration();
   error UnauthorizedTransmitter();
@@ -80,9 +81,11 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
       32; // word containing length of ss
 
   bool internal immutable i_uniqueReports;
+  uint256 internal immutable i_chainID;
 
   constructor(bool uniqueReports) {
     i_uniqueReports = uniqueReports;
+    i_chainID = block.chainid;
   }
 
   // Reverts transaction if config args are invalid
@@ -206,6 +209,10 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
 
     if (configInfo.latestConfigDigest != configDigest)
       revert ConfigDigestMismatch(configInfo.latestConfigDigest, configDigest);
+    // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
+    // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest
+    // calculated from chain A and so OCR reports will be valid on both forks.
+    if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
     emit Transmitted(configDigest, uint32(uint256(reportContext[1]) >> 8));
 
