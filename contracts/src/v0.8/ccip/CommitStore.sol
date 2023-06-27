@@ -233,6 +233,11 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
     if (dynamicConfig.arm == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();
 
     s_dynamicConfig = dynamicConfig;
+    // When the OCR config changes, we reset the price epoch and round
+    // since epoch and rounds are scoped per config digest.
+    // Note that s_minSeqNr/roots do not need to be reset as the roots persist
+    // across reconfigurations and are de-duplicated separately.
+    s_latestPriceEpochAndRound = 0;
 
     emit ConfigSet(
       StaticConfig({chainSelector: i_chainSelector, sourceChainSelector: i_sourceChainSelector, onRamp: i_onRamp}),
