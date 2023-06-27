@@ -344,8 +344,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 numberOfTokens,
     address originalSender
   ) internal view {
-    if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
+    if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     // Check that payload is formed correctly
     uint256 maxDataSize = uint256(s_dynamicConfig.maxDataSize);
     if (dataLength > maxDataSize) revert MessageTooLarge(maxDataSize, dataLength);
@@ -630,15 +630,15 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Clears existing nops, sets new nops and weights
   /// @param nopsAndWeights New set of nops and weights
   function _setNops(NopAndWeight[] memory nopsAndWeights) internal {
+    uint256 numberOfNops = nopsAndWeights.length;
+    if (numberOfNops > MAX_NUMBER_OF_NOPS) revert TooManyNops();
+
     // Make sure all nops have been paid before removing nops
     // We only have to pay when there are nops and there is enough
     // outstanding NOP balance to trigger a payment.
     if (s_nopWeightsTotal > 0 && s_nopFeesJuels > s_nopWeightsTotal) {
       payNops();
     }
-
-    uint256 numberOfNops = nopsAndWeights.length;
-    if (numberOfNops > MAX_NUMBER_OF_NOPS) revert TooManyNops();
 
     // Remove all previous nops, move from end to start to avoid shifting
     for (uint256 i = s_nops.length(); i > 0; --i) {

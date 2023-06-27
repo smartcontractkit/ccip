@@ -156,7 +156,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   ) external view override whenNotPaused returns (uint256 timestamp) {
     bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
     // Only return non-zero if present and blessed.
-    if (s_roots[root] == 0 || !isBlessed(root)) {
+    if (!isBlessed(root)) {
       return 0;
     }
     return s_roots[root];
