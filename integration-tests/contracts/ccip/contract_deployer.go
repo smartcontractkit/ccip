@@ -370,6 +370,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				ChainSelector:     sourceChainSelector, // source chain id
 				DestChainSelector: destChainSelector,   // destinationChainSelector
 				DefaultTxGasLimit: 200_000,
+				MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 				PrevOnRamp:        common.HexToAddress(""),
 			},
 			evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{

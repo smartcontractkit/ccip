@@ -30,6 +30,7 @@ const (
 	PERMISSIONLESS_EXEC_THRESHOLD_SEC = 7 * 24 * 3600
 	DEST_GAS_OVERHEAD                 = 300_000
 	DEFAULT_GAS_LIMIT                 = 200_000
+	MAX_NOP_FEES_LINK                 = 100_000_000
 )
 
 // DeployLanes will deploy all source and Destination chain contracts using the
@@ -252,6 +253,7 @@ func deployOnRamp(t *testing.T, client EvmConfig, laneConfig *EVMLaneConfig, des
 			ChainSelector:     GetCCIPChainSelector(client.ChainConfig.EvmChainId),
 			DestChainSelector: destChainSelector,
 			DefaultTxGasLimit: DEFAULT_GAS_LIMIT,
+			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(MAX_NOP_FEES_LINK), big.NewInt(1e18)),
 			PrevOnRamp:        prevOnRamp,
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{

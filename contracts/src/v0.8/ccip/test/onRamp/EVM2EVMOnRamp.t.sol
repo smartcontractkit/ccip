@@ -17,6 +17,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       chainSelector: SOURCE_CHAIN_ID,
       destChainSelector: DEST_CHAIN_ID,
       defaultTxGasLimit: GAS_LIMIT,
+      maxNopFeesJuels: MAX_NOP_FEES_JUELS,
       prevOnRamp: address(0)
     });
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = generateDynamicOnRampConfig(
@@ -51,6 +52,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
     assertEq(staticConfig.destChainSelector, gotStaticConfig.destChainSelector);
     assertEq(staticConfig.defaultTxGasLimit, gotStaticConfig.defaultTxGasLimit);
+    assertEq(staticConfig.maxNopFeesJuels, gotStaticConfig.maxNopFeesJuels);
     assertEq(staticConfig.prevOnRamp, gotStaticConfig.prevOnRamp);
 
     EVM2EVMOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
@@ -84,6 +86,7 @@ contract EVM2EVMOnRamp_payNops_fuzz is EVM2EVMOnRampSetup {
     (EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, uint256 weightsTotal) = s_onRamp.getNops();
     // To avoid NoFeesToPay
     vm.assume(nopFeesJuels > weightsTotal);
+    vm.assume(nopFeesJuels < MAX_NOP_FEES_JUELS);
 
     // Set Nop fee juels
     deal(s_sourceFeeToken, address(s_onRamp), nopFeesJuels);
@@ -343,6 +346,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     // To avoid RouterMustSetOriginalSender
     vm.assume(originalSender != address(0));
     vm.assume(uint160(receiver) >= 10);
+    vm.assume(feeTokenAmount <= MAX_NOP_FEES_JUELS);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.receiver = abi.encode(receiver);
@@ -512,6 +516,14 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
       s_onRamp.forwardFromRouter(message, 1, OWNER);
     }
   }
+
+  function testMaxFeeBalanceReachedReverts() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+
+    vm.expectRevert(EVM2EVMOnRamp.MaxFeeBalanceReached.selector);
+
+    s_onRamp.forwardFromRouter(message, MAX_NOP_FEES_JUELS + 1, OWNER);
+  }
 }
 
 /// @notice #forwardFromRouter with ramp upgrade
@@ -530,6 +542,7 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
         chainSelector: SOURCE_CHAIN_ID,
         destChainSelector: DEST_CHAIN_ID,
         defaultTxGasLimit: GAS_LIMIT,
+        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
         prevOnRamp: address(s_prevOnRamp)
       }),
       generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_mockARM)),
@@ -1044,7 +1057,7 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
   // Reverts
 
   function testNotEnoughFundsForPayoutReverts() public {
-    uint96 nopFeesJuels = 2 ** 95;
+    uint96 nopFeesJuels = MAX_NOP_FEES_JUELS;
     // Set Nop fee juels but don't transfer LINK. This can happen when users
     // pay in non-link tokens.
     changePrank(address(s_sourceRouter));

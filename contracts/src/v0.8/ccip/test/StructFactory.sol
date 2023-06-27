@@ -87,6 +87,9 @@ contract StructFactory {
   uint256 internal constant BLOCK_TIME = 1234567890;
   uint32 internal constant TWELVE_HOURS = 60 * 60 * 12;
 
+  // onramp
+  uint96 internal constant MAX_NOP_FEES_JUELS = 1e27;
+
   // offRamp
   uint256 internal constant POOL_BALANCE = 1e25;
   uint32 internal constant EXECUTION_DELAY_SECONDS = 0;
