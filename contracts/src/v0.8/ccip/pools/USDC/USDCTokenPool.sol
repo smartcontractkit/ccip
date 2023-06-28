@@ -27,9 +27,10 @@ contract USDCTokenPool is TokenPool {
 
   // A domain is a USDC representation of a chain.
   struct DomainUpdate {
-    bytes32 allowedCaller; // Address allowed to mint on the domain
-    uint32 domainIdentifier; // Unique domain ID
-    uint64 destChainSelector; // The destination chain for this domain
+    bytes32 allowedCaller; //       Address allowed to mint on the domain
+    uint32 domainIdentifier; // --┐ Unique domain ID
+    uint64 destChainSelector; //  | The destination chain for this domain
+    bool enabled; // --------- ---┘ Whether the domain is enabled
   }
 
   // Contains the contracts for sending and receiving USDC tokens
@@ -47,8 +48,9 @@ contract USDCTokenPool is TokenPool {
 
   // A domain is a USDC representation of a chain.
   struct Domain {
-    bytes32 allowedCaller; // Address allowed to mint on the domain
-    uint32 domainIdentifier; // Unique domain ID
+    bytes32 allowedCaller; //      Address allowed to mint on the domain
+    uint32 domainIdentifier; // -┐ Unique domain ID
+    bool enabled; // ------------┘ Whether the domain is enabled
   }
 
   // A mapping of CCIP chain identifiers to destination domains
@@ -61,8 +63,6 @@ contract USDCTokenPool is TokenPool {
     RateLimiter.Config memory rateLimiterConfig
   ) TokenPool(token, allowlist, rateLimiterConfig) {
     _setConfig(config);
-
-    i_token.approve(config.tokenMessenger, type(uint256).max);
   }
 
   /// @notice returns the USDC interface flag used for EIP165 identification.
@@ -88,7 +88,7 @@ contract USDCTokenPool is TokenPool {
     bytes calldata
   ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) returns (bytes memory) {
     Domain memory domain = s_chainToDomain[destChainSelector];
-    if (domain.domainIdentifier == 0) revert UnknownDomain(destChainSelector);
+    if (!domain.enabled) revert UnknownDomain(destChainSelector);
     bytes32 receiver = bytes32(destinationReceiver[0:32]);
 
     uint64 nonce = ITokenMessenger(s_config.tokenMessenger).depositForBurnWithCaller(
@@ -140,6 +140,7 @@ contract USDCTokenPool is TokenPool {
   /// @notice Sets the config
   function _setConfig(USDCConfig memory config) internal {
     if (config.messageTransmitter == address(0) || config.tokenMessenger == address(0)) revert InvalidConfig();
+    i_token.approve(config.tokenMessenger, type(uint256).max);
     s_config = config;
     emit ConfigSet(config);
   }
@@ -155,7 +156,8 @@ contract USDCTokenPool is TokenPool {
       DomainUpdate memory domain = domains[i];
       s_chainToDomain[domain.destChainSelector] = Domain({
         domainIdentifier: domain.domainIdentifier,
-        allowedCaller: domain.allowedCaller
+        allowedCaller: domain.allowedCaller,
+        enabled: domain.enabled
       });
     }
     emit DomainsSet(domains);
