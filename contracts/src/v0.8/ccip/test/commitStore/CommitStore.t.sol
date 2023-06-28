@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
 import {IARM} from "../../interfaces/IARM.sol";
@@ -135,6 +135,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     assertEq(dynamicConfig.arm, gotDynamicConfig.arm);
 
     // CommitStore initial values
+    assertEq(0, commitStore.getLatestPriceEpochAndRound());
     assertEq(1, commitStore.getExpectedNextSequenceNumber());
     assertEq(commitStore.typeAndVersion(), "CommitStore 1.0.0");
     assertEq(OWNER, commitStore.owner());
@@ -160,7 +161,7 @@ contract CommitStore_setMinSeqNr is CommitStoreSetup {
 
 /// @notice #setDynamicConfig
 contract CommitStore_setDynamicConfig is CommitStoreSetup {
-  function testSetMinSeqNrSuccess(address priceRegistry, address arm) public {
+  function testSetDynamicConfigSuccess(address priceRegistry, address arm) public {
     vm.assume(priceRegistry != address(0) && arm != address(0));
     CommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
@@ -198,6 +199,29 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
     CommitStore.DynamicConfig memory gotDynamicConfig = s_commitStore.getDynamicConfig();
     assertEq(gotDynamicConfig.priceRegistry, dynamicConfig.priceRegistry);
+  }
+
+  function testPriceEpochClearedSuccess() public {
+    // Set latest price epoch and round to non-zero.
+    uint40 latestEpochAndRound = 1782155;
+    s_commitStore.setLatestPriceEpochAndRound(latestEpochAndRound);
+    assertEq(latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
+
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
+      priceRegistry: address(1),
+      arm: address(2)
+    });
+    // New config should clear it.
+    s_commitStore.setOCR2Config(
+      s_valid_signers,
+      s_valid_transmitters,
+      s_f,
+      abi.encode(dynamicConfig),
+      s_offchainConfigVersion,
+      abi.encode("")
+    );
+    // Assert cleared.
+    assertEq(0, s_commitStore.getLatestPriceEpochAndRound());
   }
 
   // Reverts

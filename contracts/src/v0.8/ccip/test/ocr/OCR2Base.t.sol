@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
 import {OCR2Setup} from "./OCR2Setup.t.sol";
@@ -116,6 +116,18 @@ contract OCR2Base_transmit is OCR2BaseSetup {
   }
 
   // Reverts
+
+  function testForkedChainReverts() public {
+    bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
+
+    uint256 chain1 = block.chainid;
+    uint256 chain2 = chain1 + 1;
+    vm.chainId(chain2);
+    vm.expectRevert(abi.encodeWithSelector(OCR2Base.ForkedChain.selector, chain1, chain2));
+    changePrank(s_valid_transmitters[0]);
+    s_OCR2Base.transmit(reportContext, REPORT, s_rs, s_ss, s_rawVs);
+  }
+
   function testWrongNumberOfSignaturesReverts() public {
     bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
 

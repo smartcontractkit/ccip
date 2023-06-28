@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
@@ -13,6 +13,7 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
   error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
+  error ForkedChain(uint256 expected, uint256 actual);
   error UnauthorizedTransmitter();
   error OracleCannotBeZeroAddress();
 
@@ -73,11 +74,17 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
       32 + // word containing length rs
       32; // word containing length of ss
 
+  uint256 internal immutable i_chainID;
+
   // Reverts transaction if config args are invalid
   modifier checkConfigValid(uint256 numTransmitters, uint256 f) {
     if (numTransmitters > MAX_NUM_ORACLES) revert InvalidConfig("too many transmitters");
     if (f == 0) revert InvalidConfig("f must be positive");
     _;
+  }
+
+  constructor() {
+    i_chainID = block.chainid;
   }
 
   /// @notice sets offchain reporting protocol configuration incl. participating oracles
@@ -172,8 +179,11 @@ abstract contract OCR2BaseNoChecks is OwnerIsCreator, OCR2Abstract {
     // reportContext[2]: ExtraHash
     bytes32 configDigest = reportContext[0];
     bytes32 latestConfigDigest = s_configInfo.latestConfigDigest;
-
     if (latestConfigDigest != configDigest) revert ConfigDigestMismatch(latestConfigDigest, configDigest);
+    // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
+    // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest
+    // calculated from chain A and so OCR reports will be valid on both forks.
+    if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
     emit Transmitted(configDigest, uint32(uint256(reportContext[1]) >> 8));
 

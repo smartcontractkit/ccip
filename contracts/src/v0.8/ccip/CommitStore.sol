@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
 import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
@@ -156,7 +156,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   ) external view override whenNotPaused returns (uint256 timestamp) {
     bytes32 root = MerkleMultiProof.merkleRoot(hashedLeaves, proofs, proofFlagBits);
     // Only return non-zero if present and blessed.
-    if (s_roots[root] == 0 || !isBlessed(root)) {
+    if (!isBlessed(root)) {
       return 0;
     }
     return s_roots[root];
@@ -233,6 +233,11 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
     if (dynamicConfig.arm == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();
 
     s_dynamicConfig = dynamicConfig;
+    // When the OCR config changes, we reset the price epoch and round
+    // since epoch and rounds are scoped per config digest.
+    // Note that s_minSeqNr/roots do not need to be reset as the roots persist
+    // across reconfigurations and are de-duplicated separately.
+    s_latestPriceEpochAndRound = 0;
 
     emit ConfigSet(
       StaticConfig({chainSelector: i_chainSelector, sourceChainSelector: i_sourceChainSelector, onRamp: i_onRamp}),

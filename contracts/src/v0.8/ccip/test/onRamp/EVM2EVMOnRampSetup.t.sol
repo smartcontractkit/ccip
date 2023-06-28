@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
@@ -88,6 +88,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
         chainSelector: SOURCE_CHAIN_ID,
         destChainSelector: DEST_CHAIN_ID,
         defaultTxGasLimit: GAS_LIMIT,
+        maxNopFeesJuels: MAX_NOP_FEES_JUELS,
         prevOnRamp: address(0)
       }),
       generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_mockARM)),

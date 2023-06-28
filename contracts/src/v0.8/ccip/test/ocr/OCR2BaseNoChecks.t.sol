@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
 import {OCR2Setup} from "./OCR2Setup.t.sol";
 import {OCR2BaseNoChecks} from "../../ocr/OCR2BaseNoChecks.sol";
 import {OCR2NoChecksHelper} from "../helpers/OCR2NoChecksHelper.sol";
 
-contract OCR2BasNoChecksSetup is OCR2Setup {
+contract OCR2BaseNoChecksSetup is OCR2Setup {
   OCR2NoChecksHelper internal s_OCR2Base;
 
   bytes32[] internal s_rs;
@@ -34,11 +34,11 @@ contract OCR2BasNoChecksSetup is OCR2Setup {
   }
 }
 
-contract OCR2BaseNoChecks_transmit is OCR2BasNoChecksSetup {
+contract OCR2BaseNoChecks_transmit is OCR2BaseNoChecksSetup {
   bytes32 internal s_configDigest;
 
   function setUp() public virtual override {
-    OCR2BasNoChecksSetup.setUp();
+    OCR2BaseNoChecksSetup.setUp();
     bytes memory configBytes = abi.encode("");
 
     s_configDigest = getBasicConfigDigest(s_f, 0);
@@ -63,6 +63,17 @@ contract OCR2BaseNoChecks_transmit is OCR2BasNoChecksSetup {
 
   // Reverts
 
+  function testForkedChainReverts() public {
+    bytes32[3] memory reportContext = [s_configDigest, s_configDigest, s_configDigest];
+
+    uint256 chain1 = block.chainid;
+    uint256 chain2 = chain1 + 1;
+    vm.chainId(chain2);
+    vm.expectRevert(abi.encodeWithSelector(OCR2BaseNoChecks.ForkedChain.selector, chain1, chain2));
+    changePrank(s_valid_transmitters[0]);
+    s_OCR2Base.transmit(reportContext, REPORT, s_rs, s_ss, s_rawVs);
+  }
+
   function testConfigDigestMismatchReverts() public {
     bytes32 configDigest;
 
@@ -84,7 +95,7 @@ contract OCR2BaseNoChecks_transmit is OCR2BasNoChecksSetup {
   }
 }
 
-contract OCR2BaseNoChecks_setOCR2Config is OCR2BasNoChecksSetup {
+contract OCR2BaseNoChecks_setOCR2Config is OCR2BaseNoChecksSetup {
   event ConfigSet(
     uint32 previousConfigBlockNumber,
     bytes32 configDigest,

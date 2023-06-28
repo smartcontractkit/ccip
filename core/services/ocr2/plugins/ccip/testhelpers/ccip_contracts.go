@@ -204,6 +204,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			ChainSelector:     c.Source.ChainID,
 			DestChainSelector: c.Dest.ChainID,
 			DefaultTxGasLimit: 200_000,
+			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 			PrevOnRamp:        prevOnRamp,
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
@@ -814,6 +815,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			ChainSelector:     sourceChainID, // source chain id
 			DestChainSelector: destChainID,   // destinationChainSelectors
 			DefaultTxGasLimit: 200_000,
+			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 			PrevOnRamp:        common.HexToAddress(""),
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{

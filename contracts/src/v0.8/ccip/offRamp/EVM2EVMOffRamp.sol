@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
@@ -202,6 +202,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// @notice Manually execute a message.
   /// @param report Internal.ExecutionReport.
   function manuallyExecute(Internal.ExecutionReport calldata report) external {
+    // We do this here because the other _execute path is already covered OCR2BaseXXX.
+    if (i_chainID != block.chainid) revert OCR2BaseNoChecks.ForkedChain(i_chainID, uint64(block.chainid));
     _execute(report, true);
   }
 

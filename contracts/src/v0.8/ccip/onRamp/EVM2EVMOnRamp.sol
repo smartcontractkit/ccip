@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
 import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
@@ -43,6 +43,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error NoNopsToPay();
   error InsufficientBalance();
   error TooManyNops();
+  error MaxFeeBalanceReached();
   error MessageTooLarge(uint256 maxSize, uint256 actualSize);
   error MessageGasLimitTooHigh();
   error UnsupportedNumberOfTokens();
@@ -80,7 +81,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address linkToken; // --------┐ Link token address
     uint64 chainSelector; // -----┘ Source chainSelector
     uint64 destChainSelector; // -┐ Destination chainSelector
-    uint64 defaultTxGasLimit; // -┘ Default gas limit for a tx
+    uint64 defaultTxGasLimit; //  | Default gas limit for a tx
+    uint96 maxNopFeesJuels; // ---┘ Max nop fee balance onramp can have
     address prevOnRamp; //          Address of previous-version OnRamp
   }
 
@@ -144,6 +146,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Default gas limit for a transactions that did not specify
   /// a gas limit in the extraArgs.
   uint64 internal immutable i_defaultTxGasLimit;
+  /// @dev Maximum nop fee that can accumulate in this onramp
+  uint96 internal immutable i_maxNopFeesJuels;
   /// @dev The link token address - known to pay nops for their work
   address internal immutable i_linkToken;
   /// @dev The chain ID of the source chain that this contract is deployed to
@@ -216,6 +220,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     i_chainSelector = staticConfig.chainSelector;
     i_destChainSelector = staticConfig.destChainSelector;
     i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
+    i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
     i_prevOnRamp = staticConfig.prevOnRamp;
 
     _setDynamicConfig(dynamicConfig);
@@ -280,6 +285,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         IPriceRegistry(s_dynamicConfig.priceRegistry).convertTokenAmount(message.feeToken, feeTokenAmount, i_linkToken)
       );
     }
+    if (s_nopFeesJuels > i_maxNopFeesJuels) revert MaxFeeBalanceReached();
 
     if (s_senderNonce[originalSender] == 0 && i_prevOnRamp != address(0)) {
       // If this is first time send for a sender in new OnRamp, check if they have a nonce
@@ -344,8 +350,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 numberOfTokens,
     address originalSender
   ) internal view {
-    if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
+    if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     // Check that payload is formed correctly
     uint256 maxDataSize = uint256(s_dynamicConfig.maxDataSize);
     if (dataLength > maxDataSize) revert MessageTooLarge(maxDataSize, dataLength);
@@ -367,6 +373,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         chainSelector: i_chainSelector,
         destChainSelector: i_destChainSelector,
         defaultTxGasLimit: i_defaultTxGasLimit,
+        maxNopFeesJuels: i_maxNopFeesJuels,
         prevOnRamp: i_prevOnRamp
       });
   }
@@ -397,6 +404,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         chainSelector: i_chainSelector,
         destChainSelector: i_destChainSelector,
         defaultTxGasLimit: i_defaultTxGasLimit,
+        maxNopFeesJuels: i_maxNopFeesJuels,
         prevOnRamp: i_prevOnRamp
       }),
       dynamicConfig
@@ -630,15 +638,15 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Clears existing nops, sets new nops and weights
   /// @param nopsAndWeights New set of nops and weights
   function _setNops(NopAndWeight[] memory nopsAndWeights) internal {
+    uint256 numberOfNops = nopsAndWeights.length;
+    if (numberOfNops > MAX_NUMBER_OF_NOPS) revert TooManyNops();
+
     // Make sure all nops have been paid before removing nops
     // We only have to pay when there are nops and there is enough
     // outstanding NOP balance to trigger a payment.
     if (s_nopWeightsTotal > 0 && s_nopFeesJuels > s_nopWeightsTotal) {
       payNops();
     }
-
-    uint256 numberOfNops = nopsAndWeights.length;
-    if (numberOfNops > MAX_NUMBER_OF_NOPS) revert TooManyNops();
 
     // Remove all previous nops, move from end to start to avoid shifting
     for (uint256 i = s_nops.length(); i > 0; --i) {
