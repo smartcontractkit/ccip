@@ -43,7 +43,7 @@ contract BurnMintTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes memory
-  ) external override whenNotPaused onlyOffRamp {
+  ) external virtual override whenNotPaused onlyOffRamp {
     _consumeRateLimit(amount);
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
     emit Minted(msg.sender, receiver, amount);

@@ -2,8 +2,9 @@
 pragma solidity 0.8.19;
 
 import "../../offRamp/EVM2EVMOffRamp.sol";
+import {IgnoreContractSize} from "./IgnoreContractSize.sol";
 
-contract EVM2EVMOffRampHelper is EVM2EVMOffRamp {
+contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
   constructor(
     StaticConfig memory staticConfig,
     IERC20[] memory sourceTokens,
@@ -26,6 +27,14 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp {
     bytes[] calldata offchainTokenData
   ) external returns (Client.EVMTokenAmount[] memory) {
     return _releaseOrMintTokens(sourceTokenAmounts, originalSender, receiver, offchainTokenData);
+  }
+
+  function trialExecute(
+    Internal.EVM2EVMMessage memory message,
+    bytes[] memory offchainTokenData,
+    bool manualExecution
+  ) external returns (Internal.MessageExecutionState, bytes memory) {
+    return _trialExecute(message, offchainTokenData, manualExecution);
   }
 
   function report(bytes calldata executableMessages) external {

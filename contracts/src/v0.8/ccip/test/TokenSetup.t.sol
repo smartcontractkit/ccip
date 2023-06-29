@@ -6,6 +6,7 @@ import "../pools/BurnMintTokenPool.sol";
 import "../pools/LockReleaseTokenPool.sol";
 import "../libraries/Client.sol";
 import {BurnMintERC677} from "../../shared/token/ERC677/BurnMintERC677.sol";
+import {MaybeRevertingBurnMintTokenPool} from "./helpers/MaybeRevertingBurnMintTokenPool.sol";
 
 contract TokenSetup is BaseTest {
   address[] internal s_sourceTokens;
@@ -43,18 +44,16 @@ contract TokenSetup is BaseTest {
       BurnMintERC677 destLink = new BurnMintERC677("dLINK", "dLNK", 18, 0);
       deal(address(destLink), OWNER, type(uint256).max);
       s_destTokens.push(address(destLink));
+      s_destPools.push(address(new LockReleaseTokenPool(destLink, new address[](0), rateLimiterConfig())));
 
       BurnMintERC677 destEth = new BurnMintERC677("dETH", "dETH", 18, 0);
       deal(address(destEth), OWNER, 2 ** 128);
       s_destTokens.push(address(destEth));
-
-      s_destPools.push(address(new LockReleaseTokenPool(destLink, new address[](0), rateLimiterConfig())));
-      s_destPools.push(address(new BurnMintTokenPool(destEth, new address[](0), rateLimiterConfig())));
+      s_destPools.push(address(new MaybeRevertingBurnMintTokenPool(destEth, new address[](0), rateLimiterConfig())));
       destEth.grantMintAndBurnRoles(s_destPools[1]);
 
-      // Float the pools with funds
+      // Float the lockRelease pool with funds
       IERC20(s_destTokens[0]).transfer(address(s_destPools[0]), POOL_BALANCE);
-      IERC20(s_destTokens[1]).transfer(address(s_destPools[1]), POOL_BALANCE);
     }
 
     s_destFeeToken = s_destTokens[0];

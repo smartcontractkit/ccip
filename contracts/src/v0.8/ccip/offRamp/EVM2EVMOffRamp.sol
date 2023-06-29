@@ -48,6 +48,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   error UnsupportedToken(IERC20 token);
   error CanOnlySelfCall();
   error ReceiverError(bytes error);
+  error TokenHandlingError(bytes error);
+  error TokenRateLimitError(bytes error);
   error EmptyReport();
   error BadARMSignal();
   error InvalidMessageId();
@@ -357,7 +359,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     bool manualExecution
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
     try this.executeSingleMessage(message, offchainTokenData, manualExecution) {} catch (bytes memory err) {
-      if (ReceiverError.selector == bytes4(err)) {
+      if (ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector
         // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
@@ -557,6 +559,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
   /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
   /// @param receiver The address that will receive the tokens.
+  /// @dev This function wrappes the token pool call in a try catch block to gracefully handle
+  /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
+  /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
   function _releaseOrMintTokens(
     Client.EVMTokenAmount[] memory sourceTokenAmounts,
     bytes memory originalSender,
@@ -566,13 +571,30 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
-      pool.releaseOrMint(
-        originalSender,
-        receiver,
-        sourceTokenAmounts[i].amount,
-        i_sourceChainSelector,
-        offchainTokenData[i]
-      );
+
+      try
+        pool.releaseOrMint(
+          originalSender,
+          receiver,
+          sourceTokenAmounts[i].amount,
+          i_sourceChainSelector,
+          offchainTokenData[i]
+        )
+      {} catch (
+        /// @dev we only want to revert on rate limiting errors, any other errors are
+        /// wrapped in a TokenHandlingError, which is caught above and handled gracefully.
+        bytes memory err
+      ) {
+        if (
+          RateLimiter.BucketOverfilled.selector == bytes4(err) ||
+          RateLimiter.ConsumingMoreThanMaxCapacity.selector == bytes4(err) ||
+          RateLimiter.RateLimitReached.selector == bytes4(err)
+        ) {
+          revert TokenRateLimitError(err);
+        } else {
+          revert TokenHandlingError(err);
+        }
+      }
 
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
