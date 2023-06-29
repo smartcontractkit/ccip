@@ -179,13 +179,13 @@ ClientCertificate is the client certificate used for mTLS authentication
 ## Threshold
 ```toml
 [Threshold]
-ThresholdDecryptionKeyShare = "A-Threshold-Decryption-Key-Share" # Example
+ThresholdKeyShare = "A-Threshold-Decryption-Key-Share" # Example
 ```
 
 
-### ThresholdDecryptionKeyShare
+### ThresholdKeyShare
 ```toml
-ThresholdDecryptionKeyShare = "A-Threshold-Decryption-Key-Share" # Example
+ThresholdKeyShare = "A-Threshold-Decryption-Key-Share" # Example
 ```
-ThresholdDecryptionKeyShare used by the threshold decryption OCR plugin
+ThresholdKeyShare used by the threshold decryption OCR plugin
 

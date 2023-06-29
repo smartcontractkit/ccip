@@ -74,7 +74,8 @@ require (
 	github.com/smartcontractkit/ocr2keepers v0.7.0
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230616201444-d8b4222aff3c
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb
-	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230526143804-20ea6fd3d0dc
+	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230616141813-ca0ecf03ca5c
+	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230616062456-5c32c95fc166
 	github.com/smartcontractkit/wsrpc v0.7.2
 	github.com/spf13/cast v1.5.1
 	github.com/stretchr/testify v1.8.4
@@ -351,7 +352,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/chainlink-env v0.32.5 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework v1.11.6 // indirect
-	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230523211009-fd9406f09967 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
