@@ -28,12 +28,12 @@ contract TokenSetup is BaseTest {
       BurnMintERC677 sourceLink = new BurnMintERC677("sLINK", "sLNK", 18, 0);
       deal(address(sourceLink), OWNER, type(uint256).max);
       s_sourceTokens.push(address(sourceLink));
-      s_sourcePools.push(address(new LockReleaseTokenPool(sourceLink, new address[](0), rateLimiterConfig())));
+      s_sourcePools.push(address(new LockReleaseTokenPool(sourceLink, new address[](0))));
 
       BurnMintERC677 sourceETH = new BurnMintERC677("sETH", "sETH", 18, 0);
       deal(address(sourceETH), OWNER, 2 ** 128);
       s_sourceTokens.push(address(sourceETH));
-      s_sourcePools.push(address(new BurnMintTokenPool(sourceETH, new address[](0), rateLimiterConfig())));
+      s_sourcePools.push(address(new BurnMintTokenPool(sourceETH, new address[](0))));
       sourceETH.grantMintAndBurnRoles(s_sourcePools[1]);
     }
 
@@ -44,12 +44,13 @@ contract TokenSetup is BaseTest {
       BurnMintERC677 destLink = new BurnMintERC677("dLINK", "dLNK", 18, 0);
       deal(address(destLink), OWNER, type(uint256).max);
       s_destTokens.push(address(destLink));
-      s_destPools.push(address(new LockReleaseTokenPool(destLink, new address[](0), rateLimiterConfig())));
+      s_destPools.push(address(new LockReleaseTokenPool(destLink, new address[](0))));
 
       BurnMintERC677 destEth = new BurnMintERC677("dETH", "dETH", 18, 0);
       deal(address(destEth), OWNER, 2 ** 128);
       s_destTokens.push(address(destEth));
-      s_destPools.push(address(new MaybeRevertingBurnMintTokenPool(destEth, new address[](0), rateLimiterConfig())));
+
+      s_destPools.push(address(new MaybeRevertingBurnMintTokenPool(destEth, new address[](0))));
       destEth.grantMintAndBurnRoles(s_destPools[1]);
 
       // Float the lockRelease pool with funds

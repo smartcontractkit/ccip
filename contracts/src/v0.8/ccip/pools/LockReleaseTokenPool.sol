@@ -25,11 +25,7 @@ contract LockReleaseTokenPool is TokenPool {
 
   mapping(address provider => uint256 balance) internal s_liquidityProviderBalances;
 
-  constructor(
-    IERC20 token,
-    address[] memory allowlist,
-    RateLimiter.Config memory rateLimiterConfig
-  ) TokenPool(token, allowlist, rateLimiterConfig) {}
+  constructor(IERC20 token, address[] memory allowlist) TokenPool(token, allowlist) {}
 
   /// @notice Locks the token in the pool
   /// @dev Locks are not rate limited at per-pool level. Each pool is shared across lanes,
@@ -42,7 +38,8 @@ contract LockReleaseTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) returns (bytes memory) {
+  ) external override onlyOnRamp checkAllowList(originalSender) returns (bytes memory) {
+    _consumeOnRampRateLimit(amount);
     emit Locked(msg.sender, amount);
     return "";
   }
@@ -56,8 +53,8 @@ contract LockReleaseTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes memory
-  ) external override whenNotPaused onlyOffRamp {
-    _consumeRateLimit(amount);
+  ) external override onlyOffRamp {
+    _consumeOffRampRateLimit(amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, amount);
   }

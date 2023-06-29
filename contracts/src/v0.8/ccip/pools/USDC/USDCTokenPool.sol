@@ -56,12 +56,7 @@ contract USDCTokenPool is TokenPool {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) private s_chainToDomain;
 
-  constructor(
-    USDCConfig memory config,
-    IBurnMintERC20 token,
-    address[] memory allowlist,
-    RateLimiter.Config memory rateLimiterConfig
-  ) TokenPool(token, allowlist, rateLimiterConfig) {
+  constructor(USDCConfig memory config, IBurnMintERC20 token, address[] memory allowlist) TokenPool(token, allowlist) {
     _setConfig(config);
   }
 
@@ -86,11 +81,11 @@ contract USDCTokenPool is TokenPool {
     uint256 amount,
     uint64 destChainSelector,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp checkAllowList(originalSender) returns (bytes memory) {
+  ) external override onlyOnRamp checkAllowList(originalSender) returns (bytes memory) {
     Domain memory domain = s_chainToDomain[destChainSelector];
     if (!domain.enabled) revert UnknownDomain(destChainSelector);
+    _consumeOnRampRateLimit(amount);
     bytes32 receiver = bytes32(destinationReceiver[0:32]);
-
     uint64 nonce = ITokenMessenger(s_config.tokenMessenger).depositForBurnWithCaller(
       amount,
       domain.domainIdentifier,
@@ -111,8 +106,8 @@ contract USDCTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes memory extraData
-  ) external override whenNotPaused onlyOffRamp {
-    _consumeRateLimit(amount);
+  ) external override onlyOffRamp {
+    _consumeOffRampRateLimit(amount);
     MessageAndAttestation memory msgAndAttestation = abi.decode(extraData, (MessageAndAttestation));
     if (
       !IMessageReceiver(s_config.messageTransmitter).receiveMessage(

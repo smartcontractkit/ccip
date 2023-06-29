@@ -175,7 +175,13 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting on ramp for onramp router")
-	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRamp, Allowed: true}}, []lock_release_token_pool.TokenPoolRampUpdate{})
+	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{
+		{Ramp: onRamp, Allowed: true,
+			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			}}}, []lock_release_token_pool.TokenPoolRampUpdate{})
 
 	if err != nil {
 		return err
@@ -196,7 +202,13 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting off ramp for Token Pool")
-	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{{Ramp: offRamp, Allowed: true}})
+
+	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{
+		{Ramp: offRamp, Allowed: true, RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+			IsEnabled: true,
+			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+		}}})
 	if err != nil {
 		return err
 	}

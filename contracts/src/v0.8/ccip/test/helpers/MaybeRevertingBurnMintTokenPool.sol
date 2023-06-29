@@ -9,11 +9,7 @@ import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
   bytes public s_revertReason = "";
 
-  constructor(
-    IBurnMintERC20 token,
-    address[] memory allowlist,
-    RateLimiter.Config memory rateLimiterConfig
-  ) BurnMintTokenPool(token, allowlist, rateLimiterConfig) {}
+  constructor(IBurnMintERC20 token, address[] memory allowlist) BurnMintTokenPool(token, allowlist) {}
 
   function setShouldRevert(bytes calldata revertReason) external {
     s_revertReason = revertReason;
@@ -26,14 +22,14 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     uint256 amount,
     uint64,
     bytes memory
-  ) external virtual override whenNotPaused onlyOffRamp {
+  ) external virtual override onlyOffRamp {
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
       assembly {
         revert(add(32, revertReason), mload(revertReason))
       }
     }
-    _consumeRateLimit(amount);
+    _consumeOnRampRateLimit(amount);
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
     emit Minted(msg.sender, receiver, amount);
   }

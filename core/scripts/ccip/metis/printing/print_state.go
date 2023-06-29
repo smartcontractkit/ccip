@@ -400,13 +400,7 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 		if tokenConfig.Pool == common.HexToAddress("") {
 			continue
 		}
-
-		tokenPool, err := lock_release_token_pool.NewLockReleaseTokenPool(tokenConfig.Pool, chain.Client)
-		helpers.PanicErr(err)
-		paused, err := tokenPool.Paused(&bind.CallOpts{})
-		helpers.PanicErr(err)
-
-		sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "token pool", tokenConfig.Pool.Hex(), printBool(!paused)))
+		sb.WriteString(fmt.Sprintf("| %-25s | %42s |\n", "token pool", tokenConfig.Pool.Hex()))
 	}
 
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)

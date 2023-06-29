@@ -23,16 +23,16 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     BaseTest.setUp();
     s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
-    s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, new address[](0), rateLimiterConfig());
+    s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, new address[](0));
 
     s_allowedList.push(USER_1);
     s_allowedList.push(DUMMY_CONTRACT_ADDRESS);
-    s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(s_token, s_allowedList, rateLimiterConfig());
+    s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(s_token, s_allowedList);
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true});
+    onRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
     TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOffRamp, allowed: true});
+    offRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOffRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
 
     s_lockReleaseTokenPool.applyRampUpdates(onRamps, offRamps);
     s_lockReleaseTokenPoolWithAllowList.applyRampUpdates(onRamps, offRamps);
@@ -42,10 +42,14 @@ contract LockReleaseTokenPoolSetup is BaseTest {
 contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
   error SenderNotAllowed(address sender);
   event Locked(address indexed sender, uint256 amount);
+  event TokensConsumed(uint256 tokens);
 
   function testLockOrBurnNoAllowListSuccess(uint256 amount) public {
+    amount = bound(amount, 1, rateLimiterConfig().capacity);
     changePrank(s_allowedOnRamp);
 
+    vm.expectEmit();
+    emit TokensConsumed(amount);
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
@@ -56,6 +60,8 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     uint256 amount = 100;
     changePrank(s_allowedOnRamp);
 
+    vm.expectEmit();
+    emit TokensConsumed(amount);
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 

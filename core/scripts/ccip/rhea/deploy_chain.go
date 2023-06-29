@@ -151,12 +151,7 @@ func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, to
 		client.Owner,
 		client.Client,
 		tokenAddress,
-		poolAllowList,
-		lock_release_token_pool.RateLimiterConfig{
-			IsEnabled: false,
-			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(RATE_LIMIT_CAPACITY_DOLLAR)),
-			Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(RATE_LIMIT_RATE_DOLLAR)),
-		})
+		poolAllowList)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -178,12 +173,7 @@ func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, token
 		client.Owner,
 		client.Client,
 		tokenAddress,
-		poolAllowList,
-		burn_mint_token_pool.RateLimiterConfig{
-			IsEnabled: false,
-			Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(RATE_LIMIT_CAPACITY_DOLLAR)),
-			Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(RATE_LIMIT_RATE_DOLLAR)),
-		})
+		poolAllowList)
 	if err != nil {
 		return common.Address{}, err
 	}

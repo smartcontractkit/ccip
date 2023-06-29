@@ -12,11 +12,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
 
   bool private s_attacked;
 
-  constructor(
-    address facade,
-    IERC20 token,
-    RateLimiter.Config memory rateLimiterConfig
-  ) TokenPool(token, new address[](0), rateLimiterConfig) {
+  constructor(address facade, IERC20 token) TokenPool(token, new address[](0)) {
     i_facade = facade;
   }
 

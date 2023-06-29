@@ -38,16 +38,24 @@ contract USDCTokenPoolSetup is BaseTest {
       messageTransmitter: address(s_mockUSDC)
     });
 
-    s_usdcTokenPool = new USDCTokenPool(config, s_token, new address[](0), rateLimiterConfig());
+    s_usdcTokenPool = new USDCTokenPool(config, s_token, new address[](0));
 
     s_allowedList.push(USER_1);
-    s_usdcTokenPoolWithAllowList = new USDCTokenPool(config, s_token, s_allowedList, rateLimiterConfig());
+    s_usdcTokenPoolWithAllowList = new USDCTokenPool(config, s_token, s_allowedList);
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({ramp: s_routerAllowedOnRamp, allowed: true});
+    onRamps[0] = TokenPool.RampUpdate({
+      ramp: s_routerAllowedOnRamp,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
 
     TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({ramp: s_routerAllowedOffRamp, allowed: true});
+    offRamps[0] = TokenPool.RampUpdate({
+      ramp: s_routerAllowedOffRamp,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
 
     s_usdcTokenPool.applyRampUpdates(onRamps, offRamps);
     s_usdcTokenPoolWithAllowList.applyRampUpdates(onRamps, offRamps);
@@ -91,13 +99,18 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     bytes32 destinationCaller
   );
   event Burned(address indexed sender, uint256 amount);
+  event TokensConsumed(uint256 tokens);
 
   function testLockOrBurnSuccess(bytes32 destinationReceiver, uint256 amount) public {
+    vm.assume(amount < rateLimiterConfig().capacity);
+    vm.assume(amount > 0);
     changePrank(s_routerAllowedOnRamp);
     s_token.approve(address(s_usdcTokenPool), amount);
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_ID);
 
+    vm.expectEmit();
+    emit TokensConsumed(amount);
     vm.expectEmit();
     emit DepositForBurn(
       s_mockUSDC.s_nonce(),
@@ -109,7 +122,6 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       s_mockUSDC.i_destinationTokenMessenger(),
       expectedDomain.allowedCaller
     );
-
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
@@ -125,11 +137,15 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   }
 
   function testLockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
+    vm.assume(amount < rateLimiterConfig().capacity);
+    vm.assume(amount > 0);
     changePrank(s_routerAllowedOnRamp);
     s_token.approve(address(s_usdcTokenPoolWithAllowList), amount);
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPoolWithAllowList.getDomain(DEST_CHAIN_ID);
 
+    vm.expectEmit();
+    emit TokensConsumed(amount);
     vm.expectEmit();
     emit DepositForBurn(
       s_mockUSDC.s_nonce(),
@@ -141,7 +157,6 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
       s_mockUSDC.i_destinationTokenMessenger(),
       expectedDomain.allowedCaller
     );
-
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 

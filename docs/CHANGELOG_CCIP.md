@@ -12,9 +12,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.7.0 - Unreleased
 
 ### Added
+- TokenPool's now have getOnRamps() and getOffRamps() functions to get the list of on and off ramps for a token pool.
+
 
 ### Changed
 
+- RampUpdates for token pool upgrades now contain a rate limit to be able to configure  
+per lane token pool rate limits.
+  - Before
+  ```
+    struct RampUpdate {
+      address ramp;
+      bool allowed;
+    }
+    ```
+  - After
+  ```
+    struct RampUpdate {
+      address ramp;
+      bool allowed;
+      RateLimiter.Config rateLimiterConfig;
+    }
+  ```
 - FeeTokenConfigArgs & FeeTokenConfig have two new fields and one renamed field
   - added
     - destGasPerPayloadByte - gas cost per payload byte on destination chain
@@ -27,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Removed
+- Token pool constructor no longer takes a `rateLimiterConfig` parameter.
 
 
 ## 0.6.0 - 2023-06-19

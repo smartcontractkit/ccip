@@ -37,7 +37,6 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
     s_thirdPartyPool = new ThirdPartyBurnMintTokenPool(
       IBurnMintERC20(address(s_token)),
       new address[](0),
-      rateLimiterConfig(),
       address(s_router)
     );
 
@@ -46,7 +45,6 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
     s_thirdPartyPoolWithAllowList = new ThirdPartyBurnMintTokenPool(
       IBurnMintERC20(address(s_token)),
       s_allowedList,
-      rateLimiterConfig(),
       address(s_router)
     );
 
@@ -54,7 +52,11 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
     BurnMintERC677(address(s_token)).grantMintAndBurnRoles(address(s_thirdPartyPoolWithAllowList));
 
     TokenPool.RampUpdate[] memory poolOnRampsUpdates = new TokenPool.RampUpdate[](1);
-    poolOnRampsUpdates[0] = TokenPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true});
+    poolOnRampsUpdates[0] = TokenPool.RampUpdate({
+      ramp: s_allowedOnRamp,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
     TokenPool.RampUpdate[] memory poolOffRampUpdates = new TokenPool.RampUpdate[](0);
 
     s_thirdPartyPool.applyRampUpdates(poolOnRampsUpdates, poolOffRampUpdates);
@@ -65,6 +67,7 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
 contract ThirdPartyBurnMintTokenPool_lockOrBurn is ThirdPartyBurnMintTokenPoolSetup {
   error SenderNotAllowed(address sender);
   event Burned(address indexed sender, uint256 amount);
+  event TokensConsumed(uint256 amount);
 
   function setUp() public virtual override {
     ThirdPartyBurnMintTokenPoolSetup.setUp();
@@ -74,8 +77,11 @@ contract ThirdPartyBurnMintTokenPool_lockOrBurn is ThirdPartyBurnMintTokenPoolSe
   }
 
   function testLockOrBurnNoAllowListSuccess(uint256 amount) public {
+    amount = bound(amount, 1, rateLimiterConfig().capacity);
     changePrank(s_allowedOnRamp);
 
+    vm.expectEmit();
+    emit TokensConsumed(amount);
     vm.expectEmit();
     emit Burned(s_allowedOnRamp, amount);
 
@@ -87,10 +93,14 @@ contract ThirdPartyBurnMintTokenPool_lockOrBurn is ThirdPartyBurnMintTokenPoolSe
     changePrank(s_allowedOnRamp);
 
     vm.expectEmit();
+    emit TokensConsumed(amount);
+    vm.expectEmit();
     emit Burned(s_allowedOnRamp, amount);
 
     s_thirdPartyPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), amount, DEST_CHAIN_ID, bytes(""));
 
+    vm.expectEmit();
+    emit TokensConsumed(amount);
     vm.expectEmit();
     emit Burned(s_allowedOnRamp, amount);
 
@@ -107,38 +117,12 @@ contract ThirdPartyBurnMintTokenPool_lockOrBurn is ThirdPartyBurnMintTokenPoolSe
 }
 
 contract ThirdPartyBurnMintTokenPool_applyRampUpdates is ThirdPartyBurnMintTokenPoolSetup {
-  event OnRampAllowanceSet(address onRamp, bool allowed);
-  event OffRampAllowanceSet(address onRamp, bool allowed);
-
-  function testApplyRampUpdatesSuccess() public {
-    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({ramp: address(1), allowed: true});
-
-    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({ramp: s_routerAllowedOffRamp, allowed: true});
-
-    vm.expectEmit();
-    emit OnRampAllowanceSet(onRamps[0].ramp, true);
-
-    vm.expectEmit();
-    emit OffRampAllowanceSet(offRamps[0].ramp, true);
-
-    s_thirdPartyPool.applyRampUpdates(onRamps, offRamps);
-
-    offRamps[0] = TokenPool.RampUpdate({ramp: s_routerAllowedOffRamp, allowed: false});
-
-    vm.expectEmit();
-    emit OffRampAllowanceSet(offRamps[0].ramp, false);
-
-    s_thirdPartyPool.applyRampUpdates(onRamps, offRamps);
-  }
-
+  // Note applyRampUpdates inherits from TokenPool so we only need to test the new functionality.
   // Reverts
-
   function testInvalidOffRampReverts() public {
     address invalidOffRamp = address(23456787654321);
     TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({ramp: invalidOffRamp, allowed: true});
+    offRamps[0] = TokenPool.RampUpdate({ramp: invalidOffRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
 
     vm.expectRevert(abi.encodeWithSelector(ThirdPartyBurnMintTokenPool.InvalidOffRamp.selector, invalidOffRamp));
 

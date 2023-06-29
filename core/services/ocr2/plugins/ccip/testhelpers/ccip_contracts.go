@@ -162,7 +162,13 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 func (c *CCIPContracts) EnableOffRamp(t *testing.T) {
 	_, err := c.Dest.Pool.ApplyRampUpdates(c.Dest.User,
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
-		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: c.Dest.OffRamp.Address(), Allowed: true}},
+		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: c.Dest.OffRamp.Address(), Allowed: true,
+			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  HundredLink,
+				Rate:      big.NewInt(1e18),
+			},
+		}},
 	)
 
 	require.NoError(t, err)
@@ -267,8 +273,19 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 
 func (c *CCIPContracts) EnableOnRamp(t *testing.T) {
 	t.Log("Setting onRamp on source pool")
-	_, err := c.Source.Pool.ApplyRampUpdates(c.Source.User,
-		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: c.Source.OnRamp.Address(), Allowed: true}},
+	_, err := c.Source.Pool.ApplyRampUpdates(
+		c.Source.User,
+		[]lock_release_token_pool.TokenPoolRampUpdate{
+			{
+				Ramp:    c.Source.OnRamp.Address(),
+				Allowed: true,
+				RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+					IsEnabled: true,
+					Capacity:  HundredLink,
+					Rate:      big.NewInt(1e18),
+				},
+			},
+		},
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
 	)
 
@@ -483,11 +500,6 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		c.Dest.Chain,
 		destTokenAddress,
 		[]common.Address{}, // pool originalSender allowList
-		burn_mint_token_pool.RateLimiterConfig{
-			IsEnabled: true,
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
-		},
 	)
 	if err != nil {
 		return [20]byte{}, nil, err
@@ -500,7 +512,13 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	}
 
 	_, err = destPool.ApplyRampUpdates(c.Dest.User, nil, []burn_mint_token_pool.TokenPoolRampUpdate{
-		{Ramp: c.Dest.OffRamp.Address(), Allowed: true},
+		{Ramp: c.Dest.OffRamp.Address(), Allowed: true,
+			RateLimiterConfig: burn_mint_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  HundredLink,
+				Rate:      big.NewInt(1e18),
+			},
+		},
 	})
 	if err != nil {
 		return [20]byte{}, nil, err
@@ -512,11 +530,6 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		c.Source.Chain,
 		sourceTokenAddress,
 		[]common.Address{}, // empty allowList at deploy time indicates pool has no original sender restrictions
-		lock_release_token_pool.RateLimiterConfig{
-			IsEnabled: true,
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
-		},
 	)
 	if err != nil {
 		return [20]byte{}, nil, err
@@ -528,6 +541,11 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		{
 			Ramp:    c.Source.OnRamp.Address(),
 			Allowed: true,
+			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  HundredLink,
+				Rate:      big.NewInt(1e18),
+			},
 		},
 	}, nil)
 	if err != nil {
@@ -683,12 +701,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceUser,
 		sourceChain,
 		sourceLinkTokenAddress,
-		[]common.Address{},
-		lock_release_token_pool.RateLimiterConfig{
-			IsEnabled: true,
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
-		})
+		[]common.Address{})
 	require.NoError(t, err)
 	sourceChain.Commit()
 	sourcePool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourcePoolAddress, sourceChain)
@@ -704,12 +717,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destUser,
 		destChain,
 		destLinkTokenAddress,
-		[]common.Address{},
-		lock_release_token_pool.RateLimiterConfig{
-			IsEnabled: true,
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
-		})
+		[]common.Address{})
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -758,12 +766,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceUser,
 		sourceChain,
 		sourceWeth9addr,
-		[]common.Address{},
-		lock_release_token_pool.RateLimiterConfig{
-			IsEnabled: true,
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
-		})
+		[]common.Address{})
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -874,12 +877,24 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
 	_, err = sourcePool.ApplyRampUpdates(sourceUser,
-		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true}},
+		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true,
+			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  HundredLink,
+				Rate:      big.NewInt(1e18),
+			},
+		}},
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
 	)
 	require.NoError(t, err)
 	_, err = sourceWeth9Pool.ApplyRampUpdates(sourceUser,
-		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true}},
+		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true,
+			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  HundredLink,
+				Rate:      big.NewInt(1e18),
+			},
+		}},
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
 	)
 	require.NoError(t, err)
@@ -905,12 +920,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destUser,
 		destChain,
 		destWeth9addr,
-		[]common.Address{},
-		lock_release_token_pool.RateLimiterConfig{
-			IsEnabled: true,
-			Capacity:  HundredLink,
-			Rate:      big.NewInt(1e18),
-		})
+		[]common.Address{})
 	require.NoError(t, err)
 	destWrappedPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destWrappedPoolAddress, destChain)
 	require.NoError(t, err)
@@ -988,7 +998,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	_, err = destPool.ApplyRampUpdates(destUser,
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
-		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: offRampAddress, Allowed: true}},
+		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: offRampAddress, Allowed: true,
+			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  HundredLink,
+				Rate:      big.NewInt(1e18),
+			},
+		}},
 	)
 	require.NoError(t, err)
 	destChain.Commit()

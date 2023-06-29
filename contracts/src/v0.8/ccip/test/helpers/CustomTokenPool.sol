@@ -10,10 +10,7 @@ contract CustomTokenPool is TokenPool {
   event SynthBurned(uint256 amount);
   event SynthMinted(uint256 amount);
 
-  constructor(
-    IERC20 token,
-    RateLimiter.Config memory rateLimiterConfig
-  ) TokenPool(token, new address[](0), rateLimiterConfig) {}
+  constructor(IERC20 token) TokenPool(token, new address[](0)) {}
 
   /// @notice Locks the token in the pool
   /// @param amount Amount to lock
@@ -23,20 +20,14 @@ contract CustomTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override whenNotPaused onlyOnRamp returns (bytes memory) {
+  ) external override onlyOnRamp returns (bytes memory) {
     emit SynthBurned(amount);
     return "";
   }
 
   /// @notice Release tokens from the pool to the recipient
   /// @param amount Amount to release
-  function releaseOrMint(
-    bytes memory,
-    address,
-    uint256 amount,
-    uint64,
-    bytes memory
-  ) external override whenNotPaused onlyOffRamp {
+  function releaseOrMint(bytes memory, address, uint256 amount, uint64, bytes memory) external override onlyOffRamp {
     emit SynthMinted(amount);
   }
 }

@@ -12,7 +12,7 @@ import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.0/utils/introspec
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.0/utils/structs/EnumerableSet.sol";
 
 /// @notice Base abstract class with common functions for all token pools.
-abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
+abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   using EnumerableSet for EnumerableSet.AddressSet;
   using RateLimiter for RateLimiter.TokenBucket;
 
@@ -20,48 +20,48 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
   error NullAddressNotAllowed();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
+  error NonExistentRamp(address ramp);
+  error RampAlreadyExists(address ramp);
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
   event Released(address indexed sender, address indexed recipient, uint256 amount);
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
-  event OnRampAllowanceSet(address onRamp, bool allowed);
-  event OffRampAllowanceSet(address onRamp, bool allowed);
+  event OnRampAdded(address onRamp, RateLimiter.Config rateLimiterConfig);
+  event OnRampConfigured(address onRamp, RateLimiter.Config rateLimiterConfig);
+  event OnRampRemoved(address onRamp);
+  event OffRampAdded(address offRamp, RateLimiter.Config rateLimiterConfig);
+  event OffRampConfigured(address offRamp, RateLimiter.Config rateLimiterConfig);
+  event OffRampRemoved(address offRamp);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
 
   struct RampUpdate {
     address ramp;
     bool allowed;
+    RateLimiter.Config rateLimiterConfig;
   }
 
   // The immutable token that belongs to this pool.
   IERC20 internal immutable i_token;
-  // The immutable flag that indicates if the pool is access-controled.
+  // The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
-  // A set of allowed onRamps.
-  EnumerableSet.AddressSet internal s_onRamps;
-  // A set of allowed offRamps.
-  EnumerableSet.AddressSet internal s_offRamps;
   // A set of addresses allowed to trigger lockOrBurn as original senders.
   EnumerableSet.AddressSet internal s_allowList;
-  // The token bucket object that contains the bucket state.
-  RateLimiter.TokenBucket private s_rateLimiter;
 
-  constructor(IERC20 token, address[] memory allowlist, RateLimiter.Config memory rateLimiterConfig) {
+  // A set of allowed onRamps. We want the whitelist to be enumerable to
+  // be able to quickly determine (without parsing logs) who can access the pool.
+  EnumerableSet.AddressSet internal s_onRamps;
+  mapping(address => RateLimiter.TokenBucket) internal s_onRampRateLimits;
+  // A set of allowed offRamps.
+  EnumerableSet.AddressSet internal s_offRamps;
+  mapping(address => RateLimiter.TokenBucket) internal s_offRampRateLimits;
+
+  constructor(IERC20 token, address[] memory allowlist) {
     if (address(token) == address(0)) revert NullAddressNotAllowed();
-
-    s_rateLimiter = RateLimiter.TokenBucket({
-      rate: rateLimiterConfig.rate,
-      capacity: rateLimiterConfig.capacity,
-      tokens: rateLimiterConfig.capacity,
-      lastUpdated: uint32(block.timestamp),
-      isEnabled: rateLimiterConfig.isEnabled
-    });
-
     i_token = token;
 
-    // pool can be set as permissioned or permissionless at deployment time
+    // Pool can be set as permissioned or permissionless at deployment time only.
     i_allowlistEnabled = allowlist.length > 0;
     if (i_allowlistEnabled) {
       _applyAllowListUpdates(new address[](0), allowlist);
@@ -89,29 +89,81 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
   }
 
   /// @notice Checks whether something is a permissioned offRamp on this contract.
-  /// @return true is the given address is a permissioned offRamp.
+  /// @return true if the given address is a permissioned offRamp.
   function isOffRamp(address offRamp) public view returns (bool) {
     return s_offRamps.contains(offRamp);
   }
 
+  /// @notice Get onRamp whitelist
+  /// @return list of onramps.
+  function getOnRamps() public view returns (address[] memory) {
+    return s_onRamps.values();
+  }
+
+  /// @notice Get offRamp whitelist
+  /// @return list of offramps
+  function getOffRamps() public view returns (address[] memory) {
+    return s_offRamps.values();
+  }
+
   /// @notice Sets permissions for all on and offRamps.
   /// @dev Only callable by the owner
-  /// @param onRamps A list of onRamps and their new permission status
-  /// @param offRamps A list of offRamps and their new permission status
+  /// @param onRamps A list of onRamps and their new permission status/rate limits
+  /// @param offRamps A list of offRamps and their new permission status/rate limits
   function applyRampUpdates(RampUpdate[] calldata onRamps, RampUpdate[] calldata offRamps) external virtual onlyOwner {
+    _applyRampUpdates(onRamps, offRamps);
+  }
+
+  function _applyRampUpdates(RampUpdate[] calldata onRamps, RampUpdate[] calldata offRamps) internal onlyOwner {
     for (uint256 i = 0; i < onRamps.length; ++i) {
       RampUpdate memory update = onRamps[i];
-
-      if (update.allowed ? s_onRamps.add(update.ramp) : s_onRamps.remove(update.ramp)) {
-        emit OnRampAllowanceSet(onRamps[i].ramp, onRamps[i].allowed);
+      if (update.allowed) {
+        if (s_onRamps.add(update.ramp)) {
+          s_onRampRateLimits[update.ramp] = RateLimiter.TokenBucket({
+            rate: update.rateLimiterConfig.rate,
+            capacity: update.rateLimiterConfig.capacity,
+            tokens: update.rateLimiterConfig.capacity,
+            lastUpdated: uint32(block.timestamp),
+            isEnabled: update.rateLimiterConfig.isEnabled
+          });
+          emit OnRampAdded(update.ramp, update.rateLimiterConfig);
+        } else {
+          revert RampAlreadyExists(update.ramp);
+        }
+      } else {
+        if (s_onRamps.remove(update.ramp)) {
+          delete s_onRampRateLimits[update.ramp];
+          emit OnRampRemoved(update.ramp);
+        } else {
+          // Cannot remove a non-existent onRamp.
+          revert NonExistentRamp(update.ramp);
+        }
       }
     }
 
     for (uint256 i = 0; i < offRamps.length; ++i) {
       RampUpdate memory update = offRamps[i];
-
-      if (update.allowed ? s_offRamps.add(update.ramp) : s_offRamps.remove(update.ramp)) {
-        emit OffRampAllowanceSet(offRamps[i].ramp, offRamps[i].allowed);
+      if (update.allowed) {
+        if (s_offRamps.add(update.ramp)) {
+          s_offRampRateLimits[update.ramp] = RateLimiter.TokenBucket({
+            rate: update.rateLimiterConfig.rate,
+            capacity: update.rateLimiterConfig.capacity,
+            tokens: update.rateLimiterConfig.capacity,
+            lastUpdated: uint32(block.timestamp),
+            isEnabled: update.rateLimiterConfig.isEnabled
+          });
+          emit OffRampAdded(update.ramp, update.rateLimiterConfig);
+        } else {
+          revert RampAlreadyExists(update.ramp);
+        }
+      } else {
+        if (s_offRamps.remove(update.ramp)) {
+          delete s_offRampRateLimits[update.ramp];
+          emit OffRampRemoved(update.ramp);
+        } else {
+          // Cannot remove a non-existent offRamp.
+          revert NonExistentRamp(update.ramp);
+        }
       }
     }
   }
@@ -120,22 +172,42 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
   // |                        Rate limiting                         |
   // ================================================================
 
-  /// @notice Consumes rate limiting capacity in this pool
-  function _consumeRateLimit(uint256 amount) internal {
-    s_rateLimiter._consume(amount);
+  /// @notice Consumes outbound rate limiting capacity in this pool
+  function _consumeOnRampRateLimit(uint256 amount) internal {
+    s_onRampRateLimits[msg.sender]._consume(amount);
+  }
+
+  /// @notice Consumes inbound rate limiting capacity in this pool
+  function _consumeOffRampRateLimit(uint256 amount) internal {
+    s_offRampRateLimits[msg.sender]._consume(amount);
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentRateLimiterState() external view returns (RateLimiter.TokenBucket memory) {
-    return s_rateLimiter._currentTokenBucketState();
+  function currentOnRampRateLimiterState(address onRamp) external view returns (RateLimiter.TokenBucket memory) {
+    return s_onRampRateLimits[onRamp]._currentTokenBucketState();
   }
 
-  /// @notice Sets the rate limited config.
+  /// @notice Gets the token bucket with its values for the block it was requested at.
+  /// @return The token bucket.
+  function currentOffRampRateLimiterState(address offRamp) external view returns (RateLimiter.TokenBucket memory) {
+    return s_offRampRateLimits[offRamp]._currentTokenBucketState();
+  }
+
+  /// @notice Sets the onramp rate limited config.
   /// @param config The new rate limiter config.
-  /// @dev should only be callable by the owner or token limit admin.
-  function setRateLimiterConfig(RateLimiter.Config memory config) external onlyOwner {
-    s_rateLimiter._setTokenBucketConfig(config);
+  function setOnRampRateLimiterConfig(address onRamp, RateLimiter.Config memory config) external onlyOwner {
+    if (!isOnRamp(onRamp)) revert NonExistentRamp(onRamp);
+    s_onRampRateLimits[onRamp]._setTokenBucketConfig(config);
+    emit OnRampConfigured(onRamp, config);
+  }
+
+  /// @notice Sets the offramp rate limited config.
+  /// @param config The new rate limiter config.
+  function setOffRampRateLimiterConfig(address offRamp, RateLimiter.Config memory config) external onlyOwner {
+    if (!isOffRamp(offRamp)) revert NonExistentRamp(offRamp);
+    s_offRampRateLimits[offRamp]._setTokenBucketConfig(config);
+    emit OffRampConfigured(offRamp, config);
   }
 
   // ================================================================
@@ -156,16 +228,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
     _;
   }
 
-  /// @notice Pauses the token pool.
-  function pause() external onlyOwner {
-    _pause();
-  }
-
-  /// @notice Unpauses the token pool.
-  function unpause() external onlyOwner {
-    _unpause();
-  }
-
   // ================================================================
   // |                          Allowlist                           |
   // ================================================================
@@ -184,11 +246,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, Pausable, IERC165 {
   /// @notice Gets the allowed addresses.
   /// @return The allowed addresses.
   function getAllowList() external view returns (address[] memory) {
-    address[] memory allowList = new address[](s_allowList.length());
-    for (uint256 i = 0; i < s_allowList.length(); ++i) {
-      allowList[i] = s_allowList.at(i);
-    }
-    return allowList;
+    return s_allowList.values();
   }
 
   /// @notice Apply updates to the allow list.

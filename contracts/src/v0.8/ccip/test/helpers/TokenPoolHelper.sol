@@ -8,11 +8,7 @@ contract TokenPoolHelper is TokenPool {
   event ReleaseOrMint(address indexed recipient, uint256 amount);
   event AssertionPassed();
 
-  constructor(
-    IERC20 token,
-    address[] memory allowlist,
-    RateLimiter.Config memory rateLimiterConfig
-  ) TokenPool(token, allowlist, rateLimiterConfig) {}
+  constructor(IERC20 token, address[] memory allowlist) TokenPool(token, allowlist) {}
 
   function lockOrBurn(
     address,

@@ -24,7 +24,7 @@ var (
 )
 
 func setOffRampOnTokenPools(t *testing.T, client EvmConfig, lane *EVMLaneConfig) {
-	for _, tokenConfig := range client.ChainConfig.SupportedTokens {
+	for token, tokenConfig := range client.ChainConfig.SupportedTokens {
 		if tokenConfig.TokenPoolType == FeeTokenOnly {
 			continue
 		}
@@ -34,6 +34,11 @@ func setOffRampOnTokenPools(t *testing.T, client EvmConfig, lane *EVMLaneConfig)
 		rampUpdate := lock_release_token_pool.TokenPoolRampUpdate{
 			Ramp:    lane.OffRamp,
 			Allowed: true,
+			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  new(big.Int).Mul(token.Multiplier(), big.NewInt(RATE_LIMIT_CAPACITY_DOLLAR)),
+				Rate:      new(big.Int).Mul(token.Multiplier(), big.NewInt(RATE_LIMIT_RATE_DOLLAR)),
+			},
 		}
 
 		// Configure offramp address on pool

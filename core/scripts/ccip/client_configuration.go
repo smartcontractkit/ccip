@@ -854,6 +854,11 @@ func (client *CCIPClient) syncOnRampOnPools() error {
 			rampUpdate := lock_release_token_pool.TokenPoolRampUpdate{
 				Ramp:    client.Source.OnRamp.Address(),
 				Allowed: true,
+				RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+					IsEnabled: true,
+					Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(rhea.RATE_LIMIT_CAPACITY_DOLLAR)),
+					Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(rhea.RATE_LIMIT_RATE_DOLLAR)),
+				},
 			}
 
 			tx, err := tokenConfig.Pool.ApplyRampUpdates(client.Source.Owner, []lock_release_token_pool.TokenPoolRampUpdate{rampUpdate}, []lock_release_token_pool.TokenPoolRampUpdate{})
@@ -887,6 +892,11 @@ func (client *CCIPClient) syncOffRampOnPools() error {
 			rampUpdate := lock_release_token_pool.TokenPoolRampUpdate{
 				Ramp:    client.Dest.OffRamp.Address(),
 				Allowed: true,
+				RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+					IsEnabled: true,
+					Capacity:  new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(rhea.RATE_LIMIT_CAPACITY_DOLLAR)),
+					Rate:      new(big.Int).Mul(tokenName.Multiplier(), big.NewInt(rhea.RATE_LIMIT_RATE_DOLLAR)),
+				},
 			}
 
 			tx, err := tokenConfig.Pool.ApplyRampUpdates(client.Dest.Owner, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{rampUpdate})

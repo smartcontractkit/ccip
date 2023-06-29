@@ -15,7 +15,7 @@ contract TokenPoolSetup is BaseTest {
     s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_tokenPool = new TokenPoolHelper(s_token, new address[](0), rateLimiterConfig());
+    s_tokenPool = new TokenPoolHelper(s_token, new address[](0));
   }
 }
 
@@ -24,59 +24,112 @@ contract TokenPool_constructor is TokenPoolSetup {
   function testNullAddressNotAllowedReverts() public {
     vm.expectRevert(TokenPool.NullAddressNotAllowed.selector);
 
-    s_tokenPool = new TokenPoolHelper(IERC20(address(0)), new address[](0), rateLimiterConfig());
+    s_tokenPool = new TokenPoolHelper(IERC20(address(0)), new address[](0));
   }
 }
 
 contract TokenPool_applyRampUpdates is TokenPoolSetup {
-  event OnRampAllowanceSet(address onRamp, bool allowed);
-  event OffRampAllowanceSet(address onRamp, bool allowed);
+  event OnRampAdded(address onRamp, RateLimiter.Config rateLimiterConfig);
+  event OnRampRemoved(address onRamp);
+  event OffRampAdded(address offRamp, RateLimiter.Config rateLimiterConfig);
+  event OffRampRemoved(address offRamp);
+
+  function addressesFromUpdates(TokenPool.RampUpdate[] memory updates) public pure returns (address[] memory) {
+    address[] memory addresses = new address[](updates.length);
+    for (uint256 i = 0; i < updates.length; i++) {
+      addresses[i] = updates[i].ramp;
+    }
+    return addresses;
+  }
+
+  function assertState(TokenPool.RampUpdate[] memory onRamps, TokenPool.RampUpdate[] memory offRamps) public {
+    assertEq(s_tokenPool.getOnRamps(), addressesFromUpdates(onRamps));
+    for (uint256 i = 0; i < onRamps.length; ++i) {
+      assertTrue(s_tokenPool.isOnRamp(onRamps[i].ramp));
+      RateLimiter.TokenBucket memory bkt = s_tokenPool.currentOnRampRateLimiterState(onRamps[i].ramp);
+      assertEq(bkt.capacity, onRamps[i].rateLimiterConfig.capacity);
+      assertEq(bkt.rate, onRamps[i].rateLimiterConfig.rate);
+      assertEq(bkt.isEnabled, onRamps[i].rateLimiterConfig.isEnabled);
+    }
+    assertEq(s_tokenPool.getOffRamps(), addressesFromUpdates(offRamps));
+    for (uint256 i = 0; i < offRamps.length; ++i) {
+      assertTrue(s_tokenPool.isOffRamp(offRamps[i].ramp));
+      RateLimiter.TokenBucket memory bkt = s_tokenPool.currentOffRampRateLimiterState(offRamps[i].ramp);
+      assertEq(bkt.capacity, offRamps[i].rateLimiterConfig.capacity);
+      assertEq(bkt.rate, offRamps[i].rateLimiterConfig.rate);
+      assertEq(bkt.isEnabled, offRamps[i].rateLimiterConfig.isEnabled);
+    }
+  }
 
   function testApplyRampUpdatesSuccess() public {
-    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](2);
-    onRamps[0] = TokenPool.RampUpdate({ramp: address(1), allowed: true});
-    onRamps[1] = TokenPool.RampUpdate({ramp: address(2), allowed: true});
-    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](2);
-    offRamps[0] = TokenPool.RampUpdate({ramp: address(11), allowed: true});
-    offRamps[1] = TokenPool.RampUpdate({ramp: address(12), allowed: true});
+    // Create on and offramps.
+    RateLimiter.Config memory rateLimit1 = RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15});
+    RateLimiter.Config memory rateLimit2 = RateLimiter.Config({isEnabled: true, capacity: 101e28, rate: 1e14});
+    TokenPool.RampUpdate[] memory onRampUpdates1 = new TokenPool.RampUpdate[](2);
+    onRampUpdates1[0] = TokenPool.RampUpdate({ramp: address(1), allowed: true, rateLimiterConfig: rateLimit1});
+    onRampUpdates1[1] = TokenPool.RampUpdate({ramp: address(2), allowed: true, rateLimiterConfig: rateLimit2});
+    TokenPool.RampUpdate[] memory offRampUpdates1 = new TokenPool.RampUpdate[](2);
+    offRampUpdates1[0] = TokenPool.RampUpdate({ramp: address(11), allowed: true, rateLimiterConfig: rateLimit2});
+    offRampUpdates1[1] = TokenPool.RampUpdate({ramp: address(12), allowed: true, rateLimiterConfig: rateLimit1});
 
+    // Assert configuration is applied
     vm.expectEmit();
-    emit OnRampAllowanceSet(onRamps[0].ramp, onRamps[0].allowed);
+    emit OnRampAdded(onRampUpdates1[0].ramp, onRampUpdates1[0].rateLimiterConfig);
     vm.expectEmit();
-    emit OnRampAllowanceSet(onRamps[1].ramp, onRamps[1].allowed);
-
+    emit OnRampAdded(onRampUpdates1[1].ramp, onRampUpdates1[1].rateLimiterConfig);
     vm.expectEmit();
-    emit OffRampAllowanceSet(offRamps[0].ramp, offRamps[0].allowed);
+    emit OffRampAdded(offRampUpdates1[0].ramp, offRampUpdates1[0].rateLimiterConfig);
     vm.expectEmit();
-    emit OffRampAllowanceSet(offRamps[1].ramp, offRamps[1].allowed);
+    emit OffRampAdded(offRampUpdates1[1].ramp, offRampUpdates1[1].rateLimiterConfig);
+    s_tokenPool.applyRampUpdates(onRampUpdates1, offRampUpdates1);
+    // on1: rateLimit1, on2: rateLimit2, off1: rateLimit1, off2: rateLimit3
+    assertState(onRampUpdates1, offRampUpdates1);
 
-    s_tokenPool.applyRampUpdates(onRamps, offRamps);
+    // Removing an non-existent onRamp should revert
+    TokenPool.RampUpdate[] memory onRampRemoves = new TokenPool.RampUpdate[](1);
+    address strangerOnRamp = address(120938);
+    onRampRemoves[0] = TokenPool.RampUpdate({ramp: strangerOnRamp, allowed: false, rateLimiterConfig: rateLimit1});
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentRamp.selector, strangerOnRamp));
+    s_tokenPool.applyRampUpdates(onRampRemoves, offRampUpdates1);
+    // State remains
+    assertState(onRampUpdates1, offRampUpdates1);
 
-    assertTrue(s_tokenPool.isOnRamp(onRamps[0].ramp));
-    assertTrue(s_tokenPool.isOnRamp(onRamps[1].ramp));
+    // Same with offramps
+    TokenPool.RampUpdate[] memory offRampRemoves = new TokenPool.RampUpdate[](1);
+    offRampRemoves[0] = TokenPool.RampUpdate({ramp: strangerOnRamp, allowed: false, rateLimiterConfig: rateLimit1});
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentRamp.selector, strangerOnRamp));
+    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRampRemoves);
+    // State remains
+    assertState(onRampUpdates1, offRampUpdates1);
 
-    assertTrue(s_tokenPool.isOffRamp(offRamps[0].ramp));
-    assertTrue(s_tokenPool.isOffRamp(offRamps[1].ramp));
-
-    onRamps[0].allowed = false;
-    offRamps[1].allowed = false;
-
+    // Can remove an onRamp
+    onRampRemoves[0].ramp = address(1);
     vm.expectEmit();
-    emit OnRampAllowanceSet(onRamps[0].ramp, onRamps[0].allowed);
+    emit OnRampRemoved(onRampRemoves[0].ramp);
+    s_tokenPool.applyRampUpdates(onRampRemoves, new TokenPool.RampUpdate[](0));
+    // State updated, only onRamp2 remains
+    TokenPool.RampUpdate[] memory onRampUpdates2 = new TokenPool.RampUpdate[](1);
+    onRampUpdates2[0] = onRampUpdates1[1];
+    assertState(onRampUpdates2, offRampUpdates1);
 
+    // Can remove an offRamp
+    offRampRemoves[0].ramp = address(11);
     vm.expectEmit();
-    emit OffRampAllowanceSet(offRamps[1].ramp, offRamps[1].allowed);
+    emit OffRampRemoved(offRampRemoves[0].ramp);
+    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRampRemoves);
+    TokenPool.RampUpdate[] memory offRampUpdates2 = new TokenPool.RampUpdate[](1);
+    offRampUpdates2[0] = offRampUpdates1[1];
+    assertState(onRampUpdates2, offRampUpdates2);
 
-    s_tokenPool.applyRampUpdates(onRamps, offRamps);
-
-    assertFalse(s_tokenPool.isOnRamp(onRamps[0].ramp));
-    assertTrue(s_tokenPool.isOnRamp(onRamps[1].ramp));
-
-    assertTrue(s_tokenPool.isOffRamp(offRamps[0].ramp));
-    assertFalse(s_tokenPool.isOffRamp(offRamps[1].ramp));
+    // Cannot reset already configured ramp
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.RampAlreadyExists.selector, address(2)));
+    s_tokenPool.applyRampUpdates(onRampUpdates2, new TokenPool.RampUpdate[](0));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.RampAlreadyExists.selector, address(12)));
+    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRampUpdates2);
   }
 
   // Reverts
+
   function testOnlyCallableByOwnerReverts() public {
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
@@ -84,37 +137,38 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
   }
 }
 
-contract TokenPool_currentRateLimiterState is TokenPoolSetup {
-  function testCurrentRateLimiterStateSuccess() public {
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentRateLimiterState();
-    RateLimiter.Config memory expectedConfig = rateLimiterConfig();
-    assertEq(bucket.capacity, expectedConfig.capacity);
-    assertEq(bucket.rate, expectedConfig.rate);
-    assertEq(bucket.tokens, expectedConfig.capacity);
-    assertEq(bucket.lastUpdated, uint32(block.timestamp));
-  }
-}
-
-contract TokenPool_setRateLimiterConfig is TokenPoolSetup {
+contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
   event ConfigChanged(RateLimiter.Config);
+  event OnRampConfigured(address onRamp, RateLimiter.Config);
+  address internal s_onRamp;
+
+  function setUp() public virtual override {
+    TokenPoolSetup.setUp();
+    TokenPool.RampUpdate[] memory onRampUpdates1 = new TokenPool.RampUpdate[](1);
+    s_onRamp = address(1);
+    onRampUpdates1[0] = TokenPool.RampUpdate({ramp: s_onRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
+    s_tokenPool.applyRampUpdates(onRampUpdates1, new TokenPool.RampUpdate[](0));
+  }
 
   function testSetRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
     // Bucket updates only work on increasing time
     vm.assume(newTime >= block.timestamp);
     vm.warp(newTime);
 
-    uint256 oldTokens = s_tokenPool.currentRateLimiterState().tokens;
+    uint256 oldTokens = s_tokenPool.currentOnRampRateLimiterState(s_onRamp).tokens;
 
     RateLimiter.Config memory newConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
 
     vm.expectEmit();
     emit ConfigChanged(newConfig);
+    vm.expectEmit();
+    emit OnRampConfigured(s_onRamp, newConfig);
 
-    s_tokenPool.setRateLimiterConfig(newConfig);
+    s_tokenPool.setOnRampRateLimiterConfig(s_onRamp, newConfig);
 
     uint256 expectedTokens = RateLimiter._min(newConfig.capacity, oldTokens);
 
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentRateLimiterState();
+    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentOnRampRateLimiterState(s_onRamp);
     assertEq(bucket.capacity, newConfig.capacity);
     assertEq(bucket.rate, newConfig.rate);
     assertEq(bucket.tokens, expectedTokens);
@@ -127,48 +181,65 @@ contract TokenPool_setRateLimiterConfig is TokenPoolSetup {
     changePrank(STRANGER);
 
     vm.expectRevert("Only callable by owner");
-    s_tokenPool.setRateLimiterConfig(rateLimiterConfig());
+    s_tokenPool.setOnRampRateLimiterConfig(s_onRamp, rateLimiterConfig());
+  }
+
+  function testNonExistentRampReverts() public {
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentRamp.selector, address(120938)));
+    s_tokenPool.setOnRampRateLimiterConfig(address(120938), rateLimiterConfig());
   }
 }
 
-contract TokenPool_pause is TokenPoolSetup {
-  function testPauseSuccess() public {
-    s_tokenPool.pause();
-    assertTrue(s_tokenPool.paused());
+contract TokenPool_setOffRampRateLimiterConfig is TokenPoolSetup {
+  event ConfigChanged(RateLimiter.Config);
+  event OffRampConfigured(address onRamp, RateLimiter.Config);
+  address internal s_offRamp;
+
+  function setUp() public virtual override {
+    TokenPoolSetup.setUp();
+    TokenPool.RampUpdate[] memory offRampUpdates1 = new TokenPool.RampUpdate[](1);
+    s_offRamp = address(1);
+    offRampUpdates1[0] = TokenPool.RampUpdate({ramp: s_offRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
+    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRampUpdates1);
+  }
+
+  function testSetRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
+    // Bucket updates only work on increasing time
+    vm.assume(newTime >= block.timestamp);
+    vm.warp(newTime);
+
+    uint256 oldTokens = s_tokenPool.currentOffRampRateLimiterState(s_offRamp).tokens;
+
+    RateLimiter.Config memory newConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
+
+    vm.expectEmit();
+    emit ConfigChanged(newConfig);
+    vm.expectEmit();
+    emit OffRampConfigured(s_offRamp, newConfig);
+
+    s_tokenPool.setOffRampRateLimiterConfig(s_offRamp, newConfig);
+
+    uint256 expectedTokens = RateLimiter._min(newConfig.capacity, oldTokens);
+
+    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentOffRampRateLimiterState(s_offRamp);
+    assertEq(bucket.capacity, newConfig.capacity);
+    assertEq(bucket.rate, newConfig.rate);
+    assertEq(bucket.tokens, expectedTokens);
+    assertEq(bucket.lastUpdated, newTime);
   }
 
   // Reverts
-  function testPauseReverts() public {
-    s_tokenPool.pause();
-    vm.expectRevert("Pausable: paused");
-    s_tokenPool.pause();
-  }
 
-  function testNonOwnerReverts() public {
+  function testOnlyOwnerReverts() public {
     changePrank(STRANGER);
+
     vm.expectRevert("Only callable by owner");
-    s_tokenPool.pause();
-  }
-}
-
-contract TokenPool_unpause is TokenPoolSetup {
-  function testUnpauseSuccess() public {
-    s_tokenPool.pause();
-    s_tokenPool.unpause();
-    assertFalse(s_tokenPool.paused());
+    s_tokenPool.setOffRampRateLimiterConfig(s_offRamp, rateLimiterConfig());
   }
 
-  // Reverts
-  function testUnpauseReverts() public {
-    vm.expectRevert("Pausable: not paused");
-    s_tokenPool.unpause();
-  }
-
-  function testNonOwnerReverts() public {
-    s_tokenPool.pause();
-    changePrank(STRANGER);
-    vm.expectRevert("Only callable by owner");
-    s_tokenPool.unpause();
+  function testNonExistentRampReverts() public {
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentRamp.selector, address(120938)));
+    s_tokenPool.setOffRampRateLimiterConfig(address(120938), rateLimiterConfig());
   }
 }
 
@@ -181,7 +252,7 @@ contract TokenPoolWithAllowListSetup is TokenPoolSetup {
     s_allowedSenders.push(STRANGER);
     s_allowedSenders.push(DUMMY_CONTRACT_ADDRESS);
 
-    s_tokenPool = new TokenPoolHelper(s_token, s_allowedSenders, rateLimiterConfig());
+    s_tokenPool = new TokenPoolHelper(s_token, s_allowedSenders);
   }
 }
 

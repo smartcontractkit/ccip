@@ -21,12 +21,12 @@ contract BurnMintERC677_mint is BurnMintERC677Setup {
   function testPoolMintSuccess() public {
     uint256 amount = 1e19;
     address offRamp = address(238323465456);
-    BurnMintTokenPool pool = new BurnMintTokenPool(s_burnMintERC20, new address[](0), rateLimiterConfig());
+    BurnMintTokenPool pool = new BurnMintTokenPool(s_burnMintERC20, new address[](0));
     s_burnMintERC20.grantMintAndBurnRoles(address(pool));
 
     TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0].ramp = offRamp;
-    offRamps[0].allowed = true;
+    offRamps[0] = TokenPool.RampUpdate({ramp: offRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
+
     pool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
 
     changePrank(offRamp);
@@ -44,12 +44,11 @@ contract BurnMintERC677_burn is BurnMintERC677Setup {
   function testPoolBurnSuccess() public {
     uint256 burnAmount = 1e19;
     address onRamp = address(238323465456);
-    BurnMintTokenPool pool = new BurnMintTokenPool(s_burnMintERC20, new address[](0), rateLimiterConfig());
+    BurnMintTokenPool pool = new BurnMintTokenPool(s_burnMintERC20, new address[](0));
     s_burnMintERC20.grantMintAndBurnRoles(address(pool));
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0].ramp = onRamp;
-    onRamps[0].allowed = true;
+    onRamps[0] = TokenPool.RampUpdate({ramp: onRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
     pool.applyRampUpdates(onRamps, new TokenPool.RampUpdate[](0));
 
     deal(address(s_burnMintERC20), address(pool), burnAmount);

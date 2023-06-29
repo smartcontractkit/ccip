@@ -106,7 +106,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     );
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({ramp: address(s_onRamp), allowed: true});
+    onRamps[0] = TokenPool.RampUpdate({ramp: address(s_onRamp), allowed: true, rateLimiterConfig: rateLimiterConfig()});
 
     LockReleaseTokenPool(address(s_sourcePools[0])).applyRampUpdates(onRamps, new TokenPool.RampUpdate[](0));
     LockReleaseTokenPool(address(s_sourcePools[1])).applyRampUpdates(onRamps, new TokenPool.RampUpdate[](0));
