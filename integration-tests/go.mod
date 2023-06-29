@@ -373,6 +373,8 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230612131011-369bfb503592 // indirect
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20230622060316-7ce48476dd7d // indirect
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb // indirect
+	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230616141813-ca0ecf03ca5c // indirect
+	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230616062456-5c32c95fc166 // indirect
 	github.com/smartcontractkit/wsrpc v0.7.2 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
