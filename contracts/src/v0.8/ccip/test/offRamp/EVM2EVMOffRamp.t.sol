@@ -257,7 +257,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       ""
     );
 
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
 
     messages[0].nonce++;
     messages[0].sequenceNumber++;
@@ -272,7 +272,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     );
 
     uint64 nonceBefore = s_offRamp.getSenderNonce(messages[0].sender);
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertGt(s_offRamp.getSenderNonce(messages[0].sender), nonceBefore);
   }
 
@@ -295,7 +295,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     );
     // Nonce should not increment on a strict revert.
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
   }
 
@@ -322,7 +322,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     );
     // Nonce should increment on non-strict
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)));
   }
 
@@ -342,7 +342,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     );
     // Nonce should increment on a strict untouched -> success.
     assertEq(uint64(0), s_offRamp.getSenderNonce(address(OWNER)));
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertEq(uint64(1), s_offRamp.getSenderNonce(address(OWNER)));
   }
 
@@ -355,7 +355,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.expectEmit();
     emit SkippedIncorrectNonce(messages[0].nonce, messages[0].sender);
 
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
   function testSkippedIncorrectNonceStillExecutesSuccess() public {
@@ -375,7 +375,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.expectEmit();
     emit SkippedIncorrectNonce(messages[1].nonce, messages[1].sender);
 
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
   // Send a message to a contract that does not implement the CCIPReceiver interface
@@ -394,7 +394,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
       ""
     );
 
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
   function testSingleMessagesNoTokensSuccess_gas() public {
@@ -412,7 +412,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
 
     vm.resumeGasMetering();
-    s_offRamp.execute(report, false);
+    s_offRamp.execute(report, new uint256[](0));
   }
 
   function testTwoMessagesWithTokensSuccess_gas() public {
@@ -441,7 +441,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
 
     vm.resumeGasMetering();
-    s_offRamp.execute(report, false);
+    s_offRamp.execute(report, new uint256[](0));
   }
 
   function testTwoMessagesWithTokensAndGESuccess() public {
@@ -467,7 +467,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     );
 
     assertEq(uint64(0), s_offRamp.getSenderNonce(OWNER));
-    s_offRamp.execute(_generateReportFromMessages(messages), true);
+    s_offRamp.execute(_generateReportFromMessages(messages), _getGasLimitsFromMessages(messages));
     assertEq(uint64(2), s_offRamp.getSenderNonce(OWNER));
   }
 
@@ -479,19 +479,19 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     // MessageID no longer matches hash.
     Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
     vm.expectRevert(EVM2EVMOffRamp.InvalidMessageId.selector);
-    s_offRamp.execute(executionReport, false);
+    s_offRamp.execute(executionReport, new uint256[](0));
   }
 
   function testPausedReverts() public {
     s_mockCommitStore.pause();
     vm.expectRevert(PausedError.selector);
-    s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
+    s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), new uint256[](0));
   }
 
   function testUnhealthyReverts() public {
     s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
-    s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), true);
+    s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), new uint256[](0));
   }
 
   function testUnexpectedTokenDataReverts() public {
@@ -500,7 +500,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
 
     vm.expectRevert(EVM2EVMOffRamp.UnexpectedTokenData.selector);
 
-    s_offRamp.execute(report, false);
+    s_offRamp.execute(report, new uint256[](0));
   }
 
   function testEmptyReportReverts() public {
@@ -512,7 +512,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
         messages: new Internal.EVM2EVMMessage[](0),
         offchainTokenData: new bytes[][](0)
       }),
-      true
+      new uint256[](0)
     );
   }
 
@@ -520,7 +520,8 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.mockCall(address(s_mockCommitStore), abi.encodeWithSelector(ICommitStore.verify.selector), abi.encode(0));
     vm.expectRevert(EVM2EVMOffRamp.RootNotCommitted.selector);
 
-    s_offRamp.execute(_generateReportFromMessages(_generateBasicMessages()), true);
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    s_offRamp.execute(_generateReportFromMessages(messages), _getGasLimitsFromMessages(messages));
     vm.clearMockedCalls();
   }
 
@@ -532,16 +533,17 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     );
     vm.expectRevert(EVM2EVMOffRamp.ManualExecutionNotYetEnabled.selector);
 
-    s_offRamp.execute(_generateReportFromMessages(_generateBasicMessages()), true);
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    s_offRamp.execute(_generateReportFromMessages(messages), _getGasLimitsFromMessages(messages));
     vm.clearMockedCalls();
   }
 
   function testAlreadyExecutedReverts() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
     Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
-    s_offRamp.execute(executionReport, false);
+    s_offRamp.execute(executionReport, new uint256[](0));
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.AlreadyExecuted.selector, messages[0].sequenceNumber));
-    s_offRamp.execute(executionReport, false);
+    s_offRamp.execute(executionReport, new uint256[](0));
   }
 
   function testInvalidSourceChainReverts() public {
@@ -550,7 +552,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidSourceChain.selector, SOURCE_CHAIN_ID + 1));
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
   function testUnsupportedNumberOfTokensReverts() public {
@@ -563,7 +565,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMOffRamp.UnsupportedNumberOfTokens.selector, messages[0].sequenceNumber)
     );
-    s_offRamp.execute(report, false);
+    s_offRamp.execute(report, new uint256[](0));
   }
 
   function testTokenDataMismatchReverts() public {
@@ -573,7 +575,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     report.offchainTokenData[0] = new bytes[](messages[0].tokenAmounts.length + 1);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenDataMismatch.selector, messages[0].sequenceNumber));
-    s_offRamp.execute(report, false);
+    s_offRamp.execute(report, new uint256[](0));
   }
 
   function testMessageTooLargeReverts() public {
@@ -586,7 +588,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(EVM2EVMOffRamp.MessageTooLarge.selector, MAX_DATA_SIZE, messages[0].data.length)
     );
-    s_offRamp.execute(executionReport, false);
+    s_offRamp.execute(executionReport, new uint256[](0));
   }
 
   function testUnsupportedTokenReverts() public {
@@ -601,7 +603,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
         abi.encodeWithSelector(EVM2EVMOffRamp.UnsupportedToken.selector, s_destTokens[0])
       )
     );
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
   function testRouterYULCallReverts() public {
@@ -615,7 +617,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     Internal.ExecutionReport memory executionReport = _generateReportFromMessages(messages);
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.ExecutionError.selector, ""));
-    s_offRamp.execute(executionReport, false);
+    s_offRamp.execute(executionReport, new uint256[](0));
   }
 }
 
@@ -642,7 +644,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       ""
     );
 
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
   }
 
   function testV2SenderNoncesReadsPreviousRampSuccess() public {
@@ -650,7 +652,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     uint64 startNonce = s_offRamp.getSenderNonce(messages[0].sender);
 
     for (uint64 i = 1; i < 4; ++i) {
-      s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+      s_prevOffRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
 
       messages[0].nonce++;
       messages[0].sequenceNumber++;
@@ -672,7 +674,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
 
     uint64 startNonce = s_offRamp.getSenderNonce(messages[0].sender);
 
-    s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+    s_prevOffRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
 
     assertEq(startNonce + 1, s_offRamp.getSenderNonce(messages[0].sender));
 
@@ -687,7 +689,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       ""
     );
 
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertEq(startNonce + 2, s_offRamp.getSenderNonce(messages[0].sender));
 
     messages[0].nonce++;
@@ -702,7 +704,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       ""
     );
 
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertEq(startNonce + 3, s_offRamp.getSenderNonce(messages[0].sender));
   }
 
@@ -716,7 +718,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       ""
     );
 
-    s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+    s_prevOffRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
 
     address newSender = address(1234567);
     messages[0].sender = newSender;
@@ -732,7 +734,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
 
     // new sender nonce in new offramp should go from 0 -> 1
     assertEq(s_offRamp.getSenderNonce(newSender), 0);
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertEq(s_offRamp.getSenderNonce(newSender), 1);
   }
 
@@ -750,7 +752,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
     // it waits for previous offramp to execute
     vm.expectEmit();
     emit SkippedSenderWithPreviousRampMessageInflight(messages[0].nonce, newSender);
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertEq(startNonce, s_offRamp.getSenderNonce(messages[0].sender));
 
     messages[0].nonce = 1;
@@ -764,7 +766,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       Internal.MessageExecutionState.SUCCESS,
       ""
     );
-    s_prevOffRamp.execute(_generateReportFromMessages(messages), false);
+    s_prevOffRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertEq(startNonce + 1, s_offRamp.getSenderNonce(messages[0].sender));
 
     messages[0].nonce = 2;
@@ -779,7 +781,7 @@ contract EVM2EVMOffRamp_execute_upgrade is EVM2EVMOffRampSetup {
       ""
     );
 
-    s_offRamp.execute(_generateReportFromMessages(messages), false);
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
     assertEq(startNonce + 2, s_offRamp.getSenderNonce(messages[0].sender));
   }
 }
@@ -796,30 +798,18 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
 
   function testNoTokensSuccess() public {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
-    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
 
   function testTokensSuccess() public {
     Internal.EVM2EVMMessage memory message = _generateMessagesWithTokens()[0];
-    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
 
   function testNonContractSuccess() public {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     message.receiver = STRANGER;
-    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
-  }
-
-  function testLowGasLimitManualExecutionSuccess() public {
-    Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
-    message.gasLimit = 1;
-    message.receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
-    message.messageId = Internal._hash(message, s_offRamp.metadataHash());
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.ReceiverError.selector, ""));
-    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
-    vm.expectEmit();
-    emit MessageReceived();
-    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), true);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
 
   function testNonContractWithTokensSuccess() public {
@@ -832,7 +822,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
     emit Minted(address(s_offRamp), STRANGER, amounts[1]);
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
     message.receiver = STRANGER;
-    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
 
   function testTokenHandlingErrorReverts() public {
@@ -847,7 +837,7 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, errorMessage));
 
-    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
 
   // Reverts
@@ -858,14 +848,14 @@ contract EVM2EVMOffRamp_executeSingleMessage is EVM2EVMOffRampSetup {
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.ReceiverError.selector, ""));
 
-    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
 
   function testMessageSenderReverts() public {
     vm.stopPrank();
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageNoTokens(1);
     vm.expectRevert(EVM2EVMOffRamp.CanOnlySelfCall.selector);
-    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length), false);
+    s_offRamp.executeSingleMessage(message, new bytes[](message.tokenAmounts.length));
   }
 }
 
@@ -889,16 +879,119 @@ contract EVM2EVMOffRamp__report is EVM2EVMOffRampSetup {
 contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
   event ReentrancySucceeded();
 
+  function testManualExecSuccess() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    messages[0].receiver = address(s_reverting_receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+
+    s_reverting_receiver.setRevert(false);
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), new uint256[](messages.length));
+  }
+
+  function testManualExecWithGasOverrideSuccess() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    messages[0].receiver = address(s_reverting_receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+
+    s_reverting_receiver.setRevert(false);
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+
+    uint256[] memory gasLimitOverrides = _getGasLimitsFromMessages(messages);
+    gasLimitOverrides[0] += 1;
+
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
+  }
+
+  event MessageReceived();
+
+  function testLowGasLimitManualExecSuccess() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+    messages[0].gasLimit = 1;
+    messages[0].receiver = address(new ConformingReceiver(address(s_destRouter), s_destFeeToken));
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.FAILURE,
+      abi.encodeWithSelector(EVM2EVMOffRamp.ReceiverError.selector, "")
+    );
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+
+    uint256[] memory gasLimitOverrides = new uint256[](1);
+    gasLimitOverrides[0] = 100_000;
+
+    vm.expectEmit();
+    emit MessageReceived();
+
+    vm.expectEmit();
+    emit ExecutionStateChanged(
+      messages[0].sequenceNumber,
+      messages[0].messageId,
+      Internal.MessageExecutionState.SUCCESS,
+      ""
+    );
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimitOverrides);
+  }
+
   function testManualExecForkedChainReverts() public {
     Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
-    //messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
 
     Internal.ExecutionReport memory report = _generateReportFromMessages(messages);
     uint256 chain1 = block.chainid;
     uint256 chain2 = chain1 + 1;
     vm.chainId(chain2);
     vm.expectRevert(abi.encodeWithSelector(OCR2BaseNoChecks.ForkedChain.selector, chain1, chain2));
-    s_offRamp.manuallyExecute(report);
+
+    s_offRamp.manuallyExecute(report, _getGasLimitsFromMessages(messages));
+  }
+
+  function testManualExecGasLimitMismatchReverts() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    vm.expectRevert(EVM2EVMOffRamp.ManualExecutionGasLimitMismatch.selector);
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), new uint256[](0));
+
+    vm.expectRevert(EVM2EVMOffRamp.ManualExecutionGasLimitMismatch.selector);
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), new uint256[](messages.length - 1));
+
+    vm.expectRevert(EVM2EVMOffRamp.ManualExecutionGasLimitMismatch.selector);
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), new uint256[](messages.length + 1));
+  }
+
+  function testManualExecInvalidGasLimitReverts() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    uint256[] memory gasLimits = _getGasLimitsFromMessages(messages);
+    gasLimits[0]--;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector,
+        0,
+        messages[0].gasLimit,
+        gasLimits[0]
+      )
+    );
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimits);
   }
 
   function testReentrancyManualExecuteFAILS() public {
@@ -924,7 +1017,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     // sets the report to be repeated on the ReentrancyAbuser to be able to replay
     receiver.setPayload(report);
 
-    s_offRamp.manuallyExecute(report);
+    s_offRamp.manuallyExecute(report, _getGasLimitsFromMessages(messages));
 
     // The first entry should be fine and triggers the second entry. This one fails
     // but since it's an inner tx of the first one it is caught in the cry-catch.
@@ -1030,8 +1123,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
 
     (Internal.MessageExecutionState newState, bytes memory error) = s_offRamp.trialExecute(
       message,
-      new bytes[](message.tokenAmounts.length),
-      false
+      new bytes[](message.tokenAmounts.length)
     );
     assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(newState));
     assertEq("", error);
@@ -1055,8 +1147,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
 
     (Internal.MessageExecutionState newState, bytes memory error) = s_offRamp.trialExecute(
       message,
-      new bytes[](message.tokenAmounts.length),
-      false
+      new bytes[](message.tokenAmounts.length)
     );
     assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(newState));
     assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, errorMessage), error);
@@ -1084,7 +1175,7 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
       )
     );
 
-    s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length), false);
+    s_offRamp.trialExecute(message, new bytes[](message.tokenAmounts.length));
   }
 }
 

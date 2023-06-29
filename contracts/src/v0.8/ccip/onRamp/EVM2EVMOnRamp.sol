@@ -644,7 +644,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // Make sure all nops have been paid before removing nops
     // We only have to pay when there are nops and there is enough
     // outstanding NOP balance to trigger a payment.
-    if (s_nopWeightsTotal > 0 && s_nopFeesJuels > s_nopWeightsTotal) {
+    if (s_nopWeightsTotal > 0 && s_nopFeesJuels >= s_nopWeightsTotal) {
       payNops();
     }
 

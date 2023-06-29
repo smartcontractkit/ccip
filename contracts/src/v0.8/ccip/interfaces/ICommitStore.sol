@@ -10,7 +10,7 @@ interface ICommitStore {
     bytes32[] calldata hashedLeaves,
     bytes32[] calldata proofs,
     uint256 proofFlagBits
-  ) external returns (uint256 timestamp);
+  ) external view returns (uint256 timestamp);
 
   /// @notice Returns the expected next sequence number
   function getExpectedNextSequenceNumber() external view returns (uint64 sequenceNumber);

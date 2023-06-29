@@ -127,7 +127,7 @@ func init() {
 	if !ok {
 		panic("missing event 'manuallyExecute'")
 	}
-	ExecutionReportArgs = manuallyExecuteMethod.Inputs
+	ExecutionReportArgs = manuallyExecuteMethod.Inputs[:1]
 }
 
 func MessagesFromExecutionReport(report types.Report) ([]evm_2_evm_offramp.InternalEVM2EVMMessage, error) {

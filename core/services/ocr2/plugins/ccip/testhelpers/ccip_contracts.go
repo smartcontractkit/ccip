@@ -1280,6 +1280,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	var leaves [][32]byte
 	var curr, prove int
 	var msgs []evm_2_evm_offramp.InternalEVM2EVMMessage
+	var manualExecGasLimits []*big.Int
 	var tokenData [][][]byte
 	sendRequestedIterator, err := onRampContract.FilterCCIPSendRequested(&bind.FilterOpts{
 		Start: args.SourceStartBlock.Uint64(),
@@ -1303,6 +1304,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 					return nil, err2
 				}
 				msgs = append(msgs, *msg)
+				manualExecGasLimits = append(manualExecGasLimits, msg.GasLimit)
 				var msgTokenData [][]byte
 				for range sendRequestedIterator.Event.Message.TokenAmounts {
 					msgTokenData = append(msgTokenData, []byte{})
@@ -1338,7 +1340,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 		return nil, err
 	}
 	// Execute.
-	return offRamp.ManuallyExecute(args.DestUser, offRampProof)
+	return offRamp.ManuallyExecute(args.DestUser, offRampProof, manualExecGasLimits)
 }
 
 func (c *CCIPContracts) ExecuteMessage(

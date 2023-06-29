@@ -245,6 +245,7 @@ func (args *execArgs) execute() error {
 			curr++
 		}
 	}
+
 	sendRequestedIterator.Close()
 	if encodedMsg == nil {
 		return fmt.Errorf("unable to find msg with seqNr %d", seqNr)
@@ -266,7 +267,12 @@ func (args *execArgs) execute() error {
 	}
 
 	// Execute.
-	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof)
+	gasLimitOverrides := make([]*big.Int, len(offRampProof.EncodedMessages))
+	for i := range offRampProof.EncodedMessages {
+		gasLimitOverrides[i] = big.NewInt(0)
+	}
+
+	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof, gasLimitOverrides)
 	if err != nil {
 		return err
 	}

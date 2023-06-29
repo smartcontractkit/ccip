@@ -193,6 +193,17 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       });
   }
 
+  function _getGasLimitsFromMessages(
+    Internal.EVM2EVMMessage[] memory messages
+  ) internal pure returns (uint256[] memory) {
+    uint256[] memory gasLimits = new uint256[](messages.length);
+    for (uint256 i = 0; i < messages.length; ++i) {
+      gasLimits[i] = messages[i].gasLimit;
+    }
+
+    return gasLimits;
+  }
+
   function _assertSameConfig(EVM2EVMOffRamp.DynamicConfig memory a, EVM2EVMOffRamp.DynamicConfig memory b) public {
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);

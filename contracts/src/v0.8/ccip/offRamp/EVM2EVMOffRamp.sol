@@ -43,6 +43,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   error UnexpectedTokenData();
   error UnsupportedNumberOfTokens(uint64 sequenceNumber);
   error ManualExecutionNotYetEnabled();
+  error ManualExecutionGasLimitMismatch();
+  error InvalidManualExecutionGasLimit(uint256 index, uint256 currentLimit, uint256 newLimit);
   error RootNotCommitted();
   error InvalidOffRampConfig(DynamicConfig config);
   error UnsupportedToken(IERC20 token);
@@ -203,23 +205,34 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   /// @notice Manually execute a message.
   /// @param report Internal.ExecutionReport.
-  function manuallyExecute(Internal.ExecutionReport calldata report) external {
+  function manuallyExecute(Internal.ExecutionReport memory report, uint256[] memory gasLimitOverrides) external {
     // We do this here because the other _execute path is already covered OCR2BaseXXX.
     if (i_chainID != block.chainid) revert OCR2BaseNoChecks.ForkedChain(i_chainID, uint64(block.chainid));
-    _execute(report, true);
+
+    uint256 numMsgs = report.messages.length;
+    if (numMsgs != gasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
+    for (uint256 i = 0; i < numMsgs; ++i) {
+      // Checks to ensure message cannot be executed with less gas than specified.
+      if (gasLimitOverrides[i] != 0 && gasLimitOverrides[i] < report.messages[i].gasLimit) {
+        revert InvalidManualExecutionGasLimit(i, report.messages[i].gasLimit, gasLimitOverrides[i]);
+      }
+    }
+
+    _execute(report, gasLimitOverrides);
   }
 
   /// @notice Entrypoint for execution, called by the OCR network
   /// @dev Expects an encoded ExecutionReport
   function _report(bytes calldata report) internal override {
-    _execute(abi.decode(report, (Internal.ExecutionReport)), false);
+    _execute(abi.decode(report, (Internal.ExecutionReport)), new uint256[](0));
   }
 
   /// @notice Executes a report, executing each message in order.
   /// @param report The execution report containing the messages and proofs.
-  /// @param manualExecution A boolean value indication whether this function is called
-  /// from the DON (false) or manually (true).
-  function _execute(Internal.ExecutionReport memory report, bool manualExecution) internal whenHealthy {
+  /// @param manualExecGasLimits An array of gas limits to use for manual execution.
+  /// If called from the DON, this array is always empty.
+  /// If called from manual execution, this array is always same length as messages.
+  function _execute(Internal.ExecutionReport memory report, uint256[] memory manualExecGasLimits) internal whenHealthy {
     uint256 numMsgs = report.messages.length;
     if (numMsgs == 0) revert EmptyReport();
     if (numMsgs != report.offchainTokenData.length) revert UnexpectedTokenData();
@@ -242,6 +255,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     if (timestampCommitted == 0) revert RootNotCommitted();
 
     // Execute messages
+    bool manualExecution = manualExecGasLimits.length != 0;
     for (uint256 i = 0; i < numMsgs; ++i) {
       Internal.EVM2EVMMessage memory message = report.messages[i];
       Internal.MessageExecutionState originalState = getExecutionState(message.sequenceNumber);
@@ -260,6 +274,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
         // Acceptable state transitions: FAILURE->SUCCESS, UNTOUCHED->SUCCESS, FAILURE->FAILURE
         if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE))
           revert ManualExecutionNotYetEnabled();
+
+        // Manual execution gas limit can override gas limit specified in the message. Value of 0 indicates no override.
+        if (manualExecGasLimits[i] != 0) {
+          message.gasLimit = manualExecGasLimits[i];
+        }
       } else {
         // DON can only execute a message once
         // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE
@@ -302,11 +321,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
       _isWellFormed(message, offchainTokenData.length);
 
       _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
-      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(
-        message,
-        offchainTokenData,
-        manualExecution
-      );
+      (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
       _setExecutionState(message.sequenceNumber, newState);
 
       // The only valid prior states are UNTOUCHED and FAILURE (checked above)
@@ -350,15 +365,14 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   /// @notice Try executing a message.
   /// @param message Client.Any2EVMMessage memory message.
-  /// @param manualExecution bool to indicate manual instead of DON execution.
+  /// @param offchainTokenData Data provided by the DON for token transfers.
   /// @return the new state of the message, being either SUCCESS or FAILURE.
   /// @return revert data in bytes if CCIP receiver reverted during execution.
   function _trialExecute(
     Internal.EVM2EVMMessage memory message,
-    bytes[] memory offchainTokenData,
-    bool manualExecution
+    bytes[] memory offchainTokenData
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
-    try this.executeSingleMessage(message, offchainTokenData, manualExecution) {} catch (bytes memory err) {
+    try this.executeSingleMessage(message, offchainTokenData) {} catch (bytes memory err) {
       if (ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector
@@ -375,14 +389,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   /// @notice Execute a single message.
   /// @param message The message that will be executed.
-  /// @param manualExecution bool to indicate manual instead of DON execution.
+  /// @param offchainTokenData Token transfer data to be passed to TokenPool.
   /// @dev this can only be called by the contract itself. It is part of
   /// the Execute call, as we can only try/catch on external calls.
-  function executeSingleMessage(
-    Internal.EVM2EVMMessage memory message,
-    bytes[] memory offchainTokenData,
-    bool manualExecution
-  ) external {
+  function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
@@ -397,21 +407,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
       !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
-    uint256 gasLimit = message.gasLimit;
-    if (manualExecution) {
-      // Want to pass the maximum that routeExternalCall will permit given the current gas value.
-      // It will revert if gasAmount <= (gasleft() - GAS_FOR_CALL_EXACT_CHECK)*63/64.
-      // However making the call to routeExternalMessage will also use some gas and itself only pass all but
-      // 1/64th. We err on the side of caution and  instead of passing ((gasleft() - approx cost of call)*63/64) - approx cost of call)*63/64
-      // we just pass (gasleft() - approx of call)*62/64.
-      // If this underflows and reverts that's ok because it's manual execution.
-      gasLimit = ((gasleft() - 2 * (16 * message.data.length + GAS_FOR_CALL_EXACT_CHECK)) * 62) / 64;
-    }
-
     (bool success, bytes memory returnData) = IRouter(s_dynamicConfig.router).routeMessage(
       Internal._toAny2EVMMessage(message, destTokenAmounts),
       GAS_FOR_CALL_EXACT_CHECK,
-      gasLimit,
+      message.gasLimit,
       message.receiver
     );
     // If CCIP receiver execution is not successful, revert the call including token transfers

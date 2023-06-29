@@ -3,6 +3,8 @@
 package mock_contracts
 
 import (
+	big "math/big"
+
 	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	common "github.com/ethereum/go-ethereum/common"
 
@@ -128,25 +130,25 @@ func (_m *EVM2EVMOffRampInterface) CurrentRateLimiterState(opts *bind.CallOpts) 
 	return r0, r1
 }
 
-// ExecuteSingleMessage provides a mock function with given fields: opts, message, offchainTokenData, manualExecution
-func (_m *EVM2EVMOffRampInterface) ExecuteSingleMessage(opts *bind.TransactOpts, message evm_2_evm_offramp.InternalEVM2EVMMessage, offchainTokenData [][]byte, manualExecution bool) (*types.Transaction, error) {
-	ret := _m.Called(opts, message, offchainTokenData, manualExecution)
+// ExecuteSingleMessage provides a mock function with given fields: opts, message, offchainTokenData
+func (_m *EVM2EVMOffRampInterface) ExecuteSingleMessage(opts *bind.TransactOpts, message evm_2_evm_offramp.InternalEVM2EVMMessage, offchainTokenData [][]byte) (*types.Transaction, error) {
+	ret := _m.Called(opts, message, offchainTokenData)
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalEVM2EVMMessage, [][]byte, bool) (*types.Transaction, error)); ok {
-		return rf(opts, message, offchainTokenData, manualExecution)
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalEVM2EVMMessage, [][]byte) (*types.Transaction, error)); ok {
+		return rf(opts, message, offchainTokenData)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalEVM2EVMMessage, [][]byte, bool) *types.Transaction); ok {
-		r0 = rf(opts, message, offchainTokenData, manualExecution)
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalEVM2EVMMessage, [][]byte) *types.Transaction); ok {
+		r0 = rf(opts, message, offchainTokenData)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalEVM2EVMMessage, [][]byte, bool) error); ok {
-		r1 = rf(opts, message, offchainTokenData, manualExecution)
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalEVM2EVMMessage, [][]byte) error); ok {
+		r1 = rf(opts, message, offchainTokenData)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -790,25 +792,25 @@ func (_m *EVM2EVMOffRampInterface) LatestConfigDigestAndEpoch(opts *bind.CallOpt
 	return r0, r1
 }
 
-// ManuallyExecute provides a mock function with given fields: opts, report
-func (_m *EVM2EVMOffRampInterface) ManuallyExecute(opts *bind.TransactOpts, report evm_2_evm_offramp.InternalExecutionReport) (*types.Transaction, error) {
-	ret := _m.Called(opts, report)
+// ManuallyExecute provides a mock function with given fields: opts, report, gasLimitOverrides
+func (_m *EVM2EVMOffRampInterface) ManuallyExecute(opts *bind.TransactOpts, report evm_2_evm_offramp.InternalExecutionReport, gasLimitOverrides []*big.Int) (*types.Transaction, error) {
+	ret := _m.Called(opts, report, gasLimitOverrides)
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalExecutionReport) (*types.Transaction, error)); ok {
-		return rf(opts, report)
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalExecutionReport, []*big.Int) (*types.Transaction, error)); ok {
+		return rf(opts, report, gasLimitOverrides)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalExecutionReport) *types.Transaction); ok {
-		r0 = rf(opts, report)
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalExecutionReport, []*big.Int) *types.Transaction); ok {
+		r0 = rf(opts, report, gasLimitOverrides)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalExecutionReport) error); ok {
-		r1 = rf(opts, report)
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, evm_2_evm_offramp.InternalExecutionReport, []*big.Int) error); ok {
+		r1 = rf(opts, report, gasLimitOverrides)
 	} else {
 		r1 = ret.Error(1)
 	}
