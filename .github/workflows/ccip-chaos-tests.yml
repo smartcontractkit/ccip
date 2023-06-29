@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: Check if image exists
         id: check-image
-        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@8489879838862929f43f7d7cd1b33903965cf507 # 2.1.6
+        uses: smartcontractkit/chainlink-github-actions/docker/image-exists@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
         with:
           repository: chainlink
           tag: ${{ github.sha }}
@@ -38,7 +38,7 @@ jobs:
           AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
       - name: Build Image
         if: steps.check-image.outputs.exists == 'false'
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@8489879838862929f43f7d7cd1b33903965cf507 # 2.1.6
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/build-image@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
         env:
           GH_TOKEN: ${{ github.token }}
         with:
@@ -115,7 +115,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: Run Chaos Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@8489879838862929f43f7d7cd1b33903965cf507 # 2.1.6
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
         with:
           test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -timeout 1h -count=1 -json -test.parallel 11 -run 'TestChaosCCIP' ./chaos 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: make gomod
@@ -174,7 +174,7 @@ jobs:
       - name: Checkout the repo
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: Run Load With Chaos Tests
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@8489879838862929f43f7d7cd1b33903965cf507 # 2.1.6
+        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
         with:
           test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -timeout 1h -count=1 -json -run '^TestLoadCCIPStableRequestTriggeringWithPodChaos$' ./load 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: make gomod

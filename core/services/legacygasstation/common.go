@@ -7,14 +7,15 @@ import (
 
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 type Config interface {
-	EvmGasLimitDefault() uint32
-	EvmFinalityDepth() uint32
-	EvmMaxGasPriceWei() *assets.Wei
+	LimitDefault() uint32
+	FinalityDepth() uint32
+	PriceMax() *assets.Wei
 }
 
 type ORM interface {
@@ -27,4 +28,20 @@ type ORM interface {
 
 type EthClient interface {
 	EstimateGas(ctx context.Context, call ethereum.CallMsg) (uint64, error)
+}
+
+type EVMConfig struct {
+	EVM config.EVM
+}
+
+func (e EVMConfig) LimitDefault() uint32 {
+	return e.EVM.GasEstimator().LimitDefault()
+}
+
+func (e EVMConfig) FinalityDepth() uint32 {
+	return e.EVM.FinalityDepth()
+}
+
+func (e EVMConfig) PriceMax() *assets.Wei {
+	return e.EVM.GasEstimator().PriceMax()
 }

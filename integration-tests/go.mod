@@ -13,19 +13,18 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/manifoldco/promptui v0.9.0
-	github.com/onsi/gomega v1.27.4
+	github.com/onsi/gomega v1.27.8
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.29.1
 	github.com/slack-go/slack v0.12.2
-	github.com/smartcontractkit/chainlink-env v0.32.10-0.20230615204346-0067ac7c683f
+	github.com/smartcontractkit/chainlink-env v0.33.0
 	github.com/smartcontractkit/chainlink-testing-framework v1.11.9
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20230606215712-82b910bef5c1
 	github.com/smartcontractkit/ocr2keepers v0.7.0
-	github.com/smartcontractkit/ocr2vrf v0.0.0-20230607140106-3de6d0aed120
+	github.com/smartcontractkit/ocr2vrf v0.0.0-20230616201444-d8b4222aff3c
 	github.com/smartcontractkit/wasp v0.2.4-0.20230621180253-1b141aa1fd55
 	github.com/stretchr/testify v1.8.4
-	github.com/test-go/testify v1.1.4
 	github.com/umbracle/ethgo v0.1.3
 	go.dedis.ch/kyber/v3 v3.1.0
 	go.uber.org/atomic v1.11.0
@@ -368,11 +367,11 @@ require (
 	github.com/shirou/gopsutil/v3 v3.22.12 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/smartcontractkit/caigo v0.0.0-20230530082629-53a5a4bdb25e // indirect
+	github.com/smartcontractkit/caigo v0.0.0-20230621050857-b29a4ca8c704 // indirect
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20230525203711-20bed74ac906 // indirect
-	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230615205306-31dec2180682 // indirect
+	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230620171700-bbcb3a99b7d3 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230612131011-369bfb503592 // indirect
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230601080524-3d8186742482 // indirect
+	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20230622060316-7ce48476dd7d // indirect
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb // indirect
 	github.com/smartcontractkit/wsrpc v0.7.2 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
@@ -394,6 +393,7 @@ require (
 	github.com/tendermint/tendermint v0.34.23 // indirect
 	github.com/tendermint/tm-db v0.6.7 // indirect
 	github.com/teris-io/shortid v0.0.0-20201117134242-e59966efd125 // indirect
+	github.com/test-go/testify v1.1.4 // indirect
 	github.com/theodesp/go-heaps v0.0.0-20190520121037-88e35354fe0a // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

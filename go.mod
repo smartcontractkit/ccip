@@ -47,7 +47,7 @@ require (
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/onsi/gomega v1.24.1
+	github.com/onsi/gomega v1.27.8
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pelletier/go-toml v1.9.5
 	github.com/pelletier/go-toml/v2 v2.0.8
@@ -64,15 +64,15 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1
 	github.com/shirou/gopsutil/v3 v3.22.12
 	github.com/shopspring/decimal v1.3.1
-	github.com/smartcontractkit/caigo v0.0.0-20230530082629-53a5a4bdb25e
+	github.com/smartcontractkit/caigo v0.0.0-20230621050857-b29a4ca8c704
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20230525203711-20bed74ac906
-	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230615205306-31dec2180682
+	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230620171700-bbcb3a99b7d3
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230612131011-369bfb503592
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.0-20230601080524-3d8186742482
+	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20230622060316-7ce48476dd7d
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230601092347-ed7c04f0085f
 	github.com/smartcontractkit/libocr v0.0.0-20230606215712-82b910bef5c1
 	github.com/smartcontractkit/ocr2keepers v0.7.0
-	github.com/smartcontractkit/ocr2vrf v0.0.0-20230607140106-3de6d0aed120
+	github.com/smartcontractkit/ocr2vrf v0.0.0-20230616201444-d8b4222aff3c
 	github.com/smartcontractkit/sqlx v1.3.5-0.20210805004948-4be295aacbeb
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230526143804-20ea6fd3d0dc
 	github.com/smartcontractkit/wsrpc v0.7.2

@@ -115,7 +115,9 @@ func (s *gasStationService) Start(context.Context) error {
 	}
 
 	orm := NewORM(s.db, l, chain.Config().Database())
-
+	cfg := EVMConfig{
+		EVM: chain.Config().EVM(),
+	}
 	reqHandler, err := NewRequestHandler(
 		l,
 		forwarder,
@@ -125,7 +127,7 @@ func (s *gasStationService) Start(context.Context) error {
 		s.ks,
 		s.q,
 		s.spec,
-		chain.Config(),
+		cfg,
 		orm,
 		s.spec.LegacyGasStationServerSpec.FromAddresses,
 		s.pr,

@@ -69,10 +69,10 @@ func (d *SidecarDelegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) 
 		return nil, errors.Wrap(err, "initializing off ramp")
 	}
 
-	if jb.LegacyGasStationSidecarSpec.LookbackBlocks < int32(chain.Config().EvmFinalityDepth()) {
+	if jb.LegacyGasStationSidecarSpec.LookbackBlocks < int32(chain.Config().EVM().FinalityDepth()) {
 		return nil, fmt.Errorf(
 			"waitBlocks must be greater than or equal to chain's finality depth (%d), currently %d",
-			chain.Config().EvmFinalityDepth(), jb.LegacyGasStationSidecarSpec.LookbackBlocks)
+			chain.Config().EVM().FinalityDepth(), jb.LegacyGasStationSidecarSpec.LookbackBlocks)
 	}
 
 	orm := NewORM(d.db, d.logger, chain.Config().Database())
@@ -95,13 +95,15 @@ func (d *SidecarDelegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) 
 	if err != nil {
 		return nil, errors.Wrap(err, "new status updater")
 	}
-
+	cfg := EVMConfig{
+		EVM: chain.Config().EVM(),
+	}
 	sidecar, err := NewSidecar(
 		log,
 		chain.LogPoller(),
 		forwarder,
 		offramp,
-		chain.Config(),
+		cfg,
 		jb.LegacyGasStationSidecarSpec.CCIPChainSelector.ToInt().Uint64(),
 		uint32(jb.LegacyGasStationSidecarSpec.LookbackBlocks),
 		orm,

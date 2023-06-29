@@ -67,7 +67,7 @@ func buildVrfUni(t *testing.T, db *sqlx.DB, cfg chainlink.GeneralConfig) vrfUniv
 	ec := evmclimocks.NewClient(t)
 	ec.On("ConfiguredChainID").Return(testutils.FixtureChainID)
 	lggr := logger.TestLogger(t)
-	hb := headtracker.NewEVMHeadBroadcaster(lggr)
+	hb := headtracker.NewHeadBroadcaster(lggr)
 
 	// Don't mock db interactions
 	prm := pipeline.NewORM(db, lggr, cfg.Database(), cfg.JobPipeline().MaxSuccessfulRuns())
@@ -300,7 +300,7 @@ func TestDelegate_ValidLog(t *testing.T) {
 		// Ensure we queue up a valid eth transaction
 		// Linked to requestID
 		vuni.txm.On("CreateTransaction",
-			mock.MatchedBy(func(txRequest txmgr.EvmTxRequest) bool {
+			mock.MatchedBy(func(txRequest txmgr.TxRequest) bool {
 				meta := txRequest.Meta
 				return txRequest.FromAddress == vuni.submitter &&
 					txRequest.ToAddress == common.HexToAddress(jb.VRFSpec.CoordinatorAddress.String()) &&
@@ -308,7 +308,7 @@ func TestDelegate_ValidLog(t *testing.T) {
 					meta.JobID != nil && meta.RequestID != nil && meta.RequestTxHash != nil &&
 					(*meta.JobID > 0 && *meta.RequestID == tc.reqID && *meta.RequestTxHash == txHash)
 			}),
-		).Once().Return(txmgr.EvmTx{}, nil)
+		).Once().Return(txmgr.Tx{}, nil)
 
 		listener.HandleLog(log.NewLogBroadcast(tc.log, vuni.cid, nil))
 		// Wait until the log is present
@@ -495,7 +495,7 @@ decode_log->vrf->encode_tx->submit_tx
 		require.NoError(tt, err)
 
 		cfg := vrf_mocks.NewConfig(t)
-		require.NoError(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg))
+		require.NoError(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
 
 	t.Run("returns nil error on valid gas lane <=> key specific gas price setting", func(tt *testing.T) {
@@ -522,7 +522,7 @@ decode_log->vrf->encode_tx->submit_tx
 			Toml())
 		require.NoError(t, err)
 
-		require.NoError(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg))
+		require.NoError(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
 
 	t.Run("returns error on invalid setting", func(tt *testing.T) {
@@ -550,7 +550,7 @@ decode_log->vrf->encode_tx->submit_tx
 			Toml())
 		require.NoError(t, err)
 
-		require.Error(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg))
+		require.Error(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
 }
 
@@ -638,7 +638,7 @@ func Test_FromAddressMaxGasPricesAllEqual(t *testing.T) {
 		}
 		defer cfg.AssertExpectations(tt)
 
-		assert.True(tt, vrf.FromAddressMaxGasPricesAllEqual(jb, cfg))
+		assert.True(tt, vrf.FromAddressMaxGasPricesAllEqual(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
 
 	t.Run("one max gas price not equal to others", func(tt *testing.T) {
@@ -667,6 +667,6 @@ func Test_FromAddressMaxGasPricesAllEqual(t *testing.T) {
 			Return(assets.GWei(200)) // doesn't match the rest
 		defer cfg.AssertExpectations(tt)
 
-		assert.False(tt, vrf.FromAddressMaxGasPricesAllEqual(jb, cfg))
+		assert.False(tt, vrf.FromAddressMaxGasPricesAllEqual(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
 }
