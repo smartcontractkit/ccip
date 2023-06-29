@@ -56,7 +56,8 @@ contract USDCTokenPoolSetup is BaseTest {
     domains[0] = USDCTokenPool.DomainUpdate({
       destChainSelector: DEST_CHAIN_ID,
       domainIdentifier: 9999,
-      allowedCaller: keccak256("allowedCaller")
+      allowedCaller: keccak256("allowedCaller"),
+      enabled: true
     });
 
     s_usdcTokenPool.setDomains(domains);
@@ -260,12 +261,14 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
       domainUpdates[i] = USDCTokenPool.DomainUpdate({
         allowedCaller: allowedCallers[i],
         domainIdentifier: domainIdentifiers[i],
-        destChainSelector: destChainSelectors[i]
+        destChainSelector: destChainSelectors[i],
+        enabled: true
       });
 
       s_chainToDomain[destChainSelectors[i]] = USDCTokenPool.Domain({
         domainIdentifier: domainIdentifiers[i],
-        allowedCaller: allowedCallers[i]
+        allowedCaller: allowedCallers[i],
+        enabled: true
       });
     }
 

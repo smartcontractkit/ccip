@@ -140,7 +140,7 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
     }
   }
 
-  function testFeeAdminPayNopsSuccess() public {
+  function testAdminPayNopsSuccess() public {
     changePrank(ADMIN);
 
     uint256 totalJuels = s_onRamp.getNopFeesJuels();
@@ -204,7 +204,7 @@ contract EVM2EVMOnRamp_payNops is EVM2EVMNopsFeeSetup {
   function testWrongPermissionsReverts() public {
     changePrank(STRANGER);
 
-    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrFeeAdminOrNop.selector);
+    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdminOrNop.selector);
     s_onRamp.payNops();
   }
 
@@ -1004,6 +1004,13 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     }
   }
 
+  function testAdminCanSetNopsSuccess() public {
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
+    // Should not revert
+    changePrank(ADMIN);
+    s_onRamp.setNops(nopsAndWeights);
+  }
+
   function testIncludesPaymentSuccess() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
     nopsAndWeights[1].nop = USER_4;
@@ -1050,7 +1057,7 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     changePrank(prevNop);
 
     // prev nop should not have permission to call payNops
-    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrFeeAdminOrNop.selector);
+    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdminOrNop.selector);
     s_onRamp.payNops();
   }
 
@@ -1069,12 +1076,10 @@ contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
     s_onRamp.setNops(getNopsAndWeights());
   }
 
-  function testNonOwnerReverts() public {
+  function testNonOwnerOrAdminReverts() public {
     EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = getNopsAndWeights();
     changePrank(STRANGER);
-
-    vm.expectRevert("Only callable by owner");
-
+    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdmin.selector);
     s_onRamp.setNops(nopsAndWeights);
   }
 
@@ -1155,10 +1160,10 @@ contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
     s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
   }
 
-  function testNonOwnerReverts() public {
+  function testNonOwnerOrAdminReverts() public {
     changePrank(STRANGER);
 
-    vm.expectRevert("Only callable by owner");
+    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdmin.selector);
     s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
   }
 
@@ -1186,7 +1191,7 @@ contract EVM2EVMOnRamp_setFeeTokenConfig is EVM2EVMOnRampSetup {
     s_onRamp.setFeeTokenConfig(feeConfig);
   }
 
-  function testSetFeeTokenConfigByFeeAdminSuccess() public {
+  function testSetFeeTokenConfigByAdminSuccess() public {
     EVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeConfig;
 
     changePrank(ADMIN);
@@ -1199,11 +1204,11 @@ contract EVM2EVMOnRamp_setFeeTokenConfig is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function testOnlyCallableByOwnerOrFeeAdminReverts() public {
+  function testOnlyCallableByOwnerOrAdminReverts() public {
     EVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeConfig;
     changePrank(STRANGER);
 
-    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrFeeAdmin.selector);
+    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdmin.selector);
 
     s_onRamp.setFeeTokenConfig(feeConfig);
   }
@@ -1249,7 +1254,7 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
     assertEq(1, tokenTransferFeeConfig1.ratio);
   }
 
-  function testSetFeeTokenConfigByFeeAdminSuccess() public {
+  function testSetFeeTokenConfigByAdminSuccess() public {
     EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory transferFeeConfig;
     changePrank(ADMIN);
 
@@ -1261,11 +1266,11 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
 
   // Reverts
 
-  function testOnlyCallableByOwnerOrFeeAdminReverts() public {
+  function testOnlyCallableByOwnerOrAdminReverts() public {
     EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] memory transferFeeConfig;
     changePrank(STRANGER);
 
-    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrFeeAdmin.selector);
+    vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdmin.selector);
 
     s_onRamp.setTokenTransferFeeConfig(transferFeeConfig);
   }
@@ -1341,9 +1346,10 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
   // Reverts
   function testOnlyCallableByOwnerReverts() public {
     changePrank(STRANGER);
-
     vm.expectRevert("Only callable by owner");
-
+    s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), new Internal.PoolUpdate[](0));
+    changePrank(ADMIN);
+    vm.expectRevert("Only callable by owner");
     s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), new Internal.PoolUpdate[](0));
   }
 
@@ -1505,7 +1511,10 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
   }
 
   function testSetConfigOnlyOwnerReverts() public {
-    vm.stopPrank();
+    changePrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(4)));
+    changePrank(ADMIN);
     vm.expectRevert("Only callable by owner");
     s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(4)));
   }
@@ -1533,7 +1542,10 @@ contract EVM2EVMOnRamp_setAllowListEnabled is EVM2EVMOnRampWithAllowListSetup {
   // Reverts
 
   function testOnlyOwnerReverts() public {
-    vm.stopPrank();
+    changePrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_onRamp.setAllowListEnabled(true);
+    changePrank(ADMIN);
     vm.expectRevert("Only callable by owner");
     s_onRamp.setAllowListEnabled(true);
   }
@@ -1608,9 +1620,12 @@ contract EVM2EVMOnRamp_applyAllowListUpdates is EVM2EVMOnRampWithAllowListSetup 
   // Reverts
 
   function testOnlyOwnerReverts() public {
-    vm.stopPrank();
+    changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     address[] memory newAddresses = new address[](2);
+    s_onRamp.applyAllowListUpdates(new address[](0), newAddresses);
+    changePrank(ADMIN);
+    vm.expectRevert("Only callable by owner");
     s_onRamp.applyAllowListUpdates(new address[](0), newAddresses);
   }
 }

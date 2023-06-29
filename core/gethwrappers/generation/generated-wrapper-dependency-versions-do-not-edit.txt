@@ -20,7 +20,7 @@ custom_token_pool: ../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../contra
 derived_price_feed_wrapper: ../../contracts/solc/v0.8.6/DerivedPriceFeed.abi ../../contracts/solc/v0.8.6/DerivedPriceFeed.bin c8542e6c850c2d0fffb79a7f7213dc927ec64e6ddd54e1224cb2fb4a13aabdd0
 evm_2_evm_offramp: ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOffRamp.bin 7be569c822136f04f0071239698892e207d71b29ae622c75b13f71a841c5ff64
 evm_2_evm_offramp_helper: ../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.abi ../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.bin 6d714c406cf8fa9dc56ab344e3e969b785855ab6620333f37f380f545d7f5a3b
-evm_2_evm_onramp: ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin ae006935cf1c8828bbe6c241a4b4b8a53ad28bfad75f6622cd4ed9322ecf1884
+evm_2_evm_onramp: ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin 1aadb22347804b9d26b71f44d6aa3b32bc3f3949beec316683795a3965b7a692
 feed_lookup_compatible_interface: ../../contracts/solc/v0.8.15/FeedLookupCompatibleInterface.abi ../../contracts/solc/v0.8.15/FeedLookupCompatibleInterface.bin 2c5c2cb669a666ab6f14e7fdbd11ea019997e3860f56ccfaf112156e412f1b15
 flags_wrapper: ../../contracts/solc/v0.6/Flags.abi ../../contracts/solc/v0.6/Flags.bin 2034d1b562ca37a63068851915e3703980276e8d5f7db6db8a3351a49d69fc4a
 flux_aggregator_wrapper: ../../contracts/solc/v0.6/FluxAggregator.abi ../../contracts/solc/v0.6/FluxAggregator.bin a3b0a6396c4aa3b5ee39b3c4bd45efc89789d4859379a8a92caca3a0496c5794
@@ -83,9 +83,9 @@ type_and_version_interface_wrapper: ../../contracts/solc/v0.8.6/TypeAndVersionIn
 upkeep_counter_wrapper: ../../contracts/solc/v0.7/UpkeepCounter.abi ../../contracts/solc/v0.7/UpkeepCounter.bin 901961ebf18906febc1c350f02da85c7ea1c2a68da70cfd94efa27c837a48663
 upkeep_perform_counter_restrictive_wrapper: ../../contracts/solc/v0.7/UpkeepPerformCounterRestrictive.abi ../../contracts/solc/v0.7/UpkeepPerformCounterRestrictive.bin 8975a058fba528e16d8414dc6f13946d17a145fcbc66cf25a32449b6fe1ce878
 upkeep_transcoder: ../../contracts/solc/v0.8.6/UpkeepTranscoder.abi ../../contracts/solc/v0.8.6/UpkeepTranscoder.bin 336c92a981597be26508455f81a908a0784a817b129a59686c5b2c4afcba730a
-usdc_token_pool: ../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../contracts/solc/v0.8.19/USDCTokenPool.bin 81f4c315a112170dd60396b66a11448ac13cd89efaeef33cedec35e3b8b45b5d
 verifiable_load_mercury_upkeep_wrapper: ../../contracts/solc/v0.8.6/VerifiableLoadMercuryUpkeep.abi ../../contracts/solc/v0.8.6/VerifiableLoadMercuryUpkeep.bin 83ccf231fec162786942d239268552525dfa04b3d98347983a7ef1b183e5d997
 verifiable_load_upkeep_wrapper: ../../contracts/solc/v0.8.6/VerifiableLoadUpkeep.abi ../../contracts/solc/v0.8.6/VerifiableLoadUpkeep.bin b6ea79e8b71dddc185ca137ec2eaab00709a37c664df11011a6348ac17fa989e
+usdc_token_pool: ../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../contracts/solc/v0.8.19/USDCTokenPool.bin 25071760db3c69e89c11c9c2c591a7f8e000c72a6130f2651846313040a69b8f
 vrf_consumer_v2: ../../contracts/solc/v0.8.6/VRFConsumerV2.abi ../../contracts/solc/v0.8.6/VRFConsumerV2.bin 9ef258bf8e9f8d880fd229ceb145593d91e24fc89366baa0bf19169c5787d15f
 vrf_consumer_v2_upgradeable_example: ../../contracts/solc/v0.8.6/VRFConsumerV2UpgradeableExample.abi ../../contracts/solc/v0.8.6/VRFConsumerV2UpgradeableExample.bin f1790a9a2f2a04c730593e483459709cb89e897f8a19d7a3ac0cfe6a97265e6e
 vrf_coordinator_mock: ../../contracts/solc/v0.8.6/VRFCoordinatorMock.abi ../../contracts/solc/v0.8.6/VRFCoordinatorMock.bin 5c495cf8df1f46d8736b9150cdf174cce358cb8352f60f0d5bb9581e23920501
