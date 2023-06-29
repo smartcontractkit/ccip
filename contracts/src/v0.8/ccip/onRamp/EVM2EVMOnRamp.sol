@@ -36,8 +36,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   error PausedError();
   error InvalidExtraArgsTag();
-  error OnlyCallableByOwnerOrFeeAdmin();
-  error OnlyCallableByOwnerOrFeeAdminOrNop();
+  error OnlyCallableByOwnerOrAdmin();
+  error OnlyCallableByOwnerOrAdminOrNop();
   error InvalidWithdrawParams();
   error NoFeesToPay();
   error NoNopsToPay();
@@ -631,7 +631,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @notice Sets the Nops and their weights
   /// @param nopsAndWeights Array of NopAndWeight structs
-  function setNops(NopAndWeight[] calldata nopsAndWeights) external onlyOwner {
+  function setNops(NopAndWeight[] calldata nopsAndWeights) external onlyOwnerOrAdmin {
     _setNops(nopsAndWeights);
   }
 
@@ -703,7 +703,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @notice Allows the owner to withdraw any ERC20 token that is not the fee token
   /// @param feeToken The token to withdraw
   /// @param to The address to send the tokens to
-  function withdrawNonLinkFees(address feeToken, address to) external onlyOwner {
+  function withdrawNonLinkFees(address feeToken, address to) external onlyOwnerOrAdmin {
     if (feeToken == i_linkToken || to == address(0)) revert InvalidWithdrawParams();
 
     // We require the link balance to be settled before allowing withdrawal
@@ -788,13 +788,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev Require that the sender is the owner or the fee admin or a nop
   modifier onlyOwnerOrAdminOrNop() {
     if (msg.sender != owner() && msg.sender != s_admin && !s_nops.contains(msg.sender))
-      revert OnlyCallableByOwnerOrFeeAdminOrNop();
+      revert OnlyCallableByOwnerOrAdminOrNop();
     _;
   }
 
   /// @dev Require that the sender is the owner or the fee admin
   modifier onlyOwnerOrAdmin() {
-    if (msg.sender != owner() && msg.sender != s_admin) revert OnlyCallableByOwnerOrFeeAdmin();
+    if (msg.sender != owner() && msg.sender != s_admin) revert OnlyCallableByOwnerOrAdmin();
     _;
   }
 

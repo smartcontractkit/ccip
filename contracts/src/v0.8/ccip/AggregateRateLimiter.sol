@@ -59,7 +59,7 @@ contract AggregateRateLimiter is OwnerIsCreator {
   /// @notice Sets the rate limited config.
   /// @param config The new rate limiter config.
   /// @dev should only be callable by the owner or token limit admin.
-  function setRateLimiterConfig(RateLimiter.Config memory config) external requireAdminOrOwner {
+  function setRateLimiterConfig(RateLimiter.Config memory config) external onlyAdminOrOwner {
     s_rateLimiter._setTokenBucketConfig(config);
   }
 
@@ -76,14 +76,14 @@ contract AggregateRateLimiter is OwnerIsCreator {
   /// @notice Sets the token limit admin address.
   /// @param newAdmin the address of the new admin.
   /// @dev setting this to address(0) indicates there is no active admin.
-  function setAdmin(address newAdmin) external requireAdminOrOwner {
+  function setAdmin(address newAdmin) external onlyAdminOrOwner {
     s_admin = newAdmin;
     emit AdminSet(newAdmin);
   }
 
   /// @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions
   /// it is applied to.
-  modifier requireAdminOrOwner() {
+  modifier onlyAdminOrOwner() {
     if (msg.sender != owner() && msg.sender != s_admin) revert RateLimiter.OnlyCallableByAdminOrOwner();
     _;
   }
