@@ -341,7 +341,6 @@ require (
 	github.com/smartcontractkit/chainlink-env v0.32.5 // indirect
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230620171700-bbcb3a99b7d3 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230612131011-369bfb503592 // indirect
-	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20230622060316-7ce48476dd7d // indirect
 	github.com/smartcontractkit/tdh2/go/ocr2/decryptionplugin v0.0.0-20230616141813-ca0ecf03ca5c // indirect
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230616062456-5c32c95fc166 // indirect
 	github.com/smartcontractkit/wsrpc v0.7.2 // indirect
