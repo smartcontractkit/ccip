@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - enabled - whether the fee token is enabled
   - renamed
     - multiplier -> gasMultiplier
+- EVM2EVMOnRamp.StaticConfig has a new field
+  - added
+    - maxNopFeesJuels - max NOP fees in juels that the onramp can accure
+
 
 ### Removed
 
