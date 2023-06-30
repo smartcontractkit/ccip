@@ -30,15 +30,15 @@ func getFinalityDepth(chain rhea.Chain) uint32 {
 		rhea.Goerli:         4,
 		rhea.OptimismGoerli: 5,
 		rhea.Quorum:         4,
-		rhea.AvaxFuji:       2, // Should be 1 theoretically
-		rhea.PolygonMumbai:  5,
-		rhea.ArbitrumGoerli: 5,
-		rhea.Sepolia:        4,
+		rhea.AvaxFuji:       40,  // Implements strange finality tag
+		rhea.PolygonMumbai:  550, // No finality tag available
+		rhea.ArbitrumGoerli: 5,   // We use finality tag
+		rhea.Sepolia:        4,   // We use finality tag
 		// Mainnets
 		// We've made a bit of an effort to make these realistic, but they are *not* production-ready parameters, only use them for testing!!!
 		rhea.Ethereum: 96, // 3 epochs to be safe
-		rhea.Avax:     2,  // Should be 1 theoretically
-		rhea.Polygon:  600,
+		rhea.Avax:     40, // Should be 1 theoretically
+		rhea.Polygon:  550,
 		rhea.Optimism: 5000, // Should be 1 theoretically
 		rhea.Arbitrum: 5000,
 	}

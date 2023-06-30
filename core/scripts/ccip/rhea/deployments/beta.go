@@ -6,7 +6,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rhea"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
+
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
@@ -48,7 +48,7 @@ var Beta_Sepolia = rhea.EVMChainConfig{
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x74f9d0e57b4ee4e05e4438087e1a78357f6171ae"),
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
 			TokenPoolType: rhea.LockRelease,
@@ -70,10 +70,10 @@ var Beta_Sepolia = rhea.EVMChainConfig{
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
-	Router:        gethcommon.HexToAddress(""),
-	UpgradeRouter: gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0x614c634e24acdaf241bf14c1fdbc38a5cb474048"),
+	UpgradeRouter: gethcommon.HexToAddress("0x5c4eb68f8ced09049f62ee02d9bd3142322d487e"),
+	ARM:           gethcommon.HexToAddress("0x7821108421214a1b4294e1ca772826dc7310c7f9"),
+	PriceRegistry: gethcommon.HexToAddress("0xc30465b21b8c97cdc09436be2f4f1d7ce398d6a8"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Sepolia),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.Sepolia),
@@ -84,60 +84,6 @@ var Beta_Sepolia = rhea.EVMChainConfig{
 		MaxGasPrice:              getMaxGasPrice(rhea.Sepolia),
 		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
-	},
-	ARMConfig: &arm_contract.ARMConfig{
-		Voters: []arm_contract.ARMVoter{
-			// Kostis-0
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0xcee3d4ac88c3ec196a1b09b5142c0f83d7e5bd61"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0xefb9e871f768a9535dca47946a44d73f074e0ca1"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Kostis-1
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x9bd9bfe1c863c50c732dfd1e4b2c7d6dec1dd293"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0xaff9ad86d7c119a9707a95888ce1a0955b5af8f1"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000002"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Kostis-2
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x3b809ea936b365438d371e6794f250536f1dda0d"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0xd911d677c758201e84e55a00f232f58b6587e978"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000003"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-0
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x61183156e620fe24fad874a936d2cdfebb7b9cc5"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x285d081480996bbe5dd11256f0d09321c7e93a58"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000004"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-1
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x3436679441013bc0bc4a2a9b091ec76a447e8e35"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x1b94b22f4f0623f3bc3ac91f1a4112c65f942f38"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000005"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-2
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x809de34394cda8a78185e7f8e7ad7a3f7a699813"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x7dab8add75b3c0900895432fe8816d232317b8b6"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000006"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-		},
-		BlessWeightThreshold: 2,
-		CurseWeightThreshold: 2,
 	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployARM:           false,
@@ -156,7 +102,7 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:          gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
-			Pool:           gethcommon.HexToAddress(""),
+			Pool:           gethcommon.HexToAddress("0xdbdb2a0ec3b42c1896f116f6f6eca03d3ee3a90b"),
 			TokenPoolType:  rhea.LockRelease,
 			TokenPriceType: rhea.PriceFeeds,
 			Price:          rhea.LINK.Price(),
@@ -176,10 +122,10 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
-	Router:        gethcommon.HexToAddress(""),
-	UpgradeRouter: gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0x0eef52c0abeb718030134e1fbcd0c308383d9c9b"),
+	UpgradeRouter: gethcommon.HexToAddress("0xad457845cab9f6e375571c6d639d222534bcb8e9"),
+	ARM:           gethcommon.HexToAddress("0x8ac6ec2e3cd05dcacfd5fb9462f49e4d6cbeb42a"),
+	PriceRegistry: gethcommon.HexToAddress("0x8d249185c242088f605796f1281e20213f13f725"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.OptimismGoerli),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.OptimismGoerli),
@@ -190,60 +136,6 @@ var Beta_OptimismGoerli = rhea.EVMChainConfig{
 		MaxGasPrice:              getMaxGasPrice(rhea.OptimismGoerli),
 		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
-	},
-	ARMConfig: &arm_contract.ARMConfig{
-		Voters: []arm_contract.ARMVoter{
-			// Kostis-0
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x5318adc442a78983ad51f6a04de37f1ec5161ce5"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0xa4bc432862724ac4f89f09ac49a7ba5f5d2f86c4"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Kostis-1
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0xa2235d4e15fb6a7bc5544f640bc9e86459fe7fd9"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x7b3eff7928a252d0117d94994f11b2f5662f854c"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000002"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Kostis-2
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x119fb25b52e579fa3b73516f8957b9f01e363357"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0xdf66bffcadb3485812d7ff3ca9cc345e2d94d4a5"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000003"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-0
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x3c560408bd37d480bc6ba0bc809d432250d3bd0a"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x35c376146bda951dd8988c180ef71d00e157f318"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000004"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-1
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x76ed187733982c10641fa6e58871d6f77cf0d4e1"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x992bbf33efc78d4e034d48a5aa374a319c6e78fe"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000005"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-2
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x67b22898dfa78efccde2dcdc301cdc5a6bbc77b8"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x2ce367fb5014e5f0e8b383eff7bf7bb74391296e"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000006"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-		},
-		BlessWeightThreshold: 2,
-		CurseWeightThreshold: 2,
 	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployARM:           false,
@@ -262,7 +154,7 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:          gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
-			Pool:           gethcommon.HexToAddress(""),
+			Pool:           gethcommon.HexToAddress("0x73baaf43eb73e337234d0d7cd943cf48d510fb26"),
 			Price:          rhea.LINK.Price(),
 			Decimals:       rhea.LINK.Decimals(),
 			TokenPoolType:  rhea.LockRelease,
@@ -286,10 +178,10 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
 	WrappedNative: rhea.WAVAX,
-	Router:        gethcommon.HexToAddress(""),
-	UpgradeRouter: gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0x6272842cfe36a84af4751fd068d41ac71cd71e02"),
+	UpgradeRouter: gethcommon.HexToAddress("0x3a58dfa06bc85ecc5d535bcc42e2aa2605515fcc"),
+	ARM:           gethcommon.HexToAddress("0xfb04cd1f7cf59946ea60c5171a7bd670251edb5a"),
+	PriceRegistry: gethcommon.HexToAddress("0x1eafbab2182ae0dcacd0852ebb1e6c588b5b757f"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.AvaxFuji),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.AvaxFuji),
@@ -300,60 +192,6 @@ var Beta_AvaxFuji = rhea.EVMChainConfig{
 		MaxGasPrice:              getMaxGasPrice(rhea.AvaxFuji),
 		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
-	},
-	ARMConfig: &arm_contract.ARMConfig{
-		Voters: []arm_contract.ARMVoter{
-			// Kostis-0
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x22ad1e7ca671f07b502654a4a9605bd440a374ae"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x949754c662d24079f6ed024ae8cc152a03e02a83"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Kostis-1
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x7c10ef26cc03093ac39629da2c154b95b9093378"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x2a31f2831e9ad6fd7b24bb1d47637e59052b03c1"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000002"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Kostis-2
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0xf3bb58c4595e39eec9518bfc5c3651e293e784e8"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x042f5b5f61697c155d2ef45e497250a01b0b8db9"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000003"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-0
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x8e7d8c061dcd9c86260a187d0a61d5c2e0ee09c7"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x306ca690533d30b418f90740265074186b532249"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000004"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-1
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0xe99c75aad15e1f59d9e18fca9ac9e7d61c00c2a9"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0xd02d00f3846860371bead4c8bf4a44b673aef319"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000005"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-2
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x9f82b506ac8e9c08f6b37afcceae93c34557474f"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x99271e6e4c88d4ac23510debb6ca4ff0412d5fba"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000006"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-		},
-		BlessWeightThreshold: 2,
-		CurseWeightThreshold: 2,
 	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployARM:           false,
@@ -372,7 +210,7 @@ var Beta_ArbitrumGoerli = rhea.EVMChainConfig{
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:          gethcommon.HexToAddress("0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28"),
-			Pool:           gethcommon.HexToAddress(""),
+			Pool:           gethcommon.HexToAddress("0x5bb0ac3d2f78da00d83485961ef44254de9e2257"),
 			Price:          rhea.LINK.Price(),
 			Decimals:       rhea.LINK.Decimals(),
 			TokenPoolType:  rhea.LockRelease,
@@ -396,10 +234,10 @@ var Beta_ArbitrumGoerli = rhea.EVMChainConfig{
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
-	Router:        gethcommon.HexToAddress(""),
-	UpgradeRouter: gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0x0584e878c687f5e39af5d1a60bd3e1465420191e"),
+	UpgradeRouter: gethcommon.HexToAddress("0xf6fd9dd7e462e07e04e7b3cad0a43fa6d2b8e4b8"),
+	ARM:           gethcommon.HexToAddress("0x80c9221a6a24977da34ad933327e0ce8ef0afa53"),
+	PriceRegistry: gethcommon.HexToAddress("0x104a33b934cb2ebf3bd0d4969b06019d1aea5da6"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.ArbitrumGoerli),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.ArbitrumGoerli),
@@ -410,60 +248,6 @@ var Beta_ArbitrumGoerli = rhea.EVMChainConfig{
 		MaxGasPrice:              getMaxGasPrice(rhea.ArbitrumGoerli),
 		InflightCacheExpiry:      models.MustMakeDuration(INFLIGHT_CACHE_EXPIRY),
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
-	},
-	ARMConfig: &arm_contract.ARMConfig{
-		Voters: []arm_contract.ARMVoter{
-			// Kostis-0
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0xc8e7532913d78f5b2874e48455e5df367116524e"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0xbf16a12b390f40e2dcbb4fb533a699346102e9fb"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Kostis-1
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x482520152d83daa7005f547ed2019675f7581b01"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0xec61b7ddc4fb36f06a8b066b16513ac7519c162f"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000002"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Kostis-2
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x4f6af3a1cf3d83c537164f5c4792e70e77dd4cf3"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x39cb1995898baca087335558d0aef66589172cf5"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000003"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-0
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x76c7d8712b6f8539fba326519e39844bab19bf32"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x8bfa8c4db766be6d8c5cded7000a292d06e9848e"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000004"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-1
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x4fd9c1f9d3b74ea2980d5d5f7b26f2dcb627cb9d"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x6280eec1ca26c07f986df51aa7b303a00fdb2e8a"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000005"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-			// Xueyuan-2
-			{
-				BlessVoteAddr:   gethcommon.HexToAddress("0x2eb4b9c1f512f6ab04afbef99cdb44fcf9f3cb5e"),
-				CurseVoteAddr:   gethcommon.HexToAddress("0x7814f9a0a2687fec23134852b9cacae03e50acbf"),
-				CurseUnvoteAddr: gethcommon.HexToAddress("0x0000000000000000000000000000000000000006"),
-				BlessWeight:     1,
-				CurseWeight:     1,
-			},
-		},
-		BlessWeightThreshold: 2,
-		CurseWeightThreshold: 2,
 	},
 	DeploySettings: rhea.ChainDeploySettings{
 		DeployARM:           false,
@@ -477,14 +261,14 @@ var Beta_ArbitrumGoerli = rhea.EVMChainConfig{
 var Beta_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_OptimismGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress(""),
-		OffRamp:      gethcommon.HexToAddress(""),
-		CommitStore:  gethcommon.HexToAddress(""),
-		PingPongDapp: gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress("0x7ae29380a0ffaf487f315f4a98a1ada2f76dd6dd"),
+		OffRamp:      gethcommon.HexToAddress("0x77daa03b89b190021527614ca43158139a0302ae"),
+		CommitStore:  gethcommon.HexToAddress("0xab7cc1d2fcb7b24f33d94930c43bc3eac40cf3a1"),
+		PingPongDapp: gethcommon.HexToAddress("0x245d8cc0559c1f976229bb3592cdfd18e85345f2"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    10655209,
+			DeployedAtBlock:    10870445,
 		},
 	},
 }
@@ -492,14 +276,14 @@ var Beta_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 var Beta_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_AvaxFuji,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress(""),
-		OffRamp:      gethcommon.HexToAddress(""),
-		CommitStore:  gethcommon.HexToAddress(""),
-		PingPongDapp: gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress("0x79b1428bc9291f3016b52aacbcf54c5794855789"),
+		OffRamp:      gethcommon.HexToAddress("0xf444da4cfc231dee3fdabda7c75352b63100d341"),
+		CommitStore:  gethcommon.HexToAddress("0xc80adaccc3c4dcfef1d961f7e818b3009e60cc4b"),
+		PingPongDapp: gethcommon.HexToAddress("0x30dfd3dfd0c2eb94858acb2ad741a25a9309057a"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    23076286,
+			DeployedAtBlock:    23266831,
 		},
 	},
 }
@@ -567,14 +351,14 @@ var Beta_OptimismGoerliToArbitrumGoerli = rhea.EvmDeploymentConfig{
 var Beta_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_AvaxFuji,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress(""),
-		OffRamp:      gethcommon.HexToAddress(""),
-		CommitStore:  gethcommon.HexToAddress(""),
-		PingPongDapp: gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress("0xf8510723c2dbf8c2acb9e2c37ca5aad1c2b7af5c"),
+		OffRamp:      gethcommon.HexToAddress("0xcab948c8b684edd8d5fb77d96624d7838f977601"),
+		CommitStore:  gethcommon.HexToAddress("0x2a2458d248cbb63a6e0bcdeae5390897a841eafd"),
+		PingPongDapp: gethcommon.HexToAddress("0xcc8abb746f291724e37f777458349514d99e8fbf"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    23078007,
+			DeployedAtBlock:    23273310,
 		},
 	},
 }
@@ -582,14 +366,14 @@ var Beta_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 var Beta_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_Sepolia,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress(""),
-		OffRamp:      gethcommon.HexToAddress(""),
-		CommitStore:  gethcommon.HexToAddress(""),
-		PingPongDapp: gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress("0x9461de3bb161855c838217faebb9e09b858ff4fd"),
+		OffRamp:      gethcommon.HexToAddress("0x95b5e1294000a6f7daaee6f79bcbc42794390eeb"),
+		CommitStore:  gethcommon.HexToAddress("0x59108d9a96ab8433da20e96683a3bd0809072c63"),
+		PingPongDapp: gethcommon.HexToAddress("0xba9e819847b7df50bc18635783da815e6062359a"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3689886,
+			DeployedAtBlock:    3724928,
 		},
 	},
 }
@@ -597,14 +381,14 @@ var Beta_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 var Beta_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_OptimismGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress(""),
-		OffRamp:      gethcommon.HexToAddress(""),
-		CommitStore:  gethcommon.HexToAddress(""),
-		PingPongDapp: gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress("0xe8b7b8a8f82bc64bcd96e509957f1e7b97f30661"),
+		OffRamp:      gethcommon.HexToAddress("0xd2b51f177d0af8c00c81bef53eb91ba280acb32a"),
+		CommitStore:  gethcommon.HexToAddress("0x9a13cd266662d9a80e34429dd97f3785ed2abcf3"),
+		PingPongDapp: gethcommon.HexToAddress("0x8ae9c9b1bdf3d1db732bb5d5e1ea8a1b2f198512"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    10657183,
+			DeployedAtBlock:    10873097,
 		},
 	},
 }
@@ -612,14 +396,14 @@ var Beta_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 var Beta_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_Sepolia,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress(""),
-		OffRamp:      gethcommon.HexToAddress(""),
-		CommitStore:  gethcommon.HexToAddress(""),
-		PingPongDapp: gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress("0x7e34bf2deedece628520c613fe3072641a9ef1a9"),
+		OffRamp:      gethcommon.HexToAddress("0x21d4718c51230939b94ecb4842a95570d4195791"),
+		CommitStore:  gethcommon.HexToAddress("0x50be096cd8e7cf118c3d243332cc38e10e0d6256"),
+		PingPongDapp: gethcommon.HexToAddress("0xe0ca935c99d5b40fd50bdd3c96dac41068371ce1"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3689917,
+			DeployedAtBlock:    3724229,
 		},
 	},
 }
@@ -627,14 +411,14 @@ var Beta_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_ArbitrumGoerli,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress(""),
-		OffRamp:      gethcommon.HexToAddress(""),
-		CommitStore:  gethcommon.HexToAddress(""),
-		PingPongDapp: gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress("0x150a7c88a441e129ff5b991e831d8f6b4ff8397c"),
+		OffRamp:      gethcommon.HexToAddress("0xdbec267175e6aa9469137dfa3aa84562d6e54af4"),
+		CommitStore:  gethcommon.HexToAddress("0x18034841fa3c5e4ff55aeab09f22866ea91621a9"),
+		PingPongDapp: gethcommon.HexToAddress("0xe4867cc573f623de28e29eafa5845e0a310106d7"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    25970391,
+			DeployedAtBlock:    26819726,
 		},
 	},
 }
@@ -642,14 +426,14 @@ var Beta_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 var Beta_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_Sepolia,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress(""),
-		OffRamp:      gethcommon.HexToAddress(""),
-		CommitStore:  gethcommon.HexToAddress(""),
-		PingPongDapp: gethcommon.HexToAddress(""),
+		OnRamp:       gethcommon.HexToAddress("0xc15d647bc2aca2437ab115089494e881f4ddb8f9"),
+		OffRamp:      gethcommon.HexToAddress("0xb9f9cc3e3e0a69ece402de7367b4f284eb987425"),
+		CommitStore:  gethcommon.HexToAddress("0x64acab89a976ed89853eadecb0984b4d2c6451d9"),
+		PingPongDapp: gethcommon.HexToAddress("0x8ce4f3640c0c6efce4c4c253fe25ef5176d8622d"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3689948,
+			DeployedAtBlock:    3724273,
 		},
 	},
 }

@@ -356,7 +356,7 @@ func deployCommitStore(t *testing.T, client EvmConfig, lane *EVMLaneConfig, sour
 }
 
 func deployPingPongDapp(t *testing.T, router common.Address, client EvmConfig, lane *EVMLaneConfig) {
-	fundingAmount := big.NewInt(1e18)
+	fundingAmount := big.NewInt(5e18)
 
 	if !lane.DeploySettings.DeployPingPongDapp {
 		return

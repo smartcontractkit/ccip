@@ -77,8 +77,10 @@ func deployARM(client *EvmDeploymentConfig) error {
 	armConfig := client.ChainConfig.ARMConfig
 	switch armConfig {
 	case nil:
+		client.Logger.Infof("Deploying Mock ARM")
 		armAddress, tx, _, err = mock_arm_contract.DeployMockARMContract(client.Owner, client.Client)
 	default:
+		client.Logger.Infof("Deploying real ARM %+v", *armConfig)
 		armAddress, tx, _, err = arm_contract.DeployARMContract(client.Owner, client.Client, *armConfig)
 	}
 	if err != nil {
