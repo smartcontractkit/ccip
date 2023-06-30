@@ -10,9 +10,11 @@ pragma solidity ^0.8.0;
 /// e.g. compromised issuer, an enabled RateLimiter will check and revert.
 library RateLimiter {
   error BucketOverfilled();
-  error ConsumingMoreThanMaxCapacity(uint256 capacity, uint256 requested);
-  error RateLimitReached(uint256 waitInSeconds);
   error OnlyCallableByAdminOrOwner();
+  error TokenMaxCapacityExceeded(uint256 capacity, uint256 requested, address tokenAddress);
+  error TokenRateLimitReached(uint256 minWaitInSeconds, uint256 available, address tokenAddress);
+  error AggregateValueMaxCapacityExceeded(uint256 capacity, uint256 requested);
+  error AggregateValueRateLimitReached(uint256 minWaitInSeconds, uint256 available);
 
   event TokensConsumed(uint256 tokens);
   event ConfigChanged(Config config);
@@ -34,9 +36,10 @@ library RateLimiter {
   /// @notice _consume removes the given tokens from the pool, lowering the
   /// rate tokens allowed to be consumed for subsequent calls.
   /// @param requestTokens The total tokens to be consumed from the bucket.
+  /// @param tokenAddress The token to consume capacity for, use 0x0 to indicate aggregate value capacity.
   /// @dev Reverts when requestTokens exceeds bucket capacity or available tokens in the bucket
   /// @dev emits removal of requestTokens if requestTokens is > 0
-  function _consume(TokenBucket storage s_bucket, uint256 requestTokens) internal {
+  function _consume(TokenBucket storage s_bucket, uint256 requestTokens, address tokenAddress) internal {
     // If there is no value to remove or rate limiting is turned off, skip this step to reduce gas usage
     if (!s_bucket.isEnabled || requestTokens == 0) {
       return;
@@ -55,12 +58,20 @@ library RateLimiter {
       s_bucket.lastUpdated = uint32(block.timestamp);
     }
 
-    if (capacity < requestTokens) revert ConsumingMoreThanMaxCapacity(capacity, requestTokens);
+    if (capacity < requestTokens) {
+      // Token address 0 indicates consuming aggregate value rate limit capacity.
+      if (tokenAddress == address(0)) revert AggregateValueMaxCapacityExceeded(capacity, requestTokens);
+      revert TokenMaxCapacityExceeded(capacity, requestTokens, tokenAddress);
+    }
     if (tokens < requestTokens) {
       uint256 rate = s_bucket.rate;
-      // Seconds wait required until the bucket is refilled enough to accept this value
-      // Round up to the next higher second
-      revert RateLimitReached(((requestTokens - tokens) + (rate - 1)) / rate);
+      // Wait required until the bucket is refilled enough to accept this value, round up to next higher second
+      // Consume is not guaranteed to succeed after wait time passes if there is competing traffic.
+      // This acts as a lower bound of wait time.
+      uint256 minWaitInSeconds = ((requestTokens - tokens) + (rate - 1)) / rate;
+
+      if (tokenAddress == address(0)) revert AggregateValueRateLimitReached(minWaitInSeconds, tokens);
+      revert TokenRateLimitReached(minWaitInSeconds, tokens, tokenAddress);
     }
     tokens -= requestTokens;
 

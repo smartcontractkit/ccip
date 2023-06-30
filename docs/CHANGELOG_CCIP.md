@@ -48,6 +48,9 @@ per lane token pool rate limits.
   - if an array entry is 0, corresponding message's gas limit is used during execution
   - if an array entry is not 0, it overrides the message's gas limit
   - gas limit override cannot be lower than the original limit defined in the message
+- RateLimiter errors are changed to reflect type
+  - `ConsumingMoreThanCapacity` error is now `AggregateValueMaxCapacityExceeded` and `TokenMaxCapacityExceeded`
+  - `RateLimitReached` error is now `AggregateValueRateLimitReached` and `TokenRateLimitReached`
 
 
 ### Removed

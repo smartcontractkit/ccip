@@ -236,7 +236,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     s_usdcTokenPool.releaseOrMint(abi.encode(OWNER), OWNER, 1, SOURCE_CHAIN_ID, extraData);
   }
 
-  function testConsumingMoreThanMaxCapacityReverts() public {
+  function testTokenMaxCapacityExceededReverts() public {
     uint256 capacity = rateLimiterConfig().capacity;
     uint256 amount = 10 * capacity;
     address receiver = address(1);
@@ -246,7 +246,9 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
       USDCTokenPool.MessageAndAttestation({message: bytes(""), attestation: bytes("")})
     );
 
-    vm.expectRevert(abi.encodeWithSelector(RateLimiter.ConsumingMoreThanMaxCapacity.selector, capacity, amount));
+    vm.expectRevert(
+      abi.encodeWithSelector(RateLimiter.TokenMaxCapacityExceeded.selector, capacity, amount, address(s_token))
+    );
 
     s_usdcTokenPool.releaseOrMint(abi.encode(OWNER), receiver, amount, SOURCE_CHAIN_ID, extraData);
   }

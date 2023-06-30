@@ -174,12 +174,12 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   /// @notice Consumes outbound rate limiting capacity in this pool
   function _consumeOnRampRateLimit(uint256 amount) internal {
-    s_onRampRateLimits[msg.sender]._consume(amount);
+    s_onRampRateLimits[msg.sender]._consume(amount, address(i_token));
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
   function _consumeOffRampRateLimit(uint256 amount) internal {
-    s_offRampRateLimits[msg.sender]._consume(amount);
+    s_offRampRateLimits[msg.sender]._consume(amount, address(i_token));
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.

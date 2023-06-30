@@ -201,7 +201,9 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
     // Since value * 2 > bucket.capacity we cannot take it out twice.
     // Expect a revert when we try, with a wait time.
     uint256 waitTime = 4;
-    vm.expectRevert(abi.encodeWithSelector(RateLimiter.RateLimitReached.selector, waitTime));
+    vm.expectRevert(
+      abi.encodeWithSelector(RateLimiter.AggregateValueRateLimitReached.selector, waitTime, bucket.tokens)
+    );
     s_rateLimiter.rateLimitValue(tokenAmounts, s_priceRegistry);
 
     // Move the block time forward by 10 so the bucket refills by 10 * rate
@@ -221,7 +223,7 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
     s_rateLimiter.rateLimitValue(new Client.EVMTokenAmount[](1), s_priceRegistry);
   }
 
-  function testConsumingMoreThanMaxCapacityReverts() public {
+  function testAggregateValueMaxCapacityExceededReverts() public {
     RateLimiter.TokenBucket memory bucket = s_rateLimiter.currentRateLimiterState();
 
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
@@ -230,7 +232,7 @@ contract AggregateTokenLimiter__rateLimitValue is AggregateTokenLimiterSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        RateLimiter.ConsumingMoreThanMaxCapacity.selector,
+        RateLimiter.AggregateValueMaxCapacityExceeded.selector,
         bucket.capacity,
         (tokenAmounts[0].amount * TOKEN_PRICE) / 1e18
       )

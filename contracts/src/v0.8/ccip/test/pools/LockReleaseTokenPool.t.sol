@@ -99,7 +99,9 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     uint256 capacity = rateLimiterConfig().capacity;
     // Determine if we hit the rate limit or the txs should succeed.
     if (amount > capacity) {
-      vm.expectRevert(abi.encodeWithSelector(RateLimiter.ConsumingMoreThanMaxCapacity.selector, capacity, amount));
+      vm.expectRevert(
+        abi.encodeWithSelector(RateLimiter.TokenMaxCapacityExceeded.selector, capacity, amount, address(s_token))
+      );
     } else {
       // Only rate limit if the amount is >0
       if (amount > 0) {

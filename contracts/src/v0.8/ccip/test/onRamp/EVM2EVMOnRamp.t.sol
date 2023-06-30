@@ -447,7 +447,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.forwardFromRouter(message, 0, OWNER);
   }
 
-  function testConsumingMoreThanMaxCapacityReverts() public {
+  function testMaxCapacityExceededReverts() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = new Client.EVMTokenAmount[](1);
     message.tokenAmounts[0].amount = 2 ** 128;
@@ -457,7 +457,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
 
     vm.expectRevert(
       abi.encodeWithSelector(
-        RateLimiter.ConsumingMoreThanMaxCapacity.selector,
+        RateLimiter.AggregateValueMaxCapacityExceeded.selector,
         rateLimiterConfig().capacity,
         (message.tokenAmounts[0].amount * s_sourceTokenPrices[0]) / 1e18
       )

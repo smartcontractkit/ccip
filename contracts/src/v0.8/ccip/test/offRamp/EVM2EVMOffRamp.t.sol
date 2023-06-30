@@ -211,7 +211,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
       address(1)
     );
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidOffRampConfig.selector, dynamicConfig));
+    vm.expectRevert(EVM2EVMOffRamp.ZeroAddressNotAllowed.selector);
 
     s_offRamp.setOCR2Config(
       s_valid_signers,
@@ -983,14 +983,7 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     uint256[] memory gasLimits = _getGasLimitsFromMessages(messages);
     gasLimits[0]--;
 
-    vm.expectRevert(
-      abi.encodeWithSelector(
-        EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector,
-        0,
-        messages[0].gasLimit,
-        gasLimits[0]
-      )
-    );
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOffRamp.InvalidManualExecutionGasLimit.selector, 0, gasLimits[0]));
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimits);
   }
 
@@ -1207,14 +1200,31 @@ contract EVM2EVMOffRamp__releaseOrMintTokens is EVM2EVMOffRampSetup {
   function testRateLimitErrorsReverts() public {
     Client.EVMTokenAmount[] memory srcTokenAmounts = getCastedSourceEVMTokenAmountsWithZeroAmounts();
 
-    bytes[] memory rateLimitErrors = new bytes[](3);
+    bytes[] memory rateLimitErrors = new bytes[](5);
     rateLimitErrors[0] = abi.encodeWithSelector(RateLimiter.BucketOverfilled.selector);
     rateLimitErrors[1] = abi.encodeWithSelector(
-      RateLimiter.ConsumingMoreThanMaxCapacity.selector,
+      RateLimiter.AggregateValueMaxCapacityExceeded.selector,
       uint256(100),
       uint256(1000)
     );
-    rateLimitErrors[2] = abi.encodeWithSelector(RateLimiter.RateLimitReached.selector, uint256(42));
+    rateLimitErrors[2] = abi.encodeWithSelector(
+      RateLimiter.AggregateValueRateLimitReached.selector,
+      uint256(42),
+      1,
+      s_sourceTokens[0]
+    );
+    rateLimitErrors[3] = abi.encodeWithSelector(
+      RateLimiter.TokenMaxCapacityExceeded.selector,
+      uint256(100),
+      uint256(1000),
+      s_sourceTokens[0]
+    );
+    rateLimitErrors[4] = abi.encodeWithSelector(
+      RateLimiter.TokenRateLimitReached.selector,
+      uint256(42),
+      1,
+      s_sourceTokens[0]
+    );
 
     for (uint256 i = 0; i < rateLimitErrors.length; ++i) {
       MaybeRevertingBurnMintTokenPool(s_destPools[1]).setShouldRevert(rateLimitErrors[i]);

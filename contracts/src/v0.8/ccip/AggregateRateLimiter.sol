@@ -47,7 +47,7 @@ contract AggregateRateLimiter is OwnerIsCreator {
       value += pricePerToken._calcUSDValueFromTokenAmount(tokenAmounts[i].amount);
     }
 
-    s_rateLimiter._consume(value);
+    s_rateLimiter._consume(value, address(0));
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.

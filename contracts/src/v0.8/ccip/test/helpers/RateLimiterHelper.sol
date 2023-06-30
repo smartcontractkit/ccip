@@ -18,8 +18,8 @@ contract RateLimiterHelper {
     });
   }
 
-  function consume(uint256 requestTokens) external {
-    s_rateLimiter._consume(requestTokens);
+  function consume(uint256 requestTokens, address tokenAddress) external {
+    s_rateLimiter._consume(requestTokens, tokenAddress);
   }
 
   function currentTokenBucketState() external view returns (RateLimiter.TokenBucket memory) {

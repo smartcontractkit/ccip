@@ -44,9 +44,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   error UnsupportedNumberOfTokens(uint64 sequenceNumber);
   error ManualExecutionNotYetEnabled();
   error ManualExecutionGasLimitMismatch();
-  error InvalidManualExecutionGasLimit(uint256 index, uint256 currentLimit, uint256 newLimit);
+  error InvalidManualExecutionGasLimit(uint256 index, uint256 newLimit);
   error RootNotCommitted();
-  error InvalidOffRampConfig(DynamicConfig config);
   error UnsupportedToken(IERC20 token);
   error CanOnlySelfCall();
   error ReceiverError(bytes error);
@@ -212,9 +211,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     uint256 numMsgs = report.messages.length;
     if (numMsgs != gasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
     for (uint256 i = 0; i < numMsgs; ++i) {
+      uint256 newLimit = gasLimitOverrides[i];
       // Checks to ensure message cannot be executed with less gas than specified.
-      if (gasLimitOverrides[i] != 0 && gasLimitOverrides[i] < report.messages[i].gasLimit)
-        revert InvalidManualExecutionGasLimit(i, report.messages[i].gasLimit, gasLimitOverrides[i]);
+      if (newLimit != 0 && newLimit < report.messages[i].gasLimit) revert InvalidManualExecutionGasLimit(i, newLimit);
     }
 
     _execute(report, gasLimitOverrides);
@@ -448,8 +447,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   function _beforeSetConfig(bytes memory onchainConfig) internal override {
     DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
-    if (dynamicConfig.router == address(0) || dynamicConfig.arm == address(0))
-      revert InvalidOffRampConfig(dynamicConfig);
+    if (dynamicConfig.router == address(0) || dynamicConfig.arm == address(0)) revert ZeroAddressNotAllowed();
 
     s_dynamicConfig = dynamicConfig;
 
@@ -583,10 +581,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
         /// wrapped in a TokenHandlingError, which is caught above and handled gracefully.
         bytes memory err
       ) {
+        bytes4 errSig = bytes4(err);
         if (
-          RateLimiter.BucketOverfilled.selector == bytes4(err) ||
-          RateLimiter.ConsumingMoreThanMaxCapacity.selector == bytes4(err) ||
-          RateLimiter.RateLimitReached.selector == bytes4(err)
+          RateLimiter.BucketOverfilled.selector == errSig ||
+          RateLimiter.AggregateValueMaxCapacityExceeded.selector == errSig ||
+          RateLimiter.AggregateValueRateLimitReached.selector == errSig ||
+          RateLimiter.TokenMaxCapacityExceeded.selector == errSig ||
+          RateLimiter.TokenRateLimitReached.selector == errSig
         ) {
           revert TokenRateLimitError(err);
         } else {
