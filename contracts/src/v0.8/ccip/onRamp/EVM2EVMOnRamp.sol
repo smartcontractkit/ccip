@@ -263,17 +263,17 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 feeTokenAmount,
     address originalSender
   ) external whenNotPaused whenHealthy returns (bytes32) {
-    Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
-    // Validate the message with various checks
-    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts.length, originalSender);
-    // Rate limit on aggregated token value
-    _rateLimitValue(message.tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
-
     // EVM destination addresses should be abi encoded and therefore always 32 bytes long
     if (message.receiver.length != 32) revert InvalidAddress(message.receiver);
     uint256 decodedReceiver = abi.decode(message.receiver, (uint256));
     // We want to disallow sending to address(0) and to precompiles, which exist on address(1) through address(9).
     if (decodedReceiver > type(uint160).max || decodedReceiver < 10) revert InvalidAddress(message.receiver);
+
+    Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
+    // Validate the message with various checks
+    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts.length, originalSender);
+    // Rate limit on aggregated token value
+    _rateLimitValue(message.tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
 
     // Convert feeToken to link if not already in link
     if (message.feeToken == i_linkToken) {

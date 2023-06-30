@@ -208,7 +208,7 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
 
     for (uint256 i = 0; i < taggedRoots.length; ++i) {
       IARM.TaggedRoot memory taggedRoot = taggedRoots[i];
-      bytes32 taggedRootHash = _taggedRootHash(taggedRoots[i]);
+      bytes32 taggedRootHash = _taggedRootHash(taggedRoot);
       BlessVoteProgress memory voteProgress = s_blessVoteProgressByTaggedRootHash[taggedRootHash];
       if (voteProgress.weightThresholdMet) {
         // We don't revert here because it's unreasonable to expect from the
@@ -254,14 +254,16 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
   /// scenario. The owner must ensure that there are no in-flight transactions by ARM nodes voting for any of the
   /// taggedRoots before calling this function, as such in-flight transactions could lead to the roots becoming
   /// re-blessed shortly after the call to this function, contrary to the original intention.
-  function ownerResetBlessVotes(IARM.TaggedRoot[] memory taggedRoots) external onlyOwner {
+  function ownerResetBlessVotes(IARM.TaggedRoot[] calldata taggedRoots) external onlyOwner {
+    uint32 configVersion = s_versionedConfig.configVersion;
     for (uint256 i = 0; i < taggedRoots.length; ++i) {
-      bytes32 taggedRootHash = _taggedRootHash(taggedRoots[i]);
+      IARM.TaggedRoot memory taggedRoot = taggedRoots[i];
+      bytes32 taggedRootHash = _taggedRootHash(taggedRoot);
       BlessVoteProgress memory voteProgress = s_blessVoteProgressByTaggedRootHash[taggedRootHash];
       delete s_blessVoteProgressByTaggedRootHash[taggedRootHash];
       bool wasBlessed = voteProgress.weightThresholdMet;
-      if (voteProgress.configVersion == s_versionedConfig.configVersion || wasBlessed) {
-        emit TaggedRootBlessVotesReset(s_versionedConfig.configVersion, taggedRoots[i], wasBlessed);
+      if (voteProgress.configVersion == configVersion || wasBlessed) {
+        emit TaggedRootBlessVotesReset(configVersion, taggedRoot, wasBlessed);
       }
     }
   }
@@ -345,7 +347,7 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
   /// @notice Enables the owner to remove curse votes. After the curse votes are removed,
   /// this function will check whether the curse is still valid and restore the uncursed state if possible.
   /// This function also enables the owner to lift a curse created through ownerCurse.
-  function ownerUnvoteToCurse(UnvoteToCurseRecord[] memory unvoteRecords) external onlyOwner {
+  function ownerUnvoteToCurse(UnvoteToCurseRecord[] calldata unvoteRecords) external onlyOwner {
     for (uint256 i = 0; i < unvoteRecords.length; ++i) {
       UnvoteToCurseRecord memory unvoteRecord = unvoteRecords[i];
       CurserRecord memory curserRecord = s_curserRecords[unvoteRecord.curseVoteAddr];
@@ -505,8 +507,9 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
       totalCurseWeight += voter.curseWeight;
     }
     for (uint256 i = 0; i < allAddrs.length; ++i) {
+      address allAddrs_i = allAddrs[i];
       for (uint256 j = i + 1; j < allAddrs.length; ++j) {
-        if (allAddrs[i] == allAddrs[j]) {
+        if (allAddrs_i == allAddrs[j]) {
           return false;
         }
       }
