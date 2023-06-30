@@ -213,9 +213,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     if (numMsgs != gasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
     for (uint256 i = 0; i < numMsgs; ++i) {
       // Checks to ensure message cannot be executed with less gas than specified.
-      if (gasLimitOverrides[i] != 0 && gasLimitOverrides[i] < report.messages[i].gasLimit) {
+      if (gasLimitOverrides[i] != 0 && gasLimitOverrides[i] < report.messages[i].gasLimit)
         revert InvalidManualExecutionGasLimit(i, report.messages[i].gasLimit, gasLimitOverrides[i]);
-      }
     }
 
     _execute(report, gasLimitOverrides);

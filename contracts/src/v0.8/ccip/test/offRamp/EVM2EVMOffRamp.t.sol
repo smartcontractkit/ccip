@@ -508,7 +508,7 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
     s_offRamp.execute(
       Internal.ExecutionReport({
         proofs: new bytes32[](0),
-        proofFlagBits: 2 ** 256 - 1,
+        proofFlagBits: 0,
         messages: new Internal.EVM2EVMMessage[](0),
         offchainTokenData: new bytes[][](0)
       }),

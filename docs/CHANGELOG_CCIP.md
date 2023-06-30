@@ -43,6 +43,11 @@ per lane token pool rate limits.
 - EVM2EVMOnRamp.StaticConfig has a new field
   - added
     - maxNopFeesJuels - max NOP fees in juels that the onramp can accure
+- Manual execution additionally accepts a gas limit array
+  - the array must be same length as messages in the report
+  - if an array entry is 0, corresponding message's gas limit is used during execution
+  - if an array entry is not 0, it overrides the message's gas limit
+  - gas limit override cannot be lower than the original limit defined in the message
 
 
 ### Removed
