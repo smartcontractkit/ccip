@@ -1,7 +1,7 @@
 GETH_VERSION: 1.12.0
 aggregator_v2v3_interface: ../../contracts/solc/v0.8.6/AggregatorV2V3Interface.abi ../../contracts/solc/v0.8.6/AggregatorV2V3Interface.bin 95e8814b408bb05bf21742ef580d98698b7db6a9bac6a35c3de12b23aec4ee28
 aggregator_v3_interface: ../../contracts/solc/v0.8.6/AggregatorV3Interface.abi ../../contracts/solc/v0.8.6/AggregatorV3Interface.bin 351b55d3b0f04af67db6dfb5c92f1c64479400ca1fec77afc20bc0ce65cb49ab
-arm_contract: ../../contracts/solc/v0.8.19/ARM.abi ../../contracts/solc/v0.8.19/ARM.bin 3018b258eb11fd7b2f598c391022ef983d40c6f307d0976b8842301010b9a55b
+arm_contract: ../../contracts/solc/v0.8.19/ARM.abi ../../contracts/solc/v0.8.19/ARM.bin 27f3bb0c94fbfa2d8fc5ff4d2f06701f25a16c47a2c49d4d0095f15f1f0abaf8
 authorized_forwarder: ../../contracts/solc/v0.7/AuthorizedForwarder.abi ../../contracts/solc/v0.7/AuthorizedForwarder.bin 426d0866a294c77b27a526265f98c688326eb3dec3b7a698180c5f1921ebdf56
 authorized_receiver: ../../contracts/solc/v0.7/AuthorizedReceiver.abi ../../contracts/solc/v0.7/AuthorizedReceiver.bin 18e8969ba3234b027e1b16c11a783aca58d0ea5c2361010ec597f134b7bf1c4f
 automation_consumer_benchmark: ../../contracts/solc/v0.8.16/AutomationConsumerBenchmark.abi ../../contracts/solc/v0.8.16/AutomationConsumerBenchmark.bin f52c76f1aaed4be541d82d97189d70f5aa027fc9838037dd7a7d21910c8c488e

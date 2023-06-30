@@ -274,6 +274,14 @@ contract ARM_unvoteToCurse is ARMSetup {
     );
     s_arm.ownerUnvoteToCurse(records);
   }
+
+  function testInvalidCurseStateReverts() public {
+    ARM.Config memory cfg = armConstructorArgs();
+    changePrank(cfg.voters[1].curseUnvoteAddr);
+
+    vm.expectRevert(ARM.InvalidCurseState.selector);
+    s_arm.unvoteToCurse(cfg.voters[1].curseVoteAddr, "");
+  }
 }
 
 contract ARM_voteToCurse is ARMSetup {

@@ -158,6 +158,7 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
 
   error AlreadyVotedToCurse(address voter, bytes32 curseId);
   error InvalidVoter(address voter);
+  error InvalidCurseState();
   error InvalidCursesHash(bytes32 expectedCursesHash, bytes32 actualCursesHash);
   error MustRecoverFromCurse();
 
@@ -277,7 +278,7 @@ contract ARM is IARM, OwnerIsCreator, TypeAndVersionInterface {
 
     if (msg.sender != curserRecord.curseUnvoteAddr) revert InvalidVoter(msg.sender);
 
-    if (!curserRecord.active || curserRecord.voteCount == 0) return;
+    if (!curserRecord.active || curserRecord.voteCount == 0) revert InvalidCurseState();
     if (curserRecord.cursesHash != cursesHash) revert InvalidCursesHash(curserRecord.cursesHash, cursesHash);
 
     emit UnvotedToCurse(
