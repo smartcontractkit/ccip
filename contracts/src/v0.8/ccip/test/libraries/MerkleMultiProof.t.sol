@@ -7,7 +7,7 @@ import "../helpers/MerkleHelper.sol";
 
 contract MerkleMultiProofTest is BaseTest {
   // This must match the spec
-  function testSpecSync() public {
+  function testSpecSync_gas() public {
     bytes32 expectedRoot = 0xd4f0f3c40a4d583d98c17d89e550b1143fe4d3d759f25ccc63131c90b183928e;
 
     bytes32[] memory leaves = new bytes32[](10);
@@ -173,5 +173,24 @@ contract MerkleMultiProofTest is BaseTest {
 
     vm.expectRevert(abi.encodeWithSelector(MerkleMultiProof.LeavesCannotBeEmpty.selector));
     MerkleMultiProof.merkleRoot(leaves, proofs, 0);
+  }
+
+  function testCVE_2023_34459() public {
+    bytes32[] memory leaves = new bytes32[](2);
+    // leaves[0] stays uninitialized, i.e., 0x000...0
+    leaves[1] = "leaf";
+
+    bytes32[] memory proof = new bytes32[](2);
+    proof[0] = leaves[1];
+    proof[1] = "will never be used";
+
+    bytes32[] memory malicious = new bytes32[](2);
+    malicious[0] = "malicious leaf";
+    malicious[1] = "another malicious leaf";
+
+    vm.expectRevert(abi.encodeWithSelector(MerkleMultiProof.InvalidProof.selector));
+    MerkleMultiProof.merkleRoot(malicious, proof, 3);
+    // Note, that without the revert the above computed root
+    // would equal MerkleHelper.hashPair(leaves[0], leaves[1]).
   }
 }

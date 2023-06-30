@@ -8,6 +8,8 @@ library MerkleMultiProof {
   bytes32 internal constant INTERNAL_DOMAIN_SEPARATOR =
     0x0000000000000000000000000000000000000000000000000000000000000001;
 
+  uint256 internal constant MAX_NUM_HASHES = 256;
+
   error InvalidProof();
   error LeavesCannotBeEmpty();
 
@@ -37,7 +39,7 @@ library MerkleMultiProof {
   ///
   ///  ** round 3 **
   ///    proofFlagBits = (5 >> 2) & 1 = true
-  ///    hashes[2] = hashPair(hashed[0], hashes[1])
+  ///    hashes[2] = hashPair(hashes[0], hashes[1])
   ///    (leafPos, hashPos, proofPos) = (3, 2, 1);
   ///
   ///    i = 3 and no longer < totalHashes. The algorithm is done
@@ -52,31 +54,46 @@ library MerkleMultiProof {
   ) internal pure returns (bytes32) {
     unchecked {
       uint256 leavesLen = leaves.length;
+      uint256 proofsLen = proofs.length;
       if (leavesLen == 0) revert LeavesCannotBeEmpty();
-      // As of Solidity 0.6.5, overflow is not possible here because in-memory arrays are limited to
-      // a max length of 2**64-1. Two uint64 values will not overflow a uint256.
-      // See: https://blog.soliditylang.org/2020/04/06/memory-creation-overflow-bug/
-      // Underflow is possible if leaves and proofs are empty, resulting in totalHashes = 2**256-1
-      // This will be caught in the `require(totalHashes <= 256)` statement.
-      uint256 totalHashes = leavesLen + proofs.length - 1;
+      if (!(leavesLen <= MAX_NUM_HASHES + 1 && proofsLen <= MAX_NUM_HASHES + 1)) revert InvalidProof();
+      uint256 totalHashes = leavesLen + proofsLen - 1;
+      if (!(totalHashes <= MAX_NUM_HASHES)) revert InvalidProof();
       if (totalHashes == 0) {
         return leaves[0];
       }
-      if (totalHashes > 256) revert InvalidProof();
       bytes32[] memory hashes = new bytes32[](totalHashes);
       (uint256 leafPos, uint256 hashPos, uint256 proofPos) = (0, 0, 0);
 
       for (uint256 i = 0; i < totalHashes; ++i) {
-        hashes[i] = _hashPair(
-          // Checks if the bit flag signals the use of a supplied proof or a leaf/previous hash.
-          ((proofFlagBits >> i) & uint256(1)) == 1
-            ? (leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]) // Use a leaf or a previously computed hash
-            : proofs[proofPos++], // Use a supplied proof.
-          // The second part of the hashed pair is never a proof as hashing two proofs would result in a
-          // hash that can already be computed offchain.
-          leafPos < leavesLen ? leaves[leafPos++] : hashes[hashPos++]
-        );
+        // Checks if the bit flag signals the use of a supplied proof or a leaf/previous hash.
+        bytes32 a;
+        if (proofFlagBits & (1 << i) == (1 << i)) {
+          // Use a leaf or a previously computed hash.
+          if (leafPos < leavesLen) {
+            a = leaves[leafPos++];
+          } else {
+            a = hashes[hashPos++];
+          }
+        } else {
+          // Use a supplied proof.
+          a = proofs[proofPos++];
+        }
+
+        // The second part of the hashed pair is never a proof as hashing two proofs would result in a
+        // hash that can already be computed offchain.
+        bytes32 b;
+        if (leafPos < leavesLen) {
+          b = leaves[leafPos++];
+        } else {
+          b = hashes[hashPos++];
+        }
+
+        if (!(hashPos <= i)) revert InvalidProof();
+
+        hashes[i] = _hashPair(a, b);
       }
+      if (!(hashPos == totalHashes - 1 && leafPos == leavesLen && proofPos == proofsLen)) revert InvalidProof();
       // Return the last hash.
       return hashes[totalHashes - 1];
     }
