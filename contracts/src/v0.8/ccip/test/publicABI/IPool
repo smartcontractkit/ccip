@@ -1,5 +1,0 @@
-{
-  "getToken()": "21df0da7",
-  "lockOrBurn(address,bytes,uint256,uint64,bytes)": "96875445",
-  "releaseOrMint(bytes,address,uint256,uint64,bytes)": "8627fad6"
-}

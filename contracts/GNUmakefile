@@ -7,17 +7,6 @@ GOBIN ?= $(GOPATH)/bin
 GO_LDFLAGS := $(shell tools/bin/ldflags)
 GOFLAGS = -ldflags "$(GO_LDFLAGS)"
 
-.PHONY: ccip-abi-generate
-ccip-abi-generate: ## Generate Public ABI file for a contract
-	./scripts/ccip_public_abi_generate $(c)
-
-.PHONY: ccip-abi-fix
-ccip-abi-fix: ## Fix contract ABIs that don't match their expected public ABIs
-	./scripts/ccip_public_abi_fix
-
-.PHONY: ccip-abi-check
-ccip-abi-check: ## Check contract ABIs against their expected public ABIs
-	./scripts/ccip_public_abi_check
 
 .PHONY: abigen
 abigen: ## Build & install abigen.
@@ -39,7 +28,6 @@ ccip-precommit:
 	make snapshot
 	pnpm prettier:write
 	pnpm lint:ccip
-	make ccip-abi-fix
 
 ccip-lcov: export FOUNDRY_PROFILE=ccip
 .PHONY: ccip-lcov
