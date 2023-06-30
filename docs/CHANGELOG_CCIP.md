@@ -9,7 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [dev]
 
 ...
-## 0.7.0 - Unreleased
+## 0.8.0 - Unreleased
+
+### Added
+
+### Changed
+
+### Removed
+
+
+## 0.7.0 - 30-06-2023
 
 ### Added
 - TokenPool's now have getOnRamps() and getOffRamps() functions to get the list of on and off ramps for a token pool.
@@ -51,7 +60,8 @@ per lane token pool rate limits.
 - RateLimiter errors are changed to reflect type
   - `ConsumingMoreThanCapacity` error is now `AggregateValueMaxCapacityExceeded` and `TokenMaxCapacityExceeded`
   - `RateLimitReached` error is now `AggregateValueRateLimitReached` and `TokenRateLimitReached`
-
+- CommitOffchainConfig 
+  - DestFinalityDepth property added
 
 ### Removed
 - Token pool constructor no longer takes a `rateLimiterConfig` parameter.
