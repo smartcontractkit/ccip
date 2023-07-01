@@ -6,15 +6,24 @@ import {ARM} from "../../ARM.sol";
 import {OwnerIsCreator} from "./../../../shared/access/OwnerIsCreator.sol";
 
 contract MockARM is IARM, OwnerIsCreator {
+  error CustomError(bytes err);
   bool private s_curse;
+  bytes private s_err;
   ARM.VersionedConfig private s_versionedConfig;
 
   function isCursed() external view override returns (bool) {
+    if (s_err.length != 0) {
+      revert CustomError(s_err);
+    }
     return s_curse;
   }
 
   function voteToCurse(bytes32) external {
     s_curse = true;
+  }
+
+  function setRevert(bytes memory err) external {
+    s_err = err;
   }
 
   function ownerUnvoteToCurse(ARM.UnvoteToCurseRecord[] memory) external {

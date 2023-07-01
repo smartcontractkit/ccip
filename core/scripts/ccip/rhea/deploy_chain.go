@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
@@ -62,23 +63,23 @@ func DeployUpgradeRouters(source *EvmDeploymentConfig, dest *EvmDeploymentConfig
 
 func deployARM(client *EvmDeploymentConfig) error {
 	if !client.ChainConfig.DeploySettings.DeployARM {
-		if client.ChainConfig.ARM.Hex() == "0x0000000000000000000000000000000000000000" {
-			return fmt.Errorf("deploy new arm set to false but no arm given in config")
+		if client.ChainConfig.ARM.Hex() == "0x0000000000000000000000000000000000000000" || client.ChainConfig.ARMProxy.Hex() == "0x0000000000000000000000000000000000000000" {
+			return fmt.Errorf("deploy new arm set to false but no arm (proxy) given in config")
 		}
-		client.Logger.Infof("Skipping ARM deployment, using ARM on %s", client.ChainConfig.ARM)
+		client.Logger.Infof("Skipping ARM deployment, using ARM on %s, proxy on %s", client.ChainConfig.ARM, client.ChainConfig.ARMProxy)
 		return nil
 	}
 
 	client.Logger.Infof("Deploying ARM")
-	var address common.Address
+	var armAddress common.Address
 	var tx *evmtypes.Transaction
 	var err error
 	armConfig := client.ChainConfig.ARMConfig
 	switch armConfig {
 	case nil:
-		address, tx, _, err = mock_arm_contract.DeployMockARMContract(client.Owner, client.Client)
+		armAddress, tx, _, err = mock_arm_contract.DeployMockARMContract(client.Owner, client.Client)
 	default:
-		address, tx, _, err = arm_contract.DeployARMContract(client.Owner, client.Client, *armConfig)
+		armAddress, tx, _, err = arm_contract.DeployARMContract(client.Owner, client.Client, *armConfig)
 	}
 	if err != nil {
 		return err
@@ -86,8 +87,20 @@ func deployARM(client *EvmDeploymentConfig) error {
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return err
 	}
-	client.Logger.Infof("ARM deployed on %s in tx: %s", address.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
-	client.ChainConfig.ARM = address
+	client.Logger.Infof("ARM deployed on %s in tx: %s", armAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
+	client.ChainConfig.ARM = armAddress
+
+	client.Logger.Infof("Deploying ARM proxy")
+	proxyAddress, _, _, err := arm_proxy_contract.DeployARMProxyContract(client.Owner, client.Client, client.ChainConfig.ARM)
+	if err != nil {
+		return err
+	}
+	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
+		return err
+	}
+	client.Logger.Infof("ARM proxy deployed on %s in tx: %s", proxyAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
+	client.ChainConfig.ARMProxy = proxyAddress
+
 	return nil
 }
 
@@ -151,7 +164,8 @@ func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, to
 		client.Owner,
 		client.Client,
 		tokenAddress,
-		poolAllowList)
+		poolAllowList,
+		client.ChainConfig.ARMProxy)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -173,7 +187,8 @@ func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, token
 		client.Owner,
 		client.Client,
 		tokenAddress,
-		poolAllowList)
+		poolAllowList,
+		client.ChainConfig.ARMProxy)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -233,7 +248,7 @@ func deployRouter(client *EvmDeploymentConfig) error {
 		nativeFeeToken = client.ChainConfig.SupportedTokens[client.ChainConfig.WrappedNative].Token
 	}
 
-	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, nativeFeeToken)
+	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, nativeFeeToken, client.ChainConfig.ARMProxy)
 	if err != nil {
 		return err
 	}
@@ -259,7 +274,7 @@ func deployUpgradeRouter(client *EvmDeploymentConfig) error {
 		nativeFeeToken = client.ChainConfig.SupportedTokens[client.ChainConfig.WrappedNative].Token
 	}
 
-	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, nativeFeeToken)
+	routerAddress, tx, _, err := router.DeployRouter(client.Owner, client.Client, nativeFeeToken, client.ChainConfig.ARMProxy)
 	if err != nil {
 		return err
 	}

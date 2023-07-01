@@ -18,12 +18,12 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       destChainSelector: DEST_CHAIN_ID,
       defaultTxGasLimit: GAS_LIMIT,
       maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-      prevOnRamp: address(0)
+      prevOnRamp: address(0),
+      armProxy: address(s_mockARM)
     });
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = generateDynamicOnRampConfig(
       address(s_sourceRouter),
-      address(s_priceRegistry),
-      address(s_mockARM)
+      address(s_priceRegistry)
     );
     Internal.PoolUpdate[] memory tokensAndPools = getTokensAndPools(s_sourceTokens, getCastedSourcePools());
 
@@ -54,6 +54,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq(staticConfig.defaultTxGasLimit, gotStaticConfig.defaultTxGasLimit);
     assertEq(staticConfig.maxNopFeesJuels, gotStaticConfig.maxNopFeesJuels);
     assertEq(staticConfig.prevOnRamp, gotStaticConfig.prevOnRamp);
+    assertEq(staticConfig.armProxy, gotStaticConfig.armProxy);
 
     EVM2EVMOnRamp.DynamicConfig memory gotDynamicConfig = s_onRamp.getDynamicConfig();
     assertEq(dynamicConfig.router, gotDynamicConfig.router);
@@ -61,7 +62,6 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
     assertEq(dynamicConfig.maxDataSize, gotDynamicConfig.maxDataSize);
     assertEq(dynamicConfig.maxTokensLength, gotDynamicConfig.maxTokensLength);
     assertEq(dynamicConfig.maxGasLimit, gotDynamicConfig.maxGasLimit);
-    assertEq(dynamicConfig.arm, gotDynamicConfig.arm);
 
     // Tokens
     assertEq(s_sourceTokens, s_onRamp.getSupportedTokens());
@@ -368,9 +368,11 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   // Reverts
 
   function testPausedReverts() public {
+    // We pause by disabling the whitelist
     changePrank(OWNER);
-    s_onRamp.pause();
-    vm.expectRevert(EVM2EVMOnRamp.PausedError.selector);
+    address router = address(0);
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(router, address(2)));
+    vm.expectRevert(EVM2EVMOnRamp.MustBeCalledByRouter.selector);
     s_onRamp.forwardFromRouter(_generateEmptyMessage(), 0, OWNER);
   }
 
@@ -543,9 +545,10 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
         destChainSelector: DEST_CHAIN_ID,
         defaultTxGasLimit: GAS_LIMIT,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
-        prevOnRamp: address(s_prevOnRamp)
+        prevOnRamp: address(s_prevOnRamp),
+        armProxy: address(s_mockARM)
       }),
-      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry), address(s_mockARM)),
+      generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
       new address[](0),
       rateLimiterConfig(),
@@ -1462,8 +1465,7 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       priceRegistry: address(23423),
       maxDataSize: 400,
       maxTokensLength: 14,
-      maxGasLimit: MAX_GAS_LIMIT / 2,
-      arm: address(11)
+      maxGasLimit: MAX_GAS_LIMIT / 2
     });
 
     vm.expectEmit();
@@ -1483,40 +1485,30 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
 
   function testSetConfigInvalidConfigReverts() public {
     EVM2EVMOnRamp.DynamicConfig memory newConfig = EVM2EVMOnRamp.DynamicConfig({
-      router: address(0),
+      router: address(1),
       priceRegistry: address(23423),
       maxDataSize: 400,
       maxTokensLength: 14,
-      maxGasLimit: MAX_GAS_LIMIT / 2,
-      arm: address(11)
+      maxGasLimit: MAX_GAS_LIMIT / 2
     });
 
-    vm.expectRevert(EVM2EVMOnRamp.InvalidConfig.selector);
-
-    s_onRamp.setDynamicConfig(newConfig);
-
-    newConfig.router = address(1);
+    // Invalid price reg reverts.
     newConfig.priceRegistry = address(0);
-
     vm.expectRevert(EVM2EVMOnRamp.InvalidConfig.selector);
-
     s_onRamp.setDynamicConfig(newConfig);
 
+    // Succeeds if valid
     newConfig.priceRegistry = address(23423);
-    newConfig.arm = address(0);
-
-    vm.expectRevert(EVM2EVMOnRamp.InvalidConfig.selector);
-
     s_onRamp.setDynamicConfig(newConfig);
   }
 
   function testSetConfigOnlyOwnerReverts() public {
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(4)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2)));
     changePrank(ADMIN);
     vm.expectRevert("Only callable by owner");
-    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2), address(4)));
+    s_onRamp.setDynamicConfig(generateDynamicOnRampConfig(address(1), address(2)));
   }
 }
 
@@ -1635,25 +1627,5 @@ contract EVM2EVMOnRamp_getAllowList is EVM2EVMOnRampWithAllowListSetup {
   function testGetAllowListSuccess() public {
     address[] memory setAddresses = s_onRamp.getAllowList();
     assertEq(OWNER, setAddresses[0]);
-  }
-}
-
-contract EVM2EVMOnRamp_arm is EVM2EVMOnRampSetup {
-  function testARM() public {
-    // Test pausing
-    assertEq(s_onRamp.paused(), false);
-    s_onRamp.pause();
-    assertEq(s_onRamp.paused(), true);
-    s_onRamp.unpause();
-    assertEq(s_onRamp.paused(), false);
-
-    // Test arm
-    assertEq(s_onRamp.isARMHealthy(), true);
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertEq(s_onRamp.isARMHealthy(), false);
-    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
-    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockARM.ownerUnvoteToCurse(records);
-    assertEq(s_onRamp.isARMHealthy(), true);
   }
 }

@@ -23,12 +23,12 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       chainSelector: DEST_CHAIN_ID,
       sourceChainSelector: SOURCE_CHAIN_ID,
       onRamp: ON_RAMP_ADDRESS,
-      prevOffRamp: address(0)
+      prevOffRamp: address(0),
+      armProxy: address(s_mockARM)
     });
     EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
       address(s_destRouter),
-      address(s_priceRegistry),
-      address(s_mockARM)
+      address(s_priceRegistry)
     );
     IERC20[] memory sourceTokens = getCastedSourceTokens();
     IPool[] memory castedPools = getCastedDestinationPools();
@@ -90,7 +90,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS,
-        prevOffRamp: address(0)
+        prevOffRamp: address(0),
+        armProxy: address(s_mockARM)
       }),
       wrongTokens,
       pools,
@@ -101,7 +102,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
   function testZeroOnRampAddressReverts() public {
     IPool[] memory pools = new IPool[](2);
     pools[0] = IPool(s_sourcePools[0]);
-    pools[1] = new LockReleaseTokenPool(IERC20(s_sourceTokens[1]), new address[](0));
+    pools[1] = new LockReleaseTokenPool(IERC20(s_sourceTokens[1]), new address[](0), address(s_mockARM));
 
     vm.expectRevert(EVM2EVMOffRamp.ZeroAddressNotAllowed.selector);
 
@@ -113,7 +114,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
         onRamp: ZERO_ADDRESS,
-        prevOffRamp: address(0)
+        prevOffRamp: address(0),
+        armProxy: address(s_mockARM)
       }),
       getCastedSourceTokens(),
       pools,
@@ -132,7 +134,8 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS,
-        prevOffRamp: address(0)
+        prevOffRamp: address(0),
+        armProxy: address(s_mockARM)
       }),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
@@ -147,11 +150,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 
   function testSetDynamicConfigSuccess() public {
     EVM2EVMOffRamp.StaticConfig memory staticConfig = s_offRamp.getStaticConfig();
-    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
-      USER_3,
-      address(s_priceRegistry),
-      address(s_mockARM)
-    );
+    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(s_priceRegistry));
     bytes memory onchainConfig = abi.encode(dynamicConfig);
 
     vm.expectEmit();
@@ -186,11 +185,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
 
   function testNonOwnerReverts() public {
     changePrank(STRANGER);
-    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
-      USER_3,
-      address(s_priceRegistry),
-      address(1)
-    );
+    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(USER_3, address(s_priceRegistry));
 
     vm.expectRevert("Only callable by owner");
 
@@ -205,11 +200,7 @@ contract EVM2EVMOffRamp_setDynamicConfig is EVM2EVMOffRampSetup {
   }
 
   function testRouterZeroAddressReverts() public {
-    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(
-      ZERO_ADDRESS,
-      ZERO_ADDRESS,
-      address(1)
-    );
+    EVM2EVMOffRamp.DynamicConfig memory dynamicConfig = generateDynamicOffRampConfig(ZERO_ADDRESS, ZERO_ADDRESS);
 
     vm.expectRevert(EVM2EVMOffRamp.ZeroAddressNotAllowed.selector);
 
@@ -491,6 +482,11 @@ contract EVM2EVMOffRamp_execute is EVM2EVMOffRampSetup {
   function testUnhealthyReverts() public {
     s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
     vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
+    s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), new uint256[](0));
+    // Uncurse should succeed
+    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
+    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
+    s_mockARM.ownerUnvoteToCurse(records);
     s_offRamp.execute(_generateReportFromMessages(_generateMessagesWithTokens()), new uint256[](0));
   }
 
@@ -1251,7 +1247,7 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({
       token: address(1),
-      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0)))
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0), address(s_mockARM)))
     });
 
     vm.expectEmit();
@@ -1283,11 +1279,11 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](2);
     adds[0] = Internal.PoolUpdate({
       token: address(1),
-      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0)))
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0), address(s_mockARM)))
     });
     adds[1] = Internal.PoolUpdate({
       token: address(1),
-      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0)))
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0), address(s_mockARM)))
     });
 
     vm.expectRevert(EVM2EVMOffRamp.PoolAlreadyAdded.selector);
@@ -1314,7 +1310,7 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
     removes[0] = Internal.PoolUpdate({
       token: address(1),
-      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0)))
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0), address(s_mockARM)))
     });
 
     vm.expectRevert(EVM2EVMOffRamp.PoolDoesNotExist.selector);
@@ -1326,14 +1322,14 @@ contract EVM2EVMOffRamp_applyPoolUpdates is EVM2EVMOffRampSetup {
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({
       token: address(1),
-      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0)))
+      pool: address(new LockReleaseTokenPool(IERC20(address(1)), new address[](0), address(s_mockARM)))
     });
     s_offRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
     removes[0] = Internal.PoolUpdate({
       token: address(1),
-      pool: address(new LockReleaseTokenPool(IERC20(address(1000)), new address[](0)))
+      pool: address(new LockReleaseTokenPool(IERC20(address(1000)), new address[](0), address(s_mockARM)))
     });
 
     vm.expectRevert(EVM2EVMOffRamp.TokenPoolMismatch.selector);
@@ -1368,17 +1364,5 @@ contract EVM2EVMOffRamp_getDestinationTokens is EVM2EVMOffRampSetup {
     for (uint256 i = 0; i < actualTokens.length; ++i) {
       assertEq(address(s_destTokens[i]), address(actualTokens[i]));
     }
-  }
-}
-
-contract EVM2EVMOffRamp_arm is EVM2EVMOffRampSetup {
-  function testARM() public {
-    assertEq(s_offRamp.isARMHealthy(), true);
-    s_mockARM.voteToCurse(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff);
-    assertEq(s_offRamp.isARMHealthy(), false);
-    ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](1);
-    records[0] = ARM.UnvoteToCurseRecord({curseVoteAddr: OWNER, cursesHash: bytes32(uint256(0)), forceUnvote: true});
-    s_mockARM.ownerUnvoteToCurse(records);
-    assertEq(s_offRamp.isARMHealthy(), true);
   }
 }

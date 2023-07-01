@@ -25,15 +25,12 @@ func TestCommitOnchainConfig(t *testing.T) {
 			name: "encodes and decodes config with all fields set",
 			want: CommitOnchainConfig{
 				PriceRegistry: randomAddress(),
-				Arm:           randomAddress(),
 			},
 			expectErr: false,
 		},
 		{
-			name: "encodes and fails decoding config with missing fields",
-			want: CommitOnchainConfig{
-				PriceRegistry: randomAddress(),
-			},
+			name:      "encodes and fails decoding config with missing fields",
+			want:      CommitOnchainConfig{},
 			expectErr: true,
 		},
 	}
@@ -65,7 +62,6 @@ func TestExecOnchainConfig(t *testing.T) {
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  randomAddress(),
 				PriceRegistry:                           randomAddress(),
-				Arm:                                     randomAddress(),
 				MaxTokensLength:                         uint16(rand.Uint32()),
 				MaxDataSize:                             rand.Uint32(),
 			},

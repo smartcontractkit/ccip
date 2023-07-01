@@ -12,7 +12,7 @@ contract ReentrantMaliciousTokenPool is TokenPool {
 
   bool private s_attacked;
 
-  constructor(address facade, IERC20 token) TokenPool(token, new address[](0)) {
+  constructor(address facade, IERC20 token, address armProxy) TokenPool(token, new address[](0), armProxy) {
     i_facade = facade;
   }
 

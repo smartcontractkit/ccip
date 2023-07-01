@@ -5,6 +5,7 @@ import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol
 import {IRouterClient} from "./interfaces/IRouterClient.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
 import {IEVM2AnyOnRamp} from "./interfaces/IEVM2AnyOnRamp.sol";
+import {IARM} from "./interfaces/IARM.sol";
 import {IWrappedNative} from "./interfaces/IWrappedNative.sol";
 import {IAny2EVMMessageReceiver} from "./interfaces/IAny2EVMMessageReceiver.sol";
 
@@ -25,6 +26,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   error FailedToSendValue();
   error InvalidRecipientAddress(address to);
   error OffRampMismatch();
+  error BadARMSignal();
 
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
   event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
@@ -46,6 +48,9 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   // malicious contracts from returning large amounts of data and causing
   // repeated out-of-gas scenarios.
   uint16 public constant MAX_RET_BYTES = 4 + 4 * 32;
+  // STATIC CONFIG
+  // Address of arm proxy contract.
+  address private immutable i_armProxy;
 
   // DYNAMIC CONFIG
   address private s_wrappedNative;
@@ -57,10 +62,11 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   // for example during an no downtime upgrade while v1 messages are being flushed.
   EnumerableMap.AddressToUintMap private s_offRamps;
 
-  constructor(address wrappedNative) {
+  constructor(address wrappedNative, address armProxy) {
     // Zero address indicates unsupported auto-wrapping, therefore, unsupported
     // native fee token payments.
     s_wrappedNative = wrappedNative;
+    i_armProxy = armProxy;
   }
 
   // ================================================================
@@ -98,7 +104,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   function ccipSend(
     uint64 destinationChainSelector,
     Client.EVM2AnyMessage memory message
-  ) external payable returns (bytes32) {
+  ) external payable whenHealthy returns (bytes32) {
     address onRamp = s_onRamps[destinationChainSelector];
     if (onRamp == address(0)) revert UnsupportedDestinationChain(destinationChainSelector);
     uint256 feeTokenAmount;
@@ -151,7 +157,13 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     uint16 gasForCallExactCheck,
     uint256 gasLimit,
     address receiver
-  ) external override onlyOffRamp(message.sourceChainSelector) returns (bool success, bytes memory retData) {
+  )
+    external
+    override
+    onlyOffRamp(message.sourceChainSelector)
+    whenHealthy
+    returns (bool success, bytes memory retData)
+  {
     // We encode here instead of the offRamps to constrain specifically what functions
     // can be called from the router.
     bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
@@ -215,6 +227,12 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   /// @param wrappedNative The address of the new wrapped native ERC20 token.
   function setWrappedNative(address wrappedNative) external onlyOwner {
     s_wrappedNative = wrappedNative;
+  }
+
+  /// @notice Gets the arm address
+  /// @return The address of the ARM proxy contract.
+  function getArmProxy() external view returns (address) {
+    return i_armProxy;
   }
 
   /// @notice Return the configured onramp for specific a destination chain.
@@ -302,6 +320,12 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
   modifier onlyOffRamp(uint64 expectedSourceChainSelector) {
     (bool exists, uint256 sourceChainSelector) = s_offRamps.tryGet(msg.sender);
     if (!exists || expectedSourceChainSelector != uint64(sourceChainSelector)) revert OnlyOffRamp();
+    _;
+  }
+
+  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
+  modifier whenHealthy() {
+    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
     _;
   }
 }

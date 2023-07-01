@@ -9,7 +9,11 @@ import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
   bytes public s_revertReason = "";
 
-  constructor(IBurnMintERC20 token, address[] memory allowlist) BurnMintTokenPool(token, allowlist) {}
+  constructor(
+    IBurnMintERC20 token,
+    address[] memory allowlist,
+    address armProxy
+  ) BurnMintTokenPool(token, allowlist, armProxy) {}
 
   function setShouldRevert(bytes calldata revertReason) external {
     s_revertReason = revertReason;
@@ -22,7 +26,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
     uint256 amount,
     uint64,
     bytes memory
-  ) external virtual override onlyOffRamp {
+  ) external virtual override whenHealthy onlyOffRamp {
     bytes memory revertReason = s_revertReason;
     if (revertReason.length != 0) {
       assembly {

@@ -68,6 +68,7 @@ type Client struct {
 	SupportedTokens  map[rhea.Token]EVMBridgedToken
 	PingPongDapp     *ping_pong_demo.PingPongDemo
 	ARM              *arm_contract.ARMContract
+	ARMProxy         *arm_contract.ARMContract
 	PriceRegistry    *price_registry.PriceRegistry
 	Router           *router.Router
 	TunableValues    rhea.TunableChainValues
@@ -112,6 +113,8 @@ func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLan
 
 	arm, err := arm_contract.NewARMContract(config.ChainConfig.ARM, config.Client)
 	shared.RequireNoError(t, err)
+	armProxy, err := arm_contract.NewARMContract(config.ChainConfig.ARMProxy, config.Client)
+	shared.RequireNoError(t, err)
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(laneConfig.OnRamp, config.Client)
 	shared.RequireNoError(t, err)
 	router, err := router.NewRouter(config.ChainConfig.Router, config.Client)
@@ -130,6 +133,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLan
 			LinkToken:        LinkToken,
 			WrappedNative:    wrappedNative,
 			ARM:              arm,
+			ARMProxy:         armProxy,
 			PriceRegistry:    priceRegistry,
 			SupportedTokens:  supportedTokens,
 			PingPongDapp:     pingPongDapp,
@@ -307,7 +311,6 @@ func (client *CCIPClient) SetDynamicConfigOnRamp(t *testing.T) {
 		MaxDataSize:     rhea.MAX_DATA_SIZE,
 		MaxTokensLength: rhea.MAX_TOKEN_LENGTH,
 		MaxGasLimit:     rhea.MAX_TX_GAS_LIMIT,
-		Arm:             client.Source.ARM.Address(),
 	}
 	tx, err := client.Source.OnRamp.SetDynamicConfig(client.Source.Owner, config)
 	shared.RequireNoError(t, err)

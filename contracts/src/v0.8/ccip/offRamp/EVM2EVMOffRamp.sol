@@ -79,7 +79,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     uint64 chainSelector; // -------┘  Destination chainSelector
     uint64 sourceChainSelector; // -┐  Source chainSelector
     address onRamp; // -------------┘  OnRamp address on the source chain
-    address prevOffRamp; //            Address of previous-version OffRamp
+    address prevOffRamp; // --------   Address of previous-version OffRamp
+    address armProxy; // ------------  ARM proxy address
   }
 
   /// @notice Dynamic offRamp config
@@ -87,8 +88,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   struct DynamicConfig {
     uint32 permissionLessExecutionThresholdSeconds; // -┐ Waiting time before manual execution is enabled
     address router; // ---------------------------------┘ Router address
-    address priceRegistry; //        Price registry address
-    address arm; // ---------------┐ ARM address
+    address priceRegistry; // -----┐ Price registry address
     uint16 maxTokensLength; //     | Maximum number of distinct ERC20 tokens that can be sent per message
     uint32 maxDataSize; // --------┘ Maximum payload data size
   }
@@ -110,6 +110,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   bytes32 internal immutable i_metadataHash;
   /// @dev The address of previous-version OffRamp for this lane
   address internal immutable i_prevOffRamp;
+  /// @dev The address of the arm proxy
+  address internal immutable i_armProxy;
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
@@ -143,6 +145,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     i_chainSelector = staticConfig.chainSelector;
     i_onRamp = staticConfig.onRamp;
     i_prevOffRamp = staticConfig.prevOffRamp;
+    i_armProxy = staticConfig.armProxy;
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
 
@@ -433,7 +436,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
         chainSelector: i_chainSelector,
         sourceChainSelector: i_sourceChainSelector,
         onRamp: i_onRamp,
-        prevOffRamp: i_prevOffRamp
+        prevOffRamp: i_prevOffRamp,
+        armProxy: i_armProxy
       });
   }
 
@@ -447,7 +451,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   function _beforeSetConfig(bytes memory onchainConfig) internal override {
     DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
-    if (dynamicConfig.router == address(0) || dynamicConfig.arm == address(0)) revert ZeroAddressNotAllowed();
+    if (dynamicConfig.router == address(0)) revert ZeroAddressNotAllowed();
 
     s_dynamicConfig = dynamicConfig;
 
@@ -457,7 +461,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
         chainSelector: i_chainSelector,
         sourceChainSelector: i_sourceChainSelector,
         onRamp: i_onRamp,
-        prevOffRamp: i_prevOffRamp
+        prevOffRamp: i_prevOffRamp,
+        armProxy: i_armProxy
       }),
       dynamicConfig
     );
@@ -612,14 +617,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     revert();
   }
 
-  /// @notice Support querying whether health checker is healthy.
-  function isARMHealthy() external view returns (bool) {
-    return !IARM(s_dynamicConfig.arm).isCursed();
-  }
-
   /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IARM(s_dynamicConfig.arm).isCursed()) revert BadARMSignal();
+    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
     _;
   }
 }

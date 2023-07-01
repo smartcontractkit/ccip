@@ -332,6 +332,18 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	cd := ccipModule.Deployer
 
 	ccipModule.LoadContractAddresses(conf)
+	if ccipModule.ARM != nil {
+		arm, err := cd.NewARMContract(ccipModule.ARM.EthAddress)
+		if err != nil {
+			return fmt.Errorf("getting new ARM contract shouldn't fail %+v", err)
+		}
+		ccipModule.ARM = arm
+	} else {
+		// deploy a mock ARM contract
+		if ccipModule.ARMContract == nil {
+			ccipModule.ARMContract, err = cd.DeployMockARMContract()
+		}
+	}
 	if ccipModule.FeeToken == nil {
 		// deploy link token
 		token, err := cd.DeployLinkTokenContract()
@@ -353,7 +365,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	}
 	if ccipModule.FeeTokenPool == nil {
 		// token pool for fee token
-		ccipModule.FeeTokenPool, err = cd.DeployLockReleaseTokenPoolContract(ccipModule.FeeToken.Address())
+		ccipModule.FeeTokenPool, err = cd.DeployLockReleaseTokenPoolContract(ccipModule.FeeToken.Address(), *ccipModule.ARMContract)
 		if err != nil {
 			return fmt.Errorf("deploying fee Token pool shouldn't fail %+v", err)
 		}
@@ -393,7 +405,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 		// deploy native token pool
 		for i := len(ccipModule.BridgeTokenPools); i < noOfTokens; i++ {
 			token := ccipModule.BridgeTokens[i]
-			btp, err := cd.DeployLockReleaseTokenPoolContract(token.Address())
+			btp, err := cd.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.ARMContract)
 			if err != nil {
 				return fmt.Errorf("deploying bridge Token pool shouldn't fail %+v", err)
 			}
@@ -415,18 +427,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	for range ccipModule.BridgeTokens {
 		ccipModule.TokenPrices = append(ccipModule.TokenPrices, big.NewInt(1))
 	}
-	if ccipModule.ARM != nil {
-		arm, err := cd.NewARMContract(ccipModule.ARM.EthAddress)
-		if err != nil {
-			return fmt.Errorf("getting new ARM contract shouldn't fail %+v", err)
-		}
-		ccipModule.ARM = arm
-	} else {
-		// deploy a mock ARM contract
-		if ccipModule.ARMContract == nil {
-			ccipModule.ARMContract, err = cd.DeployMockARMContract()
-		}
-	}
 
 	if ccipModule.Router == nil {
 		weth9addr, err := cd.DeployWrappedNative()
@@ -440,7 +440,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 		}
 		ccipModule.WrappedNative = *weth9addr
 
-		ccipModule.Router, err = cd.DeployRouter(ccipModule.WrappedNative)
+		ccipModule.Router, err = cd.DeployRouter(ccipModule.WrappedNative, *ccipModule.ARMContract)
 		if err != nil {
 			return fmt.Errorf("deploying router shouldn't fail %+v", err)
 		}
@@ -1055,6 +1055,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		// commitStore responsible for validating the transfer message
 		destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
 			sourceChainSelector, destChainSelector, sourceCCIP.OnRamp.EthAddress,
+			*destCCIP.Common.ARMContract,
 		)
 		if err != nil {
 			return fmt.Errorf("deploying commitstore shouldn't fail %+v", err)
@@ -1114,7 +1115,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(
 			sourceChainSelector, destChainSelector,
 			destCCIP.CommitStore.EthAddress, sourceCCIP.OnRamp.EthAddress,
-			sourceTokens, pools, destCCIP.Common.RateLimiterConfig)
+			sourceTokens, pools, destCCIP.Common.RateLimiterConfig, *destCCIP.Common.ARMContract)
 		if err != nil {
 			return fmt.Errorf("deploying offramp shouldn't fail %+v", err)
 		}
@@ -1956,7 +1957,6 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		InflightCacheExpiry:   inflightExpiry,
 	}, ccipConfig.CommitOnchainConfig{
 		PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
-		Arm:           *destCCIP.Common.ARMContract,
 	})
 	if err != nil {
 		return errors.WithStack(err)
@@ -1986,7 +1986,6 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			PermissionLessExecutionThresholdSeconds: 60 * 30,
 			Router:                                  destCCIP.Common.Router.EthAddress,
 			PriceRegistry:                           destCCIP.Common.PriceRegistry.EthAddress,
-			Arm:                                     *destCCIP.Common.ARMContract,
 			MaxTokensLength:                         5,
 			MaxDataSize:                             1e5,
 		})

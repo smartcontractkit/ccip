@@ -23,11 +23,11 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     BaseTest.setUp();
     s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
-    s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, new address[](0));
+    s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, new address[](0), address(s_mockARM));
 
     s_allowedList.push(USER_1);
     s_allowedList.push(DUMMY_CONTRACT_ADDRESS);
-    s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(s_token, s_allowedList);
+    s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(s_token, s_allowedList, address(s_mockARM));
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
     onRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
@@ -80,6 +80,16 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
 
     s_lockReleaseTokenPoolWithAllowList.lockOrBurn(STRANGER, bytes(""), 100, DEST_CHAIN_ID, bytes(""));
   }
+
+  function testPoolBurnRevertNotHealthyReverts() public {
+    // Should not burn tokens if cursed.
+    s_mockARM.voteToCurse(bytes32(0));
+    uint256 before = s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList));
+    changePrank(s_allowedOnRamp);
+    vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), 1e5, 0, bytes(""));
+    assertEq(s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList)), before);
+  }
 }
 
 contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
@@ -114,6 +124,16 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     }
 
     s_lockReleaseTokenPool.releaseOrMint(bytes(""), recipient, amount, SOURCE_CHAIN_ID, bytes(""));
+  }
+
+  function testPoolMintNotHealthyReverts() public {
+    // Should not mint tokens if cursed.
+    s_mockARM.voteToCurse(bytes32(0));
+    uint256 before = s_token.balanceOf(OWNER);
+    changePrank(s_allowedOffRamp);
+    vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
+    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, 1e5, 0, bytes(""));
+    assertEq(s_token.balanceOf(OWNER), before);
   }
 }
 

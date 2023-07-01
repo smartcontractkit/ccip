@@ -108,7 +108,7 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr string) (
+func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr string, armProxy common.Address) (
 	*LockReleaseTokenPool,
 	error,
 ) {
@@ -122,7 +122,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 			auth,
 			backend,
 			token,
-			[]common.Address{})
+			[]common.Address{}, armProxy)
 	})
 
 	if err != nil {
@@ -182,7 +182,7 @@ func (e *CCIPContractsDeployer) NewCommitStore(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChainSelector uint64, onRamp common.Address) (*CommitStore, error) {
+func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChainSelector uint64, onRamp common.Address, armProxy common.Address) (*CommitStore, error) {
 	address, _, instance, err := e.evmClient.DeployContract("CommitStore Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -194,6 +194,7 @@ func (e *CCIPContractsDeployer) DeployCommitStore(sourceChainSelector, destChain
 				ChainSelector:       destChainSelector,
 				SourceChainSelector: sourceChainSelector,
 				OnRamp:              onRamp,
+				ArmProxy:            armProxy,
 			},
 		)
 	})
@@ -245,7 +246,7 @@ func (e *CCIPContractsDeployer) NewReceiverDapp(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployRouter(wrappedNative common.Address) (
+func (e *CCIPContractsDeployer) DeployRouter(wrappedNative common.Address, armAddress common.Address) (
 	*Router,
 	error,
 ) {
@@ -253,7 +254,7 @@ func (e *CCIPContractsDeployer) DeployRouter(wrappedNative common.Address) (
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return router.DeployRouter(auth, backend, wrappedNative)
+		return router.DeployRouter(auth, backend, wrappedNative, armAddress)
 	})
 	if err != nil {
 		return nil, err
@@ -367,6 +368,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				DefaultTxGasLimit: 200_000,
 				MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 				PrevOnRamp:        common.HexToAddress(""),
+				ArmProxy:          arm,
 			},
 			evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 				Router:          router,
@@ -374,7 +376,6 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				MaxDataSize:     1e5,
 				MaxTokensLength: 5,
 				MaxGasLimit:     4_000_000,
-				Arm:             arm,
 			},
 			tokensAndPools,
 			allowList,
@@ -415,7 +416,7 @@ func (e *CCIPContractsDeployer) NewOffRamp(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSelector uint64, commitStore, onRamp common.Address, sourceToken, pools []common.Address, opts RateLimiterConfig) (*OffRamp, error) {
+func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSelector uint64, commitStore, onRamp common.Address, sourceToken, pools []common.Address, opts RateLimiterConfig, armProxy common.Address) (*OffRamp, error) {
 	address, _, instance, err := e.evmClient.DeployContract("OffRamp Contract", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -429,6 +430,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSele
 				SourceChainSelector: sourceChainSelector,
 				OnRamp:              onRamp,
 				PrevOffRamp:         common.HexToAddress(""),
+				ArmProxy:            armProxy,
 			},
 			sourceToken,
 			pools,

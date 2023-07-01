@@ -295,6 +295,13 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 
   // Reverts
 
+  function testWhenNotHealthyReverts() public {
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    s_mockARM.voteToCurse(bytes32(0));
+    vm.expectRevert(Router.BadARMSignal.selector);
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+  }
+
   function testUnsupportedDestinationChainReverts() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     uint64 wrongChain = DEST_CHAIN_ID + 1;
@@ -658,6 +665,17 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     changePrank(STRANGER);
 
     vm.expectRevert(IRouter.OnlyOffRamp.selector);
+    s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID),
+      GAS_FOR_CALL_EXACT_CHECK,
+      100_000,
+      address(s_receiver)
+    );
+  }
+
+  function testWhenNotHealthyReverts() public {
+    s_mockARM.voteToCurse(bytes32(0));
+    vm.expectRevert(Router.BadARMSignal.selector);
     s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,

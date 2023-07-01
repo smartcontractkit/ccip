@@ -8,7 +8,7 @@ contract TokenPoolHelper is TokenPool {
   event ReleaseOrMint(address indexed recipient, uint256 amount);
   event AssertionPassed();
 
-  constructor(IERC20 token, address[] memory allowlist) TokenPool(token, allowlist) {}
+  constructor(IERC20 token, address[] memory allowlist, address armProxy) TokenPool(token, allowlist, armProxy) {}
 
   function lockOrBurn(
     address,

@@ -56,7 +56,12 @@ contract USDCTokenPool is TokenPool {
   // A mapping of CCIP chain identifiers to destination domains
   mapping(uint64 chainSelector => Domain CCTPDomain) private s_chainToDomain;
 
-  constructor(USDCConfig memory config, IBurnMintERC20 token, address[] memory allowlist) TokenPool(token, allowlist) {
+  constructor(
+    USDCConfig memory config,
+    IBurnMintERC20 token,
+    address[] memory allowlist,
+    address armProxy
+  ) TokenPool(token, allowlist, armProxy) {
     _setConfig(config);
   }
 

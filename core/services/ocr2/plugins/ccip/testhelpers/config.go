@@ -18,7 +18,6 @@ const PermissionLessExecutionThresholdSeconds = 20 * 60
 func (c *CCIPContracts) CreateDefaultCommitOnchainConfig(t *testing.T) []byte {
 	config, err := abihelpers.EncodeAbiStruct(ccipconfig.CommitOnchainConfig{
 		PriceRegistry: c.Dest.PriceRegistry.Address(),
-		Arm:           c.Dest.ARM.Address(),
 	})
 	require.NoError(t, err)
 	return config
@@ -45,7 +44,6 @@ func (c *CCIPContracts) CreateDefaultExecOnchainConfig(t *testing.T) []byte {
 	config, err := abihelpers.EncodeAbiStruct(ccipconfig.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: PermissionLessExecutionThresholdSeconds,
 		Router:                                  c.Dest.Router.Address(),
-		Arm:                                     c.Dest.ARM.Address(),
 		PriceRegistry:                           c.Dest.PriceRegistry.Address(),
 		MaxDataSize:                             1e5,
 		MaxTokensLength:                         5,

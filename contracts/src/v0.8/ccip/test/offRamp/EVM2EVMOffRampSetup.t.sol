@@ -31,8 +31,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
 
   EVM2EVMOffRampHelper internal s_offRamp;
 
-  uint256 internal constant EXECUTION_FEE_AMOUNT = 1e18;
-
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
@@ -61,7 +59,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
         onRamp: ON_RAMP_ADDRESS,
-        prevOffRamp: prevOffRamp
+        prevOffRamp: prevOffRamp,
+        armProxy: address(s_mockARM)
       }),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
@@ -71,7 +70,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       s_valid_signers,
       s_valid_transmitters,
       s_f,
-      abi.encode(generateDynamicOffRampConfig(address(router), address(s_priceRegistry), address(s_mockARM))),
+      abi.encode(generateDynamicOffRampConfig(address(router), address(s_priceRegistry))),
       s_offchainConfigVersion,
       abi.encode("")
     );
@@ -208,7 +207,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     assertEq(a.maxDataSize, b.maxDataSize);
     assertEq(a.maxTokensLength, b.maxTokensLength);
     assertEq(a.permissionLessExecutionThresholdSeconds, b.permissionLessExecutionThresholdSeconds);
-    assertEq(a.arm, b.arm);
     assertEq(a.router, b.router);
     assertEq(a.priceRegistry, b.priceRegistry);
   }

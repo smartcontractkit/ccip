@@ -720,30 +720,6 @@ func (_m *EVM2EVMOffRampInterface) GetTransmitters(opts *bind.CallOpts) ([]commo
 	return r0, r1
 }
 
-// IsARMHealthy provides a mock function with given fields: opts
-func (_m *EVM2EVMOffRampInterface) IsARMHealthy(opts *bind.CallOpts) (bool, error) {
-	ret := _m.Called(opts)
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (bool, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) bool); ok {
-		r0 = rf(opts)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // LatestConfigDetails provides a mock function with given fields: opts
 func (_m *EVM2EVMOffRampInterface) LatestConfigDetails(opts *bind.CallOpts) (evm_2_evm_offramp.LatestConfigDetails, error) {
 	ret := _m.Called(opts)

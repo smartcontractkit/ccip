@@ -255,6 +255,7 @@ func deployOnRamp(t *testing.T, client EvmConfig, laneConfig *EVMLaneConfig, des
 			DefaultTxGasLimit: DEFAULT_GAS_LIMIT,
 			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(MAX_NOP_FEES_LINK), big.NewInt(1e18)),
 			PrevOnRamp:        prevOnRamp,
+			ArmProxy:          client.ChainConfig.ARMProxy,
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          client.ChainConfig.Router,
@@ -262,7 +263,6 @@ func deployOnRamp(t *testing.T, client EvmConfig, laneConfig *EVMLaneConfig, des
 			MaxDataSize:     MAX_DATA_SIZE,
 			MaxTokensLength: MAX_TOKEN_LENGTH,
 			MaxGasLimit:     MAX_TX_GAS_LIMIT,
-			Arm:             client.ChainConfig.ARM,
 		},
 		tokensAndPools,
 		[]common.Address{}, // allow list
@@ -311,6 +311,7 @@ func deployOffRamp(t *testing.T, client EvmConfig, sourceChainSelector uint64, s
 			SourceChainSelector: sourceChainSelector,
 			OnRamp:              onRamp,
 			PrevOffRamp:         prevOffRamp,
+			ArmProxy:            client.ChainConfig.ARMProxy,
 		},
 		syncedSourceTokens,
 		syncedDestPools,
@@ -344,6 +345,7 @@ func deployCommitStore(t *testing.T, client EvmConfig, lane *EVMLaneConfig, sour
 			ChainSelector:       GetCCIPChainSelector(client.ChainConfig.EvmChainId),
 			SourceChainSelector: sourceChainSelector,
 			OnRamp:              onRamp,
+			ArmProxy:            client.ChainConfig.ARMProxy,
 		},
 	)
 	shared.RequireNoError(t, err)

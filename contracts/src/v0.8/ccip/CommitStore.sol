@@ -30,12 +30,12 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
     uint64 chainSelector; // -------┐  Destination chainSelector
     uint64 sourceChainSelector; // -┘  Source chainSelector
     address onRamp; // OnRamp address on the source chain
+    address armProxy; // ARM proxy address
   }
 
   /// @notice Dynamic commit store config
   struct DynamicConfig {
     address priceRegistry; // Price registry address on the destination chain
-    address arm; // ARM
   }
 
   /// @notice a sequenceNumber interval
@@ -60,6 +60,8 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   uint64 internal immutable i_sourceChainSelector;
   // The onRamp address on the source chain
   address internal immutable i_onRamp;
+  // The address of the arm proxy
+  address internal immutable i_armProxy;
 
   // DYNAMIC CONFIG
   // The dynamic commitStore config
@@ -82,12 +84,17 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   /// the DON. In our case additional valid reports (i.e. approved by >= f+1 oracles) are not a problem, as they will
   /// will either be ignored (reverted as an invalid interval) or will be accepted as an additional valid price update.
   constructor(StaticConfig memory staticConfig) OCR2Base(false) {
-    if (staticConfig.onRamp == address(0) || staticConfig.chainSelector == 0 || staticConfig.sourceChainSelector == 0)
-      revert InvalidCommitStoreConfig();
+    if (
+      staticConfig.onRamp == address(0) ||
+      staticConfig.chainSelector == 0 ||
+      staticConfig.sourceChainSelector == 0 ||
+      staticConfig.armProxy == address(0)
+    ) revert InvalidCommitStoreConfig();
 
     i_chainSelector = staticConfig.chainSelector;
     i_sourceChainSelector = staticConfig.sourceChainSelector;
     i_onRamp = staticConfig.onRamp;
+    i_armProxy = staticConfig.armProxy;
   }
 
   // ================================================================
@@ -131,7 +138,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   /// @param root The merkle root to check the blessing status for.
   /// @return whether the root is blessed or not.
   function isBlessed(bytes32 root) public view returns (bool) {
-    return IARM(s_dynamicConfig.arm).isBlessed(IARM.TaggedRoot({commitStore: address(this), root: root}));
+    return IARM(i_armProxy).isBlessed(IARM.TaggedRoot({commitStore: address(this), root: root}));
   }
 
   /// @notice Used by the owner in case an invalid sequence of roots has been
@@ -217,7 +224,13 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   /// @notice Returns the static commit store config.
   /// @return the configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return StaticConfig({chainSelector: i_chainSelector, sourceChainSelector: i_sourceChainSelector, onRamp: i_onRamp});
+    return
+      StaticConfig({
+        chainSelector: i_chainSelector,
+        sourceChainSelector: i_sourceChainSelector,
+        onRamp: i_onRamp,
+        armProxy: i_armProxy
+      });
   }
 
   /// @notice Returns the dynamic commit store config.
@@ -230,7 +243,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   function _beforeSetConfig(bytes memory onchainConfig) internal override {
     DynamicConfig memory dynamicConfig = abi.decode(onchainConfig, (DynamicConfig));
 
-    if (dynamicConfig.arm == address(0) || dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();
+    if (dynamicConfig.priceRegistry == address(0)) revert InvalidCommitStoreConfig();
 
     s_dynamicConfig = dynamicConfig;
     // When the OCR config changes, we reset the price epoch and round
@@ -240,7 +253,12 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
     s_latestPriceEpochAndRound = 0;
 
     emit ConfigSet(
-      StaticConfig({chainSelector: i_chainSelector, sourceChainSelector: i_sourceChainSelector, onRamp: i_onRamp}),
+      StaticConfig({
+        chainSelector: i_chainSelector,
+        sourceChainSelector: i_sourceChainSelector,
+        onRamp: i_onRamp,
+        armProxy: i_armProxy
+      }),
       dynamicConfig
     );
   }
@@ -251,17 +269,17 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
 
   /// @notice Single function to check the status of the commitStore.
   function isUnpausedAndARMHealthy() external view returns (bool) {
-    return !IARM(s_dynamicConfig.arm).isCursed() && !s_paused;
+    return !IARM(i_armProxy).isCursed() && !s_paused;
   }
 
   /// @notice Support querying whether health checker is healthy.
   function isARMHealthy() external view returns (bool) {
-    return !IARM(s_dynamicConfig.arm).isCursed();
+    return !IARM(i_armProxy).isCursed();
   }
 
   /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (IARM(s_dynamicConfig.arm).isCursed()) revert BadARMSignal();
+    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
     _;
   }
 

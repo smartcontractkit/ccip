@@ -106,7 +106,6 @@ func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, pluginOffchainCon
 func (client *CCIPClient) getCommitStoreOnchainConfig() []byte {
 	commitStoreOnchainConfig := ccipconfig.CommitOnchainConfig{
 		PriceRegistry: client.Dest.PriceRegistry.Address(),
-		Arm:           client.Dest.ARM.Address(),
 	}
 
 	encodedCommitStoreOnchainConfig, err := abihelpers.EncodeAbiStruct(commitStoreOnchainConfig)
@@ -139,7 +138,6 @@ func (client *CCIPClient) getOffRampOnchainConfig() []byte {
 	offRampOnchainConfig := ccipconfig.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: rhea.PERMISSIONLESS_EXEC_THRESHOLD_SEC,
 		Router:                                  client.Dest.Router.Address(),
-		Arm:                                     client.Dest.ARM.Address(),
 		PriceRegistry:                           client.Dest.PriceRegistry.Address(),
 		MaxTokensLength:                         rhea.MAX_TOKEN_LENGTH,
 		MaxDataSize:                             rhea.MAX_DATA_SIZE,

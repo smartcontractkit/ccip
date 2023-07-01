@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
@@ -76,6 +77,7 @@ type Common struct {
 	WrappedNative     *weth9.WETH9
 	WrappedNativePool *lock_release_token_pool.LockReleaseTokenPool
 	ARM               *mock_arm_contract.MockARMContract
+	ARMProxy          *arm_proxy_contract.ARMProxyContract
 	PriceRegistry     *price_registry.PriceRegistry
 }
 
@@ -140,6 +142,7 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 			SourceChainSelector: c.Source.ChainID,
 			OnRamp:              c.Source.OnRamp.Address(),
 			PrevOffRamp:         prevOffRamp,
+			ArmProxy:            c.Dest.ARMProxy.Address(),
 		},
 		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
 		[]common.Address{c.Dest.Pool.Address()},        // pools
@@ -212,6 +215,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			DefaultTxGasLimit: 200_000,
 			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 			PrevOnRamp:        prevOnRamp,
+			ArmProxy:          c.Source.ARM.Address(), // ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          c.Source.Router.Address(),
@@ -219,7 +223,6 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     4_000_000,
-			Arm:             c.Source.ARM.Address(), // ARM
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
@@ -307,6 +310,7 @@ func (c *CCIPContracts) DeployNewCommitStore(t *testing.T) {
 			ChainSelector:       c.Dest.ChainID,
 			SourceChainSelector: c.Source.ChainID,
 			OnRamp:              c.Source.OnRamp.Address(),
+			ArmProxy:            c.Dest.ARMProxy.Address(),
 		},
 	)
 	require.NoError(t, err)
@@ -500,6 +504,7 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		c.Dest.Chain,
 		destTokenAddress,
 		[]common.Address{}, // pool originalSender allowList
+		c.Dest.ARMProxy.Address(),
 	)
 	if err != nil {
 		return [20]byte{}, nil, err
@@ -530,6 +535,7 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		c.Source.Chain,
 		sourceTokenAddress,
 		[]common.Address{}, // empty allowList at deploy time indicates pool has no original sender restrictions
+		c.Source.ARMProxy.Address(),
 	)
 	if err != nil {
 		return [20]byte{}, nil, err
@@ -691,6 +697,40 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	sourceChain, sourceUser := SetupChain(t)
 	destChain, destUser := SetupChain(t)
 
+	armSourceAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
+		sourceUser,
+		sourceChain,
+	)
+	require.NoError(t, err)
+	sourceARM, err := mock_arm_contract.NewMockARMContract(armSourceAddress, sourceChain)
+	require.NoError(t, err)
+	armProxySourceAddress, _, _, err := arm_proxy_contract.DeployARMProxyContract(
+		sourceUser,
+		sourceChain,
+		armSourceAddress,
+	)
+	require.NoError(t, err)
+	sourceARMProxy, err := arm_proxy_contract.NewARMProxyContract(armProxySourceAddress, sourceChain)
+	require.NoError(t, err)
+	sourceChain.Commit()
+
+	armDestAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
+		destUser,
+		destChain,
+	)
+	require.NoError(t, err)
+	armProxyDestAddress, _, _, err := arm_proxy_contract.DeployARMProxyContract(
+		destUser,
+		destChain,
+		armDestAddress,
+	)
+	require.NoError(t, err)
+	destChain.Commit()
+	destARM, err := mock_arm_contract.NewMockARMContract(armDestAddress, destChain)
+	require.NoError(t, err)
+	destARMProxy, err := arm_proxy_contract.NewARMProxyContract(armProxyDestAddress, destChain)
+	require.NoError(t, err)
+
 	// Deploy link token and pool on source chain
 	sourceLinkTokenAddress, _, _, err := link_token_interface.DeployLinkToken(sourceUser, sourceChain)
 	require.NoError(t, err)
@@ -701,7 +741,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceUser,
 		sourceChain,
 		sourceLinkTokenAddress,
-		[]common.Address{})
+		[]common.Address{},
+		armProxySourceAddress)
 	require.NoError(t, err)
 	sourceChain.Commit()
 	sourcePool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourcePoolAddress, sourceChain)
@@ -717,7 +758,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destUser,
 		destChain,
 		destLinkTokenAddress,
-		[]common.Address{})
+		[]common.Address{}, armProxyDestAddress)
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -748,15 +789,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	destChain.Commit()
 
-	armSourceAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
-		sourceUser,
-		sourceChain,
-	)
-	require.NoError(t, err)
-	sourceChain.Commit()
-	sourceARM, err := mock_arm_contract.NewMockARMContract(armSourceAddress, sourceChain)
-	require.NoError(t, err)
-
 	// Create router
 	sourceWeth9addr, _, _, err := weth9.DeployWETH9(sourceUser, sourceChain)
 	require.NoError(t, err)
@@ -766,14 +798,14 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		sourceUser,
 		sourceChain,
 		sourceWeth9addr,
-		[]common.Address{})
+		[]common.Address{}, armProxySourceAddress)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
 	sourceWeth9Pool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourceWeth9PoolAddress, sourceChain)
 	require.NoError(t, err)
 
-	sourceRouterAddress, _, _, err := router.DeployRouter(sourceUser, sourceChain, sourceWeth9addr)
+	sourceRouterAddress, _, _, err := router.DeployRouter(sourceUser, sourceChain, sourceWeth9addr, armProxySourceAddress)
 	require.NoError(t, err)
 	sourceRouter, err := router.NewRouter(sourceRouterAddress, sourceChain)
 	require.NoError(t, err)
@@ -820,6 +852,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			DefaultTxGasLimit: 200_000,
 			MaxNopFeesJuels:   big.NewInt(0).Mul(big.NewInt(100_000_000), big.NewInt(1e18)),
 			PrevOnRamp:        common.HexToAddress(""),
+			ArmProxy:          armProxySourceAddress, // ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          sourceRouterAddress,
@@ -827,7 +860,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			MaxDataSize:     1e5,
 			MaxTokensLength: 5,
 			MaxGasLimit:     4_000_000,
-			Arm:             armSourceAddress, // ARM
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
@@ -903,15 +935,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 	sourceChain.Commit()
 
-	armDestAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
-		destUser,
-		destChain,
-	)
-	require.NoError(t, err)
-	destChain.Commit()
-	destARM, err := mock_arm_contract.NewMockARMContract(armDestAddress, destChain)
-	require.NoError(t, err)
-
 	destWeth9addr, _, _, err := weth9.DeployWETH9(destUser, destChain)
 	require.NoError(t, err)
 	destWrapped, err := weth9.NewWETH9(destWeth9addr, destChain)
@@ -920,7 +943,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 		destUser,
 		destChain,
 		destWeth9addr,
-		[]common.Address{})
+		[]common.Address{}, armProxyDestAddress)
 	require.NoError(t, err)
 	destWrappedPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destWrappedPoolAddress, destChain)
 	require.NoError(t, err)
@@ -959,6 +982,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			ChainSelector:       destChainID,
 			SourceChainSelector: sourceChainID,
 			OnRamp:              onRamp.Address(),
+			ArmProxy:            destARMProxy.Address(),
 		},
 	)
 	require.NoError(t, err)
@@ -969,7 +993,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 	require.NoError(t, err)
 
 	// Create dest router
-	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, destWeth9addr)
+	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, destWeth9addr, armProxyDestAddress)
 	require.NoError(t, err)
 	destChain.Commit()
 	destRouter, err := router.NewRouter(destRouterAddress, destChain)
@@ -984,6 +1008,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			SourceChainSelector: sourceChainID,
 			OnRamp:              onRampAddress,
 			PrevOffRamp:         common.HexToAddress(""),
+			ArmProxy:            armProxyDestAddress,
 		},
 		[]common.Address{sourceLinkTokenAddress},
 		[]common.Address{destPoolAddress},
@@ -1041,6 +1066,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			CustomPool:        nil,
 			CustomToken:       sourceCustomToken,
 			ARM:               sourceARM,
+			ARMProxy:          sourceARMProxy,
 			PriceRegistry:     srcPriceRegistry,
 			WrappedNative:     sourceWrapped,
 			WrappedNativePool: sourceWeth9Pool,
@@ -1058,6 +1084,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			CustomPool:        nil,
 			CustomToken:       destCustomToken,
 			ARM:               destARM,
+			ARMProxy:          destARMProxy,
 			PriceRegistry:     destPriceRegistry,
 			WrappedNative:     destWrapped,
 			WrappedNativePool: destWrappedPool,

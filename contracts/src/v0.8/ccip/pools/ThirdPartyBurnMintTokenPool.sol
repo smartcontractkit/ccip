@@ -14,7 +14,12 @@ contract ThirdPartyBurnMintTokenPool is BurnMintTokenPool {
   /// @notice the trusted Router address to validate new offRamps through.
   address private s_router;
 
-  constructor(IBurnMintERC20 token, address[] memory allowlist, address router) BurnMintTokenPool(token, allowlist) {
+  constructor(
+    IBurnMintERC20 token,
+    address[] memory allowlist,
+    address router,
+    address armProxy
+  ) BurnMintTokenPool(token, allowlist, armProxy) {
     s_router = router;
   }
 

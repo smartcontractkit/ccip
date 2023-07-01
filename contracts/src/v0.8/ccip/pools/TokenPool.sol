@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {IPool} from "../interfaces/pools/IPool.sol";
+import {IARM} from "../interfaces/IARM.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
@@ -17,10 +18,11 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   using RateLimiter for RateLimiter.TokenBucket;
 
   error PermissionsError();
-  error NullAddressNotAllowed();
+  error ZeroAddressNotAllowed();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
   error NonExistentRamp(address ramp);
+  error BadARMSignal();
   error RampAlreadyExists(address ramp);
 
   event Locked(address indexed sender, uint256 amount);
@@ -44,6 +46,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   // The immutable token that belongs to this pool.
   IERC20 internal immutable i_token;
+  address internal immutable i_armProxy;
   // The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
   // A set of addresses allowed to trigger lockOrBurn as original senders.
@@ -57,15 +60,22 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   EnumerableSet.AddressSet internal s_offRamps;
   mapping(address => RateLimiter.TokenBucket) internal s_offRampRateLimits;
 
-  constructor(IERC20 token, address[] memory allowlist) {
-    if (address(token) == address(0)) revert NullAddressNotAllowed();
+  constructor(IERC20 token, address[] memory allowlist, address armProxy) {
+    if (address(token) == address(0)) revert ZeroAddressNotAllowed();
     i_token = token;
+    i_armProxy = armProxy;
 
     // Pool can be set as permissioned or permissionless at deployment time only.
     i_allowlistEnabled = allowlist.length > 0;
     if (i_allowlistEnabled) {
       _applyAllowListUpdates(new address[](0), allowlist);
     }
+  }
+
+  /// @notice Get ARM proxy address
+  /// @return armProxy Address of arm proxy
+  function getArmProxy() public view returns (address armProxy) {
+    return i_armProxy;
   }
 
   /// @inheritdoc IPool
@@ -276,5 +286,11 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
         emit AllowListAdd(toAdd);
       }
     }
+  }
+
+  /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
+  modifier whenHealthy() {
+    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
+    _;
   }
 }

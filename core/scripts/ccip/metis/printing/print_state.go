@@ -403,16 +403,9 @@ func printPaused(chain *rhea.EvmDeploymentConfig) {
 		sb.WriteString(fmt.Sprintf("| %-25s | %42s |\n", "token pool", tokenConfig.Pool.Hex()))
 	}
 
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(chain.LaneConfig.OnRamp, chain.Client)
-	helpers.PanicErr(err)
-	paused, err := onRamp.Paused(&bind.CallOpts{})
-	helpers.PanicErr(err)
-
-	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "onramp", onRamp.Address(), printBool(!paused)))
-
 	commitStore, err := commit_store.NewCommitStore(chain.LaneConfig.CommitStore, chain.Client)
 	helpers.PanicErr(err)
-	paused, err = commitStore.Paused(&bind.CallOpts{})
+	paused, err := commitStore.Paused(&bind.CallOpts{})
 	helpers.PanicErr(err)
 
 	sb.WriteString(fmt.Sprintf("| %-25s | %42s | %14s |\n", "commitStore", commitStore.Address(), printBool(!paused)))

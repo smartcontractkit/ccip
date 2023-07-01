@@ -8,6 +8,7 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin LockReleaseTokenPool lock_release_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../contracts/solc/v0.8.19/CustomTokenPool.bin CustomTokenPool custom_token_pool
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/ARM.abi ../../contracts/solc/v0.8.19/ARM.bin ARMContract arm_contract
+//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/ARMProxy.abi ../../contracts/solc/v0.8.19/ARMProxy.bin ARMProxyContract arm_proxy_contract
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/MockARM.abi ../../contracts/solc/v0.8.19/MockARM.bin MockARMContract mock_arm_contract
 
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin EVM2EVMOnRamp evm_2_evm_onramp

@@ -221,6 +221,7 @@ type EVMChainConfig struct {
 	Router             gethcommon.Address
 	UpgradeRouter      gethcommon.Address
 	ARM                gethcommon.Address
+	ARMProxy           gethcommon.Address
 	PriceRegistry      gethcommon.Address
 	AllowList          []gethcommon.Address
 	ARMConfig          *arm_contract.ARMConfig // Setting ARMConfig to nil will deploy MockARM

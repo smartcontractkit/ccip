@@ -589,12 +589,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			t.Logf("verifying node %d", i)
 			node.EventuallyNodeUsesNewCommitConfig(t, ccipTH, ccipconfig.CommitOnchainConfig{
 				PriceRegistry: ccipTH.Dest.PriceRegistry.Address(),
-				Arm:           ccipTH.Dest.ARM.Address(),
 			})
 			node.EventuallyNodeUsesNewExecConfig(t, ccipTH, ccipconfig.ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: testhelpers.PermissionLessExecutionThresholdSeconds,
 				Router:                                  ccipTH.Dest.Router.Address(),
-				Arm:                                     ccipTH.Dest.ARM.Address(),
 				PriceRegistry:                           ccipTH.Dest.PriceRegistry.Address(),
 				MaxDataSize:                             1e5,
 				MaxTokensLength:                         5,

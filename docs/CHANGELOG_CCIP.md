@@ -22,10 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - TokenPool's now have getOnRamps() and getOffRamps() functions to get the list of on and off ramps for a token pool.
+- ARMProxy contract (see reasoning here https://github.com/smartcontractkit/chainlink-ccip/pull/990). It's a new
+contract that router, ramps and token pools use to access the ARM contract. Constructor/config changes:
+  - Router constructor accepts ARM proxy 
+  - ARMProxy constructor accepts ARM contract 
+  - TokenPool constructor accepts ARM proxy
+  - EVM2EVMOnRamp no longer accepts ARM contract in setDynamicConfig, instead ARMProxy is a new field on StaticConfig 
+  - EVM2EVMOffRamp no longer accepts ARM contract in the onChainConfig passed in setOCR2Config, instead ARMProxy is a new field on StaticConfig 
+  - ComitStore no longer accepts ARM contract in the onChainConfig passed in setOCR2Config, instead ARMProxy is a new field on StaticConfig 
 
 
 ### Changed
-
+- We now support setting the router to zero as a cheaper way to pause the onramp vs an explicit pause function. Explicit pausing is removed.
 - RampUpdates for token pool upgrades now contain a rate limit to be able to configure  
 per lane token pool rate limits.
   - Before

@@ -105,15 +105,13 @@ contract StructFactory {
 
   function generateDynamicOffRampConfig(
     address router,
-    address priceRegistry,
-    address arm
+    address priceRegistry
   ) internal pure returns (EVM2EVMOffRamp.DynamicConfig memory) {
     return
       EVM2EVMOffRamp.DynamicConfig({
         router: router,
         maxDataSize: MAX_DATA_SIZE,
         priceRegistry: priceRegistry,
-        arm: arm,
         maxTokensLength: MAX_TOKENS_LENGTH,
         permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS
       });
@@ -121,8 +119,7 @@ contract StructFactory {
 
   function generateDynamicOnRampConfig(
     address router,
-    address priceRegistry,
-    address arm
+    address priceRegistry
   ) internal pure returns (EVM2EVMOnRamp.DynamicConfig memory) {
     return
       EVM2EVMOnRamp.DynamicConfig({
@@ -130,8 +127,7 @@ contract StructFactory {
         priceRegistry: priceRegistry,
         maxDataSize: MAX_DATA_SIZE,
         maxTokensLength: MAX_TOKENS_LENGTH,
-        maxGasLimit: MAX_GAS_LIMIT,
-        arm: arm
+        maxGasLimit: MAX_GAS_LIMIT
       });
   }
 

@@ -11,7 +11,11 @@ import {TokenPool} from "./TokenPool.sol";
 /// The only way to change whitelisting mode is to deploy a new pool.
 /// If that is expected, please make sure the token's burner/minter roles are adjustable.
 contract BurnMintTokenPool is TokenPool {
-  constructor(IBurnMintERC20 token, address[] memory allowlist) TokenPool(token, allowlist) {}
+  constructor(
+    IBurnMintERC20 token,
+    address[] memory allowlist,
+    address armProxy
+  ) TokenPool(token, allowlist, armProxy) {}
 
   /// @notice Burn the token in the pool
   /// @dev Burn is not rate limited at per-pool level. Burn does not contribute to honey pot risk.
@@ -23,7 +27,7 @@ contract BurnMintTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override onlyOnRamp checkAllowList(originalSender) returns (bytes memory) {
+  ) external override onlyOnRamp checkAllowList(originalSender) whenHealthy returns (bytes memory) {
     _consumeOnRampRateLimit(amount);
     IBurnMintERC20(address(i_token)).burn(amount);
     emit Burned(msg.sender, amount);
@@ -39,7 +43,7 @@ contract BurnMintTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes memory
-  ) external virtual override onlyOffRamp {
+  ) external virtual override whenHealthy onlyOffRamp {
     _consumeOffRampRateLimit(amount);
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
     emit Minted(msg.sender, receiver, amount);

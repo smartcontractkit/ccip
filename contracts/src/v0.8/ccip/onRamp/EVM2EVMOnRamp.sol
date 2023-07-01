@@ -34,7 +34,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint192;
 
-  error PausedError();
   error InvalidExtraArgsTag();
   error OnlyCallableByOwnerOrAdmin();
   error OnlyCallableByOwnerOrAdminOrNop();
@@ -62,8 +61,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error InvalidNopAddress(address nop);
   error NotAFeeToken(address token);
 
-  event Paused(address account);
-  event Unpaused(address account);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
   event AllowListEnabledSet(bool enabled);
@@ -83,17 +80,17 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint64 destChainSelector; // -┐ Destination chainSelector
     uint64 defaultTxGasLimit; //  | Default gas limit for a tx
     uint96 maxNopFeesJuels; // ---┘ Max nop fee balance onramp can have
-    address prevOnRamp; //          Address of previous-version OnRamp
+    address prevOnRamp; // -------  Address of previous-version OnRamp
+    address armProxy; // ---------- Address of ARM proxy
   }
 
   /// @dev Struct to contains the dynamic configuration
   struct DynamicConfig {
-    address router; //            Router address
+    address router; // -------- ┐  Router address
+    uint16 maxTokensLength; //  ┘  Maximum number of distinct ERC20 tokens that can be sent per message
     address priceRegistry; // --┐ Price registry address
     uint32 maxDataSize; //      | Maximum payload data size
     uint64 maxGasLimit; // -----┘ Maximum gas limit for messages targeting EVMs
-    uint16 maxTokensLength; // -┐ Maximum number of distinct ERC20 tokens that can be sent per message
-    address arm; // ------------┘ ARM address
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -156,6 +153,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   uint64 internal immutable i_destChainSelector;
   /// @dev The address of previous-version OnRamp for this lane
   address internal immutable i_prevOnRamp;
+  /// @dev The address of the arm proxy
+  address internal immutable i_armProxy;
   /// @dev the maximum number of nops that can be configured at the same time.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
 
@@ -205,7 +204,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       staticConfig.linkToken == address(0) ||
       staticConfig.chainSelector == 0 ||
       staticConfig.destChainSelector == 0 ||
-      staticConfig.defaultTxGasLimit == 0
+      staticConfig.defaultTxGasLimit == 0 ||
+      staticConfig.armProxy == address(0)
     ) revert InvalidConfig();
 
     i_metadataHash = keccak256(
@@ -222,6 +222,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     i_defaultTxGasLimit = staticConfig.defaultTxGasLimit;
     i_maxNopFeesJuels = staticConfig.maxNopFeesJuels;
     i_prevOnRamp = staticConfig.prevOnRamp;
+    i_armProxy = staticConfig.armProxy;
 
     _setDynamicConfig(dynamicConfig);
     _setFeeTokenConfig(feeTokenConfigs);
@@ -262,7 +263,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
     address originalSender
-  ) external whenNotPaused whenHealthy returns (bytes32) {
+  ) external whenHealthy returns (bytes32) {
     // EVM destination addresses should be abi encoded and therefore always 32 bytes long
     if (message.receiver.length != 32) revert InvalidAddress(message.receiver);
     uint256 decodedReceiver = abi.decode(message.receiver, (uint256));
@@ -351,6 +352,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address originalSender
   ) internal view {
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
+    // Router address may be zero intentionally to pause.
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
     // Check that payload is formed correctly
     uint256 maxDataSize = uint256(s_dynamicConfig.maxDataSize);
@@ -374,7 +376,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         destChainSelector: i_destChainSelector,
         defaultTxGasLimit: i_defaultTxGasLimit,
         maxNopFeesJuels: i_maxNopFeesJuels,
-        prevOnRamp: i_prevOnRamp
+        prevOnRamp: i_prevOnRamp,
+        armProxy: i_armProxy
       });
   }
 
@@ -392,9 +395,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @notice Internal version of setDynamicConfig to allow for reuse in the constructor.
   function _setDynamicConfig(DynamicConfig memory dynamicConfig) internal {
-    if (
-      dynamicConfig.router == address(0) || dynamicConfig.priceRegistry == address(0) || dynamicConfig.arm == address(0)
-    ) revert InvalidConfig();
+    // We permit router to be set to zero as a way to pause the contract.
+    if (dynamicConfig.priceRegistry == address(0)) revert InvalidConfig();
 
     s_dynamicConfig = dynamicConfig;
 
@@ -405,7 +407,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         destChainSelector: i_destChainSelector,
         defaultTxGasLimit: i_defaultTxGasLimit,
         maxNopFeesJuels: i_maxNopFeesJuels,
-        prevOnRamp: i_prevOnRamp
+        prevOnRamp: i_prevOnRamp,
+        armProxy: i_armProxy
       }),
       dynamicConfig
     );
@@ -798,39 +801,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     _;
   }
 
-  /// @notice Support querying whether health checker is healthy.
-  function isARMHealthy() public view returns (bool) {
-    return !IARM(s_dynamicConfig.arm).isCursed();
-  }
-
   /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {
-    if (!isARMHealthy()) revert BadARMSignal();
+    if (IARM(i_armProxy).isCursed()) revert BadARMSignal();
     _;
-  }
-
-  /// @notice Modifier to make a function callable only when the contract is not paused.
-  modifier whenNotPaused() {
-    if (paused()) revert PausedError();
-    _;
-  }
-
-  /// @notice Returns true if the contract is paused, and false otherwise.
-  function paused() public view returns (bool) {
-    return s_paused;
-  }
-
-  /// @notice Pause the contract
-  /// @dev only callable by the owner
-  function pause() external onlyOwner {
-    s_paused = true;
-    emit Paused(msg.sender);
-  }
-
-  /// @notice Unpause the contract
-  /// @dev only callable by the owner
-  function unpause() external onlyOwner {
-    s_paused = false;
-    emit Unpaused(msg.sender);
   }
 }

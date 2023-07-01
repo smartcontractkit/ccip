@@ -24,7 +24,7 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
     s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_router = new Router(address(s_token));
+    s_router = new Router(address(s_token), address(s_mockARM));
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
@@ -37,7 +37,8 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
     s_thirdPartyPool = new ThirdPartyBurnMintTokenPool(
       IBurnMintERC20(address(s_token)),
       new address[](0),
-      address(s_router)
+      address(s_router),
+      address(s_mockARM)
     );
 
     s_allowedList.push(USER_1);
@@ -45,7 +46,8 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
     s_thirdPartyPoolWithAllowList = new ThirdPartyBurnMintTokenPool(
       IBurnMintERC20(address(s_token)),
       s_allowedList,
-      address(s_router)
+      address(s_router),
+      address(s_mockARM)
     );
 
     BurnMintERC677(address(s_token)).grantMintAndBurnRoles(address(s_thirdPartyPool));

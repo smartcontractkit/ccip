@@ -15,16 +15,16 @@ contract TokenPoolSetup is BaseTest {
     s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
     deal(address(s_token), OWNER, type(uint256).max);
 
-    s_tokenPool = new TokenPoolHelper(s_token, new address[](0));
+    s_tokenPool = new TokenPoolHelper(s_token, new address[](0), address(s_mockARM));
   }
 }
 
 contract TokenPool_constructor is TokenPoolSetup {
   // Reverts
-  function testNullAddressNotAllowedReverts() public {
-    vm.expectRevert(TokenPool.NullAddressNotAllowed.selector);
+  function testZeroAddressNotAllowedReverts() public {
+    vm.expectRevert(TokenPool.ZeroAddressNotAllowed.selector);
 
-    s_tokenPool = new TokenPoolHelper(IERC20(address(0)), new address[](0));
+    s_tokenPool = new TokenPoolHelper(IERC20(address(0)), new address[](0), address(s_mockARM));
   }
 }
 
@@ -252,7 +252,7 @@ contract TokenPoolWithAllowListSetup is TokenPoolSetup {
     s_allowedSenders.push(STRANGER);
     s_allowedSenders.push(DUMMY_CONTRACT_ADDRESS);
 
-    s_tokenPool = new TokenPoolHelper(s_token, s_allowedSenders);
+    s_tokenPool = new TokenPoolHelper(s_token, s_allowedSenders, address(s_mockARM));
   }
 }
 

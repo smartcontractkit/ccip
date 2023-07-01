@@ -25,12 +25,12 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
       CommitStore.StaticConfig({
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
-        onRamp: ON_RAMP_ADDRESS
+        onRamp: ON_RAMP_ADDRESS,
+        armProxy: address(s_mockARM)
       })
     );
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(s_priceRegistry),
-      arm: address(s_mockARM)
+      priceRegistry: address(s_priceRegistry)
     });
     s_commitStore.setOCR2Config(
       s_valid_signers,
@@ -72,12 +72,12 @@ contract CommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
       CommitStore.StaticConfig({
         chainSelector: DEST_CHAIN_ID,
         sourceChainSelector: SOURCE_CHAIN_ID,
-        onRamp: ON_RAMP_ADDRESS
+        onRamp: ON_RAMP_ADDRESS,
+        armProxy: address(s_arm)
       })
     );
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(s_priceRegistry),
-      arm: address(s_arm)
+      priceRegistry: address(s_priceRegistry)
     });
     s_commitStore.setOCR2Config(
       s_valid_signers,
@@ -103,11 +103,11 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     CommitStore.StaticConfig memory staticConfig = CommitStore.StaticConfig({
       chainSelector: DEST_CHAIN_ID,
       sourceChainSelector: SOURCE_CHAIN_ID,
-      onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc
+      onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc,
+      armProxy: address(s_mockARM)
     });
     CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(s_priceRegistry),
-      arm: address(s_mockARM)
+      priceRegistry: address(s_priceRegistry)
     });
 
     vm.expectEmit();
@@ -128,11 +128,11 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     assertEq(staticConfig.chainSelector, gotStaticConfig.chainSelector);
     assertEq(staticConfig.sourceChainSelector, gotStaticConfig.sourceChainSelector);
     assertEq(staticConfig.onRamp, gotStaticConfig.onRamp);
+    assertEq(staticConfig.armProxy, gotStaticConfig.armProxy);
 
     CommitStore.DynamicConfig memory gotDynamicConfig = commitStore.getDynamicConfig();
 
     assertEq(dynamicConfig.priceRegistry, gotDynamicConfig.priceRegistry);
-    assertEq(dynamicConfig.arm, gotDynamicConfig.arm);
 
     // CommitStore initial values
     assertEq(0, commitStore.getLatestPriceEpochAndRound());
@@ -161,13 +161,10 @@ contract CommitStore_setMinSeqNr is CommitStoreSetup {
 
 /// @notice #setDynamicConfig
 contract CommitStore_setDynamicConfig is CommitStoreSetup {
-  function testSetDynamicConfigSuccess(address priceRegistry, address arm) public {
-    vm.assume(priceRegistry != address(0) && arm != address(0));
+  function testSetDynamicConfigSuccess(address priceRegistry) public {
+    vm.assume(priceRegistry != address(0));
     CommitStore.StaticConfig memory staticConfig = s_commitStore.getStaticConfig();
-    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: priceRegistry,
-      arm: arm
-    });
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({priceRegistry: priceRegistry});
     bytes memory onchainConfig = abi.encode(dynamicConfig);
 
     vm.expectEmit();
@@ -207,10 +204,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
     s_commitStore.setLatestPriceEpochAndRound(latestEpochAndRound);
     assertEq(latestEpochAndRound, s_commitStore.getLatestPriceEpochAndRound());
 
-    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(1),
-      arm: address(2)
-    });
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({priceRegistry: address(1)});
     // New config should clear it.
     s_commitStore.setOCR2Config(
       s_valid_signers,
@@ -226,10 +220,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
 
   // Reverts
   function testOnlyOwnerReverts() public {
-    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(23784264),
-      arm: address(s_mockARM)
-    });
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({priceRegistry: address(23784264)});
 
     vm.stopPrank();
     vm.expectRevert("Only callable by owner");
@@ -244,23 +235,7 @@ contract CommitStore_setDynamicConfig is CommitStoreSetup {
   }
 
   function testInvalidCommitStoreConfigReverts() public {
-    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({
-      priceRegistry: address(0),
-      arm: address(1)
-    });
-
-    vm.expectRevert(CommitStore.InvalidCommitStoreConfig.selector);
-    s_commitStore.setOCR2Config(
-      s_valid_signers,
-      s_valid_transmitters,
-      s_f,
-      abi.encode(dynamicConfig),
-      s_offchainConfigVersion,
-      abi.encode("")
-    );
-
-    dynamicConfig.priceRegistry = address(1);
-    dynamicConfig.arm = address(0);
+    CommitStore.DynamicConfig memory dynamicConfig = CommitStore.DynamicConfig({priceRegistry: address(0)});
 
     vm.expectRevert(CommitStore.InvalidCommitStoreConfig.selector);
     s_commitStore.setOCR2Config(

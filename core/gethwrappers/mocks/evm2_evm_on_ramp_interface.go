@@ -428,32 +428,6 @@ func (_m *EVM2EVMOnRampInterface) FilterOwnershipTransferred(opts *bind.FilterOp
 	return r0, r1
 }
 
-// FilterPaused provides a mock function with given fields: opts
-func (_m *EVM2EVMOnRampInterface) FilterPaused(opts *bind.FilterOpts) (*evm_2_evm_onramp.EVM2EVMOnRampPausedIterator, error) {
-	ret := _m.Called(opts)
-
-	var r0 *evm_2_evm_onramp.EVM2EVMOnRampPausedIterator
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts) (*evm_2_evm_onramp.EVM2EVMOnRampPausedIterator, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts) *evm_2_evm_onramp.EVM2EVMOnRampPausedIterator); ok {
-		r0 = rf(opts)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*evm_2_evm_onramp.EVM2EVMOnRampPausedIterator)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.FilterOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // FilterPoolAdded provides a mock function with given fields: opts
 func (_m *EVM2EVMOnRampInterface) FilterPoolAdded(opts *bind.FilterOpts) (*evm_2_evm_onramp.EVM2EVMOnRampPoolAddedIterator, error) {
 	ret := _m.Called(opts)
@@ -520,32 +494,6 @@ func (_m *EVM2EVMOnRampInterface) FilterTokenTransferFeeConfigSet(opts *bind.Fil
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigSetIterator)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.FilterOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// FilterUnpaused provides a mock function with given fields: opts
-func (_m *EVM2EVMOnRampInterface) FilterUnpaused(opts *bind.FilterOpts) (*evm_2_evm_onramp.EVM2EVMOnRampUnpausedIterator, error) {
-	ret := _m.Called(opts)
-
-	var r0 *evm_2_evm_onramp.EVM2EVMOnRampUnpausedIterator
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts) (*evm_2_evm_onramp.EVM2EVMOnRampUnpausedIterator, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts) *evm_2_evm_onramp.EVM2EVMOnRampUnpausedIterator); ok {
-		r0 = rf(opts)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*evm_2_evm_onramp.EVM2EVMOnRampUnpausedIterator)
 		}
 	}
 
@@ -932,30 +880,6 @@ func (_m *EVM2EVMOnRampInterface) GetTokenTransferFeeConfig(opts *bind.CallOpts,
 	return r0, r1
 }
 
-// IsARMHealthy provides a mock function with given fields: opts
-func (_m *EVM2EVMOnRampInterface) IsARMHealthy(opts *bind.CallOpts) (bool, error) {
-	ret := _m.Called(opts)
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (bool, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) bool); ok {
-		r0 = rf(opts)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // LinkAvailableForPayment provides a mock function with given fields: opts
 func (_m *EVM2EVMOnRampInterface) LinkAvailableForPayment(opts *bind.CallOpts) (*big.Int, error) {
 	ret := _m.Called(opts)
@@ -1320,32 +1244,6 @@ func (_m *EVM2EVMOnRampInterface) ParseOwnershipTransferred(log types.Log) (*evm
 	return r0, r1
 }
 
-// ParsePaused provides a mock function with given fields: log
-func (_m *EVM2EVMOnRampInterface) ParsePaused(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampPaused, error) {
-	ret := _m.Called(log)
-
-	var r0 *evm_2_evm_onramp.EVM2EVMOnRampPaused
-	var r1 error
-	if rf, ok := ret.Get(0).(func(types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampPaused, error)); ok {
-		return rf(log)
-	}
-	if rf, ok := ret.Get(0).(func(types.Log) *evm_2_evm_onramp.EVM2EVMOnRampPaused); ok {
-		r0 = rf(log)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*evm_2_evm_onramp.EVM2EVMOnRampPaused)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
-		r1 = rf(log)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // ParsePoolAdded provides a mock function with given fields: log
 func (_m *EVM2EVMOnRampInterface) ParsePoolAdded(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampPoolAdded, error) {
 	ret := _m.Called(log)
@@ -1417,82 +1315,6 @@ func (_m *EVM2EVMOnRampInterface) ParseTokenTransferFeeConfigSet(log types.Log) 
 
 	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
 		r1 = rf(log)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ParseUnpaused provides a mock function with given fields: log
-func (_m *EVM2EVMOnRampInterface) ParseUnpaused(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampUnpaused, error) {
-	ret := _m.Called(log)
-
-	var r0 *evm_2_evm_onramp.EVM2EVMOnRampUnpaused
-	var r1 error
-	if rf, ok := ret.Get(0).(func(types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampUnpaused, error)); ok {
-		return rf(log)
-	}
-	if rf, ok := ret.Get(0).(func(types.Log) *evm_2_evm_onramp.EVM2EVMOnRampUnpaused); ok {
-		r0 = rf(log)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*evm_2_evm_onramp.EVM2EVMOnRampUnpaused)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
-		r1 = rf(log)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Pause provides a mock function with given fields: opts
-func (_m *EVM2EVMOnRampInterface) Pause(opts *bind.TransactOpts) (*types.Transaction, error) {
-	ret := _m.Called(opts)
-
-	var r0 *types.Transaction
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts) (*types.Transaction, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts) *types.Transaction); ok {
-		r0 = rf(opts)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.Transaction)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Paused provides a mock function with given fields: opts
-func (_m *EVM2EVMOnRampInterface) Paused(opts *bind.CallOpts) (bool, error) {
-	ret := _m.Called(opts)
-
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (bool, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts) bool); ok {
-		r0 = rf(opts)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
-		r1 = rf(opts)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1750,32 +1572,6 @@ func (_m *EVM2EVMOnRampInterface) TypeAndVersion(opts *bind.CallOpts) (string, e
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
-		r1 = rf(opts)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Unpause provides a mock function with given fields: opts
-func (_m *EVM2EVMOnRampInterface) Unpause(opts *bind.TransactOpts) (*types.Transaction, error) {
-	ret := _m.Called(opts)
-
-	var r0 *types.Transaction
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts) (*types.Transaction, error)); ok {
-		return rf(opts)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts) *types.Transaction); ok {
-		r0 = rf(opts)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*types.Transaction)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts) error); ok {
 		r1 = rf(opts)
 	} else {
 		r1 = ret.Error(1)
@@ -2070,32 +1866,6 @@ func (_m *EVM2EVMOnRampInterface) WatchOwnershipTransferred(opts *bind.WatchOpts
 	return r0, r1
 }
 
-// WatchPaused provides a mock function with given fields: opts, sink
-func (_m *EVM2EVMOnRampInterface) WatchPaused(opts *bind.WatchOpts, sink chan<- *evm_2_evm_onramp.EVM2EVMOnRampPaused) (event.Subscription, error) {
-	ret := _m.Called(opts, sink)
-
-	var r0 event.Subscription
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *evm_2_evm_onramp.EVM2EVMOnRampPaused) (event.Subscription, error)); ok {
-		return rf(opts, sink)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *evm_2_evm_onramp.EVM2EVMOnRampPaused) event.Subscription); ok {
-		r0 = rf(opts, sink)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(event.Subscription)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *evm_2_evm_onramp.EVM2EVMOnRampPaused) error); ok {
-		r1 = rf(opts, sink)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // WatchPoolAdded provides a mock function with given fields: opts, sink
 func (_m *EVM2EVMOnRampInterface) WatchPoolAdded(opts *bind.WatchOpts, sink chan<- *evm_2_evm_onramp.EVM2EVMOnRampPoolAdded) (event.Subscription, error) {
 	ret := _m.Called(opts, sink)
@@ -2166,32 +1936,6 @@ func (_m *EVM2EVMOnRampInterface) WatchTokenTransferFeeConfigSet(opts *bind.Watc
 	}
 
 	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigSet) error); ok {
-		r1 = rf(opts, sink)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// WatchUnpaused provides a mock function with given fields: opts, sink
-func (_m *EVM2EVMOnRampInterface) WatchUnpaused(opts *bind.WatchOpts, sink chan<- *evm_2_evm_onramp.EVM2EVMOnRampUnpaused) (event.Subscription, error) {
-	ret := _m.Called(opts, sink)
-
-	var r0 event.Subscription
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *evm_2_evm_onramp.EVM2EVMOnRampUnpaused) (event.Subscription, error)); ok {
-		return rf(opts, sink)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *evm_2_evm_onramp.EVM2EVMOnRampUnpaused) event.Subscription); ok {
-		r0 = rf(opts, sink)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(event.Subscription)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *evm_2_evm_onramp.EVM2EVMOnRampUnpaused) error); ok {
 		r1 = rf(opts, sink)
 	} else {
 		r1 = ret.Error(1)
