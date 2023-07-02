@@ -17,6 +17,62 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 )
 
+type OCR2Params struct {
+	// If an epoch (driven by a leader) fails to achieve progress (generate a
+	// report) after DeltaProgress, we enter a new epoch. This parameter must be
+	// chosen carefully. If the duration is too short, we may keep prematurely
+	// switching epochs without ever achieving any progress, resulting in a
+	// liveness failure!
+	deltaProgress time.Duration
+	// deltaResend determines how often Pacemaker newepoch messages should be
+	// resent, allowing oracles that had crashed and are recovering to rejoin
+	// the protocol more quickly. ~30s should be a reasonable default under most
+	// circumstances.
+	deltaResend time.Duration
+	// deltaRound determines the minimal amount of time that should pass between
+	// the start of report generation rounds. With OCR2 only (not OCR1!) you can
+	// set this value very aggressively. Note that this only provides a lower
+	// bound on the round interval; actual rounds might take longer.
+	deltaRound time.Duration
+	// Once the leader of a report generation round has collected sufficiently
+	// many observations, it will wait for DeltaGrace to pass to allow slower
+	// oracles to still contribute an observation before moving on to generating
+	// the report. Consequently, rounds driven by correct leaders will always
+	// take at least DeltaGrace.
+	deltaGrace time.Duration
+
+	query          time.Duration
+	observation    time.Duration
+	report         time.Duration
+	shouldAccept   time.Duration
+	shouldTransmit time.Duration
+}
+
+var (
+	CommitOcr2Params = OCR2Params{
+		deltaProgress:  2 * time.Minute,
+		deltaResend:    5 * time.Second,
+		deltaRound:     1 * time.Minute,
+		deltaGrace:     5 * time.Second,
+		query:          100 * time.Millisecond, // commit does not use query
+		observation:    35 * time.Second,       // TODO: shorten once db issues resolved
+		report:         10 * time.Second,       // TODO: shorten once db issues resolved
+		shouldAccept:   5 * time.Second,
+		shouldTransmit: 10 * time.Second, // TODO: shorten once db issues resolved
+	}
+	ExecOcr2Params = OCR2Params{
+		deltaProgress:  2 * time.Minute,
+		deltaResend:    5 * time.Second,
+		deltaRound:     1 * time.Minute,
+		deltaGrace:     5 * time.Second,
+		query:          100 * time.Millisecond, // exec does not use query
+		observation:    35 * time.Second,       // TODO: shorten once db issues resolved
+		report:         10 * time.Second,       // TODO: shorten once db issues resolved
+		shouldAccept:   5 * time.Second,
+		shouldTransmit: 10 * time.Second, // TODO: shorten once db issues resolved
+	}
+)
+
 func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 	verifierOCRConfig, err := client.Dest.CommitStore.LatestConfigDetails(&bind.CallOpts{})
 	helpers.PanicErr(err)
@@ -37,16 +93,16 @@ func (client *CCIPClient) SetOCR2Config(env dione.Environment) {
 	don := dione.NewOfflineDON(env, client.Dest.logger)
 	faults := len(don.Config.Nodes) / 3
 
-	tx, err := client.setOCRConfig(client.Dest.CommitStore, client.getCommitStoreOffChainConfig(), client.getCommitStoreOnchainConfig(), faults, don.GenerateOracleIdentities(client.Dest.ChainId))
+	tx, err := client.setOCRConfig(client.Dest.CommitStore, client.getCommitStoreOffChainConfig(), client.getCommitStoreOnchainConfig(), CommitOcr2Params, faults, don.GenerateOracleIdentities(client.Dest.ChainId))
 	helpers.PanicErr(err)
 	client.Dest.logger.Infof("Config set on commitStore %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 
-	tx, err = client.setOCRConfig(client.Dest.OffRamp, client.getOffRampOffChainConfig(), client.getOffRampOnchainConfig(), faults, don.GenerateOracleIdentities(client.Dest.ChainId))
+	tx, err = client.setOCRConfig(client.Dest.OffRamp, client.getOffRampOffChainConfig(), client.getOffRampOnchainConfig(), ExecOcr2Params, faults, don.GenerateOracleIdentities(client.Dest.ChainId))
 	helpers.PanicErr(err)
 	client.Dest.logger.Infof("Config set on offramp %s", helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 }
 
-func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, pluginOffchainConfig []byte, onchainConfig []byte, faults int, identities []ocrconfighelper.OracleIdentityExtra) (*types.Transaction, error) {
+func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, pluginOffchainConfig []byte, onchainConfig []byte, ocr2Params OCR2Params, faults int, identities []ocrconfighelper.OracleIdentityExtra) (*types.Transaction, error) {
 	// Simple transmission schedule of 1 node per stage.
 	// sum(transmissionSchedule) should equal number of nodes.
 	var transmissionSchedule []int
@@ -54,20 +110,20 @@ func (client *CCIPClient) setOCRConfig(ocrConf ocr2Configurer, pluginOffchainCon
 		transmissionSchedule = append(transmissionSchedule, 1)
 	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocrconfighelper.ContractSetConfigArgsForTests(
-		2*time.Minute, // deltaProgress
-		5*time.Second, // deltaResend
-		1*time.Minute, // deltaRound
-		5*time.Second, // deltaGrace
+		ocr2Params.deltaProgress,
+		ocr2Params.deltaResend,
+		ocr2Params.deltaRound,
+		ocr2Params.deltaGrace,
 		client.Dest.TunableValues.InflightCacheExpiry.Duration(), // deltaStage
 		3,
 		transmissionSchedule,
 		identities,
 		pluginOffchainConfig,
-		100*time.Millisecond, // query not used
-		35*time.Second,       // observation TODO: shorten once db issues resolved
-		10*time.Second,       // report TODO: shorten once db issues resolved
-		5*time.Second,        // shouldAccept
-		10*time.Second,       // shouldTransmit TODO: shorten once db issues resolved
+		ocr2Params.query,
+		ocr2Params.observation,
+		ocr2Params.report,
+		ocr2Params.shouldAccept,
+		ocr2Params.shouldTransmit,
 		faults,
 		onchainConfig,
 	)
