@@ -111,7 +111,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   }
 
   /// @inheritdoc IPriceRegistry
-  /// @dev this function assumed that no more than 1e59 dollar, is sent as payment.
+  /// @dev this function assumes that no more than 1e59 dollars are sent as payment.
   /// If more is sent, the multiplication of feeTokenAmount and feeTokenValue will overflow.
   /// Since there isn't even close to 1e59 dollars in the world economy this is safe.
   function convertTokenAmount(
