@@ -62,10 +62,10 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x37ffDEe6Dc234E0D1d66571E2c2405aEfd661A6f"), // batch testing key
 		gethcommon.HexToAddress("0x450F58153db2289B422e7629Eb4a70cFF77aA72f"), // batch testing key
 		// Ping pong
-		gethcommon.HexToAddress("0xa5d05f68e22bf0991bf38b81104b9963df7c66f3"), // SepoliaToAvaxFuji.PingPongDapp,
-		gethcommon.HexToAddress("0x80d745370c1fea9c00facfdab73816e3cd6572c6"), // SepoliaToOptimismGoerli.PingPongDapp,
-		gethcommon.HexToAddress("0xf1881b373288e7ffaf476cc5b0dc306a40e973b0"), // SepoliaToArbitrum.PingPongDapp,
-		gethcommon.HexToAddress("0xf503110854c0156a775311a032994c897d396f76"), // SepoliaToPolygonMumbai.PingPongDapp,
+		gethcommon.HexToAddress("0x7a7783e6073175f58db4d5f8bb40ea44065246db"), // SepoliaToAvaxFuji.PingPongDapp,
+		gethcommon.HexToAddress("0x37b27863a14781acf41b787cf9ec3fb65d1c5885"), // SepoliaToOptimismGoerli.PingPongDapp,
+		gethcommon.HexToAddress("0x65b51ba5c9233465f118285e5fb2110c52ad6b27"), // SepoliaToArbitrum.PingPongDapp,
+		gethcommon.HexToAddress("0xa64d7266d34265d9416b9a1d74d2f46279ed6533"), // SepoliaToPolygonMumbai.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x25D7214ae75F169263921a1cAaf7E6F033210E24"), // Chris Cushman
@@ -288,9 +288,9 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 		// ==============  INTERNAL ==============
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
 		// Ping pong
-		gethcommon.HexToAddress("0x1415c3b242ef12a27060ab6a2e3cd4a872ed6a4d"), // OptimismGoerliToAvaxFuji.PingPongDapp,
-		gethcommon.HexToAddress("0x06fa62706747a612bdb4014c3dd530c2e4f44af5"), // OptimismGoerliToSepolia.PingPongDapp,
-		gethcommon.HexToAddress("0x8f17ff4acf26a6a191aa9c8a073ed7d7176a9896"), // OptimismGoerliToArbitrumGoerli.PingPongDapp,
+		gethcommon.HexToAddress("0x227c3699f9f0d6d55c38551a7d7feaea82efdd66"), // OptimismGoerliToAvaxFuji.PingPongDapp,
+		gethcommon.HexToAddress("0x3b7a30028bf7ce52ad75b0afb142beef02deeecd"), // OptimismGoerliToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0x2af63f50fa3f97f4aa94d28327a759ca86b33bf8"), // OptimismGoerliToArbitrumGoerli.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
@@ -445,9 +445,9 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Test Script 0xEa94AA1318796b5C01a9A37faCBc65423fb2c520
 		// Ping pong
-		gethcommon.HexToAddress("0x425475ad0dc29714e6da0a541e48bced2b46ef08"), // AvaxFujiToSepolia.PingPongDapp,
-		gethcommon.HexToAddress("0xd9657c01d5ec6cf70706101c64d89660a60d9417"), // AvaxFujiToOptimismGoerli.PingPongDapp,
-		gethcommon.HexToAddress("0xc5947750f085d311611d3966aad8864144b61387"), // AvaxFujiToPolygonMumbai.PingPongDapp,
+		gethcommon.HexToAddress("0xc1f01a6d0e8382f2c5d394923a7e79693354934b"), // AvaxFujiToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0x4ce7b0782966d58ebc5e1804ca6de3244dac9ad9"), // AvaxFujiToOptimismGoerli.PingPongDapp,
+		gethcommon.HexToAddress("0xcffb4c676a996daefa2a8a6d404a55f59ecc7ce8"), // AvaxFujiToPolygonMumbai.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x594D8E57D8801069C77AAB90222a9162E908AA63"), // Pramod - Dapp Fuji->OptimismGoerli
@@ -641,8 +641,8 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 		// ==============  INTERNAL ==============
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
 		// Ping pong
-		gethcommon.HexToAddress("0xd194a706e49750e9bfd77f2fc067f10e1c719213"), // ArbitrumGoerliToSepolia.PingPongDapp,
-		gethcommon.HexToAddress("0x3e0df884042c21e83276abb368b4388a17f78a82"), // ArbitrumGoerliToOptimismGoerli.PingPongDapp,
+		gethcommon.HexToAddress("0x9b451300c94c7328bdb56a514f83205ea789136f"), // ArbitrumGoerliToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0x57c0059fc3f98aa0a5ce4fb5d2882d81d839e74f"), // ArbitrumGoerliToOptimismGoerli.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
 		gethcommon.HexToAddress("0x208AA722Aca42399eaC5192EE778e4D42f4E5De3"), // Zubin Pratap
@@ -759,8 +759,8 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Test Script 0xEa94AA1318796b5C01a9A37faCBc65423fb2c520
 		// Ping pong
-		gethcommon.HexToAddress("0x6fe3e48057a39311725964840af164c890752a47"), // PolygonMumbaiToSepolia.PingPongDapp,
-		gethcommon.HexToAddress("0xc1982985720b959e66c19b64f783361eb9b60f26"), // PolygonMumbaiToAvax.PingPongDapp,
+		gethcommon.HexToAddress("0x495423ecc6e432c20f13070c17300992e287bc89"), // PolygonMumbaiToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0x3bd38d308045a39253b502f1789e95c703e27f77"), // PolygonMumbaiToAvax.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
