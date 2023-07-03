@@ -168,7 +168,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 	c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
 		testreporters.SendTransactionStats{
 			Fee:                fee.String(),
-			GasUsed:            rcpt.CumulativeGasUsed,
+			GasUsed:            rcpt.GasUsed,
 			TxHash:             sendTx.Hash().Hex(),
 			NoOfTokensSent:     len(msg.TokenAmounts),
 			MessageBytesLength: len(msg.Data),

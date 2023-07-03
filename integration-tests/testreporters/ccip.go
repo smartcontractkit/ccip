@@ -45,6 +45,7 @@ type SendTransactionStats struct {
 	TxHash             string `json:"tx_hash,omitempty"`
 	NoOfTokensSent     int    `json:"no_of_tokens_sent,omitempty"`
 	MessageBytesLength int    `json:"message_bytes_length,omitempty"`
+	FinalizedByBlock   string `json:"finalized_block_num,omitempty"`
 }
 
 type PhaseStat struct {
