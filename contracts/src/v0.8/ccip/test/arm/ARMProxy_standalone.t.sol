@@ -45,14 +45,15 @@ contract ARMProxyStandaloneTest is Test {
   function testARMCall_fuzz(bool expectedSuccess, bytes memory call, bytes memory ret) public {
     // filter out calls to functions that will be handled on the ARMProxy instead
     // of the underlying ARM contract
-    vm.assume(call.length < 4 || (
-      bytes4(call) != s_armProxy.getARM.selector
-      && bytes4(call) != s_armProxy.setARM.selector
-      && bytes4(call) != s_armProxy.owner.selector
-      && bytes4(call) != s_armProxy.acceptOwnership.selector
-      && bytes4(call) != s_armProxy.transferOwnership.selector
-      && bytes4(call) != s_armProxy.typeAndVersion.selector
-    ));
+    vm.assume(
+      call.length < 4 ||
+        (bytes4(call) != s_armProxy.getARM.selector &&
+          bytes4(call) != s_armProxy.setARM.selector &&
+          bytes4(call) != s_armProxy.owner.selector &&
+          bytes4(call) != s_armProxy.acceptOwnership.selector &&
+          bytes4(call) != s_armProxy.transferOwnership.selector &&
+          bytes4(call) != s_armProxy.typeAndVersion.selector)
+    );
 
     // TODO: Remove once ccip is updated to more recent version of forge-std that supports
     // mockCallRevert
@@ -61,8 +62,8 @@ contract ARMProxyStandaloneTest is Test {
     if (expectedSuccess) {
       vm.mockCall(MOCK_ARM_ADDRESS, 0, call, ret);
     } else {
-    // TODO: Uncomment once ccip is updated to more recent version of forge-std that supports
-    // mockCallRevert
+      // TODO: Uncomment once ccip is updated to more recent version of forge-std that supports
+      // mockCallRevert
       // vm.mockCallRevert(MOCK_ARM_ADDRESS, 0, call, ret);
     }
     (bool actualSuccess, bytes memory result) = address(s_armProxy).call(call);
@@ -77,7 +78,7 @@ contract ARMProxyStandaloneTest is Test {
     s_armProxy.setARM(EMPTY_ADDRESS); // No code at address 1, should revert.
     vm.expectRevert();
     bytes memory b = new bytes(0);
-    (bool success,) = address(s_armProxy).call(b);
+    (bool success, ) = address(s_armProxy).call(b);
     success;
   }
 }
