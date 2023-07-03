@@ -55,16 +55,10 @@ contract ARMProxyStandaloneTest is Test {
           bytes4(call) != s_armProxy.typeAndVersion.selector)
     );
 
-    // TODO: Remove once ccip is updated to more recent version of forge-std that supports
-    // mockCallRevert
-    vm.assume(expectedSuccess);
-
     if (expectedSuccess) {
       vm.mockCall(MOCK_ARM_ADDRESS, 0, call, ret);
     } else {
-      // TODO: Uncomment once ccip is updated to more recent version of forge-std that supports
-      // mockCallRevert
-      // vm.mockCallRevert(MOCK_ARM_ADDRESS, 0, call, ret);
+      vm.mockCallRevert(MOCK_ARM_ADDRESS, 0, call, ret);
     }
     (bool actualSuccess, bytes memory result) = address(s_armProxy).call(call);
     vm.clearMockedCalls();
