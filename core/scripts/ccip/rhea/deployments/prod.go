@@ -62,10 +62,10 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x37ffDEe6Dc234E0D1d66571E2c2405aEfd661A6f"), // batch testing key
 		gethcommon.HexToAddress("0x450F58153db2289B422e7629Eb4a70cFF77aA72f"), // batch testing key
 		// Ping pong
-		gethcommon.HexToAddress(""), // SepoliaToAvaxFuji.PingPongDapp,
-		gethcommon.HexToAddress(""), // SepoliaToOptimismGoerli.PingPongDapp,
-		gethcommon.HexToAddress(""), // SepoliaToArbitrum.PingPongDapp,
-		gethcommon.HexToAddress(""), // SepoliaToPolygonMumbai.PingPongDapp,
+		gethcommon.HexToAddress("0xa5d05f68e22bf0991bf38b81104b9963df7c66f3"), // SepoliaToAvaxFuji.PingPongDapp,
+		gethcommon.HexToAddress("0x80d745370c1fea9c00facfdab73816e3cd6572c6"), // SepoliaToOptimismGoerli.PingPongDapp,
+		gethcommon.HexToAddress("0xf1881b373288e7ffaf476cc5b0dc306a40e973b0"), // SepoliaToArbitrum.PingPongDapp,
+		gethcommon.HexToAddress("0xf503110854c0156a775311a032994c897d396f76"), // SepoliaToPolygonMumbai.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x25D7214ae75F169263921a1cAaf7E6F033210E24"), // Chris Cushman
@@ -79,6 +79,10 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x0F1aF0A5d727b53dA44bBDE16843B3BA7F98Af68"), // Frank Kong
 		gethcommon.HexToAddress("0x5803a251D118899dF7B403769e72532dBE854712"), // Amine El Manaa
 		gethcommon.HexToAddress("0xcD936a39336a2E2c5a011137E46c8120dcaE0d65"), // Internal devrel proxy
+		gethcommon.HexToAddress("0x03f6D53c4B337EE4D121db358baf33dF8c71108C"), // Zubin Pratap
+		gethcommon.HexToAddress("0xeA3977eCC954a820cc709f6Edf8b467FDbe085A9"), // Richard Gottleber
+		gethcommon.HexToAddress("0xF7b4ef69E7Cf13C205566345CcFAd1aB5fdCc49F"), // Harry Papacharissiou
+		gethcommon.HexToAddress("0x9680201d9c93d65a3603d2088d125e955c73BD65"), // Patrick Collins
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0xd65113b9B1EeD81113EaF41DC0D2d34fCa31522C"), // BetaUser - Multimedia
@@ -113,81 +117,75 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"), // BetaUser - Alongside
 		gethcommon.HexToAddress("0x0819BBae96c2C0F15477D212e063303221Cf24b9"), // BetaUser - Oddz
 		gethcommon.HexToAddress("0x38104E1bB27A06306B72162047F585B3e6D27484"), // BetaUser - Oddz
+		gethcommon.HexToAddress("0x789d7f3e2eaA6de41133A7fB11d7390603645F31"), // BetaUser - Galaxis
+		gethcommon.HexToAddress("0xB1d5b1A03b2A76b80990F58551e95Fe7b29255BB"), // BetaUser - OpenXYZ
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x5344b4bf5ae39038a591866d2853b2b1db622911"),
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
 			TokenPoolType: rhea.LockRelease,
 		},
-		rhea.WETH: {
-			Token:         gethcommon.HexToAddress("0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.WETH.Price(),
-			Decimals:      rhea.WETH.Decimals(),
-			TokenPoolType: rhea.FeeTokenOnly,
-		},
-		rhea.CACHEGOLD: {
-			Token:         gethcommon.HexToAddress("0x997BCCAE553112CD023592691d41687a3f1EfA7C"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.CACHEGOLD.Price(),
-			Decimals:      rhea.CACHEGOLD.Decimals(),
-			TokenPoolType: rhea.LockRelease,
-		},
 		rhea.ANZ: {
 			Token:         gethcommon.HexToAddress("0x92eA346B7a2AaB84e6AaB03b80E2421eeFB04685"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x6c4cf212a5d074bb4d9055279b1fb2f1f37265db"),
 			Price:         rhea.ANZ.Price(),
 			Decimals:      rhea.ANZ.Decimals(),
 			TokenPoolType: rhea.LockRelease,
 		},
-		rhea.InsurAce: {
-			Token:         gethcommon.HexToAddress("0xb7c8bCA891143221a34DB60A26639785C4839040"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.InsurAce.Price(),
-			Decimals:      rhea.InsurAce.Decimals(),
+		rhea.Alongside: {
+			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
+			Pool:          gethcommon.HexToAddress("0xac8cfc3762a979628334a0e4c1026244498e821b"),
+			Price:         rhea.Alongside.Price(),
+			Decimals:      rhea.Alongside.Decimals(),
 			TokenPoolType: rhea.LockRelease,
 		},
-		//rhea.ZUSD: {
-		//	Token:         gethcommon.HexToAddress("0x09ae935D80E190403C61Cc5d854Fbf6a7b4a559a"),
-		//	Pool:          gethcommon.HexToAddress(""),
-		//	Price:         rhea.ZUSD.Price(),
-		//	Decimals:      rhea.ZUSD.Decimals(),
-		//	TokenPoolType: rhea.Legacy,
-		//},
-		rhea.STEADY: {
-			Token:         gethcommon.HexToAddress("0x82abB1864326A8A7e1A357FFA2270D09CCb867B9"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.STEADY.Price(),
-			Decimals:      rhea.STEADY.Decimals(),
-			TokenPoolType: rhea.LockRelease,
-		},
-		//rhea.SUPER: {
-		//	Token:         gethcommon.HexToAddress("0xCb4B3f72B5b6D0b7072aFDDf18FE61A0d569EC39"),
-		//	Pool:          gethcommon.HexToAddress(""),
-		//	Price:         rhea.SUPER.Price(),
-		//	Decimals:      rhea.SUPER.Decimals(),
-		//	TokenPoolType: rhea.Legacy,
-		//},
 		rhea.BankToken: {
 			Token:         gethcommon.HexToAddress("0x784c400D6fF625051d2f587dC0276E3A1ffD9cda"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x5f217ce93e206d6f13b342aeef53a084fa957745"),
 			Price:         rhea.BankToken.Price(),
 			Decimals:      rhea.BankToken.Decimals(),
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.BondToken: {
 			Token:         gethcommon.HexToAddress("0xF92E4b278380f39fADc24483C7baC61b73EE93F2"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x919b1d308e4477c88350c336537ec5ac9ee76d9a"),
 			Price:         rhea.BondToken.Price(),
 			Decimals:      rhea.BondToken.Decimals(),
 			TokenPoolType: rhea.LockRelease,
 		},
+		rhea.FUGAZIUSDC: {
+			Token:         gethcommon.HexToAddress("0x832bA6abcAdC68812be372F4ef20aAC268bA20B7"),
+			Pool:          gethcommon.HexToAddress("0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f"),
+			Price:         rhea.FUGAZIUSDC.Price(),
+			Decimals:      rhea.FUGAZIUSDC.Decimals(),
+			TokenPoolType: rhea.BurnMint,
+		},
+		rhea.InsurAce: {
+			Token:         gethcommon.HexToAddress("0xb7c8bCA891143221a34DB60A26639785C4839040"),
+			Pool:          gethcommon.HexToAddress("0xa04c2cbbfa7bf7adcbde911216a0ba7e3f1e36b3"),
+			Price:         rhea.InsurAce.Price(),
+			Decimals:      rhea.InsurAce.Decimals(),
+			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.STEADY: {
+			Token:         gethcommon.HexToAddress("0x82abB1864326A8A7e1A357FFA2270D09CCb867B9"),
+			Pool:          gethcommon.HexToAddress("0x5c0b55dbd1335a7c96653788cf545a8c08148496"),
+			Price:         rhea.STEADY.Price(),
+			Decimals:      rhea.STEADY.Decimals(),
+			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.WETH: {
+			Token:         gethcommon.HexToAddress("0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534"),
+			Price:         rhea.WETH.Price(),
+			Decimals:      rhea.WETH.Decimals(),
+			TokenPoolType: rhea.FeeTokenOnly,
+		},
 		rhea.SNXUSD: {
 			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x2291909e328dd00e6b3284730d478f39dbde4c88"),
 			Price:         rhea.SNXUSD.Price(),
 			Decimals:      rhea.SNXUSD.Decimals(),
 			TokenPoolType: rhea.BurnMint,
@@ -196,26 +194,34 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 				gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"),
 			},
 		},
-		//rhea.FUGAZIUSDC: {
-		//	Token:         gethcommon.HexToAddress("0x832bA6abcAdC68812be372F4ef20aAC268bA20B7"),
+		//rhea.CACHEGOLD: {
+		//	Token:         gethcommon.HexToAddress("0x997BCCAE553112CD023592691d41687a3f1EfA7C"),
+		//	Pool:          gethcommon.HexToAddress("0x23183132966fd8c91dbf6c13830b357ffeba98a2"),
+		//	Price:         rhea.CACHEGOLD.Price(),
+		//	Decimals:      rhea.CACHEGOLD.Decimals(),
+		//	TokenPoolType: rhea.LockRelease,
+		//},
+		//rhea.ZUSD: {
+		//	Token:         gethcommon.HexToAddress("0x09ae935D80E190403C61Cc5d854Fbf6a7b4a559a"),
 		//	Pool:          gethcommon.HexToAddress(""),
-		//	Price:         rhea.FUGAZIUSDC.Price(),
-		//	Decimals:      rhea.FUGAZIUSDC.Decimals(),
+		//	Price:         rhea.ZUSD.Price(),
+		//	Decimals:      rhea.ZUSD.Decimals(),
 		//	TokenPoolType: rhea.Legacy,
 		//},
-		rhea.Alongside: {
-			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.Alongside.Price(),
-			Decimals:      rhea.Alongside.Decimals(),
-			TokenPoolType: rhea.LockRelease,
-		},
+		//rhea.SUPER: {
+		//	Token:         gethcommon.HexToAddress("0xCb4B3f72B5b6D0b7072aFDDf18FE61A0d569EC39"),
+		//	Pool:          gethcommon.HexToAddress(""),
+		//	Price:         rhea.SUPER.Price(),
+		//	Decimals:      rhea.SUPER.Decimals(),
+		//	TokenPoolType: rhea.Legacy,
+		//},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
-	Router:        gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0xd0daae2231e9cb96b94c8512223533293c3693bf"),
+	ARM:           gethcommon.HexToAddress("0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa"),
+	ARMProxy:      gethcommon.HexToAddress("0xba3f6251de62ded61ff98590cb2fdf6871fbb991"),
+	PriceRegistry: gethcommon.HexToAddress("0x8737a1c3d55779d03b7a08188e97af87b4110946"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.Sepolia),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.Sepolia),
@@ -282,15 +288,17 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 		// ==============  INTERNAL ==============
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
 		// Ping pong
-		gethcommon.HexToAddress(""), // OptimismGoerliToAvaxFuji.PingPongDapp,
-		gethcommon.HexToAddress(""), // OptimismGoerliToSepolia.PingPongDapp,
-		gethcommon.HexToAddress(""), // OptimismGoerliToArbitrumGoerli.PingPongDapp,
+		gethcommon.HexToAddress("0x1415c3b242ef12a27060ab6a2e3cd4a872ed6a4d"), // OptimismGoerliToAvaxFuji.PingPongDapp,
+		gethcommon.HexToAddress("0x06fa62706747a612bdb4014c3dd530c2e4f44af5"), // OptimismGoerliToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0x8f17ff4acf26a6a191aa9c8a073ed7d7176a9896"), // OptimismGoerliToArbitrumGoerli.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
 		gethcommon.HexToAddress("0x208AA722Aca42399eaC5192EE778e4D42f4E5De3"), // Zubin Pratap
 		gethcommon.HexToAddress("0x52eE5a881287486573cF5CB5e7E7D92F30b03014"), // Zubin Pratap
 		gethcommon.HexToAddress("0xabFD23063251A6481D65e8244237996d3D4d7b59"), // Internal devrel proxy
+		gethcommon.HexToAddress("0x03f6D53c4B337EE4D121db358baf33dF8c71108C"), // Zubin Pratap
+		gethcommon.HexToAddress("0x9680201d9c93d65a3603d2088d125e955c73BD65"), // Patrick Collins
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0x3FcFF7d9f88C64905e2cD9960c7452b5E6690E13"), // BetaUser - AAVE
@@ -304,21 +312,39 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x69D235A7E01aBdf463D7d886492229b75A4F1BC6"), // BetaUser - Steadefi
 		gethcommon.HexToAddress("0xDdcE30979147091F26513C495EEE1bfa6C0a6730"), // BetaUser - RiseWorks
 		gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"), // BetaUser - Alongside
+		gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"), // BetaUser - Synthetix v3 core
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+		rhea.Alongside: {
+			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
+			Pool:          gethcommon.HexToAddress("0x8bcd622ac003160ea239c82e1b0e09364d77b1ac"),
+			Price:         rhea.Alongside.Price(),
+			Decimals:      rhea.Alongside.Decimals(),
+			TokenPoolType: rhea.BurnMint,
+		},
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0xdc2CC710e42857672E7907CF474a69B63B93089f"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0xdecfaf632175915bdf38c00d9d9746e8a90a56c4"),
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.WETH: {
 			Token:         gethcommon.HexToAddress("0x4200000000000000000000000000000000000006"),
-			Pool:          gethcommon.HexToAddress(""),
 			Price:         rhea.WETH.Price(),
 			Decimals:      rhea.WETH.Decimals(),
 			TokenPoolType: rhea.FeeTokenOnly,
+		},
+		rhea.SNXUSD: {
+			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
+			Pool:          gethcommon.HexToAddress("0x7a81e36b40b0a778afb2ae3c8384b6195233d093"),
+			Price:         rhea.SNXUSD.Price(),
+			Decimals:      rhea.SNXUSD.Decimals(),
+			TokenPoolType: rhea.BurnMint,
+			PoolAllowList: []gethcommon.Address{
+				gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"),
+				gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"),
+			},
 		},
 		//rhea.CACHEGOLD: {
 		//	Token:         gethcommon.HexToAddress("0xa6446C6f492f31A33bC68249ae59F8871123a777"),
@@ -341,19 +367,13 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 		//	Decimals:      rhea.STEADY.Decimals(),
 		//	TokenPoolType: rhea.Legacy,
 		//},
-		rhea.Alongside: {
-			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.Alongside.Price(),
-			Decimals:      rhea.Alongside.Decimals(),
-			TokenPoolType: rhea.BurnMint,
-		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
-	Router:        gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0xeb52e9ae4a9fb37172978642d4c141ef53876f26"),
+	ARM:           gethcommon.HexToAddress("0xeaf6968fab9c54ac31c3679f120705b5019d3546"),
+	ARMProxy:      gethcommon.HexToAddress("0x4eb4dbdb3c3b56e5e209abf9c424a3834f2087d0"),
+	PriceRegistry: gethcommon.HexToAddress("0x490f3b46fba6af0d7499867a73469a077251c2bb"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.OptimismGoerli),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.OptimismGoerli),
@@ -425,9 +445,9 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Test Script 0xEa94AA1318796b5C01a9A37faCBc65423fb2c520
 		// Ping pong
-		gethcommon.HexToAddress(""), // AvaxFujiToSepolia.PingPongDapp,
-		gethcommon.HexToAddress(""), // AvaxFujiToOptimismGoerli.PingPongDapp,
-		gethcommon.HexToAddress(""), // AvaxFujiToPolygonMumbai.PingPongDapp,
+		gethcommon.HexToAddress("0x425475ad0dc29714e6da0a541e48bced2b46ef08"), // AvaxFujiToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0xd9657c01d5ec6cf70706101c64d89660a60d9417"), // AvaxFujiToOptimismGoerli.PingPongDapp,
+		gethcommon.HexToAddress("0xc5947750f085d311611d3966aad8864144b61387"), // AvaxFujiToPolygonMumbai.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x594D8E57D8801069C77AAB90222a9162E908AA63"), // Pramod - Dapp Fuji->OptimismGoerli
@@ -439,6 +459,10 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x52eE5a881287486573cF5CB5e7E7D92F30b03014"), // Zubin Pratap
 		gethcommon.HexToAddress("0x00104e54E037453daE202d6a92A3f75B2fdC2737"), // Amine El Manaa
 		gethcommon.HexToAddress("0x447Fd5eC2D383091C22B8549cb231a3bAD6d3fAf"), // Internal devrel proxy
+		gethcommon.HexToAddress("0x03f6D53c4B337EE4D121db358baf33dF8c71108C"), // Zubin Pratap
+		gethcommon.HexToAddress("0xeA3977eCC954a820cc709f6Edf8b467FDbe085A9"), // Richard Gottleber
+		gethcommon.HexToAddress("0xF7b4ef69E7Cf13C205566345CcFAd1aB5fdCc49F"), // Harry Papacharissiou
+		gethcommon.HexToAddress("0x9680201d9c93d65a3603d2088d125e955c73BD65"), // Patrick Collins
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0x1b5D803Be089e43110Faf54c6b4eC40409Cc7450"), // BetaUser - Multimedia
@@ -465,20 +489,62 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x89Eccc61B2d35eACCe08284CF22c2D6487B80A3A"), // BetaUser - Robolabs
 		gethcommon.HexToAddress("0xAa6f663a14b8dA1EB9CF021379f4Ba6BF536268A"), // BetaUser - Fidelity Digital Assets
 		gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"), // BetaUser - Alongside
-		gethcommon.HexToAddress("0xA9cb37191A089C8f8c24fC3e1F2f761De93FA827"), // MintDAO - Sender (EOA)
-		gethcommon.HexToAddress("0xaFE336062eD69c108232c303fBa9b2b1c709fd9d"), // MintDAO - Sender (Proxy)
+		gethcommon.HexToAddress("0xA9cb37191A089C8f8c24fC3e1F2f761De93FA827"), // BetaUser - MintDAO - Sender (EOA)
+		gethcommon.HexToAddress("0xaFE336062eD69c108232c303fBa9b2b1c709fd9d"), // BetaUser - MintDAO - Sender (Proxy)
+		gethcommon.HexToAddress("0x3e44ba19e932F4985983994DFa1Bd01f2a2f8eE2"), // BetaUser - Folks Finance
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
+		rhea.ANZ: {
+			Token:         gethcommon.HexToAddress("0x518bf6423f4cd64d456f2695db874a3541f010bf"),
+			Pool:          gethcommon.HexToAddress("0x232794176678d6b500e263ef65be956dbac32692"),
+			Price:         rhea.ANZ.Price(),
+			Decimals:      rhea.ANZ.Decimals(),
+			TokenPoolType: rhea.Wrapped,
+		},
+		rhea.Alongside: {
+			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
+			Pool:          gethcommon.HexToAddress("0xaef84b05e96e2aafac9a347e60ae7e9a414fb649"),
+			Price:         rhea.Alongside.Price(),
+			Decimals:      rhea.Alongside.Decimals(),
+			TokenPoolType: rhea.BurnMint,
+		},
+		rhea.BankToken: {
+			Token:         gethcommon.HexToAddress("0xd015f3f467a1b0f7e6fd081899aea298fbd4e681"),
+			Pool:          gethcommon.HexToAddress("0xd12e98b53446048e5ec614df514bc6838c5a8010"),
+			Price:         rhea.BankToken.Price(),
+			Decimals:      rhea.BankToken.Decimals(),
+			TokenPoolType: rhea.Wrapped,
+		},
+		rhea.BondToken: {
+			Token:         gethcommon.HexToAddress("0x5efcebcb1db58dd3508b57939b19910df739433c"),
+			Pool:          gethcommon.HexToAddress("0xfac166b229ca504c254bf89449da10d08d44cf69"),
+			Price:         rhea.BondToken.Price(),
+			Decimals:      rhea.BondToken.Decimals(),
+			TokenPoolType: rhea.Wrapped,
+		},
+		rhea.FUGAZIUSDC: {
+			Token:         gethcommon.HexToAddress("0x150a0ee7393294442EE4d4F5C7d637af01dF93ee"),
+			Pool:          gethcommon.HexToAddress("0x0040e5e502fe84de97b1b1cd7d33ca729d8b2a8b"),
+			Price:         rhea.FUGAZIUSDC.Price(),
+			Decimals:      rhea.FUGAZIUSDC.Decimals(),
+			TokenPoolType: rhea.BurnMint,
+		},
+		rhea.InsurAce: {
+			Token:         gethcommon.HexToAddress("0x402be7106b5843ceec38ae2759a910bcecf143e6"),
+			Pool:          gethcommon.HexToAddress("0x96a0c308a3293f0a4425bab68f37bdf6661eedad"),
+			Price:         rhea.InsurAce.Price(),
+			Decimals:      rhea.InsurAce.Decimals(),
+			TokenPoolType: rhea.Wrapped,
+		},
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x658af0d8ecbb13c5fd5b545ac7316e50cc07cf6e"),
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
 			TokenPoolType: rhea.LockRelease,
 		},
 		rhea.WAVAX: {
 			Token:         gethcommon.HexToAddress("0xd00ae08403B9bbb9124bB305C09058E32C39A48c"),
-			Pool:          gethcommon.HexToAddress(""),
 			Price:         rhea.WAVAX.Price(),
 			Decimals:      rhea.WAVAX.Decimals(),
 			TokenPoolType: rhea.FeeTokenOnly,
@@ -490,20 +556,6 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		//	Decimals:      rhea.CACHEGOLD.Decimals(),
 		//	TokenPoolType: rhea.Legacy,
 		//},
-		rhea.ANZ: {
-			Token:         gethcommon.HexToAddress("0xe3d06cb8eac016749281f45e779ac2976baa02ed"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.ANZ.Price(),
-			Decimals:      rhea.ANZ.Decimals(),
-			TokenPoolType: rhea.Wrapped,
-		},
-		rhea.InsurAce: {
-			Token:         gethcommon.HexToAddress("0xda305ab72858939758d5a711494cd447d2d8842e"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.InsurAce.Price(),
-			Decimals:      rhea.InsurAce.Decimals(),
-			TokenPoolType: rhea.Wrapped,
-		},
 		//rhea.SUPER: {
 		//	Token:         gethcommon.HexToAddress("0xCb4B3f72B5b6D0b7072aFDDf18FE61A0d569EC39"),
 		//	Pool:          gethcommon.HexToAddress(""),
@@ -511,40 +563,13 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		//	Decimals:      rhea.SUPER.Decimals(),
 		//	TokenPoolType: rhea.Legacy,
 		//},
-		rhea.BankToken: {
-			Token:         gethcommon.HexToAddress("0x7130aac4827a8b085ffe701a7d4749e2b452a837"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.BankToken.Price(),
-			Decimals:      rhea.BankToken.Decimals(),
-			TokenPoolType: rhea.Wrapped,
-		},
-		rhea.BondToken: {
-			Token:         gethcommon.HexToAddress("0x56e01ecb119c45ff14248f6ebc27c05d4a72d4f9"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.BondToken.Price(),
-			Decimals:      rhea.BondToken.Decimals(),
-			TokenPoolType: rhea.Wrapped,
-		},
-		//rhea.FUGAZIUSDC: {
-		//	Token:         gethcommon.HexToAddress("0x150a0ee7393294442EE4d4F5C7d637af01dF93ee"),
-		//	Pool:          gethcommon.HexToAddress(""),
-		//	Price:         rhea.FUGAZIUSDC.Price(),
-		//	Decimals:      rhea.FUGAZIUSDC.Decimals(),
-		//	TokenPoolType: rhea.Legacy,
-		//},
-		rhea.Alongside: {
-			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
-			Pool:          gethcommon.HexToAddress(""),
-			Price:         rhea.Alongside.Price(),
-			Decimals:      rhea.Alongside.Decimals(),
-			TokenPoolType: rhea.BurnMint,
-		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WAVAX},
 	WrappedNative: rhea.WAVAX,
-	Router:        gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0x554472a2720e5e7d5d3c817529aba05eed5f82d8"),
+	ARM:           gethcommon.HexToAddress("0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f"),
+	ARMProxy:      gethcommon.HexToAddress("0xac8cfc3762a979628334a0e4c1026244498e821b"),
+	PriceRegistry: gethcommon.HexToAddress("0xe42ecce39ce5bd2bbf2443660ba6979eeafd48df"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.AvaxFuji),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.AvaxFuji),
@@ -616,23 +641,28 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 		// ==============  INTERNAL ==============
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
 		// Ping pong
-		gethcommon.HexToAddress(""), // ArbitrumGoerliToSepolia.PingPongDapp,
-		gethcommon.HexToAddress(""), // ArbitrumGoerliToOptimismGoerli.PingPongDapp,
+		gethcommon.HexToAddress("0xd194a706e49750e9bfd77f2fc067f10e1c719213"), // ArbitrumGoerliToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0x3e0df884042c21e83276abb368b4388a17f78a82"), // ArbitrumGoerliToOptimismGoerli.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
 		gethcommon.HexToAddress("0x208AA722Aca42399eaC5192EE778e4D42f4E5De3"), // Zubin Pratap
 		gethcommon.HexToAddress("0x52eE5a881287486573cF5CB5e7E7D92F30b03014"), // Zubin Pratap
 		gethcommon.HexToAddress("0x82FAB72c5Baf6f15f89540EfBb7A62Cb410c300C"), // Internal devrel proxy
+		gethcommon.HexToAddress("0x03f6D53c4B337EE4D121db358baf33dF8c71108C"), // Zubin Pratap
+		gethcommon.HexToAddress("0x9680201d9c93d65a3603d2088d125e955c73BD65"), // Patrick Collins
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0xF5022eDd1B827E6EA4bBdb961212ECD7F315ed88"), // BetaUser - RiseWorks
 		gethcommon.HexToAddress("0x0D7a3a17E2E160287D3e7e74c4A1B22422156642"), // BetaUser - RiseWorks
 		gethcommon.HexToAddress("0x63e430dBd88C1bBFBc97336b4357Aa5Aea83367e"), // BetaUser - RiseWorks
+		gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"), // Synthetix v3 core
+		gethcommon.HexToAddress("0x3e44ba19e932F4985983994DFa1Bd01f2a2f8eE2"), // BetaUser - Folks Finance
+		gethcommon.HexToAddress("0xB573315f912a7e31A8d37054641c031c3c6A9eb9"), // BetaUser - Whitehole Finance
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x044a6b4b561af69d2319a2f4be5ec327a6975d0a"),
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
 			TokenPoolType: rhea.LockRelease,
@@ -643,12 +673,24 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 			Decimals:      rhea.WETH.Decimals(),
 			TokenPoolType: rhea.FeeTokenOnly,
 		},
+		rhea.SNXUSD: {
+			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
+			Pool:          gethcommon.HexToAddress("0x7990f84bbe3e6638907d5fcc217555146304a8d9"),
+			Price:         rhea.SNXUSD.Price(),
+			Decimals:      rhea.SNXUSD.Decimals(),
+			TokenPoolType: rhea.BurnMint,
+			PoolAllowList: []gethcommon.Address{
+				gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"),
+				gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"),
+			},
+		},
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
-	Router:        gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0x88e492127709447a5abefdab8788a15b4567589e"),
+	ARM:           gethcommon.HexToAddress("0x8af4204e30565df93352fe8e1de78925f6664da7"),
+	ARMProxy:      gethcommon.HexToAddress("0x3cc9364260d80f09ccac1ee6b07366db598900e6"),
+	PriceRegistry: gethcommon.HexToAddress("0x114a20a10b43d4115e5aeef7345a1a71d2a60c57"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.ArbitrumGoerli),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.ArbitrumGoerli),
@@ -717,8 +759,8 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"), // deployer key
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Test Script 0xEa94AA1318796b5C01a9A37faCBc65423fb2c520
 		// Ping pong
-		gethcommon.HexToAddress(""), // PolygonMumbaiToSepolia.PingPongDapp,
-		gethcommon.HexToAddress(""), // PolygonMumbaiToAvax.PingPongDapp,
+		gethcommon.HexToAddress("0x6fe3e48057a39311725964840af164c890752a47"), // PolygonMumbaiToSepolia.PingPongDapp,
+		gethcommon.HexToAddress("0xc1982985720b959e66c19b64f783361eb9b60f26"), // PolygonMumbaiToAvax.PingPongDapp,
 		// Personal
 		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 		gethcommon.HexToAddress("0x8fDEA7A82D7861144D027e4eb2acCCf4eB37bb05"), // Andrej Rakic
@@ -728,6 +770,10 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x0F1aF0A5d727b53dA44bBDE16843B3BA7F98Af68"), // Frank Kong
 		gethcommon.HexToAddress("0xA4285EC042b198aeb0C68679c94a615c4d82DAd0"), // Amine El Manaa
 		gethcommon.HexToAddress("0xBdcc3f1D0B4c78F1fe03C91D9498f3DAEeE6948B"), // Internal devrel proxy
+		gethcommon.HexToAddress("0x03f6D53c4B337EE4D121db358baf33dF8c71108C"), // Zubin Pratap
+		gethcommon.HexToAddress("0xeA3977eCC954a820cc709f6Edf8b467FDbe085A9"), // Richard Gottleber
+		gethcommon.HexToAddress("0xF7b4ef69E7Cf13C205566345CcFAd1aB5fdCc49F"), // Harry Papacharissiou
+		gethcommon.HexToAddress("0x9680201d9c93d65a3603d2088d125e955c73BD65"), // Patrick Collins
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0xe764C455e3Bd05Eb7Cf53Ec8491dca0e91486D24"), // BetaUser - Synthetix v3 core
@@ -738,11 +784,12 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x38104E1bB27A06306B72162047F585B3e6D27484"), // BetaUser - Oddz
 		gethcommon.HexToAddress("0xA9cb37191A089C8f8c24fC3e1F2f761De93FA827"), // MintDAO - Sender (EOA)
 		gethcommon.HexToAddress("0xaFE336062eD69c108232c303fBa9b2b1c709fd9d"), // MintDAO - Sender (Proxy)
+		gethcommon.HexToAddress("0x789d7f3e2eaA6de41133A7fB11d7390603645F31"), // BetaUser - Galaxis
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
 			Token:         gethcommon.HexToAddress("0x326C977E6efc84E512bB9C30f76E30c160eD06FB"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x6fce09b2e74f649a4494a1844219cb0d86cfe8b7"),
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
 			TokenPoolType: rhea.LockRelease,
@@ -755,7 +802,7 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		},
 		rhea.SNXUSD: {
 			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
-			Pool:          gethcommon.HexToAddress(""),
+			Pool:          gethcommon.HexToAddress("0x56ffa3ae8bb98b120067b1be50136f681aa3addf"),
 			Price:         rhea.SNXUSD.Price(),
 			Decimals:      rhea.SNXUSD.Decimals(),
 			TokenPoolType: rhea.BurnMint,
@@ -767,9 +814,10 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WMATIC},
 	WrappedNative: rhea.WMATIC,
-	Router:        gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0x70499c328e1e2a3c41108bd3730f6670a44595d1"),
+	ARM:           gethcommon.HexToAddress("0x917a6913f785094f8b06785aa8a884f922a650d8"),
+	ARMProxy:      gethcommon.HexToAddress("0x235ce3408845a4767a2eaa2a3d8ef0848d283f1f"),
+	PriceRegistry: gethcommon.HexToAddress("0x9bd312170aa145ef98453940dc9ab894235b063e"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.PolygonMumbai),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.PolygonMumbai),
@@ -835,9 +883,9 @@ var Prod_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    3655211,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    3703495,
 		},
 	},
 }
@@ -850,9 +898,9 @@ var Prod_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    22876561,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    23152645,
 		},
 	},
 }
@@ -865,9 +913,9 @@ var Prod_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    3655106,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    3702451,
 		},
 	},
 }
@@ -880,9 +928,9 @@ var Prod_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    10439785,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    10735117,
 		},
 	},
 }
@@ -895,9 +943,9 @@ var Prod_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    10439147,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    10741010,
 		},
 	},
 }
@@ -910,9 +958,9 @@ var Prod_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    22875290,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    23152103,
 		},
 	},
 }
@@ -925,9 +973,9 @@ var Prod_ArbitrumGoerliToSepolia = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    25022239,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    26300243,
 		},
 	},
 }
@@ -940,9 +988,9 @@ var Prod_SepoliaToArbitrumGoerli = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    3654960,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    3702542,
 		},
 	},
 }
@@ -955,9 +1003,9 @@ var Prod_PolygonMumbaiToSepolia = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    36631143,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    36910655,
 		},
 	},
 }
@@ -970,9 +1018,9 @@ var Prod_SepoliaToPolygonMumbai = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    3654802,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    3702649,
 		},
 	},
 }
@@ -985,9 +1033,9 @@ var Prod_AvaxFujiToPolygonMumbai = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    22874574,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    23147915,
 		},
 	},
 }
@@ -1000,9 +1048,9 @@ var Prod_PolygonMumbaiToAvaxFuji = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    36631628,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    36910973,
 		},
 	},
 }
@@ -1015,9 +1063,9 @@ var Prod_OptimismGoerliToArbitrumGoerli = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    0,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    10736952,
 		},
 	},
 }
@@ -1030,9 +1078,9 @@ var Prod_ArbitrumGoerliToOptimismGoerli = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
-			DeployLane:         false,
-			DeployPingPongDapp: false,
-			DeployedAtBlock:    0,
+			DeployLane:         true,
+			DeployPingPongDapp: true,
+			DeployedAtBlock:    26305339,
 		},
 	},
 }

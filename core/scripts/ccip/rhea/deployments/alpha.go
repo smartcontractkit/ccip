@@ -223,7 +223,6 @@ var Alpha_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress("0x3a9eb812a299196f2b4e05c62cbeb959c7beab59"),
 		OnRamp:       gethcommon.HexToAddress("0x1fd73af7953b3402b9204e01f137f9878b04122e"),
 		OffRamp:      gethcommon.HexToAddress("0xf904d336ab8db50c0beb38823b35e5c164c71547"),
-		ReceiverDapp: gethcommon.HexToAddress("0x96250fe5bc50283c3ff900ff99ef342429cbb6dc"),
 		PingPongDapp: gethcommon.HexToAddress("0xd2a9e71a67aa965c4880c5b078ff2a56aa6fdf36"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
@@ -239,7 +238,6 @@ var Alpha_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress("0x05df5f5c7ac976b3968e1e0539094e2d09fee365"),
 		OnRamp:       gethcommon.HexToAddress("0x86a6e48d823ff5aa6dab47f9af8b20f41e1dd11b"),
 		OffRamp:      gethcommon.HexToAddress("0x09c0a5cd78cfcc470d41ab8ecf9cd356a5b27041"),
-		ReceiverDapp: gethcommon.HexToAddress("0x0c51053fa16ba9b1ce71b9b328776b71831bf94b"),
 		PingPongDapp: gethcommon.HexToAddress("0xf9aad8a4cc15813f1086c48764df3c270391178e"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
@@ -255,7 +253,6 @@ var Alpha_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress("0xb29ac4f927b734adb0a18543fa3f33d2011f8f5a"),
 		OnRamp:       gethcommon.HexToAddress("0x41d2c9b2665bd7fe12ded7b56a85701b6d0e9fb2"),
 		OffRamp:      gethcommon.HexToAddress("0x886faefbd511d76d635d12f87726cf3cc4349cf9"),
-		ReceiverDapp: gethcommon.HexToAddress("0x608850eb9c25922d355c02dbb721799ceb1092e9"),
 		PingPongDapp: gethcommon.HexToAddress("0x3f949ab4b4d31c9dbe92dc8e0870a7f3ec1987c8"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
@@ -271,7 +268,6 @@ var Alpha_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress("0x5d50d6239a3da796650321699380f364975d95f2"),
 		OnRamp:       gethcommon.HexToAddress("0x211fe3dcc4c70bd2d4c243cf306202e3a28e5099"),
 		OffRamp:      gethcommon.HexToAddress("0x7dd4517c4c144792ebee90bce6c0d852a5d2db83"),
-		ReceiverDapp: gethcommon.HexToAddress("0xda9190149645f4ad8f09b517b50e25d8f5c310cb"),
 		PingPongDapp: gethcommon.HexToAddress("0xc4e40d949bfaa569fd29c6eb568ea810fa48f77c"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
@@ -287,7 +283,6 @@ var Alpha_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress("0x30c2f336ced959d56d6bd79d22acf34dccd0effc"),
 		OnRamp:       gethcommon.HexToAddress("0x9e8a738a321b105065ce6fa22d47130b4519cde4"),
 		OffRamp:      gethcommon.HexToAddress("0x79dbafa3b9b39a3e3b3789f8e0dc92f649d4b7c7"),
-		ReceiverDapp: gethcommon.HexToAddress("0x1f4e1ef33d4e0f751ee66083dcaccf007b7e52c7"),
 		PingPongDapp: gethcommon.HexToAddress("0xb012a8562c441975cd9f256c63d7779e66b390b0"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
@@ -303,7 +298,6 @@ var Alpha_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress("0x3b22729c18d93e67c7389bcedf69c59f0df77a95"),
 		OnRamp:       gethcommon.HexToAddress("0xf6b5f2b53261068daf9806b2980ff75c4c872d75"),
 		OffRamp:      gethcommon.HexToAddress("0x70001a5cd7b1a8f8818243b1e54a730b15d90731"),
-		ReceiverDapp: gethcommon.HexToAddress("0x6dc153a7d8ddec309585fc59d89fc09ed2412357"),
 		PingPongDapp: gethcommon.HexToAddress("0xc342b4af5dcc055e6720a8a622908af2244e38f6"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
@@ -319,7 +313,6 @@ var Alpha_PolygonMumbaiToSepolia = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		OnRamp:       gethcommon.HexToAddress(""),
 		OffRamp:      gethcommon.HexToAddress(""),
-		ReceiverDapp: gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
@@ -335,7 +328,6 @@ var Alpha_SepoliaToPolygonMumbai = rhea.EvmDeploymentConfig{
 		CommitStore:  gethcommon.HexToAddress(""),
 		OnRamp:       gethcommon.HexToAddress(""),
 		OffRamp:      gethcommon.HexToAddress(""),
-		ReceiverDapp: gethcommon.HexToAddress(""),
 		PingPongDapp: gethcommon.HexToAddress(""),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,

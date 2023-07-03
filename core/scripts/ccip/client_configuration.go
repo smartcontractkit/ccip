@@ -179,8 +179,6 @@ func NewDestinationClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.E
 	shared.RequireNoError(t, err)
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(laneConfig.OffRamp, config.Client)
 	shared.RequireNoError(t, err)
-	receiverDapp, err := receiver_dapp.NewReceiverDapp(laneConfig.ReceiverDapp, config.Client)
-	shared.RequireNoError(t, err)
 	router, err := router.NewRouter(config.ChainConfig.Router, config.Client)
 	shared.RequireNoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(laneConfig.PingPongDapp, config.Client)
@@ -206,9 +204,8 @@ func NewDestinationClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.E
 			AllowList:        config.ChainConfig.AllowList,
 			t:                t,
 		},
-		CommitStore:  commitStore,
-		ReceiverDapp: receiverDapp,
-		OffRamp:      offRamp,
+		CommitStore: commitStore,
+		OffRamp:     offRamp,
 	}
 }
 

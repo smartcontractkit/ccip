@@ -267,11 +267,9 @@ type PriceFeed struct {
 }
 
 type EVMLaneConfig struct {
-	OnRamp      gethcommon.Address
-	OffRamp     gethcommon.Address
-	CommitStore gethcommon.Address
-
-	ReceiverDapp   gethcommon.Address
+	OnRamp         gethcommon.Address
+	OffRamp        gethcommon.Address
+	CommitStore    gethcommon.Address
 	PingPongDapp   gethcommon.Address
 	DeploySettings LaneDeploySettings
 }
