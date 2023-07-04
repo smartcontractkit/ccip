@@ -107,7 +107,7 @@ var (
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 		FinalityTag:               true,
-		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 6 * time.Minute},
+		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
 	}
 
 	// sepoliaTestnet https://sepolia.dev/
@@ -122,7 +122,7 @@ var (
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 		FinalityTag:               true,
-		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 6 * time.Minute},
+		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
 	}
 
 	// goerliTestnet https://goerli.net/
@@ -240,7 +240,7 @@ var (
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 		FinalityTag:               true,
-		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 6 * time.Minute},
+		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
 	}
 
 	RSKMainnet blockchain.EVMNetwork = blockchain.EVMNetwork{
@@ -292,7 +292,7 @@ var (
 		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
-		FinalityDepth:             5,
+		FinalityDepth:             550,
 	}
 
 	AvalancheMainnet blockchain.EVMNetwork = blockchain.EVMNetwork{

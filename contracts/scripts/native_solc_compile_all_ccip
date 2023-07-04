@@ -35,6 +35,7 @@ compileContract ccip/applications/ReceiverDapp.sol
 compileContract ccip/applications/PingPongDemo.sol
 
 # Test helpers
+compileContract ccip/test/helpers/BurnMintERC677Helper.sol
 compileContract ccip/test/helpers/CommitStoreHelper.sol
 compileContract ccip/test/helpers/EVM2EVMOffRampHelper.sol
 compileContract ccip/test/helpers/CustomTokenPool.sol

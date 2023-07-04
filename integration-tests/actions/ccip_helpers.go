@@ -802,6 +802,7 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), FinalityTimeout)
 	defer cancel()
+	prevFinalizedBlockNum := ""
 	for {
 		select {
 		case <-ticker.C:
@@ -810,14 +811,24 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 				return time.Time{}, err
 			}
 			if finalizedHdr.Number.Cmp(hdr.Number) >= 0 {
-				finalizedAt := time.Unix(int64(finalizedHdr.Time), 0)
-				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(prevEventAt), testreporters.Success)
+				finalizedAt := time.Now().UTC()
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(prevEventAt), testreporters.Success,
+					testreporters.SendTransactionStats{
+						TxHash:           SendRequested.Raw.TxHash.String(),
+						FinalizedByBlock: finalizedHdr.Number.String(),
+					})
+				lggr.Info().
+					Str("Finalized Block", finalizedHdr.Number.String()).
+					Str("Tx block", hdr.Number.String()).
+					Str("Previous Finalized Block", prevFinalizedBlockNum).
+					Msg("Found finalized log")
 				return finalizedAt, nil
 			} else {
 				lggr.Info().
 					Str("Finalized Block", finalizedHdr.Number.String()).
 					Str("Tx block", hdr.Number.String()).
 					Msg("Still Waiting for CCIPSendRequested event log to be finalized")
+				prevFinalizedBlockNum = finalizedHdr.Number.String()
 			}
 		case <-ctx.Done():
 			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
