@@ -123,7 +123,6 @@ func deployPool(client *EvmDeploymentConfig, tokenName Token, tokenConfig EVMBri
 	// Only deploy a new pool if there is no current pool address given
 	// and the deploySetting indicate a new pool should be deployed.
 	if client.ChainConfig.DeploySettings.DeployTokenPools && tokenConfig.Pool == common.HexToAddress("") {
-		client.Logger.Infof("Deploying token pool for %s token", tokenName)
 		var poolAddress, tokenAddress common.Address
 		var err error
 		switch tokenConfig.TokenPoolType {
@@ -184,7 +183,7 @@ func deployLockReleaseTokenPool(client *EvmDeploymentConfig, tokenName Token, to
 }
 
 func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, tokenAddress common.Address, poolAllowList []common.Address) (common.Address, error) {
-	client.Logger.Infof("Deploying token pool for %s token", tokenName)
+	client.Logger.Infof("Deploying burn mint pool for %s token", tokenName)
 	tokenPoolAddress, tx, _, err := burn_mint_token_pool.DeployBurnMintTokenPool(
 		client.Owner,
 		client.Client,
@@ -202,7 +201,7 @@ func deployBurnMintTokenPool(client *EvmDeploymentConfig, tokenName Token, token
 }
 
 func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenAddress common.Address, tokenName Token, poolAllowList []common.Address) (common.Address, common.Address, error) {
-	client.Logger.Infof("Deploying token pool for %s token", tokenName)
+	client.Logger.Infof("Deploying wrapped token pool for %s token", tokenName)
 	if tokenName.Symbol() == "" {
 		return common.Address{}, common.Address{}, fmt.Errorf("no token symbol given for wrapped token pool %s", tokenName)
 	}
@@ -219,7 +218,7 @@ func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenAddress common.Add
 		}
 		client.Logger.Infof("New %s token deployed on %s in tx %s", tokenName, tokenAddress, helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	} else {
-		client.Logger.Infof("Using existing %s token deployed at", tokenName, tokenAddress)
+		client.Logger.Infof("Using existing %s token deployed at", tokenName, tokenAddress.Hex())
 	}
 
 	poolAddress, err := deployBurnMintTokenPool(client, tokenName, tokenAddress, poolAllowList)
@@ -239,6 +238,7 @@ func deployWrappedTokenPool(client *EvmDeploymentConfig, tokenAddress common.Add
 	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
 		return common.Address{}, common.Address{}, err
 	}
+	client.Logger.Infof("Granted burnMint for %s on pool %s", tokenName, poolAddress.Hex())
 
 	return tokenAddress, poolAddress, nil
 }

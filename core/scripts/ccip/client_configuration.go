@@ -26,6 +26,7 @@ import (
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/burn_mint_erc677_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
@@ -279,6 +280,21 @@ func (client *CCIPClient) applyFeeTokensUpdates(t *testing.T, sourceClient *rhea
 	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
 	client.Source.logger.Infof("Added feeTokens: %v to PriceRegistry: %s", feeTokens, client.Source.PriceRegistry.Address().Hex())
+}
+
+// Deploys a token which can be minted by anyone. Set the name and symbol before running the script.
+func (client *CCIPClient) deployTestToken(t *testing.T) {
+	name := "CCIPTEST-BnM"
+	symbol := "CCIPTEST-BnM"
+	if name == "" || symbol == "" {
+		t.Fatal("name and symbol must be set")
+	}
+	testToken, tx, _, err := burn_mint_erc677_helper.DeployBurnMintERC677Helper(client.Source.Owner, client.Source.Client.Client, name, symbol)
+	shared.RequireNoError(t, err)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+
+	client.Source.logger.Infof("Deployed token %s in tx %s on address %s", name, tx.Hash().Hex(), testToken)
 }
 
 func (client *CCIPClient) setOnRampFeeConfig(t *testing.T, sourceClient *rhea.EvmDeploymentConfig) {

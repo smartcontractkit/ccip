@@ -353,6 +353,9 @@ func TestUpdateAllLanes(t *testing.T) {
 // ** 	Modify the chain config to include the new info
 // **   Set DeployTokenPools back to `false` where changed
 //
+// Set new jobs
+// ** 	If any new tokens are added, add new job specs that include these tokens
+//
 // Run TestSyncTokens
 // ** 	This should set the correct config on each ramp and token pool based on previous steps
 func TestSyncTokens(t *testing.T) {
