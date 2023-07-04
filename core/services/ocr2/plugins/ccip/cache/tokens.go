@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -118,11 +119,20 @@ func (t *supportedTokensOrigin) CallOrigin(ctx context.Context) (map[common.Addr
 	if err != nil {
 		return nil, err
 	}
+
+	seenDestinationTokens := make(map[common.Address]struct{})
+
 	for _, sourceToken := range sourceTokens {
 		dst, err1 := t.offRamp.GetDestinationToken(&bind.CallOpts{Context: ctx}, sourceToken)
 		if err1 != nil {
 			return nil, err1
 		}
+
+		if _, exists := seenDestinationTokens[dst]; exists {
+			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", dst)
+		}
+
+		seenDestinationTokens[dst] = struct{}{}
 		srcToDstTokenMapping[sourceToken] = dst
 	}
 	return srcToDstTokenMapping, nil

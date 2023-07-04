@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -86,6 +87,61 @@ func Test_tokenToDecimals(t *testing.T) {
 			got, err := tokenToDecimal.CallOrigin(testutils.Context(t))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCallOrigin(t *testing.T) {
+	src1 := common.HexToAddress("10")
+	dst1 := common.HexToAddress("11")
+	src2 := common.HexToAddress("20")
+	dst2 := common.HexToAddress("21")
+
+	testCases := []struct {
+		name      string
+		srcTokens []common.Address
+		srcToDst  map[common.Address]common.Address
+		expErr    bool
+	}{
+		{
+			name:      "base",
+			srcTokens: []common.Address{src1, src2},
+			srcToDst: map[common.Address]common.Address{
+				src1: dst1,
+				src2: dst2,
+			},
+			expErr: false,
+		},
+		{
+			name:      "dup dst token",
+			srcTokens: []common.Address{src1, src2},
+			srcToDst: map[common.Address]common.Address{
+				src1: dst1,
+				src2: dst1,
+			},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			offRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
+			offRamp.On("GetSupportedTokens", mock.Anything).Return(tc.srcTokens, nil)
+			for src, dst := range tc.srcToDst {
+				offRamp.On("GetDestinationToken", mock.Anything, src).Return(dst, nil)
+			}
+			o := supportedTokensOrigin{offRamp: offRamp}
+			srcToDst, err := o.CallOrigin(context.Background())
+
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			for src, dst := range tc.srcToDst {
+				assert.Equal(t, dst, srcToDst[src])
+			}
 		})
 	}
 }
