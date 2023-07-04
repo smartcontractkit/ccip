@@ -700,6 +700,7 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x82FAB72c5Baf6f15f89540EfBb7A62Cb410c300C"), // Internal devrel proxy
 		gethcommon.HexToAddress("0x03f6D53c4B337EE4D121db358baf33dF8c71108C"), // Zubin Pratap
 		gethcommon.HexToAddress("0x9680201d9c93d65a3603d2088d125e955c73BD65"), // Patrick Collins
+		gethcommon.HexToAddress("0xEa94AA1318796b5C01a9A37faCBc65423fb2c520"), // Anindita Ghosh
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0xF5022eDd1B827E6EA4bBdb961212ECD7F315ed88"), // BetaUser - RiseWorks
