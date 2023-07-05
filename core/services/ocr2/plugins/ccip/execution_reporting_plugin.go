@@ -500,7 +500,17 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		messageMaxGas := msg.GasLimit.Uint64() + maxGasOverHeadGas(len(report.sendRequestsWithMeta), len(msg.Data), len(msg.TokenAmounts))
+		messageMaxGas, err := calculateMessageMaxGas(
+			msg.GasLimit,
+			len(report.sendRequestsWithMeta),
+			len(msg.Data),
+			len(msg.TokenAmounts),
+		)
+		if err != nil {
+			msgLggr.Errorw("calculate message max gas", "err", err)
+			continue
+		}
+
 		// Check sufficient gas in batch
 		if availableGas < messageMaxGas {
 			msgLggr.Infow("Insufficient remaining gas in batch limit", "availableGas", availableGas, "messageMaxGas", messageMaxGas)
@@ -522,6 +532,22 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		expectedNonces[msg.Sender] = msg.Nonce + 1
 	}
 	return executableMessages
+}
+
+func calculateMessageMaxGas(gasLimit *big.Int, numRequests, dataLen, numTokens int) (uint64, error) {
+	if !gasLimit.IsUint64() {
+		return 0, fmt.Errorf("gas limit %s cannot be casted to uint64", gasLimit)
+	}
+
+	gasLimitU64 := gasLimit.Uint64()
+	gasOverHeadGas := maxGasOverHeadGas(numRequests, dataLen, numTokens)
+	messageMaxGas := gasLimitU64 + gasOverHeadGas
+
+	if messageMaxGas < gasLimitU64 || messageMaxGas < gasOverHeadGas {
+		return 0, fmt.Errorf("message max gas overflow, gasLimit=%d gasOverHeadGas=%d", gasLimitU64, gasOverHeadGas)
+	}
+
+	return messageMaxGas, nil
 }
 
 // helper struct to hold the commitReport and the related send requests

@@ -3,6 +3,7 @@ package ccip
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"math/big"
 	"sort"
 	"testing"
@@ -724,6 +725,51 @@ func Test_calculateObservedMessagesConsensus(t *testing.T) {
 				return res[i].SeqNr < res[j].SeqNr
 			})
 			assert.Equalf(t, tt.want, res, "calculateObservedMessagesConsensus(%v, %v)", tt.args.observations, tt.args.f)
+		})
+	}
+}
+
+func Test_calculateMessageMaxGas(t *testing.T) {
+	type args struct {
+		gasLimit    *big.Int
+		numRequests int
+		dataLen     int
+		numTokens   int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    uint64
+		wantErr bool
+	}{
+		{
+			name:    "base",
+			args:    args{gasLimit: big.NewInt(1000), numRequests: 5, dataLen: 5, numTokens: 2},
+			want:    112700,
+			wantErr: false,
+		},
+		{
+			name:    "large",
+			args:    args{gasLimit: big.NewInt(1000), numRequests: 1000, dataLen: 1000, numTokens: 1000},
+			want:    36391540,
+			wantErr: false,
+		},
+		{
+			name:    "gas limit overflow",
+			args:    args{gasLimit: big.NewInt(0).Mul(big.NewInt(math.MaxInt64), big.NewInt(math.MaxInt64))},
+			want:    36391540,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := calculateMessageMaxGas(tt.args.gasLimit, tt.args.numRequests, tt.args.dataLen, tt.args.numTokens)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equalf(t, tt.want, got, "calculateMessageMaxGas(%v, %v, %v, %v)", tt.args.gasLimit, tt.args.numRequests, tt.args.dataLen, tt.args.numTokens)
 		})
 	}
 }
