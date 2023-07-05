@@ -502,7 +502,8 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			tokenData = append(tokenData, []byte{})
 		}
 
-		msgLggr.Infow("Adding msg to batch", "seqNum", msg.SequenceNumber, "nonce", msg.Nonce)
+		msgLggr.Infow("Adding msg to batch", "seqNum", msg.SequenceNumber, "nonce", msg.Nonce,
+			"value", msgValue, "aggregateTokenLimit", aggregateTokenLimit)
 		executableMessages = append(executableMessages, NewObservedMessage(msg.SequenceNumber, tokenData))
 		expectedNonces[msg.Sender] = msg.Nonce + 1
 	}
