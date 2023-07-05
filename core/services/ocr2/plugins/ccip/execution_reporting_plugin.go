@@ -472,12 +472,26 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			msgLggr.Errorw("Unexpected error fetching gas price estimate", "err", err)
 			return []ObservedMessage{}
 		}
-		execCostUsd := computeExecCost(msg.GasLimit, execGasPriceEstimateValue, destTokenPricesUSD[r.destWrappedNative])
+
+		dstWrappedNativePrice, exists := destTokenPricesUSD[r.destWrappedNative]
+		if !exists {
+			msgLggr.Errorw("token not in dst token prices", "token", r.destWrappedNative)
+			continue
+		}
+
+		execCostUsd := computeExecCost(msg.GasLimit, execGasPriceEstimateValue, dstWrappedNativePrice)
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),
 		// availableFee is 1e17*6e18/1e18 = 6e17 = 0.6 USD
-		availableFee := big.NewInt(0).Mul(msg.FeeTokenAmount, srcTokenPricesUSD[msg.FeeToken])
+
+		srcFeeTokenPrice, exists := srcTokenPricesUSD[msg.FeeToken]
+		if !exists {
+			msgLggr.Errorw("token not in src token prices", "token", msg.FeeToken)
+			continue
+		}
+
+		availableFee := big.NewInt(0).Mul(msg.FeeTokenAmount, srcFeeTokenPrice)
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
 		availableFeeUsd := waitBoostedFee(time.Since(msg.blockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
 		if availableFeeUsd.Cmp(execCostUsd) < 0 {

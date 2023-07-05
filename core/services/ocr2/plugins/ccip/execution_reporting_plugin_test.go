@@ -556,7 +556,6 @@ func TestBuildBatch(t *testing.T) {
 		srcPrices, dstPrices     map[common.Address]*big.Int
 		offRampNoncesBySender    map[common.Address]uint64
 		expectedSeqNrs           []ObservedMessage
-		expectedAllExecuted      bool
 	}{
 		{
 			name:                  "single message no tokens",
@@ -568,7 +567,6 @@ func TestBuildBatch(t *testing.T) {
 			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ObservedMessage{{SeqNr: uint64(1)}},
-			expectedAllExecuted:   false,
 		},
 		{
 			name:                  "unfinalized executed log",
@@ -580,7 +578,6 @@ func TestBuildBatch(t *testing.T) {
 			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ObservedMessage{{SeqNr: uint64(1)}},
-			expectedAllExecuted:   false,
 		},
 		{
 			name:                  "finalized executed log",
@@ -592,7 +589,28 @@ func TestBuildBatch(t *testing.T) {
 			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
 			expectedSeqNrs:        nil,
-			expectedAllExecuted:   true,
+		},
+		{
+			name:                  "dst token price does not exist",
+			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg2},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[common.Address]*big.Int{},
+			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			expectedSeqNrs:        nil,
+		},
+		{
+			name:                  "src token price does not exist",
+			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg2},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[common.Address]*big.Int{},
+			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			expectedSeqNrs:        nil,
 		},
 	}
 
