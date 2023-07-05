@@ -80,14 +80,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint64 destChainSelector; // -┐ Destination chainSelector
     uint64 defaultTxGasLimit; //  | Default gas limit for a tx
     uint96 maxNopFeesJuels; // ---┘ Max nop fee balance onramp can have
-    address prevOnRamp; // -------  Address of previous-version OnRamp
-    address armProxy; // ---------- Address of ARM proxy
+    address prevOnRamp; //          Address of previous-version OnRamp
+    address armProxy; //            Address of ARM proxy
   }
 
   /// @dev Struct to contains the dynamic configuration
   struct DynamicConfig {
-    address router; // -------- ┐  Router address
-    uint16 maxTokensLength; //  ┘  Maximum number of distinct ERC20 tokens that can be sent per message
+    address router; // ---------┐  Router address
+    uint16 maxTokensLength; // -┘  Maximum number of distinct ERC20 tokens that can be sent per message
     address priceRegistry; // --┐ Price registry address
     uint32 maxDataSize; //      | Maximum payload data size
     uint64 maxGasLimit; // -----┘ Maximum gas limit for messages targeting EVMs

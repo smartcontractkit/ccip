@@ -538,7 +538,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	priceUpdates := calculatePriceUpdates(r.config.sourceChainSelector, parsableObservations, r.F)
 	// If there are no fee updates and the interval is zero there is no report to produce.
 	if len(priceUpdates.TokenPriceUpdates) == 0 && priceUpdates.DestChainSelector == 0 && agreedInterval.Min == 0 {
-		lggr.Warnw("Empty report, skipping")
+		lggr.Infow("Empty report, skipping")
 		return false, nil, nil
 	}
 

@@ -79,8 +79,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     uint64 chainSelector; // -------┘  Destination chainSelector
     uint64 sourceChainSelector; // -┐  Source chainSelector
     address onRamp; // -------------┘  OnRamp address on the source chain
-    address prevOffRamp; // --------   Address of previous-version OffRamp
-    address armProxy; // ------------  ARM proxy address
+    address prevOffRamp; //            Address of previous-version OffRamp
+    address armProxy; //               ARM proxy address
   }
 
   /// @notice Dynamic offRamp config
