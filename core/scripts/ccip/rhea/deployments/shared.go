@@ -27,10 +27,9 @@ func getFinalityDepth(chain rhea.Chain) uint32 {
 	// those higher than others.
 	var finalityDepthPerChain = map[rhea.Chain]uint32{
 		// Testnets
-		rhea.Goerli:         4,
-		rhea.OptimismGoerli: 5,
+		rhea.OptimismGoerli: 5, // We use finality tag
 		rhea.Quorum:         4,
-		rhea.AvaxFuji:       35,  // Implements strange finality tag
+		rhea.AvaxFuji:       35,  // Implements strange finality tag, use 35 blocks instead of 1 block tag
 		rhea.PolygonMumbai:  550, // No finality tag available
 		rhea.ArbitrumGoerli: 5,   // We use finality tag
 		rhea.Sepolia:        4,   // We use finality tag
@@ -52,7 +51,6 @@ func getFinalityDepth(chain rhea.Chain) uint32 {
 func getOptimisticConfirmations(chain rhea.Chain) uint32 {
 	var optimisticConfirmations = map[rhea.Chain]uint32{
 		// Testnets
-		rhea.Goerli:         4,
 		rhea.Sepolia:        4,
 		rhea.OptimismGoerli: 4,
 		rhea.AvaxFuji:       1,

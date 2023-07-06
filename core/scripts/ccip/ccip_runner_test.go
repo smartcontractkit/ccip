@@ -248,14 +248,11 @@ func TestDione(t *testing.T) {
 		env = dione.Prod_Swift
 	}
 
-	don := dione.NewDON(env, logger.TestLogger(t))
-	don.ClearAllJobs(ccip.ChainName(int64(SOURCE.ChainConfig.EvmChainId)), ccip.ChainName(int64(DESTINATION.ChainConfig.EvmChainId)))
-	don.AddTwoWaySpecs(SOURCE, DESTINATION)
-
-	// Sometimes jobs don't get added correctly. This script looks for missing jobs
-	// and attempts to add them.
-	don.AddMissingSpecs(DESTINATION, SOURCE, "")
-	don.AddMissingSpecs(SOURCE, DESTINATION, "")
+	DoForEachBidirectionalLane(t, env, func(src rhea.EvmDeploymentConfig, dst rhea.EvmDeploymentConfig) {
+		don := dione.NewDON(env, logger.TestLogger(t))
+		don.UpdateCommitJobs(src, dst)
+		//don.UpdateExecJobs(src, dst)
+	})
 }
 
 // TestDionePopulateNodeKeys

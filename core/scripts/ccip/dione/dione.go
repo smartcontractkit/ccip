@@ -18,7 +18,8 @@ import (
 )
 
 const (
-	PollPeriod = time.Second
+	PollPeriod          = time.Second
+	DelayBetweenJobAdds = 5 * time.Second
 )
 
 type Environment string
@@ -261,11 +262,29 @@ func (don *DON) LoadCurrentNodeParams() {
 	don.PrintConfig()
 }
 
-func (don *DON) ClearAllJobs(chainA string, chainB string) {
+func (don *DON) UpdateCommitJobs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
+	don.ClearCommitJobs(ccip.ChainName(int64(chainA.ChainConfig.EvmChainId)), ccip.ChainName(int64(chainB.ChainConfig.EvmChainId)))
+	don.AddTwoWayCommitJobsByVersion(chainA.OnlyEvmConfig(), chainA.LaneConfig, chainB.OnlyEvmConfig(), chainB.LaneConfig, "")
+}
+
+func (don *DON) UpdateExecJobs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {
+	don.ClearExecJobs(ccip.ChainName(int64(chainA.ChainConfig.EvmChainId)), ccip.ChainName(int64(chainB.ChainConfig.EvmChainId)))
+	don.AddTwoWayExecJobsByVersion(chainA.OnlyEvmConfig(), chainA.LaneConfig, chainB.OnlyEvmConfig(), chainB.LaneConfig, "")
+}
+
+func (don *DON) ClearCommitJobs(chainA string, chainB string) {
 	don.ClearJobSpecs(Commit, chainA, chainB)
-	don.ClearJobSpecs(Execution, chainA, chainB)
 	don.ClearJobSpecs(Commit, chainB, chainA)
+}
+
+func (don *DON) ClearExecJobs(chainA string, chainB string) {
+	don.ClearJobSpecs(Execution, chainA, chainB)
 	don.ClearJobSpecs(Execution, chainB, chainA)
+}
+
+func (don *DON) ClearAllJobs(chainA string, chainB string) {
+	don.ClearCommitJobs(chainA, chainB)
+	don.ClearExecJobs(chainA, chainB)
 }
 
 func (don *DON) ClearAllLaneJobsByVersion(chainA string, chainB string, version string) {
@@ -275,29 +294,36 @@ func (don *DON) ClearAllLaneJobsByVersion(chainA string, chainB string, version 
 	don.ClearUpgradeJobSpecs(Execution, chainB, chainA, version)
 }
 
-func (don *DON) AddTwoWaySpecsByVersion(chainA rhea.EvmConfig, laneA rhea.EVMLaneConfig, chainB rhea.EvmConfig, laneB rhea.EVMLaneConfig, version string) {
-	jobParamsAB := NewCCIPJobSpecParams(chainA.ChainConfig, laneA, chainB.ChainConfig, laneB, version)
-	relaySpecAB, err := jobParamsAB.CommitJobSpec()
+func (don *DON) AddTwoWayCommitJobsByVersion(chainA rhea.EvmConfig, laneA rhea.EVMLaneConfig, chainB rhea.EvmConfig, laneB rhea.EVMLaneConfig, version string) {
+	relaySpecAB, err := NewCCIPJobSpecParams(chainA.ChainConfig, laneA, chainB.ChainConfig, laneB, version).CommitJobSpec()
 	if err != nil {
 		don.lggr.Errorf("commit jobspec error %v", err)
 	}
 	don.AddJobSpec(relaySpecAB)
 	// We sleep to give the nodes some time to start the new job
-	time.Sleep(time.Second * 5)
-	executionSpecAB, err := jobParamsAB.ExecutionJobSpec()
-	if err != nil {
-		don.lggr.Errorf("exec jobspec error %v", err)
-	}
-	don.AddJobSpec(executionSpecAB)
-	time.Sleep(time.Second * 5)
-	jobParamsBA := NewCCIPJobSpecParams(chainB.ChainConfig, laneB, chainA.ChainConfig, laneA, version)
-	relaySpecBA, err := jobParamsBA.CommitJobSpec()
+	time.Sleep(DelayBetweenJobAdds)
+
+	relaySpecBA, err := NewCCIPJobSpecParams(chainB.ChainConfig, laneB, chainA.ChainConfig, laneA, version).CommitJobSpec()
 	if err != nil {
 		don.lggr.Errorf("commit jobspec error %v", err)
 	}
 	don.AddJobSpec(relaySpecBA)
-	time.Sleep(time.Second * 5)
-	executionSpecBA, err := jobParamsBA.ExecutionJobSpec()
+
+	// Sometimes jobs don't get added correctly. This script looks for missing jobs
+	// and attempts to add them.
+	don.AddMissingSpecsByLanes(chainB, laneB, chainA, laneA, version)
+	don.AddMissingSpecsByLanes(chainA, laneA, chainB, laneB, version)
+}
+
+func (don *DON) AddTwoWayExecJobsByVersion(chainA rhea.EvmConfig, laneA rhea.EVMLaneConfig, chainB rhea.EvmConfig, laneB rhea.EVMLaneConfig, version string) {
+	executionSpecAB, err := NewCCIPJobSpecParams(chainA.ChainConfig, laneA, chainB.ChainConfig, laneB, version).ExecutionJobSpec()
+	if err != nil {
+		don.lggr.Errorf("exec jobspec error %v", err)
+	}
+	don.AddJobSpec(executionSpecAB)
+	time.Sleep(DelayBetweenJobAdds)
+
+	executionSpecBA, err := NewCCIPJobSpecParams(chainB.ChainConfig, laneB, chainA.ChainConfig, laneA, version).ExecutionJobSpec()
 	if err != nil {
 		don.lggr.Errorf("exec jobspec error %v", err)
 	}
@@ -307,6 +333,11 @@ func (don *DON) AddTwoWaySpecsByVersion(chainA rhea.EvmConfig, laneA rhea.EVMLan
 	// and attempts to add them.
 	don.AddMissingSpecsByLanes(chainB, laneB, chainA, laneA, version)
 	don.AddMissingSpecsByLanes(chainA, laneA, chainB, laneB, version)
+}
+
+func (don *DON) AddTwoWaySpecsByVersion(chainA rhea.EvmConfig, laneA rhea.EVMLaneConfig, chainB rhea.EvmConfig, laneB rhea.EVMLaneConfig, version string) {
+	don.AddTwoWayCommitJobsByVersion(chainA, laneA, chainB, laneB, version)
+	don.AddTwoWayExecJobsByVersion(chainA, laneA, chainB, laneB, version)
 }
 
 func (don *DON) AddTwoWaySpecs(chainA rhea.EvmDeploymentConfig, chainB rhea.EvmDeploymentConfig) {

@@ -284,8 +284,8 @@ func (client *CCIPClient) applyFeeTokensUpdates(t *testing.T, sourceClient *rhea
 
 // Deploys a token which can be minted by anyone. Set the name and symbol before running the script.
 func (client *CCIPClient) deployTestToken(t *testing.T) {
-	name := "CCIPTEST-BnM"
-	symbol := "CCIPTEST-BnM"
+	name := "CCIP-BnM"
+	symbol := "CCIP-BnM"
 	if name == "" || symbol == "" {
 		t.Fatal("name and symbol must be set")
 	}
