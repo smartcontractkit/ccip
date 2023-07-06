@@ -3,6 +3,7 @@ package ccip
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"math/big"
 	"sort"
 	"testing"
@@ -73,6 +74,7 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 			onRamp:                th.Source.OnRamp,
 			commitStore:           th.Dest.CommitStore,
 			offRamp:               th.Dest.OffRamp,
+			destClient:            th.DestClient,
 			srcWrappedNativeToken: th.Source.WrappedNative.Address(),
 			leafHasher:            hasher.NewLeafHasher(th.Source.ChainID, th.Dest.ChainID, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
 			destGasEstimator:      destFeeEstimator,
@@ -548,6 +550,11 @@ func TestBuildBatch(t *testing.T) {
 	msg3.executed = true
 	msg3.finalized = true
 
+	msg4 := msg1
+	msg4.TokenAmounts = []evm_2_evm_offramp.ClientEVMTokenAmount{
+		{Token: srcNative, Amount: big.NewInt(100)},
+	}
+
 	var tt = []struct {
 		name                     string
 		reqs                     []evm2EVMOnRampCCIPSendRequestedWithMeta
@@ -555,6 +562,8 @@ func TestBuildBatch(t *testing.T) {
 		tokenLimit, destGasPrice *big.Int
 		srcPrices, dstPrices     map[common.Address]*big.Int
 		offRampNoncesBySender    map[common.Address]uint64
+		destRateLimits           map[common.Address]*big.Int
+		srcToDestTokens          map[common.Address]common.Address
 		expectedSeqNrs           []ObservedMessage
 		expectedAllExecuted      bool
 	}{
@@ -594,6 +603,22 @@ func TestBuildBatch(t *testing.T) {
 			expectedSeqNrs:        nil,
 			expectedAllExecuted:   true,
 		},
+		{
+			name:                  "rate limit hit",
+			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg4},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			destRateLimits: map[common.Address]*big.Int{
+				destNative: big.NewInt(99),
+			},
+			srcToDestTokens: map[common.Address]common.Address{
+				srcNative: destNative,
+			},
+			expectedSeqNrs: nil,
+		},
 	}
 
 	for _, tc := range tt {
@@ -611,7 +636,8 @@ func TestBuildBatch(t *testing.T) {
 				tc.srcPrices,
 				tc.dstPrices,
 				func() (*big.Int, error) { return tc.destGasPrice, nil },
-				map[common.Address]common.Address{},
+				tc.srcToDestTokens,
+				tc.destRateLimits,
 			)
 			assert.Equal(t, tc.expectedSeqNrs, seqNrs)
 		})
@@ -706,6 +732,126 @@ func Test_calculateObservedMessagesConsensus(t *testing.T) {
 				return res[i].SeqNr < res[j].SeqNr
 			})
 			assert.Equalf(t, tt.want, res, "calculateObservedMessagesConsensus(%v, %v)", tt.args.observations, tt.args.f)
+		})
+	}
+}
+
+func Test_calculateMessageMaxGas(t *testing.T) {
+	type args struct {
+		gasLimit    *big.Int
+		numRequests int
+		dataLen     int
+		numTokens   int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    uint64
+		wantErr bool
+	}{
+		{
+			name:    "base",
+			args:    args{gasLimit: big.NewInt(1000), numRequests: 5, dataLen: 5, numTokens: 2},
+			want:    112700,
+			wantErr: false,
+		},
+		{
+			name:    "large",
+			args:    args{gasLimit: big.NewInt(1000), numRequests: 1000, dataLen: 1000, numTokens: 1000},
+			want:    36391540,
+			wantErr: false,
+		},
+		{
+			name:    "gas limit overflow",
+			args:    args{gasLimit: big.NewInt(0).Mul(big.NewInt(math.MaxInt64), big.NewInt(math.MaxInt64))},
+			want:    36391540,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := calculateMessageMaxGas(tt.args.gasLimit, tt.args.numRequests, tt.args.dataLen, tt.args.numTokens)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equalf(t, tt.want, got, "calculateMessageMaxGas(%v, %v, %v, %v)", tt.args.gasLimit, tt.args.numRequests, tt.args.dataLen, tt.args.numTokens)
+		})
+	}
+}
+
+func TestExecutionReportingPlugin_tokenPoolRateLimitValidation(t *testing.T) {
+	testCases := []struct {
+		name                    string
+		destTokenPoolRateLimits map[common.Address]*big.Int
+		tokenAmounts            []evm_2_evm_offramp.ClientEVMTokenAmount
+		inflightTokenAmounts    map[common.Address]*big.Int
+		srcToDestToken          map[common.Address]common.Address
+		exp                     bool
+	}{
+		{
+			name: "base",
+			destTokenPoolRateLimits: map[common.Address]*big.Int{
+				common.HexToAddress("10"): big.NewInt(100),
+				common.HexToAddress("20"): big.NewInt(50),
+			},
+			tokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{
+				{Token: common.HexToAddress("1"), Amount: big.NewInt(50)},
+				{Token: common.HexToAddress("2"), Amount: big.NewInt(20)},
+			},
+			srcToDestToken: map[common.Address]common.Address{
+				common.HexToAddress("1"): common.HexToAddress("10"),
+				common.HexToAddress("2"): common.HexToAddress("20"),
+			},
+			inflightTokenAmounts: map[common.Address]*big.Int{
+				common.HexToAddress("1"): big.NewInt(20),
+				common.HexToAddress("2"): big.NewInt(30),
+			},
+			exp: true,
+		},
+		{
+			name: "rate limit hit",
+			destTokenPoolRateLimits: map[common.Address]*big.Int{
+				common.HexToAddress("10"): big.NewInt(100),
+				common.HexToAddress("20"): big.NewInt(50),
+			},
+			srcToDestToken: map[common.Address]common.Address{
+				common.HexToAddress("1"): common.HexToAddress("10"),
+				common.HexToAddress("2"): common.HexToAddress("20"),
+			},
+			tokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{
+				{Token: common.HexToAddress("1"), Amount: big.NewInt(50)},
+				{Token: common.HexToAddress("2"), Amount: big.NewInt(51)},
+			},
+			exp: true,
+		},
+		{
+			name: "rate limit hit, inflight included",
+			destTokenPoolRateLimits: map[common.Address]*big.Int{
+				common.HexToAddress("10"): big.NewInt(100),
+				common.HexToAddress("20"): big.NewInt(50),
+			},
+			srcToDestToken: map[common.Address]common.Address{
+				common.HexToAddress("1"): common.HexToAddress("10"),
+				common.HexToAddress("2"): common.HexToAddress("20"),
+			},
+			tokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{
+				{Token: common.HexToAddress("1"), Amount: big.NewInt(50)},
+				{Token: common.HexToAddress("2"), Amount: big.NewInt(20)},
+			},
+			inflightTokenAmounts: map[common.Address]*big.Int{
+				common.HexToAddress("1"): big.NewInt(51),
+				common.HexToAddress("2"): big.NewInt(30),
+			},
+			exp: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &ExecutionReportingPlugin{lggr: logger.TestLogger(t)}
+			p.isRateLimitReachedForTokenPool(tc.destTokenPoolRateLimits, tc.tokenAmounts, tc.inflightTokenAmounts, tc.srcToDestToken)
 		})
 	}
 }

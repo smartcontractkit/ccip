@@ -49,3 +49,9 @@ func (o *ObservedEVM2EVMOfframp) CurrentRateLimiterState(opts *bind.CallOpts) (e
 		return o.EVM2EVMOffRampInterface.CurrentRateLimiterState(opts)
 	})
 }
+
+func (o *ObservedEVM2EVMOfframp) GetPoolByDestToken(opts *bind.CallOpts, destToken common.Address) (common.Address, error) {
+	return withObservedContract(o.metric, "GetPoolByDestToken", func() (common.Address, error) {
+		return o.EVM2EVMOffRampInterface.GetPoolByDestToken(opts, destToken)
+	})
+}
