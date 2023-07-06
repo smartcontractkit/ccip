@@ -739,7 +739,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 			// false makes Search keep looking to the right, always including any "erroring" ObservedMessage and allowing us to detect in the bottom
 			return false
 		}
-		return len(encoded) > MaxObservationLength
+		return len(encoded) > MaxExecutionReportLength
 	})
 	if err != nil {
 		return nil, err
