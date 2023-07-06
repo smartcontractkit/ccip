@@ -711,6 +711,7 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x3e44ba19e932F4985983994DFa1Bd01f2a2f8eE2"), // BetaUser - Folks Finance
 		gethcommon.HexToAddress("0xB573315f912a7e31A8d37054641c031c3c6A9eb9"), // BetaUser - Whitehole Finance
 		gethcommon.HexToAddress("0x3D3F14b31eb5a86a64Eb7951CcAdBE9471eaAd23"), // BetaUser - Yieldification
+		gethcommon.HexToAddress("0x495aca962984F9F969BBf9a4EfB34a72515CF00C"), // BetaUser - Neobred
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.CCIP_BnM: {
