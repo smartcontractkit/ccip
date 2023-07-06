@@ -119,6 +119,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x38104E1bB27A06306B72162047F585B3e6D27484"), // BetaUser - Oddz
 		gethcommon.HexToAddress("0x789d7f3e2eaA6de41133A7fB11d7390603645F31"), // BetaUser - Galaxis
 		gethcommon.HexToAddress("0xB1d5b1A03b2A76b80990F58551e95Fe7b29255BB"), // BetaUser - OpenXYZ
+		gethcommon.HexToAddress("0x9B4a955444776f24FD976B9044Faf2FF902cD035"), // BetaUser - Yieldification
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
@@ -709,6 +710,7 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"), // Synthetix v3 core
 		gethcommon.HexToAddress("0x3e44ba19e932F4985983994DFa1Bd01f2a2f8eE2"), // BetaUser - Folks Finance
 		gethcommon.HexToAddress("0xB573315f912a7e31A8d37054641c031c3c6A9eb9"), // BetaUser - Whitehole Finance
+		gethcommon.HexToAddress("0x3D3F14b31eb5a86a64Eb7951CcAdBE9471eaAd23"), // BetaUser - Yieldification
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.CCIP_BnM: {
