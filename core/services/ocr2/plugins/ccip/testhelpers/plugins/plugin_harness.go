@@ -46,8 +46,9 @@ type CCIPPluginTestHarness struct {
 	testhelpers.CCIPContracts
 	Lggr logger.Logger
 
-	SourceLP logpoller.LogPollerTest
-	DestLP   logpoller.LogPollerTest
+	SourceLP   logpoller.LogPollerTest
+	DestLP     logpoller.LogPollerTest
+	DestClient evmclient.Client
 
 	CommitOnchainConfig ccipconfig.CommitOnchainConfig
 	ExecOnchainConfig   ccipconfig.ExecOnchainConfig
@@ -153,9 +154,9 @@ func SetupCCIPTestHarness(t *testing.T) CCIPPluginTestHarness {
 		CCIPContracts: c,
 		Lggr:          lggr,
 
-		SourceLP: sourceLP,
-		DestLP:   destLP,
-
+		SourceLP:            sourceLP,
+		DestLP:              destLP,
+		DestClient:          evmclient.NewSimulatedBackendClient(t, c.Dest.Chain, new(big.Int).SetUint64(c.Dest.ChainID)),
 		CommitOnchainConfig: commitOnchainConfig,
 		ExecOnchainConfig:   execOnchainConfig,
 	}

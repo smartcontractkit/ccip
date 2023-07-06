@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
@@ -244,28 +245,28 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	// Since this will only increase over time, the highest observed value will
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
-	allowedTokenAmount := LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+	getAllowedTokenAmount := LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
 		return r.config.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 	})
 	srcToDstTokens, supportedDestTokens, err := r.sourceDestinationTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
-	srcTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
+	getSrcTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
 		srcFeeTokens, err1 := r.cachedSrcFeeTokens.Get(ctx)
 		if err1 != nil {
 			return nil, err1
 		}
 		return getTokensPrices(ctx, srcFeeTokens, r.config.srcPriceRegistry, []common.Address{r.config.srcWrappedNativeToken})
 	})
-	destTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
+	getDestTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
 		dstTokens, err1 := r.cachedDstTokens.Get(ctx)
 		if err1 != nil {
 			return nil, err1
 		}
 		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	})
-	destGasPrice := LazyFetch(func() (*big.Int, error) {
+	getDestGasPrice := LazyFetch(func() (*big.Int, error) {
 		return r.estimateDestinationGasPrice(ctx)
 	})
 
@@ -280,6 +281,10 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
+
+	getDestPoolRateLimits := LazyFetch(func() (map[common.Address]*big.Int, error) {
+		return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, srcToDstTokens)
+	})
 
 	for _, rep := range unexpiredReportsWithSendReqs {
 		if ctx.Err() != nil {
@@ -324,23 +329,28 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			continue
 		}
 
-		allowedTokenAmountValue, err := allowedTokenAmount()
+		allowedTokenAmountValue, err := getAllowedTokenAmount()
 		if err != nil {
 			return nil, err
 		}
-		srcTokensPricesValue, err := srcTokensPrices()
+		srcTokensPricesValue, err := getSrcTokensPrices()
 		if err != nil {
 			return nil, err
 		}
 
-		destTokensPricesValue, err := destTokensPrices()
+		destTokensPricesValue, err := getDestTokensPrices()
+		if err != nil {
+			return nil, err
+		}
+
+		destPoolRateLimits, err := getDestPoolRateLimits()
 		if err != nil {
 			return nil, err
 		}
 
 		buildBatchDuration := time.Now()
 		batch := r.buildBatch(rootLggr, rep, inflight, allowedTokenAmountValue.Tokens,
-			srcTokensPricesValue, destTokensPricesValue, destGasPrice, srcToDstTokens)
+			srcTokensPricesValue, destTokensPricesValue, getDestGasPrice, srcToDstTokens, destPoolRateLimits)
 		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 		if len(batch) != 0 {
 			return batch, nil
@@ -348,6 +358,43 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		r.snoozedRoots[merkleRoot] = time.Now().Add(r.offchainConfig.RootSnoozeTime.Duration())
 	}
 	return []ObservedMessage{}, nil
+}
+
+func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commitReports []commitReportWithSendRequests, srcToDstToken map[common.Address]common.Address) (map[common.Address]*big.Int, error) {
+	dstTokens := make(map[common.Address]struct{}) // todo: replace with a set or uniqueSlice data structure
+	for _, msg := range commitReports {
+		for _, req := range msg.sendRequestsWithMeta {
+			for _, tk := range req.TokenAmounts {
+				if dstToken, exists := srcToDstToken[tk.Token]; exists {
+					dstTokens[dstToken] = struct{}{}
+					continue
+				}
+				r.lggr.Warnw("token not found on destination chain", "sourceToken", tk)
+			}
+		}
+	}
+
+	res := make(map[common.Address]*big.Int, len(dstTokens))
+
+	for dstToken := range dstTokens {
+		poolAddress, err := r.config.offRamp.GetPoolByDestToken(&bind.CallOpts{Context: ctx}, dstToken)
+		if err != nil {
+			return nil, fmt.Errorf("get pool by dest token (%s): %w", dstToken, err)
+		}
+
+		tokenPool, err := custom_token_pool.NewCustomTokenPool(poolAddress, r.config.destClient)
+		if err != nil {
+			return nil, fmt.Errorf("new custom dest token pool %s: %w", poolAddress, err)
+		}
+
+		rateLimiterState, err := tokenPool.CurrentOffRampRateLimiterState(&bind.CallOpts{Context: ctx}, r.config.offRamp.Address())
+		if err != nil {
+			return nil, fmt.Errorf("get rate off ramp rate limiter state: %w", err)
+		}
+		res[dstToken] = rateLimiterState.Tokens
+	}
+
+	return res, nil
 }
 
 func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (*big.Int, error) {
@@ -416,8 +463,9 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	destTokenPricesUSD map[common.Address]*big.Int,
 	execGasPriceEstimate LazyFunction[*big.Int],
 	srcToDestToken map[common.Address]common.Address,
+	destTokenPoolRateLimits map[common.Address]*big.Int,
 ) (executableMessages []ObservedMessage) {
-	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, err := inflightAggregates(inflight, destTokenPricesUSD, srcToDestToken)
+	inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, inflightTokenAmounts, err := inflightAggregates(inflight, destTokenPricesUSD, srcToDestToken)
 	if err != nil {
 		lggr.Errorw("Unexpected error computing inflight values", "err", err)
 		return []ObservedMessage{}
@@ -425,6 +473,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
 	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
 	expectedNonces := make(map[common.Address]uint64)
+
 	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
 		if msg.executed && msg.finalized {
@@ -456,6 +505,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			msgLggr.Warnw("Skipping message invalid nonce", "have", msg.Nonce, "want", expectedNonces[msg.Sender])
 			continue
 		}
+
+		if !r.isRateLimitReachedForTokenPool(destTokenPoolRateLimits, msg.TokenAmounts, inflightTokenAmounts, srcToDestToken) {
+			msgLggr.Warnw("Skipping message token pool rate limit hit")
+			continue
+		}
+
 		msgValue, err := aggregateTokenValue(destTokenPricesUSD, srcToDestToken, msg.TokenAmounts)
 		if err != nil {
 			msgLggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
@@ -518,6 +573,16 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		}
 		availableGas -= messageMaxGas
 		aggregateTokenLimit.Sub(aggregateTokenLimit, msgValue)
+		for _, tk := range msg.TokenAmounts {
+			dstToken, exists := srcToDestToken[tk.Token]
+			if !exists {
+				msgLggr.Warnw("destination token does not exist", "token", tk.Token)
+				continue
+			}
+			if rl, exists := destTokenPoolRateLimits[dstToken]; exists {
+				destTokenPoolRateLimits[dstToken] = rl.Sub(rl, tk.Amount)
+			}
+		}
 
 		var tokenData [][]byte
 
@@ -532,6 +597,49 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		expectedNonces[msg.Sender] = msg.Nonce + 1
 	}
 	return executableMessages
+}
+
+func (r *ExecutionReportingPlugin) isRateLimitReachedForTokenPool(
+	destTokenPoolRateLimits map[common.Address]*big.Int,
+	srcTokenAmounts []evm_2_evm_offramp.ClientEVMTokenAmount,
+	inflightTokenAmounts map[common.Address]*big.Int,
+	srcToDestToken map[common.Address]common.Address,
+) bool {
+	rateLimitsCopy := make(map[common.Address]*big.Int)
+	for dstToken, rl := range destTokenPoolRateLimits {
+		rateLimitsCopy[dstToken] = new(big.Int).Set(rl)
+	}
+
+	for srcToken, amount := range inflightTokenAmounts {
+		if destToken, exists := srcToDestToken[srcToken]; exists {
+			if rl, exists := rateLimitsCopy[destToken]; exists {
+				rateLimitsCopy[destToken] = rl.Sub(rl, amount)
+			}
+		}
+	}
+
+	for _, srcToken := range srcTokenAmounts {
+		destToken, exists := srcToDestToken[srcToken.Token]
+		if !exists {
+			r.lggr.Warnw("dest token not found", "sourceToken", srcToken.Token)
+			continue
+		}
+
+		rl, exists := rateLimitsCopy[destToken]
+		if !exists {
+			r.lggr.Warnw("rate limit not found for token", "token", destToken)
+			continue
+		}
+
+		if rl.Cmp(srcToken.Amount) < 0 {
+			r.lggr.Warnw("token pool rate limit reached",
+				"token", srcToken.Token, "destToken", destToken, "amount", srcToken.Amount, "rateLimit", rl)
+			return false
+		}
+		rateLimitsCopy[destToken] = rl.Sub(rl, srcToken.Amount)
+	}
+
+	return true
 }
 
 func calculateMessageMaxGas(gasLimit *big.Int, numRequests, dataLen, numTokens int) (uint64, error) {
@@ -906,25 +1014,35 @@ func inflightAggregates(
 	inflight []InflightInternalExecutionReport,
 	destTokenPrices map[common.Address]*big.Int,
 	srcToDst map[common.Address]common.Address,
-) (map[uint64]struct{}, *big.Int, map[common.Address]uint64, error) {
+) (map[uint64]struct{}, *big.Int, map[common.Address]uint64, map[common.Address]*big.Int, error) {
 	inflightSeqNrs := make(map[uint64]struct{})
 	inflightAggregateValue := big.NewInt(0)
 	maxInflightSenderNonces := make(map[common.Address]uint64)
+	inflightTokenAmounts := make(map[common.Address]*big.Int)
+
 	for _, rep := range inflight {
 		for _, message := range rep.messages {
 			inflightSeqNrs[message.SequenceNumber] = struct{}{}
 			msgValue, err := aggregateTokenValue(destTokenPrices, srcToDst, message.TokenAmounts)
 			if err != nil {
-				return nil, nil, nil, err
+				return nil, nil, nil, nil, err
 			}
 			inflightAggregateValue.Add(inflightAggregateValue, msgValue)
 			maxInflightSenderNonce, ok := maxInflightSenderNonces[message.Sender]
 			if !ok || message.Nonce > maxInflightSenderNonce {
 				maxInflightSenderNonces[message.Sender] = message.Nonce
 			}
+
+			for _, tk := range message.TokenAmounts {
+				if rl, exists := inflightTokenAmounts[tk.Token]; exists {
+					inflightTokenAmounts[tk.Token] = rl.Sub(rl, tk.Amount)
+				} else {
+					inflightTokenAmounts[tk.Token] = new(big.Int).Set(tk.Amount)
+				}
+			}
 		}
 	}
-	return inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, nil
+	return inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, inflightTokenAmounts, nil
 }
 
 // getTokensPrices returns token prices of the given price registry,
