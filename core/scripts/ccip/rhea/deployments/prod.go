@@ -156,21 +156,12 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			Decimals:      rhea.BondToken.Decimals(),
 			TokenPoolType: rhea.LockRelease,
 		},
-		rhea.CCIPTEST_BnM: {
+		rhea.CCIP_BnM: {
 			// NOTE this should be the custom burn_mint_erc677_helper contract, not the default burn_mint_erc677
-			Token:    gethcommon.HexToAddress("0x091e170E01B05556C8B1BD5f6a865c7E9a3dfe4D"),
-			Pool:     gethcommon.HexToAddress("0xd61bec16fdeb2cd304df8fed54acd592faceb839"),
-			Price:    rhea.CCIPTEST_BnM.Price(),
-			Decimals: rhea.CCIPTEST_BnM.Decimals(),
-			// Wrapped is used to ensure new pool deployments will automatically grant burn/mint permissions
-			TokenPoolType: rhea.Wrapped,
-		},
-		rhea.CCIPTEST_LnM: {
-			// NOTE this should be the custom burn_mint_erc677_helper contract, not the default burn_mint_erc677
-			Token:    gethcommon.HexToAddress("0xD7239b8035813e528033567888C1A004E1A4BC3f"),
-			Pool:     gethcommon.HexToAddress("0xf353d8c95ec5243210429f50353709ae53979e8b"),
-			Price:    rhea.CCIPTEST_LnM.Price(),
-			Decimals: rhea.CCIPTEST_LnM.Decimals(),
+			Token:    gethcommon.HexToAddress("0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05"),
+			Pool:     gethcommon.HexToAddress("0x38d1ef9619cd40cf5482c045660ae7c82ada062c"),
+			Price:    rhea.CCIP_BnM.Price(),
+			Decimals: rhea.CCIP_BnM.Decimals(),
 			// Wrapped is used to ensure new pool deployments will automatically grant burn/mint permissions
 			TokenPoolType: rhea.Wrapped,
 		},
@@ -200,6 +191,15 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			Price:         rhea.WETH.Price(),
 			Decimals:      rhea.WETH.Decimals(),
 			TokenPoolType: rhea.FeeTokenOnly,
+		},
+		rhea.CCIP_LnM: {
+			// NOTE this should be the custom burn_mint_erc677_helper contract, not the default burn_mint_erc677
+			Token:    gethcommon.HexToAddress("0x466D489b6d36E7E3b824ef491C225F5830E81cC1"),
+			Pool:     gethcommon.HexToAddress("0x3637220fccd067927766a40475f2e8fade33f590"),
+			Price:    rhea.CCIP_LnM.Price(),
+			Decimals: rhea.CCIP_LnM.Decimals(),
+			// Wrapped is used to ensure new pool deployments will automatically grant burn/mint permissions
+			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.SNXUSD: {
 			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
@@ -340,20 +340,13 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 			Decimals:      rhea.Alongside.Decimals(),
 			TokenPoolType: rhea.BurnMint,
 		},
-		rhea.CCIPTEST_BnM: {
+		rhea.CCIP_BnM: {
 			// NOTE this should be the custom burn_mint_erc677_helper contract, not the default burn_mint_erc677
-			Token:    gethcommon.HexToAddress("0x93117C269831F2d36B38E1a6a2ce6327d44cb72B"),
-			Pool:     gethcommon.HexToAddress("0xa180f426638487202dadf9d435011c38a23e70b3"),
-			Price:    rhea.CCIPTEST_BnM.Price(),
-			Decimals: rhea.CCIPTEST_BnM.Decimals(),
+			Token:    gethcommon.HexToAddress("0xaBfE9D11A2f1D61990D1d253EC98B5Da00304F16"),
+			Pool:     gethcommon.HexToAddress("0x8668ab4eb1dffe11db7491ebce633b050bb29cda"),
+			Price:    rhea.CCIP_BnM.Price(),
+			Decimals: rhea.CCIP_BnM.Decimals(),
 			// Wrapped is used to ensure new pool deployments will automatically grant burn/mint permissions
-			TokenPoolType: rhea.Wrapped,
-		},
-		rhea.CCIPTEST_LnM: {
-			Token:         gethcommon.HexToAddress("0x35de75d9b20065966a98b6c01ca396021d9e5dc1"),
-			Pool:          gethcommon.HexToAddress("0x78283a0b7db8682847b5b51cdcce073f64ea8faf"),
-			Price:         rhea.CCIPTEST_LnM.Price(),
-			Decimals:      rhea.CCIPTEST_LnM.Decimals(),
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.LINK: {
@@ -368,6 +361,13 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 			Price:         rhea.WETH.Price(),
 			Decimals:      rhea.WETH.Decimals(),
 			TokenPoolType: rhea.FeeTokenOnly,
+		},
+		rhea.CCIP_LnM: {
+			Token:         gethcommon.HexToAddress("0x835833d556299cdec623e7980e7369145b037591"),
+			Pool:          gethcommon.HexToAddress("0xf66d20ac7b981e249fce8fb8ddae3974f5559735"),
+			Price:         rhea.CCIP_LnM.Price(),
+			Decimals:      rhea.CCIP_LnM.Decimals(),
+			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.SNXUSD: {
 			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
@@ -556,20 +556,13 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 			Decimals:      rhea.BondToken.Decimals(),
 			TokenPoolType: rhea.Wrapped,
 		},
-		rhea.CCIPTEST_BnM: {
+		rhea.CCIP_BnM: {
 			// NOTE this should be the custom burn_mint_erc677_helper contract, not the default burn_mint_erc677
-			Token:    gethcommon.HexToAddress("0xf0D9E6806981A6897472359C24B42a9524d6DA34"),
-			Pool:     gethcommon.HexToAddress("0xc6898155809338af6bf71ecface1217d88a58499"),
-			Price:    rhea.CCIPTEST_BnM.Price(),
-			Decimals: rhea.CCIPTEST_BnM.Decimals(),
+			Token:    gethcommon.HexToAddress("0xD21341536c5cF5EB1bcb58f6723cE26e8D8E90e4"),
+			Pool:     gethcommon.HexToAddress("0xec1062cbdf4fbf31b3a6aac62b6f6f123bb70e12"),
+			Price:    rhea.CCIP_BnM.Price(),
+			Decimals: rhea.CCIP_BnM.Decimals(),
 			// Wrapped is used to ensure new pool deployments will automatically grant burn/mint permissions
-			TokenPoolType: rhea.Wrapped,
-		},
-		rhea.CCIPTEST_LnM: {
-			Token:         gethcommon.HexToAddress("0x7ae6532ee8aa287119f4ba73a383010cbcfe3cfa"),
-			Pool:          gethcommon.HexToAddress("0xf312b636d7d97dfa7fd51564973cb90270ac0c58"),
-			Price:         rhea.CCIPTEST_LnM.Price(),
-			Decimals:      rhea.CCIPTEST_LnM.Decimals(),
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.FUGAZIUSDC: {
@@ -598,6 +591,13 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 			Price:         rhea.WAVAX.Price(),
 			Decimals:      rhea.WAVAX.Decimals(),
 			TokenPoolType: rhea.FeeTokenOnly,
+		},
+		rhea.CCIP_LnM: {
+			Token:         gethcommon.HexToAddress("0x70f5c5c40b873ea597776da2c21929a8282a3b35"),
+			Pool:          gethcommon.HexToAddress("0x583dbe5f15dea93f321826d856994e53e01cd498"),
+			Price:         rhea.CCIP_LnM.Price(),
+			Decimals:      rhea.CCIP_LnM.Decimals(),
+			TokenPoolType: rhea.Wrapped,
 		},
 		//rhea.CACHEGOLD: {
 		//	Token:         gethcommon.HexToAddress("0xD16eD805F3eCe986d9541afaD3E59De2F3732517"),
@@ -711,20 +711,13 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xB573315f912a7e31A8d37054641c031c3c6A9eb9"), // BetaUser - Whitehole Finance
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
-		rhea.CCIPTEST_BnM: {
+		rhea.CCIP_BnM: {
 			// NOTE this should be the custom burn_mint_erc677_helper contract, not the default burn_mint_erc677
-			Token:    gethcommon.HexToAddress("0x552a6D7131F3425e48f313003aA2fd08596d9663"),
-			Pool:     gethcommon.HexToAddress("0x6246820116a5a46958f703e7f903592195611035"),
-			Price:    rhea.CCIPTEST_BnM.Price(),
-			Decimals: rhea.CCIPTEST_BnM.Decimals(),
+			Token:    gethcommon.HexToAddress("0x0579b4c1C8AcbfF13c6253f1B10d66896Bf399Ef"),
+			Pool:     gethcommon.HexToAddress("0xf399f6a4ea83442f97f480118ebd56d1aed767b9"),
+			Price:    rhea.CCIP_BnM.Price(),
+			Decimals: rhea.CCIP_BnM.Decimals(),
 			// Wrapped is used to ensure new pool deployments will automatically grant burn/mint permissions
-			TokenPoolType: rhea.Wrapped,
-		},
-		rhea.CCIPTEST_LnM: {
-			Token:         gethcommon.HexToAddress("0xd0122db1fff5a7d9407d1f3c644c7fdb94ec83b1"),
-			Pool:          gethcommon.HexToAddress("0x287276c9f60546ab39ff8948086e3e79555238fb"),
-			Price:         rhea.CCIPTEST_LnM.Price(),
-			Decimals:      rhea.CCIPTEST_LnM.Decimals(),
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.LINK: {
@@ -739,6 +732,13 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 			Price:         rhea.WETH.Price(),
 			Decimals:      rhea.WETH.Decimals(),
 			TokenPoolType: rhea.FeeTokenOnly,
+		},
+		rhea.CCIP_LnM: {
+			Token:         gethcommon.HexToAddress("0x0e14dbe2c8e1121902208be173a3fb91bb125cdb"),
+			Pool:          gethcommon.HexToAddress("0xa77aefaba6161f907299dc2be79a60c9e80e9b91"),
+			Price:         rhea.CCIP_LnM.Price(),
+			Decimals:      rhea.CCIP_LnM.Decimals(),
+			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.SNXUSD: {
 			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
@@ -854,20 +854,13 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x789d7f3e2eaA6de41133A7fB11d7390603645F31"), // BetaUser - Galaxis
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
-		rhea.CCIPTEST_BnM: {
+		rhea.CCIP_BnM: {
 			// NOTE this should be the custom burn_mint_erc677_helper contract, not the default burn_mint_erc677
-			Token:    gethcommon.HexToAddress("0x260AF9b83e0d2Bb6C9015fC9f0BfF8858A0CCE68"),
-			Pool:     gethcommon.HexToAddress("0x4d20536e60832be579cd38e89dc03d11e1741fba"),
-			Price:    rhea.CCIPTEST_BnM.Price(),
-			Decimals: rhea.CCIPTEST_BnM.Decimals(),
+			Token:    gethcommon.HexToAddress("0xf1E3A5842EeEF51F2967b3F05D45DD4f4205FF40"),
+			Pool:     gethcommon.HexToAddress("0xa6c88f12ae1aa9c333e86ccbdd2957cac2e5f58c"),
+			Price:    rhea.CCIP_BnM.Price(),
+			Decimals: rhea.CCIP_BnM.Decimals(),
 			// Wrapped is used to ensure new pool deployments will automatically grant burn/mint permissions
-			TokenPoolType: rhea.Wrapped,
-		},
-		rhea.CCIPTEST_LnM: {
-			Token:         gethcommon.HexToAddress("0xd4f309a3aee05cf1be08144488d9abbe38dde27e"),
-			Pool:          gethcommon.HexToAddress("0xf5ae5ac023dd75e89b08fd241a7aec3ea4a7138a"),
-			Price:         rhea.CCIPTEST_LnM.Price(),
-			Decimals:      rhea.CCIPTEST_LnM.Decimals(),
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.LINK: {
@@ -882,6 +875,13 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 			Price:         rhea.WMATIC.Price(),
 			Decimals:      rhea.WMATIC.Decimals(),
 			TokenPoolType: rhea.FeeTokenOnly,
+		},
+		rhea.CCIP_LnM: {
+			Token:         gethcommon.HexToAddress("0xc1c76a8c5bfde1be034bbcd930c668726e7c1987"),
+			Pool:          gethcommon.HexToAddress("0x83369f8586ba000a87db278549b9a2370dc626b6"),
+			Price:         rhea.CCIP_LnM.Price(),
+			Decimals:      rhea.CCIP_LnM.Decimals(),
+			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.SNXUSD: {
 			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),

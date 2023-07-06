@@ -103,23 +103,23 @@ func GetCCIPChainSelector(EVMChainId uint64) uint64 {
 type Token string
 
 const (
-	LINK         Token = "Link"
-	WETH         Token = "WETH"
-	WAVAX        Token = "WAVAX"
-	WMATIC       Token = "WMATIC"
-	CACHEGOLD    Token = "CACHE.gold"
-	ANZ          Token = "ANZ"
-	InsurAce     Token = "InsurAce"
-	ZUSD         Token = "zUSD"
-	STEADY       Token = "STEADY"
-	SUPER        Token = "SUPER"
-	BondToken    Token = "BondToken"
-	BankToken    Token = "BankToken"
-	SNXUSD       Token = "snxUSD"
-	FUGAZIUSDC   Token = "FugaziUSDCToken"
-	Alongside    Token = "Alongside"
-	CCIPTEST_BnM Token = "CCIPTEST-BnM"
-	CCIPTEST_LnM Token = "CCIPTEST-LnM"
+	LINK       Token = "Link"
+	WETH       Token = "WETH"
+	WAVAX      Token = "WAVAX"
+	WMATIC     Token = "WMATIC"
+	CACHEGOLD  Token = "CACHE.gold"
+	ANZ        Token = "ANZ"
+	InsurAce   Token = "InsurAce"
+	ZUSD       Token = "zUSD"
+	STEADY     Token = "STEADY"
+	SUPER      Token = "SUPER"
+	BondToken  Token = "BondToken"
+	BankToken  Token = "BankToken"
+	SNXUSD     Token = "snxUSD"
+	FUGAZIUSDC Token = "FugaziUSDCToken"
+	Alongside  Token = "Alongside"
+	CCIP_BnM   Token = "CCIP-BnM"
+	CCIP_LnM   Token = "clCCIP-LnM"
 )
 
 func GetAllTokens() []Token {
@@ -129,28 +129,28 @@ func GetAllTokens() []Token {
 		InsurAce, ZUSD, STEADY,
 		SUPER, BondToken, BankToken,
 		SNXUSD, FUGAZIUSDC, Alongside,
-		CCIPTEST_BnM, CCIPTEST_LnM,
+		CCIP_BnM, CCIP_LnM,
 	}
 }
 
 var tokenSymbols = map[Token]string{
-	LINK:         "LINK",
-	WETH:         "wETH",
-	WAVAX:        "wAVAX",
-	WMATIC:       "wMATIC",
-	CACHEGOLD:    "CGT",
-	ANZ:          "A$DC",
-	InsurAce:     "INSUR",
-	ZUSD:         "zUSD",
-	STEADY:       "Steadefi",
-	SUPER:        "SuperDuper",
-	BondToken:    "BondToken",
-	BankToken:    "BankToken",
-	SNXUSD:       "snxUSD",
-	FUGAZIUSDC:   "FUGAZIUSDC",
-	Alongside:    "AMKT",
-	CCIPTEST_BnM: "CCIPTEST-BnM",
-	CCIPTEST_LnM: "clCCIPTEST-LnM",
+	LINK:       "LINK",
+	WETH:       "wETH",
+	WAVAX:      "wAVAX",
+	WMATIC:     "wMATIC",
+	CACHEGOLD:  "CGT",
+	ANZ:        "A$DC",
+	InsurAce:   "INSUR",
+	ZUSD:       "zUSD",
+	STEADY:     "Steadefi",
+	SUPER:      "SuperDuper",
+	BondToken:  "BondToken",
+	BankToken:  "BankToken",
+	SNXUSD:     "snxUSD",
+	FUGAZIUSDC: "FUGAZIUSDC",
+	Alongside:  "AMKT",
+	CCIP_BnM:   "CCIP-BnM",
+	CCIP_LnM:   "clCCIP-LnM",
 }
 
 func (token Token) Symbol() string {
@@ -158,23 +158,23 @@ func (token Token) Symbol() string {
 }
 
 var tokenDecimalMultiplier = map[Token]uint8{
-	LINK:         18,
-	WETH:         18,
-	WAVAX:        18,
-	WMATIC:       18,
-	CACHEGOLD:    8,
-	ANZ:          6,
-	InsurAce:     18,
-	ZUSD:         18,
-	STEADY:       18,
-	SUPER:        18,
-	BondToken:    18,
-	BankToken:    18,
-	SNXUSD:       18,
-	FUGAZIUSDC:   6,
-	Alongside:    18,
-	CCIPTEST_BnM: 18,
-	CCIPTEST_LnM: 18,
+	LINK:       18,
+	WETH:       18,
+	WAVAX:      18,
+	WMATIC:     18,
+	CACHEGOLD:  8,
+	ANZ:        6,
+	InsurAce:   18,
+	ZUSD:       18,
+	STEADY:     18,
+	SUPER:      18,
+	BondToken:  18,
+	BankToken:  18,
+	SNXUSD:     18,
+	FUGAZIUSDC: 6,
+	Alongside:  18,
+	CCIP_BnM:   18,
+	CCIP_LnM:   18,
 }
 
 func (token Token) Decimals() uint8 {
@@ -186,23 +186,23 @@ func (token Token) Decimals() uint8 {
 func (token Token) Price() *big.Int {
 	// Token prices in $ per whole coin
 	var TokenPrices = map[Token]*big.Float{
-		LINK:         big.NewFloat(6.5),
-		WETH:         big.NewFloat(1800),
-		WAVAX:        big.NewFloat(15),
-		WMATIC:       big.NewFloat(0.85),
-		CACHEGOLD:    big.NewFloat(60),
-		ANZ:          big.NewFloat(1),
-		InsurAce:     big.NewFloat(0.08),
-		ZUSD:         big.NewFloat(1),
-		STEADY:       big.NewFloat(1),
-		SUPER:        big.NewFloat(1),
-		BondToken:    big.NewFloat(1),
-		BankToken:    big.NewFloat(1),
-		SNXUSD:       big.NewFloat(1),
-		FUGAZIUSDC:   big.NewFloat(1),
-		Alongside:    big.NewFloat(1),
-		CCIPTEST_BnM: big.NewFloat(0.000000001),
-		CCIPTEST_LnM: big.NewFloat(0.000000001),
+		LINK:       big.NewFloat(6.5),
+		WETH:       big.NewFloat(1800),
+		WAVAX:      big.NewFloat(15),
+		WMATIC:     big.NewFloat(0.85),
+		CACHEGOLD:  big.NewFloat(60),
+		ANZ:        big.NewFloat(1),
+		InsurAce:   big.NewFloat(0.08),
+		ZUSD:       big.NewFloat(1),
+		STEADY:     big.NewFloat(1),
+		SUPER:      big.NewFloat(1),
+		BondToken:  big.NewFloat(1),
+		BankToken:  big.NewFloat(1),
+		SNXUSD:     big.NewFloat(1),
+		FUGAZIUSDC: big.NewFloat(1),
+		Alongside:  big.NewFloat(1),
+		CCIP_BnM:   big.NewFloat(0.0000000001),
+		CCIP_LnM:   big.NewFloat(0.0000000001),
 	}
 
 	tokenValue := big.NewInt(0)
