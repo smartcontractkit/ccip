@@ -38,9 +38,9 @@
           "receiver_dapp": "0xc96aEdd80da0E5C204fA52446b00624817C8718B"
         },
         "43114" : {
-            "off_ramp": "0xe93Cfa6Eb853E5A337e7Ae2f66704118033824cd",
-            "commit_store": "0xA70136619F945b2A9a2d60719436a4877dc96d3e",
-            "receiver_dapp": "0x16673CFb93Dc33dE90830EaF856E557Ca18Bf897"
+          "off_ramp": "0xe93Cfa6Eb853E5A337e7Ae2f66704118033824cd",
+          "commit_store": "0xA70136619F945b2A9a2d60719436a4877dc96d3e",
+          "receiver_dapp": "0x16673CFb93Dc33dE90830EaF856E557Ca18Bf897"
         },
         "137": {
           "off_ramp": "0xFe0B8E2f3eD168D36b4024C65E9BE287583938fe",
@@ -164,217 +164,222 @@
     },
     "Avalanche Fuji": {
       "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
-      "fee_token_pool": "0xec92ae3ec1b4d181274e18968d0ce86ecc666816",
+      "fee_token_pool": "0x658af0d8ecbb13c5fd5b545ac7316e50cc07cf6e",
       "bridge_tokens": [
         "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"
       ],
       "bridge_tokens_pools": [
-        "0xec92ae3ec1b4d181274e18968d0ce86ecc666816"
+        "0x658af0d8ecbb13c5fd5b545ac7316e50cc07cf6e"
       ],
-      "arm": "0xfbb354af29227e457bbd429518e13e12a4592a16",
-      "router": "0xf1440b81dca34efacdcd6ce0ab6c9a4a345c76a4",
-      "price_registry": "0x300f28dde11b34c549914a0b055015dd3ac8cfcb",
+      "arm": "0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f",
+      "arm_proxy" : "0xac8cfc3762a979628334a0e4c1026244498e821b",
+      "router": "0x554472a2720e5e7d5d3c817529aba05eed5f82d8",
+      "price_registry": "0xe42ecce39ce5bd2bbf2443660ba6979eeafd48df",
       "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
       "src_contracts": {
         "11155111": {
-          "on_ramp": "0xd80316ca70237f02fd4d7441b5a760b0c649504a",
-          "deployed_at": 23152645
+          "on_ramp": "0xa799c1855875e79b2e1752412058b485ee51aec4",
+          "deployed_at": 23753755
         },
         "420" : {
-            "on_ramp": "0x69ac932291a99dac0066f87468e89cec04ef81c1",
-            "deployed_at": 23152103
+          "on_ramp": "0x097076fbd8573418c77d2600606ad063c0e3cc7c",
+          "deployed_at": 23755228
         },
         "80001" : {
-            "on_ramp": "0x699659380b9aaa8f5b8e365142aabadb3e1f36c9",
-            "deployed_at": 23147915
+          "on_ramp": "0x762aabc808270fadfdd9e4186739920d68106673",
+          "deployed_at": 23754063
         }
       },
       "dest_contracts": {
         "11155111": {
-          "off_ramp": "0xec277a6482d37531204755ea3ce959a29254f649",
-          "commit_store": "0x3684bd4f3b46d5dba5de15dcaecb7fdf7954c53c",
+          "off_ramp": "0x61c67e7b7c90ed1a44dabb26c33900270df7a144",
+          "commit_store": "0xb4407405465a5dab21fe6e6b748b42a2dccc5e9d",
           "receiver_dapp": "0x19910CB895d3F611c4143B80bC194C52ebFaA60A"
         },
         "420" : {
-            "off_ramp": "0xfe3023ade053cf70b3f016ac5541feb0508ef8b6",
-            "commit_store": "0x774df4e314b2b2ec0af3185df65ea1df1c30c254",
-            "receiver_dapp": "0x1C23955C7770E4fF85Cd806520A7Ce6A69745E96"
+          "off_ramp": "0x0f287140d86335b37ae2ad0707992ecd4202d5b7",
+          "commit_store": "0x5a7fa03e52628a0a6f0ab637f10ba45b68f9ad33",
+          "receiver_dapp": "0x1C23955C7770E4fF85Cd806520A7Ce6A69745E96"
         },
         "80001": {
-          "off_ramp": "0x99c7080e72d0f53297ef2b0f79189380bb592004",
-          "commit_store": "0xdf309892689a29a6f38e7474a5d792bdafff5da4",
+          "off_ramp": "0x31cf2040d53f178d168997c658d1a7fc5fa7d215",
+          "commit_store": "0xa60821b061116054672d102c0b59290910fb51e2",
           "receiver_dapp": "0x58100cF5d6432037f391bEb9b2D0f791Da0E4d02"
         }
       }
     },
     "Sepolia Testnet": {
       "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
-      "fee_token_pool": "0x56a9f4b3b88acdb2021ec06a5bf8f96d3a0e9afd",
+      "fee_token_pool": "0x5344b4bf5ae39038a591866d2853b2b1db622911",
       "bridge_tokens": [
         "0x779877A7B0D9E8603169DdbD7836e478b4624789"
       ],
       "bridge_tokens_pools": [
-        "0x56a9f4b3b88acdb2021ec06a5bf8f96d3a0e9afd"
+        "0x5344b4bf5ae39038a591866d2853b2b1db622911"
       ],
-      "arm": "0x0a708698fe8e000248f7ab579c3e2f9b304d8a4d",
-      "router": "0x366e98df2881543185ece04dacffde417c7d2f1d",
-      "price_registry": "0x4b00c4e0bb7f94006eac355674743c05908925f0",
+      "arm": "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
+      "arm_proxy" : "0xba3f6251de62ded61ff98590cb2fdf6871fbb991",
+      "router": "0xd0daae2231e9cb96b94c8512223533293c3693bf",
+      "price_registry": "0x8737a1c3d55779d03b7a08188e97af87b4110946",
       "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
       "src_contracts": {
         "43113": {
-          "on_ramp": "0x8eaae2b66628adf5b4edd92ab7710bcc883d763e",
-          "deployed_at": 3703495
+          "on_ramp": "0xe42ecce39ce5bd2bbf2443660ba6979eeafd48df",
+          "deployed_at": 3816446
         },
         "420" : {
-            "on_ramp": "0xa180f426638487202dadf9d435011c38a23e70b3",
-            "deployed_at": 3702451
+          "on_ramp": "0x365408d655a6cdf8bc668fd6cebe1bb16a403ca6",
+          "deployed_at": 3816777
         },
         "421613" : {
-            "on_ramp": "0xa98988a9669cbefd7ac49d7c3439dedadcacad3f",
-            "deployed_at": 3702542
+          "on_ramp": "0x2c0b51f491ceaefe8c24c0199fce62d7b040470a",
+          "deployed_at": 3816651
         },
         "80001" : {
-            "on_ramp": "0x74fe926f1f77b2ad56215749e844bae7e74b5ac1",
-            "deployed_at": 3702649
+          "on_ramp": "0x23438be3256369316e53fd2ef1cd2bdfaf22f6ad",
+          "deployed_at": 3819110
         }
       },
       "dest_contracts": {
         "43113": {
-          "off_ramp": "0xce59d27ae5858bac16c06eace63a8354758291e8",
-          "commit_store": "0x1b07783af7073c6b58111fdcaf2077a06f48eb48",
+          "off_ramp": "0x1f06781450e994b0005ce2922fca78e2c72d4353",
+          "commit_store": "0xf3855a07bf75c4e0b4ddbeb7784badc9dd2ca274",
           "receiver_dapp": "0xBB1Ac68B35D4DE11Ea110Ed14D07054c0F101432"
         },
         "420" : {
-            "off_ramp": "0x9944c0d00fab49cd01afb540410eeefcad12c2c7",
-            "commit_store": "0x57fed6013fedb202243fddc91514064e8da97612",
-            "receiver_dapp": "0x59d7ec1883DbCc5510943A0788D5d437f5D1743d"
+          "off_ramp": "0x0d3299ee55d493b8d9aafc834a6fd5dcbc4a409a",
+          "commit_store": "0x1576d23f986ecb572a4c839ba6758ca05c1eadc2",
+          "receiver_dapp": "0x59d7ec1883DbCc5510943A0788D5d437f5D1743d"
         },
         "421613" : {
-            "off_ramp": "0xe3220d0b5feaff2cfa1e1f1ee94f85c6bfa65fe7",
-            "commit_store": "0x053ddadacc4e5eb5c3b14962bb24bda93776801d",
-            "receiver_dapp": "0xa2428b38A9aa97b663d3B8411Bd3df2675f22714"
+          "off_ramp": "0x1d649a11fa14024f9fa2058a6b5b473ea308b688",
+          "commit_store": "0xc677d898f06cee7b5f6ecbd0f72df5125cebbfc9",
+          "receiver_dapp": "0xa2428b38A9aa97b663d3B8411Bd3df2675f22714"
         },
         "80001" : {
-            "off_ramp": "0x4452ad7d67f1f16a2e2f01c5211cf6427b389710",
-            "commit_store": "0x74d82d16fa89e133ee0b79eb9c282d709c8d9c6d",
-            "receiver_dapp": "0x5529276B5D53496B98CFde5C8FF2F577d88E9aC7"
+          "off_ramp": "0x026fb7c16f1d0082809ff2335715f27e1e074ff6",
+          "commit_store": "0x290789a55e2e26480f9c04c583d1d5c682aba49a",
+          "receiver_dapp": "0x5529276B5D53496B98CFde5C8FF2F577d88E9aC7"
         }
       }
     },
     "Optimism Goerli": {
       "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
-      "fee_token_pool": "0x9297aab356e7d387080b856b20231ccea5d33bfe",
+      "fee_token_pool": "0xdecfaf632175915bdf38c00d9d9746e8a90a56c4",
       "bridge_tokens": [
         "0xdc2CC710e42857672E7907CF474a69B63B93089f"
       ],
       "bridge_tokens_pools": [
-        "0x9297aab356e7d387080b856b20231ccea5d33bfe"
+        "0xdecfaf632175915bdf38c00d9d9746e8a90a56c4"
       ],
-      "arm": "0x03f3d6e14e59b1592fc842b49d9add27f7be845d",
-      "router": "0x8ec5ad6cb5496dae52d2e80cd59fa78d066626d6",
-      "price_registry": "0x3bcd6bd4afe640ddca583de7e78d3af8ab0fa672",
+      "arm": "0xeaf6968fab9c54ac31c3679f120705b5019d3546",
+      "arm_proxy" : "0x4eb4dbdb3c3b56e5e209abf9c424a3834f2087d0",
+      "router": "0xeb52e9ae4a9fb37172978642d4c141ef53876f26",
+      "price_registry": "0x490f3b46fba6af0d7499867a73469a077251c2bb",
       "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
         "43113": {
-          "on_ramp": "0x693bf39c0924dfddf4e832c2d449a8aeb1124c76",
-          "deployed_at": 10741010
+          "on_ramp": "0xf33303166911ff86ad1a5ea94d459b4ba0ba8cc9",
+          "deployed_at": 11482157
         },
         "11155111" : {
-            "on_ramp": "0xdae0492a49f5fecda1e54848eb8afd38a9c1ee77",
-            "deployed_at": 10735117
+          "on_ramp": "0x64877f0b53e801adeb8d65f9706f7b134b82971c",
+          "deployed_at": 11482670
         },
         "421613" : {
-            "on_ramp": "0xdde1b190c21a9c194152fd60a3eba36c6ce2728c",
-            "deployed_at": 10736952
+          "on_ramp": "0x6bb8d729c35f29df532eb3998ddace336187c84b",
+          "deployed_at": 11481052
         }
       },
       "dest_contracts": {
         "43113": {
-          "off_ramp": "0xc453afac62fa5888c0db5514ff48178a8c443e9e",
-          "commit_store": "0x5f6286fa03030738951e1041226fb71123713eae",
+          "off_ramp": "0xee8ce182ea0c0edecf06c2a032a17b2058fc5a04",
+          "commit_store": "0x2980de4ce178bc8bb6840abd2ef0e2a7c8e7272f",
           "receiver_dapp": "0x18992693d445f70dc931e5711b0732c569951397"
         },
         "11155111" : {
-            "off_ramp": "0x66d585f8d3affed1e2db1e73a8727b65d6c01ec3",
-            "commit_store": "0xde4f64f3745648325fa849ea4c46496a275a7db5",
-            "receiver_dapp": "0x766f4279A17c65452E9f25Aa6d9eC75ca8B1a241"
+          "off_ramp": "0xdc4606e96c37b877f2c9ddda82104c85a198a82d",
+          "commit_store": "0xb7019c10bd604768c9cf5b3d086a2e661559a189",
+          "receiver_dapp": "0x766f4279A17c65452E9f25Aa6d9eC75ca8B1a241"
         },
         "421613" : {
-            "off_ramp": "0xad1a60707d8e1bc453bd31a0707a91a5827c90e3",
-            "commit_store": "0x5bf6f3769f744f450ee11fa84315d9abc14644ee",
-            "receiver_dapp": "0xF4b300716856e468f584163937E26aEda5741eCB"
+          "off_ramp": "0xee55842b1d68224d9eef238d4736e851db613630",
+          "commit_store": "0x4f57b2d4b3b42f09cd7ef48254d2c31b6b525763",
+          "receiver_dapp": "0xF4b300716856e468f584163937E26aEda5741eCB"
         }
       }
     },
     "Arbitrum Goerli" : {
-        "fee_token": "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
-        "fee_token_pool": "0x95b2d6e4119cc7d1832a7190b0126d034b642c6c",
-        "bridge_tokens": [
-            "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28"
-        ],
-        "bridge_tokens_pools": [
-            "0x95b2d6e4119cc7d1832a7190b0126d034b642c6c"
-        ],
-        "arm": "0xa132fc1eea603ba25f8be96b474246f60625330d",
-        "router": "0x651ef69f635f5017e281c2ee09cdd4436560c89e",
-        "price_registry": "0x8d482ecbe85bd0ef13d8c56e0d83e93ccf0d66c8",
-        "wrapped_native": "0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a",
-        "src_contracts": {
-            "420": {
-              "on_ramp": "0xb498caafd7fa2bfd7ec0540c000542484bd8bba3",
-              "deployed_at": 26305339
-            },
-            "11155111" : {
-                "on_ramp": "0xcb07846c37adaf8e90bd53f648ac25b0baaf970b",
-                "deployed_at": 26300243
-            }
+      "fee_token": "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
+      "fee_token_pool": "0x044a6b4b561af69d2319a2f4be5ec327a6975d0a",
+      "bridge_tokens": [
+        "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28"
+      ],
+      "bridge_tokens_pools": [
+        "0x044a6b4b561af69d2319a2f4be5ec327a6975d0a"
+      ],
+      "arm": "0x8af4204e30565df93352fe8e1de78925f6664da7",
+      "arm_proxy" : "0x3cc9364260d80f09ccac1ee6b07366db598900e6",
+      "router": "0x88e492127709447a5abefdab8788a15b4567589e",
+      "price_registry": "0x114a20a10b43d4115e5aeef7345a1a71d2a60c57",
+      "wrapped_native": "0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a",
+      "src_contracts": {
+        "420": {
+          "on_ramp": "0x782a7ba95215f2f7c3dd4c153cbb2ae3ec2d3215",
+          "deployed_at": 29167620
         },
-        "dest_contracts": {
-            "420": {
-              "off_ramp": "0x917a6913f785094f8b06785aa8a884f922a650d8",
-              "commit_store": "0xa5007c13b7df93e7647ffd671b9982cdced4e7ff",
-              "receiver_dapp": "0x68c13fEe38e7a28019a88Bee52477C9402D71104"
-            },
-          "11155111" : {
-                "off_ramp": "0x60fa2ab7b549f1d1220a5b4969f83adab3abc071",
-                "commit_store": "0x473336c120f463a7295921754deda0455c8c80e9",
-                "receiver_dapp": "0xEF6a6f52D0fC494Fb59Ee9C1813AF38c7F8d9278"
-          }
+        "11155111" : {
+          "on_ramp": "0xc8b93b46bf682c39b3f65aa1c135bc8a95a5e43a",
+          "deployed_at": 29170089
         }
+      },
+      "dest_contracts": {
+        "420": {
+          "off_ramp": "0xff4b0c64c50d2d7b444cb28699df03ed4bbaf44f",
+          "commit_store": "0xb69923dfb790e622084b774b99bb45f68904d6a4",
+          "receiver_dapp": "0x68c13fEe38e7a28019a88Bee52477C9402D71104"
+        },
+        "11155111" : {
+          "off_ramp": "0x7a0bb92bc8663abe6296d0162a9b41a2cb2e0358",
+          "commit_store": "0x7eef73aca8657aaefd509a97ee75aa6740046e75",
+          "receiver_dapp": "0xEF6a6f52D0fC494Fb59Ee9C1813AF38c7F8d9278"
+        }
+      }
     },
     "Polygon Mumbai" : {
       "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
-      "fee_token_pool": "0x6b0b8f7a4230abb678515e339c56ddb4e41be137",
+      "fee_token_pool": "0x6fce09b2e74f649a4494a1844219cb0d86cfe8b7",
       "bridge_tokens": [
         "0x326C977E6efc84E512bB9C30f76E30c160eD06FB"
       ],
       "bridge_tokens_pools": [
-        "0x6b0b8f7a4230abb678515e339c56ddb4e41be137"
+        "0x6fce09b2e74f649a4494a1844219cb0d86cfe8b7"
       ],
-      "arm": "0x77e87c108f73cfe3e480463c42d6910fda215229",
-      "router": "0x43a2a4c2ecb74ff45eca704a14111d8f2b1c0fa0",
-      "price_registry": "0x9853a2e16adb1a7169a42d6a8079b3bb77322e4c",
+      "arm": "0x917a6913f785094f8b06785aa8a884f922a650d8",
+      "arm_proxy" : "0x235ce3408845a4767a2eaa2a3d8ef0848d283f1f",
+      "router": "0x70499c328e1e2a3c41108bd3730f6670a44595d1",
+      "price_registry": "0x9bd312170aa145ef98453940dc9ab894235b063e",
       "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
       "src_contracts": {
         "43113": {
-          "on_ramp": "0xf1686d99f337fd5b02ed0dda8a3f9e31bf17b447",
+          "on_ramp": "0x48601a62aa4cb289d006ff4c14023e9d8a7e5a88",
           "deployed_at": 36910973
         },
         "11155111" : {
-            "on_ramp": "0xef0eb69b4add3da3489b6260e69e7b789fb168f4",
-            "deployed_at": 36910655
+          "on_ramp": "0xa83f2cecb391779b59022eded6ebba0d7ec01f20",
+          "deployed_at": 37526794
         }
       },
       "dest_contracts": {
         "43113": {
-          "off_ramp": "0x0a36795b3006f50088c11ea45b960a1b0406f03b",
-          "commit_store": "0x012815759d188b3fc48ef36b53b920c55353c04b",
+          "off_ramp": "0xf11e96f85e1038c429d32a877e2225d37cde10e2",
+          "commit_store": "0x6b6b328cb1467d906389a1bbe54359c56000422c",
           "receiver_dapp": "0xf8B335b847B4DFBB57dd0c0a2F440CD1251FebA3"
         },
         "11155111" : {
-            "off_ramp": "0x8318a45d769fcffa103163a2a5edce9da118a191",
-            "commit_store": "0xd42be8af3761dc2cb547b91e8c1b80067243ecfe",
-            "receiver_dapp": "0x7d829100e7752E3928BCEeddcAAc655536157Fdd"
+          "off_ramp": "0xbe582db704bd387222c70ca2e5a027e5e2c06fb7",
+          "commit_store": "0xf06ff5d2084295909119ca541e93635e7d582ffc",
+          "receiver_dapp": "0x7d829100e7752E3928BCEeddcAAc655536157Fdd"
         }
       }
     }

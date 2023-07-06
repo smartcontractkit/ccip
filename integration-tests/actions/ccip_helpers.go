@@ -797,21 +797,36 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	if err != nil {
 		return time.Time{}, err
 	}
-	// poll for finalized block after estimated finality time
-	ticker := time.NewTicker(sourceCCIP.Common.FinalityTimeOnChain)
-	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), FinalityTimeout)
 	defer cancel()
+	headerChn := make(chan *blockchain.SafeEVMHeader)
+	sub, err := sourceCCIP.Common.ChainClient.SubscribeNewHeaders(context.Background(), headerChn)
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer sub.Unsubscribe()
 	prevFinalizedBlockNum := ""
 	for {
 		select {
-		case <-ticker.C:
+		// each time a new header is received, check if the block is finalized
+		case newHdr := <-headerChn:
+			if sourceCCIP.Common.ChainClient.GetNetworkConfig().FinalityDepth > 0 {
+				if newHdr.Number.Cmp(new(big.Int).Add(hdr.Number,
+					big.NewInt(int64(sourceCCIP.Common.ChainClient.GetNetworkConfig().FinalityDepth)))) < 0 {
+					lggr.Info().
+						Str("Current Block", newHdr.Number.String()).
+						Str("Tx block", hdr.Number.String()).
+						Uint64("Finality Depth", sourceCCIP.Common.ChainClient.GetNetworkConfig().FinalityDepth).
+						Msg("Still Waiting for CCIPSendRequested event log to be finalized")
+					continue
+				}
+			}
 			finalizedHdr, err := sourceCCIP.Common.ChainClient.GetLatestFinalizedBlockHeader(context.Background())
 			if err != nil {
 				return time.Time{}, err
 			}
 			if finalizedHdr.Number.Cmp(hdr.Number) >= 0 {
-				finalizedAt := time.Now().UTC()
+				finalizedAt := newHdr.Timestamp.UTC()
 				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(prevEventAt), testreporters.Success,
 					testreporters.SendTransactionStats{
 						TxHash:           SendRequested.Raw.TxHash.String(),
@@ -859,7 +874,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 			sourceCCIP.CCIPSendRequestedWatcherMu.Unlock()
 			if ok && sendRequested != nil {
 				hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(sendRequested.Raw.BlockNumber)))
-				receivedAt := time.Now()
+				receivedAt := time.Now().UTC()
 				if err == nil {
 					receivedAt = hdr.Timestamp
 				}
@@ -1325,8 +1340,8 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 			destCCIP.ReportAcceptedWatcherMu.Lock()
 			reportAccepted, ok := destCCIP.ReportAcceptedWatcher[seqNum]
 			destCCIP.ReportAcceptedWatcherMu.Unlock()
-			receivedAt := time.Now().UTC()
 			if ok && reportAccepted != nil {
+				receivedAt := time.Now().UTC()
 				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(
 					context.Background(), big.NewInt(int64(reportAccepted.Raw.BlockNumber)))
 				if err == nil {
@@ -1334,8 +1349,18 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 				}
 
 				totalTime := receivedAt.Sub(prevEventAt)
+				// we cannot calculate the exact time at which block was finalized
+				// as a result sometimes we get a time which is slightly after the block was marked as finalized
+				// in such cases we get a negative time difference between finalized and report accepted if the commit
+				// has happened almost immediately after block being finalized
+				// in such cases we set the time difference to 1 second
 				if totalTime < 0 {
-					totalTime = 0
+					lggr.Warn().
+						Uint64("seqNum", seqNum).
+						Time("finalized at", prevEventAt).
+						Time("ReportAccepted at", receivedAt).
+						Msg("ReportAccepted event received before finalized timestamp")
+					totalTime = time.Second
 				}
 				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, totalTime, testreporters.Success)
 				return &reportAccepted.Report, receivedAt, nil

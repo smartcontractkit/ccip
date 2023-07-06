@@ -279,6 +279,7 @@ var (
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 		FinalityDepth:             550,
+		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
 	}
 
 	// PolygonMumbai https://mumbai.polygonscan.com/
@@ -293,6 +294,7 @@ var (
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 		FinalityDepth:             550,
+		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
 	}
 
 	AvalancheMainnet blockchain.EVMNetwork = blockchain.EVMNetwork{
@@ -305,7 +307,8 @@ var (
 		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
-		FinalityTag:               true,
+		// though Avalanche has finality tag enabled, it is not accurate at the moment, so we use finality depth instead
+		FinalityDepth: 35,
 	}
 
 	AvalancheFuji = blockchain.EVMNetwork{
@@ -318,7 +321,8 @@ var (
 		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
-		FinalityTag:               true,
+		// though Avalanche has finality tag enabled, it is not accurate at the moment, so we use finality depth instead
+		FinalityDepth: 35,
 	}
 
 	Quorum = blockchain.EVMNetwork{

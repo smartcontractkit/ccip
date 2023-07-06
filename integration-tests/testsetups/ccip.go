@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
@@ -99,6 +100,7 @@ type CCIPTestConfig struct {
 	PhaseTimeout            time.Duration
 	TestDuration            time.Duration
 	ExistingDeployment      bool
+	ExistingEnv             string
 	ReuseContracts          bool
 	SequentialLaneAddition  bool
 	NodeFunding             *big.Float
@@ -362,6 +364,14 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			p.ReuseContracts = e
 		}
 	}
+	if p.ExistingDeployment {
+		envName, _ := utils.GetEnv("CCIP_EXISTING_ENV")
+		if envName != "" {
+			p.ExistingEnv = envName
+		} else {
+			p.ExistingEnv = fmt.Sprintf("Existing-Deployment-%s", uuid.NewString()[0:5])
+		}
+	}
 
 	if allError != nil {
 		t.Fatal(allError)
@@ -405,7 +415,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	t := o.Cfg.Test
 	var k8Env *environment.Environment
 	ccipEnv := o.Env
-	namespace := "existing"
+	namespace := o.Cfg.ExistingEnv
 	if ccipEnv != nil {
 		k8Env = ccipEnv.K8Env
 		namespace = k8Env.Cfg.Namespace

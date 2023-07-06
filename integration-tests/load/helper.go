@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/chainlink-env/chaos"
 	"github.com/smartcontractkit/wasp"
@@ -156,7 +155,7 @@ func (l *loadArgs) Start() {
 	go func() {
 		defer l.LoadStarterWg.Done()
 		loadCount := 0
-		namespace := fmt.Sprintf("Existing-Deployment-%s", uuid.NewString()[0:5])
+		namespace := l.TestCfg.ExistingEnv
 		for {
 			select {
 			case cfg := <-l.LaneLoadCfg:
