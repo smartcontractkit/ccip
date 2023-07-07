@@ -471,7 +471,6 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		return []ObservedMessage{}
 	}
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
-	aggregateTokenLimit.Sub(aggregateTokenLimit, inflightAggregateValue)
 	expectedNonces := make(map[common.Address]uint64)
 
 	for _, msg := range report.sendRequestsWithMeta {
@@ -517,8 +516,8 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 		// if token limit is smaller than message value skip message
-		if aggregateTokenLimit.Cmp(msgValue) == -1 {
-			msgLggr.Warnw("token limit is smaller than message value", "aggregateTokenLimit", aggregateTokenLimit.String(), "msgValue", msgValue.String())
+		if tokensLeft, hasCapacity := hasEnoughTokens(aggregateTokenLimit, msgValue, inflightAggregateValue); !hasCapacity {
+			msgLggr.Warnw("token limit is smaller than message value", "aggregateTokenLimit", tokensLeft.String(), "msgValue", msgValue.String())
 			continue
 		}
 		// Fee boosting
@@ -640,6 +639,11 @@ func (r *ExecutionReportingPlugin) isRateLimitReachedForTokenPool(
 	}
 
 	return true
+}
+
+func hasEnoughTokens(tokenLimit *big.Int, msgValue *big.Int, inflightValue *big.Int) (*big.Int, bool) {
+	tokensLeft := big.NewInt(0).Sub(tokenLimit, inflightValue)
+	return tokensLeft, tokensLeft.Cmp(msgValue) >= 0
 }
 
 func calculateMessageMaxGas(gasLimit *big.Int, numRequests, dataLen, numTokens int) (uint64, error) {

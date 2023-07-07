@@ -555,6 +555,10 @@ func TestBuildBatch(t *testing.T) {
 		{Token: srcNative, Amount: big.NewInt(100)},
 	}
 
+	msg5 := msg4
+	msg5.SequenceNumber = msg5.SequenceNumber + 1
+	msg5.Nonce = msg5.Nonce + 1
+
 	var tt = []struct {
 		name                     string
 		reqs                     []evm2EVMOnRampCCIPSendRequestedWithMeta
@@ -636,6 +640,39 @@ func TestBuildBatch(t *testing.T) {
 				srcNative: destNative,
 			},
 			expectedSeqNrs: nil,
+		},
+		{
+			name:         "message with tokens is not executed if limit is reached",
+			reqs:         []evm2EVMOnRampCCIPSendRequestedWithMeta{msg4},
+			inflight:     []InflightInternalExecutionReport{},
+			tokenLimit:   big.NewInt(2),
+			destGasPrice: big.NewInt(10),
+			srcPrices:    map[common.Address]*big.Int{srcNative: big.NewInt(1e18)},
+			dstPrices:    map[common.Address]*big.Int{destNative: big.NewInt(1e18)},
+			srcToDestTokens: map[common.Address]common.Address{
+				srcNative: destNative,
+			},
+			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			expectedSeqNrs:        nil,
+		},
+		{
+			name: "message with tokens is not executed if limit is reached when inflight is full",
+			reqs: []evm2EVMOnRampCCIPSendRequestedWithMeta{msg5},
+			inflight: []InflightInternalExecutionReport{
+				{
+					createdAt: time.Now(),
+					messages:  []evm_2_evm_offramp.InternalEVM2EVMMessage{msg4.InternalEVM2EVMMessage},
+				},
+			},
+			tokenLimit:   big.NewInt(19),
+			destGasPrice: big.NewInt(10),
+			srcPrices:    map[common.Address]*big.Int{srcNative: big.NewInt(1e18)},
+			dstPrices:    map[common.Address]*big.Int{destNative: big.NewInt(1e18)},
+			srcToDestTokens: map[common.Address]common.Address{
+				srcNative: destNative,
+			},
+			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			expectedSeqNrs:        nil,
 		},
 	}
 
