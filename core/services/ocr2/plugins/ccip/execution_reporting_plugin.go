@@ -335,17 +335,17 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 		srcTokensPricesValue, err := getSrcTokensPrices()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get src token prices: %w", err)
 		}
 
 		destTokensPricesValue, err := getDestTokensPrices()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get dest token prices: %w", err)
 		}
 
 		destPoolRateLimits, err := getDestPoolRateLimits()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get dest pool rate limits: %w", err)
 		}
 
 		buildBatchDuration := time.Now()
@@ -1054,15 +1054,34 @@ func inflightAggregates(
 // price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
 func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegistry price_registry.PriceRegistryInterface, tokens []common.Address) (map[common.Address]*big.Int, error) {
+	priceRegistryAddress := priceRegistry.Address()
 	prices := make(map[common.Address]*big.Int)
 
 	wantedTokens := append(feeTokens, tokens...)
-	wantedPrices, err := priceRegistry.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
+	fetchedPrices, err := priceRegistry.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not get token prices of %v", wantedTokens)
 	}
+
+	// price registry should always return a price per token ordered by input tokens
+	if len(fetchedPrices) != len(wantedTokens) {
+		return nil, fmt.Errorf("token prices length exp=%d actual=%d", len(wantedTokens), len(fetchedPrices))
+	}
+
 	for i, token := range wantedTokens {
-		prices[token] = wantedPrices[i].Value
+		// price of a token can never be zero
+		if fetchedPrices[i].Value.BitLen() == 0 {
+			return nil, fmt.Errorf("price of token %s is zero (price registry=%s)", token, priceRegistryAddress)
+		}
+
+		// price registry should not report different price for the same token
+		price, exists := prices[token]
+		if exists && fetchedPrices[i].Value.Cmp(price) != 0 {
+			return nil, fmt.Errorf("price registry reported different prices (%s and %s) for the same token %s",
+				fetchedPrices[i].Value, price, token)
+		}
+
+		prices[token] = fetchedPrices[i].Value
 	}
 
 	return prices, nil

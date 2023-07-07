@@ -572,6 +572,10 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 					///   * 1 ETH = 2,000 USD per token -> 2_000e18
 					UsdPerToken: big.NewInt(5e18),
 				},
+				{
+					SourceToken: sourceCCIP.Common.WrappedNative,
+					UsdPerToken: big.NewInt(1e18),
+				},
 			},
 		}
 		for i, token := range sourceCCIP.Common.BridgeTokens {
@@ -1056,6 +1060,10 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 					///   * 1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
 					///   * 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 					UsdPerToken: big.NewInt(5e18),
+				},
+				{
+					SourceToken: destCCIP.Common.WrappedNative,
+					UsdPerToken: big.NewInt(1e18),
 				},
 			},
 		}
@@ -1876,6 +1884,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	tokenUSDMap[lane.Dest.Common.FeeToken.Address()] = LinkToUSD.String()
 	tokenUSDMap[lane.Source.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
+	tokenUSDMap[lane.Dest.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
 	log.Info().Interface("tokenUSDMap", tokenUSDMap).Msg("tokenUSDMap")
 
 	// first node is the bootstrapper

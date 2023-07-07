@@ -344,6 +344,10 @@ func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 				SourceToken: c.Dest.LinkToken.Address(),
 				UsdPerToken: big.NewInt(8e18), // 8usd
 			},
+			{
+				SourceToken: c.Dest.WrappedNative.Address(),
+				UsdPerToken: big.NewInt(1e18), // 1usd
+			},
 		},
 		DestChainSelector: c.Source.ChainID,
 		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
@@ -832,7 +836,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 			},
 			{
 				SourceToken: sourceWeth9addr,
-				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)), // 2000usd
+				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2)), // TODO make this 2000USD and once we figure out the fee and exec cost discrepancy
 			},
 		},
 		DestChainSelector: destChainID,
@@ -962,10 +966,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPCon
 
 	destPrices := price_registry.InternalPriceUpdates{
 		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: destLinkTokenAddress,
-				UsdPerToken: big.NewInt(8e18), // 8usd
-			},
+			{SourceToken: destLinkTokenAddress, UsdPerToken: big.NewInt(8e18)},   // 8usd
+			{SourceToken: destCustomTokenAddress, UsdPerToken: big.NewInt(5e18)}, // 5usd
+			{SourceToken: destWeth9addr, UsdPerToken: big.NewInt(2e18)},          // 2usd
 		},
 		DestChainSelector: sourceChainID,
 		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9

@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
@@ -109,6 +110,16 @@ func SetupCCIPTestHarness(t *testing.T) CCIPPluginTestHarness {
 	_, err = c.Source.LinkToken.Approve(c.Source.User, c.Source.Router.Address(), testhelpers.Link(500))
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
+
+	_, err = c.Dest.PriceRegistry.UpdatePrices(c.Dest.User, price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{SourceToken: c.Dest.LinkToken.Address(), UsdPerToken: big.NewInt(5)},
+			{SourceToken: c.Dest.WrappedNative.Address(), UsdPerToken: big.NewInt(5)},
+		},
+		DestChainSelector: c.Dest.ChainID,
+		UsdPerUnitGas:     big.NewInt(1),
+	})
+	require.NoError(t, err)
 
 	// register filters in logPoller
 	require.NoError(t, sourceLP.RegisterFilter(logpoller.Filter{

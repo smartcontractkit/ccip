@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -791,6 +792,109 @@ func Test_calculateObservedMessagesConsensus(t *testing.T) {
 	}
 }
 
+func Test_getTokensPrices(t *testing.T) {
+	tk1 := common.HexToAddress("1")
+	tk2 := common.HexToAddress("2")
+	tk3 := common.HexToAddress("3")
+
+	testCases := []struct {
+		name      string
+		feeTokens []common.Address
+		tokens    []common.Address
+		retPrices []price_registry.InternalTimestampedUint192Value
+		expPrices map[common.Address]*big.Int
+		expErr    bool
+	}{
+		{
+			name:      "base",
+			feeTokens: []common.Address{tk1, tk2},
+			tokens:    []common.Address{tk3},
+			retPrices: []price_registry.InternalTimestampedUint192Value{
+				{Value: big.NewInt(10)},
+				{Value: big.NewInt(20)},
+				{Value: big.NewInt(30)},
+			},
+			expPrices: map[common.Address]*big.Int{
+				tk1: big.NewInt(10),
+				tk2: big.NewInt(20),
+				tk3: big.NewInt(30),
+			},
+			expErr: false,
+		},
+		{
+			name:      "token is both fee token and normal token",
+			feeTokens: []common.Address{tk1, tk2},
+			tokens:    []common.Address{tk3, tk1},
+			retPrices: []price_registry.InternalTimestampedUint192Value{
+				{Value: big.NewInt(10)},
+				{Value: big.NewInt(20)},
+				{Value: big.NewInt(30)},
+				{Value: big.NewInt(10)},
+			},
+			expPrices: map[common.Address]*big.Int{
+				tk1: big.NewInt(10),
+				tk2: big.NewInt(20),
+				tk3: big.NewInt(30),
+			},
+			expErr: false,
+		},
+		{
+			name:      "token is both fee token and normal token and price registry gave different price",
+			feeTokens: []common.Address{tk1, tk2},
+			tokens:    []common.Address{tk3, tk1},
+			retPrices: []price_registry.InternalTimestampedUint192Value{
+				{Value: big.NewInt(10)},
+				{Value: big.NewInt(20)},
+				{Value: big.NewInt(30)},
+				{Value: big.NewInt(1000)}, // different price for same token
+			},
+			expErr: true,
+		},
+		{
+			name:      "zero price should lead to an error",
+			feeTokens: []common.Address{tk1, tk2},
+			tokens:    []common.Address{tk3},
+			retPrices: []price_registry.InternalTimestampedUint192Value{
+				{Value: big.NewInt(10)},
+				{Value: big.NewInt(0)},
+				{Value: big.NewInt(30)},
+			},
+			expErr: true,
+		},
+		{
+			name:      "contract returns less prices than requested",
+			feeTokens: []common.Address{tk1, tk2},
+			tokens:    []common.Address{tk3},
+			retPrices: []price_registry.InternalTimestampedUint192Value{
+				{Value: big.NewInt(10)},
+				{Value: big.NewInt(20)},
+			},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			priceReg := mock_contracts.NewPriceRegistryInterface(t)
+
+			priceReg.On("GetTokenPrices", mock.Anything, append(tc.feeTokens, tc.tokens...)).
+				Return(tc.retPrices, nil)
+			priceReg.On("Address").Return(common.HexToAddress("1234"), nil)
+
+			prices, err := getTokensPrices(context.Background(), tc.feeTokens, priceReg, tc.tokens)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			for tk, price := range tc.expPrices {
+				assert.Equal(t, price, prices[tk])
+			}
+		})
+	}
+}
+
 func Test_calculateMessageMaxGas(t *testing.T) {
 	type args struct {
 		gasLimit    *big.Int
@@ -823,6 +927,7 @@ func Test_calculateMessageMaxGas(t *testing.T) {
 			wantErr: true,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := calculateMessageMaxGas(tt.args.gasLimit, tt.args.numRequests, tt.args.dataLen, tt.args.numTokens)

@@ -91,6 +91,13 @@ func TestComputeExecCost(t *testing.T) {
 			big.NewInt(6e15),
 			big.NewInt(384e12),
 		},
+		{
+			"zero token price",
+			big.NewInt(3_000_000),
+			big.NewInt(2e10),
+			big.NewInt(0),
+			big.NewInt(0),
+		},
 	}
 
 	for _, tc := range tests {
