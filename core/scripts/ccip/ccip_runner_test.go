@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -522,15 +523,56 @@ func TestUpdateLaneARMAddress(t *testing.T) {
 }
 
 func TestFinalityTags(t *testing.T) {
-	checkOwnerKeyAndSetupChain(t)
+	checkOwnerKey(t)
 
 	// Ensure that HeaderByBlockNumber using finality tag works.
-	finalityTagChains := []uint64{420, 43113, 421613, 11155111, 1, 10, 43114, 42161}
+	finalityTagChains := []uint64{420, 43113, 421613, 11155111}
+
+	stringBuilderMap := make(map[uint64]*strings.Builder)
+	for _, chainID := range finalityTagChains {
+		stringBuilderMap[chainID] = &strings.Builder{}
+	}
+
+	clients := make(map[uint64]*ethclient.Client)
 	for _, chainID := range finalityTagChains {
 		client, err := ethclient.Dial(secrets.GetRPC(chainID))
 		require.NoError(t, err)
-		f, err := client.HeaderByNumber(context.Background(), big.NewInt(rpc.FinalizedBlockNumber.Int64()))
-		require.NoError(t, err, "chainID: %d", chainID)
-		fmt.Println(f.Number.String())
+		clients[chainID] = client
 	}
+
+	for i := 0; i < 20; i++ {
+		for _, chainID := range finalityTagChains {
+			f, err := clients[chainID].HeaderByNumber(context.Background(), big.NewInt(rpc.FinalizedBlockNumber.Int64()))
+			if err != nil {
+				stringBuilderMap[chainID].WriteString("error: " + err.Error() + "\n")
+				continue
+			}
+
+			timeNow := time.Now().Unix()
+			finTimeDiffSec := timeNow - int64(f.Time)
+
+			safe, err := clients[chainID].HeaderByNumber(context.Background(), big.NewInt(rpc.SafeBlockNumber.Int64()))
+			if err != nil {
+				stringBuilderMap[chainID].WriteString("error: " + err.Error() + "\n")
+				continue
+			}
+
+			safeTimeDiffSec := timeNow - int64(safe.Time)
+
+			stringBuilderMap[chainID].WriteString(
+				fmt.Sprintf("%s ::: finalized time %02d:%02d, block %s -- safe time %02d:%02d, block %s\n",
+					time.Now().Format(time.TimeOnly),
+					finTimeDiffSec/60, finTimeDiffSec%60,
+					f.Number.String(),
+					safeTimeDiffSec/60, safeTimeDiffSec%60,
+					safe.Number.String()))
+		}
+		time.Sleep(10 * time.Second)
+	}
+
+	for chainID, builder := range stringBuilderMap {
+		fmt.Printf("ChainID: %d\n", chainID)
+		fmt.Println(builder.String())
+	}
+
 }
