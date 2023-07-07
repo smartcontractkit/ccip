@@ -120,6 +120,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x789d7f3e2eaA6de41133A7fB11d7390603645F31"), // BetaUser - Galaxis
 		gethcommon.HexToAddress("0xB1d5b1A03b2A76b80990F58551e95Fe7b29255BB"), // BetaUser - OpenXYZ
 		gethcommon.HexToAddress("0x9B4a955444776f24FD976B9044Faf2FF902cD035"), // BetaUser - Yieldification
+		gethcommon.HexToAddress("0xF57D158aA44B95E657bA4697fD69A2B9037bd723"), // BetaUser - AAVE
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
@@ -527,6 +528,7 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xA9cb37191A089C8f8c24fC3e1F2f761De93FA827"), // BetaUser - MintDAO - Sender (EOA)
 		gethcommon.HexToAddress("0xaFE336062eD69c108232c303fBa9b2b1c709fd9d"), // BetaUser - MintDAO - Sender (Proxy)
 		gethcommon.HexToAddress("0x3e44ba19e932F4985983994DFa1Bd01f2a2f8eE2"), // BetaUser - Folks Finance
+		gethcommon.HexToAddress("0xf369468Ff0AE765b64af729e3C61668b4aA5717b"), // BetaUser - AAVE
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.ANZ: {
