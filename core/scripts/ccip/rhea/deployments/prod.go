@@ -859,6 +859,7 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xA9cb37191A089C8f8c24fC3e1F2f761De93FA827"), // MintDAO - Sender (EOA)
 		gethcommon.HexToAddress("0xaFE336062eD69c108232c303fBa9b2b1c709fd9d"), // MintDAO - Sender (Proxy)
 		gethcommon.HexToAddress("0x789d7f3e2eaA6de41133A7fB11d7390603645F31"), // BetaUser - Galaxis
+		gethcommon.HexToAddress("0x6a327aFFDF7e100B27E072321eCe92c492c2B3C5"), // BetaUser - Neobred
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.CCIP_BnM: {
