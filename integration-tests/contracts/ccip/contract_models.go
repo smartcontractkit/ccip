@@ -63,7 +63,6 @@ func (l *LinkToken) Approve(to string, amount *big.Int) error {
 	if err != nil {
 		return err
 	}
-	opts.GasLimit = 500000
 	chain := l.client.GetNetworkConfig().Name
 	if chain == networks.ArbitrumGoerli.Name || chain == networks.ArbitrumMainnet.Name {
 		opts.GasLimit = 100000000

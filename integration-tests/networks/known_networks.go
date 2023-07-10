@@ -108,6 +108,7 @@ var (
 		GasEstimationBuffer:       0,
 		FinalityTag:               true,
 		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
+		DefaultGasLimit:           6000000,
 	}
 
 	// sepoliaTestnet https://sepolia.dev/
@@ -123,6 +124,7 @@ var (
 		GasEstimationBuffer:       1000,
 		FinalityTag:               true,
 		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
+		DefaultGasLimit:           6000000,
 	}
 
 	// goerliTestnet https://goerli.net/
@@ -199,6 +201,7 @@ var (
 		MinimumConfirmations:      0,
 		GasEstimationBuffer:       0,
 		FinalityTag:               true,
+		DefaultGasLimit:           100000000,
 	}
 
 	// arbitrumGoerli https://developer.offchainlabs.com/docs/public_chains
@@ -213,6 +216,7 @@ var (
 		MinimumConfirmations:      0,
 		GasEstimationBuffer:       0,
 		FinalityTag:               true,
+		DefaultGasLimit:           100000000,
 	}
 
 	OptimismMainnet blockchain.EVMNetwork = blockchain.EVMNetwork{
@@ -222,10 +226,11 @@ var (
 		ChainID:                   10,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: 5 * time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 		FinalityTag:               true,
+		DefaultGasLimit:           6000000,
 	}
 
 	// optimismGoerli https://dev.optimism.io/kovan-to-goerli/
@@ -241,6 +246,7 @@ var (
 		GasEstimationBuffer:       0,
 		FinalityTag:               true,
 		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
+		DefaultGasLimit:           6000000,
 	}
 
 	RSKMainnet blockchain.EVMNetwork = blockchain.EVMNetwork{
@@ -275,11 +281,12 @@ var (
 		ChainID:                   137,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{Duration: 2 * time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: 5 * time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 		FinalityDepth:             550,
 		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
+		DefaultGasLimit:           6000000,
 	}
 
 	// PolygonMumbai https://mumbai.polygonscan.com/
@@ -295,6 +302,7 @@ var (
 		GasEstimationBuffer:       1000,
 		FinalityDepth:             550,
 		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
+		DefaultGasLimit:           6000000,
 	}
 
 	AvalancheMainnet blockchain.EVMNetwork = blockchain.EVMNetwork{
@@ -308,7 +316,8 @@ var (
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 		// though Avalanche has finality tag enabled, it is not accurate at the moment, so we use finality depth instead
-		FinalityDepth: 35,
+		FinalityDepth:   35,
+		DefaultGasLimit: 6000000,
 	}
 
 	AvalancheFuji = blockchain.EVMNetwork{
@@ -322,7 +331,8 @@ var (
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 		// though Avalanche has finality tag enabled, it is not accurate at the moment, so we use finality depth instead
-		FinalityDepth: 35,
+		FinalityDepth:   35,
+		DefaultGasLimit: 6000000,
 	}
 
 	Quorum = blockchain.EVMNetwork{

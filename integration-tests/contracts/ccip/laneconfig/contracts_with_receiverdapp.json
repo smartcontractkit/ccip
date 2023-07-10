@@ -36,17 +36,17 @@
         "10": {
           "off_ramp": "0x41627a90f2c6238f2BADAB72D5aB050B857fdAb5",
           "commit_store": "0x8bEFCa744c6f2b567b1863dcF055C593afdC11A0",
-          "receiver_dapp": "0xAFa2c441a83bBCEDc2E8c5c6f66248aFD8b9af3d"
+          "receiver_dapp": "0xc96aEdd80da0E5C204fA52446b00624817C8718B"
         },
         "43114" : {
           "off_ramp": "0x1C207dabc46902dF9028b27D6d301c3849b2D12c",
           "commit_store": "0x40c558575093eC1099CC21B020d9b8D13c74417F",
-          "receiver_dapp": "0xAFa2c441a83bBCEDc2E8c5c6f66248aFD8b9af3d"
+          "receiver_dapp": "0x16673CFb93Dc33dE90830EaF856E557Ca18Bf897"
         },
         "137": {
           "off_ramp": "0xBDd822f3bC2EAB6818CfA3053107831D4E93fE72",
           "commit_store": "0x20718EfbC25Dba60FD51c2c81362b83f7C411A6D",
-          "receiver_dapp": "0xAFa2c441a83bBCEDc2E8c5c6f66248aFD8b9af3d"
+          "receiver_dapp": "0x0D0dFD71E1223b320aF443DD538e167f711a52AF"
         },
         "42161": {
           "off_ramp": "",
@@ -79,7 +79,7 @@
         "1": {
           "off_ramp": "0x032F957BfbB8C535a1b2048f8b4FA27E1F2018Fd",
           "commit_store": "0xa4D34ca38244F6c8AB640315d7257221408B6596",
-          "receiver_dapp": "0xAFa2c441a83bBCEDc2E8c5c6f66248aFD8b9af3d"
+          "receiver_dapp": "0x236034Bbb418A269f0d160b16087af11931Eba71"
         }
       }
     },
@@ -134,7 +134,7 @@
         "1": {
           "off_ramp": "0xa73bf37F78CD1629ff11Fa2B397CED39F49F6efe",
           "commit_store": "0x779cA414cAC21c76AbE9213861b1bE9187d495F9",
-          "receiver_dapp": "0xAFa2c441a83bBCEDc2E8c5c6f66248aFD8b9af3d"
+          "receiver_dapp": "0xEfA0D1B10f9E2ec379494d5ae68615A0aA3F9A9C"
         }
       }
     },
@@ -162,7 +162,7 @@
         "1": {
           "off_ramp": "0x2BF2611a07e2cA880b814d53325e9b2ee0BbfD2f",
           "commit_store": "0x5eBE880c4d340892dA1b0F32798a7A28e17e6E65",
-          "receiver_dapp": "0xAFa2c441a83bBCEDc2E8c5c6f66248aFD8b9af3d"
+          "receiver_dapp": "0xEfA0D1B10f9E2ec379494d5ae68615A0aA3F9A9C"
         }
       }
     },

@@ -39,20 +39,22 @@ type AggregatorMetrics struct {
 	sum   float64
 	count int
 }
-type SendTransactionStats struct {
+type TransactionStats struct {
 	Fee                string `json:"fee,omitempty"`
 	GasUsed            uint64 `json:"gas_used,omitempty"`
 	TxHash             string `json:"tx_hash,omitempty"`
 	NoOfTokensSent     int    `json:"no_of_tokens_sent,omitempty"`
 	MessageBytesLength int    `json:"message_bytes_length,omitempty"`
 	FinalizedByBlock   string `json:"finalized_block_num,omitempty"`
+	FinalizedAt        string `json:"finalized_at,omitempty"`
+	CommitRoot         string `json:"commit_root,omitempty"`
 }
 
 type PhaseStat struct {
-	SeqNum               uint64               `json:"seq_num,omitempty"`
-	Duration             float64              `json:"duration,omitempty"`
-	Status               Status               `json:"success"`
-	SendTransactionStats SendTransactionStats `json:"ccip_send_data,omitempty"`
+	SeqNum               uint64           `json:"seq_num,omitempty"`
+	Duration             float64          `json:"duration,omitempty"`
+	Status               Status           `json:"success"`
+	SendTransactionStats TransactionStats `json:"ccip_send_data,omitempty"`
 }
 
 type CCIPLaneStats struct {
@@ -72,7 +74,7 @@ func (testStats *CCIPLaneStats) GetPhaseStatsForRequest(reqNo int64) map[Phase]P
 	return testStats.StatusByPhaseByRequests[reqNo]
 }
 
-func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, step Phase, duration time.Duration, state Status, sendTransactionStats ...SendTransactionStats) {
+func (testStats *CCIPLaneStats) UpdatePhaseStats(reqNo int64, seqNum uint64, step Phase, duration time.Duration, state Status, sendTransactionStats ...TransactionStats) {
 	testStats.mu.Lock()
 	defer testStats.mu.Unlock()
 	durationInSec := duration.Seconds()

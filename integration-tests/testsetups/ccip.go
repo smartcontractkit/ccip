@@ -725,7 +725,7 @@ func CCIPExistingDeploymentTestSetUp(
 	bidirectional bool,
 	input *CCIPTestConfig,
 ) *CCIPTestSetUpOutputs {
-	return CCIPDefaultTestSetUp(t, lggr, "runner", nil, transferAmounts,
+	return CCIPDefaultTestSetUp(t, lggr, "ccip-runner", nil, transferAmounts,
 		0, false, bidirectional, input)
 }
 

@@ -57,7 +57,6 @@ const (
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
 	RootSnoozeTimeSimulated       = 1 * time.Minute
 	InflightExpirySimulated       = 1 * time.Minute
-	DefaultFinalityTimeOnChain    = 10 * time.Minute
 	// we keep the finality timeout high as it's out of our control
 	FinalityTimeout = 1 * time.Hour
 )
@@ -71,16 +70,19 @@ var EvmChainIdToChainSelector = func(chainId uint64, simulated bool) (uint64, er
 		return chainId, nil
 	}
 	mapSelector := map[uint64]uint64{
-		11155111: 16015286601757825753,
-		420:      2664363617261496610,
-		421613:   6101244977088475029,
-		43113:    14767482510784806043,
-		80001:    12532609583862916517,
-		137:      4051577828743386545,
-		1:        5009297550715157269,
-		42161:    4949039107694359620,
-		10:       3734403246176062136,
-		43114:    6433500567565415381,
+		// Testnets
+		420:      2664363617261496610,  // Optimism Goerli
+		1337:     3379446385462418246,  // Quorem
+		43113:    14767482510784806043, // Avax Fuji
+		80001:    12532609583862916517, // Polygon Mumbai
+		421613:   6101244977088475029,  // Arbitrum Goerli
+		11155111: 16015286601757825753, // Sepolia
+		// Mainnets
+		1:     5009297550715157269, // Ethereum
+		10:    3734403246176062136, // Optimism
+		137:   4051577828743386545, // Polygon
+		42161: 4949039107694359620, // Arbitrum
+		43114: 6433500567565415381, // Avalanche
 	}
 	chainSelector, ok := mapSelector[chainId]
 	if !ok {
@@ -305,26 +307,6 @@ func (ccipModule *CCIPCommon) CleanUp() error {
 	return nil
 }
 
-func (ccipModule *CCIPCommon) FinalityTime(done chan<- struct{}) {
-	defer func() {
-		done <- struct{}{}
-	}()
-	if ccipModule.FinalityTimeOnChain > 0 {
-		return
-	}
-	if ccipModule.ChainClient.NetworkSimulated() {
-		ccipModule.FinalityTimeOnChain = time.Second
-		return
-	}
-	var err error
-	ccipModule.FinalityTimeOnChain, err = ccipModule.ChainClient.EstimatedFinalizationTime(context.Background())
-	if err != nil {
-		log.Info().Str("default Finality", fmt.Sprintf("%s", DefaultFinalityTimeOnChain)).
-			Msgf("error in getting finality time %+v. Setting default finality time", err)
-		ccipModule.FinalityTimeOnChain = DefaultFinalityTimeOnChain
-	}
-}
-
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
 // This reuses common contracts for bidirectional lanes
 func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.LaneConfig) error {
@@ -499,6 +481,8 @@ type SourceCCIPModule struct {
 	SrcStartBlock              uint64
 	CCIPSendRequestedWatcherMu *sync.Mutex
 	CCIPSendRequestedWatcher   map[string]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
+	NewFinalizedBlockNum       atomic.Uint64
+	NewFinalizedBlockTimestamp atomic.Time
 	SeqNumToMsgIDMu            *sync.Mutex
 	SeqNumToMsgID              map[uint64][32]byte
 }
@@ -804,12 +788,12 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	ctx, cancel := context.WithTimeout(context.Background(), FinalityTimeout)
 	defer cancel()
 	headerChn := make(chan *blockchain.SafeEVMHeader)
-	sub, err := sourceCCIP.Common.ChainClient.SubscribeNewHeaders(context.Background(), headerChn)
+	sub, err := sourceCCIP.Common.ChainClient.SubscribeNewHeaders(ctx, headerChn)
 	if err != nil {
 		return time.Time{}, err
 	}
 	defer sub.Unsubscribe()
-	prevFinalizedBlockNum := ""
+	prevFinalizedBlockNum := sourceCCIP.NewFinalizedBlockNum.Load()
 	for {
 		select {
 		// each time a new header is received, check if the block is finalized
@@ -824,32 +808,49 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 						Msg("Still Waiting for CCIPSendRequested event log to be finalized")
 					continue
 				}
-			}
-			finalizedHdr, err := sourceCCIP.Common.ChainClient.GetLatestFinalizedBlockHeader(context.Background())
-			if err != nil {
-				return time.Time{}, err
-			}
-			if finalizedHdr.Number.Cmp(hdr.Number) >= 0 {
-				finalizedAt := newHdr.Timestamp.UTC()
-				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(prevEventAt), testreporters.Success,
-					testreporters.SendTransactionStats{
+				lggr.Info().
+					Str("Finalized Block", newHdr.Number.String()).
+					Str("Tx block", hdr.Number.String()).
+					Msg("Found finalized log")
+				finalizedAt := newHdr.Timestamp
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(hdr.Timestamp), testreporters.Success,
+					testreporters.TransactionStats{
 						TxHash:           SendRequested.Raw.TxHash.String(),
-						FinalizedByBlock: finalizedHdr.Number.String(),
+						FinalizedByBlock: newHdr.Number.String(),
+						FinalizedAt:      finalizedAt.String(),
 					})
 				lggr.Info().
-					Str("Finalized Block", finalizedHdr.Number.String()).
+					Str("Finalized Block", newHdr.Number.String()).
 					Str("Tx block", hdr.Number.String()).
-					Str("Previous Finalized Block", prevFinalizedBlockNum).
+					Msg("Found finalized log")
+				return newHdr.Timestamp, nil
+			}
+			finalizedBlckNum := sourceCCIP.NewFinalizedBlockNum.Load()
+			finalizedAt := sourceCCIP.NewFinalizedBlockTimestamp.Load()
+			if finalizedBlckNum >= hdr.Number.Uint64() {
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(hdr.Timestamp), testreporters.Success,
+					testreporters.TransactionStats{
+						TxHash:           SendRequested.Raw.TxHash.String(),
+						FinalizedByBlock: strconv.FormatUint(finalizedBlckNum, 10),
+						FinalizedAt:      finalizedAt.String(),
+					})
+				lggr.Info().
+					Uint64("Finalized Block", finalizedBlckNum).
+					Str("Tx block", hdr.Number.String()).
+					Uint64("Previous Finalized Block", prevFinalizedBlockNum).
 					Msg("Found finalized log")
 				return finalizedAt, nil
 			} else {
 				lggr.Info().
-					Str("Finalized Block", finalizedHdr.Number.String()).
+					Uint64("Finalized Block", finalizedBlckNum).
 					Str("Tx block", hdr.Number.String()).
 					Msg("Still Waiting for CCIPSendRequested event log to be finalized")
-				prevFinalizedBlockNum = finalizedHdr.Number.String()
+				prevFinalizedBlockNum = finalizedBlckNum
 			}
 		case <-ctx.Done():
+			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
+			return time.Time{}, fmt.Errorf("timeout waiting for CCIPSendRequested event log to be finalized")
+		case <-sub.Err():
 			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
 			return time.Time{}, fmt.Errorf("timeout waiting for CCIPSendRequested event log to be finalized")
 		}
@@ -877,7 +878,7 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 			sendRequested, ok := sourceCCIP.CCIPSendRequestedWatcher[txHash]
 			sourceCCIP.CCIPSendRequestedWatcherMu.Unlock()
 			if ok && sendRequested != nil {
-				hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(sendRequested.Raw.BlockNumber)))
+				hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(sendRequested.Raw.BlockNumber)))
 				receivedAt := time.Now().UTC()
 				if err == nil {
 					receivedAt = hdr.Timestamp
@@ -1308,13 +1309,21 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 			if ok && e != nil {
 				vLogs := e.Raw
 				receivedAt := time.Now().UTC()
-				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(
-					context.Background(), big.NewInt(int64(vLogs.BlockNumber)))
+				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
 				if err == nil {
 					receivedAt = hdr.Timestamp
 				}
+				receipt, err := destCCIP.Common.ChainClient.GetTxReceipt(vLogs.TxHash)
+				if err != nil {
+					lggr.Warn().Msg("Failed to get receipt for ExecStateChanged event")
+				}
 				if abihelpers.MessageExecutionState(e.State) == abihelpers.ExecutionStateSuccess {
-					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow), testreporters.Success)
+					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow),
+						testreporters.Success,
+						testreporters.TransactionStats{
+							TxHash:  vLogs.TxHash.Hex(),
+							GasUsed: receipt.GasUsed,
+						})
 					return nil
 				} else {
 					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
@@ -1350,8 +1359,7 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 			destCCIP.ReportAcceptedWatcherMu.Unlock()
 			if ok && reportAccepted != nil {
 				receivedAt := time.Now().UTC()
-				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(
-					context.Background(), big.NewInt(int64(reportAccepted.Raw.BlockNumber)))
+				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(reportAccepted.Raw.BlockNumber)))
 				if err == nil {
 					receivedAt = hdr.Timestamp
 				}
@@ -1370,7 +1378,16 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 						Msg("ReportAccepted event received before finalized timestamp")
 					totalTime = time.Second
 				}
-				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, totalTime, testreporters.Success)
+				receipt, err := destCCIP.Common.ChainClient.GetTxReceipt(reportAccepted.Raw.TxHash)
+				if err != nil {
+					lggr.Warn().Msg("Failed to get receipt for ReportAccepted event")
+				}
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, totalTime, testreporters.Success,
+					testreporters.TransactionStats{
+						GasUsed:    receipt.GasUsed,
+						TxHash:     reportAccepted.Raw.TxHash.String(),
+						CommitRoot: fmt.Sprintf("%x", reportAccepted.Report.MerkleRoot),
+					})
 				return &reportAccepted.Report, receivedAt, nil
 			}
 		case <-ctx.Done():
@@ -1406,13 +1423,20 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 			destCCIP.ReportBlessedWatcherMu.Unlock()
 			receivedAt := time.Now().UTC()
 			if ok && vLogs != nil {
-				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(
-					context.Background(), big.NewInt(int64(vLogs.BlockNumber)))
+				hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
 				if err == nil {
 					receivedAt = hdr.Timestamp
 				}
-
-				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ReportBlessed, receivedAt.Sub(prevEventAt), testreporters.Success)
+				receipt, err := destCCIP.Common.ChainClient.GetTxReceipt(vLogs.TxHash)
+				if err != nil {
+					lggr.Warn().Msg("Failed to get receipt for ReportBlessed event")
+				}
+				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ReportBlessed, receivedAt.Sub(prevEventAt), testreporters.Success,
+					testreporters.TransactionStats{
+						GasUsed:    receipt.GasUsed,
+						TxHash:     vLogs.TxHash.String(),
+						CommitRoot: fmt.Sprintf("%x", CommitReport.MerkleRoot),
+					})
 				return receivedAt, nil
 			}
 		case <-ctx.Done():
@@ -1642,7 +1666,7 @@ func (lane *CCIPLane) SendRequests(noOfRequests int) (map[int64]CCIPRequest, err
 		}
 		lane.SentReqs[int64(lane.NumberOfReq+i)] = txMap[int64(lane.NumberOfReq+i)]
 		lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
-			testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.SendTransactionStats{
+			testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.TransactionStats{
 				Fee:                fee.String(),
 				GasUsed:            rcpt.CumulativeGasUsed,
 				TxHash:             txHash.Hex(),
@@ -1703,6 +1727,47 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmattion tim
 }
 
 func (lane *CCIPLane) StartEventWatchers() error {
+	if !lane.Source.Common.ChainClient.NetworkSimulated() && lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
+		hdrs := make(chan *blockchain.SafeEVMHeader)
+		sub, err := lane.Source.Common.ChainClient.SubscribeNewHeaders(context.Background(), hdrs)
+		if err != nil {
+			return err
+		}
+		lane.Subscriptions = append(lane.Subscriptions, sub)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), lane.Source.Common.ChainClient.GetNetworkConfig().Timeout.Duration)
+			finalizedBlock, err := lane.Source.Common.ChainClient.GetLatestFinalizedBlockHeader(ctx)
+			cancel()
+			if err != nil {
+				lane.Logger.Fatal().Err(err).Msg("could not get latest finalized block")
+			}
+			lane.Source.NewFinalizedBlockNum.Store(finalizedBlock.Number.Uint64())
+			for {
+				select {
+				case newHdr := <-hdrs:
+					// if the new header is less than 5 blocks ahead of the latest finalized block, ignore it
+					// assumption : it will take atleast 5 new blocks to get the transaction confirmed
+					if newHdr.Number.Cmp(finalizedBlock.Number) <= 0 &&
+						new(big.Int).Sub(newHdr.Number, finalizedBlock.Number).Cmp(big.NewInt(5)) <= 0 {
+						continue
+					}
+					ctx, cancel = context.WithTimeout(context.Background(), lane.Source.Common.ChainClient.GetNetworkConfig().Timeout.Duration)
+					newFinalizedBlock, err := lane.Source.Common.ChainClient.GetLatestFinalizedBlockHeader(ctx)
+					cancel()
+					if err != nil {
+						lane.Logger.Fatal().Err(err).Msg("could not get latest finalized block")
+					}
+					if newFinalizedBlock.Number.Cmp(finalizedBlock.Number) > 0 {
+						finalizedBlock = newFinalizedBlock
+						lane.Source.NewFinalizedBlockNum.Store(newFinalizedBlock.Number.Uint64())
+						lane.Source.NewFinalizedBlockTimestamp.Store(newHdr.Timestamp)
+						lane.Logger.Info().Msgf("new finalized block received: %d", finalizedBlock.Number)
+					}
+				}
+			}
+		}()
+	}
+
 	sendReqEvent := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
 	sub, err := lane.Source.OnRamp.Instance.WatchCCIPSendRequested(nil, sendReqEvent)
 	if err != nil {
@@ -1830,9 +1895,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return lane.Source.Common.DeployContracts(len(lane.Source.TransferAmount), srcConf)
 	})
 
-	finalityCalculated := make(chan struct{})
-	go lane.Source.Common.FinalityTime(finalityCalculated)
-
 	lane.Dest.Common.deploy.Go(func() error {
 		return lane.Dest.Common.DeployContracts(len(lane.Source.TransferAmount), destConf)
 	})
@@ -1847,8 +1909,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	// wait for the finality time to be set
-	<-finalityCalculated
 	lane.UpdateLaneConfig()
 
 	// start event watchers

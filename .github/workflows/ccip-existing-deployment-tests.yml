@@ -62,11 +62,6 @@ on:
         default: 2
         type: number
 
-# Only run 1 of this workflow at a time per PR
-concurrency:
-  group: ccip-soak-tests-chainlink-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   # for run-test variables and environment
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ github.sha }}
@@ -191,16 +186,29 @@ jobs:
       - name: Sets env vars
         shell: bash
         run: |
-          echo "${{ inputs.network1 }}_URLS=${{ inputs.wsURL1 }}" >> $GITHUB_ENV
-          echo "${{ inputs.network1 }}_HTTP_URLS=${{ inputs.httpURL1 }}" >> $GITHUB_ENV
-          echo "${{ inputs.network2 }}_URLS=${{ inputs.wsURL2 }}" >> $GITHUB_ENV
-          echo "${{ inputs.network2 }}_HTTP_URLS=${{ inputs.httpURL2 }}" >> $GITHUB_ENV
-          echo "EVM_KEYS=${{ inputs.ownerKey }}" >> $GITHUB_ENV
+          EVM_KEYS=$(jq -r '.inputs.ownerKey' $GITHUB_EVENT_PATH)
+          EVM_URLS_1=$(jq -r '.inputs.wsURL1' $GITHUB_EVENT_PATH)
+          EVM_HTTP_URLS_1=$(jq -r '.inputs.httpURL1' $GITHUB_EVENT_PATH)
+          EVM_URLS_2=$(jq -r '.inputs.wsURL2' $GITHUB_EVENT_PATH)
+          EVM_HTTP_URLS_2=$(jq -r '.inputs.httpURL2' $GITHUB_EVENT_PATH)
+          
+          echo ::add-mask::$EVM_KEYS
+          echo ::add-mask::$EVM_URLS_1
+          echo ::add-mask::$EVM_HTTP_URLS_1
+          echo ::add-mask::$EVM_URLS_2
+          echo ::add-mask::$EVM_HTTP_URLS_2
+          
+          echo "EVM_KEYS=$EVM_KEYS" >> $GITHUB_ENV
+          echo "${{ inputs.network1 }}_URLS=$EVM_URLS_1" >> $GITHUB_ENV
+          echo "${{ inputs.network1 }}_HTTP_URLS=$EVM_HTTP_URLS_1" >> $GITHUB_ENV
+          echo "${{ inputs.network2 }}_URLS=$EVM_URLS_2" >> $GITHUB_ENV
+          echo "${{ inputs.network2 }}_HTTP_URLS=$EVM_HTTP_URLS_2" >> $GITHUB_ENV
+
       ## Run this step when changes that require tests to be run are made
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
         with:
-          test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -v -timeout 900h -count=1 -json -run ^TestLoadCCIPStableRPS$ ./load  2>&1 | tee /tmp/gotest.log | gotestfmt
+          test_command_to_run: make test_need_operator_assets && cd ./integration-tests && go test -v -timeout 900h -count=1 -json -run ^TestLoadCCIPStableRPS$ ./load
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           cl_repo: ${{ env.CHAINLINK_IMAGE }}
           cl_image_tag: ${{ github.sha }}
