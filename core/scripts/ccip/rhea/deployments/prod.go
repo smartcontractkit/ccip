@@ -114,6 +114,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xe764C455e3Bd05Eb7Cf53Ec8491dca0e91486D24"), // BetaUser - Synthetix v3 core
 		gethcommon.HexToAddress("0x8e52262f91ef7049adfD8d1E608172fAC57995c3"), // BetaUser - Synthetix v3 core
 		gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"), // BetaUser - Synthetix v3 core
+		gethcommon.HexToAddress("0x76490713314fCEC173f44e99346F54c6e92a8E42"), // BetaUser - Synthetix v3 core
 		gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"), // BetaUser - Alongside
 		gethcommon.HexToAddress("0x0819BBae96c2C0F15477D212e063303221Cf24b9"), // BetaUser - Oddz
 		gethcommon.HexToAddress("0x38104E1bB27A06306B72162047F585B3e6D27484"), // BetaUser - Oddz
@@ -213,6 +214,7 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			PoolAllowList: []gethcommon.Address{
 				gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"),
 				gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"),
+				gethcommon.HexToAddress("0x76490713314fCEC173f44e99346F54c6e92a8E42"), // BetaUser - Synthetix v3 core
 			},
 		},
 		//rhea.CACHEGOLD: {
@@ -334,6 +336,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xDdcE30979147091F26513C495EEE1bfa6C0a6730"), // BetaUser - RiseWorks
 		gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"), // BetaUser - Alongside
 		gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"), // BetaUser - Synthetix v3 core
+		gethcommon.HexToAddress("0x76490713314fCEC173f44e99346F54c6e92a8E42"), // BetaUser - Synthetix v3 core
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.Alongside: {
@@ -381,6 +384,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 			PoolAllowList: []gethcommon.Address{
 				gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"),
 				gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"),
+				gethcommon.HexToAddress("0x76490713314fCEC173f44e99346F54c6e92a8E42"), // BetaUser - Synthetix v3 core
 			},
 		},
 		//rhea.CACHEGOLD: {
@@ -711,6 +715,7 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x0D7a3a17E2E160287D3e7e74c4A1B22422156642"), // BetaUser - RiseWorks
 		gethcommon.HexToAddress("0x63e430dBd88C1bBFBc97336b4357Aa5Aea83367e"), // BetaUser - RiseWorks
 		gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"), // Synthetix v3 core
+		gethcommon.HexToAddress("0x76490713314fCEC173f44e99346F54c6e92a8E42"), // BetaUser - Synthetix v3 core
 		gethcommon.HexToAddress("0x3e44ba19e932F4985983994DFa1Bd01f2a2f8eE2"), // BetaUser - Folks Finance
 		gethcommon.HexToAddress("0xB573315f912a7e31A8d37054641c031c3c6A9eb9"), // BetaUser - Whitehole Finance
 		gethcommon.HexToAddress("0x3D3F14b31eb5a86a64Eb7951CcAdBE9471eaAd23"), // BetaUser - Yieldification
@@ -756,6 +761,7 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 			PoolAllowList: []gethcommon.Address{
 				gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"),
 				gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"),
+				gethcommon.HexToAddress("0x76490713314fCEC173f44e99346F54c6e92a8E42"), // BetaUser - Synthetix v3 core
 			},
 		},
 	},
@@ -854,6 +860,7 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x8e52262f91ef7049adfD8d1E608172fAC57995c3"), // BetaUser - Synthetix v3 core
 		gethcommon.HexToAddress("0x6De1e981d2137f7839840e2140dBB3A05F05B770"), // BetaUser - Flash Liquidity
 		gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"), // BetaUser - Synthetix v3 core
+		gethcommon.HexToAddress("0x76490713314fCEC173f44e99346F54c6e92a8E42"), // BetaUser - Synthetix v3 core
 		gethcommon.HexToAddress("0x0819BBae96c2C0F15477D212e063303221Cf24b9"), // BetaUser - Oddz
 		gethcommon.HexToAddress("0x38104E1bB27A06306B72162047F585B3e6D27484"), // BetaUser - Oddz
 		gethcommon.HexToAddress("0xA9cb37191A089C8f8c24fC3e1F2f761De93FA827"), // MintDAO - Sender (EOA)
@@ -900,6 +907,7 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 			PoolAllowList: []gethcommon.Address{
 				gethcommon.HexToAddress("0xda9e8e71bb750a996af33ebb8abb18cd9eb9dc75"),
 				gethcommon.HexToAddress("0x2A45BaE1E58AaD3261af187b7dAde90889c039Dc"),
+				gethcommon.HexToAddress("0x76490713314fCEC173f44e99346F54c6e92a8E42"), // BetaUser - Synthetix v3 core
 			},
 		},
 	},

@@ -84,6 +84,7 @@ type EVMBridgedToken struct {
 	Price                *big.Int
 	Decimals             uint8
 	PriceFeedsAggregator common.Address
+	PoolAllowList        []common.Address // empty slice indicates allowList is not enabled
 	rhea.TokenPoolType
 }
 
@@ -109,6 +110,7 @@ func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLan
 			Price:         tokenConfig.Price,
 			Decimals:      tokenConfig.Decimals,
 			TokenPoolType: tokenConfig.TokenPoolType,
+			PoolAllowList: tokenConfig.PoolAllowList,
 		}
 	}
 
@@ -366,6 +368,41 @@ func (client *CCIPClient) setAllowList(t *testing.T) {
 	t.Logf("ApplyAllowListUpdates: chainId=%d, toRemove=%v, toAdd=%v", client.Source.ChainId, toRemove, toAdd)
 
 	tx, err := client.Source.OnRamp.ApplyAllowListUpdates(client.Source.Owner, toRemove, toAdd)
+	shared.RequireNoError(t, err)
+	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
+	shared.RequireNoError(t, err)
+}
+
+func (client *CCIPClient) setAllowListTokenPool(t *testing.T, token rhea.Token) {
+	isEnabled, err := client.Source.SupportedTokens[token].Pool.GetAllowListEnabled(&bind.CallOpts{})
+	shared.RequireNoError(t, err)
+
+	if !isEnabled {
+		t.Logf("Allow list disabled in token pool for token=%s, chainId=%d", token, client.Source.ChainId)
+		return
+	}
+	currentAllowList, err := client.Source.SupportedTokens[token].Pool.GetAllowList(&bind.CallOpts{})
+	shared.RequireNoError(t, err)
+
+	var toRemove []common.Address
+	for _, addr := range currentAllowList {
+		if !slices.Contains(client.Source.SupportedTokens[token].PoolAllowList, addr) {
+			toRemove = append(toRemove, addr)
+		}
+	}
+	var toAdd []common.Address
+	for _, addr := range client.Source.SupportedTokens[token].PoolAllowList {
+		if !slices.Contains(currentAllowList, addr) {
+			toAdd = append(toAdd, addr)
+		}
+	}
+	if len(toRemove) == 0 && len(toAdd) == 0 {
+		t.Logf("Nothing to add or remove from allowlist: chainId=%d", client.Source.ChainId)
+		return
+	}
+	t.Logf("ApplyAllowListUpdates: chainId=%d, toRemove=%v, toAdd=%v", client.Source.ChainId, toRemove, toAdd)
+
+	tx, err := client.Source.SupportedTokens[token].Pool.ApplyAllowListUpdates(client.Source.Owner, toRemove, toAdd)
 	shared.RequireNoError(t, err)
 	err = shared.WaitForMined(client.Source.logger, client.Source.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
