@@ -20,11 +20,6 @@ const (
 	cachedValue = "cached_value"
 )
 
-var (
-	emptyLogs []logpoller.Log
-	someLogs  = make([]logpoller.Log, 1)
-)
-
 func TestGet_InitDataForTheFirstTime(t *testing.T) {
 	lp := lpMocks.NewLogPoller(t)
 	lp.On("LatestBlock", mock.Anything).Maybe().Return(int64(100), nil)
@@ -39,7 +34,7 @@ func TestGet_InitDataForTheFirstTime(t *testing.T) {
 func TestGet_ReturnDataFromCacheIfNoNewEvents(t *testing.T) {
 	latestBlock := int64(100)
 	lp := lpMocks.NewLogPoller(t)
-	mockLogPollerQuery(lp, latestBlock, emptyLogs)
+	mockLogPollerQuery(lp, latestBlock)
 
 	contract := newCachedContract(lp, cachedValue, []string{"value1"}, latestBlock)
 
@@ -51,7 +46,7 @@ func TestGet_ReturnDataFromCacheIfNoNewEvents(t *testing.T) {
 func TestGet_CallOriginForNewEvents(t *testing.T) {
 	latestBlock := int64(100)
 	lp := lpMocks.NewLogPoller(t)
-	m := mockLogPollerQuery(lp, latestBlock, someLogs)
+	m := mockLogPollerQuery(lp, latestBlock+1)
 
 	contract := newCachedContract(lp, cachedValue, []string{"value1", "value2", "value3"}, latestBlock)
 
@@ -64,7 +59,7 @@ func TestGet_CallOriginForNewEvents(t *testing.T) {
 	require.Equal(t, latestBlock+1, currentBlock)
 
 	m.Unset()
-	mockLogPollerQuery(lp, latestBlock+1, emptyLogs)
+	mockLogPollerQuery(lp, latestBlock+1)
 
 	// Second call doesn't change anything
 	value, err = contract.Get(testutils.Context(t))
@@ -74,26 +69,29 @@ func TestGet_CallOriginForNewEvents(t *testing.T) {
 }
 
 func TestGet_CacheProgressing(t *testing.T) {
-	latestBlock := int64(100)
-	lp := lpMocks.NewLogPoller(t)
-	m := mockLogPollerQuery(lp, latestBlock, someLogs)
+	firstBlock := int64(100)
+	secondBlock := int64(105)
+	thirdBlock := int64(110)
 
-	contract := newCachedContract(lp, cachedValue, []string{"value1", "value2", "value3"}, latestBlock)
+	lp := lpMocks.NewLogPoller(t)
+	m := mockLogPollerQuery(lp, secondBlock)
+
+	contract := newCachedContract(lp, cachedValue, []string{"value1", "value2", "value3"}, firstBlock)
 
 	// First call
 	value, err := contract.Get(testutils.Context(t))
 	require.NoError(t, err)
 	require.Equal(t, "value1", value)
-	require.Equal(t, int64(101), contract.lastChangeBlock)
+	require.Equal(t, secondBlock, contract.lastChangeBlock)
 
 	m.Unset()
-	mockLogPollerQuery(lp, latestBlock+1, someLogs)
+	mockLogPollerQuery(lp, thirdBlock)
 
 	// Second call
 	value, err = contract.Get(testutils.Context(t))
 	require.NoError(t, err)
 	require.Equal(t, "value2", value)
-	require.Equal(t, int64(102), contract.lastChangeBlock)
+	require.Equal(t, thirdBlock, contract.lastChangeBlock)
 }
 
 func TestGet_ConcurrentAccess(t *testing.T) {
@@ -120,8 +118,8 @@ func TestGet_ConcurrentAccess(t *testing.T) {
 	}
 	wg.Wait()
 
-	// 1 init block + 100 iterations + 1 (increment)
-	require.Equal(t, int64(102), contract.lastChangeBlock)
+	// 1 init block + 100 iterations
+	require.Equal(t, int64(101), contract.lastChangeBlock)
 
 	// Make sure that recent value is stored in cache
 	val := contract.copyCachedValue()
@@ -142,9 +140,9 @@ func newCachedContract(lp logpoller.LogPoller, cacheValue string, originValue []
 	}
 }
 
-func mockLogPollerQuery(lp *lpMocks.LogPoller, nextBlock int64, logs []logpoller.Log) *mock.Call {
-	return lp.On("LatestLogEventSigsAddrsWithConfs", nextBlock, []common.Hash{{}}, []common.Address{{}}, 0, mock.Anything).
-		Maybe().Return(logs, nil)
+func mockLogPollerQuery(lp *lpMocks.LogPoller, latestBlock int64) *mock.Call {
+	return lp.On("LatestBlockByEventSigsAddrsWithConfs", []common.Hash{{}}, []common.Address{{}}, 0, mock.Anything).
+		Maybe().Return(latestBlock, nil)
 }
 
 type ProgressingLogPoller struct {
@@ -153,11 +151,11 @@ type ProgressingLogPoller struct {
 	lock        sync.Mutex
 }
 
-func (lp *ProgressingLogPoller) LatestLogEventSigsAddrsWithConfs(int64, []common.Hash, []common.Address, int, ...pg.QOpt) ([]logpoller.Log, error) {
+func (lp *ProgressingLogPoller) LatestBlockByEventSigsAddrsWithConfs([]common.Hash, []common.Address, int, ...pg.QOpt) (int64, error) {
 	lp.lock.Lock()
 	defer lp.lock.Unlock()
 	lp.latestBlock++
-	return []logpoller.Log{{BlockNumber: lp.latestBlock}}, nil
+	return lp.latestBlock, nil
 }
 
 type FakeContractOrigin struct {

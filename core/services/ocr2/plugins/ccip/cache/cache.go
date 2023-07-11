@@ -53,21 +53,15 @@ func (c *CachedChain[T]) Get(ctx context.Context) (T, error) {
 		return c.initializeCache(ctx)
 	}
 
-	events, err := c.logPoller.LatestLogEventSigsAddrsWithConfs(
-		lastChangeBlock,
-		c.observedEvents,
-		c.address,
-		int(c.optimisticConfirmations),
-		pg.WithParentCtx(ctx),
-	)
+	currentBlockNumber, err := c.logPoller.LatestBlockByEventSigsAddrsWithConfs(c.observedEvents, c.address, int(c.optimisticConfirmations), pg.WithParentCtx(ctx))
 
 	if err != nil {
 		return empty, err
 	}
 
 	// In case of new updates, fetch fresh data from the origin
-	if len(events) != 0 {
-		return c.fetchFromOrigin(ctx, lastChangeBlock, events)
+	if currentBlockNumber > lastChangeBlock {
+		return c.fetchFromOrigin(ctx, currentBlockNumber)
 	}
 	return c.copyCachedValue(), nil
 }
@@ -97,21 +91,13 @@ func (c *CachedChain[T]) initializeCache(ctx context.Context) (T, error) {
 
 // fetchFromOrigin fetches data from origin. This action is performed when logpoller.LogPoller says there were events
 // emitted since last update.
-func (c *CachedChain[T]) fetchFromOrigin(ctx context.Context, lastChangeBlock int64, events []logpoller.Log) (T, error) {
+func (c *CachedChain[T]) fetchFromOrigin(ctx context.Context, currentBlockNumber int64) (T, error) {
 	var empty T
-
-	// Otherwise re-generate and update cache.
-	highestBlockNumber := lastChangeBlock
-	for _, e := range events {
-		if e.BlockNumber > highestBlockNumber {
-			highestBlockNumber = e.BlockNumber
-		}
-	}
 	value, err := c.origin.CallOrigin(ctx)
 	if err != nil {
 		return empty, err
 	}
-	c.updateCache(value, highestBlockNumber+1)
+	c.updateCache(value, currentBlockNumber)
 
 	return c.copyCachedValue(), nil
 }
@@ -119,17 +105,17 @@ func (c *CachedChain[T]) fetchFromOrigin(ctx context.Context, lastChangeBlock in
 // updateCache performs updating two critical variables for cache to work properly:
 // * value that is stored within cache
 // * lastChangeBlock representing last seen event from logpoller.LogPoller
-func (c *CachedChain[T]) updateCache(newValue T, newChangeBlock int64) {
+func (c *CachedChain[T]) updateCache(newValue T, currentBlockNumber int64) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	// Double-lock checking. No need to update if other goroutine was faster
-	if newChangeBlock <= c.lastChangeBlock {
+	if currentBlockNumber <= c.lastChangeBlock {
 		return
 	}
 
 	c.value = newValue
-	c.lastChangeBlock = newChangeBlock
+	c.lastChangeBlock = currentBlockNumber
 }
 
 func (c *CachedChain[T]) readLastChangeBlock() int64 {
