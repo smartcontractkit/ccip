@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -144,6 +145,40 @@ func TestCallOrigin(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_copyArray(t *testing.T) {
+	t.Run("base", func(t *testing.T) {
+		a := []common.Address{common.HexToAddress("1"), common.HexToAddress("2")}
+		b := copyArray(a)
+		assert.Equal(t, a, b)
+		b[0] = common.HexToAddress("3")
+		assert.NotEqual(t, a, b)
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		b := copyArray([]common.Address{})
+		assert.Empty(t, b)
+	})
+}
+
+func Test_copyMap(t *testing.T) {
+	t.Run("base", func(t *testing.T) {
+		val := map[string]int{"a": 100, "b": 50}
+		cp := copyMap(val)
+		assert.Len(t, val, 2)
+		assert.Equal(t, 100, cp["a"])
+		assert.Equal(t, 50, cp["b"])
+		val["b"] = 10
+		assert.Equal(t, 50, cp["b"])
+	})
+
+	t.Run("pointer val", func(t *testing.T) {
+		val := map[string]*big.Int{"a": big.NewInt(100), "b": big.NewInt(50)}
+		cp := copyMap(val)
+		val["a"] = big.NewInt(20)
+		assert.Equal(t, int64(100), cp["a"].Int64())
+	})
 }
 
 func createTokenFactory(decimalMapping map[common.Address]uint8) func(address common.Address) (link_token_interface.LinkTokenInterface, error) {

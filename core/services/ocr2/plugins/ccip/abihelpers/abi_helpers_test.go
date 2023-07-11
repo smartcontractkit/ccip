@@ -1,9 +1,12 @@
 package abihelpers
 
 import (
+	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"
 
@@ -75,4 +78,21 @@ func TestExecutionReportEncoding(t *testing.T) {
 	decodeCommitReport, err := DecodeExecutionReport(encodeExecutionReport)
 	require.NoError(t, err)
 	require.Equal(t, report, decodeCommitReport)
+}
+
+func TestEvmWord(t *testing.T) {
+	testCases := []struct {
+		inp uint64
+		exp common.Hash
+	}{
+		{inp: 1, exp: common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000001")},
+		{inp: math.MaxUint64, exp: common.HexToHash("0x000000000000000000000000000000000000000000000000ffffffffffffffff")},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("test %d", tc.inp), func(t *testing.T) {
+			h := EvmWord(tc.inp)
+			assert.Equal(t, tc.exp, h)
+		})
+	}
 }

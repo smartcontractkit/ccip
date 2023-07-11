@@ -3,9 +3,11 @@ package ccip
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,6 +29,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -1014,4 +1017,64 @@ func TestExecutionReportingPlugin_tokenPoolRateLimitValidation(t *testing.T) {
 			p.isRateLimitReachedForTokenPool(tc.destTokenPoolRateLimits, tc.tokenAmounts, tc.inflightTokenAmounts, tc.srcToDestToken)
 		})
 	}
+}
+
+func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
+	const numFilters = 10
+	filters := make([]logpoller.Filter, numFilters)
+	for i := range filters {
+		filters[i] = logpoller.Filter{
+			Name:      fmt.Sprintf("filter-%d", i),
+			EventSigs: []common.Hash{common.HexToHash(fmt.Sprintf("%d", i))},
+			Addresses: []common.Address{common.HexToAddress(fmt.Sprintf("%d", i))},
+			Retention: time.Duration(i) * time.Second,
+		}
+	}
+
+	destLP := lpMocks.NewLogPoller(t)
+	sourceLP := lpMocks.NewLogPoller(t)
+
+	onRamp := mock_contracts.NewEVM2EVMOnRampInterface(t)
+	onRamp.On("Address").Return(utils.RandomAddress(), nil)
+
+	sourcePriceRegistry := mock_contracts.NewPriceRegistryInterface(t)
+	sourcePriceRegistry.On("Address").Return(utils.RandomAddress(), nil)
+
+	commitStore := mock_contracts.NewCommitStoreInterface(t)
+	commitStore.On("Address").Return(utils.RandomAddress(), nil)
+
+	offRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
+	offRamp.On("Address").Return(utils.RandomAddress(), nil)
+
+	destPriceRegistryAddr := utils.RandomAddress()
+
+	rf := &ExecutionReportingPluginFactory{
+		filtersMu:          &sync.Mutex{},
+		sourceChainFilters: filters[:5],
+		destChainFilters:   filters[5:10],
+		config: ExecutionPluginConfig{
+			destLP:              destLP,
+			sourceLP:            sourceLP,
+			onRamp:              onRamp,
+			commitStore:         commitStore,
+			offRamp:             offRamp,
+			sourcePriceRegistry: sourcePriceRegistry,
+		},
+	}
+
+	for _, f := range getExecutionPluginSourceLpChainFilters(onRamp.Address(), sourcePriceRegistry.Address()) {
+		sourceLP.On("RegisterFilter", f).Return(nil)
+	}
+	for _, f := range getExecutionPluginDestLpChainFilters(commitStore.Address(), offRamp.Address(), destPriceRegistryAddr) {
+		destLP.On("RegisterFilter", f).Return(nil)
+	}
+	for _, f := range rf.sourceChainFilters[1:] { // zero address is skipped
+		sourceLP.On("UnregisterFilter", f.Name, mock.Anything).Return(nil)
+	}
+	for _, f := range rf.destChainFilters {
+		destLP.On("UnregisterFilter", f.Name, mock.Anything).Return(nil)
+	}
+
+	err := rf.UpdateLogPollerFilters(destPriceRegistryAddr)
+	assert.NoError(t, err)
 }

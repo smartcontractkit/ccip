@@ -77,6 +77,8 @@ func (c *CachedChain[T]) Get(ctx context.Context) (T, error) {
 func (c *CachedChain[T]) initializeCache(ctx context.Context) (T, error) {
 	var empty T
 
+	// To prevent missing data when blocks are produced after calling the origin,
+	// we first get the latest block and then call the origin.
 	latestBlock, err := c.logPoller.LatestBlock(pg.WithParentCtx(ctx))
 	if err != nil {
 		return empty, err

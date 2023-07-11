@@ -19,6 +19,12 @@ func TestCommitInflight(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	c := newInflightCommitReportsContainer(time.Hour)
 
+	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
+		priceUpdates:  commit_store.InternalPriceUpdates{DestChainSelector: 0}, // skipped when destChainSelector is 0
+		createdAt:     time.Now(),
+		epochAndRound: mergeEpochAndRound(2, 4),
+	})
+
 	// Initially should be empty
 	assert.Nil(t, c.getLatestInflightGasPriceUpdate())
 	assert.Equal(t, uint64(0), c.maxInflightSeqNr())
@@ -63,4 +69,56 @@ func TestCommitInflight(t *testing.T) {
 	latestInflightTokenPriceUpdates := c.latestInflightTokenPriceUpdates()
 	require.Equal(t, len(latestInflightTokenPriceUpdates), 1)
 	assert.Equal(t, big.NewInt(10), latestInflightTokenPriceUpdates[token].value)
+
+	// larger epoch and round overrides existing price update
+	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
+		priceUpdates: commit_store.InternalPriceUpdates{
+			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
+				{SourceToken: token, UsdPerToken: big.NewInt(9999)},
+			},
+			DestChainSelector: uint64(1),
+			UsdPerUnitGas:     big.NewInt(999),
+		},
+		createdAt:     time.Now(),
+		epochAndRound: mergeEpochAndRound(999, 99),
+	})
+	latestInflightTokenPriceUpdates = c.latestInflightTokenPriceUpdates()
+	require.Equal(t, len(latestInflightTokenPriceUpdates), 1)
+	assert.Equal(t, big.NewInt(9999), latestInflightTokenPriceUpdates[token].value)
+}
+
+func Test_inflightCommitReportsContainer_expire(t *testing.T) {
+	c := &inflightCommitReportsContainer{
+		cacheExpiry: time.Minute,
+		inFlight: map[[32]byte]InflightCommitReport{
+			common.HexToHash("1"): {
+				report:    commit_store.CommitStoreCommitReport{},
+				createdAt: time.Now().Add(-5 * time.Minute),
+			},
+			common.HexToHash("2"): {
+				report:    commit_store.CommitStoreCommitReport{},
+				createdAt: time.Now().Add(-10 * time.Second),
+			},
+		},
+		inFlightPriceUpdates: []InflightPriceUpdate{
+			{
+				priceUpdates:  commit_store.InternalPriceUpdates{DestChainSelector: 100},
+				createdAt:     time.Now().Add(-PRICE_EXPIRY_MULTIPLIER * time.Minute),
+				epochAndRound: mergeEpochAndRound(10, 5),
+			},
+			{
+				priceUpdates:  commit_store.InternalPriceUpdates{DestChainSelector: 200},
+				createdAt:     time.Now().Add(-PRICE_EXPIRY_MULTIPLIER * time.Second),
+				epochAndRound: mergeEpochAndRound(20, 5),
+			},
+		},
+	}
+	c.expire(logger.NullLogger)
+
+	assert.Len(t, c.inFlight, 1)
+	_, exists := c.inFlight[common.HexToHash("2")]
+	assert.True(t, exists)
+
+	assert.Len(t, c.inFlightPriceUpdates, 1)
+	assert.Equal(t, mergeEpochAndRound(20, 5), c.inFlightPriceUpdates[0].epochAndRound)
 }

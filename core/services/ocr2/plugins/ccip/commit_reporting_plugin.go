@@ -361,7 +361,11 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		}
 	}
 
-	sourceNativePriceUSD := rawTokenPricesUSD[r.config.sourceNative]
+	sourceNativePriceUSD, exists := rawTokenPricesUSD[r.config.sourceNative]
+	if !exists {
+		return nil, nil, fmt.Errorf("missing source native (%s) price", r.config.sourceNative)
+	}
+
 	tokenPricesUSD = make(map[common.Address]*big.Int, len(rawTokenPricesUSD))
 	for token := range rawTokenPricesUSD {
 		decimals, exists := tokenToDecimalMappingValue[token]
