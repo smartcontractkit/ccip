@@ -68,27 +68,27 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 	}
 	plugin := ExecutionReportingPlugin{
 		config: ExecutionPluginConfig{
-			lggr:                  th.Lggr,
-			sourceLP:              th.SourceLP,
-			destLP:                th.DestLP,
-			srcPriceRegistry:      th.Source.PriceRegistry,
-			onRamp:                th.Source.OnRamp,
-			commitStore:           th.Dest.CommitStore,
-			offRamp:               th.Dest.OffRamp,
-			destClient:            th.DestClient,
-			srcWrappedNativeToken: th.Source.WrappedNative.Address(),
-			leafHasher:            hasher.NewLeafHasher(th.Source.ChainID, th.Dest.ChainID, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
-			destGasEstimator:      destFeeEstimator,
+			lggr:                     th.Lggr,
+			sourceLP:                 th.SourceLP,
+			destLP:                   th.DestLP,
+			sourcePriceRegistry:      th.Source.PriceRegistry,
+			onRamp:                   th.Source.OnRamp,
+			commitStore:              th.Dest.CommitStore,
+			offRamp:                  th.Dest.OffRamp,
+			destClient:               th.DestClient,
+			sourceWrappedNativeToken: th.Source.WrappedNative.Address(),
+			leafHasher:               hasher.NewLeafHasher(th.Source.ChainID, th.Dest.ChainID, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
+			destGasEstimator:         destFeeEstimator,
 		},
-		onchainConfig:      th.ExecOnchainConfig,
-		offchainConfig:     offchainConfig,
-		lggr:               th.Lggr.Named("ExecutionReportingPlugin"),
-		snoozedRoots:       make(map[[32]byte]time.Time),
-		inflightReports:    newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-		destPriceRegistry:  th.Dest.PriceRegistry,
-		destWrappedNative:  th.Dest.WrappedNative.Address(),
-		cachedSrcFeeTokens: cache.NewCachedFeeTokens(th.SourceLP, th.Source.PriceRegistry, int64(offchainConfig.SourceFinalityDepth)),
-		cachedDstTokens:    cache.NewCachedSupportedTokens(th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, int64(offchainConfig.DestOptimisticConfirmations)),
+		onchainConfig:         th.ExecOnchainConfig,
+		offchainConfig:        offchainConfig,
+		lggr:                  th.Lggr.Named("ExecutionReportingPlugin"),
+		snoozedRoots:          make(map[[32]byte]time.Time),
+		inflightReports:       newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
+		destPriceRegistry:     th.Dest.PriceRegistry,
+		destWrappedNative:     th.Dest.WrappedNative.Address(),
+		cachedSourceFeeTokens: cache.NewCachedFeeTokens(th.SourceLP, th.Source.PriceRegistry, int64(offchainConfig.SourceFinalityDepth)),
+		cachedDestTokens:      cache.NewCachedSupportedTokens(th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, int64(offchainConfig.DestOptimisticConfirmations)),
 	}
 	return execTestHarness{
 		CCIPPluginTestHarness: th,
@@ -201,10 +201,10 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 			destLP:  mockDestLP,
 			offRamp: mockOffRamp,
 		},
-		cachedDstTokens: cache.NewCachedSupportedTokens(mockDestLP, mockOffRamp, mockPriceRegistry, 0),
+		cachedDestTokens: cache.NewCachedSupportedTokens(mockDestLP, mockOffRamp, mockPriceRegistry, 0),
 	}
 
-	value, err := plugin.cachedDstTokens.Get(context.Background())
+	value, err := plugin.cachedDestTokens.Get(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, destToken, value.SupportedTokens[sourceToken])
 }

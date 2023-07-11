@@ -82,35 +82,36 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp config")
 	}
-	srcRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
+	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading source router")
 	}
-	sourceWrappedNative, err := srcRouter.GetWrappedNative(&bind.CallOpts{})
+	sourceWrappedNative, err := sourceRouter.GetWrappedNative(&bind.CallOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get source native token")
 	}
-	srcPriceRegistry, err := observability.NewObservedPriceRegistry(dynamicOnRampConfig.PriceRegistry, ExecPluginLabel, sourceChain.Client())
+	sourcePriceRegistry, err := observability.NewObservedPriceRegistry(dynamicOnRampConfig.PriceRegistry, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not create source price registry")
 	}
 
 	execLggr := lggr.Named("CCIPExecution").With(
-		"srcChain", ChainName(pluginConfig.SourceEvmChainId), "dstChain", ChainName(destChainID))
+		"sourceChain", ChainName(pluginConfig.SourceEvmChainId),
+		"destChain", ChainName(destChainID))
 
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
-			lggr:                  execLggr,
-			sourceLP:              sourceChain.LogPoller(),
-			destLP:                destChain.LogPoller(),
-			onRamp:                onRamp,
-			offRamp:               offRamp,
-			commitStore:           commitStore,
-			srcPriceRegistry:      srcPriceRegistry,
-			srcWrappedNativeToken: sourceWrappedNative,
-			destClient:            destChain.Client(),
-			destGasEstimator:      destChain.GasEstimator(),
-			leafHasher:            hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
+			lggr:                     execLggr,
+			sourceLP:                 sourceChain.LogPoller(),
+			destLP:                   destChain.LogPoller(),
+			onRamp:                   onRamp,
+			offRamp:                  offRamp,
+			commitStore:              commitStore,
+			sourcePriceRegistry:      sourcePriceRegistry,
+			sourceWrappedNativeToken: sourceWrappedNative,
+			destClient:               destChain.Client(),
+			destGasEstimator:         destChain.GasEstimator(),
+			leafHasher:               hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)
@@ -127,10 +128,10 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", pluginConfig,
 		"onRampAddress", onRamp.Address(),
-		"sourcePriceRegistry", srcPriceRegistry.Address(),
+		"sourcePriceRegistry", sourcePriceRegistry.Address(),
 		"dynamicOnRampConfig", dynamicOnRampConfig,
 		"sourceNative", sourceWrappedNative,
-		"sourceRouter", srcRouter.Address())
+		"sourceRouter", sourceRouter.Address())
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
 		return []job.ServiceCtx{
@@ -240,44 +241,44 @@ func UnregisterExecPluginLpFilters(ctx context.Context, q pg.Queryer, spec *job.
 	if err != nil {
 		return errors.Wrap(err, "unable to open source chain")
 	}
-	srcOnRamp, err := LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
+	sourceOnRamp, err := LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
 		return errors.Wrap(err, "failed loading onRamp")
 	}
 
-	return unregisterExecutionPluginLpFilters(ctx, q, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, srcOnRamp)
+	return unregisterExecutionPluginLpFilters(ctx, q, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, sourceOnRamp)
 }
 
 func unregisterExecutionPluginLpFilters(
 	ctx context.Context,
 	q pg.Queryer,
-	srcLp logpoller.LogPoller,
-	dstLp logpoller.LogPoller,
-	dstOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
-	dstOffRampConfig evm_2_evm_offramp.EVM2EVMOffRampStaticConfig,
-	srcOnRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) error {
-	dstOffRampDynCfg, err := dstOffRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	sourceLP logpoller.LogPoller,
+	destLP logpoller.LogPoller,
+	destOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
+	destOffRampConfig evm_2_evm_offramp.EVM2EVMOffRampStaticConfig,
+	sourceOnRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) error {
+	destOffRampDynCfg, err := destOffRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
 	}
 
-	onRampDynCfg, err := srcOnRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	onRampDynCfg, err := sourceOnRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
 	}
 
 	if err := unregisterLpFilters(
 		q,
-		srcLp,
-		getExecutionPluginSourceLpChainFilters(dstOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry),
+		sourceLP,
+		getExecutionPluginSourceLpChainFilters(destOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry),
 	); err != nil {
 		return err
 	}
 
 	return unregisterLpFilters(
 		q,
-		dstLp,
-		getExecutionPluginDestLpChainFilters(dstOffRampConfig.CommitStore, dstOffRamp.Address(), dstOffRampDynCfg.PriceRegistry),
+		destLP,
+		getExecutionPluginDestLpChainFilters(destOffRampConfig.CommitStore, destOffRamp.Address(), destOffRampDynCfg.PriceRegistry),
 	)
 }
 

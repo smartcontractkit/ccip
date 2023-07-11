@@ -279,20 +279,20 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, q pg.Queryer, spec *jo
 	return unregisterCommitPluginFilters(ctx, q, sourceChain.LogPoller(), destChain.LogPoller(), commitStore, common.HexToAddress(pluginConfig.OffRamp))
 }
 
-func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, srcLP, dstLP logpoller.LogPoller, dstCommitStore commit_store.CommitStoreInterface, offRamp common.Address) error {
-	staticCfg, err := dstCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
+func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, sourceLP, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address) error {
+	staticCfg, err := destCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
 	}
 
-	dynamicCfg, err := dstCommitStore.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	dynamicCfg, err := destCommitStore.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
 	}
 
 	if err := unregisterLpFilters(
 		q,
-		srcLP,
+		sourceLP,
 		getCommitPluginSourceLpFilters(staticCfg.OnRamp),
 	); err != nil {
 		return err
@@ -300,7 +300,7 @@ func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, srcLP, dst
 
 	return unregisterLpFilters(
 		q,
-		dstLP,
+		destLP,
 		getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry, offRamp),
 	)
 }

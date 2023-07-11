@@ -132,11 +132,11 @@ func Test_updateCommitPluginLogPollerFilters(t *testing.T) {
 			onRampAddress: onRampAddr,
 			offRamp:       offRamp,
 		},
-		dstChainFilters: []logpoller.Filter{
+		destChainFilters: []logpoller.Filter{
 			{Name: "a"},
 			{Name: "b"},
 		},
-		srcChainFilters: []logpoller.Filter{
+		sourceChainFilters: []logpoller.Filter{
 			{Name: newSrcFilters[0].Name}, // should not be touched, since it's already registered
 			{Name: "c"},
 			{Name: "d"},
@@ -145,10 +145,10 @@ func Test_updateCommitPluginLogPollerFilters(t *testing.T) {
 	}
 
 	// make sure existing filters get unregistered
-	for _, f := range rf.dstChainFilters {
+	for _, f := range rf.destChainFilters {
 		dstLP.On("UnregisterFilter", f.Name, nil).Return(nil)
 	}
-	for _, f := range rf.srcChainFilters[1:] { // skip the first one, which should not be unregistered
+	for _, f := range rf.sourceChainFilters[1:] { // skip the first one, which should not be unregistered
 		srcLP.On("UnregisterFilter", f.Name, nil).Return(nil)
 	}
 

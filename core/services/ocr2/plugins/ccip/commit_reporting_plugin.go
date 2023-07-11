@@ -85,9 +85,9 @@ type CommitReportingPluginFactory struct {
 	config CommitPluginConfig
 
 	// We keep track of the registered filters
-	srcChainFilters []logpoller.Filter
-	dstChainFilters []logpoller.Filter
-	filtersMu       *sync.Mutex
+	sourceChainFilters []logpoller.Filter
+	destChainFilters   []logpoller.Filter
+	filtersMu          *sync.Mutex
 }
 
 // NewCommitReportingPluginFactory return a new CommitReportingPluginFactory.
@@ -197,32 +197,32 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 }
 
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
-// pass zeroAddress if dstPriceRegistry is unknown, filters with zero address are omitted.
-func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(dstPriceRegistry common.Address) error {
+// pass zeroAddress if destPriceRegistry is unknown, filters with zero address are omitted.
+func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
 
 	// source chain filters
-	srcFiltersBefore, srcFiltersNow := rf.srcChainFilters, getCommitPluginSourceLpFilters(rf.config.onRampAddress)
-	created, deleted := filtersDiff(srcFiltersBefore, srcFiltersNow)
+	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getCommitPluginSourceLpFilters(rf.config.onRampAddress)
+	created, deleted := filtersDiff(sourceFiltersBefore, sourceFiltersNow)
 	if err := unregisterLpFilters(nilQueryer, rf.config.sourceLP, deleted); err != nil {
 		return err
 	}
 	if err := registerLpFilters(nilQueryer, rf.config.sourceLP, created); err != nil {
 		return err
 	}
-	rf.srcChainFilters = srcFiltersNow
+	rf.sourceChainFilters = sourceFiltersNow
 
 	// destination chain filters
-	dstFiltersBefore, dstFiltersNow := rf.dstChainFilters, getCommitPluginDestLpFilters(dstPriceRegistry, rf.config.offRamp.Address())
-	created, deleted = filtersDiff(dstFiltersBefore, dstFiltersNow)
+	destFiltersBefore, destFiltersNow := rf.destChainFilters, getCommitPluginDestLpFilters(destPriceRegistry, rf.config.offRamp.Address())
+	created, deleted = filtersDiff(destFiltersBefore, destFiltersNow)
 	if err := unregisterLpFilters(nilQueryer, rf.config.destLP, deleted); err != nil {
 		return err
 	}
 	if err := registerLpFilters(nilQueryer, rf.config.destLP, created); err != nil {
 		return err
 	}
-	rf.dstChainFilters = dstFiltersNow
+	rf.destChainFilters = destFiltersNow
 
 	return nil
 }
