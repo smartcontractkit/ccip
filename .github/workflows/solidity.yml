@@ -329,17 +329,21 @@ jobs:
     needs: [initialize, changes, native-compile, lint, prettier]
     name: Publish Beta NPM
     runs-on: ubuntu-latest
-    if: needs.initialize.outputs.is-pre-release == 'true' && needs.changes.outputs.changes == 'true'
+    if: needs.initialize.outputs.is-pre-release == 'true'
     steps:
       - name: Checkout the repo
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: Setup NodeJS
         uses: ./.github/actions/setup-nodejs
+      - name: Configure npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+          echo "registry=https://registry.npmjs.org/" >> ~/.npmrc
       - name: Publish Beta
         run: pnpm publish-beta --publish-branch "${GITHUB_REF_NAME}" --no-git-checks
         working-directory: contracts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Collect Metrics
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@90fcbaac8ebf86da9c4d55dba24f6fe3029f0e0b
@@ -353,17 +357,21 @@ jobs:
     needs: [initialize, changes, native-compile, lint, prettier]
     name: Publish Prod NPM
     runs-on: ubuntu-latest
-    if: needs.initialize.outputs.is-release == 'true' && needs.changes.outputs.changes == 'true'
+    if: needs.initialize.outputs.is-release == 'true'
     steps:
       - name: Checkout the repo
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
       - name: Setup NodeJS
         uses: ./.github/actions/setup-nodejs
+      - name: Configure npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+          echo "registry=https://registry.npmjs.org/" >> ~/.npmrc
       - name: Publish Prod
         run: pnpm publish-prod --publish-branch "${GITHUB_REF_NAME}" --no-git-checks
         working-directory: contracts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Collect Metrics
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@90fcbaac8ebf86da9c4d55dba24f6fe3029f0e0b

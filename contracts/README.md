@@ -61,4 +61,4 @@ Thank you!
 
 ## License
 
-[MIT](https://choosealicense.com/licenses/mit/)
+[BUSL-1.1](https://spdx.org/licenses/BUSL-1.1.html)
