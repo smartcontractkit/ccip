@@ -329,7 +329,7 @@ jobs:
     needs: [initialize, changes, native-compile, lint, prettier]
     name: Publish Beta NPM
     runs-on: ubuntu-latest
-    if: needs.initialize.outputs.is-pre-release == 'true' && needs.changes.outputs.changes == 'true'
+    if: needs.initialize.outputs.is-pre-release == 'true'
     steps:
       - name: Checkout the repo
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
@@ -353,7 +353,7 @@ jobs:
     needs: [initialize, changes, native-compile, lint, prettier]
     name: Publish Prod NPM
     runs-on: ubuntu-latest
-    if: needs.initialize.outputs.is-release == 'true' && needs.changes.outputs.changes == 'true'
+    if: needs.initialize.outputs.is-release == 'true'
     steps:
       - name: Checkout the repo
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
