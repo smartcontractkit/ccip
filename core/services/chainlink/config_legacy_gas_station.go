@@ -1,7 +1,7 @@
 package chainlink
 
 import (
-	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/toml"
 	lgsconfig "github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation/types/config"
 )
 

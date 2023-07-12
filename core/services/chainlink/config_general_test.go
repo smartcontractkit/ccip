@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
+	"github.com/smartcontractkit/chainlink/v2/core/config/env"
 )
 
 func TestTOMLGeneralConfig_Defaults(t *testing.T) {
@@ -79,10 +79,10 @@ func TestTOMLGeneralConfig_InsecureConfig(t *testing.T) {
 }
 
 func TestValidateDB(t *testing.T) {
-	t.Setenv(string(v2.EnvConfig), "")
+	t.Setenv(string(env.Config), "")
 
 	t.Run("unset db url", func(t *testing.T) {
-		t.Setenv(string(v2.EnvDatabaseURL), "")
+		t.Setenv(string(env.DatabaseURL), "")
 
 		config, err := GeneralConfigOpts{}.New()
 		require.NoError(t, err)
@@ -92,7 +92,7 @@ func TestValidateDB(t *testing.T) {
 	})
 
 	t.Run("garbage db url", func(t *testing.T) {
-		t.Setenv(string(v2.EnvDatabaseURL), "garbage")
+		t.Setenv(string(env.DatabaseURL), "garbage")
 
 		config, err := GeneralConfigOpts{}.New()
 		require.NoError(t, err)
@@ -102,7 +102,7 @@ func TestValidateDB(t *testing.T) {
 	})
 
 	t.Run("dev url", func(t *testing.T) {
-		t.Setenv(string(v2.EnvDatabaseURL), "postgres://postgres:admin@localhost:5432/chainlink_dev_test?sslmode=disable")
+		t.Setenv(string(env.DatabaseURL), "postgres://postgres:admin@localhost:5432/chainlink_dev_test?sslmode=disable")
 
 		config, err := GeneralConfigOpts{}.New()
 		require.NoError(t, err)
@@ -111,7 +111,7 @@ func TestValidateDB(t *testing.T) {
 	})
 
 	t.Run("bad password url", func(t *testing.T) {
-		t.Setenv(string(v2.EnvDatabaseURL), "postgres://postgres:pwdToShort@localhost:5432/chainlink_dev_prod?sslmode=disable")
+		t.Setenv(string(env.DatabaseURL), "postgres://postgres:pwdToShort@localhost:5432/chainlink_dev_prod?sslmode=disable")
 
 		config, err := GeneralConfigOpts{}.New()
 		require.NoError(t, err)

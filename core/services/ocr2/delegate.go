@@ -1059,6 +1059,11 @@ func (d *Delegate) newServicesOCR2Functions(
 		return nil, err
 	}
 
+	thresholdProvider, err := createPluginProvider(functionsRelay.ThresholdPlugin, "FunctionsThresholdRelayer")
+	if err != nil {
+		return nil, err
+	}
+
 	s4Provider, err := createPluginProvider(functionsRelay.S4Plugin, "FunctionsS4Relayer")
 	if err != nil {
 		return nil, err
@@ -1084,6 +1089,21 @@ func (d *Delegate) newServicesOCR2Functions(
 		Logger:                       ocrLogger,
 		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID, synchronization.OCR2Functions),
 		OffchainConfigDigester:       functionsProvider.OffchainConfigDigester(),
+		OffchainKeyring:              kb,
+		OnchainKeyring:               kb,
+		ReportingPluginFactory:       nil, // To be set by NewFunctionsServices
+	}
+
+	thresholdOracleArgs := libocr2.OCR2OracleArgs{
+		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
+		V2Bootstrappers:              bootstrapPeers,
+		ContractTransmitter:          thresholdProvider.ContractTransmitter(),
+		ContractConfigTracker:        thresholdProvider.ContractConfigTracker(),
+		Database:                     thresholdOcrDB,
+		LocalConfig:                  lc,
+		Logger:                       ocrLogger,
+		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID, synchronization.OCR2Threshold),
+		OffchainConfigDigester:       thresholdProvider.OffchainConfigDigester(),
 		OffchainKeyring:              kb,
 		OnchainKeyring:               kb,
 		ReportingPluginFactory:       nil, // To be set by NewFunctionsServices
@@ -1132,7 +1152,7 @@ func (d *Delegate) newServicesOCR2Functions(
 		ThresholdKeyShare: thresholdKeyShare,
 	}
 
-	functionsServices, err := functions.NewFunctionsServices(&functionsOracleArgs, nil, &s4OracleArgs, &functionsServicesConfig)
+	functionsServices, err := functions.NewFunctionsServices(&functionsOracleArgs, &thresholdOracleArgs, &s4OracleArgs, &functionsServicesConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "error calling NewFunctionsServices")
 	}
