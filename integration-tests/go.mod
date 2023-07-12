@@ -17,7 +17,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.29.1
 	github.com/slack-go/slack v0.12.2
-	github.com/smartcontractkit/chainlink-env v0.33.0
+	github.com/smartcontractkit/chainlink-env v0.33.1
 	github.com/smartcontractkit/chainlink-testing-framework v1.12.0
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20230606215712-82b910bef5c1
@@ -466,12 +466,12 @@ require (
 	k8s.io/api v0.27.2 // indirect
 	k8s.io/apiextensions-apiserver v0.25.3 // indirect
 	k8s.io/apimachinery v0.27.2 // indirect
-	k8s.io/cli-runtime v0.25.4 // indirect
+	k8s.io/cli-runtime v0.25.11 // indirect
 	k8s.io/client-go v1.5.2 // indirect
-	k8s.io/component-base v0.25.4 // indirect
+	k8s.io/component-base v0.25.11 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20230606174411-725288a7abf1 // indirect
-	k8s.io/kubectl v0.25.4 // indirect
+	k8s.io/kubectl v0.25.11 // indirect
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 	sigs.k8s.io/controller-runtime v0.13.0 // indirect
