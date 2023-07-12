@@ -341,7 +341,7 @@ func TestUpdateAllLanes(t *testing.T) {
 // How to add tokens in 3 steps
 // Add token to config
 // **	If the token is new add it to `models.go` and set its symbol, decimals and price
-// **	Add it to the chain config in e.g. prod.go
+// **	Add it to the chain config in e.g. prod.go (PLEASE keep this map's keys sorted alphabetically)
 // **	Leave the pool address empty
 // ** 	Depending on the pool type fill in the token address or not (wrapped doesn't have a token so leave it empty)
 // **   Set DeployTokenPools to `true` for chains that need the pool deployed

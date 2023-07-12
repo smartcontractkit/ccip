@@ -108,7 +108,6 @@ const (
 	WAVAX      Token = "WAVAX"
 	WMATIC     Token = "WMATIC"
 	CACHEGOLD  Token = "CACHE.gold"
-	ANZ        Token = "ANZ"
 	InsurAce   Token = "InsurAce"
 	ZUSD       Token = "zUSD"
 	STEADY     Token = "STEADY"
@@ -120,16 +119,19 @@ const (
 	Alongside  Token = "Alongside"
 	CCIP_BnM   Token = "CCIP-BnM"
 	CCIP_LnM   Token = "clCCIP-LnM"
+	A_DC       Token = "A$DC"
+	NZ_DC      Token = "NZ$DC"
+	SG_DC      Token = "SG$DC"
 )
 
 func GetAllTokens() []Token {
 	return []Token{
 		LINK, WETH, WAVAX,
-		WMATIC, CACHEGOLD, ANZ,
+		WMATIC, CACHEGOLD,
 		InsurAce, ZUSD, STEADY,
 		SUPER, BondToken, BankToken,
 		SNXUSD, FUGAZIUSDC, Alongside,
-		CCIP_BnM, CCIP_LnM,
+		CCIP_BnM, CCIP_LnM, A_DC, NZ_DC, SG_DC,
 	}
 }
 
@@ -139,7 +141,6 @@ var tokenSymbols = map[Token]string{
 	WAVAX:      "wAVAX",
 	WMATIC:     "wMATIC",
 	CACHEGOLD:  "CGT",
-	ANZ:        "A$DC",
 	InsurAce:   "INSUR",
 	ZUSD:       "zUSD",
 	STEADY:     "Steadefi",
@@ -151,6 +152,9 @@ var tokenSymbols = map[Token]string{
 	Alongside:  "AMKT",
 	CCIP_BnM:   "CCIP-BnM",
 	CCIP_LnM:   "clCCIP-LnM",
+	A_DC:       "A$DC",
+	NZ_DC:      "NZ$DC",
+	SG_DC:      "SG$DC",
 }
 
 func (token Token) Symbol() string {
@@ -163,7 +167,6 @@ var tokenDecimalMultiplier = map[Token]uint8{
 	WAVAX:      18,
 	WMATIC:     18,
 	CACHEGOLD:  8,
-	ANZ:        6,
 	InsurAce:   18,
 	ZUSD:       18,
 	STEADY:     18,
@@ -175,6 +178,9 @@ var tokenDecimalMultiplier = map[Token]uint8{
 	Alongside:  18,
 	CCIP_BnM:   18,
 	CCIP_LnM:   18,
+	A_DC:       6,
+	NZ_DC:      6,
+	SG_DC:      6,
 }
 
 func (token Token) Decimals() uint8 {
@@ -191,7 +197,6 @@ func (token Token) Price() *big.Int {
 		WAVAX:      big.NewFloat(15),
 		WMATIC:     big.NewFloat(0.85),
 		CACHEGOLD:  big.NewFloat(60),
-		ANZ:        big.NewFloat(1),
 		InsurAce:   big.NewFloat(0.08),
 		ZUSD:       big.NewFloat(1),
 		STEADY:     big.NewFloat(1),
@@ -203,6 +208,9 @@ func (token Token) Price() *big.Int {
 		Alongside:  big.NewFloat(1),
 		CCIP_BnM:   big.NewFloat(0.0000000001),
 		CCIP_LnM:   big.NewFloat(0.0000000001),
+		A_DC:       big.NewFloat(1),
+		NZ_DC:      big.NewFloat(1),
+		SG_DC:      big.NewFloat(1),
 	}
 
 	tokenValue := big.NewInt(0)

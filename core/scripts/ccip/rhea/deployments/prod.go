@@ -94,9 +94,6 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x012a3fda37649945Cc72D725168FcB57A469bA6A"), // BetaUser - CACHE.gold
 		gethcommon.HexToAddress("0x552acA1343A6383aF32ce1B7c7B1b47959F7ad90"), // BetaUser - Sommelier Finance
 		gethcommon.HexToAddress("0x8e0866aacCF880E45249e932a094c821Ef4dE5f7"), // BetaUser - OpenZeppelin
-		gethcommon.HexToAddress("0x9bf889acd6dd651bd897b6ff7a6ecde84a4b29aa"), // BetaUser - ANZ
-		gethcommon.HexToAddress("0x9E945BB44B7E264c579e7f0c1FC28FBb39a32386"), // BetaUser - ANZ
-		gethcommon.HexToAddress("0x309bdb4F7608584653D1bE804E8420fA0302911b"), // BetaUser - ANZ
 		gethcommon.HexToAddress("0x066AFe67f2762C4009637c5ac10C789738cc7488"), // BetaUser - Tristero
 		gethcommon.HexToAddress("0x6d818effaE3B40a89AEEb0e0FbA1827EFf77e0E1"), // BetaUser - Tristero
 		gethcommon.HexToAddress("0x1C4310602DEFc04117980080b1807eac15687649"), // BetaUser - Zaros (ZD Labs)
@@ -126,19 +123,12 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x61D280D61b6A093eF91b0da9072Ed313fcc80084"), // BetaUser - ANZ Sender (Upgradable)
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
-		rhea.LINK: {
-			Token:         gethcommon.HexToAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789"),
-			Pool:          gethcommon.HexToAddress("0x5344b4bf5ae39038a591866d2853b2b1db622911"),
-			Price:         rhea.LINK.Price(),
-			Decimals:      rhea.LINK.Decimals(),
-			TokenPoolType: rhea.LockRelease,
-		},
-		rhea.ANZ: {
-			Token:         gethcommon.HexToAddress("0x92eA346B7a2AaB84e6AaB03b80E2421eeFB04685"),
-			Pool:          gethcommon.HexToAddress("0x6c4cf212a5d074bb4d9055279b1fb2f1f37265db"),
-			Price:         rhea.ANZ.Price(),
-			Decimals:      rhea.ANZ.Decimals(),
-			TokenPoolType: rhea.LockRelease,
+		rhea.A_DC: {
+			Token:         gethcommon.HexToAddress("0x5B0bCa59dB458c159e5CbbE977119797F290F355"),
+			Pool:          gethcommon.HexToAddress("0x660b0f3feacd3a6de68c28b091f4548f6f75b457"),
+			Price:         rhea.A_DC.Price(),
+			Decimals:      rhea.A_DC.Decimals(),
+			TokenPoolType: rhea.BurnMint,
 		},
 		rhea.Alongside: {
 			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
@@ -183,6 +173,27 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			Price:         rhea.InsurAce.Price(),
 			Decimals:      rhea.InsurAce.Decimals(),
 			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.LINK: {
+			Token:         gethcommon.HexToAddress("0x779877A7B0D9E8603169DdbD7836e478b4624789"),
+			Pool:          gethcommon.HexToAddress("0x5344b4bf5ae39038a591866d2853b2b1db622911"),
+			Price:         rhea.LINK.Price(),
+			Decimals:      rhea.LINK.Decimals(),
+			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.NZ_DC: {
+			Token:         gethcommon.HexToAddress("0x72C6333A5A99BCB3394DcCd879d6D8FE8766A297"),
+			Pool:          gethcommon.HexToAddress("0x21509dfda83a72e444cc18bc57e6961f1af93959"),
+			Price:         rhea.NZ_DC.Price(),
+			Decimals:      rhea.NZ_DC.Decimals(),
+			TokenPoolType: rhea.BurnMint,
+		},
+		rhea.SG_DC: {
+			Token:         gethcommon.HexToAddress("0x1c1383CFdb6D64e884696C533c6D8A8c42033D79"),
+			Pool:          gethcommon.HexToAddress("0x2a0e16a7d9a027f0aa77a64d362b05c35824db0d"),
+			Price:         rhea.SG_DC.Price(),
+			Decimals:      rhea.SG_DC.Decimals(),
+			TokenPoolType: rhea.BurnMint,
 		},
 		rhea.STEADY: {
 			Token:         gethcommon.HexToAddress("0x82abB1864326A8A7e1A357FFA2270D09CCb867B9"),
@@ -523,7 +534,6 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x4986fD36b6b16f49b43282Ee2e24C5cF90ed166d"), // BetaUser - Sommelier Finance
 		gethcommon.HexToAddress("0xc7a5d29248cf53b094106ca1d29634b34ad0fede"), // BetaUser - Tristero
 		gethcommon.HexToAddress("0x4A5D71F7027684d473a1110a412B510354aF33e7"), // BetaUser - Aave (BGD Labs)
-		gethcommon.HexToAddress("0x44eb6D97e98CE35eEFBD5764aa786f10121bC5e4"), // BetaUser - ANZ
 		gethcommon.HexToAddress("0xa707480A11f12569b888306F2F118716d3BC29A1"), // BetaUser - Lendvest
 		gethcommon.HexToAddress("0xbcFA8eAB1fCe576F1Ef71772E46519e0ADC06623"), // BetaUser - Lendvest
 		gethcommon.HexToAddress("0xd35468ab2547a5ba9c9b809e67a35bcc5b89d2fe"), // BetaUser - Lendvest
@@ -538,12 +548,12 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xBAf3f6ac63F74dC84c0f19F1a195eEA74a6EBA73"), // BetaUser - ANZ Sender (Upgradable)
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
-		rhea.ANZ: {
-			Token:         gethcommon.HexToAddress("0xcdf7d0e9b7216160907722f9e10cccb0362c3b9c"),
-			Pool:          gethcommon.HexToAddress("0x232794176678d6b500e263ef65be956dbac32692"),
-			Price:         rhea.ANZ.Price(),
-			Decimals:      rhea.ANZ.Decimals(),
-			TokenPoolType: rhea.Wrapped,
+		rhea.A_DC: {
+			Token:         gethcommon.HexToAddress("0x2DFfDe4CEb3E17d27D19cE4add6b351044c3d290"),
+			Pool:          gethcommon.HexToAddress("0xffef5d7868416491c3f7ebeee835a2872871e31f"),
+			Price:         rhea.A_DC.Price(),
+			Decimals:      rhea.A_DC.Decimals(),
+			TokenPoolType: rhea.BurnMint,
 		},
 		rhea.Alongside: {
 			Token:         gethcommon.HexToAddress("0xB3c3977B0aC329A9035889929482a4c635B50573"),
@@ -595,6 +605,20 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
 			TokenPoolType: rhea.LockRelease,
+		},
+		rhea.NZ_DC: {
+			Token:         gethcommon.HexToAddress("0x3d1263bAa30c696f1d7eff8E63962674A43E5980"),
+			Pool:          gethcommon.HexToAddress("0x9c03068935e61fc1070f8a1d7afe13f799422301"),
+			Price:         rhea.NZ_DC.Price(),
+			Decimals:      rhea.NZ_DC.Decimals(),
+			TokenPoolType: rhea.BurnMint,
+		},
+		rhea.SG_DC: {
+			Token:         gethcommon.HexToAddress("0xA6C01A7E40e784934739BAC707DE1d6463e76cb7"),
+			Pool:          gethcommon.HexToAddress("0xe359d83ed390c4143820230e18a5e535d93a9a6d"),
+			Price:         rhea.SG_DC.Price(),
+			Decimals:      rhea.SG_DC.Decimals(),
+			TokenPoolType: rhea.BurnMint,
 		},
 		rhea.WAVAX: {
 			Token:         gethcommon.HexToAddress("0xd00ae08403B9bbb9124bB305C09058E32C39A48c"),
