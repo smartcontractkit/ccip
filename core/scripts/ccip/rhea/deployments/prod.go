@@ -546,6 +546,7 @@ var Prod_AvaxFuji = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x3e44ba19e932F4985983994DFa1Bd01f2a2f8eE2"), // BetaUser - Folks Finance
 		gethcommon.HexToAddress("0xf369468Ff0AE765b64af729e3C61668b4aA5717b"), // BetaUser - AAVE
 		gethcommon.HexToAddress("0xBAf3f6ac63F74dC84c0f19F1a195eEA74a6EBA73"), // BetaUser - ANZ Sender (Upgradable)
+		gethcommon.HexToAddress("0x64c9f47178DCcCce9FDA4d8721CeC5335F2F3f11"), // BetaUser - MintDAO - Sender (Proxy)
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.A_DC: {
@@ -889,10 +890,11 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0x76490713314fCEC173f44e99346F54c6e92a8E42"), // BetaUser - Synthetix v3 core
 		gethcommon.HexToAddress("0x0819BBae96c2C0F15477D212e063303221Cf24b9"), // BetaUser - Oddz
 		gethcommon.HexToAddress("0x38104E1bB27A06306B72162047F585B3e6D27484"), // BetaUser - Oddz
-		gethcommon.HexToAddress("0xA9cb37191A089C8f8c24fC3e1F2f761De93FA827"), // MintDAO - Sender (EOA)
-		gethcommon.HexToAddress("0xaFE336062eD69c108232c303fBa9b2b1c709fd9d"), // MintDAO - Sender (Proxy)
+		gethcommon.HexToAddress("0xA9cb37191A089C8f8c24fC3e1F2f761De93FA827"), // BetaUser - MintDAO - Sender (EOA)
+		gethcommon.HexToAddress("0xaFE336062eD69c108232c303fBa9b2b1c709fd9d"), // BetaUser - MintDAO - Sender (Proxy)
 		gethcommon.HexToAddress("0x789d7f3e2eaA6de41133A7fB11d7390603645F31"), // BetaUser - Galaxis
 		gethcommon.HexToAddress("0x6a327aFFDF7e100B27E072321eCe92c492c2B3C5"), // BetaUser - Neobred
+		gethcommon.HexToAddress("0x64c9f47178DCcCce9FDA4d8721CeC5335F2F3f11"), // BetaUser - MintDAO - Sender (Proxy)
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.CCIP_BnM: {
