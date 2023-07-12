@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
 )
 
@@ -13,8 +14,8 @@ type ObservedPriceRegistry struct {
 	metric metricDetails
 }
 
-func NewObservedPriceRegistry(address common.Address, pluginName string, backend bind.ContractBackend) (price_registry.PriceRegistryInterface, error) {
-	priceRegistry, err := price_registry.NewPriceRegistry(address, backend)
+func NewObservedPriceRegistry(address common.Address, pluginName string, client client.Client) (price_registry.PriceRegistryInterface, error) {
+	priceRegistry, err := price_registry.NewPriceRegistry(address, client)
 	if err != nil {
 		return nil, err
 	}
@@ -24,6 +25,7 @@ func NewObservedPriceRegistry(address common.Address, pluginName string, backend
 		metric: metricDetails{
 			histogram:  priceRegistryHistogram,
 			pluginName: pluginName,
+			chainId:    client.ConfiguredChainID(),
 		},
 	}, nil
 }

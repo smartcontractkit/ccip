@@ -1,6 +1,8 @@
 package observability
 
 import (
+	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,7 +21,7 @@ var (
 		float64(750 * time.Millisecond),
 		float64(1 * time.Second),
 	}
-	labels                 = []string{"plugin", "function"}
+	labels                 = []string{"evmChainID", "plugin", "function", "success"}
 	priceRegistryHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "ccip_price_registry_contract_rpc_duration",
 		Help:    "Duration of RPC calls to the Price Registry contract",
@@ -45,14 +47,19 @@ var (
 type metricDetails struct {
 	histogram  *prometheus.HistogramVec
 	pluginName string
+	chainId    *big.Int
 }
 
 func withObservedContract[T any](metric metricDetails, function string, contract func() (T, error)) (T, error) {
 	contractExecutionStarted := time.Now()
-	defer func() {
-		metric.histogram.
-			WithLabelValues(metric.pluginName, function).
-			Observe(float64(time.Since(contractExecutionStarted)))
-	}()
-	return contract()
+	value, err := contract()
+	metric.histogram.
+		WithLabelValues(
+			metric.chainId.String(),
+			metric.pluginName,
+			function,
+			strconv.FormatBool(err == nil),
+		).
+		Observe(float64(time.Since(contractExecutionStarted)))
+	return value, err
 }

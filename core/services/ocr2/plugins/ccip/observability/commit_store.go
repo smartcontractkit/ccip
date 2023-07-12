@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 )
 
@@ -12,8 +13,8 @@ type ObservedCommitStore struct {
 	metric metricDetails
 }
 
-func NewObservedCommitStore(address common.Address, pluginName string, backend bind.ContractBackend) (commit_store.CommitStoreInterface, error) {
-	commitStore, err := commit_store.NewCommitStore(address, backend)
+func NewObservedCommitStore(address common.Address, pluginName string, client client.Client) (*ObservedCommitStore, error) {
+	commitStore, err := commit_store.NewCommitStore(address, client)
 	if err != nil {
 		return nil, err
 	}
@@ -22,6 +23,7 @@ func NewObservedCommitStore(address common.Address, pluginName string, backend b
 		metric: metricDetails{
 			histogram:  commitStoreHistogram,
 			pluginName: pluginName,
+			chainId:    client.ConfiguredChainID(),
 		},
 	}, nil
 }

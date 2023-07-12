@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 )
 
@@ -12,8 +13,8 @@ type ObservedEVM2EVMOfframp struct {
 	metric metricDetails
 }
 
-func NewObservedEVM2EVMOffRamp(address common.Address, pluginName string, backend bind.ContractBackend) (evm_2_evm_offramp.EVM2EVMOffRampInterface, error) {
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(address, backend)
+func NewObservedEVM2EVMOffRamp(address common.Address, pluginName string, client client.Client) (*ObservedEVM2EVMOfframp, error) {
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(address, client)
 	if err != nil {
 		return nil, err
 	}
@@ -22,6 +23,7 @@ func NewObservedEVM2EVMOffRamp(address common.Address, pluginName string, backen
 		metric: metricDetails{
 			histogram:  evm2evmOffRampHistogram,
 			pluginName: pluginName,
+			chainId:    client.ConfiguredChainID(),
 		},
 	}, nil
 }
