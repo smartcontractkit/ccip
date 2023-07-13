@@ -547,18 +547,6 @@ func (o *ORM) SelectIndexedLogsWithSigsExcluding(sigA, sigB common.Hash, topicIn
 	return logs, nil
 }
 
-type byteProducer interface {
-	Bytes() []byte
-}
-
-func concatBytes[T byteProducer](byteSlice []T) pq.ByteaArray {
-	var output [][]byte
-	for _, b := range byteSlice {
-		output = append(output, b.Bytes())
-	}
-	return output
-}
-
 type bytesProducer interface {
 	Bytes() []byte
 }
