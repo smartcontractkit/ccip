@@ -50,7 +50,7 @@ type OCR2Params struct {
 
 var (
 	CommitOcr2Params = OCR2Params{
-		deltaProgress:  2 * time.Minute,
+		deltaProgress:  70 * time.Second, // Should be larger than deltaRound
 		deltaResend:    5 * time.Second,
 		deltaRound:     1 * time.Minute,
 		deltaGrace:     5 * time.Second,
@@ -61,12 +61,12 @@ var (
 		shouldTransmit: 10 * time.Second, // TODO: shorten once db issues resolved
 	}
 	ExecOcr2Params = OCR2Params{
-		deltaProgress:  2 * time.Minute,
+		deltaProgress:  20 * time.Second, // Should be larger than deltaRound
 		deltaResend:    5 * time.Second,
-		deltaRound:     1 * time.Minute,
-		deltaGrace:     5 * time.Second,
+		deltaRound:     5 * time.Second,
+		deltaGrace:     2 * time.Second,
 		query:          100 * time.Millisecond, // exec does not use query
-		observation:    35 * time.Second,       // TODO: shorten once db issues resolved
+		observation:    5 * time.Second,        // TODO: shorten once db issues resolved
 		report:         10 * time.Second,       // TODO: shorten once db issues resolved
 		shouldAccept:   5 * time.Second,
 		shouldTransmit: 10 * time.Second, // TODO: shorten once db issues resolved
