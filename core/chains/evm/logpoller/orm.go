@@ -558,3 +558,15 @@ func concatBytes[T byteProducer](byteSlice []T) pq.ByteaArray {
 	}
 	return output
 }
+
+type bytesProducer interface {
+	Bytes() []byte
+}
+
+func concatBytes[T bytesProducer](byteSlice []T) pq.ByteaArray {
+	var output [][]byte
+	for _, b := range byteSlice {
+		output = append(output, b.Bytes())
+	}
+	return output
+}
