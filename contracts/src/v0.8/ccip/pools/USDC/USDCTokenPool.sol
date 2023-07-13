@@ -140,6 +140,9 @@ contract USDCTokenPool is TokenPool {
   /// @notice Sets the config
   function _setConfig(USDCConfig memory config) internal {
     if (config.messageTransmitter == address(0) || config.tokenMessenger == address(0)) revert InvalidConfig();
+    // Revoke approval for previous token messenger
+    if (s_config.tokenMessenger != address(0)) i_token.approve(s_config.tokenMessenger, 0);
+    // Approve new token messenger
     i_token.approve(config.tokenMessenger, type(uint256).max);
     s_config = config;
     emit ConfigSet(config);

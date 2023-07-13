@@ -324,6 +324,8 @@ contract USDCTokenPool_setConfig is USDCTokenPoolSetup {
       messageTransmitter: address(123456789)
     });
 
+    USDCTokenPool.USDCConfig memory oldConfig = s_usdcTokenPool.getConfig();
+
     vm.expectEmit();
     emit ConfigSet(newConfig);
     s_usdcTokenPool.setConfig(newConfig);
@@ -332,6 +334,12 @@ contract USDCTokenPool_setConfig is USDCTokenPoolSetup {
     assertEq(gotConfig.tokenMessenger, newConfig.tokenMessenger);
     assertEq(gotConfig.messageTransmitter, newConfig.messageTransmitter);
     assertEq(gotConfig.version, newConfig.version);
+
+    assertEq(0, s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), oldConfig.tokenMessenger));
+    assertEq(
+      type(uint256).max,
+      s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), gotConfig.tokenMessenger)
+    );
   }
 
   // Reverts
