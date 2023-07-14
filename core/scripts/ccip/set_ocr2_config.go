@@ -55,10 +55,10 @@ var (
 		deltaRound:     1 * time.Minute,
 		deltaGrace:     5 * time.Second,
 		query:          100 * time.Millisecond, // commit does not use query
-		observation:    35 * time.Second,       // TODO: shorten once db issues resolved
-		report:         10 * time.Second,       // TODO: shorten once db issues resolved
+		observation:    35 * time.Second,
+		report:         10 * time.Second,
 		shouldAccept:   5 * time.Second,
-		shouldTransmit: 10 * time.Second, // TODO: shorten once db issues resolved
+		shouldTransmit: 10 * time.Second,
 	}
 	ExecOcr2Params = OCR2Params{
 		deltaProgress:  20 * time.Second, // Should be larger than deltaRound
@@ -66,10 +66,10 @@ var (
 		deltaRound:     5 * time.Second,
 		deltaGrace:     2 * time.Second,
 		query:          100 * time.Millisecond, // exec does not use query
-		observation:    5 * time.Second,        // TODO: shorten once db issues resolved
-		report:         10 * time.Second,       // TODO: shorten once db issues resolved
+		observation:    5 * time.Second,
+		report:         5 * time.Second,
 		shouldAccept:   5 * time.Second,
-		shouldTransmit: 10 * time.Second, // TODO: shorten once db issues resolved
+		shouldTransmit: 10 * time.Second,
 	}
 )
 
