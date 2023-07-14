@@ -1,12 +1,12 @@
 pragma solidity ^0.8.0;
 
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
-import "../../applications/ImmutableExample.sol";
+import "../../applications/CCIPClientExample.sol";
 import {ERC165Checker} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/ERC165Checker.sol";
 
-contract ImmutableExample_sanity is EVM2EVMOnRampSetup {
+contract CCIPClientExample_sanity is EVM2EVMOnRampSetup {
   function testExamples() public {
-    ImmutableExample exampleContract = new ImmutableExample(s_sourceRouter, IERC20(s_sourceFeeToken));
+    CCIPClientExample exampleContract = new CCIPClientExample(s_sourceRouter, IERC20(s_sourceFeeToken));
     deal(address(exampleContract), 100 ether);
     deal(s_sourceFeeToken, address(exampleContract), 100 ether);
 

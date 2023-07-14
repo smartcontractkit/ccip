@@ -15,7 +15,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
 
   address internal constant CUSTOM_TOKEN = address(12345);
-  uint192 internal constant CUSTON_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
+  uint192 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
 
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;
@@ -23,7 +23,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   bytes32 internal s_metadataHash;
 
   EVM2EVMOnRampHelper internal s_onRamp;
-  address[] s_offRamps;
+  address[] internal s_offRamps;
 
   EVM2EVMOnRamp.FeeTokenConfigArgs[] internal s_feeTokenConfigArgs;
   EVM2EVMOnRamp.TokenTransferFeeConfigArgs[] internal s_tokenTransferFeeConfigArgs;
@@ -32,7 +32,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     TokenSetup.setUp();
     PriceRegistrySetup.setUp();
 
-    s_priceRegistry.updatePrices(getSinglePriceUpdateStruct(CUSTOM_TOKEN, CUSTON_TOKEN_PRICE));
+    s_priceRegistry.updatePrices(getSinglePriceUpdateStruct(CUSTOM_TOKEN, CUSTOM_TOKEN_PRICE));
 
     address WETH = s_sourceRouter.getWrappedNative();
 

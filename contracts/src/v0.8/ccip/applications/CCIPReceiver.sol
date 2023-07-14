@@ -9,7 +9,7 @@ import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.0/utils/introspec
 
 /// @title CCIPReceiver - Base contract for CCIP applications that can receive messages.
 abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
-  address private immutable i_router;
+  address internal immutable i_router;
 
   constructor(address router) {
     if (router == address(0)) revert InvalidRouter(address(0));
@@ -24,7 +24,7 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
   }
 
   /// @inheritdoc IAny2EVMMessageReceiver
-  function ccipReceive(Client.Any2EVMMessage calldata message) external override onlyRouter {
+  function ccipReceive(Client.Any2EVMMessage calldata message) external virtual override onlyRouter {
     _ccipReceive(message);
   }
 

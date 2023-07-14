@@ -637,7 +637,7 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
 
     s_feeTokenPrice = s_sourceTokenPrices[0];
     s_wrappedTokenPrice = s_sourceTokenPrices[2];
-    s_customTokenPrice = CUSTON_TOKEN_PRICE;
+    s_customTokenPrice = CUSTOM_TOKEN_PRICE;
   }
 
   function calcUSDValueFromTokenAmount(uint192 tokenPrice, uint256 tokenAmount) internal pure returns (uint256) {
