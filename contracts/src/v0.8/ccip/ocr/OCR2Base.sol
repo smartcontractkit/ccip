@@ -249,6 +249,7 @@ abstract contract OCR2Base is OwnerIsCreator, OCR2Abstract {
 
     uint256 numberOfSignatures = rs.length;
     for (uint256 i = 0; i < numberOfSignatures; ++i) {
+      // Safe from ECDSA malleability here since we check for duplicate signers.
       address signer = ecrecover(h, uint8(rawVs[i]) + 27, rs[i], ss[i]);
       // Since we disallow address(0) as a valid signer address, it can
       // never have a signer role.
