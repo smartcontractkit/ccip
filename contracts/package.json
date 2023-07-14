@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/contracts-ccip",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Chainlink smart contracts",
   "author": "Chainlink devs",
   "license": "BUSL-1.1",
@@ -17,13 +17,23 @@
     "coverage": "hardhat coverage",
     "prepublishOnly": "pnpm compile && ./scripts/prepublish_generate_abi_folder",
     "publish-beta": "pnpm publish --tag beta",
-    "publish-prod": "npm dist-tag add @chainlink/contracts-ccip@0.7.2 latest",
+    "publish-prod": "npm dist-tag add @chainlink/contracts-ccip@0.7.3 latest",
     "lint:ccip": "solhint --config ./src/v0.8/ccip/.solhint.json --ignore-path .ccip-solhint-ignore --max-warnings 0 \"./src/v0.8/ccip/**/*.sol\""
   },
   "files": [
     "src/v0.8/ccip/**/*.sol",
-    "!src/v0.8/ccip/tests/**/*",
+    "!src/v0.8/ccip/test/**/*",
     "!src/v0.8/ccip/pools/USDC/**/*",
+    "src/v0.8/shared/access/OwnerIsCreator.sol",
+    "src/v0.8/shared/enumerable/EnumerableMapAddresses.sol",
+    "src/v0.8/shared/token/ERC20/IBurnMintERC20.sol",
+    "src/v0.8/vendor/openzeppelin-solidity",
+    "src/v0.8/vendor/Context.sol",
+    "src/v0.8/vendor/Pausable.sol",
+    "src/v0.8/interfaces/TypeAndVersionInterface.sol",
+    "src/v0.8/interfaces/OwnableInterface.sol",
+    "src/v0.8/ConfirmedOwner.sol",
+    "src/v0.8/ConfirmedOwnerWithProposal.sol",
     "abi/"
   ],
   "pnpm": {

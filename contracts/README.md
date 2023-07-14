@@ -14,16 +14,8 @@ $ npm install @chainlink/contracts-ccip --save
 ```sh
 @chainlink/contracts-ccip
 ├── src # Solidity contracts
-│   ├── v0.4
-│   ├── v0.5
-│   ├── v0.6
-│   ├── v0.7
 │   └── v0.8
 └── abi # ABI json output
-    ├── v0.4
-    ├── v0.5
-    ├── v0.6
-    ├── v0.7
     └── v0.8
 ```
 
@@ -32,8 +24,7 @@ $ npm install @chainlink/contracts-ccip --save
 The solidity smart contracts themselves can be imported via the `src` directory of `@chainlink/contracts-ccip`:
 
 ```solidity
-import '@chainlink-ccip/contracts/src/v0.8/ccip/applications/CCIPReceiver.sol';
-
+import '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 ```
 
 ## License
