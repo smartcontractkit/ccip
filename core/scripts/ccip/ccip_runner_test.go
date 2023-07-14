@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"math/big"
 	"os"
 	"strings"
@@ -525,14 +526,26 @@ func TestUpdateLaneARMAddress(t *testing.T) {
 func TestFinalityTags(t *testing.T) {
 	checkOwnerKey(t)
 
+	/// CONFIG
 	// Ensure that HeaderByBlockNumber using finality tag works.
 	finalityTagChains := []uint64{420, 43113, 421613, 11155111}
+
+	WRITE_ALL_TO_LOG := false
+
+	/// END CONFIG
 
 	stringBuilderMap := make(map[uint64]*strings.Builder)
 	for _, chainID := range finalityTagChains {
 		stringBuilderMap[chainID] = &strings.Builder{}
 	}
 
+	type FinalityResult struct {
+		time                 int64
+		secondsSinceFinality int64
+		secondsSinceSafe     int64
+	}
+
+	results := make(map[uint64][]FinalityResult)
 	clients := make(map[uint64]*ethclient.Client)
 	for _, chainID := range finalityTagChains {
 		client, err := ethclient.Dial(secrets.GetRPC(chainID))
@@ -540,7 +553,7 @@ func TestFinalityTags(t *testing.T) {
 		clients[chainID] = client
 	}
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 720; i++ {
 		for _, chainID := range finalityTagChains {
 			f, err := clients[chainID].HeaderByNumber(context.Background(), big.NewInt(rpc.FinalizedBlockNumber.Int64()))
 			if err != nil {
@@ -559,20 +572,66 @@ func TestFinalityTags(t *testing.T) {
 
 			safeTimeDiffSec := timeNow - int64(safe.Time)
 
-			stringBuilderMap[chainID].WriteString(
-				fmt.Sprintf("%s ::: finalized time %02d:%02d, block %s -- safe time %02d:%02d, block %s\n",
-					time.Now().Format(time.TimeOnly),
-					finTimeDiffSec/60, finTimeDiffSec%60,
-					f.Number.String(),
-					safeTimeDiffSec/60, safeTimeDiffSec%60,
-					safe.Number.String()))
+			results[chainID] = append(results[chainID], FinalityResult{
+				time:                 timeNow,
+				secondsSinceFinality: finTimeDiffSec,
+				secondsSinceSafe:     safeTimeDiffSec,
+			})
+
+			if WRITE_ALL_TO_LOG {
+				stringBuilderMap[chainID].WriteString(
+					fmt.Sprintf("%s ::: finalized time %02d:%02d, block %s -- safe time %02d:%02d, block %s\n",
+						time.Now().Format(time.TimeOnly),
+						finTimeDiffSec/60, finTimeDiffSec%60,
+						f.Number.String(),
+						safeTimeDiffSec/60, safeTimeDiffSec%60,
+						safe.Number.String()))
+			}
 		}
-		time.Sleep(10 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 
-	for chainID, builder := range stringBuilderMap {
-		fmt.Printf("ChainID: %d\n", chainID)
-		fmt.Println(builder.String())
+	for chainID, results := range results {
+		totalFinalityTime, totalSafeTime := int64(0), int64(0)
+		minFinalityTime, minSafeTime := int64(math.MaxInt64), int64(math.MaxInt64)
+		maxFinalityTime, maxSafeTime := int64(0), int64(0)
+
+		for _, result := range results {
+			totalFinalityTime += result.secondsSinceFinality
+			totalSafeTime += result.secondsSinceSafe
+			if result.secondsSinceFinality < minFinalityTime {
+				minFinalityTime = result.secondsSinceFinality
+			}
+			if result.secondsSinceSafe < minSafeTime {
+				minSafeTime = result.secondsSinceSafe
+			}
+			if result.secondsSinceFinality > maxFinalityTime {
+				maxFinalityTime = result.secondsSinceFinality
+			}
+			if result.secondsSinceSafe > maxSafeTime {
+				maxSafeTime = result.secondsSinceSafe
+			}
+		}
+
+		secondsSinceFinality := totalFinalityTime / int64(len(results))
+		secondsSinceSafe := totalSafeTime / int64(len(results))
+
+		fmt.Printf("ChainID: %8d ::: avg finalized time %02d:%02d | min finalized time %02d:%02d | max finalized time %02d:%02d -- avg safe time %02d:%02d | min safe time %02d:%02d | max safe time %02d:%02d\n",
+			chainID,
+			secondsSinceFinality/60, secondsSinceFinality%60,
+			minFinalityTime/60, minFinalityTime%60,
+			maxFinalityTime/60, maxFinalityTime%60,
+			secondsSinceSafe/60, secondsSinceSafe%60,
+			minSafeTime/60, minSafeTime%60,
+			maxSafeTime/60, maxSafeTime%60,
+		)
+	}
+
+	if WRITE_ALL_TO_LOG {
+		for chainID, builder := range stringBuilderMap {
+			fmt.Printf("ChainID: %d\n", chainID)
+			fmt.Println(builder.String())
+		}
 	}
 
 }
