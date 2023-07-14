@@ -787,6 +787,31 @@ contract EVM2EVMOnRamp_getTokenTransferFee is EVM2EVMOnRamp_getFeeSetup {
     assertEq(0, feeAmount);
   }
 
+  function testTokenTransferFeeDuplicateTokens(uint256 transfers, uint256 amount) public {
+    // It shouldn't be possible to pay materially lower fees by splitting up the transfers.
+    // Note it is possible to pay higher fees since the minimum fees are added.
+    EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
+    transfers = bound(transfers, 1, dynamicConfig.maxTokensLength);
+    // Cap amount to avoid overflow
+    amount = bound(amount, 0, 1e36);
+    Client.EVMTokenAmount[] memory multiple = new Client.EVMTokenAmount[](transfers);
+    for (uint256 i = 0; i < transfers; ++i) {
+      multiple[i] = Client.EVMTokenAmount({token: s_sourceTokens[0], amount: amount});
+    }
+    Client.EVMTokenAmount[] memory single = new Client.EVMTokenAmount[](1);
+    single[0] = Client.EVMTokenAmount({token: s_sourceTokens[0], amount: amount * transfers});
+    uint256 feeSingle = s_onRamp.getTokenTransferFee(s_sourceRouter.getWrappedNative(), s_wrappedTokenPrice, single);
+    uint256 feeMultiple = s_onRamp.getTokenTransferFee(
+      s_sourceRouter.getWrappedNative(),
+      s_wrappedTokenPrice,
+      multiple
+    );
+    console.log(feeSingle);
+    console.log(feeMultiple);
+    // Note that there can be a rounding error once per split.
+    assertTrue(feeMultiple >= (feeSingle - dynamicConfig.maxTokensLength));
+  }
+
   function testMixedTokenFeeSuccess() public {
     uint192[3] memory tokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice, s_customTokenPrice];
     uint256[3] memory tokenTransferAmounts = [uint256(10000e18), uint256(10000e18), uint256(100000e18)];

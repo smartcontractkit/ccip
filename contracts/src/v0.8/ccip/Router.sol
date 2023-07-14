@@ -113,6 +113,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
       // for fee calculation we check the wrapped native price as we wrap
       // as part of the native fee coin payment.
       message.feeToken = s_wrappedNative;
+      // We rely on getFee to validate that the feeToken is whitelisted.
       feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(message);
       // Ensure sufficient native.
       if (msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
@@ -123,6 +124,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
       IERC20(message.feeToken).safeTransfer(onRamp, feeTokenAmount);
     } else {
       if (msg.value > 0) revert InvalidMsgValue();
+      // We rely on getFee to validate that the feeToken is whitelisted.
       feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(message);
       IERC20(message.feeToken).safeTransferFrom(msg.sender, onRamp, feeTokenAmount);
     }
@@ -130,6 +132,7 @@ contract Router is IRouter, IRouterClient, TypeAndVersionInterface, OwnerIsCreat
     // Transfer the tokens to the token pools.
     for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
       IERC20 token = IERC20(message.tokenAmounts[i].token);
+      // We rely on getPoolBySourceToken to validate that the token is whitelisted.
       token.safeTransferFrom(
         msg.sender,
         address(IEVM2AnyOnRamp(onRamp).getPoolBySourceToken(token)),

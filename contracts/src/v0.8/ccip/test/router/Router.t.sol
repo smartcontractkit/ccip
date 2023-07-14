@@ -325,6 +325,20 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
   }
 
+  function testUnsupportedTokenReverts(address wrongToken) public {
+    for (uint256 i = 0; i < s_sourceTokens.length; ++i) {
+      vm.assume(address(s_sourceTokens[i]) != wrongToken);
+    }
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+    tokenAmounts[0] = Client.EVMTokenAmount({token: wrongToken, amount: 1});
+    message.tokenAmounts = tokenAmounts;
+
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, wrongToken));
+
+    s_sourceRouter.ccipSend(DEST_CHAIN_ID, message);
+  }
+
   function testFeeTokenAmountTooLowReverts() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     IERC20(s_sourceTokens[0]).approve(address(s_sourceRouter), 0);

@@ -475,6 +475,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
+  /// @dev getFee MUST revert if the feeToken is not listed in the fee token config.
+  /// as the router assumes it does.
   function getFee(Client.EVM2AnyMessage calldata message) external view returns (uint256) {
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
     if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
@@ -504,7 +506,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @notice Returns the fee based on the tokens transferred. Will always be 0 if
-  /// no tokens are transferred. The token fee is calculated based on basis points.
+  /// no tokens are transferred or if the token as no configuration. The token fee is calculated based on basis points.
+  /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
   function _getTokenTransferFee(
     address feeToken,
     uint192 feeTokenPrice,

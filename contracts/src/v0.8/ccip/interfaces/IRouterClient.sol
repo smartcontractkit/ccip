@@ -21,9 +21,9 @@ interface IRouterClient {
 
   /// @param destinationChainSelector The destination chainSelector
   /// @param message The cross-chain CCIP message including data and/or tokens
-  /// @return fee returns guaranteed execution fee for the specified message
-  /// delivery to destination chain
-  /// @dev returns 0 fee on invalid message.
+  /// @return fee returns execution fee for the message
+  /// delivery to destination chain, denominated in the feeToken specified in the message.
+  /// @dev Reverts with appropriate reason upon invalid message.
   function getFee(
     uint64 destinationChainSelector,
     Client.EVM2AnyMessage memory message
@@ -35,6 +35,7 @@ interface IRouterClient {
   /// @return messageId The message ID
   /// @dev Note if msg.value is larger than the required fee (from getFee) we accept
   /// the overpayment with no refund.
+  /// @dev Reverts with appropriate reason upon invalid message.
   function ccipSend(
     uint64 destinationChainSelector,
     Client.EVM2AnyMessage calldata message
