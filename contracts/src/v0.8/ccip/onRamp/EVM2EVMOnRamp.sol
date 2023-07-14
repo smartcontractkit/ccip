@@ -117,7 +117,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   struct TokenTransferFeeConfig {
     uint32 minFee; // ---┐ Minimum USD fee to charge, multiples of 1 US cent, or 0.01USD
     uint32 maxFee; //    | Maximum USD fee to charge, multiples of 1 US cent, or 0.01USD
-    uint16 ratio; // ----┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 10e-5
+    uint16 ratio; // ----┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
   }
 
   /// @dev Same as TokenTransferFeeConfig
@@ -126,7 +126,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address token; // ---┐ Token address
     uint32 minFee; //    | Minimum USD fee to charge, multiples of 1 US cent, or 0.01USD
     uint32 maxFee; //    | Maximum USD fee to charge, multiples of 1 US cent, or 0.01USD
-    uint16 ratio; // ----┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 10e-5
+    uint16 ratio; // ----┘ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
@@ -529,7 +529,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         }
 
         // calculate token transfer value, then apply fee ratio
-        // ratio represents multiples of 0.1bps, or 10e-5
+        // ratio represents multiples of 0.1bps, or 1e-5
         feeValue = (tokenPrice._calcUSDValueFromTokenAmount(tokenAmount.amount) * transferFeeConfig.ratio) / 1e5;
       }
 
