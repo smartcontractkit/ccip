@@ -218,8 +218,8 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.SNXUSD: {
-			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
-			Pool:          gethcommon.HexToAddress("0x2291909e328dd00e6b3284730d478f39dbde4c88"),
+			Token:         gethcommon.HexToAddress("0x1b791d05E437C78039424749243F5A79E747525e"),
+			Pool:          gethcommon.HexToAddress("0x9b65749b38278060c5787cce0391ac7f1094c8e8"),
 			Price:         rhea.SNXUSD.Price(),
 			Decimals:      rhea.SNXUSD.Decimals(),
 			TokenPoolType: rhea.BurnMint,
@@ -388,8 +388,8 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.SNXUSD: {
-			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
-			Pool:          gethcommon.HexToAddress("0x7a81e36b40b0a778afb2ae3c8384b6195233d093"),
+			Token:         gethcommon.HexToAddress("0xe487Ad4291019b33e2230F8E2FB1fb6490325260"),
+			Pool:          gethcommon.HexToAddress("0xd23c2ef3a533040b57cadaf33ccb111edbaca018"),
 			Price:         rhea.SNXUSD.Price(),
 			Decimals:      rhea.SNXUSD.Decimals(),
 			TokenPoolType: rhea.BurnMint,
@@ -780,8 +780,8 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.SNXUSD: {
-			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
-			Pool:          gethcommon.HexToAddress("0x7990f84bbe3e6638907d5fcc217555146304a8d9"),
+			Token:         gethcommon.HexToAddress("0x1b791d05E437C78039424749243F5A79E747525e"),
+			Pool:          gethcommon.HexToAddress("0xd7d47c0e62029a1a3eb8c08691c8c9863fe766c2"),
 			Price:         rhea.SNXUSD.Price(),
 			Decimals:      rhea.SNXUSD.Decimals(),
 			TokenPoolType: rhea.BurnMint,
@@ -927,8 +927,8 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 			TokenPoolType: rhea.Wrapped,
 		},
 		rhea.SNXUSD: {
-			Token:         gethcommon.HexToAddress("0x585d8E269A250aCBf7D4884A1a31D3b596B46D8B"),
-			Pool:          gethcommon.HexToAddress("0x56ffa3ae8bb98b120067b1be50136f681aa3addf"),
+			Token:         gethcommon.HexToAddress("0x1b791d05E437C78039424749243F5A79E747525e"),
+			Pool:          gethcommon.HexToAddress("0xb8b8592aaf82bd42190aa8b629c6afa35a433461"),
 			Price:         rhea.SNXUSD.Price(),
 			Decimals:      rhea.SNXUSD.Decimals(),
 			TokenPoolType: rhea.BurnMint,
