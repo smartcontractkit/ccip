@@ -35,18 +35,18 @@ type ICommitStoreInterval struct {
 }
 
 type InternalEVM2EVMMessage struct {
-	SourceChainId  uint64
-	SequenceNumber uint64
-	FeeTokenAmount *big.Int
-	Sender         common.Address
-	Nonce          uint64
-	GasLimit       *big.Int
-	Strict         bool
-	Receiver       common.Address
-	Data           []byte
-	TokenAmounts   []ClientEVMTokenAmount
-	FeeToken       common.Address
-	MessageId      [32]byte
+	SourceChainSelector uint64
+	SequenceNumber      uint64
+	FeeTokenAmount      *big.Int
+	Sender              common.Address
+	Nonce               uint64
+	GasLimit            *big.Int
+	Strict              bool
+	Receiver            common.Address
+	Data                []byte
+	TokenAmounts        []ClientEVMTokenAmount
+	FeeToken            common.Address
+	MessageId           [32]byte
 }
 
 type ClientEVMTokenAmount struct {
@@ -60,10 +60,10 @@ type SendRequestedEvent struct {
 }
 
 type InternalExecutionReport struct {
-	SequenceNumbers []uint64
-	EncodedMessages [][]byte
-	Proofs          [][32]byte
-	ProofFlagBits   *big.Int
+	Messages          []InternalEVM2EVMMessage
+	OffchainTokenData [][][]byte
+	Proofs            [][32]byte
+	ProofFlagBits     *big.Int
 }
 
 type EVM2EVMOffRampExecutionStateChanged struct {

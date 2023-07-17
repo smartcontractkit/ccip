@@ -22,16 +22,19 @@ import (
 	"manual-execution/helpers"
 )
 
+const NumberOfBlocks = 5000
+
 // Config represents configuration fields
 type Config struct {
-	SrcNodeURL     string `json:"src_rpc"`
-	DestNodeURL    string `json:"dest_rpc"`
-	DestOwner      string `json:"dest_owner_key"`
-	CommitStore    string `json:"commit_store"`
-	OffRamp        string `json:"off_ramp"`
-	DestStartBlock uint64 `json:"dest_start_block"`
-	CcipSendTx     string `json:"ccip_send_tx"`
-	DestDeployedAt uint64 `json:"dest_deployed_at"`
+	SrcNodeURL       string `json:"src_rpc"`
+	DestNodeURL      string `json:"dest_rpc"`
+	DestOwner        string `json:"dest_owner_key"`
+	CommitStore      string `json:"commit_store"`
+	OffRamp          string `json:"off_ramp"`
+	DestStartBlock   uint64 `json:"dest_start_block"`
+	CcipSendTx       string `json:"ccip_send_tx"`
+	DestDeployedAt   uint64 `json:"dest_deployed_at"`
+	GasLimitOverride uint64 `json:"gas_limit_override"`
 }
 
 type execArgs struct {
@@ -77,6 +80,7 @@ func main() {
 	"ccip_send_tx": "",
 	"source_start_block": "",
 	"dest_deployed_at": 0,
+	"gas_limit_override": 0,
 }`)
 		os.Exit(1)
 	}
@@ -119,6 +123,9 @@ func (cfg Config) verifyConfig() error {
 dest_deployed_at - the block number before destination contracts were deployed;
 dest_start_block - the block number from which events will be filtered at destination chain.
 `))
+	}
+	if cfg.GasLimitOverride == 0 {
+		allErr = multierr.Append(allErr, fmt.Errorf("must set gas_limit_override - new value of gas limit for ccip-send request\n"))
 	}
 	err := helpers.VerifyAddress(cfg.CommitStore)
 	if err != nil {
@@ -168,7 +175,7 @@ func (args *execArgs) populateValues() error {
 	if err != nil {
 		return err
 	}
-	args.srcStartBlock = txReceipt.BlockNumber
+	args.srcStartBlock = big.NewInt(0).Sub(txReceipt.BlockNumber, big.NewInt(NumberOfBlocks))
 	args.destLatestBlock, err = args.destChain.BlockNumber(context.Background())
 	if err != nil {
 		return err
@@ -215,14 +222,24 @@ func (args *execArgs) execute() error {
 	seqNr := args.seqNum
 	// Build a merkle tree for the report
 	mctx := helpers.NewKeccakCtx()
-	leafHasher := helpers.NewLeafHasher(args.sourceChainId.Uint64(), args.destChainId.Uint64(), args.OnRamp, mctx)
+	leafHasher := helpers.NewLeafHasher(
+		GetCCIPChainSelector(args.sourceChainId.Uint64()),
+		GetCCIPChainSelector(args.destChainId.Uint64()),
+		args.OnRamp,
+		mctx,
+	)
+
 	var leaves [][32]byte
 	var curr, prove int
-	var encodedMsg []byte
+	var tokenData [][][]byte
+	var msgs []helpers.InternalEVM2EVMMessage
 
 	sendRequestedIterator, err := helpers.FilterCCIPSendRequested(args.sourceChain, &bind.FilterOpts{
 		Start: args.srcStartBlock.Uint64(),
 	}, args.OnRamp.Hex())
+	if err != nil {
+		return err
+	}
 
 	for sendRequestedIterator.Next() {
 		event, err := sendRequestedIterator.SendRequestedEventFromLog()
@@ -239,7 +256,14 @@ func (args *execArgs) execute() error {
 			leaves = append(leaves, hash)
 			if event.Message.SequenceNumber == seqNr && event.Message.MessageId == args.msgID {
 				log.Printf("Found proving %d %+v\n\n", curr, event.Message)
-				encodedMsg = sendRequestedIterator.Raw.Data
+				msgs = append(msgs, event.Message)
+
+				var msgTokenData [][]byte
+				for range event.Message.TokenAmounts {
+					msgTokenData = append(msgTokenData, []byte{})
+				}
+
+				tokenData = append(tokenData, msgTokenData)
 				prove = curr
 			}
 			curr++
@@ -247,9 +271,15 @@ func (args *execArgs) execute() error {
 	}
 
 	sendRequestedIterator.Close()
-	if encodedMsg == nil {
+	if len(msgs) == 0 {
 		return fmt.Errorf("unable to find msg with seqNr %d", seqNr)
 	}
+
+	expectedNumberOfLeaves := int(commitReport.Interval.Max) - int(commitReport.Interval.Min) + 1
+	if len(leaves) != expectedNumberOfLeaves {
+		return fmt.Errorf("not enough leaves gather to build a commit root - want %d got %d. Please set NumberOfBlocks const to a higher value", expectedNumberOfLeaves, len(leaves))
+	}
+
 	tree, err := helpers.NewTree(mctx, leaves)
 	if err != nil {
 		return err
@@ -260,16 +290,16 @@ func (args *execArgs) execute() error {
 
 	proof := tree.Prove([]int{prove})
 	offRampProof := helpers.InternalExecutionReport{
-		SequenceNumbers: []uint64{seqNr},
-		EncodedMessages: [][]byte{encodedMsg},
-		Proofs:          proof.Hashes,
-		ProofFlagBits:   helpers.ProofFlagsToBits(proof.SourceFlags),
+		Messages:          msgs,
+		Proofs:            proof.Hashes,
+		OffchainTokenData: tokenData,
+		ProofFlagBits:     helpers.ProofFlagsToBits(proof.SourceFlags),
 	}
 
 	// Execute.
-	gasLimitOverrides := make([]*big.Int, len(offRampProof.EncodedMessages))
-	for i := range offRampProof.EncodedMessages {
-		gasLimitOverrides[i] = big.NewInt(0)
+	gasLimitOverrides := make([]*big.Int, len(offRampProof.Messages))
+	for i := range offRampProof.Messages {
+		gasLimitOverrides[i] = big.NewInt(int64(args.cfg.GasLimitOverride))
 	}
 
 	tx, err := helpers.ManuallyExecute(args.destChain, args.destUser, args.cfg.OffRamp, offRampProof, gasLimitOverrides)
@@ -387,4 +417,28 @@ func (args *execArgs) approxDestStartBlock() error {
 	args.destStartBlock = closestBlockHdr.Number.Uint64()
 	log.Printf("using approx destination start block number %d for filtering event", args.destStartBlock)
 	return nil
+}
+
+var evmChainIdToChainSelector = map[uint64]uint64{
+	// Testnets
+	420:      2664363617261496610,  // Optimism Goerli
+	1337:     3379446385462418246,  // Quorem
+	43113:    14767482510784806043, // Avax Fuji
+	80001:    12532609583862916517, // Polygon Mumbai
+	421613:   6101244977088475029,  // Arbitrum Goerli
+	11155111: 16015286601757825753, // Sepolia
+	// Mainnets
+	1:     5009297550715157269, // Ethereum
+	10:    3734403246176062136, // Optimism
+	137:   4051577828743386545, // Polygon
+	42161: 4949039107694359620, // Arbitrum
+	43114: 6433500567565415381, // Avalanche
+}
+
+func GetCCIPChainSelector(EVMChainId uint64) uint64 {
+	selector, ok := evmChainIdToChainSelector[EVMChainId]
+	if !ok {
+		panic(fmt.Sprintf("no chain selector for %d", EVMChainId))
+	}
+	return selector
 }
