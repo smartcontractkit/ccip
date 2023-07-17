@@ -21,8 +21,7 @@ import (
 )
 
 type laneLoadCfg struct {
-	schedule []*wasp.Segment
-	lane     *actions.CCIPLane
+	lane *actions.CCIPLane
 }
 
 type ChaosConfig struct {
@@ -32,20 +31,19 @@ type ChaosConfig struct {
 }
 
 type loadArgs struct {
-	t                  *testing.T
-	lggr               zerolog.Logger
-	ctx                context.Context
-	ccipLoad           []*CCIPE2ELoad
-	RequestPerUnitTime int
-	UnitTime           time.Duration
-	loadRunner         []*wasp.Generator
-	LaneLoadCfg        chan laneLoadCfg
-	RunnerWg           *errgroup.Group // to wait on individual load generators run
-	LoadStarterWg      *sync.WaitGroup // waits for all the runners to start
-	TestCfg            *testsetups.CCIPTestConfig
-	TestSetupArgs      *testsetups.CCIPTestSetUpOutputs
-	EstimatedEnd       time.Time
-	ChaosExps          []ChaosConfig
+	t             *testing.T
+	lggr          zerolog.Logger
+	ctx           context.Context
+	ccipLoad      []*CCIPE2ELoad
+	schedules     []*wasp.Segment
+	loadRunner    []*wasp.Generator
+	LaneLoadCfg   chan laneLoadCfg
+	RunnerWg      *errgroup.Group // to wait on individual load generators run
+	LoadStarterWg *sync.WaitGroup // waits for all the runners to start
+	TestCfg       *testsetups.CCIPTestConfig
+	TestSetupArgs *testsetups.CCIPTestSetUpOutputs
+	EstimatedEnd  time.Time
+	ChaosExps     []ChaosConfig
 }
 
 func (l *loadArgs) Setup(sameCommitAndExec bool) {
@@ -72,27 +70,44 @@ func (l *loadArgs) Setup(sameCommitAndExec bool) {
 	l.EstimatedEnd = time.Now().Add(l.TestCfg.TestDuration)
 }
 
+func (l *loadArgs) setSchedule() {
+	var segments []*wasp.Segment
+	var segmentDuration time.Duration
+	require.Greater(l.t, len(l.TestCfg.Load.RequestPerUnitTime), 0, "RequestPerUnitTime must be set")
+	if len(l.TestCfg.Load.RequestPerUnitTime) > 0 {
+		for i, req := range l.TestCfg.Load.RequestPerUnitTime {
+			duration := l.TestCfg.Load.StepDuration[i]
+			segmentDuration += duration
+			segments = append(segments, wasp.Plain(req, duration)...)
+		}
+		totalDuration := l.TestCfg.TestDuration
+		repeatTimes := int(totalDuration / segmentDuration)
+		l.schedules = wasp.CombineAndRepeat(repeatTimes, segments)
+	} else {
+		l.schedules = wasp.Plain(l.TestCfg.Load.RequestPerUnitTime[0], l.TestCfg.TestDuration)
+	}
+}
+
 func (l *loadArgs) TriggerLoad(schedule ...*wasp.Segment) {
 	l.Start()
 	if len(schedule) == 0 {
-		schedule = wasp.Plain(l.TestCfg.Load.RequestPerUnitTime, l.TestCfg.TestDuration)
+		l.setSchedule()
+	} else {
+		l.schedules = schedule
 	}
 	for _, lane := range l.TestSetupArgs.Lanes {
 		if lane.LaneDeployed {
 			l.LaneLoadCfg <- laneLoadCfg{
-				schedule: schedule,
-				lane:     lane.ForwardLane,
+				lane: lane.ForwardLane,
 			}
 			if lane.ReverseLane != nil {
 				l.LaneLoadCfg <- laneLoadCfg{
-					schedule: schedule,
-					lane:     lane.ReverseLane,
+					lane: lane.ReverseLane,
 				}
 			}
 		}
 	}
 	l.TestSetupArgs.Reporter.SetDuration(l.TestCfg.TestDuration)
-	l.TestSetupArgs.Reporter.SetRPS(l.TestCfg.Load.RequestPerUnitTime)
 }
 
 func (l *loadArgs) AddMoreLanesToRun() {
@@ -106,6 +121,7 @@ func (l *loadArgs) AddMoreLanesToRun() {
 	noOfPair := int64(len(l.TestCfg.NetworkPairs))
 	step := l.TestCfg.TestDuration.Nanoseconds() / noOfPair
 	ticker := time.NewTicker(time.Duration(step))
+	l.setSchedule()
 	// Lane for the first network pair is already deployed
 	netIndex := 1
 	for {
@@ -122,21 +138,12 @@ func (l *loadArgs) AddMoreLanesToRun() {
 				transferAmounts, 5, true,
 				true, false)
 			assert.NoError(l.t, err)
-			// set the duration for the load to be the remaining time
-			dur := l.EstimatedEnd.Sub(time.Now())
-			// if the estimated end is already passed, set the duration to mentioned duration
-			if l.EstimatedEnd.Before(time.Now()) {
-				l.lggr.Warn().Msgf("Estimated end time is already passed, setting the load for additional %s", l.TestCfg.TestDuration)
-				dur = l.TestCfg.TestDuration
-			}
 			l.LaneLoadCfg <- laneLoadCfg{
-				schedule: wasp.Plain(l.TestCfg.Load.RequestPerUnitTime, dur),
-				lane:     l.TestSetupArgs.Lanes[netIndex].ForwardLane,
+				lane: l.TestSetupArgs.Lanes[netIndex].ForwardLane,
 			}
 			if l.TestSetupArgs.Lanes[netIndex].ReverseLane != nil {
 				l.LaneLoadCfg <- laneLoadCfg{
-					schedule: wasp.Plain(l.TestCfg.Load.RequestPerUnitTime, dur),
-					lane:     l.TestSetupArgs.Lanes[netIndex].ReverseLane,
+					lane: l.TestSetupArgs.Lanes[netIndex].ReverseLane,
 				}
 			}
 			netIndex++
@@ -166,7 +173,6 @@ func (l *loadArgs) Start() {
 					Str("Destination Network", lane.DestNetworkName).
 					Msg("Starting load for lane")
 
-				schedule := cfg.schedule
 				ccipLoad := NewCCIPLoad(l.TestCfg.Test, lane, l.TestCfg.PhaseTimeout, 100000, lane.Reports)
 				ccipLoad.BeforeAllCall(l.TestCfg.MsgType)
 				if lane.TestEnv != nil && lane.TestEnv.K8Env != nil && lane.TestEnv.K8Env.Cfg != nil {
@@ -176,12 +182,13 @@ func (l *loadArgs) Start() {
 				loadRunner, err := wasp.NewGenerator(&wasp.Config{
 					T:                     l.TestCfg.Test,
 					GenName:               fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
-					Schedule:              schedule,
+					StatsPollInterval:     time.Minute,
+					Schedule:              l.schedules,
 					LoadType:              wasp.RPS,
 					RateLimitUnitDuration: l.TestCfg.Load.TimeUnit,
 					CallTimeout:           l.TestCfg.Load.LoadTimeOut,
 					Gun:                   ccipLoad,
-					Logger:                zerolog.Logger{},
+					Logger:                ccipLoad.Lane.Logger,
 					SharedData:            l.TestCfg.MsgType,
 					LokiConfig:            wasp.NewEnvLokiConfig(),
 					Labels: map[string]string{

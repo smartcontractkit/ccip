@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/networks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
@@ -63,11 +62,6 @@ func (l *LinkToken) Approve(to string, amount *big.Int) error {
 	if err != nil {
 		return err
 	}
-	chain := l.client.GetNetworkConfig().Name
-	if chain == networks.ArbitrumGoerli.Name || chain == networks.ArbitrumMainnet.Name {
-		opts.GasLimit = 100000000
-	}
-
 	log.Info().
 		Str("From", l.client.GetDefaultWallet().Address()).
 		Str("To", to).
@@ -414,11 +408,6 @@ func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMess
 	}
 	if valueForNative != nil {
 		opts.Value = valueForNative
-	}
-	opts.GasLimit = 600000
-	chain := r.client.GetNetworkConfig().Name
-	if chain == networks.ArbitrumGoerli.Name || chain == networks.ArbitrumMainnet.Name {
-		opts.GasLimit = 100000000
 	}
 
 	tx, err := r.Instance.CcipSend(opts, destChainSelector, msg)

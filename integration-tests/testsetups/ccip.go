@@ -33,8 +33,6 @@ import (
 )
 
 const (
-	TokenTransfer                   string = "WithToken"
-	DataOnlyTransfer                string = "WithoutToken"
 	Load                            string = "Load"
 	Chaos                           string = "Chaos"
 	Smoke                           string = "Smoke"
@@ -114,24 +112,26 @@ type CCIPTestConfig struct {
 }
 
 type CCIPLoadInput struct {
-	RequestPerUnitTime         int64
+	RequestPerUnitTime         []int64
 	LoadTimeOut                time.Duration
 	TimeUnit                   time.Duration
+	StepDuration               []time.Duration
 	WaitBetweenChaosDuringLoad time.Duration
 }
 
 func (p *CCIPTestConfig) setLoadInputs() {
 	var allError error
 	p.Load = &CCIPLoadInput{
-		RequestPerUnitTime:         DefaultLoadRPS,
+		RequestPerUnitTime:         []int64{DefaultLoadRPS},
 		LoadTimeOut:                DefaultLoadTimeOut,
 		TimeUnit:                   time.Second,
+		StepDuration:               []time.Duration{p.TestDuration},
 		WaitBetweenChaosDuringLoad: 1 * time.Minute,
 	}
 
-	interval, _ := utils.GetEnv("CCIP_LOAD_TEST_RATEUNIT")
-	if interval != "" {
-		d, err := time.ParseDuration(interval)
+	timeUnit, _ := utils.GetEnv("CCIP_LOAD_TEST_RATEUNIT")
+	if timeUnit != "" {
+		d, err := time.ParseDuration(timeUnit)
 		if err != nil {
 			allError = multierr.Append(allError, err)
 		} else {
@@ -139,28 +139,39 @@ func (p *CCIPTestConfig) setLoadInputs() {
 		}
 	}
 
-	if allError != nil {
-		p.Test.Fatal(allError)
+	schedule, _ := utils.GetEnv("CCIP_LOAD_TEST_STEP_DURATION")
+	if schedule != "" {
+		steps := strings.Split(schedule, ",")
+		var durations []time.Duration
+		for _, i := range steps {
+			d, err := time.ParseDuration(i)
+			if err != nil {
+				allError = multierr.Append(allError, err)
+			} else {
+				durations = append(durations, d)
+			}
+		}
+		p.Load.StepDuration = durations
 	}
 
 	inputRps, _ := utils.GetEnv("CCIP_LOAD_TEST_RATE")
 	if inputRps != "" {
-		rps, err := strconv.ParseInt(inputRps, 10, 64)
-		if err != nil {
-			allError = multierr.Append(allError, err)
-		} else {
-			maxRps := int64(16)
-			if rps > maxRps {
-				allError = multierr.Append(allError, fmt.Errorf("rps %d is too high - maximum value is %d", rps, maxRps))
+		var rpss []int64
+		inputRpss := strings.Split(inputRps, ",")
+		for _, r := range inputRpss {
+			rps, err := strconv.ParseInt(r, 10, 64)
+			if err != nil {
+				allError = multierr.Append(allError, err)
 			} else {
-				p.Load.RequestPerUnitTime = rps
+				rpss = append(rpss, rps)
 			}
 		}
+		p.Load.RequestPerUnitTime = rpss
 	}
 
 	waitTimeBtwnChaos, _ := utils.GetEnv("CCIP_LOAD_TEST_CHAOS_INTERVAL")
 	if waitTimeBtwnChaos != "" {
-		d, err := time.ParseDuration(interval)
+		d, err := time.ParseDuration(waitTimeBtwnChaos)
 		if err != nil {
 			allError = multierr.Append(allError, err)
 		} else {
@@ -171,8 +182,16 @@ func (p *CCIPTestConfig) setLoadInputs() {
 			}
 		}
 	}
+	// if all phases take max time to complete, then the load test will run for 4 times the individual phase time
+	// the goal of setting high timeout is to avoid load test failure due to load generator timeout
+	// In case of failure the test should fail for individual phase timeout
 	if p.PhaseTimeout.Seconds() > 0 {
-		p.Load.LoadTimeOut = time.Duration(p.PhaseTimeout.Minutes()+10) * time.Minute
+		p.Load.LoadTimeOut = time.Duration(p.PhaseTimeout.Minutes()*4) * time.Minute
+	}
+	if len(p.Load.RequestPerUnitTime) != len(p.Load.StepDuration) {
+		allError = multierr.Append(allError, fmt.Errorf(
+			"the number of request per unit time %d and step duration %d should be equal",
+			len(p.Load.RequestPerUnitTime), len(p.Load.StepDuration)))
 	}
 	if allError != nil {
 		p.Test.Fatal(allError)
@@ -200,7 +219,7 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	}
 	p := &CCIPTestConfig{
 		Test:                t,
-		MsgType:             TokenTransfer,
+		MsgType:             actions.TokenTransfer,
 		PhaseTimeout:        DefaultPhaseTimeout,
 		TestDuration:        DefaultTestDuration,
 		NodeFunding:         DefaultNodeFunding,
@@ -328,7 +347,7 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	inputMsgType, _ := utils.GetEnv("CCIP_MSG_TYPE")
 
 	if inputMsgType != "" {
-		if inputMsgType != DataOnlyTransfer && inputMsgType != TokenTransfer {
+		if inputMsgType != actions.DataOnlyTransfer && inputMsgType != actions.TokenTransfer {
 			allError = multierr.Append(allError, fmt.Errorf("invalid msg type %s", inputMsgType))
 		} else {
 			p.MsgType = inputMsgType
@@ -641,7 +660,6 @@ func CCIPDefaultTestSetUp(
 			})
 		err = k8Env.Run()
 		require.NoErrorf(t, err, "error creating environment remote runner")
-		setUpArgs.Env = ccipEnv
 		if k8Env.WillUseRemoteRunner() {
 			return setUpArgs
 		}

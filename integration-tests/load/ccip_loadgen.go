@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,27 +16,28 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
-	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
-
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type CCIPE2ELoad struct {
-	t                     *testing.T
-	Lane                  *actions.CCIPLane
-	NoOfReq               int64 // no of Request fired - required for balance assertion at the end
-	totalGEFee            *big.Int
-	BalanceStats          BalanceStats  // balance assertion details
-	CurrentMsgSerialNo    *atomic.Int64 // current msg serial number in the load sequence
-	InitialSourceBlockNum uint64
-	InitialDestBlockNum   uint64        // blocknumber before the first message is fired in the load sequence
-	CallTimeOut           time.Duration // max time to wait for various on-chain events
-	reports               *testreporters.CCIPLaneStats
-	msg                   router.ClientEVM2AnyMessage
+	t                      *testing.T
+	Lane                   *actions.CCIPLane
+	NoOfReq                int64 // no of Request fired - required for balance assertion at the end
+	totalGEFee             *big.Int
+	BalanceStats           BalanceStats  // balance assertion details
+	CurrentMsgSerialNo     *atomic.Int64 // current msg serial number in the load sequence
+	InitialSourceBlockNum  uint64
+	InitialDestBlockNum    uint64        // blocknumber before the first message is fired in the load sequence
+	CallTimeOut            time.Duration // max time to wait for various on-chain events
+	reports                *testreporters.CCIPLaneStats
+	msg                    router.ClientEVM2AnyMessage
+	MaxDataSize            uint32
+	LastFinalizedTxBlock   atomic.Uint64
+	LastFinalizedTimestamp atomic.Time
 }
 type BalanceStats struct {
 	SourceBalanceReq        map[string]*big.Int
@@ -99,9 +101,20 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 		FeeToken:  common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
 		Data:      []byte("message with Id 1"),
 	}
-	if msgType == testsetups.TokenTransfer {
+	if msgType == actions.TokenTransfer {
 		c.msg.TokenAmounts = tokenAndAmounts
 	}
+	dCfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
+	require.NoError(c.t, err, "failed to fetch dynamic config")
+	c.MaxDataSize = dCfg.MaxDataSize
+
+	// wait for any pending txs before moving on
+	err = sourceCCIP.Common.ChainClient.WaitForEvents()
+	require.NoError(c.t, err, "Failed to wait for events")
+	err = destCCIP.Common.ChainClient.WaitForEvents()
+	require.NoError(c.t, err, "Failed to wait for events")
+	c.LastFinalizedTxBlock.Store(c.Lane.Source.NewFinalizedBlockNum.Load())
+	c.LastFinalizedTimestamp.Store(c.Lane.Source.NewFinalizedBlockTimestamp.Load())
 
 	sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
@@ -116,7 +129,22 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 	lggr := c.Lane.Logger.With().Int("msg Number", int(msgSerialNo)).Logger()
 
 	// form the message for transfer
-	msgStr := fmt.Sprintf("message with Id %d", msgSerialNo)
+	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
+
+	/* TODO - add this back after CCIP-874 is fixed
+	// every 10th message will have extra data with almost MaxDataSize
+	if msgSerialNo%10 == 0 {
+		length := c.MaxDataSize - 1
+		b := make([]byte, c.MaxDataSize-1)
+		_, err := rand.Read(b)
+		if err != nil {
+			res.Error = err.Error()
+			res.Failed = true
+			return res
+		}
+		randomString := base64.URLEncoding.EncodeToString(b)
+		msgStr = randomString[:length]
+	}*/
 	msg := c.msg
 	msg.Data = []byte(msgStr)
 
@@ -126,15 +154,15 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 	var sendTx *types.Transaction
 	var err error
 
-	// initiate the transfer
-	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
-
 	destChainSelector, err := actions.EvmChainIdToChainSelector(sourceCCIP.DestinationChainId, c.Lane.Dest.Common.ChainClient.NetworkSimulated())
 	if err != nil {
 		res.Error = err.Error()
 		res.Failed = true
 		return res
 	}
+	// initiate the transfer
+	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
+
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
 		res.Error = err.Error()
@@ -191,13 +219,33 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 		res.Failed = true
 		return res
 	}
-	sourceLogFinalizedAt, err := c.Lane.Source.AssertSendRequestedLogFinalized(
-		lggr, msgSerialNo, seqNum, msgLog, sourceLogTime, c.reports)
-	if err != nil {
-		res.Error = err.Error()
-		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
-		res.Failed = true
-		return res
+
+	lstFinalizedBlock := c.LastFinalizedTxBlock.Load()
+	var sourceLogFinalizedAt time.Time
+	// if the finality tag is enabled and the last finalized block is greater than the block number of the message
+	// consider the message finalized
+	if c.Lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 &&
+		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLog.Raw.BlockNumber {
+		sourceLogFinalizedAt = c.LastFinalizedTimestamp.Load()
+		c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.SourceLogFinalized,
+			sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
+			testreporters.TransactionStats{
+				TxHash:           msgLog.Raw.TxHash.String(),
+				FinalizedByBlock: strconv.FormatUint(lstFinalizedBlock, 10),
+				FinalizedAt:      sourceLogFinalizedAt.String(),
+			})
+	} else {
+		var finalizingBlock uint64
+		sourceLogFinalizedAt, finalizingBlock, err = c.Lane.Source.AssertSendRequestedLogFinalized(
+			lggr, msgSerialNo, seqNum, msgLog, sourceLogTime, c.reports)
+		if err != nil {
+			res.Error = err.Error()
+			res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+			res.Failed = true
+			return res
+		}
+		c.LastFinalizedTxBlock.Store(finalizingBlock)
+		c.LastFinalizedTimestamp.Store(sourceLogFinalizedAt)
 	}
 
 	// wait for

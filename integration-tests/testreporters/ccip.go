@@ -190,7 +190,6 @@ type CCIPTestReporter struct {
 	namespace      string
 	reportFilePath string
 	duration       time.Duration             // duration is the duration of the test
-	loadrps        int64                     // loadrps is the rate of requests per second in load tests
 	soakInterval   time.Duration             // soakInterval is the interval at which requests are triggered in soak tests
 	LaneStats      map[string]*CCIPLaneStats `json:"lane_stats"` // LaneStats is the statistics for each lane
 	mu             *sync.Mutex
@@ -216,15 +215,15 @@ func (r *CCIPTestReporter) SendSlackNotification(t *testing.T, slackClient *slac
 				msgTexts = append(msgTexts,
 					fmt.Sprintf(":x: Run Failed for lane %s :x:", name),
 					fmt.Sprintf(
-						"Load sequence ran on lane %s for %.0fm sending a total of %d transactions at a rate of %d tx(s) per second."+
+						"Load sequence ran on lane %s for %.0fm sending a total of %d transactions."+
 							"\n No of failed requests %d",
-						name, r.duration.Minutes(), lane.TotalRequests, r.loadrps, lane.FailedCountsByPhase[E2E]))
+						name, r.duration.Minutes(), lane.TotalRequests, lane.FailedCountsByPhase[E2E]))
 			} else {
 				msgTexts = append(msgTexts,
 					fmt.Sprintf(
-						"Load sequence ran on lane %s for %.0fm sending a total of %d transactions at a rate of %d tx(s) per second."+
+						"Load sequence ran on lane %s for %.0fm sending a total of %d transactions."+
 							"\n All requests were successful",
-						name, r.duration.Minutes(), lane.TotalRequests, r.loadrps))
+						name, r.duration.Minutes(), lane.TotalRequests))
 			}
 		}
 		if strings.Contains(strings.ToLower(r.t.Name()), "soak") {
@@ -310,11 +309,6 @@ func (r *CCIPTestReporter) SetDuration(d time.Duration) {
 // SetSoakRunInterval sets the interval at which requests are triggered in soak test
 func (r *CCIPTestReporter) SetSoakRunInterval(interval time.Duration) {
 	r.soakInterval = interval
-}
-
-// SetRPS sets the rps of load test
-func (r *CCIPTestReporter) SetRPS(rps int64) {
-	r.loadrps = rps
 }
 
 func (r *CCIPTestReporter) AddNewLane(name string, lggr zerolog.Logger) *CCIPLaneStats {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.uber.org/multierr"
@@ -19,17 +18,16 @@ var (
 )
 
 type CommonContracts struct {
-	IsNativeFeeToken    bool          `json:"is_native_fee_token,omitempty"`
-	IsMockARM           bool          `json:"is_mock_arm,omitempty"`
-	FeeToken            string        `json:"fee_token"`
-	FeeTokenPool        string        `json:"fee_token_pool"`
-	BridgeTokens        []string      `json:"bridge_tokens"`
-	BridgeTokenPools    []string      `json:"bridge_tokens_pools"`
-	ARM                 string        `json:"arm"`
-	Router              string        `json:"router"`
-	PriceRegistry       string        `json:"price_registry"`
-	WrappedNative       string        `json:"wrapped_native"`
-	TimeToReachFinality time.Duration `json:"time_to_reach_finality,omitempty"`
+	IsNativeFeeToken bool     `json:"is_native_fee_token,omitempty"`
+	IsMockARM        bool     `json:"is_mock_arm,omitempty"`
+	FeeToken         string   `json:"fee_token"`
+	FeeTokenPool     string   `json:"fee_token_pool"`
+	BridgeTokens     []string `json:"bridge_tokens"`
+	BridgeTokenPools []string `json:"bridge_tokens_pools"`
+	ARM              string   `json:"arm"`
+	Router           string   `json:"router"`
+	PriceRegistry    string   `json:"price_registry"`
+	WrappedNative    string   `json:"wrapped_native"`
 }
 
 type SourceContracts struct {

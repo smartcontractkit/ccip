@@ -58,7 +58,10 @@ const (
 	RootSnoozeTimeSimulated       = 1 * time.Minute
 	InflightExpirySimulated       = 1 * time.Minute
 	// we keep the finality timeout high as it's out of our control
-	FinalityTimeout = 1 * time.Hour
+	FinalityTimeout        = 1 * time.Hour
+	TokenTransfer   string = "WithToken"
+
+	DataOnlyTransfer string = "WithoutToken"
 )
 
 type CCIPTOMLEnv struct {
@@ -113,31 +116,30 @@ var (
 		return fmt.Sprintf("%s-ethereum-geth", name)
 	}
 	// ApprovedAmountToRouter is the default amount which gets approved for router so that it can transfer token and use the fee token for fee payment
-	ApprovedAmountToRouter           = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
-	ApprovedFeeAmountToRouter        = new(big.Int).Mul(big.NewInt(int64(GasFeeMultiplier)), big.NewInt(1e9))
+	ApprovedAmountToRouter           = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(200))
+	ApprovedFeeAmountToRouter        = new(big.Int).Mul(big.NewInt(int64(GasFeeMultiplier)), big.NewInt(1e5))
 	GasFeeMultiplier          uint64 = 12e17
 	LinkToUSD                        = big.NewInt(8e18)
 	WrappedNativeToUSD               = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1.7e3))
 )
 
 type CCIPCommon struct {
-	ChainClient         blockchain.EVMClient
-	Deployer            *ccip.CCIPContractsDeployer
-	FeeToken            *ccip.LinkToken
-	FeeTokenPool        *ccip.LockReleaseTokenPool
-	BridgeTokens        []*ccip.LinkToken // as of now considering the bridge token is same as link token
-	TokenPrices         []*big.Int
-	BridgeTokenPools    []*ccip.LockReleaseTokenPool
-	RateLimiterConfig   ccip.RateLimiterConfig
-	ARMContract         *common.Address
-	ARM                 *ccip.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events
-	Router              *ccip.Router
-	PriceRegistry       *ccip.PriceRegistry
-	WrappedNative       common.Address
-	ExistingDeployment  bool
-	deploy              *errgroup.Group
-	poolFunds           *big.Int
-	FinalityTimeOnChain time.Duration
+	ChainClient        blockchain.EVMClient
+	Deployer           *ccip.CCIPContractsDeployer
+	FeeToken           *ccip.LinkToken
+	FeeTokenPool       *ccip.LockReleaseTokenPool
+	BridgeTokens       []*ccip.LinkToken // as of now considering the bridge token is same as link token
+	TokenPrices        []*big.Int
+	BridgeTokenPools   []*ccip.LockReleaseTokenPool
+	RateLimiterConfig  ccip.RateLimiterConfig
+	ARMContract        *common.Address
+	ARM                *ccip.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events
+	Router             *ccip.Router
+	PriceRegistry      *ccip.PriceRegistry
+	WrappedNative      common.Address
+	ExistingDeployment bool
+	deploy             *errgroup.Group
+	poolFunds          *big.Int
 }
 
 func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blockchain.EVMClient, existingDeployment bool) *CCIPCommon {
@@ -170,10 +172,9 @@ func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blo
 		Router: &ccip.Router{
 			EthAddress: ccipModule.Router.EthAddress,
 		},
-		WrappedNative:       ccipModule.WrappedNative,
-		deploy:              grp,
-		poolFunds:           ccipModule.poolFunds,
-		FinalityTimeOnChain: ccipModule.FinalityTimeOnChain,
+		WrappedNative: ccipModule.WrappedNative,
+		deploy:        grp,
+		poolFunds:     ccipModule.poolFunds,
 	}
 	if ccipModule.ARM != nil {
 		c.ARM = &ccip.ARM{
@@ -195,10 +196,6 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 				EthAddress: common.HexToAddress("0x0"),
 			}
 		}
-		if conf.TimeToReachFinality > 0 {
-			ccipModule.FinalityTimeOnChain = conf.TimeToReachFinality
-		}
-
 		if common.IsHexAddress(conf.FeeTokenPool) {
 			ccipModule.FeeTokenPool = &ccip.LockReleaseTokenPool{
 				EthAddress: common.HexToAddress(conf.FeeTokenPool),
@@ -483,8 +480,6 @@ type SourceCCIPModule struct {
 	CCIPSendRequestedWatcher   map[string]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
 	NewFinalizedBlockNum       atomic.Uint64
 	NewFinalizedBlockTimestamp atomic.Time
-	SeqNumToMsgIDMu            *sync.Mutex
-	SeqNumToMsgID              map[uint64][32]byte
 }
 
 func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
@@ -767,6 +762,87 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 		})
 	}
 }
+
+func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalizedWithFinalityDepth(
+	lggr zerolog.Logger,
+	reqNo int64,
+	seqNum uint64,
+	newHdr, txHdr *blockchain.SafeEVMHeader,
+	txHash string,
+	reports *testreporters.CCIPLaneStats,
+	logUpdatedAt time.Time,
+) (bool, time.Time) {
+	if sourceCCIP.Common.ChainClient.GetNetworkConfig().FinalityDepth > 0 {
+		if newHdr.Number.Cmp(new(big.Int).Add(txHdr.Number,
+			big.NewInt(int64(sourceCCIP.Common.ChainClient.GetNetworkConfig().FinalityDepth)))) < 0 {
+			now := time.Now()
+			if now.Sub(logUpdatedAt) > 2*time.Minute {
+				logUpdatedAt = now
+				lggr.Info().
+					Str("Current Block", newHdr.Number.String()).
+					Str("Tx block", txHdr.Number.String()).
+					Uint64("Finality Depth", sourceCCIP.Common.ChainClient.GetNetworkConfig().FinalityDepth).
+					Msg("Still Waiting for CCIPSendRequested event log to be finalized")
+			}
+			return false, logUpdatedAt
+		}
+		lggr.Info().
+			Str("Finalized Block", newHdr.Number.String()).
+			Str("Tx block", txHdr.Number.String()).
+			Msg("Found finalized log")
+		finalizedAt := newHdr.Timestamp
+		reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(txHdr.Timestamp), testreporters.Success,
+			testreporters.TransactionStats{
+				TxHash:           txHash,
+				FinalizedByBlock: newHdr.Number.String(),
+				FinalizedAt:      finalizedAt.String(),
+			})
+		lggr.Info().
+			Str("Finalized Block", newHdr.Number.String()).
+			Str("Tx block", txHdr.Number.String()).
+			Msg("Found finalized log")
+		return true, logUpdatedAt
+	}
+	return false, logUpdatedAt
+}
+
+func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalizedWithFinalityTag(
+	lggr zerolog.Logger,
+	reqNo int64,
+	seqNum uint64,
+	txHdr *blockchain.SafeEVMHeader,
+	txHash string,
+	reports *testreporters.CCIPLaneStats,
+	logUpdatedAt time.Time,
+) (bool, time.Time, uint64, time.Time) {
+	finalizedBlckNum := sourceCCIP.NewFinalizedBlockNum.Load()
+	finalizedAt := sourceCCIP.NewFinalizedBlockTimestamp.Load()
+	if finalizedBlckNum >= txHdr.Number.Uint64() {
+		reports.UpdatePhaseStats(
+			reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(txHdr.Timestamp), testreporters.Success,
+			testreporters.TransactionStats{
+				TxHash:           txHash,
+				FinalizedByBlock: strconv.FormatUint(finalizedBlckNum, 10),
+				FinalizedAt:      finalizedAt.String(),
+			})
+		lggr.Info().
+			Uint64("Finalized Block", finalizedBlckNum).
+			Str("Tx block", txHdr.Number.String()).
+			Msg("Found finalized log")
+		return true, finalizedAt, finalizedBlckNum, logUpdatedAt
+	}
+
+	now := time.Now()
+	if now.Sub(logUpdatedAt) > 2*time.Minute {
+		logUpdatedAt = now
+		lggr.Info().
+			Uint64("Finalized Block", finalizedBlckNum).
+			Str("Tx block", txHdr.Number.String()).
+			Msg("Still Waiting for CCIPSendRequested event log to be finalized")
+	}
+	return false, time.Time{}, 0, logUpdatedAt
+}
+
 func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	lggr zerolog.Logger,
 	reqNo int64,
@@ -774,85 +850,52 @@ func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	SendRequested *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
 	prevEventAt time.Time,
 	reports *testreporters.CCIPLaneStats,
-) (time.Time, error) {
+) (time.Time, uint64, error) {
 	if sourceCCIP.Common.ChainClient.NetworkSimulated() {
-		return prevEventAt, nil
+		return prevEventAt, 0, nil
 	}
-	lggr.Info().
-		Str("Estimated Finality time", fmt.Sprintf("%s", sourceCCIP.Common.FinalityTimeOnChain)).
-		Msg("Waiting for CCIPSendRequested event log to be finalized")
-	hdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(SendRequested.Raw.BlockNumber)))
+	lggr.Info().Msg("Waiting for CCIPSendRequested event log to be finalized")
+	txHdr, err := sourceCCIP.Common.ChainClient.HeaderByNumber(context.Background(), big.NewInt(int64(SendRequested.Raw.BlockNumber)))
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, 0, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), FinalityTimeout)
 	defer cancel()
 	headerChn := make(chan *blockchain.SafeEVMHeader)
 	sub, err := sourceCCIP.Common.ChainClient.SubscribeNewHeaders(ctx, headerChn)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, 0, err
 	}
 	defer sub.Unsubscribe()
-	prevFinalizedBlockNum := sourceCCIP.NewFinalizedBlockNum.Load()
+	logUpdatedAt := time.Now()
+	isFinalized := false
+	var finalizedBlckNum uint64
+	var finalizedAt time.Time
 	for {
 		select {
 		// each time a new header is received, check if the block is finalized
 		case newHdr := <-headerChn:
 			if sourceCCIP.Common.ChainClient.GetNetworkConfig().FinalityDepth > 0 {
-				if newHdr.Number.Cmp(new(big.Int).Add(hdr.Number,
-					big.NewInt(int64(sourceCCIP.Common.ChainClient.GetNetworkConfig().FinalityDepth)))) < 0 {
-					lggr.Info().
-						Str("Current Block", newHdr.Number.String()).
-						Str("Tx block", hdr.Number.String()).
-						Uint64("Finality Depth", sourceCCIP.Common.ChainClient.GetNetworkConfig().FinalityDepth).
-						Msg("Still Waiting for CCIPSendRequested event log to be finalized")
-					continue
+				isFinalized, logUpdatedAt = sourceCCIP.AssertSendRequestedLogFinalizedWithFinalityDepth(
+					lggr, reqNo, seqNum, newHdr, txHdr,
+					SendRequested.Raw.TxHash.String(), reports, logUpdatedAt)
+				if isFinalized {
+					return newHdr.Timestamp, 0, nil
 				}
-				lggr.Info().
-					Str("Finalized Block", newHdr.Number.String()).
-					Str("Tx block", hdr.Number.String()).
-					Msg("Found finalized log")
-				finalizedAt := newHdr.Timestamp
-				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(hdr.Timestamp), testreporters.Success,
-					testreporters.TransactionStats{
-						TxHash:           SendRequested.Raw.TxHash.String(),
-						FinalizedByBlock: newHdr.Number.String(),
-						FinalizedAt:      finalizedAt.String(),
-					})
-				lggr.Info().
-					Str("Finalized Block", newHdr.Number.String()).
-					Str("Tx block", hdr.Number.String()).
-					Msg("Found finalized log")
-				return newHdr.Timestamp, nil
-			}
-			finalizedBlckNum := sourceCCIP.NewFinalizedBlockNum.Load()
-			finalizedAt := sourceCCIP.NewFinalizedBlockTimestamp.Load()
-			if finalizedBlckNum >= hdr.Number.Uint64() {
-				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(hdr.Timestamp), testreporters.Success,
-					testreporters.TransactionStats{
-						TxHash:           SendRequested.Raw.TxHash.String(),
-						FinalizedByBlock: strconv.FormatUint(finalizedBlckNum, 10),
-						FinalizedAt:      finalizedAt.String(),
-					})
-				lggr.Info().
-					Uint64("Finalized Block", finalizedBlckNum).
-					Str("Tx block", hdr.Number.String()).
-					Uint64("Previous Finalized Block", prevFinalizedBlockNum).
-					Msg("Found finalized log")
-				return finalizedAt, nil
 			} else {
-				lggr.Info().
-					Uint64("Finalized Block", finalizedBlckNum).
-					Str("Tx block", hdr.Number.String()).
-					Msg("Still Waiting for CCIPSendRequested event log to be finalized")
-				prevFinalizedBlockNum = finalizedBlckNum
+				isFinalized, finalizedAt, finalizedBlckNum, logUpdatedAt = sourceCCIP.AssertSendRequestedLogFinalizedWithFinalityTag(
+					lggr, reqNo, seqNum, txHdr,
+					SendRequested.Raw.TxHash.String(), reports, logUpdatedAt)
+				if isFinalized {
+					return finalizedAt, finalizedBlckNum, nil
+				}
 			}
 		case <-ctx.Done():
 			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
-			return time.Time{}, fmt.Errorf("timeout waiting for CCIPSendRequested event log to be finalized")
+			return time.Time{}, 0, fmt.Errorf("timeout waiting for CCIPSendRequested event log to be finalized")
 		case <-sub.Err():
 			reports.UpdatePhaseStats(reqNo, seqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
-			return time.Time{}, fmt.Errorf("timeout waiting for CCIPSendRequested event log to be finalized")
+			return time.Time{}, 0, fmt.Errorf("timeout waiting for CCIPSendRequested event log to be finalized")
 		}
 	}
 }
@@ -1533,8 +1576,6 @@ type CCIPLane struct {
 	SrcNetworkLaneCfg       *laneconfig.LaneConfig
 	DstNetworkLaneCfg       *laneconfig.LaneConfig
 	Subscriptions           []event.Subscription
-	LaneUnderUpgrade        bool
-	LaneUpgraded            chan bool
 }
 
 func (lane *CCIPLane) UpdateLaneConfig() {
@@ -1545,15 +1586,14 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		btpAddresses = append(btpAddresses, lane.Source.Common.BridgeTokenPools[i].Address())
 	}
 	lane.SrcNetworkLaneCfg.CommonContracts = laneconfig.CommonContracts{
-		FeeToken:            lane.Source.Common.FeeToken.Address(),
-		FeeTokenPool:        lane.Source.Common.FeeTokenPool.Address(),
-		BridgeTokens:        btAddresses,
-		BridgeTokenPools:    btpAddresses,
-		ARM:                 lane.Source.Common.ARMContract.Hex(),
-		Router:              lane.Source.Common.Router.Address(),
-		PriceRegistry:       lane.Source.Common.PriceRegistry.Address(),
-		WrappedNative:       lane.Source.Common.WrappedNative.Hex(),
-		TimeToReachFinality: lane.Source.Common.FinalityTimeOnChain,
+		FeeToken:         lane.Source.Common.FeeToken.Address(),
+		FeeTokenPool:     lane.Source.Common.FeeTokenPool.Address(),
+		BridgeTokens:     btAddresses,
+		BridgeTokenPools: btpAddresses,
+		ARM:              lane.Source.Common.ARMContract.Hex(),
+		Router:           lane.Source.Common.Router.Address(),
+		PriceRegistry:    lane.Source.Common.PriceRegistry.Address(),
+		WrappedNative:    lane.Source.Common.WrappedNative.Hex(),
 	}
 	if lane.Source.Common.ARM == nil {
 		lane.SrcNetworkLaneCfg.CommonContracts.IsMockARM = true
@@ -1626,12 +1666,14 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 	lane.SentReqs = make(map[int64]CCIPRequest)
 }
 
-func (lane *CCIPLane) SendRequests(noOfRequests int) (map[int64]CCIPRequest, error) {
+func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]CCIPRequest, error) {
 	var tokenAndAmounts []router.ClientEVMTokenAmount
-	for i, token := range lane.Source.Common.BridgeTokens {
-		tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
-			Token: common.HexToAddress(token.Address()), Amount: lane.Source.TransferAmount[i],
-		})
+	if msgType == TokenTransfer {
+		for i, token := range lane.Source.Common.BridgeTokens {
+			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
+				Token: common.HexToAddress(token.Address()), Amount: lane.Source.TransferAmount[i],
+			})
+		}
 	}
 
 	err := lane.Source.Common.ChainClient.WaitForEvents()
@@ -1699,7 +1741,7 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmattion tim
 	}
 	seqNumber := msgLog.Message.SequenceNumber
 
-	sourceLogFinalizedAt, err := lane.Source.AssertSendRequestedLogFinalized(lane.Logger, reqNo, seqNumber, msgLog, ccipSendReqGenAt, lane.Reports)
+	sourceLogFinalizedAt, _, err := lane.Source.AssertSendRequestedLogFinalized(lane.Logger, reqNo, seqNumber, msgLog, ccipSendReqGenAt, lane.Reports)
 	if err != nil {
 		return fmt.Errorf("could not finalize CCIPSendRequested event: %+v", err)
 	}
@@ -1745,10 +1787,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			for {
 				select {
 				case newHdr := <-hdrs:
-					// if the new header is less than 5 blocks ahead of the latest finalized block, ignore it
-					// assumption : it will take atleast 5 new blocks to get the transaction confirmed
+					// if the new header is less than 10 blocks ahead of the latest finalized block, ignore it
+					// assumption : it will take atleast 10 new blocks to get the transaction confirmed
 					if newHdr.Number.Cmp(finalizedBlock.Number) <= 0 &&
-						new(big.Int).Sub(newHdr.Number, finalizedBlock.Number).Cmp(big.NewInt(5)) <= 0 {
+						new(big.Int).Sub(newHdr.Number, finalizedBlock.Number).Cmp(big.NewInt(10)) <= 0 {
 						continue
 					}
 					ctx, cancel = context.WithTimeout(context.Background(), lane.Source.Common.ChainClient.GetNetworkConfig().Timeout.Duration)
@@ -1760,8 +1802,11 @@ func (lane *CCIPLane) StartEventWatchers() error {
 					if newFinalizedBlock.Number.Cmp(finalizedBlock.Number) > 0 {
 						finalizedBlock = newFinalizedBlock
 						lane.Source.NewFinalizedBlockNum.Store(newFinalizedBlock.Number.Uint64())
-						lane.Source.NewFinalizedBlockTimestamp.Store(newHdr.Timestamp)
-						lane.Logger.Info().Msgf("new finalized block received: %d", finalizedBlock.Number)
+						lane.Source.NewFinalizedBlockTimestamp.Store(time.Now().UTC())
+						lane.Logger.Info().
+							Str("block", finalizedBlock.Number.String()).
+							Str("At", time.Now().UTC().String()).
+							Msg("new finalized block received")
 					}
 				}
 			}

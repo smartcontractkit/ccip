@@ -20,7 +20,7 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 	testArgs := NewLoadArgs(t, lggr, context.Background())
 	testArgs.Setup(true)
 	// if the test runs on remote runner
-	if testArgs.TestSetupArgs.Env != nil && testArgs.TestSetupArgs.Env.K8Env.WillUseRemoteRunner() {
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
 	}
 	t.Cleanup(func() {
@@ -41,7 +41,7 @@ func TestLoadCCIPSequentialLaneAdd(t *testing.T) {
 	}
 	testArgs.Setup(true)
 	// if the test runs on remote runner
-	if testArgs.TestSetupArgs.Env != nil && testArgs.TestSetupArgs.Env.K8Env.WillUseRemoteRunner() {
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
 	}
 	t.Cleanup(func() {
@@ -60,7 +60,7 @@ func TestLoadCCIPIncrementalLoad(t *testing.T) {
 	testArgs.TestCfg.SequentialLaneAddition = true
 	testArgs.Setup(true)
 	// if the test runs on remote runner
-	if testArgs.TestSetupArgs.Env != nil && testArgs.TestSetupArgs.Env.K8Env.WillUseRemoteRunner() {
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
 	}
 	t.Cleanup(func() {
@@ -69,7 +69,7 @@ func TestLoadCCIPIncrementalLoad(t *testing.T) {
 	})
 	stepDuration := testArgs.TestCfg.TestDuration / 3
 	schedules := wasp.CombineAndRepeat(3,
-		wasp.Line(1, testArgs.TestCfg.Load.RequestPerUnitTime, stepDuration))
+		wasp.Line(1, testArgs.TestCfg.Load.RequestPerUnitTime[0], stepDuration))
 	testArgs.TriggerLoad(schedules...)
 	testArgs.Wait()
 }
@@ -115,10 +115,10 @@ func TestLoadCCIPStableRequestTriggeringWithPodChaos(t *testing.T) {
 	lggr := utils.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background(), inputs...)
 	testArgs.TestCfg.TestDuration = 10 * time.Minute
-	testArgs.TestCfg.Load.RequestPerUnitTime = 2
+	testArgs.TestCfg.Load.RequestPerUnitTime = []int64{2}
 	testArgs.Setup(false)
 	// if the test runs on remote runner
-	if testArgs.TestSetupArgs.Env != nil && testArgs.TestSetupArgs.Env.K8Env.WillUseRemoteRunner() {
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
 	}
 	t.Cleanup(func() {
