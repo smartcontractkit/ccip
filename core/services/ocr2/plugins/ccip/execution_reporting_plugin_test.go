@@ -944,7 +944,7 @@ func Test_calculateMessageMaxGas(t *testing.T) {
 	}
 }
 
-func TestExecutionReportingPlugin_tokenPoolRateLimitValidation(t *testing.T) {
+func TestExecutionReportingPlugin_isRateLimitEnoughForTokenPool(t *testing.T) {
 	testCases := []struct {
 		name                    string
 		destTokenPoolRateLimits map[common.Address]*big.Int
@@ -1009,12 +1009,29 @@ func TestExecutionReportingPlugin_tokenPoolRateLimitValidation(t *testing.T) {
 			},
 			exp: true,
 		},
+		{
+			destTokenPoolRateLimits: map[common.Address]*big.Int{},
+			tokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{
+				{Token: common.HexToAddress("1"), Amount: big.NewInt(50)},
+				{Token: common.HexToAddress("2"), Amount: big.NewInt(20)},
+			},
+			srcToDestToken: map[common.Address]common.Address{
+				common.HexToAddress("1"): common.HexToAddress("10"),
+				common.HexToAddress("2"): common.HexToAddress("20"),
+			},
+			inflightTokenAmounts: map[common.Address]*big.Int{
+				common.HexToAddress("1"): big.NewInt(20),
+				common.HexToAddress("2"): big.NewInt(30),
+			},
+			name: "rate limit not applied to token",
+			exp:  false,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &ExecutionReportingPlugin{lggr: logger.TestLogger(t)}
-			p.isRateLimitReachedForTokenPool(tc.destTokenPoolRateLimits, tc.tokenAmounts, tc.inflightTokenAmounts, tc.srcToDestToken)
+			p.isRateLimitEnoughForTokenPool(tc.destTokenPoolRateLimits, tc.tokenAmounts, tc.inflightTokenAmounts, tc.srcToDestToken)
 		})
 	}
 }

@@ -391,7 +391,10 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 		if err != nil {
 			return nil, fmt.Errorf("get rate off ramp rate limiter state: %w", err)
 		}
-		res[dstToken] = rateLimiterState.Tokens
+
+		if rateLimiterState.IsEnabled {
+			res[dstToken] = rateLimiterState.Tokens
+		}
 	}
 
 	return res, nil
@@ -505,7 +508,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		if !r.isRateLimitReachedForTokenPool(destTokenPoolRateLimits, msg.TokenAmounts, inflightTokenAmounts, sourceToDestToken) {
+		if !r.isRateLimitEnoughForTokenPool(destTokenPoolRateLimits, msg.TokenAmounts, inflightTokenAmounts, sourceToDestToken) {
 			msgLggr.Warnw("Skipping message token pool rate limit hit")
 			continue
 		}
@@ -598,7 +601,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	return executableMessages
 }
 
-func (r *ExecutionReportingPlugin) isRateLimitReachedForTokenPool(
+func (r *ExecutionReportingPlugin) isRateLimitEnoughForTokenPool(
 	destTokenPoolRateLimits map[common.Address]*big.Int,
 	sourceTokenAmounts []evm_2_evm_offramp.ClientEVMTokenAmount,
 	inflightTokenAmounts map[common.Address]*big.Int,
@@ -626,7 +629,7 @@ func (r *ExecutionReportingPlugin) isRateLimitReachedForTokenPool(
 
 		rl, exists := rateLimitsCopy[destToken]
 		if !exists {
-			r.lggr.Warnw("rate limit not found for token", "token", destToken)
+			r.lggr.Debugw("rate limit not applied to token", "token", destToken)
 			continue
 		}
 
