@@ -83,7 +83,9 @@ var Prod_Sepolia = rhea.EVMChainConfig{
 		gethcommon.HexToAddress("0xeA3977eCC954a820cc709f6Edf8b467FDbe085A9"), // Richard Gottleber
 		gethcommon.HexToAddress("0xF7b4ef69E7Cf13C205566345CcFAd1aB5fdCc49F"), // Harry Papacharissiou
 		gethcommon.HexToAddress("0x9680201d9c93d65a3603d2088d125e955c73BD65"), // Patrick Collins
-		gethcommon.HexToAddress("0xc26496d520549b7304700f1557c9cb9E75210c85"), // Richard Gottleber - Recording Video
+		gethcommon.HexToAddress("0xc26496d520549b7304700f1557c9cb9E75210c85"), // Richard Gottleber - Recording Video #1
+		gethcommon.HexToAddress("0x3856E4f685Ad70Ff21b351ff61c642ACb9e378c7"), // Richard Gottleber - Recording Video #2
+		gethcommon.HexToAddress("0x6719D451c97CCc48fA9B547495BB57072CD34228"), // Patrick Collins - Recording Video #1
 
 		// ==============  EXTERNAL ==============
 		gethcommon.HexToAddress("0xd65113b9B1EeD81113EaF41DC0D2d34fCa31522C"), // BetaUser - Multimedia
