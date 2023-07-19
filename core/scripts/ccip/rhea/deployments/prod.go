@@ -377,7 +377,7 @@ var Prod_OptimismGoerli = rhea.EVMChainConfig{
 			Pool:          gethcommon.HexToAddress("0xdecfaf632175915bdf38c00d9d9746e8a90a56c4"),
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
-			TokenPoolType: rhea.LockRelease,
+			TokenPoolType: rhea.FeeTokenOnly,
 		},
 		rhea.WETH: {
 			Token:         gethcommon.HexToAddress("0x4200000000000000000000000000000000000006"),
@@ -771,7 +771,7 @@ var Prod_ArbitrumGoerli = rhea.EVMChainConfig{
 			Pool:          gethcommon.HexToAddress("0x044a6b4b561af69d2319a2f4be5ec327a6975d0a"),
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
-			TokenPoolType: rhea.LockRelease,
+			TokenPoolType: rhea.FeeTokenOnly,
 		},
 		rhea.WETH: {
 			Token:         gethcommon.HexToAddress("0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a"),
@@ -919,7 +919,7 @@ var Prod_PolygonMumbai = rhea.EVMChainConfig{
 			Pool:          gethcommon.HexToAddress("0x6fce09b2e74f649a4494a1844219cb0d86cfe8b7"),
 			Price:         rhea.LINK.Price(),
 			Decimals:      rhea.LINK.Decimals(),
-			TokenPoolType: rhea.LockRelease,
+			TokenPoolType: rhea.FeeTokenOnly,
 		},
 		rhea.WMATIC: {
 			Token:         gethcommon.HexToAddress("0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889"),
