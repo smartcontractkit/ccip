@@ -38,8 +38,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-// exec Report should make sure to cap returned payload to this limit
-const MaxExecutionReportLength = 250_000
+const (
+	// exec Report should make sure to cap returned payload to this limit
+	MaxExecutionReportLength = 250_000
+
+	// MaxDataLenPerBatch limits the total length of msg data that can be in a batch.
+	MaxDataLenPerBatch = 60_000
+)
 
 var (
 	_ types.ReportingPluginFactory = &ExecutionReportingPluginFactory{}
@@ -475,6 +480,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	}
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
 	expectedNonces := make(map[common.Address]uint64)
+	availableDataLen := MaxDataLenPerBatch
 
 	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
@@ -548,6 +554,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
+		if len(msg.Data) > availableDataLen {
+			msgLggr.Infow("Skipping message, insufficient remaining batch data len",
+				"msgDataLen", len(msg.Data), "availableBatchDataLen", availableDataLen)
+			continue
+		}
+
 		availableFee := big.NewInt(0).Mul(msg.FeeTokenAmount, sourceFeeTokenPrice)
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
 		availableFeeUsd := waitBoostedFee(time.Since(msg.blockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
@@ -596,6 +608,10 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		msgLggr.Infow("Adding msg to batch", "seqNum", msg.SequenceNumber, "nonce", msg.Nonce,
 			"value", msgValue, "aggregateTokenLimit", aggregateTokenLimit)
 		executableMessages = append(executableMessages, NewObservedMessage(msg.SequenceNumber, tokenData))
+
+		// after message is added to the batch, decrease the available data length
+		availableDataLen -= len(msg.Data)
+
 		expectedNonces[msg.Sender] = msg.Nonce + 1
 	}
 	return executableMessages

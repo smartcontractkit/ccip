@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -677,6 +678,57 @@ func TestBuildBatch(t *testing.T) {
 			},
 			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
 			expectedSeqNrs:        nil,
+		},
+		{
+			name: "some messages skipped after hitting max batch data len",
+			reqs: []evm2EVMOnRampCCIPSendRequestedWithMeta{
+				{
+					InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+						SequenceNumber: 10,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          1,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageId:      [32]byte{},
+					},
+					blockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+						SequenceNumber: 11,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          2,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, MaxDataLenPerBatch-500), // skipped from batch
+						FeeToken:       srcNative,
+						MessageId:      [32]byte{},
+					},
+					blockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+				{
+					InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+						SequenceNumber: 12,
+						FeeTokenAmount: big.NewInt(1e9),
+						Sender:         sender1,
+						Nonce:          2,
+						GasLimit:       big.NewInt(1),
+						Data:           bytes.Repeat([]byte{'a'}, 1000),
+						FeeToken:       srcNative,
+						MessageId:      [32]byte{},
+					},
+					blockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+				},
+			},
+			inflight:              []InflightInternalExecutionReport{},
+			tokenLimit:            big.NewInt(0),
+			destGasPrice:          big.NewInt(10),
+			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			expectedSeqNrs:        []ObservedMessage{{SeqNr: uint64(10)}, {SeqNr: uint64(12)}},
 		},
 	}
 
