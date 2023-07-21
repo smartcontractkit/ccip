@@ -169,19 +169,6 @@ func (p *CCIPTestConfig) setLoadInputs() {
 		p.Load.RequestPerUnitTime = rpss
 	}
 
-	waitTimeBtwnChaos, _ := utils.GetEnv("CCIP_LOAD_TEST_CHAOS_INTERVAL")
-	if waitTimeBtwnChaos != "" {
-		d, err := time.ParseDuration(waitTimeBtwnChaos)
-		if err != nil {
-			allError = multierr.Append(allError, err)
-		} else {
-			if d > p.TestDuration {
-				allError = multierr.Append(allError, fmt.Errorf("invalid wait time between chaos experiments: %s", d))
-			} else {
-				p.Load.WaitBetweenChaosDuringLoad = d
-			}
-		}
-	}
 	// if all phases take max time to complete, then the load test will run for 4 times the individual phase time
 	// the goal of setting high timeout is to avoid load test failure due to load generator timeout
 	// In case of failure the test should fail for individual phase timeout
@@ -468,6 +455,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		Balance:           o.Balance,
 		Context:           ctx,
 		CommonContractsWg: &sync.WaitGroup{},
+		Done:              make(chan struct{}),
 	}
 	ccipLaneA2B.SrcNetworkLaneCfg, err = o.LaneConfig.ReadLaneConfig(networkA.Name)
 	require.NoError(t, err, "Reading lane config shouldn't fail")
@@ -512,6 +500,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			CommonContractsWg: &sync.WaitGroup{},
 			SrcNetworkLaneCfg: ccipLaneA2B.DstNetworkLaneCfg,
 			DstNetworkLaneCfg: ccipLaneA2B.SrcNetworkLaneCfg,
+			Done:              make(chan struct{}),
 		}
 		ccipLaneB2A.Logger = lggr.With().Str("env", namespace).Str("Lane",
 			fmt.Sprintf("%s-->%s", ccipLaneB2A.SourceNetworkName, ccipLaneB2A.DestNetworkName)).Logger()

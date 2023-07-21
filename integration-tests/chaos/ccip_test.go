@@ -3,6 +3,7 @@ package chaos_test
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-env/chaos"
 	a "github.com/smartcontractkit/chainlink-env/pkg/alias"
@@ -144,7 +145,7 @@ func TestChaosCCIP(t *testing.T) {
 			require.NoError(t, err)
 			if in.waitForChaosRecovery {
 				// wait for chaos to be recovered before further validation
-				testEnvironment.Chaos.WaitForAllRecovered(chaosId)
+				testEnvironment.Chaos.WaitForAllRecovered(chaosId, 1*time.Minute)
 			} else {
 				l.Info().Msg("proceeding without waiting for chaos recovery")
 			}

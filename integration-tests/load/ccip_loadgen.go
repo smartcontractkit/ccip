@@ -3,6 +3,8 @@ package load
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -24,20 +26,21 @@ import (
 )
 
 type CCIPE2ELoad struct {
-	t                      *testing.T
-	Lane                   *actions.CCIPLane
-	NoOfReq                int64 // no of Request fired - required for balance assertion at the end
-	totalGEFee             *big.Int
-	BalanceStats           BalanceStats  // balance assertion details
-	CurrentMsgSerialNo     *atomic.Int64 // current msg serial number in the load sequence
-	InitialSourceBlockNum  uint64
-	InitialDestBlockNum    uint64        // blocknumber before the first message is fired in the load sequence
-	CallTimeOut            time.Duration // max time to wait for various on-chain events
-	reports                *testreporters.CCIPLaneStats
-	msg                    router.ClientEVM2AnyMessage
-	MaxDataSize            uint32
-	LastFinalizedTxBlock   atomic.Uint64
-	LastFinalizedTimestamp atomic.Time
+	t                         *testing.T
+	Lane                      *actions.CCIPLane
+	NoOfReq                   int64 // no of Request fired - required for balance assertion at the end
+	totalGEFee                *big.Int
+	BalanceStats              BalanceStats  // balance assertion details
+	CurrentMsgSerialNo        *atomic.Int64 // current msg serial number in the load sequence
+	InitialSourceBlockNum     uint64
+	InitialDestBlockNum       uint64        // blocknumber before the first message is fired in the load sequence
+	CallTimeOut               time.Duration // max time to wait for various on-chain events
+	reports                   *testreporters.CCIPLaneStats
+	msg                       router.ClientEVM2AnyMessage
+	MaxDataSize               uint32
+	SendMaxDataIntermittently bool
+	LastFinalizedTxBlock      atomic.Uint64
+	LastFinalizedTimestamp    atomic.Time
 }
 type BalanceStats struct {
 	SourceBalanceReq        map[string]*big.Int
@@ -48,12 +51,13 @@ type BalanceStats struct {
 
 func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, noOfReq int64, reporter *testreporters.CCIPLaneStats) *CCIPE2ELoad {
 	return &CCIPE2ELoad{
-		t:                  t,
-		Lane:               lane,
-		CurrentMsgSerialNo: atomic.NewInt64(1),
-		CallTimeOut:        timeout,
-		NoOfReq:            noOfReq,
-		reports:            reporter,
+		t:                         t,
+		Lane:                      lane,
+		CurrentMsgSerialNo:        atomic.NewInt64(1),
+		CallTimeOut:               timeout,
+		NoOfReq:                   noOfReq,
+		reports:                   reporter,
+		SendMaxDataIntermittently: false,
 	}
 }
 
@@ -131,20 +135,23 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 	// form the message for transfer
 	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
 
-	/* TODO - add this back after CCIP-874 is fixed
-	// every 10th message will have extra data with almost MaxDataSize
-	if msgSerialNo%10 == 0 {
-		length := c.MaxDataSize - 1
-		b := make([]byte, c.MaxDataSize-1)
-		_, err := rand.Read(b)
-		if err != nil {
-			res.Error = err.Error()
-			res.Failed = true
-			return res
+	if c.SendMaxDataIntermittently {
+		lggr.Info().Msg("sending max data intermittently")
+		// every 10th message will have extra data with almost MaxDataSize
+		if msgSerialNo%10 == 0 {
+			length := c.MaxDataSize - 1
+			b := make([]byte, c.MaxDataSize-1)
+			_, err := rand.Read(b)
+			if err != nil {
+				res.Error = err.Error()
+				res.Failed = true
+				return res
+			}
+			randomString := base64.URLEncoding.EncodeToString(b)
+			msgStr = randomString[:length]
 		}
-		randomString := base64.URLEncoding.EncodeToString(b)
-		msgStr = randomString[:length]
-	}*/
+	}
+
 	msg := c.msg
 	msg.Data = []byte(msgStr)
 
@@ -212,6 +219,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
 	}
 	sentMsg := msgLog.Message
 	seqNum := sentMsg.SequenceNumber
+	lggr = lggr.With().Bytes("msgId ", sentMsg.MessageId[:]).Logger()
 
 	if bytes.Compare(sentMsg.Data, []byte(msgStr)) != 0 {
 		res.Error = fmt.Sprintf("the message byte didnot match expected %s received %s msg ID %d", msgStr, string(sentMsg.Data), msgSerialNo)

@@ -59,6 +59,7 @@ var (
 		Timeout:                   blockchain.JSONStrDuration{Duration: 2 * time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       10000,
+		DefaultGasLimit:           6000000,
 	}
 
 	// SimulatedEVM_NON_DEV_2 represents a simulated network with chain id 2337 which can be used to deploy a non-dev geth node
@@ -77,6 +78,7 @@ var (
 		Timeout:                   blockchain.JSONStrDuration{Duration: 2 * time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       10000,
+		DefaultGasLimit:           6000000,
 	}
 
 	SimulatedEVMNonDev = blockchain.EVMNetwork{
@@ -285,7 +287,6 @@ var (
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       0,
 		FinalityDepth:             550,
-		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
 		DefaultGasLimit:           6000000,
 	}
 
@@ -297,11 +298,10 @@ var (
 		ChainID:                   80001,
 		Simulated:                 false,
 		ChainlinkTransactionLimit: 5000,
-		Timeout:                   blockchain.JSONStrDuration{Duration: time.Minute},
+		Timeout:                   blockchain.JSONStrDuration{Duration: 5 * time.Minute},
 		MinimumConfirmations:      1,
 		GasEstimationBuffer:       1000,
 		FinalityDepth:             550,
-		TimeToReachFinality:       blockchain.JSONStrDuration{Duration: 30 * time.Second},
 		DefaultGasLimit:           6000000,
 	}
 

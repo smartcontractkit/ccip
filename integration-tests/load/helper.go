@@ -3,6 +3,7 @@ package load
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"testing"
@@ -42,7 +43,6 @@ type loadArgs struct {
 	LoadStarterWg *sync.WaitGroup // waits for all the runners to start
 	TestCfg       *testsetups.CCIPTestConfig
 	TestSetupArgs *testsetups.CCIPTestSetUpOutputs
-	EstimatedEnd  time.Time
 	ChaosExps     []ChaosConfig
 }
 
@@ -64,27 +64,36 @@ func (l *loadArgs) Setup(sameCommitAndExec bool) {
 		setUpArgs = testsetups.CCIPExistingDeploymentTestSetUp(l.TestCfg.Test, lggr, transferAmounts, true, l.TestCfg)
 	}
 	l.TestSetupArgs = setUpArgs
-	if len(setUpArgs.Lanes) == 0 {
-		return
-	}
-	l.EstimatedEnd = time.Now().Add(l.TestCfg.TestDuration)
 }
 
 func (l *loadArgs) setSchedule() {
 	var segments []*wasp.Segment
 	var segmentDuration time.Duration
 	require.Greater(l.t, len(l.TestCfg.Load.RequestPerUnitTime), 0, "RequestPerUnitTime must be set")
-	if len(l.TestCfg.Load.RequestPerUnitTime) > 0 {
+	if len(l.TestCfg.Load.RequestPerUnitTime) > 1 {
 		for i, req := range l.TestCfg.Load.RequestPerUnitTime {
 			duration := l.TestCfg.Load.StepDuration[i]
 			segmentDuration += duration
 			segments = append(segments, wasp.Plain(req, duration)...)
 		}
 		totalDuration := l.TestCfg.TestDuration
-		repeatTimes := int(totalDuration / segmentDuration)
-		l.schedules = wasp.CombineAndRepeat(repeatTimes, segments)
+		repeatTimes := totalDuration.Seconds() / segmentDuration.Seconds()
+		l.schedules = wasp.CombineAndRepeat(int(math.Round(repeatTimes)), segments)
 	} else {
 		l.schedules = wasp.Plain(l.TestCfg.Load.RequestPerUnitTime[0], l.TestCfg.TestDuration)
+	}
+}
+
+func (l *loadArgs) SanityCheck() {
+	for _, lane := range l.TestSetupArgs.Lanes {
+		lane.ForwardLane.RecordStateBeforeTransfer()
+		_, err := lane.ForwardLane.SendRequests(1, l.TestCfg.MsgType)
+		require.NoError(l.t, err)
+		lane.ForwardLane.ValidateRequests()
+		lane.ReverseLane.RecordStateBeforeTransfer()
+		_, err = lane.ReverseLane.SendRequests(1, l.TestCfg.MsgType)
+		require.NoError(l.t, err)
+		lane.ReverseLane.ValidateRequests()
 	}
 }
 
@@ -182,7 +191,6 @@ func (l *loadArgs) Start() {
 				loadRunner, err := wasp.NewGenerator(&wasp.Config{
 					T:                     l.TestCfg.Test,
 					GenName:               fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
-					StatsPollInterval:     time.Minute,
 					Schedule:              l.schedules,
 					LoadType:              wasp.RPS,
 					RateLimitUnitDuration: l.TestCfg.Load.TimeUnit,
@@ -240,21 +248,21 @@ func (l *loadArgs) ApplyChaos() {
 		return
 	}
 	testEnv.ChaosLabelForCLNodes(l.TestCfg.Test)
-	waitBetweenChaosExps := l.TestCfg.Load.WaitBetweenChaosDuringLoad
-	if waitBetweenChaosExps == 0 {
-		l.lggr.Warn().Msg("waitBetweenChaosDuringLoad is not set, setting it to 1 minute")
-		waitBetweenChaosExps = 1 * time.Minute
-	}
+
 	for _, exp := range l.ChaosExps {
-		timeNow := <-time.After(waitBetweenChaosExps)
-		l.lggr.Info().Msgf("Starting to apply chaos %s at %s", exp.ChaosName, timeNow.UTC())
+		l.lggr.Info().Msgf("Starting to apply chaos %s at %s", exp.ChaosName, time.Now().UTC())
 		// apply chaos
 		chaosId, err := testEnv.K8Env.Chaos.Run(exp.ChaosFunc(testEnv.K8Env.Cfg.Namespace, exp.ChaosProps))
 		require.NoError(l.t, err)
 		if chaosId != "" {
-			testEnv.K8Env.Chaos.WaitForAllRecovered(chaosId)
-			testEnv.K8Env.Chaos.Stop(chaosId)
+			chaosDur, err := time.ParseDuration(exp.ChaosProps.DurationStr)
+			require.NoError(l.t, err)
+			err = testEnv.K8Env.Chaos.WaitForAllRecovered(chaosId, chaosDur+1*time.Minute)
+			require.NoError(l.t, err)
 			l.lggr.Info().Msgf("chaos %s is recovered at %s", exp.ChaosName, time.Now().UTC())
+			err = testEnv.K8Env.Chaos.Stop(chaosId)
+			require.NoError(l.t, err)
+			l.lggr.Info().Msgf("stopped chaos %s at %s", exp.ChaosName, time.Now().UTC())
 		}
 	}
 }

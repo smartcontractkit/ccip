@@ -77,13 +77,14 @@ func TestLoadCCIPIncrementalLoad(t *testing.T) {
 // This test applies pod chaos to the CL nodes asynchronously and sequentially  while the load is running
 // the pod chaos is applied at a regular interval throughout the test duration
 func TestLoadCCIPStableRequestTriggeringWithPodChaos(t *testing.T) {
+	t.Parallel()
 	inputs := []ChaosConfig{
 		{
 			ChaosName: "CCIP Commit works after majority of CL nodes are recovered from pod failure @pod-chaos",
 			ChaosFunc: chaos.NewFailPods,
 			ChaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaultyPlus: a.Str("1")},
-				DurationStr:    "1m",
+				DurationStr:    "2m",
 			},
 		},
 		{
@@ -91,7 +92,7 @@ func TestLoadCCIPStableRequestTriggeringWithPodChaos(t *testing.T) {
 			ChaosFunc: chaos.NewFailPods,
 			ChaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaultyPlus: a.Str("1")},
-				DurationStr:    "1m",
+				DurationStr:    "2m",
 			},
 		},
 		{
@@ -99,7 +100,7 @@ func TestLoadCCIPStableRequestTriggeringWithPodChaos(t *testing.T) {
 			ChaosFunc: chaos.NewFailPods,
 			ChaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaulty: a.Str("1")},
-				DurationStr:    "1m",
+				DurationStr:    "4m",
 			},
 		},
 		{
@@ -107,25 +108,33 @@ func TestLoadCCIPStableRequestTriggeringWithPodChaos(t *testing.T) {
 			ChaosFunc: chaos.NewFailPods,
 			ChaosProps: &chaos.Props{
 				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaulty: a.Str("1")},
-				DurationStr:    "1m",
+				DurationStr:    "4m",
 			},
 		},
 	}
-	t.Parallel()
-	lggr := utils.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr, context.Background(), inputs...)
-	testArgs.TestCfg.TestDuration = 10 * time.Minute
-	testArgs.TestCfg.Load.RequestPerUnitTime = []int64{2}
-	testArgs.Setup(false)
-	// if the test runs on remote runner
-	if len(testArgs.TestSetupArgs.Lanes) == 0 {
-		return
+	for _, in := range inputs {
+		in := in
+		t.Run(in.ChaosName, func(t *testing.T) {
+			t.Parallel()
+			lggr := utils.GetTestLogger(t)
+			testArgs := NewLoadArgs(t, lggr, context.Background(), in)
+			testArgs.TestCfg.TestDuration = 5 * time.Minute
+			testArgs.TestCfg.Load.TimeUnit = 1 * time.Second
+			testArgs.TestCfg.Load.RequestPerUnitTime = []int64{2}
+
+			testArgs.Setup(false)
+			// if the test runs on remote runner
+			if len(testArgs.TestSetupArgs.Lanes) == 0 {
+				return
+			}
+			t.Cleanup(func() {
+				log.Info().Msg("Tearing down the environment")
+				testArgs.TestSetupArgs.TearDown()
+			})
+			testArgs.SanityCheck()
+			testArgs.TriggerLoad()
+			testArgs.ApplyChaos()
+			testArgs.Wait()
+		})
 	}
-	t.Cleanup(func() {
-		log.Info().Msg("Tearing down the environment")
-		testArgs.TestSetupArgs.TearDown()
-	})
-	testArgs.TriggerLoad()
-	testArgs.ApplyChaos()
-	testArgs.Wait()
 }

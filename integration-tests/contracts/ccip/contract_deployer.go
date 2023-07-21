@@ -373,7 +373,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 			evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 				Router:          router,
 				PriceRegistry:   priceRegistry,
-				MaxDataSize:     1e5,
+				MaxDataSize:     50000,
 				MaxTokensLength: 5,
 				MaxGasLimit:     4_000_000,
 			},

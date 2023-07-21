@@ -1472,7 +1472,7 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 				}
 				receipt, err := destCCIP.Common.ChainClient.GetTxReceipt(vLogs.TxHash)
 				if err != nil {
-					lggr.Warn().Msg("Failed to get receipt for ReportBlessed event")
+					lggr.Fatal().Err(err).Msg("Failed to get receipt for ReportBlessed event")
 				}
 				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ReportBlessed, receivedAt.Sub(prevEventAt), testreporters.Success,
 					testreporters.TransactionStats{
@@ -1576,6 +1576,7 @@ type CCIPLane struct {
 	SrcNetworkLaneCfg       *laneconfig.LaneConfig
 	DstNetworkLaneCfg       *laneconfig.LaneConfig
 	Subscriptions           []event.Subscription
+	Done                    chan struct{}
 }
 
 func (lane *CCIPLane) UpdateLaneConfig() {
@@ -1769,7 +1770,8 @@ func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmattion tim
 }
 
 func (lane *CCIPLane) StartEventWatchers() error {
-	if !lane.Source.Common.ChainClient.NetworkSimulated() && lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
+	if !lane.Source.Common.ChainClient.NetworkSimulated() &&
+		lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
 		hdrs := make(chan *blockchain.SafeEVMHeader)
 		sub, err := lane.Source.Common.ChainClient.SubscribeNewHeaders(context.Background(), hdrs)
 		if err != nil {
@@ -1808,6 +1810,11 @@ func (lane *CCIPLane) StartEventWatchers() error {
 							Str("At", time.Now().UTC().String()).
 							Msg("new finalized block received")
 					}
+				case <-lane.Done:
+					return
+				case <-sub.Err():
+					lane.Logger.Fatal().Msg("subscription to new headers stopped")
+					return
 				}
 			}
 		}()
@@ -1890,6 +1897,10 @@ func (lane *CCIPLane) StartEventWatchers() error {
 
 func (lane *CCIPLane) CleanUp() {
 	lane.Logger.Info().Msg("Cleaning up lane")
+	if !lane.Source.Common.ChainClient.NetworkSimulated() &&
+		lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 {
+		lane.Done <- struct{}{}
+	}
 	for _, sub := range lane.Subscriptions {
 		sub.Unsubscribe()
 	}
@@ -2137,7 +2148,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			Router:                                  destCCIP.Common.Router.EthAddress,
 			PriceRegistry:                           destCCIP.Common.PriceRegistry.EthAddress,
 			MaxTokensLength:                         5,
-			MaxDataSize:                             1e5,
+			MaxDataSize:                             50000,
 		})
 		if err != nil {
 			return errors.WithStack(err)
