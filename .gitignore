@@ -88,3 +88,7 @@ core/scripts/ccip/csv/node-wallets
 *.out
 
 contracts/yarn.lock
+
+
+# Ignore DevSpace cache and log folder
+.devspace/
