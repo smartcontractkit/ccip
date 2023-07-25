@@ -124,8 +124,8 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
 }
 
-func (c *CCIPE2ELoad) Call(_ *wasp.Generator) wasp.CallResult {
-	var res wasp.CallResult
+func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
+	var res *wasp.CallResult
 	sourceCCIP := c.Lane.Source
 	msgSerialNo := c.CurrentMsgSerialNo.Load()
 	c.CurrentMsgSerialNo.Inc()

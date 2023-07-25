@@ -119,7 +119,7 @@ var (
 	ApprovedAmountToRouter           = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(200))
 	ApprovedFeeAmountToRouter        = new(big.Int).Mul(big.NewInt(int64(GasFeeMultiplier)), big.NewInt(1e5))
 	GasFeeMultiplier          uint64 = 12e17
-	LinkToUSD                        = big.NewInt(8e18)
+	LinkToUSD                        = big.NewInt(6e18)
 	WrappedNativeToUSD               = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1.7e3))
 )
 
@@ -404,7 +404,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	// Set price of the bridge tokens to 1
 	ccipModule.TokenPrices = []*big.Int{}
 	for range ccipModule.BridgeTokens {
-		ccipModule.TokenPrices = append(ccipModule.TokenPrices, big.NewInt(1))
+		ccipModule.TokenPrices = append(ccipModule.TokenPrices, big.NewInt(6e18))
 	}
 
 	if ccipModule.Router == nil {
@@ -465,7 +465,7 @@ func DefaultCCIPModule(ctx context.Context, chainClient blockchain.EVMClient, ex
 			Capacity: ccip.HundredCoins,
 		},
 		ExistingDeployment: existingDeployment,
-		poolFunds:          testhelpers.Link(10),
+		poolFunds:          testhelpers.Link(1000),
 	}
 }
 
@@ -940,10 +940,18 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 
 func (sourceCCIP *SourceCCIPModule) SendRequest(
 	receiver common.Address,
-	tokenAndAmounts []router.ClientEVMTokenAmount,
+	msgType,
 	data string,
 	feeToken common.Address,
 ) (common.Hash, time.Duration, *big.Int, error) {
+	var tokenAndAmounts []router.ClientEVMTokenAmount
+	if msgType == TokenTransfer {
+		for i, token := range sourceCCIP.Common.BridgeTokens {
+			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
+				Token: common.HexToAddress(token.Address()), Amount: sourceCCIP.TransferAmount[i],
+			})
+		}
+	}
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
 	var d time.Duration
 	if err != nil {
@@ -969,6 +977,10 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	log.Info().Interface("ge msg details", msg).Msg("ccip message to be sent")
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
+		reason, _ := blockchain.RPCErrorFromError(err)
+		if reason != "" {
+			return common.Hash{}, d, nil, fmt.Errorf("failed getting the fee: %s", reason)
+		}
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the fee: %+v", err)
 	}
 	log.Info().Str("fee", fee.String()).Msg("calculated fee")
@@ -991,10 +1003,6 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	}
 
 	log.Info().Str("Send token transaction", sendTx.Hash().String()).Msg("Sending token")
-	err = sourceCCIP.Common.ChainClient.WaitForEvents()
-	if err != nil {
-		return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed waiting for events: %+v", err)
-	}
 	return sendTx.Hash(), time.Since(timeNow), fee, nil
 }
 
@@ -1668,28 +1676,20 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 }
 
 func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]CCIPRequest, error) {
-	var tokenAndAmounts []router.ClientEVMTokenAmount
-	if msgType == TokenTransfer {
-		for i, token := range lane.Source.Common.BridgeTokens {
-			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
-				Token: common.HexToAddress(token.Address()), Amount: lane.Source.TransferAmount[i],
-			})
-		}
-	}
-
-	err := lane.Source.Common.ChainClient.WaitForEvents()
-	if err != nil {
-		return nil, fmt.Errorf("could not wait for events: %+v", err)
-	}
-
 	txMap := make(map[int64]CCIPRequest)
 	for i := 1; i <= noOfRequests; i++ {
 		msg := fmt.Sprintf("msg %d", i)
 		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
-			tokenAndAmounts, msg,
+			msgType, msg,
 			common.HexToAddress(lane.Source.Common.FeeToken.Address()),
 		)
+		if err != nil {
+			lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
+				testreporters.TX, txConfirmationDur, testreporters.Failure)
+			return nil, fmt.Errorf("could not send request: %+v", err)
+		}
+		err = lane.Source.Common.ChainClient.WaitForEvents()
 		if err != nil {
 			lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
 				testreporters.TX, txConfirmationDur, testreporters.Failure)
@@ -1708,12 +1708,16 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]
 			txConfirmationTimestamp: txConfirmationTimestamp,
 		}
 		lane.SentReqs[int64(lane.NumberOfReq+i)] = txMap[int64(lane.NumberOfReq+i)]
+		noOfTokens := len(lane.Source.TransferAmount)
+		if msgType == DataOnlyTransfer {
+			noOfTokens = 0
+		}
 		lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
 			testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.TransactionStats{
 				Fee:                fee.String(),
-				GasUsed:            rcpt.CumulativeGasUsed,
+				GasUsed:            rcpt.GasUsed,
 				TxHash:             txHash.Hex(),
-				NoOfTokensSent:     len(tokenAndAmounts),
+				NoOfTokensSent:     noOfTokens,
 				MessageBytesLength: len([]byte(msg)),
 			})
 		lane.TotalFee = bigmath.Add(lane.TotalFee, fee)
