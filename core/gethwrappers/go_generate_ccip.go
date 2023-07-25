@@ -17,7 +17,6 @@ package gethwrappers
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/Router.abi ../../contracts/solc/v0.8.19/Router.bin Router router
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/PriceRegistry.abi ../../contracts/solc/v0.8.19/PriceRegistry.bin PriceRegistry price_registry
 
-//go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/ReceiverDapp.abi ../../contracts/solc/v0.8.19/ReceiverDapp.bin ReceiverDapp receiver_dapp
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin MaybeRevertMessageReceiver maybe_revert_message_receiver
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/PingPongDemo.abi ../../contracts/solc/v0.8.19/PingPongDemo.bin PingPongDemo ping_pong_demo
 //go:generate go run ./generation/generate/wrap.go ../../contracts/solc/v0.8.19/WETH9.abi ../../contracts/solc/v0.8.19/WETH9.bin WETH9 weth9

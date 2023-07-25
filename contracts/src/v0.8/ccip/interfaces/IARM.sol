@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 /// @notice This interface contains the only ARM-related functions that might be used on-chain by other CCIP contracts.

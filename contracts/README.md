@@ -29,4 +29,9 @@ import '@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol';
 
 ## License
 
-[BUSL-1.1](https://spdx.org/licenses/BUSL-1.1.html)
+The CCIP repo is licensed under the [BUSL-1.1](LICENSE.md) license, however, there are a few exceptions
+
+- `src/v0.8/ccip/applications/*` is licensed under the [MIT](./LICENSE-MIT.md) license
+- `src/v0.8/ccip/interfaces/*` is licensed under the [MIT](./LICENSE-MIT.md) license
+- `src/v0.8/ccip/libraries/{Client.sol, Internal.sol}` is licensed under the [MIT](./LICENSE-MIT.md) license
+

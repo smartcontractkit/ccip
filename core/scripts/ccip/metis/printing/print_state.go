@@ -265,12 +265,6 @@ func printDappSanityCheck(source *rhea.EvmDeploymentConfig) {
 
 	sb.WriteString(generateHeader(tableHeaders, headerLengths))
 
-	//receiverDap, err := receiver_dapp.NewReceiverDapp(source.LaneConfig.ReceiverDapp, source.Client)
-	//helpers.PanicErr(err)
-	//router, err = receiverDap.SRouter(&bind.CallOpts{})
-	//helpers.PanicErr(err)
-	//sb.WriteString(fmt.Sprintf("| %-30s | %14s |\n", "Receiver dapp", printBool(router == source.ChainConfig.Router)))
-
 	if source.LaneConfig.PingPongDapp != common.HexToAddress("") {
 		pingDapp, err := ping_pong_demo.NewPingPongDemo(source.LaneConfig.PingPongDapp, source.Client)
 		helpers.PanicErr(err)

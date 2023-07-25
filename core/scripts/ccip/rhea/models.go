@@ -271,7 +271,6 @@ type EVMLaneConfig struct {
 	OffRamp     gethcommon.Address
 	CommitStore gethcommon.Address
 
-	ReceiverDapp   gethcommon.Address
 	PingPongDapp   gethcommon.Address
 	DeploySettings LaneDeploySettings
 }

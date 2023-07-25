@@ -72,7 +72,6 @@ operator_wrapper: ../../contracts/solc/v0.7/Operator.abi ../../contracts/solc/v0
 oracle_wrapper: ../../contracts/solc/v0.6/Oracle.abi ../../contracts/solc/v0.6/Oracle.bin 7af2fbac22a6e8c2847e8e685a5400cac5101d72ddf5365213beb79e4dede43a
 ping_pong_demo: ../../contracts/solc/v0.8.19/PingPongDemo.abi ../../contracts/solc/v0.8.19/PingPongDemo.bin c6f5dedc53069dd52334f33ce1a8bd7ee2d6f54ef7adc1325d8e0308d41b2b9b
 price_registry: ../../contracts/solc/v0.8.19/PriceRegistry.abi ../../contracts/solc/v0.8.19/PriceRegistry.bin 1b6f9628e9a45cf512fd4bd2a4beb6160dc17c5832c4d9beaa2c3aac8430fba1
-receiver_dapp: ../../contracts/solc/v0.8.19/ReceiverDapp.abi ../../contracts/solc/v0.8.19/ReceiverDapp.bin 65d8a62eca52f1f40e1043b934c580d5a54516234ade50914684c76f832d51eb
 router: ../../contracts/solc/v0.8.19/Router.abi ../../contracts/solc/v0.8.19/Router.bin 29690cda0fbe8ea7215132d65082c1987a3f27baebcdd8fff8f04df5e3712d00
 solidity_vrf_consumer_interface: ../../contracts/solc/v0.6/VRFConsumer.abi ../../contracts/solc/v0.6/VRFConsumer.bin ecc99378aa798014de9db42b2eb81320778b0663dbe208008dad75ccdc1d4366
 solidity_vrf_consumer_interface_v08: ../../contracts/solc/v0.8.6/VRFConsumer.abi ../../contracts/solc/v0.8.6/VRFConsumer.bin b14f9136b15e3dc9d6154d5700f3ed4cf88ddc4f70f20c3bb57fc46050904c8f

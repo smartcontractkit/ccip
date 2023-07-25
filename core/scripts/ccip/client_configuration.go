@@ -32,7 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/receiver_dapp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
@@ -149,9 +148,8 @@ func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLan
 
 type DestClient struct {
 	Client
-	CommitStore  *commit_store.CommitStore
-	ReceiverDapp *receiver_dapp.ReceiverDapp
-	OffRamp      *evm_2_evm_offramp.EVM2EVMOffRamp
+	CommitStore *commit_store.CommitStore
+	OffRamp     *evm_2_evm_offramp.EVM2EVMOffRamp
 }
 
 func NewDestinationClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLaneConfig) DestClient {
@@ -179,8 +177,6 @@ func NewDestinationClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.E
 	shared.RequireNoError(t, err)
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(laneConfig.OffRamp, config.Client)
 	shared.RequireNoError(t, err)
-	receiverDapp, err := receiver_dapp.NewReceiverDapp(laneConfig.ReceiverDapp, config.Client)
-	shared.RequireNoError(t, err)
 	router, err := router.NewRouter(config.ChainConfig.Router, config.Client)
 	shared.RequireNoError(t, err)
 	pingPongDapp, err := ping_pong_demo.NewPingPongDemo(laneConfig.PingPongDapp, config.Client)
@@ -206,9 +202,8 @@ func NewDestinationClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.E
 			AllowList:        config.ChainConfig.AllowList,
 			t:                t,
 		},
-		CommitStore:  commitStore,
-		ReceiverDapp: receiverDapp,
-		OffRamp:      offRamp,
+		CommitStore: commitStore,
+		OffRamp:     offRamp,
 	}
 }
 
