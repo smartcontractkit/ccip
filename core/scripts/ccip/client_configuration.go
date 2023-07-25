@@ -87,7 +87,8 @@ type EVMBridgedToken struct {
 
 type SourceClient struct {
 	Client
-	OnRamp *evm_2_evm_onramp.EVM2EVMOnRamp
+	OnRamp    *evm_2_evm_onramp.EVM2EVMOnRamp
+	ARMConfig *arm_contract.ARMConfig
 }
 
 func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLaneConfig) SourceClient {
@@ -142,7 +143,8 @@ func NewSourceClient(t *testing.T, config rhea.EvmConfig, laneConfig rhea.EVMLan
 			logger:           config.Logger,
 			t:                t,
 		},
-		OnRamp: onRamp,
+		OnRamp:    onRamp,
+		ARMConfig: config.ChainConfig.ARMConfig,
 	}
 }
 
@@ -444,6 +446,21 @@ func (client *CCIPClient) reemitEvents(t *testing.T, destConfig rhea.EvmDeployme
 	client.Dest.logger.Infof("CommitStore.SetOCR2Config %+v in tx %s", commitStoreConfigEvent, helpers.ExplorerLink(int64(client.Dest.ChainId), tx.Hash()))
 	err = shared.WaitForMined(client.Dest.logger, client.Dest.Client.Client, tx.Hash(), true)
 	shared.RequireNoError(t, err)
+}
+
+func (client *CCIPClient) setConfigARM(t *testing.T) {
+	chainId := client.Source.ChainId
+	owner := client.Source.Owner
+	arm := client.Source.ARM
+
+	cfg := client.Source.ARMConfig
+	if cfg == nil {
+		panic(fmt.Errorf("ARMConfig for chain %d is nil", chainId))
+	}
+	client.Source.logger.Infof("ARM.setConfig: %+v", *cfg)
+	tx, err := arm.SetConfig(owner, *cfg)
+	shared.RequireNoError(t, err)
+	client.Source.logger.Infof("ARM.setConfig in tx %s", helpers.ExplorerLink(int64(chainId), tx.Hash()))
 }
 
 // Uncurses the ARM contract on the source chain.

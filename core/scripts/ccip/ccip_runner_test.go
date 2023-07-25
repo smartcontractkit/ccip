@@ -92,6 +92,8 @@ func TestCCIP(t *testing.T) {
 		client.TestGasVariousTxs(t)
 	case "uncurseSourceARM":
 		client.uncurseSourceARM(t)
+	case "setConfigARM":
+		client.setConfigARM(t)
 	case "executeManually":
 		client.ExecuteManually(t, &DESTINATION)
 	case "wip":
