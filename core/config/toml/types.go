@@ -1288,6 +1288,25 @@ type LegacyGasStationSecrets struct {
 	AuthConfig *LegacyGasStationAuthConfig
 }
 
+func (l *LegacyGasStationSecrets) SetFrom(s *LegacyGasStationSecrets) (err error) {
+	err = l.validateMerge(s)
+	if err != nil {
+		return err
+	}
+
+	if v := s.AuthConfig; v != nil {
+		l.AuthConfig = v
+	}
+	return nil
+}
+
+func (l *LegacyGasStationSecrets) validateMerge(s *LegacyGasStationSecrets) (err error) {
+	if l.AuthConfig != nil && s.AuthConfig != nil {
+		err = multierr.Append(err, configutils.ErrOverride{Name: "LegacyGasStationSecrets"})
+	}
+	return err
+}
+
 func (l *LegacyGasStationSecrets) ValidateConfig() (err error) {
 	if l.AuthConfig == nil {
 		// no validation needed
