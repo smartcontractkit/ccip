@@ -137,7 +137,7 @@ func FilterExecutionStateChanged(
 	offRampAddr string,
 	sequenceNumber []uint64,
 	messageId [][32]byte,
-) (uint8, error) {
+) (int, error) {
 	var sequenceNumberRule []interface{}
 	for _, sequenceNumberItem := range sequenceNumber {
 		sequenceNumberRule = append(sequenceNumberRule, sequenceNumberItem)
@@ -156,15 +156,21 @@ func FilterExecutionStateChanged(
 		logs:     logs,
 		sub:      sub,
 	}
-	if it.Next() {
-		event := new(EVM2EVMOffRampExecutionStateChanged)
-		err = it.Contract.UnpackLog(event, "ExecutionStateChanged", it.Raw)
+
+	executionState := -1
+	for it.Next() && executionState != 2 {
+		execStateEvent := new(EVM2EVMOffRampExecutionStateChanged)
+		err = it.Contract.UnpackLog(execStateEvent, "ExecutionStateChanged", it.Raw)
 		if err != nil {
 			return 0, err
 		}
-		return event.State, nil
+		executionState = int(execStateEvent.State)
 	}
-	return 0, fmt.Errorf("no ExecutionStateChanged found for seq num %v and msg id %v", sequenceNumber, messageId)
+
+	if executionState == -1 {
+		return 0, fmt.Errorf("no ExecutionStateChanged found for seq num %v and msg id %v", sequenceNumber, messageId)
+	}
+	return executionState, nil
 }
 
 func ManuallyExecute(
