@@ -1058,7 +1058,7 @@ func inflightAggregates(
 
 			for _, tk := range message.TokenAmounts {
 				if rl, exists := inflightTokenAmounts[tk.Token]; exists {
-					inflightTokenAmounts[tk.Token] = rl.Sub(rl, tk.Amount)
+					inflightTokenAmounts[tk.Token] = rl.Add(rl, tk.Amount)
 				} else {
 					inflightTokenAmounts[tk.Token] = new(big.Int).Set(tk.Amount)
 				}

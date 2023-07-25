@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"reflect"
 	"sort"
 	"sync"
 	"testing"
@@ -1146,4 +1147,127 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 
 	err := rf.UpdateLogPollerFilters(destPriceRegistryAddr)
 	assert.NoError(t, err)
+}
+
+func Test_inflightAggregates(t *testing.T) {
+	const n = 10
+	addrs := make([]common.Address, n)
+	tokenAddrs := make([]common.Address, n)
+	for i := range addrs {
+		addrs[i] = utils.RandomAddress()
+		tokenAddrs[i] = utils.RandomAddress()
+	}
+
+	testCases := []struct {
+		name            string
+		inflight        []InflightInternalExecutionReport
+		destTokenPrices map[common.Address]*big.Int
+		sourceToDest    map[common.Address]common.Address
+
+		expInflightSeqNrs          map[uint64]struct{}
+		expInflightAggrVal         *big.Int
+		expMaxInflightSenderNonces map[common.Address]uint64
+		expInflightTokenAmounts    map[common.Address]*big.Int
+		expErr                     bool
+	}{
+		{
+			name: "base",
+			inflight: []InflightInternalExecutionReport{
+				{
+					messages: []evm_2_evm_offramp.InternalEVM2EVMMessage{
+						{
+							Sender:         addrs[0],
+							SequenceNumber: 100,
+							Nonce:          2,
+							TokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{
+								{Token: tokenAddrs[0], Amount: big.NewInt(1e18)},
+								{Token: tokenAddrs[0], Amount: big.NewInt(2e18)},
+							},
+						},
+						{
+							Sender:         addrs[0],
+							SequenceNumber: 106,
+							Nonce:          4,
+							TokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{
+								{Token: tokenAddrs[0], Amount: big.NewInt(1e18)},
+								{Token: tokenAddrs[0], Amount: big.NewInt(5e18)},
+								{Token: tokenAddrs[2], Amount: big.NewInt(5e18)},
+							},
+						},
+					},
+				},
+			},
+			destTokenPrices: map[common.Address]*big.Int{
+				tokenAddrs[1]: big.NewInt(1000),
+				tokenAddrs[3]: big.NewInt(500),
+			},
+			sourceToDest: map[common.Address]common.Address{
+				tokenAddrs[0]: tokenAddrs[1],
+				tokenAddrs[2]: tokenAddrs[3],
+			},
+			expInflightSeqNrs: map[uint64]struct{}{
+				100: {},
+				106: {},
+			},
+			expInflightAggrVal: big.NewInt(9*1000 + 5*500),
+			expMaxInflightSenderNonces: map[common.Address]uint64{
+				addrs[0]: 4,
+			},
+			expInflightTokenAmounts: map[common.Address]*big.Int{
+				tokenAddrs[0]: big.NewInt(9e18),
+				tokenAddrs[2]: big.NewInt(5e18),
+			},
+			expErr: false,
+		},
+		{
+			name: "missing price",
+			inflight: []InflightInternalExecutionReport{
+				{
+					messages: []evm_2_evm_offramp.InternalEVM2EVMMessage{
+						{
+							Sender:         addrs[0],
+							SequenceNumber: 100,
+							Nonce:          2,
+							TokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{
+								{Token: tokenAddrs[0], Amount: big.NewInt(1e18)},
+							},
+						},
+					},
+				},
+			},
+			destTokenPrices: map[common.Address]*big.Int{
+				tokenAddrs[3]: big.NewInt(500),
+			},
+			sourceToDest: map[common.Address]common.Address{
+				tokenAddrs[2]: tokenAddrs[3],
+			},
+			expErr: true,
+		},
+		{
+			name:                       "nothing inflight",
+			inflight:                   []InflightInternalExecutionReport{},
+			expInflightSeqNrs:          map[uint64]struct{}{},
+			expInflightAggrVal:         big.NewInt(0),
+			expMaxInflightSenderNonces: map[common.Address]uint64{},
+			expInflightTokenAmounts:    map[common.Address]*big.Int{},
+			expErr:                     false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			inflightSeqNrs, inflightAggrVal, maxInflightSenderNonces, inflightTokenAmounts, err := inflightAggregates(
+				tc.inflight, tc.destTokenPrices, tc.sourceToDest)
+
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.True(t, reflect.DeepEqual(tc.expInflightSeqNrs, inflightSeqNrs))
+			assert.True(t, reflect.DeepEqual(tc.expInflightAggrVal, inflightAggrVal))
+			assert.True(t, reflect.DeepEqual(tc.expMaxInflightSenderNonces, maxInflightSenderNonces))
+			assert.True(t, reflect.DeepEqual(tc.expInflightTokenAmounts, inflightTokenAmounts))
+		})
+	}
 }
