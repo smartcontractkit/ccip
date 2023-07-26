@@ -158,7 +158,7 @@ jobs:
       matrix:
         product:
           - name: ccip
-            nodes: 1
+            nodes: 2
             os: ubuntu-latest
 #          - name: automation
 #            nodes: 9

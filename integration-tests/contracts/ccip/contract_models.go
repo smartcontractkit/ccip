@@ -99,7 +99,7 @@ func (l *LinkToken) Transfer(to string, amount *big.Int) error {
 // LockReleaseTokenPool represents a LockReleaseTokenPool address
 type LockReleaseTokenPool struct {
 	client     blockchain.EVMClient
-	instance   *lock_release_token_pool.LockReleaseTokenPool
+	Instance   *lock_release_token_pool.LockReleaseTokenPool
 	EthAddress common.Address
 }
 
@@ -116,7 +116,7 @@ func (pool *LockReleaseTokenPool) RemoveLiquidity(amount *big.Int) error {
 		Str("Token Pool", pool.Address()).
 		Str("Amount", amount.String()).
 		Msg("Initiating removing funds from pool")
-	tx, err := pool.instance.RemoveLiquidity(opts, amount)
+	tx, err := pool.Instance.RemoveLiquidity(opts, amount)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (pool *LockReleaseTokenPool) AddLiquidity(linkToken *LinkToken, amount *big
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Initiating adding Tokens in pool")
-	tx, err := pool.instance.AddLiquidity(opts, amount)
+	tx, err := pool.Instance.AddLiquidity(opts, amount)
 	if err != nil {
 		return err
 	}
@@ -168,7 +168,7 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting on ramp for onramp router")
-	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{
+	tx, err := pool.Instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{
 		{Ramp: onRamp, Allowed: true,
 			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
@@ -187,6 +187,52 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	return pool.client.ProcessTransaction(tx)
 }
 
+func (pool *LockReleaseTokenPool) SetOnRampRateLimit(onRamp common.Address, rl lock_release_token_pool.RateLimiterConfig) error {
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("OnRamp", onRamp.Hex()).
+		Interface("RateLimiterConfig", rl).
+		Msg("Setting Rate Limit on token pool")
+	tx, err := pool.Instance.SetOnRampRateLimiterConfig(opts, onRamp, rl)
+
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("OnRamp", onRamp.Hex()).
+		Interface("RateLimiterConfig", rl).
+		Msg("Rate Limit on ramp is set")
+	return pool.client.ProcessTransaction(tx)
+}
+
+func (pool *LockReleaseTokenPool) SetOffRampRateLimit(offRamp common.Address, rl lock_release_token_pool.RateLimiterConfig) error {
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("OffRamp", offRamp.Hex()).
+		Interface("RateLimiterConfig", rl).
+		Msg("Setting Rate Limit offramp")
+	tx, err := pool.Instance.SetOffRampRateLimiterConfig(opts, offRamp, rl)
+
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Str("OffRamp", offRamp.Hex()).
+		Interface("RateLimiterConfig", rl).
+		Msg("Rate Limit offRamp is set")
+	return pool.client.ProcessTransaction(tx)
+}
+
 func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
@@ -196,7 +242,7 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 		Str("Token Pool", pool.Address()).
 		Msg("Setting off ramp for Token Pool")
 
-	tx, err := pool.instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{
+	tx, err := pool.Instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{
 		{Ramp: offRamp, Allowed: true, RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
@@ -306,7 +352,7 @@ func (rDapp *ReceiverDapp) ToggleRevert(revert bool) error {
 
 type PriceRegistry struct {
 	client     blockchain.EVMClient
-	instance   *price_registry.PriceRegistry
+	Instance   *price_registry.PriceRegistry
 	EthAddress common.Address
 }
 
@@ -319,7 +365,7 @@ func (c *PriceRegistry) AddPriceUpdater(addr common.Address) error {
 	if err != nil {
 		return err
 	}
-	tx, err := c.instance.ApplyPriceUpdatersUpdates(opts, []common.Address{addr}, []common.Address{})
+	tx, err := c.Instance.ApplyPriceUpdatersUpdates(opts, []common.Address{addr}, []common.Address{})
 	if err != nil {
 		return err
 	}
@@ -335,7 +381,7 @@ func (c *PriceRegistry) AddFeeToken(addr common.Address) error {
 	if err != nil {
 		return err
 	}
-	tx, err := c.instance.ApplyFeeTokensUpdates(opts, []common.Address{addr}, []common.Address{})
+	tx, err := c.Instance.ApplyFeeTokensUpdates(opts, []common.Address{addr}, []common.Address{})
 	if err != nil {
 		return err
 	}
@@ -351,7 +397,7 @@ func (c *PriceRegistry) UpdatePrices(priceUpdates price_registry.InternalPriceUp
 	if err != nil {
 		return err
 	}
-	tx, err := c.instance.UpdatePrices(opts, priceUpdates)
+	tx, err := c.Instance.UpdatePrices(opts, priceUpdates)
 	if err != nil {
 		return err
 	}
@@ -467,6 +513,25 @@ type OnRamp struct {
 
 func (onRamp *OnRamp) Address() string {
 	return onRamp.EthAddress.Hex()
+}
+
+func (onRamp *OnRamp) SetRateLimit(rlConfig evm_2_evm_onramp.RateLimiterConfig) error {
+	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	tx, err := onRamp.Instance.SetRateLimiterConfig(opts, rlConfig)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Bool("Enabled", rlConfig.IsEnabled).
+		Str("capacity", rlConfig.Capacity.String()).
+		Str("rate", rlConfig.Rate.String()).
+		Str("onRamp", onRamp.Address()).
+		Str("Network Name", onRamp.client.GetNetworkConfig().Name).
+		Msg("Setting Rate limit in OnRamp")
+	return onRamp.client.ProcessTransaction(tx)
 }
 
 type OffRamp struct {

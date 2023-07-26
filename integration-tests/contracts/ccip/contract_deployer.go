@@ -103,7 +103,7 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 		Msg("New contract")
 	return &LockReleaseTokenPool{
 		client:     e.evmClient,
-		instance:   pool,
+		Instance:   pool,
 		EthAddress: addr,
 	}, err
 }
@@ -130,7 +130,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 	}
 	return &LockReleaseTokenPool{
 		client:     e.evmClient,
-		instance:   instance.(*lock_release_token_pool.LockReleaseTokenPool),
+		Instance:   instance.(*lock_release_token_pool.LockReleaseTokenPool),
 		EthAddress: *address,
 	}, err
 }
@@ -300,7 +300,7 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 		Msg("New contract")
 	return &PriceRegistry{
 		client:     e.evmClient,
-		instance:   ins,
+		Instance:   ins,
 		EthAddress: addr,
 	}, err
 }
@@ -318,7 +318,7 @@ func (e *CCIPContractsDeployer) DeployPriceRegistry() (*PriceRegistry, error) {
 	}
 	return &PriceRegistry{
 		client:     e.evmClient,
-		instance:   instance.(*price_registry.PriceRegistry),
+		Instance:   instance.(*price_registry.PriceRegistry),
 		EthAddress: *address,
 	}, err
 }
