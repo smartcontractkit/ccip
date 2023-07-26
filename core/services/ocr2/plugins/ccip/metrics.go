@@ -113,6 +113,10 @@ func ChainName(chainID int64) string {
 		return "ethereum-testnet-goerli-optimism-1"
 	case 4002:
 		return "fantom-testnet"
+	case 8453:
+		return "base-mainnet"
+	case 84531:
+		return "ethereum-testnet-goerli-base-1"
 	case 42161:
 		return "ethereum-mainnet-arbitrum-1"
 	case 421613:

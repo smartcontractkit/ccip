@@ -54,42 +54,42 @@ const (
 	// Testnets
 	Sepolia        Chain = "ethereum-testnet-sepolia"
 	AvaxFuji       Chain = "avalanche-testnet-fuji"
-	OptimismGoerli Chain = "ethereum-testnet-goerli-optimism-1"
 	Goerli         Chain = "ethereum-testnet-goerli"
 	PolygonMumbai  Chain = "polygon-testnet-mumbai"
-	ArbitrumGoerli Chain = "ethereum-testnet-goerli-arbitrum-1"
 	Quorum         Chain = "quorum-testnet-swift"
+	BSCTestnet     Chain = "binance_smart_chain-testnet"
+	ArbitrumGoerli Chain = "ethereum-testnet-goerli-arbitrum-1"
+	OptimismGoerli Chain = "ethereum-testnet-goerli-optimism-1"
+	BASEGoerli     Chain = "ethereum-testnet-goerli-base-1"
 	// Mainnets
 	Ethereum Chain = "ethereum-mainnet"
 	Optimism Chain = "optimism-mainnet"
 	Avax     Chain = "avax-mainnet"
 	Arbitrum Chain = "arbitrum-mainnet"
 	Polygon  Chain = "polygon-mainnet"
+	Base     Chain = "base-mainnet"
+	BSC      Chain = "binance_smart_chain-mainnet"
 )
-
-func GetAllChains() []Chain {
-	return []Chain{
-		// Testnets
-		Sepolia, AvaxFuji, OptimismGoerli, Goerli, PolygonMumbai, ArbitrumGoerli, Quorum,
-		// Mainnets
-		Ethereum, Optimism, Avax, Arbitrum, Polygon,
-	}
-}
 
 var evmChainIdToChainSelector = map[uint64]uint64{
 	// Testnets
+	97:       13264668187771770619, // BSC Testnet
 	420:      2664363617261496610,  // Optimism Goerli
 	1337:     3379446385462418246,  // Quorem
 	43113:    14767482510784806043, // Avax Fuji
+	84531:    5790810961207155433,  // BASE Goerli
 	80001:    12532609583862916517, // Polygon Mumbai
 	421613:   6101244977088475029,  // Arbitrum Goerli
 	11155111: 16015286601757825753, // Sepolia
 	// Mainnets
-	1:     5009297550715157269, // Ethereum
-	10:    3734403246176062136, // Optimism
-	137:   4051577828743386545, // Polygon
-	42161: 4949039107694359620, // Arbitrum
-	43114: 6433500567565415381, // Avalanche
+	1:     5009297550715157269,  // Ethereum
+	10:    3734403246176062136,  // Optimism
+	56:    11344663589394136015, // BSC
+	137:   4051577828743386545,  // Polygon
+	8453:  15971525489660198786, // BASE
+	42161: 4949039107694359620,  // Arbitrum
+	43114: 6433500567565415381,  // Avalanche
+
 }
 
 func GetCCIPChainSelector(EVMChainId uint64) uint64 {
