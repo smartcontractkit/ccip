@@ -70,9 +70,6 @@ func SetupCCIPTestHarness(t *testing.T) CCIPPluginTestHarness {
 
 	// db, clients and logpollers
 	db := pgtest.NewSqlxDB(t)
-	require.NoError(t, utils.JustError(db.Exec(`SET CONSTRAINTS evm_log_poller_blocks_evm_chain_id_fkey DEFERRED`)))
-	require.NoError(t, utils.JustError(db.Exec(`SET CONSTRAINTS evm_log_poller_filters_evm_chain_id_fkey DEFERRED`)))
-	require.NoError(t, utils.JustError(db.Exec(`SET CONSTRAINTS evm_logs_evm_chain_id_fkey DEFERRED`)))
 
 	sourceORM := logpoller.NewORM(new(big.Int).SetUint64(c.Source.ChainID), db, lggr, pgtest.NewQConfig(true))
 	var sourceLP logpoller.LogPollerTest = logpoller.NewLogPoller(

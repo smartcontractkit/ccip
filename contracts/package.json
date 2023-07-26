@@ -92,7 +92,7 @@
     "solhint": "^3.4.1",
     "solhint-plugin-chainlink-solidity": "git+https://github.com/smartcontractkit/chainlink-solhint-rules.git",
     "solhint-plugin-prettier": "^0.0.5",
-    "solidity-coverage": "^0.7.22",
+    "solidity-coverage": "^0.8.4",
     "ts-node": "^10.0.0",
     "tslib": "^2.4.0",
     "typechain": "^8.0.0",

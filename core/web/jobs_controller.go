@@ -28,7 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
-	"github.com/smartcontractkit/chainlink/v2/core/services/vrf"
+	"github.com/smartcontractkit/chainlink/v2/core/services/vrf/vrfcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/webhook"
 	"github.com/smartcontractkit/chainlink/v2/core/web/presenters"
 )
@@ -240,7 +240,7 @@ func (jc *JobsController) validateJobSpec(tomlString string) (jb job.Job, status
 	case job.Cron:
 		jb, err = cron.ValidatedCronSpec(tomlString)
 	case job.VRF:
-		jb, err = vrf.ValidatedVRFSpec(tomlString)
+		jb, err = vrfcommon.ValidatedVRFSpec(tomlString)
 	case job.Webhook:
 		jb, err = webhook.ValidatedWebhookSpec(tomlString, jc.App.GetExternalInitiatorManager())
 	case job.BlockhashStore:

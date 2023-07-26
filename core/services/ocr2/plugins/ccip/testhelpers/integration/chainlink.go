@@ -305,8 +305,6 @@ func setupNodeCCIP(
 	// test, we fake different chainIDs using the wrapped sim cltest.SimulatedBackend so the RPC
 	// appears to operate on different chainIDs and we use an EthKeyStoreSim wrapper which always
 	// signs 1337 see https://github.com/smartcontractkit/chainlink-ccip/blob/a24dd436810250a458d27d8bb3fb78096afeb79c/core/services/ocr2/plugins/ccip/testhelpers/simulated_backend.go#L35
-	err := evm.EnsureChains(db, lggr, config.Database(), []utils.Big{*utils.NewBig(sourceChainID), *utils.NewBig(destChainID)})
-	require.NoError(t, err)
 	sourceClient := client.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := client.NewSimulatedBackendClient(t, destChain, destChainID)
 	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config.Database())
