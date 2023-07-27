@@ -651,6 +651,7 @@ func TestShouldTransmitAcceptedReport(t *testing.T) {
 		{"gasPrice stale", 0, gasPrice, nil, false},
 		{"tokenPrice update", 0, nil, big.NewInt(20), true},
 		{"tokenPrice stale", 0, nil, tokenPrice, false},
+		{"token price and gas price stale", 0, gasPrice, tokenPrice, false},
 	}
 
 	for _, tt := range tests {

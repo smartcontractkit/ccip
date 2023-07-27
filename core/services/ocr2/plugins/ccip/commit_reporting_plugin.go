@@ -814,13 +814,11 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 		return true
 	}
 
-	gasPriceStale := hasGasPriceUpdate && r.isStaleGasPrice(ctx, lggr, report.PriceUpdates, checkInflight)
-	if gasPriceStale {
-		return true
-	}
+	// We consider a price update as stale when, there isn't an update or there is an update that is stale.
+	gasPriceStale := !hasGasPriceUpdate || r.isStaleGasPrice(ctx, lggr, report.PriceUpdates, checkInflight)
+	tokenPricesStale := !hasTokenPriceUpdates || r.isStaleTokenPrices(ctx, lggr, report.PriceUpdates.TokenPriceUpdates, checkInflight)
 
-	tokenPricesStale := hasTokenPriceUpdates && r.isStaleTokenPrices(ctx, lggr, report.PriceUpdates.TokenPriceUpdates, checkInflight)
-	if tokenPricesStale {
+	if gasPriceStale && tokenPricesStale {
 		return true
 	}
 
@@ -832,11 +830,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 	}
 
 	thisEpochAndRound := mergeEpochAndRound(reportTimestamp.Epoch, reportTimestamp.Round)
-	if lastPriceEpochAndRound >= thisEpochAndRound {
-		return true
-	}
-
-	return false
+	return lastPriceEpochAndRound >= thisEpochAndRound
 }
 
 func (r *CommitReportingPlugin) isStaleMerkleRoot(ctx context.Context, lggr logger.Logger, reportInterval commit_store.CommitStoreInterval, checkInflight bool) bool {
