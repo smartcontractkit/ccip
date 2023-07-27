@@ -47,6 +47,7 @@ var checkFinalityTags = map[int64]bool{
 	1337:     false, // Local evm / Quorum
 	2337:     false, // Local evm integration test
 	1000:     false, // Local evm2
+	84531:    true,  // BASE testnet
 
 	// Mainnets
 	1:     true, // Mainnet
