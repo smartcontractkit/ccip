@@ -831,6 +831,23 @@ func Test_calculateObservedMessagesConsensus(t *testing.T) {
 				{SeqNr: 1, MsgData: MsgData{TokenData: [][]byte{{0x1}, {0x1, 0x1}}}},
 			},
 		},
+		{
+			name: "results should be deterministic",
+			args: args{
+				observations: []ExecutionObservation{
+					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x2}}}}},
+					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x2}}}}},
+					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x1}}}}},
+					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x3}}}}},
+					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x3}}}}},
+					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x1}}}}},
+				},
+				f: 1,
+			},
+			want: []ObservedMessage{
+				{SeqNr: 1, MsgData: MsgData{TokenData: [][]byte{{0x1}}}},
+			},
+		},
 	}
 
 	for _, tt := range tests {

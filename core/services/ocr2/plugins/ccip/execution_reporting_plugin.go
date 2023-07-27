@@ -960,7 +960,18 @@ func calculateObservedMessagesConsensus(observations []ExecutionObservation, f i
 	// We might have different token data for the same sequence number.
 	// For that purpose we want to keep the token data with the most occurrences.
 	seqNumTally := make(map[uint64]tallyVal)
-	for key, tallyInfo := range tally {
+
+	// order tally keys to make looping over the entries deterministic
+	tallyKeys := make([]tallyKey, 0, len(tally))
+	for key := range tally {
+		tallyKeys = append(tallyKeys, key)
+	}
+	sort.Slice(tallyKeys, func(i, j int) bool {
+		return hex.EncodeToString(tallyKeys[i].tokenDataHash[:]) < hex.EncodeToString(tallyKeys[j].tokenDataHash[:])
+	})
+
+	for _, key := range tallyKeys {
+		tallyInfo := tally[key]
 		existingTally, exists := seqNumTally[key.seqNr]
 		if tallyInfo.tally > f && (!exists || tallyInfo.tally > existingTally.tally) {
 			seqNumTally[key.seqNr] = tallyInfo
