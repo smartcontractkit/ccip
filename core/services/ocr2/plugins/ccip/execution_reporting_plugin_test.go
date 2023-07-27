@@ -353,7 +353,8 @@ func TestExecReport(t *testing.T) {
 				mb2.Messages = mb.Messages[:1]
 				mb2.TokenData = mb.TokenData[:1]
 				mb2.Interval = commit_store.CommitStoreInterval{Min: 1, Max: 1}
-				mb2.Proof = mb2.Tree.Prove([]int{0})
+				mb2.Proof, err = mb2.Tree.Prove([]int{0})
+				assert.NoError(t, err)
 				mb2.ProofBits = abihelpers.ProofFlagsToBits(mb2.Proof.SourceFlags)
 				report := mb2.ToExecutionReport()
 				return &report

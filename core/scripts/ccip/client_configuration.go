@@ -660,7 +660,7 @@ func (client *CCIPClient) ValidateMerkleRoot(
 	request *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
 	reportRequests []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
 	report commit_store.CommitStoreCommitReport,
-) merklemulti.Proof[[32]byte] {
+) (merklemulti.Proof[[32]byte], error) {
 	mctx := hasher.NewKeccakCtx()
 	var leafHashes [][32]byte
 	for _, req := range reportRequests {

@@ -1358,7 +1358,11 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 		return nil, fmt.Errorf("root doesn't match")
 	}
 
-	proof := tree.Prove([]int{prove})
+	proof, err := tree.Prove([]int{prove})
+	if err != nil {
+		return nil, err
+	}
+
 	offRampProof := evm_2_evm_offramp.InternalExecutionReport{
 		Messages:          msgs,
 		OffchainTokenData: tokenData,

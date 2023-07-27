@@ -54,7 +54,7 @@ func buildExecutionReportForMessages(
 	tree *merklemulti.Tree[[32]byte],
 	commitInterval commit_store.CommitStoreInterval,
 	observedMessages []ObservedMessage,
-) (report evm_2_evm_offramp.InternalExecutionReport, hashes [][32]byte) {
+) (report evm_2_evm_offramp.InternalExecutionReport, hashes [][32]byte, err error) {
 	innerIdxs := make([]int, 0, len(observedMessages))
 	report.Messages = []evm_2_evm_offramp.InternalEVM2EVMMessage{}
 	for _, observedMessage := range observedMessages {
@@ -70,12 +70,16 @@ func buildExecutionReportForMessages(
 		hashes = append(hashes, leaves[innerIdx])
 	}
 
-	merkleProof := tree.Prove(innerIdxs)
+	merkleProof, err := tree.Prove(innerIdxs)
+	if err != nil {
+		return evm_2_evm_offramp.InternalExecutionReport{}, nil, err
+	}
+
 	// any capped proof will have length <= this one, so we reuse it to avoid proving inside loop, and update later if changed
 	report.Proofs = merkleProof.Hashes
 	report.ProofFlagBits = abihelpers.ProofFlagsToBits(merkleProof.SourceFlags)
 
-	return report, hashes
+	return report, hashes, nil
 }
 
 // Validates the given message observations do not exceed the committed sequence numbers

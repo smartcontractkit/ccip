@@ -59,7 +59,8 @@ func TestPadding(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 6, len(tr8.layers[0]))
 	assert.Equal(t, 4, len(tr8.layers[1]))
-	p := tr8.Prove([]int{0})
+	p, err := tr8.Prove([]int{0})
+	assert.NoError(t, err)
 	h, err := VerifyComputeRoot(ctx, [][32]byte{a}, p)
 	require.NoError(t, err)
 	assert.Equal(t, tr8.Root(), h)
@@ -70,7 +71,9 @@ func TestPadding(t *testing.T) {
 func TestMerkleMultiProofSecondPreimage(t *testing.T) {
 	tr, err := NewTree(ctx, [][32]byte{a, b})
 	require.NoError(t, err)
-	root, err := VerifyComputeRoot(ctx, [][32]byte{a}, tr.Prove([]int{0}))
+	pr, err := tr.Prove([]int{0})
+	require.NoError(t, err)
+	root, err := VerifyComputeRoot(ctx, [][32]byte{a}, pr)
 	require.NoError(t, err)
 	assert.Equal(t, root, tr.Root())
 	tr2, err := NewTree(ctx, [][32]byte{ctx.Hash(append(a[:], b[:]...))})
@@ -99,7 +102,8 @@ func TestMerkleMultiProof(t *testing.T) {
 			gen := combin.NewCombinationGenerator(len_, k)
 			for gen.Next() {
 				leaveIndices := gen.Combination(nil)
-				proof := tr.Prove(leaveIndices)
+				proof, err := tr.Prove(leaveIndices)
+				require.NoError(t, err)
 				var leavesToProve [][32]byte
 				for _, idx := range leaveIndices {
 					leavesToProve = append(leavesToProve, leafHashes[idx])
@@ -110,4 +114,11 @@ func TestMerkleMultiProof(t *testing.T) {
 			}
 		}
 	}
+
+	t.Run("invalid indices should not lead to panic", func(t *testing.T) {
+		tr, err := NewTree(ctx, leafHashes[:])
+		require.NoError(t, err)
+		_, err = tr.Prove([]int{1, 2, 3, 9999})
+		require.Error(t, err)
+	})
 }

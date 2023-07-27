@@ -42,7 +42,7 @@ func siblingIndex(idx int) int {
 	return idx ^ 1
 }
 
-func proveSingleLayer[H hasher.Hash](layer []H, indices []int) singleLayerProof[H] {
+func proveSingleLayer[H hasher.Hash](layer []H, indices []int) (singleLayerProof[H], error) {
 	var (
 		authIndices []int
 		nextIndices []int
@@ -63,13 +63,16 @@ func proveSingleLayer[H hasher.Hash](layer []H, indices []int) singleLayerProof[
 	}
 	var subProof []H
 	for _, i := range authIndices {
+		if i < 0 || i >= len(layer) {
+			return singleLayerProof[H]{}, fmt.Errorf("auth index %d is out of bounds", i)
+		}
 		subProof = append(subProof, layer[i])
 	}
 	return singleLayerProof[H]{
 		nextIndices: nextIndices,
 		subProof:    subProof,
 		sourceFlags: sourceFlags,
-	}
+	}, nil
 }
 
 type Tree[H hasher.Hash] struct {
@@ -111,15 +114,19 @@ func (t *Tree[H]) Root() H {
 	return t.layers[len(t.layers)-1][0]
 }
 
-func (t *Tree[H]) Prove(indices []int) Proof[H] {
+func (t *Tree[H]) Prove(indices []int) (Proof[H], error) {
 	var proof Proof[H]
 	for _, layer := range t.layers[:len(t.layers)-1] {
-		res := proveSingleLayer(layer, indices)
+		res, err := proveSingleLayer(layer, indices)
+		if err != nil {
+			return Proof[H]{}, err
+		}
+
 		indices = res.nextIndices
 		proof.Hashes = append(proof.Hashes, res.subProof...)
 		proof.SourceFlags = append(proof.SourceFlags, res.sourceFlags...)
 	}
-	return proof
+	return proof, nil
 }
 
 func computeNextLayer[H hasher.Hash](ctx hasher.Ctx[H], layer []H) ([]H, []H) {

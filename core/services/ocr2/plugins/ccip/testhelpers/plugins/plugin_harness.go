@@ -254,7 +254,8 @@ func (th *CCIPPluginTestHarness) GenerateAndSendMessageBatch(t *testing.T, nMess
 
 	tree, err := merklemulti.NewTree(mctx, leafHashes)
 	require.NoError(t, err)
-	proof := tree.Prove(indices)
+	proof, err := tree.Prove(indices)
+	require.NoError(t, err)
 	root := tree.Root()
 	rootLocal, err := merklemulti.VerifyComputeRoot(mctx, leafHashes, proof)
 	require.NoError(t, err)

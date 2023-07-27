@@ -863,7 +863,12 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 	// cap messages which fits MaxExecutionReportLength (after serialized)
 	capped := sort.Search(len(observedMessages), func(i int) bool {
-		report, _ := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:i+1])
+		report, _, err2 := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:i+1])
+		if err2 != nil {
+			r.lggr.Errorw("build execution report", "err", err)
+			return false
+		}
+
 		var encoded []byte
 		encoded, err = abihelpers.EncodeExecutionReport(report)
 		if err != nil {
@@ -876,7 +881,11 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		return nil, err
 	}
 
-	execReport, hashes := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:capped])
+	execReport, hashes, err := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:capped])
+	if err != nil {
+		return nil, err
+	}
+
 	encodedReport, err := abihelpers.EncodeExecutionReport(execReport)
 	if err != nil {
 		return nil, err
