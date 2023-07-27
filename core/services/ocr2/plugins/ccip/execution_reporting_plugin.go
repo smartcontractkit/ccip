@@ -985,13 +985,15 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, err
 	}
+	lggr = lggr.With("messageIDs", getMessageIDsAsHexString(messages))
+
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(messages)
 	if err != nil {
 		return false, err
 	}
 	if stale {
-		lggr.Infow("Execution report is stale", "messages", messages)
+		lggr.Info("Execution report is stale")
 		return false, nil
 	}
 	// Else just assume in flight
@@ -1003,18 +1005,35 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 }
 
 func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, timestamp types.ReportTimestamp, report types.Report) (bool, error) {
+	lggr := r.lggr.Named("ShouldTransmitAcceptedReport")
 	messages, err := abihelpers.MessagesFromExecutionReport(report)
 	if err != nil {
+		lggr.Errorw("Unable to decode report", "err", err)
 		return false, nil
 	}
+	lggr = lggr.With("messageIDs", getMessageIDsAsHexString(messages))
+
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
 	stale, err := r.isStaleReport(messages)
-	return !stale, err
+	if err != nil {
+		return false, err
+	}
+	if stale {
+		lggr.Info("Execution report is stale")
+		return false, nil
+	}
+
+	lggr.Info("Transmitting finalized report")
+	return true, err
 }
 
 func (r *ExecutionReportingPlugin) isStaleReport(messages []evm_2_evm_offramp.InternalEVM2EVMMessage) (bool, error) {
+	if len(messages) == 0 {
+		return true, fmt.Errorf("messages are empty")
+	}
+
 	// If the first message is executed already, this execution report is stale.
 	// Note the default execution state, including for arbitrary seq number not yet committed
 	// is ExecutionStateUntouched.

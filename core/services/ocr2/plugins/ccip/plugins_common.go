@@ -2,6 +2,7 @@ package ccip
 
 import (
 	"context"
+	"encoding/hex"
 	"math/big"
 	"sort"
 
@@ -229,4 +230,12 @@ func bytesOfBytesKeccak(b [][]byte) ([32]byte, error) {
 
 func mergeEpochAndRound(epoch uint32, round uint8) uint64 {
 	return uint64(epoch)<<8 + uint64(round)
+}
+
+func getMessageIDsAsHexString(messages []evm_2_evm_offramp.InternalEVM2EVMMessage) []string {
+	messageIDs := make([]string, 0, len(messages))
+	for _, m := range messages {
+		messageIDs = append(messageIDs, "0x"+hex.EncodeToString(m.MessageId[:]))
+	}
+	return messageIDs
 }

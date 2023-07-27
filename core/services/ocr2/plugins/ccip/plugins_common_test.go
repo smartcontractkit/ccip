@@ -2,6 +2,8 @@ package ccip
 
 import (
 	"math"
+	"math/rand"
+	"strconv"
 	"testing"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -228,4 +231,28 @@ func Test_contiguousReqs(t *testing.T) {
 		res := contiguousReqs(logger.NullLogger, tc.min, tc.max, tc.seqNrs)
 		assert.Equal(t, tc.exp, res)
 	}
+}
+
+func Test_getMessageIDsAsHexString(t *testing.T) {
+	t.Run("base", func(t *testing.T) {
+		hashes := make([]common.Hash, 10)
+		for i := range hashes {
+			hashes[i] = common.HexToHash(strconv.Itoa(rand.Intn(100000)))
+		}
+
+		msgs := make([]evm_2_evm_offramp.InternalEVM2EVMMessage, len(hashes))
+		for i := range msgs {
+			msgs[i] = evm_2_evm_offramp.InternalEVM2EVMMessage{MessageId: hashes[i]}
+		}
+
+		messageIDs := getMessageIDsAsHexString(msgs)
+		for i := range messageIDs {
+			assert.Equal(t, hashes[i].String(), messageIDs[i])
+		}
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		messageIDs := getMessageIDsAsHexString(nil)
+		assert.Empty(t, messageIDs)
+	})
 }
