@@ -778,7 +778,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	for i, report := range reports {
 		reportsWithSendReqs[i] = commitReportWithSendRequests{
 			commitReport:         report,
-			sendRequestsWithMeta: make([]evm2EVMOnRampCCIPSendRequestedWithMeta, 0, len(sendRequestLogs)),
+			sendRequestsWithMeta: make([]evm2EVMOnRampCCIPSendRequestedWithMeta, 0, report.Interval.Max-report.Interval.Min+1),
 		}
 	}
 
