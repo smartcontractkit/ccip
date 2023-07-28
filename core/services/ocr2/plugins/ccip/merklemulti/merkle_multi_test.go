@@ -28,6 +28,50 @@ func hashesFromHexStrings(hexStrs []string) [][32]byte {
 	}
 	return hashes
 }
+
+func TestReturnErrorForTooLargeInput(t *testing.T) {
+	leavesOrProofsToLarge := "leaves or proofs length is beyond the limit 256"
+
+	tests := []struct {
+		name                 string
+		leavesLen, proofsLen int
+		errorMessage         string
+	}{
+		{"both below maximum, but sum above", MaxNumberTreeLeaves + 1, MaxNumberTreeLeaves + 1, "total hashes length cannot me larger than 256"},
+		{"both maximum lengths", MaxNumberTreeLeaves + 2, MaxNumberTreeLeaves + 2, leavesOrProofsToLarge},
+		{"leaves are too large", MaxNumberTreeLeaves + 2, 1, leavesOrProofsToLarge},
+		{"proofs are too large", 2, MaxNumberTreeLeaves + 2, leavesOrProofsToLarge},
+		{"empty", 0, 0, "leaves and proofs are empty"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			leaves := make([][32]byte, test.leavesLen)
+			proofs := make([][32]byte, test.proofsLen)
+
+			var flags []bool
+			flagsLength := test.leavesLen + test.proofsLen - 1
+			if flagsLength > 0 {
+				flags = make([]bool, flagsLength)
+			}
+
+			_, err := VerifyComputeRoot(ctx, leaves, Proof[[32]byte]{Hashes: proofs, SourceFlags: flags})
+			require.Error(t, err)
+			require.Equal(t, err.Error(), test.errorMessage)
+		})
+	}
+}
+
+func TestErrorWhenNotAllProofsCanBeUsed(t *testing.T) {
+	leaves := [][32]byte{a, b}
+	proofs := [][32]byte{c, d}
+	sourceFlags := []bool{false, true, true}
+
+	_, err := VerifyComputeRoot(ctx, leaves, Proof[[32]byte]{Hashes: proofs, SourceFlags: sourceFlags})
+	require.Error(t, err)
+	require.Equal(t, err.Error(), "proof source flags 1 != proof hashes 2")
+}
+
 func TestSpecFixtureVerifyProof(t *testing.T) {
 	for _, testVector := range fixtures.TestVectors {
 		var leafHashes = hashesFromHexStrings(testVector.ProofLeaves)

@@ -39,9 +39,6 @@ const (
 	// and restart from the chain's minSeqNum. Want to set it high to allow for large throughput,
 	// but low enough to minimize wasted revert cost.
 	MaxInflightSeqNumGap = 500
-
-	// Maximum number of leaves in a Merkle tree. This is a limitation of the contract.
-	maxNumberOfMerkleTreeLeaves = 256
 )
 
 var (
@@ -534,7 +531,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		intervals = append(intervals, obs.Interval)
 	}
 
-	agreedInterval, err := calculateIntervalConsensus(intervals, r.F, maxNumberOfMerkleTreeLeaves)
+	agreedInterval, err := calculateIntervalConsensus(intervals, r.F, merklemulti.MaxNumberTreeLeaves)
 	if err != nil {
 		return false, nil, err
 	}

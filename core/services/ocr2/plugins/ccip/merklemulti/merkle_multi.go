@@ -32,6 +32,8 @@ func (p Proof[H]) countSourceFlags(b bool) (count int) {
 const (
 	SourceFromHashes = true
 	SourceFromProof  = false
+	// Maximum number of leaves in a Merkle tree. This is a limitation of the contract.
+	MaxNumberTreeLeaves = 256
 )
 
 func parentIndex(idx int) int {
@@ -144,15 +146,29 @@ func computeNextLayer[H hasher.Hash](ctx hasher.Ctx[H], layer []H) ([]H, []H) {
 }
 
 func VerifyComputeRoot[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H, proof Proof[H]) (H, error) {
-	totalHashes := len(leafHashes) + len(proof.Hashes) - 1
+	leavesLength := len(leafHashes)
+	proofsLength := len(proof.Hashes)
+	if leavesLength == 0 && proofsLength == 0 {
+		return ctx.ZeroHash(), errors.Errorf("leaves and proofs are empty")
+	}
+	if leavesLength > MaxNumberTreeLeaves+1 || proofsLength > MaxNumberTreeLeaves+1 {
+		return ctx.ZeroHash(), errors.Errorf("leaves or proofs length is beyond the limit %d", MaxNumberTreeLeaves)
+	}
+	totalHashes := leavesLength + proofsLength - 1
+	if totalHashes > MaxNumberTreeLeaves {
+		return ctx.ZeroHash(), errors.Errorf("total hashes length cannot me larger than %d", MaxNumberTreeLeaves)
+	}
 	if totalHashes != len(proof.SourceFlags) {
 		return ctx.ZeroHash(), errors.Errorf("hashes %d != sourceFlags %d", totalHashes, len(proof.SourceFlags))
 	}
-	sourceProofCount := proof.countSourceFlags(SourceFromProof)
-	if sourceProofCount != len(proof.Hashes) {
-		return ctx.ZeroHash(), errors.Errorf("proof source flags %d != proof hashes%d", sourceProofCount, len(proof.Hashes))
+	if totalHashes == 0 {
+		return leafHashes[0], nil
 	}
-	var hashes []H
+	sourceProofCount := proof.countSourceFlags(SourceFromProof)
+	if sourceProofCount != proofsLength {
+		return ctx.ZeroHash(), errors.Errorf("proof source flags %d != proof hashes %d", sourceProofCount, proofsLength)
+	}
+	hashes := make([]H, totalHashes)
 	for i := 0; i < totalHashes; i++ {
 		hashes = append(hashes, leafHashes[0])
 	}
@@ -165,7 +181,7 @@ func VerifyComputeRoot[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H, proof P
 		var a, b H
 		//nolint:gosimple
 		if proof.SourceFlags[i] == SourceFromHashes {
-			if leafPos < len(leafHashes) {
+			if leafPos < leavesLength {
 				a = leafHashes[leafPos]
 				leafPos++
 			} else {
@@ -177,7 +193,7 @@ func VerifyComputeRoot[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H, proof P
 			a = proof.Hashes[proofPos]
 			proofPos++
 		}
-		if leafPos < len(leafHashes) {
+		if leafPos < leavesLength {
 			b = leafHashes[leafPos]
 			leafPos++
 		} else {
@@ -186,8 +202,10 @@ func VerifyComputeRoot[H hasher.Hash](ctx hasher.Ctx[H], leafHashes []H, proof P
 		}
 		hashes[i] = ctx.HashInternal(a, b)
 	}
-	if totalHashes == 0 {
-		return leafHashes[0], nil
+	if hashPos != totalHashes-1 ||
+		leafPos != leavesLength ||
+		proofPos != proofsLength {
+		return ctx.ZeroHash(), errors.Errorf("not all proofs used during processing")
 	}
 	return hashes[totalHashes-1], nil
 }
