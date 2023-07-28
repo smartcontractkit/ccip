@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -46,6 +47,10 @@ func typeAndVersion(addr common.Address, client bind.ContractBackend) (ContractT
 		return "", semver.Version{}, errors.Wrap(err, "failed to call type and version")
 	}
 	typeAndVersionValues := strings.Split(tvStr, " ")
+
+	if len(typeAndVersionValues) < 2 {
+		return "", semver.Version{}, fmt.Errorf("invalid type and version %s", tvStr)
+	}
 	contractType, version := typeAndVersionValues[0], typeAndVersionValues[1]
 	v, err := semver.NewVersion(version)
 	if err != nil {
