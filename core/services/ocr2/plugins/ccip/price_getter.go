@@ -68,25 +68,15 @@ func (d *priceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Addres
 	if !ok {
 		return nil, errors.Errorf("expected map output of price pipeline, got %T", finalResult.Values[0])
 	}
+
 	priceMap := make(map[common.Address]*big.Int)
-	for addr, priceI := range prices {
+	for addr, rawPrice := range prices {
 		addr := common.HexToAddress(addr)
-		var priceStr string
-		switch v := priceI.(type) {
-		case decimal.Decimal:
-			priceStr = v.String()
-		case *decimal.Decimal:
-			priceStr = v.String()
-		case string:
-			priceStr = v
-		default:
-			return nil, errors.Errorf("unsupported price type %T from tokensForFeeCoin spec", priceI)
+		castedPrice, err := parseBigInt(rawPrice)
+		if err != nil {
+			return nil, err
 		}
-		priceBigInt, success := big.NewInt(0).SetString(priceStr, 10)
-		if !success {
-			return nil, errors.Errorf("unable to convert to integer %v", priceStr)
-		}
-		priceMap[addr] = priceBigInt
+		priceMap[addr] = castedPrice
 	}
 	// The mapping of token address to source of token price has to live offchain.
 	// Best we can do is sanity check that the token price spec covers all our desired execution token prices.
@@ -96,6 +86,39 @@ func (d *priceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Addres
 		}
 	}
 	return priceMap, nil
+}
+
+func parseBigInt(price any) (*big.Int, error) {
+	if price == nil {
+		return nil, errors.Errorf("nil value passed")
+	}
+
+	switch v := price.(type) {
+	case decimal.Decimal:
+		return bigIntFromString(v.String())
+	case *decimal.Decimal:
+		return bigIntFromString(v.String())
+	case *big.Int:
+		return v, nil
+	case string:
+		return bigIntFromString(v)
+	case int64:
+		return big.NewInt(v), nil
+	case float64:
+		i := new(big.Int)
+		big.NewFloat(v).Int(i)
+		return i, nil
+	default:
+		return nil, errors.Errorf("unsupported price type %T from tokensForFeeCoin spec", price)
+	}
+}
+
+func bigIntFromString(v string) (*big.Int, error) {
+	priceBigInt, success := new(big.Int).SetString(v, 10)
+	if !success {
+		return nil, errors.Errorf("unable to convert to integer %v", v)
+	}
+	return priceBigInt, nil
 }
 
 var _ PriceGetter = &fakePriceGetter{}
