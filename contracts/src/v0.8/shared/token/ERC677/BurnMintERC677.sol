@@ -2,16 +2,18 @@
 pragma solidity ^0.8.0;
 
 import {IBurnMintERC20} from "../ERC20/IBurnMintERC20.sol";
+import {IERC677} from "./IERC677.sol";
 
 import {ERC677} from "./ERC677.sol";
 import {OwnerIsCreator} from "../../access/OwnerIsCreator.sol";
 
 import {ERC20Burnable} from "../../../vendor/openzeppelin-solidity/v4.8.0/token/ERC20/extensions/ERC20Burnable.sol";
 import {EnumerableSet} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/structs/EnumerableSet.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/utils/introspection/IERC165.sol";
 
 /// @notice A basic ERC677 compatible token contract with burn and minting roles.
 /// @dev The total supply can be limited during deployment.
-contract BurnMintERC677 is IBurnMintERC20, ERC677, ERC20Burnable, OwnerIsCreator {
+contract BurnMintERC677 is IBurnMintERC20, ERC677, IERC165, ERC20Burnable, OwnerIsCreator {
   using EnumerableSet for EnumerableSet.AddressSet;
 
   error SenderNotMinter(address sender);
@@ -29,14 +31,21 @@ contract BurnMintERC677 is IBurnMintERC20, ERC677, ERC20Burnable, OwnerIsCreator
   EnumerableSet.AddressSet internal s_burners;
 
   /// @dev The number of decimals for the token
-  uint8 private immutable i_decimals;
+  uint8 internal immutable i_decimals;
 
   /// @dev The maximum supply of the token, 0 if unlimited
-  uint256 private immutable i_maxSupply;
+  uint256 internal immutable i_maxSupply;
 
   constructor(string memory name, string memory symbol, uint8 decimals_, uint256 maxSupply_) ERC677(name, symbol) {
     i_decimals = decimals_;
     i_maxSupply = maxSupply_;
+  }
+
+  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+    return
+      interfaceId == type(IERC677).interfaceId ||
+      interfaceId == type(IBurnMintERC20).interfaceId ||
+      interfaceId == type(IERC165).interfaceId;
   }
 
   // ================================================================
@@ -92,6 +101,13 @@ contract BurnMintERC677 is IBurnMintERC20, ERC677, ERC20Burnable, OwnerIsCreator
   /// @dev Decreases the total supply.
   function burn(uint256 amount) public override(IBurnMintERC20, ERC20Burnable) onlyBurner {
     super.burn(amount);
+  }
+
+  /// @inheritdoc IBurnMintERC20
+  /// @dev Alias for BurnFrom for compatibility with the older naming convention.
+  /// @dev Uses burnFrom for all validation & logic.
+  function burn(address account, uint256 amount) public virtual override {
+    burnFrom(account, amount);
   }
 
   /// @inheritdoc ERC20Burnable

@@ -19,5 +19,11 @@ interface IBurnMintERC20 is IERC20 {
   /// @param account The address to burn tokens from.
   /// @param amount The number of tokens to be burned.
   /// @dev this function decreases the total supply.
+  function burn(address account, uint256 amount) external;
+
+  /// @notice Burns tokens from a given address..
+  /// @param account The address to burn tokens from.
+  /// @param amount The number of tokens to be burned.
+  /// @dev this function decreases the total supply.
   function burnFrom(address account, uint256 amount) external;
 }
