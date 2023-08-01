@@ -38,24 +38,29 @@ const (
 // TODO: Once core exposes EvmFinalityTag() for a given chain we can use that instead.
 var checkFinalityTags = map[int64]bool{
 	// Testnets
-	420:    true, // Optimism goerli
-	421613: true, // Arbitrum goerli
+	97:  true, // BSC testnet
+	420: true, // Optimism goerli
 	// TODO Temporarily disabling Avax until we figure out issues there
 	43113:    false, // Avax fuji
-	11155111: true,  // Sepolia
-	80001:    false, // Polygon mumbia does NOT support finality tags
-	1337:     false, // Local evm / Quorum
-	2337:     false, // Local evm integration test
-	1000:     false, // Local evm2
+	80001:    false, // Polygon mumbai does NOT support finality tags
 	84531:    true,  // BASE testnet
+	421613:   true,  // Arbitrum goerli
+	11155111: true,  // Sepolia
+
+	// Localnets
+	1000: false, // Local evm2
+	1337: false, // Local evm / Quorum
+	2337: false, // Local evm integration test
 
 	// Mainnets
-	1:     true, // Mainnet
-	10:    true, // Optimism
-	42161: true, // Arbitrum
+	1:     true,  // Mainnet
+	10:    true,  // Optimism
+	56:    true,  // BSC   scheduled for 10th Aug 2023 https://github.com/bnb-chain/bsc/releases/tag/v1.2.9
+	137:   false, // Polygon
+	42161: true,  // Arbitrum
 	// TODO Temporarily disabling Avax until we figure out issues there
 	43114: false, // Avax
-	137:   false, // Polygon
+
 }
 
 func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
@@ -119,7 +124,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 		"destChain", ChainName(destChainID))
 	checkFinalityTags, ok := checkFinalityTags[pluginConfig.SourceEvmChainId]
 	if !ok {
-		return nil, errors.Errorf("chain %d not supported", pluginConfig.SourceEvmChainId)
+		return nil, errors.Errorf("finality information for chain %d not supported", pluginConfig.SourceEvmChainId)
 	}
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
