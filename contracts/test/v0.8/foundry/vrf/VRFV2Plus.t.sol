@@ -250,7 +250,7 @@ contract VRFV2Plus is BaseTest {
     (, uint96 ethBalanceBefore, , , ) = s_testCoordinator.getSubscription(subId);
     vm.expectEmit(true, true, false, true);
     uint256 outputSeed = s_testCoordinator.getRandomnessFromProofExternal(proof, rc).randomness;
-    emit RandomWordsFulfilled(requestId, outputSeed, subId, 123150, rc.extraArgs, true);
+    emit RandomWordsFulfilled(requestId, outputSeed, subId, 123348, rc.extraArgs, true);
     s_testCoordinator.fulfillRandomWords{gas: 1_500_000}(proof, rc);
     (fulfilled, , ) = s_testConsumer.s_requests(requestId);
     assertEq(fulfilled, true);
@@ -359,7 +359,7 @@ contract VRFV2Plus is BaseTest {
     (uint96 linkBalanceBefore, , , , ) = s_testCoordinator.getSubscription(subId);
     vm.expectEmit(true, true, false, true);
     uint256 outputSeed = s_testCoordinator.getRandomnessFromProofExternal(proof, rc).randomness;
-    emit RandomWordsFulfilled(requestId, outputSeed, subId, 292278, rc.extraArgs, true);
+    emit RandomWordsFulfilled(requestId, outputSeed, subId, 292854, rc.extraArgs, true);
     s_testCoordinator.fulfillRandomWords{gas: 1_500_000}(proof, rc);
     (fulfilled, , ) = s_testConsumer.s_requests(requestId);
     assertEq(fulfilled, true);
