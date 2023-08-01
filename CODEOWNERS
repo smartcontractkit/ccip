@@ -9,10 +9,12 @@
 /core/internal @samsondav @jmank88
 
 # Chains
+/common @smartcontractkit/integrations
 /core/chains/evm @samsondav @prashantkumar1982
 /core/chains/evm/headtracker @pinebit @samsondav @prashantkumar1982
 /core/chains/evm/client @samsondav @prashantkumar1982
 /core/chains/evm/log @jmank88 @prashantkumar1982 @connorwstein
+/core/chains/evm/logpoller @reductionista @connorwstein
 /core/chains/cosmos @archseer @cfal
 
 # Services
@@ -23,7 +25,8 @@
 /core/services/health @samsondav
 /core/services/job @connorwstein
 /core/services/keystore @RyanRHall
-/core/services/offchainreporting @connorwstein @samsondav
+/core/services/ocr* @connorwstein @samsondav
+/core/services/ocr2 @jmank88 @krehermann
 /core/services/periodicbackup @PiotrTrzpil @samsondav
 /core/services/pg @samsondav
 /core/services/pipeline @connorwstein @prashantkumar1982
@@ -108,3 +111,6 @@ flake.lock @smartcontractkit/prodsec-public
 /contracts/src/v0.8/ccip/ARMProxy.sol @gtklocker @kaleofduty
 /contracts/src/v0.8/ccip/interfaces/IARM.sol @gtklocker @kaleofduty
 /contracts/src/v0.8/ccip/test/arm @gtklocker @kaleofduty
+
+# LOOP Plugins
+/plugins @jmank88 @krehermann

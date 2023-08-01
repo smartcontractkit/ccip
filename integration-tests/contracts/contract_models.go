@@ -139,7 +139,7 @@ type OffchainAggregator interface {
 	Address() string
 	Fund(nativeAmount *big.Float) error
 	GetContractData(ctx context.Context) (*OffchainAggregatorData, error)
-	SetConfig(chainlinkNodes []*client.Chainlink, ocrConfig OffChainAggregatorConfig, transmitters []common.Address) error
+	SetConfig(chainlinkNodes []*client.ChainlinkK8sClient, ocrConfig OffChainAggregatorConfig, transmitters []common.Address) error
 	SetPayees([]string, []string) error
 	RequestNewRound() error
 	GetLatestAnswer(ctx context.Context) (*big.Int, error)
@@ -160,6 +160,10 @@ type OffchainAggregatorV2 interface {
 	GetLatestRound(ctx context.Context) (*RoundData, error)
 	GetRound(ctx context.Context, roundID *big.Int) (*RoundData, error)
 	ParseEventAnswerUpdated(log types.Log) (*ocr2aggregator.OCR2AggregatorAnswerUpdated, error)
+}
+
+type KeeperRegistryCheckUpkeepGasUsageWrapper interface {
+	Address() string
 }
 
 type Oracle interface {

@@ -31,7 +31,7 @@ src = 'src/v0.8/metatx'
 test = 'src/v0.8/metatx/test'
 
 [profile.functions]
-solc_version = '0.8.6'
+solc_version = '0.8.19'
 src = 'src/v0.8/functions'
 test = 'src/v0.8/functions/tests'
 
