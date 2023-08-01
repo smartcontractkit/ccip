@@ -345,3 +345,7 @@ export function expectGasWithinDeviation(
   const expected: BigNumber = BigNumber.from(expectedGas)
   expect(gasUsed).is.gt(expected.sub(deviation)).and.lt(expected.add(deviation))
 }
+
+export function randomAddress() {
+  return ethers.Wallet.createRandom().address
+}
