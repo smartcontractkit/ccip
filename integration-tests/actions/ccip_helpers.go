@@ -2296,7 +2296,7 @@ func nodeContractPair(nodeAddr, contractAddr string) string {
 type CCIPTestEnv struct {
 	MockServer               *ctfClient.MockserverClient
 	CLNodesWithKeys          map[string][]*client.CLNodesWithKeys // key - network chain-id
-	CLNodes                  []*client.Chainlink
+	CLNodes                  []*client.ChainlinkK8sClient
 	execNodeStartIndex       int
 	commitNodeStartIndex     int
 	numOfAllowedFaultyCommit int
@@ -2367,12 +2367,17 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	chains []blockchain.EVMClient,
 ) error {
 	log.Info().Msg("Connecting to launched resources")
-	chainlinkNodes, err := client.ConnectChainlinkNodes(c.K8Env)
+	chainlinkK8sNodes, err := client.ConnectChainlinkNodes(c.K8Env)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	if len(chainlinkNodes) == 0 {
+	if len(chainlinkK8sNodes) == 0 {
 		return fmt.Errorf("no CL node found")
+	}
+
+	chainlinkNodes := make([]*client.ChainlinkClient, 0)
+	for _, chainlinkNode := range chainlinkK8sNodes {
+		chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient)
 	}
 
 	mockServer, err := ctfClient.ConnectMockServer(c.K8Env)
@@ -2414,7 +2419,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 					c.Close()
 				}
 			}()
-			err = FundChainlinkNodesAddresses(chainlinkNodes[1:], c, nodeFund)
+			err = FundChainlinkNodesAddresses(chainlinkK8sNodes[1:], c, nodeFund)
 			if err != nil {
 				return fmt.Errorf("funding nodes for chain %s %+v", c.GetNetworkName(), err)
 			}
@@ -2436,7 +2441,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 
 	c.MockServer = mockServer
 	c.CLNodesWithKeys = nodesWithKeys
-	c.CLNodes = chainlinkNodes
+	c.CLNodes = chainlinkK8sNodes
 	return nil
 }
 
