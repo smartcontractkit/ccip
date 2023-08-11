@@ -1,0 +1,30 @@
+name: 'Build Chainlink'
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+
+  build-chainlink:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+
+      - name: Build chainlink image
+        uses: ./.github/actions/build-sign-publish-chainlink
+        with:
+          publish: false
+          sign-images: false
+      - name: Collect Metrics
+        if: always()
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@2dcc6578752a8949bdabf8d7fb4f0c70b83703cd
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: build-chainlink
+        continue-on-error: true

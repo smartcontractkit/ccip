@@ -1,0 +1,21 @@
+name: Lint GH Workflows
+on:
+  push:
+jobs:
+  lint_workflows:
+    name: Validate Github Action Workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Code
+        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
+      - name: Run actionlint
+        uses: reviewdog/action-actionlint@7485c2136bd093d2317a854c72910eebaee35238 # v1.37.1
+      - name: Collect Metrics
+        if: always()
+        id: collect-gha-metrics
+        uses: smartcontractkit/push-gha-metrics-action@2dcc6578752a8949bdabf8d7fb4f0c70b83703cd
+        with:
+          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          this-job-name: Validate Github Action Workflows
+        continue-on-error: true
