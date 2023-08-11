@@ -117,6 +117,7 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 			OnRamp:      onRampAddr,
 		},
 		mockOnRamp,
+		nil,
 	)
 	assert.NoError(t, err)
 
