@@ -1,0 +1,27 @@
+type = "offchainreporting2"
+schemaVersion = 1
+name = "Functions {{timestamp}}"
+forwardingAllowed = false
+contractID = "{{oracle_contract_address}}"
+ocrKeyBundleID = "{{ocr2_key_bundle_id}}"
+p2pv2Bootstrappers = [
+  "{{p2p_bootstrapper}}"
+]
+relay = "evm"
+pluginType = "functions"
+transmitterID = "{{node_eth_address}}"
+observationSource  = """
+	run_computation    [type="bridge" name="ea_bridge" requestData="{\\"note\\": \\"observationSource is unused but the bridge is required\\"}"]
+	run_computation
+"""
+
+[relayConfig]
+chainID = {{chain_id}}
+
+[pluginConfig]
+minIncomingConfirmations = 3
+requestTimeoutSec = 300
+requestTimeoutCheckFrequencySec = 10
+requestTimeoutBatchLookupSize = 20
+listenerEventHandlerTimeoutSec = 120
+maxRequestSizeBytes = 30720
