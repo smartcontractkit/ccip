@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"sort"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -16,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp_legacy"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
@@ -45,6 +47,31 @@ func LoadOnRamp(onRampAddress common.Address, pluginName string, client client.C
 		return nil, errors.Wrap(err, "Invalid onRamp contract")
 	}
 	return observability.NewObservedEVM2EVMnRamp(onRampAddress, pluginName, client)
+}
+
+func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+	dynamicOnRampConfig, err := onRamp.GetDynamicConfig(&bind.CallOpts{})
+	if err == nil || !strings.Contains(err.Error(), "abi: improperly encoded") {
+		return dynamicOnRampConfig, err
+	}
+
+	// if error is due to ABI encoding, try to decode DynamicConfig with legacy OnRamp ABI
+	legacyOnrampVersion, err := evm_2_evm_onramp_legacy.NewEVM2EVMOnRamp(onRamp.Address(), client)
+	if err != nil {
+		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+	}
+	legacyDynamicConfig, err := legacyOnrampVersion.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+	}
+
+	return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
+		Router:          legacyDynamicConfig.Router,
+		MaxTokensLength: legacyDynamicConfig.MaxTokensLength,
+		PriceRegistry:   legacyDynamicConfig.PriceRegistry,
+		MaxDataSize:     legacyDynamicConfig.MaxDataSize,
+		MaxGasLimit:     legacyDynamicConfig.MaxGasLimit,
+	}, nil
 }
 
 func LoadOffRamp(offRampAddress common.Address, pluginName string, client client.Client) (evm_2_evm_offramp.EVM2EVMOffRampInterface, error) {
