@@ -24,6 +24,7 @@ var (
 		EVM2EVMOnRamp:  {},
 		CommitStore:    {},
 	}
+	LatestOnRampVersion = "1.1.0"
 )
 
 func VerifyTypeAndVersion(addr common.Address, client bind.ContractBackend, expectedType ContractType) error {
@@ -46,13 +47,8 @@ func typeAndVersion(addr common.Address, client bind.ContractBackend) (ContractT
 	if err != nil {
 		return "", semver.Version{}, errors.Wrap(err, "failed to call type and version")
 	}
-	typeAndVersionValues := strings.Split(tvStr, " ")
 
-	if len(typeAndVersionValues) < 2 {
-		return "", semver.Version{}, fmt.Errorf("invalid type and version %s", tvStr)
-	}
-	contractType, version := typeAndVersionValues[0], typeAndVersionValues[1]
-	v, err := semver.NewVersion(version)
+	contractType, v, err := ParseTypeAndVersion(tvStr)
 	if err != nil {
 		return "", semver.Version{}, err
 	}
@@ -60,4 +56,16 @@ func typeAndVersion(addr common.Address, client bind.ContractBackend) (ContractT
 		return "", semver.Version{}, errors.Errorf("unrecognized contract type %v", contractType)
 	}
 	return ContractType(contractType), *v, nil
+}
+
+func ParseTypeAndVersion(tvStr string) (string, *semver.Version, error) {
+	typeAndVersionValues := strings.Split(tvStr, " ")
+
+	if len(typeAndVersionValues) < 2 {
+		return "", &semver.Version{}, fmt.Errorf("invalid type and version %s", tvStr)
+	}
+	contractType, version := typeAndVersionValues[0], typeAndVersionValues[1]
+	v, err := semver.NewVersion(version)
+
+	return contractType, v, err
 }
