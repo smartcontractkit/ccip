@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"math/big"
 	"sort"
-	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp_legacy"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
@@ -50,17 +50,30 @@ func LoadOnRamp(onRampAddress common.Address, pluginName string, client client.C
 }
 
 func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
-	dynamicOnRampConfig, err := onRamp.GetDynamicConfig(&bind.CallOpts{})
-	if err == nil || !strings.Contains(err.Error(), "abi: improperly encoded") {
-		return dynamicOnRampConfig, err
-	}
-
-	// if error is due to ABI encoding, try to decode DynamicConfig with legacy OnRamp ABI
-	legacyOnrampVersion, err := evm_2_evm_onramp_legacy.NewEVM2EVMOnRamp(onRamp.Address(), client)
+	versionString, err := onRamp.TypeAndVersion(&bind.CallOpts{})
 	if err != nil {
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
 	}
-	legacyDynamicConfig, err := legacyOnrampVersion.GetDynamicConfig(&bind.CallOpts{})
+
+	_, version, err := ccipconfig.ParseTypeAndVersion(versionString)
+	if err != nil {
+		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+	}
+
+	latestVersion, err := semver.NewVersion(ccipconfig.LatestOnRampVersion)
+	if err != nil {
+		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+	}
+
+	if version.Equal(latestVersion) {
+		return onRamp.GetDynamicConfig(&bind.CallOpts{})
+	}
+
+	legacyOnramp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRamp.Address(), client)
+	if err != nil {
+		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+	}
+	legacyDynamicConfig, err := legacyOnramp.GetDynamicConfig(&bind.CallOpts{})
 	if err != nil {
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
 	}
