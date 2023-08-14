@@ -20,6 +20,7 @@ import (
 )
 
 func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
+
 	testCases := []struct {
 		description  string
 		spec         *job.OCR2OracleSpec
