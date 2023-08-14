@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
-import {IARM} from "./interfaces/IARM.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 
