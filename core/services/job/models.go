@@ -343,6 +343,10 @@ const (
 	OCR2Functions OCR2PluginType = "functions"
 
 	Mercury OCR2PluginType = "mercury"
+	// CCIPCommit refers to the ccip.CCIPCommit plugin
+	CCIPCommit OCR2PluginType = "ccip-commit"
+	// CCIPExecution refers to the ccip.CCIPExecution plugin
+	CCIPExecution OCR2PluginType = "ccip-execution"
 )
 
 // OCR2OracleSpec defines the job spec for OCR2 jobs.
