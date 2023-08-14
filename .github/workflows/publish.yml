@@ -5,8 +5,7 @@ on:
     tags:
       - 'v*'
     branches:
-      - ccip-develop
-      - deployment-test
+      - main
 
 jobs:
   build-and-publish:

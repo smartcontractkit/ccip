@@ -2,7 +2,7 @@ name: CCIP Load Test
 on:
   push:
     branches:
-      - ccip-develop
+      - main
   workflow_dispatch:
     inputs:
       existing-deployment:
