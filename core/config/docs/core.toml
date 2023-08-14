@@ -15,7 +15,7 @@ FeedsManager = true # Default
 LogPoller = false # Default
 # UICSAKeys enables CSA Keys in the UI.
 UICSAKeys = false # Default
-# UICSAKeys enables CSA Keys in the UI.
+# CCIP enables the CCIP service.
 CCIP = false # Default
 
 [Database]
