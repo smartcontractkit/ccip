@@ -10,6 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/joho/godotenv"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/dione"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rhea"
@@ -31,7 +33,13 @@ var chainMapping = map[dione.Environment]map[rhea.Chain]rhea.EvmDeploymentConfig
 	dione.Production:   deployments.ProdChains,
 }
 
+func loadEnvironment(t *testing.T) {
+	err := godotenv.Load()
+	require.NoError(t, err)
+}
+
 func checkOwnerKey(t *testing.T) string {
+	loadEnvironment(t)
 	ownerKey := os.Getenv("OWNER_KEY")
 	if ownerKey == "" {
 		t.Log("No key given, this test will be skipped. This is intended behaviour for automated testing.")

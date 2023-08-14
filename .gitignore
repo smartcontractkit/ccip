@@ -74,7 +74,6 @@ MacOSX*
 cache
 core/services/ocr2/plugins/ccip/transactions.rlp
 lcov.info
-core/scripts/ccip/secrets/secrets.go
 !core/services/ocr2/plugins/ccip/cache/
 
 
