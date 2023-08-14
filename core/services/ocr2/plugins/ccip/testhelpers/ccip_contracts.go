@@ -1126,7 +1126,7 @@ func (c *CCIPContracts) AssertExecState(t *testing.T, log logpoller.Log, state a
 		require.NotNil(t, c.Dest.OffRamp, "no offRamp configured")
 		offRamp = c.Dest.OffRamp
 	}
-	executionStateChanged, err := offRamp.ParseExecutionStateChanged(log.GetGethLog())
+	executionStateChanged, err := offRamp.ParseExecutionStateChanged(log.ToGethLog())
 	require.NoError(t, err)
 	if abihelpers.MessageExecutionState(executionStateChanged.State) != state {
 		t.Log("Execution failed")
