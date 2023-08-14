@@ -36,7 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -431,9 +431,9 @@ func (c *CCIPContracts) DeriveOCR2Config(t *testing.T, oracles []confighelper.Or
 		"onchainConfig", onchainConfig,
 		"encodedConfigVersion", offchainConfigVersion,
 	)
-	signerAddresses, err := ocrcommon.OnchainPublicKeyToAddress(signers)
+	signerAddresses, err := evm.OnchainPublicKeyToAddress(signers)
 	require.NoError(t, err)
-	transmitterAddresses, err := ocrcommon.AccountToAddress(transmitters)
+	transmitterAddresses, err := evm.AccountToAddress(transmitters)
 	require.NoError(t, err)
 
 	return &OCR2Config{
