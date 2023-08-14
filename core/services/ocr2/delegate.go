@@ -362,6 +362,9 @@ func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
 	ocrLogger := relaylogger.NewOCRWrapper(lggr, d.cfg.OCR2().TraceLogging(), func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	})
+	logError := func(msg string) {
+		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
+	}
 
 	lc, err := validate.ToLocalConfig(d.cfg.OCR2(), d.cfg.Insecure(), *spec)
 	if err != nil {
