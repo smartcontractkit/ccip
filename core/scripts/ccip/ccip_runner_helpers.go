@@ -33,13 +33,15 @@ var chainMapping = map[dione.Environment]map[rhea.Chain]rhea.EvmDeploymentConfig
 	dione.Production:   deployments.ProdChains,
 }
 
-func loadEnvironment(t *testing.T) {
-	err := godotenv.Load()
+func loadEnvironment(t *testing.T, env dione.Environment) {
+	filename := ".env." + string(env)
+	t.Logf("Using env file %s", filename)
+	err := godotenv.Load(filename)
 	require.NoError(t, err)
 }
 
-func checkOwnerKey(t *testing.T) string {
-	loadEnvironment(t)
+func checkOwnerKey(t *testing.T, env dione.Environment) string {
+	loadEnvironment(t, env)
 	ownerKey := os.Getenv("OWNER_KEY")
 	if ownerKey == "" {
 		t.Log("No key given, this test will be skipped. This is intended behaviour for automated testing.")
@@ -51,7 +53,7 @@ func checkOwnerKey(t *testing.T) string {
 
 // DoForEachChain can be run concurrently as all calls target a single chain
 func DoForEachChain(t *testing.T, env dione.Environment, f func(chain rhea.EvmDeploymentConfig)) {
-	ownerKey := checkOwnerKey(t)
+	ownerKey := checkOwnerKey(t, env)
 	var wg sync.WaitGroup
 	for chnName, chn := range chainMapping[env] {
 		wg.Add(1)
@@ -66,7 +68,7 @@ func DoForEachChain(t *testing.T, env dione.Environment, f func(chain rhea.EvmDe
 }
 
 func DoForEachLane(t *testing.T, env dione.Environment, f func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig)) {
-	ownerKey := checkOwnerKey(t)
+	ownerKey := checkOwnerKey(t, env)
 	for sourceChain, sourceMap := range laneMapping[env] {
 		for destChain := range sourceMap {
 			t.Logf("Running function for lane %s -> %s", sourceChain, destChain)
@@ -83,7 +85,7 @@ func DoForEachLane(t *testing.T, env dione.Environment, f func(source rhea.EvmDe
 }
 
 func DoForEachBidirectionalLane(t *testing.T, env dione.Environment, f func(source rhea.EvmDeploymentConfig, destination rhea.EvmDeploymentConfig)) {
-	ownerKey := checkOwnerKey(t)
+	ownerKey := checkOwnerKey(t, env)
 	completed := make(map[rhea.Chain]map[rhea.Chain]interface{})
 
 	for sourceChain, sourceMap := range laneMapping[env] {
