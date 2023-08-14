@@ -285,6 +285,10 @@ func (g *generalConfig) FeatureLogPoller() bool {
 	return *g.c.Feature.LogPoller
 }
 
+func (g *generalConfig) FeatureCCIP() bool {
+	return *g.c.Feature.CCIP
+}
+
 func (g *generalConfig) FeatureUICSAKeys() bool {
 	return *g.c.Feature.UICSAKeys
 }
