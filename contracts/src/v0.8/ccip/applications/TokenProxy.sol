@@ -14,6 +14,7 @@ contract TokenProxy is OwnerIsCreator {
 
   error InvalidToken();
   error NoDataAllowed();
+  error GasShouldBeZero();
 
   /// @notice The CCIP router contract
   IRouterClient internal immutable i_router;
@@ -36,7 +37,7 @@ contract TokenProxy is OwnerIsCreator {
   /// @dev Reverts with appropriate reason upon invalid message.
   function getFee(
     uint64 destinationChainSelector,
-    Client.EVM2AnyMessage memory message
+    Client.EVM2AnyMessage calldata message
   ) external view returns (uint256 fee) {
     _validateMessage(message);
     return i_router.getFee(destinationChainSelector, message);
@@ -45,7 +46,7 @@ contract TokenProxy is OwnerIsCreator {
   /// @notice Validates the message content, forwards it to the CCIP router and returns the result.
   function ccipSend(
     uint64 destinationChainSelector,
-    Client.EVM2AnyMessage memory message
+    Client.EVM2AnyMessage calldata message
   ) external payable returns (bytes32 messageId) {
     _validateMessage(message);
     if (message.feeToken != address(0)) {
@@ -63,9 +64,14 @@ contract TokenProxy is OwnerIsCreator {
 
   /// @notice Validates the message content.
   /// @dev Only allows a single token to be sent, and no data.
-  function _validateMessage(Client.EVM2AnyMessage memory message) internal view {
+  function _validateMessage(Client.EVM2AnyMessage calldata message) internal view {
     if (message.tokenAmounts.length != 1 || message.tokenAmounts[0].token != i_token) revert InvalidToken();
     if (message.data.length > 0) revert NoDataAllowed();
+
+    if (message.extraArgs.length == 0 || bytes4(message.extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG)
+      revert GasShouldBeZero();
+
+    if (abi.decode(message.extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit != 0) revert GasShouldBeZero();
   }
 
   /// @notice Returns the CCIP router contract.

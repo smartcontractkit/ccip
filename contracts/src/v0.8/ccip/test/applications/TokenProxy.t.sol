@@ -42,7 +42,7 @@ contract TokenProxy_getFee is TokenProxySetup {
       data: "",
       tokenAmounts: tokens,
       feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}))
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}))
     });
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
@@ -58,7 +58,7 @@ contract TokenProxy_getFee is TokenProxySetup {
       data: "",
       tokenAmounts: new Client.EVMTokenAmount[](0),
       feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}))
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}))
     });
 
     vm.expectRevert(TokenProxy.InvalidToken.selector);
@@ -75,10 +75,27 @@ contract TokenProxy_getFee is TokenProxySetup {
       data: "not empty",
       tokenAmounts: tokens,
       feeToken: s_sourceFeeToken,
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}))
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}))
     });
 
     vm.expectRevert(TokenProxy.NoDataAllowed.selector);
+
+    s_tokenProxy.getFee(DEST_CHAIN_ID, message);
+  }
+
+  function testGetFeeGasShouldBeZeroReverts() public {
+    Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
+    tokens[0] = Client.EVMTokenAmount({token: address(s_transferToken), amount: 1e18});
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(s_tokenProxy),
+      data: "",
+      tokenAmounts: tokens,
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 10}))
+    });
+
+    vm.expectRevert(TokenProxy.GasShouldBeZero.selector);
 
     s_tokenProxy.getFee(DEST_CHAIN_ID, message);
   }
@@ -92,6 +109,7 @@ contract TokenProxy_ccipSend is TokenProxySetup {
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = tokens;
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}));
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
 
@@ -116,6 +134,7 @@ contract TokenProxy_ccipSend is TokenProxySetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = tokens;
     message.feeToken = address(0);
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}));
 
     uint256 expectedFee = s_sourceRouter.getFee(DEST_CHAIN_ID, message);
 
@@ -139,6 +158,7 @@ contract TokenProxy_ccipSend is TokenProxySetup {
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = tokens;
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}));
 
     // Revoke allowance
     s_transferToken.approve(address(s_tokenProxy), 0);
@@ -154,6 +174,7 @@ contract TokenProxy_ccipSend is TokenProxySetup {
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = tokens;
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}));
 
     vm.expectRevert(TokenProxy.InvalidToken.selector);
 
@@ -167,8 +188,22 @@ contract TokenProxy_ccipSend is TokenProxySetup {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     message.tokenAmounts = tokens;
     message.data = "not empty";
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}));
 
     vm.expectRevert(TokenProxy.NoDataAllowed.selector);
+
+    s_tokenProxy.ccipSend(DEST_CHAIN_ID, message);
+  }
+
+  function testCcipSendGasShouldBeZeroReverts() public {
+    Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
+    tokens[0] = Client.EVMTokenAmount({token: address(s_transferToken), amount: 1e18});
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.tokenAmounts = tokens;
+    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 1}));
+
+    vm.expectRevert(TokenProxy.GasShouldBeZero.selector);
 
     s_tokenProxy.ccipSend(DEST_CHAIN_ID, message);
   }
