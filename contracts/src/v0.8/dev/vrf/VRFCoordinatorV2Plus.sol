@@ -364,8 +364,8 @@ contract VRFCoordinatorV2Plus is VRF, SubscriptionAPI {
   }
 
   function getRandomnessFromProof(
-    Proof calldata proof,
-    RequestCommitment calldata rc
+    Proof memory proof,
+    RequestCommitment memory rc
   ) internal view returns (Output memory) {
     bytes32 keyHash = hashOfKey(proof.pk);
     // Only registered proving keys are permitted.
@@ -406,10 +406,7 @@ contract VRFCoordinatorV2Plus is VRF, SubscriptionAPI {
    * @return payment amount billed to the subscription
    * @dev simulated offchain to determine if sufficient balance is present to fulfill the request
    */
-  function fulfillRandomWords(
-    Proof calldata proof,
-    RequestCommitment calldata rc
-  ) external nonReentrant returns (uint96) {
+  function fulfillRandomWords(Proof memory proof, RequestCommitment memory rc) external nonReentrant returns (uint96) {
     uint256 startGas = gasleft();
     Output memory output = getRandomnessFromProof(proof, rc);
 
@@ -435,7 +432,7 @@ contract VRFCoordinatorV2Plus is VRF, SubscriptionAPI {
 
     // stack too deep error
     {
-      bool nativePayment = _fromBytes(rc.extraArgs).nativePayment;
+      bool nativePayment = uint8(rc.extraArgs[rc.extraArgs.length - 1]) == 1;
       // We want to charge users exactly for how much gas they use in their callback.
       // The gasAfterPaymentCalculation is meant to cover these additional operations where we
       // decrement the subscription balance and increment the oracles withdrawable balance.

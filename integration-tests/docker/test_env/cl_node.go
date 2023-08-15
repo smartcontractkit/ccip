@@ -22,15 +22,16 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/logwatch"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	tc "github.com/testcontainers/testcontainers-go"
+	tcwait "github.com/testcontainers/testcontainers-go/wait"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/utils/templates"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
-	tc "github.com/testcontainers/testcontainers-go"
-	tcwait "github.com/testcontainers/testcontainers-go/wait"
 )
 
 type ClNode struct {
@@ -60,8 +61,14 @@ func WithDbContainerName(name string) ClNodeOption {
 	}
 }
 
-func NewClNode(networks []string, nodeConfig chainlink.Config, opts ...ClNodeOption) *ClNode {
-	nodeDefaultCName := fmt.Sprintf("%s-%s", "cl-node", uuid.NewString()[0:3])
+func WithLogWatch(lw *logwatch.LogWatch) ClNodeOption {
+	return func(c *ClNode) {
+		c.lw = lw
+	}
+}
+
+func NewClNode(networks []string, nodeConfig *chainlink.Config, opts ...ClNodeOption) *ClNode {
+	nodeDefaultCName := fmt.Sprintf("%s-%s", "cl-node", uuid.NewString()[0:8])
 	pgDefaultCName := fmt.Sprintf("pg-%s", nodeDefaultCName)
 	pgDb := NewPostgresDb(networks, WithPostgresDbContainerName(pgDefaultCName))
 	n := &ClNode{

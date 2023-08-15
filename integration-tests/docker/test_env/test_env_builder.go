@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/logwatch"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 )
 
@@ -74,15 +75,14 @@ func (m *CLTestEnvBuilder) connectExistingEnv(cfg *TestEnvConfig) (*CLClusterTes
 	}
 
 	if m.hasLogWatch {
-		lw, err := logwatch.NewLogWatch(nil, nil)
+		te.LogWatch, err = logwatch.NewLogWatch(nil, nil)
 		if err != nil {
 			return te, err
 		}
-		te.LogWatch = lw
 	}
 
 	if m.hasMockServer {
-		err := te.StartMockServer()
+		err = te.StartMockServer()
 		if err != nil {
 			return te, err
 		}
@@ -93,7 +93,7 @@ func (m *CLTestEnvBuilder) connectExistingEnv(cfg *TestEnvConfig) (*CLClusterTes
 	}
 
 	if m.hasGeth {
-		err := te.StartGeth()
+		err = te.StartGeth()
 		if err != nil {
 			return te, err
 		}
