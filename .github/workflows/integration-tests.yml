@@ -200,9 +200,6 @@ jobs:
       ## Run this step when changes that do not need the test to run are made
       - name: Run Setup
         if: needs.changes.outputs.src == 'false'
-<<<<<<< HEAD
-        uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/setup-run-tests-environment@ad22fbd6f4d108b82aaf49b527bcf40f32babea8 # v2.2.1
-=======
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/setup-run-tests-environment@v2.2.6
         with:
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
@@ -417,7 +414,6 @@ jobs:
       - name: Run Setup
         if: needs.changes.outputs.src == 'false'
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/setup-run-tests-environment@v2.2.7
->>>>>>> develop
         with:
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
           go_mod_path: ./integration-tests/go.mod
