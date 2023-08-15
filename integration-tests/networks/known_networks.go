@@ -467,7 +467,11 @@ var (
 		"AVALANCHE_FUJI":    AvalancheFuji,
 		"AVALANCHE_MAINNET": AvalancheMainnet,
 		"QUORUM":            Quorum,
+		"SCROLL_SEPOLIA":    ScrollSepolia,
+		"SCROLL_MAINNET":    ScrollMainnet,
 		"BASE_MAINNET":      BaseMainnet,
+		"BSC_TESTNET":       BSCTestnet,
+		"BSC_MAINNET":       BSCMainnet,
 	}
 )
 
