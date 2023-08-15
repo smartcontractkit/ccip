@@ -44,7 +44,8 @@ contract TokenProxy_getFee is TokenProxySetup {
   }
 
   // Reverts
-  function testGetFeeInvalidToken() public {
+
+  function testGetFeeInvalidTokenReverts() public {
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(s_tokenProxy),
       data: "",
@@ -54,6 +55,23 @@ contract TokenProxy_getFee is TokenProxySetup {
     });
 
     vm.expectRevert(TokenProxy.InvalidToken.selector);
+
+    s_tokenProxy.getFee(DEST_CHAIN_ID, message);
+  }
+
+  function testGetFeeNoDataAllowedReverts() public {
+    Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
+    tokens[0] = Client.EVMTokenAmount({token: address(s_transferToken), amount: 1e18});
+
+    Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+      receiver: abi.encode(s_tokenProxy),
+      data: "not empty",
+      tokenAmounts: tokens,
+      feeToken: s_sourceFeeToken,
+      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 2e5}))
+    });
+
+    vm.expectRevert(TokenProxy.NoDataAllowed.selector);
 
     s_tokenProxy.getFee(DEST_CHAIN_ID, message);
   }
@@ -106,7 +124,9 @@ contract TokenProxy_ccipSend is TokenProxySetup {
     s_tokenProxy.ccipSend{value: expectedFee}(DEST_CHAIN_ID, message);
   }
 
-  function testCcipSendInsufficientAllowance() public {
+  // Reverts
+
+  function testCcipSendInsufficientAllowanceReverts() public {
     Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
     tokens[0] = Client.EVMTokenAmount({token: address(s_transferToken), amount: 1e18});
 
@@ -117,6 +137,31 @@ contract TokenProxy_ccipSend is TokenProxySetup {
     s_transferToken.approve(address(s_tokenProxy), 0);
 
     vm.expectRevert("ERC20: insufficient allowance");
+
+    s_tokenProxy.ccipSend(DEST_CHAIN_ID, message);
+  }
+
+  function testCcipSendInvalidTokenReverts() public {
+    Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
+    tokens[0] = Client.EVMTokenAmount({token: address(s_feeToken), amount: 1e18});
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.tokenAmounts = tokens;
+
+    vm.expectRevert(TokenProxy.InvalidToken.selector);
+
+    s_tokenProxy.ccipSend(DEST_CHAIN_ID, message);
+  }
+
+  function testCcipSendNoDataAllowedReverts() public {
+    Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
+    tokens[0] = Client.EVMTokenAmount({token: address(s_transferToken), amount: 1e18});
+
+    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+    message.tokenAmounts = tokens;
+    message.data = "not empty";
+
+    vm.expectRevert(TokenProxy.NoDataAllowed.selector);
 
     s_tokenProxy.ccipSend(DEST_CHAIN_ID, message);
   }
