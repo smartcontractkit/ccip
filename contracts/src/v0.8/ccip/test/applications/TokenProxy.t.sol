@@ -25,6 +25,13 @@ contract TokenProxySetup is EVM2EVMOnRampSetup {
   }
 }
 
+contract TokenProxy_constructor is TokenProxySetup {
+  function testConstructor() public {
+    assertEq(address(s_tokenProxy.getRouter()), address(s_sourceRouter));
+    assertEq(address(s_tokenProxy.getToken()), address(s_transferToken));
+  }
+}
+
 contract TokenProxy_getFee is TokenProxySetup {
   function testGetFeeSuccess() public {
     Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](1);
