@@ -144,8 +144,8 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 		c.Dest.Chain,
 		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
 			CommitStore:         c.Dest.CommitStore.Address(),
-			ChainSelector:       c.Dest.ChainID,
-			SourceChainSelector: c.Source.ChainID,
+			ChainSelector:       c.Dest.ChainSelector,
+			SourceChainSelector: c.Source.ChainSelector,
 			OnRamp:              c.Source.OnRamp.Address(),
 			PrevOffRamp:         prevOffRamp,
 			ArmProxy:            c.Dest.ARMProxy.Address(),
@@ -315,8 +315,8 @@ func (c *CCIPContracts) DeployNewCommitStore(t *testing.T) {
 		c.Dest.User,  // user
 		c.Dest.Chain, // client
 		commit_store_helper.CommitStoreStaticConfig{
-			ChainSelector:       c.Dest.ChainID,
-			SourceChainSelector: c.Source.ChainID,
+			ChainSelector:       c.Dest.ChainSelector,
+			SourceChainSelector: c.Source.ChainSelector,
 			OnRamp:              c.Source.OnRamp.Address(),
 			ArmProxy:            c.Dest.ARMProxy.Address(),
 		},
