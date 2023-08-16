@@ -364,7 +364,6 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			p.LocalCluster = e
 		}
 	}
-	p.LocalCluster = true
 
 	existing, _ := utils.GetEnv("CCIP_TESTS_ON_EXISTING_DEPLOYMENT")
 	if existing != "" {
