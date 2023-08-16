@@ -733,10 +733,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	sourceChain, sourceUser := SetupChain(t)
 	destChain, destUser := SetupChain(t)
 
-	// TODO Temporary
-	sourceChainSelector := sourceChainID
-	destChainSelector := destChainID
-
 	armSourceAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
 		sourceUser,
 		sourceChain,
