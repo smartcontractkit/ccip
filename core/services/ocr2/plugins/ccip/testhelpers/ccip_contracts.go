@@ -61,9 +61,9 @@ var (
 	HundredLink         = Link(100)
 	LinkUSDValue        = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
 	SourceChainID       = uint64(1000)
-	SourceChainSelector = uint64(1000)
+	SourceChainSelector = uint64(1500)
 	DestChainID         = uint64(1337)
-	DestChainSelector   = uint64(1337)
+	DestChainSelector   = uint64(3000)
 )
 
 type MaybeRevertReceiver struct {
@@ -639,7 +639,7 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 				UsdPerToken: big.NewInt(5),
 			},
 		},
-		DestChainSelector: 0,
+		DestChainSelector: c.Source.ChainSelector,
 		UsdPerUnitGas:     big.NewInt(0),
 	})
 	if err != nil {

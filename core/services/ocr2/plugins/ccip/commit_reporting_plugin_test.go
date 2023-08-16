@@ -177,7 +177,7 @@ func TestCommitReportEncoding(t *testing.T) {
 	require.NotEqual(t, ts.String(), "0")
 
 	// Ensure price update went through
-	destChainGasPrice, err := th.Dest.PriceRegistry.GetDestinationChainGasPrice(nil, th.Source.ChainID)
+	destChainGasPrice, err := th.Dest.PriceRegistry.GetDestinationChainGasPrice(nil, th.Source.ChainSelector)
 	require.NoError(t, err)
 	assert.Equal(t, newGasPrice, destChainGasPrice.Value)
 
