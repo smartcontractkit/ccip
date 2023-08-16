@@ -46,10 +46,10 @@ var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
 		rhea.AvaxFuji: Prod_PolygonMumbaiToAvaxFuji,
 	},
 	rhea.BSCTestnet: {
-		rhea.Sepolia: Prod_SepoliaToBSCTestnet,
+		rhea.Sepolia: Prod_BSCTestnetToSepolia,
 	},
 	rhea.BASEGoerli: {
-		rhea.Sepolia: Prod_SepoliaToBASETestnet,
+		rhea.Sepolia: Prod_BASEGoerliToSepolia,
 	},
 }
 
