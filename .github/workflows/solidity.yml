@@ -41,6 +41,7 @@ jobs:
               - 'contracts/**/*'
               - '.github/workflows/solidity.yml'
 
+
 #  prepublish-test:
 #    needs: [changes]
 #    if: needs.changes.outputs.changes == 'true'

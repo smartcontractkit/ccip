@@ -24,10 +24,15 @@ jobs:
               - '.github/workflows/solidity-foundry.yml'
               - 'contacts/foundry.toml'
 
-  solhint:
+  tests:
+    strategy:
+      matrix:
+        product: [ vrf, automation, llo-feeds, functions, automation-dev, shared,ccip ]
     needs: [changes]
-    name: Solhint
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.changes == 'true'
+    name: Tests
+    # See https://github.com/foundry-rs/foundry/issues/3827
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Collect Metrics
@@ -68,65 +73,6 @@ jobs:
         continue-on-error: true
 
       - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
-        with:
-          submodules: recursive
-
-      # Only needed because we use the NPM versions of packages
-      # and not native Foundry. This is to make sure the dependencies
-      # stay in sync.
-      - name: Setup NodeJS
-        if: ${{ needs.changes.outputs.changes == 'true' }}
-        uses: ./.github/actions/setup-nodejs
-
-      - name: Install Foundry
-        if: ${{ needs.changes.outputs.changes == 'true' }}
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
-      - name: Run Forge build
-        if: ${{ needs.changes.outputs.changes == 'true' }}
-        working-directory: contracts
-        run: |
-          forge --version
-          forge build
-        id: build
-
-      - name: Run coverage
-        if: ${{ needs.changes.outputs.changes == 'true' }}
-        working-directory: contracts
-        run: forge coverage --report lcov
-
-      - name: Prune report
-        if: ${{ needs.changes.outputs.changes == 'true' }}
-        run: |
-          sudo apt-get install lcov
-          ./tools/ci/ccip_lcov_prune ./contracts/lcov.info ./lcov.info.pruned
-
-      - name: Report code coverage
-        if: ${{ needs.changes.outputs.changes == 'true' }}
-        uses: zgosalvez/github-actions-report-lcov@v1
-        with:
-          update-comment: true
-          coverage-files: lcov.info.pruned
-          minimum-coverage: 98
-          artifact-name: code-coverage-report
-          working-directory: ./contracts
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-  tests:
-    strategy:
-      matrix:
-        product: [ vrf, automation, llo-feeds, functions, automation-dev, shared, ccip ]
-    needs: [changes]
-    if: needs.changes.outputs.changes == 'true'
-    name: Tests
-    # See https://github.com/foundry-rs/foundry/issues/3827
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: Checkout the repo
-        uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 # v3.5.3
         with:
           submodules: recursive
 

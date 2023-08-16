@@ -80,6 +80,7 @@ go-solidity-wrappers-ocr2vrf: pnpmdep abigen ## Recompiles OCR2VRF solidity cont
 	# put the go:generate_disabled directive back
 	sed -i '' 's/go:generate/go:generate_disabled/g' ../core/gethwrappers/ocr2vrf/go_generate.go
 
+
 help:
 	@echo ""
 	@echo "         .__           .__       .__  .__        __"
