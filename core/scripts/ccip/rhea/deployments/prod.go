@@ -9,13 +9,13 @@ import (
 )
 
 var ProdChains = map[rhea.Chain]rhea.EvmDeploymentConfig{
-	rhea.AvaxFuji:       {ChainConfig: Prod_AvaxFuji},
-	rhea.OptimismGoerli: {ChainConfig: Prod_OptimismGoerli},
-	rhea.Sepolia:        {ChainConfig: Prod_Sepolia},
-	rhea.ArbitrumGoerli: {ChainConfig: Prod_ArbitrumGoerli},
-	rhea.PolygonMumbai:  {ChainConfig: Prod_PolygonMumbai},
-	rhea.BSCTestnet:     {ChainConfig: Prod_BSCTestnet},
-	rhea.BASEGoerli:     {ChainConfig: Prod_BASETestnet},
+	// rhea.AvaxFuji:       {ChainConfig: Prod_AvaxFuji},
+	// rhea.OptimismGoerli: {ChainConfig: Prod_OptimismGoerli},
+	// rhea.Sepolia:        {ChainConfig: Prod_Sepolia},
+	// rhea.ArbitrumGoerli: {ChainConfig: Prod_ArbitrumGoerli},
+	// rhea.PolygonMumbai:  {ChainConfig: Prod_PolygonMumbai},
+	rhea.BSCTestnet: {ChainConfig: Prod_BSCTestnet},
+	rhea.BASEGoerli: {ChainConfig: Prod_BASETestnet},
 }
 
 var ProdChainMapping = map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
@@ -936,10 +936,10 @@ var Prod_BSCTestnet = rhea.EVMChainConfig{
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployARM:           false,
-		DeployTokenPools:    false,
-		DeployRouter:        false,
-		DeployPriceRegistry: false,
+		DeployARM:           true,
+		DeployTokenPools:    true,
+		DeployRouter:        true,
+		DeployPriceRegistry: true,
 	},
 }
 
@@ -983,10 +983,10 @@ var Prod_BASETestnet = rhea.EVMChainConfig{
 		RootSnoozeTime:           models.MustMakeDuration(ROOT_SNOOZE_TIME),
 	},
 	DeploySettings: rhea.ChainDeploySettings{
-		DeployARM:           false,
-		DeployTokenPools:    false,
-		DeployRouter:        false,
-		DeployPriceRegistry: false,
+		DeployARM:           true,
+		DeployTokenPools:    true,
+		DeployRouter:        true,
+		DeployPriceRegistry: true,
 	},
 }
 

@@ -29,7 +29,7 @@ var (
 	// Change these values
 	sourceChain        = rhea.ArbitrumGoerli
 	destChain          = rhea.Sepolia
-	ENV                = dione.StagingBeta
+	ENV                = dione.Production
 	currentVersion     = ""
 	upgradeLaneVersion = ""
 
