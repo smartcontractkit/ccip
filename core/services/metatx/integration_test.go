@@ -192,7 +192,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 		deadline := big.NewInt(int64(ccipContracts.Source.Chain.Blockchain().CurrentHeader().Time + uint64(time.Hour)))
 
-		calldata, calldataHash, err := metatx.GenerateMetaTransferCalldata(holder2.From, amount, ccipContracts.Dest.ChainID)
+		calldata, calldataHash, err := metatx.GenerateMetaTransferCalldata(holder2.From, amount, ccipContracts.Dest.ChainSelector)
 		require.NoError(t, err)
 
 		signature, domainSeparatorHash, typeHash, forwarderNonce, err := metatx.SignMetaTransfer(
