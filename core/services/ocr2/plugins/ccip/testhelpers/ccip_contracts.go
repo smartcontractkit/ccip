@@ -871,7 +871,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2)), // TODO make this 2000USD and once we figure out the fee and exec cost discrepancy
 			},
 		},
-		DestChainSelector: destChainID,
+		DestChainSelector: destChainSelector,
 		UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
 	}
 
