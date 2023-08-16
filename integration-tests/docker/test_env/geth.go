@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-
 	tc "github.com/testcontainers/testcontainers-go"
 	tcwait "github.com/testcontainers/testcontainers-go/wait"
 
@@ -52,10 +51,10 @@ func NewGeth(networks []string, opts ...EnvComponentOption) *Geth {
 	return g
 }
 
-func (g *Geth) StartContainer() (blockchain.EVMNetwork, InternalDockerUrls, error) {
+func (g *Geth) StartContainer() error {
 	r, _, _, err := g.getGethContainerRequest(g.Networks)
 	if err != nil {
-		return blockchain.EVMNetwork{}, InternalDockerUrls{}, err
+		return err
 	}
 	ct, err := tc.GenericContainer(context.Background(),
 		tc.GenericContainerRequest{
@@ -64,19 +63,19 @@ func (g *Geth) StartContainer() (blockchain.EVMNetwork, InternalDockerUrls, erro
 			Reuse:            true,
 		})
 	if err != nil {
-		return blockchain.EVMNetwork{}, InternalDockerUrls{}, errors.Wrapf(err, "cannot start geth container")
+		return errors.Wrapf(err, "cannot start geth container")
 	}
 	host, err := ct.Host(context.Background())
 	if err != nil {
-		return blockchain.EVMNetwork{}, InternalDockerUrls{}, err
+		return err
 	}
 	httpPort, err := ct.MappedPort(context.Background(), "8544/tcp")
 	if err != nil {
-		return blockchain.EVMNetwork{}, InternalDockerUrls{}, err
+		return err
 	}
 	wsPort, err := ct.MappedPort(context.Background(), "8545/tcp")
 	if err != nil {
-		return blockchain.EVMNetwork{}, InternalDockerUrls{}, err
+		return err
 	}
 
 	g.Container = ct
@@ -90,10 +89,32 @@ func (g *Geth) StartContainer() (blockchain.EVMNetwork, InternalDockerUrls, erro
 	networkConfig.URLs = []string{g.ExternalWsUrl}
 	networkConfig.HTTPURLs = []string{g.ExternalHttpUrl}
 
-	internalDockerUrls := InternalDockerUrls{
-		HttpUrl: g.InternalHttpUrl,
-		WsUrl:   g.InternalWsUrl,
+	bc, err := blockchain.NewEVMClientFromNetwork(networkConfig)
+	if err != nil {
+		return err
 	}
+	// Get blockchain.EthereumClient as this is the only possible client for Geth
+	switch val := bc.(type) {
+	case *blockchain.EthereumMultinodeClient:
+		ethClient, ok := val.Clients[0].(*blockchain.EthereumClient)
+		if !ok {
+			return errors.Errorf("could not get blockchain.EthereumClient from %+v", val)
+		}
+		g.EthClient = ethClient
+	default:
+		return errors.Errorf("%+v not supported for geth", val)
+	}
+
+	cd, err := contracts.NewContractDeployer(bc)
+	if err != nil {
+		return err
+	}
+	g.ContractDeployer = cd
+	cl, err := contracts.NewContractLoader(bc)
+	if err != nil {
+		return err
+	}
+	g.ContractLoader = cl
 
 	log.Info().Str("containerName", g.ContainerName).
 		Str("internalHttpUrl", g.InternalHttpUrl).
@@ -102,7 +123,7 @@ func (g *Geth) StartContainer() (blockchain.EVMNetwork, InternalDockerUrls, erro
 		Str("internalWsUrl", g.InternalWsUrl).
 		Msg("Started Geth container")
 
-	return networkConfig, internalDockerUrls, nil
+	return nil
 }
 
 func (g *Geth) getGethContainerRequest(networks []string) (*tc.ContainerRequest, *keystore.KeyStore, *accounts.Account, error) {

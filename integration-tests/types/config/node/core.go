@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"embed"
-	"fmt"
 	"math/big"
 	"net"
 	"path/filepath"
@@ -121,44 +120,53 @@ func WithP2Pv2() NodeConfigOpt {
 	}
 }
 
-func SetChainConfig(
-	cfg *chainlink.Config,
-	wsUrls,
-	httpUrls []string,
-	chain blockchain.EVMNetwork,
-	forwarders bool,
-) {
+func SetDefaultSimulatedGeth(cfg *chainlink.Config, ws, http string, forwarders bool) {
 	if cfg.EVM == nil {
-		var nodes []*evmcfg.Node
-		for i, _ := range wsUrls {
-			node := evmcfg.Node{
-				Name:     ptr(fmt.Sprintf("node_%d_%s", i, chain.Name)),
-				WSURL:    mustURL(wsUrls[i]),
-				HTTPURL:  mustURL(httpUrls[i]),
-				SendOnly: ptr(false),
-			}
-
-			nodes = append(nodes, &node)
-		}
-		var chainConfig evmcfg.Chain
-		if chain.Simulated {
-			chainConfig = evmcfg.Chain{
-				AutoCreateKey:      ptr(true),
-				FinalityDepth:      ptr[uint32](1),
-				MinContractPayment: assets.NewLinkFromJuels(0),
-			}
-		}
 		cfg.EVM = evmcfg.EVMConfigs{
 			{
-				ChainID: utils.NewBig(big.NewInt(chain.ChainID)),
-				Chain:   chainConfig,
-				Nodes:   nodes,
+				ChainID: utils.NewBig(big.NewInt(1337)),
+				Chain: evmcfg.Chain{
+					AutoCreateKey:      ptr(true),
+					FinalityDepth:      ptr[uint32](1),
+					MinContractPayment: assets.NewLinkFromJuels(0),
+				},
+				Nodes: []*evmcfg.Node{
+					{
+						Name:     ptr("1337_primary_local_0"),
+						WSURL:    mustURL(ws),
+						HTTPURL:  mustURL(http),
+						SendOnly: ptr(false),
+					},
+				},
 			},
 		}
 		if forwarders {
 			cfg.EVM[0].Transactions = evmcfg.Transactions{
 				ForwardersEnabled: ptr(true),
 			}
+		}
+	}
+}
+
+func WithSimulatedEVM(httpUrl, wsUrl string) NodeConfigOpt {
+	return func(c *chainlink.Config) {
+		c.EVM = evmcfg.EVMConfigs{
+			{
+				ChainID: utils.NewBig(big.NewInt(1337)),
+				Chain: evmcfg.Chain{
+					AutoCreateKey:      ptr(true),
+					FinalityDepth:      ptr[uint32](1),
+					MinContractPayment: assets.NewLinkFromJuels(0),
+				},
+				Nodes: []*evmcfg.Node{
+					{
+						Name:     ptr("1337_primary_local_0"),
+						WSURL:    mustURL(wsUrl),
+						HTTPURL:  mustURL(httpUrl),
+						SendOnly: ptr(false),
+					},
+				},
+			},
 		}
 	}
 }

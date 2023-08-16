@@ -99,7 +99,7 @@ func (m *CLClusterTestEnv) StartPrivateGethChain() error {
 	return nil
 }
 
-func (te *CLClusterTestEnv) StartGeth() (blockchain.EVMNetwork, InternalDockerUrls, error) {
+func (te *CLClusterTestEnv) StartGeth() error {
 	return te.Geth.StartContainer()
 }
 

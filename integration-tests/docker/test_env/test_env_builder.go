@@ -10,8 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/logwatch"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
-	"github.com/smartcontractkit/chainlink/integration-tests/networks"
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 )
@@ -139,6 +137,13 @@ func (b *CLTestEnvBuilder) buildNewEnv(cfg *TestEnvConfig) (*CLClusterTestEnv, e
 		}
 	}
 
+	if b.hasGeth {
+		err = te.StartGeth()
+		if err != nil {
+			return te, err
+		}
+	}
+
 	if b.nonDevGethNetworks != nil {
 		te.WithPrivateGethChain(b.nonDevGethNetworks)
 		err := te.StartPrivateGethChain()
@@ -161,34 +166,6 @@ func (b *CLTestEnvBuilder) buildNewEnv(cfg *TestEnvConfig) (*CLClusterTestEnv, e
 		}
 		return te, nil
 	}
-	networkConfig := networks.SelectedNetwork
-	var internalDockerUrls InternalDockerUrls
-	if b.hasGeth && networkConfig.Simulated {
-		networkConfig, internalDockerUrls, err = te.StartGeth()
-		if err != nil {
-			return nil, err
-		}
-
-	}
-
-	bc, err := blockchain.NewEVMClientFromNetwork(networkConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	te.EVMClient = bc
-
-	cd, err := contracts.NewContractDeployer(bc)
-	if err != nil {
-		return nil, err
-	}
-	te.ContractDeployer = cd
-
-	cl, err := contracts.NewContractLoader(bc)
-	if err != nil {
-		return nil, err
-	}
-	te.ContractLoader = cl
 
 	var nodeCsaKeys []string
 
@@ -203,20 +180,7 @@ func (b *CLTestEnvBuilder) buildNewEnv(cfg *TestEnvConfig) (*CLClusterTestEnv, e
 				node.WithP2Pv1(),
 			)
 		}
-		//node.SetDefaultSimulatedGeth(cfg, te.Geth.InternalWsUrl, te.Geth.InternalHttpUrl, b.hasForwarders)
-
-		var httpUrls []string
-		var wsUrls []string
-		if networkConfig.Simulated {
-			httpUrls = []string{internalDockerUrls.HttpUrl}
-			wsUrls = []string{internalDockerUrls.WsUrl}
-		} else {
-			httpUrls = networkConfig.HTTPURLs
-			wsUrls = networkConfig.URLs
-		}
-
-		node.SetChainConfig(cfg, wsUrls, httpUrls, networkConfig, b.hasForwarders)
-
+		node.SetDefaultSimulatedGeth(cfg, te.Geth.InternalWsUrl, te.Geth.InternalHttpUrl, b.hasForwarders)
 		err := te.StartClNodes(cfg, b.clNodesCount)
 		if err != nil {
 			return nil, err

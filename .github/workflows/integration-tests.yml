@@ -247,12 +247,12 @@ jobs:
         product:
           - name: ccip-smoke
             nodes: 1
-            os: ubuntu-latest
+            os: ubuntu20.04-16cores-64GB
             file: ccip
             run: -run ^TestSmokeCCIPForBidirectionalLane$
           - name: ccip-smoke-rate-limit
             nodes: 1
-            os: ubuntu-latest
+            os: ubuntu20.04-16cores-64GB
             file: ccip
             run: -run ^TestSmokeCCIPRateLimit$
           - name: cron
