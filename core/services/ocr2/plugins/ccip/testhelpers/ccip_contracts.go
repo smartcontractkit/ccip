@@ -63,7 +63,7 @@ var (
 	SourceChainID       = uint64(1000)
 	SourceChainSelector = uint64(1500)
 	DestChainID         = uint64(1337)
-	DestChainSelector   = uint64(3000)
+	DestChainSelector   = uint64(3379446385462418246)
 )
 
 type MaybeRevertReceiver struct {

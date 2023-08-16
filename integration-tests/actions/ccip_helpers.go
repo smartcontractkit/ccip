@@ -1888,7 +1888,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		CommitStore:      lane.Dest.CommitStore.EthAddress,
 		SourceChainName:  sourceChainClient.GetNetworkName(),
 		DestChainName:    destChainClient.GetNetworkName(),
-		SourceEvmChainId: sourceChainClient.GetChainID().Uint64(),
 		DestEvmChainId:   destChainClient.GetChainID().Uint64(),
 		SourceStartBlock: lane.Source.SrcStartBlock,
 		DestStartBlock:   currentBlockOnDest,
