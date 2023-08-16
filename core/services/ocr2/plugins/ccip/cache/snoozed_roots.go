@@ -9,7 +9,7 @@ import (
 const (
 	// EvictionGracePeriod defines how long after the permissionless execution threshold a root is still kept in the cache
 	EvictionGracePeriod = 1 * time.Hour
-	// CleanupInterval defines how often roots has to be evicted
+	// CleanupInterval defines how often roots have to be evicted
 	CleanupInterval = 30 * time.Minute
 )
 
@@ -21,8 +21,8 @@ type SnoozedRoots interface {
 
 type snoozedRoots struct {
 	cache *cache.Cache
-	// Both rootSnoozedTime and permissionLessExecutionThresholdDuration can be kept in the snoozed roots without being updated during lifecycle
-	// It's because they are populated via onchain/offchain config. When changed it reboots the node, therefore initialize cache with new settings
+	// Both rootSnoozedTime and permissionLessExecutionThresholdDuration can be kept in the snoozedRoots without need to be updated.
+	// Those config properties are populates via onchain/offchain config. When changed, node will be rebooted and cache initialized with new config.
 	rootSnoozedTime                          time.Duration
 	permissionLessExecutionThresholdDuration time.Duration
 }
