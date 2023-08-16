@@ -48,24 +48,26 @@ func typeAndVersion(addr common.Address, client bind.ContractBackend) (ContractT
 		return "", semver.Version{}, errors.Wrap(err, "failed to call type and version")
 	}
 
-	contractType, v, err := ParseTypeAndVersion(tvStr)
+	contractType, versionStr, err := ParseTypeAndVersion(tvStr)
 	if err != nil {
-		return "", semver.Version{}, err
+		return "", semver.Version{}, errors.Wrap(err, "failed to parse type and version result")
 	}
+	v, err := semver.NewVersion(versionStr)
+	if err != nil {
+		return "", semver.Version{}, errors.Errorf("invalid semver string %s", versionStr)
+	}
+
 	if _, ok := ContractTypes[ContractType(contractType)]; !ok {
 		return "", semver.Version{}, errors.Errorf("unrecognized contract type %v", contractType)
 	}
 	return ContractType(contractType), *v, nil
 }
 
-func ParseTypeAndVersion(tvStr string) (string, *semver.Version, error) {
+func ParseTypeAndVersion(tvStr string) (string, string, error) {
 	typeAndVersionValues := strings.Split(tvStr, " ")
 
 	if len(typeAndVersionValues) < 2 {
-		return "", &semver.Version{}, fmt.Errorf("invalid type and version %s", tvStr)
+		return "", "", fmt.Errorf("invalid type and version %s", tvStr)
 	}
-	contractType, version := typeAndVersionValues[0], typeAndVersionValues[1]
-	v, err := semver.NewVersion(version)
-
-	return contractType, v, err
+	return typeAndVersionValues[0], typeAndVersionValues[1], nil
 }
