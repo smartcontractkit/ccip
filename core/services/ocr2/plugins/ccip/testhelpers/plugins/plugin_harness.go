@@ -64,7 +64,7 @@ func (th *CCIPPluginTestHarness) CommitAndPollLogs(t *testing.T) {
 }
 
 func SetupCCIPTestHarness(t *testing.T) CCIPPluginTestHarness {
-	c := testhelpers.SetupCCIPContracts(t, testhelpers.SourceChainID, testhelpers.DestChainID)
+	c := testhelpers.SetupCCIPContracts(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
 
 	lggr := logger.TestLogger(t)
 

@@ -729,13 +729,9 @@ func MustEncodeAddress(t *testing.T, address common.Address) []byte {
 	return bts
 }
 
-func SetupCCIPContracts(t *testing.T, sourceChainID, destChainID uint64) CCIPContracts {
+func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destChainID, destChainSelector uint64) CCIPContracts {
 	sourceChain, sourceUser := SetupChain(t)
 	destChain, destUser := SetupChain(t)
-
-	// TODO Temporary
-	sourceChainSelector := sourceChainID
-	destChainSelector := destChainID
 
 	armSourceAddress, _, _, err := mock_arm_contract.DeployMockARMContract(
 		sourceUser,
