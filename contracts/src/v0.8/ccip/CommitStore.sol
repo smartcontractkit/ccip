@@ -146,7 +146,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
   /// @param rootToReset The roots that will be reset. This function will only
   /// reset roots that are not blessed.
   function resetUnblessedRoots(bytes32[] calldata rootToReset) external onlyOwner {
-    for (uint256 i = 0; i < rootToReset.length; ++i) {
+    for (uint256 i = 0; i < rootToReset.length; i++) {
       bytes32 root = rootToReset[i];
       if (!isBlessed(root)) {
         delete s_roots[root];
