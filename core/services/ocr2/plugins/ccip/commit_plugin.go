@@ -288,7 +288,9 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, q pg.Queryer, spec *jo
 		return err
 	}
 	sourceChain, err := chainSet.Get(big.NewInt(0).SetUint64(chainId))
-
+	if err != nil {
+		return err
+	}
 	return unregisterCommitPluginFilters(ctx, q, sourceChain.LogPoller(), destChain.LogPoller(), commitStore, common.HexToAddress(pluginConfig.OffRamp))
 }
 
