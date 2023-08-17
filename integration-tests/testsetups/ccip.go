@@ -103,6 +103,7 @@ type CCIPTestConfig struct {
 	LocalCluster            bool
 	ExistingDeployment      bool
 	ExistingEnv             string
+	ContractsFile           string
 	ReuseContracts          bool
 	SequentialLaneAddition  bool
 	NodeFunding             *big.Float
@@ -902,7 +903,12 @@ func DeployEnvironments(
 		*/
 	}
 
-	clProps["toml"] = actions.DefaultCCIPCLNodeEnv(t, nets)
+	tomlCfg, err := node.NewConfigFromToml("ccip",
+		node.WithPrivateEVMs(nets))
+	tomlStr, err := tomlCfg.TOMLString()
+	require.NoError(t, err)
+	clProps["toml"] = tomlStr
+
 	err = testEnvironment.
 		AddHelm(chainlink.New(0, clProps)).
 		Run()
