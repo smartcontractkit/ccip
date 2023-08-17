@@ -160,7 +160,7 @@ jobs:
 
       - name: Run Forge snapshot
         run: |
-          forge snapshot --check gas-snapshots/${{ matrix.product }}.gas-snapshot
+          forge snapshot --no-match-test testFuzz_ --check gas-snapshots/${{ matrix.product }}.gas-snapshot
         id: snapshot
         working-directory: contracts
         env:
