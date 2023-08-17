@@ -59,7 +59,7 @@ func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, cli
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
 	}
 
-	var legacyMapping = map[string]func(opts *bind.CallOpts) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error){
+	var versionMapping = map[string]func(opts *bind.CallOpts) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error){
 		"1.0.0": func(opts *bind.CallOpts) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
 			legacyOnramp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRamp.Address(), client)
 			if err != nil {
@@ -78,12 +78,14 @@ func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, cli
 				MaxGasLimit:     legacyDynamicConfig.MaxGasLimit,
 			}, nil
 		},
+		"1.1.0": func(opts *bind.CallOpts) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+			return onRamp.GetDynamicConfig(opts)
+		},
 	}
 
-	loadFunc, ok := legacyMapping[version]
-	// if onramp version does not exist in legacy mapping, use the latest version
+	loadFunc, ok := versionMapping[version]
 	if !ok {
-		return onRamp.GetDynamicConfig(&bind.CallOpts{})
+		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, errors.Errorf("Invalid onramp version: %s", version)
 	}
 	return loadFunc(&bind.CallOpts{})
 }

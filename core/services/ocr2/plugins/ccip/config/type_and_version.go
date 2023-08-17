@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -40,20 +39,20 @@ func VerifyTypeAndVersion(addr common.Address, client bind.ContractBackend, expe
 func typeAndVersion(addr common.Address, client bind.ContractBackend) (ContractType, semver.Version, error) {
 	tv, err := type_and_version.NewTypeAndVersionInterface(addr, client)
 	if err != nil {
-		return "", semver.Version{}, errors.Wrap(err, "failed creating a type and version")
+		return "", semver.Version{}, err
 	}
 	tvStr, err := tv.TypeAndVersion(nil)
 	if err != nil {
-		return "", semver.Version{}, errors.Wrap(err, "failed to call type and version")
+		return "", semver.Version{}, err
 	}
 
 	contractType, versionStr, err := ParseTypeAndVersion(tvStr)
 	if err != nil {
-		return "", semver.Version{}, errors.Wrap(err, "failed to parse type and version result")
+		return "", semver.Version{}, err
 	}
 	v, err := semver.NewVersion(versionStr)
 	if err != nil {
-		return "", semver.Version{}, errors.Errorf("invalid semver string %s", versionStr)
+		return "", semver.Version{}, err
 	}
 
 	if _, ok := ContractTypes[ContractType(contractType)]; !ok {
@@ -66,7 +65,7 @@ func ParseTypeAndVersion(tvStr string) (string, string, error) {
 	typeAndVersionValues := strings.Split(tvStr, " ")
 
 	if len(typeAndVersionValues) < 2 {
-		return "", "", fmt.Errorf("invalid type and version %s", tvStr)
+		return "", "", errors.Errorf("invalid type and version %s", tvStr)
 	}
 	return typeAndVersionValues[0], typeAndVersionValues[1], nil
 }
