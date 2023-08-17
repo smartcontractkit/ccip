@@ -7,8 +7,9 @@ var EvmChainIdToChainSelector = map[uint64]uint64{
 	// Testnets
 	97:       13264668187771770619, // BSC Testnet
 	420:      2664363617261496610,  // Optimism Goerli
-	1337:     1337,                 // Dev network
-	43113:    14767482510784806043, // Avalanche Fuji
+	1000:     11787463284727550157, // Tests
+	1337:     3379446385462418246,  // Tests
+	2337:     12922642891491394802, // Tests
 	84531:    5790810961207155433,  // BASE Goerli
 	80001:    12532609583862916517, // Polygon Mumbai
 	421613:   6101244977088475029,  // Arbitrum Goerli
@@ -22,9 +23,6 @@ var EvmChainIdToChainSelector = map[uint64]uint64{
 	8453:  15971525489660198786, // BASE
 	42161: 4949039107694359620,  // Arbitrum
 	43114: 6433500567565415381,  // Avalanche
-	// Tests
-	1000: 1500,
-	2337: 2337,
 }
 
 func ChainIdFromSelector(chainSelectorId uint64) (uint64, error) {
