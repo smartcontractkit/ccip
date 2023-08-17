@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip/laneconfig"
+	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
 	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
@@ -68,14 +69,12 @@ type CCIPTOMLEnv struct {
 	Networks []blockchain.EVMNetwork
 }
 
-var EvmChainIdToChainSelector = func(chainId uint64, simulated bool) (uint64, error) {
-	if simulated {
-		return chainId, nil
-	}
+var EvmChainIdToChainSelector = func(chainId uint64) (uint64, error) {
 	mapSelector := map[uint64]uint64{
 		// Testnets
 		420:      2664363617261496610,  // Optimism Goerli
-		1337:     3379446385462418246,  // Quorem
+		1337:     3379446385462418246,  // Tests
+		2337:     12922642891491394802, // Tests
 		43113:    14767482510784806043, // Avax Fuji
 		80001:    12532609583862916517, // Polygon Mumbai
 		421613:   6101244977088475029,  // Arbitrum Goerli
@@ -306,7 +305,9 @@ func (ccipModule *CCIPCommon) CleanUp() error {
 
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
 // This reuses common contracts for bidirectional lanes
-func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.LaneConfig) error {
+func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
+	tokenDeployerFns []blockchain.ContractDeployer,
+	conf *laneconfig.LaneConfig) error {
 	var err error
 	cd := ccipModule.Deployer
 
@@ -359,7 +360,13 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int, conf *laneconfig.L
 	if len(ccipModule.BridgeTokens) == 0 {
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
-			token, err := cd.DeployLinkTokenContract()
+			var token *ccip.LinkToken
+			var err error
+			if len(tokenDeployerFns) != noOfTokens {
+				token, err = cd.DeployLinkTokenContract()
+			} else {
+				token, err = cd.DeployERC20TokenContract(tokenDeployerFns[i])
+			}
 			if err != nil {
 				return fmt.Errorf("deploying bridge token contract shouldn't fail %+v", err)
 			}
@@ -518,11 +525,11 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 	if len(sourceCCIP.TransferAmount) != len(sourceCCIP.Common.BridgeTokens) {
 		sourceCCIP.TransferAmount = sourceCCIP.TransferAmount[:len(sourceCCIP.Common.BridgeTokens)]
 	}
-	sourceChainSelector, err := EvmChainIdToChainSelector(sourceCCIP.Common.ChainClient.GetChainID().Uint64(), sourceCCIP.Common.ChainClient.NetworkSimulated())
+	sourceChainSelector, err := EvmChainIdToChainSelector(sourceCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	destChainSelector, err := EvmChainIdToChainSelector(sourceCCIP.DestinationChainId, sourceCCIP.Common.ChainClient.NetworkSimulated())
+	destChainSelector, err := EvmChainIdToChainSelector(sourceCCIP.DestinationChainId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -634,7 +641,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		}
 
 		// update source Router with OnRamp address
-		err = sourceCCIP.Common.Router.SetOnRamp(sourceCCIP.DestinationChainId, sourceCCIP.OnRamp.EthAddress)
+		err = sourceCCIP.Common.Router.SetOnRamp(destChainSelector, sourceCCIP.OnRamp.EthAddress)
 		if err != nil {
 			return fmt.Errorf("setting onramp on the router shouldn't fail %+v", err)
 		}
@@ -848,7 +855,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed encoding the options field: %+v", err)
 	}
-	destChainSelector, err := EvmChainIdToChainSelector(sourceCCIP.DestinationChainId, sourceCCIP.Common.ChainClient.NetworkSimulated())
+	destChainSelector, err := EvmChainIdToChainSelector(sourceCCIP.DestinationChainId)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %+v", err)
 	}
@@ -965,11 +972,11 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	}
 
 	destCCIP.LoadContracts(lane)
-	sourceChainSelector, err := EvmChainIdToChainSelector(destCCIP.SourceChainId, sourceCCIP.Common.ChainClient.NetworkSimulated())
+	sourceChainSelector, err := EvmChainIdToChainSelector(destCCIP.SourceChainId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	destChainSelector, err := EvmChainIdToChainSelector(destCCIP.Common.ChainClient.GetChainID().Uint64(), destCCIP.Common.ChainClient.NetworkSimulated())
+	destChainSelector, err := EvmChainIdToChainSelector(destCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1097,7 +1104,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		}
 
 		// apply offramp updates
-		_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, destCCIP.SourceChainId)
+		_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, sourceChainSelector)
 		if err != nil {
 			return fmt.Errorf("setting offramp as fee updater shouldn't fail %+v", err)
 		}
@@ -1763,6 +1770,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	sourceCommon *CCIPCommon,
 	destCommon *CCIPCommon,
 	transferAmounts []*big.Int,
+	tokenDeployerFns []blockchain.ContractDeployer,
 	newBootstrap bool,
 	configureCLNodes bool,
 	existingDeployment bool,
@@ -1795,11 +1803,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	// deploy all common contracts in parallel
 	lane.Source.Common.deploy.Go(func() error {
-		return lane.Source.Common.DeployContracts(len(lane.Source.TransferAmount), srcConf)
+		return lane.Source.Common.DeployContracts(len(lane.Source.TransferAmount), tokenDeployerFns, srcConf)
 	})
 
 	lane.Dest.Common.deploy.Go(func() error {
-		return lane.Dest.Common.DeployContracts(len(lane.Source.TransferAmount), destConf)
+		return lane.Dest.Common.DeployContracts(len(lane.Source.TransferAmount), tokenDeployerFns, destConf)
 	})
 
 	// deploy all source contracts
@@ -2137,6 +2145,7 @@ func nodeContractPair(nodeAddr, contractAddr string) string {
 }
 
 type CCIPTestEnv struct {
+	LocalCluster             *test_env.CLClusterTestEnv
 	MockServer               *ctfClient.MockserverClient
 	CLNodesWithKeys          map[string][]*client.CLNodesWithKeys // key - network chain-id
 	CLNodes                  []*client.ChainlinkK8sClient
@@ -2209,23 +2218,34 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	nodeFund *big.Float,
 	chains []blockchain.EVMClient,
 ) error {
-	log.Info().Msg("Connecting to launched resources")
-	chainlinkK8sNodes, err := client.ConnectChainlinkNodes(c.K8Env)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	if len(chainlinkK8sNodes) == 0 {
-		return fmt.Errorf("no CL node found")
-	}
-
 	chainlinkNodes := make([]*client.ChainlinkClient, 0)
-	for _, chainlinkNode := range chainlinkK8sNodes {
-		chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient)
-	}
+	var err error
+	if c.LocalCluster != nil {
+		// for local cluster, fetch the values from the local cluster
+		c.MockServer = c.LocalCluster.MockServer.Client
+		for _, chainlinkNode := range c.LocalCluster.CLNodes {
+			chainlinkNodes = append(chainlinkNodes, chainlinkNode.API)
+		}
+	} else {
+		// in case of k8s, we need to connect to the chainlink nodes
+		log.Info().Msg("Connecting to launched resources")
+		chainlinkK8sNodes, err := client.ConnectChainlinkNodes(c.K8Env)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if len(chainlinkK8sNodes) == 0 {
+			return fmt.Errorf("no CL node found")
+		}
 
-	mockServer, err := ctfClient.ConnectMockServer(c.K8Env)
-	if err != nil {
-		return fmt.Errorf("creating mockserver clients shouldn't fail %+v", err)
+		for _, chainlinkNode := range chainlinkK8sNodes {
+			chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient)
+		}
+
+		c.MockServer, err = ctfClient.ConnectMockServer(c.K8Env)
+		if err != nil {
+			return fmt.Errorf("creating mockserver clients shouldn't fail %+v", err)
+		}
+		c.CLNodes = chainlinkK8sNodes
 	}
 
 	nodesWithKeys := make(map[string][]*client.CLNodesWithKeys)
@@ -2253,18 +2273,18 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 			if cfg == nil {
 				return fmt.Errorf("blank network config")
 			}
-			c, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec)
+			c1, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec)
 			if err != nil {
 				return fmt.Errorf("getting concurrent evmclient chain %s %+v", ec.GetNetworkName(), err)
 			}
 			defer func() {
-				if c != nil {
-					c.Close()
+				if c1 != nil {
+					c1.Close()
 				}
 			}()
-			err = FundChainlinkNodesAddresses(chainlinkK8sNodes[1:], c, nodeFund)
+			err = FundChainlinkNodesAddresses(chainlinkNodes[1:], c1, nodeFund)
 			if err != nil {
-				return fmt.Errorf("funding nodes for chain %s %+v", c.GetNetworkName(), err)
+				return fmt.Errorf("funding nodes for chain %s %+v", c1.GetNetworkName(), err)
 			}
 			return nil
 		})
@@ -2282,9 +2302,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		return errors.WithStack(err)
 	}
 
-	c.MockServer = mockServer
 	c.CLNodesWithKeys = nodesWithKeys
-	c.CLNodes = chainlinkK8sNodes
 	return nil
 }
 
