@@ -72,6 +72,7 @@ type CCIPTOMLEnv struct {
 var EvmChainIdToChainSelector = func(chainId uint64) (uint64, error) {
 	mapSelector := map[uint64]uint64{
 		// Testnets
+		97:       13264668187771770619, // BSC Testnet
 		420:      2664363617261496610,  // Optimism Goerli
 		1337:     3379446385462418246,  // Tests
 		2337:     12922642891491394802, // Tests
@@ -80,11 +81,13 @@ var EvmChainIdToChainSelector = func(chainId uint64) (uint64, error) {
 		421613:   6101244977088475029,  // Arbitrum Goerli
 		11155111: 16015286601757825753, // Sepolia
 		// Mainnets
-		1:     5009297550715157269, // Ethereum
-		10:    3734403246176062136, // Optimism
-		137:   4051577828743386545, // Polygon
-		42161: 4949039107694359620, // Arbitrum
-		43114: 6433500567565415381, // Avalanche
+		1:     5009297550715157269,  // Ethereum
+		10:    3734403246176062136,  // Optimism
+		56:    11344663589394136015, // BSC
+		137:   4051577828743386545,  // Polygon
+		8453:  15971525489660198786, // BASE
+		42161: 4949039107694359620,  // Arbitrum
+		43114: 6433500567565415381,  // Avalanche
 	}
 	chainSelector, ok := mapSelector[chainId]
 	if !ok {
