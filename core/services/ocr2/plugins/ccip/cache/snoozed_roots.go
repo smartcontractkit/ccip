@@ -22,7 +22,7 @@ type SnoozedRoots interface {
 type snoozedRoots struct {
 	cache *cache.Cache
 	// Both rootSnoozedTime and permissionLessExecutionThresholdDuration can be kept in the snoozedRoots without need to be updated.
-	// Those config properties are populates via onchain/offchain config. When changed, node will be rebooted and cache initialized with new config.
+	// Those config properties are populates via onchain/offchain config. When changed, OCR plugin will be restarted and cache initialized with new config.
 	rootSnoozedTime                          time.Duration
 	permissionLessExecutionThresholdDuration time.Duration
 }

@@ -17,7 +17,7 @@ func TestSnoozedRoots(t *testing.T) {
 	snoozed := c.IsSnoozed(k1)
 	assert.False(t, snoozed)
 
-	// after an element is mark as executed it should be snoozed
+	// after an element is marked as executed it should be snoozed
 	c.MarkAsExecuted(k1)
 	snoozed = c.IsSnoozed(k1)
 	assert.True(t, snoozed)
