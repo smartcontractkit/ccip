@@ -14,7 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
+
+var nilQueryer pg.Queryer
 
 func TestGetExecutionPluginFilterNamesFromSpec(t *testing.T) {
 	testCases := []struct {

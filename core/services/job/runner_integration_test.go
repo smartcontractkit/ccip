@@ -641,7 +641,7 @@ ds1 -> ds1_parse;
 			config.Database(),
 			srvctest.Start(t, utils.NewMailboxMonitor(t.Name())),
 		)
-		services, err := sd.ServicesForSpec(*jb)
+		services, err := sd.ServicesForSpec(*jb, nil)
 		require.NoError(t, err)
 
 		// Return an error getting the contract code.

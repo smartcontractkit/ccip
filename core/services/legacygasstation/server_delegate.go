@@ -60,7 +60,7 @@ func (d *Delegate) RequestRouter() RequestRouter {
 	return d.rr
 }
 
-func (d *Delegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
+func (d *Delegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	if jb.LegacyGasStationServerSpec == nil || jb.PipelineSpec == nil {
 		return nil, errors.Errorf("ServicesForSpec expects a LegacyGasStationServerSpec and PipelineSpec, got %+v", jb)
 	}

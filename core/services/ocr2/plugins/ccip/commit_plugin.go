@@ -63,7 +63,7 @@ var checkFinalityTags = map[int64]bool{
 
 }
 
-func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 
 	var pluginConfig ccipconfig.CommitPluginConfig
@@ -145,7 +145,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			checkFinalityTags:   checkFinalityTags,
 		})
 
-	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)
+	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress, qopts...)
 	if err != nil {
 		return nil, err
 	}
@@ -297,16 +297,16 @@ func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, sourceLP, 
 	}
 
 	if err := unregisterLpFilters(
-		q,
 		sourceLP,
 		getCommitPluginSourceLpFilters(staticCfg.OnRamp),
+		pg.WithQueryer(q),
 	); err != nil {
 		return err
 	}
 
 	return unregisterLpFilters(
-		q,
 		destLP,
 		getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry, offRamp),
+		pg.WithQueryer(q),
 	)
 }

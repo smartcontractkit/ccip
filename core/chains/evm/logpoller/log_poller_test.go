@@ -216,17 +216,16 @@ func Test_BackupLogPoller(t *testing.T) {
 	require.Equal(t, 1, len(filters))
 	require.Equal(t, filter1, filters["filter1"])
 
-	err = th.LogPoller.RegisterFilter(
-		logpoller.Filter{"filter2",
-			[]common.Hash{EmitterABI.Events["Log1"].ID},
-			[]common.Address{th.EmitterAddress2}, 0})
+	err = th.LogPoller.RegisterFilter(logpoller.Filter{"filter2",
+		[]common.Hash{EmitterABI.Events["Log1"].ID},
+		[]common.Address{th.EmitterAddress2}, 0})
 	require.NoError(t, err)
 
 	defer func() {
-		assert.NoError(t, th.LogPoller.UnregisterFilter("filter1", nil))
+		assert.NoError(t, th.LogPoller.UnregisterFilter("filter1"))
 	}()
 	defer func() {
-		assert.NoError(t, th.LogPoller.UnregisterFilter("filter2", nil))
+		assert.NoError(t, th.LogPoller.UnregisterFilter("filter2"))
 	}()
 
 	// generate some tx's with logs
@@ -767,8 +766,7 @@ func TestLogPoller_GetBlocks_Range(t *testing.T) {
 	th := SetupTH(t, 2, 3, 2)
 
 	err := th.LogPoller.RegisterFilter(logpoller.Filter{"GetBlocks Test", []common.Hash{
-		EmitterABI.Events["Log1"].ID, EmitterABI.Events["Log2"].ID}, []common.Address{th.EmitterAddress1, th.EmitterAddress2}, 0},
-	)
+		EmitterABI.Events["Log1"].ID, EmitterABI.Events["Log2"].ID}, []common.Address{th.EmitterAddress1, th.EmitterAddress2}, 0})
 	require.NoError(t, err)
 
 	// LP retrieves 0 blocks

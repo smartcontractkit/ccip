@@ -41,7 +41,7 @@ const (
 	FEE_TOKEN_REMOVED            = "Fee token removed"
 )
 
-func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	var pluginConfig ccipconfig.ExecutionPluginConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
@@ -114,7 +114,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet,
 			leafHasher:               hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
 		})
 
-	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)
+	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress, qopts...)
 	if err != nil {
 		return nil, err
 	}
@@ -268,17 +268,17 @@ func unregisterExecutionPluginLpFilters(
 	}
 
 	if err := unregisterLpFilters(
-		q,
 		sourceLP,
 		getExecutionPluginSourceLpChainFilters(destOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry),
+		pg.WithQueryer(q),
 	); err != nil {
 		return err
 	}
 
 	return unregisterLpFilters(
-		q,
 		destLP,
 		getExecutionPluginDestLpChainFilters(destOffRampConfig.CommitStore, destOffRamp.Address(), destOffRampDynCfg.PriceRegistry),
+		pg.WithQueryer(q),
 	)
 }
 

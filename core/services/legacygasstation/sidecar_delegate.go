@@ -46,7 +46,7 @@ func NewSidecarDelegate(
 }
 
 // ServicesForSpec satisfies the job.Delegate interface.
-func (d *SidecarDelegate) ServicesForSpec(jb job.Job) ([]job.ServiceCtx, error) {
+func (d *SidecarDelegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	if jb.LegacyGasStationSidecarSpec == nil {
 		return nil, errors.Errorf(
 			"legacygasstation.Delegate expects a LegacyGasStationSidecarSpec to be present, got %+v", jb)

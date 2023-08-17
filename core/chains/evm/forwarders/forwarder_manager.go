@@ -209,12 +209,11 @@ func (f *FwdMgr) subscribeSendersChangedLogs(addr common.Address) error {
 		return nil
 	}
 
-	err := f.logpoller.RegisterFilter(
-		evmlogpoller.Filter{
-			Name:      FilterName(addr),
-			EventSigs: []common.Hash{authChangedTopic},
-			Addresses: []common.Address{addr},
-		})
+	err := f.logpoller.RegisterFilter(evmlogpoller.Filter{
+		Name:      FilterName(addr),
+		EventSigs: []common.Hash{authChangedTopic},
+		Addresses: []common.Address{addr},
+	})
 	return err
 }
 
