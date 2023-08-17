@@ -24,6 +24,7 @@ var EvmChainIdToChainSelector = map[uint64]uint64{
 	43114: 6433500567565415381,  // Avalanche
 	// Tests
 	1000: 1500,
+	2337: 3337,
 }
 
 func ChainIdFromSelector(chainSelectorId uint64) (uint64, error) {
