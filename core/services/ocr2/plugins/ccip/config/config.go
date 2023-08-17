@@ -2,6 +2,7 @@ package config
 
 import "fmt"
 
+// TODO Replace with https://github.com/smartcontractkit/ccip-chain-selectors after making it public
 var EvmChainIdToChainSelector = map[uint64]uint64{
 	// Testnets
 	97:       13264668187771770619, // BSC Testnet
