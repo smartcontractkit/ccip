@@ -7,7 +7,7 @@ var EvmChainIdToChainSelector = map[uint64]uint64{
 	// Testnets
 	97:       13264668187771770619, // BSC Testnet
 	420:      2664363617261496610,  // Optimism Goerli
-	1337:     3379446385462418246,  // Dev network
+	1337:     1337,                 // Dev network
 	43113:    14767482510784806043, // Avalanche Fuji
 	84531:    5790810961207155433,  // BASE Goerli
 	80001:    12532609583862916517, // Polygon Mumbai

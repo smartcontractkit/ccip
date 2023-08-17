@@ -76,7 +76,8 @@ var EvmChainIdToChainSelector = func(chainId uint64) (uint64, error) {
 		420:      2664363617261496610,  // Optimism Goerli
 		1337:     3379446385462418246,  // Tests
 		2337:     12922642891491394802, // Tests
-		43113:    14767482510784806043, // Avax Fuji
+		43113:    14767482510784806043, // Avalanche Fuji
+		84531:    5790810961207155433,  // BASE Goerli
 		80001:    12532609583862916517, // Polygon Mumbai
 		421613:   6101244977088475029,  // Arbitrum Goerli
 		11155111: 16015286601757825753, // Sepolia
