@@ -16,11 +16,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	"github.com/smartcontractkit/ocr2keepers/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ethereum"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
-	"github.com/smartcontractkit/ocr2keepers/pkg/config"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
@@ -29,7 +30,7 @@ import (
 
 func BuildAutoOCR2ConfigVars(
 	t *testing.T,
-	chainlinkNodes []*client.Chainlink,
+	chainlinkNodes []*client.ChainlinkK8sClient,
 	registryConfig contracts.KeeperRegistrySettings,
 	registrar string,
 	deltaStage time.Duration,
@@ -39,7 +40,7 @@ func BuildAutoOCR2ConfigVars(
 
 func BuildAutoOCR2ConfigVarsWithKeyIndex(
 	t *testing.T,
-	chainlinkNodes []*client.Chainlink,
+	chainlinkNodes []*client.ChainlinkK8sClient,
 	registryConfig contracts.KeeperRegistrySettings,
 	registrar string,
 	deltaStage time.Duration,
@@ -118,14 +119,13 @@ func BuildAutoOCR2ConfigVarsWithKeyIndex(
 // CreateOCRKeeperJobs bootstraps the first node and to the other nodes sends ocr jobs
 func CreateOCRKeeperJobs(
 	t *testing.T,
-	chainlinkNodes []*client.Chainlink,
+	chainlinkNodes []*client.ChainlinkK8sClient,
 	registryAddr string,
 	chainID int64,
 	keyIndex int,
 ) {
 	l := utils.GetTestLogger(t)
 	bootstrapNode := chainlinkNodes[0]
-	bootstrapNode.InternalIP()
 	bootstrapP2PIds, err := bootstrapNode.MustReadP2PKeys()
 	require.NoError(t, err, "Shouldn't fail reading P2P keys from bootstrap node")
 	bootstrapP2PId := bootstrapP2PIds.Data[0].Attributes.PeerID
@@ -144,7 +144,7 @@ func CreateOCRKeeperJobs(
 	}
 	_, err = bootstrapNode.MustCreateJob(bootstrapSpec)
 	require.NoError(t, err, "Shouldn't fail creating bootstrap job on bootstrap node")
-	P2Pv2Bootstrapper := fmt.Sprintf("%s@%s:%d", bootstrapP2PId, bootstrapNode.Name(), 8090)
+	P2Pv2Bootstrapper := fmt.Sprintf("%s@%s:%d", bootstrapP2PId, bootstrapNode.Name(), 6690)
 
 	for nodeIndex := 1; nodeIndex < len(chainlinkNodes); nodeIndex++ {
 		nodeTransmitterAddress, err := chainlinkNodes[nodeIndex].EthAddresses()
