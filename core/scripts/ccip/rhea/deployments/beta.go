@@ -377,15 +377,15 @@ var Beta_AvaxANZTestnet = rhea.EVMChainConfig{
 	},
 	SupportedTokens: map[rhea.Token]rhea.EVMBridgedToken{
 		rhea.LINK: {
-			Token:          gethcommon.HexToAddress(""),
-			Pool:           gethcommon.HexToAddress(""),
+			Token:          gethcommon.HexToAddress("0x25d997d8618e1299418b3d905e40bc353ec89f61"),
+			Pool:           gethcommon.HexToAddress("0xc095b651f3a483d74c42f319309e08af676ddcae"),
 			TokenPoolType:  rhea.Wrapped,
 			TokenPriceType: rhea.TokenPrices,
 			Price:          rhea.LINK.Price(),
 			Decimals:       rhea.LINK.Decimals(),
 		},
 		rhea.WCBS: {
-			Token:          gethcommon.HexToAddress(""),
+			Token:          gethcommon.HexToAddress("0xD84E2f21D0bBbe0be697cB4A400AF367b39FbCD4"),
 			Price:          rhea.WCBS.Price(),
 			Decimals:       rhea.WCBS.Decimals(),
 			TokenPoolType:  rhea.FeeTokenOnly,
@@ -394,10 +394,10 @@ var Beta_AvaxANZTestnet = rhea.EVMChainConfig{
 	},
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WCBS},
 	WrappedNative: rhea.WCBS,
-	Router:        gethcommon.HexToAddress(""),
-	ARM:           gethcommon.HexToAddress(""),
-	ARMProxy:      gethcommon.HexToAddress(""),
-	PriceRegistry: gethcommon.HexToAddress(""),
+	Router:        gethcommon.HexToAddress("0xcc22cd1ad8ae43389eb3577ae576efb99e66be25"),
+	ARM:           gethcommon.HexToAddress("0x5058af17e36899aa9073c2fe777f3e79ae06c566"),
+	ARMProxy:      gethcommon.HexToAddress("0x90410a109c952074645b66e149eaac70a91d4f50"),
+	PriceRegistry: gethcommon.HexToAddress("0x338f33f149c9257284a37144e37b1d5a62507a0e"),
 	TunableChainValues: rhea.TunableChainValues{
 		FinalityDepth:            getFinalityDepth(rhea.AvaxAnzSubnet),
 		OptimisticConfirmations:  getOptimisticConfirmations(rhea.AvaxAnzSubnet),
