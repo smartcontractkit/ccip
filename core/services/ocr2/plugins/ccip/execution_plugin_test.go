@@ -80,7 +80,7 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 		}, nil)
 
 	mockOnRamp := mock_contracts.NewEVM2EVMOnRampInterface(t)
-	mockOnRamp.On("TypeAndVersion", mock.Anything).Return(fmt.Sprintf("%s %s", ccipconfig.EVM2EVMOnRamp, ccipconfig.LatestOnRampVersion), nil)
+	mockOnRamp.On("TypeAndVersion", mock.Anything).Return(fmt.Sprintf("%s %s", ccipconfig.EVM2EVMOnRamp, "9.9.9"), nil)
 	mockOnRamp.On("GetDynamicConfig", mock.Anything).Return(
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			PriceRegistry: srcPriceRegAddr,

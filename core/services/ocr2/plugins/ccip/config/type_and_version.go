@@ -24,7 +24,6 @@ var (
 		EVM2EVMOnRamp:  {},
 		CommitStore:    {},
 	}
-	LatestOnRampVersion = "1.1.0"
 )
 
 func VerifyTypeAndVersion(addr common.Address, client bind.ContractBackend, expectedType ContractType) error {
