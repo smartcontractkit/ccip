@@ -267,6 +267,9 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
 
   mapping(uint64 destChainSelector => USDCTokenPool.Domain domain) private s_chainToDomain;
 
+  // Setting lower fuzz run as this test is causing differing gas results in snapshot.
+  /// forge-config: default.fuzz.runs = 32
+  /// forge-config: ccip.fuzz.runs = 32
   function testFuzz_SetDomainsSuccess(
     bytes32[10] calldata allowedCallers,
     uint32[10] calldata domainIdentifiers,
