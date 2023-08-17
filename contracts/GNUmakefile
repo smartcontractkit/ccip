@@ -15,7 +15,7 @@ ALL_FOUNDRY_PRODUCTS = vrf automation llo-feeds functions automation-dev shared 
 # 		make FOUNDRY_PROFILE=llo-feeds snapshot
 .PHONY: snapshot
 snapshot: ## Make a snapshot for a specific product.
-	export FOUNDRY_PROFILE=$(FOUNDRY_PROFILE) && forge snapshot --snap gas-snapshots/$(FOUNDRY_PROFILE).gas-snapshot
+	export FOUNDRY_PROFILE=$(FOUNDRY_PROFILE) && forge snapshot --no-match-test testFuzz_ --snap gas-snapshots/$(FOUNDRY_PROFILE).gas-snapshot
 
 .PHONY: snapshot-all
 snapshot-all: ## Make a snapshot for all products.
