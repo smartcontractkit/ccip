@@ -4,13 +4,13 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 )
 
 var _ config.OCR2 = (*ocr2Config)(nil)
 
 type ocr2Config struct {
-	c toml.OCR2
+	c v2.OCR2
 }
 
 func (o *ocr2Config) Enabled() bool {
@@ -55,10 +55,6 @@ func (o *ocr2Config) TraceLogging() bool {
 
 func (o *ocr2Config) CaptureEATelemetry() bool {
 	return *o.c.CaptureEATelemetry
-}
-
-func (o *ocr2Config) CaptureAutomationCustomTelemetry() bool {
-	return *o.c.CaptureAutomationCustomTelemetry
 }
 
 func (o *ocr2Config) DefaultTransactionQueueDepth() uint32 {

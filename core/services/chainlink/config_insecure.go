@@ -2,11 +2,11 @@ package chainlink
 
 import (
 	"github.com/smartcontractkit/chainlink/v2/core/build"
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 )
 
 type insecureConfig struct {
-	c toml.Insecure
+	c v2.Insecure
 }
 
 func (i *insecureConfig) DevWebServer() bool {

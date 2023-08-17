@@ -23,7 +23,7 @@ type DonChain struct {
 	EVMNetwork        *blockchain.EVMNetwork
 	ContractDeployer  contracts.ContractDeployer
 	LinkTokenContract contracts.LinkToken
-	ChainlinkNodes    []*client.ChainlinkK8sClient
+	ChainlinkNodes    []*client.Chainlink
 	Mockserver        *ctfClient.MockserverClient
 }
 

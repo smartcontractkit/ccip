@@ -63,7 +63,6 @@ MaxSuccessfulRuns = 0
 
 [OCR2]
 Enabled = true
-CaptureEATelemetry = true
 
 [P2P]
 [P2P.V2]

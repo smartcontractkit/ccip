@@ -58,6 +58,8 @@ ShutdownGracePeriod is the maximum time allowed to shut down gracefully. If exce
 FeedsManager = true # Default
 LogPoller = false # Default
 UICSAKeys = false # Default
+CCIP = false # Default
+LegacyGasStation = false # Default
 ```
 
 
@@ -78,6 +80,18 @@ LogPoller enables the log poller, an experimental approach to processing logs, r
 UICSAKeys = false # Default
 ```
 UICSAKeys enables CSA Keys in the UI.
+
+### CCIP
+```toml
+CCIP = false # Default
+```
+CCIP enables the Cross Chain Interoperability Protocol
+
+### LegacyGasStation
+```toml
+LegacyGasStation = false # Default
+```
+LegacyGasStation is an experimental feature that enables meta-transactions for token transfers
 
 ## Database
 ```toml
@@ -730,7 +744,6 @@ ContractTransmitterTransmitTimeout = '10s' # Default
 DatabaseTimeout = '10s' # Default
 KeyBundleID = '7a5f66bbe6594259325bf2b4f5b1a9c900000000000000000000000000000000' # Example
 CaptureEATelemetry = false # Default
-CaptureAutomationCustomTelemetry = false # Default
 DefaultTransactionQueueDepth = 1 # Default
 SimulateTransactions = false # Default
 TraceLogging = false # Default
@@ -824,12 +837,6 @@ KeyBundleID is a sha256 hexadecimal hash identifier.
 CaptureEATelemetry = false # Default
 ```
 CaptureEATelemetry toggles collecting extra information from External Adaptares
-
-### CaptureAutomationCustomTelemetry
-```toml
-CaptureAutomationCustomTelemetry = false # Default
-```
-CaptureAutomationCustomTelemetry toggles collecting automation specific telemetry
 
 ### DefaultTransactionQueueDepth
 ```toml
@@ -1439,7 +1446,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x514910771AF9Ca656af840dff83E8264EcF986CA'
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -1518,7 +1524,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x20fE562d797A42Dcb3399062AE9546cd06f63280'
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -1596,7 +1601,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x01BE23585060835E02B77ef475b0Cc51aA1e0709'
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -1674,7 +1678,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x326C977E6efc84E512bB9C30f76E30c160eD06FB'
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -1753,7 +1756,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'optimismBedrock'
 FinalityDepth = 200
-FinalityTagEnabled = false
 LinkContractAddress = '0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6'
 LogBackfillBatchSize = 1000
 LogPollInterval = '2s'
@@ -1831,7 +1833,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x14AdaE34beF7ca957Ce2dDe5ADD97ea050123827'
 LogBackfillBatchSize = 1000
 LogPollInterval = '30s'
@@ -1909,7 +1910,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x8bBbd80981FE76d44854D8DF305e8985c19f0e78'
 LogBackfillBatchSize = 1000
 LogPollInterval = '30s'
@@ -1987,7 +1987,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0xa36085F69e2889c224210F603D836748e7dC0088'
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -2066,7 +2065,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x404460C6A5EdE2D891e8297795264fDe62ADBB75'
 LogBackfillBatchSize = 1000
 LogPollInterval = '3s'
@@ -2144,7 +2142,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
@@ -2221,7 +2218,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
@@ -2291,84 +2287,6 @@ GasLimit = 5300000
 
 </p></details>
 
-<details><summary>BSC Testnet (97)</summary><p>
-
-```toml
-AutoCreateKey = true
-BlockBackfillDepth = 10
-BlockBackfillSkip = false
-FinalityDepth = 50
-FinalityTagEnabled = false
-LinkContractAddress = '0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06'
-LogBackfillBatchSize = 1000
-LogPollInterval = '3s'
-LogKeepBlocksDepth = 100000
-MinIncomingConfirmations = 3
-MinContractPayment = '0.00001 link'
-NonceAutoSync = true
-NoNewHeadsThreshold = '30s'
-RPCDefaultBatchSize = 250
-RPCBlockQueryDelay = 2
-
-[Transactions]
-ForwardersEnabled = false
-MaxInFlight = 16
-MaxQueued = 250
-ReaperInterval = '1h0m0s'
-ReaperThreshold = '168h0m0s'
-ResendAfterThreshold = '1m0s'
-
-[BalanceMonitor]
-Enabled = true
-
-[GasEstimator]
-Mode = 'BlockHistory'
-PriceDefault = '5 gwei'
-PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
-PriceMin = '1 gwei'
-LimitDefault = 500000
-LimitMax = 500000
-LimitMultiplier = '1'
-LimitTransfer = 21000
-BumpMin = '5 gwei'
-BumpPercent = 20
-BumpThreshold = 5
-EIP1559DynamicFees = false
-FeeCapDefault = '100 gwei'
-TipCapDefault = '1 wei'
-TipCapMin = '1 wei'
-
-[GasEstimator.BlockHistory]
-BatchSize = 25
-BlockHistorySize = 24
-CheckInclusionBlocks = 12
-CheckInclusionPercentile = 90
-TransactionPercentile = 60
-
-[HeadTracker]
-HistoryDepth = 100
-MaxBufferSize = 3
-SamplingInterval = '1s'
-
-[NodePool]
-PollFailureThreshold = 5
-PollInterval = '10s'
-SelectionMode = 'HighestHead'
-SyncThreshold = 10
-
-[OCR]
-ContractConfirmations = 4
-ContractTransmitterTransmitTimeout = '2s'
-DatabaseTimeout = '2s'
-ObservationGracePeriod = '500ms'
-
-[OCR2]
-[OCR2.Automation]
-GasLimit = 5300000
-```
-
-</p></details>
-
 <details><summary>xDai Mainnet (100)</summary><p>
 
 ```toml
@@ -2377,7 +2295,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'xdai'
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0xE2e73A1c69ecF83F464EFCE6A5be353a37cA09b2'
 LogBackfillBatchSize = 1000
 LogPollInterval = '5s'
@@ -2455,7 +2372,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x404460C6A5EdE2D891e8297795264fDe62ADBB75'
 LogBackfillBatchSize = 1000
 LogPollInterval = '3s'
@@ -2533,7 +2449,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 500
-FinalityTagEnabled = false
 LinkContractAddress = '0xb0897686c545045aFc77CF20eC7A532E3120E0F1'
 LogBackfillBatchSize = 1000
 LogPollInterval = '1s'
@@ -2611,7 +2526,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x6F43FF82CCA38001B6699a8AC47A2d0E66939407'
 LogBackfillBatchSize = 1000
 LogPollInterval = '1s'
@@ -2690,7 +2604,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'optimismBedrock'
 FinalityDepth = 200
-FinalityTagEnabled = false
 LinkContractAddress = '0xdc2CC710e42857672E7907CF474a69B63B93089f'
 LogBackfillBatchSize = 1000
 LogPollInterval = '2s'
@@ -2769,7 +2682,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'metis'
 FinalityDepth = 1
-FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
@@ -2846,7 +2758,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 1
-FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
@@ -2924,7 +2835,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'metis'
 FinalityDepth = 1
-FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
@@ -3001,7 +2911,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 1
-FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
@@ -3078,7 +2987,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0xfaFedb041c0DD4fA2Dc0d87a6B0979Ee6FA7af5F'
 LogBackfillBatchSize = 1000
 LogPollInterval = '1s'
@@ -3156,7 +3064,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 1
-FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
 LogKeepBlocksDepth = 100000
@@ -3226,84 +3133,6 @@ GasLimit = 5300000
 
 </p></details>
 
-<details><summary>Base Mainnet (8453)</summary><p>
-
-```toml
-AutoCreateKey = true
-BlockBackfillDepth = 10
-BlockBackfillSkip = false
-ChainType = 'optimismBedrock'
-FinalityDepth = 200
-FinalityTagEnabled = false
-LogBackfillBatchSize = 1000
-LogPollInterval = '2s'
-LogKeepBlocksDepth = 100000
-MinIncomingConfirmations = 1
-MinContractPayment = '0.00001 link'
-NonceAutoSync = true
-NoNewHeadsThreshold = '40s'
-RPCDefaultBatchSize = 250
-RPCBlockQueryDelay = 1
-
-[Transactions]
-ForwardersEnabled = false
-MaxInFlight = 16
-MaxQueued = 250
-ReaperInterval = '1h0m0s'
-ReaperThreshold = '168h0m0s'
-ResendAfterThreshold = '30s'
-
-[BalanceMonitor]
-Enabled = true
-
-[GasEstimator]
-Mode = 'BlockHistory'
-PriceDefault = '20 gwei'
-PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
-PriceMin = '1 wei'
-LimitDefault = 500000
-LimitMax = 500000
-LimitMultiplier = '1'
-LimitTransfer = 21000
-BumpMin = '100 wei'
-BumpPercent = 20
-BumpThreshold = 3
-EIP1559DynamicFees = true
-FeeCapDefault = '100 gwei'
-TipCapDefault = '1 wei'
-TipCapMin = '1 wei'
-
-[GasEstimator.BlockHistory]
-BatchSize = 25
-BlockHistorySize = 24
-CheckInclusionBlocks = 12
-CheckInclusionPercentile = 90
-TransactionPercentile = 60
-
-[HeadTracker]
-HistoryDepth = 300
-MaxBufferSize = 3
-SamplingInterval = '1s'
-
-[NodePool]
-PollFailureThreshold = 5
-PollInterval = '10s'
-SelectionMode = 'HighestHead'
-SyncThreshold = 10
-
-[OCR]
-ContractConfirmations = 1
-ContractTransmitterTransmitTimeout = '10s'
-DatabaseTimeout = '10s'
-ObservationGracePeriod = '1s'
-
-[OCR2]
-[OCR2.Automation]
-GasLimit = 6500000
-```
-
-</p></details>
-
 <details><summary>Arbitrum Mainnet (42161)</summary><p>
 
 ```toml
@@ -3312,7 +3141,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'arbitrum'
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0xf97f4df75117a78c1A5a0DBb814Af92458539FB4'
 LogBackfillBatchSize = 1000
 LogPollInterval = '1s'
@@ -3391,7 +3219,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'celo'
 FinalityDepth = 1
-FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '5s'
 LogKeepBlocksDepth = 100000
@@ -3468,7 +3295,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 1
-FinalityTagEnabled = false
 LinkContractAddress = '0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846'
 LogBackfillBatchSize = 1000
 LogPollInterval = '3s'
@@ -3546,7 +3372,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 1
-FinalityTagEnabled = false
 LinkContractAddress = '0x5947BB275c521040051D82396192181b413227A3'
 LogBackfillBatchSize = 1000
 LogPollInterval = '3s'
@@ -3625,7 +3450,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'celo'
 FinalityDepth = 1
-FinalityTagEnabled = false
 LogBackfillBatchSize = 1000
 LogPollInterval = '5s'
 LogKeepBlocksDepth = 100000
@@ -3702,7 +3526,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 500
-FinalityTagEnabled = false
 LinkContractAddress = '0x326C977E6efc84E512bB9C30f76E30c160eD06FB'
 LogBackfillBatchSize = 1000
 LogPollInterval = '1s'
@@ -3773,84 +3596,6 @@ GasLimit = 5300000
 
 </p></details>
 
-<details><summary>Base Goerli (84531)</summary><p>
-
-```toml
-AutoCreateKey = true
-BlockBackfillDepth = 10
-BlockBackfillSkip = false
-ChainType = 'optimismBedrock'
-FinalityDepth = 200
-FinalityTagEnabled = false
-LogBackfillBatchSize = 1000
-LogPollInterval = '2s'
-LogKeepBlocksDepth = 100000
-MinIncomingConfirmations = 1
-MinContractPayment = '0.00001 link'
-NonceAutoSync = true
-NoNewHeadsThreshold = '40s'
-RPCDefaultBatchSize = 250
-RPCBlockQueryDelay = 1
-
-[Transactions]
-ForwardersEnabled = false
-MaxInFlight = 16
-MaxQueued = 250
-ReaperInterval = '1h0m0s'
-ReaperThreshold = '168h0m0s'
-ResendAfterThreshold = '30s'
-
-[BalanceMonitor]
-Enabled = true
-
-[GasEstimator]
-Mode = 'BlockHistory'
-PriceDefault = '20 gwei'
-PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
-PriceMin = '1 wei'
-LimitDefault = 500000
-LimitMax = 500000
-LimitMultiplier = '1'
-LimitTransfer = 21000
-BumpMin = '100 wei'
-BumpPercent = 20
-BumpThreshold = 3
-EIP1559DynamicFees = true
-FeeCapDefault = '100 gwei'
-TipCapDefault = '1 wei'
-TipCapMin = '1 wei'
-
-[GasEstimator.BlockHistory]
-BatchSize = 25
-BlockHistorySize = 60
-CheckInclusionBlocks = 12
-CheckInclusionPercentile = 90
-TransactionPercentile = 60
-
-[HeadTracker]
-HistoryDepth = 300
-MaxBufferSize = 3
-SamplingInterval = '1s'
-
-[NodePool]
-PollFailureThreshold = 5
-PollInterval = '10s'
-SelectionMode = 'HighestHead'
-SyncThreshold = 10
-
-[OCR]
-ContractConfirmations = 1
-ContractTransmitterTransmitTimeout = '10s'
-DatabaseTimeout = '10s'
-ObservationGracePeriod = '1s'
-
-[OCR2]
-[OCR2.Automation]
-GasLimit = 6500000
-```
-
-</p></details>
-
 <details><summary>Arbitrum Rinkeby (421611)</summary><p>
 
 ```toml
@@ -3859,7 +3604,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'arbitrum'
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x615fBe6372676474d9e6933d310469c9b68e9726'
 LogBackfillBatchSize = 1000
 LogPollInterval = '1s'
@@ -3938,7 +3682,6 @@ BlockBackfillDepth = 10
 BlockBackfillSkip = false
 ChainType = 'arbitrum'
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28'
 LogBackfillBatchSize = 1000
 LogPollInterval = '1s'
@@ -4009,160 +3752,6 @@ GasLimit = 5300000
 
 </p></details>
 
-<details><summary>Scroll Sepolia (534351)</summary><p>
-
-```toml
-AutoCreateKey = true
-BlockBackfillDepth = 10
-BlockBackfillSkip = false
-FinalityDepth = 1
-FinalityTagEnabled = false
-LogBackfillBatchSize = 1000
-LogPollInterval = '3s'
-LogKeepBlocksDepth = 100000
-MinIncomingConfirmations = 1
-MinContractPayment = '0.00001 link'
-NonceAutoSync = true
-NoNewHeadsThreshold = '0s'
-RPCDefaultBatchSize = 250
-RPCBlockQueryDelay = 1
-
-[Transactions]
-ForwardersEnabled = false
-MaxInFlight = 16
-MaxQueued = 250
-ReaperInterval = '1h0m0s'
-ReaperThreshold = '168h0m0s'
-ResendAfterThreshold = '1m0s'
-
-[BalanceMonitor]
-Enabled = true
-
-[GasEstimator]
-Mode = 'L2Suggested'
-PriceDefault = '20 gwei'
-PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
-PriceMin = '0'
-LimitDefault = 500000
-LimitMax = 500000
-LimitMultiplier = '1'
-LimitTransfer = 21000
-BumpMin = '5 gwei'
-BumpPercent = 20
-BumpThreshold = 0
-EIP1559DynamicFees = false
-FeeCapDefault = '100 gwei'
-TipCapDefault = '1 wei'
-TipCapMin = '1 wei'
-
-[GasEstimator.BlockHistory]
-BatchSize = 25
-BlockHistorySize = 0
-CheckInclusionBlocks = 12
-CheckInclusionPercentile = 90
-TransactionPercentile = 60
-
-[HeadTracker]
-HistoryDepth = 50
-MaxBufferSize = 3
-SamplingInterval = '1s'
-
-[NodePool]
-PollFailureThreshold = 5
-PollInterval = '10s'
-SelectionMode = 'HighestHead'
-SyncThreshold = 5
-
-[OCR]
-ContractConfirmations = 1
-ContractTransmitterTransmitTimeout = '10s'
-DatabaseTimeout = '10s'
-ObservationGracePeriod = '1s'
-
-[OCR2]
-[OCR2.Automation]
-GasLimit = 5300000
-```
-
-</p></details>
-
-<details><summary>Scroll Mainnet (534352)</summary><p>
-
-```toml
-AutoCreateKey = true
-BlockBackfillDepth = 10
-BlockBackfillSkip = false
-FinalityDepth = 1
-FinalityTagEnabled = false
-LogBackfillBatchSize = 1000
-LogPollInterval = '3s'
-LogKeepBlocksDepth = 100000
-MinIncomingConfirmations = 1
-MinContractPayment = '0.00001 link'
-NonceAutoSync = true
-NoNewHeadsThreshold = '0s'
-RPCDefaultBatchSize = 250
-RPCBlockQueryDelay = 1
-
-[Transactions]
-ForwardersEnabled = false
-MaxInFlight = 16
-MaxQueued = 250
-ReaperInterval = '1h0m0s'
-ReaperThreshold = '168h0m0s'
-ResendAfterThreshold = '1m0s'
-
-[BalanceMonitor]
-Enabled = true
-
-[GasEstimator]
-Mode = 'L2Suggested'
-PriceDefault = '20 gwei'
-PriceMax = '115792089237316195423570985008687907853269984665.640564039457584007913129639935 tether'
-PriceMin = '0'
-LimitDefault = 500000
-LimitMax = 500000
-LimitMultiplier = '1'
-LimitTransfer = 21000
-BumpMin = '5 gwei'
-BumpPercent = 20
-BumpThreshold = 0
-EIP1559DynamicFees = false
-FeeCapDefault = '100 gwei'
-TipCapDefault = '1 wei'
-TipCapMin = '1 wei'
-
-[GasEstimator.BlockHistory]
-BatchSize = 25
-BlockHistorySize = 0
-CheckInclusionBlocks = 12
-CheckInclusionPercentile = 90
-TransactionPercentile = 60
-
-[HeadTracker]
-HistoryDepth = 50
-MaxBufferSize = 3
-SamplingInterval = '1s'
-
-[NodePool]
-PollFailureThreshold = 5
-PollInterval = '10s'
-SelectionMode = 'HighestHead'
-SyncThreshold = 5
-
-[OCR]
-ContractConfirmations = 1
-ContractTransmitterTransmitTimeout = '10s'
-DatabaseTimeout = '10s'
-ObservationGracePeriod = '1s'
-
-[OCR2]
-[OCR2.Automation]
-GasLimit = 5300000
-```
-
-</p></details>
-
 <details><summary>Ethereum Sepolia (11155111)</summary><p>
 
 ```toml
@@ -4170,7 +3759,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0xb227f007804c16546Bd054dfED2E7A1fD5437678'
 LogBackfillBatchSize = 1000
 LogPollInterval = '15s'
@@ -4248,7 +3836,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x218532a12a389a4a92fC0C5Fb22901D1c19198aA'
 LogBackfillBatchSize = 1000
 LogPollInterval = '2s'
@@ -4326,7 +3913,6 @@ AutoCreateKey = true
 BlockBackfillDepth = 10
 BlockBackfillSkip = false
 FinalityDepth = 50
-FinalityTagEnabled = false
 LinkContractAddress = '0x8b12Ac23BFe11cAb03a634C1F117D64a7f2cFD3e'
 LogBackfillBatchSize = 1000
 LogPollInterval = '2s'
@@ -4460,13 +4046,6 @@ A transaction is sent at block height 42
 A re-org occurs at height 44 starting at block 41, transaction is marked for rebroadcast
 A re-org occurs at height 46 starting at block 41, transaction is marked for rebroadcast
 A re-org occurs at height 47 starting at block 41, transaction is NOT marked for rebroadcast
-
-### FinalityTagEnabled
-```toml
-FinalityTagEnabled = false # Default
-```
-FinalityTagEnabled means that the chain supports the finalized block tag when querying for a block. If FinalityTagEnabled is set to true for a chain, then FinalityDepth field is ignored.
-Finality for a block is solely defined by the finality related tags provided by the chain's RPC API. This is a placeholder and hasn't been implemented yet.
 
 ### FlagsContractAddress
 :warning: **_ADVANCED_**: _Do not change this setting unless you know what you are doing._
@@ -5138,7 +4717,7 @@ Enabled = true # Default
 BlockRate = '6s' # Default
 BlocksUntilTxTimeout = 30 # Default
 ConfirmPollPeriod = '1s' # Default
-FallbackGasPrice = '0.015' # Default
+FallbackGasPriceUAtom = '0.015' # Default
 FCDURL = 'http://cosmos.com' # Example
 GasLimitMultiplier = '1.5' # Default
 MaxMsgsPerBatch = 100 # Default
@@ -5178,11 +4757,11 @@ ConfirmPollPeriod = '1s' # Default
 ```
 ConfirmPollPeriod sets how often check for tx confirmation.
 
-### FallbackGasPrice
+### FallbackGasPriceUAtom
 ```toml
-FallbackGasPrice = '0.015' # Default
+FallbackGasPriceUAtom = '0.015' # Default
 ```
-FallbackGasPrice sets a fallback gas price to use when the estimator is not available.
+FallbackGasPriceUAtom sets a fallback gas price to use when the estimator is not available.
 
 ### FCDURL
 ```toml

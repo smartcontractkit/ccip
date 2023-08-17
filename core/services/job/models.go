@@ -248,7 +248,7 @@ type OCROracleSpec struct {
 	ContractConfigTrackerPollIntervalEnv      bool
 	ContractConfigConfirmations               uint16 `toml:"contractConfigConfirmations"`
 	ContractConfigConfirmationsEnv            bool
-	EVMChainID                                *utils.Big       `toml:"evmChainID" db:"evm_chain_id"`
+	EVMChainID                                *utils.Big       `toml:"evmChainID"                             db:"evm_chain_id"`
 	DatabaseTimeout                           *models.Interval `toml:"databaseTimeout"`
 	DatabaseTimeoutEnv                        bool
 	ObservationGracePeriod                    *models.Interval `toml:"observationGracePeriod"`
@@ -322,13 +322,11 @@ func (r JSONConfig) MercuryCredentialName() (string, error) {
 	return name, nil
 }
 
-var ForwardersSupportedPlugins = []OCR2PluginType{Median, DKG, OCR2VRF, OCR2Keeper, OCR2Functions}
-
 // OCR2PluginType defines supported OCR2 plugin types.
 type OCR2PluginType string
 
 const (
-	// Median refers to the median.Median type
+	// Median refers to the median.Median plugin
 	Median OCR2PluginType = "median"
 
 	DKG OCR2PluginType = "dkg"
@@ -342,6 +340,11 @@ const (
 
 	OCR2Functions OCR2PluginType = "functions"
 
+	// CCIPCommit refers to the ccip.CCIPCommit plugin
+	CCIPCommit OCR2PluginType = "ccip-commit"
+	// CCIPExecution refers to the ccip.CCIPExecution plugin
+	CCIPExecution OCR2PluginType = "ccip-execution"
+
 	Mercury OCR2PluginType = "mercury"
 )
 
@@ -350,7 +353,7 @@ const (
 type OCR2OracleSpec struct {
 	ID                                int32           `toml:"-"`
 	ContractID                        string          `toml:"contractID"`
-	FeedID                            *common.Hash    `toml:"feedID"`
+	FeedID                            common.Hash     `toml:"feedID"`
 	Relay                             relay.Network   `toml:"relay"`
 	RelayConfig                       JSONConfig      `toml:"relayConfig"`
 	P2PV2Bootstrappers                pq.StringArray  `toml:"p2pv2Bootstrappers"`
@@ -365,7 +368,6 @@ type OCR2OracleSpec struct {
 	CreatedAt                         time.Time       `toml:"-"`
 	UpdatedAt                         time.Time       `toml:"-"`
 	CaptureEATelemetry                bool            `toml:"captureEATelemetry"`
-	CaptureAutomationCustomTelemetry  bool            `toml:"captureAutomationCustomTelemetry"`
 }
 
 // GetID is a getter function that returns the ID of the spec.
@@ -394,8 +396,8 @@ type ExternalInitiatorWebhookSpec struct {
 type WebhookSpec struct {
 	ID                            int32 `toml:"-"`
 	ExternalInitiatorWebhookSpecs []ExternalInitiatorWebhookSpec
-	CreatedAt                     time.Time `json:"createdAt" toml:"-"`
-	UpdatedAt                     time.Time `json:"updatedAt" toml:"-"`
+	CreatedAt                     time.Time `toml:"-"`
+	UpdatedAt                     time.Time `toml:"-"`
 }
 
 func (w WebhookSpec) GetID() string {
@@ -539,10 +541,6 @@ type BlockhashStoreSpec struct {
 	// no V2 coordinator will be watched.
 	CoordinatorV2Address *ethkey.EIP55Address `toml:"coordinatorV2Address"`
 
-	// CoordinatorV2PlusAddress is the VRF V2Plus coordinator to watch for unfulfilled requests. If empty,
-	// no V2Plus coordinator will be watched.
-	CoordinatorV2PlusAddress *ethkey.EIP55Address `toml:"coordinatorV2PlusAddress"`
-
 	// LookbackBlocks defines the maximum age of blocks whose hashes should be stored.
 	LookbackBlocks int32 `toml:"lookbackBlocks"`
 
@@ -552,12 +550,6 @@ type BlockhashStoreSpec struct {
 	// BlockhashStoreAddress is the address of the BlockhashStore contract to store blockhashes
 	// into.
 	BlockhashStoreAddress ethkey.EIP55Address `toml:"blockhashStoreAddress"`
-
-	// BatchBlockhashStoreAddress is the address of the trusted BlockhashStore contract to store blockhashes
-	TrustedBlockhashStoreAddress *ethkey.EIP55Address `toml:"trustedBlockhashStoreAddress"`
-
-	// BatchBlockhashStoreBatchSize is the number of blockhashes to store in a single batch
-	TrustedBlockhashStoreBatchSize int32 `toml:"trustedBlockhashStoreBatchSize"`
 
 	// PollPeriod defines how often recent blocks should be scanned for blockhash storage.
 	PollPeriod time.Duration `toml:"pollPeriod"`
@@ -589,10 +581,6 @@ type BlockHeaderFeederSpec struct {
 	// CoordinatorV2Address is the VRF V2 coordinator to watch for unfulfilled requests. If empty,
 	// no V2 coordinator will be watched.
 	CoordinatorV2Address *ethkey.EIP55Address `toml:"coordinatorV2Address"`
-
-	// CoordinatorV2PlusAddress is the VRF V2Plus coordinator to watch for unfulfilled requests. If empty,
-	// no V2Plus coordinator will be watched.
-	CoordinatorV2PlusAddress *ethkey.EIP55Address `toml:"coordinatorV2PlusAddress"`
 
 	// LookbackBlocks defines the maximum age of blocks whose hashes should be stored.
 	LookbackBlocks int32 `toml:"lookbackBlocks"`
@@ -683,6 +671,9 @@ type LegacyGasStationSidecarSpec struct {
 
 	// CCIPChainSelector is the CCIP chain selector that corresponds to EVMChainID param
 	CCIPChainSelector *utils.Big `toml:"ccipChainSelector"`
+
+	// StatusUpdateURL is the endpoint URL where the sidecar posts status updates
+	StatusUpdateURL string `toml:"statusUpdateURL"`
 
 	// CreatedAt is the time this job was created.
 	CreatedAt time.Time `toml:"-"`

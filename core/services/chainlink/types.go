@@ -2,7 +2,7 @@ package chainlink
 
 import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/cosmos"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/solana"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/starknet"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
@@ -12,7 +12,7 @@ import (
 
 type GeneralConfig interface {
 	config.AppConfig
-	toml.HasEVMConfigs
+	v2.HasEVMConfigs
 	CosmosConfigs() cosmos.CosmosConfigs
 	SolanaConfigs() solana.SolanaConfigs
 	StarknetConfigs() starknet.StarknetConfigs

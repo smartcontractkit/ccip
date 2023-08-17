@@ -11,7 +11,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -248,9 +247,6 @@ func TestTxm_CreateTransaction(t *testing.T) {
 		pgtest.MustExec(t, db, `DELETE FROM eth_txes`)
 		testDefaultSubID := uint64(2)
 		testDefaultMaxLink := "1000000000000000000"
-		testDefaultMaxEth := "2000000000000000000"
-		// max uint256 is 1.1579209e+77
-		testDefaultGlobalSubID := crypto.Keccak256Hash([]byte("sub id")).String()
 		jobID := int32(25)
 		requestID := gethcommon.HexToHash("abcd")
 		requestTxHash := gethcommon.HexToHash("dcba")
@@ -259,9 +255,7 @@ func TestTxm_CreateTransaction(t *testing.T) {
 			RequestID:     &requestID,
 			RequestTxHash: &requestTxHash,
 			MaxLink:       &testDefaultMaxLink, // 1e18
-			MaxEth:        &testDefaultMaxEth,  // 2e18
 			SubID:         &testDefaultSubID,
-			GlobalSubID:   &testDefaultGlobalSubID,
 		}
 		evmConfig.maxQueued = uint64(1)
 		checker := txmgr.TransmitCheckerSpec{
@@ -401,9 +395,6 @@ func (g *gasEstimatorConfig) PriceMax() *assets.Wei                { return asse
 func (g *gasEstimatorConfig) PriceMin() *assets.Wei                { return assets.NewWeiI(42) }
 func (g *gasEstimatorConfig) Mode() string                         { return "FixedPrice" }
 func (g *gasEstimatorConfig) LimitJobType() evmconfig.LimitJobType { return &limitJobTypeConfig{} }
-func (e *gasEstimatorConfig) PriceMaxKey(addr common.Address) *assets.Wei {
-	return assets.NewWeiI(42)
-}
 
 type limitJobTypeConfig struct {
 }
@@ -441,18 +432,17 @@ type mockConfig struct {
 	evmConfig           *evmConfig
 	rpcDefaultBatchSize uint32
 	finalityDepth       uint32
-	finalityTagEnabled  bool
 }
 
 func (c *mockConfig) EVM() evmconfig.EVM {
 	return c.evmConfig
 }
 
-func (c *mockConfig) NonceAutoSync() bool         { return true }
-func (c *mockConfig) ChainType() config.ChainType { return "" }
-func (c *mockConfig) FinalityDepth() uint32       { return c.finalityDepth }
-func (c *mockConfig) FinalityTagEnabled() bool    { return c.finalityTagEnabled }
-func (c *mockConfig) RPCDefaultBatchSize() uint32 { return c.rpcDefaultBatchSize }
+func (c *mockConfig) NonceAutoSync() bool                                  { return true }
+func (c *mockConfig) ChainType() config.ChainType                          { return "" }
+func (c *mockConfig) FinalityDepth() uint32                                { return c.finalityDepth }
+func (c *mockConfig) KeySpecificMaxGasPriceWei(common.Address) *assets.Wei { return assets.NewWeiI(0) }
+func (c *mockConfig) RPCDefaultBatchSize() uint32                          { return c.rpcDefaultBatchSize }
 
 func makeConfigs(t *testing.T) (*mockConfig, *databaseConfig, *evmConfig) {
 	db := &databaseConfig{defaultQueryTimeout: pg.DefaultQueryTimeout}

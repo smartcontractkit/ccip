@@ -1,7 +1,6 @@
 [profile.default]
-auto_detect_solc = true
 optimizer = true
-optimizer_runs = 1_000_000
+optimizer_runs = 26_000
 
 src = 'src/v0.8'
 test = 'test/v0.8/foundry'
@@ -16,21 +15,30 @@ gas_price = 1
 block_timestamp = 1234567890
 block_number = 12345
 
-[profile.functions]
+[profile.shared]
 solc_version = '0.8.19'
+src = 'src/v0.8/shared'
+test = 'src/v0.8/shared/test'
+
+[profile.ccip]
+solc_version = '0.8.19'
+src = 'src/v0.8/ccip'
+test = 'src/v0.8/ccip/test'
+
+[profile.metatx]
+solc_version = '0.8.15'
+src = 'src/v0.8/metatx'
+test = 'src/v0.8/metatx/test'
+
+[profile.functions]
+solc_version = '0.8.6'
 src = 'src/v0.8/functions'
 test = 'src/v0.8/functions/tests'
 
 [profile.vrf]
-optimizer_runs = 1000
-src = 'src/v0.8/vrf'
-test = 'test/v0.8/foundry/vrf' # skips tests for no VRF foundry tests
-solc_version = '0.8.6'
-
-[profile.automation]
 optimizer_runs = 10000
-src = 'src/v0.8/automation'
-test = 'src/v0.8/automation/test'
+src = 'src/v0.8/vrf'
+test = 'src/v0.8/vrf' # skips tests for no VRF foundry tests
 solc_version = '0.8.6'
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

@@ -32,7 +32,7 @@ var ContractDeploymentInterval = 200
 
 // FundChainlinkNodes will fund all of the provided Chainlink nodes with a set amount of native currency
 func FundChainlinkNodes(
-	nodes []*client.ChainlinkK8sClient,
+	nodes []*client.Chainlink,
 	client blockchain.EVMClient,
 	amount *big.Float,
 ) error {
@@ -41,13 +41,7 @@ func FundChainlinkNodes(
 		if err != nil {
 			return err
 		}
-		recipient := common.HexToAddress(toAddress)
-		msg := ethereum.CallMsg{
-			From:  common.HexToAddress(client.GetDefaultWallet().Address()),
-			To:    &recipient,
-			Value: utils.EtherToWei(amount),
-		}
-		gasEstimates, err := client.EstimateGas(msg)
+		gasEstimates, err := client.EstimateGas(ethereum.CallMsg{})
 		if err != nil {
 			return err
 		}
@@ -61,7 +55,7 @@ func FundChainlinkNodes(
 
 // FundChainlinkNodesAddress will fund all of the provided Chainlink nodes address at given index with a set amount of native currency
 func FundChainlinkNodesAddress(
-	nodes []*client.ChainlinkK8sClient,
+	nodes []*client.Chainlink,
 	client blockchain.EVMClient,
 	amount *big.Float,
 	keyIndex int,
@@ -85,7 +79,7 @@ func FundChainlinkNodesAddress(
 
 // FundChainlinkNodesAddress will fund all of the provided Chainlink nodes addresses with a set amount of native currency
 func FundChainlinkNodesAddresses(
-	nodes []*client.ChainlinkK8sClient,
+	nodes []*client.Chainlink,
 	client blockchain.EVMClient,
 	amount *big.Float,
 ) error {
@@ -110,7 +104,7 @@ func FundChainlinkNodesAddresses(
 
 // FundChainlinkNodes will fund all of the provided Chainlink nodes with a set amount of native currency
 func FundChainlinkNodesLink(
-	nodes []*client.ChainlinkK8sClient,
+	nodes []*client.Chainlink,
 	blockchain blockchain.EVMClient,
 	linkToken contracts.LinkToken,
 	linkAmount *big.Int,
@@ -129,7 +123,7 @@ func FundChainlinkNodesLink(
 }
 
 // ChainlinkNodeAddresses will return all the on-chain wallet addresses for a set of Chainlink nodes
-func ChainlinkNodeAddresses(nodes []*client.ChainlinkK8sClient) ([]common.Address, error) {
+func ChainlinkNodeAddresses(nodes []*client.Chainlink) ([]common.Address, error) {
 	addresses := make([]common.Address, 0)
 	for _, node := range nodes {
 		primaryAddress, err := node.PrimaryEthAddress()
@@ -142,7 +136,7 @@ func ChainlinkNodeAddresses(nodes []*client.ChainlinkK8sClient) ([]common.Addres
 }
 
 // ChainlinkNodeAddressesAtIndex will return all the on-chain wallet addresses for a set of Chainlink nodes
-func ChainlinkNodeAddressesAtIndex(nodes []*client.ChainlinkK8sClient, keyIndex int) ([]common.Address, error) {
+func ChainlinkNodeAddressesAtIndex(nodes []*client.Chainlink, keyIndex int) ([]common.Address, error) {
 	addresses := make([]common.Address, 0)
 	for _, node := range nodes {
 		nodeAddresses, err := node.EthAddresses()
@@ -155,7 +149,7 @@ func ChainlinkNodeAddressesAtIndex(nodes []*client.ChainlinkK8sClient, keyIndex 
 }
 
 // SetChainlinkAPIPageSize specifies the page size from the Chainlink API, useful for high volume testing
-func SetChainlinkAPIPageSize(nodes []*client.ChainlinkK8sClient, pageSize int) {
+func SetChainlinkAPIPageSize(nodes []*client.Chainlink, pageSize int) {
 	for _, n := range nodes {
 		n.SetPageSize(pageSize)
 	}
@@ -198,7 +192,7 @@ func EncodeOnChainVRFProvingKey(vrfKey client.VRFKey) ([2]*big.Int, error) {
 // GetMockserverInitializerDataForOTPE creates mocked weiwatchers data needed for otpe
 func GetMockserverInitializerDataForOTPE(
 	OCRInstances []contracts.OffchainAggregator,
-	chainlinkNodes []*client.ChainlinkK8sClient,
+	chainlinkNodes []*client.Chainlink,
 ) (interface{}, error) {
 	var contractsInfo []ctfClient.ContractInfoJSON
 
@@ -246,7 +240,7 @@ func TeardownSuite(
 	t *testing.T,
 	env *environment.Environment,
 	logsFolderPath string,
-	chainlinkNodes []*client.ChainlinkK8sClient,
+	chainlinkNodes []*client.Chainlink,
 	optionalTestReporter testreporters.TestReporter, // Optionally pass in a test reporter to log further metrics
 	failingLogLevel zapcore.Level, // Examines logs after the test, and fails the test if any Chainlink logs are found at or above provided level
 	clients ...blockchain.EVMClient,
@@ -290,14 +284,14 @@ func TeardownSuite(
 // soak tests
 func TeardownRemoteSuite(
 	t *testing.T,
-	namespace string,
-	chainlinkNodes []*client.ChainlinkK8sClient,
+	env *environment.Environment,
+	chainlinkNodes []*client.Chainlink,
 	optionalTestReporter testreporters.TestReporter, // Optionally pass in a test reporter to log further metrics
 	client blockchain.EVMClient,
 ) error {
 	l := utils.GetTestLogger(t)
 	var err error
-	if err = testreporters.SendReport(t, namespace, "./", optionalTestReporter); err != nil {
+	if err = testreporters.SendReport(t, env, "./", optionalTestReporter); err != nil {
 		l.Warn().Err(err).Msg("Error writing test report")
 	}
 	// Delete all jobs to stop depleting the funds
@@ -307,18 +301,15 @@ func TeardownRemoteSuite(
 	}
 
 	if err = returnFunds(chainlinkNodes, client); err != nil {
-		l.Error().Err(err).Str("Namespace", namespace).
+		l.Error().Err(err).Str("Namespace", env.Cfg.Namespace).
 			Msg("Error attempting to return funds from chainlink nodes to network's default wallet. " +
 				"Environment is left running so you can try manually!")
 	}
 	return err
 }
 
-func DeleteAllJobs(chainlinkNodes []*client.ChainlinkK8sClient) error {
+func DeleteAllJobs(chainlinkNodes []*client.Chainlink) error {
 	for _, node := range chainlinkNodes {
-		if node == nil {
-			return fmt.Errorf("found a nil chainlink node in the list of chainlink nodes while tearing down: %v", chainlinkNodes)
-		}
 		jobs, _, err := node.ReadJobs()
 		if err != nil {
 			return errors.Wrap(err, "error reading jobs from chainlink node")
@@ -338,9 +329,9 @@ func DeleteAllJobs(chainlinkNodes []*client.ChainlinkK8sClient) error {
 }
 
 // Returns all the funds from the chainlink nodes to the networks default address
-func returnFunds(chainlinkNodes []*client.ChainlinkK8sClient, blockchainClient blockchain.EVMClient) error {
+func returnFunds(chainlinkNodes []*client.Chainlink, blockchainClient blockchain.EVMClient) error {
 	if blockchainClient == nil {
-		return errors.New("blockchain client is nil, unable to return funds from chainlink nodes")
+		log.Warn().Msg("No blockchain client found, unable to return funds from chainlink nodes.")
 	}
 	log.Info().Msg("Attempting to return Chainlink node funds to default network wallets")
 	if blockchainClient.NetworkSimulated() {
@@ -400,7 +391,7 @@ func EncodeOnChainExternalJobID(jobID uuid.UUID) [32]byte {
 func UpgradeChainlinkNodeVersions(
 	testEnvironment *environment.Environment,
 	newImage, newVersion string,
-	nodes ...*client.ChainlinkK8sClient,
+	nodes ...*client.Chainlink,
 ) error {
 	if newImage == "" && newVersion == "" {
 		return errors.New("unable to upgrade node version, found empty image and version, must provide either a new image or a new version")
@@ -415,20 +406,4 @@ func UpgradeChainlinkNodeVersions(
 		return err
 	}
 	return client.ReconnectChainlinkNodes(testEnvironment, nodes)
-}
-
-func DeployLINKToken(cd contracts.ContractDeployer) (contracts.LinkToken, error) {
-	linkToken, err := cd.DeployLinkTokenContract()
-	if err != nil {
-		return nil, err
-	}
-	return linkToken, err
-}
-
-func DeployMockETHLinkFeed(cd contracts.ContractDeployer, answer *big.Int) (contracts.MockETHLINKFeed, error) {
-	mockETHLINKFeed, err := cd.DeployMockETHLINKFeed(answer)
-	if err != nil {
-		return nil, err
-	}
-	return mockETHLINKFeed, err
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/binary"
-	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -19,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
+var _ types.ConfigPoller = &configPoller{}
+
 type FunctionsPluginType int
 
 const (
@@ -29,13 +30,11 @@ const (
 
 type configPoller struct {
 	lggr               logger.Logger
+	filterName         string
 	destChainLogPoller logpoller.LogPoller
-	targetContract     atomic.Pointer[common.Address]
+	addr               common.Address
 	pluginType         FunctionsPluginType
 }
-
-var _ types.ConfigPoller = &configPoller{}
-var _ types.RouteUpdateSubscriber = &configPoller{}
 
 // ConfigSet Common to all OCR2 evm based contracts: https://github.com/smartcontractkit/libocr/blob/master/contract2/dev/OCR2Abstract.sol
 var ConfigSet common.Hash
@@ -104,15 +103,23 @@ func configFromLog(logData []byte, pluginType FunctionsPluginType) (ocrtypes.Con
 }
 
 func configPollerFilterName(addr common.Address) string {
-	return logpoller.FilterName("FunctionsOCR2ConfigPoller", addr.String())
+	return logpoller.FilterName("OCR2ConfigPoller", addr.String())
 }
 
-func NewFunctionsConfigPoller(pluginType FunctionsPluginType, destChainPoller logpoller.LogPoller, lggr logger.Logger) (*configPoller, error) {
+func NewFunctionsConfigPoller(pluginType FunctionsPluginType, destChainPoller logpoller.LogPoller, addr common.Address, lggr logger.Logger) (types.ConfigPoller, error) {
+	err := destChainPoller.RegisterFilter(logpoller.Filter{Name: configPollerFilterName(addr), EventSigs: []common.Hash{ConfigSet}, Addresses: []common.Address{addr}})
+	if err != nil {
+		return nil, err
+	}
+
 	cp := &configPoller{
 		lggr:               lggr,
+		filterName:         configPollerFilterName(addr),
 		destChainLogPoller: destChainPoller,
+		addr:               addr,
 		pluginType:         pluginType,
 	}
+
 	return cp, nil
 }
 
@@ -131,12 +138,7 @@ func (cp *configPoller) Replay(ctx context.Context, fromBlock int64) error {
 }
 
 func (cp *configPoller) LatestConfigDetails(ctx context.Context) (changedInBlock uint64, configDigest ocrtypes.ConfigDigest, err error) {
-	contractAddr := cp.targetContract.Load()
-	if contractAddr == nil {
-		return 0, ocrtypes.ConfigDigest{}, nil
-	}
-
-	latest, err := cp.destChainLogPoller.LatestLogByEventSigWithConfs(ConfigSet, *contractAddr, 1, pg.WithParentCtx(ctx))
+	latest, err := cp.destChainLogPoller.LatestLogByEventSigWithConfs(ConfigSet, cp.addr, 1, pg.WithParentCtx(ctx))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, ocrtypes.ConfigDigest{}, nil
@@ -151,14 +153,7 @@ func (cp *configPoller) LatestConfigDetails(ctx context.Context) (changedInBlock
 }
 
 func (cp *configPoller) LatestConfig(ctx context.Context, changedInBlock uint64) (ocrtypes.ContractConfig, error) {
-	// NOTE: if targetContract changes between invocations of LatestConfigDetails() and LatestConfig()
-	// (unlikely), we'll return an error here and libocr will re-try.
-	contractAddr := cp.targetContract.Load()
-	if contractAddr == nil {
-		return ocrtypes.ContractConfig{}, errors.New("no target contract address set yet")
-	}
-
-	lgs, err := cp.destChainLogPoller.Logs(int64(changedInBlock), int64(changedInBlock), ConfigSet, *contractAddr, pg.WithParentCtx(ctx))
+	lgs, err := cp.destChainLogPoller.Logs(int64(changedInBlock), int64(changedInBlock), ConfigSet, cp.addr, pg.WithParentCtx(ctx))
 	if err != nil {
 		return ocrtypes.ContractConfig{}, err
 	}
@@ -179,20 +174,4 @@ func (cp *configPoller) LatestBlockHeight(ctx context.Context) (blockHeight uint
 		return 0, err
 	}
 	return uint64(latest), nil
-}
-
-// called from LogPollerWrapper in a separate goroutine
-func (cp *configPoller) UpdateRoutes(activeCoordinator common.Address, proposedCoordinator common.Address) error {
-	cp.targetContract.Store(&activeCoordinator)
-	// Register filters for both active and proposed
-	err := cp.destChainLogPoller.RegisterFilter(logpoller.Filter{Name: configPollerFilterName(activeCoordinator), EventSigs: []common.Hash{ConfigSet}, Addresses: []common.Address{activeCoordinator}})
-	if err != nil {
-		return err
-	}
-	err = cp.destChainLogPoller.RegisterFilter(logpoller.Filter{Name: configPollerFilterName(proposedCoordinator), EventSigs: []common.Hash{ConfigSet}, Addresses: []common.Address{activeCoordinator}})
-	if err != nil {
-		return err
-	}
-	// TODO: unregister old filter (needs refactor to get pg.Queryer)
-	return nil
 }

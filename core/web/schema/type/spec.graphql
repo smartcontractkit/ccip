@@ -10,6 +10,8 @@ union JobSpec =
     BlockhashStoreSpec |
     BlockHeaderFeederSpec |
     BootstrapSpec |
+    LegacyGasStationServerSpec |
+    LegacyGasStationSidecarSpec |
     GatewaySpec
 
 type CronSpec {
@@ -91,7 +93,7 @@ type OCR2Spec {
     transmitterID: String
     pluginType: String!
     pluginConfig: Map!
-    feedID: String
+    feedID: String!
 }
 
 type VRFSpec {
@@ -122,12 +124,9 @@ type WebhookSpec {
 type BlockhashStoreSpec {
     coordinatorV1Address: String
     coordinatorV2Address: String
-    coordinatorV2PlusAddress: String
     waitBlocks: Int!
     lookbackBlocks: Int!
     blockhashStoreAddress: String!
-    trustedBlockhashStoreAddress: String
-    trustedBlockhashStoreBatchSize: Int!
     pollPeriod: String!
     runTimeout: String!
     evmChainID: String
@@ -138,7 +137,6 @@ type BlockhashStoreSpec {
 type BlockHeaderFeederSpec {
     coordinatorV1Address: String
     coordinatorV2Address: String
-    coordinatorV2PlusAddress: String
     waitBlocks: Int!
     lookbackBlocks: Int!
     blockhashStoreAddress: String!
@@ -161,6 +159,26 @@ type BootstrapSpec {
     blockchainTimeout: String
     contractConfigTrackerPollInterval: String
     contractConfigConfirmations: Int
+    createdAt: Time!
+}
+
+type LegacyGasStationServerSpec {
+    forwarderAddress: String!
+    evmChainID: String
+    ccipChainSelector: String
+    fromAddresses: [String!]
+    createdAt: Time!
+}
+
+type LegacyGasStationSidecarSpec {
+    forwarderAddress: String!
+    offRampAddress: String!
+    lookbackBlocks: Int!
+    pollPeriod: String!
+    runTimeout: String!
+    evmChainID: String
+    ccipChainSelector: String
+    statusUpdateURL: String!
     createdAt: Time!
 }
 

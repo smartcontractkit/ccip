@@ -1,9 +1,9 @@
 package chainlink
 
-import "github.com/smartcontractkit/chainlink/v2/core/config/toml"
+import v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 
 type thresholdConfig struct {
-	s toml.ThresholdKeyShareSecrets
+	s v2.ThresholdKeyShareSecrets
 }
 
 func (t *thresholdConfig) ThresholdKeyShare() string {

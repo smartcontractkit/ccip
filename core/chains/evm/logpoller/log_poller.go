@@ -20,7 +20,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services"
@@ -45,7 +44,6 @@ type LogPoller interface {
 	LogsCreatedAfter(eventSig common.Hash, address common.Address, time time.Time, confs int, qopts ...pg.QOpt) ([]Log, error)
 	LatestLogByEventSigWithConfs(eventSig common.Hash, address common.Address, confs int, qopts ...pg.QOpt) (*Log, error)
 	LatestLogEventSigsAddrsWithConfs(fromBlock int64, eventSigs []common.Hash, addresses []common.Address, confs int, qopts ...pg.QOpt) ([]Log, error)
-	LatestBlockByEventSigsAddrsWithConfs(fromBlock int64, eventSigs []common.Hash, addresses []common.Address, confs int, qopts ...pg.QOpt) (int64, error)
 
 	// Content based querying
 	IndexedLogs(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error)
@@ -56,6 +54,7 @@ type LogPoller interface {
 	IndexedLogsWithSigsExcluding(address common.Address, eventSigA, eventSigB common.Hash, topicIndex int, fromBlock, toBlock int64, confs int, qopts ...pg.QOpt) ([]Log, error)
 	LogsDataWordRange(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin, wordValueMax common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error)
 	LogsDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error)
+	LogsUntilBlockHashDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, untilBlockHash common.Hash, qopts ...pg.QOpt) ([]Log, error)
 }
 
 type LogPollerTest interface {
@@ -444,8 +443,7 @@ func (lp *logPoller) run() {
 					if err = loadFilters(); err != nil {
 						lp.lggr.Errorw("Failed loading filters during Replay", "err", err, "fromBlock", fromBlock)
 					}
-				}
-				if err == nil {
+				} else {
 					// Serially process replay requests.
 					lp.lggr.Infow("Executing replay", "fromBlock", fromBlock, "requested", fromBlockReq)
 					lp.PollAndSaveLogs(lp.ctx, fromBlock)
@@ -485,7 +483,7 @@ func (lp *logPoller) run() {
 				// Only safe thing to do is to start at the first finalized block.
 				latest, err := lp.ec.HeadByNumber(lp.ctx, nil)
 				if err != nil {
-					lp.lggr.Warnw("Unable to get latest for first poll", "err", err)
+					lp.lggr.Warnw("unable to get latest for first poll", "err", err)
 					continue
 				}
 				latestNum := latest.Number
@@ -493,7 +491,7 @@ func (lp *logPoller) run() {
 				// Could conceivably support this but not worth the effort.
 				// Need finality depth + 1, no block 0.
 				if latestNum <= lp.finalityDepth {
-					lp.lggr.Warnw("Insufficient number of blocks on chain, waiting for finality depth", "err", err, "latest", latestNum, "finality", lp.finalityDepth)
+					lp.lggr.Warnw("insufficient number of blocks on chain, waiting for finality depth", "err", err, "latest", latestNum, "finality", lp.finalityDepth)
 					continue
 				}
 				// Starting at the first finalized block. We do not backfill the first finalized block.
@@ -515,14 +513,14 @@ func (lp *logPoller) run() {
 
 			backupLogPollTick = time.After(utils.WithJitter(backupPollerBlockDelay * lp.pollPeriod))
 			if !filtersLoaded {
-				lp.lggr.Warnw("Backup log poller ran before filters loaded, skipping")
+				lp.lggr.Warnw("backup log poller ran before filters loaded, skipping")
 				continue
 			}
 			lp.BackupPollAndSaveLogs(lp.ctx, backupPollerBlockDelay)
 		case <-blockPruneTick:
 			blockPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 1000))
 			if err := lp.pruneOldBlocks(lp.ctx); err != nil {
-				lp.lggr.Errorw("Unable to prune old blocks", "err", err)
+				lp.lggr.Errorw("unable to prune old blocks", "err", err)
 			}
 		case <-logPruneTick:
 			logPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 2401)) // = 7^5 avoids common factors with 1000
@@ -627,33 +625,17 @@ func (lp *logPoller) blocksFromLogs(ctx context.Context, logs []types.Log) (bloc
 	return lp.GetBlocksRange(ctx, numbers)
 }
 
-const jsonRpcLimitExceeded = -32005 // See https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1474.md
-
 // backfill will query FilterLogs in batches for logs in the
 // block range [start, end] and save them to the db.
 // Retries until ctx cancelled. Will return an error if cancelled
 // or if there is an error backfilling.
 func (lp *logPoller) backfill(ctx context.Context, start, end int64) error {
-	batchSize := lp.backfillBatchSize
-	for from := start; from <= end; from += batchSize {
-		to := mathutil.Min(from+batchSize-1, end)
+	for from := start; from <= end; from += lp.backfillBatchSize {
+		to := mathutil.Min(from+lp.backfillBatchSize-1, end)
 		gethLogs, err := lp.ec.FilterLogs(ctx, lp.Filter(big.NewInt(from), big.NewInt(to), nil))
 		if err != nil {
-			var rpcErr client.JsonError
-			if errors.As(err, &rpcErr) {
-				if rpcErr.Code != jsonRpcLimitExceeded {
-					lp.lggr.Errorw("Unable to query for logs", "err", err, "from", from, "to", to)
-					return err
-				}
-			}
-			if batchSize == 1 {
-				lp.lggr.Criticalw("Too many log results in a single block, failed to retrieve logs! Node may run in a degraded state unless LogBackfillBatchSize is increased", "err", err, "from", from, "to", to, "LogBackfillBatchSize", lp.backfillBatchSize)
-				return err
-			}
-			batchSize /= 2
-			lp.lggr.Warnw("Too many log results, halving block range batch size.  Consider increasing LogBackfillBatchSize if this happens frequently", "err", err, "from", from, "to", to, "newBatchSize", batchSize, "LogBackfillBatchSize", lp.backfillBatchSize)
-			from -= batchSize // counteract +=batchSize on next loop iteration, so starting block does not change
-			continue
+			lp.lggr.Warnw("Unable query for logs, retrying", "err", err, "from", from, "to", to)
+			return err
 		}
 		if len(gethLogs) == 0 {
 			continue
@@ -955,6 +937,12 @@ func (lp *logPoller) LogsDataWordGreaterThan(eventSig common.Hash, address commo
 	return lp.orm.SelectDataWordGreaterThan(address, eventSig, wordIndex, wordValueMin, confs, qopts...)
 }
 
+// LogsUntilBlockHashDataWordGreaterThan note index is 0 based.
+// If the blockhash is not found (i.e. a stale fork) it will error.
+func (lp *logPoller) LogsUntilBlockHashDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, untilBlockHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	return lp.orm.SelectUntilBlockHashDataWordGreaterThan(address, eventSig, wordIndex, wordValueMin, untilBlockHash, qopts...)
+}
+
 // LogsDataWordRange note index is 0 based.
 func (lp *logPoller) LogsDataWordRange(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin, wordValueMax common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error) {
 	return lp.orm.SelectDataWordRange(address, eventSig, wordIndex, wordValueMin, wordValueMax, confs, qopts...)
@@ -992,10 +980,6 @@ func (lp *logPoller) LatestLogByEventSigWithConfs(eventSig common.Hash, address 
 
 func (lp *logPoller) LatestLogEventSigsAddrsWithConfs(fromBlock int64, eventSigs []common.Hash, addresses []common.Address, confs int, qopts ...pg.QOpt) ([]Log, error) {
 	return lp.orm.SelectLatestLogEventSigsAddrsWithConfs(fromBlock, addresses, eventSigs, confs, qopts...)
-}
-
-func (lp *logPoller) LatestBlockByEventSigsAddrsWithConfs(fromBlock int64, eventSigs []common.Hash, addresses []common.Address, confs int, qopts ...pg.QOpt) (int64, error) {
-	return lp.orm.SelectLatestBlockNumberEventSigsAddrsWithConfs(fromBlock, eventSigs, addresses, confs, qopts...)
 }
 
 // GetBlocksRange tries to get the specified block numbers from the log pollers
@@ -1077,7 +1061,7 @@ func (lp *logPoller) fillRemainingBlocksFromRPC(
 	}
 
 	if len(remainingBlocks) > 0 {
-		lp.lggr.Debugw("Falling back to RPC for blocks not found in log poller blocks table",
+		lp.lggr.Debugw("falling back to RPC for blocks not found in log poller blocks table",
 			"remainingBlocks", remainingBlocks)
 	}
 

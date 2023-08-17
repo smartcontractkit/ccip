@@ -1,11 +1,11 @@
 package chainlink
 
 import (
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 )
 
 type sentryConfig struct {
-	c toml.Sentry
+	c v2.Sentry
 }
 
 func (s sentryConfig) DSN() string {

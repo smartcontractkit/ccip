@@ -19,7 +19,6 @@ import (
 // https://github.com/smartcontractkit/offchain-reporting/blob/master/lib/offchainreporting2/reportingplugin/median/evmreportcodec/reportcodec.go
 
 var ReportTypes = getReportTypes()
-var maxReportLength = 32 * len(ReportTypes) // each arg is 256 bit EVM word
 
 func getReportTypes() abi.Arguments {
 	mustNewType := func(t string) abi.Type {
@@ -94,17 +93,17 @@ func (r *EVMReportCodec) BuildReport(paos []relaymercury.ParsedAttributedObserva
 	return ocrtypes.Report(reportBytes), errors.Wrap(err, "failed to pack report blob")
 }
 
-// Maximum length in bytes of Report returned by BuildReport. Used for
-// defending against spam attacks.
 func (r *EVMReportCodec) MaxReportLength(n int) (int, error) {
-	return maxReportLength, nil
-}
-
-func (r *EVMReportCodec) FeedIDFromReport(report ocrtypes.Report) (feedID [32]byte, err error) {
-	if n := copy(feedID[:], report); n != 32 {
-		return feedID, errors.Errorf("invalid length for report: %d", len(report))
-	}
-	return feedID, nil
+	return 8*32 + // feed ID
+			32 + // timestamp
+			192 + // benchmarkPrice
+			192 + // bid
+			192 + // ask
+			64 + //currentBlockNum
+			8*32 + // currentBlockHash
+			64 + // validFromBlockNum
+			64, // currentBlockTimestamp
+		nil
 }
 
 func (r *EVMReportCodec) CurrentBlockNumFromReport(report ocrtypes.Report) (int64, error) {

@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/store/dialects"
 )
 
 type backupConfig struct {
-	c toml.DatabaseBackup
-	s toml.DatabaseSecrets
+	c v2.DatabaseBackup
+	s v2.DatabaseSecrets
 }
 
 func (b *backupConfig) Dir() string {
@@ -35,7 +35,7 @@ func (b *backupConfig) URL() *url.URL {
 }
 
 type lockConfig struct {
-	c toml.DatabaseLock
+	c v2.DatabaseLock
 }
 
 func (l *lockConfig) LockingMode() string {
@@ -51,7 +51,7 @@ func (l *lockConfig) LeaseRefreshInterval() time.Duration {
 }
 
 type listenerConfig struct {
-	c toml.DatabaseListener
+	c v2.DatabaseListener
 }
 
 func (l *listenerConfig) MaxReconnectDuration() time.Duration {
@@ -69,8 +69,8 @@ func (l *listenerConfig) FallbackPollInterval() time.Duration {
 var _ config.Database = (*databaseConfig)(nil)
 
 type databaseConfig struct {
-	c      toml.Database
-	s      toml.DatabaseSecrets
+	c      v2.Database
+	s      v2.DatabaseSecrets
 	logSQL func() bool
 }
 

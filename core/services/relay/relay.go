@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
 	"github.com/smartcontractkit/chainlink-relay/pkg/types"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services"
 )
 
@@ -63,10 +64,6 @@ func (r *relayerAdapter) NewMedianProvider(ctx context.Context, rargs types.Rela
 
 func (r *relayerAdapter) NewMercuryProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.MercuryProvider, error) {
 	return r.Relayer.NewMercuryProvider(rargs, pargs)
-}
-
-func (r *relayerAdapter) NewFunctionsProvider(ctx context.Context, rargs types.RelayArgs, pargs types.PluginArgs) (types.FunctionsProvider, error) {
-	return r.Relayer.NewFunctionsProvider(rargs, pargs)
 }
 
 func (r *relayerAdapter) Start(ctx context.Context) error {

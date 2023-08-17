@@ -214,8 +214,8 @@ func TestShell_DiskMaxSizeBeforeRotateOptionDisablesAsExpected(t *testing.T) {
 			}
 			assert.NoError(t, os.MkdirAll(cfg.Dir, os.FileMode(0700)))
 
-			lggr, closeFn := cfg.New()
-			t.Cleanup(func() { assert.NoError(t, closeFn()) })
+			lggr, close := cfg.New()
+			t.Cleanup(func() { assert.NoError(t, close()) })
 
 			// Tries to create a log file by logging. The log file won't be created if there's no logging happening.
 			lggr.Debug("Trying to create a log file by logging.")

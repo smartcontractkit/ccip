@@ -8,7 +8,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/require"
 
-	evmtoml "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -58,7 +58,7 @@ ReaperThreshold = '1m0s'
 ResendAfterThreshold = '1h0m0s'
 `
 	)
-	var chain evmtoml.EVMConfig
+	var chain v2.EVMConfig
 	err := toml.Unmarshal([]byte(configTOML), &chain)
 	require.NoError(t, err)
 
@@ -72,7 +72,7 @@ ResendAfterThreshold = '1h0m0s'
 			before: func(f *gqlTestFramework) {
 				f.App.On("EVMORM").Return(f.Mocks.evmORM)
 
-				f.Mocks.evmORM.PutChains(evmtoml.EVMConfig{
+				f.Mocks.evmORM.PutChains(v2.EVMConfig{
 					ChainID: &chainID,
 					Enabled: chain.Enabled,
 					Chain:   chain.Chain,
@@ -145,7 +145,7 @@ ReaperThreshold = '1m0s'
 ResendAfterThreshold = '1h0m0s'
 `
 	)
-	var chain evmtoml.Chain
+	var chain v2.Chain
 	err := toml.Unmarshal([]byte(configTOML), &chain)
 	require.NoError(t, err)
 
@@ -158,7 +158,7 @@ ResendAfterThreshold = '1h0m0s'
 			authenticated: true,
 			before: func(f *gqlTestFramework) {
 				f.App.On("EVMORM").Return(f.Mocks.evmORM)
-				f.Mocks.evmORM.PutChains(evmtoml.EVMConfig{
+				f.Mocks.evmORM.PutChains(v2.EVMConfig{
 					ChainID: &chainID,
 					Chain:   chain,
 				})

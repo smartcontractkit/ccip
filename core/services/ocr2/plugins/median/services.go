@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
 	"github.com/smartcontractkit/chainlink-relay/pkg/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/config/env"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -103,10 +103,9 @@ func NewMedianServices(ctx context.Context,
 		CreatedAt:    time.Now(),
 	}, lggr)
 
-	if cmdName := env.MedianPluginCmd.Get(); cmdName != "" {
-
-		// use unique logger names so we can use it to register a loop
-		medianLggr := lggr.Named("Median").Named(spec.ContractID).Named(spec.GetID())
+	if cmdName := v2.EnvMedianPluginCmd.Get(); cmdName != "" {
+		medianLggr := lggr.Named("Median")
+		// use logger name to ensure unique naming
 		cmdFn, telem, err2 := cfg.RegisterLOOP(medianLggr.Name(), cmdName)
 		if err2 != nil {
 			err = fmt.Errorf("failed to register loop: %w", err2)
@@ -125,7 +124,7 @@ func NewMedianServices(ctx context.Context,
 		}
 	}
 
-	var oracle libocr.Oracle
+	var oracle *libocr.Oracle
 	oracle, err = libocr.NewOracle(argsNoPlugin)
 	if err != nil {
 		abort()

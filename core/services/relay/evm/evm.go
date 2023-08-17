@@ -33,7 +33,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
-	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/functions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/reportcodec"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury/wsrpc"
@@ -43,17 +42,20 @@ import (
 
 var _ relaytypes.Relayer = &Relayer{}
 
+type RelayerConfig interface {
+}
+
 type Relayer struct {
 	db               *sqlx.DB
 	chainSet         evm.ChainSet
 	lggr             logger.Logger
-	cfg              pg.QConfig
+	cfg              RelayerConfig
 	ks               keystore.Master
 	mercuryPool      wsrpc.Pool
 	eventBroadcaster pg.EventBroadcaster
 }
 
-func NewRelayer(db *sqlx.DB, chainSet evm.ChainSet, lggr logger.Logger, cfg pg.QConfig, ks keystore.Master, eventBroadcaster pg.EventBroadcaster) *Relayer {
+func NewRelayer(db *sqlx.DB, chainSet evm.ChainSet, lggr logger.Logger, cfg RelayerConfig, ks keystore.Master, eventBroadcaster pg.EventBroadcaster) *Relayer {
 	return &Relayer{
 		db:               db,
 		chainSet:         chainSet,
@@ -124,15 +126,9 @@ func (r *Relayer) NewMercuryProvider(rargs relaytypes.RelayArgs, pargs relaytype
 	if err != nil {
 		return nil, err
 	}
-	transmitter := mercury.NewTransmitter(r.lggr, configWatcher.ContractConfigTracker(), client, privKey.PublicKey, *relayConfig.FeedID, r.db, r.cfg)
+	transmitter := mercury.NewTransmitter(r.lggr, configWatcher.ContractConfigTracker(), client, privKey.PublicKey, *relayConfig.FeedID)
 
 	return NewMercuryProvider(configWatcher, transmitter, reportCodec, r.lggr), nil
-}
-
-func (r *Relayer) NewFunctionsProvider(rargs relaytypes.RelayArgs, pargs relaytypes.PluginArgs) (relaytypes.FunctionsProvider, error) {
-	// TODO(FUN-668): Not ready yet (doesn't implement FunctionsEvents() properly).
-	// Currently only used by the bootstrap job.
-	return NewFunctionsProvider(r.chainSet, rargs, pargs, r.lggr, r.ks.Eth(), functions.FunctionsPlugin)
 }
 
 func (r *Relayer) NewConfigProvider(args relaytypes.RelayArgs) (relaytypes.ConfigProvider, error) {
@@ -290,7 +286,7 @@ func newConfigProvider(lggr logger.Logger, chainSet evm.ChainSet, args relaytype
 	var offchainConfigDigester ocrtypes.OffchainConfigDigester
 	if relayConfig.FeedID != nil {
 		// Mercury
-		offchainConfigDigester = mercury.NewOffchainConfigDigester(*relayConfig.FeedID, chain.Config().EVM().ChainID(), contractAddress)
+		offchainConfigDigester = mercury.NewOffchainConfigDigester(*relayConfig.FeedID, chain.Config().EVM().ChainID().Uint64(), contractAddress)
 	} else {
 		// Non-mercury
 		offchainConfigDigester = evmutil.EVMOffchainConfigDigester{
@@ -301,7 +297,7 @@ func newConfigProvider(lggr logger.Logger, chainSet evm.ChainSet, args relaytype
 	return newConfigWatcher(lggr, contractAddress, contractABI, offchainConfigDigester, cp, chain, relayConfig.FromBlock, args.New), nil
 }
 
-func newContractTransmitter(lggr logger.Logger, rargs relaytypes.RelayArgs, transmitterID string, configWatcher *configWatcher, ethKeystore keystore.Eth) (*contractTransmitter, error) {
+func newContractTransmitter(lggr logger.Logger, rargs relaytypes.RelayArgs, transmitterID string, configWatcher *configWatcher, ethKeystore keystore.Eth, reportToEthMeta ReportToEthMetadata) (*contractTransmitter, error) {
 	var relayConfig types.RelayConfig
 	if err := json.Unmarshal(rargs.RelayConfig, &relayConfig); err != nil {
 		return nil, err
@@ -366,7 +362,7 @@ func newContractTransmitter(lggr logger.Logger, rargs relaytypes.RelayArgs, tran
 		transmitter,
 		configWatcher.chain.LogPoller(),
 		lggr,
-		nil,
+		reportToEthMeta,
 	)
 }
 
@@ -430,10 +426,8 @@ func (r *Relayer) NewMedianProvider(rargs relaytypes.RelayArgs, pargs relaytypes
 		return nil, err
 	}
 	var contractTransmitter ContractTransmitter
-	var reportCodec median.ReportCodec
-
-	reportCodec = evmreportcodec.ReportCodec{}
-	contractTransmitter, err = newContractTransmitter(r.lggr, rargs, pargs.TransmitterID, configWatcher, r.ks.Eth())
+	reportCodec := evmreportcodec.ReportCodec{}
+	contractTransmitter, err = newContractTransmitter(r.lggr, rargs, pargs.TransmitterID, configWatcher, r.ks.Eth(), nil)
 	if err != nil {
 		return nil, err
 	}

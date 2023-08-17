@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	reportModel "github.com/smartcontractkit/chainlink-testing-framework/testreporters"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
-
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/keeper_registry_wrapper1_1"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/keeper_registry_wrapper1_2"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/keeper_registry_wrapper1_3"
@@ -46,8 +45,7 @@ type KeeperBenchmarkTest struct {
 	upkeepIDs               [][]*big.Int
 
 	env              *environment.Environment
-	namespace        string
-	chainlinkNodes   []*client.ChainlinkK8sClient
+	chainlinkNodes   []*client.Chainlink
 	chainClient      blockchain.EVMClient
 	contractDeployer contracts.ContractDeployer
 
@@ -104,7 +102,6 @@ func (k *KeeperBenchmarkTest) Setup(t *testing.T, env *environment.Environment) 
 	k.TestReporter.Summary.StartTime = startTime.UnixMilli()
 	k.ensureInputValues(t)
 	k.env = env
-	k.namespace = k.env.Cfg.Namespace
 	inputs := k.Inputs
 
 	k.keeperRegistries = make([]contracts.KeeperRegistry, len(inputs.RegistryVersions))
@@ -241,7 +238,7 @@ func (k *KeeperBenchmarkTest) Run(t *testing.T) {
 
 		// Send keeper jobs to registry and chainlink nodes
 		if inputs.RegistryVersions[rIndex] == ethereum.RegistryVersion_2_0 {
-			actions.CreateOCRKeeperJobs(t, k.chainlinkNodes, k.keeperRegistries[rIndex].Address(), k.chainClient.GetChainID().Int64(), txKeyId, ethereum.RegistryVersion_2_0)
+			actions.CreateOCRKeeperJobs(t, k.chainlinkNodes, k.keeperRegistries[rIndex].Address(), k.chainClient.GetChainID().Int64(), txKeyId)
 			err = k.keeperRegistries[rIndex].SetConfig(*inputs.KeeperRegistrySettings, ocrConfig)
 			require.NoError(t, err, "Registry config should be be set successfully")
 			// Give time for OCR nodes to bootstrap
@@ -395,12 +392,12 @@ func (k *KeeperBenchmarkTest) subscribeToUpkeepPerformedEvent(
 // TearDownVals returns the networks that the test is running on
 func (k *KeeperBenchmarkTest) TearDownVals(t *testing.T) (
 	*testing.T,
-	string,
-	[]*client.ChainlinkK8sClient,
+	*environment.Environment,
+	[]*client.Chainlink,
 	reportModel.TestReporter,
 	blockchain.EVMClient,
 ) {
-	return t, k.namespace, k.chainlinkNodes, &k.TestReporter, k.chainClient
+	return t, k.env, k.chainlinkNodes, &k.TestReporter, k.chainClient
 }
 
 // ensureValues ensures that all values needed to run the test are present

@@ -14,6 +14,7 @@ install-git-hooks: ## Install git hooks.
 
 .PHONY: install-chainlink-autoinstall
 install-chainlink-autoinstall: | pnpmdep gomod install-chainlink ## Autoinstall chainlink.
+
 .PHONY: operator-ui-autoinstall
 operator-ui-autoinstall: | operator-ui ## Autoinstall frontend UI.
 
@@ -53,10 +54,6 @@ chainlink-dev: operator-ui ## Build a dev build of chainlink binary.
 chainlink-test: operator-ui ## Build a test build of chainlink binary.
 	go build -tags test $(GOFLAGS) .
 
-.PHONY: chainlink-local-start
-chainlink-local-start:
-	./chainlink -c /etc/node-secrets-volume/default.toml -c /etc/node-secrets-volume/overrides.toml -secrets /etc/node-secrets-volume/secrets.toml node start -d -p /etc/node-secrets-volume/node-password -a /etc/node-secrets-volume/apicredentials --vrfpassword=/etc/node-secrets-volume/apicredentials
-
 .PHONY: install-solana
 install-solana: ## Build & install the chainlink-solana binary.
 	go install $(GOFLAGS) ./plugins/cmd/chainlink-solana
@@ -90,12 +87,13 @@ abigen: ## Build & install abigen.
 	./tools/bin/build_abigen
 
 .PHONY: go-solidity-wrappers
-go-solidity-wrappers: pnpmdep abigen ## Recompiles solidity contracts and their go wrappers.
+go-solidity-wrappers: pnpmdep abigen mockery ## Recompiles solidity contracts and their go wrappers.
+	./contracts/scripts/native_solc_compile_all
 	go generate ./core/gethwrappers
 
 .PHONY: go-solidity-wrappers-transmission
 go-solidity-wrappers-transmission: pnpmdep abigen ## Recompiles solidity contracts and their go wrappers.
-	./contracts/scripts/native_solc_compile_all_transmission
+	./contracts/scripts/transmission/native_solc_compile_all_transmission
 	go generate ./core/gethwrappers/transmission
 
 .PHONY: go-solidity-wrappers-ocr2vrf
@@ -112,12 +110,12 @@ go-solidity-wrappers-ocr2vrf: pnpmdep abigen ## Recompiles solidity contracts an
 .PHONY: go-solidity-wrappers-functions
 go-solidity-wrappers-functions: pnpmdep abigen ## Recompiles solidity contracts and their go wrappers.
 	./contracts/scripts/native_solc_compile_all_functions
-	go generate ./core/gethwrappers/functions/go_generate.go
+	go generate ./core/gethwrappers/go_generate_functions.go
 
 .PHONY: go-solidity-wrappers-llo
 go-solidity-wrappers-llo: pnpmdep abigen ## Recompiles solidity contracts and their go wrappers.
 	./contracts/scripts/native_solc_compile_all_llo
-	go generate ./core/gethwrappers/llo-feeds/go_generate.go
+	go generate ./core/gethwrappers/go_generate_llo.go
 
 .PHONY: generate
 generate: abigen codecgen mockery ## Execute all go:generate commands.
@@ -171,7 +169,7 @@ test_need_operator_assets: ## Add blank file in web assets if operator ui has no
 
 .PHONY: config-docs
 config-docs: ## Generate core node configuration documentation
-	go run ./core/config/docs/cmd/generate -o ./docs/
+	go run ./core/config/v2/docs/cmd/generate -o ./docs/
 
 .PHONY: golangci-lint
 golangci-lint: ## Run golangci-lint for all issues.

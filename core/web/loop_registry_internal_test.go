@@ -6,11 +6,10 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
-
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
 type responseWriter struct {
@@ -38,7 +37,7 @@ func TestLoopRegistryServer_CantWriteToResponse(t *testing.T) {
 	l, o := logger.TestLoggerObserved(t, zap.ErrorLevel)
 	s := &LoopRegistryServer{
 		exposedPromPort: 1,
-		registry:        plugins.NewLoopRegistry(l),
+		registry:        plugins.NewLoopRegistry(),
 		logger:          l.(logger.SugaredLogger),
 		jsonMarshalFn:   json.Marshal,
 	}
@@ -53,7 +52,7 @@ func TestLoopRegistryServer_CantMarshal(t *testing.T) {
 	l, o := logger.TestLoggerObserved(t, zap.ErrorLevel)
 	s := &LoopRegistryServer{
 		exposedPromPort: 1,
-		registry:        plugins.NewLoopRegistry(l),
+		registry:        plugins.NewLoopRegistry(),
 		logger:          l.(logger.SugaredLogger),
 		jsonMarshalFn: func(any) ([]byte, error) {
 			return []byte(""), errors.New("can't unmarshal")

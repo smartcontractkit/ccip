@@ -6,9 +6,8 @@ const (
 
 	HandshakeTimestampLen            int = 4
 	HandshakeDonIdLen                int = 64
-	HandshakeGatewayURLLen           int = 128
+	HandshakeGatewayURLMinLen        int = 10
 	HandshakeSignatureLen            int = 65
-	HandshakeAuthHeaderLen           int = HandshakeTimestampLen + HandshakeDonIdLen + HandshakeGatewayURLLen + HandshakeSignatureLen
+	HandshakeAuthHeaderMinLen        int = HandshakeTimestampLen + HandshakeDonIdLen + HandshakeGatewayURLMinLen + HandshakeSignatureLen
 	HandshakeEncodedAuthHeaderMaxLen int = 512
-	HandshakeChallengeMinLen         int = HandshakeTimestampLen + HandshakeGatewayURLLen + 1
 )

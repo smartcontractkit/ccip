@@ -1,12 +1,12 @@
 package chainlink
 
 import (
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
 )
 
 type mercuryConfig struct {
-	s toml.MercurySecrets
+	s v2.MercurySecrets
 }
 
 func (m *mercuryConfig) Credentials(credName string) *models.MercuryCredentials {

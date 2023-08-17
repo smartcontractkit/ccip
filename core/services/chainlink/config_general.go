@@ -18,18 +18,16 @@ import (
 	ocrnetworking "github.com/smartcontractkit/libocr/networking"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/cosmos"
-	evmcfg "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
+	evmcfg "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/solana"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/starknet"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
 	coreconfig "github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/config/env"
 	"github.com/smartcontractkit/chainlink/v2/core/config/parse"
-	v2 "github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
-	configutils "github.com/smartcontractkit/chainlink/v2/core/utils/config"
 )
 
 // generalConfig is a wrapper to adapt Config to the config.GeneralConfig interface.
@@ -54,8 +52,8 @@ type generalConfig struct {
 //
 // See ParseTOML to initilialize Config and Secrets from TOML.
 type GeneralConfigOpts struct {
-	ConfigStrings  []string
-	SecretsStrings []string
+	ConfigStrings []string
+	SecretsString string
 
 	Config
 	Secrets
@@ -66,39 +64,10 @@ type GeneralConfigOpts struct {
 	SkipEnv bool
 }
 
-func (o *GeneralConfigOpts) Setup(configFiles []string, secretsFiles []string) error {
-	configs := []string{}
-	for _, fileName := range configFiles {
-		b, err := os.ReadFile(fileName)
-		if err != nil {
-			return errors.Wrapf(err, "failed to read config file: %s", fileName)
-		}
-		configs = append(configs, string(b))
-	}
-
-	if configTOML := env.Config.Get(); configTOML != "" {
-		configs = append(configs, configTOML)
-	}
-
-	o.ConfigStrings = configs
-
-	secrets := []string{}
-	for _, fileName := range secretsFiles {
-		b, err := os.ReadFile(fileName)
-		if err != nil {
-			return errors.Wrapf(err, "failed to read secrets file: %s", fileName)
-		}
-		secrets = append(secrets, string(b))
-	}
-
-	o.SecretsStrings = secrets
-	return nil
-}
-
 // parseConfig sets Config from the given TOML string, overriding any existing duplicate Config fields.
 func (o *GeneralConfigOpts) parseConfig(config string) error {
 	var c Config
-	if err2 := configutils.DecodeTOML(strings.NewReader(config), &c); err2 != nil {
+	if err2 := v2.DecodeTOML(strings.NewReader(config), &c); err2 != nil {
 		return fmt.Errorf("failed to decode config TOML: %w", err2)
 	}
 
@@ -109,26 +78,28 @@ func (o *GeneralConfigOpts) parseConfig(config string) error {
 	return nil
 }
 
-// parseSecrets sets Secrets from the given TOML string. Errors on overrides
-func (o *GeneralConfigOpts) parseSecrets(secrets string) error {
-	var s Secrets
-	if err2 := configutils.DecodeTOML(strings.NewReader(secrets), &s); err2 != nil {
+// parseSecrets sets Secrets from the given TOML string.
+func (o *GeneralConfigOpts) parseSecrets() (err error) {
+	if err2 := v2.DecodeTOML(strings.NewReader(o.SecretsString), &o.Secrets); err2 != nil {
 		return fmt.Errorf("failed to decode secrets TOML: %w", err2)
 	}
-
-	// merge fields and err on overrides
-	if err4 := o.Secrets.SetFrom(&s); err4 != nil {
-		return fmt.Errorf("invalid secrets: %w", err4)
-	}
-
 	return nil
 }
 
 // New returns a coreconfig.GeneralConfig for the given options.
 func (o GeneralConfigOpts) New() (GeneralConfig, error) {
-	err := o.parse()
-	if err != nil {
-		return nil, err
+	for _, c := range o.ConfigStrings {
+		err := o.parseConfig(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if o.SecretsString != "" {
+		err := o.parseSecrets()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	input, err := o.Config.TOMLString()
@@ -170,25 +141,6 @@ func (o GeneralConfigOpts) New() (GeneralConfig, error) {
 	}
 
 	return cfg, nil
-}
-
-func (o *GeneralConfigOpts) parse() (err error) {
-	for _, c := range o.ConfigStrings {
-		err := o.parseConfig(c)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, s := range o.SecretsStrings {
-		err := o.parseSecrets(s)
-		if err != nil {
-			return err
-		}
-	}
-
-	o.Secrets.setDefaults()
-	return
 }
 
 func (g *generalConfig) EVMConfigs() evmcfg.EVMConfigs {
@@ -283,6 +235,14 @@ func (g *generalConfig) OCR2Enabled() bool {
 
 func (g *generalConfig) FeatureLogPoller() bool {
 	return *g.c.Feature.LogPoller
+}
+
+func (g *generalConfig) FeatureCCIP() bool {
+	return *g.c.Feature.CCIP
+}
+
+func (g *generalConfig) FeatureLegacyGasStation() bool {
+	return *g.c.Feature.LegacyGasStation
 }
 
 func (g *generalConfig) FeatureUICSAKeys() bool {
@@ -514,6 +474,13 @@ func (g *generalConfig) Sentry() coreconfig.Sentry {
 
 func (g *generalConfig) Password() coreconfig.Password {
 	return &passwordConfig{keystore: g.keystorePassword, vrf: g.vrfPassword}
+}
+
+func (g *generalConfig) LegacyGasStation() coreconfig.LegacyGasStation {
+	if g.secrets.LegacyGasStation.AuthConfig == nil {
+		return nil
+	}
+	return &legacyGasStationConfig{s: g.secrets.LegacyGasStation}
 }
 
 func (g *generalConfig) Prometheus() coreconfig.Prometheus {

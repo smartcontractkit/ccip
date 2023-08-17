@@ -33,10 +33,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocrkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/p2pkey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/vrfkey"
+	"github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
-	"github.com/smartcontractkit/chainlink/v2/core/services/vrf/vrfcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/vrf"
 	"github.com/smartcontractkit/chainlink/v2/core/services/webhook"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -1029,13 +1030,17 @@ func (r *Resolver) CreateJob(ctx context.Context, args struct {
 	case job.Cron:
 		jb, err = cron.ValidatedCronSpec(args.Input.TOML)
 	case job.VRF:
-		jb, err = vrfcommon.ValidatedVRFSpec(args.Input.TOML)
+		jb, err = vrf.ValidatedVRFSpec(args.Input.TOML)
 	case job.Webhook:
 		jb, err = webhook.ValidatedWebhookSpec(args.Input.TOML, r.App.GetExternalInitiatorManager())
 	case job.BlockhashStore:
 		jb, err = blockhashstore.ValidatedSpec(args.Input.TOML)
 	case job.BlockHeaderFeeder:
 		jb, err = blockheaderfeeder.ValidatedSpec(args.Input.TOML)
+	case job.LegacyGasStationServer:
+		jb, err = legacygasstation.ValidatedServerSpec(args.Input.TOML)
+	case job.LegacyGasStationSidecar:
+		jb, err = legacygasstation.ValidatedSidecarSpec(args.Input.TOML)
 	case job.Bootstrap:
 		jb, err = ocrbootstrap.ValidatedBootstrapSpecToml(args.Input.TOML)
 	case job.Gateway:

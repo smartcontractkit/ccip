@@ -219,7 +219,7 @@ func NewEthConfirmer(t testing.TB, txStore txmgr.EvmTxStore, ethClient evmclient
 	lggr := logger.TestLogger(t)
 	ge := config.EVM().GasEstimator()
 	estimator := gas.NewWrappedEvmEstimator(gas.NewFixedPriceEstimator(ge, ge.BlockHistory(), lggr), ge.EIP1559DynamicFees())
-	txBuilder := txmgr.NewEvmTxAttemptBuilder(*ethClient.ConfiguredChainID(), ge, ks, estimator)
+	txBuilder := txmgr.NewEvmTxAttemptBuilder(*ethClient.ConfiguredChainID(), config.EVM(), ge, ks, estimator)
 	ec := txmgr.NewEvmConfirmer(txStore, txmgr.NewEvmTxmClient(ethClient), txmgr.NewEvmTxmConfig(config.EVM()), txmgr.NewEvmTxmFeeConfig(ge), config.EVM().Transactions(), config.Database(), ks, txBuilder, lggr)
 	ec.SetResumeCallback(fn)
 	require.NoError(t, ec.Start(testutils.Context(t)))
@@ -392,7 +392,14 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 	for _, c := range cfg.EVMConfigs() {
 		ids = append(ids, *c.ChainID)
 	}
-
+	if len(ids) > 0 {
+		o := chainCfgs
+		if o == nil {
+			if err = evm.EnsureChains(db, lggr, cfg.Database(), ids); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	mailMon := utils.NewMailboxMonitor(cfg.AppID().String())
 	var chains chainlink.Chains
 	chainId := ethClient.ConfiguredChainID()
@@ -437,6 +444,11 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		for _, c := range cfgs {
 			ids = append(ids, *c.ChainID)
 		}
+		if len(ids) > 0 {
+			if err = solana.EnsureChains(db, solLggr, cfg.Database(), ids); err != nil {
+				t.Fatal(err)
+			}
+		}
 
 		opts := solana.ChainSetOpts{
 			Logger:   solLggr,
@@ -458,7 +470,11 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		for _, c := range cfgs {
 			ids = append(ids, *c.ChainID)
 		}
-
+		if len(ids) > 0 {
+			if err = starknet.EnsureChains(db, starkLggr, cfg.Database(), ids); err != nil {
+				t.Fatal(err)
+			}
+		}
 		if err != nil {
 			lggr.Fatal(err)
 		}
@@ -491,7 +507,7 @@ func NewApplicationWithConfig(t testing.TB, cfg chainlink.GeneralConfig, flagsAn
 		RestrictedHTTPClient:     c,
 		UnrestrictedHTTPClient:   c,
 		SecretGenerator:          MockSecretGenerator{},
-		LoopRegistry:             plugins.NewLoopRegistry(lggr),
+		LoopRegistry:             plugins.NewLoopRegistry(),
 	})
 	require.NoError(t, err)
 	app := appInstance.(*chainlink.ChainlinkApplication)
@@ -555,13 +571,9 @@ func NewEthMocksWithTransactionsOnBlocksAssertions(t testing.TB) *evmclimocks.Cl
 	c.On("SubscribeNewHead", mock.Anything, mock.Anything).Maybe().Return(EmptyMockSubscription(t), nil)
 	c.On("SendTransaction", mock.Anything, mock.Anything).Maybe().Return(nil)
 	c.On("SendTransactionReturnCode", mock.Anything, mock.Anything, mock.Anything).Maybe().Return(clienttypes.Successful, nil)
-	// Construct chain
-	h2 := Head(2)
-	h1 := HeadWithHash(1, h2.ParentHash)
-	h0 := HeadWithHash(0, h1.ParentHash)
-	c.On("HeadByNumber", mock.Anything, (*big.Int)(nil)).Maybe().Return(h2, nil)
-	c.On("HeadByHash", mock.Anything, h1.Hash).Maybe().Return(h1, nil)
-	c.On("HeadByHash", mock.Anything, h0.Hash).Maybe().Return(h0, nil)
+	c.On("HeadByNumber", mock.Anything, (*big.Int)(nil)).Maybe().Return(Head(2), nil)
+	c.On("HeadByNumber", mock.Anything, big.NewInt(1)).Maybe().Return(Head(1), nil)
+	c.On("HeadByNumber", mock.Anything, big.NewInt(0)).Maybe().Return(Head(0), nil)
 	c.On("BatchCallContext", mock.Anything, mock.Anything).Maybe().Return(nil).Run(func(args mock.Arguments) {
 		elems := args.Get(1).([]rpc.BatchElem)
 		elems[0].Result = &evmtypes.Block{
@@ -581,7 +593,7 @@ func NewEthMocksWithTransactionsOnBlocksAssertions(t testing.TB) *evmclimocks.Cl
 	block := &types.Header{
 		Number: big.NewInt(100),
 	}
-	c.On("HeaderByHash", mock.Anything, mock.Anything).Maybe().Return(block, nil)
+	c.On("HeaderByNumber", mock.Anything, mock.Anything).Maybe().Return(block, nil)
 
 	return c
 }
@@ -1041,14 +1053,6 @@ func Head(val interface{}) *evmtypes.Head {
 		panic(fmt.Sprintf("Could not convert %v of type %T to Head", val, val))
 	}
 	return &h
-}
-
-func HeadWithHash(n int64, hash common.Hash) *evmtypes.Head {
-	var h evmtypes.Head
-	time := uint64(0)
-	h = evmtypes.NewHead(big.NewInt(n), hash, utils.NewHash(), time, utils.NewBig(&FixtureChainID))
-	return &h
-
 }
 
 // LegacyTransactionsFromGasPrices returns transactions matching the given gas prices

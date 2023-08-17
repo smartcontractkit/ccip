@@ -10,14 +10,14 @@ import (
 	"github.com/gin-contrib/sessions"
 
 	"github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 var _ config.WebServer = (*webServerConfig)(nil)
 
 type tlsConfig struct {
-	c       toml.WebServerTLS
+	c       v2.WebServerTLS
 	rootDir func() string
 }
 
@@ -65,7 +65,7 @@ func (t *tlsConfig) ListenIP() net.IP {
 }
 
 type rateLimitConfig struct {
-	c toml.WebServerRateLimit
+	c v2.WebServerRateLimit
 }
 
 func (r *rateLimitConfig) Authenticated() int64 {
@@ -85,7 +85,7 @@ func (r *rateLimitConfig) UnauthenticatedPeriod() time.Duration {
 }
 
 type mfaConfig struct {
-	c toml.WebServerMFA
+	c v2.WebServerMFA
 }
 
 func (m *mfaConfig) RPID() string {
@@ -97,7 +97,7 @@ func (m *mfaConfig) RPOrigin() string {
 }
 
 type webServerConfig struct {
-	c       toml.WebServer
+	c       v2.WebServer
 	rootDir func() string
 }
 

@@ -34,9 +34,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/srvctest"
 	"github.com/smartcontractkit/chainlink/v2/core/services/vrf"
 	vrf_mocks "github.com/smartcontractkit/chainlink/v2/core/services/vrf/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/services/vrf/solidity_cross_tests"
-	v1 "github.com/smartcontractkit/chainlink/v2/core/services/vrf/v1"
-	"github.com/smartcontractkit/chainlink/v2/core/services/vrf/vrfcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/testdata/testspecs"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
@@ -137,7 +134,7 @@ func waitForChannel(t *testing.T, c chan struct{}, timeout time.Duration, errMsg
 	}
 }
 
-func setup(t *testing.T) (vrfUniverse, *v1.Listener, job.Job) {
+func setup(t *testing.T) (vrfUniverse, *vrf.ListenerV1, job.Job) {
 	db := pgtest.NewSqlxDB(t)
 	cfg := configtest.NewTestGeneralConfig(t)
 	vuni := buildVrfUni(t, db, cfg)
@@ -154,14 +151,14 @@ func setup(t *testing.T) (vrfUniverse, *v1.Listener, job.Job) {
 		cfg.Database(),
 		mailMon)
 	vs := testspecs.GenerateVRFSpec(testspecs.VRFSpecParams{PublicKey: vuni.vrfkey.PublicKey.String()})
-	jb, err := vrfcommon.ValidatedVRFSpec(vs.Toml())
+	jb, err := vrf.ValidatedVRFSpec(vs.Toml())
 	require.NoError(t, err)
 	err = vuni.jrm.CreateJob(&jb)
 	require.NoError(t, err)
 	vl, err := vd.ServicesForSpec(jb)
 	require.NoError(t, err)
 	require.Len(t, vl, 1)
-	listener := vl[0].(*v1.Listener)
+	listener := vl[0].(*vrf.ListenerV1)
 	// Start the listenerV1
 	go func() {
 		listener.RunLogListener([]func(){}, 6)
@@ -204,7 +201,7 @@ func TestDelegate_ReorgAttackProtection(t *testing.T) {
 		),
 		// JobID is indexed, thats why it lives in the Topics.
 		Topics: []common.Hash{
-			solidity_cross_tests.VRFRandomnessRequestLogTopic(),
+			vrf.VRFRandomnessRequestLogTopic(),
 			jb.ExternalIDEncodeStringToTopic(), // jobID
 		},
 		BlockNumber: 10,
@@ -251,7 +248,7 @@ func TestDelegate_ValidLog(t *testing.T) {
 					[]byte{}),
 				// JobID is indexed, thats why it lives in the Topics.
 				Topics: []common.Hash{
-					solidity_cross_tests.VRFRandomnessRequestLogTopic(),
+					vrf.VRFRandomnessRequestLogTopic(),
 					jb.ExternalIDEncodeStringToTopic(), // jobID STRING
 				},
 				TxHash:      txHash,
@@ -272,7 +269,7 @@ func TestDelegate_ValidLog(t *testing.T) {
 					reqID2.Bytes()},                          // requestID
 					[]byte{}),
 				Topics: []common.Hash{
-					solidity_cross_tests.VRFRandomnessRequestLogTopic(),
+					vrf.VRFRandomnessRequestLogTopic(),
 					jb.ExternalIDEncodeBytesToTopic(), // jobID BYTES
 				},
 				TxHash:      txHash,
@@ -379,7 +376,7 @@ func TestDelegate_InvalidLog(t *testing.T) {
 			utils.NewHash().Bytes()...), // requestID
 		// JobID is indexed, that's why it lives in the Topics.
 		Topics: []common.Hash{
-			solidity_cross_tests.VRFRandomnessRequestLogTopic(),
+			vrf.VRFRandomnessRequestLogTopic(),
 			jb.ExternalIDEncodeBytesToTopic(), // jobID
 		},
 		Address:     common.Address{},
@@ -444,7 +441,7 @@ func TestFulfilledCheck(t *testing.T) {
 				[]byte{}),
 			// JobID is indexed, that's why it lives in the Topics.
 			Topics: []common.Hash{
-				solidity_cross_tests.VRFRandomnessRequestLogTopic(),
+				vrf.VRFRandomnessRequestLogTopic(),
 				jb.ExternalIDEncodeBytesToTopic(), // jobID STRING
 			},
 			//TxHash:      utils.NewHash().Bytes(),
@@ -494,11 +491,11 @@ submit_tx  [type=ethtx to="%s"
 decode_log->vrf->encode_tx->submit_tx
 """
 `
-		jb, err := vrfcommon.ValidatedVRFSpec(spec)
+		jb, err := vrf.ValidatedVRFSpec(spec)
 		require.NoError(tt, err)
 
-		cfg := vrf_mocks.NewFeeConfig(t)
-		require.NoError(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg.PriceMaxKey))
+		cfg := vrf_mocks.NewConfig(t)
+		require.NoError(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
 
 	t.Run("returns nil error on valid gas lane <=> key specific gas price setting", func(tt *testing.T) {
@@ -507,13 +504,13 @@ decode_log->vrf->encode_tx->submit_tx
 			fromAddresses = append(fromAddresses, testutils.NewAddress().Hex())
 		}
 
-		cfg := vrf_mocks.NewFeeConfig(t)
+		cfg := vrf_mocks.NewConfig(t)
 		for _, a := range fromAddresses {
-			cfg.On("PriceMaxKey", common.HexToAddress(a)).Return(assets.GWei(100)).Once()
+			cfg.On("KeySpecificMaxGasPriceWei", common.HexToAddress(a)).Return(assets.GWei(100)).Once()
 		}
 		defer cfg.AssertExpectations(tt)
 
-		jb, err := vrfcommon.ValidatedVRFSpec(testspecs.GenerateVRFSpec(
+		jb, err := vrf.ValidatedVRFSpec(testspecs.GenerateVRFSpec(
 			testspecs.VRFSpecParams{
 				RequestedConfsDelay: 10,
 				FromAddresses:       fromAddresses,
@@ -525,7 +522,7 @@ decode_log->vrf->encode_tx->submit_tx
 			Toml())
 		require.NoError(t, err)
 
-		require.NoError(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg.PriceMaxKey))
+		require.NoError(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
 
 	t.Run("returns error on invalid setting", func(tt *testing.T) {
@@ -534,14 +531,14 @@ decode_log->vrf->encode_tx->submit_tx
 			fromAddresses = append(fromAddresses, testutils.NewAddress().Hex())
 		}
 
-		cfg := vrf_mocks.NewFeeConfig(t)
-		cfg.On("PriceMaxKey", common.HexToAddress(fromAddresses[0])).Return(assets.GWei(100)).Once()
-		cfg.On("PriceMaxKey", common.HexToAddress(fromAddresses[1])).Return(assets.GWei(100)).Once()
+		cfg := vrf_mocks.NewConfig(t)
+		cfg.On("KeySpecificMaxGasPriceWei", common.HexToAddress(fromAddresses[0])).Return(assets.GWei(100)).Once()
+		cfg.On("KeySpecificMaxGasPriceWei", common.HexToAddress(fromAddresses[1])).Return(assets.GWei(100)).Once()
 		// last from address has wrong key-specific max gas price
-		cfg.On("PriceMaxKey", common.HexToAddress(fromAddresses[2])).Return(assets.GWei(50)).Once()
+		cfg.On("KeySpecificMaxGasPriceWei", common.HexToAddress(fromAddresses[2])).Return(assets.GWei(50)).Once()
 		defer cfg.AssertExpectations(tt)
 
-		jb, err := vrfcommon.ValidatedVRFSpec(testspecs.GenerateVRFSpec(
+		jb, err := vrf.ValidatedVRFSpec(testspecs.GenerateVRFSpec(
 			testspecs.VRFSpecParams{
 				RequestedConfsDelay: 10,
 				FromAddresses:       fromAddresses,
@@ -553,7 +550,7 @@ decode_log->vrf->encode_tx->submit_tx
 			Toml())
 		require.NoError(t, err)
 
-		require.Error(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg.PriceMaxKey))
+		require.Error(tt, vrf.CheckFromAddressMaxGasPrices(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
 }
 
@@ -571,7 +568,7 @@ func Test_CheckFromAddressesExist(t *testing.T) {
 			assert.NoError(t, err)
 			fromAddresses = append(fromAddresses, k.Address.Hex())
 		}
-		jb, err := vrfcommon.ValidatedVRFSpec(testspecs.GenerateVRFSpec(
+		jb, err := vrf.ValidatedVRFSpec(testspecs.GenerateVRFSpec(
 			testspecs.VRFSpecParams{
 				RequestedConfsDelay: 10,
 				FromAddresses:       fromAddresses,
@@ -601,7 +598,7 @@ func Test_CheckFromAddressesExist(t *testing.T) {
 		}
 		// add an address that isn't in the keystore
 		fromAddresses = append(fromAddresses, testutils.NewAddress().Hex())
-		jb, err := vrfcommon.ValidatedVRFSpec(testspecs.GenerateVRFSpec(
+		jb, err := vrf.ValidatedVRFSpec(testspecs.GenerateVRFSpec(
 			testspecs.VRFSpecParams{
 				RequestedConfsDelay: 10,
 				FromAddresses:       fromAddresses,
@@ -625,7 +622,7 @@ func Test_FromAddressMaxGasPricesAllEqual(t *testing.T) {
 			"0xD94E6AD557277c6E3e163cefF90F52AB51A95143",
 		}
 
-		jb, err := vrfcommon.ValidatedVRFSpec(testspecs.GenerateVRFSpec(testspecs.VRFSpecParams{
+		jb, err := vrf.ValidatedVRFSpec(testspecs.GenerateVRFSpec(testspecs.VRFSpecParams{
 			RequestedConfsDelay: 10,
 			FromAddresses:       fromAddresses,
 			ChunkSize:           25,
@@ -635,13 +632,13 @@ func Test_FromAddressMaxGasPricesAllEqual(t *testing.T) {
 		}).Toml())
 		require.NoError(tt, err)
 
-		cfg := vrf_mocks.NewFeeConfig(t)
+		cfg := vrf_mocks.NewConfig(t)
 		for _, a := range fromAddresses {
-			cfg.On("PriceMaxKey", common.HexToAddress(a)).Return(assets.GWei(100))
+			cfg.On("KeySpecificMaxGasPriceWei", common.HexToAddress(a)).Return(assets.GWei(100))
 		}
 		defer cfg.AssertExpectations(tt)
 
-		assert.True(tt, vrf.FromAddressMaxGasPricesAllEqual(jb, cfg.PriceMaxKey))
+		assert.True(tt, vrf.FromAddressMaxGasPricesAllEqual(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
 
 	t.Run("one max gas price not equal to others", func(tt *testing.T) {
@@ -652,7 +649,7 @@ func Test_FromAddressMaxGasPricesAllEqual(t *testing.T) {
 			"0x86E7c45Bf013Bf1Df3C22c14d5fd6fc3051AC569",
 		}
 
-		jb, err := vrfcommon.ValidatedVRFSpec(testspecs.GenerateVRFSpec(testspecs.VRFSpecParams{
+		jb, err := vrf.ValidatedVRFSpec(testspecs.GenerateVRFSpec(testspecs.VRFSpecParams{
 			RequestedConfsDelay: 10,
 			FromAddresses:       fromAddresses,
 			ChunkSize:           25,
@@ -662,48 +659,14 @@ func Test_FromAddressMaxGasPricesAllEqual(t *testing.T) {
 		}).Toml())
 		require.NoError(tt, err)
 
-		cfg := vrf_mocks.NewFeeConfig(t)
+		cfg := vrf_mocks.NewConfig(t)
 		for _, a := range fromAddresses[:3] {
-			cfg.On("PriceMaxKey", common.HexToAddress(a)).Return(assets.GWei(100))
+			cfg.On("KeySpecificMaxGasPriceWei", common.HexToAddress(a)).Return(assets.GWei(100))
 		}
-		cfg.On("PriceMaxKey", common.HexToAddress(fromAddresses[len(fromAddresses)-1])).
+		cfg.On("KeySpecificMaxGasPriceWei", common.HexToAddress(fromAddresses[len(fromAddresses)-1])).
 			Return(assets.GWei(200)) // doesn't match the rest
 		defer cfg.AssertExpectations(tt)
 
-		assert.False(tt, vrf.FromAddressMaxGasPricesAllEqual(jb, cfg.PriceMaxKey))
+		assert.False(tt, vrf.FromAddressMaxGasPricesAllEqual(jb, cfg.KeySpecificMaxGasPriceWei))
 	})
-}
-
-func Test_VRFV2PlusServiceFailsWhenVRFOwnerProvided(t *testing.T) {
-	db := pgtest.NewSqlxDB(t)
-	cfg := configtest.NewTestGeneralConfig(t)
-	vuni := buildVrfUni(t, db, cfg)
-
-	mailMon := srvctest.Start(t, utils.NewMailboxMonitor(t.Name()))
-
-	vd := vrf.NewDelegate(
-		db,
-		vuni.ks,
-		vuni.pr,
-		vuni.prm,
-		vuni.cc,
-		logger.TestLogger(t),
-		cfg.Database(),
-		mailMon)
-	chain, err := vuni.cc.Get(testutils.FixtureChainID)
-	require.NoError(t, err)
-	vs := testspecs.GenerateVRFSpec(testspecs.VRFSpecParams{
-		VRFVersion:    vrfcommon.V2Plus,
-		PublicKey:     vuni.vrfkey.PublicKey.String(),
-		FromAddresses: []string{string(vuni.submitter.Hex())},
-		GasLanePrice:  chain.Config().EVM().GasEstimator().PriceMax(),
-	})
-	toml := "vrfOwnerAddress=\"0xF62fEFb54a0af9D32CDF0Db21C52710844c7eddb\"\n" + vs.Toml()
-	jb, err := vrfcommon.ValidatedVRFSpec(toml)
-	require.NoError(t, err)
-	err = vuni.jrm.CreateJob(&jb)
-	require.NoError(t, err)
-	_, err = vd.ServicesForSpec(jb)
-	require.Error(t, err)
-	require.Equal(t, "VRF Owner is not supported for VRF V2 Plus", err.Error())
 }

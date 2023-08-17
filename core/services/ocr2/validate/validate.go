@@ -9,7 +9,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/pelletier/go-toml"
 	pkgerrors "github.com/pkg/errors"
-
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -84,10 +83,7 @@ var (
 )
 
 func validateTimingParameters(ocr2Conf OCR2Config, insConf InsecureConfig, spec job.OCR2OracleSpec) error {
-	lc, err := ToLocalConfig(ocr2Conf, insConf, spec)
-	if err != nil {
-		return err
-	}
+	lc := ToLocalConfig(ocr2Conf, insConf, spec)
 	return libocr2.SanityCheckLocalConfig(lc)
 }
 
@@ -113,6 +109,7 @@ func validateSpec(tree *toml.Tree, spec job.Job) error {
 		return nil
 	case job.Mercury:
 		return validateOCR2MercurySpec(spec.OCR2OracleSpec.PluginConfig)
+	case job.CCIPExecution, job.CCIPCommit:
 	case "":
 		return errors.New("no plugin specified")
 	default:

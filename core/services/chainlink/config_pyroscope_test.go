@@ -8,8 +8,8 @@ import (
 
 func TestPyroscopeConfigTest(t *testing.T) {
 	opts := GeneralConfigOpts{
-		ConfigStrings:  []string{fullTOML},
-		SecretsStrings: []string{secretsFullTOML},
+		ConfigStrings: []string{fullTOML},
+		SecretsString: secretsFullTOML,
 	}
 	cfg, err := opts.New()
 	require.NoError(t, err)

@@ -35,16 +35,16 @@ import (
 	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
 	pkgsolana "github.com/smartcontractkit/chainlink-solana/pkg/solana"
 	pkgstarknet "github.com/smartcontractkit/chainlink-starknet/relayer/pkg/chainlink"
+
 	"github.com/smartcontractkit/chainlink/v2/core/build"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/cosmos"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/solana"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/starknet"
 	"github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/config/env"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/logger/audit"
-	"github.com/smartcontractkit/chainlink/v2/core/services"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/periodicbackup"
@@ -100,7 +100,7 @@ type Shell struct {
 
 	configFiles      []string
 	configFilesIsSet bool
-	secretsFiles     []string
+	secretsFile      string
 	secretsFileIsSet bool
 }
 
@@ -135,13 +135,27 @@ type ChainlinkAppFactory struct{}
 func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.GeneralConfig, appLggr logger.Logger, db *sqlx.DB) (app chainlink.Application, err error) {
 	initGlobals(cfg.Prometheus())
 
-	err = handleNodeVersioning(db, appLggr, cfg.RootDir(), cfg.Database(), cfg.WebServer().HTTPPort())
+	err = handleNodeVersioning(db, appLggr, cfg.RootDir(), cfg.Database())
 	if err != nil {
 		return nil, err
 	}
 
 	keyStore := keystore.New(db, utils.GetScryptParams(cfg), appLggr, cfg.Database())
 	mailMon := utils.NewMailboxMonitor(cfg.AppID().String())
+
+	// Upsert EVM chains/nodes from ENV, necessary for backwards compatibility
+	if cfg.EVMEnabled() {
+		var ids []utils.Big
+		for _, c := range cfg.EVMConfigs() {
+			c := c
+			ids = append(ids, *c.ChainID)
+		}
+		if len(ids) > 0 {
+			if err = evm.EnsureChains(db, appLggr, cfg.Database(), ids); err != nil {
+				return nil, errors.Wrap(err, "failed to setup EVM chains")
+			}
+		}
+	}
 
 	dbListener := cfg.Database().Listener()
 	eventBroadcaster := pg.NewEventBroadcaster(cfg.Database().URL(), dbListener.MinReconnectInterval(), dbListener.MaxReconnectDuration(), appLggr, cfg.AppID())
@@ -154,7 +168,7 @@ func (n ChainlinkAppFactory) NewApplication(ctx context.Context, cfg chainlink.G
 		MailMon:          mailMon,
 	}
 
-	loopRegistry := plugins.NewLoopRegistry(appLggr.Named("LoopRegistry"))
+	loopRegistry := plugins.NewLoopRegistry()
 
 	var chains chainlink.Chains
 	chains.EVM, err = evm.NewTOMLChainSet(ctx, ccOpts)
@@ -251,8 +265,13 @@ func (r relayerFactory) NewSolana(ks keystore.Solana) (loop.Relayer, error) {
 		c := c
 		ids = append(ids, *c.ChainID)
 	}
+	if len(ids) > 0 {
+		if err := solana.EnsureChains(r.DB, solLggr, r.Database(), ids); err != nil {
+			return nil, fmt.Errorf("failed to setup Solana chains: %w", err)
+		}
+	}
 
-	if cmdName := env.SolanaPluginCmd.Get(); cmdName != "" {
+	if cmdName := v2.EnvSolanaPluginCmd.Get(); cmdName != "" {
 		// setup the solana relayer to be a LOOP
 		tomls, err := toml.Marshal(struct {
 			Solana solana.SolanaConfigs
@@ -297,8 +316,13 @@ func (r relayerFactory) NewStarkNet(ks keystore.StarkNet) (loop.Relayer, error) 
 		c := c
 		ids = append(ids, *c.ChainID)
 	}
+	if len(ids) > 0 {
+		if err := starknet.EnsureChains(r.DB, starkLggr, r.Database(), ids); err != nil {
+			return nil, fmt.Errorf("failed to setup StarkNet chains: %w", err)
+		}
+	}
 
-	if cmdName := env.StarknetPluginCmd.Get(); cmdName != "" {
+	if cmdName := v2.EnvStarknetPluginCmd.Get(); cmdName != "" {
 		// setup the starknet relayer to be a LOOP
 		tomls, err := toml.Marshal(struct {
 			Starknet starknet.StarknetConfigs
@@ -335,7 +359,7 @@ func (r relayerFactory) NewStarkNet(ks keystore.StarkNet) (loop.Relayer, error) 
 }
 
 // handleNodeVersioning is a setup-time helper to encapsulate version changes and db migration
-func handleNodeVersioning(db *sqlx.DB, appLggr logger.Logger, rootDir string, cfg config.Database, healthReportPort uint16) error {
+func handleNodeVersioning(db *sqlx.DB, appLggr logger.Logger, rootDir string, cfg config.Database) error {
 	var err error
 	// Set up the versioning Configs
 	verORM := versioning.NewORM(db, appLggr, cfg.DefaultQueryTimeout())
@@ -352,7 +376,7 @@ func handleNodeVersioning(db *sqlx.DB, appLggr logger.Logger, rootDir string, cf
 		// Need to do this BEFORE migration
 		backupCfg := cfg.Backup()
 		if backupCfg.Mode() != config.DatabaseBackupModeNone && backupCfg.OnVersionUpgrade() {
-			if err = takeBackupIfVersionUpgrade(cfg.URL(), rootDir, cfg.Backup(), appLggr, appv, dbv, healthReportPort); err != nil {
+			if err = takeBackupIfVersionUpgrade(cfg.URL(), rootDir, cfg.Backup(), appLggr, appv, dbv); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					appLggr.Debugf("Failed to find any node version in the DB: %w", err)
 				} else if strings.Contains(err.Error(), "relation \"node_versions\" does not exist") {
@@ -381,7 +405,7 @@ func handleNodeVersioning(db *sqlx.DB, appLggr logger.Logger, rootDir string, cf
 	return nil
 }
 
-func takeBackupIfVersionUpgrade(dbUrl url.URL, rootDir string, cfg periodicbackup.BackupConfig, lggr logger.Logger, appv, dbv *semver.Version, healthReportPort uint16) (err error) {
+func takeBackupIfVersionUpgrade(dbUrl url.URL, rootDir string, cfg periodicbackup.BackupConfig, lggr logger.Logger, appv, dbv *semver.Version) (err error) {
 	if appv == nil {
 		lggr.Debug("Application version is missing, skipping automatic DB backup.")
 		return nil
@@ -400,14 +424,7 @@ func takeBackupIfVersionUpgrade(dbUrl url.URL, rootDir string, cfg periodicbacku
 	if err != nil {
 		return errors.Wrap(err, "takeBackupIfVersionUpgrade failed")
 	}
-
-	//Because backups can take a long time we must start a "fake" health report to prevent
-	//node shutdown because of healthcheck fail/timeout
-	ibhr := services.NewInBackupHealthReport(healthReportPort, lggr)
-	ibhr.Start()
-	defer ibhr.Stop()
-	err = databaseBackup.RunBackup(appv.String())
-	return err
+	return databaseBackup.RunBackup(appv.String())
 }
 
 // Runner implements the Run method.
@@ -448,16 +465,16 @@ func (n ChainlinkRunner) Run(ctx context.Context, app chainlink.Application) err
 	server := server{handler: handler, lggr: app.GetLogger()}
 
 	g, gCtx := errgroup.WithContext(ctx)
-	serverStartTimeoutDuration := config.WebServer().StartTimeout()
+	timeoutDuration := config.WebServer().StartTimeout()
 	if ws.HTTPPort() != 0 {
-		go tryRunServerUntilCancelled(gCtx, app.GetLogger(), serverStartTimeoutDuration, func() error {
+		go tryRunServerUntilCancelled(gCtx, app.GetLogger(), timeoutDuration, func() error {
 			return server.run(ws.ListenIP(), ws.HTTPPort(), config.WebServer().HTTPWriteTimeout())
 		})
 	}
 
 	tls := config.WebServer().TLS()
 	if tls.HTTPSPort() != 0 {
-		go tryRunServerUntilCancelled(gCtx, app.GetLogger(), serverStartTimeoutDuration, func() error {
+		go tryRunServerUntilCancelled(gCtx, app.GetLogger(), timeoutDuration, func() error {
 			return server.runTLS(
 				tls.ListenIP(),
 				tls.HTTPSPort(),
@@ -548,20 +565,20 @@ func (s *server) run(ip net.IP, port uint16, writeTimeout time.Duration) error {
 	return errors.Wrap(err, "failed to run plaintext HTTP server")
 }
 
-func (s *server) runTLS(ip net.IP, port uint16, certFile, keyFile string, requestTimeout time.Duration) error {
+func (s *server) runTLS(ip net.IP, port uint16, certFile, keyFile string, writeTimeout time.Duration) error {
 	addr := fmt.Sprintf("%s:%d", ip.String(), port)
 	s.lggr.Infow(fmt.Sprintf("Listening and serving HTTPS on %s", addr), "ip", ip, "port", port)
-	s.tlsServer = createServer(s.handler, addr, requestTimeout)
+	s.tlsServer = createServer(s.handler, addr, writeTimeout)
 	err := s.tlsServer.ListenAndServeTLS(certFile, keyFile)
 	return errors.Wrap(err, "failed to run TLS server (NOTE: you can disable TLS server completely and silence these errors by setting WebServer.TLS.HTTPSPort=0 in your config)")
 }
 
-func createServer(handler *gin.Engine, addr string, requestTimeout time.Duration) *http.Server {
+func createServer(handler *gin.Engine, addr string, writeTimeout time.Duration) *http.Server {
 	s := &http.Server{
 		Addr:           addr,
 		Handler:        handler,
-		ReadTimeout:    requestTimeout,
-		WriteTimeout:   requestTimeout,
+		ReadTimeout:    5 * time.Second,
+		WriteTimeout:   writeTimeout,
 		IdleTimeout:    60 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}

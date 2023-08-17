@@ -40,7 +40,7 @@ type Signer interface {
 type GatewayConnectorHandler interface {
 	job.ServiceCtx
 
-	HandleGatewayMessage(ctx context.Context, gatewayId string, msg *api.Message)
+	HandleGatewayMessage(ctx context.Context, gatewayId string, body *api.MessageBody)
 }
 
 type gatewayConnector struct {
@@ -53,7 +53,6 @@ type gatewayConnector struct {
 	signer      Signer
 	handler     GatewayConnectorHandler
 	gateways    map[string]*gatewayState
-	urlToId     map[string]string
 	closeWait   sync.WaitGroup
 	shutdownCh  chan struct{}
 	lggr        logger.Logger
@@ -61,7 +60,7 @@ type gatewayConnector struct {
 
 type gatewayState struct {
 	conn     network.WSConnectionWrapper
-	config   ConnectorGatewayConfig
+	config   *ConnectorGatewayConfig
 	url      *url.URL
 	wsClient network.WebSocketClient
 }
@@ -88,30 +87,24 @@ func NewGatewayConnector(config *ConnectorConfig, signer Signer, handler Gateway
 		lggr:        lggr,
 	}
 	gateways := make(map[string]*gatewayState)
-	urlToId := make(map[string]string)
 	for _, gw := range config.Gateways {
 		gw := gw
-		if _, exists := gateways[gw.Id]; exists {
+		_, ok := gateways[gw.Id]
+		if ok {
 			return nil, fmt.Errorf("duplicate Gateway ID %s", gw.Id)
-		}
-		if _, exists := urlToId[gw.URL]; exists {
-			return nil, fmt.Errorf("duplicate Gateway URL %s", gw.URL)
 		}
 		parsedURL, err := url.Parse(gw.URL)
 		if err != nil {
 			return nil, err
 		}
 		gateway := &gatewayState{
-			conn:     network.NewWSConnectionWrapper(),
-			config:   gw,
+			config:   &gw,
 			url:      parsedURL,
 			wsClient: network.NewWebSocketClient(config.WsClientConfig, connector, lggr),
 		}
 		gateways[gw.Id] = gateway
-		urlToId[gw.URL] = gw.Id
 	}
 	connector.gateways = gateways
-	connector.urlToId = urlToId
 	return connector, nil
 }
 
@@ -149,7 +142,7 @@ func (c *gatewayConnector) readLoop(gatewayState *gatewayState) {
 				c.lggr.Errorw("failed to validate message signature", "id", gatewayState.config.Id, "error", err)
 				break
 			}
-			c.handler.HandleGatewayMessage(ctx, gatewayState.config.Id, msg)
+			c.handler.HandleGatewayMessage(ctx, gatewayState.config.Id, &msg.Body)
 		}
 	}
 }
@@ -162,12 +155,11 @@ func (c *gatewayConnector) reconnectLoop(gatewayState *gatewayState) {
 	for {
 		conn, err := gatewayState.wsClient.Connect(ctx, gatewayState.url)
 		if err != nil {
-			c.lggr.Errorw("connection error", "url", gatewayState.url, "error", err)
+			c.lggr.Error("connection error")
 		} else {
-			c.lggr.Infow("connected successfully", "url", gatewayState.url)
-			closeCh := gatewayState.conn.Reset(conn)
+			closeCh := gatewayState.conn.Restart(conn)
 			<-closeCh
-			c.lggr.Infow("connection closed", "url", gatewayState.url)
+			c.lggr.Info("connection closed")
 			// reset backoff
 			redialBackoff = utils.NewRedialBackoff()
 		}
@@ -187,12 +179,10 @@ func (c *gatewayConnector) Start(ctx context.Context) error {
 		if err := c.handler.Start(ctx); err != nil {
 			return err
 		}
+		c.closeWait.Add(2 * len(c.gateways))
 		for _, gatewayState := range c.gateways {
 			gatewayState := gatewayState
-			if err := gatewayState.conn.Start(); err != nil {
-				return err
-			}
-			c.closeWait.Add(2)
+			gatewayState.conn = network.NewWSConnectionWrapper()
 			go c.readLoop(gatewayState)
 			go c.reconnectLoop(gatewayState)
 		}
@@ -213,16 +203,12 @@ func (c *gatewayConnector) Close() error {
 }
 
 func (c *gatewayConnector) NewAuthHeader(url *url.URL) ([]byte, error) {
-	gatewayId, found := c.urlToId[url.String()]
-	if !found {
-		return nil, network.ErrAuthInvalidGateway
-	}
 	authHeaderElems := &network.AuthHeaderElems{
-		Timestamp: uint32(c.clock.Now().Unix()),
-		DonId:     c.config.DonId,
-		GatewayId: gatewayId,
+		Timestamp:  uint32(c.clock.Now().Unix()),
+		DonId:      c.config.DonId,
+		GatewayURL: url.String(),
 	}
-	packedElems := network.PackAuthHeader(authHeaderElems)
+	packedElems := network.Pack(authHeaderElems)
 	signature, err := c.signer.Sign(packedElems)
 	if err != nil {
 		return nil, err
@@ -230,22 +216,9 @@ func (c *gatewayConnector) NewAuthHeader(url *url.URL) ([]byte, error) {
 	return append(packedElems, signature...), nil
 }
 
-func (c *gatewayConnector) ChallengeResponse(url *url.URL, challenge []byte) ([]byte, error) {
-	challengeElems, err := network.UnpackChallenge(challenge)
-	if err != nil {
-		return nil, err
-	}
-	if len(challengeElems.ChallengeBytes) < c.config.AuthMinChallengeLen {
-		return nil, network.ErrChallengeTooShort
-	}
-	gatewayId, found := c.urlToId[url.String()]
-	if !found || challengeElems.GatewayId != gatewayId {
-		return nil, network.ErrAuthInvalidGateway
-	}
-	nowTs := uint32(c.clock.Now().Unix())
-	ts := challengeElems.Timestamp
-	if ts < nowTs-c.config.AuthTimestampToleranceSec || nowTs+c.config.AuthTimestampToleranceSec < ts {
-		return nil, network.ErrAuthInvalidTimestamp
+func (c *gatewayConnector) ChallengeResponse(challenge []byte) ([]byte, error) {
+	if len(challenge) < c.config.MinHandshakeChallengeLen {
+		return nil, errors.New("handshake challenge too short")
 	}
 	return c.signer.Sign(challenge)
 }

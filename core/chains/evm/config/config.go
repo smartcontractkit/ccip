@@ -26,8 +26,8 @@ type EVM interface {
 	ChainID() *big.Int
 	ChainType() config.ChainType
 	FinalityDepth() uint32
-	FinalityTagEnabled() bool
 	FlagsContractAddress() string
+	KeySpecificMaxGasPriceWei(addr gethcommon.Address) *assets.Wei
 	LinkContractAddress() string
 	LogBackfillBatchSize() uint32
 	LogKeepBlocksDepth() uint32
@@ -74,7 +74,6 @@ type Transactions interface {
 	MaxQueued() uint64
 }
 
-//go:generate mockery --quiet --name GasEstimator --output ./mocks/ --case=underscore
 type GasEstimator interface {
 	BlockHistory() BlockHistory
 	LimitJobType() LimitJobType
@@ -95,7 +94,6 @@ type GasEstimator interface {
 	PriceMax() *assets.Wei
 	PriceMin() *assets.Wei
 	Mode() string
-	PriceMaxKey(gethcommon.Address) *assets.Wei
 }
 
 type LimitJobType interface {
@@ -115,13 +113,6 @@ type BlockHistory interface {
 	CheckInclusionPercentile() uint16
 	EIP1559FeeCapBufferBlocks() uint16
 	TransactionPercentile() uint16
-}
-
-type NodePool interface {
-	PollFailureThreshold() uint32
-	PollInterval() time.Duration
-	SelectionMode() string
-	SyncThreshold() uint32
 }
 
 //go:generate mockery --quiet --name ChainScopedConfig --output ./mocks/ --case=underscore

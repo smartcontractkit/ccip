@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 )
 
 var _ config.TelemetryIngress = (*telemetryIngressConfig)(nil)
 
 type telemetryIngressConfig struct {
-	c toml.TelemetryIngress
+	c v2.TelemetryIngress
 }
 
 func (t *telemetryIngressConfig) Logging() bool {

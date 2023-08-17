@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -12,7 +12,7 @@ import (
 var _ config.AutoPprof = (*autoPprofConfig)(nil)
 
 type autoPprofConfig struct {
-	c       toml.AutoPprof
+	c       v2.AutoPprof
 	rootDir func() string
 }
 

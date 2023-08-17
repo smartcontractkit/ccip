@@ -4,13 +4,13 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/core/config"
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 )
 
 var _ config.Keeper = (*keeperConfig)(nil)
 
 type registryConfig struct {
-	c toml.KeeperRegistry
+	c v2.KeeperRegistry
 }
 
 func (r *registryConfig) CheckGasOverhead() uint32 {
@@ -34,7 +34,7 @@ func (r *registryConfig) SyncUpkeepQueueSize() uint32 {
 }
 
 type keeperConfig struct {
-	c toml.Keeper
+	c v2.Keeper
 }
 
 func (k *keeperConfig) Registry() config.Registry {

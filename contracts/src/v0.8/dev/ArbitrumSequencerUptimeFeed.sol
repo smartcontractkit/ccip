@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import {AddressAliasHelper} from "./../vendor/arb-bridge-eth/v0.8.0-custom/contracts/libraries/AddressAliasHelper.sol";
+import {AddressAliasHelper} from "./vendor/arb-bridge-eth/v0.8.0-custom/contracts/libraries/AddressAliasHelper.sol";
 import {ForwarderInterface} from "./interfaces/ForwarderInterface.sol";
 import {AggregatorInterface} from "../interfaces/AggregatorInterface.sol";
 import {AggregatorV3Interface} from "../interfaces/AggregatorV3Interface.sol";
@@ -10,7 +10,7 @@ import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol
 import {FlagsInterface} from "./interfaces/FlagsInterface.sol";
 import {ArbitrumSequencerUptimeFeedInterface} from "./interfaces/ArbitrumSequencerUptimeFeedInterface.sol";
 import {SimpleReadAccessController} from "../SimpleReadAccessController.sol";
-import {ConfirmedOwner} from "../shared/access/ConfirmedOwner.sol";
+import {ConfirmedOwner} from "../ConfirmedOwner.sol";
 
 /**
  * @title ArbitrumSequencerUptimeFeed - L2 sequencer uptime status aggregator
@@ -53,7 +53,7 @@ contract ArbitrumSequencerUptimeFeed is
 
   /// @dev Follows: https://eips.ethereum.org/EIPS/eip-1967
   address public constant FLAG_L2_SEQ_OFFLINE =
-    address(bytes20(bytes32(uint256(keccak256("chainlink.flags.arbitrum-seq-offline")) - 1)));
+    address(bytes20(bytes32(uint256(keccak256("chainlink.flags.l2-seq-offline")) - 1)));
 
   uint8 public constant override decimals = 0;
   string public constant override description = "L2 Sequencer Uptime Status Feed";

@@ -24,7 +24,7 @@ var ZeroAddress = common.Address{}
 
 func CreateKeeperJobs(
 	t *testing.T,
-	chainlinkNodes []*client.ChainlinkK8sClient,
+	chainlinkNodes []*client.Chainlink,
 	keeperRegistry contracts.KeeperRegistry,
 	ocrConfig contracts.OCRv2Config,
 ) {
@@ -57,7 +57,7 @@ func CreateKeeperJobs(
 
 func CreateKeeperJobsWithKeyIndex(
 	t *testing.T,
-	chainlinkNodes []*client.ChainlinkK8sClient,
+	chainlinkNodes []*client.Chainlink,
 	keeperRegistry contracts.KeeperRegistry,
 	keyIndex int,
 	ocrConfig contracts.OCRv2Config,
@@ -89,7 +89,7 @@ func CreateKeeperJobsWithKeyIndex(
 	}
 }
 
-func DeleteKeeperJobsWithId(t *testing.T, chainlinkNodes []*client.ChainlinkK8sClient, id int) {
+func DeleteKeeperJobsWithId(t *testing.T, chainlinkNodes []*client.Chainlink, id int) {
 	for _, chainlinkNode := range chainlinkNodes {
 		err := chainlinkNode.MustDeleteJob(strconv.Itoa(id))
 		require.NoError(t, err, "Deleting KeeperV2 Job shouldn't fail")

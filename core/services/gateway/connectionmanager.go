@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -28,7 +27,6 @@ type ConnectionManager interface {
 	network.ConnectionAcceptor
 
 	DONConnectionManager(donId string) *donConnectionManager
-	GetPort() int
 }
 
 type connectionManager struct {
@@ -55,14 +53,16 @@ type donConnectionManager struct {
 }
 
 type nodeState struct {
-	conn network.WSConnectionWrapper
+	conn           network.WSConnectionWrapper
+	lastAcceptedTs uint32
+	mu             sync.RWMutex
 }
 
 // immutable
 type connAttempt struct {
 	nodeState   *nodeState
 	nodeAddress string
-	challenge   network.ChallengeElems
+	challenge   []byte
 	timestamp   uint32
 }
 
@@ -80,12 +80,11 @@ func NewConnectionManager(gwConfig *config.GatewayConfig, clock utils.Clock, lgg
 		}
 		nodes := make(map[string]*nodeState)
 		for _, nodeConfig := range donConfig.Members {
-			nodeAddress := strings.ToLower(nodeConfig.Address)
-			_, ok := nodes[nodeAddress]
+			_, ok := nodes[nodeConfig.Address]
 			if ok {
-				return nil, fmt.Errorf("duplicate node address %s in DON %s", nodeAddress, donConfig.DonId)
+				return nil, fmt.Errorf("duplicate node address %s in DON %s", nodeConfig.Address, donConfig.DonId)
 			}
-			nodes[nodeAddress] = &nodeState{conn: network.NewWSConnectionWrapper()}
+			nodes[nodeConfig.Address] = &nodeState{}
 		}
 		dons[donConfig.DonId] = &donConnectionManager{
 			donConfig:  &donConfig,
@@ -115,13 +114,11 @@ func (m *connectionManager) Start(ctx context.Context) error {
 	return m.StartOnce("ConnectionManager", func() error {
 		m.lggr.Info("starting connection manager")
 		for _, donConnMgr := range m.dons {
-			donConnMgr.closeWait.Add(len(donConnMgr.nodes))
 			for nodeAddress, nodeState := range donConnMgr.nodes {
-				if err := nodeState.conn.Start(); err != nil {
-					return err
-				}
+				nodeState.conn = network.NewWSConnectionWrapper()
 				go donConnMgr.readLoop(nodeAddress, nodeState)
 			}
+			donConnMgr.closeWait.Add(len(donConnMgr.nodes))
 		}
 		return m.wsServer.Start(ctx)
 	})
@@ -146,26 +143,28 @@ func (m *connectionManager) Close() error {
 
 func (m *connectionManager) StartHandshake(authHeader []byte) (attemptId string, challenge []byte, err error) {
 	m.lggr.Debug("StartHandshake")
-	authHeaderElems, signer, err := network.UnpackSignedAuthHeader(authHeader)
+	nodeAddress, authHeaderElems, err := m.parseAuthHeader(authHeader)
 	if err != nil {
-		return "", nil, multierr.Append(network.ErrAuthHeaderParse, err)
+		return "", nil, err
 	}
-	nodeAddress := "0x" + hex.EncodeToString(signer)
 	donConnMgr, ok := m.dons[authHeaderElems.DonId]
 	if !ok {
-		return "", nil, network.ErrAuthInvalidDonId
+		return "", nil, errors.New("invalid DON ID")
 	}
 	nodeState, ok := donConnMgr.nodes[nodeAddress]
 	if !ok {
-		return "", nil, network.ErrAuthInvalidNode
-	}
-	if authHeaderElems.GatewayId != m.config.AuthGatewayId {
-		return "", nil, network.ErrAuthInvalidGateway
+		return "", nil, errors.New("no such node")
 	}
 	nowTs := uint32(m.clock.Now().Unix())
 	ts := authHeaderElems.Timestamp
 	if ts < nowTs-m.config.AuthTimestampToleranceSec || nowTs+m.config.AuthTimestampToleranceSec < ts {
-		return "", nil, network.ErrAuthInvalidTimestamp
+		return "", nil, errors.New("timestamp out of tolerance zone")
+	}
+	nodeState.mu.RLock()
+	lastAcceptedTs := nodeState.lastAcceptedTs
+	nodeState.mu.RUnlock()
+	if ts <= lastAcceptedTs {
+		return "", nil, errors.New("timestamp too low")
 	}
 	attemptId, challenge, err = m.newAttempt(nodeState, nodeAddress, ts)
 	if err != nil {
@@ -174,48 +173,65 @@ func (m *connectionManager) StartHandshake(authHeader []byte) (attemptId string,
 	return attemptId, challenge, nil
 }
 
+func (m *connectionManager) parseAuthHeader(authHeader []byte) (nodeAddress string, authHeaderElems *network.AuthHeaderElems, err error) {
+	n := len(authHeader)
+	if n < network.HandshakeAuthHeaderMinLen {
+		return "", nil, errors.New("auth header too short")
+	}
+	authHeaderElems, err = network.Unpack(authHeader[:n-network.HandshakeSignatureLen])
+	if err != nil {
+		return "", nil, errors.New("unable to parse auth header")
+	}
+	signature := authHeader[n-network.HandshakeSignatureLen:]
+	signer, err := common.ValidateSignature(signature, authHeader[:n-network.HandshakeSignatureLen])
+	nodeAddress = "0x" + hex.EncodeToString(signer)
+	return
+}
+
 func (m *connectionManager) newAttempt(nodeSt *nodeState, nodeAddress string, timestamp uint32) (string, []byte, error) {
-	challengeBytes := make([]byte, m.config.AuthChallengeLen)
-	_, err := rand.Read(challengeBytes)
+	challenge := make([]byte, m.config.AuthChallengeLen)
+	_, err := rand.Read(challenge)
 	if err != nil {
 		return "", nil, err
 	}
-	challenge := network.ChallengeElems{Timestamp: timestamp, GatewayId: m.config.AuthGatewayId, ChallengeBytes: challengeBytes}
 	m.connAttemptsMu.Lock()
 	defer m.connAttemptsMu.Unlock()
 	m.connAttemptCounter++
 	newId := fmt.Sprintf("%s_%d", nodeAddress, m.connAttemptCounter)
 	m.connAttempts[newId] = &connAttempt{nodeState: nodeSt, nodeAddress: nodeAddress, challenge: challenge, timestamp: timestamp}
-	return newId, network.PackChallenge(&challenge), nil
+	return newId, challenge, nil
 }
 
 func (m *connectionManager) FinalizeHandshake(attemptId string, response []byte, conn *websocket.Conn) error {
-	m.lggr.Debugw("FinalizeHandshake", "attemptId", attemptId)
+	m.lggr.Debug("FinalizeHandshake attempt: ", attemptId)
 	m.connAttemptsMu.Lock()
 	attempt, ok := m.connAttempts[attemptId]
-	delete(m.connAttempts, attemptId)
 	m.connAttemptsMu.Unlock()
 	if !ok {
-		return network.ErrChallengeAttemptNotFound
+		return errors.New("connection attempt not found")
 	}
-	signer, err := common.ExtractSigner(response, network.PackChallenge(&attempt.challenge))
-	if err != nil || attempt.nodeAddress != "0x"+hex.EncodeToString(signer) {
-		return network.ErrChallengeInvalidSignature
+	signer, err := common.ValidateSignature(response, attempt.challenge)
+	if err != nil {
+		return errors.New("invalid challenge response")
 	}
-	attempt.nodeState.conn.Reset(conn)
-	m.lggr.Infof("node %s connected", attempt.nodeAddress)
+	if attempt.nodeAddress != "0x"+hex.EncodeToString(signer) {
+		return errors.New("invalid signer")
+	}
+	attempt.nodeState.mu.Lock()
+	defer attempt.nodeState.mu.Unlock()
+	if attempt.nodeState.lastAcceptedTs >= attempt.timestamp {
+		return errors.New("timestamp too low")
+	}
+	m.lggr.Infof("Node %s connected!", attempt.nodeAddress)
+	attempt.nodeState.conn.Restart(conn)
 	return nil
 }
 
 func (m *connectionManager) AbortHandshake(attemptId string) {
-	m.lggr.Debugw("AbortHandshake", "attemptId", attemptId)
+	m.lggr.Debug("AbortHandshake attempt:", attemptId)
 	m.connAttemptsMu.Lock()
 	defer m.connAttemptsMu.Unlock()
 	delete(m.connAttempts, attemptId)
-}
-
-func (m *connectionManager) GetPort() int {
-	return m.wsServer.GetPort()
 }
 
 func (m *donConnectionManager) SetHandler(handler handlers.Handler) {
@@ -240,11 +256,7 @@ func (m *donConnectionManager) readLoop(nodeAddress string, nodeState *nodeState
 		case item := <-nodeState.conn.ReadChannel():
 			msg, err := m.codec.DecodeResponse(item.Data)
 			if err != nil {
-				m.lggr.Errorw("parse error when reading from node", "nodeAddress", nodeAddress, "err", err)
-				break
-			}
-			if err = msg.Validate(); err != nil {
-				m.lggr.Errorw("message validation error when reading from node", "nodeAddress", nodeAddress, "err", err)
+				m.lggr.Error("parse error when reading from node ", nodeAddress, err)
 				break
 			}
 			err = m.handler.HandleNodeMessage(ctx, msg, nodeAddress)

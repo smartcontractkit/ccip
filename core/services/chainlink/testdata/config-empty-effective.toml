@@ -7,6 +7,8 @@ ShutdownGracePeriod = '5s'
 FeedsManager = true
 LogPoller = false
 UICSAKeys = false
+CCIP = false
+LegacyGasStation = false
 
 [Database]
 DefaultIdleInTxSessionTimeout = '1h0m0s'
@@ -118,7 +120,6 @@ ContractTransmitterTransmitTimeout = '10s'
 DatabaseTimeout = '10s'
 KeyBundleID = '0000000000000000000000000000000000000000000000000000000000000000'
 CaptureEATelemetry = false
-CaptureAutomationCustomTelemetry = false
 DefaultTransactionQueueDepth = 1
 SimulateTransactions = false
 TraceLogging = false

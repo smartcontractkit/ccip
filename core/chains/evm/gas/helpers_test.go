@@ -79,7 +79,6 @@ type MockBlockHistoryConfig struct {
 	CheckInclusionPercentileF  uint16
 	EIP1559FeeCapBufferBlocksF uint16
 	TransactionPercentileF     uint16
-	FinalityTagEnabledF        bool
 }
 
 func (m *MockBlockHistoryConfig) BatchSize() uint32 {
@@ -111,8 +110,7 @@ func (m *MockBlockHistoryConfig) TransactionPercentile() uint16 {
 }
 
 type MockConfig struct {
-	ChainTypeF          string
-	FinalityTagEnabledF bool
+	ChainTypeF string
 }
 
 func NewMockConfig() *MockConfig {
@@ -125,10 +123,6 @@ func (m *MockConfig) ChainType() config.ChainType {
 
 func (m *MockConfig) FinalityDepth() uint32 {
 	panic("not implemented") // TODO: Implement
-}
-
-func (m *MockConfig) FinalityTagEnabled() bool {
-	return m.FinalityTagEnabledF
 }
 
 type MockGasEstimatorConfig struct {

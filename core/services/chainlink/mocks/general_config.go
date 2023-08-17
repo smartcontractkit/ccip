@@ -17,9 +17,9 @@ import (
 
 	time "time"
 
-	toml "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
-
 	uuid "github.com/google/uuid"
+
+	v2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/v2"
 
 	zapcore "go.uber.org/zap/zapcore"
 )
@@ -164,15 +164,15 @@ func (_m *GeneralConfig) DefaultChainID() *big.Int {
 }
 
 // EVMConfigs provides a mock function with given fields:
-func (_m *GeneralConfig) EVMConfigs() toml.EVMConfigs {
+func (_m *GeneralConfig) EVMConfigs() v2.EVMConfigs {
 	ret := _m.Called()
 
-	var r0 toml.EVMConfigs
-	if rf, ok := ret.Get(0).(func() toml.EVMConfigs); ok {
+	var r0 v2.EVMConfigs
+	if rf, ok := ret.Get(0).(func() v2.EVMConfigs); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(toml.EVMConfigs)
+			r0 = ret.Get(0).(v2.EVMConfigs)
 		}
 	}
 
@@ -311,6 +311,22 @@ func (_m *GeneralConfig) Keeper() config.Keeper {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(config.Keeper)
+		}
+	}
+
+	return r0
+}
+
+// LegacyGasStation provides a mock function with given fields:
+func (_m *GeneralConfig) LegacyGasStation() config.LegacyGasStation {
+	ret := _m.Called()
+
+	var r0 config.LegacyGasStation
+	if rf, ok := ret.Get(0).(func() config.LegacyGasStation); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(config.LegacyGasStation)
 		}
 	}
 

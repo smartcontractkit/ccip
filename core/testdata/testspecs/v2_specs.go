@@ -9,9 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/services/vrf/vrfcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/webhook"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 var (
@@ -242,7 +240,6 @@ type VRFSpecParams struct {
 	JobID                         string
 	Name                          string
 	CoordinatorAddress            string
-	VRFVersion                    vrfcommon.Version
 	BatchCoordinatorAddress       string
 	VRFOwnerAddress               string
 	BatchFulfillmentEnabled       bool
@@ -278,10 +275,6 @@ func GenerateVRFSpec(params VRFSpecParams) VRFSpec {
 	if params.Name != "" {
 		name = params.Name
 	}
-	vrfVersion := vrfcommon.V2
-	if params.VRFVersion != "" {
-		vrfVersion = params.VRFVersion
-	}
 	coordinatorAddress := "0xABA5eDc1a551E55b1A570c0e1f1055e5BE11eca7"
 	if params.CoordinatorAddress != "" {
 		coordinatorAddress = params.CoordinatorAddress
@@ -291,7 +284,7 @@ func GenerateVRFSpec(params VRFSpecParams) VRFSpec {
 		batchCoordinatorAddress = params.BatchCoordinatorAddress
 	}
 	vrfOwnerAddress := "0x5383C25DA15b1253463626243215495a3718beE4"
-	if params.VRFOwnerAddress != "" && vrfVersion == vrfcommon.V2 {
+	if params.VRFOwnerAddress != "" {
 		vrfOwnerAddress = params.VRFOwnerAddress
 	}
 	batchFulfillmentGasMultiplier := 1.0
@@ -364,31 +357,6 @@ simulate [type=ethcall
 decode_log->vrf->estimate_gas->simulate
 `, coordinatorAddress, coordinatorAddress, coordinatorAddress)
 	}
-	if vrfVersion == vrfcommon.V2Plus {
-		observationSource = fmt.Sprintf(`
-decode_log              [type=ethabidecodelog
-                         abi="RandomWordsRequested(bytes32 indexed keyHash,uint256 requestId,uint256 preSeed,uint256 indexed subId,uint16 minimumRequestConfirmations,uint32 callbackGasLimit,uint32 numWords,bytes extraArgs,address indexed sender)"
-                         data="$(jobRun.logData)"
-                         topics="$(jobRun.logTopics)"]
-generate_proof          [type=vrfv2plus
-                         publicKey="$(jobSpec.publicKey)"
-                         requestBlockHash="$(jobRun.logBlockHash)"
-                         requestBlockNumber="$(jobRun.logBlockNumber)"
-                         topics="$(jobRun.logTopics)"]
-estimate_gas            [type=estimategaslimit
-                         to="%s"
-                         multiplier="1.1"
-                         data="$(generate_proof.output)"]
-simulate_fulfillment    [type=ethcall
-                         to="%s"
-		                 gas="$(estimate_gas)"
-		                 gasPrice="$(jobSpec.maxGasPrice)"
-		                 extractRevertReason=true
-		                 contract="%s"
-		                 data="$(generate_proof.output)"]
-decode_log->generate_proof->estimate_gas->simulate_fulfillment
-`, coordinatorAddress, coordinatorAddress, coordinatorAddress)
-	}
 	if params.ObservationSource != "" {
 		observationSource = params.ObservationSource
 	}
@@ -401,6 +369,7 @@ coordinatorAddress = "%s"
 batchCoordinatorAddress = "%s"
 batchFulfillmentEnabled = %v
 batchFulfillmentGasMultiplier = %s
+vrfOwnerAddress = "%s"
 minIncomingConfirmations = %d
 requestedConfsDelay = %d
 requestTimeout = "%s"
@@ -416,7 +385,7 @@ observationSource = """
 	toml := fmt.Sprintf(template,
 		jobID, name, coordinatorAddress, batchCoordinatorAddress,
 		params.BatchFulfillmentEnabled, strconv.FormatFloat(batchFulfillmentGasMultiplier, 'f', 2, 64),
-		confirmations, params.RequestedConfsDelay, requestTimeout.String(), publicKey, chunkSize,
+		vrfOwnerAddress, confirmations, params.RequestedConfsDelay, requestTimeout.String(), publicKey, chunkSize,
 		params.BackoffInitialDelay.String(), params.BackoffMaxDelay.String(), gasLanePrice.String(), observationSource)
 	if len(params.FromAddresses) != 0 {
 		var addresses []string
@@ -424,9 +393,6 @@ observationSource = """
 			addresses = append(addresses, fmt.Sprintf("%q", address))
 		}
 		toml = toml + "\n" + fmt.Sprintf(`fromAddresses = [%s]`, strings.Join(addresses, ", "))
-	}
-	if vrfVersion == vrfcommon.V2 {
-		toml = toml + "\n" + fmt.Sprintf(`vrfOwnerAddress = "%s"`, vrfOwnerAddress)
 	}
 
 	return VRFSpec{VRFSpecParams: VRFSpecParams{
@@ -444,7 +410,6 @@ observationSource = """
 		BackoffInitialDelay:      params.BackoffInitialDelay,
 		BackoffMaxDelay:          params.BackoffMaxDelay,
 		VRFOwnerAddress:          vrfOwnerAddress,
-		VRFVersion:               vrfVersion,
 	}, toml: toml}
 }
 
@@ -586,20 +551,17 @@ ds -> ds_parse -> ds_multiply;
 
 // BlockhashStoreSpecParams defines params for building a blockhash store job spec.
 type BlockhashStoreSpecParams struct {
-	JobID                          string
-	Name                           string
-	CoordinatorV1Address           string
-	CoordinatorV2Address           string
-	CoordinatorV2PlusAddress       string
-	WaitBlocks                     int
-	LookbackBlocks                 int
-	BlockhashStoreAddress          string
-	TrustedBlockhashStoreAddress   string
-	TrustedBlockhashStoreBatchSize int32
-	PollPeriod                     time.Duration
-	RunTimeout                     time.Duration
-	EVMChainID                     int64
-	FromAddresses                  []string
+	JobID                 string
+	Name                  string
+	CoordinatorV1Address  string
+	CoordinatorV2Address  string
+	WaitBlocks            int
+	LookbackBlocks        int
+	BlockhashStoreAddress string
+	PollPeriod            time.Duration
+	RunTimeout            time.Duration
+	EVMChainID            int64
+	FromAddresses         []string
 }
 
 // BlockhashStoreSpec defines a blockhash store job spec.
@@ -629,18 +591,6 @@ func GenerateBlockhashStoreSpec(params BlockhashStoreSpecParams) BlockhashStoreS
 
 	if params.CoordinatorV2Address == "" {
 		params.CoordinatorV2Address = "0x2498e651Ae17C2d98417C4826F0816Ac6366A95E"
-	}
-
-	if params.CoordinatorV2PlusAddress == "" {
-		params.CoordinatorV2PlusAddress = "0x92B5e28Ac583812874e4271380c7d070C5FB6E6b"
-	}
-
-	if params.TrustedBlockhashStoreAddress == "" {
-		params.TrustedBlockhashStoreAddress = utils.ZeroAddress.Hex()
-	}
-
-	if params.TrustedBlockhashStoreBatchSize == 0 {
-		params.TrustedBlockhashStoreBatchSize = 20
 	}
 
 	if params.WaitBlocks == 0 {
@@ -680,23 +630,33 @@ schemaVersion = 1
 name = "%s"
 coordinatorV1Address = "%s"
 coordinatorV2Address = "%s"
-coordinatorV2PlusAddress = "%s"
 waitBlocks = %d
 lookbackBlocks = %d
 blockhashStoreAddress = "%s"
-trustedBlockhashStoreAddress = "%s"
-trustedBlockhashStoreBatchSize = %d
 pollPeriod = "%s"
 runTimeout = "%s"
 evmChainID = "%d"
 fromAddresses = %s
 `
 	toml := fmt.Sprintf(template, params.Name, params.CoordinatorV1Address,
-		params.CoordinatorV2Address, params.CoordinatorV2PlusAddress, params.WaitBlocks, params.LookbackBlocks,
-		params.BlockhashStoreAddress, params.TrustedBlockhashStoreAddress, params.TrustedBlockhashStoreBatchSize, params.PollPeriod.String(), params.RunTimeout.String(),
+		params.CoordinatorV2Address, params.WaitBlocks, params.LookbackBlocks,
+		params.BlockhashStoreAddress, params.PollPeriod.String(), params.RunTimeout.String(),
 		params.EVMChainID, formattedFromAddresses)
 
 	return BlockhashStoreSpec{BlockhashStoreSpecParams: params, toml: toml}
+}
+
+type CCIPSpecParams struct {
+	contractID string
+}
+
+type CCIPSpec struct {
+	CCIPSpecParams
+	toml string
+}
+
+func (c CCIPSpec) Toml() string {
+	return c.toml
 }
 
 // BlockHeaderFeederSpecParams defines params for building a block header feeder job spec.
@@ -705,7 +665,6 @@ type BlockHeaderFeederSpecParams struct {
 	Name                       string
 	CoordinatorV1Address       string
 	CoordinatorV2Address       string
-	CoordinatorV2PlusAddress   string
 	WaitBlocks                 int
 	LookbackBlocks             int
 	BlockhashStoreAddress      string
@@ -745,10 +704,6 @@ func GenerateBlockHeaderFeederSpec(params BlockHeaderFeederSpecParams) BlockHead
 
 	if params.CoordinatorV2Address == "" {
 		params.CoordinatorV2Address = "0x2d7F888fE0dD469bd81A12f77e6291508f714d4B"
-	}
-
-	if params.CoordinatorV2PlusAddress == "" {
-		params.CoordinatorV2PlusAddress = "0x2d7F888fE0dD469bd81A12f77e6291508f714d4B"
 	}
 
 	if params.WaitBlocks == 0 {
@@ -800,7 +755,6 @@ schemaVersion = 1
 name = "%s"
 coordinatorV1Address = "%s"
 coordinatorV2Address = "%s"
-coordinatorV2PlusAddress = "%s"
 waitBlocks = %d
 lookbackBlocks = %d
 blockhashStoreAddress = "%s"
@@ -813,10 +767,172 @@ getBlockhashesBatchSize = %d
 storeBlockhashesBatchSize = %d
 `
 	toml := fmt.Sprintf(template, params.Name, params.CoordinatorV1Address,
-		params.CoordinatorV2Address, params.CoordinatorV2PlusAddress, params.WaitBlocks, params.LookbackBlocks,
+		params.CoordinatorV2Address, params.WaitBlocks, params.LookbackBlocks,
 		params.BlockhashStoreAddress, params.BatchBlockhashStoreAddress, params.PollPeriod.String(),
 		params.RunTimeout.String(), params.EVMChainID, formattedFromAddresses, params.GetBlockhashesBatchSize,
 		params.StoreBlockhashesBatchSize)
 
 	return BlockHeaderFeederSpec{BlockHeaderFeederSpecParams: params, toml: toml}
+}
+
+// LegacyGasStationServerSpecParams defines params for building a legacy gas station server job spec.
+type LegacyGasStationServerSpecParams struct {
+	JobID             string
+	Name              string
+	ForwarderAddress  string
+	EVMChainID        uint64
+	CCIPChainSelector uint64
+	FromAddresses     []string
+}
+
+// LegacyGasStationServerSpec defines a legacy gas station server job spec.
+type LegacyGasStationServerSpec struct {
+	LegacyGasStationServerSpecParams
+	toml string
+}
+
+// Toml returns the LegacyGasStationServerSpec in TOML string form.
+func (l LegacyGasStationServerSpec) Toml() string {
+	return l.toml
+}
+
+// GenerateLegacyGasStationServerSpec creates a LegacyGasStationServerSpec from the given params.
+func GenerateLegacyGasStationServerSpec(params LegacyGasStationServerSpecParams) LegacyGasStationServerSpec {
+	if params.JobID == "" {
+		params.JobID = "123e4567-e89b-12d3-a456-426655442211"
+	}
+
+	if params.Name == "" {
+		params.Name = "legacygasstationserver"
+	}
+
+	if params.ForwarderAddress == "" {
+		params.ForwarderAddress = "0xb078DA5cDa45Ee0f5D2007C03fCf8d9461395e6c"
+	}
+
+	if params.CCIPChainSelector == 0 {
+		params.CCIPChainSelector = 125500
+	}
+
+	var formattedFromAddresses string
+	if params.FromAddresses == nil {
+		formattedFromAddresses = `["0xBe0b739f841bC113D4F4e4CdD16086ffAbB5f39f"]`
+	} else {
+		var addresses []string
+		for _, address := range params.FromAddresses {
+			addresses = append(addresses, fmt.Sprintf("%q", address))
+		}
+		formattedFromAddresses = fmt.Sprintf("[%s]", strings.Join(addresses, ", "))
+	}
+
+	template := `
+type = "legacygasstationserver"
+schemaVersion = 1
+name = "%s"
+forwarderAddress = "%s"
+evmChainID = "%d"
+ccipChainSelector = "%d"
+fromAddresses = %s
+observationSource = """
+estimate_gas [type=estimategaslimit
+              to="%s"
+              multiplier="1.1"
+              data="$(jobRun.payload)"]
+simulate [type=ethcall
+          to="%s"
+          gas="$(estimate_gas)"
+          gasPrice="$(jobSpec.maxGasPrice)"
+          extractRevertReason=true
+          contract="%s"
+          data="$(jobRun.payload)"]
+estimate_gas->simulate
+"""
+`
+	toml := fmt.Sprintf(template, params.Name, params.ForwarderAddress, params.EVMChainID, params.CCIPChainSelector,
+		formattedFromAddresses, params.ForwarderAddress, params.ForwarderAddress, params.ForwarderAddress)
+
+	return LegacyGasStationServerSpec{LegacyGasStationServerSpecParams: params, toml: toml}
+}
+
+// LegacyGasStationSidecarSpecParams defines params for building a legacy gas station sidecar job spec.
+type LegacyGasStationSidecarSpecParams struct {
+	JobID             string
+	Name              string
+	ForwarderAddress  string
+	OffRampAddress    string
+	LookbackBlocks    int
+	PollPeriod        time.Duration
+	RunTimeout        time.Duration
+	EVMChainID        uint64
+	CCIPChainSelector uint64
+	StatusUpdateURL   string
+}
+
+// LegacyGasStationSidecarSpec defines a legacy gas station sidecar job spec.
+type LegacyGasStationSidecarSpec struct {
+	LegacyGasStationSidecarSpecParams
+	toml string
+}
+
+// Toml returns the LegacyGasStationSidecarSpec in TOML string form.
+func (l LegacyGasStationSidecarSpec) Toml() string {
+	return l.toml
+}
+
+// GenerateLegacyGasStationSidecarSpec creates a LegacyGasStationSidecarSpec from the given params.
+func GenerateLegacyGasStationSidecarSpec(params LegacyGasStationSidecarSpecParams) LegacyGasStationSidecarSpec {
+	if params.JobID == "" {
+		params.JobID = "123e4567-e89b-12d3-a456-426655442211"
+	}
+
+	if params.Name == "" {
+		params.Name = "legacygasstationsidecar"
+	}
+
+	if params.ForwarderAddress == "" {
+		params.ForwarderAddress = "0x2d7F888fE0dD469bd81A12f77e6291508f714d4B"
+	}
+
+	if params.OffRampAddress == "" {
+		params.OffRampAddress = "0x016D54091ee83D42aF46e4F2d7177D0A232D2bDa"
+	}
+
+	if params.CCIPChainSelector == 0 {
+		params.CCIPChainSelector = 125500
+	}
+
+	if params.LookbackBlocks == 0 {
+		params.LookbackBlocks = 10000
+	}
+
+	if params.PollPeriod == 0 {
+		params.PollPeriod = 10 * time.Second
+	}
+
+	if params.RunTimeout == 0 {
+		params.RunTimeout = 10 * time.Second
+	}
+
+	if params.StatusUpdateURL == "" {
+		params.StatusUpdateURL = "http://testurl.com"
+	}
+
+	template := `
+type = "legacygasstationsidecar"
+schemaVersion = 1
+name = "%s"
+forwarderAddress = "%s"
+offRampAddress = "%s"
+lookbackBlocks = %d
+pollPeriod = "%s"
+runTimeout = "%s"
+evmChainID = "%d"
+ccipChainSelector = "%d"
+statusUpdateURL = "%s"
+`
+	toml := fmt.Sprintf(template, params.Name, params.ForwarderAddress,
+		params.OffRampAddress, params.LookbackBlocks, params.PollPeriod,
+		params.RunTimeout, params.EVMChainID, params.CCIPChainSelector, params.StatusUpdateURL)
+
+	return LegacyGasStationSidecarSpec{LegacyGasStationSidecarSpecParams: params, toml: toml}
 }

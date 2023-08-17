@@ -1,10 +1,10 @@
 package chainlink
 
-import "github.com/smartcontractkit/chainlink/v2/core/config/toml"
+import v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 
 type pyroscopeConfig struct {
-	c toml.Pyroscope
-	s toml.PyroscopeSecrets
+	c v2.Pyroscope
+	s v2.PyroscopeSecrets
 }
 
 func (p *pyroscopeConfig) AuthToken() string {

@@ -2,14 +2,15 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/config/env"
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
-	testtomlutils "github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest/v2/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
@@ -21,10 +22,10 @@ var (
 	testEnvContents = fmt.Sprintf("P2P.V2.AnnounceAddresses = ['%s']", setInEnv)
 
 	testConfigFileContents = chainlink.Config{
-		Core: toml.Core{
+		Core: v2.Core{
 			RootDir: &setInFile,
-			P2P: toml.P2P{
-				V2: toml.P2PV2{
+			P2P: v2.P2P{
+				V2: v2.P2PV2{
 					AnnounceAddresses: &[]string{setInFile},
 					ListenAddresses:   &[]string{setInFile},
 				},
@@ -33,21 +34,32 @@ var (
 	}
 
 	testSecretsFileContents = chainlink.Secrets{
-		Secrets: toml.Secrets{
-			Prometheus: toml.PrometheusSecrets{
+		Secrets: v2.Secrets{
+			Prometheus: v2.PrometheusSecrets{
 				AuthToken: models.NewSecret("PROM_TOKEN"),
 			},
 		},
 	}
 
 	testSecretsRedactedContents = chainlink.Secrets{
-		Secrets: toml.Secrets{
-			Prometheus: toml.PrometheusSecrets{
+		Secrets: v2.Secrets{
+			Prometheus: v2.PrometheusSecrets{
 				AuthToken: models.NewSecret("xxxxx"),
 			},
 		},
 	}
 )
+
+func makeTestFile(t *testing.T, contents any, fileName string) string {
+	d := t.TempDir()
+	p := filepath.Join(d, fileName)
+
+	b, err := toml.Marshal(contents)
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(p, b, 0777))
+	return p
+}
 
 func withDefaults(t *testing.T, c chainlink.Config, s chainlink.Secrets) chainlink.GeneralConfig {
 	cfg, err := chainlink.GeneralConfigOpts{Config: c, Secrets: s}.New()
@@ -57,10 +69,10 @@ func withDefaults(t *testing.T, c chainlink.Config, s chainlink.Secrets) chainli
 
 func Test_initServerConfig(t *testing.T) {
 	type args struct {
-		opts         *chainlink.GeneralConfigOpts
-		fileNames    []string
-		secretsFiles []string
-		envVar       string
+		opts        *chainlink.GeneralConfigOpts
+		fileNames   []string
+		secretsFile string
+		envVar      string
 	}
 	tests := []struct {
 		name    string
@@ -75,9 +87,9 @@ func Test_initServerConfig(t *testing.T) {
 				envVar: testEnvContents,
 			},
 			wantCfg: withDefaults(t, chainlink.Config{
-				Core: toml.Core{
-					P2P: toml.P2P{
-						V2: toml.P2PV2{
+				Core: v2.Core{
+					P2P: v2.P2P{
+						V2: v2.P2PV2{
 							AnnounceAddresses: &[]string{setInEnv},
 						},
 					},
@@ -88,7 +100,7 @@ func Test_initServerConfig(t *testing.T) {
 			name: "files only",
 			args: args{
 				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
+				fileNames: []string{makeTestFile(t, testConfigFileContents, "test.toml")},
 			},
 			wantCfg: withDefaults(t, testConfigFileContents, chainlink.Secrets{}),
 		},
@@ -104,14 +116,14 @@ func Test_initServerConfig(t *testing.T) {
 			name: "env overlay of file",
 			args: args{
 				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
+				fileNames: []string{makeTestFile(t, testConfigFileContents, "test.toml")},
 				envVar:    testEnvContents,
 			},
 			wantCfg: withDefaults(t, chainlink.Config{
-				Core: toml.Core{
+				Core: v2.Core{
 					RootDir: &setInFile,
-					P2P: toml.P2P{
-						V2: toml.P2PV2{
+					P2P: v2.P2P{
+						V2: v2.P2PV2{
 							// env should override this specific field
 							AnnounceAddresses: &[]string{setInEnv},
 							ListenAddresses:   &[]string{setInFile},
@@ -123,136 +135,32 @@ func Test_initServerConfig(t *testing.T) {
 		{
 			name: "failed to read secrets",
 			args: args{
-				opts:         new(chainlink.GeneralConfigOpts),
-				fileNames:    []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{"/doesnt-exist"},
+				opts:        new(chainlink.GeneralConfigOpts),
+				fileNames:   []string{makeTestFile(t, testConfigFileContents, "test.toml")},
+				secretsFile: "/doesnt-exist",
 			},
 			wantErr: true,
 		},
 		{
 			name: "reading secrets",
 			args: args{
-				opts:         new(chainlink.GeneralConfigOpts),
-				fileNames:    []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{testtomlutils.WriteTOMLFile(t, testSecretsFileContents, "test_secrets.toml")},
+				opts:        new(chainlink.GeneralConfigOpts),
+				fileNames:   []string{makeTestFile(t, testConfigFileContents, "test.toml")},
+				secretsFile: makeTestFile(t, testSecretsFileContents, "test_secrets.toml"),
 			},
 			wantCfg: withDefaults(t, testConfigFileContents, testSecretsRedactedContents),
-		},
-		{
-			name: "reading multiple secrets",
-			args: args{
-				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{
-					"../services/chainlink/testdata/mergingsecretsdata/secrets-database.toml",
-					"../services/chainlink/testdata/mergingsecretsdata/secrets-explorer.toml",
-					"../services/chainlink/testdata/mergingsecretsdata/secrets-password.toml",
-					"../services/chainlink/testdata/mergingsecretsdata/secrets-pyroscope.toml",
-					"../services/chainlink/testdata/mergingsecretsdata/secrets-prometheus.toml",
-					"../services/chainlink/testdata/mergingsecretsdata/secrets-mercury-split-one.toml",
-					"../services/chainlink/testdata/mergingsecretsdata/secrets-mercury-split-two.toml",
-					"../services/chainlink/testdata/mergingsecretsdata/secrets-threshold.toml",
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "reading multiple secrets with overrides: Database",
-			args: args{
-				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{
-					"../testdata/mergingsecretsdata/secrets-database.toml",
-					"../testdata/mergingsecretsdata/secrets-database.toml",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "reading multiple secrets with overrides: Explorer",
-			args: args{
-				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{
-					"../testdata/mergingsecretsdata/secrets-explorer.toml",
-					"../testdata/mergingsecretsdata/secrets-explorer.toml",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "reading multiple secrets with overrides: Password",
-			args: args{
-				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{
-					"../testdata/mergingsecretsdata/secrets-password.toml",
-					"../testdata/mergingsecretsdata/secrets-password.toml",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "reading multiple secrets with overrides: Pyroscope",
-			args: args{
-				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{
-					"../testdata/mergingsecretsdata/secrets-pyroscope.toml",
-					"../testdata/mergingsecretsdata/secrets-pyroscope.toml",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "reading multiple secrets with overrides: Prometheus",
-			args: args{
-				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{
-					"../testdata/mergingsecretsdata/secrets-prometheus.toml",
-					"../testdata/mergingsecretsdata/secrets-prometheus.toml",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "reading multiple secrets with overrides: Mercury",
-			args: args{
-				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{
-					"../testdata/mergingsecretsdata/secrets-mercury-split-one.toml",
-					"../testdata/mergingsecretsdata/secrets-mercury-split-one.toml",
-				},
-			},
-			wantErr: true,
-		},
-		{
-			name: "reading multiple secrets with overrides: Threshold",
-			args: args{
-				opts:      new(chainlink.GeneralConfigOpts),
-				fileNames: []string{testtomlutils.WriteTOMLFile(t, testConfigFileContents, "test.toml")},
-				secretsFiles: []string{
-					"../testdata/mergingsecretsdata/secrets-threshold.toml",
-					"../testdata/mergingsecretsdata/secrets-threshold.toml",
-				},
-			},
-			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.args.envVar != "" {
-				t.Setenv(string(env.Config), tt.args.envVar)
+				t.Setenv(string(v2.EnvConfig), tt.args.envVar)
 			}
-			cfg, err := initServerConfig(tt.args.opts, tt.args.fileNames, tt.args.secretsFiles)
+			cfg, err := initServerConfig(tt.args.opts, tt.args.fileNames, tt.args.secretsFile)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("loadOpts() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if tt.wantCfg != nil {
-				assert.Equal(t, tt.wantCfg, cfg)
-			}
+			assert.Equal(t, cfg, tt.wantCfg)
 		})
 	}
 }

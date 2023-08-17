@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector"
-	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions"
 	"github.com/smartcontractkit/chainlink/v2/core/services/s4"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -26,27 +25,27 @@ type functionsConnectorHandler struct {
 	nodeAddress string
 	storage     s4.Storage
 	allowlist   functions.OnchainAllowlist
-	rateLimiter *hc.RateLimiter
 	lggr        logger.Logger
 }
+
+const (
+	methodSecretsSet  = "secrets_set"
+	methodSecretsList = "secrets_list"
+)
 
 var (
 	_ connector.Signer                  = &functionsConnectorHandler{}
 	_ connector.GatewayConnectorHandler = &functionsConnectorHandler{}
 )
 
-func NewFunctionsConnectorHandler(nodeAddress string, signerKey *ecdsa.PrivateKey, storage s4.Storage, allowlist functions.OnchainAllowlist, rateLimiter *hc.RateLimiter, lggr logger.Logger) (*functionsConnectorHandler, error) {
-	if signerKey == nil || storage == nil || allowlist == nil || rateLimiter == nil {
-		return nil, fmt.Errorf("signerKey, storage, allowlist and rateLimiter must be non-nil")
-	}
+func NewFunctionsConnectorHandler(nodeAddress string, signerKey *ecdsa.PrivateKey, storage s4.Storage, allowlist functions.OnchainAllowlist, lggr logger.Logger) *functionsConnectorHandler {
 	return &functionsConnectorHandler{
 		nodeAddress: nodeAddress,
 		signerKey:   signerKey,
 		storage:     storage,
 		allowlist:   allowlist,
-		rateLimiter: rateLimiter,
 		lggr:        lggr.Named("functionsConnectorHandler"),
-	}, nil
+	}
 }
 
 func (h *functionsConnectorHandler) SetConnector(connector connector.GatewayConnector) {
@@ -57,24 +56,19 @@ func (h *functionsConnectorHandler) Sign(data ...[]byte) ([]byte, error) {
 	return common.SignData(h.signerKey, data...)
 }
 
-func (h *functionsConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayId string, msg *api.Message) {
-	body := &msg.Body
+func (h *functionsConnectorHandler) HandleGatewayMessage(ctx context.Context, gatewayId string, body *api.MessageBody) {
 	fromAddr := ethCommon.HexToAddress(body.Sender)
 	if !h.allowlist.Allow(fromAddr) {
 		h.lggr.Errorw("allowlist prevented the request from this address", "id", gatewayId, "address", fromAddr)
-		return
-	}
-	if !h.rateLimiter.Allow(body.Sender) {
-		h.lggr.Errorw("request rate-limited", "id", gatewayId, "address", fromAddr)
 		return
 	}
 
 	h.lggr.Debugw("handling gateway request", "id", gatewayId, "method", body.Method)
 
 	switch body.Method {
-	case functions.MethodSecretsList:
+	case methodSecretsList:
 		h.handleSecretsList(ctx, gatewayId, body, fromAddr)
-	case functions.MethodSecretsSet:
+	case methodSecretsSet:
 		h.handleSecretsSet(ctx, gatewayId, body, fromAddr)
 	default:
 		h.lggr.Errorw("unsupported method", "id", gatewayId, "method", body.Method)
@@ -94,13 +88,25 @@ func (h *functionsConnectorHandler) Close() error {
 }
 
 func (h *functionsConnectorHandler) handleSecretsList(ctx context.Context, gatewayId string, body *api.MessageBody, fromAddr ethCommon.Address) {
-	var response functions.SecretsListResponse
+	type ListRow struct {
+		SlotID     uint   `json:"slot_id"`
+		Version    uint64 `json:"version"`
+		Expiration int64  `json:"expiration"`
+	}
+
+	type ListResponse struct {
+		Success      bool      `json:"success"`
+		ErrorMessage string    `json:"error_message,omitempty"`
+		Rows         []ListRow `json:"rows,omitempty"`
+	}
+
+	var response ListResponse
 	snapshot, err := h.storage.List(ctx, fromAddr)
 	if err == nil {
 		response.Success = true
-		response.Rows = make([]functions.SecretsListRow, len(snapshot))
+		response.Rows = make([]ListRow, len(snapshot))
 		for i, row := range snapshot {
-			response.Rows[i] = functions.SecretsListRow{
+			response.Rows[i] = ListRow{
 				SlotID:     row.SlotId,
 				Version:    row.Version,
 				Expiration: row.Expiration,
@@ -116,8 +122,21 @@ func (h *functionsConnectorHandler) handleSecretsList(ctx context.Context, gatew
 }
 
 func (h *functionsConnectorHandler) handleSecretsSet(ctx context.Context, gatewayId string, body *api.MessageBody, fromAddr ethCommon.Address) {
-	var request functions.SecretsSetRequest
-	var response functions.SecretsSetResponse
+	type SetRequest struct {
+		SlotID     uint   `json:"slot_id"`
+		Version    uint64 `json:"version"`
+		Expiration int64  `json:"expiration"`
+		Payload    []byte `json:"payload"`
+		Signature  []byte `json:"signature"`
+	}
+
+	type SetResponse struct {
+		Success      bool   `json:"success"`
+		ErrorMessage string `json:"error_message,omitempty"`
+	}
+
+	var request SetRequest
+	var response SetResponse
 	err := json.Unmarshal(body.Payload, &request)
 	if err == nil {
 		key := s4.Key{
@@ -129,7 +148,6 @@ func (h *functionsConnectorHandler) handleSecretsSet(ctx context.Context, gatewa
 			Expiration: request.Expiration,
 			Payload:    request.Payload,
 		}
-		h.lggr.Debugw("handling a secrets_set request", "address", fromAddr, "slotId", request.SlotID, "payloadVersion", request.Version, "expiration", request.Expiration)
 		err = h.storage.Put(ctx, &key, &record, request.Signature)
 		if err == nil {
 			response.Success = true
@@ -156,7 +174,7 @@ func (h *functionsConnectorHandler) sendResponse(ctx context.Context, gatewayId 
 			MessageId: requestBody.MessageId,
 			DonId:     requestBody.DonId,
 			Method:    requestBody.Method,
-			Receiver:  requestBody.Sender,
+			Sender:    h.nodeAddress,
 			Payload:   payloadJson,
 		},
 	}

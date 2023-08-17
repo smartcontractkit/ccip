@@ -16,10 +16,10 @@ import (
 //go:generate mockery --quiet --name ORM --output ./mocks/ --case=underscore
 
 type ORM interface {
-	CreateRequest(request *Request, qopts ...pg.QOpt) error
+	CreateRequest(requestID RequestID, receivedAt time.Time, requestTxHash *common.Hash, qopts ...pg.QOpt) error
 
-	SetResult(requestID RequestID, computationResult []byte, readyAt time.Time, qopts ...pg.QOpt) error
-	SetError(requestID RequestID, errorType ErrType, computationError []byte, readyAt time.Time, readyForProcessing bool, qopts ...pg.QOpt) error
+	SetResult(requestID RequestID, runID int64, computationResult []byte, readyAt time.Time, qopts ...pg.QOpt) error
+	SetError(requestID RequestID, runID int64, errorType ErrType, computationError []byte, readyAt time.Time, readyForProcessing bool, qopts ...pg.QOpt) error
 	SetFinalized(requestID RequestID, reportedResult []byte, reportedError []byte, qopts ...pg.QOpt) error
 	SetConfirmed(requestID RequestID, qopts ...pg.QOpt) error
 
@@ -40,14 +40,9 @@ var _ ORM = (*orm)(nil)
 
 var ErrDuplicateRequestID = errors.New("Functions ORM: duplicate request ID")
 
-const (
-	tableName           = "functions_requests"
-	defaultInitialState = IN_PROGRESS
-	requestFields       = "request_id, received_at, request_tx_hash, " +
-		"state, result_ready_at, result, error_type, error, " +
-		"transmitted_result, transmitted_error, flags, aggregation_method, " +
-		"callback_gas_limit, coordinator_contract_address, onchain_metadata, processing_metadata"
-)
+const requestFields = "request_id, run_id, received_at, request_tx_hash, " +
+	"state, result_ready_at, result, error_type, error, " +
+	"transmitted_result, transmitted_error"
 
 func NewORM(db *sqlx.DB, lggr logger.Logger, cfg pg.QConfig, contractAddress common.Address) ORM {
 	return &orm{
@@ -56,23 +51,12 @@ func NewORM(db *sqlx.DB, lggr logger.Logger, cfg pg.QConfig, contractAddress com
 	}
 }
 
-func (o *orm) CreateRequest(request *Request, qopts ...pg.QOpt) error {
-	stmt := fmt.Sprintf(`
-		INSERT INTO %s (request_id, contract_address, received_at, request_tx_hash, state, flags, aggregation_method, callback_gas_limit, coordinator_contract_address, onchain_metadata)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (request_id) DO NOTHING;
-	`, tableName)
-	result, err := o.q.WithOpts(qopts...).Exec(
-		stmt,
-		request.RequestID,
-		o.contractAddress,
-		request.ReceivedAt,
-		request.RequestTxHash,
-		defaultInitialState,
-		request.Flags,
-		request.AggregationMethod,
-		request.CallbackGasLimit,
-		request.CoordinatorContractAddress,
-		request.OnchainMetadata)
+func (o *orm) CreateRequest(requestID RequestID, receivedAt time.Time, requestTxHash *common.Hash, qopts ...pg.QOpt) error {
+	stmt := `
+		INSERT INTO ocr2dr_requests (request_id, contract_address, received_at, request_tx_hash, state)
+		VALUES ($1,$2,$3,$4,$5) ON CONFLICT (request_id) DO NOTHING;
+	`
+	result, err := o.q.WithOpts(qopts...).Exec(stmt, requestID, o.contractAddress, receivedAt, requestTxHash, IN_PROGRESS)
 	if err != nil {
 		return err
 	}
@@ -88,8 +72,8 @@ func (o *orm) CreateRequest(request *Request, qopts ...pg.QOpt) error {
 
 func (o *orm) setWithStateTransitionCheck(requestID RequestID, newState RequestState, setter func(pg.Queryer) error, qopts ...pg.QOpt) error {
 	err := o.q.WithOpts(qopts...).Transaction(func(tx pg.Queryer) error {
-		prevState := defaultInitialState
-		stmt := fmt.Sprintf(`SELECT state FROM %s WHERE request_id=$1 AND contract_address=$2;`, tableName)
+		prevState := IN_PROGRESS // default initial state
+		stmt := `SELECT state FROM ocr2dr_requests WHERE request_id=$1 AND contract_address=$2;`
 		if err2 := tx.Get(&prevState, stmt, requestID, o.contractAddress); err2 != nil {
 			return err2
 		}
@@ -102,21 +86,21 @@ func (o *orm) setWithStateTransitionCheck(requestID RequestID, newState RequestS
 	return err
 }
 
-func (o *orm) SetResult(requestID RequestID, computationResult []byte, readyAt time.Time, qopts ...pg.QOpt) error {
+func (o *orm) SetResult(requestID RequestID, runID int64, computationResult []byte, readyAt time.Time, qopts ...pg.QOpt) error {
 	newState := RESULT_READY
 	err := o.setWithStateTransitionCheck(requestID, newState, func(tx pg.Queryer) error {
-		stmt := fmt.Sprintf(`
-			UPDATE %s
-			SET result=$3, result_ready_at=$4, state=$5
+		stmt := `
+			UPDATE ocr2dr_requests
+			SET run_id=$3, result=$4, result_ready_at=$5, state=$6
 			WHERE request_id=$1 AND contract_address=$2;
-		`, tableName)
-		_, err2 := tx.Exec(stmt, requestID, o.contractAddress, computationResult, readyAt, newState)
+		`
+		_, err2 := tx.Exec(stmt, requestID, o.contractAddress, runID, computationResult, readyAt, newState)
 		return err2
 	}, qopts...)
 	return err
 }
 
-func (o *orm) SetError(requestID RequestID, errorType ErrType, computationError []byte, readyAt time.Time, readyForProcessing bool, qopts ...pg.QOpt) error {
+func (o *orm) SetError(requestID RequestID, runID int64, errorType ErrType, computationError []byte, readyAt time.Time, readyForProcessing bool, qopts ...pg.QOpt) error {
 	var newState RequestState
 	if readyForProcessing {
 		newState = RESULT_READY
@@ -124,12 +108,12 @@ func (o *orm) SetError(requestID RequestID, errorType ErrType, computationError 
 		newState = IN_PROGRESS
 	}
 	err := o.setWithStateTransitionCheck(requestID, newState, func(tx pg.Queryer) error {
-		stmt := fmt.Sprintf(`
-			UPDATE %s
-			SET error=$3, error_type=$4, result_ready_at=$5, state=$6
+		stmt := `
+			UPDATE ocr2dr_requests
+			SET run_id=$3, error=$4, error_type=$5, result_ready_at=$6, state=$7
 			WHERE request_id=$1 AND contract_address=$2;
-		`, tableName)
-		_, err2 := tx.Exec(stmt, requestID, o.contractAddress, computationError, errorType, readyAt, newState)
+		`
+		_, err2 := tx.Exec(stmt, requestID, o.contractAddress, runID, computationError, errorType, readyAt, newState)
 		return err2
 	}, qopts...)
 	return err
@@ -138,11 +122,11 @@ func (o *orm) SetError(requestID RequestID, errorType ErrType, computationError 
 func (o *orm) SetFinalized(requestID RequestID, reportedResult []byte, reportedError []byte, qopts ...pg.QOpt) error {
 	newState := FINALIZED
 	err := o.setWithStateTransitionCheck(requestID, newState, func(tx pg.Queryer) error {
-		stmt := fmt.Sprintf(`
-			UPDATE %s
+		stmt := `
+			UPDATE ocr2dr_requests
 			SET transmitted_result=$3, transmitted_error=$4, state=$5
 			WHERE request_id=$1 AND contract_address=$2;
-		`, tableName)
+		`
 		_, err2 := tx.Exec(stmt, requestID, o.contractAddress, reportedResult, reportedError, newState)
 		return err2
 	}, qopts...)
@@ -152,7 +136,7 @@ func (o *orm) SetFinalized(requestID RequestID, reportedResult []byte, reportedE
 func (o *orm) SetConfirmed(requestID RequestID, qopts ...pg.QOpt) error {
 	newState := CONFIRMED
 	err := o.setWithStateTransitionCheck(requestID, newState, func(tx pg.Queryer) error {
-		stmt := fmt.Sprintf(`UPDATE %s SET state=$3 WHERE request_id=$1 AND contract_address=$2;`, tableName)
+		stmt := `UPDATE ocr2dr_requests SET state=$3 WHERE request_id=$1 AND contract_address=$2;`
 		_, err2 := tx.Exec(stmt, requestID, o.contractAddress, newState)
 		return err2
 	}, qopts...)
@@ -170,12 +154,12 @@ func (o *orm) TimeoutExpiredResults(cutoff time.Time, limit uint32, qopts ...pg.
 		}
 	}
 	err := o.q.WithOpts(qopts...).Transaction(func(tx pg.Queryer) error {
-		selectStmt := fmt.Sprintf(`
+		selectStmt := `
 			SELECT request_id
-			FROM %s
+			FROM ocr2dr_requests
 			WHERE (state=$1 OR state=$2 OR state=$3) AND contract_address=$4 AND received_at < ($5)
 			ORDER BY received_at
-			LIMIT $6;`, tableName)
+			LIMIT $6;`
 		if err2 := tx.Select(&ids, selectStmt, allowedPrevStates[0], allowedPrevStates[1], allowedPrevStates[2], o.contractAddress, cutoff, limit); err2 != nil {
 			return err2
 		}
@@ -188,10 +172,10 @@ func (o *orm) TimeoutExpiredResults(cutoff time.Time, limit uint32, qopts ...pg.
 			"contractAddr": o.contractAddress,
 			"ids":          ids,
 		}
-		updateStmt, args, err2 := sqlx.Named(fmt.Sprintf(`
-			UPDATE %s
+		updateStmt, args, err2 := sqlx.Named(`
+			UPDATE ocr2dr_requests
 			SET state = :nextState
-			WHERE contract_address = :contractAddr AND request_id IN (:ids);`, tableName), a)
+			WHERE contract_address = :contractAddr AND request_id IN (:ids);`, a)
 		if err2 != nil {
 			return err2
 		}
@@ -211,7 +195,7 @@ func (o *orm) TimeoutExpiredResults(cutoff time.Time, limit uint32, qopts ...pg.
 
 func (o *orm) FindOldestEntriesByState(state RequestState, limit uint32, qopts ...pg.QOpt) ([]Request, error) {
 	var requests []Request
-	stmt := fmt.Sprintf(`SELECT %s FROM %s WHERE state=$1 AND contract_address=$2 ORDER BY received_at LIMIT $3;`, requestFields, tableName)
+	stmt := fmt.Sprintf(`SELECT %s FROM ocr2dr_requests WHERE state=$1 AND contract_address=$2 ORDER BY received_at LIMIT $3;`, requestFields)
 	if err := o.q.WithOpts(qopts...).Select(&requests, stmt, state, o.contractAddress, limit); err != nil {
 		return nil, err
 	}
@@ -220,7 +204,7 @@ func (o *orm) FindOldestEntriesByState(state RequestState, limit uint32, qopts .
 
 func (o *orm) FindById(requestID RequestID, qopts ...pg.QOpt) (*Request, error) {
 	var request Request
-	stmt := fmt.Sprintf(`SELECT %s FROM %s WHERE request_id=$1 AND contract_address=$2;`, requestFields, tableName)
+	stmt := fmt.Sprintf(`SELECT %s FROM ocr2dr_requests WHERE request_id=$1 AND contract_address=$2;`, requestFields)
 	if err := o.q.WithOpts(qopts...).Get(&request, stmt, requestID, o.contractAddress); err != nil {
 		return nil, err
 	}
@@ -229,8 +213,7 @@ func (o *orm) FindById(requestID RequestID, qopts ...pg.QOpt) (*Request, error) 
 
 func (o *orm) PruneOldestRequests(maxStoredRequests uint32, batchSize uint32, qopts ...pg.QOpt) (total uint32, pruned uint32, err error) {
 	err = o.q.WithOpts(qopts...).Transaction(func(tx pg.Queryer) error {
-		stmt := fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE contract_address=$1`, tableName)
-		if err2 := tx.Get(&total, stmt, o.contractAddress); err2 != nil {
+		if err2 := tx.Get(&total, "SELECT COUNT(*) FROM ocr2dr_requests WHERE contract_address=$1", o.contractAddress); err2 != nil {
 			return errors.Wrap(err, "failed to get request count")
 		}
 
@@ -244,8 +227,8 @@ func (o *orm) PruneOldestRequests(maxStoredRequests uint32, batchSize uint32, qo
 			pruneLimit = batchSize
 		}
 
-		with := fmt.Sprintf(`WITH ids AS (SELECT request_id FROM %s WHERE contract_address = $1 ORDER BY received_at LIMIT $2)`, tableName)
-		deleteStmt := fmt.Sprintf(`%s DELETE FROM %s WHERE contract_address = $1 AND request_id IN (SELECT request_id FROM ids);`, with, tableName)
+		with := `WITH ids AS (SELECT request_id FROM ocr2dr_requests WHERE contract_address = $1 ORDER BY received_at LIMIT $2)`
+		deleteStmt := fmt.Sprintf(`%s DELETE FROM ocr2dr_requests WHERE contract_address = $1 AND request_id IN (SELECT request_id FROM ids);`, with)
 		res, err2 := tx.Exec(deleteStmt, o.contractAddress, pruneLimit)
 		if err2 != nil {
 			return err2

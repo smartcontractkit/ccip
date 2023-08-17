@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -134,9 +133,9 @@ func TestOCR2VRFChaos(t *testing.T) {
 				return
 			}
 
-			err = testEnvironment.Client.LabelChaosGroup(testEnvironment.Cfg.Namespace, "instance=", 1, 2, ChaosGroupMinority)
+			err = testEnvironment.Client.LabelChaosGroup(testEnvironment.Cfg.Namespace, 1, 2, ChaosGroupMinority)
 			require.NoError(t, err)
-			err = testEnvironment.Client.LabelChaosGroup(testEnvironment.Cfg.Namespace, "instance=", 3, 5, ChaosGroupMajority)
+			err = testEnvironment.Client.LabelChaosGroup(testEnvironment.Cfg.Namespace, 3, 5, ChaosGroupMajority)
 			require.NoError(t, err)
 
 			chainClient, err := blockchain.NewEVMClient(testNetwork, testEnvironment)
@@ -195,7 +194,7 @@ func TestOCR2VRFChaos(t *testing.T) {
 			require.NoError(t, err, "Error running Chaos Experiment")
 			l.Info().Msg("Chaos Applied")
 
-			err = testEnvironment.Chaos.WaitForAllRecovered(id, time.Minute)
+			err = testEnvironment.Chaos.WaitForAllRecovered(id)
 			require.NoError(t, err, "Error waiting for Chaos Experiment to end")
 			l.Info().Msg("Chaos Recovered")
 

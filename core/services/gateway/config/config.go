@@ -14,7 +14,6 @@ type GatewayConfig struct {
 }
 
 type ConnectionManagerConfig struct {
-	AuthGatewayId             string
 	AuthTimestampToleranceSec uint32
 	AuthChallengeLen          uint32
 }
@@ -24,7 +23,6 @@ type DONConfig struct {
 	HandlerName   string
 	HandlerConfig json.RawMessage
 	Members       []NodeConfig
-	F             int
 }
 
 type NodeConfig struct {

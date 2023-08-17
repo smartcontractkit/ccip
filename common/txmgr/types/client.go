@@ -45,15 +45,11 @@ type TransactionClient[
 
 	BatchSendTransactions(
 		ctx context.Context,
+		updateBroadcastTime func(now time.Time, txIDs []int64) error,
 		attempts []TxAttempt[CHAIN_ID, ADDR, TX_HASH, BLOCK_HASH, SEQ, FEE],
 		bathSize int,
 		lggr logger.Logger,
-	) (
-		txCodes []clienttypes.SendTxReturnCode,
-		txErrs []error,
-		broadcastTime time.Time,
-		successfulTxIDs []int64,
-		err error)
+	) ([]clienttypes.SendTxReturnCode, []error, error)
 	SendTransactionReturnCode(
 		ctx context.Context,
 		tx Tx[CHAIN_ID, ADDR, TX_HASH, BLOCK_HASH, SEQ, FEE],

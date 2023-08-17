@@ -1,9 +1,9 @@
 package chainlink
 
-import "github.com/smartcontractkit/chainlink/v2/core/config/toml"
+import v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 
 type fluxMonitorConfig struct {
-	c toml.FluxMonitor
+	c v2.FluxMonitor
 }
 
 func (f *fluxMonitorConfig) DefaultTransactionQueueDepth() uint32 {

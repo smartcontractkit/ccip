@@ -13,7 +13,7 @@ import (
 	relaytypes "github.com/smartcontractkit/chainlink-relay/pkg/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/v2"
 	evmmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	evmtxmgrmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr/mocks"
@@ -36,9 +36,9 @@ func TestLoader_Chains(t *testing.T) {
 	ctx := InjectDataloader(testutils.Context(t), app)
 
 	one := utils.NewBigI(1)
-	chain := toml.EVMConfig{ChainID: one, Chain: toml.Defaults(one)}
+	chain := v2.EVMConfig{ChainID: one, Chain: v2.Defaults(one)}
 	two := utils.NewBigI(2)
-	chain2 := toml.EVMConfig{ChainID: two, Chain: toml.Defaults(two)}
+	chain2 := v2.EVMConfig{ChainID: two, Chain: v2.Defaults(two)}
 	evmORM := evmtest.NewTestConfigs(&chain, &chain2)
 	app.On("EVMORM").Return(evmORM)
 

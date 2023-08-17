@@ -25,9 +25,9 @@ type ChainlinkProfileTest struct {
 
 // ChainlinkProfileTestInputs are the inputs necessary to run a profiling tests
 type ChainlinkProfileTestInputs struct {
-	ProfileFunction func(*client.ChainlinkClient)
+	ProfileFunction func(*client.Chainlink)
 	ProfileDuration time.Duration
-	ChainlinkNodes  []*client.ChainlinkK8sClient
+	ChainlinkNodes  []*client.Chainlink
 }
 
 // NewChainlinkProfileTest prepares a new keeper Chainlink profiling test to be run
@@ -63,7 +63,7 @@ func (c *ChainlinkProfileTest) Run() {
 }
 
 // Networks returns the networks that the test is running on
-func (c *ChainlinkProfileTest) TearDownVals() (*environment.Environment, []*client.ChainlinkK8sClient, reportModel.TestReporter, blockchain.EVMClient) {
+func (c *ChainlinkProfileTest) TearDownVals() (*environment.Environment, []*client.Chainlink, reportModel.TestReporter, blockchain.EVMClient) {
 	return c.env, c.Inputs.ChainlinkNodes, &c.TestReporter, c.c
 }
 

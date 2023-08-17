@@ -33,7 +33,6 @@ type ExternalAdapterClient interface {
 		jobName string,
 		subscriptionOwner string,
 		subscriptionId uint64,
-		flags RequestFlags,
 		nodeProvidedSecrets string,
 		requestData *RequestData,
 	) (userResult, userError []byte, domains []string, err error)
@@ -67,7 +66,6 @@ type requestPayload struct {
 	JobName             string       `json:"jobName"`
 	SubscriptionOwner   string       `json:"subscriptionOwner"`
 	SubscriptionId      uint64       `json:"subscriptionId"`
-	Flags               RequestFlags `json:"flags"` // marshalled as an array of numbers
 	NodeProvidedSecrets string       `json:"nodeProvidedSecrets"`
 	Data                *RequestData `json:"data"`
 }
@@ -125,7 +123,6 @@ func (ea *externalAdapterClient) RunComputation(
 	jobName string,
 	subscriptionOwner string,
 	subscriptionId uint64,
-	flags RequestFlags,
 	nodeProvidedSecrets string,
 	requestData *RequestData,
 ) (userResult, userError []byte, domains []string, err error) {
@@ -136,7 +133,6 @@ func (ea *externalAdapterClient) RunComputation(
 		JobName:             jobName,
 		SubscriptionOwner:   subscriptionOwner,
 		SubscriptionId:      subscriptionId,
-		Flags:               flags,
 		NodeProvidedSecrets: nodeProvidedSecrets,
 		Data:                requestData,
 	}

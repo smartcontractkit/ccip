@@ -17,66 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-var hash = hexutil.MustDecode("0x552c2cea3ab43bae137d89ee6142a01db3ae2b5678bc3c9bd5f509f537bea57b")
-var paos = []relaymercury.ParsedAttributedObservation{
-	{
-		Timestamp: uint32(42),
-		Observer:  commontypes.OracleID(49),
-
-		BenchmarkPrice: big.NewInt(43),
-		Bid:            big.NewInt(44),
-		Ask:            big.NewInt(45),
-		PricesValid:    true,
-
-		CurrentBlockNum:       48,
-		CurrentBlockHash:      hash,
-		CurrentBlockTimestamp: uint64(123),
-		CurrentBlockValid:     true,
-	},
-	{
-		Timestamp: uint32(142),
-		Observer:  commontypes.OracleID(149),
-
-		BenchmarkPrice: big.NewInt(143),
-		Bid:            big.NewInt(144),
-		Ask:            big.NewInt(145),
-		PricesValid:    true,
-
-		CurrentBlockNum:       48,
-		CurrentBlockHash:      hash,
-		CurrentBlockTimestamp: uint64(123),
-		CurrentBlockValid:     true,
-	},
-	{
-		Timestamp: uint32(242),
-		Observer:  commontypes.OracleID(249),
-
-		BenchmarkPrice: big.NewInt(243),
-		Bid:            big.NewInt(244),
-		Ask:            big.NewInt(245),
-		PricesValid:    true,
-
-		CurrentBlockNum:       248,
-		CurrentBlockHash:      hash,
-		CurrentBlockTimestamp: uint64(789),
-		CurrentBlockValid:     true,
-	},
-	{
-		Timestamp: uint32(342),
-		Observer:  commontypes.OracleID(250),
-
-		BenchmarkPrice: big.NewInt(343),
-		Bid:            big.NewInt(344),
-		Ask:            big.NewInt(345),
-		PricesValid:    true,
-
-		CurrentBlockNum:       348,
-		CurrentBlockHash:      hash,
-		CurrentBlockTimestamp: uint64(123456),
-		CurrentBlockValid:     true,
-	},
-}
-
 func Test_ReportCodec_BuildReport(t *testing.T) {
 	r := EVMReportCodec{}
 
@@ -92,6 +32,66 @@ func Test_ReportCodec_BuildReport(t *testing.T) {
 	t.Run("BuildReport constructs a report from observations", func(t *testing.T) {
 		// only need to test happy path since validations are done in relaymercury
 
+		hash := hexutil.MustDecode("0x552c2cea3ab43bae137d89ee6142a01db3ae2b5678bc3c9bd5f509f537bea57b")
+
+		paos := []relaymercury.ParsedAttributedObservation{
+			{
+				Timestamp: uint32(42),
+				Observer:  commontypes.OracleID(49),
+
+				BenchmarkPrice: big.NewInt(43),
+				Bid:            big.NewInt(44),
+				Ask:            big.NewInt(45),
+				PricesValid:    true,
+
+				CurrentBlockNum:       48,
+				CurrentBlockHash:      hash,
+				CurrentBlockTimestamp: uint64(123),
+				CurrentBlockValid:     true,
+			},
+			{
+				Timestamp: uint32(142),
+				Observer:  commontypes.OracleID(149),
+
+				BenchmarkPrice: big.NewInt(143),
+				Bid:            big.NewInt(144),
+				Ask:            big.NewInt(145),
+				PricesValid:    true,
+
+				CurrentBlockNum:       48,
+				CurrentBlockHash:      hash,
+				CurrentBlockTimestamp: uint64(123),
+				CurrentBlockValid:     true,
+			},
+			{
+				Timestamp: uint32(242),
+				Observer:  commontypes.OracleID(249),
+
+				BenchmarkPrice: big.NewInt(243),
+				Bid:            big.NewInt(244),
+				Ask:            big.NewInt(245),
+				PricesValid:    true,
+
+				CurrentBlockNum:       248,
+				CurrentBlockHash:      hash,
+				CurrentBlockTimestamp: uint64(789),
+				CurrentBlockValid:     true,
+			},
+			{
+				Timestamp: uint32(342),
+				Observer:  commontypes.OracleID(250),
+
+				BenchmarkPrice: big.NewInt(343),
+				Bid:            big.NewInt(344),
+				Ask:            big.NewInt(345),
+				PricesValid:    true,
+
+				CurrentBlockNum:       348,
+				CurrentBlockHash:      hash,
+				CurrentBlockTimestamp: uint64(123456),
+				CurrentBlockValid:     true,
+			},
+		}
 		report, err := r.BuildReport(paos, f, 46)
 		require.NoError(t, err)
 
@@ -117,26 +117,23 @@ func Test_ReportCodec_BuildReport(t *testing.T) {
 
 func Test_ReportCodec_MaxReportLength(t *testing.T) {
 	r := EVMReportCodec{}
-	n := len(paos)
-	report, err := r.BuildReport(paos, 1, 46)
-	require.NoError(t, err)
+	n := 4
 
-	t.Run("MaxReportLength returns length of report", func(t *testing.T) {
+	t.Run("MaxReportLength returns correct length", func(t *testing.T) {
 		max, err := r.MaxReportLength(n)
 		require.NoError(t, err)
-		assert.Equal(t, len(report), max)
+		assert.Equal(t, 1312, max)
 	})
 }
 
 func Test_ReportCodec_CurrentBlockNumFromReport(t *testing.T) {
 	r := EVMReportCodec{}
-	feedID := utils.NewHash()
 
 	var validBn int64 = 42
 	var invalidBn int64 = -1
 
 	t.Run("CurrentBlockNumFromReport extracts the current block number from a valid report", func(t *testing.T) {
-		report := buildSampleReport(validBn, feedID)
+		report := buildSampleReport(validBn)
 
 		bn, err := r.CurrentBlockNumFromReport(report)
 		require.NoError(t, err)
@@ -144,7 +141,7 @@ func Test_ReportCodec_CurrentBlockNumFromReport(t *testing.T) {
 		assert.Equal(t, validBn, bn)
 	})
 	t.Run("CurrentBlockNumFromReport returns error if block num is too large", func(t *testing.T) {
-		report := buildSampleReport(invalidBn, feedID)
+		report := buildSampleReport(invalidBn)
 
 		_, err := r.CurrentBlockNumFromReport(report)
 		require.Error(t, err)
@@ -153,29 +150,8 @@ func Test_ReportCodec_CurrentBlockNumFromReport(t *testing.T) {
 	})
 }
 
-func Test_ReportCodec_FeedIDFromReport(t *testing.T) {
-	r := EVMReportCodec{}
-
-	feedID := utils.NewHash()
-	var validBn int64 = 42
-
-	t.Run("FeedIDFromReport extracts the current block number from a valid report", func(t *testing.T) {
-		report := buildSampleReport(validBn, feedID)
-
-		f, err := r.FeedIDFromReport(report)
-		require.NoError(t, err)
-
-		assert.Equal(t, feedID[:], f[:])
-	})
-	t.Run("FeedIDFromReport returns error if report is invalid", func(t *testing.T) {
-		report := []byte{1}
-
-		_, err := r.FeedIDFromReport(report)
-		assert.EqualError(t, err, "invalid length for report: 1")
-	})
-}
-
-func buildSampleReport(bn int64, feedID [32]byte) []byte {
+func buildSampleReport(bn int64) []byte {
+	feedID := [32]byte{'f', 'o', 'o'}
 	timestamp := uint32(42)
 	bp := big.NewInt(242)
 	bid := big.NewInt(243)

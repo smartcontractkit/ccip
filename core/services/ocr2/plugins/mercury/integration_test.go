@@ -32,15 +32,12 @@ import (
 	"github.com/smartcontractkit/wsrpc/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
 
 	relaymercury "github.com/smartcontractkit/chainlink-relay/pkg/reportingplugins/mercury"
-
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/verifier"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/verifier_proxy"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mercury_verifier"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mercury_verifier_proxy"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -127,44 +124,26 @@ func TestIntegration_Mercury(t *testing.T) {
 	t.Cleanup(stopMining)
 
 	// Deploy config contract
-	verifierProxyAddr, _, verifierProxy, err := verifier_proxy.DeployVerifierProxy(steve, backend, common.Address{}) // zero address for access controller disables access control
+	verifierProxyAddr, _, verifierProxy, err := mercury_verifier_proxy.DeployMercuryVerifierProxy(steve, backend, common.Address{}) // zero address for access controller disables access control
 	require.NoError(t, err)
-	verifierAddress, _, verifier, err := verifier.DeployVerifier(steve, backend, verifierProxyAddr)
+	verifierAddress, _, verifier, err := mercury_verifier.DeployMercuryVerifier(steve, backend, verifierProxyAddr)
 	require.NoError(t, err)
 	_, err = verifierProxy.InitializeVerifier(steve, verifierAddress)
 	require.NoError(t, err)
 	backend.Commit()
 
-	var logObservers []*observer.ObservedLogs
-	t.Cleanup(func() {
-		var panicLines []string
-		for _, observedLogs := range logObservers {
-			panicLogs := observedLogs.Filter(func(e observer.LoggedEntry) bool {
-				return e.Level >= zapcore.DPanicLevel
-			})
-			for _, log := range panicLogs.All() {
-				line := fmt.Sprintf("%v\t%s\t%s\t%s\t%s", log.Time.Format(time.RFC3339), log.Level.CapitalString(), log.LoggerName, log.Caller.TrimmedPath(), log.Message)
-				panicLines = append(panicLines, line)
-			}
-		}
-		if len(panicLines) > 0 {
-			t.Errorf("Found logs with DPANIC or higher level:\n%s", strings.Join(panicLines, "\n"))
-		}
-	})
-
 	// Setup bootstrap + oracle nodes
 	bootstrapNodePort := int64(19700)
-	appBootstrap, bootstrapPeerID, _, bootstrapKb, observedLogs := setupNode(t, bootstrapNodePort, "bootstrap_mercury", nil, backend, clientCSAKeys[n])
+	appBootstrap, bootstrapPeerID, _, bootstrapKb := setupNode(t, bootstrapNodePort, "bootstrap_mercury", nil, backend, clientCSAKeys[n])
 	bootstrapNode := Node{App: appBootstrap, KeyBundle: bootstrapKb}
-	logObservers = append(logObservers, observedLogs)
-
-	// Set up n oracles
 	var (
 		oracles []confighelper.OracleIdentityExtra
 		nodes   []Node
 	)
+	// Set up n oracles
+
 	for i := int64(0); i < int64(n); i++ {
-		app, peerID, transmitter, kb, observedLogs := setupNode(t, bootstrapNodePort+i+1, fmt.Sprintf("oracle_mercury%d", i), []commontypes.BootstrapperLocator{
+		app, peerID, transmitter, kb := setupNode(t, bootstrapNodePort+i+1, fmt.Sprintf("oracle_mercury%d", i), []commontypes.BootstrapperLocator{
 			// Supply the bootstrap IP and port as a V2 peer address
 			{PeerID: bootstrapPeerID, Addrs: []string{fmt.Sprintf("127.0.0.1:%d", bootstrapNodePort)}},
 		}, backend, clientCSAKeys[i])
@@ -182,7 +161,6 @@ func TestIntegration_Mercury(t *testing.T) {
 			},
 			ConfigEncryptionPublicKey: kb.ConfigEncryptionPublicKey(),
 		})
-		logObservers = append(logObservers, observedLogs)
 	}
 
 	for _, feed := range feeds {
@@ -256,10 +234,8 @@ func TestIntegration_Mercury(t *testing.T) {
 	signers, _, _, onchainConfig, offchainConfigVersion, offchainConfig, err := confighelper.ContractSetConfigArgsForTestsMercuryV02(
 		2*time.Second,        // DeltaProgress
 		20*time.Second,       // DeltaResend
-		400*time.Millisecond, // DeltaInitial
 		100*time.Millisecond, // DeltaRound
 		0,                    // DeltaGrace
-		300*time.Millisecond, // DeltaCertifiedCommitRequest
 		1*time.Minute,        // DeltaStage
 		100,                  // rMax
 		[]int{len(nodes)},    // S
@@ -300,7 +276,6 @@ func TestIntegration_Mercury(t *testing.T) {
 			onchainConfig,
 			offchainConfigVersion,
 			offchainConfig,
-			nil,
 		)
 		require.NoError(t, err)
 		backend.Commit()
@@ -367,7 +342,7 @@ func TestIntegration_Mercury(t *testing.T) {
 
 			seen[feedID][req.pk] = struct{}{}
 			if len(seen[feedID]) == n {
-				t.Logf("all oracles reported for feed %s (0x%x)", feed.name, feed.id)
+				t.Logf("all oracles reported for feed %x (0x%x)", feed.name, feed.id)
 				delete(seen, feedID)
 				if len(seen) == 0 {
 					break // saw all oracles; success!
@@ -430,7 +405,7 @@ func TestIntegration_Mercury(t *testing.T) {
 
 			seen[feedID][req.pk] = struct{}{}
 			if len(seen[feedID]) == n {
-				t.Logf("all oracles reported for feed %s (0x%x)", feed.name, feed.id)
+				t.Logf("all oracles reported for feed %x (0x%x)", feed.name, feed.id)
 				delete(seen, feedID)
 				if len(seen) == 0 {
 					break // saw all oracles; success!
@@ -528,7 +503,7 @@ func setupNode(
 	p2pV2Bootstrappers []commontypes.BootstrapperLocator,
 	backend *backends.SimulatedBackend,
 	csaKey csakey.KeyV2,
-) (app chainlink.Application, peerID string, clientPubKey credentials.StaticSizedPublicKey, ocr2kb ocr2key.KeyBundle, observedLogs *observer.ObservedLogs) {
+) (app chainlink.Application, peerID string, clientPubKey credentials.StaticSizedPublicKey, ocr2kb ocr2key.KeyBundle) {
 	k := big.NewInt(port) // keys unique to port
 	p2pKey := p2pkey.MustNewV2XXXTestingOnly(k)
 	rdr := keystest.NewRandReaderFromSeed(port)
@@ -570,7 +545,7 @@ func setupNode(
 		// [P2P.V2]
 		// Enabled = true
 		// AnnounceAddresses = ['$EXT_IP:17775']
-		// ListenAddresses = ['127.0.0.1:17775']
+		// ListenAddresses = ['0.0.0.0:17775']
 		// DeltaDial = 500ms
 		// DeltaReconcile = 5s
 		c.P2P.V2.Enabled = ptr(true)
@@ -580,8 +555,7 @@ func setupNode(
 		c.P2P.V2.DeltaReconcile = models.MustNewDuration(5 * time.Second)
 	})
 
-	lggr, observedLogs := logger.TestLoggerObserved(t, zapcore.DebugLevel)
-	app = cltest.NewApplicationWithConfigV2OnSimulatedBlockchain(t, config, backend, p2pKey, ocr2kb, csaKey, lggr.Named(dbName))
+	app = cltest.NewApplicationWithConfigV2OnSimulatedBlockchain(t, config, backend, p2pKey, ocr2kb, csaKey, logger.TestLogger(t).Named(dbName))
 	err := app.Start(testutils.Context(t))
 	require.NoError(t, err)
 
@@ -589,7 +563,7 @@ func setupNode(
 		assert.NoError(t, app.Stop())
 	})
 
-	return app, p2pKey.PeerID().Raw(), csaKey.StaticSizedPublicKey(), ocr2kb, observedLogs
+	return app, p2pKey.PeerID().Raw(), csaKey.StaticSizedPublicKey(), ocr2kb
 }
 
 func ptr[T any](t T) *T { return &t }

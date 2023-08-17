@@ -219,10 +219,7 @@ export function evmWordToAddress(hex?: string): string {
  * @param contract The contract with the actual abi to check the expected exposed methods and getters against.
  * @param expectedPublic The expected public exposed methods and getters to match against the actual abi.
  */
-export function publicAbi(
-  contract: Contract,
-  expectedPublic: string[],
-): boolean {
+export function publicAbi(contract: Contract, expectedPublic: string[]) {
   const actualPublic = []
   for (const m in contract.functions) {
     if (!m.includes('(')) {
@@ -239,8 +236,6 @@ export function publicAbi(
     const index = actualPublic.indexOf(method)
     assert.isAtLeast(index, 0, `#${method} is expected to be public`)
   }
-
-  return true
 }
 
 /**
@@ -337,6 +332,11 @@ export async function reset() {
   })
 }
 
-export function randomAddress() {
-  return ethers.Wallet.createRandom().address
+export function expectGasWithinDeviation(
+  gasUsed: BigNumber,
+  expectedGas: BigNumberish,
+  deviation: BigNumberish = 100,
+) {
+  const expected: BigNumber = BigNumber.from(expectedGas)
+  expect(gasUsed).is.gt(expected.sub(deviation)).and.lt(expected.add(deviation))
 }

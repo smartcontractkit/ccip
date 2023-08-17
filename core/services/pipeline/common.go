@@ -40,9 +40,9 @@ const (
 	BlockHeaderFeederJobType       string = "blockheaderfeeder"
 	WebhookJobType                 string = "webhook"
 	BootstrapJobType               string = "bootstrap"
-	GatewayJobType                 string = "gateway"
 	LegacyGasStationServerJobType  string = "legacygasstationserver"
 	LegacyGasStationSidecarJobType string = "legacygasstationsidecar"
+	GatewayJobType                 string = "gateway"
 )
 
 //go:generate mockery --quiet --name Config --output ./mocks/ --case=underscore
@@ -393,7 +393,6 @@ const (
 	TaskTypeUppercase        TaskType = "uppercase"
 	TaskTypeVRF              TaskType = "vrf"
 	TaskTypeVRFV2            TaskType = "vrfv2"
-	TaskTypeVRFV2Plus        TaskType = "vrfv2plus"
 
 	// Testing only.
 	TaskTypePanic TaskType = "panic"
@@ -450,8 +449,6 @@ func UnmarshalTaskFromMap(taskType TaskType, taskMap interface{}, ID int, dotID 
 		task = &VRFTask{BaseTask: BaseTask{id: ID, dotID: dotID}}
 	case TaskTypeVRFV2:
 		task = &VRFTaskV2{BaseTask: BaseTask{id: ID, dotID: dotID}}
-	case TaskTypeVRFV2Plus:
-		task = &VRFTaskV2Plus{BaseTask: BaseTask{id: ID, dotID: dotID}}
 	case TaskTypeEstimateGasLimit:
 		task = &EstimateGasLimitTask{BaseTask: BaseTask{id: ID, dotID: dotID}}
 	case TaskTypeETHCall:

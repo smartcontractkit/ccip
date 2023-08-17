@@ -3,6 +3,7 @@ package common
 import (
 	"crypto/ecdsa"
 	"encoding/binary"
+	"errors"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/exp/slices"
@@ -35,11 +36,18 @@ func SignData(privateKey *ecdsa.PrivateKey, data ...[]byte) ([]byte, error) {
 	return crypto.Sign(hash.Bytes(), privateKey)
 }
 
-func ExtractSigner(signature []byte, data ...[]byte) (signerAddress []byte, err error) {
+func ValidateSignature(signature []byte, data ...[]byte) (signerAddress []byte, err error) {
 	hash := crypto.Keccak256Hash(data...)
-	ecdsaPubKey, err := crypto.SigToPub(hash.Bytes(), signature)
+	sigPublicKey, err := crypto.Ecrecover(hash.Bytes(), signature)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return crypto.PubkeyToAddress(*ecdsaPubKey).Bytes(), nil
+	ecdsaPubKey, _ := crypto.UnmarshalPubkey(sigPublicKey)
+	signerAddress = crypto.PubkeyToAddress(*ecdsaPubKey).Bytes()
+
+	signatureNoRecoverID := signature[:len(signature)-1]
+	if !crypto.VerifySignature(sigPublicKey, hash.Bytes(), signatureNoRecoverID) {
+		return nil, errors.New("invalid signature")
+	}
+	return
 }

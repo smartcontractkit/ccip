@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/api"
 	"github.com/smartcontractkit/chainlink/v2/core/services/gateway/common"
 	gcmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/connector/mocks"
-	hc "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/common"
 	gfmocks "github.com/smartcontractkit/chainlink/v2/core/services/gateway/handlers/functions/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/s4"
 	s4mocks "github.com/smartcontractkit/chainlink/v2/core/services/s4/mocks"
@@ -30,16 +29,14 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 	storage := s4mocks.NewStorage(t)
 	connector := gcmocks.NewGatewayConnector(t)
 	allowlist := gfmocks.NewOnchainAllowlist(t)
-	rateLimiter, err := hc.NewRateLimiter(hc.RateLimiterConfig{GlobalRPS: 100.0, GlobalBurst: 100, PerSenderRPS: 100.0, PerSenderBurst: 100})
-	require.NoError(t, err)
 	allowlist.On("Start", mock.Anything).Return(nil)
 	allowlist.On("Close", mock.Anything).Return(nil)
-	handler, err := functions.NewFunctionsConnectorHandler(addr.Hex(), privateKey, storage, allowlist, rateLimiter, logger)
-	require.NoError(t, err)
+	handler := functions.NewFunctionsConnectorHandler(addr.Hex(), privateKey, storage, allowlist, logger)
+	require.NotNil(t, handler)
 
 	handler.SetConnector(connector)
 
-	err = handler.Start(testutils.Context(t))
+	err := handler.Start(testutils.Context(t))
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		assert.NoError(t, handler.Close())
@@ -49,7 +46,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 		signature, err := handler.Sign([]byte("test"))
 		require.NoError(t, err)
 
-		signer, err := common.ExtractSigner(signature, []byte("test"))
+		signer, err := common.ValidateSignature(signature, []byte("test"))
 		require.NoError(t, err)
 		require.Equal(t, addr.Bytes(), signer)
 	})
@@ -80,7 +77,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 
 			}).Return(nil).Once()
 
-			handler.HandleGatewayMessage(ctx, "gw1", &msg)
+			handler.HandleGatewayMessage(ctx, "gw1", &msg.Body)
 
 			t.Run("orm error", func(t *testing.T) {
 				storage.On("List", ctx, addr).Return(nil, errors.New("boom")).Once()
@@ -92,12 +89,12 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 
 				}).Return(nil).Once()
 
-				handler.HandleGatewayMessage(ctx, "gw1", &msg)
+				handler.HandleGatewayMessage(ctx, "gw1", &msg.Body)
 			})
 
 			t.Run("not allowed", func(t *testing.T) {
 				allowlist.On("Allow", addr).Return(false).Once()
-				handler.HandleGatewayMessage(ctx, "gw1", &msg)
+				handler.HandleGatewayMessage(ctx, "gw1", &msg.Body)
 			})
 		})
 
@@ -136,7 +133,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 
 			}).Return(nil).Once()
 
-			handler.HandleGatewayMessage(ctx, "gw1", &msg)
+			handler.HandleGatewayMessage(ctx, "gw1", &msg.Body)
 
 			t.Run("orm error", func(t *testing.T) {
 				storage.On("Put", ctx, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("boom")).Once()
@@ -148,7 +145,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 
 				}).Return(nil).Once()
 
-				handler.HandleGatewayMessage(ctx, "gw1", &msg)
+				handler.HandleGatewayMessage(ctx, "gw1", &msg.Body)
 			})
 
 			t.Run("missing signature", func(t *testing.T) {
@@ -163,7 +160,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 
 				}).Return(nil).Once()
 
-				handler.HandleGatewayMessage(ctx, "gw1", &msg)
+				handler.HandleGatewayMessage(ctx, "gw1", &msg.Body)
 			})
 
 			t.Run("malformed request", func(t *testing.T) {
@@ -177,7 +174,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 
 				}).Return(nil).Once()
 
-				handler.HandleGatewayMessage(ctx, "gw1", &msg)
+				handler.HandleGatewayMessage(ctx, "gw1", &msg.Body)
 			})
 		})
 
@@ -194,7 +191,7 @@ func TestFunctionsConnectorHandler(t *testing.T) {
 			require.NoError(t, msg.Sign(privateKey))
 
 			allowlist.On("Allow", addr).Return(true).Once()
-			handler.HandleGatewayMessage(testutils.Context(t), "gw1", &msg)
+			handler.HandleGatewayMessage(testutils.Context(t), "gw1", &msg.Body)
 		})
 	})
 }

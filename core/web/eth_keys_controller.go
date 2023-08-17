@@ -11,7 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
+	v2 "github.com/smartcontractkit/chainlink/v2/core/config/v2"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/logger/audit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/web/presenters"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"go.uber.org/multierr"
@@ -40,16 +41,11 @@ func NewETHKeysController(app chainlink.Application) *ETHKeysController {
 }
 
 func createETHKeyResource(c *gin.Context, ekc *ETHKeysController, key ethkey.KeyV2, state ethkey.State) *presenters.ETHKeyResource {
-	ethBalance := ekc.getEthBalance(c.Request.Context(), state)
-	linkBalance := ekc.getLinkBalance(c.Request.Context(), state)
-	maxGasPrice := ekc.getKeyMaxGasPriceWei(state, key.Address)
-
 	r := presenters.NewETHKeyResource(key, state,
-		ekc.setEthBalance(ethBalance),
-		ekc.setLinkBalance(linkBalance),
-		ekc.setKeyMaxGasPriceWei(maxGasPrice),
+		ekc.setEthBalance(c.Request.Context(), state),
+		ekc.setLinkBalance(c.Request.Context(), state),
+		ekc.setKeyMaxGasPriceWei(state, key.Address),
 	)
-
 	return r
 }
 
@@ -103,7 +99,11 @@ func (ekc *ETHKeysController) Index(c *gin.Context) {
 			return
 		}
 
-		r := createETHKeyResource(c, ekc, key, state)
+		r := presenters.NewETHKeyResource(key, state,
+			ekc.setEthBalance(c.Request.Context(), state),
+			ekc.setLinkBalance(c.Request.Context(), state),
+			ekc.setKeyMaxGasPriceWei(state, key.Address),
+		)
 
 		resources = append(resources, *r)
 	}
@@ -113,7 +113,6 @@ func (ekc *ETHKeysController) Index(c *gin.Context) {
 	})
 
 	jsonAPIResponseWithStatus(c, resources, "keys", http.StatusOK)
-
 }
 
 // Create adds a new account
@@ -130,7 +129,7 @@ func (ekc *ETHKeysController) Create(c *gin.Context) {
 	}
 
 	if c.Query("maxGasPriceGWei") != "" {
-		jsonAPIError(c, http.StatusBadRequest, toml.ErrUnsupported)
+		jsonAPIError(c, http.StatusBadRequest, v2.ErrUnsupported)
 		return
 	}
 
@@ -163,14 +162,14 @@ func (ekc *ETHKeysController) Delete(c *gin.Context) {
 
 	keyID := c.Param("address")
 	if !common.IsHexAddress(keyID) {
-		jsonAPIError(c, http.StatusBadRequest, errors.Errorf("invalid keyID: %s, must be hex address", keyID))
+		jsonAPIError(c, http.StatusInternalServerError, errors.Errorf("invalid keyID: %s, must be hex address", keyID))
 		return
 	}
 
 	key, err := ethKeyStore.Get(keyID)
 	if err != nil {
 		if errors.Is(err, keystore.ErrKeyNotFound) {
-			jsonAPIError(c, http.StatusNotFound, err)
+			jsonAPIError(c, http.StatusInternalServerError, err)
 			return
 		}
 		jsonAPIError(c, http.StatusInternalServerError, err)
@@ -259,16 +258,16 @@ func (ekc *ETHKeysController) Export(c *gin.Context) {
 
 // Chain updates settings for a given chain for the key
 func (ekc *ETHKeysController) Chain(c *gin.Context) {
-	var err error
 	kst := ekc.app.GetKeyStore().Eth()
 	defer ekc.app.GetLogger().ErrorIfFn(c.Request.Body.Close, "Error closing Import request body")
 
-	keyID := c.Query("address")
-	if !common.IsHexAddress(keyID) {
-		jsonAPIError(c, http.StatusBadRequest, errors.Errorf("invalid address: %s, must be hex address", keyID))
+	addressHex := c.Query("address")
+	addressBytes, err := hexutil.Decode(addressHex)
+	if err != nil {
+		jsonAPIError(c, http.StatusInternalServerError, errors.Wrap(err, "invalid address"))
 		return
 	}
-	address := common.HexToAddress((keyID))
+	address := common.BytesToAddress(addressBytes)
 
 	cid := c.Query("evmChainID")
 	chain, ok := ekc.getChain(c, ekc.app.GetChains().EVM, cid)
@@ -280,7 +279,7 @@ func (ekc *ETHKeysController) Chain(c *gin.Context) {
 	if nonceStr := c.Query("nextNonce"); nonceStr != "" {
 		nonce, err = strconv.ParseInt(nonceStr, 10, 64)
 		if err != nil || nonce < 0 {
-			jsonAPIError(c, http.StatusBadRequest, errors.Wrapf(err, "invalid value for nonce: expected 0 or positive int, got: %s", nonceStr))
+			jsonAPIError(c, http.StatusInternalServerError, errors.Wrapf(err, "invalid value for nonce: expected 0 or positive int, got: %s", nonceStr))
 			return
 		}
 	}
@@ -288,7 +287,7 @@ func (ekc *ETHKeysController) Chain(c *gin.Context) {
 	if abandonStr := c.Query("abandon"); abandonStr != "" {
 		abandon, err = strconv.ParseBool(abandonStr)
 		if err != nil {
-			jsonAPIError(c, http.StatusBadRequest, errors.Wrapf(err, "invalid value for abandon: expected boolean, got: %s", abandonStr))
+			jsonAPIError(c, http.StatusInternalServerError, errors.Wrapf(err, "invalid value for abandon: expected boolean, got: %s", abandonStr))
 			return
 		}
 	}
@@ -304,8 +303,7 @@ func (ekc *ETHKeysController) Chain(c *gin.Context) {
 		err = multierr.Combine(err, resetErr)
 		if err != nil {
 			if strings.Contains(err.Error(), "key state not found with address") {
-				jsonAPIError(c, http.StatusNotFound, err)
-				return
+				jsonAPIError(c, http.StatusInternalServerError, err)
 			}
 			jsonAPIError(c, http.StatusInternalServerError, err)
 			return
@@ -317,7 +315,7 @@ func (ekc *ETHKeysController) Chain(c *gin.Context) {
 		var enabled bool
 		enabled, err = strconv.ParseBool(enabledStr)
 		if err != nil {
-			jsonAPIError(c, http.StatusBadRequest, errors.Wrap(err, "enabled must be bool"))
+			jsonAPIError(c, http.StatusInternalServerError, errors.Wrap(err, "enabled must be bool"))
 			return
 		}
 
@@ -332,8 +330,12 @@ func (ekc *ETHKeysController) Chain(c *gin.Context) {
 		}
 	}
 
-	key, err := kst.Get(keyID)
+	key, err := kst.Get(address.Hex())
 	if err != nil {
+		if errors.Is(err, keystore.ErrKeyNotFound) {
+			jsonAPIError(c, http.StatusInternalServerError, err)
+			return
+		}
 		jsonAPIError(c, http.StatusInternalServerError, err)
 		return
 	}
@@ -349,75 +351,64 @@ func (ekc *ETHKeysController) Chain(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (ekc *ETHKeysController) setEthBalance(bal *big.Int) presenters.NewETHKeyOption {
-	return presenters.SetETHKeyEthBalance((*assets.Eth)(bal))
-}
-
-// queries the EthClient for the ETH balance at the address associated with state
-func (ekc *ETHKeysController) getEthBalance(ctx context.Context, state ethkey.State) *big.Int {
+// setEthBalance is a custom functional option for NewEthKeyResource which
+// queries the EthClient for the ETH balance at the address and sets it on the
+// resource.
+func (ekc *ETHKeysController) setEthBalance(ctx context.Context, state ethkey.State) presenters.NewETHKeyOption {
+	var bal *big.Int
 	chainID := state.EVMChainID.ToInt()
 	chain, err := ekc.app.GetChains().EVM.Get(chainID)
 	if err != nil {
 		if !errors.Is(errors.Cause(err), evm.ErrNoChains) {
-			ekc.lggr.Errorw("Failed to get EVM Chain", "chainID", chainID, "address", state.Address, "err", err)
+			ekc.lggr.Errorw("Failed to get EVM Chain", "chainID", chainID, "address", state.Address, "error", err)
 		}
-		return nil
+	} else {
+		ethClient := chain.Client()
+		bal, err = ethClient.BalanceAt(ctx, state.Address.Address(), nil)
+		if err != nil {
+			ekc.lggr.Errorw("Failed to get ETH balance", "chainID", chainID, "address", state.Address, "error", err)
+		}
 	}
-
-	ethClient := chain.Client()
-	bal, err := ethClient.BalanceAt(ctx, state.Address.Address(), nil)
-	if err != nil {
-		ekc.lggr.Errorw("Failed to get ETH balance", "chainID", chainID, "address", state.Address, "err", err)
-		return nil
-	}
-
-	return bal
-
+	return presenters.SetETHKeyEthBalance((*assets.Eth)(bal))
 }
 
-func (ekc *ETHKeysController) setLinkBalance(bal *assets.Link) presenters.NewETHKeyOption {
-	return presenters.SetETHKeyLinkBalance(bal)
-}
-
-// queries the EthClient for the LINK balance at the address associated with state
-func (ekc *ETHKeysController) getLinkBalance(ctx context.Context, state ethkey.State) *assets.Link {
+// setLinkBalance is a custom functional option for NewEthKeyResource which
+// queries the EthClient for the LINK balance at the address and sets it on the
+// resource.
+func (ekc *ETHKeysController) setLinkBalance(ctx context.Context, state ethkey.State) presenters.NewETHKeyOption {
 	var bal *assets.Link
 	chainID := state.EVMChainID.ToInt()
 	chain, err := ekc.app.GetChains().EVM.Get(chainID)
 	if err != nil {
 		if !errors.Is(errors.Cause(err), evm.ErrNoChains) {
-			ekc.lggr.Errorw("Failed to get EVM Chain", "chainID", chainID, "err", err)
+			ekc.lggr.Errorw("Failed to get EVM Chain", "chainID", chainID, "error", err)
 		}
 	} else {
 		ethClient := chain.Client()
 		addr := common.HexToAddress(chain.Config().EVM().LinkContractAddress())
 		bal, err = ethClient.LINKBalance(ctx, state.Address.Address(), addr)
 		if err != nil {
-			ekc.lggr.Errorw("Failed to get LINK balance", "chainID", chainID, "address", state.Address, "err", err)
+			ekc.lggr.Errorw("Failed to get LINK balance", "chainID", chainID, "address", state.Address, "error", err)
 		}
 	}
-	return bal
+	return presenters.SetETHKeyLinkBalance(bal)
 }
 
 // setKeyMaxGasPriceWei is a custom functional option for NewEthKeyResource which
 // gets the key specific max gas price from the chain config and sets it on the
 // resource.
-func (ekc *ETHKeysController) setKeyMaxGasPriceWei(price *assets.Wei) presenters.NewETHKeyOption {
-	return presenters.SetETHKeyMaxGasPriceWei(utils.NewBig(price.ToInt()))
-}
-
-func (ekc *ETHKeysController) getKeyMaxGasPriceWei(state ethkey.State, keyAddress common.Address) *assets.Wei {
+func (ekc *ETHKeysController) setKeyMaxGasPriceWei(state ethkey.State, keyAddress common.Address) presenters.NewETHKeyOption {
 	var price *assets.Wei
 	chainID := state.EVMChainID.ToInt()
 	chain, err := ekc.app.GetChains().EVM.Get(chainID)
 	if err != nil {
 		if !errors.Is(errors.Cause(err), evm.ErrNoChains) {
-			ekc.lggr.Errorw("Failed to get EVM Chain", "chainID", chainID, "err", err)
+			ekc.lggr.Errorw("Failed to get EVM Chain", "chainID", chainID, "error", err)
 		}
 	} else {
-		price = chain.Config().EVM().GasEstimator().PriceMaxKey(keyAddress)
+		price = chain.Config().EVM().KeySpecificMaxGasPriceWei(keyAddress)
 	}
-	return price
+	return presenters.SetETHKeyMaxGasPriceWei(utils.NewBig(price.ToInt()))
 }
 
 // getChain is a convenience wrapper to retrieve a chain for a given request
@@ -426,13 +417,13 @@ func (ekc *ETHKeysController) getChain(c *gin.Context, cs evm.ChainSet, chainIDs
 	chain, err := getChain(ekc.app.GetChains().EVM, chainIDstr)
 	if err != nil {
 		if errors.Is(err, ErrInvalidChainID) {
-			jsonAPIError(c, http.StatusBadRequest, err)
+			jsonAPIError(c, http.StatusInternalServerError, err)
 			return nil, false
 		} else if errors.Is(err, ErrMultipleChains) {
-			jsonAPIError(c, http.StatusBadRequest, err)
+			jsonAPIError(c, http.StatusInternalServerError, err)
 			return nil, false
 		} else if errors.Is(err, ErrMissingChainID) {
-			jsonAPIError(c, http.StatusNotFound, err)
+			jsonAPIError(c, http.StatusInternalServerError, err)
 			return nil, false
 		}
 		jsonAPIError(c, http.StatusInternalServerError, err)

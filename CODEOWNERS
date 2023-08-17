@@ -9,12 +9,10 @@
 /core/internal @samsondav @jmank88
 
 # Chains
-/common @smartcontractkit/integrations
 /core/chains/evm @samsondav @prashantkumar1982
 /core/chains/evm/headtracker @pinebit @samsondav @prashantkumar1982
 /core/chains/evm/client @samsondav @prashantkumar1982
 /core/chains/evm/log @jmank88 @prashantkumar1982 @connorwstein
-/core/chains/evm/logpoller @reductionista @connorwstein
 /core/chains/cosmos @archseer @cfal
 
 # Services
@@ -25,14 +23,12 @@
 /core/services/health @samsondav
 /core/services/job @connorwstein
 /core/services/keystore @RyanRHall
-/core/services/ocr* @connorwstein @samsondav
-/core/services/ocr2 @jmank88 @krehermann
+/core/services/offchainreporting @connorwstein @samsondav
 /core/services/periodicbackup @PiotrTrzpil @samsondav
 /core/services/pg @samsondav
 /core/services/pipeline @connorwstein @prashantkumar1982
 /core/services/synchronization
 /core/services/telemetry
-/core/services/relay/evm/mercury @samsondav @sdrug @martin-cll
 
 # VRF-related services
 /core/services/vrf @smartcontractkit/vrf-team
@@ -49,6 +45,7 @@
 # Chainlink Functions related services
 core/services/ocr2/plugins/functions @bolekk @justinkaseman @KuphJr @pinebit
 
+
 # API
 /core/web @jkongie
 
@@ -62,15 +59,15 @@ core/services/ocr2/plugins/functions @bolekk @justinkaseman @KuphJr @pinebit
 /contracts/ @se3000 @connorwstein
 /contracts/**/*Keeper* @smartcontractkit/keepers
 /contracts/**/*Upkeep* @smartcontractkit/keepers
+/contracts/**/ccip/ @rensr @matyang
 /contracts/**/*Functions* @bolekk @justinkaseman @KuphJr @pinebit
 /contracts/src/v0.8/functions @bolekk @justinkaseman @KuphJr @pinebit
-/contracts/src/v0.8/llo-feeds @austinborn @Fletch153
+
 
 # Tests
 /integration-tests/ @smartcontractkit/test-tooling-team
 /integration-tests/**/*keeper* @smartcontractkit/keepers
 /integration-tests/**/*automation* @smartcontractkit/keepers
-
 
 # CI/CD
 /.github/** @chainchad @javuto @jkongie @jmank88 @samsondav
@@ -99,5 +96,8 @@ flake.lock @smartcontractkit/prodsec-public
 ./docs/CONFIG.md @samsondav @jmank88 @dwightjl
 ./internal/config/docs.toml @samsondav @jmank88 @dwightjl
 
-# LOOP Plugins
-/plugins @jmank88 @krehermann
+
+# CCIP override
+/core/ @smartcontractkit/ccip
+/contracts/ @rensr @matyang
+/.github/ @rensr @connorwstein

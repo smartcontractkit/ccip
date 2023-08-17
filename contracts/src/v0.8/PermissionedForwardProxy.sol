@@ -2,7 +2,7 @@
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/Address.sol";
-import "./shared/access/ConfirmedOwner.sol";
+import "./ConfirmedOwner.sol";
 
 /**
  * @title PermissionedForwardProxy

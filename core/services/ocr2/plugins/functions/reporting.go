@@ -19,22 +19,20 @@ import (
 )
 
 type FunctionsReportingPluginFactory struct {
-	Logger          commontypes.Logger
-	PluginORM       functions.ORM
-	JobID           uuid.UUID
-	ContractVersion uint32
+	Logger    commontypes.Logger
+	PluginORM functions.ORM
+	JobID     uuid.UUID
 }
 
 var _ types.ReportingPluginFactory = (*FunctionsReportingPluginFactory)(nil)
 
 type functionsReporting struct {
-	logger          commontypes.Logger
-	pluginORM       functions.ORM
-	jobID           uuid.UUID
-	reportCodec     encoding.ReportCodec
-	genericConfig   *types.ReportingPluginConfig
-	specificConfig  *config.ReportingPluginConfigWrapper
-	contractVersion uint32
+	logger         commontypes.Logger
+	pluginORM      functions.ORM
+	jobID          uuid.UUID
+	reportCodec    *encoding.ReportCodec
+	genericConfig  *types.ReportingPluginConfig
+	specificConfig *config.ReportingPluginConfigWrapper
 }
 
 var _ types.ReportingPlugin = &functionsReporting{}
@@ -90,7 +88,7 @@ func (f FunctionsReportingPluginFactory) NewReportingPlugin(rpConfig types.Repor
 		})
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	codec, err := encoding.NewReportCodec(f.ContractVersion)
+	codec, err := encoding.NewReportCodec()
 	if err != nil {
 		f.Logger.Error("unable to create a report codec object", commontypes.LogFields{})
 		return nil, types.ReportingPluginInfo{}, err
@@ -105,13 +103,12 @@ func (f FunctionsReportingPluginFactory) NewReportingPlugin(rpConfig types.Repor
 		},
 	}
 	plugin := functionsReporting{
-		logger:          f.Logger,
-		pluginORM:       f.PluginORM,
-		jobID:           f.JobID,
-		reportCodec:     codec,
-		genericConfig:   &rpConfig,
-		specificConfig:  pluginConfig,
-		contractVersion: f.ContractVersion,
+		logger:         f.Logger,
+		pluginORM:      f.PluginORM,
+		jobID:          f.JobID,
+		reportCodec:    codec,
+		genericConfig:  &rpConfig,
+		specificConfig: pluginConfig,
 	}
 	promReportingPlugins.WithLabelValues(f.JobID.String()).Inc()
 	return &plugin, info, nil
@@ -137,10 +134,6 @@ func (r *functionsReporting) Query(ctx context.Context, ts types.ReportTimestamp
 		queryProto.RequestIDs = append(queryProto.RequestIDs, result.RequestID[:])
 		idStrs = append(idStrs, formatRequestId(result.RequestID[:]))
 	}
-	// The ID batch built in Query can exceed maxReportTotalCallbackGas. This is done
-	// on purpose as some requests may (repeatedly) fail aggregation and we don't want
-	// them to block processing of other requests. Final total callback gas limit
-	// is enforced in the Report() phase.
 	r.logger.Debug("FunctionsReporting Query end", commontypes.LogFields{
 		"epoch":      ts.Epoch,
 		"round":      ts.Round,
@@ -196,20 +189,9 @@ func (r *functionsReporting) Observation(ctx context.Context, ts types.ReportTim
 		// NOTE: ignoring TIMED_OUT requests, which potentially had ready results
 		if localResult.State == functions.RESULT_READY {
 			resultProto := encoding.ProcessedRequest{
-				RequestID:       localResult.RequestID[:],
-				Result:          localResult.Result,
-				Error:           localResult.Error,
-				OnchainMetadata: localResult.OnchainMetadata,
-			}
-			if r.contractVersion == 1 {
-				if localResult.CallbackGasLimit == nil || localResult.CoordinatorContractAddress == nil {
-					r.logger.Error("FunctionsReporting Observation missing required v1 fields", commontypes.LogFields{
-						"requestID": formatRequestId(id[:]),
-					})
-					continue
-				}
-				resultProto.CallbackGasLimit = *localResult.CallbackGasLimit
-				resultProto.CoordinatorContract = localResult.CoordinatorContractAddress[:]
+				RequestID: localResult.RequestID[:],
+				Result:    localResult.Result,
+				Error:     localResult.Error,
 			}
 			observationProto.ProcessedRequests = append(observationProto.ProcessedRequests, &resultProto)
 			idStrs = append(idStrs, formatRequestId(localResult.RequestID[:]))
@@ -287,7 +269,6 @@ func (r *functionsReporting) Report(ctx context.Context, ts types.ReportTimestam
 	defaultAggMethod := r.specificConfig.Config.GetDefaultAggregationMethod()
 	var allAggregated []*encoding.ProcessedRequest
 	var allIdStrs []string
-	var totalCallbackGas uint32
 	for _, reqId := range uniqueQueryIds {
 		observations := reqIdToObservationList[reqId]
 		if !CanAggregate(r.genericConfig.N, r.genericConfig.F, observations) {
@@ -312,18 +293,6 @@ func (r *functionsReporting) Report(ctx context.Context, ts types.ReportTimestam
 			})
 			continue
 		}
-		if totalCallbackGas+aggregated.CallbackGasLimit > r.specificConfig.Config.GetMaxReportTotalCallbackGas() {
-			r.logger.Warn("FunctionsReporting Report: total callback gas limit exceeded", commontypes.LogFields{
-				"epoch":                ts.Epoch,
-				"round":                ts.Round,
-				"requestID":            reqId,
-				"requestCallbackGas":   aggregated.CallbackGasLimit,
-				"totalCallbackGas":     totalCallbackGas,
-				"maxReportCallbackGas": r.specificConfig.Config.GetMaxReportTotalCallbackGas(),
-			})
-			continue
-		}
-		totalCallbackGas += aggregated.CallbackGasLimit
 		r.logger.Debug("FunctionsReporting Report: aggregated successfully", commontypes.LogFields{
 			"epoch":         ts.Epoch,
 			"round":         ts.Round,
@@ -341,7 +310,6 @@ func (r *functionsReporting) Report(ctx context.Context, ts types.ReportTimestam
 		"nAggregatedRequests": len(allAggregated),
 		"reporting":           len(allAggregated) > 0,
 		"requestIDs":          allIdStrs,
-		"totalCallbackGas":    totalCallbackGas,
 	})
 	if len(allAggregated) == 0 {
 		return false, nil, nil
@@ -439,12 +407,12 @@ func (r *functionsReporting) ShouldTransmitAcceptedReport(ctx context.Context, t
 			needTransmissionIds = append(needTransmissionIds, reqIdStr)
 			continue
 		}
-		if request.State == functions.CONFIRMED {
-			r.logger.Debug("FunctionsReporting ShouldTransmitAcceptedReport: request already CONFIRMED. Not transmitting.", commontypes.LogFields{"requestID": reqIdStr})
-			continue
-		}
-		if request.State == functions.TIMED_OUT {
-			r.logger.Debug("FunctionsReporting ShouldTransmitAcceptedReport: request already TIMED_OUT. Not transmitting.", commontypes.LogFields{"requestID": reqIdStr})
+		if request.State == functions.TIMED_OUT || request.State == functions.CONFIRMED {
+			r.logger.Debug("FunctionsReporting ShouldTransmitAcceptedReport: request is not FINALIZED any more. Not transmitting.",
+				commontypes.LogFields{
+					"requestID": reqIdStr,
+					"state":     request.State.String(),
+				})
 			continue
 		}
 		if request.State == functions.IN_PROGRESS || request.State == functions.RESULT_READY {

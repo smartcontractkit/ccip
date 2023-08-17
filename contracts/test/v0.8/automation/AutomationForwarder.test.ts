@@ -1,8 +1,7 @@
 import { expect } from 'chai'
 import { ethers } from 'hardhat'
 import { getUsers, Roles } from '../../test-helpers/setup'
-import { IAutomationForwarder } from '../../../typechain/IAutomationForwarder'
-import { IAutomationForwarder__factory as IAutomationForwarderFactory } from '../../../typechain/factories/IAutomationForwarder__factory'
+import { AutomationForwarder } from '../../../typechain/AutomationForwarder'
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 import {
   deployMockContract,
@@ -16,11 +15,12 @@ import {
  * the contract factory, which deploys forwarder instances :)
  */
 
+const NOT_AUTHORIZED_ERR = 'NotAuthorized()'
 const CUSTOM_REVERT = 'this is a custom revert message'
 
 let roles: Roles
 let defaultAddress: string
-let forwarder: IAutomationForwarder
+let forwarder: AutomationForwarder
 let target: MockContract
 
 const targetABI = [
@@ -45,24 +45,11 @@ const setup = async () => {
   await target.mock.handler.returns()
   await target.mock.handlerUint.returns(100)
   await target.mock.iRevert.revertsWithReason(CUSTOM_REVERT)
-  const logicFactory = await ethers.getContractFactory(
-    'AutomationForwarderLogic',
-  )
-  const logicContract = await logicFactory
-    .connect(roles.defaultAccount)
-    .deploy()
   const factory = await ethers.getContractFactory('AutomationForwarder')
-  const forwarderContract = await factory
+  forwarder = await factory
     .connect(roles.defaultAccount)
-    .deploy(
-      target.address,
-      await roles.defaultAccount.getAddress(),
-      logicContract.address,
-    )
-  forwarder = IAutomationForwarderFactory.connect(
-    forwarderContract.address,
-    roles.defaultAccount,
-  )
+    .deploy(100, target.address, await roles.defaultAccount.getAddress())
+  await forwarder.deployed()
 }
 
 describe('AutomationForwarder', () => {
@@ -74,6 +61,7 @@ describe('AutomationForwarder', () => {
     it('sets the initial values', async () => {
       expect(await forwarder.getRegistry()).to.equal(defaultAddress)
       expect(await forwarder.getTarget()).to.equal(target.address)
+      expect(await forwarder.getUpkeepID()).to.equal(100)
     })
   })
 
@@ -90,7 +78,7 @@ describe('AutomationForwarder', () => {
     it('is only callable by the registry', async () => {
       await expect(
         forwarder.connect(roles.stranger).forward(gas, HANDLER),
-      ).to.be.revertedWith('')
+      ).to.be.revertedWith(NOT_AUTHORIZED_ERR)
       await forwarder.connect(roles.defaultAccount).forward(gas, HANDLER)
     })
 
@@ -100,24 +88,21 @@ describe('AutomationForwarder', () => {
       await forwarder.connect(roles.defaultAccount).forward(gas, HANDLER_BYTES)
     })
 
-    it('returns the success value & gas used by the target call', async () => {
+    it('returns the success value of the target call', async () => {
       const result = await forwarder
         .connect(roles.defaultAccount)
         .callStatic.forward(gas, HANDLER)
-      expect(result.success).to.be.true
-      expect(result.gasUsed.toNumber()).to.be.greaterThan(0)
+      expect(result).to.be.true
 
       const result2 = await forwarder
         .connect(roles.defaultAccount)
         .callStatic.forward(gas, HANDLER_UINT)
-      expect(result2.success).to.be.true
-      expect(result2.gasUsed.toNumber()).to.be.greaterThan(0)
+      expect(result2).to.be.true
 
       const result3 = await forwarder
         .connect(roles.defaultAccount)
         .callStatic.forward(gas, HANDLER_REVERT)
-      expect(result3.success).to.be.false
-      expect(result3.gasUsed.toNumber()).to.be.greaterThan(0)
+      expect(result3).to.be.false
     })
 
     it('reverts if too little gas is supplied', async () => {
@@ -133,7 +118,7 @@ describe('AutomationForwarder', () => {
     it('is only callable by the existing registry', async () => {
       await expect(
         forwarder.connect(roles.stranger).updateRegistry(newRegistry),
-      ).to.be.revertedWith('')
+      ).to.be.revertedWith(NOT_AUTHORIZED_ERR)
       await forwarder.connect(roles.defaultAccount).updateRegistry(newRegistry)
     })
 

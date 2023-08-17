@@ -62,8 +62,8 @@ func TestKeeperPerformance(t *testing.T) {
 	)
 	gom := gomega.NewGomegaWithT(t)
 
-	profileFunction := func(chainlinkNode *client.ChainlinkClient) {
-		if chainlinkNode != chainlinkNodes[len(chainlinkNodes)-1].ChainlinkClient {
+	profileFunction := func(chainlinkNode *client.Chainlink) {
+		if chainlinkNode != chainlinkNodes[len(chainlinkNodes)-1] {
 			// Not the last node, hence not all nodes started profiling yet.
 			return
 		}
@@ -130,7 +130,7 @@ func setupKeeperTest(
 ) (
 	*environment.Environment,
 	blockchain.EVMClient,
-	[]*client.ChainlinkK8sClient,
+	[]*client.Chainlink,
 	contracts.ContractDeployer,
 	contracts.LinkToken,
 ) {

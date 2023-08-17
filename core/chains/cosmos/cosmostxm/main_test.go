@@ -9,7 +9,7 @@ import (
 
 func TestMain(m *testing.M) {
 	params.InitCosmosSdk(
-		/* bech32Prefix= */ "wasm",
+		/* bech32Prefix= */ "cosmos",
 		/* token= */ "atom",
 	)
 	code := m.Run()

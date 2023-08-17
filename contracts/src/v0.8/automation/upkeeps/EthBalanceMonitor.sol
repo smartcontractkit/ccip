@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.6;
 
-import "../../shared/access/ConfirmedOwner.sol";
-import "../interfaces/KeeperCompatibleInterface.sol";
+import "../../ConfirmedOwner.sol";
+import "../../interfaces/automation/KeeperCompatibleInterface.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 
 /**
