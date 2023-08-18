@@ -911,7 +911,7 @@ var Prod_BSCTestnet = rhea.EVMChainConfig{
 			Decimals:       rhea.LINK.Decimals(),
 		},
 		rhea.WBNB: {
-			Token:          gethcommon.HexToAddress("0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"),
+			Token:          gethcommon.HexToAddress("0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"),
 			Price:          rhea.WBNB.Price(),
 			Decimals:       rhea.WBNB.Decimals(),
 			TokenPoolType:  rhea.FeeTokenOnly,
