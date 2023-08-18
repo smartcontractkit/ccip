@@ -63,7 +63,7 @@ func DeployUpgradeRouters(source *EvmDeploymentConfig, dest *EvmDeploymentConfig
 
 func deployARM(client *EvmDeploymentConfig) error {
 	if !client.ChainConfig.DeploySettings.DeployARM {
-		if client.ChainConfig.ARM.Hex() == "0x0000000000000000000000000000000000000000" || client.ChainConfig.ARMProxy.Hex() == "0x0000000000000000000000000000000000000000" {
+		if client.ChainConfig.ARM == common.HexToAddress("") || client.ChainConfig.ARMProxy == common.HexToAddress("") {
 			return fmt.Errorf("deploy new arm set to false but no arm (proxy) given in config")
 		}
 		client.Logger.Infof("Skipping ARM deployment, using ARM on %s, proxy on %s", client.ChainConfig.ARM, client.ChainConfig.ARMProxy)
@@ -90,16 +90,32 @@ func deployARM(client *EvmDeploymentConfig) error {
 	client.Logger.Infof("ARM deployed on %s in tx: %s", armAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
 	client.ChainConfig.ARM = armAddress
 
-	client.Logger.Infof("Deploying ARM proxy")
-	proxyAddress, _, _, err := arm_proxy_contract.DeployARMProxyContract(client.Owner, client.Client, client.ChainConfig.ARM)
-	if err != nil {
-		return err
+	// If there is an ARM proxy address given, just update it to point to the new ARM
+	if client.ChainConfig.ARMProxy != common.HexToAddress("") {
+		client.Logger.Infof("Updating ARM proxy to point to new ARM")
+		proxy, err := arm_proxy_contract.NewARMProxyContract(client.ChainConfig.ARMProxy, client.Client)
+		if err != nil {
+			return err
+		}
+		tx, err := proxy.SetARM(client.Owner, armAddress)
+		if err != nil {
+			return err
+		}
+		if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
+			return err
+		}
+	} else {
+		client.Logger.Infof("Deploying ARM proxy")
+		proxyAddress, _, _, err := arm_proxy_contract.DeployARMProxyContract(client.Owner, client.Client, client.ChainConfig.ARM)
+		if err != nil {
+			return err
+		}
+		if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
+			return err
+		}
+		client.Logger.Infof("ARM proxy deployed on %s in tx: %s", proxyAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
+		client.ChainConfig.ARMProxy = proxyAddress
 	}
-	if err = shared.WaitForMined(client.Logger, client.Client, tx.Hash(), true); err != nil {
-		return err
-	}
-	client.Logger.Infof("ARM proxy deployed on %s in tx: %s", proxyAddress.Hex(), helpers.ExplorerLink(int64(client.ChainConfig.EvmChainId), tx.Hash()))
-	client.ChainConfig.ARMProxy = proxyAddress
 
 	return nil
 }
