@@ -27,7 +27,7 @@ import (
 
 var (
 	// Change these values
-	sourceChain        = rhea.ArbitrumGoerli
+	sourceChain        = rhea.AvaxFuji
 	destChain          = rhea.Sepolia
 	ENV                = dione.StagingBeta
 	currentVersion     = ""
