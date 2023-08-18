@@ -7,13 +7,6 @@ concurrency:
 # Run on key branches to make sure integration is good, otherwise run on all PR's
 on:
   push:
-    branches:
-      - master
-      - develop
-      - 'release/*'
-      - staging
-      - trying
-      - rollup
   merge_group:
   pull_request:
   schedule:
