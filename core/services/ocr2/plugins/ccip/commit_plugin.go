@@ -42,6 +42,7 @@ var checkFinalityTags = map[int64]bool{
 	420: true, // Optimism goerli
 	// TODO Temporarily disabling Avax until we figure out issues there
 	43113:    false, // Avax fuji
+	76578:    false, // Avax ANZ testnet
 	80001:    false, // Polygon mumbai does NOT support finality tags
 	84531:    true,  // BASE testnet
 	421613:   true,  // Arbitrum goerli
