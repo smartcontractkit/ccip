@@ -1,7 +1,7 @@
 ChainID = '76578'
 FinalityDepth = 1
 FinalityTagEnabled = false
-LinkContractAddress = '0x25d997d8618e1299418b3d905e40bc353ec89f61'
+LinkContractAddress = '0x779877A7B0D9E8603169DdbD7836e478b4624789'
 LogPollInterval = '3s'
 MinIncomingConfirmations = 1
 NoNewHeadsThreshold = '30s'
