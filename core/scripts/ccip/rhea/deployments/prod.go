@@ -921,7 +921,7 @@ var Prod_BSCTestnet = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WBNB},
 	WrappedNative: rhea.WBNB,
 	Router:        gethcommon.HexToAddress("0x9527e2d01a3064ef6b50c1da1c0cc523803bcff2"),
-	ARM:           gethcommon.HexToAddress("0xe591bf0a0cf924a0674d7792db046b23cebf5f34"),
+	ARM:           gethcommon.HexToAddress("0xf9a21b587111e7e8745fb8b13750014f19db0014"),
 	ARMProxy:      gethcommon.HexToAddress("0xa8c0c11bf64af62cdca6f93d3769b88bdd7cb93d"),
 	PriceRegistry: gethcommon.HexToAddress("0xa8bfa4fc9f97793297793291e7f63da18eccbe05"),
 	TunableChainValues: rhea.TunableChainValues{
@@ -1021,7 +1021,7 @@ var Prod_BASETestnet = rhea.EVMChainConfig{
 	FeeTokens:     []rhea.Token{rhea.LINK, rhea.WETH},
 	WrappedNative: rhea.WETH,
 	Router:        gethcommon.HexToAddress("0xa8c0c11bf64af62cdca6f93d3769b88bdd7cb93d"),
-	ARM:           gethcommon.HexToAddress("0xdca67fd8324990792c0bfae95903b8a64097754f"),
+	ARM:           gethcommon.HexToAddress("0xe5bd6bcb6fa8e5236984d5ea127de5047f93b5ff"),
 	ARMProxy:      gethcommon.HexToAddress("0x4c10d67e4b8e18a67a7606defdce42ccc281d39b"),
 	PriceRegistry: gethcommon.HexToAddress("0x8a710bbd77661d168d5a6725bd2e514ba1bff59d"),
 	TunableChainValues: rhea.TunableChainValues{
