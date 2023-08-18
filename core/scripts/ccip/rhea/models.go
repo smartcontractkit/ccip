@@ -132,8 +132,8 @@ func GetAllTokens() []Token {
 		InsurAce, ZUSD, STEADY,
 		SUPER, BondToken, BankToken,
 		SNXUSD, FUGAZIUSDC, Alongside,
-		CCIP_BnM, CCIP_LnM, A_DC, NZ_DC, SG_DC, BetSwirl,
-		WCBS,
+		CCIP_BnM, CCIP_LnM, A_DC, NZ_DC,
+		SG_DC, BetSwirl, WCBS,
 	}
 }
 
