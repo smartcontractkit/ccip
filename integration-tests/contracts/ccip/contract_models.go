@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_arm_contract"
@@ -36,9 +35,22 @@ type ARMConfig struct {
 	ThresholdForBadSignal    *big.Int
 }
 
+type ERC20TokenInterface interface {
+	Allowance(opts *bind.CallOpts, _owner common.Address, _spender common.Address) (*big.Int, error)
+	BalanceOf(opts *bind.CallOpts, _owner common.Address) (*big.Int, error)
+	Decimals(opts *bind.CallOpts) (uint8, error)
+	Name(opts *bind.CallOpts) (string, error)
+	Symbol(opts *bind.CallOpts) (string, error)
+	TotalSupply(opts *bind.CallOpts) (*big.Int, error)
+	Approve(opts *bind.TransactOpts, _spender common.Address, _value *big.Int) (*types.Transaction, error)
+	Transfer(opts *bind.TransactOpts, _to common.Address, _value *big.Int) (*types.Transaction, error)
+	TransferFrom(opts *bind.TransactOpts, _from common.Address, _to common.Address, _value *big.Int) (*types.Transaction, error)
+	Address() common.Address
+}
+
 type LinkToken struct {
 	client     blockchain.EVMClient
-	instance   *link_token_interface.LinkToken
+	instance   ERC20TokenInterface
 	EthAddress common.Address
 }
 

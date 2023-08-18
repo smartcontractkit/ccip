@@ -75,7 +75,7 @@ func (e *CCIPContractsDeployer) DeployERC20TokenContract(deployerFn blockchain.C
 
 	return &LinkToken{
 		client:     e.evmClient,
-		instance:   instance.(*link_token_interface.LinkToken),
+		instance:   instance.(ERC20TokenInterface),
 		EthAddress: *address,
 	}, err
 }
