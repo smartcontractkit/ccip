@@ -103,7 +103,6 @@ type CCIPTestConfig struct {
 	LocalCluster            bool
 	ExistingDeployment      bool
 	ExistingEnv             string
-	ContractsFile           string
 	ReuseContracts          bool
 	SequentialLaneAddition  bool
 	NodeFunding             *big.Float
