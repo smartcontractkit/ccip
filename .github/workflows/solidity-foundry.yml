@@ -19,7 +19,7 @@ jobs:
           filters: |
             src:
               - 'contracts/**/*'
-              - '.github/workflows/solidity.yml'
+              - '.github/workflows/solidity-foundry.yml'
 
   solhint:
     needs: [changes]
