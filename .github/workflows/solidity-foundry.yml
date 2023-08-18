@@ -1,5 +1,7 @@
 name: Solidity Foundry
-on: [pull_request]
+on:
+  merge_group:
+  push:
 
 env:
   FOUNDRY_PROFILE: ci
