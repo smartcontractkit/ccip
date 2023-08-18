@@ -114,7 +114,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.ChainSet, ne
 			commitStore:         commitStore,
 			leafHasher:          leafHasher,
 			getSeqNumFromLog:    getSeqNumFromLog(onRamp),
-			checkFinalityTags:   destChain.Config().EVM().FinalityTagEnabled(),
+			checkFinalityTags:   sourceChain.Config().EVM().FinalityTagEnabled(),
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)
