@@ -79,7 +79,6 @@ func NewConfigFromToml(tomlFile string, opts ...NodeConfigOpt) (*chainlink.Confi
 		return nil, err
 	}
 	var cfg chainlink.Config
-	err = cfg.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +89,7 @@ func NewConfigFromToml(tomlFile string, opts ...NodeConfigOpt) (*chainlink.Confi
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	return &cfg, err
+	return &cfg, nil
 }
 
 func WithOCR1() NodeConfigOpt {
