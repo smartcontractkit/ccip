@@ -33,7 +33,7 @@ func panicErr(err error) {
 // You can either add an error string (like "0x4e487b710000000000000000000000000000000000000000000000000000000000000032")
 // or you can specify an ethURL, txHash and requester.
 func main() {
-	errorCodeString := "0x09b16ade00992a6ac600ce16617f271e10ca9933bb93284989ee1ea05d67dd44"
+	errorCodeString := ""
 
 	if errorCodeString == "" {
 		// Need a node URL
