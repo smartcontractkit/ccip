@@ -32,7 +32,9 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		setUpOutput.Balance.Verify(t)
+		if TestCfg.MsgType == actions.TokenTransfer {
+			setUpOutput.Balance.Verify(t)
+		}
 		setUpOutput.TearDown()
 	})
 	for i := range setUpOutput.Lanes {

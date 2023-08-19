@@ -333,7 +333,12 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 			var token *ccip.ERC20Token
 			var err error
 			if len(tokenDeployerFns) != noOfTokens {
-				token, err = cd.DeployERC20TokenContract()
+				// we deploy link token and cast it to ERC20Token
+				linkToken, err := cd.DeployLinkTokenContract()
+				if err != nil {
+					return fmt.Errorf("deploying bridge token contract shouldn't fail %+v", err)
+				}
+				token, err = cd.NewERC20TokenContract(common.HexToAddress(linkToken.Address()))
 			} else {
 				token, err = cd.DeployCustomTokenContract(tokenDeployerFns[i])
 			}
@@ -1058,6 +1063,11 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		pool := destCCIP.Common.BridgeTokenPools[i]
 		pools = append(pools, pool.EthAddress)
 		if !destCCIP.Common.ExistingDeployment {
+			bal, err := token.BalanceOf(context.Background(), destCCIP.Common.ChainClient.GetDefaultWallet().Address())
+			if err != nil {
+				return err
+			}
+			log.Info().Msg(fmt.Sprintf("dest token %s balance %s", token.Address(), bal.String()))
 			err = pool.AddLiquidity(token.Approve, token.Address(), destCCIP.Common.poolFunds)
 			if err != nil {
 				return fmt.Errorf("adding liquidity token to dest pool shouldn't fail %+v", err)

@@ -68,25 +68,6 @@ func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployERC20TokenContract() (*ERC20Token, error) {
-	address, _, instance, err := e.evmClient.DeployContract("ERC20 Token", func(
-		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
-	) (common.Address, *types.Transaction, interface{}, error) {
-		return erc20.DeployERC20(auth, backend, "ERC20 Token", "TESTTKN")
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &ERC20Token{
-		client:     e.evmClient,
-		instance:   instance.(*erc20.ERC20),
-		EthAddress: *address,
-	}, err
-}
-
 func (e *CCIPContractsDeployer) DeployCustomTokenContract(deployerFn blockchain.ContractDeployer) (*ERC20Token, error) {
 	address, _, instance, err := e.evmClient.DeployContract("Custom ERC20 Token", deployerFn)
 	if err != nil {

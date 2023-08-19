@@ -47,10 +47,6 @@ func (token *ERC20Token) Address() string {
 	return token.EthAddress.Hex()
 }
 
-func (token *ERC20Token) TotalSupply() (*big.Int, error) {
-	return token.instance.TotalSupply(nil)
-}
-
 func (token *ERC20Token) BalanceOf(ctx context.Context, addr string) (*big.Int, error) {
 	opts := &bind.CallOpts{
 		From:    common.HexToAddress(token.client.GetDefaultWallet().Address()),
