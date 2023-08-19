@@ -28,7 +28,7 @@ import (
 var (
 	// Change these values
 	sourceChain        = rhea.AvaxFuji
-	destChain          = rhea.Sepolia
+	destChain          = rhea.BSCTestnet
 	ENV                = dione.StagingBeta
 	currentVersion     = ""
 	upgradeLaneVersion = ""

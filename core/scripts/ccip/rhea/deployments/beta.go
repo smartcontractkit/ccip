@@ -662,14 +662,14 @@ var Beta_BaseGoerliToSepolia = rhea.EvmDeploymentConfig{
 var Beta_AvaxFujiToBscTestnet = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_AvaxFuji,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0xc8ab64477b14baa744ffba0d783847d05b8da0dc"),
-		OffRamp:      gethcommon.HexToAddress("0x59cf18505b5ac6a7e4aa5213d2d5d34d9e0004bd"),
-		CommitStore:  gethcommon.HexToAddress("0x56fe1342714a4a3f0ad65b1b19cbe4cdacc042b4"),
-		PingPongDapp: gethcommon.HexToAddress("0x1d2b308e029ec587729f1cab2ca9663cafec1f5f"),
+		OnRamp:       gethcommon.HexToAddress("0x300571597cbcd81da15217f789d5aa2ee37f973f"),
+		OffRamp:      gethcommon.HexToAddress("0x05d922d2041fbcba9dbd37be469c945b9e81b50c"),
+		CommitStore:  gethcommon.HexToAddress("0x0c279c0600f7567081c2074247931d245245942d"),
+		PingPongDapp: gethcommon.HexToAddress("0x759f207fa52c865644f60d43d14fd3fbd11198c8"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    24674403,
+			DeployedAtBlock:    25121727,
 		},
 	},
 }
@@ -677,14 +677,14 @@ var Beta_AvaxFujiToBscTestnet = rhea.EvmDeploymentConfig{
 var Beta_BscTestnetToAvaxFuji = rhea.EvmDeploymentConfig{
 	ChainConfig: Beta_BSCTestnet,
 	LaneConfig: rhea.EVMLaneConfig{
-		OnRamp:       gethcommon.HexToAddress("0x3431aa74d9468e3c40ecfb6f3059de4cecf3565f"),
-		OffRamp:      gethcommon.HexToAddress("0x11ac1567069e540920ee5d5ea4b3d44bc6c6d10b"),
-		CommitStore:  gethcommon.HexToAddress("0x99ce75105d6a882af40cd5f6166a9564b3003a07"),
-		PingPongDapp: gethcommon.HexToAddress("0x51158ca439fea9e809bc063cfa6701747b05254e"),
+		OnRamp:       gethcommon.HexToAddress("0xbfb9e43ac9123ee4baa8ccd56e33d8865961d04c"),
+		OffRamp:      gethcommon.HexToAddress("0x94cd0d171ef08924f0008305e5bb90b0fc1b61ab"),
+		CommitStore:  gethcommon.HexToAddress("0xd19fab6c0abd82b39c48f6bb39066e80428b2e6f"),
+		PingPongDapp: gethcommon.HexToAddress("0xae32fd8ae148bd88e3da6fae8cd7561eed3ec5cc"),
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    32089112,
+			DeployedAtBlock:    32568567,
 		},
 	},
 }
