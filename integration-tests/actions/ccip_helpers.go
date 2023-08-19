@@ -92,7 +92,6 @@ type CCIPCommon struct {
 	FeeToken           *ccip.LinkToken
 	FeeTokenPool       *ccip.LockReleaseTokenPool
 	BridgeTokens       []*ccip.ERC20Token // as of now considering the bridge token is same as link token
-	CustomBrideTokens  []common.Address
 	TokenPrices        []*big.Int
 	BridgeTokenPools   []*ccip.LockReleaseTokenPool
 	RateLimiterConfig  ccip.RateLimiterConfig
@@ -117,10 +116,7 @@ func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blo
 			EthAddress: token.EthAddress,
 		})
 	}
-	var customTokens []common.Address
-	for _, token := range ccipModule.CustomBrideTokens {
-		customTokens = append(customTokens, token)
-	}
+
 	grp, _ := errgroup.WithContext(ctx)
 	c := &CCIPCommon{
 		ChainClient: chainClient,
@@ -133,7 +129,6 @@ func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blo
 			EthAddress: ccipModule.FeeTokenPool.EthAddress,
 		},
 		BridgeTokens:      tokens,
-		CustomBrideTokens: customTokens,
 		TokenPrices:       ccipModule.TokenPrices,
 		BridgeTokenPools:  pools,
 		RateLimiterConfig: ccipModule.RateLimiterConfig,
