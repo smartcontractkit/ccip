@@ -217,6 +217,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   /// @notice Manually execute a message.
   /// @param report Internal.ExecutionReport.
+  /// @param gasLimitOverrides New gasLimit for each message in the report.
   /// @dev We permit gas limit overrides so that users may manually execute messages which failed due to
   /// insufficient gas provided.
   function manuallyExecute(Internal.ExecutionReport memory report, uint256[] memory gasLimitOverrides) external {
