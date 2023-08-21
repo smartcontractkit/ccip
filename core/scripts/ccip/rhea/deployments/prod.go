@@ -1137,7 +1137,7 @@ var Prod_SepoliaToOptimismGoerli = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3816777,
+			DeployedAtBlock:    4115704,
 		},
 	},
 }
@@ -1152,7 +1152,7 @@ var Prod_OptimismGoerliToSepolia = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    11482670,
+			DeployedAtBlock:    13511000,
 		},
 	},
 }
