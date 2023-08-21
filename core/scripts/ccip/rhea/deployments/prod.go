@@ -1287,7 +1287,7 @@ var Prod_OptimismGoerliToArbitrumGoerli = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    12260052,
+			DeployedAtBlock:    13511000,
 		},
 	},
 }
@@ -1302,7 +1302,7 @@ var Prod_ArbitrumGoerliToOptimismGoerli = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    31280095,
+			DeployedAtBlock:    35312943,
 		},
 	},
 }
