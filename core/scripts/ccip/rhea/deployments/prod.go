@@ -1257,7 +1257,7 @@ var Prod_AvaxFujiToPolygonMumbai = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    23754063,
+			DeployedAtBlock:    25100000,
 		},
 	},
 }
@@ -1272,7 +1272,7 @@ var Prod_PolygonMumbaiToAvaxFuji = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    37511834,
+			DeployedAtBlock:    39132693,
 		},
 	},
 }
