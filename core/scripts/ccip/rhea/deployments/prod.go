@@ -1107,7 +1107,7 @@ var Prod_SepoliaToAvaxFuji = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3816446,
+			DeployedAtBlock:    4115704,
 		},
 	},
 }
@@ -1122,7 +1122,7 @@ var Prod_AvaxFujiToSepolia = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    23753755,
+			DeployedAtBlock:    25100000,
 		},
 	},
 }
