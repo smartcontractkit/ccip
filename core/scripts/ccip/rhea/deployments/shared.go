@@ -36,7 +36,7 @@ func getFinalityDepth(chain rhea.Chain) uint32 {
 		rhea.Sepolia:        4,   // We use finality tag
 		rhea.BASEGoerli:     5,   // We use finality tag
 		rhea.AvaxAnzSubnet:  1,   // devnet without normal block production
-		rhea.BSCTestnet:     2,   // // We use finality tag
+		rhea.BSCTestnet:     2,   //  We use finality tag
 		// Mainnets
 		// We've made a bit of an effort to make these realistic, but they are *not* production-ready parameters, only use them for testing!!!
 		rhea.Ethereum: 96, // 3 epochs to be safe
