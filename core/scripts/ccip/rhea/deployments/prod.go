@@ -1227,7 +1227,7 @@ var Prod_PolygonMumbaiToSepolia = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    37526794,
+			DeployedAtBlock:    39133179,
 		},
 	},
 }
@@ -1242,7 +1242,7 @@ var Prod_SepoliaToPolygonMumbai = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    3819110,
+			DeployedAtBlock:    4115704,
 		},
 	},
 }
