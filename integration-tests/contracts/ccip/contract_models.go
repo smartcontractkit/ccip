@@ -38,13 +38,13 @@ type ARMConfig struct {
 }
 
 type ERC20Token struct {
-	client     blockchain.EVMClient
-	instance   *erc20.ERC20
-	EthAddress common.Address
+	client          blockchain.EVMClient
+	instance        *erc20.ERC20
+	ContractAddress common.Address
 }
 
 func (token *ERC20Token) Address() string {
-	return token.EthAddress.Hex()
+	return token.ContractAddress.Hex()
 }
 
 func (token *ERC20Token) BalanceOf(ctx context.Context, addr string) (*big.Int, error) {
@@ -71,7 +71,7 @@ func (l *ERC20Token) Approve(to string, amount *big.Int) error {
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
 		Str("Network Name", l.client.GetNetworkConfig().Name).
-		Msg("Approving LINK Transfer")
+		Msg("Approving ERC20 Transfer")
 	tx, err := l.instance.Approve(opts, common.HexToAddress(to), amount)
 	if err != nil {
 		return err
@@ -90,7 +90,7 @@ func (l *ERC20Token) Transfer(to string, amount *big.Int) error {
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
 		Str("Network Name", l.client.GetNetworkConfig().Name).
-		Msg("Transferring LINK")
+		Msg("Transferring ERC20")
 	tx, err := l.instance.Transfer(opts, common.HexToAddress(to), amount)
 	if err != nil {
 		return err

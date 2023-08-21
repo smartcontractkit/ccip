@@ -113,7 +113,7 @@ func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blo
 	var tokens []*ccip.ERC20Token
 	for _, token := range ccipModule.BridgeTokens {
 		tokens = append(tokens, &ccip.ERC20Token{
-			EthAddress: token.EthAddress,
+			ContractAddress: token.ContractAddress,
 		})
 	}
 
@@ -192,7 +192,7 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 			for _, token := range conf.BridgeTokens {
 				if common.IsHexAddress(token) {
 					tokens = append(tokens, &ccip.ERC20Token{
-						EthAddress: common.HexToAddress(token),
+						ContractAddress: common.HexToAddress(token),
 					})
 				}
 			}
@@ -221,7 +221,7 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		if token.EthAddress == ccipModule.FeeToken.EthAddress {
+		if token.ContractAddress == ccipModule.FeeToken.EthAddress {
 			isApproved = true
 		}
 	}
@@ -335,7 +335,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 				}
 				token, err = cd.NewERC20TokenContract(common.HexToAddress(linkToken.Address()))
 			} else {
-				token, err = cd.DeployCustomTokenContract(tokenDeployerFns[i])
+				token, err = cd.DeployERC20TokenContract(tokenDeployerFns[i])
 			}
 
 			if err != nil {
@@ -538,7 +538,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		}
 		for i, token := range sourceCCIP.Common.BridgeTokens {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
-				SourceToken: token.EthAddress,
+				SourceToken: token.ContractAddress,
 				UsdPerToken: sourceCCIP.Common.TokenPrices[i],
 			})
 		}
@@ -557,11 +557,11 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
 		for i, token := range sourceCCIP.Common.BridgeTokens {
 			tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.InternalPoolUpdate{
-				Token: token.EthAddress,
+				Token: token.ContractAddress,
 				Pool:  sourceCCIP.Common.BridgeTokenPools[i].EthAddress,
 			})
 			tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
-				Token: token.EthAddress,
+				Token: token.ContractAddress,
 				Ratio: 5_0, // 5 bps
 			})
 		}
@@ -995,7 +995,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		}
 		for i, token := range destCCIP.Common.BridgeTokens {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, price_registry.InternalTokenPriceUpdate{
-				SourceToken: token.EthAddress,
+				SourceToken: token.ContractAddress,
 				UsdPerToken: destCCIP.Common.TokenPrices[i],
 			})
 		}
