@@ -1167,7 +1167,7 @@ var Prod_OptimismGoerliToAvaxFuji = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    11482157,
+			DeployedAtBlock:    13511000,
 		},
 	},
 }
@@ -1182,7 +1182,7 @@ var Prod_AvaxFujiToOptimismGoerli = rhea.EvmDeploymentConfig{
 		DeploySettings: rhea.LaneDeploySettings{
 			DeployLane:         false,
 			DeployPingPongDapp: false,
-			DeployedAtBlock:    23755228,
+			DeployedAtBlock:    25100000,
 		},
 	},
 }
