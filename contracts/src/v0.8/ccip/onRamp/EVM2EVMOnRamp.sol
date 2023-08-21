@@ -21,10 +21,11 @@ import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.0/utils/str
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.0/utils/structs/EnumerableMap.sol";
 
 /// @notice The onRamp is a contract that handles fee logic, NOP payments,
-/// token support and an allowList. It will always be deployed 1:1:1 with a
+/// bridegable token support and an allowList.
+/// @dev It will always be deployed 1:1:1 with a
 /// commitStore and offRamp contract. These three contracts together form a
 /// `lane`. A lane is an upgradable set of contracts within the non-upgradable
-/// routers and are always deployed as complete set, even during upgrades.
+/// routers and are always deployed as complete set.
 /// This means an upgrade to an onRamp will require redeployment of the
 /// commitStore and offRamp as well.
 contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, TypeAndVersionInterface {
@@ -525,6 +526,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// A basis point fee is calculated from the USD value of each token transfer.
   /// Sum of basis point fees is confined within range [minTokenTransferFeeUSD, maxTokenTransferFeeUSD].
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
+  /// @dev tokenAmounts may contain duplicate tokens, transferFee when amount is split will be equal or greater than
+  /// the amount aggregated/de-duped, so this is acceptable.
   function _getTokenTransferFeeUSD(
     address feeToken,
     uint192 feeTokenPrice,
@@ -660,8 +663,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     _setNops(nopsAndWeights);
   }
 
-  /// @dev Clears existing nops, sets new nops and weights
   /// @param nopsAndWeights New set of nops and weights
+  /// @dev Clears existing nops, sets new nops and weights
+  /// @dev We permit fees to accrue before nops are configured, in which case
+  /// they will go to the first set of configured nops.
   function _setNops(NopAndWeight[] memory nopsAndWeights) internal {
     uint256 numberOfNops = nopsAndWeights.length;
     if (numberOfNops > MAX_NUMBER_OF_NOPS) revert TooManyNops();

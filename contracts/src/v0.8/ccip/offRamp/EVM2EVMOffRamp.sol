@@ -27,6 +27,9 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.0/utils/int
 /// and we will never do partial updates where e.g. only an offRamp gets replaced.
 /// If we would replace only the offRamp and connect it with an existing commitStore,
 /// a replay attack would be possible.
+/// @dev OCR2BaseNoChecks is used to save gas, signatures are not required as the offramp can only execute
+/// messages which are committed in the commitStore. We still make use of OCR2 as an executor whitelist
+/// and turn-taking mechanism.
 contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
   using Address for address;
   using ERC165Checker for address;
@@ -96,17 +99,18 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMOffRamp 1.1.0";
-  // The minimum amount of gas to perform the call with exact gas
+  /// @dev The minimum amount of gas to perform the call with exact gas.
+  ///  
   uint16 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
-  // Commit store address on the destination chain
+  /// @dev Commit store address on the destination chain
   address internal immutable i_commitStore;
-  // ChainSelector of the source chain
+  /// @dev ChainSelector of the source chain
   uint64 internal immutable i_sourceChainSelector;
-  // ChainSelector of this chain
+  /// @dev ChainSelector of this chain
   uint64 internal immutable i_chainSelector;
-  // OnRamp address on the source chain
+  /// @dev OnRamp address on the source chain
   address internal immutable i_onRamp;
-  // metadataHash is a prefix for a message hash preimage to ensure uniqueness.
+  /// @dev metadataHash is a prefix for a message hash preimage to ensure uniqueness.
   bytes32 internal immutable i_metadataHash;
   /// @dev The address of previous-version OffRamp for this lane
   address internal immutable i_prevOffRamp;
@@ -115,17 +119,17 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
-  // source token => token pool
+  /// @dev source token => token pool
   EnumerableMapAddresses.AddressToAddressMap private s_poolsBySourceToken;
-  // dest token => token pool
+  /// @dev dest token => token pool
   EnumerableMapAddresses.AddressToAddressMap private s_poolsByDestToken;
 
   // STATE
-  // The expected nonce for a given sender.
+  /// @dev The expected nonce for a given sender.
   mapping(address sender => uint64 nonce) internal s_senderNonce;
-  // A mapping of sequence numbers to execution state using a bitmap with each execution
-  // state only taking up 2 bits of the uint256, packing 128 states into a single slot.
-  // This state makes sure we never execute a message twice.
+  /// @dev A mapping of sequence numbers to execution state using a bitmap with each execution
+  /// state only taking up 2 bits of the uint256, packing 128 states into a single slot.
+  /// This state makes sure we never execute a message twice.
   mapping(uint64 seqNum => uint256 executionStateBitmap) internal s_executionStates;
 
   constructor(
@@ -380,8 +384,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// @notice Execute a single message.
   /// @param message The message that will be executed.
   /// @param offchainTokenData Token transfer data to be passed to TokenPool.
-  /// @dev this can only be called by the contract itself. It is part of
-  /// the Execute call, as we can only try/catch on external calls.
+  /// @dev We make this external and callable by the contract itself, in order to try/catch
+  /// its execution and enforce atomicity among successful message processing and token transfer.
+  /// @dev We use 165 to check for the ccipReceive interface to permit sending tokens to contracts
+  /// (for example smart contract wallets) without an associated message.
   function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
