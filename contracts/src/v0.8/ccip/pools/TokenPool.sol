@@ -45,13 +45,14 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     RateLimiter.Config rateLimiterConfig;
   }
 
-  /// @dev The immutable token that belongs to this pool.
+  /// @dev The bridgeable token that is managed by this pool.
   IERC20 internal immutable i_token;
   /// @dev The address of the arm proxy
   address internal immutable i_armProxy;
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
+  /// Only takes effect if i_allowlistEnabled is true.
   /// This can be used to ensure only token-issuer specified addresses can
   /// move tokens.
   EnumerableSet.AddressSet internal s_allowList;

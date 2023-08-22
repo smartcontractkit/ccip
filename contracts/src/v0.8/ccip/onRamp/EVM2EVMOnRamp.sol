@@ -529,8 +529,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// A basis point fee is calculated from the USD value of each token transfer.
   /// Sum of basis point fees is confined within range [minTokenTransferFeeUSD, maxTokenTransferFeeUSD].
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
-  /// @dev tokenAmounts may contain duplicate tokens, transferFee when amount is split will be equal or greater than
-  /// the amount aggregated/de-duped, so this is acceptable.
+  /// @dev Splitting one token transfer into multiple transfers is discouraged,
+  /// as it will result in a transferFee equal or greater than the same amount aggregated/de-duped.
   function _getTokenTransferFeeUSD(
     address feeToken,
     uint192 feeTokenPrice,
