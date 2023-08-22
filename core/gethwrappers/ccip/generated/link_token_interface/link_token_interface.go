@@ -28,131 +28,131 @@ var (
 	_ = abi.ConvertType
 )
 
-var LinkTokenInterfaceMetaData = &bind.MetaData{
+var LinkTokenMetaData = &bind.MetaData{
 	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"}],\"name\":\"allowance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"remaining\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"approve\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\"}],\"name\":\"balanceOf\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"balance\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"decimals\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"decimalPlaces\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"addedValue\",\"type\":\"uint256\"}],\"name\":\"decreaseApproval\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"spender\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"subtractedValue\",\"type\":\"uint256\"}],\"name\":\"increaseApproval\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"name\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"tokenName\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"symbol\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"tokenSymbol\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"totalSupply\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"totalTokensIssued\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"transfer\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"transferAndCall\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"from\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"transferFrom\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"success\",\"type\":\"bool\"}],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 }
 
-var LinkTokenInterfaceABI = LinkTokenInterfaceMetaData.ABI
+var LinkTokenABI = LinkTokenMetaData.ABI
 
-type LinkTokenInterface struct {
+type LinkToken struct {
 	address common.Address
 	abi     abi.ABI
-	LinkTokenInterfaceCaller
-	LinkTokenInterfaceTransactor
-	LinkTokenInterfaceFilterer
+	LinkTokenCaller
+	LinkTokenTransactor
+	LinkTokenFilterer
 }
 
-type LinkTokenInterfaceCaller struct {
+type LinkTokenCaller struct {
 	contract *bind.BoundContract
 }
 
-type LinkTokenInterfaceTransactor struct {
+type LinkTokenTransactor struct {
 	contract *bind.BoundContract
 }
 
-type LinkTokenInterfaceFilterer struct {
+type LinkTokenFilterer struct {
 	contract *bind.BoundContract
 }
 
-type LinkTokenInterfaceSession struct {
-	Contract     *LinkTokenInterface
+type LinkTokenSession struct {
+	Contract     *LinkToken
 	CallOpts     bind.CallOpts
 	TransactOpts bind.TransactOpts
 }
 
-type LinkTokenInterfaceCallerSession struct {
-	Contract *LinkTokenInterfaceCaller
+type LinkTokenCallerSession struct {
+	Contract *LinkTokenCaller
 	CallOpts bind.CallOpts
 }
 
-type LinkTokenInterfaceTransactorSession struct {
-	Contract     *LinkTokenInterfaceTransactor
+type LinkTokenTransactorSession struct {
+	Contract     *LinkTokenTransactor
 	TransactOpts bind.TransactOpts
 }
 
-type LinkTokenInterfaceRaw struct {
-	Contract *LinkTokenInterface
+type LinkTokenRaw struct {
+	Contract *LinkToken
 }
 
-type LinkTokenInterfaceCallerRaw struct {
-	Contract *LinkTokenInterfaceCaller
+type LinkTokenCallerRaw struct {
+	Contract *LinkTokenCaller
 }
 
-type LinkTokenInterfaceTransactorRaw struct {
-	Contract *LinkTokenInterfaceTransactor
+type LinkTokenTransactorRaw struct {
+	Contract *LinkTokenTransactor
 }
 
-func NewLinkTokenInterface(address common.Address, backend bind.ContractBackend) (*LinkTokenInterface, error) {
-	abi, err := abi.JSON(strings.NewReader(LinkTokenInterfaceABI))
+func NewLinkToken(address common.Address, backend bind.ContractBackend) (*LinkToken, error) {
+	abi, err := abi.JSON(strings.NewReader(LinkTokenABI))
 	if err != nil {
 		return nil, err
 	}
-	contract, err := bindLinkTokenInterface(address, backend, backend, backend)
+	contract, err := bindLinkToken(address, backend, backend, backend)
 	if err != nil {
 		return nil, err
 	}
-	return &LinkTokenInterface{address: address, abi: abi, LinkTokenInterfaceCaller: LinkTokenInterfaceCaller{contract: contract}, LinkTokenInterfaceTransactor: LinkTokenInterfaceTransactor{contract: contract}, LinkTokenInterfaceFilterer: LinkTokenInterfaceFilterer{contract: contract}}, nil
+	return &LinkToken{address: address, abi: abi, LinkTokenCaller: LinkTokenCaller{contract: contract}, LinkTokenTransactor: LinkTokenTransactor{contract: contract}, LinkTokenFilterer: LinkTokenFilterer{contract: contract}}, nil
 }
 
-func NewLinkTokenInterfaceCaller(address common.Address, caller bind.ContractCaller) (*LinkTokenInterfaceCaller, error) {
-	contract, err := bindLinkTokenInterface(address, caller, nil, nil)
+func NewLinkTokenCaller(address common.Address, caller bind.ContractCaller) (*LinkTokenCaller, error) {
+	contract, err := bindLinkToken(address, caller, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &LinkTokenInterfaceCaller{contract: contract}, nil
+	return &LinkTokenCaller{contract: contract}, nil
 }
 
-func NewLinkTokenInterfaceTransactor(address common.Address, transactor bind.ContractTransactor) (*LinkTokenInterfaceTransactor, error) {
-	contract, err := bindLinkTokenInterface(address, nil, transactor, nil)
+func NewLinkTokenTransactor(address common.Address, transactor bind.ContractTransactor) (*LinkTokenTransactor, error) {
+	contract, err := bindLinkToken(address, nil, transactor, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &LinkTokenInterfaceTransactor{contract: contract}, nil
+	return &LinkTokenTransactor{contract: contract}, nil
 }
 
-func NewLinkTokenInterfaceFilterer(address common.Address, filterer bind.ContractFilterer) (*LinkTokenInterfaceFilterer, error) {
-	contract, err := bindLinkTokenInterface(address, nil, nil, filterer)
+func NewLinkTokenFilterer(address common.Address, filterer bind.ContractFilterer) (*LinkTokenFilterer, error) {
+	contract, err := bindLinkToken(address, nil, nil, filterer)
 	if err != nil {
 		return nil, err
 	}
-	return &LinkTokenInterfaceFilterer{contract: contract}, nil
+	return &LinkTokenFilterer{contract: contract}, nil
 }
 
-func bindLinkTokenInterface(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
-	parsed, err := LinkTokenInterfaceMetaData.GetAbi()
+func bindLinkToken(address common.Address, caller bind.ContractCaller, transactor bind.ContractTransactor, filterer bind.ContractFilterer) (*bind.BoundContract, error) {
+	parsed, err := LinkTokenMetaData.GetAbi()
 	if err != nil {
 		return nil, err
 	}
 	return bind.NewBoundContract(address, *parsed, caller, transactor, filterer), nil
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _LinkTokenInterface.Contract.LinkTokenInterfaceCaller.contract.Call(opts, result, method, params...)
+func (_LinkToken *LinkTokenRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _LinkToken.Contract.LinkTokenCaller.contract.Call(opts, result, method, params...)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.LinkTokenInterfaceTransactor.contract.Transfer(opts)
+func (_LinkToken *LinkTokenRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _LinkToken.Contract.LinkTokenTransactor.contract.Transfer(opts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.LinkTokenInterfaceTransactor.contract.Transact(opts, method, params...)
+func (_LinkToken *LinkTokenRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _LinkToken.Contract.LinkTokenTransactor.contract.Transact(opts, method, params...)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
-	return _LinkTokenInterface.Contract.contract.Call(opts, result, method, params...)
+func (_LinkToken *LinkTokenCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
+	return _LinkToken.Contract.contract.Call(opts, result, method, params...)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.contract.Transfer(opts)
+func (_LinkToken *LinkTokenTransactorRaw) Transfer(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _LinkToken.Contract.contract.Transfer(opts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.contract.Transact(opts, method, params...)
+func (_LinkToken *LinkTokenTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
+	return _LinkToken.Contract.contract.Transact(opts, method, params...)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCaller) Allowance(opts *bind.CallOpts, owner common.Address, spender common.Address) (*big.Int, error) {
+func (_LinkToken *LinkTokenCaller) Allowance(opts *bind.CallOpts, owner common.Address, spender common.Address) (*big.Int, error) {
 	var out []interface{}
-	err := _LinkTokenInterface.contract.Call(opts, &out, "allowance", owner, spender)
+	err := _LinkToken.contract.Call(opts, &out, "allowance", owner, spender)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -164,17 +164,17 @@ func (_LinkTokenInterface *LinkTokenInterfaceCaller) Allowance(opts *bind.CallOp
 
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) Allowance(owner common.Address, spender common.Address) (*big.Int, error) {
-	return _LinkTokenInterface.Contract.Allowance(&_LinkTokenInterface.CallOpts, owner, spender)
+func (_LinkToken *LinkTokenSession) Allowance(owner common.Address, spender common.Address) (*big.Int, error) {
+	return _LinkToken.Contract.Allowance(&_LinkToken.CallOpts, owner, spender)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCallerSession) Allowance(owner common.Address, spender common.Address) (*big.Int, error) {
-	return _LinkTokenInterface.Contract.Allowance(&_LinkTokenInterface.CallOpts, owner, spender)
+func (_LinkToken *LinkTokenCallerSession) Allowance(owner common.Address, spender common.Address) (*big.Int, error) {
+	return _LinkToken.Contract.Allowance(&_LinkToken.CallOpts, owner, spender)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCaller) BalanceOf(opts *bind.CallOpts, owner common.Address) (*big.Int, error) {
+func (_LinkToken *LinkTokenCaller) BalanceOf(opts *bind.CallOpts, owner common.Address) (*big.Int, error) {
 	var out []interface{}
-	err := _LinkTokenInterface.contract.Call(opts, &out, "balanceOf", owner)
+	err := _LinkToken.contract.Call(opts, &out, "balanceOf", owner)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -186,17 +186,17 @@ func (_LinkTokenInterface *LinkTokenInterfaceCaller) BalanceOf(opts *bind.CallOp
 
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) BalanceOf(owner common.Address) (*big.Int, error) {
-	return _LinkTokenInterface.Contract.BalanceOf(&_LinkTokenInterface.CallOpts, owner)
+func (_LinkToken *LinkTokenSession) BalanceOf(owner common.Address) (*big.Int, error) {
+	return _LinkToken.Contract.BalanceOf(&_LinkToken.CallOpts, owner)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCallerSession) BalanceOf(owner common.Address) (*big.Int, error) {
-	return _LinkTokenInterface.Contract.BalanceOf(&_LinkTokenInterface.CallOpts, owner)
+func (_LinkToken *LinkTokenCallerSession) BalanceOf(owner common.Address) (*big.Int, error) {
+	return _LinkToken.Contract.BalanceOf(&_LinkToken.CallOpts, owner)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCaller) Decimals(opts *bind.CallOpts) (uint8, error) {
+func (_LinkToken *LinkTokenCaller) Decimals(opts *bind.CallOpts) (uint8, error) {
 	var out []interface{}
-	err := _LinkTokenInterface.contract.Call(opts, &out, "decimals")
+	err := _LinkToken.contract.Call(opts, &out, "decimals")
 
 	if err != nil {
 		return *new(uint8), err
@@ -208,17 +208,17 @@ func (_LinkTokenInterface *LinkTokenInterfaceCaller) Decimals(opts *bind.CallOpt
 
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) Decimals() (uint8, error) {
-	return _LinkTokenInterface.Contract.Decimals(&_LinkTokenInterface.CallOpts)
+func (_LinkToken *LinkTokenSession) Decimals() (uint8, error) {
+	return _LinkToken.Contract.Decimals(&_LinkToken.CallOpts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCallerSession) Decimals() (uint8, error) {
-	return _LinkTokenInterface.Contract.Decimals(&_LinkTokenInterface.CallOpts)
+func (_LinkToken *LinkTokenCallerSession) Decimals() (uint8, error) {
+	return _LinkToken.Contract.Decimals(&_LinkToken.CallOpts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCaller) Name(opts *bind.CallOpts) (string, error) {
+func (_LinkToken *LinkTokenCaller) Name(opts *bind.CallOpts) (string, error) {
 	var out []interface{}
-	err := _LinkTokenInterface.contract.Call(opts, &out, "name")
+	err := _LinkToken.contract.Call(opts, &out, "name")
 
 	if err != nil {
 		return *new(string), err
@@ -230,17 +230,17 @@ func (_LinkTokenInterface *LinkTokenInterfaceCaller) Name(opts *bind.CallOpts) (
 
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) Name() (string, error) {
-	return _LinkTokenInterface.Contract.Name(&_LinkTokenInterface.CallOpts)
+func (_LinkToken *LinkTokenSession) Name() (string, error) {
+	return _LinkToken.Contract.Name(&_LinkToken.CallOpts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCallerSession) Name() (string, error) {
-	return _LinkTokenInterface.Contract.Name(&_LinkTokenInterface.CallOpts)
+func (_LinkToken *LinkTokenCallerSession) Name() (string, error) {
+	return _LinkToken.Contract.Name(&_LinkToken.CallOpts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCaller) Symbol(opts *bind.CallOpts) (string, error) {
+func (_LinkToken *LinkTokenCaller) Symbol(opts *bind.CallOpts) (string, error) {
 	var out []interface{}
-	err := _LinkTokenInterface.contract.Call(opts, &out, "symbol")
+	err := _LinkToken.contract.Call(opts, &out, "symbol")
 
 	if err != nil {
 		return *new(string), err
@@ -252,17 +252,17 @@ func (_LinkTokenInterface *LinkTokenInterfaceCaller) Symbol(opts *bind.CallOpts)
 
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) Symbol() (string, error) {
-	return _LinkTokenInterface.Contract.Symbol(&_LinkTokenInterface.CallOpts)
+func (_LinkToken *LinkTokenSession) Symbol() (string, error) {
+	return _LinkToken.Contract.Symbol(&_LinkToken.CallOpts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCallerSession) Symbol() (string, error) {
-	return _LinkTokenInterface.Contract.Symbol(&_LinkTokenInterface.CallOpts)
+func (_LinkToken *LinkTokenCallerSession) Symbol() (string, error) {
+	return _LinkToken.Contract.Symbol(&_LinkToken.CallOpts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCaller) TotalSupply(opts *bind.CallOpts) (*big.Int, error) {
+func (_LinkToken *LinkTokenCaller) TotalSupply(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _LinkTokenInterface.contract.Call(opts, &out, "totalSupply")
+	err := _LinkToken.contract.Call(opts, &out, "totalSupply")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -274,91 +274,91 @@ func (_LinkTokenInterface *LinkTokenInterfaceCaller) TotalSupply(opts *bind.Call
 
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) TotalSupply() (*big.Int, error) {
-	return _LinkTokenInterface.Contract.TotalSupply(&_LinkTokenInterface.CallOpts)
+func (_LinkToken *LinkTokenSession) TotalSupply() (*big.Int, error) {
+	return _LinkToken.Contract.TotalSupply(&_LinkToken.CallOpts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceCallerSession) TotalSupply() (*big.Int, error) {
-	return _LinkTokenInterface.Contract.TotalSupply(&_LinkTokenInterface.CallOpts)
+func (_LinkToken *LinkTokenCallerSession) TotalSupply() (*big.Int, error) {
+	return _LinkToken.Contract.TotalSupply(&_LinkToken.CallOpts)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactor) Approve(opts *bind.TransactOpts, spender common.Address, value *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.contract.Transact(opts, "approve", spender, value)
+func (_LinkToken *LinkTokenTransactor) Approve(opts *bind.TransactOpts, spender common.Address, value *big.Int) (*types.Transaction, error) {
+	return _LinkToken.contract.Transact(opts, "approve", spender, value)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) Approve(spender common.Address, value *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.Approve(&_LinkTokenInterface.TransactOpts, spender, value)
+func (_LinkToken *LinkTokenSession) Approve(spender common.Address, value *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.Approve(&_LinkToken.TransactOpts, spender, value)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactorSession) Approve(spender common.Address, value *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.Approve(&_LinkTokenInterface.TransactOpts, spender, value)
+func (_LinkToken *LinkTokenTransactorSession) Approve(spender common.Address, value *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.Approve(&_LinkToken.TransactOpts, spender, value)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactor) DecreaseApproval(opts *bind.TransactOpts, spender common.Address, addedValue *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.contract.Transact(opts, "decreaseApproval", spender, addedValue)
+func (_LinkToken *LinkTokenTransactor) DecreaseApproval(opts *bind.TransactOpts, spender common.Address, addedValue *big.Int) (*types.Transaction, error) {
+	return _LinkToken.contract.Transact(opts, "decreaseApproval", spender, addedValue)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) DecreaseApproval(spender common.Address, addedValue *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.DecreaseApproval(&_LinkTokenInterface.TransactOpts, spender, addedValue)
+func (_LinkToken *LinkTokenSession) DecreaseApproval(spender common.Address, addedValue *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.DecreaseApproval(&_LinkToken.TransactOpts, spender, addedValue)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactorSession) DecreaseApproval(spender common.Address, addedValue *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.DecreaseApproval(&_LinkTokenInterface.TransactOpts, spender, addedValue)
+func (_LinkToken *LinkTokenTransactorSession) DecreaseApproval(spender common.Address, addedValue *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.DecreaseApproval(&_LinkToken.TransactOpts, spender, addedValue)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactor) IncreaseApproval(opts *bind.TransactOpts, spender common.Address, subtractedValue *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.contract.Transact(opts, "increaseApproval", spender, subtractedValue)
+func (_LinkToken *LinkTokenTransactor) IncreaseApproval(opts *bind.TransactOpts, spender common.Address, subtractedValue *big.Int) (*types.Transaction, error) {
+	return _LinkToken.contract.Transact(opts, "increaseApproval", spender, subtractedValue)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) IncreaseApproval(spender common.Address, subtractedValue *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.IncreaseApproval(&_LinkTokenInterface.TransactOpts, spender, subtractedValue)
+func (_LinkToken *LinkTokenSession) IncreaseApproval(spender common.Address, subtractedValue *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.IncreaseApproval(&_LinkToken.TransactOpts, spender, subtractedValue)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactorSession) IncreaseApproval(spender common.Address, subtractedValue *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.IncreaseApproval(&_LinkTokenInterface.TransactOpts, spender, subtractedValue)
+func (_LinkToken *LinkTokenTransactorSession) IncreaseApproval(spender common.Address, subtractedValue *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.IncreaseApproval(&_LinkToken.TransactOpts, spender, subtractedValue)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactor) Transfer(opts *bind.TransactOpts, to common.Address, value *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.contract.Transact(opts, "transfer", to, value)
+func (_LinkToken *LinkTokenTransactor) Transfer(opts *bind.TransactOpts, to common.Address, value *big.Int) (*types.Transaction, error) {
+	return _LinkToken.contract.Transact(opts, "transfer", to, value)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) Transfer(to common.Address, value *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.Transfer(&_LinkTokenInterface.TransactOpts, to, value)
+func (_LinkToken *LinkTokenSession) Transfer(to common.Address, value *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.Transfer(&_LinkToken.TransactOpts, to, value)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactorSession) Transfer(to common.Address, value *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.Transfer(&_LinkTokenInterface.TransactOpts, to, value)
+func (_LinkToken *LinkTokenTransactorSession) Transfer(to common.Address, value *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.Transfer(&_LinkToken.TransactOpts, to, value)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactor) TransferAndCall(opts *bind.TransactOpts, to common.Address, value *big.Int, data []byte) (*types.Transaction, error) {
-	return _LinkTokenInterface.contract.Transact(opts, "transferAndCall", to, value, data)
+func (_LinkToken *LinkTokenTransactor) TransferAndCall(opts *bind.TransactOpts, to common.Address, value *big.Int, data []byte) (*types.Transaction, error) {
+	return _LinkToken.contract.Transact(opts, "transferAndCall", to, value, data)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) TransferAndCall(to common.Address, value *big.Int, data []byte) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.TransferAndCall(&_LinkTokenInterface.TransactOpts, to, value, data)
+func (_LinkToken *LinkTokenSession) TransferAndCall(to common.Address, value *big.Int, data []byte) (*types.Transaction, error) {
+	return _LinkToken.Contract.TransferAndCall(&_LinkToken.TransactOpts, to, value, data)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactorSession) TransferAndCall(to common.Address, value *big.Int, data []byte) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.TransferAndCall(&_LinkTokenInterface.TransactOpts, to, value, data)
+func (_LinkToken *LinkTokenTransactorSession) TransferAndCall(to common.Address, value *big.Int, data []byte) (*types.Transaction, error) {
+	return _LinkToken.Contract.TransferAndCall(&_LinkToken.TransactOpts, to, value, data)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactor) TransferFrom(opts *bind.TransactOpts, from common.Address, to common.Address, value *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.contract.Transact(opts, "transferFrom", from, to, value)
+func (_LinkToken *LinkTokenTransactor) TransferFrom(opts *bind.TransactOpts, from common.Address, to common.Address, value *big.Int) (*types.Transaction, error) {
+	return _LinkToken.contract.Transact(opts, "transferFrom", from, to, value)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceSession) TransferFrom(from common.Address, to common.Address, value *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.TransferFrom(&_LinkTokenInterface.TransactOpts, from, to, value)
+func (_LinkToken *LinkTokenSession) TransferFrom(from common.Address, to common.Address, value *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.TransferFrom(&_LinkToken.TransactOpts, from, to, value)
 }
 
-func (_LinkTokenInterface *LinkTokenInterfaceTransactorSession) TransferFrom(from common.Address, to common.Address, value *big.Int) (*types.Transaction, error) {
-	return _LinkTokenInterface.Contract.TransferFrom(&_LinkTokenInterface.TransactOpts, from, to, value)
+func (_LinkToken *LinkTokenTransactorSession) TransferFrom(from common.Address, to common.Address, value *big.Int) (*types.Transaction, error) {
+	return _LinkToken.Contract.TransferFrom(&_LinkToken.TransactOpts, from, to, value)
 }
 
-func (_LinkTokenInterface *LinkTokenInterface) Address() common.Address {
-	return _LinkTokenInterface.address
+func (_LinkToken *LinkToken) Address() common.Address {
+	return _LinkToken.address
 }
 
-type LinkTokenInterfaceInterface interface {
+type LinkTokenInterface interface {
 	Allowance(opts *bind.CallOpts, owner common.Address, spender common.Address) (*big.Int, error)
 
 	BalanceOf(opts *bind.CallOpts, owner common.Address) (*big.Int, error)
