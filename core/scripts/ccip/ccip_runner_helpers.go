@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rhea/deployments"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/shared"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 )
 
 var laneMapping = map[dione.Environment]map[rhea.Chain]map[rhea.Chain]rhea.EvmDeploymentConfig{
