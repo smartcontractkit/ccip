@@ -23,7 +23,7 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/BurnMintERC677.abi ../../../contracts/solc/v0.8.19/BurnMintERC677.bin BurnMintERC677 burn_mint_erc677
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/BurnMintERC677Helper.abi ../../../contracts/solc/v0.8.19/BurnMintERC677Helper.bin BurnMintERC677Helper burn_mint_erc677_helper
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ERC20.abi ../../../contracts/solc/v0.8.19/ERC20.bin ERC20 erc20
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/LinkTokenInterface.abi ../../../contracts/solc/v0.8.19/LinkTokenInterface.bin LinkToken link_token_interface
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/LinkToken.abi ../../../contracts/solc/v0.8.19/LinkToken.bin LinkToken link_token_interface
 
 // Customer contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool.bin USDCTokenPool usdc_token_pool

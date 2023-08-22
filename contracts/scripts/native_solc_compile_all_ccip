@@ -31,7 +31,7 @@ compileContract ccip/PriceRegistry.sol
 compileContract ccip/pools/LockReleaseTokenPool.sol
 compileContract ccip/pools/BurnMintTokenPool.sol
 compileContract shared/token/ERC677/BurnMintERC677.sol
-compileContract shared/interfaces/LinkTokenInterface.sol
+compileContract shared/token/ERC677/LinkToken.sol
 compileContract ccip/applications/PingPongDemo.sol
 
 # Test helpers
