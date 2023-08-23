@@ -1574,8 +1574,17 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 	lane.SentReqs = make(map[int64]CCIPRequest)
 }
 
-func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]CCIPRequest, error) {
-	txMap := make(map[int64]CCIPRequest)
+func (lane *CCIPLane) AddToSentReqs(txHash common.Hash) (*types.Receipt, error) {
+	request, rcpt, err := CCIPRequestFromTxHash(txHash, lane.Source.Common.ChainClient)
+	if err != nil {
+		return rcpt, fmt.Errorf("could not get request from tx hash: %+v", err)
+	}
+	lane.SentReqs[int64(lane.NumberOfReq+1)] = request
+	lane.NumberOfReq++
+	return rcpt, nil
+}
+
+func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
 	for i := 1; i <= noOfRequests; i++ {
 		msg := fmt.Sprintf("msg %d", i)
 		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
@@ -1586,24 +1595,24 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]
 		if err != nil {
 			lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
 				testreporters.TX, txConfirmationDur, testreporters.Failure)
-			return nil, fmt.Errorf("could not send request: %+v", err)
+			return fmt.Errorf("could not send request: %+v", err)
 		}
 		err = lane.Source.Common.ChainClient.WaitForEvents()
 		if err != nil {
 			lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
 				testreporters.TX, txConfirmationDur, testreporters.Failure)
-			return nil, fmt.Errorf("could not send request: %+v", err)
+			return fmt.Errorf("could not send request: %+v", err)
 		}
 
-		request, rcpt, err := CCIPRequestFromTxHash(txHash, lane.Source.Common.ChainClient)
-		if err != nil {
-			return txMap, fmt.Errorf("could not get request from tx hash: %+v", err)
-		}
-		txMap[int64(lane.NumberOfReq+i)] = request
-		lane.SentReqs[int64(lane.NumberOfReq+i)] = txMap[int64(lane.NumberOfReq+i)]
 		noOfTokens := len(lane.Source.TransferAmount)
 		if msgType == DataOnlyTransfer {
 			noOfTokens = 0
+		}
+		rcpt, err := lane.AddToSentReqs(txHash)
+		if err != nil {
+			lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
+				testreporters.TX, txConfirmationDur, testreporters.Failure)
+			return err
 		}
 		lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
 			testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.TransactionStats{
@@ -1615,9 +1624,8 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]
 			})
 		lane.TotalFee = bigmath.Add(lane.TotalFee, fee)
 	}
-	lane.NumberOfReq += noOfRequests
 
-	return txMap, nil
+	return nil
 }
 
 func (lane *CCIPLane) ValidateRequests() {
