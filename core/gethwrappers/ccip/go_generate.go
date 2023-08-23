@@ -23,7 +23,6 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/BurnMintERC677.abi ../../../contracts/solc/v0.8.19/BurnMintERC677.bin BurnMintERC677 burn_mint_erc677
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/BurnMintERC677Helper.abi ../../../contracts/solc/v0.8.19/BurnMintERC677Helper.bin BurnMintERC677Helper burn_mint_erc677_helper
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ERC20.abi ../../../contracts/solc/v0.8.19/ERC20.bin ERC20 erc20
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/LinkToken.abi ../../../contracts/solc/v0.8.19/LinkToken.bin LinkToken link_token_interface
 
 // Customer contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool.bin USDCTokenPool usdc_token_pool
@@ -33,7 +32,7 @@ package ccip
 //go:generate mockery --quiet --dir ./generated/evm_2_evm_offramp/ --name EVM2EVMOffRampInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 //go:generate mockery --quiet --dir ./generated/commit_store/ --name CommitStoreInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 //go:generate mockery --quiet --dir ./generated/price_registry/ --name PriceRegistryInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
-//go:generate mockery --quiet --dir ./generated/link_token_interface/ --name LinkTokenInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
+//go:generate mockery --quiet --dir ../generated/link_token_interface/ --name LinkTokenInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:
