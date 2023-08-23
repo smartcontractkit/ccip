@@ -12,6 +12,7 @@ import (
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 
+	"github.com/smartcontractkit/ccip-chain-selectors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
@@ -60,7 +61,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
-	chainId, err := ccipconfig.ChainIdFromSelector(staticConfig.SourceChainSelector)
+	chainId, err := ccip_chain_selectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +252,7 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, q pg.Queryer, spec *jo
 	if err != nil {
 		return err
 	}
-	chainId, err := ccipconfig.ChainIdFromSelector(staticConfig.SourceChainSelector)
+	chainId, err := ccip_chain_selectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {
 		return err
 	}

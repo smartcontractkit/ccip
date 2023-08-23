@@ -13,6 +13,7 @@ import (
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 
+	"github.com/smartcontractkit/ccip-chain-selectors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
@@ -67,7 +68,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	if err != nil {
 		return nil, err
 	}
-	chainId, err := ccipconfig.ChainIdFromSelector(offRampConfig.SourceChainSelector)
+	chainId, err := ccip_chain_selectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +243,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, q pg.Queryer, spec *job.
 	if err != nil {
 		return err
 	}
-	chainId, err := ccipconfig.ChainIdFromSelector(offRampConfig.SourceChainSelector)
+	chainId, err := ccip_chain_selectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
 	if err != nil {
 		return err
 	}
