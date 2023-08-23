@@ -1260,8 +1260,8 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 					return nil
 				} else {
 					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
-					return fmt.Errorf("ExecutionStateChanged event state changed to %d for seq num %v for lane %d-->%d",
-						e.State, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+					return fmt.Errorf("ExecutionStateChanged event state changed to %d with data %x for seq num %v for lane %d-->%d",
+						e.State, e.ReturnData, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
 			}
 		case <-ctx.Done():
