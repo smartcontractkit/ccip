@@ -14,16 +14,17 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/smartcontractkit/ccip-chain-selectors"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/actions"
-	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
 )
 
 type CCIPE2ELoad struct {
@@ -109,9 +110,11 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	if msgType == actions.TokenTransfer {
 		c.msg.TokenAmounts = tokenAndAmounts
 	}
-	dCfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
-	require.NoError(c.t, err, "failed to fetch dynamic config")
-	c.MaxDataSize = dCfg.MaxDataSize
+	if c.SendMaxDataIntermittently {
+		dCfg, err := sourceCCIP.OnRamp.Instance.GetDynamicConfig(nil)
+		require.NoError(c.t, err, "failed to fetch dynamic config")
+		c.MaxDataSize = dCfg.MaxDataSize
+	}
 
 	// wait for any pending txs before moving on
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
@@ -162,7 +165,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	var sendTx *types.Transaction
 	var err error
 
-	destChainSelector, err := ccip_chain_selectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
+	destChainSelector, err := chain_selectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
 		res.Error = err.Error()
 		res.Failed = true
