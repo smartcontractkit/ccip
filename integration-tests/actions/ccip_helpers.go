@@ -1438,9 +1438,27 @@ func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain 
 }
 
 type CCIPRequest struct {
-	reqNo                   int64
 	txHash                  string
 	txConfirmationTimestamp time.Time
+}
+
+func CCIPRequestFromTxHash(txHash common.Hash, chainClient blockchain.EVMClient) (CCIPRequest, *types.Receipt, error) {
+	txConfirmationTimestamp := time.Now().UTC()
+	rcpt, err := chainClient.GetTxReceipt(txHash)
+	if err != nil {
+		return CCIPRequest{}, nil, err
+	}
+
+	hdr, err := chainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
+	if err != nil {
+		return CCIPRequest{}, nil, err
+	}
+	txConfirmationTimestamp = hdr.Timestamp
+
+	return CCIPRequest{
+		txHash:                  txHash.Hex(),
+		txConfirmationTimestamp: txConfirmationTimestamp,
+	}, rcpt, nil
 }
 
 type CCIPLane struct {
@@ -1576,18 +1594,12 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]
 				testreporters.TX, txConfirmationDur, testreporters.Failure)
 			return nil, fmt.Errorf("could not send request: %+v", err)
 		}
-		txConfirmationTimestamp := time.Now().UTC()
-		rcpt, err := lane.Source.Common.ChainClient.GetTxReceipt(txHash)
-		if err == nil {
-			hdr, err := lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
-			if err == nil {
-				txConfirmationTimestamp = hdr.Timestamp
-			}
+
+		request, rcpt, err := CCIPRequestFromTxHash(txHash, lane.Source.Common.ChainClient)
+		if err != nil {
+			return txMap, fmt.Errorf("could not get request from tx hash: %+v", err)
 		}
-		txMap[int64(lane.NumberOfReq+i)] = CCIPRequest{
-			txHash:                  txHash.Hex(),
-			txConfirmationTimestamp: txConfirmationTimestamp,
-		}
+		txMap[int64(lane.NumberOfReq+i)] = request
 		lane.SentReqs[int64(lane.NumberOfReq+i)] = txMap[int64(lane.NumberOfReq+i)]
 		noOfTokens := len(lane.Source.TransferAmount)
 		if msgType == DataOnlyTransfer {
