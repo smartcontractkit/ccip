@@ -9,7 +9,7 @@ import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 /// to point to a static address for ARM queries, which saves gas
 /// since each contract need not store an ARM address in storage. That way
 /// we can add ARM queries along many code paths for increased defense in depth
-/// with no additional cost.
+/// with minimal additional cost.
 contract ARMProxy is OwnerIsCreator, TypeAndVersionInterface {
   error ZeroAddressNotAllowed();
 
