@@ -483,7 +483,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
-		if msg.executed && msg.finalized {
+		if msg.executed {
 			msgLggr.Infow("Skipping message already executed", "seqNr", msg.SequenceNumber)
 			continue
 		}
