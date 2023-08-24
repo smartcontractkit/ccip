@@ -12,16 +12,17 @@ import (
 	"github.com/pkg/errors"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
+
+	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -44,7 +45,7 @@ const (
 
 func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
-	var pluginConfig ccipconfig.ExecutionPluginConfig
+	var pluginConfig ccipconfig.ExecutionPluginJobSpecConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
 		return nil, err
@@ -213,7 +214,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, q pg.Queryer, spec *job.
 		return errors.New("spec is nil")
 	}
 
-	var pluginConfig ccipconfig.ExecutionPluginConfig
+	var pluginConfig ccipconfig.ExecutionPluginJobSpecConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
 		return err

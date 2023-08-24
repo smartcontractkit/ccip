@@ -23,12 +23,12 @@ import (
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/custom_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/price_registry"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
@@ -95,8 +95,6 @@ func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) *Execution
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	ctx := context.TODO()
-
 	onchainConfig, err := abihelpers.DecodeAbiStruct[ccipconfig.ExecOnchainConfig](config.OnchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
@@ -113,7 +111,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	destWrappedNative, err := destRouter.GetWrappedNative(&bind.CallOpts{Context: ctx})
+	destWrappedNative, err := destRouter.GetWrappedNative(nil)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -166,7 +164,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	inFlight := r.inflightReports.getAll()
 
 	observationBuildStart := time.Now()
-	// IMPORTANT: We build executable set based on the leaders token prices, ensuring consistency across followers.
+
 	executableObservations, err := r.getExecutableObservations(ctx, lggr, timestamp, inFlight)
 	measureObservationBuildDuration(timestamp, time.Since(observationBuildStart))
 	if err != nil {
