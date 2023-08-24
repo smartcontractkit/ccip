@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -26,11 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip"
-	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip/laneconfig"
-	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
@@ -39,12 +35,17 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipConfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	bigmath "github.com/smartcontractkit/chainlink/v2/core/utils/big_math"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip"
+	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip/laneconfig"
+	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
 )
 
 const (
@@ -497,11 +498,11 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 	if len(sourceCCIP.TransferAmount) != len(sourceCCIP.Common.BridgeTokens) {
 		sourceCCIP.TransferAmount = sourceCCIP.TransferAmount[:len(sourceCCIP.Common.BridgeTokens)]
 	}
-	sourceChainSelector, err := ccipconfig.SelectorFromChainId(sourceCCIP.Common.ChainClient.GetChainID().Uint64())
+	sourceChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	destChainSelector, err := ccipconfig.SelectorFromChainId(sourceCCIP.DestinationChainId)
+	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -838,7 +839,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed encoding the options field: %+v", err)
 	}
-	destChainSelector, err := ccipconfig.SelectorFromChainId(sourceCCIP.DestinationChainId)
+	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %+v", err)
 	}
@@ -955,11 +956,11 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	}
 
 	destCCIP.LoadContracts(lane)
-	sourceChainSelector, err := ccipconfig.SelectorFromChainId(destCCIP.SourceChainId)
+	sourceChainSelector, err := chainselectors.SelectorFromChainId(destCCIP.SourceChainId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	destChainSelector, err := ccipconfig.SelectorFromChainId(destCCIP.Common.ChainClient.GetChainID().Uint64())
+	destChainSelector, err := chainselectors.SelectorFromChainId(destCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1259,8 +1260,8 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 					return nil
 				} else {
 					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, time.Since(timeNow), testreporters.Failure)
-					return fmt.Errorf("ExecutionStateChanged event state changed to %d for seq num %v for lane %d-->%d",
-						e.State, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
+					return fmt.Errorf("ExecutionStateChanged event state changed to %d with data %x for seq num %v for lane %d-->%d",
+						e.State, e.ReturnData, seqNum, destCCIP.SourceChainId, destCCIP.Common.ChainClient.GetChainID())
 				}
 			}
 		case <-ctx.Done():
@@ -1437,9 +1438,27 @@ func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain 
 }
 
 type CCIPRequest struct {
-	reqNo                   int64
 	txHash                  string
 	txConfirmationTimestamp time.Time
+}
+
+func CCIPRequestFromTxHash(txHash common.Hash, chainClient blockchain.EVMClient) (CCIPRequest, *types.Receipt, error) {
+	txConfirmationTimestamp := time.Now().UTC()
+	rcpt, err := chainClient.GetTxReceipt(txHash)
+	if err != nil {
+		return CCIPRequest{}, nil, err
+	}
+
+	hdr, err := chainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
+	if err != nil {
+		return CCIPRequest{}, nil, err
+	}
+	txConfirmationTimestamp = hdr.Timestamp
+
+	return CCIPRequest{
+		txHash:                  txHash.Hex(),
+		txConfirmationTimestamp: txConfirmationTimestamp,
+	}, rcpt, nil
 }
 
 type CCIPLane struct {
@@ -1555,8 +1574,17 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 	lane.SentReqs = make(map[int64]CCIPRequest)
 }
 
-func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]CCIPRequest, error) {
-	txMap := make(map[int64]CCIPRequest)
+func (lane *CCIPLane) AddToSentReqs(txHash common.Hash) (*types.Receipt, error) {
+	request, rcpt, err := CCIPRequestFromTxHash(txHash, lane.Source.Common.ChainClient)
+	if err != nil {
+		return rcpt, fmt.Errorf("could not get request from tx hash: %+v", err)
+	}
+	lane.SentReqs[int64(lane.NumberOfReq+1)] = request
+	lane.NumberOfReq++
+	return rcpt, nil
+}
+
+func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
 	for i := 1; i <= noOfRequests; i++ {
 		msg := fmt.Sprintf("msg %d", i)
 		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
@@ -1567,30 +1595,24 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]
 		if err != nil {
 			lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
 				testreporters.TX, txConfirmationDur, testreporters.Failure)
-			return nil, fmt.Errorf("could not send request: %+v", err)
+			return fmt.Errorf("could not send request: %+v", err)
 		}
 		err = lane.Source.Common.ChainClient.WaitForEvents()
 		if err != nil {
 			lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
 				testreporters.TX, txConfirmationDur, testreporters.Failure)
-			return nil, fmt.Errorf("could not send request: %+v", err)
+			return fmt.Errorf("could not send request: %+v", err)
 		}
-		txConfirmationTimestamp := time.Now().UTC()
-		rcpt, err := lane.Source.Common.ChainClient.GetTxReceipt(txHash)
-		if err == nil {
-			hdr, err := lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
-			if err == nil {
-				txConfirmationTimestamp = hdr.Timestamp
-			}
-		}
-		txMap[int64(lane.NumberOfReq+i)] = CCIPRequest{
-			txHash:                  txHash.Hex(),
-			txConfirmationTimestamp: txConfirmationTimestamp,
-		}
-		lane.SentReqs[int64(lane.NumberOfReq+i)] = txMap[int64(lane.NumberOfReq+i)]
+
 		noOfTokens := len(lane.Source.TransferAmount)
 		if msgType == DataOnlyTransfer {
 			noOfTokens = 0
+		}
+		rcpt, err := lane.AddToSentReqs(txHash)
+		if err != nil {
+			lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
+				testreporters.TX, txConfirmationDur, testreporters.Failure)
+			return err
 		}
 		lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
 			testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.TransactionStats{
@@ -1602,9 +1624,8 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) (map[int64]
 			})
 		lane.TotalFee = bigmath.Add(lane.TotalFee, fee)
 	}
-	lane.NumberOfReq += noOfRequests
 
-	return txMap, nil
+	return nil
 }
 
 func (lane *CCIPLane) ValidateRequests() {
