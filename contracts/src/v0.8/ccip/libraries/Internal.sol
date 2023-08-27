@@ -9,17 +9,24 @@ library Internal {
   struct PriceUpdates {
     TokenPriceUpdate[] tokenPriceUpdates;
     uint64 destChainSelector; // --┐ Destination chain selector
-    uint192 usdPerUnitGas; // -----┘ 1e18 USD per smallest unit (e.g. wei) of destination chain gas
+    uint224 usdPerUnitGas; // -----┘ 1e18 USD per smallest unit (e.g. wei) of destination chain gas
   }
 
   struct TokenPriceUpdate {
     address sourceToken; // Source token
-    uint192 usdPerToken; // 1e18 USD per smallest unit of token
+    uint224 usdPerToken; // 1e18 USD per smallest unit of token
   }
 
-  struct TimestampedUint192Value {
-    uint192 value; // -------┐ The price, in 1e18 USD.
-    uint64 timestamp; // ----┘ Timestamp of the most recent price update.
+  struct TimestampedPackedUint224 {
+    uint224 value; // ------┐ Value in uint224, packed.
+    uint32 timestamp; // ----┘ Timestamp of the most recent update.
+  }
+
+  uint256 private constant UINT_112__MASK = (1 << 112) - 1;
+
+  // little endian
+  function _unpackUint224Into112(uint224 value) internal pure returns (uint112, uint112) {
+    return (uint112(value & UINT_112__MASK), uint112((value >> 112) & UINT_112__MASK));
   }
 
   struct PoolUpdate {

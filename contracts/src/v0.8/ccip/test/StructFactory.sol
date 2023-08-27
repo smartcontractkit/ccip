@@ -95,11 +95,11 @@ contract StructFactory {
   // offRamp
   uint256 internal constant POOL_BALANCE = 1e25;
   uint32 internal constant EXECUTION_DELAY_SECONDS = 0;
-  uint32 internal constant MAX_DATA_SIZE = 30_000;
+  uint24 internal constant MAX_DATA_SIZE = 30_000;
   uint16 internal constant MAX_TOKENS_LENGTH = 5;
   uint16 internal constant GAS_FOR_CALL_EXACT_CHECK = 5000;
   uint32 internal constant PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS = 500;
-  uint64 internal constant MAX_GAS_LIMIT = 4_000_000;
+  uint32 internal constant MAX_GAS_LIMIT = 4_000_000;
 
   function generateManualGasLimit(uint256 callDataLength) internal view returns (uint256) {
     return ((gasleft() - 2 * (16 * callDataLength + GAS_FOR_CALL_EXACT_CHECK)) * 62) / 64;
@@ -129,6 +129,9 @@ contract StructFactory {
         maxTokensLength: MAX_TOKENS_LENGTH,
         destGasOverhead: DEST_GAS_OVERHEAD,
         destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
+        destCalldataOverhead: 188,
+        destGasPerCalldataByte: 16,
+        destCalldataMultiplier: 0,
         priceRegistry: priceRegistry,
         maxDataSize: MAX_DATA_SIZE,
         maxGasLimit: MAX_GAS_LIMIT
@@ -163,7 +166,7 @@ contract StructFactory {
 
   function getSinglePriceUpdateStruct(
     address token,
-    uint192 price
+    uint224 price
   ) internal pure returns (Internal.PriceUpdates memory) {
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
     tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: token, usdPerToken: price});
@@ -179,7 +182,7 @@ contract StructFactory {
 
   function getPriceUpdatesStruct(
     address[] memory tokens,
-    uint192[] memory prices
+    uint224[] memory prices
   ) internal pure returns (Internal.PriceUpdates memory) {
     uint256 length = tokens.length;
 

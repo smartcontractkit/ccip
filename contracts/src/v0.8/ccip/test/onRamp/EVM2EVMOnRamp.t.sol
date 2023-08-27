@@ -655,9 +655,9 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
 }
 
 contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
-  uint192 internal s_feeTokenPrice;
-  uint192 internal s_wrappedTokenPrice;
-  uint192 internal s_customTokenPrice;
+  uint224 internal s_feeTokenPrice;
+  uint224 internal s_wrappedTokenPrice;
+  uint224 internal s_customTokenPrice;
 
   function setUp() public virtual override {
     EVM2EVMOnRampSetup.setUp();
@@ -678,7 +678,7 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     s_customTokenPrice = CUSTOM_TOKEN_PRICE;
   }
 
-  function calcUSDValueFromTokenAmount(uint192 tokenPrice, uint256 tokenAmount) internal pure returns (uint256) {
+  function calcUSDValueFromTokenAmount(uint224 tokenPrice, uint256 tokenAmount) internal pure returns (uint256) {
     return (tokenPrice * tokenAmount) / 1e18;
   }
 
@@ -693,7 +693,7 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
 
 /// @notice #getTokenTransferFee
 contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
-  using USDPriceWith18Decimals for uint192;
+  using USDPriceWith18Decimals for uint224;
 
   function testNoTokenTransferChargesMinFeeSuccess() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -909,7 +909,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
   function testMixedTokenTransferFeeSuccess() public {
     address[3] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative(), CUSTOM_TOKEN];
-    uint192[3] memory tokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice, s_customTokenPrice];
+    uint224[3] memory tokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice, s_customTokenPrice];
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(OWNER),
@@ -1002,11 +1002,11 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
 
 /// @notice #getFee
 contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
-  using USDPriceWith18Decimals for uint192;
+  using USDPriceWith18Decimals for uint224;
 
   function testEmptyMessageSuccess() public {
     address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint192[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
 
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
       Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -1027,7 +1027,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
 
   function testHighGasMessageSuccess() public {
     address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint192[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
 
     uint256 customGasLimit = MAX_GAS_LIMIT;
     uint256 customDataSize = MAX_DATA_SIZE;
@@ -1055,7 +1055,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
 
   function testSingleTokenMessageSuccess() public {
     address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint192[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
 
     uint256 tokenAmount = 10000e18;
     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
@@ -1083,7 +1083,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
 
   function testMessageWithDataAndTokenTransferSuccess() public {
     address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint192[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
 
     uint256 customGasLimit = 1_000_000;
     uint256 feeTokenAmount = 10000e18;
@@ -1639,6 +1639,9 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxTokensLength: 14,
       destGasOverhead: DEST_GAS_OVERHEAD / 2,
       destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE / 2,
+      destCalldataOverhead: 188,
+      destGasPerCalldataByte: 16,
+      destCalldataMultiplier: 61800000,
       priceRegistry: address(23423),
       maxDataSize: 400,
       maxGasLimit: MAX_GAS_LIMIT / 2
@@ -1667,6 +1670,9 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxTokensLength: 14,
       destGasOverhead: DEST_GAS_OVERHEAD / 2,
       destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE / 2,
+      destCalldataOverhead: 188,
+      destGasPerCalldataByte: 16,
+      destCalldataMultiplier: 61800000,
       priceRegistry: address(23423),
       maxDataSize: 400,
       maxGasLimit: MAX_GAS_LIMIT / 2

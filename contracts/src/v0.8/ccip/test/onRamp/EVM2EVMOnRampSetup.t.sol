@@ -15,7 +15,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
 
   address internal constant CUSTOM_TOKEN = address(12345);
-  uint192 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
+  uint224 internal constant CUSTOM_TOKEN_PRICE = 1e17; // $0.1 CUSTOM
 
   uint256 internal immutable i_tokenAmount0 = 9;
   uint256 internal immutable i_tokenAmount1 = 7;

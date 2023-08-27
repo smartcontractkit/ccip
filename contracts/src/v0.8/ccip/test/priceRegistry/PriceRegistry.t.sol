@@ -7,7 +7,7 @@ import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 
 contract PriceRegistrySetup is TokenSetup, RouterSetup {
-  uint192 internal constant USD_PER_GAS = 1e6;
+  uint224 internal constant USD_PER_GAS = 1e6;
 
   PriceRegistry internal s_priceRegistry;
   // Cheat to store the price updates in storage since struct arrays aren't supported.
@@ -15,9 +15,9 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
   address internal s_weth;
 
   address[] internal s_sourceFeeTokens;
-  uint192[] internal s_sourceTokenPrices;
+  uint224[] internal s_sourceTokenPrices;
   address[] internal s_destFeeTokens;
-  uint192[] internal s_destTokenPrices;
+  uint224[] internal s_destTokenPrices;
 
   function setUp() public virtual override(TokenSetup, RouterSetup) {
     TokenSetup.setUp();
@@ -31,7 +31,7 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
     sourceFeeTokens[2] = s_sourceRouter.getWrappedNative();
     s_sourceFeeTokens = sourceFeeTokens;
 
-    uint192[] memory sourceTokenPrices = new uint192[](3);
+    uint224[] memory sourceTokenPrices = new uint224[](3);
     sourceTokenPrices[0] = 5e18;
     sourceTokenPrices[1] = 2000e18;
     sourceTokenPrices[2] = 2000e18;
@@ -43,7 +43,7 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
     destFeeTokens[2] = s_destRouter.getWrappedNative();
     s_destFeeTokens = destFeeTokens;
 
-    uint192[] memory destTokenPrices = new uint192[](3);
+    uint224[] memory destTokenPrices = new uint224[](3);
     destTokenPrices[0] = 5e18;
     destTokenPrices[1] = 2000e18;
     destTokenPrices[2] = 2000e18;
@@ -52,7 +52,7 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
     uint256 sourceTokenCount = sourceFeeTokens.length;
     uint256 destTokenCount = destFeeTokens.length;
     address[] memory pricedTokens = new address[](sourceTokenCount + destTokenCount);
-    uint192[] memory tokenPrices = new uint192[](sourceTokenCount + destTokenCount);
+    uint224[] memory tokenPrices = new uint224[](sourceTokenCount + destTokenCount);
     for (uint256 i = 0; i < sourceTokenCount; ++i) {
       pricedTokens[i] = sourceFeeTokens[i];
       tokenPrices[i] = sourceTokenPrices[i];
@@ -107,7 +107,7 @@ contract PriceRegistry_getTokenPrices is PriceRegistrySetup {
     tokens[1] = s_sourceTokens[1];
     tokens[2] = s_weth;
 
-    Internal.TimestampedUint192Value[] memory tokenPrices = s_priceRegistry.getTokenPrices(tokens);
+    Internal.TimestampedPackedUint224[] memory tokenPrices = s_priceRegistry.getTokenPrices(tokens);
 
     assertEq(tokenPrices.length, 3);
     assertEq(tokenPrices[0].value, priceUpdates.tokenPriceUpdates[0].usdPerToken);
@@ -121,7 +121,7 @@ contract PriceRegistry_getValidatedTokenPrice is PriceRegistrySetup {
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
     address token = priceUpdates.tokenPriceUpdates[0].sourceToken;
 
-    uint192 tokenPrice = s_priceRegistry.getValidatedTokenPrice(token);
+    uint224 tokenPrice = s_priceRegistry.getValidatedTokenPrice(token);
 
     assertEq(priceUpdates.tokenPriceUpdates[0].usdPerToken, tokenPrice);
   }
@@ -272,9 +272,9 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
 
   function testFuzz_ConvertTokenAmountSuccess(
     uint256 feeTokenAmount,
-    uint192 usdPerFeeToken,
+    uint224 usdPerFeeToken,
     uint160 usdPerLinkToken,
-    uint192 usdPerUnitGas
+    uint224 usdPerUnitGas
   ) public {
     vm.assume(usdPerFeeToken > 0);
     vm.assume(usdPerLinkToken > 0);
@@ -361,7 +361,7 @@ contract PriceRegistry_convertTokenAmount is PriceRegistrySetup {
 
 contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
   function testGetFeeTokenAndGasPricesSuccess() public {
-    (uint192 feeTokenPrice, uint192 gasPrice) = s_priceRegistry.getTokenAndGasPrices(s_sourceFeeToken, DEST_CHAIN_ID);
+    (uint224 feeTokenPrice, uint224 gasPrice) = s_priceRegistry.getTokenAndGasPrices(s_sourceFeeToken, DEST_CHAIN_ID);
 
     Internal.PriceUpdates memory priceUpdates = abi.decode(s_encodedInitialPriceUpdates, (Internal.PriceUpdates));
 
@@ -378,7 +378,7 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
     });
     s_priceRegistry.updatePrices(priceUpdates);
 
-    (, uint192 gasPrice) = s_priceRegistry.getTokenAndGasPrices(s_sourceFeeToken, zeroGasDestChainSelector);
+    (, uint224 gasPrice) = s_priceRegistry.getTokenAndGasPrices(s_sourceFeeToken, zeroGasDestChainSelector);
 
     assertEq(gasPrice, priceUpdates.usdPerUnitGas);
   }
