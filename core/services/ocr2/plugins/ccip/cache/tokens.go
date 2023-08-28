@@ -241,7 +241,7 @@ func (t *tokenToDecimals) CallOrigin(ctx context.Context) (map[common.Address]ui
 			return nil, fmt.Errorf("get token %s decimals: %w", token, err)
 		}
 
-		t.storeInCache(token, decimals)
+		t.setCachedDecimals(token, decimals)
 		mapping[token] = decimals
 	}
 	return mapping, nil
@@ -261,6 +261,6 @@ func (t *tokenToDecimals) getCachedDecimals(token common.Address) (uint8, bool) 
 	return decimals, true
 }
 
-func (t *tokenToDecimals) storeInCache(token common.Address, decimals uint8) {
+func (t *tokenToDecimals) setCachedDecimals(token common.Address, decimals uint8) {
 	t.tokenDecimals.Store(token.String(), decimals)
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func Test_tokenToDecimals(t *testing.T) {
@@ -196,6 +197,20 @@ func Test_copyMap(t *testing.T) {
 		val["a"] = big.NewInt(20)
 		assert.Equal(t, int64(100), cp["a"].Int64())
 	})
+}
+
+func Test_cachedDecimals(t *testing.T) {
+	c := &tokenToDecimals{}
+	addr := utils.RandomAddress()
+
+	v, ok := c.getCachedDecimals(addr)
+	assert.Zero(t, v)
+	assert.False(t, ok)
+
+	c.setCachedDecimals(addr, 123)
+	v, ok = c.getCachedDecimals(addr)
+	assert.Equal(t, uint8(123), v)
+	assert.True(t, ok)
 }
 
 func createTokenFactory(decimalMapping map[common.Address]uint8) func(address common.Address) (link_token_interface.LinkTokenInterface, error) {
