@@ -26,17 +26,19 @@ func (t JobSpecType) String() string {
 }
 
 const (
-	DirectRequestJobSpec     JobSpecType = "directrequest"
-	FluxMonitorJobSpec       JobSpecType = "fluxmonitor"
-	OffChainReportingJobSpec JobSpecType = "offchainreporting"
-	KeeperJobSpec            JobSpecType = "keeper"
-	CronJobSpec              JobSpecType = "cron"
-	VRFJobSpec               JobSpecType = "vrf"
-	WebhookJobSpec           JobSpecType = "webhook"
-	BlockhashStoreJobSpec    JobSpecType = "blockhashstore"
-	BlockHeaderFeederJobSpec JobSpecType = "blockheaderfeeder"
-	BootstrapJobSpec         JobSpecType = "bootstrap"
-	GatewayJobSpec           JobSpecType = "gateway"
+	DirectRequestJobSpec           JobSpecType = "directrequest"
+	FluxMonitorJobSpec             JobSpecType = "fluxmonitor"
+	OffChainReportingJobSpec       JobSpecType = "offchainreporting"
+	KeeperJobSpec                  JobSpecType = "keeper"
+	CronJobSpec                    JobSpecType = "cron"
+	VRFJobSpec                     JobSpecType = "vrf"
+	WebhookJobSpec                 JobSpecType = "webhook"
+	BlockhashStoreJobSpec          JobSpecType = "blockhashstore"
+	BlockHeaderFeederJobSpec       JobSpecType = "blockheaderfeeder"
+	BootstrapJobSpec               JobSpecType = "bootstrap"
+	LegacyGasStationServerJobSpec  JobSpecType = "legacygasstationserver"
+	LegacyGasStationSidecarJobSpec JobSpecType = "legacygasstationsidecar"
+	GatewayJobSpec                 JobSpecType = "gateway"
 )
 
 // DirectRequestSpec defines the spec details of a DirectRequest Job
@@ -439,6 +441,56 @@ func NewGatewaySpec(spec *job.GatewaySpec) *GatewaySpec {
 	}
 }
 
+// LegacyGasStationServerSpec defines the job parameters for a legacy gas station server job.
+type LegacyGasStationServerSpec struct {
+	ForwarderAddress  ethkey.EIP55Address   `json:"forwarderAddress"`
+	EVMChainID        *utils.Big            `json:"evmChainID"`
+	CCIPChainSelector *utils.Big            `json:"ccipChainSelector"`
+	FromAddresses     []ethkey.EIP55Address `json:"fromAddresses"`
+
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// NewLegacyGasStationServerSpec creates a new LegacyGasStationServerSpec for the given parameters.
+func NewLegacyGasStationServerSpec(spec *job.LegacyGasStationServerSpec) *LegacyGasStationServerSpec {
+	return &LegacyGasStationServerSpec{
+		ForwarderAddress:  spec.ForwarderAddress,
+		EVMChainID:        spec.EVMChainID,
+		CCIPChainSelector: spec.CCIPChainSelector,
+		FromAddresses:     spec.FromAddresses,
+	}
+}
+
+// LegacyGasStationSidecarSpec defines the job parameters for a legacy gas station sidecar job.
+type LegacyGasStationSidecarSpec struct {
+	ForwarderAddress  ethkey.EIP55Address `json:"forwarderAddress"`
+	OffRampAddress    ethkey.EIP55Address `json:"offRampAddress"`
+	LookbackBlocks    int32               `json:"lookbackBlocks"`
+	EVMChainID        *utils.Big          `json:"evmChainID"`
+	CCIPChainSelector *utils.Big          `json:"ccipChainSelector"`
+	PollPeriod        time.Duration       `json:"pollPeriod"`
+	RunTimeout        time.Duration       `json:"runTimeout"`
+	StatusUpdateURL   string              `json:"statusUpdateURL"`
+
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// NewLegacyGasStationSidecarSpec creates a new LegacyGasStationSidecarSpec for the given parameters.
+func NewLegacyGasStationSidecarSpec(spec *job.LegacyGasStationSidecarSpec) *LegacyGasStationSidecarSpec {
+	return &LegacyGasStationSidecarSpec{
+		ForwarderAddress:  spec.ForwarderAddress,
+		OffRampAddress:    spec.OffRampAddress,
+		LookbackBlocks:    spec.LookbackBlocks,
+		EVMChainID:        spec.EVMChainID,
+		CCIPChainSelector: spec.CCIPChainSelector,
+		PollPeriod:        spec.PollPeriod,
+		RunTimeout:        spec.RunTimeout,
+		StatusUpdateURL:   spec.StatusUpdateURL,
+	}
+}
+
 // JobError represents errors on the job
 type JobError struct {
 	ID          int64     `json:"id"`
@@ -461,27 +513,29 @@ func NewJobError(e job.SpecError) JobError {
 // JobResource represents a JobResource
 type JobResource struct {
 	JAID
-	Name                   string                  `json:"name"`
-	Type                   JobSpecType             `json:"type"`
-	SchemaVersion          uint32                  `json:"schemaVersion"`
-	GasLimit               clnull.Uint32           `json:"gasLimit"`
-	ForwardingAllowed      bool                    `json:"forwardingAllowed"`
-	MaxTaskDuration        models.Interval         `json:"maxTaskDuration"`
-	ExternalJobID          uuid.UUID               `json:"externalJobID"`
-	DirectRequestSpec      *DirectRequestSpec      `json:"directRequestSpec"`
-	FluxMonitorSpec        *FluxMonitorSpec        `json:"fluxMonitorSpec"`
-	CronSpec               *CronSpec               `json:"cronSpec"`
-	OffChainReportingSpec  *OffChainReportingSpec  `json:"offChainReportingOracleSpec"`
-	OffChainReporting2Spec *OffChainReporting2Spec `json:"offChainReporting2OracleSpec"`
-	KeeperSpec             *KeeperSpec             `json:"keeperSpec"`
-	VRFSpec                *VRFSpec                `json:"vrfSpec"`
-	WebhookSpec            *WebhookSpec            `json:"webhookSpec"`
-	BlockhashStoreSpec     *BlockhashStoreSpec     `json:"blockhashStoreSpec"`
-	BlockHeaderFeederSpec  *BlockHeaderFeederSpec  `json:"blockHeaderFeederSpec"`
-	BootstrapSpec          *BootstrapSpec          `json:"bootstrapSpec"`
-	GatewaySpec            *GatewaySpec            `json:"gatewaySpec"`
-	PipelineSpec           PipelineSpec            `json:"pipelineSpec"`
-	Errors                 []JobError              `json:"errors"`
+	Name                        string                       `json:"name"`
+	Type                        JobSpecType                  `json:"type"`
+	SchemaVersion               uint32                       `json:"schemaVersion"`
+	GasLimit                    clnull.Uint32                `json:"gasLimit"`
+	ForwardingAllowed           bool                         `json:"forwardingAllowed"`
+	MaxTaskDuration             models.Interval              `json:"maxTaskDuration"`
+	ExternalJobID               uuid.UUID                    `json:"externalJobID"`
+	DirectRequestSpec           *DirectRequestSpec           `json:"directRequestSpec"`
+	FluxMonitorSpec             *FluxMonitorSpec             `json:"fluxMonitorSpec"`
+	CronSpec                    *CronSpec                    `json:"cronSpec"`
+	OffChainReportingSpec       *OffChainReportingSpec       `json:"offChainReportingOracleSpec"`
+	OffChainReporting2Spec      *OffChainReporting2Spec      `json:"offChainReporting2OracleSpec"`
+	KeeperSpec                  *KeeperSpec                  `json:"keeperSpec"`
+	VRFSpec                     *VRFSpec                     `json:"vrfSpec"`
+	WebhookSpec                 *WebhookSpec                 `json:"webhookSpec"`
+	BlockhashStoreSpec          *BlockhashStoreSpec          `json:"blockhashStoreSpec"`
+	BlockHeaderFeederSpec       *BlockHeaderFeederSpec       `json:"blockHeaderFeederSpec"`
+	LegacyGasStationServerSpec  *LegacyGasStationServerSpec  `json:"legacyGasStationServerSpec"`
+	LegacyGasStationSidecarSpec *LegacyGasStationSidecarSpec `json:"legacyGasStationSidecarSpec"`
+	BootstrapSpec               *BootstrapSpec               `json:"bootstrapSpec"`
+	GatewaySpec                 *GatewaySpec                 `json:"gatewaySpec"`
+	PipelineSpec                PipelineSpec                 `json:"pipelineSpec"`
+	Errors                      []JobError                   `json:"errors"`
 }
 
 // NewJobResource initializes a new JSONAPI job resource
@@ -521,6 +575,10 @@ func NewJobResource(j job.Job) *JobResource {
 		resource.BlockHeaderFeederSpec = NewBlockHeaderFeederSpec(j.BlockHeaderFeederSpec)
 	case job.Bootstrap:
 		resource.BootstrapSpec = NewBootstrapSpec(j.BootstrapSpec)
+	case job.LegacyGasStationServer:
+		resource.LegacyGasStationServerSpec = NewLegacyGasStationServerSpec(j.LegacyGasStationServerSpec)
+	case job.LegacyGasStationSidecar:
+		resource.LegacyGasStationSidecarSpec = NewLegacyGasStationSidecarSpec(j.LegacyGasStationSidecarSpec)
 	case job.Gateway:
 		resource.GatewaySpec = NewGatewaySpec(j.GatewaySpec)
 	}

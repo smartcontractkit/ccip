@@ -95,6 +95,8 @@ func NewRouter(app chainlink.Application, prometheus *ginprom.Prometheus) (*gin.
 		graphqlHandler(app),
 	)
 
+	legacyGasStationRoutes(config, app, api)
+
 	return engine, nil
 }
 
@@ -122,6 +124,17 @@ func graphqlHandler(app chainlink.Application) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		h.ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+func legacyGasStationRoutes(config chainlink.GeneralConfig, app chainlink.Application, r *gin.RouterGroup) {
+	if config.Feature().LegacyGasStation() {
+		group := r.Group("/gasstation")
+		lgsc := LegacyGasStationController{
+			requestRouter: app.LegacyGasStationRequestRouter(),
+			lggr:          app.GetLogger(),
+		}
+		group.Any("send_transaction", lgsc.SendTransaction)
 	}
 }
 

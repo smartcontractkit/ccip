@@ -2,6 +2,8 @@ package chainlink
 
 import (
 	"net/url"
+
+	"github.com/smartcontractkit/chainlink/v2/core/config/toml"
 )
 
 func (g *generalConfig) DatabaseURL() url.URL {
@@ -27,4 +29,14 @@ func (g *generalConfig) ExplorerSecret() string {
 		return ""
 	}
 	return string(*g.secrets.Explorer.Secret)
+}
+
+func (g *generalConfig) LegacyGasStationAuthConfig() *toml.LegacyGasStationAuthConfig {
+	if g.secrets.LegacyGasStation.AuthConfig == nil {
+		return nil
+	}
+	return &toml.LegacyGasStationAuthConfig{
+		ClientKey:         g.secrets.LegacyGasStation.AuthConfig.ClientKey,
+		ClientCertificate: g.secrets.LegacyGasStation.AuthConfig.ClientCertificate,
+	}
 }

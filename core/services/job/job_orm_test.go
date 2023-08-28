@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
@@ -297,6 +298,54 @@ func TestORM(t *testing.T) {
 		require.Equal(t, jb.BlockHeaderFeederSpec.FromAddresses, savedJob.BlockHeaderFeederSpec.FromAddresses)
 		require.Equal(t, jb.BlockHeaderFeederSpec.GetBlockhashesBatchSize, savedJob.BlockHeaderFeederSpec.GetBlockhashesBatchSize)
 		require.Equal(t, jb.BlockHeaderFeederSpec.StoreBlockhashesBatchSize, savedJob.BlockHeaderFeederSpec.StoreBlockhashesBatchSize)
+		err = orm.DeleteJob(jb.ID)
+		require.NoError(t, err)
+		_, err = orm.FindJob(testutils.Context(t), jb.ID)
+		require.Error(t, err)
+	})
+
+	t.Run("it creates and deletes records for legacy gas station server job", func(t *testing.T) {
+		jb, err := legacygasstation.ValidatedServerSpec(
+			testspecs.GenerateLegacyGasStationServerSpec(testspecs.LegacyGasStationServerSpecParams{}).Toml())
+		require.NoError(t, err)
+
+		err = orm.CreateJob(&jb)
+		require.NoError(t, err)
+		savedJob, err := orm.FindJob(testutils.Context(t), jb.ID)
+		require.NoError(t, err)
+		require.Equal(t, jb.ID, savedJob.ID)
+		require.Equal(t, jb.Type, savedJob.Type)
+		require.Equal(t, jb.LegacyGasStationServerSpec.ID, savedJob.LegacyGasStationServerSpec.ID)
+		require.Equal(t, jb.LegacyGasStationServerSpec.ForwarderAddress, savedJob.LegacyGasStationServerSpec.ForwarderAddress)
+		require.Equal(t, jb.LegacyGasStationServerSpec.EVMChainID, savedJob.LegacyGasStationServerSpec.EVMChainID)
+		require.Equal(t, jb.LegacyGasStationServerSpec.CCIPChainSelector, savedJob.LegacyGasStationServerSpec.CCIPChainSelector)
+		require.Equal(t, jb.LegacyGasStationServerSpec.FromAddresses, savedJob.LegacyGasStationServerSpec.FromAddresses)
+		err = orm.DeleteJob(jb.ID)
+		require.NoError(t, err)
+		_, err = orm.FindJob(testutils.Context(t), jb.ID)
+		require.Error(t, err)
+	})
+
+	t.Run("it creates and deletes records for legacy gas station sidecar jobs", func(t *testing.T) {
+		jb, err := legacygasstation.ValidatedSidecarSpec(
+			testspecs.GenerateLegacyGasStationSidecarSpec(testspecs.LegacyGasStationSidecarSpecParams{}).Toml())
+		require.NoError(t, err)
+
+		err = orm.CreateJob(&jb)
+		require.NoError(t, err)
+		savedJob, err := orm.FindJob(testutils.Context(t), jb.ID)
+		require.NoError(t, err)
+		require.Equal(t, jb.ID, savedJob.ID)
+		require.Equal(t, jb.Type, savedJob.Type)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.ID, savedJob.LegacyGasStationSidecarSpec.ID)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.ForwarderAddress, savedJob.LegacyGasStationSidecarSpec.ForwarderAddress)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.OffRampAddress, savedJob.LegacyGasStationSidecarSpec.OffRampAddress)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.LookbackBlocks, savedJob.LegacyGasStationSidecarSpec.LookbackBlocks)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.PollPeriod, savedJob.LegacyGasStationSidecarSpec.PollPeriod)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.RunTimeout, savedJob.LegacyGasStationSidecarSpec.RunTimeout)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.EVMChainID, savedJob.LegacyGasStationSidecarSpec.EVMChainID)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.CCIPChainSelector, savedJob.LegacyGasStationSidecarSpec.CCIPChainSelector)
+		require.Equal(t, jb.LegacyGasStationSidecarSpec.StatusUpdateURL, savedJob.LegacyGasStationSidecarSpec.StatusUpdateURL)
 		err = orm.DeleteJob(jb.ID)
 		require.NoError(t, err)
 		_, err = orm.FindJob(testutils.Context(t), jb.ID)

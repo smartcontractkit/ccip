@@ -156,6 +156,26 @@ URL = "https://example.com" # Example
 ```
 URL is the Mercury endpoint URL which is used by OCR2 Automation to access Mercury price feed
 
+## LegacyGasStation.AuthConfig
+```toml
+[LegacyGasStation.AuthConfig]
+ClientKey = "client-key" # Example
+ClientCertificate = "client-certificate" # Example
+```
+
+
+### ClientKey
+```toml
+ClientKey = "client-key" # Example
+```
+ClientKey is the client key used for mTLS authentication
+
+### ClientCertificate
+```toml
+ClientCertificate = "client-certificate" # Example
+```
+ClientCertificate is the client certificate used for mTLS authentication
+
 ## Threshold
 ```toml
 [Threshold]

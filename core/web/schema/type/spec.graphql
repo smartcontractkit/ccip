@@ -10,7 +10,9 @@ union JobSpec =
     BlockhashStoreSpec |
     BlockHeaderFeederSpec |
     BootstrapSpec |
-    GatewaySpec
+    GatewaySpec |
+    LegacyGasStationServerSpec |
+    LegacyGasStationSidecarSpec
 
 type CronSpec {
     schedule: String!
@@ -167,5 +169,25 @@ type BootstrapSpec {
 type GatewaySpec {
     id: ID!
     gatewayConfig: Map!
+    createdAt: Time!
+}
+
+type LegacyGasStationServerSpec {
+    forwarderAddress: String!
+    evmChainID: String
+    ccipChainSelector: String
+    fromAddresses: [String!]
+    createdAt: Time!
+}
+
+type LegacyGasStationSidecarSpec {
+    forwarderAddress: String!
+    offRampAddress: String!
+    lookbackBlocks: Int!
+    pollPeriod: String!
+    runTimeout: String!
+    evmChainID: String
+    ccipChainSelector: String
+    statusUpdateURL: String!
     createdAt: Time!
 }

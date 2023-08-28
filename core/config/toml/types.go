@@ -1,6 +1,7 @@
 package toml
 
 import (
+	"crypto/tls"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -101,13 +102,14 @@ func (c *Core) ValidateConfig() (err error) {
 }
 
 type Secrets struct {
-	Database   DatabaseSecrets          `toml:",omitempty"`
-	Explorer   ExplorerSecrets          `toml:",omitempty"`
-	Password   Passwords                `toml:",omitempty"`
-	Pyroscope  PyroscopeSecrets         `toml:",omitempty"`
-	Prometheus PrometheusSecrets        `toml:",omitempty"`
-	Mercury    MercurySecrets           `toml:",omitempty"`
-	Threshold  ThresholdKeyShareSecrets `toml:",omitempty"`
+	Database         DatabaseSecrets          `toml:",omitempty"`
+	Explorer         ExplorerSecrets          `toml:",omitempty"`
+	Password         Passwords                `toml:",omitempty"`
+	Pyroscope        PyroscopeSecrets         `toml:",omitempty"`
+	Prometheus       PrometheusSecrets        `toml:",omitempty"`
+	Mercury          MercurySecrets           `toml:",omitempty"`
+	LegacyGasStation LegacyGasStationSecrets  `toml:",omitempty"`
+	Threshold        ThresholdKeyShareSecrets `toml:",omitempty"`
 }
 
 func dbURLPasswordComplexity(err error) string {
@@ -321,10 +323,11 @@ func (p *PrometheusSecrets) validateMerge(f *PrometheusSecrets) (err error) {
 }
 
 type Feature struct {
-	FeedsManager *bool
-	LogPoller    *bool
-	UICSAKeys    *bool
-	CCIP         *bool
+	FeedsManager     *bool
+	LogPoller        *bool
+	UICSAKeys        *bool
+	CCIP             *bool
+	LegacyGasStation *bool
 }
 
 func (f *Feature) setFrom(f2 *Feature) {
@@ -339,6 +342,9 @@ func (f *Feature) setFrom(f2 *Feature) {
 	}
 	if v := f2.CCIP; v != nil {
 		f.CCIP = v
+	}
+	if v := f2.LegacyGasStation; v != nil {
+		f.LegacyGasStation = v
 	}
 }
 
@@ -1273,6 +1279,45 @@ func (m *MercurySecrets) ValidateConfig() (err error) {
 		}
 		urls[s] = struct{}{}
 	}
+	return err
+}
+
+type LegacyGasStationAuthConfig struct {
+	// ClientKey is the X.509 private key used for mTLS in PEM (base64-encoding) format
+	ClientKey models.Secret
+	// ClientCertificate is the X.509 certificate for mTLS in PEM (base64-encoding) format
+	ClientCertificate models.Secret
+}
+type LegacyGasStationSecrets struct {
+	AuthConfig *LegacyGasStationAuthConfig
+}
+
+func (l *LegacyGasStationSecrets) SetFrom(s *LegacyGasStationSecrets) (err error) {
+	err = l.validateMerge(s)
+	if err != nil {
+		return err
+	}
+
+	if v := s.AuthConfig; v != nil {
+		l.AuthConfig = v
+	}
+	return nil
+}
+
+func (l *LegacyGasStationSecrets) validateMerge(s *LegacyGasStationSecrets) (err error) {
+	if l.AuthConfig != nil && s.AuthConfig != nil {
+		err = multierr.Append(err, configutils.ErrOverride{Name: "LegacyGasStationSecrets"})
+	}
+	return err
+}
+
+func (l *LegacyGasStationSecrets) ValidateConfig() (err error) {
+	if l.AuthConfig == nil {
+		// no validation needed
+		return nil
+	}
+	// validates private key and certificate match
+	_, err = tls.X509KeyPair([]byte(l.AuthConfig.ClientCertificate), []byte(l.AuthConfig.ClientKey))
 	return err
 }
 

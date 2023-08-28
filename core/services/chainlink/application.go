@@ -38,6 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keeper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
+	"github.com/smartcontractkit/chainlink/v2/core/services/legacygasstation"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
@@ -103,6 +104,9 @@ type Application interface {
 	ID() uuid.UUID
 
 	SecretGenerator() SecretGenerator
+
+	// Request router accepts http request and processes meta-transaction of same-chain or cross-chain token transfers
+	LegacyGasStationRequestRouter() legacygasstation.RequestRouter
 }
 
 // ChainlinkApplication contains fields for the JobSubscriber, Scheduler,
@@ -136,6 +140,7 @@ type ChainlinkApplication struct {
 	secretGenerator          SecretGenerator
 	profiler                 *pyroscope.Profiler
 	loopRegistry             *plugins.LoopRegistry
+	lgsRequestRouter         legacygasstation.RequestRouter
 
 	started     bool
 	startStopMu sync.Mutex
@@ -336,8 +341,24 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 				legacyEVMChains,
 				keyStore.Eth(),
 				globalLogger),
+			job.LegacyGasStationServer: legacygasstation.NewServerDelegate(
+				globalLogger,
+				legacyEVMChains,
+				keyStore.Eth(),
+				db,
+				cfg.Database(),
+				pipelineRunner,
+			),
+			job.LegacyGasStationSidecar: legacygasstation.NewSidecarDelegate(
+				globalLogger,
+				legacyEVMChains,
+				keyStore.Eth(),
+				db,
+				cfg.LegacyGasStation(),
+			),
 		}
 		webhookJobRunner = delegates[job.Webhook].(*webhook.Delegate).WebhookJobRunner()
+		lgsRequestRouter = delegates[job.LegacyGasStationServer].(*legacygasstation.Delegate).RequestRouter()
 	)
 
 	// Flux monitor requires ethereum just to boot, silence errors with a null delegate
@@ -480,8 +501,8 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		secretGenerator:          opts.SecretGenerator,
 		profiler:                 profiler,
 		loopRegistry:             loopRegistry,
-
-		sqlxDB: opts.SqlxDB,
+		lgsRequestRouter:         lgsRequestRouter,
+		sqlxDB:                   opts.SqlxDB,
 
 		// NOTE: Can keep things clean by putting more things in srvcs instead of manually start/closing
 		srvcs: srvcs,
@@ -646,6 +667,10 @@ func (app *ChainlinkApplication) GetHealthChecker() services.Checker {
 
 func (app *ChainlinkApplication) JobSpawner() job.Spawner {
 	return app.jobSpawner
+}
+
+func (app *ChainlinkApplication) LegacyGasStationRequestRouter() legacygasstation.RequestRouter {
+	return app.lgsRequestRouter
 }
 
 func (app *ChainlinkApplication) JobORM() job.ORM {

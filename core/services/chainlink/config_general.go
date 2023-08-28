@@ -289,6 +289,10 @@ func (g *generalConfig) FeatureCCIP() bool {
 	return *g.c.Feature.CCIP
 }
 
+func (g *generalConfig) FeatureLegacyGasStation() bool {
+	return *g.c.Feature.LegacyGasStation
+}
+
 func (g *generalConfig) FeatureUICSAKeys() bool {
 	return *g.c.Feature.UICSAKeys
 }
@@ -530,6 +534,10 @@ func (g *generalConfig) Mercury() coreconfig.Mercury {
 
 func (g *generalConfig) Threshold() coreconfig.Threshold {
 	return &thresholdConfig{s: g.secrets.Threshold}
+}
+
+func (g *generalConfig) LegacyGasStation() coreconfig.LegacyGasStation {
+	return &legacyGasStationConfig{s: g.secrets.LegacyGasStation}
 }
 
 var (

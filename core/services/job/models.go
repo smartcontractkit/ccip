@@ -715,6 +715,9 @@ type LegacyGasStationSidecarSpec struct {
 	// CCIPChainSelector is the CCIP chain selector that corresponds to EVMChainID param
 	CCIPChainSelector *utils.Big `toml:"ccipChainSelector"`
 
+	// StatusUpdateURL is the endpoint URL where the sidecar posts status updates
+	StatusUpdateURL string `toml:"statusUpdateURL"`
+
 	// CreatedAt is the time this job was created.
 	CreatedAt time.Time `toml:"-"`
 

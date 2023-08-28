@@ -54,9 +54,10 @@ var (
 				},
 			},
 			Feature: toml.Feature{
-				LogPoller:    ptr(true),
-				FeedsManager: ptr(true),
-				UICSAKeys:    ptr(true),
+				LogPoller:        ptr(true),
+				FeedsManager:     ptr(true),
+				UICSAKeys:        ptr(true),
+				LegacyGasStation: ptr(true),
 			},
 			P2P: toml.P2P{},
 		},

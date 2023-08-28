@@ -46,6 +46,7 @@ type AppConfig interface {
 	Keeper() Keeper
 	Log() Log
 	Mercury() Mercury
+	LegacyGasStation() LegacyGasStation
 	OCR() OCR
 	OCR2() OCR2
 	P2P() P2P
