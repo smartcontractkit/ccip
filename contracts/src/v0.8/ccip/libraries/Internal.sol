@@ -18,15 +18,8 @@ library Internal {
   }
 
   struct TimestampedPackedUint224 {
-    uint224 value; // ------┐ Value in uint224, packed.
+    uint224 value; // -------┐ Value in uint224, packed.
     uint32 timestamp; // ----┘ Timestamp of the most recent update.
-  }
-
-  uint256 private constant UINT_112__MASK = (1 << 112) - 1;
-
-  // little endian
-  function _unpackUint224Into112(uint224 value) internal pure returns (uint112, uint112) {
-    return (uint112(value & UINT_112__MASK), uint112((value >> 112) & UINT_112__MASK));
   }
 
   struct PoolUpdate {

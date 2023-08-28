@@ -195,8 +195,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// messages has been sent yet. 0 is not a valid sequence number for any
   /// real transaction.
   uint64 internal s_sequenceNumber;
-  /// @dev Whether this OnRamp is paused or not
-  bool private s_paused = false;
   /// @dev This allowListing will be removed before public launch
   /// @dev Whether s_allowList is enabled or not.
   bool private s_allowlistEnabled;
@@ -502,7 +500,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       message.feeToken,
       i_destChainSelector
     );
-    (uint112 executionGasPrice, uint112 calldataGasPrice) = Internal._unpackUint224Into112(packedGasPrice);
+    uint112 executionGasPrice = uint112(packedGasPrice);
 
     // Calculate premiumFee in USD with 18 decimals precision.
     // If there are token transfers, premiumFee is calculated from token transfer fees.
@@ -537,6 +535,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
     if (s_dynamicConfig.destCalldataMultiplier > 0) {
       // If calldata cost is non-zero, calculate execution calldata fee
+      uint112 calldataGasPrice = uint112(packedGasPrice >> 112);
+
       executionCostUSD += calldataGasPrice *
         (s_dynamicConfig.destCalldataOverhead +
           (Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES +
@@ -544,7 +544,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
             message.tokenAmounts.length * Internal.EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN +
             tokenTransferBytesOverhead
           ) * s_dynamicConfig.destGasPerPayloadByte
-        ) * s_dynamicConfig.destCalldataMultiplier * 1e15;
+        ) * s_dynamicConfig.destCalldataMultiplier * 1e14;
     } 
 
     // Transform total USD fee in 36 decimals to 18 decimals, then convert into fee token amount.

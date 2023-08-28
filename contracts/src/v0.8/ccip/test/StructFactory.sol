@@ -94,7 +94,7 @@ contract StructFactory {
 
   uint32 internal constant DEST_CALLDATA_OVERHEAD = 188 // op fixed
     + 32 * 31 * 16 // CommitStore Transmit
-    + 32 * 33 * 16; // OffRamo Transmit excl message, total -> 32_956 L1 gas
+    + 32 * 33 * 16; // OffRamp Transmit excl message, total -> 32_956 L1 gas
   
   uint16 internal constant DEST_GAS_PER_CALLDATA_BYTE = 16; // overestimating, ignores 4 gas per 0 byte
 
