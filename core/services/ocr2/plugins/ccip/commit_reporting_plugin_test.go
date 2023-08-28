@@ -592,9 +592,17 @@ func TestCalculateIntervalConsensus(t *testing.T) {
 		}, 0, 1, 0, 0, true},
 		{
 			"range limit", []commit_store.CommitStoreInterval{
-				{Min: 10, Max: 100},
-				{Min: 1, Max: 1000},
+				{Min: 10, Max: 1000},
+				{Min: 10, Max: 1000},
 			}, 256, 1, 10, 265, false,
+		},
+		{
+			"range selection on equal votes", []commit_store.CommitStoreInterval{
+				{Min: 1, Max: 10},
+				{Min: 1, Max: 10},
+				{Min: 2, Max: 8},
+				{Min: 2, Max: 8},
+			}, 256, 1, 1, 10, false,
 		},
 	}
 	for _, tt := range tests {

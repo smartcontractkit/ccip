@@ -558,62 +558,57 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 // in between.
 // rangeLimit is the maximum range of the interval. If the interval is larger than this, it will be truncated. Zero means no limit.
 func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f int, rangeLimit uint64) (commit_store.CommitStoreInterval, error) {
-	// We require at least f+1 parsed values. This corresponds to the scenario where f of the 2f+1 are faulty
-	// in the sense that they are unparseable.
-	if len(intervals) <= f {
+	interval, votesOfMin, votesOfMax := getMostVotedInterval(intervals)
+	// We require at least f+1 votes for both min/max seq nums to form consensus.
+	if votesOfMin <= f || votesOfMax <= f {
 		return commit_store.CommitStoreInterval{}, errors.Errorf("Not enough intervals to form consensus: #obs=%d, f=%d", len(intervals), f)
 	}
 
-	// To understand min/max selection here, we need to consider an adversary that controls f values
-	// and is intentionally trying to stall the protocol or influence the value returned. For simplicity
-	// consider f=1 and n=4 nodes. In that case adversary may try to bias the min or max high/low.
-	// We could end up (2f+1=3) with sorted_mins=[1,1,1e9] or [-1e9,1,1] as examples. Selecting
-	// sorted_mins[f] ensures:
-	// - At least one honest node has seen this value, so adversary cannot bias the value lower which
-	// would cause reverts
-	// - If an honest oracle reports sorted_min[f] which happens to be stale i.e. that oracle
-	// has a delayed view of the chain, then the report will revert onchain but still succeed upon retry
-	// - We minimize the risk of naturally hitting the error condition minSeqNum > maxSeqNum due to oracles
-	// delayed views of the chain (would be an issue with taking sorted_mins[-f])
-	sort.Slice(intervals, func(i, j int) bool {
-		return intervals[i].Min < intervals[j].Min
-	})
-	minSeqNum := intervals[f].Min
-
 	// The only way a report could have a minSeqNum of 0 is when there are no messages to report
 	// and the report is potentially still valid for gas fee updates.
-	if minSeqNum == 0 {
+	if interval.Min == 0 {
 		return commit_store.CommitStoreInterval{Min: 0, Max: 0}, nil
 	}
-	// Consider a similar example to the sorted_mins one above except where they are maxes.
-	// We choose the more "conservative" sorted_maxes[f] so:
-	// - We are ensured that at least one honest oracle has seen the max, so adversary cannot set it lower and
-	// cause the maxSeqNum < minSeqNum errors
-	// - If an honest oracle reports sorted_max[f] which happens to be stale i.e. that oracle
-	// has a delayed view of the source chain, then we simply lose a little bit of throughput.
-	// - If we were to pick sorted_max[-f] i.e. the maximum honest node view (a more "aggressive" setting in terms of throughput),
-	// then an adversary can continually send high values e.g. imagine we have observations from all 4 nodes
-	// [honest 1, honest 1, honest 2, malicious 2], in this case we pick 2, but it's not enough to be able
-	// to build a report since the first 2 honest nodes are unaware of message 2.
-	sort.Slice(intervals, func(i, j int) bool {
-		return intervals[i].Max < intervals[j].Max
-	})
-	maxSeqNum := intervals[f].Max
-	if maxSeqNum < minSeqNum {
+
+	if interval.Max < interval.Min {
 		// If the consensus report is invalid for onchain acceptance, we do not vote for it as
 		// an early termination step.
 		return commit_store.CommitStoreInterval{}, errors.New("max seq num smaller than min")
 	}
 
 	// If the range is too large, truncate it.
-	if rangeLimit > 0 && maxSeqNum-minSeqNum+1 > rangeLimit {
-		maxSeqNum = minSeqNum + rangeLimit - 1
+	if rangeLimit > 0 && interval.Max-interval.Min+1 > rangeLimit {
+		interval.Max = interval.Min + rangeLimit - 1
 	}
 
-	return commit_store.CommitStoreInterval{
-		Min: minSeqNum,
-		Max: maxSeqNum,
-	}, nil
+	return interval, nil
+}
+
+func getMostVotedInterval(intervals []commit_store.CommitStoreInterval) (csi commit_store.CommitStoreInterval, minVotes, maxVotes int) {
+	if len(intervals) == 0 {
+		return commit_store.CommitStoreInterval{}, 0, 0
+	}
+
+	mostVotedMin := intervals[0].Min
+	mostVotedMax := intervals[0].Max
+
+	votesMin := map[uint64]int{intervals[0].Min: 1}
+	votesMax := map[uint64]int{intervals[0].Max: 1}
+
+	for _, interval := range intervals[1:] {
+		votesMin[interval.Min]++
+		votesMax[interval.Max]++
+
+		if votesMin[interval.Min] > votesMin[mostVotedMin] || (votesMin[interval.Min] == votesMin[mostVotedMin] && interval.Min < mostVotedMin) {
+			mostVotedMin = interval.Min
+		}
+
+		if votesMax[interval.Max] > votesMax[mostVotedMax] || (votesMax[interval.Max] == votesMax[mostVotedMax] && interval.Max > mostVotedMax) {
+			mostVotedMax = interval.Max
+		}
+	}
+
+	return commit_store.CommitStoreInterval{Min: mostVotedMin, Max: mostVotedMax}, votesMin[mostVotedMin], votesMax[mostVotedMax]
 }
 
 // Note priceUpdates must be deterministic.
