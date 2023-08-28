@@ -60,6 +60,10 @@ library Internal {
     bytes32 messageId;
   }
 
+  uint256 public constant EVM_2_EVM_MESSAGE_FIXED_BYTES = 32 * 14; // 448, excl data and tokenAmounts contents
+
+  uint256 public constant EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN = 64;
+
   function _toAny2EVMMessage(
     EVM2EVMMessage memory original,
     Client.EVMTokenAmount[] memory destTokenAmounts

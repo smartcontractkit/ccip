@@ -92,6 +92,14 @@ contract StructFactory {
   uint32 internal constant DEST_GAS_OVERHEAD = 350_000;
   uint16 internal constant DEST_GAS_PER_PAYLOAD_BYTE = 16;
 
+  uint32 internal constant DEST_CALLDATA_OVERHEAD = 188 // op fixed
+    + 32 * 31 * 16 // CommitStore Transmit
+    + 32 * 33 * 16; // OffRamo Transmit excl message, total -> 32_956 L1 gas
+  
+  uint16 internal constant DEST_GAS_PER_CALLDATA_BYTE = 16; // overestimating, ignores 4 gas per 0 byte
+
+  uint16 internal constant DEST_GAS_CALLDATA_MULTIPLIER = 0; // multiples of 0.0001, so 6180 for OP, using 0 to pass tests.
+
   // offRamp
   uint256 internal constant POOL_BALANCE = 1e25;
   uint32 internal constant EXECUTION_DELAY_SECONDS = 0;
@@ -129,9 +137,9 @@ contract StructFactory {
         maxTokensLength: MAX_TOKENS_LENGTH,
         destGasOverhead: DEST_GAS_OVERHEAD,
         destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
-        destCalldataOverhead: 188,
-        destGasPerCalldataByte: 16,
-        destCalldataMultiplier: 0,
+        destCalldataOverhead: DEST_CALLDATA_OVERHEAD,
+        destGasPerCalldataByte: DEST_GAS_PER_CALLDATA_BYTE,
+        destCalldataMultiplier: DEST_GAS_CALLDATA_MULTIPLIER,
         priceRegistry: priceRegistry,
         maxDataSize: MAX_DATA_SIZE,
         maxGasLimit: MAX_GAS_LIMIT
