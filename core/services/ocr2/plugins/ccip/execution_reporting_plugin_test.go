@@ -220,6 +220,7 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 func TestExecObservation(t *testing.T) {
 	th := setupExecTestHarness(t)
 	th.plugin.F = 1
+	th.plugin.cachedTokenPools = cache.NewTokenPools(logger.NullLogger, th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, 10)
 	mb := th.GenerateAndSendMessageBatch(t, 2, 10, 1)
 
 	// commit root

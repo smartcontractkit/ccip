@@ -76,6 +76,7 @@ type ExecutionReportingPlugin struct {
 	offchainConfig        ccipconfig.ExecOffchainConfig
 	cachedSourceFeeTokens *cache.CachedChain[[]common.Address]
 	cachedDestTokens      *cache.CachedChain[cache.CachedTokens]
+	cachedTokenPools      *cache.CachedChain[map[common.Address]common.Address]
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -122,6 +123,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 
 	cachedSourceFeeTokens := cache.NewCachedFeeTokens(rf.config.sourceLP, rf.config.sourcePriceRegistry, int64(offchainConfig.SourceFinalityDepth))
 	cachedDestTokens := cache.NewCachedSupportedTokens(rf.config.destLP, rf.config.offRamp, priceRegistry, int64(offchainConfig.DestOptimisticConfirmations))
+	cachedTokenPools := cache.NewTokenPools(rf.config.lggr, rf.config.destLP, rf.config.offRamp, priceRegistry, int64(offchainConfig.DestOptimisticConfirmations))
 	rf.config.lggr.Infow("Starting exec plugin",
 		"offchainConfig", offchainConfig,
 		"onchainConfig", onchainConfig)
@@ -138,6 +140,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig:        offchainConfig,
 			cachedDestTokens:      cachedDestTokens,
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
+			cachedTokenPools:      cachedTokenPools,
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -376,12 +379,20 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 		}
 	}
 
+	tokenPools, err := r.cachedTokenPools.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get cached token pools: %w", err)
+	}
+
 	res := make(map[common.Address]*big.Int, len(dstTokens))
 
 	for dstToken := range dstTokens {
-		poolAddress, err := r.config.offRamp.GetPoolByDestToken(&bind.CallOpts{Context: ctx}, dstToken)
-		if err != nil {
-			return nil, fmt.Errorf("get pool by dest token (%s): %w", dstToken, err)
+		poolAddress, exists := tokenPools[dstToken]
+		if !exists {
+			poolAddress, err = r.config.offRamp.GetPoolByDestToken(&bind.CallOpts{Context: ctx}, dstToken)
+			if err != nil {
+				return nil, fmt.Errorf("get pool by dest token (%s): %w", dstToken, err)
+			}
 		}
 
 		tokenPool, err := custom_token_pool.NewCustomTokenPool(poolAddress, r.config.destClient)
