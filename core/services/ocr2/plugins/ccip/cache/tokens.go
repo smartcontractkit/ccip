@@ -253,12 +253,12 @@ func (t *tokenToDecimals) getCachedDecimals(token common.Address) (uint8, bool) 
 		return 0, false
 	}
 
-	vUint8, is := v.(uint8)
+	decimals, is := v.(uint8)
 	if !is {
 		return 0, false
 	}
 
-	return vUint8, true
+	return decimals, true
 }
 
 func (t *tokenToDecimals) storeInCache(token common.Address, decimals uint8) {
