@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -93,6 +94,15 @@ func Test_tokenToDecimals(t *testing.T) {
 				return
 			}
 
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+
+			// we set token factory to always return an error
+			// we don't expect it to be used again, decimals should be in cache.
+			tokenToDecimal.tokenFactory = func(address common.Address) (link_token_interface.LinkTokenInterface, error) {
+				return nil, fmt.Errorf("some error")
+			}
+			got, err = tokenToDecimal.CallOrigin(testutils.Context(t))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})

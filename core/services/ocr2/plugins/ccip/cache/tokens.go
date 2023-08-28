@@ -196,6 +196,7 @@ type tokenToDecimals struct {
 	offRamp       evm_2_evm_offramp.EVM2EVMOffRampInterface
 	priceRegistry price_registry.PriceRegistryInterface
 	tokenFactory  func(address common.Address) (link_token_interface.LinkTokenInterface, error)
+	tokenDecimals sync.Map
 }
 
 func (t *tokenToDecimals) Copy(value map[common.Address]uint8) map[common.Address]uint8 {
@@ -225,6 +226,11 @@ func (t *tokenToDecimals) CallOrigin(ctx context.Context) (map[common.Address]ui
 	}
 
 	for _, token := range destTokens {
+		if decimals, exists := t.getCachedDecimals(token); exists {
+			mapping[token] = decimals
+			continue
+		}
+
 		tokenContract, err := t.tokenFactory(token)
 		if err != nil {
 			return nil, err
@@ -235,7 +241,26 @@ func (t *tokenToDecimals) CallOrigin(ctx context.Context) (map[common.Address]ui
 			return nil, fmt.Errorf("get token %s decimals: %w", token, err)
 		}
 
+		t.storeInCache(token, decimals)
 		mapping[token] = decimals
 	}
 	return mapping, nil
+}
+
+func (t *tokenToDecimals) getCachedDecimals(token common.Address) (uint8, bool) {
+	v, exists := t.tokenDecimals.Load(token.String())
+	if !exists {
+		return 0, false
+	}
+
+	vUint8, is := v.(uint8)
+	if !is {
+		return 0, false
+	}
+
+	return vUint8, true
+}
+
+func (t *tokenToDecimals) storeInCache(token common.Address, decimals uint8) {
+	t.tokenDecimals.Store(token.String(), decimals)
 }
