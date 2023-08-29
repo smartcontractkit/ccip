@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/actions"
-	"github.com/smartcontractkit/chainlink/integration-tests/testsetups"
+	"ccip-tests/actions"
+	"ccip-tests/testsetups"
 )
 
 type laneLoadCfg struct {
