@@ -912,6 +912,7 @@ func TestJob(t *testing.T) {
 							"jobID": 0,
 							"dotDagSource": ""
 						},
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}
@@ -983,6 +984,7 @@ func TestJob(t *testing.T) {
 							"jobID": 0,
 							"dotDagSource": ""
 						},
+						"gatewaySpec": null,
 						"errors": []
 					}
 				}

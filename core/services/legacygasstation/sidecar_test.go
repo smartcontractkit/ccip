@@ -391,10 +391,10 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 	backend := cltest.NewSimulatedBackend(t, core.GenesisAlloc{}, uint32(ethconfig.Defaults.Miner.GasCeil))
 	app := cltest.NewApplicationWithConfigV2AndKeyOnSimulatedBlockchain(t, cfg, backend)
 	forwarder := forwarder_mocks.NewForwarderInterface(t)
-	offramp := mock_contracts.NewEVM2EVMOffRampInterface(t)
 	lggr := logger.TestLogger(t)
+	offramp := mock_contracts.NewEVM2EVMOffRampInterface(t)
 	orm := legacygasstation.NewORM(db, lggr, cfg.Database())
-	chain, err := app.Chains.EVM.Get(testutils.SimulatedChainID)
+	chain, err := app.GetRelayers().LegacyEVMChains().Get(testutils.SimulatedChainID.String())
 	require.NoError(t, err)
 	lp := mocks.NewLogPoller(t)
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
@@ -460,7 +460,7 @@ func setUp(t *testing.T, test testcase) (*legacygasstation.Sidecar, legacygassta
 		txStore := cltest.NewTestTxStore(t, app.GetSqlxDB(), app.Config.Database())
 		var ethTx txmgr.Tx
 		if r.confirmed {
-			ethTx = cltest.MustInsertConfirmedEthTxWithLegacyAttempt(t, app.TxmStorageService(), int64(i), blockNumber, fromAddress)
+			ethTx = cltest.MustInsertConfirmedEthTxWithLegacyAttempt(t, txStore, int64(i), blockNumber, fromAddress)
 			blockHash := utils.NewHash()
 			receipt := evmtypes.Receipt{
 				TxHash:           ethTx.TxAttempts[0].Hash,
