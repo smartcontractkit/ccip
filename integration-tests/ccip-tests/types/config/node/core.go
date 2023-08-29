@@ -1,7 +1,9 @@
 package node
 
 import (
+	_ "embed"
 	"math/big"
+	"path/filepath"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -65,4 +67,12 @@ func WithCCIPGasEstimator(chainId int64) evmcfg.GasEstimator {
 	}
 
 	return cfg
+}
+
+func ConfigToml() string {
+	path, err := filepath.Abs("tomls/ccip.toml")
+	if err != nil {
+		panic(err)
+	}
+	return path
 }
