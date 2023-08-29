@@ -10,8 +10,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
 
-	"ccip-tests/actions"
-	"ccip-tests/testsetups"
+	"github.com/smartcontractkit/ccip-tests/actions"
+	"github.com/smartcontractkit/ccip-tests/testsetups"
 )
 
 /* @network-chaos and @pod-chaos are split intentionally into 2 parallel groups

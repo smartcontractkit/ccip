@@ -23,8 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
-	"ccip-tests/actions"
-	"ccip-tests/testreporters"
+	"github.com/smartcontractkit/ccip-tests/actions"
+	"github.com/smartcontractkit/ccip-tests/testreporters"
 )
 
 type CCIPE2ELoad struct {
