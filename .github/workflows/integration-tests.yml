@@ -253,11 +253,11 @@ jobs:
             nodes: 1
             os: ubuntu20.04-16cores-64GB
             file: ccip
-            dir: ccip/smoke
+            dir: ccip-tests/smoke
             run: -run ^TestSmokeCCIPForBidirectionalLane$
           - name: ccip-smoke-rate-limit
             nodes: 1
-            dir: ccip/smoke
+            dir: ccip-tests/smoke
             os: ubuntu20.04-16cores-64GB
             file: ccip
             run: -run ^TestSmokeCCIPRateLimit$
