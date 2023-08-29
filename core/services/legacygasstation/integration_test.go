@@ -132,7 +132,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_SourceChain(t *testing.
 	owner := ccipContracts.Source.User
 	sourceBackend := ccipContracts.Source.Chain
 
-	forwarder, bankERC20, forwarderAddress, bankERC20Address := setupTokenAndForwarderContracts(t, owner, sourceBackend, ccipContracts.Source.Router.Address(), sourceChainID)
+	forwarder, bankERC20, forwarderAddress, bankERC20Address := setupTokenAndForwarderContracts(t, owner, sourceBackend, ccipContracts.Source.Router.Address(), testhelpers.SourceChainSelector)
 	_, _, err := ccipContracts.SetupLockAndMintTokenPool(bankERC20Address, "WrappedBankToken", "WBANK")
 	require.NoError(t, err)
 
@@ -154,7 +154,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_SourceChain(t *testing.
 	defer statusUpdateServer.Stop()
 	createLegacyGasStationSidecarJob(t, app, forwarderAddress, dummySourceOffRampAddress, testhelpers.SourceChainSelector, sourceChainID, statusUpdateServer)
 
-	req := generateRequest(t, sourceBackend, forwarder, bankERC20Address, senderKey, receiver.From, amount, testhelpers.SourceChainSelector, destChainID)
+	req := generateRequest(t, sourceBackend, forwarder, bankERC20Address, senderKey, receiver.From, amount, testhelpers.SourceChainSelector, testhelpers.DestChainSelector)
 	requestID := sendTransaction(t, req, app.Server.URL)
 
 	orm := legacygasstation.NewORM(db, app.GetLogger(), app.GetConfig().Database())
@@ -175,7 +175,6 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_SourceChain(t *testing.
 // sets up CCIP DON for cross-chain transfer and validates destination chain sidecar has successfully picked up
 // the destination chain off-ramp event and updated status to Finalized
 func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T) {
-	destCCIPChainSelector := testhelpers.DestChainID
 	ccipContracts := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
 	// relay is a CL-owned address that posts txs
 	relayKey, relay := generateKeyAndTransactor(t, ccipContracts.Source.Chain.Blockchain().Config().ChainID)
@@ -188,7 +187,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	sourceBackend := ccipContracts.Source.Chain
 	destBackend := ccipContracts.Dest.Chain
 
-	forwarder, bankERC20, forwarderAddress, bankERC20Address := setupTokenAndForwarderContracts(t, owner, sourceBackend, ccipContracts.Source.Router.Address(), testhelpers.SourceChainID)
+	forwarder, bankERC20, forwarderAddress, bankERC20Address := setupTokenAndForwarderContracts(t, owner, sourceBackend, ccipContracts.Source.Router.Address(), testhelpers.SourceChainSelector)
 	_, destToken, err := ccipContracts.SetupLockAndMintTokenPool(bankERC20Address, "WrappedBankToken", "WBANK")
 	require.NoError(t, err)
 
@@ -248,9 +247,9 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	statusUpdateServer := legacygasstation.NewUnstartedStatusUpdateServer(t)
 	go statusUpdateServer.Start()
 	defer statusUpdateServer.Stop()
-	createLegacyGasStationSidecarJob(t, app, dummyDestForwarderRouter, ccipContracts.Dest.OffRamp.Address(), destCCIPChainSelector, ccipContracts.Dest.ChainID, statusUpdateServer)
+	createLegacyGasStationSidecarJob(t, app, dummyDestForwarderRouter, ccipContracts.Dest.OffRamp.Address(), testhelpers.DestChainSelector, ccipContracts.Dest.ChainID, statusUpdateServer)
 
-	calldata, calldataHash, err := metatx.GenerateMetaTransferCalldata(receiver.From, amount, destCCIPChainSelector)
+	calldata, calldataHash, err := metatx.GenerateMetaTransferCalldata(receiver.From, amount, testhelpers.DestChainSelector)
 	require.NoError(t, err)
 
 	deadline := big.NewInt(int64(sourceBackend.Blockchain().CurrentHeader().Time + uint64(time.Hour)))
@@ -295,6 +294,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	// verify that token was transferred to receiver on destination chain
 	gomega.NewWithT(t).Eventually(func() bool {
 		ccipContracts.Source.Chain.Commit()
+		ccipContracts.Dest.Chain.Commit()
 		destBackend.Commit()
 		receiverBal, err2 := destToken.BalanceOf(nil, receiver.From)
 		require.NoError(t, err2)
@@ -334,7 +334,7 @@ func TestIntegration_LegacyGasStation_CrossChainTransfer_DestChain(t *testing.T)
 	gomega.NewWithT(t).Eventually(func() bool {
 		sourceBackend.Commit()
 		destBackend.Commit()
-		txs, err := orm.SelectByDestChainIDAndStatus(ccipContracts.Dest.ChainID, types.Finalized)
+		txs, err := orm.SelectByDestChainIDAndStatus(ccipContracts.Dest.ChainSelector, types.Finalized)
 		require.NoError(t, err)
 		for _, tx := range txs {
 			return tx.Status == types.Finalized
