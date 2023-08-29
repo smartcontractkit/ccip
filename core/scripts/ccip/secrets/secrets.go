@@ -11,5 +11,5 @@ func GetRPC(chainID uint64) string {
 	if rpc != "" {
 		return rpc
 	}
-	panic("RPC not found. Please check secrets.go for chainID " + strconv.FormatUint(chainID, 10))
+	panic("RPC not found. Please set the environment variable for chain " + strconv.FormatUint(chainID, 10) + " e.g. RPC_420=https://rpc.420.com")
 }
