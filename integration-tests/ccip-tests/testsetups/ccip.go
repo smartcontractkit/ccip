@@ -820,7 +820,7 @@ func DeployLocalCluster(
 		if nonDevGethNetworks == nil {
 			return errors.New("cannot create nodes with custom config without nonDevGethNetworks")
 		}
-		toml, err := node.NewConfigFromToml("ccip",
+		toml, err := node.NewConfigFromToml(ccipnode.ConfigToml(),
 			node.WithPrivateEVMs(nonDevGethNetworks))
 		if err != nil {
 			return err
