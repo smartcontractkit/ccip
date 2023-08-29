@@ -2,8 +2,8 @@ package node
 
 import (
 	_ "embed"
+	"fmt"
 	"math/big"
-	"path/filepath"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -16,7 +16,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
+	localutil "github.com/smartcontractkit/integration-tests/ccip-tests/utils"
 )
+
+var CCIPTOML = fmt.Sprintf("%s/%s", localutil.ProjectRoot(), "/types/config/node/tomls/ccip.toml")
 
 func WithPrivateEVMs(networks []blockchain.EVMNetwork) node.NodeConfigOpt {
 	var evmConfigs []*evmcfg.EVMConfig
@@ -67,12 +70,4 @@ func WithCCIPGasEstimator(chainId int64) evmcfg.GasEstimator {
 	}
 
 	return cfg
-}
-
-func ConfigToml() string {
-	path, err := filepath.Abs("tomls/ccip.toml")
-	if err != nil {
-		panic(err)
-	}
-	return path
 }

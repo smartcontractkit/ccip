@@ -12,7 +12,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
-
 	"github.com/smartcontractkit/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/integration-tests/ccip-tests/testsetups"
 )
