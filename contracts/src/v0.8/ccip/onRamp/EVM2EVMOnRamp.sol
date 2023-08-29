@@ -48,7 +48,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error PoolAlreadyAdded();
   error PoolDoesNotExist(address token);
   error TokenPoolMismatch();
-  error SenderNotAllowed(address sender);
   error InvalidConfig();
   error InvalidAddress(bytes encodedAddress);
   error BadARMSignal();
