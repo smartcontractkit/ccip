@@ -1,6 +1,8 @@
-module github.com/smartcontractkit/chainlink/v2
+module github.com/smartcontractkit/ccip
 
 go 1.20
+
+replace github.com/smartcontractkit/chainlink/v2 => ./
 
 require (
 	github.com/CosmWasm/wasmd v0.40.1
@@ -109,6 +111,8 @@ require (
 	k8s.io/utils v0.0.0-20230308161112-d77c459e9343
 )
 
+require github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
+
 require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.5 // indirect
 	cosmossdk.io/api v0.3.1 // indirect
@@ -207,7 +211,6 @@ require (
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
-	github.com/gofrs/uuid v4.3.1+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/glog v1.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
