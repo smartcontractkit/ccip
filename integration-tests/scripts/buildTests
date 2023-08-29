@@ -24,5 +24,9 @@ IFS=' '
 for x in $tosplit
 do
     go test -c ./"${x}"
+    # do the same for ccip
+    go test -c ./ccip/"${x}"
 done
 IFS=$OIFS
+
+
