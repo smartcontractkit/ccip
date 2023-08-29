@@ -1,8 +1,6 @@
-module github.com/smartcontractkit/ccip
+module github.com/smartcontractkit/chainlink/v2
 
 go 1.20
-
-replace github.com/smartcontractkit/chainlink/v2 => ./
 
 require (
 	github.com/CosmWasm/wasmd v0.40.1
@@ -74,7 +72,6 @@ require (
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230802143301-165000751a85
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20230802150127-d2c95679d61a
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230828183543-6d0939746966
-	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20230816220705-665e93233ae5
 	github.com/smartcontractkit/ocr2keepers v0.7.18
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230804151440-2f1eb1e20687
