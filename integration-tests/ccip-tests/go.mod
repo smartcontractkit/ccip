@@ -2,6 +2,9 @@ module github.com/smartcontractkit/ccip-tests
 
 go 1.20
 
+// Make sure we're working with the latest chainlink libs
+replace github.com/smartcontractkit/chainlink/v2 => ../../
+
 require (
 	github.com/ethereum/go-ethereum v1.12.2
 	github.com/google/uuid v1.3.1
@@ -12,7 +15,7 @@ require (
 	github.com/smartcontractkit/chainlink-env v0.36.0
 	github.com/smartcontractkit/chainlink-testing-framework v1.16.1-0.20230825001100-85c8b45d8005
 	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230829003458-a206b3b84e61
-	github.com/smartcontractkit/chainlink/v2 v2.2.1-0.20230828183543-6d0939746966
+	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20230816220705-665e93233ae5
 	github.com/smartcontractkit/wasp v0.3.0
 	github.com/stretchr/testify v1.8.4
@@ -73,9 +76,6 @@ require (
 	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/chaos-mesh/chaos-mesh/api/v1alpha1 v0.0.0-20220226050744-799408773657 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
-	github.com/chzyer/readline v1.5.1 // indirect
-	github.com/cli/go-gh/v2 v2.0.0 // indirect
-	github.com/cli/safeexec v1.0.0 // indirect
 	github.com/cockroachdb/errors v1.9.1 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/pebble v0.0.0-20230209160836-829675f94811 // indirect
@@ -307,7 +307,6 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/manyminds/api2go v0.0.0-20171030193247-e7b693844a6f // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
@@ -389,7 +388,6 @@ require (
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/caigo v0.0.0-20230621050857-b29a4ca8c704 // indirect
-	github.com/smartcontractkit/ccip/integration-tests v0.0.0-20230829171137-e89d8072f77a // indirect
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20230824124058-9b063c470048 // indirect
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230824125819-215fd09979a2 // indirect
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20230802143301-165000751a85 // indirect
@@ -526,8 +524,9 @@ replace (
 	github.com/mwitkow/grpc-proxy => github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f
 
 	github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.43.1-0.20230327151049-211ae4f1f0a2
+	// ensure the local integration-tests package is used
+	github.com/smartcontractkit/chainlink/integration-tests => ../../integration-tests
 
-	github.com/smartcontractkit/chainlink/v2 => ../../
 	k8s.io/api => k8s.io/api v0.25.11
 	k8s.io/client-go => k8s.io/client-go v0.25.11
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20230303024457-afdc3dddf62d

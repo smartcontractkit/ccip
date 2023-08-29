@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/ccip/integration-tests
+module github.com/smartcontractkit/integration-tests
 
 go 1.20
 
