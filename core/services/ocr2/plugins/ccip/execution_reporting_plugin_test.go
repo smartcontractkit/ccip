@@ -878,7 +878,7 @@ func Test_getTokensPrices(t *testing.T) {
 		name      string
 		feeTokens []common.Address
 		tokens    []common.Address
-		retPrices []price_registry.InternalTimestampedUint192Value
+		retPrices []price_registry.InternalTimestampedPackedUint224
 		expPrices map[common.Address]*big.Int
 		expErr    bool
 	}{
@@ -886,7 +886,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "base",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 				{Value: big.NewInt(30)},
@@ -902,7 +902,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "token is both fee token and normal token",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3, tk1},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 				{Value: big.NewInt(30)},
@@ -919,7 +919,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "token is both fee token and normal token and price registry gave different price",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3, tk1},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 				{Value: big.NewInt(30)},
@@ -931,7 +931,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "zero price should lead to an error",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(0)},
 				{Value: big.NewInt(30)},
@@ -942,7 +942,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "contract returns less prices than requested",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 			},

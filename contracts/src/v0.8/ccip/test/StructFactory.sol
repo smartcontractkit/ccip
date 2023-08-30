@@ -97,18 +97,17 @@ contract StructFactory {
   // This value may be substantially decreased after EIP 4844.
   uint16 internal constant DEST_GAS_PER_CALLDATA_BYTE = 16;
 
-  // Total L1 calldata overhead estimate is 32_956 gas.
+  // Total L1 calldata overhead estimate is 33_084 gas.
+  // This value includes complete CommitStore and OffRamp call data.
   uint32 internal constant DEST_CALLDATA_OVERHEAD =
     188 + // Fixed calldata overhead in OP stack.
-      32 *
-      31 *
-      DEST_GAS_PER_CALLDATA_BYTE + // CommitStore single-root transmission takes up roughtly 31 slots.
-      32 *
-      33 *
-      DEST_GAS_PER_CALLDATA_BYTE; // OffRamp transmission excluding EVM2EVMMessage takes up roughtly 33 slots.
+      (32 * 31 + 4) *
+      DEST_GAS_PER_CALLDATA_BYTE + // CommitStore single-root transmission takes up about 31 slots, plus selector.
+      (32 * 33 + 4) *
+      DEST_GAS_PER_CALLDATA_BYTE; // OffRamp transmission excluding EVM2EVMMessage takes up about 33 slots, plus selector.
 
-  // Multiples of 0.0001, use 6180 for OP, same as OP mainnet.
-  uint16 internal constant DEST_GAS_CALLDATA_MULTIPLIER = 6180;
+  // Multiples of 0.0001, use 6840 for OP, same as OP mainnet 0.684.
+  uint16 internal constant DEST_GAS_CALLDATA_MULTIPLIER = 6840;
 
   // OffRamp
   uint256 internal constant POOL_BALANCE = 1e25;
