@@ -489,9 +489,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // If there are no token transfers, we charge a flat network fee.
     uint256 premiumFeeUSD = 0;
     uint32 tokenTransferGas = 0;
-    uint32 tokenTransferBytesOverhead = 0;
+    uint32 tokenTransferDataOverhead = 0;
     if (message.tokenAmounts.length > 0) {
-      (premiumFeeUSD, tokenTransferGas, tokenTransferBytesOverhead) = _getTokenTransferCost(
+      (premiumFeeUSD, tokenTransferGas, tokenTransferDataOverhead) = _getTokenTransferCost(
         message.feeToken,
         feeTokenPrice,
         message.tokenAmounts,
@@ -515,18 +515,18 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         s_dynamicConfig.destGasPerPayloadByte +
         tokenTransferGas) * feeTokenConfig.gasMultiplier);
 
+    uint256 calldataCostUSD = 0;
+    // Only calculate calldata cost if calldata multiplier is non-zero.
+    // The multiplier should be set to 0 if destination chain does not charge calldata cost.
     if (s_dynamicConfig.destCalldataMultiplier > 0) {
-      // If calldata cost is non-zero, calculate execution calldata fee
       uint112 calldataGasPrice = uint112(packedGasPrice >> 112);
 
-      executionCostUSD += calldataGasPrice *
-        (s_dynamicConfig.destCalldataOverhead +
-          (Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES +
-            message.data.length +
-            message.tokenAmounts.length * Internal.EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN +
-            tokenTransferBytesOverhead
-          ) * s_dynamicConfig.destGasPerPayloadByte
-        ) * s_dynamicConfig.destCalldataMultiplier * 1e14;
+      calldataCostUSD = _getMessageCalldataCostUSD(
+        calldataGasPrice,
+        message.data.length,
+        message.tokenAmounts.length,
+        tokenTransferDataOverhead
+      );
     } 
 
     // Transform total USD fee in 36 decimals to 18 decimals, then convert into fee token amount.
@@ -535,12 +535,44 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     return feeTokenPrice._calcTokenAmountFromUSDValue((premiumFeeUSD + executionCostUSD) / 1 ether);
   }
 
+  /// @notice Returns the estimated calldata cost of the message.
+  /// @dev To save on gas, we use a single destGasPerCalldataByte value for both zero and non-zero bytes.
+  /// @param calldataGasPrice USD per calldata gas in 18 decimals.
+  /// @param messageDataLength length of the data field in the message.
+  /// @param numberOfTokens number of distinct token transfers in the message.
+  /// @param tokenTransferDataOverhead additional token transfer data passed to destination, e.g. USDC attestation.
+  /// @return calldataCostUSD total calldata cost in USD with 36 decimals.
+  function _getMessageCalldataCostUSD(
+    uint112 calldataGasPrice,
+    uint256 messageDataLength,
+    uint256 numberOfTokens,
+    uint256 tokenTransferDataOverhead
+  ) internal view returns (uint256 calldataCostUSD) {
+    uint256 calldataLength = Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES +
+      messageDataLength +
+      (numberOfTokens * Internal.EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN) +
+      tokenTransferDataOverhead;
+
+    uint256 calldataGas = s_dynamicConfig.destCalldataOverhead + s_dynamicConfig.destGasPerCalldataByte * calldataLength;
+
+    // calldataGasPrice is in 18 decimals, destCalldataMultiplier is in 4 decimals
+    // we pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
+    return calldataGasPrice * calldataGas * s_dynamicConfig.destCalldataMultiplier * 1e14;
+  }
+
   /// @notice Returns the token transfer fee.
   /// A basis point fee is calculated from the USD value of each token transfer.
   /// Sum of basis point fees is confined within range [minTokenTransferFeeUSD, maxTokenTransferFeeUSD].
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
   /// @dev Splitting one token transfer into multiple transfers is discouraged,
   /// as it will result in a transferFee equal or greater than the same amount aggregated/de-duped.
+  /// @param feeToken address of the feeToken.
+  /// @param feeTokenPrice price of feeToken in USD with 18 decimals.
+  /// @param tokenAmounts token transfers in the message.
+  /// @param feeTokenConfig configuration struct of fee token.
+  /// @return tokenTransferFeeUSD total token transfer bps fee in USD with 36 decimals.
+  /// @return tokenTransferGas total execution gas of the token transfers.
+  /// @return tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   function _getTokenTransferCost(
     address feeToken,
     uint224 feeTokenPrice,
