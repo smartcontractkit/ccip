@@ -200,17 +200,17 @@ func Test_copyMap(t *testing.T) {
 }
 
 func Test_cachedDecimals(t *testing.T) {
-	c := &tokenToDecimals{}
+	tokenDecimalsCache := &tokenToDecimals{}
 	addr := utils.RandomAddress()
 
-	v, ok := c.getCachedDecimals(addr)
-	assert.Zero(t, v)
-	assert.False(t, ok)
+	decimals, exists := tokenDecimalsCache.getCachedDecimals(addr)
+	assert.Zero(t, decimals)
+	assert.False(t, exists)
 
-	c.setCachedDecimals(addr, 123)
-	v, ok = c.getCachedDecimals(addr)
-	assert.Equal(t, uint8(123), v)
-	assert.True(t, ok)
+	tokenDecimalsCache.setCachedDecimals(addr, 123)
+	decimals, exists = tokenDecimalsCache.getCachedDecimals(addr)
+	assert.Equal(t, uint8(123), decimals)
+	assert.True(t, exists)
 }
 
 func createTokenFactory(decimalMapping map[common.Address]uint8) func(address common.Address) (link_token_interface.LinkTokenInterface, error) {

@@ -248,13 +248,13 @@ func (t *tokenToDecimals) CallOrigin(ctx context.Context) (map[common.Address]ui
 }
 
 func (t *tokenToDecimals) getCachedDecimals(token common.Address) (uint8, bool) {
-	v, exists := t.tokenDecimals.Load(token.String())
+	rawVal, exists := t.tokenDecimals.Load(token.String())
 	if !exists {
 		return 0, false
 	}
 
-	decimals, is := v.(uint8)
-	if !is {
+	decimals, isUint8 := rawVal.(uint8)
+	if !isUint8 {
 		return 0, false
 	}
 
