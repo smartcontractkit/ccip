@@ -115,7 +115,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   struct TokenTransferFeeConfig {
     uint16 ratio; // -------------------┐ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //          | Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // -------┘ Extra L1 calldata bytes on top of transfer data, e.g. USDC offchain data
+    uint32 destCalldataOverhead; // ----┘ Extra L1 calldata bytes on top of transfer data, e.g. USDC offchain data
   }
 
   /// @dev Same as TokenTransferFeeConfig
@@ -124,7 +124,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address token; // ------------------┐ Token address
     uint16 ratio; //                    | Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //          | Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // -------┘ Extra L1 calldata bytes on top of transfer data, e.g. USDC offchain data
+    uint32 destCalldataOverhead; // ----┘ Extra L1 calldata bytes on top of transfer data, e.g. USDC offchain data
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
@@ -489,9 +489,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // If there are no token transfers, we charge a flat network fee.
     uint256 premiumFeeUSD = 0;
     uint32 tokenTransferGas = 0;
-    uint32 tokenTransferDataOverhead = 0;
+    uint32 tokenTransferCalldataOverhead = 0;
     if (message.tokenAmounts.length > 0) {
-      (premiumFeeUSD, tokenTransferGas, tokenTransferDataOverhead) = _getTokenTransferCost(
+      (premiumFeeUSD, tokenTransferGas, tokenTransferCalldataOverhead) = _getTokenTransferCost(
         message.feeToken,
         feeTokenPrice,
         message.tokenAmounts,
@@ -511,8 +511,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 executionCostUSD = executionGasPrice *
       ((extraArgs.gasLimit +
         s_dynamicConfig.destGasOverhead +
-        message.data.length *
-        s_dynamicConfig.destGasPerPayloadByte +
+        (message.data.length * s_dynamicConfig.destGasPerPayloadByte) +
         tokenTransferGas) * feeTokenConfig.gasMultiplier);
 
     uint256 calldataCostUSD = 0;
@@ -525,14 +524,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         calldataGasPrice,
         message.data.length,
         message.tokenAmounts.length,
-        tokenTransferDataOverhead
+        tokenTransferCalldataOverhead
       );
-    } 
+    }
 
-    // Transform total USD fee in 36 decimals to 18 decimals, then convert into fee token amount.
-    // Division of 18 decimals upfront loses slight precision. It is still accurate enough for fee calculations.
-    // This is done to extend the range of decimal-encoded token price before overflow becomes a concern.
-    return feeTokenPrice._calcTokenAmountFromUSDValue((premiumFeeUSD + executionCostUSD) / 1 ether);
+    // Calculate number of fee tokens to charge.
+    // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
+    // Result of the division is the number of smallest token denominations.
+    return (premiumFeeUSD + executionCostUSD + calldataCostUSD) / feeTokenPrice;
   }
 
   /// @notice Returns the estimated calldata cost of the message.
@@ -540,24 +539,24 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @param calldataGasPrice USD per calldata gas in 18 decimals.
   /// @param messageDataLength length of the data field in the message.
   /// @param numberOfTokens number of distinct token transfers in the message.
-  /// @param tokenTransferDataOverhead additional token transfer data passed to destination, e.g. USDC attestation.
+  /// @param tokenTransferCalldataOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   /// @return calldataCostUSD total calldata cost in USD with 36 decimals.
   function _getMessageCalldataCostUSD(
     uint112 calldataGasPrice,
     uint256 messageDataLength,
     uint256 numberOfTokens,
-    uint256 tokenTransferDataOverhead
+    uint32 tokenTransferCalldataOverhead
   ) internal view returns (uint256 calldataCostUSD) {
     uint256 calldataLength = Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES +
       messageDataLength +
       (numberOfTokens * Internal.EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN) +
-      tokenTransferDataOverhead;
+      tokenTransferCalldataOverhead;
 
-    uint256 calldataGas = s_dynamicConfig.destCalldataOverhead + s_dynamicConfig.destGasPerCalldataByte * calldataLength;
+    uint256 calldataGas = (calldataLength * s_dynamicConfig.destGasPerCalldataByte) + s_dynamicConfig.destCalldataOverhead;
 
     // calldataGasPrice is in 18 decimals, destCalldataMultiplier is in 4 decimals
     // we pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    return calldataGasPrice * calldataGas * s_dynamicConfig.destCalldataMultiplier * 1e14;
+    return ((calldataGas * calldataGasPrice) * s_dynamicConfig.destCalldataMultiplier) * 1e14;
   }
 
   /// @notice Returns the token transfer fee.
@@ -572,13 +571,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @param feeTokenConfig configuration struct of fee token.
   /// @return tokenTransferFeeUSD total token transfer bps fee in USD with 36 decimals.
   /// @return tokenTransferGas total execution gas of the token transfers.
-  /// @return tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
+  /// @return tokenTransferCalldataOverhead additional token transfer data passed to destination, e.g. USDC attestation.
   function _getTokenTransferCost(
     address feeToken,
     uint224 feeTokenPrice,
     Client.EVMTokenAmount[] calldata tokenAmounts,
     FeeTokenConfig memory feeTokenConfig
-  ) internal view returns (uint256 tokenTransferFeeUSD, uint32 tokenTransferGas, uint32 tokenTransferBytesOverhead) {
+  ) internal view returns (uint256 tokenTransferFeeUSD, uint32 tokenTransferGas, uint32 tokenTransferCalldataOverhead) {
     uint256 numberOfTokens = tokenAmounts.length;
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
@@ -606,22 +605,22 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
       tokenTransferFeeUSD += bpsFeeUSD;
       tokenTransferGas += transferFeeConfig.destGasOverhead;
-      tokenTransferBytesOverhead += transferFeeConfig.destBytesOverhead;
+      tokenTransferCalldataOverhead += transferFeeConfig.destCalldataOverhead;
     }
 
     // Convert USD values with 2 decimals to 18 decimals.
     // Sum of bps fees should be kept within range of [minTokenTransferFeeUSD, maxTokenTransferFeeUSD].
     uint256 minTransferFeeUSD = uint256(feeTokenConfig.minTokenTransferFeeUSD) * 1e16;
     if (tokenTransferFeeUSD < minTransferFeeUSD) {
-      return (minTransferFeeUSD, tokenTransferGas, tokenTransferBytesOverhead);
+      return (minTransferFeeUSD, tokenTransferGas, tokenTransferCalldataOverhead);
     }
 
     uint256 maxTransferFeeUSD = uint256(feeTokenConfig.maxTokenTransferFeeUSD) * 1e16;
     if (tokenTransferFeeUSD > maxTransferFeeUSD) {
-      return (maxTransferFeeUSD, tokenTransferGas, tokenTransferBytesOverhead);
+      return (maxTransferFeeUSD, tokenTransferGas, tokenTransferCalldataOverhead);
     }
 
-    return (tokenTransferFeeUSD, tokenTransferGas, tokenTransferBytesOverhead);
+    return (tokenTransferFeeUSD, tokenTransferGas, tokenTransferCalldataOverhead);
   }
 
   /// @notice Gets the fee configuration for a token
@@ -678,7 +677,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       s_tokenTransferFeeConfig[configArg.token] = TokenTransferFeeConfig({
         ratio: configArg.ratio,
         destGasOverhead: configArg.destGasOverhead,
-        destBytesOverhead: configArg.destBytesOverhead
+        destCalldataOverhead: configArg.destCalldataOverhead
       });
     }
     emit TokenTransferFeeConfigSet(tokenTransferFeeConfigArgs);

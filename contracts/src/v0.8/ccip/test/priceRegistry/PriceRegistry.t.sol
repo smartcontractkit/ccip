@@ -11,7 +11,7 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
   uint112 internal constant USD_PER_CALLDATA_GAS = 1e9; // 1 gwei
 
   // Encode L1 gas price of 1 gwei, and L2 gas price of 0.001 gwei
-  uint224 internal constant PACKED_USD_PER_GAS = USD_PER_CALLDATA_GAS << 112 + USD_PER_GAS;
+  uint224 internal constant PACKED_USD_PER_GAS = (uint224(USD_PER_CALLDATA_GAS) << 112) + USD_PER_GAS;
 
   PriceRegistry internal s_priceRegistry;
   // Cheat to store the price updates in storage since struct arrays aren't supported.
@@ -68,7 +68,7 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
 
     Internal.PriceUpdates memory priceUpdates = getPriceUpdatesStruct(pricedTokens, tokenPrices);
     priceUpdates.destChainSelector = DEST_CHAIN_ID;
-    priceUpdates.usdPerUnitGas = USD_PER_GAS;
+    priceUpdates.usdPerUnitGas = PACKED_USD_PER_GAS;
 
     s_encodedInitialPriceUpdates = abi.encode(priceUpdates);
     address[] memory priceUpdaters = new address[](0);
@@ -406,7 +406,7 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
       destChainSelector: DEST_CHAIN_ID,
-      usdPerUnitGas: USD_PER_GAS
+      usdPerUnitGas: PACKED_USD_PER_GAS
     });
     s_priceRegistry.updatePrices(priceUpdates);
 
