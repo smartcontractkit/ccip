@@ -22,6 +22,11 @@ library Internal {
     uint32 timestamp; // ----┘ Timestamp of the most recent update.
   }
 
+  /// @dev Gas price is stored in 112-bit unsigned int. uint224 can pack 2 prices.
+  /// When packing L1 and L2 gas prices, L1 gas price is left-shifted to the higher-order bits.
+  /// Using uint8, which is strictly lower than 1st shift operand, to avoid shift operand type warning.
+  uint8 public constant GAS_PRICE_BITS = 112;
+
   struct PoolUpdate {
     address token; // The IERC20 token address
     address pool; // The token pool address
@@ -53,16 +58,15 @@ library Internal {
     bytes32 messageId;
   }
 
-
   /// @dev EVM2EVMMessage struct has 12 fields, including 2 variable arrays.
   /// Each variable array takes 1 more slot to store its length.
   /// Hence, when abiEncoded, excluding the dynamic contents of variable arrays,
   /// EVM2EVMMessage takes up a fixed number of 14 lots, 32 bytes each.
-  uint256 public constant EVM_2_EVM_MESSAGE_FIXED_BYTES = 32 * 14;
+  uint256 public constant MESSAGE_FIXED_BYTES = 32 * 14;
 
   /// @dev Each token transfer adds 1 instance of EVMTokenAmount struct to EVM2EVMMessage.
   /// EVMTokenAmount struct contains 2 fields, 32 bytes each when abiEncoded.
-  uint256 public constant EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN = 32 * 2;
+  uint256 public constant MESSAGE_BYTES_PER_TOKEN = 32 * 2;
 
   function _toAny2EVMMessage(
     EVM2EVMMessage memory original,

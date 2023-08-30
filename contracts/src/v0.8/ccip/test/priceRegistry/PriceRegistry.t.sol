@@ -10,8 +10,10 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
   uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei
   uint112 internal constant USD_PER_CALLDATA_GAS = 1e9; // 1 gwei
 
-  // Encode L1 gas price of 1 gwei, and L2 gas price of 0.001 gwei
-  uint224 internal constant PACKED_USD_PER_GAS = (uint224(USD_PER_CALLDATA_GAS) << 112) + USD_PER_GAS;
+  // Encode L1 gas price and L2 gas price into a packed price.
+  // L1 gas price is left-shifted to the higher-order bits.
+  uint224 internal constant PACKED_USD_PER_GAS =
+    (uint224(USD_PER_CALLDATA_GAS) << Internal.GAS_PRICE_BITS) + USD_PER_GAS;
 
   PriceRegistry internal s_priceRegistry;
   // Cheat to store the price updates in storage since struct arrays aren't supported.

@@ -675,18 +675,20 @@ contract EVM2EVMOnRamp_getMessageCalldataCostUSD is EVM2EVMOnRamp_getFeeSetup {
 
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
 
-    uint256 calldataGas = dynamicConfig.destCalldataOverhead + dynamicConfig.destGasPerCalldataByte * Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES;
+    uint256 calldataGas = dynamicConfig.destCalldataOverhead +
+      dynamicConfig.destGasPerCalldataByte *
+      Internal.MESSAGE_FIXED_BYTES;
     uint256 expectedCalldataCostUSD = USD_PER_CALLDATA_GAS * calldataGas * dynamicConfig.destCalldataMultiplier * 1e14;
 
     assertEq(expectedCalldataCostUSD, calldataCostUSD);
   }
-  
+
   function testSimpleMessageCalculatesCalldataCostSuccess() public {
     uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(USD_PER_CALLDATA_GAS, 100, 5, 50);
 
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
 
-    uint256 calldataLength = Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES + 100 + (5 * Internal.EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN) + 50;
+    uint256 calldataLength = Internal.MESSAGE_FIXED_BYTES + 100 + (5 * Internal.MESSAGE_BYTES_PER_TOKEN) + 50;
     uint256 calldataGas = dynamicConfig.destCalldataOverhead + dynamicConfig.destGasPerCalldataByte * calldataLength;
     uint256 expectedCalldataCostUSD = USD_PER_CALLDATA_GAS * calldataGas * dynamicConfig.destCalldataMultiplier * 1e14;
 
@@ -701,7 +703,12 @@ contract EVM2EVMOnRamp_getMessageCalldataCostUSD is EVM2EVMOnRamp_getFeeSetup {
     vm.assume(messageDataLength < type(uint64).max);
     vm.assume(numberOfTokens < type(uint64).max);
 
-    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(0, messageDataLength, numberOfTokens, tokenTransferDataOverhead);
+    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(
+      0,
+      messageDataLength,
+      numberOfTokens,
+      tokenTransferDataOverhead
+    );
 
     assertEq(0, calldataCostUSD);
   }
@@ -724,13 +731,17 @@ contract EVM2EVMOnRamp_getMessageCalldataCostUSD is EVM2EVMOnRamp_getFeeSetup {
     dynamicConfig.destGasPerCalldataByte = destGasPerCalldataByte;
     dynamicConfig.destCalldataMultiplier = destCalldataMultiplier;
     s_onRamp.setDynamicConfig(dynamicConfig);
-    
 
-    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(calldataGasPrice, messageDataLength, numberOfTokens, tokenTransferDataOverhead);
+    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(
+      calldataGasPrice,
+      messageDataLength,
+      numberOfTokens,
+      tokenTransferDataOverhead
+    );
 
-    uint256 calldataLength = Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES +
+    uint256 calldataLength = Internal.MESSAGE_FIXED_BYTES +
       messageDataLength +
-      (numberOfTokens * Internal.EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN) +
+      (numberOfTokens * Internal.MESSAGE_BYTES_PER_TOKEN) +
       tokenTransferDataOverhead;
 
     uint256 calldataGas = destCalldataOverhead + destGasPerCalldataByte * calldataLength;
@@ -747,7 +758,7 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
   function testNoTokenTransferChargesMinFeeSuccess() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
     EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
-    (uint256 feeAmount, uint32 destGasOverhead, uint32 destCalldataOverhead ) = s_onRamp.getTokenTransferCost(
+    (uint256 feeAmount, uint32 destGasOverhead, uint32 destCalldataOverhead) = s_onRamp.getTokenTransferCost(
       message.feeToken,
       s_feeTokenPrice,
       message.tokenAmounts,
@@ -1094,7 +1105,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
     }
   }
 
-  function testZeroMultiplierNoCalldataCostSuccess() public {
+  function testZeroCalldataMultiplierSuccess() public {
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
     dynamicConfig.destCalldataMultiplier = 0;
     s_onRamp.setDynamicConfig(dynamicConfig);
@@ -1107,7 +1118,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
     uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
     uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS);
     uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSD) * feeTokenConfig.premiumMultiplier);
-    
+
     uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / s_feeTokenPrice;
     assertEq(totalPriceInFeeToken, feeAmount);
   }
@@ -1155,7 +1166,9 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
       message.feeToken = testTokens[i];
       EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
       uint32 tokenGasOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destGasOverhead;
-      uint32 tokenCalldataOverhead = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destCalldataOverhead;
+      uint32 tokenCalldataOverhead = s_onRamp
+        .getTokenTransferFeeConfig(message.tokenAmounts[0].token)
+        .destCalldataOverhead;
 
       uint256 feeAmount = s_onRamp.getFee(message);
 

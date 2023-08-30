@@ -478,10 +478,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
     if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
 
-    (uint224 feeTokenPrice, uint224 packedGasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry).getTokenAndGasPrices(
-      message.feeToken,
-      i_destChainSelector
-    );
+    (uint224 feeTokenPrice, uint224 packedGasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry)
+      .getTokenAndGasPrices(message.feeToken, i_destChainSelector);
     uint112 executionGasPrice = uint112(packedGasPrice);
 
     // Calculate premiumFee in USD with 18 decimals precision.
@@ -518,7 +516,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // Only calculate calldata cost if calldata multiplier is non-zero.
     // The multiplier should be set to 0 if destination chain does not charge calldata cost.
     if (s_dynamicConfig.destCalldataMultiplier > 0) {
-      uint112 calldataGasPrice = uint112(packedGasPrice >> 112);
+      uint112 calldataGasPrice = uint112(packedGasPrice >> Internal.GAS_PRICE_BITS);
 
       calldataCostUSD = _getMessageCalldataCostUSD(
         calldataGasPrice,
@@ -547,12 +545,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint256 numberOfTokens,
     uint32 tokenTransferCalldataOverhead
   ) internal view returns (uint256 calldataCostUSD) {
-    uint256 calldataLength = Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES +
+    uint256 calldataLength = Internal.MESSAGE_FIXED_BYTES +
       messageDataLength +
-      (numberOfTokens * Internal.EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN) +
+      (numberOfTokens * Internal.MESSAGE_BYTES_PER_TOKEN) +
       tokenTransferCalldataOverhead;
 
-    uint256 calldataGas = (calldataLength * s_dynamicConfig.destGasPerCalldataByte) + s_dynamicConfig.destCalldataOverhead;
+    uint256 calldataGas = (calldataLength * s_dynamicConfig.destGasPerCalldataByte) +
+      s_dynamicConfig.destCalldataOverhead;
 
     // calldataGasPrice is in 18 decimals, destCalldataMultiplier is in 4 decimals
     // we pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
