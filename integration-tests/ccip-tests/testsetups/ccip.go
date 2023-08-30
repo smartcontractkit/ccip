@@ -34,10 +34,10 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/networks"
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 
-	"github.com/smartcontractkit/integration-tests/ccip-tests/contracts/laneconfig"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 
-	"github.com/smartcontractkit/integration-tests/ccip-tests/actions"
-	"github.com/smartcontractkit/integration-tests/ccip-tests/testreporters"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 )
 
 const (
