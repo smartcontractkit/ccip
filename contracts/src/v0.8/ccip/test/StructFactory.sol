@@ -103,7 +103,7 @@ contract StructFactory {
     + 32 * 33 * DEST_GAS_PER_CALLDATA_BYTE; // OffRamp transmission excluding EVM2EVMMessage takes up roughtly 33 slots.
   
   // Multiples of 0.0001, use 6180 for OP, same as OP mainnet.
-  uint16 internal constant DEST_GAS_CALLDATA_MULTIPLIER = 0; 
+  uint16 internal constant DEST_GAS_CALLDATA_MULTIPLIER = 6180; 
 
   // OffRamp
   uint256 internal constant POOL_BALANCE = 1e25;

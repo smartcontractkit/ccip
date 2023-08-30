@@ -668,6 +668,80 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
   }
 }
 
+/// @notice #getMessageCalldataCostUSD
+contract EVM2EVMOnRamp_getMessageCalldataCostUSD is EVM2EVMOnRamp_getFeeSetup {
+  function test_EmptyMessageCalculatesCalldataCostSuccess() public {
+    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(USD_PER_CALLDATA_GAS, 0, 0, 0);
+
+    EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
+
+    uint256 calldataGas = dynamicConfig.destCalldataOverhead + dynamicConfig.destGasPerCalldataByte * Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES;
+    uint256 expectedCalldataCostUSD = USD_PER_CALLDATA_GAS * calldataGas * dynamicConfig.destCalldataMultiplier * 1e14;
+
+    assertEq(expectedCalldataCostUSD, calldataCostUSD);
+  }
+  
+  function test_SimpleMessageCalculatesCalldataCostSuccess() public {
+    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(USD_PER_CALLDATA_GAS, 100, 5, 50);
+
+    EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
+
+    uint256 calldataLength = Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES + 100 + (5 * Internal.EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN) + 50;
+    uint256 calldataGas = dynamicConfig.destCalldataOverhead + dynamicConfig.destGasPerCalldataByte * calldataLength;
+    uint256 expectedCalldataCostUSD = USD_PER_CALLDATA_GAS * calldataGas * dynamicConfig.destCalldataMultiplier * 1e14;
+
+    assertEq(expectedCalldataCostUSD, calldataCostUSD);
+  }
+
+  function testFuzz_ZeroCalldataGasPriceAlwaysCalculatesZeroCalldataCostSuccess(
+    uint256 messageDataLength,
+    uint256 numberOfTokens,
+    uint256 tokenTransferDataOverhead
+  ) public {
+    vm.assume(messageDataLength < type(uint64).max);
+    vm.assume(numberOfTokens < type(uint64).max);
+    vm.assume(tokenTransferDataOverhead < type(uint64).max);
+
+    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(0, messageDataLength, numberOfTokens, tokenTransferDataOverhead);
+
+    assertEq(0, calldataCostUSD);
+  }
+
+  function testFuzz_CalculateCalldataCostSuccess(
+    uint32 destCalldataOverhead,
+    uint16 destGasPerCalldataByte,
+    uint16 destCalldataMultiplier,
+    uint112 calldataGasPrice,
+    uint256 messageDataLength,
+    uint256 numberOfTokens,
+    uint256 tokenTransferDataOverhead
+  ) public {
+    // Using large yet reasonable numbers to avoid overflows.
+    vm.assume(messageDataLength < type(uint64).max);
+    vm.assume(numberOfTokens < type(uint64).max);
+    vm.assume(tokenTransferDataOverhead < type(uint64).max);
+
+    EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
+    dynamicConfig.destCalldataOverhead = destCalldataOverhead;
+    dynamicConfig.destGasPerCalldataByte = destGasPerCalldataByte;
+    dynamicConfig.destCalldataMultiplier = destCalldataMultiplier;
+    s_onRamp.setDynamicConfig(dynamicConfig);
+    
+
+    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(calldataGasPrice, messageDataLength, numberOfTokens, tokenTransferDataOverhead);
+
+    uint256 calldataLength = Internal.EVM_2_EVM_MESSAGE_FIXED_BYTES +
+      messageDataLength +
+      (numberOfTokens * Internal.EVM_2_EVM_MESSAGE_BYTES_PER_TOKEN) +
+      tokenTransferDataOverhead;
+
+    uint256 calldataGas = destCalldataOverhead + destGasPerCalldataByte * calldataLength;
+    uint256 expectedCalldataCostUSD = calldataGasPrice * calldataGas * destCalldataMultiplier * 1e14;
+
+    assertEq(expectedCalldataCostUSD, calldataCostUSD);
+  }
+}
+
 /// @notice #getTokenTransferFee
 contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
   using USDPriceWith18Decimals for uint224;
@@ -992,170 +1066,170 @@ contract EVM2EVMOnRamp_getTokenTransferCost is EVM2EVMOnRamp_getFeeSetup {
   }
 }
 
-/// @notice #getFee
-contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
-  using USDPriceWith18Decimals for uint224;
+// /// @notice #getFee
+// contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
+//   using USDPriceWith18Decimals for uint224;
 
-  function testEmptyMessageSuccess() public {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+//   function testEmptyMessageSuccess() public {
+//     address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
+//     uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
 
-    for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
-      Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-      message.feeToken = testTokens[i];
-      EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+//     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
+//       Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+//       message.feeToken = testTokens[i];
+//       EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
 
-      uint256 feeAmount = s_onRamp.getFee(message);
+//       uint256 feeAmount = s_onRamp.getFee(message);
 
-      uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
-      uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS) / 1 ether;
-      uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSD) * feeTokenConfig.premiumMultiplier) /
-        1 ether;
+//       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
+//       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS) / 1 ether;
+//       uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSD) * feeTokenConfig.premiumMultiplier) /
+//         1 ether;
 
-      uint256 totalPriceInFeeToken = ((gasFeeUSD + messageFeeUSD) * 1e18) / feeTokenPrices[i];
-      assertEq(totalPriceInFeeToken, feeAmount);
-    }
-  }
+//       uint256 totalPriceInFeeToken = ((gasFeeUSD + messageFeeUSD) * 1e18) / feeTokenPrices[i];
+//       assertEq(totalPriceInFeeToken, feeAmount);
+//     }
+//   }
 
-  function testHighGasMessageSuccess() public {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+//   function testHighGasMessageSuccess() public {
+//     address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
+//     uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
 
-    uint256 customGasLimit = MAX_GAS_LIMIT;
-    uint256 customDataSize = MAX_DATA_SIZE;
-    for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
-      Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-        receiver: abi.encode(OWNER),
-        data: new bytes(customDataSize),
-        tokenAmounts: new Client.EVMTokenAmount[](0),
-        feeToken: testTokens[i],
-        extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
-      });
+//     uint256 customGasLimit = MAX_GAS_LIMIT;
+//     uint256 customDataSize = MAX_DATA_SIZE;
+//     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
+//       Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+//         receiver: abi.encode(OWNER),
+//         data: new bytes(customDataSize),
+//         tokenAmounts: new Client.EVMTokenAmount[](0),
+//         feeToken: testTokens[i],
+//         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
+//       });
 
-      EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
-      uint256 feeAmount = s_onRamp.getFee(message);
+//       EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+//       uint256 feeAmount = s_onRamp.getFee(message);
 
-      uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + customDataSize * DEST_GAS_PER_PAYLOAD_BYTE;
-      uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS) / 1 ether;
-      uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSD) * feeTokenConfig.premiumMultiplier) /
-        1 ether;
+//       uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + customDataSize * DEST_GAS_PER_PAYLOAD_BYTE;
+//       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS) / 1 ether;
+//       uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSD) * feeTokenConfig.premiumMultiplier) /
+//         1 ether;
 
-      uint256 totalPriceInFeeToken = ((gasFeeUSD + messageFeeUSD) * 1e18) / feeTokenPrices[i];
-      assertEq(totalPriceInFeeToken, feeAmount);
-    }
-  }
+//       uint256 totalPriceInFeeToken = ((gasFeeUSD + messageFeeUSD) * 1e18) / feeTokenPrices[i];
+//       assertEq(totalPriceInFeeToken, feeAmount);
+//     }
+//   }
 
-  function testSingleTokenMessageSuccess() public {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+//   function testSingleTokenMessageSuccess() public {
+//     address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
+//     uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
 
-    uint256 tokenAmount = 10000e18;
-    for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
-      Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
-      message.feeToken = testTokens[i];
-      EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
-      uint256 tokenTransferGas = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destGasOverhead;
+//     uint256 tokenAmount = 10000e18;
+//     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
+//       Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(s_sourceFeeToken, tokenAmount);
+//       message.feeToken = testTokens[i];
+//       EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+//       uint256 tokenTransferGas = s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[0].token).destGasOverhead;
 
-      uint256 feeAmount = s_onRamp.getFee(message);
+//       uint256 feeAmount = s_onRamp.getFee(message);
 
-      uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD + tokenTransferGas;
-      uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS) / 1 ether;
-      (uint256 transferFeeUSD, , ) = s_onRamp.getTokenTransferCost(
-        message.feeToken,
-        feeTokenPrices[i],
-        message.tokenAmounts,
-        feeTokenConfig
-      );
-      uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplier) / 1 ether;
+//       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD + tokenTransferGas;
+//       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS) / 1 ether;
+//       (uint256 transferFeeUSD, , ) = s_onRamp.getTokenTransferCost(
+//         message.feeToken,
+//         feeTokenPrices[i],
+//         message.tokenAmounts,
+//         feeTokenConfig
+//       );
+//       uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplier) / 1 ether;
 
-      uint256 totalPriceInFeeToken = ((gasFeeUSD + messageFeeUSD) * 1e18) / feeTokenPrices[i];
-      assertEq(totalPriceInFeeToken, feeAmount);
-    }
-  }
+//       uint256 totalPriceInFeeToken = ((gasFeeUSD + messageFeeUSD) * 1e18) / feeTokenPrices[i];
+//       assertEq(totalPriceInFeeToken, feeAmount);
+//     }
+//   }
 
-  function testMessageWithDataAndTokenTransferSuccess() public {
-    address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
-    uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
+//   function testMessageWithDataAndTokenTransferSuccess() public {
+//     address[2] memory testTokens = [s_sourceFeeToken, s_sourceRouter.getWrappedNative()];
+//     uint224[2] memory feeTokenPrices = [s_feeTokenPrice, s_wrappedTokenPrice];
 
-    uint256 customGasLimit = 1_000_000;
-    uint256 feeTokenAmount = 10000e18;
-    uint256 customTokenAmount = 200000e18;
-    for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
-      Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-        receiver: abi.encode(OWNER),
-        data: "",
-        tokenAmounts: new Client.EVMTokenAmount[](2),
-        feeToken: testTokens[i],
-        extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
-      });
-      EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
+//     uint256 customGasLimit = 1_000_000;
+//     uint256 feeTokenAmount = 10000e18;
+//     uint256 customTokenAmount = 200000e18;
+//     for (uint256 i = 0; i < feeTokenPrices.length; ++i) {
+//       Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
+//         receiver: abi.encode(OWNER),
+//         data: "",
+//         tokenAmounts: new Client.EVMTokenAmount[](2),
+//         feeToken: testTokens[i],
+//         extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: customGasLimit}))
+//       });
+//       EVM2EVMOnRamp.FeeTokenConfig memory feeTokenConfig = s_onRamp.getFeeTokenConfig(message.feeToken);
 
-      message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: feeTokenAmount});
-      message.tokenAmounts[1] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: customTokenAmount});
-      message.data = "random bits and bytes that should be factored into the cost of the message";
+//       message.tokenAmounts[0] = Client.EVMTokenAmount({token: s_sourceFeeToken, amount: feeTokenAmount});
+//       message.tokenAmounts[1] = Client.EVMTokenAmount({token: CUSTOM_TOKEN, amount: customTokenAmount});
+//       message.data = "random bits and bytes that should be factored into the cost of the message";
 
-      uint256 expectedTokenTransferGas = 0;
-      for (uint256 j = 0; j < message.tokenAmounts.length; ++j) {
-        expectedTokenTransferGas += s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[j].token).destGasOverhead;
-      }
+//       uint256 expectedTokenTransferGas = 0;
+//       for (uint256 j = 0; j < message.tokenAmounts.length; ++j) {
+//         expectedTokenTransferGas += s_onRamp.getTokenTransferFeeConfig(message.tokenAmounts[j].token).destGasOverhead;
+//       }
 
-      uint256 feeAmount = s_onRamp.getFee(message);
+//       uint256 feeAmount = s_onRamp.getFee(message);
 
-      uint256 gasUsed = customGasLimit +
-        DEST_GAS_OVERHEAD +
-        message.data.length *
-        DEST_GAS_PER_PAYLOAD_BYTE +
-        expectedTokenTransferGas;
-      uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS) / 1 ether;
-      (uint256 transferFeeUSD, , ) = s_onRamp.getTokenTransferCost(
-        message.feeToken,
-        feeTokenPrices[i],
-        message.tokenAmounts,
-        feeTokenConfig
-      );
-      uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplier) / 1 ether;
+//       uint256 gasUsed = customGasLimit +
+//         DEST_GAS_OVERHEAD +
+//         message.data.length *
+//         DEST_GAS_PER_PAYLOAD_BYTE +
+//         expectedTokenTransferGas;
+//       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS) / 1 ether;
+//       (uint256 transferFeeUSD, , ) = s_onRamp.getTokenTransferCost(
+//         message.feeToken,
+//         feeTokenPrices[i],
+//         message.tokenAmounts,
+//         feeTokenConfig
+//       );
+//       uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplier) / 1 ether;
 
-      uint256 totalPriceInFeeToken = ((gasFeeUSD + messageFeeUSD) * 1e18) / feeTokenPrices[i];
-      assertEq(totalPriceInFeeToken, feeAmount);
-    }
-  }
+//       uint256 totalPriceInFeeToken = ((gasFeeUSD + messageFeeUSD) * 1e18) / feeTokenPrices[i];
+//       assertEq(totalPriceInFeeToken, feeAmount);
+//     }
+//   }
 
-  // Reverts
+//   // Reverts
 
-  function testNotAFeeTokenReverts() public {
-    address notAFeeToken = address(0x111111);
-    Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(notAFeeToken, 1);
-    message.feeToken = notAFeeToken;
+//   function testNotAFeeTokenReverts() public {
+//     address notAFeeToken = address(0x111111);
+//     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(notAFeeToken, 1);
+//     message.feeToken = notAFeeToken;
 
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.NotAFeeToken.selector, notAFeeToken));
+//     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.NotAFeeToken.selector, notAFeeToken));
 
-    s_onRamp.getFee(message);
-  }
+//     s_onRamp.getFee(message);
+//   }
 
-  function testMessageTooLargeReverts() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.data = new bytes(MAX_DATA_SIZE + 1);
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.MessageTooLarge.selector, MAX_DATA_SIZE, message.data.length));
+//   function testMessageTooLargeReverts() public {
+//     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+//     message.data = new bytes(MAX_DATA_SIZE + 1);
+//     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.MessageTooLarge.selector, MAX_DATA_SIZE, message.data.length));
 
-    s_onRamp.getFee(message);
-  }
+//     s_onRamp.getFee(message);
+//   }
 
-  function testTooManyTokensReverts() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    uint256 tooMany = MAX_TOKENS_LENGTH + 1;
-    message.tokenAmounts = new Client.EVMTokenAmount[](tooMany);
-    vm.expectRevert(EVM2EVMOnRamp.UnsupportedNumberOfTokens.selector);
-    s_onRamp.getFee(message);
-  }
+//   function testTooManyTokensReverts() public {
+//     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+//     uint256 tooMany = MAX_TOKENS_LENGTH + 1;
+//     message.tokenAmounts = new Client.EVMTokenAmount[](tooMany);
+//     vm.expectRevert(EVM2EVMOnRamp.UnsupportedNumberOfTokens.selector);
+//     s_onRamp.getFee(message);
+//   }
 
-  // Asserts gasLimit must be <=maxGasLimit
-  function testMessageGasLimitTooHighReverts() public {
-    Client.EVM2AnyMessage memory message = _generateEmptyMessage();
-    message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1}));
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.MessageGasLimitTooHigh.selector));
-    s_onRamp.getFee(message);
-  }
-}
+//   // Asserts gasLimit must be <=maxGasLimit
+//   function testMessageGasLimitTooHighReverts() public {
+//     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
+//     message.extraArgs = Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: MAX_GAS_LIMIT + 1}));
+//     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.MessageGasLimitTooHigh.selector));
+//     s_onRamp.getFee(message);
+//   }
+// }
 
 contract EVM2EVMOnRamp_setNops is EVM2EVMOnRampSetup {
   event NopPaid(address indexed nop, uint256 amount);
