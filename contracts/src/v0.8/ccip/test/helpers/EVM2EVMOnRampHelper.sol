@@ -25,6 +25,15 @@ contract EVM2EVMOnRampHelper is EVM2EVMOnRamp, IgnoreContractSize {
     )
   {}
 
+  function getMessageCalldataCostUSD(
+    uint112 calldataGasPrice,
+    uint256 messageDataLength,
+    uint256 numberOfTokens,
+    uint256 tokenTransferDataOverhead
+  ) external view returns (uint256) {
+    return _getMessageCalldataCostUSD(calldataGasPrice, messageDataLength, numberOfTokens, tokenTransferDataOverhead);
+  }
+
   function getTokenTransferCost(
     address feeToken,
     uint224 feeTokenPrice,

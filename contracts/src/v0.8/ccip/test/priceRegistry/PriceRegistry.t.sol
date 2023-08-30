@@ -7,7 +7,11 @@ import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 
 contract PriceRegistrySetup is TokenSetup, RouterSetup {
-  uint224 internal constant USD_PER_GAS = 1e6;
+  uint224 internal constant USD_PER_GAS = 1e6; // 0.001 gwei
+  uint224 internal constant USD_PER_CALLDATA_GAS = 1e9; // 1 gwei
+
+  // Encode L1 gas price of 1 gwei, and L2 gas price of 0.001 gwei
+  uint224 internal constant PACKED_USD_PER_GAS = USD_PER_CALLDATA_GAS << 112 + USD_PER_GAS;
 
   PriceRegistry internal s_priceRegistry;
   // Cheat to store the price updates in storage since struct arrays aren't supported.
