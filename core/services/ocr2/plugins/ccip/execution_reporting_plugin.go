@@ -32,8 +32,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -78,8 +78,8 @@ type ExecutionReportingPlugin struct {
 	offchainConfig        ccipconfig.ExecOffchainConfig
 	cachedSourceFeeTokens cache.AutoSync[[]common.Address]
 	cachedDestTokens      cache.AutoSync[cache.CachedTokens]
-	sourceLogsClient      evmlogs.Client
-	destLogsClient        evmlogs.Client
+	sourceEventsClient    ccipevents.Client
+	destEventsClient      ccipevents.Client
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -142,8 +142,8 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig:        offchainConfig,
 			cachedDestTokens:      cachedDestTokens,
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
-			sourceLogsClient:      evmlogs.NewLogPollerClient(rf.config.sourceLP, rf.config.lggr, rf.config.sourceClient),
-			destLogsClient:        evmlogs.NewLogPollerClient(rf.config.destLP, rf.config.lggr, rf.config.destClient),
+			sourceEventsClient:    ccipevents.NewLogPollerClient(rf.config.sourceLP, rf.config.lggr, rf.config.sourceClient),
+			destEventsClient:      ccipevents.NewLogPollerClient(rf.config.destLP, rf.config.lggr, rf.config.destClient),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -438,7 +438,7 @@ func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) 
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
-	stateChanges, err := r.destLogsClient.GetExecutionStateChangesInRange(
+	stateChanges, err := r.destEventsClient.GetExecutionStateChangesInRange(
 		ctx,
 		r.config.offRamp.Address(),
 		min,
@@ -451,7 +451,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context,
 	executedMp := make(map[uint64]bool, len(stateChanges))
 	for _, stateChange := range stateChanges {
 		finalized := (latestBlock - stateChange.BlockNumber) >= int64(r.offchainConfig.DestFinalityDepth)
-		executedMp[stateChange.Request.SequenceNumber] = finalized
+		executedMp[stateChange.Data.SequenceNumber] = finalized
 	}
 	return executedMp, nil
 }
@@ -733,9 +733,9 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	// use errgroup to fetch send request logs and executed sequence numbers in parallel
 	eg := &errgroup.Group{}
 
-	var sendRequests []evmlogs.RequestWithMeta[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
+	var sendRequests []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 	eg.Go(func() error {
-		sendReqs, err := r.sourceLogsClient.GetSendRequestsInSeqNumRange(
+		sendReqs, err := r.sourceEventsClient.GetSendRequestsInSeqNumRange(
 			ctx,
 			r.config.onRamp.Address(),
 			intervalMin,
@@ -751,7 +751,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 	var executedSeqNums map[uint64]bool
 	eg.Go(func() error {
-		latestBlock, err := r.destLogsClient.LatestBlock(ctx)
+		latestBlock, err := r.destEventsClient.LatestBlock(ctx)
 		if err != nil {
 			return err
 		}
@@ -778,7 +778,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	}
 
 	for _, sendReq := range sendRequests {
-		msg := abihelpers.OnRampMessageToOffRampMessage(sendReq.Request.Message)
+		msg := abihelpers.OnRampMessageToOffRampMessage(sendReq.Data.Message)
 
 		// if value exists in the map then it's executed
 		// if value exists, and it's true then it's considered finalized
@@ -826,14 +826,14 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	}
 	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
-	sendReqsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.config.onRamp.Address(), r.sourceLogsClient, commitReport.Interval)
+	sendReqsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.config.onRamp.Address(), r.sourceEventsClient, commitReport.Interval)
 	if err != nil {
 		return nil, err
 	}
 
 	messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(sendReqsInRoot))
 	for i, msg := range sendReqsInRoot {
-		offRampMsg := abihelpers.OnRampMessageToOffRampMessage(msg.Request.Message)
+		offRampMsg := abihelpers.OnRampMessageToOffRampMessage(msg.Data.Message)
 		messages[i] = &offRampMsg
 	}
 

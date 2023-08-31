@@ -28,8 +28,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -100,8 +100,8 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 		destWrappedNative:     th.Dest.WrappedNative.Address(),
 		cachedSourceFeeTokens: cache.NewCachedFeeTokens(th.SourceLP, th.Source.PriceRegistry, int64(offchainConfig.SourceFinalityDepth)),
 		cachedDestTokens:      cache.NewCachedSupportedTokens(th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, int64(offchainConfig.DestOptimisticConfirmations)),
-		sourceLogsClient:      evmlogs.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient),
-		destLogsClient:        evmlogs.NewLogPollerClient(th.DestLP, lggr, th.DestClient),
+		sourceEventsClient:    ccipevents.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient),
+		destEventsClient:      ccipevents.NewLogPollerClient(th.DestLP, lggr, th.DestClient),
 	}
 	return execTestHarness{
 		CCIPPluginTestHarness: th,

@@ -1,4 +1,4 @@
-package evmlogs
+package ccipevents
 
 import (
 	"context"
@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
+// LogPollerClient implements the Client interface by using a logPoller instance to fetch the events.
 type LogPollerClient struct {
 	lp     logpoller.LogPoller
 	lggr   logger.Logger
@@ -35,7 +36,7 @@ func NewLogPollerClient(lp logpoller.LogPoller, lggr logger.Logger, client evmcl
 	}
 }
 
-func (c *LogPollerClient) GetSendRequestsAfterNextMin(ctx context.Context, onRampAddress common.Address, nextMin uint64, confs int, checkFinalityTags bool) (sendReqs []RequestWithMeta[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], err error) {
+func (c *LogPollerClient) GetSendRequestsAfterNextMin(ctx context.Context, onRampAddress common.Address, nextMin uint64, confs int, checkFinalityTags bool) (sendReqs []Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], err error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.client)
 	if err != nil {
 		return nil, err
@@ -96,7 +97,7 @@ func (c *LogPollerClient) GetSendRequestsAfterNextMin(ctx context.Context, onRam
 	)
 }
 
-func (c *LogPollerClient) GetSendRequestsInSeqNumRange(ctx context.Context, onRampAddress common.Address, rangeMin, rangeMax uint64, confs int) ([]RequestWithMeta[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], error) {
+func (c *LogPollerClient) GetSendRequestsInSeqNumRange(ctx context.Context, onRampAddress common.Address, rangeMin, rangeMax uint64, confs int) ([]Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.client)
 	if err != nil {
 		return nil, err
@@ -123,7 +124,7 @@ func (c *LogPollerClient) GetSendRequestsInSeqNumRange(ctx context.Context, onRa
 	)
 }
 
-func (c *LogPollerClient) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, priceRegistryAddress common.Address, ts time.Time, confs int) ([]RequestWithMeta[price_registry.PriceRegistryUsdPerTokenUpdated], error) {
+func (c *LogPollerClient) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, priceRegistryAddress common.Address, ts time.Time, confs int) ([]Event[price_registry.PriceRegistryUsdPerTokenUpdated], error) {
 	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddress, c.client)
 	if err != nil {
 		return nil, err
@@ -149,7 +150,7 @@ func (c *LogPollerClient) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, 
 	)
 }
 
-func (c *LogPollerClient) GetGasPriceUpdatesCreatedAfter(ctx context.Context, priceRegistryAddress common.Address, chainSelector uint64, ts time.Time, confs int) ([]RequestWithMeta[price_registry.PriceRegistryUsdPerUnitGasUpdated], error) {
+func (c *LogPollerClient) GetGasPriceUpdatesCreatedAfter(ctx context.Context, priceRegistryAddress common.Address, chainSelector uint64, ts time.Time, confs int) ([]Event[price_registry.PriceRegistryUsdPerUnitGasUpdated], error) {
 	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddress, c.client)
 	if err != nil {
 		return nil, err
@@ -177,7 +178,7 @@ func (c *LogPollerClient) GetGasPriceUpdatesCreatedAfter(ctx context.Context, pr
 	)
 }
 
-func (c *LogPollerClient) GetExecutionStateChangesInRange(ctx context.Context, offRampAddress common.Address, rangeMin, rangeMax uint64, confs int) ([]RequestWithMeta[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged], error) {
+func (c *LogPollerClient) GetExecutionStateChangesInRange(ctx context.Context, offRampAddress common.Address, rangeMin, rangeMax uint64, confs int) ([]Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged], error) {
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, c.client)
 	if err != nil {
 		return nil, err
@@ -209,13 +210,13 @@ func (c *LogPollerClient) LatestBlock(ctx context.Context) (int64, error) {
 	return c.lp.LatestBlock(pg.WithParentCtx(ctx))
 }
 
-func convertLogsToRequests[T any](logs []logpoller.Log, lggr logger.Logger, parse func(log types.Log) (*T, error)) ([]RequestWithMeta[T], error) {
-	reqs := make([]RequestWithMeta[T], 0, len(logs))
+func convertLogsToRequests[T any](logs []logpoller.Log, lggr logger.Logger, parse func(log types.Log) (*T, error)) ([]Event[T], error) {
+	reqs := make([]Event[T], 0, len(logs))
 	for _, log := range logs {
-		req, err := parse(log.ToGethLog())
+		data, err := parse(log.ToGethLog())
 		if err == nil {
-			reqs = append(reqs, RequestWithMeta[T]{
-				Request: *req,
+			reqs = append(reqs, Event[T]{
+				Data: *data,
 				BlockMeta: BlockMeta{
 					BlockTimestamp: log.BlockTimestamp,
 					BlockNumber:    log.BlockNumber,

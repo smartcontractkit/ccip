@@ -34,8 +34,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 
@@ -97,8 +97,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 		lggr:               th.Lggr,
 		destPriceRegistry:  th.Dest.PriceRegistry,
 		tokenDecimalsCache: cache.NewTokenToDecimals(th.Lggr, th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, backendClient, 0),
-		sourceLogsClient:   evmlogs.NewLogPollerClient(th.SourceLP, lggr, backendClient),
-		destLogsClient:     evmlogs.NewLogPollerClient(th.DestLP, lggr, backendClient),
+		sourceEventsClient: ccipevents.NewLogPollerClient(th.SourceLP, lggr, backendClient),
+		destEventsClient:   ccipevents.NewLogPollerClient(th.DestLP, lggr, backendClient),
 	}
 
 	priceGetter.On("TokenPricesUSD", mock.Anything, mock.Anything).Return(map[common.Address]*big.Int{

@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -24,10 +24,10 @@ func getProofData(
 	lggr logger.Logger,
 	hashLeaf hasher.LeafHasherInterface[[32]byte],
 	onRampAddress common.Address,
-	sourceLogsClient evmlogs.Client,
+	sourceEventsClient ccipevents.Client,
 	interval commit_store.CommitStoreInterval,
-) (sendReqsInRoot []evmlogs.RequestWithMeta[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
-	sendReqs, err := sourceLogsClient.GetSendRequestsInSeqNumRange(
+) (sendReqsInRoot []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
+	sendReqs, err := sourceEventsClient.GetSendRequestsInSeqNumRange(
 		ctx,
 		onRampAddress,
 		interval.Min,

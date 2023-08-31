@@ -25,8 +25,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 )
@@ -74,8 +74,8 @@ type CommitReportingPlugin struct {
 	offchainConfig     ccipconfig.CommitOffchainConfig
 	onchainConfig      ccipconfig.CommitOnchainConfig
 	tokenDecimalsCache cache.AutoSync[map[common.Address]uint8]
-	sourceLogsClient   evmlogs.Client
-	destLogsClient     evmlogs.Client
+	sourceEventsClient ccipevents.Client
+	destEventsClient   ccipevents.Client
 }
 
 type CommitReportingPluginFactory struct {
@@ -135,8 +135,8 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				rf.config.destClient,
 				int64(offchainConfig.DestFinalityDepth),
 			),
-			sourceLogsClient: evmlogs.NewLogPollerClient(rf.config.sourceLP, rf.config.lggr, rf.config.sourceClient),
-			destLogsClient:   evmlogs.NewLogPollerClient(rf.config.destLP, rf.config.lggr, rf.config.destClient),
+			sourceEventsClient: ccipevents.NewLogPollerClient(rf.config.sourceLP, rf.config.lggr, rf.config.sourceClient),
+			destEventsClient:   ccipevents.NewLogPollerClient(rf.config.destLP, rf.config.lggr, rf.config.destClient),
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -238,17 +238,17 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	}
 
 	// Gather only finalized logs.
-	reqs, err := r.sourceLogsClient.GetSendRequestsAfterNextMin(ctx, r.config.onRampAddress, nextInflightMin, int(r.offchainConfig.SourceFinalityDepth), r.config.checkFinalityTags)
+	msgRequests, err := r.sourceEventsClient.GetSendRequestsAfterNextMin(ctx, r.config.onRampAddress, nextInflightMin, int(r.offchainConfig.SourceFinalityDepth), r.config.checkFinalityTags)
 	if err != nil {
 		return 0, 0, err
 	}
-	if len(reqs) == 0 {
+	if len(msgRequests) == 0 {
 		lggr.Infow("No new requests", "minSeqNr", nextInflightMin)
 		return 0, 0, nil
 	}
-	seqNrs := make([]uint64, 0, len(reqs))
-	for _, req := range reqs {
-		seqNrs = append(seqNrs, req.Request.Message.SequenceNumber)
+	seqNrs := make([]uint64, 0, len(msgRequests))
+	for _, msgReq := range msgRequests {
+		seqNrs = append(seqNrs, msgReq.Data.Message.SequenceNumber)
 	}
 
 	minSeqNr := seqNrs[0]
@@ -367,7 +367,7 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 // Gets the latest token price updates based on logs within the heartbeat
 // The updates returned by this function are guaranteed to not contain nil values.
 func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, checkInflight bool) (map[common.Address]update, error) {
-	tokenPriceUpdates, err := r.destLogsClient.GetTokenPriceUpdatesCreatedAfter(
+	tokenPriceUpdates, err := r.destEventsClient.GetTokenPriceUpdatesCreatedAfter(
 		ctx,
 		r.destPriceRegistry.Address(),
 		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
@@ -379,12 +379,13 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 
 	latestUpdates := make(map[common.Address]update)
 	for _, tokenPriceUpdate := range tokenPriceUpdates {
+		priceUpdate := tokenPriceUpdate.Data
 		// Ordered by ascending timestamps
-		timestamp := time.Unix(tokenPriceUpdate.Request.Timestamp.Int64(), 0)
-		if tokenPriceUpdate.Request.Value != nil && !timestamp.Before(latestUpdates[tokenPriceUpdate.Request.Token].timestamp) {
-			latestUpdates[tokenPriceUpdate.Request.Token] = update{
+		timestamp := time.Unix(priceUpdate.Timestamp.Int64(), 0)
+		if priceUpdate.Value != nil && !timestamp.Before(latestUpdates[priceUpdate.Token].timestamp) {
+			latestUpdates[priceUpdate.Token] = update{
 				timestamp: timestamp,
-				value:     tokenPriceUpdate.Request.Value,
+				value:     priceUpdate.Value,
 			}
 		}
 	}
@@ -422,7 +423,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 	}
 
 	// If there are no price updates inflight, check latest prices onchain
-	gasPriceUpdates, err := r.destLogsClient.GetGasPriceUpdatesCreatedAfter(
+	gasPriceUpdates, err := r.destEventsClient.GetGasPriceUpdatesCreatedAfter(
 		ctx,
 		r.destPriceRegistry.Address(),
 		r.config.sourceChainSelector,
@@ -435,11 +436,11 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 
 	for _, priceUpdate := range gasPriceUpdates {
 		// Ordered by ascending timestamps
-		timestamp := time.Unix(priceUpdate.Request.Timestamp.Int64(), 0)
+		timestamp := time.Unix(priceUpdate.Data.Timestamp.Int64(), 0)
 		if !timestamp.Before(gasPriceUpdate.timestamp) {
 			gasPriceUpdate = update{
 				timestamp: timestamp,
-				value:     priceUpdate.Request.Value,
+				value:     priceUpdate.Data.Value,
 			}
 		}
 	}
@@ -656,7 +657,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	sendReqs, err := r.sourceLogsClient.GetSendRequestsInSeqNumRange(
+	sendRequests, err := r.sourceEventsClient.GetSendRequestsInSeqNumRange(
 		ctx,
 		r.config.onRampAddress,
 		interval.Min,
@@ -667,7 +668,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 		return commit_store.CommitStoreCommitReport{}, err
 	}
 
-	leaves, err := leavesFromIntervals(lggr, interval, r.config.leafHasher, sendReqs)
+	leaves, err := leavesFromIntervals(lggr, interval, r.config.leafHasher, sendRequests)
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
 	}

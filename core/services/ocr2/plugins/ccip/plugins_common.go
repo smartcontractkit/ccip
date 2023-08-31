@@ -18,8 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -125,11 +125,11 @@ func leavesFromIntervals(
 	lggr logger.Logger,
 	interval commit_store.CommitStoreInterval,
 	hasher hasher.LeafHasherInterface[[32]byte],
-	sendReqs []evmlogs.RequestWithMeta[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested],
+	sendReqs []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested],
 ) ([][32]byte, error) {
 	var seqNrs []uint64
 	for _, req := range sendReqs {
-		seqNrs = append(seqNrs, req.Request.Message.SequenceNumber)
+		seqNrs = append(seqNrs, req.Data.Message.SequenceNumber)
 	}
 
 	if !contiguousReqs(lggr, interval.Min, interval.Max, seqNrs) {
@@ -138,7 +138,7 @@ func leavesFromIntervals(
 	var leaves [][32]byte
 
 	for _, sendReq := range sendReqs {
-		hash, err2 := hasher.HashLeaf(sendReq.Request.Raw)
+		hash, err2 := hasher.HashLeaf(sendReq.Data.Raw)
 		if err2 != nil {
 			return nil, err2
 		}
