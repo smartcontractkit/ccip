@@ -33,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -60,6 +61,7 @@ type ExecutionPluginConfig struct {
 	sourcePriceRegistry      price_registry.PriceRegistryInterface
 	sourceWrappedNativeToken common.Address
 	destClient               evmclient.Client
+	sourceClient             evmclient.Client
 	destGasEstimator         gas.EvmFeeEstimator
 	leafHasher               hasher.LeafHasherInterface[[32]byte]
 }
@@ -76,6 +78,8 @@ type ExecutionReportingPlugin struct {
 	offchainConfig        ccipconfig.ExecOffchainConfig
 	cachedSourceFeeTokens cache.AutoSync[[]common.Address]
 	cachedDestTokens      cache.AutoSync[cache.CachedTokens]
+	sourceLogsClient      evmlogs.Client
+	destLogsClient        evmlogs.Client
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -138,6 +142,8 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig:        offchainConfig,
 			cachedDestTokens:      cachedDestTokens,
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
+			sourceLogsClient:      evmlogs.NewLogPollerClient(rf.config.sourceLP, rf.config.lggr, rf.config.sourceClient),
+			destLogsClient:        evmlogs.NewLogPollerClient(rf.config.destLP, rf.config.lggr, rf.config.destClient),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -432,26 +438,20 @@ func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) 
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
-	executedLogs, err := r.config.destLP.IndexedLogsTopicRange(
-		abihelpers.EventSignatures.ExecutionStateChanged,
+	stateChanges, err := r.destLogsClient.GetExecutionStateChangesInRange(
+		ctx,
 		r.config.offRamp.Address(),
-		abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
-		logpoller.EvmWord(min),
-		logpoller.EvmWord(max),
+		min,
+		max,
 		int(r.offchainConfig.DestOptimisticConfirmations),
-		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
 		return nil, err
 	}
-	executedMp := make(map[uint64]bool)
-	for _, executedLog := range executedLogs {
-		exec, err := r.config.offRamp.ParseExecutionStateChanged(executedLog.ToGethLog())
-		if err != nil {
-			return nil, err
-		}
-		finalized := (latestBlock - executedLog.BlockNumber) >= int64(r.offchainConfig.DestFinalityDepth)
-		executedMp[exec.SequenceNumber] = finalized
+	executedMp := make(map[uint64]bool, len(stateChanges))
+	for _, stateChange := range stateChanges {
+		finalized := (latestBlock - stateChange.BlockNumber) >= int64(r.offchainConfig.DestFinalityDepth)
+		executedMp[stateChange.Request.SequenceNumber] = finalized
 	}
 	return executedMp, nil
 }
@@ -733,31 +733,29 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	// use errgroup to fetch send request logs and executed sequence numbers in parallel
 	eg := &errgroup.Group{}
 
-	var sendRequestLogs []logpoller.Log
+	var sendRequests []evmlogs.RequestWithMeta[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 	eg.Go(func() error {
-		// get logs from all the reports
-		rawLogs, err := r.config.sourceLP.LogsDataWordRange(
-			abihelpers.EventSignatures.SendRequested,
+		sendReqs, err := r.sourceLogsClient.GetSendRequestsInSeqNumRange(
+			ctx,
 			r.config.onRamp.Address(),
-			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-			logpoller.EvmWord(intervalMin),
-			logpoller.EvmWord(intervalMax),
+			intervalMin,
+			intervalMax,
 			int(r.offchainConfig.SourceFinalityDepth),
-			pg.WithParentCtx(ctx),
 		)
 		if err != nil {
 			return err
 		}
-		sendRequestLogs = rawLogs
+		sendRequests = sendReqs
 		return nil
 	})
 
 	var executedSeqNums map[uint64]bool
 	eg.Go(func() error {
-		latestBlock, err := r.config.destLP.LatestBlock()
+		latestBlock, err := r.destLogsClient.LatestBlock(ctx)
 		if err != nil {
 			return err
 		}
+
 		// get executable sequence numbers
 		executedMp, err := r.getExecutedSeqNrsInRange(ctx, intervalMin, intervalMax, latestBlock)
 		if err != nil {
@@ -779,32 +777,24 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 		}
 	}
 
-	for _, rawLog := range sendRequestLogs {
-		ccipSendRequested, err := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
-			Topics: rawLog.GetTopics(),
-			Data:   rawLog.Data,
-		})
-		if err != nil {
-			r.lggr.Errorw("unable to parse message", "err", err, "tx", rawLog.TxHash, "logIdx", rawLog.LogIndex)
-			continue
-		}
-		msg := abihelpers.OnRampMessageToOffRampMessage(ccipSendRequested.Message)
+	for _, sendReq := range sendRequests {
+		msg := abihelpers.OnRampMessageToOffRampMessage(sendReq.Request.Message)
 
 		// if value exists in the map then it's executed
 		// if value exists, and it's true then it's considered finalized
 		finalized, executed := executedSeqNums[msg.SequenceNumber]
 
-		sendReq := evm2EVMOnRampCCIPSendRequestedWithMeta{
+		reqWithMeta := evm2EVMOnRampCCIPSendRequestedWithMeta{
 			InternalEVM2EVMMessage: msg,
-			blockTimestamp:         rawLog.BlockTimestamp,
+			blockTimestamp:         sendReq.BlockTimestamp,
 			executed:               executed,
 			finalized:              finalized,
 		}
 
 		// attach the msg to the appropriate reports
 		for i := range reportsWithSendReqs {
-			if reportsWithSendReqs[i].sendReqFits(sendReq) {
-				reportsWithSendReqs[i].sendRequestsWithMeta = append(reportsWithSendReqs[i].sendRequestsWithMeta, sendReq)
+			if reportsWithSendReqs[i].sendReqFits(reqWithMeta) {
+				reportsWithSendReqs[i].sendRequestsWithMeta = append(reportsWithSendReqs[i].sendRequestsWithMeta, reqWithMeta)
 			}
 		}
 	}
@@ -824,14 +814,6 @@ func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, sourceT
 	return sum, nil
 }
 
-func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error) {
-	s, err := r.config.onRamp.ParseCCIPSendRequested(log.ToGethLog())
-	if err != nil {
-		return 0, err
-	}
-	return s.Message.SequenceNumber, nil
-}
-
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
 func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ObservedMessage) ([]byte, error) {
@@ -844,18 +826,15 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	}
 	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
-	msgsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.parseSeqNr, r.config.onRamp.Address(), r.config.sourceLP, commitReport.Interval)
+	sendReqsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.config.onRamp.Address(), r.sourceLogsClient, commitReport.Interval)
 	if err != nil {
 		return nil, err
 	}
 
-	messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(msgsInRoot))
-	for i, msg := range msgsInRoot {
-		decodedMessage, err2 := abihelpers.DecodeOffRampMessage(msg.Data)
-		if err2 != nil {
-			return nil, err
-		}
-		messages[i] = decodedMessage
+	messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(sendReqsInRoot))
+	for i, msg := range sendReqsInRoot {
+		offRampMsg := abihelpers.OnRampMessageToOffRampMessage(msg.Request.Message)
+		messages[i] = &offRampMsg
 	}
 
 	// cap messages which fits MaxExecutionReportLength (after serialized)

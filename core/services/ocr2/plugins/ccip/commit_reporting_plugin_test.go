@@ -35,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 
@@ -64,6 +65,7 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 		mock.Anything,
 	).Maybe().Return(gas.EvmFee{Legacy: assets.NewWei(defaultGasPrice)}, uint32(200e3), nil)
 
+	lggr := logger.TestLogger(t)
 	priceGetter := newMockPriceGetter()
 
 	backendClient := client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID))
@@ -80,8 +82,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			sourceFeeEstimator:  sourceFeeEstimator,
 			sourceChainSelector: th.Source.ChainSelector,
 			destClient:          backendClient,
+			sourceClient:        backendClient,
 			leafHasher:          hasher.NewLeafHasher(th.Source.ChainSelector, th.Dest.ChainSelector, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
-			getSeqNumFromLog:    getSeqNumFromLog(th.Source.OnRamp),
 		},
 		inflightReports: newInflightCommitReportsContainer(time.Hour),
 		onchainConfig:   th.CommitOnchainConfig,
@@ -95,6 +97,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 		lggr:               th.Lggr,
 		destPriceRegistry:  th.Dest.PriceRegistry,
 		tokenDecimalsCache: cache.NewTokenToDecimals(th.Lggr, th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, backendClient, 0),
+		sourceLogsClient:   evmlogs.NewLogPollerClient(th.SourceLP, lggr, backendClient),
+		destLogsClient:     evmlogs.NewLogPollerClient(th.DestLP, lggr, backendClient),
 	}
 
 	priceGetter.On("TokenPricesUSD", mock.Anything, mock.Anything).Return(map[common.Address]*big.Int{

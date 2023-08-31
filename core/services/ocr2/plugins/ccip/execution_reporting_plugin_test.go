@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -55,6 +56,7 @@ type execTestHarness = struct {
 func setupExecTestHarness(t *testing.T) execTestHarness {
 	th := plugintesthelpers.SetupCCIPTestHarness(t)
 
+	lggr := logger.TestLogger(t)
 	destFeeEstimator := mocks.NewEvmFeeEstimator(t)
 
 	destFeeEstimator.On(
@@ -84,6 +86,7 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 			commitStore:              th.Dest.CommitStore,
 			offRamp:                  th.Dest.OffRamp,
 			destClient:               th.DestClient,
+			sourceClient:             th.SourceClient,
 			sourceWrappedNativeToken: th.Source.WrappedNative.Address(),
 			leafHasher:               hasher.NewLeafHasher(th.Source.ChainSelector, th.Dest.ChainSelector, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
 			destGasEstimator:         destFeeEstimator,
@@ -97,6 +100,8 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 		destWrappedNative:     th.Dest.WrappedNative.Address(),
 		cachedSourceFeeTokens: cache.NewCachedFeeTokens(th.SourceLP, th.Source.PriceRegistry, int64(offchainConfig.SourceFinalityDepth)),
 		cachedDestTokens:      cache.NewCachedSupportedTokens(th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, int64(offchainConfig.DestOptimisticConfirmations)),
+		sourceLogsClient:      evmlogs.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient),
+		destLogsClient:        evmlogs.NewLogPollerClient(th.DestLP, lggr, th.DestClient),
 	}
 	return execTestHarness{
 		CCIPPluginTestHarness: th,

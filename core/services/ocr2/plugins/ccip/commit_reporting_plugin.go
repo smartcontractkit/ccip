@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -27,9 +26,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evmlogs"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -63,7 +62,6 @@ type CommitPluginConfig struct {
 	sourceFeeEstimator       gas.EvmFeeEstimator
 	sourceClient, destClient evmclient.Client
 	leafHasher               hasher.LeafHasherInterface[[32]byte]
-	getSeqNumFromLog         func(log logpoller.Log) (uint64, error)
 	checkFinalityTags        bool
 }
 
@@ -76,6 +74,8 @@ type CommitReportingPlugin struct {
 	offchainConfig     ccipconfig.CommitOffchainConfig
 	onchainConfig      ccipconfig.CommitOnchainConfig
 	tokenDecimalsCache cache.AutoSync[map[common.Address]uint8]
+	sourceLogsClient   evmlogs.Client
+	destLogsClient     evmlogs.Client
 }
 
 type CommitReportingPluginFactory struct {
@@ -135,6 +135,8 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				rf.config.destClient,
 				int64(offchainConfig.DestFinalityDepth),
 			),
+			sourceLogsClient: evmlogs.NewLogPollerClient(rf.config.sourceLP, rf.config.lggr, rf.config.sourceClient),
+			destLogsClient:   evmlogs.NewLogPollerClient(rf.config.destLP, rf.config.lggr, rf.config.destClient),
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -229,41 +231,6 @@ func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry
 	return nil
 }
 
-func (r *CommitReportingPlugin) finalizedLogsGreaterThanMinSeq(ctx context.Context, nextMin uint64) ([]logpoller.Log, error) {
-	if !r.config.checkFinalityTags {
-		return r.config.sourceLP.LogsDataWordGreaterThan(
-			abihelpers.EventSignatures.SendRequested,
-			r.config.onRampAddress,
-			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-			abihelpers.EvmWord(nextMin),
-			int(r.offchainConfig.SourceFinalityDepth),
-			pg.WithParentCtx(ctx),
-		)
-	}
-	// If the chain is based on explicit finality we only examine logs less than or equal to the latest finalized block number.
-	// NOTE: there appears to be a bug in ethclient whereby BlockByNumber fails with "unsupported txtype" when trying to parse the block
-	// when querying L2s, headers however work.
-	// TODO (CCIP-778): Migrate to core finalized tags, below doesn't work for some chains e.g. Celo.
-	latestFinalizedHeader, err := r.config.sourceClient.HeaderByNumber(ctx, big.NewInt(rpc.FinalizedBlockNumber.Int64()))
-	if err != nil {
-		return nil, err
-	}
-	if latestFinalizedHeader == nil {
-		return nil, errors.New("latest finalized header is nil")
-	}
-	if latestFinalizedHeader.Number == nil {
-		return nil, errors.New("latest finalized number is nil")
-	}
-	return r.config.sourceLP.LogsUntilBlockHashDataWordGreaterThan(
-		abihelpers.EventSignatures.SendRequested,
-		r.config.onRampAddress,
-		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-		abihelpers.EvmWord(nextMin),
-		latestFinalizedHeader.Hash(),
-		pg.WithParentCtx(ctx),
-	)
-}
-
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {
 	nextInflightMin, _, err := r.nextMinSeqNum(ctx, lggr)
 	if err != nil {
@@ -271,7 +238,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	}
 
 	// Gather only finalized logs.
-	reqs, err := r.finalizedLogsGreaterThanMinSeq(ctx, nextInflightMin)
+	reqs, err := r.sourceLogsClient.GetSendRequestsAfterNextMin(ctx, r.config.onRampAddress, nextInflightMin, int(r.offchainConfig.SourceFinalityDepth), r.config.checkFinalityTags)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -279,31 +246,22 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		lggr.Infow("No new requests", "minSeqNr", nextInflightMin)
 		return 0, 0, nil
 	}
-	var seqNrs []uint64
+	seqNrs := make([]uint64, 0, len(reqs))
 	for _, req := range reqs {
-		seqNr, err2 := r.config.getSeqNumFromLog(req)
-		if err2 != nil {
-			lggr.Errorw("Error parsing seq num", "err", err2)
-			continue
-		}
-		seqNrs = append(seqNrs, seqNr)
+		seqNrs = append(seqNrs, req.Request.Message.SequenceNumber)
 	}
 
-	if len(seqNrs) == 0 {
-		lggr.Infow("Could not parse any sequence number", "minSeqNr", nextInflightMin, "reqs", len(reqs))
-		return 0, 0, nil
-	}
-	min := seqNrs[0]
-	max := seqNrs[len(seqNrs)-1]
-	if min != nextInflightMin {
+	minSeqNr := seqNrs[0]
+	maxSeqNr := seqNrs[len(seqNrs)-1]
+	if minSeqNr != nextInflightMin {
 		// Still report the observation as even partial reports have value e.g. all nodes are
 		// missing a single, different log each, they would still be able to produce a valid report.
-		lggr.Warnf("Missing sequence number range [%d-%d]", nextInflightMin, min)
+		lggr.Warnf("Missing sequence number range [%d-%d]", nextInflightMin, minSeqNr)
 	}
-	if !contiguousReqs(lggr, min, max, seqNrs) {
+	if !contiguousReqs(lggr, minSeqNr, maxSeqNr, seqNrs) {
 		return 0, 0, errors.New("unexpected gap in seq nums")
 	}
-	return min, max, nil
+	return minSeqNr, maxSeqNr, nil
 }
 
 func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context, lggr logger.Logger) (inflightMin, onChainMin uint64, err error) {
@@ -409,23 +367,24 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 // Gets the latest token price updates based on logs within the heartbeat
 // The updates returned by this function are guaranteed to not contain nil values.
 func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, checkInflight bool) (map[common.Address]update, error) {
-	tokenUpdatesWithinHeartBeat, err := r.config.destLP.LogsCreatedAfter(abihelpers.EventSignatures.UsdPerTokenUpdated, r.destPriceRegistry.Address(), now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()), 0, pg.WithParentCtx(ctx))
-	latestUpdates := make(map[common.Address]update)
-
+	tokenPriceUpdates, err := r.destLogsClient.GetTokenPriceUpdatesCreatedAfter(
+		ctx,
+		r.destPriceRegistry.Address(),
+		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
+		0,
+	)
 	if err != nil {
 		return nil, err
 	}
-	for _, log := range tokenUpdatesWithinHeartBeat {
+
+	latestUpdates := make(map[common.Address]update)
+	for _, tokenPriceUpdate := range tokenPriceUpdates {
 		// Ordered by ascending timestamps
-		tokenUpdate, err := r.destPriceRegistry.ParseUsdPerTokenUpdated(log.ToGethLog())
-		if err != nil {
-			return nil, err
-		}
-		timestamp := time.Unix(tokenUpdate.Timestamp.Int64(), 0)
-		if tokenUpdate.Value != nil && !timestamp.Before(latestUpdates[tokenUpdate.Token].timestamp) {
-			latestUpdates[tokenUpdate.Token] = update{
+		timestamp := time.Unix(tokenPriceUpdate.Request.Timestamp.Int64(), 0)
+		if tokenPriceUpdate.Request.Value != nil && !timestamp.Before(latestUpdates[tokenPriceUpdate.Request.Token].timestamp) {
+			latestUpdates[tokenPriceUpdate.Request.Token] = update{
 				timestamp: timestamp,
-				value:     tokenUpdate.Value,
+				value:     tokenPriceUpdate.Request.Value,
 			}
 		}
 	}
@@ -463,30 +422,24 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 	}
 
 	// If there are no price updates inflight, check latest prices onchain
-	gasUpdatesWithinHeartBeat, err := r.config.destLP.IndexedLogsCreatedAfter(
-		abihelpers.EventSignatures.UsdPerUnitGasUpdated,
+	gasPriceUpdates, err := r.destLogsClient.GetGasPriceUpdatesCreatedAfter(
+		ctx,
 		r.destPriceRegistry.Address(),
-		1,
-		[]common.Hash{abihelpers.EvmWord(r.config.sourceChainSelector)},
+		r.config.sourceChainSelector,
 		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
 		0,
-		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
 		return update{}, err
 	}
 
-	for _, log := range gasUpdatesWithinHeartBeat {
+	for _, priceUpdate := range gasPriceUpdates {
 		// Ordered by ascending timestamps
-		priceUpdate, err2 := r.destPriceRegistry.ParseUsdPerUnitGasUpdated(log.ToGethLog())
-		if err2 != nil {
-			return update{}, err2
-		}
-		timestamp := time.Unix(priceUpdate.Timestamp.Int64(), 0)
+		timestamp := time.Unix(priceUpdate.Request.Timestamp.Int64(), 0)
 		if !timestamp.Before(gasPriceUpdate.timestamp) {
 			gasPriceUpdate = update{
 				timestamp: timestamp,
-				value:     priceUpdate.Value,
+				value:     priceUpdate.Request.Value,
 			}
 		}
 	}
@@ -703,18 +656,18 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	logs, err := r.config.sourceLP.LogsDataWordRange(
-		abihelpers.EventSignatures.SendRequested,
+	sendReqs, err := r.sourceLogsClient.GetSendRequestsInSeqNumRange(
+		ctx,
 		r.config.onRampAddress,
-		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-		logpoller.EvmWord(interval.Min),
-		logpoller.EvmWord(interval.Max),
+		interval.Min,
+		interval.Max,
 		int(r.offchainConfig.SourceFinalityDepth),
-		pg.WithParentCtx(ctx))
+	)
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
 	}
-	leaves, err := leavesFromIntervals(lggr, r.config.getSeqNumFromLog, interval, r.config.leafHasher, logs)
+
+	leaves, err := leavesFromIntervals(lggr, interval, r.config.leafHasher, sendReqs)
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
 	}
