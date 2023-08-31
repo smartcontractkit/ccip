@@ -39,7 +39,7 @@ type CCIPE2ELoad struct {
 	CallTimeOut               time.Duration // max time to wait for various on-chain events
 	reports                   *testreporters.CCIPLaneStats
 	msg                       router.ClientEVM2AnyMessage
-	MaxDataSize               uint32
+	MaxDataSize               *big.Int
 	SendMaxDataIntermittently bool
 	LastFinalizedTxBlock      atomic.Uint64
 	LastFinalizedTimestamp    atomic.Time
@@ -143,8 +143,8 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 		lggr.Info().Msg("sending max data intermittently")
 		// every 10th message will have extra data with almost MaxDataSize
 		if msgSerialNo%10 == 0 {
-			length := c.MaxDataSize - 1
-			b := make([]byte, c.MaxDataSize-1)
+			length := c.MaxDataSize.Uint64() - 1
+			b := make([]byte, c.MaxDataSize.Uint64()-1)
 			_, err := rand.Read(b)
 			if err != nil {
 				res.Error = err.Error()
