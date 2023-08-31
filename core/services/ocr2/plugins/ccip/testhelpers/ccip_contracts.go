@@ -268,10 +268,10 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 			{
-				Token:                c.Source.LinkToken.Address(),
-				Ratio:                5_0, // 5 bps
-				DestGasOverhead:      34_000,
-				DestCalldataOverhead: 0,
+				Token:             c.Source.LinkToken.Address(),
+				Ratio:             5_0, // 5 bps
+				DestGasOverhead:   34_000,
+				DestBytesOverhead: 0,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -943,10 +943,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 			{
-				Token:                sourceLinkTokenAddress,
-				Ratio:                5_0, // 5 bps
-				DestGasOverhead:      34_000,
-				DestCalldataOverhead: 0,
+				Token:             sourceLinkTokenAddress,
+				Ratio:             5_0, // 5 bps
+				DestGasOverhead:   34_000,
+				DestBytesOverhead: 0,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},

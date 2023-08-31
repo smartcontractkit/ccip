@@ -7,7 +7,7 @@ commit_store_helper: ../../../contracts/solc/v0.8.19/CommitStoreHelper.abi ../..
 custom_token_pool: ../../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../../contracts/solc/v0.8.19/CustomTokenPool.bin 79ab937aa4493bf31fb0e57affd00555aad75205c90268e89674c28ea9e5e48f
 evm_2_evm_offramp: ../../../contracts/solc/v0.8.19/EVM2EVMOffRamp.abi ../../../contracts/solc/v0.8.19/EVM2EVMOffRamp.bin c50a8f4210f174c35d6663fdf511274bdb170613c5578024f8495d2fde4ab37c
 evm_2_evm_offramp_helper: ../../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.abi ../../../contracts/solc/v0.8.19/EVM2EVMOffRampHelper.bin 3d297d8216acf4860cb76935a314dd39cf1825b68a49226b5fa523124fbfbc3f
-evm_2_evm_onramp: ../../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin 18a53936cf65570bcae5040ea5caa36ca7a647a48e89827012eef702c09ef780
+evm_2_evm_onramp: ../../../contracts/solc/v0.8.19/EVM2EVMOnRamp.abi ../../../contracts/solc/v0.8.19/EVM2EVMOnRamp.bin 87518ae438b374af3d644fdd5fbbfd11c8521624344f7288466a978d13c1aeb7
 lock_release_token_pool: ../../../contracts/solc/v0.8.19/LockReleaseTokenPool.abi ../../../contracts/solc/v0.8.19/LockReleaseTokenPool.bin b2eb5bee167f94e76a8b392b85f22fe312957c099d05c1403c42c3a03fbff278
 maybe_revert_message_receiver: ../../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin aaa90eac8cc555ee4b0fbe57d1fb8d72d6689b29510b238177c97ab9b7979ac5
 mock_arm_contract: ../../../contracts/solc/v0.8.19/MockARM.abi ../../../contracts/solc/v0.8.19/MockARM.bin efcf4cb260a2b6a6e189639f62bb50ab650a135715c1fcd42c92dfa9d04aa0e3
