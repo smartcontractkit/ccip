@@ -26,10 +26,11 @@ import (
 )
 
 const (
-	MaxQueryLength       = 0       // empty for both plugins
-	MaxObservationLength = 250_000 // plugins's Observation should make sure to cap to this limit
-	CommitPluginLabel    = "commit"
-	ExecPluginLabel      = "exec"
+	MaxQueryLength         = 0       // empty for both plugins
+	MaxObservationLength   = 250_000 // plugins's Observation should make sure to cap to this limit
+	CommitPluginLabel      = "commit"
+	ExecPluginLabel        = "exec"
+	GasPriceEncodingLength = 112
 )
 
 var zeroAddress = common.HexToAddress("0")

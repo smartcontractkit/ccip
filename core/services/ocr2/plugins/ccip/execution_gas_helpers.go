@@ -4,6 +4,8 @@ import (
 	"math"
 	"math/big"
 	"time"
+
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 )
 
 const (
@@ -64,9 +66,29 @@ func maxGasOverHeadGas(numMsgs, dataLength, numTokens int) uint64 {
 }
 
 // computeExecCost calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
-func computeExecCost(gasLimit *big.Int, execGasPriceEstimate, tokenPriceUSD *big.Int) *big.Int {
-	execGasEstimate := new(big.Int).Add(big.NewInt(FEE_BOOSTING_OVERHEAD_GAS), gasLimit)
-	execGasEstimate.Mul(execGasEstimate, execGasPriceEstimate)
+func computeExecCost(msg evm2EVMOnRampCCIPSendRequestedWithMeta, execGasPriceEstimate gas.EvmFee, tokenPriceUSD *big.Int) *big.Int {
+	destGasPrice := execGasPriceEstimate.Legacy.ToInt()
+	if execGasPriceEstimate.DynamicFeeCap != nil {
+		destGasPrice = execGasPriceEstimate.DynamicFeeCap.ToInt()
+	}
+
+	execGasEstimate := new(big.Int).Add(big.NewInt(FEE_BOOSTING_OVERHEAD_GAS), msg.GasLimit)
+	execGasEstimate = new(big.Int).Mul(execGasEstimate, destGasPrice)
+
+	if execGasPriceEstimate.L1BaseFee != nil {
+		if l1BaseFee := execGasPriceEstimate.L1BaseFee.ToInt(); l1BaseFee.Cmp(big.NewInt(0)) > 0 {
+			MESSAGE_FIXED_BYTES := 448
+			DON_FIXED_OVERHEAD_GAS := 33_084
+
+			calldataLength := MESSAGE_FIXED_BYTES + len(msg.Data) + len(msg.TokenAmounts)*64 // skipping tokenTransferBytesOverhead
+			calldataGas := big.NewInt((int64(calldataLength) * 16) + int64(DON_FIXED_OVERHEAD_GAS))
+
+			rawCalldataFee := new(big.Int).Mul(l1BaseFee, calldataGas)
+			scaledCalldataFee := new(big.Int).Div(new(big.Int).Mul(rawCalldataFee, big.NewInt(6840)), big.NewInt(10000))
+
+			execGasEstimate = new(big.Int).Add(execGasEstimate, scaledCalldataFee)
+		}
+	}
 
 	return calculateUsdPerUnitGas(execGasEstimate, tokenPriceUSD)
 }

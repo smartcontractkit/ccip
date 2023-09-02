@@ -379,19 +379,31 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	}
 
 	// Observe a source chain price for pricing.
-	sourceGasPriceWei, _, err := r.config.sourceFeeEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
+	evmFee, _, err := r.config.sourceFeeEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
 	if err != nil {
 		return nil, nil, err
 	}
 	// Use legacy if no dynamic is available.
-	gasPrice := sourceGasPriceWei.Legacy.ToInt()
-	if sourceGasPriceWei.DynamicFeeCap != nil {
-		gasPrice = sourceGasPriceWei.DynamicFeeCap.ToInt()
+	gasPrice := evmFee.Legacy.ToInt()
+	if evmFee.DynamicFeeCap != nil {
+		gasPrice = evmFee.DynamicFeeCap.ToInt()
 	}
 	if gasPrice == nil {
-		return nil, nil, fmt.Errorf("missing gas price %+v", sourceGasPriceWei)
+		return nil, nil, fmt.Errorf("missing gas price %+v", evmFee)
 	}
+
 	sourceGasPriceUSD = calculateUsdPerUnitGas(gasPrice, sourceNativePriceUSD)
+
+	if evmFee.L1BaseFee != nil {
+		if l1BaseFee := evmFee.L1BaseFee.ToInt(); l1BaseFee.Cmp(big.NewInt(0)) > 0 {
+			// This assumes l1 basefee is priced using the same native token as l2 native
+			l1BaseFeeUSD := calculateUsdPerUnitGas(l1BaseFee, sourceNativePriceUSD)
+
+			// encode l1 and l2 gas prices into same value, l1 is on higher-order bits, l2 is on lower-order bits.
+			l1BaseFeeUSD = new(big.Int).Lsh(l1BaseFeeUSD, GasPriceEncodingLength)
+			sourceGasPriceUSD = new(big.Int).Add(l1BaseFeeUSD, sourceGasPriceUSD)
+		}
+	}
 
 	lggr.Infow("Observing gas price", "observedGasPriceWei", gasPrice, "observedGasPriceUSD", sourceGasPriceUSD)
 	lggr.Infow("Observing token prices", "tokenPrices", tokenPricesUSD, "sourceNativePriceUSD", sourceNativePriceUSD)
@@ -675,7 +687,17 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 
 		if latestGasPrice.value != nil {
 			gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration()
+
 			gasPriceNotChanged := !deviates(usdPerUnitGas, latestGasPrice.value, int64(r.offchainConfig.FeeUpdateDeviationPPB))
+
+			l1BaesFeeStartingInt := new(big.Int).Lsh(big.NewInt(1), GasPriceEncodingLength)
+			if gasPriceNotChanged && usdPerUnitGas.Cmp(l1BaesFeeStartingInt) > 0 {
+				// if price contains 2 parts, additionally compare lower order bits representing L2 gas prices
+				newL2GasPrice := new(big.Int).Mod(usdPerUnitGas, l1BaesFeeStartingInt)
+				oldL2GasPrice := new(big.Int).Mod(latestGasPrice.value, l1BaesFeeStartingInt)
+				// increae devision threshold by 10x when compraing L2 gas, which can be volatile
+				gasPriceNotChanged = !deviates(newL2GasPrice, oldL2GasPrice, int64(r.offchainConfig.FeeUpdateDeviationPPB)*50)
+			}
 			if gasPriceUpdatedRecently && gasPriceNotChanged {
 				usdPerUnitGas = big.NewInt(0)
 				destChainSelector = uint64(0)

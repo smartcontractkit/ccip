@@ -751,7 +751,7 @@ func TestBuildBatch(t *testing.T) {
 				tc.tokenLimit,
 				tc.srcPrices,
 				tc.dstPrices,
-				func() (*big.Int, error) { return tc.destGasPrice, nil },
+				func() (gas.EvmFee, error) { return gas.EvmFee{Legacy: assets.NewWei(tc.destGasPrice)}, nil },
 				tc.srcToDestTokens,
 				tc.destRateLimits,
 			)

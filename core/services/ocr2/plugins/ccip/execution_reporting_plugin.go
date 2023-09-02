@@ -269,7 +269,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	})
-	getDestGasPrice := LazyFetch(func() (*big.Int, error) {
+	getDestGasPrice := LazyFetch(func() (gas.EvmFee, error) {
 		return r.estimateDestinationGasPrice(ctx)
 	})
 
@@ -402,14 +402,10 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 	return res, nil
 }
 
-func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (*big.Int, error) {
-	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
+func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (gas.EvmFee, error) {
+	destGasPrice, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
 	if err != nil {
-		return nil, errors.Wrap(err, "could not estimate destination gas price")
-	}
-	destGasPrice := destGasPriceWei.Legacy.ToInt()
-	if destGasPriceWei.DynamicFeeCap != nil {
-		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
+		return gas.EvmFee{}, errors.Wrap(err, "could not estimate destination gas price")
 	}
 	return destGasPrice, nil
 }
@@ -466,7 +462,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	aggregateTokenLimit *big.Int,
 	sourceTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
-	execGasPriceEstimate LazyFunction[*big.Int],
+	execGasPriceEstimate LazyFunction[gas.EvmFee],
 	sourceToDestToken map[common.Address]common.Address,
 	destTokenPoolRateLimits map[common.Address]*big.Int,
 ) (executableMessages []ObservedMessage) {
@@ -539,7 +535,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		execCostUsd := computeExecCost(msg.GasLimit, execGasPriceEstimateValue, dstWrappedNativePrice)
+		execCostUsd := computeExecCost(msg, execGasPriceEstimateValue, dstWrappedNativePrice)
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),

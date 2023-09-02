@@ -116,6 +116,9 @@ type EvmEstimator interface {
 	//   - be sorted in order from highest price to lowest price
 	//   - all be of transaction type 0x2
 	BumpDynamicFee(ctx context.Context, original DynamicFee, gasLimit uint32, maxGasPriceWei *assets.Wei, attempts []EvmPriorAttempt) (bumped DynamicFee, chainSpecificGasLimit uint32, err error)
+
+	// GetL1BaseFeeOnL2 fetches the L1 basefee used by a rollup L2 to calculate L1 data fee. This value used by L2 may not equal to basefee on actual L1.
+	GetL1BaseFeeOnL2(ctx context.Context, opts ...feetypes.Opt) (gasPrice *assets.Wei, err error)
 }
 
 var _ feetypes.Fee = (*EvmFee)(nil)
@@ -127,6 +130,9 @@ type EvmFee struct {
 	// dynamic/EIP1559 fees
 	DynamicFeeCap *assets.Wei
 	DynamicTipCap *assets.Wei
+
+	// l1 base fee used in l1 data fee calculations on rollups
+	L1BaseFee *assets.Wei
 }
 
 func (fee EvmFee) String() string {
@@ -159,11 +165,13 @@ func (e WrappedEvmEstimator) GetFee(ctx context.Context, calldata []byte, feeLim
 		dynamicFee, chainSpecificFeeLimit, err = e.EvmEstimator.GetDynamicFee(ctx, feeLimit, maxFeePrice)
 		fee.DynamicFeeCap = dynamicFee.FeeCap
 		fee.DynamicTipCap = dynamicFee.TipCap
+		fee.L1BaseFee, err = e.EvmEstimator.GetL1BaseFeeOnL2(ctx, opts...)
 		return
 	}
 
 	// get legacy fee
 	fee.Legacy, chainSpecificFeeLimit, err = e.EvmEstimator.GetLegacyGas(ctx, calldata, feeLimit, maxFeePrice, opts...)
+	fee.L1BaseFee, err = e.EvmEstimator.GetL1BaseFeeOnL2(ctx, opts...)
 	return
 }
 
@@ -209,6 +217,10 @@ func (e WrappedEvmEstimator) BumpFee(ctx context.Context, originalFee EvmFee, fe
 	// bump legacy fee
 	bumpedFee.Legacy, chainSpecificFeeLimit, err = e.EvmEstimator.BumpLegacyGas(ctx, originalFee.Legacy, feeLimit, maxFeePrice, attempts)
 	return
+}
+
+func (e WrappedEvmEstimator) GetL1BaseFeeOnL2(_ context.Context, _ ...feetypes.Opt) (gasPrice *assets.Wei, err error) {
+	return assets.NewWei(big.NewInt(0)), nil
 }
 
 // Config defines an interface for configuration in the gas package
