@@ -21,6 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
+var _ Client = &LogPollerClient{}
+
 // LogPollerClient implements the Client interface by using a logPoller instance to fetch the events.
 type LogPollerClient struct {
 	lp     logpoller.LogPoller
