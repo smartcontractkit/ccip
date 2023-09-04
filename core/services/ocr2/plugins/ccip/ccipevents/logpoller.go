@@ -48,7 +48,7 @@ func (c *LogPollerClient) GetSendRequestsGteSeqNum(ctx context.Context, onRampAd
 	}
 
 	if !checkFinalityTags {
-		logs, err := c.lp.LogsDataWordGreaterThan(
+		logs, err2 := c.lp.LogsDataWordGreaterThan(
 			abihelpers.EventSignatures.SendRequested,
 			onRampAddress,
 			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
@@ -56,8 +56,8 @@ func (c *LogPollerClient) GetSendRequestsGteSeqNum(ctx context.Context, onRampAd
 			confs,
 			pg.WithParentCtx(ctx),
 		)
-		if err != nil {
-			return nil, fmt.Errorf("logs data word greater than: %w", err)
+		if err2 != nil {
+			return nil, fmt.Errorf("logs data word greater than: %w", err2)
 		}
 		return parseLogs[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
 			logs,
