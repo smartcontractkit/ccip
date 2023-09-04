@@ -36,7 +36,7 @@ func NewLogPollerClient(lp logpoller.LogPoller, lggr logger.Logger, client evmcl
 	}
 }
 
-func (c *LogPollerClient) GetSendRequestsAfterNextMin(ctx context.Context, onRampAddress common.Address, nextMin uint64, confs int, checkFinalityTags bool) (sendReqs []Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], err error) {
+func (c *LogPollerClient) GetSendRequestsGteSeqNum(ctx context.Context, onRampAddress common.Address, seqNum uint64, checkFinalityTags bool, confs int) (sendReqs []Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], err error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.client)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (c *LogPollerClient) GetSendRequestsAfterNextMin(ctx context.Context, onRam
 			abihelpers.EventSignatures.SendRequested,
 			onRampAddress,
 			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-			abihelpers.EvmWord(nextMin),
+			abihelpers.EvmWord(seqNum),
 			confs,
 			pg.WithParentCtx(ctx),
 		)
@@ -79,7 +79,7 @@ func (c *LogPollerClient) GetSendRequestsAfterNextMin(ctx context.Context, onRam
 			abihelpers.EventSignatures.SendRequested,
 			onRampAddress,
 			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-			abihelpers.EvmWord(nextMin),
+			abihelpers.EvmWord(seqNum),
 			latestFinalizedHeader.Hash(),
 			pg.WithParentCtx(ctx),
 		)
@@ -88,7 +88,7 @@ func (c *LogPollerClient) GetSendRequestsAfterNextMin(ctx context.Context, onRam
 		}
 	}
 
-	return convertLogsToRequests[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
+	return parseLogs[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
 		logs,
 		c.lggr,
 		func(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, error) {
@@ -97,7 +97,7 @@ func (c *LogPollerClient) GetSendRequestsAfterNextMin(ctx context.Context, onRam
 	)
 }
 
-func (c *LogPollerClient) GetSendRequestsInSeqNumRange(ctx context.Context, onRampAddress common.Address, rangeMin, rangeMax uint64, confs int) ([]Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], error) {
+func (c *LogPollerClient) GetSendRequestsBetweenSeqNums(ctx context.Context, onRampAddress common.Address, seqNumMin, seqNumMax uint64, confs int) ([]Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.client)
 	if err != nil {
 		return nil, err
@@ -107,15 +107,15 @@ func (c *LogPollerClient) GetSendRequestsInSeqNumRange(ctx context.Context, onRa
 		abihelpers.EventSignatures.SendRequested,
 		onRampAddress,
 		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-		logpoller.EvmWord(rangeMin),
-		logpoller.EvmWord(rangeMax),
+		logpoller.EvmWord(seqNumMin),
+		logpoller.EvmWord(seqNumMax),
 		confs,
 		pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	return convertLogsToRequests[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
+	return parseLogs[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
 		logs,
 		c.lggr,
 		func(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, error) {
@@ -141,7 +141,7 @@ func (c *LogPollerClient) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, 
 		return nil, err
 	}
 
-	return convertLogsToRequests[price_registry.PriceRegistryUsdPerTokenUpdated](
+	return parseLogs[price_registry.PriceRegistryUsdPerTokenUpdated](
 		logs,
 		c.lggr,
 		func(log types.Log) (*price_registry.PriceRegistryUsdPerTokenUpdated, error) {
@@ -169,7 +169,7 @@ func (c *LogPollerClient) GetGasPriceUpdatesCreatedAfter(ctx context.Context, pr
 		return nil, err
 	}
 
-	return convertLogsToRequests[price_registry.PriceRegistryUsdPerUnitGasUpdated](
+	return parseLogs[price_registry.PriceRegistryUsdPerUnitGasUpdated](
 		logs,
 		c.lggr,
 		func(log types.Log) (*price_registry.PriceRegistryUsdPerUnitGasUpdated, error) {
@@ -178,7 +178,7 @@ func (c *LogPollerClient) GetGasPriceUpdatesCreatedAfter(ctx context.Context, pr
 	)
 }
 
-func (c *LogPollerClient) GetExecutionStateChangesInRange(ctx context.Context, offRampAddress common.Address, rangeMin, rangeMax uint64, confs int) ([]Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged], error) {
+func (c *LogPollerClient) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, offRampAddress common.Address, seqNumMin, seqNumMax uint64, confs int) ([]Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged], error) {
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, c.client)
 	if err != nil {
 		return nil, err
@@ -188,8 +188,8 @@ func (c *LogPollerClient) GetExecutionStateChangesInRange(ctx context.Context, o
 		abihelpers.EventSignatures.ExecutionStateChanged,
 		offRampAddress,
 		abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
-		logpoller.EvmWord(rangeMin),
-		logpoller.EvmWord(rangeMax),
+		logpoller.EvmWord(seqNumMin),
+		logpoller.EvmWord(seqNumMax),
 		confs,
 		pg.WithParentCtx(ctx),
 	)
@@ -197,7 +197,7 @@ func (c *LogPollerClient) GetExecutionStateChangesInRange(ctx context.Context, o
 		return nil, err
 	}
 
-	return convertLogsToRequests[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged](
+	return parseLogs[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged](
 		logs,
 		c.lggr,
 		func(log types.Log) (*evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged, error) {
@@ -210,10 +210,10 @@ func (c *LogPollerClient) LatestBlock(ctx context.Context) (int64, error) {
 	return c.lp.LatestBlock(pg.WithParentCtx(ctx))
 }
 
-func convertLogsToRequests[T any](logs []logpoller.Log, lggr logger.Logger, parse func(log types.Log) (*T, error)) ([]Event[T], error) {
+func parseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(log types.Log) (*T, error)) ([]Event[T], error) {
 	reqs := make([]Event[T], 0, len(logs))
 	for _, log := range logs {
-		data, err := parse(log.ToGethLog())
+		data, err := parseFunc(log.ToGethLog())
 		if err == nil {
 			reqs = append(reqs, Event[T]{
 				Data: *data,
@@ -224,9 +224,9 @@ func convertLogsToRequests[T any](logs []logpoller.Log, lggr logger.Logger, pars
 			})
 		}
 	}
+
 	if len(logs) != len(reqs) {
 		lggr.Warnw("Some logs were not parsed", "logs", len(logs), "requests", len(reqs))
 	}
-
 	return reqs, nil
 }

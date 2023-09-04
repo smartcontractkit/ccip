@@ -238,7 +238,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	}
 
 	// Gather only finalized logs.
-	msgRequests, err := r.sourceEventsClient.GetSendRequestsAfterNextMin(ctx, r.config.onRampAddress, nextInflightMin, int(r.offchainConfig.SourceFinalityDepth), r.config.checkFinalityTags)
+	msgRequests, err := r.sourceEventsClient.GetSendRequestsGteSeqNum(ctx, r.config.onRampAddress, nextInflightMin, r.config.checkFinalityTags, int(r.offchainConfig.SourceFinalityDepth))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -657,7 +657,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	sendRequests, err := r.sourceEventsClient.GetSendRequestsInSeqNumRange(
+	sendRequests, err := r.sourceEventsClient.GetSendRequestsBetweenSeqNums(
 		ctx,
 		r.config.onRampAddress,
 		interval.Min,

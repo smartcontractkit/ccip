@@ -27,7 +27,7 @@ func getProofData(
 	sourceEventsClient ccipevents.Client,
 	interval commit_store.CommitStoreInterval,
 ) (sendReqsInRoot []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
-	sendReqs, err := sourceEventsClient.GetSendRequestsInSeqNumRange(
+	sendReqs, err := sourceEventsClient.GetSendRequestsBetweenSeqNums(
 		ctx,
 		onRampAddress,
 		interval.Min,

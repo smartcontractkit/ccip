@@ -438,7 +438,7 @@ func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) 
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
-	stateChanges, err := r.destEventsClient.GetExecutionStateChangesInRange(
+	stateChanges, err := r.destEventsClient.GetExecutionStateChangesBetweenSeqNums(
 		ctx,
 		r.config.offRamp.Address(),
 		min,
@@ -735,7 +735,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 	var sendRequests []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 	eg.Go(func() error {
-		sendReqs, err := r.sourceEventsClient.GetSendRequestsInSeqNumRange(
+		sendReqs, err := r.sourceEventsClient.GetSendRequestsBetweenSeqNums(
 			ctx,
 			r.config.onRamp.Address(),
 			intervalMin,
