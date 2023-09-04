@@ -241,13 +241,13 @@ func parseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(l
 	return reqs, nil
 }
 
-func (c *LogPollerClient) loadOnRamp(addr common.Address) (evm_2_evm_onramp.EVM2EVMOnRampInterface, error) {
-	onRamp, exists := loadCachedDependency[evm_2_evm_onramp.EVM2EVMOnRampInterface](&c.dependencyCache, addr)
+func (c *LogPollerClient) loadOnRamp(addr common.Address) (*evm_2_evm_onramp.EVM2EVMOnRampFilterer, error) {
+	onRamp, exists := loadCachedDependency[*evm_2_evm_onramp.EVM2EVMOnRampFilterer](&c.dependencyCache, addr)
 	if exists {
 		return onRamp, nil
 	}
 
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(addr, c.client)
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRampFilterer(addr, c.client)
 	if err != nil {
 		return nil, err
 	}
@@ -256,13 +256,13 @@ func (c *LogPollerClient) loadOnRamp(addr common.Address) (evm_2_evm_onramp.EVM2
 	return onRamp, nil
 }
 
-func (c *LogPollerClient) loadPriceRegistry(addr common.Address) (price_registry.PriceRegistryInterface, error) {
-	priceRegistry, exists := loadCachedDependency[price_registry.PriceRegistryInterface](&c.dependencyCache, addr)
+func (c *LogPollerClient) loadPriceRegistry(addr common.Address) (*price_registry.PriceRegistryFilterer, error) {
+	priceRegistry, exists := loadCachedDependency[*price_registry.PriceRegistryFilterer](&c.dependencyCache, addr)
 	if exists {
 		return priceRegistry, nil
 	}
 
-	priceRegistry, err := price_registry.NewPriceRegistry(addr, c.client)
+	priceRegistry, err := price_registry.NewPriceRegistryFilterer(addr, c.client)
 	if err != nil {
 		return nil, err
 	}
@@ -271,13 +271,13 @@ func (c *LogPollerClient) loadPriceRegistry(addr common.Address) (price_registry
 	return priceRegistry, nil
 }
 
-func (c *LogPollerClient) loadOffRamp(addr common.Address) (evm_2_evm_offramp.EVM2EVMOffRampInterface, error) {
-	offRamp, exists := loadCachedDependency[evm_2_evm_offramp.EVM2EVMOffRampInterface](&c.dependencyCache, addr)
+func (c *LogPollerClient) loadOffRamp(addr common.Address) (*evm_2_evm_offramp.EVM2EVMOffRampFilterer, error) {
+	offRamp, exists := loadCachedDependency[*evm_2_evm_offramp.EVM2EVMOffRampFilterer](&c.dependencyCache, addr)
 	if exists {
 		return offRamp, nil
 	}
 
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(addr, c.client)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRampFilterer(addr, c.client)
 	if err != nil {
 		return nil, err
 	}
