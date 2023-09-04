@@ -237,7 +237,6 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 
-	// Gather only finalized logs.
 	msgRequests, err := r.sourceEventsClient.GetSendRequestsGteSeqNum(ctx, r.config.onRampAddress, nextInflightMin, r.config.checkFinalityTags, int(r.offchainConfig.SourceFinalityDepth))
 	if err != nil {
 		return 0, 0, err
