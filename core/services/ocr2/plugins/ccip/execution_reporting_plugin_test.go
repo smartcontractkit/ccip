@@ -81,6 +81,8 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 			lggr:                     th.Lggr,
 			sourceLP:                 th.SourceLP,
 			destLP:                   th.DestLP,
+			sourceEvents:             ccipevents.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient),
+			destEvents:               ccipevents.NewLogPollerClient(th.DestLP, lggr, th.DestClient),
 			sourcePriceRegistry:      th.Source.PriceRegistry,
 			onRamp:                   th.Source.OnRamp,
 			commitStore:              th.Dest.CommitStore,
@@ -100,8 +102,6 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 		destWrappedNative:     th.Dest.WrappedNative.Address(),
 		cachedSourceFeeTokens: cache.NewCachedFeeTokens(th.SourceLP, th.Source.PriceRegistry, int64(offchainConfig.SourceFinalityDepth)),
 		cachedDestTokens:      cache.NewCachedSupportedTokens(th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, int64(offchainConfig.DestOptimisticConfirmations)),
-		sourceEventsClient:    ccipevents.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient),
-		destEventsClient:      ccipevents.NewLogPollerClient(th.DestLP, lggr, th.DestClient),
 	}
 	return execTestHarness{
 		CCIPPluginTestHarness: th,

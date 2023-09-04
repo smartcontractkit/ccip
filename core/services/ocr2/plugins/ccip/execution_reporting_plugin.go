@@ -55,6 +55,8 @@ var (
 type ExecutionPluginConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
+	sourceEvents             ccipevents.Client
+	destEvents               ccipevents.Client
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStore              commit_store.CommitStoreInterface
@@ -78,8 +80,6 @@ type ExecutionReportingPlugin struct {
 	offchainConfig        ccipconfig.ExecOffchainConfig
 	cachedSourceFeeTokens cache.AutoSync[[]common.Address]
 	cachedDestTokens      cache.AutoSync[cache.CachedTokens]
-	sourceEventsClient    ccipevents.Client
-	destEventsClient      ccipevents.Client
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -142,8 +142,6 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig:        offchainConfig,
 			cachedDestTokens:      cachedDestTokens,
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
-			sourceEventsClient:    ccipevents.NewLogPollerClient(rf.config.sourceLP, rf.config.lggr, rf.config.sourceClient),
-			destEventsClient:      ccipevents.NewLogPollerClient(rf.config.destLP, rf.config.lggr, rf.config.destClient),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -438,7 +436,7 @@ func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) 
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
-	stateChanges, err := r.destEventsClient.GetExecutionStateChangesBetweenSeqNums(
+	stateChanges, err := r.config.destEvents.GetExecutionStateChangesBetweenSeqNums(
 		ctx,
 		r.config.offRamp.Address(),
 		min,
@@ -735,7 +733,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 	var sendRequests []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 	eg.Go(func() error {
-		sendReqs, err := r.sourceEventsClient.GetSendRequestsBetweenSeqNums(
+		sendReqs, err := r.config.sourceEvents.GetSendRequestsBetweenSeqNums(
 			ctx,
 			r.config.onRamp.Address(),
 			intervalMin,
@@ -751,7 +749,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 	var executedSeqNums map[uint64]bool
 	eg.Go(func() error {
-		latestBlock, err := r.destEventsClient.LatestBlock(ctx)
+		latestBlock, err := r.config.destEvents.LatestBlock(ctx)
 		if err != nil {
 			return err
 		}
@@ -826,7 +824,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	}
 	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
-	sendReqsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.config.onRamp.Address(), r.sourceEventsClient, commitReport.Interval)
+	sendReqsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.config.onRamp.Address(), r.config.sourceEvents, commitReport.Interval)
 	if err != nil {
 		return nil, err
 	}

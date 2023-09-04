@@ -74,6 +74,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			lggr:                th.Lggr,
 			sourceLP:            th.SourceLP,
 			destLP:              th.DestLP,
+			sourceEvents:        ccipevents.NewLogPollerClient(th.SourceLP, lggr, backendClient),
+			destEvents:          ccipevents.NewLogPollerClient(th.DestLP, lggr, backendClient),
 			offRamp:             th.Dest.OffRamp,
 			onRampAddress:       th.Source.OnRamp.Address(),
 			commitStore:         th.Dest.CommitStore,
@@ -97,8 +99,6 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 		lggr:               th.Lggr,
 		destPriceRegistry:  th.Dest.PriceRegistry,
 		tokenDecimalsCache: cache.NewTokenToDecimals(th.Lggr, th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, backendClient, 0),
-		sourceEventsClient: ccipevents.NewLogPollerClient(th.SourceLP, lggr, backendClient),
-		destEventsClient:   ccipevents.NewLogPollerClient(th.DestLP, lggr, backendClient),
 	}
 
 	priceGetter.On("TokenPricesUSD", mock.Anything, mock.Anything).Return(map[common.Address]*big.Int{
