@@ -47,10 +47,8 @@ func (c *LogPollerClient) GetSendRequestsGteSeqNum(ctx context.Context, onRampAd
 		return nil, err
 	}
 
-	var logs []logpoller.Log
-
 	if !checkFinalityTags {
-		logs, err = c.lp.LogsDataWordGreaterThan(
+		logs, err := c.lp.LogsDataWordGreaterThan(
 			abihelpers.EventSignatures.SendRequested,
 			onRampAddress,
 			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
@@ -61,36 +59,43 @@ func (c *LogPollerClient) GetSendRequestsGteSeqNum(ctx context.Context, onRampAd
 		if err != nil {
 			return nil, fmt.Errorf("logs data word greater than: %w", err)
 		}
-	} else {
-		// If the chain is based on explicit finality we only examine logs less than or equal to the latest finalized block number.
-		// NOTE: there appears to be a bug in ethclient whereby BlockByNumber fails with "unsupported txtype" when trying to parse the block
-		// when querying L2s, headers however work.
-		// TODO (CCIP-778): Migrate to core finalized tags, below doesn't work for some chains e.g. Celo.
-		latestFinalizedHeader, err := c.client.HeaderByNumber(
-			ctx,
-			big.NewInt(rpc.FinalizedBlockNumber.Int64()),
+		return parseLogs[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
+			logs,
+			c.lggr,
+			func(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, error) {
+				return onRamp.ParseCCIPSendRequested(log)
+			},
 		)
-		if err != nil {
-			return nil, err
-		}
+	}
 
-		if latestFinalizedHeader == nil {
-			return nil, errors.New("latest finalized header is nil")
-		}
-		if latestFinalizedHeader.Number == nil {
-			return nil, errors.New("latest finalized number is nil")
-		}
-		logs, err = c.lp.LogsUntilBlockHashDataWordGreaterThan(
-			abihelpers.EventSignatures.SendRequested,
-			onRampAddress,
-			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-			abihelpers.EvmWord(seqNum),
-			latestFinalizedHeader.Hash(),
-			pg.WithParentCtx(ctx),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("logs until block hash data word greater than: %w", err)
-		}
+	// If the chain is based on explicit finality we only examine logs less than or equal to the latest finalized block number.
+	// NOTE: there appears to be a bug in ethclient whereby BlockByNumber fails with "unsupported txtype" when trying to parse the block
+	// when querying L2s, headers however work.
+	// TODO (CCIP-778): Migrate to core finalized tags, below doesn't work for some chains e.g. Celo.
+	latestFinalizedHeader, err := c.client.HeaderByNumber(
+		ctx,
+		big.NewInt(rpc.FinalizedBlockNumber.Int64()),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if latestFinalizedHeader == nil {
+		return nil, errors.New("latest finalized header is nil")
+	}
+	if latestFinalizedHeader.Number == nil {
+		return nil, errors.New("latest finalized number is nil")
+	}
+	logs, err := c.lp.LogsUntilBlockHashDataWordGreaterThan(
+		abihelpers.EventSignatures.SendRequested,
+		onRampAddress,
+		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
+		abihelpers.EvmWord(seqNum),
+		latestFinalizedHeader.Hash(),
+		pg.WithParentCtx(ctx),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("logs until block hash data word greater than: %w", err)
 	}
 
 	return parseLogs[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
