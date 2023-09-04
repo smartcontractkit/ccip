@@ -54,7 +54,7 @@ func main() {
 		}
 	}
 
-	decodedError, err := handler.DecodeErrorStringFromABI(ErrorCodeString)
+	decodedError, err := handler.DecodeErrorStringFromABI(errorSting)
 	if err != nil {
 		panic(err)
 	}
