@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,6 +29,8 @@ type LogPollerClient struct {
 	lp     logpoller.LogPoller
 	lggr   logger.Logger
 	client evmclient.Client
+
+	dependencyCache sync.Map
 }
 
 func NewLogPollerClient(lp logpoller.LogPoller, lggr logger.Logger, client evmclient.Client) *LogPollerClient {
@@ -39,7 +42,7 @@ func NewLogPollerClient(lp logpoller.LogPoller, lggr logger.Logger, client evmcl
 }
 
 func (c *LogPollerClient) GetSendRequestsGteSeqNum(ctx context.Context, onRampAddress common.Address, seqNum uint64, checkFinalityTags bool, confs int) (sendReqs []Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], err error) {
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.client)
+	onRamp, err := c.loadOnRamp(onRampAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +103,7 @@ func (c *LogPollerClient) GetSendRequestsGteSeqNum(ctx context.Context, onRampAd
 }
 
 func (c *LogPollerClient) GetSendRequestsBetweenSeqNums(ctx context.Context, onRampAddress common.Address, seqNumMin, seqNumMax uint64, confs int) ([]Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], error) {
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, c.client)
+	onRamp, err := c.loadOnRamp(onRampAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +130,7 @@ func (c *LogPollerClient) GetSendRequestsBetweenSeqNums(ctx context.Context, onR
 }
 
 func (c *LogPollerClient) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, priceRegistryAddress common.Address, ts time.Time, confs int) ([]Event[price_registry.PriceRegistryUsdPerTokenUpdated], error) {
-	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddress, c.client)
+	priceRegistry, err := c.loadPriceRegistry(priceRegistryAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +156,7 @@ func (c *LogPollerClient) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, 
 }
 
 func (c *LogPollerClient) GetGasPriceUpdatesCreatedAfter(ctx context.Context, priceRegistryAddress common.Address, chainSelector uint64, ts time.Time, confs int) ([]Event[price_registry.PriceRegistryUsdPerUnitGasUpdated], error) {
-	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddress, c.client)
+	priceRegistry, err := c.loadPriceRegistry(priceRegistryAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +184,7 @@ func (c *LogPollerClient) GetGasPriceUpdatesCreatedAfter(ctx context.Context, pr
 }
 
 func (c *LogPollerClient) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, offRampAddress common.Address, seqNumMin, seqNumMax uint64, confs int) ([]Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged], error) {
-	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, c.client)
+	offRamp, err := c.loadOffRamp(offRampAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -231,4 +234,61 @@ func parseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(l
 		lggr.Warnw("Some logs were not parsed", "logs", len(logs), "requests", len(reqs))
 	}
 	return reqs, nil
+}
+
+func (c *LogPollerClient) loadOnRamp(addr common.Address) (evm_2_evm_onramp.EVM2EVMOnRampInterface, error) {
+	onRamp, exists := loadCachedDependency[evm_2_evm_onramp.EVM2EVMOnRampInterface](&c.dependencyCache, addr)
+	if exists {
+		return onRamp, nil
+	}
+
+	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(addr, c.client)
+	if err != nil {
+		return nil, err
+	}
+
+	c.dependencyCache.Store(addr, onRamp)
+	return onRamp, nil
+}
+
+func (c *LogPollerClient) loadPriceRegistry(addr common.Address) (price_registry.PriceRegistryInterface, error) {
+	priceRegistry, exists := loadCachedDependency[price_registry.PriceRegistryInterface](&c.dependencyCache, addr)
+	if exists {
+		return priceRegistry, nil
+	}
+
+	priceRegistry, err := price_registry.NewPriceRegistry(addr, c.client)
+	if err != nil {
+		return nil, err
+	}
+
+	c.dependencyCache.Store(addr, priceRegistry)
+	return priceRegistry, nil
+}
+
+func (c *LogPollerClient) loadOffRamp(addr common.Address) (evm_2_evm_offramp.EVM2EVMOffRampInterface, error) {
+	offRamp, exists := loadCachedDependency[evm_2_evm_offramp.EVM2EVMOffRampInterface](&c.dependencyCache, addr)
+	if exists {
+		return offRamp, nil
+	}
+
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(addr, c.client)
+	if err != nil {
+		return nil, err
+	}
+
+	c.dependencyCache.Store(addr, offRamp)
+	return offRamp, nil
+}
+
+func loadCachedDependency[T any](cache *sync.Map, addr common.Address) (T, bool) {
+	var empty T
+
+	if rawVal, exists := cache.Load(addr); exists {
+		if dep, is := rawVal.(T); is {
+			return dep, true
+		}
+	}
+
+	return empty, false
 }
