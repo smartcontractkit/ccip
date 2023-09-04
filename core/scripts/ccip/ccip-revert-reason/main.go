@@ -31,33 +31,41 @@ const (
 	ChainId     = uint64(420)
 	TxHash      = "0x97be8559164442595aba46b5f849c23257905b78e72ee43d9b998b28eee78b84"
 	TxRequester = "0xe88ff73814fb891bb0e149f5578796fa41f20242"
+	EnvFileName = ".env"
 )
 
 func main() {
-	errorSting := ErrorCodeString
+	errorString, err := getErrorString()
+	if err != nil {
+		panic(err)
+	}
+	decodedError, err := handler.DecodeErrorStringFromABI(errorString)
+	if err != nil {
+		panic(err)
+	}
 
-	if errorSting == "" {
+	fmt.Println(decodedError)
+}
+
+func getErrorString() (string, error) {
+	errorCodeString := ErrorCodeString
+
+	if errorCodeString == "" {
 		// Try to load env vars from .env file
-		err := godotenv.Load(".env")
+		err := godotenv.Load(EnvFileName)
 		if err != nil {
 			fmt.Println("No .env file found, using env vars from shell")
 		}
 
 		ec, err := ethclient.Dial(secrets.GetRPC(ChainId))
 		if err != nil {
-			panic(err)
+			return "", err
 		}
-		errorSting, err = handler.GetErrorForTx(ec, TxHash, TxRequester)
+		errorCodeString, err = handler.GetErrorForTx(ec, TxHash, TxRequester)
 		if err != nil {
-
-			panic(err)
+			return "", err
 		}
 	}
 
-	decodedError, err := handler.DecodeErrorStringFromABI(errorSting)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(decodedError)
+	return errorCodeString, nil
 }
