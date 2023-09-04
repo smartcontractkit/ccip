@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestLogPollerClient_loadDependency(t *testing.T) {
@@ -20,6 +21,7 @@ func TestLogPollerClient_loadDependency(t *testing.T) {
 	onRamp, err := c.loadOnRamp(someAddr)
 	assert.NoError(t, err)
 	onRamp2, err := c.loadOnRamp(someAddr)
+	assert.NoError(t, err)
 	// the objects should have the same pointer
 	// since the second time the dependency should've been loaded from cache instead of initializing a new instance.
 	assert.True(t, onRamp == onRamp2)
@@ -27,11 +29,13 @@ func TestLogPollerClient_loadDependency(t *testing.T) {
 	offRamp, err := c.loadOffRamp(someAddr)
 	assert.NoError(t, err)
 	offRamp2, err := c.loadOffRamp(someAddr)
+	assert.NoError(t, err)
 	assert.True(t, offRamp == offRamp2)
 
 	priceReg, err := c.loadPriceRegistry(someAddr)
 	assert.NoError(t, err)
 	priceReg2, err := c.loadPriceRegistry(someAddr)
+	assert.NoError(t, err)
 	assert.True(t, priceReg == priceReg2)
 }
 
