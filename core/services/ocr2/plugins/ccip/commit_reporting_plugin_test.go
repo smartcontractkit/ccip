@@ -3,6 +3,7 @@ package ccip
 import (
 	"context"
 	"fmt"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"math/big"
 	"math/rand"
 	"reflect"
@@ -190,7 +191,7 @@ func TestCommitReportEncoding(t *testing.T) {
 	assert.Equal(t, newTokenPrice, linkTokenPrice.Value)
 }
 
-func TestCommitObservation(t *testing.T) {
+func TestCommitReportingPlugin_Observation(t *testing.T) {
 	sourceNativeTokenAddr := common.HexToAddress("1000")
 	someTokenAddr := common.HexToAddress("2000")
 
@@ -304,28 +305,39 @@ func TestCommitObservation(t *testing.T) {
 	}
 }
 
-func TestCommitReport(t *testing.T) {
-	th := setupCommitTestHarness(t)
-	th.plugin.F = 1
+func TestCommitReportingPlugin_Report(t *testing.T) {
+	testCases := []struct {
+		name              string
+		observations      []CommitObservation
+		f                 int
+		gasPriceUpdates   []ccipevents.Event[price_registry.PriceRegistryUsdPerUnitGasUpdated]
+		tokenPriceUpdates []ccipevents.Event[price_registry.PriceRegistryUsdPerTokenUpdated]
+		sendRequests      []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 
-	mb := th.GenerateAndSendMessageBatch(t, 1, 0, 0)
-
-	tests := []struct {
-		name          string
-		observations  []CommitObservation
-		shouldReport  bool
-		commitReport  *commit_store.CommitStoreCommitReport
-		expectedError bool
+		expCommitReport *commit_store.CommitStoreCommitReport
+		expSeqNumRange  commit_store.CommitStoreInterval
+		expReport       bool
+		expErr          bool
 	}{
 		{
-			"base",
-			[]CommitObservation{
+			name: "base",
+			observations: []CommitObservation{
 				{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 1}},
 				{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 1}},
 			},
-			true,
-			&commit_store.CommitStoreCommitReport{
-				MerkleRoot: mb.Root,
+			f: 1,
+			sendRequests: []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{
+				{
+					Data: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{
+						Message: evm_2_evm_onramp.InternalEVM2EVMMessage{
+							SequenceNumber: 1,
+						},
+					},
+				},
+			},
+			expSeqNumRange: commit_store.CommitStoreInterval{Min: 1, Max: 1},
+			expCommitReport: &commit_store.CommitStoreCommitReport{
+				MerkleRoot: [32]byte{},
 				Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 1},
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
@@ -333,59 +345,89 @@ func TestCommitReport(t *testing.T) {
 					UsdPerUnitGas:     new(big.Int),
 				},
 			},
-			false,
+			expReport: true,
+			expErr:    false,
 		},
 		{
-			"not enough observations",
-			[]CommitObservation{
+			name: "not enough observations",
+			observations: []CommitObservation{
 				{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 1}},
 			},
-			false,
-			nil,
-			true,
+			f:              1,
+			sendRequests:   []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{{}},
+			expSeqNumRange: commit_store.CommitStoreInterval{Min: 1, Max: 1},
+			expErr:         true,
 		},
 		{
-			"empty",
-			[]CommitObservation{
+			name: "empty",
+			observations: []CommitObservation{
 				{Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0}},
 				{Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0}},
 			},
-			false,
-			nil,
-			false,
+			f:      1,
+			expErr: false,
 		},
 		{
-			"no leaves",
-			[]CommitObservation{
+			name: "no leaves",
+			observations: []CommitObservation{
 				{Interval: commit_store.CommitStoreInterval{Min: 2, Max: 2}},
 				{Interval: commit_store.CommitStoreInterval{Min: 2, Max: 2}},
 			},
-			false,
-			nil,
-			true,
+			f:              1,
+			sendRequests:   []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{{}},
+			expSeqNumRange: commit_store.CommitStoreInterval{Min: 2, Max: 2},
+			expErr:         true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			aos := make([]types.AttributedObservation, 0, len(tt.observations))
-			for _, o := range tt.observations {
+	ctx := testutils.Context(t)
+	destPriceRegistryAddress := utils.RandomAddress()
+	onRampAddress :=
+		utils.RandomAddress()
+	sourceChainSelector := rand.Int()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			destPriceRegistry := mock_contracts.NewPriceRegistryInterface(t)
+			destPriceRegistry.On("Address").Return(destPriceRegistryAddress)
+
+			destEvents := ccipevents.NewMockClient(t)
+			destEvents.On("GetGasPriceUpdatesCreatedAfter", ctx, destPriceRegistryAddress, uint64(sourceChainSelector), mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
+			destEvents.On("GetTokenPriceUpdatesCreatedAfter", ctx, destPriceRegistryAddress, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
+
+			sourceEvents := ccipevents.NewMockClient(t)
+			if len(tc.sendRequests) > 0 {
+				sourceEvents.On("GetSendRequestsBetweenSeqNums", ctx, onRampAddress, tc.expSeqNumRange.Min, tc.expSeqNumRange.Max, 0).Return(tc.sendRequests, nil)
+			}
+
+			p := &CommitReportingPlugin{}
+			p.lggr = logger.TestLogger(t)
+			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
+			p.destPriceRegistry = destPriceRegistry
+			p.config.destEvents = destEvents
+			p.config.sourceEvents = sourceEvents
+			p.config.onRampAddress = onRampAddress
+			p.config.sourceChainSelector = uint64(sourceChainSelector)
+			p.config.leafHasher = &nopLeafHasher{}
+
+			aos := make([]types.AttributedObservation, 0, len(tc.observations))
+			for _, o := range tc.observations {
 				obs, err := o.Marshal()
 				require.NoError(t, err)
 				aos = append(aos, types.AttributedObservation{Observation: obs})
 			}
-			gotShouldReport, gotReport, err := th.plugin.Report(testutils.Context(t), types.ReportTimestamp{}, types.Query{}, aos)
+			gotShouldReport, gotReport, err := p.Report(ctx, types.ReportTimestamp{}, types.Query{}, aos)
 
-			if tt.expectedError {
+			if tc.expErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Equal(t, tt.shouldReport, gotShouldReport)
+			assert.Equal(t, tc.expReport, gotShouldReport)
 
 			var expectedReport types.Report
-			if tt.commitReport != nil {
-				expectedReport, err = abihelpers.EncodeCommitReport(*tt.commitReport)
+			if tc.expCommitReport != nil {
+				expectedReport, err = abihelpers.EncodeCommitReport(*tc.expCommitReport)
 				require.NoError(t, err)
 			}
 			assert.Equal(t, expectedReport, gotReport)
@@ -1290,4 +1332,10 @@ func Test_isStaleReport(t *testing.T) {
 		assert.True(t, r.isStaleReport(ctx, lggr, commit_store.CommitStoreCommitReport{
 			MerkleRoot: merkleRoot1}, false, types.ReportTimestamp{}))
 	})
+}
+
+type nopLeafHasher struct{}
+
+func (n nopLeafHasher) HashLeaf(log gethtypes.Log) ([32]byte, error) {
+	return [32]byte{}, nil
 }
