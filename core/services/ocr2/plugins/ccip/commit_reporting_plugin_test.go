@@ -2,7 +2,6 @@ package ccip
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -27,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
@@ -191,65 +191,115 @@ func TestCommitReportEncoding(t *testing.T) {
 }
 
 func TestCommitObservation(t *testing.T) {
-	th := setupCommitTestHarness(t)
-	th.plugin.F = 1
+	sourceNativeTokenAddr := common.HexToAddress("1000")
+	someTokenAddr := common.HexToAddress("2000")
 
-	mb := th.GenerateAndSendMessageBatch(t, 1, 0, 0)
+	testCases := []struct {
+		name                string
+		epochAndRound       types.ReportTimestamp
+		commitStoreIsPaused bool
+		commitStoreSeqNum   uint64
+		tokenPrices         map[common.Address]*big.Int
+		sendReqs            []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
+		tokenDecimals       map[common.Address]uint8
+		fee                 *big.Int
 
-	tests := []struct {
-		name            string
-		commitStoreDown bool
-		expected        *CommitObservation
-		expectedError   bool
+		expErr bool
+		expObs CommitObservation
 	}{
 		{
-			"base",
-			false,
-			&CommitObservation{
-				Interval:          mb.Interval,
-				SourceGasPriceUSD: new(big.Int).Mul(defaultGasPrice, big.NewInt(100)),
+			name:              "base report",
+			commitStoreSeqNum: 54,
+			tokenPrices: map[common.Address]*big.Int{
+				someTokenAddr:         big.NewInt(2),
+				sourceNativeTokenAddr: big.NewInt(2),
+			},
+			sendReqs: []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{
+				{Data: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{Message: evm_2_evm_onramp.InternalEVM2EVMMessage{SequenceNumber: 54}}},
+				{Data: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{Message: evm_2_evm_onramp.InternalEVM2EVMMessage{SequenceNumber: 55}}},
+			},
+			fee: big.NewInt(100),
+			tokenDecimals: map[common.Address]uint8{
+				someTokenAddr: 8,
+			},
+			expObs: CommitObservation{
 				TokenPricesUSD: map[common.Address]*big.Int{
-					th.Dest.LinkToken.Address(): new(big.Int).Mul(big.NewInt(200), big.NewInt(1e18)),
+					someTokenAddr: big.NewInt(20000000000),
+				},
+				SourceGasPriceUSD: big.NewInt(0),
+				Interval: commit_store.CommitStoreInterval{
+					Min: 54,
+					Max: 55,
 				},
 			},
-			false,
 		},
 		{
-			"commitStore down",
-			true,
-			nil,
-			true,
+			name:                "commit store is down",
+			commitStoreIsPaused: true,
+			expErr:              true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.commitStoreDown && !isCommitStoreDownNow(testutils.Context(t), th.Lggr, th.Dest.CommitStore) {
-				_, err := th.Dest.CommitStore.Pause(th.Dest.User)
-				require.NoError(t, err)
-				th.CommitAndPollLogs(t)
-			} else if !tt.commitStoreDown && isCommitStoreDownNow(testutils.Context(t), th.Lggr, th.Dest.CommitStore) {
-				_, err := th.Dest.CommitStore.Unpause(th.Dest.User)
-				require.NoError(t, err)
-				th.CommitAndPollLogs(t)
+	ctx := testutils.Context(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			onRampAddress := utils.RandomAddress()
+			sourceFinalityDepth := 10
+
+			commitStore := mock_contracts.NewCommitStoreInterface(t)
+			commitStore.On("IsUnpausedAndARMHealthy", mock.Anything).Return(!tc.commitStoreIsPaused, nil)
+			if tc.commitStoreSeqNum > 0 {
+				commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.commitStoreSeqNum, nil)
 			}
 
-			gotObs, err := th.plugin.Observation(testutils.Context(t), types.ReportTimestamp{}, types.Query{})
-
-			if tt.expectedError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+			sourceEvents := ccipevents.NewMockClient(t)
+			if len(tc.sendReqs) > 0 {
+				sourceEvents.On("GetSendRequestsGteSeqNum", ctx, onRampAddress, tc.commitStoreSeqNum, false, sourceFinalityDepth).
+					Return(tc.sendReqs, nil)
 			}
 
-			var decodedObservation *CommitObservation
-			if gotObs != nil {
-				decodedObservation = new(CommitObservation)
-				err = json.Unmarshal(gotObs, decodedObservation)
-				require.NoError(t, err)
-
+			tokenDecimalsCache := cache.NewMockAutoSync[map[common.Address]uint8](t)
+			if len(tc.tokenDecimals) > 0 {
+				tokenDecimalsCache.On("Get", ctx).Return(tc.tokenDecimals, nil)
 			}
-			assert.Equal(t, tt.expected, decodedObservation)
+
+			priceGet := newMockPriceGetter()
+			if len(tc.tokenPrices) > 0 {
+				addrs := []common.Address{sourceNativeTokenAddr}
+				for addr := range tc.tokenDecimals {
+					addrs = append(addrs, addr)
+				}
+				priceGet.On("TokenPricesUSD", addrs).Return(tc.tokenPrices, nil)
+			}
+
+			sourceFeeEst := mocks.NewEvmFeeEstimator(t)
+			if tc.fee != nil {
+				sourceFeeEst.On("GetFee", ctx, []byte(nil), uint32(0), assets.NewWei(big.NewInt(0))).
+					Return(gas.EvmFee{Legacy: assets.NewWei(tc.fee)}, uint32(0), nil)
+			}
+
+			p := &CommitReportingPlugin{}
+			p.lggr = logger.TestLogger(t)
+			p.inflightReports = newInflightCommitReportsContainer(time.Hour)
+			p.config.commitStore = commitStore
+			p.config.onRampAddress = onRampAddress
+			p.offchainConfig.SourceFinalityDepth = uint32(sourceFinalityDepth)
+			p.config.sourceEvents = sourceEvents
+			p.tokenDecimalsCache = tokenDecimalsCache
+			p.config.priceGetter = priceGet
+			p.config.sourceFeeEstimator = sourceFeeEst
+			p.config.sourceNative = sourceNativeTokenAddr
+
+			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
+
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+
+			expObsBytes, _ := tc.expObs.Marshal()
+			assert.Equal(t, expObsBytes, []byte(obs))
 		})
 	}
 }
