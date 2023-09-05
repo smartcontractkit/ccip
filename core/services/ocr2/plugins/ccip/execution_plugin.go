@@ -123,7 +123,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 			sourceClient:             sourceChain.Client(),
 			destGasEstimator:         destChain.GasEstimator(),
 			leafHasher:               hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
-			usdcService:              customtokens.NewUSDCService(pluginConfig.USDCAttestationApi),
+			usdcService:              customtokens.NewUSDCService(pluginConfig.USDCAttestationApi, chainId),
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)
@@ -159,8 +159,13 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address) []logpoller.Filter {
-	return []logpoller.Filter{
+func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry, usdcToken common.Address) []logpoller.Filter {
+	var filters []logpoller.Filter
+	if usdcToken != common.HexToAddress("") {
+		filters = customtokens.GetUSDCServiceSourceLPFilters(usdcToken)
+	}
+
+	return append(filters, []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.String()),
 			EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
@@ -176,7 +181,7 @@ func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address
 			EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenRemoved},
 			Addresses: []common.Address{priceRegistry},
 		},
-	}
+	}...)
 }
 
 func getExecutionPluginDestLpChainFilters(commitStore, offRamp, priceRegistry common.Address) []logpoller.Filter {
@@ -284,10 +289,15 @@ func unregisterExecutionPluginLpFilters(
 		return err
 	}
 
+	chainId, err := chainselectors.ChainIdFromSelector(destOffRampConfig.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+
 	if err := unregisterLpFilters(
 		q,
 		sourceLP,
-		getExecutionPluginSourceLpChainFilters(destOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry),
+		getExecutionPluginSourceLpChainFilters(destOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry, customtokens.USDCTokenMapping[chainId]),
 	); err != nil {
 		return err
 	}

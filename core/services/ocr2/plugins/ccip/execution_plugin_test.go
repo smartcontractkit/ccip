@@ -116,8 +116,10 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 		dstLP,
 		mockOffRamp,
 		evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-			CommitStore: commitStoreAddr,
-			OnRamp:      onRampAddr,
+			CommitStore:         commitStoreAddr,
+			OnRamp:              onRampAddr,
+			ChainSelector:       5790810961207155433,
+			SourceChainSelector: 16015286601757825753,
 		},
 		mockOnRamp,
 		nil,

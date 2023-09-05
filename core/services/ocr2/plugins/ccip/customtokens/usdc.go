@@ -5,10 +5,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 )
 
 type USDCService struct {
-	attestationApi string
+	attestationApi  string
+	sourceChainId   uint64
+	SourceUSDCToken common.Address
 }
 
 type USDCAttestationResponse struct {
@@ -16,9 +22,21 @@ type USDCAttestationResponse struct {
 	Attestation string                `json:"attestation"`
 }
 
+// Hard coded mapping of chain id to USDC token addresses
+// Will be removed in favour of more flexible solution.
+var USDCTokenMapping = map[uint64]common.Address{
+	420:    common.HexToAddress("0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6"),
+	43113:  common.HexToAddress("0x5425890298aed601595a70ab815c96711a31bc65"),
+	80001:  common.HexToAddress("0x9999f7fea5938fd3b1e26a12c3f2fb024e194f97"),
+	84531:  common.HexToAddress("0xf175520c52418dfe19c8098071a252da48cd1c19"),
+	421613: common.HexToAddress("0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63"),
+}
+
 const (
-	version         = "v1"
-	attestationPath = "attestations"
+	version           = "v1"
+	attestationPath   = "attestations"
+	eventSignature    = "8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036"
+	USDC_MESSAGE_SENT = "USDC message sent"
 )
 
 type USDCAttestationStatus string
@@ -28,8 +46,8 @@ const (
 	USDCAttestationStatusPending USDCAttestationStatus = "pending_confirmations"
 )
 
-func NewUSDCService(usdcAttestationApi string) *USDCService {
-	return &USDCService{attestationApi: usdcAttestationApi}
+func NewUSDCService(usdcAttestationApi string, sourceChainId uint64) *USDCService {
+	return &USDCService{attestationApi: usdcAttestationApi, sourceChainId: sourceChainId, SourceUSDCToken: USDCTokenMapping[sourceChainId]}
 }
 
 func (usdc *USDCService) TryGetAttestation(messageHash string) (USDCAttestationResponse, error) {
@@ -67,4 +85,14 @@ func (usdc *USDCService) IsAttestationComplete(messageHash string) (bool, string
 		return true, response.Attestation, nil
 	}
 	return false, "", nil
+}
+
+func GetUSDCServiceSourceLPFilters(usdcTokenAddress common.Address) []logpoller.Filter {
+	return []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(USDC_MESSAGE_SENT, usdcTokenAddress.Hex()),
+			EventSigs: []common.Hash{common.HexToHash(eventSignature)},
+			Addresses: []common.Address{usdcTokenAddress},
+		},
+	}
 }

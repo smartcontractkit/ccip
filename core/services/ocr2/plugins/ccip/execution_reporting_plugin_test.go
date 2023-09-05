@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/customtokens"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -1142,6 +1143,9 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 	offRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
 	offRamp.On("Address").Return(utils.RandomAddress(), nil)
 
+	sourceChainId := uint64(420)
+	sourceUSDCTokenAddress := customtokens.USDCTokenMapping[sourceChainId]
+
 	destPriceRegistryAddr := utils.RandomAddress()
 
 	rf := &ExecutionReportingPluginFactory{
@@ -1155,10 +1159,11 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 			commitStore:         commitStore,
 			offRamp:             offRamp,
 			sourcePriceRegistry: sourcePriceRegistry,
+			usdcService:         customtokens.NewUSDCService("", sourceChainId),
 		},
 	}
 
-	for _, f := range getExecutionPluginSourceLpChainFilters(onRamp.Address(), sourcePriceRegistry.Address()) {
+	for _, f := range getExecutionPluginSourceLpChainFilters(onRamp.Address(), sourcePriceRegistry.Address(), sourceUSDCTokenAddress) {
 		sourceLP.On("RegisterFilter", f).Return(nil)
 	}
 	for _, f := range getExecutionPluginDestLpChainFilters(commitStore.Address(), offRamp.Address(), destPriceRegistryAddr) {

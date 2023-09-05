@@ -202,7 +202,11 @@ func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegis
 	defer rf.filtersMu.Unlock()
 
 	// source chain filters
-	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(rf.config.onRamp.Address(), rf.config.sourcePriceRegistry.Address())
+	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(
+		rf.config.onRamp.Address(),
+		rf.config.sourcePriceRegistry.Address(),
+		rf.config.usdcService.SourceUSDCToken,
+	)
 	created, deleted := filtersDiff(sourceFiltersBefore, sourceFiltersNow)
 	if err := unregisterLpFilters(nilQueryer, rf.config.sourceLP, deleted); err != nil {
 		return err
