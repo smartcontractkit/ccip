@@ -38,6 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 const (
@@ -525,11 +526,35 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			msgLggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
 		}
+
 		// if token limit is smaller than message value skip message
 		if tokensLeft, hasCapacity := hasEnoughTokens(aggregateTokenLimit, msgValue, inflightAggregateValue); !hasCapacity {
 			msgLggr.Warnw("token limit is smaller than message value", "aggregateTokenLimit", tokensLeft.String(), "msgValue", msgValue.String())
 			continue
 		}
+
+		// Any tokens that require offchain token data should be added here.
+		var tokenData [][]byte
+		for _, token := range msg.TokenAmounts {
+			switch token.Token {
+			case r.config.usdcService.SourceUSDCToken:
+				usdcMessageBody := ""
+				msgHash := utils.Keccak256Fixed([]byte(usdcMessageBody))
+				success, attestation, err := r.config.usdcService.IsAttestationComplete(string(msgHash[:]))
+				if err != nil {
+					msgLggr.Errorw("Skipping message unable to check USDC attestation", "err", err)
+					continue
+				}
+				if !success {
+					msgLggr.Warnw("Skipping message USDC attestation not ready")
+					continue
+				}
+				tokenData = append(tokenData, []byte(attestation))
+			default:
+				tokenData = append(tokenData, []byte{})
+			}
+		}
+
 		// Fee boosting
 		execGasPriceEstimateValue, err := execGasPriceEstimate()
 		if err != nil {
@@ -597,13 +622,6 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			if rl, exists := destTokenPoolRateLimits[dstToken]; exists {
 				destTokenPoolRateLimits[dstToken] = rl.Sub(rl, tk.Amount)
 			}
-		}
-
-		var tokenData [][]byte
-
-		// TODO add attestation data for USDC here
-		for range msg.TokenAmounts {
-			tokenData = append(tokenData, []byte{})
 		}
 
 		msgLggr.Infow("Adding msg to batch", "seqNum", msg.SequenceNumber, "nonce", msg.Nonce,
