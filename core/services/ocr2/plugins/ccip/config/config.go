@@ -14,4 +14,5 @@ type CommitPluginJobSpecConfig struct {
 // ExecutionPluginJobSpecConfig contains the plugin specific variables for the ccip.CCIPExecution plugin.
 type ExecutionPluginJobSpecConfig struct {
 	SourceStartBlock, DestStartBlock int64 // Only for first time job add.
+	USDCAttestationApi               string
 }

@@ -34,6 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/customtokens"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -66,6 +67,7 @@ type ExecutionPluginConfig struct {
 	sourceClient             evmclient.Client
 	destGasEstimator         gas.EvmFeeEstimator
 	leafHasher               hasher.LeafHasherInterface[[32]byte]
+	usdcService              *customtokens.USDCService
 }
 
 type ExecutionReportingPlugin struct {
