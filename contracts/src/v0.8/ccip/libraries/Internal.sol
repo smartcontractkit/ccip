@@ -68,12 +68,11 @@ library Internal {
   bytes32 internal constant EVM_2_EVM_MESSAGE_HASH = keccak256("EVM2EVMMessageEvent");
 
   function _hash(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
-    /// @dev Place byte32 values into a fixed size array so the abi-encoded end result is identical to passing
+    /// @dev Place values into a fixed size array so the abi-encoded end result is identical to passing
     /// these values individually. This is done to avoid stack-too-deep error when encoding many values.
-    bytes32[3] memory hashes = [
-      keccak256(original.data),
-      keccak256(abi.encode(original.tokenAmounts)),
-      keccak256(abi.encode(original.sourceTokenData))
+    uint256[2] memory nums = [
+      uint256(original.sequenceNumber),
+      uint256(original.nonce)
     ];
 
     return
@@ -81,11 +80,12 @@ library Internal {
         abi.encode(
           MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
           metadataHash,
-          original.sequenceNumber,
-          original.nonce,
+          nums,
           original.sender,
           original.receiver,
-          hashes,
+          keccak256(original.data),
+          keccak256(abi.encode(original.tokenAmounts)),
+          keccak256(abi.encode(original.sourceTokenData)),
           original.gasLimit,
           original.strict,
           original.feeToken,
