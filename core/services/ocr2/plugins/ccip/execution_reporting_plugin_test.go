@@ -114,53 +114,21 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 
 // TODO: refactor this - it's too complicated
 func TestExecutionReportingPlugin_buildReport(t *testing.T) {
+	ctx := testutils.Context(t)
+
 	const numMessages = 100
 	const tokensPerMessage = 20
 	const bytesPerMessage = 1000
 
-	ctx := testutils.Context(t)
-
-	messages := make([]evm_2_evm_offramp.InternalEVM2EVMMessage, numMessages)
-	offChainTokenData := make([][][]byte, numMessages)
-
-	for i := range messages {
-		tokenAmounts := make([]evm_2_evm_offramp.ClientEVMTokenAmount, tokensPerMessage)
-		for j := range tokenAmounts {
-			tokenAmounts[j] = evm_2_evm_offramp.ClientEVMTokenAmount{
-				Token: utils.RandomAddress(), Amount: big.NewInt(math.MaxInt64)}
-		}
-		messages[i] = evm_2_evm_offramp.InternalEVM2EVMMessage{
-			SourceChainSelector: math.MaxUint64,
-			SequenceNumber:      uint64(i + 1),
-			FeeTokenAmount:      big.NewInt(math.MaxInt64),
-			Sender:              utils.RandomAddress(),
-			Nonce:               math.MaxUint64,
-			GasLimit:            big.NewInt(math.MaxInt64),
-			Strict:              false,
-			Receiver:            utils.RandomAddress(),
-			Data:                bytes.Repeat([]byte{0}, bytesPerMessage),
-			TokenAmounts:        tokenAmounts,
-			FeeToken:            utils.RandomAddress(),
-			MessageId:           [32]byte{12},
-		}
-
-		data := []byte(`{"foo": "bar"}`)
-		offChainTokenData[i] = [][]byte{data, data, data}
-	}
-
-	encodedReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
-		Messages:          messages,
-		OffchainTokenData: offChainTokenData,
-		Proofs:            make([][32]byte, numMessages),
-		ProofFlagBits:     big.NewInt(rand.Int64()),
-	})
+	executionReport := generateExecutionReport(t, numMessages, tokensPerMessage, bytesPerMessage)
+	encodedReport, err := abihelpers.EncodeExecutionReport(executionReport)
 	assert.NoError(t, err)
 	// ensure "naive" full report would be bigger than limit
 	assert.Greater(t, len(encodedReport), MaxExecutionReportLength, "full execution report length")
 
-	observations := make([]ObservedMessage, len(messages))
-	for i, msg := range messages {
-		observations[i] = NewObservedMessage(msg.SequenceNumber, offChainTokenData[i])
+	observations := make([]ObservedMessage, len(executionReport.Messages))
+	for i, msg := range executionReport.Messages {
+		observations[i] = NewObservedMessage(msg.SequenceNumber, executionReport.OffchainTokenData[i])
 	}
 
 	// ensure that buildReport should cap the built report to fit in MaxExecutionReportLength
@@ -171,7 +139,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	commitStore := mock_contracts.NewCommitStoreInterface(t)
 	commitStore.On("Address").Return(commitStoreAddress)
 	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
-		Return(messages[len(messages)-1].SequenceNumber+1, nil)
+		Return(executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1, nil)
 	commitStore.On("Verify", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(math.MaxInt64), nil)
 	p.config.commitStore = commitStore
 
@@ -228,38 +196,19 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	assert.LessOrEqual(t, len(execReport), MaxExecutionReportLength, "built execution report length")
 }
 
-func TestExecutionReportToEthTxMetadata(t *testing.T) {
-	c := plugintesthelpers.SetupCCIPTestHarness(t)
-	tests := []struct {
-		name     string
-		msgBatch plugintesthelpers.MessageBatch
-		err      error
-	}{
-		{
-			"happy flow",
-			c.GenerateAndSendMessageBatch(t, 5, MaxPayloadLength, MaxTokensPerMessage),
-			nil,
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			encExecReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
-				Messages:          tc.msgBatch.Messages,
-				OffchainTokenData: tc.msgBatch.TokenData,
-				Proofs:            tc.msgBatch.Proof.Hashes,
-				ProofFlagBits:     tc.msgBatch.ProofBits,
-			})
-			require.NoError(t, err)
-			txMeta, err := ExecutionReportToEthTxMeta(encExecReport)
-			if tc.err != nil {
-				require.Equal(t, tc.err.Error(), err.Error())
-				return
-			}
-			require.NoError(t, err)
-			require.NotNil(t, txMeta)
-			require.Len(t, txMeta.MessageIDs, len(tc.msgBatch.Messages))
-		})
-	}
+func TestExecutionReportToEthTxMeta(t *testing.T) {
+	t.Run("happy flow", func(t *testing.T) {
+		executionReport := generateExecutionReport(t, 10, 3, 1000)
+		encExecReport, err := abihelpers.EncodeExecutionReport(executionReport)
+		txMeta, err := ExecutionReportToEthTxMeta(encExecReport)
+		assert.NoError(t, err)
+		assert.Len(t, txMeta.MessageIDs, len(executionReport.Messages))
+	})
+
+	t.Run("invalid report", func(t *testing.T) {
+		_, err := ExecutionReportToEthTxMeta([]byte("whatever"))
+		assert.Error(t, err)
+	})
 }
 
 func TestUpdateSourceToDestTokenMapping(t *testing.T) {
@@ -1367,5 +1316,45 @@ func Test_inflightAggregates(t *testing.T) {
 			assert.True(t, reflect.DeepEqual(tc.expMaxInflightSenderNonces, maxInflightSenderNonces))
 			assert.True(t, reflect.DeepEqual(tc.expInflightTokenAmounts, inflightTokenAmounts))
 		})
+	}
+}
+
+func generateExecutionReport(t *testing.T, numMsgs, tokensPerMsg, bytesPerMsg int) evm_2_evm_offramp.InternalExecutionReport {
+	messages := make([]evm_2_evm_offramp.InternalEVM2EVMMessage, numMsgs)
+
+	offChainTokenData := make([][][]byte, numMsgs)
+	for i := range messages {
+		tokenAmounts := make([]evm_2_evm_offramp.ClientEVMTokenAmount, tokensPerMsg)
+		for j := range tokenAmounts {
+			tokenAmounts[j] = evm_2_evm_offramp.ClientEVMTokenAmount{
+				Token:  utils.RandomAddress(),
+				Amount: big.NewInt(math.MaxInt64),
+			}
+		}
+
+		messages[i] = evm_2_evm_offramp.InternalEVM2EVMMessage{
+			SourceChainSelector: rand.Uint64(),
+			SequenceNumber:      uint64(i + 1),
+			FeeTokenAmount:      big.NewInt(rand.Int64()),
+			Sender:              utils.RandomAddress(),
+			Nonce:               rand.Uint64(),
+			GasLimit:            big.NewInt(rand.Int64()),
+			Strict:              false,
+			Receiver:            utils.RandomAddress(),
+			Data:                bytes.Repeat([]byte{1}, bytesPerMsg),
+			TokenAmounts:        tokenAmounts,
+			FeeToken:            utils.RandomAddress(),
+			MessageId:           utils.RandomBytes32(),
+		}
+
+		data := []byte(`{"foo": "bar"}`)
+		offChainTokenData[i] = [][]byte{data, data, data}
+	}
+
+	return evm_2_evm_offramp.InternalExecutionReport{
+		Messages:          messages,
+		OffchainTokenData: offChainTokenData,
+		Proofs:            make([][32]byte, numMsgs),
+		ProofFlagBits:     big.NewInt(rand.Int64()),
 	}
 }
