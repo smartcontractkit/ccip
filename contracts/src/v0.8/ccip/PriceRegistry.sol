@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
+import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 import {Internal} from "./libraries/Internal.sol";
@@ -11,7 +12,7 @@ import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.0/contracts/ut
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
-contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
+contract PriceRegistry is IPriceRegistry, OwnerIsCreator, TypeAndVersionInterface {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
@@ -29,7 +30,14 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator {
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
 
-  /// @dev The price, in USD with 18 decimals, of 1 unit of gas for a given destination chain.
+  // STATIC CONFIG
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
+  string public constant override typeAndVersion = "PriceRegistry 1.2.0";
+
+  /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals.
+  /// Multiple gas prices can be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits.
+  /// For example, if Optimism is the destination chain, gas price can include L1 base fee and L2 gas price.
+  /// Logic to parse the price components is chain-specific, and should live in OnRamp.
   /// @dev Price of 1e18 is 1 USD. Examples:
   ///     Very Expensive:   1 unit of gas costs 1 USD                  -> 1e18
   ///     Expensive:        1 unit of gas costs 0.1 USD                -> 1e17

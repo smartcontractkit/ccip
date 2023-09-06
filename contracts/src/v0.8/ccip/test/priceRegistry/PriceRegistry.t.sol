@@ -8,12 +8,12 @@ import {PriceRegistry} from "../../PriceRegistry.sol";
 
 contract PriceRegistrySetup is TokenSetup, RouterSetup {
   uint112 internal constant USD_PER_GAS = 1e6; // 0.001 gwei
-  uint112 internal constant USD_PER_CALLDATA_GAS = 1e9; // 1 gwei
+  uint112 internal constant USD_PER_DATA_AVAILABILITY_GAS = 1e9; // 1 gwei
 
   // Encode L1 gas price and L2 gas price into a packed price.
   // L1 gas price is left-shifted to the higher-order bits.
   uint224 internal constant PACKED_USD_PER_GAS =
-    (uint224(USD_PER_CALLDATA_GAS) << Internal.GAS_PRICE_BITS) + USD_PER_GAS;
+    (uint224(USD_PER_DATA_AVAILABILITY_GAS) << Internal.GAS_PRICE_BITS) + USD_PER_GAS;
 
   PriceRegistry internal s_priceRegistry;
   // Cheat to store the price updates in storage since struct arrays aren't supported.
@@ -96,6 +96,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     assertEq(feeTokens, s_priceRegistry.getFeeTokens());
     assertEq(uint32(TWELVE_HOURS), s_priceRegistry.getStalenessThreshold());
     assertEq(priceUpdaters, s_priceRegistry.getPriceUpdaters());
+    assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.2.0");
   }
 
   function testInvalidStalenessThresholdReverts() public {

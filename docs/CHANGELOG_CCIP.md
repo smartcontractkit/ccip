@@ -14,12 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - OnRamp fee calculation logic now includes L1 security fee if sending to L2.
-  - New field `destCalldataOverhead` added to **TokenTransferFeeConfig**.
-    - `destCalldataOverhead` is the size of additional calldata being passed to destination for token transfers. For example, USDC transfers require additional attestation data.
-  - new fields `destCalldataOverhead`, `destGasPerCalldataByte`, `destCalldataMultiplier` added to **DynamicConfig**.
-    - `destCalldataOverhead` is the additional L1 calldata gas on top of EVM2EVMMessage.
-    - `destGasPerCalldataByte` is the number of L1 calldata gas to charge per byte of total call data
-    - `destCalldataMultiplier` is the multiplier for L1 calldata gas. It is in multiples of 1e-4, or 0.0001. It can represent calldata compression factor.
+  - New field `destBytesOverhead` added to **TokenTransferFeeConfig**.
+    - `destBytesOverhead` is the size of additional bytes being passed to destination for token transfers. For example, USDC transfers require additional attestation data.
+  - new fields `destDataAvailabilityOverheadGas`, `destGasPerDataAvailabilityByte`, `destDataAvailabilityMultiplier` added to **DynamicConfig**.
+    - `destDataAvailabilityOverheadGas` is the extra data availability gas charged on top of message data.
+    - `destGasPerDataAvailabilityByte` is the amount of gas to charge per byte of data that needs data availability.
+    - `destDataAvailabilityMultiplier` is the multiplier for data availability gas. It is in multiples of 1e-4, or 0.0001. It can represent calldata compression factor on Optimistic Rollups.
 
 ### Removed
 

@@ -668,34 +668,45 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #getMessageCalldataCostUSD
-contract EVM2EVMOnRamp_getMessageCalldataCostUSD is EVM2EVMOnRamp_getFeeSetup {
-  function testEmptyMessageCalculatesCalldataCostSuccess() public {
-    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(USD_PER_CALLDATA_GAS, 0, 0, 0);
+/// @notice #getDataAvailabilityCostUSD
+contract EVM2EVMOnRamp_getDataAvailabilityCostUSD is EVM2EVMOnRamp_getFeeSetup {
+  function testEmptyMessageCalculatesDataAvailabilityCostSuccess() public {
+    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
 
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
 
-    uint256 calldataGas = dynamicConfig.destCalldataOverhead +
-      dynamicConfig.destGasPerCalldataByte *
+    uint256 dataAvailabilityGas = dynamicConfig.destDataAvailabilityOverheadGas +
+      dynamicConfig.destGasPerDataAvailabilityByte *
       Internal.MESSAGE_FIXED_BYTES;
-    uint256 expectedCalldataCostUSD = USD_PER_CALLDATA_GAS * calldataGas * dynamicConfig.destCalldataMultiplier * 1e14;
+    uint256 expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS *
+      dataAvailabilityGas *
+      dynamicConfig.destDataAvailabilityMultiplier *
+      1e14;
 
-    assertEq(expectedCalldataCostUSD, calldataCostUSD);
+    assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
   }
 
-  function testSimpleMessageCalculatesCalldataCostSuccess() public {
-    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(USD_PER_CALLDATA_GAS, 100, 5, 50);
+  function testSimpleMessageCalculatesDataAvailabilityCostSuccess() public {
+    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(USD_PER_DATA_AVAILABILITY_GAS, 100, 5, 50);
 
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
 
-    uint256 calldataLength = Internal.MESSAGE_FIXED_BYTES + 100 + (5 * Internal.MESSAGE_BYTES_PER_TOKEN) + 50;
-    uint256 calldataGas = dynamicConfig.destCalldataOverhead + dynamicConfig.destGasPerCalldataByte * calldataLength;
-    uint256 expectedCalldataCostUSD = USD_PER_CALLDATA_GAS * calldataGas * dynamicConfig.destCalldataMultiplier * 1e14;
+    uint256 dataAvailabilityLengthBytes = Internal.MESSAGE_FIXED_BYTES +
+      100 +
+      (5 * Internal.MESSAGE_BYTES_PER_TOKEN) +
+      50;
+    uint256 dataAvailabilityGas = dynamicConfig.destDataAvailabilityOverheadGas +
+      dynamicConfig.destGasPerDataAvailabilityByte *
+      dataAvailabilityLengthBytes;
+    uint256 expectedDataAvailabilityCostUSD = USD_PER_DATA_AVAILABILITY_GAS *
+      dataAvailabilityGas *
+      dynamicConfig.destDataAvailabilityMultiplier *
+      1e14;
 
-    assertEq(expectedCalldataCostUSD, calldataCostUSD);
+    assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
   }
 
-  function testFuzz_ZeroCalldataGasPriceAlwaysCalculatesZeroCalldataCostSuccess(
+  function testFuzz_ZeroDataAvailabilityGasPriceAlwaysCalculatesZeroDataAvailabilityCostSuccess(
     uint256 messageDataLength,
     uint256 numberOfTokens,
     uint32 tokenTransferBytesOverhead
@@ -703,21 +714,21 @@ contract EVM2EVMOnRamp_getMessageCalldataCostUSD is EVM2EVMOnRamp_getFeeSetup {
     vm.assume(messageDataLength < type(uint64).max);
     vm.assume(numberOfTokens < type(uint64).max);
 
-    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(
+    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(
       0,
       messageDataLength,
       numberOfTokens,
       tokenTransferBytesOverhead
     );
 
-    assertEq(0, calldataCostUSD);
+    assertEq(0, dataAvailabilityCostUSD);
   }
 
-  function testFuzz_CalculateCalldataCostSuccess(
-    uint32 destCalldataOverhead,
-    uint16 destGasPerCalldataByte,
-    uint16 destCalldataMultiplier,
-    uint112 calldataGasPrice,
+  function testFuzz_CalculateDataAvailabilityCostSuccess(
+    uint32 destDataAvailabilityOverheadGas,
+    uint16 destGasPerDataAvailabilityByte,
+    uint16 destDataAvailabilityMultiplier,
+    uint112 dataAvailabilityGasPrice,
     uint256 messageDataLength,
     uint256 numberOfTokens,
     uint32 tokenTransferBytesOverhead
@@ -727,27 +738,32 @@ contract EVM2EVMOnRamp_getMessageCalldataCostUSD is EVM2EVMOnRamp_getFeeSetup {
     vm.assume(numberOfTokens < type(uint64).max);
 
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
-    dynamicConfig.destCalldataOverhead = destCalldataOverhead;
-    dynamicConfig.destGasPerCalldataByte = destGasPerCalldataByte;
-    dynamicConfig.destCalldataMultiplier = destCalldataMultiplier;
+    dynamicConfig.destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
+    dynamicConfig.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;
+    dynamicConfig.destDataAvailabilityMultiplier = destDataAvailabilityMultiplier;
     s_onRamp.setDynamicConfig(dynamicConfig);
 
-    uint256 calldataCostUSD = s_onRamp.getMessageCalldataCostUSD(
-      calldataGasPrice,
+    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(
+      dataAvailabilityGasPrice,
       messageDataLength,
       numberOfTokens,
       tokenTransferBytesOverhead
     );
 
-    uint256 calldataLength = Internal.MESSAGE_FIXED_BYTES +
+    uint256 dataAvailabilityLengthBytes = Internal.MESSAGE_FIXED_BYTES +
       messageDataLength +
       (numberOfTokens * Internal.MESSAGE_BYTES_PER_TOKEN) +
       tokenTransferBytesOverhead;
 
-    uint256 calldataGas = destCalldataOverhead + destGasPerCalldataByte * calldataLength;
-    uint256 expectedCalldataCostUSD = calldataGasPrice * calldataGas * destCalldataMultiplier * 1e14;
+    uint256 dataAvailabilityGas = destDataAvailabilityOverheadGas +
+      destGasPerDataAvailabilityByte *
+      dataAvailabilityLengthBytes;
+    uint256 expectedDataAvailabilityCostUSD = dataAvailabilityGasPrice *
+      dataAvailabilityGas *
+      destDataAvailabilityMultiplier *
+      1e14;
 
-    assertEq(expectedCalldataCostUSD, calldataCostUSD);
+    assertEq(expectedDataAvailabilityCostUSD, dataAvailabilityCostUSD);
   }
 }
 
@@ -1096,21 +1112,21 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS);
       uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSD) * feeTokenConfig.premiumMultiplier);
-      uint256 calldataFeeUSD = s_onRamp.getMessageCalldataCostUSD(
-        USD_PER_CALLDATA_GAS,
+      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCostUSD(
+        USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
         message.tokenAmounts.length,
         0
       );
 
-      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + calldataFeeUSD) / feeTokenPrices[i];
+      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + dataAvailabilityFeeUSD) / feeTokenPrices[i];
       assertEq(totalPriceInFeeToken, feeAmount);
     }
   }
 
-  function testZeroCalldataMultiplierSuccess() public {
+  function testZeroDataAvailabilityMultiplierSuccess() public {
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
-    dynamicConfig.destCalldataMultiplier = 0;
+    dynamicConfig.destDataAvailabilityMultiplier = 0;
     s_onRamp.setDynamicConfig(dynamicConfig);
 
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
@@ -1147,14 +1163,14 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
       uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + customDataSize * DEST_GAS_PER_PAYLOAD_BYTE;
       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplier * USD_PER_GAS);
       uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSD) * feeTokenConfig.premiumMultiplier);
-      uint256 calldataFeeUSD = s_onRamp.getMessageCalldataCostUSD(
-        USD_PER_CALLDATA_GAS,
+      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCostUSD(
+        USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
         message.tokenAmounts.length,
         0
       );
 
-      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + calldataFeeUSD) / feeTokenPrices[i];
+      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + dataAvailabilityFeeUSD) / feeTokenPrices[i];
       assertEq(totalPriceInFeeToken, feeAmount);
     }
   }
@@ -1182,14 +1198,14 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
         feeTokenConfig
       );
       uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplier);
-      uint256 calldataFeeUSD = s_onRamp.getMessageCalldataCostUSD(
-        USD_PER_CALLDATA_GAS,
+      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCostUSD(
+        USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
         message.tokenAmounts.length,
         tokenBytesOverhead
       );
 
-      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + calldataFeeUSD) / feeTokenPrices[i];
+      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + dataAvailabilityFeeUSD) / feeTokenPrices[i];
       assertEq(totalPriceInFeeToken, feeAmount);
     }
   }
@@ -1237,14 +1253,14 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
         feeTokenConfig
       );
       uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplier);
-      uint256 calldataFeeUSD = s_onRamp.getMessageCalldataCostUSD(
-        USD_PER_CALLDATA_GAS,
+      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCostUSD(
+        USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
         message.tokenAmounts.length,
         tokenBytesOverhead
       );
 
-      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + calldataFeeUSD) / feeTokenPrices[i];
+      uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD + dataAvailabilityFeeUSD) / feeTokenPrices[i];
       assertEq(totalPriceInFeeToken, feeAmount);
     }
   }
@@ -1766,9 +1782,9 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxTokensLength: 14,
       destGasOverhead: DEST_GAS_OVERHEAD / 2,
       destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE / 2,
-      destCalldataOverhead: DEST_CALLDATA_OVERHEAD,
-      destGasPerCalldataByte: DEST_GAS_PER_CALLDATA_BYTE,
-      destCalldataMultiplier: DEST_GAS_CALLDATA_MULTIPLIER,
+      destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
+      destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
+      destDataAvailabilityMultiplier: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER,
       priceRegistry: address(23423),
       maxDataSize: 400,
       maxGasLimit: MAX_GAS_LIMIT / 2
@@ -1797,9 +1813,9 @@ contract EVM2EVMOnRamp_setDynamicConfig is EVM2EVMOnRampSetup {
       maxTokensLength: 14,
       destGasOverhead: DEST_GAS_OVERHEAD / 2,
       destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE / 2,
-      destCalldataOverhead: DEST_CALLDATA_OVERHEAD,
-      destGasPerCalldataByte: DEST_GAS_PER_CALLDATA_BYTE,
-      destCalldataMultiplier: DEST_GAS_CALLDATA_MULTIPLIER,
+      destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
+      destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
+      destDataAvailabilityMultiplier: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER,
       priceRegistry: address(23423),
       maxDataSize: 400,
       maxGasLimit: MAX_GAS_LIMIT / 2

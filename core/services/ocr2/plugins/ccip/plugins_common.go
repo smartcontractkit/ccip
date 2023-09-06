@@ -88,11 +88,13 @@ func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, cli
 			return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
 		}
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
-			Router:          legacyDynamicConfig.Router,
-			MaxTokensLength: legacyDynamicConfig.MaxTokensLength,
-			PriceRegistry:   legacyDynamicConfig.PriceRegistry,
-			MaxDataSize:     big.NewInt(int64(legacyDynamicConfig.MaxDataSize)),
-			MaxGasLimit:     uint32(legacyDynamicConfig.MaxGasLimit),
+			Router:                legacyDynamicConfig.Router,
+			MaxTokensLength:       legacyDynamicConfig.MaxTokensLength,
+			DestGasOverhead:       legacyDynamicConfig.DestGasOverhead,
+			DestGasPerPayloadByte: legacyDynamicConfig.DestGasPerPayloadByte,
+			PriceRegistry:         legacyDynamicConfig.PriceRegistry,
+			MaxDataSize:           big.NewInt(int64(legacyDynamicConfig.MaxDataSize)),
+			MaxGasLimit:           uint32(legacyDynamicConfig.MaxGasLimit),
 		}, nil
 	case "1.2.0":
 		return onRamp.GetDynamicConfig(opts)

@@ -91,23 +91,23 @@ contract StructFactory {
   uint32 internal constant DEST_GAS_OVERHEAD = 350_000;
   uint16 internal constant DEST_GAS_PER_PAYLOAD_BYTE = 16;
 
-  // Use 16 gas per calldata byte in our tests.
+  // Use 16 gas per data availability byte in our tests.
   // This is an overstimation in OP stack, it ignores 4 gas per 0 byte rule.
-  // Arbitrum on the other hand, does always use 16 gas per calldata byte.
+  // Arbitrum on the other hand, does always use 16 gas per data availability byte.
   // This value may be substantially decreased after EIP 4844.
-  uint16 internal constant DEST_GAS_PER_CALLDATA_BYTE = 16;
+  uint16 internal constant DEST_GAS_PER_DATA_AVAILABILITY_BYTE = 16;
 
-  // Total L1 calldata overhead estimate is 33_084 gas.
+  // Total L1 data availability overhead estimate is 33_596 gas.
   // This value includes complete CommitStore and OffRamp call data.
-  uint32 internal constant DEST_CALLDATA_OVERHEAD =
-    188 + // Fixed calldata overhead in OP stack.
+  uint32 internal constant DEST_DATA_AVAILABILITY_OVERHEAD_GAS =
+    188 + // Fixed data availability overhead in OP stack.
       (32 * 31 + 4) *
-      DEST_GAS_PER_CALLDATA_BYTE + // CommitStore single-root transmission takes up about 31 slots, plus selector.
-      (32 * 33 + 4) *
-      DEST_GAS_PER_CALLDATA_BYTE; // OffRamp transmission excluding EVM2EVMMessage takes up about 33 slots, plus selector.
+      DEST_GAS_PER_DATA_AVAILABILITY_BYTE + // CommitStore single-root transmission takes up about 31 slots, plus selector.
+      (32 * 34 + 4) *
+      DEST_GAS_PER_DATA_AVAILABILITY_BYTE; // OffRamp transmission excluding EVM2EVMMessage takes up about 34 slots, plus selector.
 
   // Multiples of 0.0001, use 6840 for OP, same as OP mainnet 0.684.
-  uint16 internal constant DEST_GAS_CALLDATA_MULTIPLIER = 6840;
+  uint16 internal constant DEST_GAS_DATA_AVAILABILITY_MULTIPLIER = 6840;
 
   // OffRamp
   uint256 internal constant POOL_BALANCE = 1e25;
@@ -146,9 +146,9 @@ contract StructFactory {
         maxTokensLength: MAX_TOKENS_LENGTH,
         destGasOverhead: DEST_GAS_OVERHEAD,
         destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
-        destCalldataOverhead: DEST_CALLDATA_OVERHEAD,
-        destGasPerCalldataByte: DEST_GAS_PER_CALLDATA_BYTE,
-        destCalldataMultiplier: DEST_GAS_CALLDATA_MULTIPLIER,
+        destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
+        destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
+        destDataAvailabilityMultiplier: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER,
         priceRegistry: priceRegistry,
         maxDataSize: MAX_DATA_SIZE,
         maxGasLimit: MAX_GAS_LIMIT

@@ -57,15 +57,16 @@ library Internal {
     bytes32 messageId; //                     a hash of the message data
   }
 
-  /// @dev EVM2EVMMessage struct has 12 fields, including 2 variable arrays.
+  /// @dev EVM2EVMMessage struct has 13 fields, including 3 variable arrays.
   /// Each variable array takes 1 more slot to store its length.
-  /// Hence, when abiEncoded, excluding the dynamic contents of variable arrays,
-  /// EVM2EVMMessage takes up a fixed number of 14 lots, 32 bytes each.
-  uint256 public constant MESSAGE_FIXED_BYTES = 32 * 14;
+  /// When abi encoded, excluding array contents,
+  /// EVM2EVMMessage takes up a fixed number of 16 lots, 32 bytes each.
+  /// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 17.
+  uint256 public constant MESSAGE_FIXED_BYTES = 32 * 17;
 
-  /// @dev Each token transfer adds 1 instance of EVMTokenAmount struct to EVM2EVMMessage.
-  /// EVMTokenAmount struct contains 2 fields, 32 bytes each when abiEncoded.
-  uint256 public constant MESSAGE_BYTES_PER_TOKEN = 32 * 2;
+  /// @dev Each token transfer adds 1 EVMTokenAmount and 1 bytes.
+  /// When abiEncoded, each EVMTokenAmount takes 2 slots, each bytes takes 2 slots.
+  uint256 public constant MESSAGE_BYTES_PER_TOKEN = 32 * 4;
 
   function _toAny2EVMMessage(
     EVM2EVMMessage memory original,

@@ -77,16 +77,16 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @dev Struct to contains the dynamic configuration
   struct DynamicConfig {
-    address router; // ------------------┐ Router address
-    uint16 maxTokensLength; //           | Maximum number of ERC20 token transfers that can be included per message
-    uint32 destGasOverhead; //           | Extra gas charged on top of the gasLimit
-    uint16 destGasPerPayloadByte; //     | Destination chain gas charged per byte of `data` payload
-    uint32 destCalldataOverhead; //      | Extra L1 calldata gas on top of the message used in security fee
-    uint16 destGasPerCalldataByte; // ---┘ Number of L1 calldata gas to charge per byte of message
-    uint16 destCalldataMultiplier; // ---┐ Multiplier for L1 calldata gas, multples of 1e-4, or 0.0001
-    address priceRegistry; //            | Price registry address
-    uint24 maxDataSize; //               | Maximum payload data size, max 16MB
-    uint32 maxGasLimit; // --------------┘ Maximum gas limit for messages targeting EVMs, max 4 Billion gas
+    address router; // -------------------------┐ Router address
+    uint16 maxTokensLength; //                  | Maximum number of ERC20 token transfers per message
+    uint32 destGasOverhead; //                  | Extra gas charged on top of the gasLimit
+    uint16 destGasPerPayloadByte; //            | Destination chain gas charged per byte of `data` payload
+    uint32 destDataAvailabilityOverheadGas; //  | Extra data availability gas charged on top of message data
+    uint16 destGasPerDataAvailabilityByte; // --┘ Amount of gas to charge per byte of data that needs availability
+    uint16 destDataAvailabilityMultiplier; // --┐ Multiplier for data availability gas, multples of 1e-4, or 0.0001
+    address priceRegistry; //                   | Price registry address
+    uint24 maxDataSize; //                      | Maximum payload data size, max 16MB
+    uint32 maxGasLimit; // ---------------------┘ Maximum gas limit for messages targeting EVMs, max 4 Billion gas
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
@@ -115,7 +115,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   struct TokenTransferFeeConfig {
     uint16 ratio; // -------------------┐ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //          | Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // -------┘ Extra L1 calldata bytes on top of transfer data, e.g. USDC offchain data
+    uint32 destBytesOverhead; // -------┘ Extra data availability bytes on top of transfer data, e.g. USDC offchain data
   }
 
   /// @dev Same as TokenTransferFeeConfig
@@ -124,7 +124,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address token; // ------------------┐ Token address
     uint16 ratio; //                    | Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //          | Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // -------┘ Extra L1 calldata bytes on top of transfer data, e.g. USDC offchain data
+    uint32 destBytesOverhead; // -------┘ Extra data availability bytes on top of transfer data, e.g. USDC offchain data
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
@@ -507,7 +507,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     premiumFeeUSD = premiumFeeUSD * feeTokenConfig.premiumMultiplier;
 
     // Calculate execution gas fee on destination chain in USD with 36 decimals.
-    // We add the message gas limit, the overhead gas, and the calldata gas together.
+    // We add the message gas limit, the overhead gas, and the data availability gas together.
     // We then multiple this destination gas total with the gas multiplier and convert it into USD.
     uint256 executionCostUSD = executionGasPrice *
       ((extraArgs.gasLimit +
@@ -515,14 +515,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         (message.data.length * s_dynamicConfig.destGasPerPayloadByte) +
         tokenTransferGas) * feeTokenConfig.gasMultiplier);
 
-    uint256 calldataCostUSD = 0;
-    // Only calculate calldata cost if calldata multiplier is non-zero.
-    // The multiplier should be set to 0 if destination chain does not charge calldata cost.
-    if (s_dynamicConfig.destCalldataMultiplier > 0) {
-      uint112 calldataGasPrice = uint112(packedGasPrice >> Internal.GAS_PRICE_BITS);
+    uint256 dataAvailabilityCostUSD = 0;
+    // Only calculate data availability cost if multiplier is non-zero.
+    // The multiplier should be set to 0 if destination chain does not charge data availability cost.
+    if (s_dynamicConfig.destDataAvailabilityMultiplier > 0) {
+      uint112 dataAvailabilityGasPrice = uint112(packedGasPrice >> Internal.GAS_PRICE_BITS);
 
-      calldataCostUSD = _getMessageCalldataCostUSD(
-        calldataGasPrice,
+      dataAvailabilityCostUSD = _getDataAvailabilityCostUSD(
+        dataAvailabilityGasPrice,
         message.data.length,
         message.tokenAmounts.length,
         tokenTransferBytesOverhead
@@ -532,33 +532,33 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // Calculate number of fee tokens to charge.
     // Total USD fee is in 36 decimals, feeTokenPrice is in 18 decimals USD for 1e18 smallest token denominations.
     // Result of the division is the number of smallest token denominations.
-    return (premiumFeeUSD + executionCostUSD + calldataCostUSD) / feeTokenPrice;
+    return (premiumFeeUSD + executionCostUSD + dataAvailabilityCostUSD) / feeTokenPrice;
   }
 
-  /// @notice Returns the estimated calldata cost of the message.
-  /// @dev To save on gas, we use a single destGasPerCalldataByte value for both zero and non-zero bytes.
-  /// @param calldataGasPrice USD per calldata gas in 18 decimals.
+  /// @notice Returns the estimated data availability cost of the message.
+  /// @dev To save on gas, we use a single destGasPerDataAvailabilityByte value for both zero and non-zero bytes.
+  /// @param dataAvailabilityGasPrice USD per data availability gas in 18 decimals.
   /// @param messageDataLength length of the data field in the message.
   /// @param numberOfTokens number of distinct token transfers in the message.
   /// @param tokenTransferBytesOverhead additional token transfer data passed to destination, e.g. USDC attestation.
-  /// @return calldataCostUSD total calldata cost in USD with 36 decimals.
-  function _getMessageCalldataCostUSD(
-    uint112 calldataGasPrice,
+  /// @return dataAvailabilityCostUSD total data availability cost in USD with 36 decimals.
+  function _getDataAvailabilityCostUSD(
+    uint112 dataAvailabilityGasPrice,
     uint256 messageDataLength,
     uint256 numberOfTokens,
     uint32 tokenTransferBytesOverhead
-  ) internal view returns (uint256 calldataCostUSD) {
-    uint256 calldataLength = Internal.MESSAGE_FIXED_BYTES +
+  ) internal view returns (uint256 dataAvailabilityCostUSD) {
+    uint256 dataAvailabilityLengthBytes = Internal.MESSAGE_FIXED_BYTES +
       messageDataLength +
       (numberOfTokens * Internal.MESSAGE_BYTES_PER_TOKEN) +
       tokenTransferBytesOverhead;
 
-    uint256 calldataGas = (calldataLength * s_dynamicConfig.destGasPerCalldataByte) +
-      s_dynamicConfig.destCalldataOverhead;
+    uint256 dataAvailabilityGas = (dataAvailabilityLengthBytes * s_dynamicConfig.destGasPerDataAvailabilityByte) +
+      s_dynamicConfig.destDataAvailabilityOverheadGas;
 
-    // calldataGasPrice is in 18 decimals, destCalldataMultiplier is in 4 decimals
+    // dataAvailabilityGasPrice is in 18 decimals, destDataAvailabilityMultiplier is in 4 decimals
     // we pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    return ((calldataGas * calldataGasPrice) * s_dynamicConfig.destCalldataMultiplier) * 1e14;
+    return ((dataAvailabilityGas * dataAvailabilityGasPrice) * s_dynamicConfig.destDataAvailabilityMultiplier) * 1e14;
   }
 
   /// @notice Returns the token transfer fee.

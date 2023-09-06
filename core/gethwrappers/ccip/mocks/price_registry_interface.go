@@ -840,6 +840,30 @@ func (_m *PriceRegistryInterface) TransferOwnership(opts *bind.TransactOpts, to 
 	return r0, r1
 }
 
+// TypeAndVersion provides a mock function with given fields: opts
+func (_m *PriceRegistryInterface) TypeAndVersion(opts *bind.CallOpts) (string, error) {
+	ret := _m.Called(opts)
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (string, error)); ok {
+		return rf(opts)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) string); ok {
+		r0 = rf(opts)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
+		r1 = rf(opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // UpdatePrices provides a mock function with given fields: opts, priceUpdates
 func (_m *PriceRegistryInterface) UpdatePrices(opts *bind.TransactOpts, priceUpdates price_registry.InternalPriceUpdates) (*types.Transaction, error) {
 	ret := _m.Called(opts, priceUpdates)

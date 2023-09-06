@@ -224,16 +224,16 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			ArmProxy:          c.Source.ARM.Address(), // ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
-			Router:                 c.Source.Router.Address(),
-			MaxTokensLength:        5,
-			DestGasOverhead:        350_000,
-			DestGasPerPayloadByte:  16,
-			DestCalldataOverhead:   33_084,
-			DestGasPerCalldataByte: 16,
-			DestCalldataMultiplier: 6840, // 0.684
-			PriceRegistry:          c.Source.PriceRegistry.Address(),
-			MaxDataSize:            big.NewInt(1e5),
-			MaxGasLimit:            4_000_000,
+			Router:                          c.Source.Router.Address(),
+			MaxTokensLength:                 5,
+			DestGasOverhead:                 350_000,
+			DestGasPerPayloadByte:           16,
+			DestDataAvailabilityOverheadGas: 33_596,
+			DestGasPerDataAvailabilityByte:  16,
+			DestDataAvailabilityMultiplier:  6840, // 0.684
+			PriceRegistry:                   c.Source.PriceRegistry.Address(),
+			MaxDataSize:                     big.NewInt(1e5),
+			MaxGasLimit:                     4_000_000,
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
@@ -895,16 +895,16 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			ArmProxy:          armProxySourceAddress, // ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
-			Router:                 sourceRouterAddress,
-			MaxTokensLength:        5,
-			DestGasOverhead:        350_000,
-			DestGasPerPayloadByte:  16,
-			DestCalldataOverhead:   33_084,
-			DestGasPerCalldataByte: 16,
-			DestCalldataMultiplier: 6840, // 0.684
-			PriceRegistry:          sourcePricesAddress,
-			MaxDataSize:            big.NewInt(1e5),
-			MaxGasLimit:            4_000_000,
+			Router:                          sourceRouterAddress,
+			MaxTokensLength:                 5,
+			DestGasOverhead:                 350_000,
+			DestGasPerPayloadByte:           16,
+			DestDataAvailabilityOverheadGas: 33_596,
+			DestGasPerDataAvailabilityByte:  16,
+			DestDataAvailabilityMultiplier:  6840, // 0.684
+			PriceRegistry:                   sourcePricesAddress,
+			MaxDataSize:                     big.NewInt(1e5),
+			MaxGasLimit:                     4_000_000,
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{

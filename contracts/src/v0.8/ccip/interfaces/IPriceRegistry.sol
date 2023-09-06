@@ -23,9 +23,11 @@ interface IPriceRegistry {
   /// @return tokenPrices The tokenPrices for the given tokens.
   function getTokenPrices(address[] calldata tokens) external view returns (Internal.TimestampedPackedUint224[] memory);
 
-  /// @notice Get the `gasPrice` for a given destination chain ID.
+  /// @notice Get an encoded `gasPrice` for a given destination chain ID.
+  /// The 224-bit result could encode multiple price components. For example, if Optimism is the destination chain,
+  /// gas price can include L1 base fee in higher-order bits, and L2 gas price in lower-order bits.
   /// @param destChainSelector The destination chain to get the price for.
-  /// @return gasPrice The gasPrice for the given destination chain ID.
+  /// @return gasPrice The encoded gasPrice for the given destination chain ID.
   function getDestinationChainGasPrice(
     uint64 destChainSelector
   ) external view returns (Internal.TimestampedPackedUint224 memory);
