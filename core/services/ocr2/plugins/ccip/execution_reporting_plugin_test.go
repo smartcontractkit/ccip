@@ -128,6 +128,7 @@ func TestExecutionReportToEthTxMeta(t *testing.T) {
 	t.Run("happy flow", func(t *testing.T) {
 		executionReport := generateExecutionReport(t, 10, 3, 1000)
 		encExecReport, err := abihelpers.EncodeExecutionReport(executionReport)
+		assert.NoError(t, err)
 		txMeta, err := ExecutionReportToEthTxMeta(encExecReport)
 		assert.NoError(t, err)
 		assert.Len(t, txMeta.MessageIDs, len(executionReport.Messages))
