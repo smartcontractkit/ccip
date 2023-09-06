@@ -28,6 +28,7 @@ ifeq ($(OSFLAG),$(WINDOWS))
 	exit 1
 endif
 
+# install asdf
 ifeq ($(shell which asdf),)
 ifeq ($(OSFLAG),$(LINUX))
 	echo "You will need to install asdf via your linux installer https://asdf-vm.com/guide/getting-started.html"
