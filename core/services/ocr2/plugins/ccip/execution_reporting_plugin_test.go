@@ -53,6 +53,8 @@ type execTestHarness = struct {
 	plugin *ExecutionReportingPlugin
 }
 
+var defaultGasPrice = big.NewInt(3e9)
+
 func setupExecTestHarness(t *testing.T) execTestHarness {
 	th := plugintesthelpers.SetupCCIPTestHarness(t)
 

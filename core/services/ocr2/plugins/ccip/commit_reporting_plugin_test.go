@@ -24,7 +24,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
@@ -40,102 +39,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
 
-	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
-
-var defaultGasPrice = big.NewInt(3e9)
-
-type commitTestHarness = struct {
-	plugintesthelpers.CCIPPluginTestHarness
-	plugin       *CommitReportingPlugin
-	mockedGetFee *mock.Call
-}
-
-func setupCommitTestHarness(t *testing.T) commitTestHarness {
-	th := plugintesthelpers.SetupCCIPTestHarness(t)
-
-	sourceFeeEstimator := mocks.NewEvmFeeEstimator(t)
-
-	mockedGetFee := sourceFeeEstimator.On(
-		"GetFee",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Maybe().Return(gas.EvmFee{Legacy: assets.NewWei(defaultGasPrice)}, uint32(200e3), nil)
-
-	lggr := logger.TestLogger(t)
-	priceGetter := newMockPriceGetter()
-
-	backendClient := client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID))
-	plugin := CommitReportingPlugin{
-		config: CommitPluginConfig{
-			lggr:                th.Lggr,
-			sourceLP:            th.SourceLP,
-			destLP:              th.DestLP,
-			sourceEvents:        ccipevents.NewLogPollerClient(th.SourceLP, lggr, backendClient),
-			destEvents:          ccipevents.NewLogPollerClient(th.DestLP, lggr, backendClient),
-			offRamp:             th.Dest.OffRamp,
-			onRampAddress:       th.Source.OnRamp.Address(),
-			commitStore:         th.Dest.CommitStore,
-			priceGetter:         priceGetter,
-			sourceNative:        utils.RandomAddress(),
-			sourceFeeEstimator:  sourceFeeEstimator,
-			sourceChainSelector: th.Source.ChainSelector,
-			destClient:          backendClient,
-			sourceClient:        backendClient,
-			leafHasher:          hasher.NewLeafHasher(th.Source.ChainSelector, th.Dest.ChainSelector, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
-		},
-		inflightReports: newInflightCommitReportsContainer(time.Hour),
-		onchainConfig:   th.CommitOnchainConfig,
-		offchainConfig: ccipconfig.CommitOffchainConfig{
-			SourceFinalityDepth:   0,
-			DestFinalityDepth:     0,
-			FeeUpdateDeviationPPB: 5e7,
-			FeeUpdateHeartBeat:    models.MustMakeDuration(12 * time.Hour),
-			MaxGasPrice:           200e9,
-		},
-		lggr:               th.Lggr,
-		destPriceRegistry:  th.Dest.PriceRegistry,
-		tokenDecimalsCache: cache.NewTokenToDecimals(th.Lggr, th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, backendClient, 0),
-	}
-
-	priceGetter.On("TokenPricesUSD", mock.Anything, mock.Anything).Return(map[common.Address]*big.Int{
-		plugin.config.sourceNative:    big.NewInt(0).Mul(big.NewInt(100), big.NewInt(1e18)),
-		th.Source.LinkToken.Address(): big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
-		th.Dest.LinkToken.Address():   big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1e18)),
-	}, nil)
-
-	return commitTestHarness{
-		CCIPPluginTestHarness: th,
-		plugin:                &plugin,
-		mockedGetFee:          mockedGetFee,
-	}
-}
-
-func TestCommitReportSize(t *testing.T) {
-	testParams := gopter.DefaultTestParameters()
-	testParams.MinSuccessfulTests = 100
-	p := gopter.NewProperties(testParams)
-	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
-		var root32 [32]byte
-		copy(root32[:], root)
-		rep, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
-			MerkleRoot: root32,
-			Interval:   commit_store.CommitStoreInterval{Min: min, Max: max},
-			PriceUpdates: commit_store.InternalPriceUpdates{
-				TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-				DestChainSelector: 1337,
-				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-			},
-		})
-		require.NoError(t, err)
-		return len(rep) <= MaxCommitReportLength
-	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
-	p.TestingRun(t)
-}
 
 func TestCommitReportingPlugin_Observation(t *testing.T) {
 	sourceNativeTokenAddr := common.HexToAddress("1000")
@@ -379,6 +285,170 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			assert.Equal(t, expectedReport, gotReport)
 		})
 	}
+}
+
+func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
+	ctx := testutils.Context(t)
+
+	newPlugin := func() *CommitReportingPlugin {
+		p := &CommitReportingPlugin{}
+		p.lggr = logger.TestLogger(t)
+		p.inflightReports = newInflightCommitReportsContainer(time.Minute)
+		return p
+	}
+
+	t.Run("report cannot be decoded leads to error", func(t *testing.T) {
+		p := newPlugin()
+		encodedReport := []byte("whatever")
+		_, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
+		assert.Error(t, err)
+	})
+
+	t.Run("empty report should not be accepted", func(t *testing.T) {
+		p := newPlugin()
+		report := commit_store.CommitStoreCommitReport{
+			// UsdPerUnitGas is mandatory otherwise report cannot be encoded/decoded
+			PriceUpdates: commit_store.InternalPriceUpdates{UsdPerUnitGas: big.NewInt(int64(rand.Int()))},
+		}
+		encodedReport, err := abihelpers.EncodeCommitReport(report)
+		assert.NoError(t, err)
+		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
+		assert.NoError(t, err)
+		assert.False(t, shouldAccept)
+	})
+
+	t.Run("stale report should not be accepted", func(t *testing.T) {
+		onChainSeqNum := uint64(100)
+
+		commitStore := mock_contracts.NewCommitStoreInterface(t)
+		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+
+		p := newPlugin()
+		p.config.commitStore = commitStore
+
+		report := commit_store.CommitStoreCommitReport{
+			PriceUpdates: commit_store.InternalPriceUpdates{UsdPerUnitGas: big.NewInt(int64(rand.Int()))},
+			MerkleRoot:   [32]byte{123}, // this report is considered non-empty since it has a merkle root
+		}
+
+		// stale since report interval is behind on chain seq num
+		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
+		encodedReport, err := abihelpers.EncodeCommitReport(report)
+		assert.NoError(t, err)
+
+		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
+		assert.NoError(t, err)
+		assert.False(t, shouldAccept)
+	})
+
+	t.Run("non-stale report should be accepted and added inflight", func(t *testing.T) {
+		onChainSeqNum := uint64(100)
+
+		commitStore := mock_contracts.NewCommitStoreInterface(t)
+		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+
+		p := newPlugin()
+		p.config.commitStore = commitStore
+
+		report := commit_store.CommitStoreCommitReport{
+			PriceUpdates: commit_store.InternalPriceUpdates{
+				TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
+					{
+						SourceToken: utils.RandomAddress(),
+						UsdPerToken: big.NewInt(int64(rand.Int())),
+					},
+				},
+				DestChainSelector: rand.Uint64(),
+				UsdPerUnitGas:     big.NewInt(int64(rand.Int())),
+			},
+			MerkleRoot: [32]byte{123},
+		}
+
+		// non-stale since report interval is not behind on-chain seq num
+		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum, Max: onChainSeqNum + 10}
+		encodedReport, err := abihelpers.EncodeCommitReport(report)
+		assert.NoError(t, err)
+
+		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
+		assert.NoError(t, err)
+		assert.True(t, shouldAccept)
+
+		// make sure that the report was added inflight
+		tokenPriceUpdates := p.inflightReports.latestInflightTokenPriceUpdates()
+		priceUpdate := tokenPriceUpdates[report.PriceUpdates.TokenPriceUpdates[0].SourceToken]
+		assert.Equal(t, report.PriceUpdates.TokenPriceUpdates[0].UsdPerToken.Uint64(), priceUpdate.value.Uint64())
+	})
+}
+
+func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
+	report := commit_store.CommitStoreCommitReport{
+		PriceUpdates: commit_store.InternalPriceUpdates{
+			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
+				{SourceToken: utils.RandomAddress(), UsdPerToken: big.NewInt(9e18)},
+			},
+			DestChainSelector: rand.Uint64(),
+			UsdPerUnitGas:     big.NewInt(2000e9),
+		},
+		MerkleRoot: [32]byte{123},
+	}
+
+	ctx := testutils.Context(t)
+	p := &CommitReportingPlugin{}
+	commitStore := mock_contracts.NewCommitStoreInterface(t)
+	p.config.commitStore = commitStore
+	p.inflightReports = newInflightCommitReportsContainer(time.Minute)
+	p.lggr = logger.TestLogger(t)
+
+	t.Run("should transmit when report is not stale", func(t *testing.T) {
+		onChainSeqNum := uint64(100)
+		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+		// not-stale since report interval is not behind on chain seq num
+		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum, Max: onChainSeqNum + 10}
+		encodedReport, err := abihelpers.EncodeCommitReport(report)
+		assert.NoError(t, err)
+		shouldTransmit, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, encodedReport)
+		assert.NoError(t, err)
+		assert.True(t, shouldTransmit)
+	})
+
+	t.Run("should not transmit when report is stale", func(t *testing.T) {
+		onChainSeqNum := uint64(100)
+		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+		// stale since report interval is behind on chain seq num
+		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
+		encodedReport, err := abihelpers.EncodeCommitReport(report)
+		assert.NoError(t, err)
+		shouldTransmit, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, encodedReport)
+		assert.NoError(t, err)
+		assert.False(t, shouldTransmit)
+	})
+
+	t.Run("error when report cannot be decoded", func(t *testing.T) {
+		_, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, []byte("whatever"))
+		assert.Error(t, err)
+	})
+}
+
+func TestCommitReportSize(t *testing.T) {
+	testParams := gopter.DefaultTestParameters()
+	testParams.MinSuccessfulTests = 100
+	p := gopter.NewProperties(testParams)
+	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
+		var root32 [32]byte
+		copy(root32[:], root)
+		rep, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
+			MerkleRoot: root32,
+			Interval:   commit_store.CommitStoreInterval{Min: min, Max: max},
+			PriceUpdates: commit_store.InternalPriceUpdates{
+				TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+				DestChainSelector: 1337,
+				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			},
+		})
+		require.NoError(t, err)
+		return len(rep) <= MaxCommitReportLength
+	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
+	p.TestingRun(t)
 }
 
 func TestCalculatePriceUpdates(t *testing.T) {
@@ -902,165 +972,6 @@ func TestCalculateUsdPer1e18TokenAmount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := calculateUsdPer1e18TokenAmount(tt.price, tt.decimal)
 			assert.Equal(t, tt.wantResult, got)
-		})
-	}
-}
-
-func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
-	report := commit_store.CommitStoreCommitReport{
-		PriceUpdates: commit_store.InternalPriceUpdates{
-			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
-				{SourceToken: utils.RandomAddress(), UsdPerToken: big.NewInt(9e18)},
-			},
-			DestChainSelector: rand.Uint64(),
-			UsdPerUnitGas:     big.NewInt(2000e9),
-		},
-		MerkleRoot: [32]byte{123},
-	}
-
-	ctx := testutils.Context(t)
-	p := &CommitReportingPlugin{}
-	commitStore := mock_contracts.NewCommitStoreInterface(t)
-	p.config.commitStore = commitStore
-	p.inflightReports = newInflightCommitReportsContainer(time.Minute)
-	p.lggr = logger.TestLogger(t)
-
-	onChainSeqNum := uint64(100)
-
-	t.Run("should transmit when report is not stale", func(t *testing.T) {
-		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
-		// not-stale since report interval is not behind on chain seq num
-		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum, Max: onChainSeqNum + 10}
-		encodedReport, err := abihelpers.EncodeCommitReport(report)
-		assert.NoError(t, err)
-		shouldTransmit, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, encodedReport)
-		assert.NoError(t, err)
-		assert.True(t, shouldTransmit)
-	})
-
-	t.Run("should not transmit when report is stale", func(t *testing.T) {
-		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
-		// stale since report interval is behind on chain seq num
-		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
-		encodedReport, err := abihelpers.EncodeCommitReport(report)
-		assert.NoError(t, err)
-		shouldTransmit, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, encodedReport)
-		assert.NoError(t, err)
-		assert.False(t, shouldTransmit)
-	})
-
-	t.Run("error when report cannot be decoded", func(t *testing.T) {
-		_, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, []byte("whatever"))
-		assert.Error(t, err)
-	})
-}
-
-func TestShouldAcceptFinalizedReport(t *testing.T) {
-	nextMinSeqNr := uint64(10)
-
-	tests := []struct {
-		name                     string
-		seq                      uint64
-		latestPriceEpochAndRound int64
-		epoch                    uint32
-		round                    uint8
-		destChainSelector        int
-		skipRoot                 bool
-		expected                 bool
-		err                      bool
-	}{
-		{
-			name:  "future",
-			seq:   nextMinSeqNr * 2,
-			epoch: 1,
-			round: 1,
-		},
-		{
-			name:  "empty",
-			epoch: 1,
-			round: 2,
-		},
-		{
-			name:  "stale",
-			seq:   nextMinSeqNr - 1,
-			epoch: 1,
-			round: 3,
-		},
-		{
-			name:     "base",
-			seq:      nextMinSeqNr,
-			epoch:    1,
-			round:    4,
-			expected: true,
-		},
-		{
-			name:                     "price update - epoch and round is ok",
-			seq:                      nextMinSeqNr,
-			latestPriceEpochAndRound: int64(mergeEpochAndRound(2, 10)),
-			epoch:                    2,
-			round:                    11,
-			destChainSelector:        rand.Int(),
-			skipRoot:                 true,
-			expected:                 true,
-		},
-		{
-			name:                     "price update - epoch and round is behind",
-			seq:                      nextMinSeqNr,
-			latestPriceEpochAndRound: int64(mergeEpochAndRound(2, 10)),
-			epoch:                    2,
-			round:                    9,
-			destChainSelector:        rand.Int(),
-			skipRoot:                 true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			th := setupCommitTestHarness(t)
-			_, err := th.Dest.CommitStore.SetMinSeqNr(th.Dest.User, nextMinSeqNr)
-			require.NoError(t, err)
-
-			_, err = th.Dest.CommitStoreHelper.SetLatestPriceEpochAndRound(th.Dest.User, big.NewInt(tt.latestPriceEpochAndRound))
-			require.NoError(t, err)
-
-			th.CommitAndPollLogs(t)
-
-			var root [32]byte
-			if tt.seq > 0 {
-				root = testutils.Random32Byte()
-			}
-
-			r := commit_store.CommitStoreCommitReport{
-				PriceUpdates: commit_store.InternalPriceUpdates{
-					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-					DestChainSelector: uint64(tt.destChainSelector),
-					UsdPerUnitGas:     new(big.Int),
-				},
-				Interval: commit_store.CommitStoreInterval{Min: tt.seq, Max: tt.seq},
-			}
-			if !tt.skipRoot {
-				r.MerkleRoot = root
-			}
-			report, err := abihelpers.EncodeCommitReport(r)
-			require.NoError(t, err)
-
-			got, err := th.plugin.ShouldAcceptFinalizedReport(
-				testutils.Context(t),
-				types.ReportTimestamp{Epoch: tt.epoch, Round: tt.round}, report)
-			if tt.err {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equal(t, tt.expected, got)
-
-			if got { // already added to inflight, should not be accepted again
-				got, err = th.plugin.ShouldAcceptFinalizedReport(
-					testutils.Context(t),
-					types.ReportTimestamp{Epoch: tt.epoch, Round: tt.round}, report)
-				require.NoError(t, err)
-				assert.False(t, got)
-			}
 		})
 	}
 }
