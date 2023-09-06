@@ -50,6 +50,32 @@ func (_m *MockClient) GetAcceptedCommitReportsGteSeqNum(ctx context.Context, com
 	return r0, r1
 }
 
+// GetAcceptedCommitReportsGteTimestamp provides a mock function with given fields: ctx, commitStoreAddress, ts, confs
+func (_m *MockClient) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, commitStoreAddress common.Address, ts time.Time, confs int) ([]Event[commit_store.CommitStoreReportAccepted], error) {
+	ret := _m.Called(ctx, commitStoreAddress, ts, confs)
+
+	var r0 []Event[commit_store.CommitStoreReportAccepted]
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, time.Time, int) ([]Event[commit_store.CommitStoreReportAccepted], error)); ok {
+		return rf(ctx, commitStoreAddress, ts, confs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, time.Time, int) []Event[commit_store.CommitStoreReportAccepted]); ok {
+		r0 = rf(ctx, commitStoreAddress, ts, confs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]Event[commit_store.CommitStoreReportAccepted])
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, common.Address, time.Time, int) error); ok {
+		r1 = rf(ctx, commitStoreAddress, ts, confs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetExecutionStateChangesBetweenSeqNums provides a mock function with given fields: ctx, offRamp, seqNumMin, seqNumMax, confs
 func (_m *MockClient) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, offRamp common.Address, seqNumMin uint64, seqNumMax uint64, confs int) ([]Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged], error) {
 	ret := _m.Called(ctx, offRamp, seqNumMin, seqNumMax, confs)

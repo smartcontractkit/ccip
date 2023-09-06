@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/pkg/errors"
@@ -36,7 +35,6 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -235,7 +233,7 @@ type evm2EVMOnRampCCIPSendRequestedWithMeta struct {
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(
 		ctx,
-		r.config.destLP,
+		r.config.destEvents,
 		r.config.commitStore,
 		r.onchainConfig.PermissionLessExecutionThresholdDuration(),
 	)
@@ -1121,30 +1119,23 @@ func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegis
 
 func getUnexpiredCommitReports(
 	ctx context.Context,
-	dstLogPoller logpoller.LogPoller,
+	destEvents ccipevents.Client,
 	commitStore commit_store.CommitStoreInterface,
 	permissionExecutionThreshold time.Duration,
 ) ([]commit_store.CommitStoreCommitReport, error) {
-	logs, err := dstLogPoller.LogsCreatedAfter(
-		abihelpers.EventSignatures.ReportAccepted,
+	acceptedReports, err := destEvents.GetAcceptedCommitReportsGteTimestamp(
+		ctx,
 		commitStore.Address(),
 		time.Now().Add(-permissionExecutionThreshold),
 		0,
-		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
 		return nil, err
 	}
+
 	var reports []commit_store.CommitStoreCommitReport
-	for _, log := range logs {
-		reportAccepted, err := commitStore.ParseReportAccepted(gethtypes.Log{
-			Topics: log.GetTopics(),
-			Data:   log.Data,
-		})
-		if err != nil {
-			return nil, err
-		}
-		reports = append(reports, reportAccepted.Report)
+	for _, acceptedReport := range acceptedReports {
+		reports = append(reports, acceptedReport.Data.Report)
 	}
 	return reports, nil
 }

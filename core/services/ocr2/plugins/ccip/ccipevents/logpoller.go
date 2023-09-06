@@ -248,6 +248,32 @@ func (c *LogPollerClient) GetAcceptedCommitReportsGteSeqNum(ctx context.Context,
 	)
 }
 
+func (c *LogPollerClient) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, commitStoreAddress common.Address, ts time.Time, confs int) ([]Event[commit_store.CommitStoreReportAccepted], error) {
+	commitStore, err := c.loadCommitStore(commitStoreAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	logs, err := c.lp.LogsCreatedAfter(
+		abihelpers.EventSignatures.ReportAccepted,
+		commitStoreAddress,
+		ts,
+		confs,
+		pg.WithParentCtx(ctx),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseLogs[commit_store.CommitStoreReportAccepted](
+		logs,
+		c.lggr,
+		func(log types.Log) (*commit_store.CommitStoreReportAccepted, error) {
+			return commitStore.ParseReportAccepted(log)
+		},
+	)
+}
+
 func parseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(log types.Log) (*T, error)) ([]Event[T], error) {
 	reqs := make([]Event[T], 0, len(logs))
 	for _, log := range logs {
