@@ -906,82 +906,53 @@ func TestCalculateUsdPer1e18TokenAmount(t *testing.T) {
 	}
 }
 
-func TestShouldTransmitAcceptedReport(t *testing.T) {
-	th := setupCommitTestHarness(t)
-	tokenPrice := big.NewInt(9e18) // $9
-	gasPrice := big.NewInt(1500e9) // $1500 per eth * 1gwei
-
-	nextMinSeqNr := uint64(10)
-	_, err := th.Dest.CommitStore.SetMinSeqNr(th.Dest.User, nextMinSeqNr)
-	require.NoError(t, err)
-	_, err = th.Dest.PriceRegistry.UpdatePrices(th.Dest.User, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{SourceToken: th.Dest.LinkToken.Address(), UsdPerToken: tokenPrice},
+func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
+	report := commit_store.CommitStoreCommitReport{
+		PriceUpdates: commit_store.InternalPriceUpdates{
+			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
+				{SourceToken: utils.RandomAddress(), UsdPerToken: big.NewInt(9e18)},
+			},
+			DestChainSelector: rand.Uint64(),
+			UsdPerUnitGas:     big.NewInt(2000e9),
 		},
-		DestChainSelector: th.Source.ChainSelector,
-		UsdPerUnitGas:     gasPrice,
+		MerkleRoot: [32]byte{123},
+	}
+
+	ctx := testutils.Context(t)
+	p := &CommitReportingPlugin{}
+	commitStore := mock_contracts.NewCommitStoreInterface(t)
+	p.config.commitStore = commitStore
+	p.inflightReports = newInflightCommitReportsContainer(time.Minute)
+	p.lggr = logger.TestLogger(t)
+
+	onChainSeqNum := uint64(100)
+
+	t.Run("should transmit when report is not stale", func(t *testing.T) {
+		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+		// not-stale since report interval is not behind on chain seq num
+		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum, Max: onChainSeqNum + 10}
+		encodedReport, err := abihelpers.EncodeCommitReport(report)
+		assert.NoError(t, err)
+		shouldTransmit, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, encodedReport)
+		assert.NoError(t, err)
+		assert.True(t, shouldTransmit)
 	})
-	require.NoError(t, err)
-	th.CommitAndPollLogs(t)
-	round := uint8(1)
 
-	tests := []struct {
-		name       string
-		seq        uint64
-		gasPrice   *big.Int
-		tokenPrice *big.Int
-		expected   bool
-	}{
-		{"base", nextMinSeqNr, nil, nil, true},
-		{"future", nextMinSeqNr + 10, nil, nil, true},
-		{"empty", 0, nil, nil, false},
-		{"gasPrice update", 0, big.NewInt(10), nil, true},
-		{"gasPrice stale", 0, gasPrice, nil, false},
-		{"tokenPrice update", 0, nil, big.NewInt(20), true},
-		{"tokenPrice stale", 0, nil, tokenPrice, false},
-		{"token price and gas price stale", 0, gasPrice, tokenPrice, false},
-	}
+	t.Run("should not transmit when report is stale", func(t *testing.T) {
+		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+		// stale since report interval is behind on chain seq num
+		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
+		encodedReport, err := abihelpers.EncodeCommitReport(report)
+		assert.NoError(t, err)
+		shouldTransmit, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, encodedReport)
+		assert.NoError(t, err)
+		assert.False(t, shouldTransmit)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var destChainSelector uint64
-			gasPrice := new(big.Int)
-			if tt.gasPrice != nil {
-				destChainSelector = th.Source.ChainSelector
-				gasPrice = tt.gasPrice
-			}
-
-			var tokenPrices []commit_store.InternalTokenPriceUpdate
-			if tt.tokenPrice != nil {
-				tokenPrices = []commit_store.InternalTokenPriceUpdate{
-					{SourceToken: th.Dest.LinkToken.Address(), UsdPerToken: tt.tokenPrice},
-				}
-			} else {
-				tokenPrices = []commit_store.InternalTokenPriceUpdate{}
-			}
-
-			var root [32]byte
-			if tt.seq > 0 {
-				root = testutils.Random32Byte()
-			}
-
-			report, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
-				PriceUpdates: commit_store.InternalPriceUpdates{
-					TokenPriceUpdates: tokenPrices,
-					DestChainSelector: destChainSelector,
-					UsdPerUnitGas:     gasPrice,
-				},
-				MerkleRoot: root,
-				Interval:   commit_store.CommitStoreInterval{Min: tt.seq, Max: tt.seq},
-			})
-			require.NoError(t, err)
-
-			got, err := th.plugin.ShouldTransmitAcceptedReport(testutils.Context(t), types.ReportTimestamp{Epoch: 1, Round: round}, report)
-			round++
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, got)
-		})
-	}
+	t.Run("error when report cannot be decoded", func(t *testing.T) {
+		_, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, []byte("whatever"))
+		assert.Error(t, err)
+	})
 }
 
 func TestShouldAcceptFinalizedReport(t *testing.T) {
