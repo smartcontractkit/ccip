@@ -166,9 +166,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		tokenPriceUpdates []ccipevents.Event[price_registry.PriceRegistryUsdPerTokenUpdated]
 		sendRequests      []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 
-		expCommitReport *commit_store.CommitStoreCommitReport
+		expCommitReport commit_store.CommitStoreCommitReport
 		expSeqNumRange  commit_store.CommitStoreInterval
-		expReport       bool
+		shouldGetReport bool
 		expErr          bool
 	}{
 		{
@@ -188,17 +188,17 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				},
 			},
 			expSeqNumRange: commit_store.CommitStoreInterval{Min: 1, Max: 1},
-			expCommitReport: &commit_store.CommitStoreCommitReport{
-				MerkleRoot: [32]byte{},
+			expCommitReport: commit_store.CommitStoreCommitReport{
+				MerkleRoot: [32]byte{123},
 				Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 1},
 				PriceUpdates: commit_store.InternalPriceUpdates{
-					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+					TokenPriceUpdates: nil,
 					DestChainSelector: 0,
-					UsdPerUnitGas:     new(big.Int),
+					UsdPerUnitGas:     big.NewInt(0),
 				},
 			},
-			expReport: true,
-			expErr:    false,
+			shouldGetReport: true,
+			expErr:          false,
 		},
 		{
 			name: "not enough observations",
@@ -234,8 +234,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 
 	ctx := testutils.Context(t)
 	destPriceRegistryAddress := utils.RandomAddress()
-	onRampAddress :=
-		utils.RandomAddress()
+	onRampAddress := utils.RandomAddress()
 	sourceChainSelector := rand.Int()
 
 	for _, tc := range testCases {
@@ -260,29 +259,29 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.config.sourceEvents = sourceEvents
 			p.config.onRampAddress = onRampAddress
 			p.config.sourceChainSelector = uint64(sourceChainSelector)
-			p.config.leafHasher = &nopLeafHasher{}
+			p.config.leafHasher = &leafHasher123{}
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
 				obs, err := o.Marshal()
-				require.NoError(t, err)
+				assert.NoError(t, err)
 				aos = append(aos, types.AttributedObservation{Observation: obs})
 			}
-			gotShouldReport, gotReport, err := p.Report(ctx, types.ReportTimestamp{}, types.Query{}, aos)
 
+			gotSomeReport, gotReport, err := p.Report(ctx, types.ReportTimestamp{}, types.Query{}, aos)
 			if tc.expErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+				assert.Error(t, err)
+				return
 			}
-			assert.Equal(t, tc.expReport, gotShouldReport)
 
-			var expectedReport types.Report
-			if tc.expCommitReport != nil {
-				expectedReport, err = abihelpers.EncodeCommitReport(*tc.expCommitReport)
-				require.NoError(t, err)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.shouldGetReport, gotSomeReport)
+
+			if tc.shouldGetReport {
+				encodedExpectedReport, err := abihelpers.EncodeCommitReport(tc.expCommitReport)
+				assert.NoError(t, err)
+				assert.Equal(t, types.Report(encodedExpectedReport), gotReport)
 			}
-			assert.Equal(t, expectedReport, gotReport)
 		})
 	}
 }
@@ -1123,8 +1122,9 @@ func Test_isStaleReport(t *testing.T) {
 	})
 }
 
-type nopLeafHasher struct{}
+// leafHasher123 always returns '123' followed by zeroes in HashLeaf method.
+type leafHasher123 struct{}
 
-func (n nopLeafHasher) HashLeaf(log gethtypes.Log) ([32]byte, error) {
+func (h leafHasher123) HashLeaf(_ gethtypes.Log) ([32]byte, error) {
 	return [32]byte{123}, nil
 }

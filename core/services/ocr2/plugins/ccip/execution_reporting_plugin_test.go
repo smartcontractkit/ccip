@@ -160,7 +160,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 		}, nil)
 	p.config.destEvents = destEvents
 
-	p.config.leafHasher = nopLeafHasher{}
+	p.config.leafHasher = leafHasher123{}
 
 	onRampAddr := utils.RandomAddress()
 	onRamp := mock_contracts.NewEVM2EVMOnRampInterface(t)
