@@ -14,6 +14,7 @@ import (
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
@@ -220,6 +221,33 @@ func (c *LogPollerClient) LatestBlock(ctx context.Context) (int64, error) {
 	return c.lp.LatestBlock(pg.WithParentCtx(ctx))
 }
 
+func (c *LogPollerClient) GetAcceptedCommitReportsGteSeqNum(ctx context.Context, commitStoreAddress common.Address, seqNum uint64, confs int) ([]Event[commit_store.CommitStoreReportAccepted], error) {
+	commitStore, err := c.loadCommitStore(commitStoreAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	logs, err := c.lp.LogsDataWordGreaterThan(
+		abihelpers.EventSignatures.ReportAccepted,
+		commitStoreAddress,
+		abihelpers.EventSignatures.ReportAcceptedMaxSequenceNumberWord,
+		logpoller.EvmWord(seqNum),
+		confs,
+		pg.WithParentCtx(ctx),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseLogs[commit_store.CommitStoreReportAccepted](
+		logs,
+		c.lggr,
+		func(log types.Log) (*commit_store.CommitStoreReportAccepted, error) {
+			return commitStore.ParseReportAccepted(log)
+		},
+	)
+}
+
 func parseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(log types.Log) (*T, error)) ([]Event[T], error) {
 	reqs := make([]Event[T], 0, len(logs))
 	for _, log := range logs {
@@ -284,6 +312,21 @@ func (c *LogPollerClient) loadOffRamp(addr common.Address) (*evm_2_evm_offramp.E
 
 	c.dependencyCache.Store(addr, offRamp)
 	return offRamp, nil
+}
+
+func (c *LogPollerClient) loadCommitStore(addr common.Address) (*commit_store.CommitStoreFilterer, error) {
+	commitStore, exists := loadCachedDependency[*commit_store.CommitStoreFilterer](&c.dependencyCache, addr)
+	if exists {
+		return commitStore, nil
+	}
+
+	commitStore, err := commit_store.NewCommitStoreFilterer(addr, c.client)
+	if err != nil {
+		return nil, err
+	}
+
+	c.dependencyCache.Store(addr, commitStore)
+	return commitStore, nil
 }
 
 func loadCachedDependency[T any](cache *sync.Map, addr common.Address) (T, bool) {

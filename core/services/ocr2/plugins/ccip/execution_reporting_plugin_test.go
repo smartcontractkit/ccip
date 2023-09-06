@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cometbft/cometbft/libs/rand"
 	"github.com/ethereum/go-ethereum/common"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
@@ -111,51 +112,120 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 	}
 }
 
-func TestMaxExecutionReportSize(t *testing.T) {
-	// Ensure that given max payload size and max num tokens,
-	// Our report size is under the tx size limit.
-	th := setupExecTestHarness(t)
-	th.plugin.F = 1
-	mb := th.GenerateAndSendMessageBatch(t, 50, MaxPayloadLength, MaxTokensPerMessage)
+// TODO: refactor this - it's too complicated
+func TestExecutionReportingPlugin_buildReport(t *testing.T) {
+	const numMessages = 100
+	const tokensPerMessage = 20
+	const bytesPerMessage = 1000
 
-	// commit root
-	encoded, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
-		Interval:   mb.Interval,
-		MerkleRoot: mb.Root,
-		PriceUpdates: commit_store.InternalPriceUpdates{
-			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-			DestChainSelector: 0,
-			UsdPerUnitGas:     big.NewInt(0),
-		},
-	})
-	require.NoError(t, err)
-	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestPriceEpochAndRound(nil)
-	require.NoError(t, err)
-	_, err = th.Dest.CommitStoreHelper.Report(th.Dest.User, encoded, big.NewInt(int64(latestEpocAndRound+1)))
-	require.NoError(t, err)
-	// double commit to ensure enough confirmations
-	th.CommitAndPollLogs(t)
-	th.CommitAndPollLogs(t)
+	ctx := testutils.Context(t)
 
-	fullReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
-		Messages:          mb.Messages,
-		OffchainTokenData: mb.TokenData,
-		Proofs:            mb.Proof.Hashes,
-		ProofFlagBits:     mb.ProofBits,
-	})
-	require.NoError(t, err)
-	// ensure "naive" full report would be bigger than limit
-	require.Greater(t, len(fullReport), MaxExecutionReportLength, "full execution report length")
+	messages := make([]evm_2_evm_offramp.InternalEVM2EVMMessage, numMessages)
+	offChainTokenData := make([][][]byte, numMessages)
 
-	observations := make([]ObservedMessage, len(mb.Messages))
-	for i, msg := range mb.Messages {
-		observations[i] = NewObservedMessage(msg.SequenceNumber, mb.TokenData[i])
+	for i := range messages {
+		tokenAmounts := make([]evm_2_evm_offramp.ClientEVMTokenAmount, tokensPerMessage)
+		for j := range tokenAmounts {
+			tokenAmounts[j] = evm_2_evm_offramp.ClientEVMTokenAmount{
+				Token: utils.RandomAddress(), Amount: big.NewInt(math.MaxInt64)}
+		}
+		messages[i] = evm_2_evm_offramp.InternalEVM2EVMMessage{
+			SourceChainSelector: math.MaxUint64,
+			SequenceNumber:      uint64(i + 1),
+			FeeTokenAmount:      big.NewInt(math.MaxInt64),
+			Sender:              utils.RandomAddress(),
+			Nonce:               math.MaxUint64,
+			GasLimit:            big.NewInt(math.MaxInt64),
+			Strict:              false,
+			Receiver:            utils.RandomAddress(),
+			Data:                bytes.Repeat([]byte{0}, bytesPerMessage),
+			TokenAmounts:        tokenAmounts,
+			FeeToken:            utils.RandomAddress(),
+			MessageId:           [32]byte{12},
+		}
+
+		data := []byte(`{"foo": "bar"}`)
+		offChainTokenData[i] = [][]byte{data, data, data}
 	}
 
-	// buildReport should cap the built report to fit in MaxExecutionReportLength
-	execReport, err := th.plugin.buildReport(testutils.Context(t), th.Lggr, observations)
-	require.NoError(t, err)
-	require.LessOrEqual(t, len(execReport), MaxExecutionReportLength, "built execution report length")
+	encodedReport, err := abihelpers.EncodeExecutionReport(evm_2_evm_offramp.InternalExecutionReport{
+		Messages:          messages,
+		OffchainTokenData: offChainTokenData,
+		Proofs:            make([][32]byte, numMessages),
+		ProofFlagBits:     big.NewInt(rand.Int64()),
+	})
+	assert.NoError(t, err)
+	// ensure "naive" full report would be bigger than limit
+	assert.Greater(t, len(encodedReport), MaxExecutionReportLength, "full execution report length")
+
+	observations := make([]ObservedMessage, len(messages))
+	for i, msg := range messages {
+		observations[i] = NewObservedMessage(msg.SequenceNumber, offChainTokenData[i])
+	}
+
+	// ensure that buildReport should cap the built report to fit in MaxExecutionReportLength
+	p := &ExecutionReportingPlugin{}
+	p.lggr = logger.TestLogger(t)
+
+	commitStoreAddress := utils.RandomAddress()
+	commitStore := mock_contracts.NewCommitStoreInterface(t)
+	commitStore.On("Address").Return(commitStoreAddress)
+	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
+		Return(messages[len(messages)-1].SequenceNumber+1, nil)
+	commitStore.On("Verify", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(math.MaxInt64), nil)
+	p.config.commitStore = commitStore
+
+	destEvents := ccipevents.NewMockClient(t)
+
+	destEvents.On("GetAcceptedCommitReportsGteSeqNum", ctx, commitStoreAddress, observations[0].SeqNr, 0).
+		Return([]ccipevents.Event[commit_store.CommitStoreReportAccepted]{
+			{
+				Data: commit_store.CommitStoreReportAccepted{
+					Report: commit_store.CommitStoreCommitReport{
+						Interval: commit_store.CommitStoreInterval{
+							Min: observations[0].SeqNr,
+							Max: observations[len(observations)-1].SeqNr,
+						},
+					},
+				},
+			},
+		}, nil)
+	p.config.destEvents = destEvents
+
+	p.config.leafHasher = nopLeafHasher{}
+
+	onRampAddr := utils.RandomAddress()
+	onRamp := mock_contracts.NewEVM2EVMOnRampInterface(t)
+	onRamp.On("Address").Return(onRampAddr)
+	p.config.onRamp = onRamp
+
+	sendReqs := make([]ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], len(observations))
+	for i := range observations {
+		sendReqs[i] = ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{
+			Data: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{Message: evm_2_evm_onramp.InternalEVM2EVMMessage{
+				SourceChainSelector: math.MaxUint64,
+				SequenceNumber:      uint64(i + 1),
+				FeeTokenAmount:      big.NewInt(math.MaxInt64),
+				Sender:              utils.RandomAddress(),
+				Nonce:               math.MaxUint64,
+				GasLimit:            big.NewInt(math.MaxInt64),
+				Strict:              false,
+				Receiver:            utils.RandomAddress(),
+				Data:                bytes.Repeat([]byte{0}, bytesPerMessage),
+				TokenAmounts:        nil,
+				FeeToken:            utils.RandomAddress(),
+				MessageId:           [32]byte{12},
+			}},
+		}
+	}
+	sourceEvents := ccipevents.NewMockClient(t)
+	sourceEvents.On("GetSendRequestsBetweenSeqNums",
+		ctx, onRampAddr, observations[0].SeqNr, observations[len(observations)-1].SeqNr, 0).Return(sendReqs, nil)
+	p.config.sourceEvents = sourceEvents
+
+	execReport, err := p.buildReport(ctx, p.lggr, observations)
+	assert.NoError(t, err)
+	assert.LessOrEqual(t, len(execReport), MaxExecutionReportLength, "built execution report length")
 }
 
 func TestExecutionReportToEthTxMetadata(t *testing.T) {

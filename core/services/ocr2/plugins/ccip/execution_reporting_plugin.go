@@ -818,7 +818,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	if err := validateSeqNumbers(ctx, r.config.commitStore, observedMessages); err != nil {
 		return nil, err
 	}
-	commitReport, err := getCommitReportForSeqNum(ctx, r.config.destLP, r.config.commitStore, observedMessages[0].SeqNr)
+	commitReport, err := getCommitReportForSeqNum(ctx, r.config.destEvents, r.config.commitStore, observedMessages[0].SeqNr)
 	if err != nil {
 		return nil, err
 	}
@@ -839,7 +839,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	capped := sort.Search(len(observedMessages), func(i int) bool {
 		report, _, err2 := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:i+1])
 		if err2 != nil {
-			r.lggr.Errorw("build execution report", "err", err)
+			r.lggr.Errorw("build execution report", "err", err2)
 			return false
 		}
 

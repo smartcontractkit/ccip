@@ -1126,5 +1126,5 @@ func Test_isStaleReport(t *testing.T) {
 type nopLeafHasher struct{}
 
 func (n nopLeafHasher) HashLeaf(log gethtypes.Log) ([32]byte, error) {
-	return [32]byte{}, nil
+	return [32]byte{123}, nil
 }
