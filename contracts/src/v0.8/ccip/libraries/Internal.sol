@@ -68,8 +68,36 @@ library Internal {
   bytes32 internal constant EVM_2_EVM_MESSAGE_HASH = keccak256("EVM2EVMMessageEvent");
 
   function _hash(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+    /// @dev Place byte32 values into a fixed size array so the abi-encoded end result is identical to passing
+    /// these values individually. This is done to avoid stack-too-deep error when encoding many values.
+    bytes32[3] memory hashes = [
+      keccak256(original.data),
+      keccak256(abi.encode(original.tokenAmounts)),
+      keccak256(abi.encode(original.sourceTokenData))
+    ];
+
+    return
+      keccak256(
+        abi.encode(
+          MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+          metadataHash,
+          original.sequenceNumber,
+          original.nonce,
+          original.sender,
+          original.receiver,
+          hashes,
+          original.gasLimit,
+          original.strict,
+          original.feeToken,
+          original.feeTokenAmount
+        )
+      );
+  }
+
+  function _hashCurrent(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
     /// @dev Fields split into 2 abi.encode calls due to number of parameters triggering stack too deep.
     /// If a dynamic type, e.g. an array is to be added, make sure it is placed in the last abi.encode call.
+    /// Costs 2700 gas more. Plcaing here for reference, should be deleted if PR is accepted.
     return
       keccak256(
         bytes.concat(
@@ -87,6 +115,29 @@ library Internal {
             original.strict
           ),
           abi.encode(original.feeToken, original.feeTokenAmount)
+        )
+      );
+  }
+
+  function _hashLegacy(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+    /// @dev stack too deep without optimization
+    /// Plcaing here for reference, should be deleted if PR is accepted.
+    return
+      keccak256(
+        abi.encode(
+          MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+          metadataHash,
+          original.sequenceNumber,
+          original.nonce,
+          original.sender,
+          original.receiver,
+          keccak256(original.data),
+          keccak256(abi.encode(original.tokenAmounts)),
+          keccak256(abi.encode(original.sourceTokenData)),
+          original.gasLimit,
+          original.strict,
+          original.feeToken,
+          original.feeTokenAmount
         )
       );
   }
