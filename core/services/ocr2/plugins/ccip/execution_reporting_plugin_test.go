@@ -77,12 +77,13 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 		InflightCacheExpiry:         models.MustMakeDuration(3 * time.Minute),
 		RelativeBoostPerWaitHour:    0.07,
 	}
+	sourceChainEventClient := ccipevents.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient)
 	plugin := ExecutionReportingPlugin{
 		config: ExecutionPluginConfig{
 			lggr:                     th.Lggr,
 			sourceLP:                 th.SourceLP,
 			destLP:                   th.DestLP,
-			sourceEvents:             ccipevents.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient),
+			sourceEvents:             sourceChainEventClient,
 			destEvents:               ccipevents.NewLogPollerClient(th.DestLP, lggr, th.DestClient),
 			sourcePriceRegistry:      th.Source.PriceRegistry,
 			onRamp:                   th.Source.OnRamp,
@@ -93,7 +94,7 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 			sourceWrappedNativeToken: th.Source.WrappedNative.Address(),
 			leafHasher:               hasher.NewLeafHasher(th.Source.ChainSelector, th.Dest.ChainSelector, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
 			destGasEstimator:         destFeeEstimator,
-			usdcService:              customtokens.NewUSDCService("", th.Source.ChainSelector),
+			usdcService:              customtokens.NewUSDCService(sourceChainEventClient, th.Source.OnRamp.Address(), "", th.Source.ChainSelector),
 		},
 		onchainConfig:         th.ExecOnchainConfig,
 		offchainConfig:        offchainConfig,
@@ -1160,7 +1161,7 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 			commitStore:         commitStore,
 			offRamp:             offRamp,
 			sourcePriceRegistry: sourcePriceRegistry,
-			usdcService:         customtokens.NewUSDCService("", sourceChainId),
+			usdcService:         customtokens.NewUSDCService(nil, onRamp.Address(), "", sourceChainId),
 		},
 	}
 

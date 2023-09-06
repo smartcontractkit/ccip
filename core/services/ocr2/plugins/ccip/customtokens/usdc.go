@@ -1,6 +1,8 @@
 package customtokens
 
 import (
+	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,17 +11,32 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type USDCService struct {
-	attestationApi  string
-	sourceChainId   uint64
-	SourceUSDCToken common.Address
+	sourceChainEvents ccipevents.Client
+	attestationApi    string
+	sourceChainId     uint64
+	SourceUSDCToken   common.Address
+	OnRampAddress     common.Address
+
+	// Cache of sequence number -> attestation attempt
+	attestationCache map[uint64]USDCAttestationAttempt
 }
 
-type USDCAttestationResponse struct {
-	Status      USDCAttestationStatus `json:"status"`
-	Attestation string                `json:"attestation"`
+type USDCAttestationAttempt struct {
+	USDCMessageBody         []byte
+	USDCMessageHash         [32]byte
+	CCIPSendTxHash          common.Hash
+	CCIPSendLogIndex        int64
+	USDCAttestationResponse AttestationResponse
+}
+
+type AttestationResponse struct {
+	Status      AttestationStatus `json:"status"`
+	Attestation string            `json:"attestation"`
 }
 
 // Hard coded mapping of chain id to USDC token addresses
@@ -39,54 +56,125 @@ const (
 	USDC_MESSAGE_SENT_FILTER_NAME = "USDC message sent"
 )
 
-var USDC_MESSAGE_SENT = common.HexToHash(eventSignatureString)
-
-type USDCAttestationStatus string
+type AttestationStatus string
 
 const (
-	USDCAttestationStatusSuccess USDCAttestationStatus = "complete"
-	USDCAttestationStatusPending USDCAttestationStatus = "pending_confirmations"
+	USDCAttestationStatusSuccess   AttestationStatus = "complete"
+	USDCAttestationStatusPending   AttestationStatus = "pending_confirmations"
+	USDCAttestationStatusUnchecked AttestationStatus = "unchecked"
 )
 
-func NewUSDCService(usdcAttestationApi string, sourceChainId uint64) *USDCService {
-	return &USDCService{attestationApi: usdcAttestationApi, sourceChainId: sourceChainId, SourceUSDCToken: USDCTokenMapping[sourceChainId]}
+func NewUSDCService(sourceChainEvents ccipevents.Client, onRampAddress common.Address, usdcAttestationApi string, sourceChainId uint64) *USDCService {
+	return &USDCService{
+		sourceChainEvents: sourceChainEvents,
+		attestationApi:    usdcAttestationApi,
+		sourceChainId:     sourceChainId,
+		SourceUSDCToken:   USDCTokenMapping[sourceChainId],
+		OnRampAddress:     onRampAddress,
+		attestationCache:  make(map[uint64]USDCAttestationAttempt),
+	}
 }
 
-func (usdc *USDCService) TryGetAttestation(messageHash string) (USDCAttestationResponse, error) {
-	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/%s", usdc.attestationApi, version, attestationPath, messageHash)
-	req, err := http.NewRequest("GET", fullAttestationUrl, nil)
-	if err != nil {
-		return USDCAttestationResponse{}, err
-	}
-	req.Header.Add("accept", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return USDCAttestationResponse{}, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return USDCAttestationResponse{}, err
-	}
-
-	var response USDCAttestationResponse
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return USDCAttestationResponse{}, err
-	}
-
-	return response, nil
-}
-
-func (usdc *USDCService) IsAttestationComplete(messageHash string) (bool, string, error) {
-	response, err := usdc.TryGetAttestation(messageHash)
+func (usdc *USDCService) IsAttestationComplete(ctx context.Context, seqNum uint64) (bool, string, error) {
+	response, err := usdc.GetUpdatedAttestation(ctx, seqNum)
 	if err != nil {
 		return false, "", err
 	}
+
 	if response.Status == USDCAttestationStatusSuccess {
 		return true, response.Attestation, nil
 	}
 	return false, "", nil
+}
+
+func (usdc *USDCService) GetUpdatedAttestation(ctx context.Context, seqNum uint64) (AttestationResponse, error) {
+	// Try to get information from cache to reduce the number of database and external calls
+	attestationAttempt, ok := usdc.attestationCache[seqNum]
+	if ok && attestationAttempt.USDCAttestationResponse.Status == USDCAttestationStatusSuccess {
+		// If successful, return the cached response
+		return attestationAttempt.USDCAttestationResponse, nil
+	}
+
+	// If no attempt for this message id exists, get the required data to make one
+	if !ok {
+		var err error
+		attestationAttempt, err = usdc.getAttemptInfoFromCCIPMessageId(ctx, seqNum)
+		if err != nil {
+			return AttestationResponse{}, err
+		}
+		// Save the attempt in the cache in case the external call fails
+		usdc.attestationCache[seqNum] = attestationAttempt
+	}
+
+	response, err := usdc.callAttestationApi(ctx, attestationAttempt.USDCMessageHash)
+	if err != nil {
+		return AttestationResponse{}, err
+	}
+
+	// Save the response in the cache
+	attestationAttempt.USDCAttestationResponse = response
+	usdc.attestationCache[seqNum] = attestationAttempt
+
+	return response, nil
+}
+
+func (usdc *USDCService) getAttemptInfoFromCCIPMessageId(ctx context.Context, seqNum uint64) (USDCAttestationAttempt, error) {
+	// Get the CCIP message send event from the log poller
+	ccipSendRequests, err := usdc.sourceChainEvents.GetSendRequestsBetweenSeqNums(ctx, usdc.OnRampAddress, seqNum, seqNum, 0)
+	if err != nil {
+		return USDCAttestationAttempt{}, err
+	}
+
+	if len(ccipSendRequests) != 1 {
+		return USDCAttestationAttempt{}, fmt.Errorf("expected 1 CCIP send request, got %d", len(ccipSendRequests))
+	}
+
+	ccipSendRequest := ccipSendRequests[0]
+
+	ccipSendTxHash := ccipSendRequest.Data.Raw.TxHash
+	ccipSendLogIndex := int64(ccipSendRequest.Data.Raw.Index)
+
+	// Get the USDC message body
+	usdcMessageBody, err := usdc.sourceChainEvents.GetLastUSDCMessagePriorToLogIndexInTx(ctx, ccipSendLogIndex, ccipSendTxHash)
+	if err != nil {
+		return USDCAttestationAttempt{}, err
+	}
+
+	return USDCAttestationAttempt{
+		USDCMessageBody:  usdcMessageBody,
+		USDCMessageHash:  utils.Keccak256Fixed(usdcMessageBody),
+		CCIPSendTxHash:   ccipSendTxHash,
+		CCIPSendLogIndex: ccipSendLogIndex,
+		USDCAttestationResponse: AttestationResponse{
+			Status:      USDCAttestationStatusUnchecked,
+			Attestation: "",
+		},
+	}, nil
+}
+
+func (usdc *USDCService) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (AttestationResponse, error) {
+	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%s", usdc.attestationApi, version, attestationPath, hex.EncodeToString(usdcMessageHash[:]))
+	req, err := http.NewRequestWithContext(ctx, "GET", fullAttestationUrl, nil)
+	if err != nil {
+		return AttestationResponse{}, err
+	}
+	req.Header.Add("accept", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return AttestationResponse{}, err
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return AttestationResponse{}, err
+	}
+
+	var response AttestationResponse
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return AttestationResponse{}, err
+	}
+	return response, nil
 }
 
 func GetUSDCServiceSourceLPFilters(usdcTokenAddress common.Address) []logpoller.Filter {

@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/customtokens"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
@@ -219,7 +218,7 @@ func (c *LogPollerClient) GetExecutionStateChangesBetweenSeqNums(ctx context.Con
 
 func (c *LogPollerClient) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
 	logs, err := c.lp.IndexedLogsByTxHash(
-		customtokens.USDC_MESSAGE_SENT,
+		abihelpers.EventSignatures.USDCMessageSent,
 		txHash,
 		pg.WithParentCtx(ctx),
 	)

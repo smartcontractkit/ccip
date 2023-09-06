@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	evmClientMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/customtokens"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -145,7 +143,7 @@ func TestLogPollerClient_GetLastUSDCMessagePriorToLogIndexInTx(t *testing.T) {
 	t.Run("multiple found", func(t *testing.T) {
 		lp := mocks.NewLogPoller(t)
 		lp.On("IndexedLogsByTxHash",
-			customtokens.USDC_MESSAGE_SENT,
+			abihelpers.EventSignatures.USDCMessageSent,
 			txHash,
 			mock.Anything,
 		).Return([]logpoller.Log{
@@ -166,7 +164,7 @@ func TestLogPollerClient_GetLastUSDCMessagePriorToLogIndexInTx(t *testing.T) {
 	t.Run("none found", func(t *testing.T) {
 		lp := mocks.NewLogPoller(t)
 		lp.On("IndexedLogsByTxHash",
-			customtokens.USDC_MESSAGE_SENT,
+			abihelpers.EventSignatures.USDCMessageSent,
 			txHash,
 			mock.Anything,
 		).Return([]logpoller.Log{}, nil)

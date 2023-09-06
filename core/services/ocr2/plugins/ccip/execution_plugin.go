@@ -107,12 +107,14 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 		"sourceChain", ChainName(int64(chainId)),
 		"destChain", ChainName(destChainID))
 
+	sourceChainEventClient := ccipevents.NewLogPollerClient(sourceChain.LogPoller(), execLggr, sourceChain.Client())
+
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
 			lggr:                     execLggr,
 			sourceLP:                 sourceChain.LogPoller(),
 			destLP:                   destChain.LogPoller(),
-			sourceEvents:             ccipevents.NewLogPollerClient(sourceChain.LogPoller(), execLggr, sourceChain.Client()),
+			sourceEvents:             sourceChainEventClient,
 			destEvents:               ccipevents.NewLogPollerClient(destChain.LogPoller(), execLggr, destChain.Client()),
 			onRamp:                   onRamp,
 			offRamp:                  offRamp,
@@ -123,7 +125,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 			sourceClient:             sourceChain.Client(),
 			destGasEstimator:         destChain.GasEstimator(),
 			leafHasher:               hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
-			usdcService:              customtokens.NewUSDCService(pluginConfig.USDCAttestationApi, chainId),
+			usdcService:              customtokens.NewUSDCService(sourceChainEventClient, offRampConfig.OnRamp, pluginConfig.USDCAttestationApi, chainId),
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)

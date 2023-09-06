@@ -38,7 +38,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 const (
@@ -362,8 +361,16 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 
 		buildBatchDuration := time.Now()
-		batch := r.buildBatch(rootLggr, rep, inflight, allowedTokenAmountValue.Tokens,
-			sourceTokensPricesValue, destTokensPricesValue, getDestGasPrice, sourceToDestTokens, destPoolRateLimits)
+		batch := r.buildBatch(
+			rootLggr,
+			rep,
+			inflight,
+			allowedTokenAmountValue.Tokens,
+			sourceTokensPricesValue,
+			destTokensPricesValue,
+			getDestGasPrice,
+			sourceToDestTokens,
+			destPoolRateLimits)
 		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 		if len(batch) != 0 {
 			return batch, nil
@@ -538,9 +545,8 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		for _, token := range msg.TokenAmounts {
 			switch token.Token {
 			case r.config.usdcService.SourceUSDCToken:
-				usdcMessageBody := ""
-				msgHash := utils.Keccak256Fixed([]byte(usdcMessageBody))
-				success, attestation, err2 := r.config.usdcService.IsAttestationComplete(string(msgHash[:]))
+				// TODO non-nil context
+				success, attestation, err2 := r.config.usdcService.IsAttestationComplete(context.TODO(), msg.SequenceNumber)
 				if err2 != nil {
 					msgLggr.Errorw("Skipping message unable to check USDC attestation", "err", err2)
 					continue
