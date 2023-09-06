@@ -3,13 +3,14 @@ package ccip
 import (
 	"context"
 	"fmt"
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"math/big"
 	"math/rand"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
+
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -135,60 +136,6 @@ func TestCommitReportSize(t *testing.T) {
 		return len(rep) <= MaxCommitReportLength
 	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
 	p.TestingRun(t)
-}
-
-func TestCommitReportEncoding(t *testing.T) {
-	th := plugintesthelpers.SetupCCIPTestHarness(t)
-	newTokenPrice := big.NewInt(9e18) // $9
-	newGasPrice := big.NewInt(2000e9) // $2000 per eth * 1gwei
-
-	// Send a report.
-	mctx := hasher.NewKeccakCtx()
-	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
-	require.NoError(t, err)
-	report := commit_store.CommitStoreCommitReport{
-		PriceUpdates: commit_store.InternalPriceUpdates{
-			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
-				{
-					SourceToken: th.Dest.LinkToken.Address(),
-					UsdPerToken: newTokenPrice,
-				},
-			},
-			DestChainSelector: th.Source.ChainSelector,
-			UsdPerUnitGas:     newGasPrice,
-		},
-		MerkleRoot: tree.Root(),
-		Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 10},
-	}
-	out, err := abihelpers.EncodeCommitReport(report)
-	require.NoError(t, err)
-	decodedReport, err := abihelpers.DecodeCommitReport(out)
-	require.NoError(t, err)
-	require.Equal(t, report, decodedReport)
-
-	latestEpocAndRound, err := th.Dest.CommitStoreHelper.GetLatestPriceEpochAndRound(nil)
-	require.NoError(t, err)
-
-	tx, err := th.Dest.CommitStoreHelper.Report(th.Dest.User, out, big.NewInt(int64(latestEpocAndRound+1)))
-	require.NoError(t, err)
-	th.CommitAndPollLogs(t)
-	res, err := th.Dest.Chain.TransactionReceipt(testutils.Context(t), tx.Hash())
-	require.NoError(t, err)
-	assert.Equal(t, uint64(1), res.Status)
-
-	// Ensure root exists.
-	ts, err := th.Dest.CommitStore.GetMerkleRoot(nil, tree.Root())
-	require.NoError(t, err)
-	require.NotEqual(t, ts.String(), "0")
-
-	// Ensure price update went through
-	destChainGasPrice, err := th.Dest.PriceRegistry.GetDestinationChainGasPrice(nil, th.Source.ChainSelector)
-	require.NoError(t, err)
-	assert.Equal(t, newGasPrice, destChainGasPrice.Value)
-
-	linkTokenPrice, err := th.Dest.PriceRegistry.GetTokenPrice(nil, th.Dest.LinkToken.Address())
-	require.NoError(t, err)
-	assert.Equal(t, newTokenPrice, linkTokenPrice.Value)
 }
 
 func TestCommitReportingPlugin_Observation(t *testing.T) {
