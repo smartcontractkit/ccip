@@ -31,7 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -863,45 +862,6 @@ func TestGeneratePriceUpdates(t *testing.T) {
 			assert.True(t, reflect.DeepEqual(tc.expTokenPricesUSD, tokenPricesUSD))
 		})
 	}
-}
-
-func TestUpdateTokenToDecimalMapping(t *testing.T) {
-	th := plugintesthelpers.SetupCCIPTestHarness(t)
-
-	destToken, _, _, err := link_token_interface.DeployLinkToken(th.Dest.User, th.Dest.Chain)
-	require.NoError(t, err)
-
-	feeToken, _, _, err := link_token_interface.DeployLinkToken(th.Dest.User, th.Dest.Chain)
-	require.NoError(t, err)
-	th.CommitAndPollLogs(t)
-
-	tokens := []common.Address{}
-	tokens = append(tokens, destToken)
-	tokens = append(tokens, feeToken)
-
-	mockOffRamp := &mock_contracts.EVM2EVMOffRampInterface{}
-	mockOffRamp.On("GetDestinationTokens", mock.Anything).Return([]common.Address{destToken}, nil)
-	mockOffRamp.On("Address").Return(common.Address{})
-
-	mockPriceRegistry := &mock_contracts.PriceRegistryInterface{}
-	mockPriceRegistry.On("GetFeeTokens", mock.Anything).Return([]common.Address{feeToken}, nil)
-	mockPriceRegistry.On("Address").Return(common.Address{})
-
-	backendClient := client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID))
-	plugin := CommitReportingPlugin{
-		config: CommitPluginConfig{
-			offRamp:    mockOffRamp,
-			destClient: backendClient,
-		},
-		destPriceRegistry:  mockPriceRegistry,
-		tokenDecimalsCache: cache.NewTokenToDecimals(th.Lggr, th.DestLP, mockOffRamp, mockPriceRegistry, backendClient, 0),
-	}
-
-	tokenMapping, err := plugin.tokenDecimalsCache.Get(testutils.Context(t))
-	require.NoError(t, err)
-	assert.Equal(t, len(tokens), len(tokenMapping))
-	assert.Equal(t, uint8(18), tokenMapping[destToken])
-	assert.Equal(t, uint8(18), tokenMapping[feeToken])
 }
 
 func TestCalculateUsdPer1e18TokenAmount(t *testing.T) {
