@@ -92,6 +92,10 @@ func (o *ObservedLogPoller) LatestBlockByEventSigsAddrsWithConfs(fromBlock int64
 	})
 }
 
+func (o *ObservedLogPoller) IndexedLogsByTxHash(eventSig common.Hash, txHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	return o.LogPoller.IndexedLogsByTxHash(eventSig, txHash, qopts...)
+}
+
 func (o *ObservedLogPoller) IndexedLogs(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error) {
 	return withObservedQueryAndResults(o, "IndexedLogs", func() ([]Log, error) {
 		return o.LogPoller.IndexedLogs(eventSig, address, topicIndex, topicValues, confs, qopts...)

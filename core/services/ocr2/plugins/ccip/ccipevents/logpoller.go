@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/customtokens"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
@@ -214,6 +215,25 @@ func (c *LogPollerClient) GetExecutionStateChangesBetweenSeqNums(ctx context.Con
 			return offRamp.ParseExecutionStateChanged(log)
 		},
 	)
+}
+
+func (c *LogPollerClient) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
+	logs, err := c.lp.IndexedLogsByTxHash(
+		customtokens.USDC_MESSAGE_SENT,
+		txHash,
+		pg.WithParentCtx(ctx),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range logs {
+		current := logs[len(logs)-i-1]
+		if current.LogIndex < logIndex {
+			return current.Data, nil
+		}
+	}
+	return nil, errors.Errorf("no USDC message found prior to log index %d in tx %s", logIndex, txHash.Hex())
 }
 
 func (c *LogPollerClient) LatestBlock(ctx context.Context) (int64, error) {

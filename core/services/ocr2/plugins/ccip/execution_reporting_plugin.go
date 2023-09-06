@@ -540,9 +540,9 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			case r.config.usdcService.SourceUSDCToken:
 				usdcMessageBody := ""
 				msgHash := utils.Keccak256Fixed([]byte(usdcMessageBody))
-				success, attestation, err := r.config.usdcService.IsAttestationComplete(string(msgHash[:]))
-				if err != nil {
-					msgLggr.Errorw("Skipping message unable to check USDC attestation", "err", err)
+				success, attestation, err2 := r.config.usdcService.IsAttestationComplete(string(msgHash[:]))
+				if err2 != nil {
+					msgLggr.Errorw("Skipping message unable to check USDC attestation", "err", err2)
 					continue
 				}
 				if !success {

@@ -87,7 +87,7 @@ func TestGetUSDCServiceSourceLPFilters(t *testing.T) {
 
 	require.Equal(t, 1, len(filters))
 	filter := filters[0]
-	require.Equal(t, logpoller.FilterName(USDC_MESSAGE_SENT, usdcTokenAddress.Hex()), filter.Name)
+	require.Equal(t, logpoller.FilterName(USDC_MESSAGE_SENT_FILTER_NAME, usdcTokenAddress.Hex()), filter.Name)
 	hash, err := utils.Keccak256([]byte("MessageSent(bytes)"))
 	require.NoError(t, err)
 	require.Equal(t, hash, filter.EventSigs[0].Bytes())

@@ -482,6 +482,22 @@ func (o *ORM) SelectIndexedLogsByBlockRangeFilter(start, end int64, address comm
 	return logs, nil
 }
 
+func (o *ORM) SelectIndexedLogsByTxHash(eventSig common.Hash, txHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	q := o.q.WithOpts(qopts...)
+	var logs []Log
+	err := q.Select(&logs, `
+		SELECT * FROM evm_logs 
+			WHERE evm_logs.evm_chain_id = $1
+			AND tx_hash = $3
+			AND event_sig = $4
+			ORDER BY (evm_logs.block_number, evm_logs.log_index)`,
+		utils.NewBig(o.chainID), txHash.Bytes(), eventSig.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	return logs, nil
+}
+
 func validateTopicIndex(index int) error {
 	// Only topicIndex 1 through 3 is valid. 0 is the event sig and only 4 total topics are allowed
 	if !(index == 1 || index == 2 || index == 3) {

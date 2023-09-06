@@ -33,11 +33,13 @@ var USDCTokenMapping = map[uint64]common.Address{
 }
 
 const (
-	version           = "v1"
-	attestationPath   = "attestations"
-	eventSignature    = "8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036"
-	USDC_MESSAGE_SENT = "USDC message sent"
+	version                       = "v1"
+	attestationPath               = "attestations"
+	eventSignatureString          = "8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036"
+	USDC_MESSAGE_SENT_FILTER_NAME = "USDC message sent"
 )
+
+var USDC_MESSAGE_SENT = common.HexToHash(eventSignatureString)
 
 type USDCAttestationStatus string
 
@@ -90,8 +92,8 @@ func (usdc *USDCService) IsAttestationComplete(messageHash string) (bool, string
 func GetUSDCServiceSourceLPFilters(usdcTokenAddress common.Address) []logpoller.Filter {
 	return []logpoller.Filter{
 		{
-			Name:      logpoller.FilterName(USDC_MESSAGE_SENT, usdcTokenAddress.Hex()),
-			EventSigs: []common.Hash{common.HexToHash(eventSignature)},
+			Name:      logpoller.FilterName(USDC_MESSAGE_SENT_FILTER_NAME, usdcTokenAddress.Hex()),
+			EventSigs: []common.Hash{common.HexToHash(eventSignatureString)},
 			Addresses: []common.Address{usdcTokenAddress},
 		},
 	}
