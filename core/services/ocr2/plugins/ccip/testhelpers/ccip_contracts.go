@@ -232,7 +232,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			DestGasPerDataAvailabilityByte:  16,
 			DestDataAvailabilityMultiplier:  6840, // 0.684
 			PriceRegistry:                   c.Source.PriceRegistry.Address(),
-			MaxDataSize:                     big.NewInt(1e5),
+			MaxDataSize:                     1e5,
 			MaxGasLimit:                     4_000_000,
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{
@@ -903,7 +903,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			DestGasPerDataAvailabilityByte:  16,
 			DestDataAvailabilityMultiplier:  6840, // 0.684
 			PriceRegistry:                   sourcePricesAddress,
-			MaxDataSize:                     big.NewInt(1e5),
+			MaxDataSize:                     1e5,
 			MaxGasLimit:                     4_000_000,
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{

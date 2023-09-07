@@ -30,7 +30,6 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, TypeAndVersionInterfac
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
 
-  // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "PriceRegistry 1.2.0";
 

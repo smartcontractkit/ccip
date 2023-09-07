@@ -85,7 +85,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint16 destGasPerDataAvailabilityByte; // --┘ Amount of gas to charge per byte of data that needs availability
     uint16 destDataAvailabilityMultiplier; // --┐ Multiplier for data availability gas, multples of 1e-4, or 0.0001
     address priceRegistry; //                   | Price registry address
-    uint24 maxDataSize; //                      | Maximum payload data size, max 16MB
+    uint32 maxDataSize; //                      | Maximum payload data size, max 4GB
     uint32 maxGasLimit; // ---------------------┘ Maximum gas limit for messages targeting EVMs, max 4 Billion gas
   }
 

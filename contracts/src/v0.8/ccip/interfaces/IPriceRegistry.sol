@@ -24,8 +24,11 @@ interface IPriceRegistry {
   function getTokenPrices(address[] calldata tokens) external view returns (Internal.TimestampedPackedUint224[] memory);
 
   /// @notice Get an encoded `gasPrice` for a given destination chain ID.
-  /// The 224-bit result could encode multiple price components. For example, if Optimism is the destination chain,
-  /// gas price can include L1 base fee in higher-order bits, and L2 gas price in lower-order bits.
+  /// The 224-bit result encodes necessary gas price components.
+  /// On L1 chains like Ethereum or Avax, the only component is the gas price.
+  /// On Optimistic Rollups, there are two components - the L2 gas price, and L1 base fee for data availability.
+  /// On future chains, there could be more or differing price components.
+  /// PriceRegistry does not contain chain-specific logic to parse destination chain price components.
   /// @param destChainSelector The destination chain to get the price for.
   /// @return gasPrice The encoded gasPrice for the given destination chain ID.
   function getDestinationChainGasPrice(

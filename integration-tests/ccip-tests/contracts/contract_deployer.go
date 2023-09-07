@@ -410,7 +410,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 				DestGasPerDataAvailabilityByte:  16,
 				DestDataAvailabilityMultiplier:  6840, // 0.684
 				PriceRegistry:                   priceRegistry,
-				MaxDataSize:                     big.NewInt(50000),
+				MaxDataSize:                     50000,
 				MaxGasLimit:                     4_000_000,
 			},
 			tokensAndPools,
