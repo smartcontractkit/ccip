@@ -428,29 +428,7 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	})
 }
 
-func TestCommitReportSize(t *testing.T) {
-	testParams := gopter.DefaultTestParameters()
-	testParams.MinSuccessfulTests = 100
-	p := gopter.NewProperties(testParams)
-	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
-		var root32 [32]byte
-		copy(root32[:], root)
-		rep, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
-			MerkleRoot: root32,
-			Interval:   commit_store.CommitStoreInterval{Min: min, Max: max},
-			PriceUpdates: commit_store.InternalPriceUpdates{
-				TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-				DestChainSelector: 1337,
-				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-			},
-		})
-		require.NoError(t, err)
-		return len(rep) <= MaxCommitReportLength
-	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
-	p.TestingRun(t)
-}
-
-func TestCalculatePriceUpdates(t *testing.T) {
+func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 	t.Parallel()
 
 	const defaultSourceChainSelector = 10 // we reuse this value across all test cases
@@ -677,52 +655,7 @@ func TestCalculatePriceUpdates(t *testing.T) {
 	}
 }
 
-func TestCalculateIntervalConsensus(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		intervals  []commit_store.CommitStoreInterval
-		rangeLimit uint64
-		f          int
-		wantMin    uint64
-		wantMax    uint64
-		wantErr    bool
-	}{
-		{"no obs", []commit_store.CommitStoreInterval{{Min: 0, Max: 0}}, 0, 0, 0, 0, false},
-		{"basic", []commit_store.CommitStoreInterval{
-			{Min: 9, Max: 14},
-			{Min: 10, Max: 12},
-			{Min: 10, Max: 14},
-		}, 0, 1, 10, 14, false},
-		{"not enough intervals", []commit_store.CommitStoreInterval{}, 0, 1, 0, 0, true},
-		{"min > max", []commit_store.CommitStoreInterval{
-			{Min: 9, Max: 4},
-			{Min: 10, Max: 4},
-			{Min: 10, Max: 6},
-		}, 0, 1, 0, 0, true},
-		{
-			"range limit", []commit_store.CommitStoreInterval{
-				{Min: 10, Max: 100},
-				{Min: 1, Max: 1000},
-			}, 256, 1, 10, 265, false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := calculateIntervalConsensus(tt.intervals, tt.f, tt.rangeLimit)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			assert.Equal(t, tt.wantMin, got.Min)
-			assert.Equal(t, tt.wantMax, got.Max)
-		})
-	}
-}
-
-func TestGeneratePriceUpdates(t *testing.T) {
+func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 	t.Parallel()
 
 	val1e18 := func(val int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(val)) }
@@ -933,93 +866,7 @@ func TestGeneratePriceUpdates(t *testing.T) {
 	}
 }
 
-func TestCalculateUsdPer1e18TokenAmount(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		price      *big.Int
-		decimal    uint8
-		wantResult *big.Int
-	}{
-		{
-			name:       "18-decimal token, $6.5 per token",
-			price:      big.NewInt(65e17),
-			decimal:    18,
-			wantResult: big.NewInt(65e17),
-		},
-		{
-			name:       "6-decimal token, $1 per token",
-			price:      big.NewInt(1e18),
-			decimal:    6,
-			wantResult: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e12)), // 1e30
-		},
-		{
-			name:       "0-decimal token, $1 per token",
-			price:      big.NewInt(1e18),
-			decimal:    0,
-			wantResult: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e18)), // 1e36
-		},
-		{
-			name:       "36-decimal token, $1 per token",
-			price:      big.NewInt(1e18),
-			decimal:    36,
-			wantResult: big.NewInt(1),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := calculateUsdPer1e18TokenAmount(tt.price, tt.decimal)
-			assert.Equal(t, tt.wantResult, got)
-		})
-	}
-}
-
-func TestCommitReportToEthTxMeta(t *testing.T) {
-	mctx := hasher.NewKeccakCtx()
-	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
-	require.NoError(t, err)
-
-	tests := []struct {
-		name          string
-		min, max      uint64
-		expectedRange []uint64
-	}{
-		{
-			"happy flow",
-			1, 10,
-			[]uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-		},
-		{
-			"same sequence",
-			1, 1,
-			[]uint64{1},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			report := commit_store.CommitStoreCommitReport{
-				PriceUpdates: commit_store.InternalPriceUpdates{
-					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-					DestChainSelector: uint64(1337),
-					UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-				},
-				MerkleRoot: tree.Root(),
-				Interval:   commit_store.CommitStoreInterval{Min: tc.min, Max: tc.max},
-			}
-			out, err := abihelpers.EncodeCommitReport(report)
-			require.NoError(t, err)
-
-			txMeta, err := CommitReportToEthTxMeta(out)
-			require.NoError(t, err)
-			require.NotNil(t, txMeta)
-			require.EqualValues(t, tc.expectedRange, txMeta.SeqNumbers)
-		})
-	}
-}
-
-func TestNextMin(t *testing.T) {
+func TestCommitReportingPlugin_nextMinSeqNum(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	commitStore := mock_contracts.CommitStoreInterface{}
 	cp := CommitReportingPlugin{config: CommitPluginConfig{commitStore: &commitStore}, inflightReports: newInflightCommitReportsContainer(time.Hour)}
@@ -1075,7 +922,7 @@ func TestNextMin(t *testing.T) {
 	}
 }
 
-func Test_isStaleReport(t *testing.T) {
+func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.TestLogger(t)
 	merkleRoot1 := utils.Keccak256Fixed([]byte("some merkle root 1"))
@@ -1432,6 +1279,159 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 		})
 	}
 
+}
+
+func Test_commitReportSize(t *testing.T) {
+	testParams := gopter.DefaultTestParameters()
+	testParams.MinSuccessfulTests = 100
+	p := gopter.NewProperties(testParams)
+	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
+		var root32 [32]byte
+		copy(root32[:], root)
+		rep, err := abihelpers.EncodeCommitReport(commit_store.CommitStoreCommitReport{
+			MerkleRoot: root32,
+			Interval:   commit_store.CommitStoreInterval{Min: min, Max: max},
+			PriceUpdates: commit_store.InternalPriceUpdates{
+				TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+				DestChainSelector: 1337,
+				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			},
+		})
+		require.NoError(t, err)
+		return len(rep) <= MaxCommitReportLength
+	}, gen.SliceOfN(32, gen.UInt8()), gen.UInt64(), gen.UInt64()))
+	p.TestingRun(t)
+}
+
+func Test_calculateIntervalConsensus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		intervals  []commit_store.CommitStoreInterval
+		rangeLimit uint64
+		f          int
+		wantMin    uint64
+		wantMax    uint64
+		wantErr    bool
+	}{
+		{"no obs", []commit_store.CommitStoreInterval{{Min: 0, Max: 0}}, 0, 0, 0, 0, false},
+		{"basic", []commit_store.CommitStoreInterval{
+			{Min: 9, Max: 14},
+			{Min: 10, Max: 12},
+			{Min: 10, Max: 14},
+		}, 0, 1, 10, 14, false},
+		{"not enough intervals", []commit_store.CommitStoreInterval{}, 0, 1, 0, 0, true},
+		{"min > max", []commit_store.CommitStoreInterval{
+			{Min: 9, Max: 4},
+			{Min: 10, Max: 4},
+			{Min: 10, Max: 6},
+		}, 0, 1, 0, 0, true},
+		{
+			"range limit", []commit_store.CommitStoreInterval{
+				{Min: 10, Max: 100},
+				{Min: 1, Max: 1000},
+			}, 256, 1, 10, 265, false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := calculateIntervalConsensus(tt.intervals, tt.f, tt.rangeLimit)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantMin, got.Min)
+			assert.Equal(t, tt.wantMax, got.Max)
+		})
+	}
+}
+
+func Test_calculateUsdPer1e18TokenAmount(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		price      *big.Int
+		decimal    uint8
+		wantResult *big.Int
+	}{
+		{
+			name:       "18-decimal token, $6.5 per token",
+			price:      big.NewInt(65e17),
+			decimal:    18,
+			wantResult: big.NewInt(65e17),
+		},
+		{
+			name:       "6-decimal token, $1 per token",
+			price:      big.NewInt(1e18),
+			decimal:    6,
+			wantResult: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e12)), // 1e30
+		},
+		{
+			name:       "0-decimal token, $1 per token",
+			price:      big.NewInt(1e18),
+			decimal:    0,
+			wantResult: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e18)), // 1e36
+		},
+		{
+			name:       "36-decimal token, $1 per token",
+			price:      big.NewInt(1e18),
+			decimal:    36,
+			wantResult: big.NewInt(1),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateUsdPer1e18TokenAmount(tt.price, tt.decimal)
+			assert.Equal(t, tt.wantResult, got)
+		})
+	}
+}
+
+func TestCommitReportToEthTxMeta(t *testing.T) {
+	mctx := hasher.NewKeccakCtx()
+	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		min, max      uint64
+		expectedRange []uint64
+	}{
+		{
+			"happy flow",
+			1, 10,
+			[]uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+		},
+		{
+			"same sequence",
+			1, 1,
+			[]uint64{1},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			report := commit_store.CommitStoreCommitReport{
+				PriceUpdates: commit_store.InternalPriceUpdates{
+					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
+					DestChainSelector: uint64(1337),
+					UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+				},
+				MerkleRoot: tree.Root(),
+				Interval:   commit_store.CommitStoreInterval{Min: tc.min, Max: tc.max},
+			}
+			out, err := abihelpers.EncodeCommitReport(report)
+			require.NoError(t, err)
+
+			txMeta, err := CommitReportToEthTxMeta(out)
+			require.NoError(t, err)
+			require.NotNil(t, txMeta)
+			require.EqualValues(t, tc.expectedRange, txMeta.SeqNumbers)
+		})
+	}
 }
 
 // leafHasher123 always returns '123' followed by zeroes in HashLeaf method.
