@@ -44,15 +44,31 @@ type AttestationResponse struct {
 // Hard coded mapping of chain id to USDC token addresses
 // Will be removed in favour of more flexible solution.
 var TokenMapping = map[uint64]common.Address{
-	420:    common.HexToAddress("0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6"),
-	43113:  common.HexToAddress("0x5425890298aed601595a70ab815c96711a31bc65"),
-	80001:  common.HexToAddress("0x9999f7fea5938fd3b1e26a12c3f2fb024e194f97"),
-	84531:  common.HexToAddress("0xf175520c52418dfe19c8098071a252da48cd1c19"),
-	421613: common.HexToAddress("0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63"),
+	// Mainnet
+	1:     common.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"), // Ethereum
+	10:    common.HexToAddress("0x0b2c639c533813f4aa9d7837caf62653d097ff85"), // Optimism
+	42161: common.HexToAddress("0xaf88d065e77c8cc2239327c5edb3a432268e5831"), // Arbitrum
+	43114: common.HexToAddress("0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e"), // Avalanche
+
+	// Testnets
+	5:      common.HexToAddress("0xca6b4c00831ffb77afe22e734a6101b268b7fcbe"), // Goerli
+	420:    common.HexToAddress("0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6"), // Optimism Goerli
+	43113:  common.HexToAddress("0x5425890298aed601595a70ab815c96711a31bc65"), // Avalanche Fuji
+	421613: common.HexToAddress("0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63"), // Arbitrum Goerli
 }
 
 var messageTransmitterMapping = map[uint64]common.Address{
-	420: common.HexToAddress("0x8c5261668696ce22758910d05bab8f186d6eb247"),
+	// Mainnet
+	1:     common.HexToAddress("0x0a992d191deec32afe36203ad87d7d289a738f81"), // Ethereum
+	10:    common.HexToAddress("0x4d41f22c5a0e5c74090899e5a8fb597a8842b3e8"), // Optimism
+	42161: common.HexToAddress("0xC30362313FBBA5cf9163F0bb16a0e01f01A896ca"), // Arbitrum
+	43114: common.HexToAddress("0x8186359af5f57fbb40c6b14a588d2a59c0c29880"), // Avalanche
+
+	// Testnets
+	5:      common.HexToAddress("0xca6b4c00831ffb77afe22e734a6101b268b7fcbe"), // Goerli
+	420:    common.HexToAddress("0x9ff9a4da6f2157a9c82ce756f8fd7e0d75be8895"), // Optimism Goerli
+	43113:  common.HexToAddress("0xa9fb1b3009dcb79e2fe346c16a604b8fa8ae0a79"), // Avalanche Fuji
+	421613: common.HexToAddress("0x109bc137cb64eab7c0b1dddd1edf341467dc2d35"), // Arbitrum Goerli
 }
 
 const (
