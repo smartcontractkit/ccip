@@ -67,17 +67,18 @@ type ExecutionPluginConfig struct {
 }
 
 type ExecutionReportingPlugin struct {
-	config                ExecutionPluginConfig
-	F                     int
-	lggr                  logger.Logger
-	inflightReports       *inflightExecReportsContainer
-	snoozedRoots          cache.SnoozedRoots
-	destPriceRegistry     price_registry.PriceRegistryInterface
-	destWrappedNative     common.Address
-	onchainConfig         ccipconfig.ExecOnchainConfig
-	offchainConfig        ccipconfig.ExecOffchainConfig
-	cachedSourceFeeTokens cache.AutoSync[[]common.Address]
-	cachedDestTokens      cache.AutoSync[cache.CachedTokens]
+	config                 ExecutionPluginConfig
+	F                      int
+	lggr                   logger.Logger
+	inflightReports        *inflightExecReportsContainer
+	snoozedRoots           cache.SnoozedRoots
+	destPriceRegistry      price_registry.PriceRegistryInterface
+	destWrappedNative      common.Address
+	onchainConfig          ccipconfig.ExecOnchainConfig
+	offchainConfig         ccipconfig.ExecOffchainConfig
+	cachedSourceFeeTokens  cache.AutoSync[[]common.Address]
+	cachedDestTokens       cache.AutoSync[cache.CachedTokens]
+	customTokenPoolFactory func(ctx context.Context, bind bind.ContractBackend, poolAddress common.Address) (custom_token_pool.CustomTokenPoolInterface, error)
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -140,6 +141,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig:        offchainConfig,
 			cachedDestTokens:      cachedDestTokens,
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
+			customTokenPoolFactory: func(ctx context.Context, contractBackend bind.ContractBackend, poolAddress common.Address) (custom_token_pool.CustomTokenPoolInterface, error) {
+				return custom_token_pool.NewCustomTokenPool(poolAddress, contractBackend)
+			},
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -364,6 +368,8 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	return []ObservedMessage{}, nil
 }
 
+// destPoolRateLimits returns a map that consists of the rate limits of each destination tokens of the provided reports.
+// If a token is missing from the returned map it either means that token was not found or token pool is disabled for this token.
 func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commitReports []commitReportWithSendRequests, sourceToDestToken map[common.Address]common.Address) (map[common.Address]*big.Int, error) {
 	dstTokens := make(map[common.Address]struct{}) // todo: replace with a set or uniqueSlice data structure
 	for _, msg := range commitReports {
@@ -386,7 +392,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 			return nil, fmt.Errorf("get pool by dest token (%s): %w", dstToken, err)
 		}
 
-		tokenPool, err := custom_token_pool.NewCustomTokenPool(poolAddress, r.config.destClient)
+		tokenPool, err := r.customTokenPoolFactory(ctx, r.config.destClient, poolAddress)
 		if err != nil {
 			return nil, fmt.Errorf("new custom dest token pool %s: %w", poolAddress, err)
 		}
