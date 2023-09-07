@@ -1122,6 +1122,109 @@ func Test_isStaleReport(t *testing.T) {
 	})
 }
 
+func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
+	testCases := []struct {
+		name              string
+		commitStoreSeqNum uint64
+		inflightSeqNum    uint64
+		msgSeqNums        []uint64
+
+		expQueryMin uint64 // starting seq num that is used in the query to get messages
+		expMin      uint64
+		expMax      uint64
+		expErr      bool
+	}{
+		{
+			name:              "happy flow inflight",
+			commitStoreSeqNum: 9,
+			inflightSeqNum:    10,
+			msgSeqNums:        []uint64{11, 12, 13, 14},
+			expQueryMin:       11, // inflight+1
+			expMin:            11,
+			expMax:            14,
+			expErr:            false,
+		},
+		{
+			name:              "happy flow no inflight",
+			commitStoreSeqNum: 9,
+			msgSeqNums:        []uint64{11, 12, 13, 14},
+			expQueryMin:       9, // from commit store
+			expMin:            11,
+			expMax:            14,
+			expErr:            false,
+		},
+		{
+			name:              "gap in msg seq nums",
+			commitStoreSeqNum: 10,
+			inflightSeqNum:    9,
+			expQueryMin:       10,
+			msgSeqNums:        []uint64{11, 12, 14},
+			expErr:            true,
+		},
+		{
+			name:              "no new messages",
+			commitStoreSeqNum: 9,
+			msgSeqNums:        []uint64{},
+			expQueryMin:       9,
+			expMin:            0,
+			expMax:            0,
+			expErr:            false,
+		},
+		{
+			name:              "unordered seq nums",
+			commitStoreSeqNum: 9,
+			msgSeqNums:        []uint64{11, 13, 14, 10},
+			expQueryMin:       9,
+			expErr:            true,
+		},
+	}
+
+	ctx := testutils.Context(t)
+	lggr := logger.TestLogger(t)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &CommitReportingPlugin{}
+			commitStore := mock_contracts.NewCommitStoreInterface(t)
+			commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.commitStoreSeqNum, nil)
+			p.config.commitStore = commitStore
+
+			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
+			if tc.inflightSeqNum > 0 {
+				p.inflightReports.inFlight[[32]byte{}] = InflightCommitReport{
+					report: commit_store.CommitStoreCommitReport{
+						Interval: commit_store.CommitStoreInterval{
+							Min: tc.inflightSeqNum,
+							Max: tc.inflightSeqNum,
+						},
+					},
+				}
+			}
+
+			sourceEvents := ccipevents.NewMockClient(t)
+			var sendReqs []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
+			for _, seqNum := range tc.msgSeqNums {
+				sendReqs = append(sendReqs, ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{
+					Data: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{
+						Message: evm_2_evm_onramp.InternalEVM2EVMMessage{SequenceNumber: seqNum},
+					},
+				})
+			}
+			sourceEvents.On("GetSendRequestsGteSeqNum", ctx, mock.Anything, tc.expQueryMin, false, 0).Return(sendReqs, nil)
+			p.config.sourceEvents = sourceEvents
+
+			minSeqNum, maxSeqNum, err := p.calculateMinMaxSequenceNumbers(ctx, lggr)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.Equal(t, tc.expMin, minSeqNum)
+			assert.Equal(t, tc.expMax, maxSeqNum)
+		})
+	}
+}
+
 // leafHasher123 always returns '123' followed by zeroes in HashLeaf method.
 type leafHasher123 struct{}
 
