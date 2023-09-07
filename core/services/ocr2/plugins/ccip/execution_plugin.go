@@ -28,9 +28,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/customtokens"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/offchaintokendata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/offchaintokendata/usdc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -109,6 +110,18 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 
 	sourceChainEventClient := ccipevents.NewLogPollerClient(sourceChain.LogPoller(), execLggr, sourceChain.Client())
 
+	tokenDataProviders := make(map[common.Address]offchaintokendata.Provider)
+
+	// Subscribe all token data providers
+	if pluginConfig.USDCAttestationApi != "" {
+		tokenDataProviders[usdc.TokenMapping[chainId]] = usdc.NewUSDCOffchainTokenDataService(
+			sourceChainEventClient,
+			usdc.TokenMapping[chainId],
+			offRampConfig.OnRamp,
+			pluginConfig.USDCAttestationApi,
+			chainId)
+	}
+
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
 			lggr:                     execLggr,
@@ -125,7 +138,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 			sourceClient:             sourceChain.Client(),
 			destGasEstimator:         destChain.GasEstimator(),
 			leafHasher:               hasher.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx()),
-			usdcService:              customtokens.NewUSDCService(sourceChainEventClient, offRampConfig.OnRamp, pluginConfig.USDCAttestationApi, chainId),
+			tokenDataProviders:       tokenDataProviders,
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)
@@ -161,10 +174,10 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry, usdcToken common.Address) []logpoller.Filter {
+func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address, tokenDataProviders map[common.Address]offchaintokendata.Provider) []logpoller.Filter {
 	var filters []logpoller.Filter
-	if usdcToken != common.HexToAddress("") {
-		filters = customtokens.GetUSDCServiceSourceLPFilters(usdcToken)
+	for _, provider := range tokenDataProviders {
+		filters = append(filters, provider.GetSourceLogPollerFilters()...)
 	}
 
 	return append(filters, []logpoller.Filter{
@@ -296,10 +309,19 @@ func unregisterExecutionPluginLpFilters(
 		return err
 	}
 
-	if err := unregisterLpFilters(
+	tokenDataProviders := make(map[common.Address]offchaintokendata.Provider)
+
+	// TODO the called function only uses the chainId to get the message transmitter address
+	tokenDataProviders[usdc.TokenMapping[chainId]] = usdc.NewUSDCOffchainTokenDataService(nil,
+		usdc.TokenMapping[chainId],
+		common.Address{},
+		"",
+		chainId)
+
+	if err = unregisterLpFilters(
 		q,
 		sourceLP,
-		getExecutionPluginSourceLpChainFilters(destOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry, customtokens.USDCTokenMapping[chainId]),
+		getExecutionPluginSourceLpChainFilters(destOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry, tokenDataProviders),
 	); err != nil {
 		return err
 	}

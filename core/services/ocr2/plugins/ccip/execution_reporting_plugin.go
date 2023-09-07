@@ -34,9 +34,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/customtokens"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/offchaintokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
@@ -67,7 +67,7 @@ type ExecutionPluginConfig struct {
 	sourceClient             evmclient.Client
 	destGasEstimator         gas.EvmFeeEstimator
 	leafHasher               hasher.LeafHasherInterface[[32]byte]
-	usdcService              *customtokens.USDCService
+	tokenDataProviders       map[common.Address]offchaintokendata.Provider
 }
 
 type ExecutionReportingPlugin struct {
@@ -205,7 +205,7 @@ func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegis
 	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(
 		rf.config.onRamp.Address(),
 		rf.config.sourcePriceRegistry.Address(),
-		rf.config.usdcService.SourceUSDCToken,
+		rf.config.tokenDataProviders,
 	)
 	created, deleted := filtersDiff(sourceFiltersBefore, sourceFiltersNow)
 	if err := unregisterLpFilters(nilQueryer, rf.config.sourceLP, deleted); err != nil {
@@ -540,23 +540,20 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		// Any tokens that require offchain token data should be added here.
 		var tokenData [][]byte
 		for _, token := range msg.TokenAmounts {
-			switch token.Token {
-			case r.config.usdcService.SourceUSDCToken:
-				// TODO non-nil context
-				success, attestation, err2 := r.config.usdcService.IsAttestationComplete(context.TODO(), msg.SequenceNumber)
+			if offchainTokenDataProvider, ok := r.config.tokenDataProviders[token.Token]; ok {
+				ready, attestation, err2 := offchainTokenDataProvider.IsAttestationComplete(context.TODO(), msg.SequenceNumber)
 				if err2 != nil {
-					msgLggr.Errorw("Skipping message unable to check USDC attestation", "err", err2)
+					msgLggr.Errorw("Skipping message unable to check attestation", "err", err2)
 					continue
 				}
-				if !success {
-					msgLggr.Warnw("Skipping message USDC attestation not ready")
+				if !ready {
+					msgLggr.Warnw("Skipping message attestation not ready")
 					continue
 				}
-				tokenData = append(tokenData, []byte(attestation))
-			default:
+				tokenData = append(tokenData, attestation)
+			} else {
 				tokenData = append(tokenData, []byte{})
 			}
 		}

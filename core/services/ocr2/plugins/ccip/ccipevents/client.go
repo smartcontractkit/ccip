@@ -22,6 +22,8 @@ type BlockMeta struct {
 }
 
 // Client can be used to fetch CCIP related parsed on-chain events.
+//
+//go:generate mockery --quiet --name Client --output . --filename client_mock.go --inpackage --case=underscore
 type Client interface {
 	// GetSendRequestsGteSeqNum returns all the message send requests with sequence number greater than or equal to the provided.
 	// If checkFinalityTags is set to true then confs param is ignored, the latest finalized block is used in the query.

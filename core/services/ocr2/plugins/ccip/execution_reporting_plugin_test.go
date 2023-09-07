@@ -30,7 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/customtokens"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/offchaintokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -78,6 +78,8 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 		RelativeBoostPerWaitHour:    0.07,
 	}
 	sourceChainEventClient := ccipevents.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient)
+	tokenDataProviders := make(map[common.Address]offchaintokendata.Provider)
+
 	plugin := ExecutionReportingPlugin{
 		config: ExecutionPluginConfig{
 			lggr:                     th.Lggr,
@@ -94,7 +96,7 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 			sourceWrappedNativeToken: th.Source.WrappedNative.Address(),
 			leafHasher:               hasher.NewLeafHasher(th.Source.ChainSelector, th.Dest.ChainSelector, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
 			destGasEstimator:         destFeeEstimator,
-			usdcService:              customtokens.NewUSDCService(sourceChainEventClient, th.Source.OnRamp.Address(), "", th.Source.ChainSelector),
+			tokenDataProviders:       tokenDataProviders,
 		},
 		onchainConfig:         th.ExecOnchainConfig,
 		offchainConfig:        offchainConfig,
@@ -1145,9 +1147,6 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 	offRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
 	offRamp.On("Address").Return(utils.RandomAddress(), nil)
 
-	sourceChainId := uint64(420)
-	sourceUSDCTokenAddress := customtokens.USDCTokenMapping[sourceChainId]
-
 	destPriceRegistryAddr := utils.RandomAddress()
 
 	rf := &ExecutionReportingPluginFactory{
@@ -1161,11 +1160,11 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 			commitStore:         commitStore,
 			offRamp:             offRamp,
 			sourcePriceRegistry: sourcePriceRegistry,
-			usdcService:         customtokens.NewUSDCService(nil, onRamp.Address(), "", sourceChainId),
+			tokenDataProviders:  make(map[common.Address]offchaintokendata.Provider),
 		},
 	}
 
-	for _, f := range getExecutionPluginSourceLpChainFilters(onRamp.Address(), sourcePriceRegistry.Address(), sourceUSDCTokenAddress) {
+	for _, f := range getExecutionPluginSourceLpChainFilters(onRamp.Address(), sourcePriceRegistry.Address(), rf.config.tokenDataProviders) {
 		sourceLP.On("RegisterFilter", f).Return(nil)
 	}
 	for _, f := range getExecutionPluginDestLpChainFilters(commitStore.Address(), offRamp.Address(), destPriceRegistryAddr) {
