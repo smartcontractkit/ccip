@@ -1225,6 +1225,215 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 	}
 }
 
+func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
+	now := time.Now()
+
+	testCases := []struct {
+		name                   string
+		checkInflight          bool
+		inflightGasPriceUpdate *update
+		destGasPriceUpdates    []update
+		expUpdate              update
+		expErr                 bool
+	}{
+		{
+			name:                   "only inflight gas price",
+			checkInflight:          true,
+			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(1000)},
+			expUpdate:              update{timestamp: now, value: big.NewInt(1000)},
+			expErr:                 false,
+		},
+		{
+			name:                   "inflight price is nil",
+			checkInflight:          true,
+			inflightGasPriceUpdate: &update{timestamp: now, value: nil},
+			destGasPriceUpdates: []update{
+				{timestamp: now.Add(time.Minute), value: big.NewInt(2000)},
+				{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
+			},
+			expUpdate: update{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
+			expErr:    false,
+		},
+		{
+			name:                   "inflight updates are skipped",
+			checkInflight:          false,
+			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(1000)},
+			destGasPriceUpdates: []update{
+				{timestamp: now.Add(time.Minute), value: big.NewInt(2000)},
+				{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
+			},
+			expUpdate: update{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
+			expErr:    false,
+		},
+	}
+
+	ctx := testutils.Context(t)
+	lggr := logger.TestLogger(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &CommitReportingPlugin{}
+			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
+			p.lggr = lggr
+			destPriceRegistry := mock_contracts.NewPriceRegistryInterface(t)
+			destPriceRegistry.On("Address").Return(utils.RandomAddress()).Maybe()
+			p.destPriceRegistry = destPriceRegistry
+
+			if tc.inflightGasPriceUpdate != nil {
+				p.inflightReports.inFlightPriceUpdates = append(
+					p.inflightReports.inFlightPriceUpdates,
+					InflightPriceUpdate{
+						createdAt: tc.inflightGasPriceUpdate.timestamp,
+						priceUpdates: commit_store.InternalPriceUpdates{
+							DestChainSelector: 1234,
+							UsdPerUnitGas:     tc.inflightGasPriceUpdate.value,
+						},
+					},
+				)
+			}
+
+			if len(tc.destGasPriceUpdates) > 0 {
+				var events []ccipevents.Event[price_registry.PriceRegistryUsdPerUnitGasUpdated]
+				for _, u := range tc.destGasPriceUpdates {
+					events = append(events, ccipevents.Event[price_registry.PriceRegistryUsdPerUnitGasUpdated]{
+						Data: price_registry.PriceRegistryUsdPerUnitGasUpdated{
+							Value:     u.value,
+							Timestamp: big.NewInt(u.timestamp.Unix()),
+						},
+					})
+				}
+				destEvents := ccipevents.NewMockClient(t)
+				destEvents.On("GetGasPriceUpdatesCreatedAfter", ctx, mock.Anything, uint64(0), mock.Anything, 0).Return(events, nil)
+				p.config.destEvents = destEvents
+			}
+
+			priceUpdate, err := p.getLatestGasPriceUpdate(ctx, time.Now(), tc.checkInflight)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expUpdate.timestamp.Truncate(time.Second), priceUpdate.timestamp.Truncate(time.Second))
+			assert.Equal(t, tc.expUpdate.value.Uint64(), priceUpdate.value.Uint64())
+		})
+	}
+}
+
+func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
+	now := time.Now()
+	tk1 := utils.RandomAddress()
+	tk2 := utils.RandomAddress()
+
+	testCases := []struct {
+		name                 string
+		priceRegistryUpdates []price_registry.PriceRegistryUsdPerTokenUpdated
+		checkInflight        bool
+		inflightUpdates      map[common.Address]update
+		expUpdates           map[common.Address]update
+		expErr               bool
+	}{
+		{
+			name: "ignore inflight updates",
+			priceRegistryUpdates: []price_registry.PriceRegistryUsdPerTokenUpdated{
+				{
+					Token:     tk1,
+					Value:     big.NewInt(1000),
+					Timestamp: big.NewInt(now.Add(1 * time.Minute).Unix()),
+				},
+				{
+					Token:     tk2,
+					Value:     big.NewInt(2000),
+					Timestamp: big.NewInt(now.Add(2 * time.Minute).Unix()),
+				},
+			},
+			checkInflight: false,
+			expUpdates: map[common.Address]update{
+				tk1: {timestamp: now.Add(1 * time.Minute), value: big.NewInt(1000)},
+				tk2: {timestamp: now.Add(2 * time.Minute), value: big.NewInt(2000)},
+			},
+			expErr: false,
+		},
+		{
+			name: "consider inflight updates",
+			priceRegistryUpdates: []price_registry.PriceRegistryUsdPerTokenUpdated{
+				{
+					Token:     tk1,
+					Value:     big.NewInt(1000),
+					Timestamp: big.NewInt(now.Add(1 * time.Minute).Unix()),
+				},
+				{
+					Token:     tk2,
+					Value:     big.NewInt(2000),
+					Timestamp: big.NewInt(now.Add(2 * time.Minute).Unix()),
+				},
+			},
+			checkInflight: true,
+			inflightUpdates: map[common.Address]update{
+				tk1: {timestamp: now, value: big.NewInt(500)}, // inflight but older
+				tk2: {timestamp: now.Add(4 * time.Minute), value: big.NewInt(4000)},
+			},
+			expUpdates: map[common.Address]update{
+				tk1: {timestamp: now.Add(1 * time.Minute), value: big.NewInt(1000)},
+				tk2: {timestamp: now.Add(4 * time.Minute), value: big.NewInt(4000)},
+			},
+			expErr: false,
+		},
+	}
+
+	ctx := testutils.Context(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &CommitReportingPlugin{}
+
+			priceRegAddr := utils.RandomAddress()
+			priceReg := mock_contracts.NewPriceRegistryInterface(t)
+			priceReg.On("Address").Return(priceRegAddr)
+			p.destPriceRegistry = priceReg
+
+			destEvents := ccipevents.NewMockClient(t)
+			var events []ccipevents.Event[price_registry.PriceRegistryUsdPerTokenUpdated]
+			for _, up := range tc.priceRegistryUpdates {
+				events = append(events, ccipevents.Event[price_registry.PriceRegistryUsdPerTokenUpdated]{
+					Data: price_registry.PriceRegistryUsdPerTokenUpdated{
+						Token:     up.Token,
+						Value:     up.Value,
+						Timestamp: up.Timestamp,
+					},
+				})
+			}
+			destEvents.On("GetTokenPriceUpdatesCreatedAfter", ctx, priceRegAddr, mock.Anything, 0).Return(events, nil)
+			p.config.destEvents = destEvents
+
+			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
+			if len(tc.inflightUpdates) > 0 {
+				for tk, upd := range tc.inflightUpdates {
+					p.inflightReports.inFlightPriceUpdates = append(p.inflightReports.inFlightPriceUpdates, InflightPriceUpdate{
+						createdAt: upd.timestamp,
+						priceUpdates: commit_store.InternalPriceUpdates{
+							TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
+								{SourceToken: tk, UsdPerToken: upd.value},
+							},
+						},
+					})
+				}
+			}
+
+			updates, err := p.getLatestTokenPriceUpdates(ctx, now, tc.checkInflight)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, len(tc.expUpdates), len(updates))
+			for k, v := range updates {
+				assert.Equal(t, tc.expUpdates[k].timestamp.Truncate(time.Second), v.timestamp.Truncate(time.Second))
+				assert.Equal(t, tc.expUpdates[k].value.Uint64(), v.value.Uint64())
+			}
+		})
+	}
+
+}
+
 // leafHasher123 always returns '123' followed by zeroes in HashLeaf method.
 type leafHasher123 struct{}
 
