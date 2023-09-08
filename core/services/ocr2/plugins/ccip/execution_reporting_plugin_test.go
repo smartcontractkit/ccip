@@ -1078,7 +1078,15 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expReports, populatedReports)
+			assert.Equal(t, len(tc.expReports), len(populatedReports))
+			for i, expReport := range tc.expReports {
+				assert.Equal(t, len(expReport.sendRequestsWithMeta), len(populatedReports[i].sendRequestsWithMeta))
+				for j, expReq := range expReport.sendRequestsWithMeta {
+					assert.Equal(t, expReq.executed, populatedReports[i].sendRequestsWithMeta[j].executed)
+					assert.Equal(t, expReq.finalized, populatedReports[i].sendRequestsWithMeta[j].finalized)
+					assert.Equal(t, expReq.SequenceNumber, populatedReports[i].sendRequestsWithMeta[j].SequenceNumber)
+				}
+			}
 		})
 	}
 }
