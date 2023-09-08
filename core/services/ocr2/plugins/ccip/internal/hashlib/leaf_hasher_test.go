@@ -1,4 +1,4 @@
-package hashlib_test
+package hashlib
 
 import (
 	"encoding/hex"
@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 )
 
@@ -17,9 +16,9 @@ func TestHasher(t *testing.T) {
 	sourceChainSelector, destChainSelector := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 
-	hashingCtx := hashlib.NewKeccakCtx()
+	hashingCtx := NewKeccakCtx()
 
-	hasher := hashlib.NewLeafHasher(sourceChainSelector, destChainSelector, onRampAddress, hashingCtx)
+	hasher := NewLeafHasher(sourceChainSelector, destChainSelector, onRampAddress, hashingCtx)
 
 	message := evm_2_evm_onramp.InternalEVM2EVMMessage{
 		SourceChainSelector: sourceChainSelector,
@@ -72,7 +71,7 @@ func TestHasher(t *testing.T) {
 func TestMetaDataHash(t *testing.T) {
 	sourceChainSelector, destChainSelector := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
-	ctx := hashlib.NewKeccakCtx()
-	hash := hashlib.GetMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMSubscriptionMessagePlus")), sourceChainSelector, onRampAddress, destChainSelector)
+	ctx := NewKeccakCtx()
+	hash := GetMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMSubscriptionMessagePlus")), sourceChainSelector, onRampAddress, destChainSelector)
 	require.Equal(t, "e8b93c9d01a7a72ec6c7235e238701cf1511b267a31fdb78dd342649ee58c08d", hex.EncodeToString(hash[:]))
 }
