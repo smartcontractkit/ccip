@@ -10,8 +10,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
+
+	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -136,7 +139,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 		"sourceRouter", sourceRouter.Address())
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
-		return []job.ServiceCtx{NewBackfilledOracle(
+		return []job.ServiceCtx{oraclelib.NewBackfilledOracle(
 			commitLggr,
 			sourceChain.LogPoller(),
 			destChain.LogPoller(),
