@@ -58,35 +58,46 @@ func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
+	packedFixedSizeValues, err := utils.ABIEncode(
+		`[
+{"name": "sender", "type":"address"},
+{"name": "receiver", "type":"address"},
+{"name": "sequenceNumber", "type":"uint64"},
+{"name": "gasLimit", "type":"uint256"},
+{"name": "strict", "type":"bool"},
+{"name": "nonce", "type":"uint64"},
+{"name": "feeToken","type": "address"},
+{"name": "feeTokenAmount","type": "uint256"}
+]`,
+		message.Sender,
+		message.Receiver,
+		message.SequenceNumber,
+		message.GasLimit,
+		message.Strict,
+		message.Nonce,
+		message.FeeToken,
+		message.FeeTokenAmount,
+	)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	fixedSizeValuesHash := t.ctx.Hash(packedFixedSizeValues)
+
 	packedValues, err := utils.ABIEncode(
 		`[
 {"name": "leafDomainSeparator","type":"bytes1"},
 {"name": "metadataHash", "type":"bytes32"},
-{"name": "sequenceNumber", "type":"uint64"},
-{"name": "nonce", "type":"uint64"},
-{"name": "sender", "type":"address"},
-{"name": "receiver", "type":"address"},
+{"name": "fixedSizeValuesHash", "type":"bytes32"},
 {"name": "dataHash", "type":"bytes32"},
 {"name": "tokenAmountsHash", "type":"bytes32"},
 {"name": "sourceTokenDataHash", "type":"bytes32"},
-{"name": "gasLimit", "type":"uint256"},
-{"name": "strict", "type":"bool"},
-{"name": "feeToken","type": "address"},
-{"name": "feeTokenAmount","type": "uint256"}
 ]`,
 		LeafDomainSeparator,
 		t.metaDataHash,
-		message.SequenceNumber,
-		message.Nonce,
-		message.Sender,
-		message.Receiver,
+		fixedSizeValuesHash,
 		t.ctx.Hash(message.Data),
 		t.ctx.Hash(encodedTokens),
 		t.ctx.Hash(encodedSourceTokenData),
-		message.GasLimit,
-		message.Strict,
-		message.FeeToken,
-		message.FeeTokenAmount,
 	)
 	if err != nil {
 		return [32]byte{}, err
