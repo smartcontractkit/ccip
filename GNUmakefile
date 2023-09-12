@@ -137,7 +137,9 @@ telemetry-protobuf: $(telemetry-protobuf) ## Generate telemetry protocol buffers
 
 .PHONY: test_need_operator_assets
 test_need_operator_assets: ## Add blank file in web assets if operator ui has not been built
-	[ -f "./core/web/assets/index.html" ] || mkdir ./core/web/assets && touch ./core/web/assets/index.html
+	ccipPath=$GOPATH/pkg/mod/github.com/smartcontractkit/ccip
+    ccipV2=$(ls -1 $ccipPath | grep v2 | tail -n 1)
+	[ -f "./core/web/assets/index.html" ] || mkdir /go/pkg/mod/github.com/smartcontractkit/ccip/v2@v2.5.0-ccip1.1.0/core/web && touch ./core/web/assets/index.html
 
 .PHONY: config-docs
 config-docs: ## Generate core node configuration documentation
