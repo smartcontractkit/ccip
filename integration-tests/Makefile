@@ -224,4 +224,4 @@ run_test_with_local_image: build_docker_image
 
 .PHONY: operator-ui
 operator-ui: ## Fetch the frontend
-	./operator_ui/install.sh
+	operator_ui/install.sh
