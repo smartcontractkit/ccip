@@ -9,8 +9,8 @@ set -ex
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 cd "$SCRIPT_DIR"/../../ || exit 1
-make operator-ui
 cd ./integration-tests
+make operator-ui
 
 helm repo update
 

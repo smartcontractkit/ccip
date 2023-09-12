@@ -6,6 +6,14 @@ LINUX=LINUX
 OSX=OSX
 WINDOWS=WIN32
 OSFLAG :=
+
+.DEFAULT_GOAL := abigen
+
+COMMIT_SHA ?= $(shell git rev-parse HEAD)
+VERSION = $(shell cat VERSION)
+GO_LDFLAGS := $(shell tools/bin/ldflags)
+GOFLAGS = -ldflags "$(GO_LDFLAGS)"
+
 ifeq ($(OS),Windows_NT)
 	OSFLAG = $(WINDOWS)
 else
@@ -213,3 +221,7 @@ run_test_with_local_image: build_docker_image
 	ARGS="$(args)" \
 	PRODUCT=$(product) 	\
 	./scripts/run_product_tests
+
+.PHONY: operator-ui
+operator-ui: ## Fetch the frontend
+	./operator_ui/install.sh
