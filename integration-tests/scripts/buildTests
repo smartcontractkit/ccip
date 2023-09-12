@@ -9,12 +9,12 @@ set -ex
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 cd "$SCRIPT_DIR"/../../ || exit 1
-make test_need_operator_assets
+make operator-ui
 cd ./integration-tests
 
 helm repo update
 
-# parse out quotes if they exist in the string
+# parse out quotes if they exist in the strin
 temp="${1%\"}"
 tosplit="${temp#\"}"
 

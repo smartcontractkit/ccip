@@ -4,9 +4,13 @@ set -e
 owner=smartcontractkit
 repo=operator-ui
 fullRepo=${owner}/${repo}
+
+ccipPath=$GOPATH/pkg/mod/github.com/smartcontractkit/ccip
+ccipV2=$(ls -1 $ccipPath | grep v2 | tail -n 1)
+
 gitRoot=$(git rev-parse --show-toplevel || pwd)
 cd "$gitRoot/operator_ui"
-unpack_dir="$gitRoot/core/web/assets"
+unpack_dir="$ccipPath/$ccipV2/core/web/assets"
 tag=$(cat TAG)
 # Remove the version prefix "v"
 strippedTag="${tag:1}"
@@ -47,6 +51,14 @@ tar -xvzf "$asset_name"
 msg ""
 msg "Removing old contents of $unpack_dir"
 rm -rf "$unpack_dir"
+
+if [ ! -d "$unpack_dir" ]
+then
+echo "$unpack_dir folder path not present, creating $ccipPath/$ccipV2/core/web"
+chmod u+rwx $ccipPath/$ccipV2/core/web
+mkdir -p $unpack_dir
+fi
+
 msg "Copying contents of package/artifacts to $unpack_dir"
 cp -rf package/artifacts/. "$unpack_dir" || true
 
