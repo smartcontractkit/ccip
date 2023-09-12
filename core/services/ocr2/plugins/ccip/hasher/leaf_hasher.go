@@ -90,7 +90,7 @@ func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 {"name": "fixedSizeValuesHash", "type":"bytes32"},
 {"name": "dataHash", "type":"bytes32"},
 {"name": "tokenAmountsHash", "type":"bytes32"},
-{"name": "sourceTokenDataHash", "type":"bytes32"},
+{"name": "sourceTokenDataHash", "type":"bytes32"}
 ]`,
 		LeafDomainSeparator,
 		t.metaDataHash,
