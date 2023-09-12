@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -18,17 +19,12 @@ import (
 	ocrConfigHelper "github.com/smartcontractkit/libocr/offchainreporting/confighelper"
 	ocrTypes "github.com/smartcontractkit/libocr/offchainreporting/types"
 
-	"strings"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/integration-tests/client"
-	eth_contracts "github.com/smartcontractkit/chainlink/integration-tests/contracts/ethereum"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/functions/generated/functions_coordinator"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/functions/generated/functions_load_test_client"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/functions/generated/functions_router"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/functions/generated/functions_v1_events_mock"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/authorized_forwarder"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/flags_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/flux_aggregator_wrapper"
@@ -48,6 +44,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/test_api_consumer_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/verifier"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/verifier_proxy"
+
+	"github.com/smartcontractkit/chainlink/integration-tests/client"
+	eth_contracts "github.com/smartcontractkit/chainlink/integration-tests/contracts/ethereum"
 )
 
 // EthereumOracle oracle for "directrequest" job tests
@@ -742,6 +741,7 @@ func (f *EthereumKeeperGasWrapperMock) SetMeasureCheckGasResult(result bool, pay
 	return f.client.ProcessTransaction(tx)
 }
 
+/*
 // EthereumFunctionsV1EventsMock represents the basic functions v1 events mock contract
 type EthereumFunctionsV1EventsMock struct {
 	client     blockchain.EVMClient
@@ -884,6 +884,8 @@ func (f *EthereumFunctionsV1EventsMock) EmitContractUpdated(id [32]byte, from co
 	}
 	return f.client.ProcessTransaction(tx)
 }
+
+*/
 
 // EthereumFluxAggregator represents the basic flux aggregation contract
 type EthereumFluxAggregator struct {
@@ -2188,7 +2190,7 @@ func Bytes32ToSlice(a [32]byte) (r []byte) {
 	return
 }
 
-func (e *EthereumFunctionsLoadTestClient) GetStats() (*EthereumFunctionsLoadStats, error) {
+/*func (e *EthereumFunctionsLoadTestClient) GetStats() (*EthereumFunctionsLoadStats, error) {
 	opts := &bind.CallOpts{
 		From:    common.HexToAddress(e.client.GetDefaultWallet().Address()),
 		Context: context.Background(),
@@ -2223,6 +2225,8 @@ func (e *EthereumFunctionsLoadTestClient) ResetStats() error {
 	return nil
 }
 
+
+
 func (e *EthereumFunctionsLoadTestClient) SendRequest(times uint32, source string, encryptedSecretsReferences []byte, args []string, subscriptionId uint64, jobId [32]byte) error {
 	opts, err := e.client.TransactionOpts(e.client.GetDefaultWallet())
 	if err != nil {
@@ -2235,6 +2239,7 @@ func (e *EthereumFunctionsLoadTestClient) SendRequest(times uint32, source strin
 	return e.client.ProcessTransaction(tx)
 }
 
+
 func (e *EthereumFunctionsLoadTestClient) SendRequestWithDONHostedSecrets(times uint32, source string, slotID uint8, slotVersion uint64, args []string, subscriptionId uint64, donID [32]byte) error {
 	opts, err := e.client.TransactionOpts(e.client.GetDefaultWallet())
 	if err != nil {
@@ -2246,6 +2251,8 @@ func (e *EthereumFunctionsLoadTestClient) SendRequestWithDONHostedSecrets(times 
 	}
 	return e.client.ProcessTransaction(tx)
 }
+
+*/
 
 type EthereumMercuryVerifier struct {
 	address  common.Address
@@ -2294,6 +2301,7 @@ func (e *EthereumMercuryVerifierProxy) Verify(signedReport []byte, value *big.In
 	return tx, e.client.ProcessTransaction(tx)
 }
 
+/*
 func (e *EthereumMercuryVerifierProxy) VerifyBulk(signedReports [][]byte, value *big.Int) (*types.Transaction, error) {
 	opts, err := e.client.TransactionOpts(e.client.GetDefaultWallet())
 	if value != nil {
@@ -2308,3 +2316,5 @@ func (e *EthereumMercuryVerifierProxy) VerifyBulk(signedReports [][]byte, value 
 	}
 	return tx, e.client.ProcessTransaction(tx)
 }
+
+*/

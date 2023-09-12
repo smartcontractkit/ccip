@@ -3,14 +3,14 @@ package contracts
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/vrf_coordinator_v2plus"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/vrf_v2plus_load_test_with_metrics"
-	"math/big"
-	"time"
 )
 
 type EthereumVRFCoordinatorV2Plus struct {
@@ -19,12 +19,14 @@ type EthereumVRFCoordinatorV2Plus struct {
 	coordinator *vrf_coordinator_v2plus.VRFCoordinatorV2Plus
 }
 
+/*
 // EthereumVRFv2PlusLoadTestConsumer represents VRFv2Plus consumer contract for performing Load Tests
 type EthereumVRFv2PlusLoadTestConsumer struct {
 	address  *common.Address
 	client   blockchain.EVMClient
 	consumer *vrf_v2plus_load_test_with_metrics.VRFV2PlusLoadTestWithMetrics
 }
+*/
 
 // DeployVRFCoordinatorV2Plus deploys VRFV2Plus coordinator contract
 func (e *EthereumContractDeployer) DeployVRFCoordinatorV2Plus(bhsAddr string) (VRFCoordinatorV2Plus, error) {
@@ -204,6 +206,7 @@ func (v *EthereumVRFCoordinatorV2Plus) WaitForRandomWordsFulfilledEvent(subID []
 	}
 }
 
+/*
 func (v *EthereumVRFv2PlusLoadTestConsumer) Address() string {
 	return v.address.Hex()
 }
@@ -279,3 +282,5 @@ func (v *EthereumVRFv2PlusLoadTestConsumer) GetLoadTestMetrics(ctx context.Conte
 		fastestFulfillment,
 	}, nil
 }
+
+*/
