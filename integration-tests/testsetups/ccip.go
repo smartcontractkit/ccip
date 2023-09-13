@@ -21,6 +21,7 @@ import (
 	mockserver_cfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/multierr"
@@ -28,11 +29,12 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
+	integrationactions "github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts/ccip/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-	"github.com/smartcontractkit/chainlink/integration-tests/networks"
 	"github.com/smartcontractkit/chainlink/integration-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
+	ccipnode "github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 )
 
 const (
@@ -189,47 +191,42 @@ func (p *CCIPTestConfig) setLoadInputs() {
 	}
 }
 
-func (p *CCIPTestConfig) FormNetworkPairs() {
-	for i := 0; i < p.NoOfNetworks; i++ {
-		for j := i + 1; j < p.NoOfNetworks; j++ {
-			p.NetworkPairs = append(p.NetworkPairs, NetworkPair{
-				NetworkA: p.AllNetworks[i],
-				NetworkB: p.AllNetworks[j],
-			})
-		}
-	}
-}
-
-// NewCCIPTestConfig collects all test related CCIPTestConfig from environment variables
-func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
+func (p *CCIPTestConfig) SetNetworkPairs(t *testing.T, lggr zerolog.Logger) error {
 	var allError error
+	// if network pairs are provided, then use them
+	// example usage - CCIP_NETWORK_PAIRS="networkA,networkB|networkC,networkD|networkA,networkC"
+	lanes, _ := utils.GetEnv("CCIP_NETWORK_PAIRS")
+	if lanes != "" {
+		p.NetworkPairs = []NetworkPair{}
+		networkPairs := strings.Split(lanes, "|")
+		networkMap := make(map[int64]blockchain.EVMNetwork)
+		for _, pair := range networkPairs {
+			networkNames := strings.Split(pair, ",")
+			if len(networkNames) != 2 {
+				allError = multierr.Append(allError, fmt.Errorf("invalid network pair"))
+			}
+			nets := networks.SetNetworks(networkNames)
+			p.NetworkPairs = append(p.NetworkPairs, NetworkPair{
+				NetworkA: nets[0],
+				NetworkB: nets[1],
+			})
+			if _, ok := networkMap[nets[0].ChainID]; !ok {
+				networkMap[nets[0].ChainID] = nets[0]
+			}
+			if _, ok := networkMap[nets[1].ChainID]; !ok {
+				networkMap[nets[1].ChainID] = nets[1]
+			}
+		}
+		return allError
+	}
+	// if network pairs are not provided with CCIP_NETWORK_PAIRS, then form all possible network pair combination from SELECTED_NETWORKS
 	if len(networks.SelectedNetworks) < 3 {
 		lggr.Fatal().
 			Interface("SELECTED_NETWORKS", networks.SelectedNetworks).
 			Msg("Set source and destination network in index 1 & 2 of env variable SELECTED_NETWORKS")
 	}
-	p := &CCIPTestConfig{
-		Test:                t,
-		MsgType:             actions.TokenTransfer,
-		PhaseTimeout:        DefaultPhaseTimeout,
-		TestDuration:        DefaultTestDuration,
-		NodeFunding:         DefaultNodeFunding,
-		NoOfNetworks:        DefaultNoOfNetworks,
-		AllNetworks:         networks.SelectedNetworks[1:],
-		GethResourceProfile: GethResourceProfile,
-	}
-
-	if tType != Smoke {
-		p.CLNodeDBResourceProfile = DONDBResourceProfile
-	}
-
-	if tType == Load {
-		p.EnvTTL = DefaultTTLForLongTests
-		p.CLNodeResourceProfile = DONResourceProfile
-		p.NodeFunding = NodeFundingForLoad
-		p.PhaseTimeout = DefaultPhaseTimeoutForLongTests
-	}
-
+	p.AllNetworks = networks.SelectedNetworks[1:]
+	p.NoOfNetworks = DefaultNoOfNetworks
 	inputNoOfNetworks, _ := utils.GetEnv("CCIP_NO_OF_NETWORKS")
 	if inputNoOfNetworks != "" {
 		n, err := strconv.Atoi(inputNoOfNetworks)
@@ -258,7 +255,7 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	// and the provided networks are simulated network, create replicas of the provided networks with
 	// different chain ids
 	if len(p.AllNetworks) < p.NoOfNetworks {
-		if p.AllNetworks[0].Simulated {
+		if simulated {
 			actualNoOfNetworks := len(p.AllNetworks)
 			n := p.AllNetworks[0]
 			for i := 0; i < p.NoOfNetworks-actualNoOfNetworks; i++ {
@@ -279,7 +276,7 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	}
 	lggr.Info().Interface("Networks", p.AllNetworks).Msg("Running tests with networks")
 	if p.NoOfNetworks > 2 {
-		p.FormNetworkPairs()
+		p.FormNetworkPairCombinations()
 	} else {
 		p.NetworkPairs = []NetworkPair{
 			{
@@ -292,6 +289,45 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	for _, n := range p.NetworkPairs {
 		lggr.Info().Str("NetworkA", n.NetworkA.Name).Str("NetworkB", n.NetworkB.Name).Msg("Network Pairs")
 	}
+
+	return allError
+}
+
+func (p *CCIPTestConfig) FormNetworkPairCombinations() {
+	for i := 0; i < p.NoOfNetworks; i++ {
+		for j := i + 1; j < p.NoOfNetworks; j++ {
+			p.NetworkPairs = append(p.NetworkPairs, NetworkPair{
+				NetworkA: p.AllNetworks[i],
+				NetworkB: p.AllNetworks[j],
+			})
+		}
+	}
+}
+
+// NewCCIPTestConfig collects all test related CCIPTestConfig from environment variables
+func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
+	var allError error
+	p := &CCIPTestConfig{
+		Test:                t,
+		MsgType:             actions.TokenTransfer,
+		PhaseTimeout:        DefaultPhaseTimeout,
+		TestDuration:        DefaultTestDuration,
+		NodeFunding:         DefaultNodeFunding,
+		GethResourceProfile: GethResourceProfile,
+	}
+
+	if tType != Smoke {
+		p.CLNodeDBResourceProfile = DONDBResourceProfile
+	}
+
+	if tType == Load {
+		p.EnvTTL = DefaultTTLForLongTests
+		p.CLNodeResourceProfile = DONResourceProfile
+		p.NodeFunding = NodeFundingForLoad
+		p.PhaseTimeout = DefaultPhaseTimeoutForLongTests
+	}
+
+	allError = multierr.Append(allError, p.SetNetworkPairs(t, lggr))
 
 	ttlDuration, _ := utils.GetEnv("CCIP_KEEP_ENV_TTL")
 	if ttlDuration != "" {
@@ -710,7 +746,7 @@ func CCIPDefaultTestSetUp(
 				}
 				return
 			}
-			err = actions.TeardownSuite(t, ccipEnv.K8Env, utils.ProjectRoot, ccipEnv.CLNodes, setUpArgs.Reporter,
+			err = integrationactions.TeardownSuite(t, ccipEnv.K8Env, utils.ProjectRoot, ccipEnv.CLNodes, setUpArgs.Reporter,
 				zapcore.ErrorLevel, chains...)
 			require.NoError(t, err, "Environment teardown shouldn't fail")
 		} else {
@@ -731,7 +767,9 @@ func CCIPDefaultTestSetUp(
 			return ccipEnv.SetUpNodesAndKeys(ctx, inputs.NodeFunding, chains)
 		})
 	}
-
+	if inputs.MsgType == actions.DataOnlyTransfer {
+		transferAmounts = []*big.Int{}
+	}
 	for i, n := range inputs.NetworkPairs {
 		newBootstrap := false
 		if i == 0 {
@@ -906,8 +944,7 @@ func DeployEnvironments(
 		*/
 	}
 
-	tomlCfg, err := node.NewConfigFromToml("ccip",
-		node.WithPrivateEVMs(nets))
+	tomlCfg, err := node.NewConfigFromToml("ccip", ccipnode.WithPrivateEVMs(nets))
 	tomlStr, err := tomlCfg.TOMLString()
 	require.NoError(t, err)
 	clProps["toml"] = tomlStr
