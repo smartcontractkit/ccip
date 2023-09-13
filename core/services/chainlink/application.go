@@ -221,16 +221,26 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 	telemetryIngressBatchClient := synchronization.TelemetryIngressBatchClient(&synchronization.NoopTelemetryIngressBatchClient{})
 	monitoringEndpointGen := telemetry.MonitoringEndpointGenerator(&telemetry.NoopAgent{})
 
+	//TODO: @george-dorin: change this when https://github.com/smartcontractkit/chainlink/pull/10581 is merged
+	if cfg.Explorer().URL() != nil && len(cfg.TelemetryIngress().Endpoints()) > 0 {
+		globalLogger.Warn("Both ExplorerUrl and TelemetryIngress.Url are set, defaulting to Explorer")
+	}
+
+	if cfg.Explorer().URL() != nil {
+		explorerClient = synchronization.NewExplorerClient(cfg.Explorer().URL(), cfg.Explorer().AccessKey(), cfg.Explorer().Secret(), globalLogger)
+		monitoringEndpointGen = telemetry.NewExplorerAgent(explorerClient)
+	}
+
 	ticfg := cfg.TelemetryIngress()
-	if ticfg.URL() != nil {
+	// Use Explorer over TelemetryIngress if both URLs are set
+	//TODO: @george-dorin: change this when https://github.com/smartcontractkit/chainlink/pull/10581 is merged
+	if cfg.Explorer().URL() == nil && len(cfg.TelemetryIngress().Endpoints()) > 0 {
 		if ticfg.UseBatchSend() {
-			telemetryIngressBatchClient = synchronization.NewTelemetryIngressBatchClient(ticfg.URL(),
-				ticfg.ServerPubKey(), keyStore.CSA(), ticfg.Logging(), globalLogger, ticfg.BufferSize(), ticfg.MaxBatchSize(), ticfg.SendInterval(), ticfg.SendTimeout(), ticfg.UniConn())
+			telemetryIngressBatchClient = synchronization.NewTelemetryIngressBatchClient(ticfg, keyStore.CSA(), globalLogger)
 			monitoringEndpointGen = telemetry.NewIngressAgentBatchWrapper(telemetryIngressBatchClient)
 
 		} else {
-			telemetryIngressClient = synchronization.NewTelemetryIngressClient(ticfg.URL(),
-				ticfg.ServerPubKey(), keyStore.CSA(), ticfg.Logging(), globalLogger, ticfg.BufferSize())
+			telemetryIngressClient = synchronization.NewTelemetryIngressClient(keyStore.CSA(), ticfg.Logging(), globalLogger, ticfg.BufferSize(), ticfg.Endpoints())
 			monitoringEndpointGen = telemetry.NewIngressAgentWrapper(telemetryIngressClient)
 		}
 	}
