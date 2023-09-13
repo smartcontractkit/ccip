@@ -6,10 +6,11 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
 func TestHasher(t *testing.T) {
@@ -36,7 +37,9 @@ func TestHasher(t *testing.T) {
 		MessageId:           [32]byte{},
 	}
 
-	hash, err := hasher.HashLeaf(testhelpers.GenerateCCIPSendLog(t, message))
+	pack, err := abihelpers.MessageArgs.Pack(message)
+	require.NoError(t, err)
+	hash, err := hasher.HashLeaf(types.Log{Topics: []common.Hash{abihelpers.EventSignatures.SendRequested}, Data: pack})
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
@@ -61,7 +64,9 @@ func TestHasher(t *testing.T) {
 		MessageId:       [32]byte{},
 	}
 
-	hash, err = hasher.HashLeaf(testhelpers.GenerateCCIPSendLog(t, message))
+	pack, err = abihelpers.MessageArgs.Pack(message)
+	require.NoError(t, err)
+	hash, err = hasher.HashLeaf(types.Log{Topics: []common.Hash{abihelpers.EventSignatures.SendRequested}, Data: pack})
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
