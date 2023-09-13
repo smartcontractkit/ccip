@@ -55,7 +55,7 @@ func TestGetExecutionPluginFilterNamesFromSpec(t *testing.T) {
 	for _, tc := range testCases {
 		chainSet := &mocks.LegacyChainContainer{}
 		t.Run(tc.description, func(t *testing.T) {
-			err := UnregisterExecPluginLpFilters(context.Background(), nilQueryer, tc.spec, chainSet)
+			err := UnregisterExecPluginLpFilters(context.Background(), tc.spec, chainSet)
 			if tc.expectingErr {
 				assert.Error(t, err)
 			} else {
@@ -80,7 +80,7 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 		}, nil)
 
 	mockOnRamp := mock_contracts.NewEVM2EVMOnRampInterface(t)
-	mockOnRamp.On("TypeAndVersion", mock.Anything).Return(fmt.Sprintf("%s %s", ccipconfig.EVM2EVMOnRamp, "1.1.0"), nil)
+	mockOnRamp.On("TypeAndVersion", mock.Anything).Return(fmt.Sprintf("%s %s", ccipconfig.EVM2EVMOnRamp, "1.2.0"), nil)
 	mockOnRamp.On("GetDynamicConfig", mock.Anything).Return(
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			PriceRegistry: srcPriceRegAddr,
@@ -111,7 +111,6 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 
 	err := unregisterExecutionPluginLpFilters(
 		context.Background(),
-		nilQueryer,
 		srcLP,
 		dstLP,
 		mockOffRamp,

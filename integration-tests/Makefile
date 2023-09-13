@@ -129,16 +129,6 @@ test_chaos_network: install_gotestfmt ## Run all smoke tests
 test_chaos_verbose: ## Run all smoke tests with verbose logging
 	go test -timeout 24h -count=1 -v $(args) ./chaos
 
-.PHONY: test_chaos_ccip_pods_raw
-test_chaos_ccip_pods_raw:
-	DATABASE_URL="postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable" \
-	go test -timeout 2h -v -count=1 $(args) -p 2 -run 'TestChaosCCIP/.*pod-chaos' ./chaos
-
-.PHONY: test_chaos_ccip_network_raw
-test_chaos_ccip_network_raw:
-	DATABASE_URL="postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable" \
-	go test -timeout 2h -v -count=1 $(args) -p 2 -run 'TestChaosCCIP/.*network-chaos' ./chaos
-
 # Performance
 .PHONY: test_perf
 test_perf: test_need_operator_assets ## Run core node performance tests.
@@ -201,7 +191,6 @@ test_benchmark_automation: ## Run the automation benchmark tests
 .PHONY: test_reorg_automation
 test_reorg_automation: ## Run the automation reorg tests
 	go test -timeout 300m -v -run ^TestAutomationReorg$$ ./reorg -count=1 | tee automation_reorg_run_`date +"%Y%m%d-%H%M%S"`.log
-
 
 # image: the name for the chainlink image being built, example: image=chainlink
 # tag: the tag for the chainlink image being built, example: tag=latest
