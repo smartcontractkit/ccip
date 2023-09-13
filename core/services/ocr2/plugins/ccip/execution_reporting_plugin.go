@@ -553,9 +553,11 @@ func (r *ExecutionReportingPlugin) buildBatch(
 					continue
 				}
 				tokenData = append(tokenData, attestation)
-			} else {
-				tokenData = append(tokenData, []byte{})
+				continue
 			}
+
+			// No token data required
+			tokenData = append(tokenData, []byte{})
 		}
 
 		// Fee boosting

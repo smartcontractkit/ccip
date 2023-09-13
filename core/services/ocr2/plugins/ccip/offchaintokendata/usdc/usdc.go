@@ -107,7 +107,7 @@ func (usdc *OffchainTokenDataService) IsAttestationComplete(ctx context.Context,
 	if response.Status == AttestationStatusSuccess {
 		attestationBytes, err := hex.DecodeString(response.Attestation)
 		if err != nil {
-			return false, nil, err
+			return false, nil, fmt.Errorf("decode response attestation: %w", err)
 		}
 		return true, attestationBytes, nil
 	}
@@ -180,7 +180,7 @@ func (usdc *OffchainTokenDataService) getAttemptInfoFromCCIPMessageId(ctx contex
 }
 
 func (usdc *OffchainTokenDataService) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (AttestationResponse, error) {
-	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%s", usdc.attestationApi, version, attestationPath, hex.EncodeToString(usdcMessageHash[:]))
+	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%x", usdc.attestationApi, version, attestationPath, usdcMessageHash)
 	req, err := http.NewRequestWithContext(ctx, "GET", fullAttestationUrl, nil)
 	if err != nil {
 		return AttestationResponse{}, err
