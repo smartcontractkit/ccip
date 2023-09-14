@@ -105,7 +105,7 @@ func TestUSDCService_IsAttestationComplete(t *testing.T) {
 	).Return(attestationBytes, nil)
 
 	usdcService := NewUSDCOffchainTokenDataService(&eventsClient, mockUSDCTokenAddress, mockOnRampAddress, ts.URL, 420)
-	isReady, attestation, err := usdcService.IsAttestationComplete(context.Background(), seqNum)
+	isReady, attestation, err := usdcService.IsTokenDataReady(context.Background(), seqNum)
 	require.NoError(t, err)
 
 	require.True(t, isReady)

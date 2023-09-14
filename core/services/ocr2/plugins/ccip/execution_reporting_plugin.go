@@ -540,24 +540,14 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		var tokenData [][]byte
-		for _, token := range msg.TokenAmounts {
-			if offchainTokenDataProvider, ok := r.config.tokenDataProviders[token.Token]; ok {
-				ready, attestation, err2 := offchainTokenDataProvider.IsAttestationComplete(context.TODO(), msg.SequenceNumber)
-				if err2 != nil {
-					msgLggr.Errorw("Skipping message unable to check attestation", "err", err2)
-					continue
-				}
-				if !ready {
-					msgLggr.Warnw("Skipping message attestation not ready")
-					continue
-				}
-				tokenData = append(tokenData, attestation)
-				continue
-			}
-
-			// No token data required
-			tokenData = append(tokenData, []byte{})
+		tokenData, ready, err2 := getTokenData(context.TODO(), msg, r.config.tokenDataProviders)
+		if err2 != nil {
+			msgLggr.Errorw("Skipping message unable to check attestation", "err", err2)
+			continue
+		}
+		if !ready {
+			msgLggr.Warnw("Skipping message attestation not ready")
+			continue
 		}
 
 		// Fee boosting
@@ -639,6 +629,26 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		expectedNonces[msg.Sender] = msg.Nonce + 1
 	}
 	return executableMessages
+}
+
+func getTokenData(ctx context.Context, msg evm2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]offchaintokendata.Provider) (tokenData [][]byte, allReady bool, err error) {
+	for _, token := range msg.TokenAmounts {
+		if offchainTokenDataProvider, ok := tokenDataProviders[token.Token]; ok {
+			ready, attestation, err2 := offchainTokenDataProvider.IsTokenDataReady(ctx, msg.SequenceNumber)
+			if err2 != nil {
+				return [][]byte{}, false, err2
+			}
+			if !ready {
+				return [][]byte{}, false, nil
+			}
+			tokenData = append(tokenData, attestation)
+			continue
+		}
+
+		// No token data required
+		tokenData = append(tokenData, []byte{})
+	}
+	return tokenData, true, nil
 }
 
 func (r *ExecutionReportingPlugin) isRateLimitEnoughForTokenPool(

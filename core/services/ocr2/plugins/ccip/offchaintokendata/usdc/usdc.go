@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -25,7 +26,8 @@ type OffchainTokenDataService struct {
 	onRampAddress      common.Address
 
 	// Cache of sequence number -> attestation attempt
-	attestationCache map[uint64]AttestationAttempt
+	attestationCache      map[uint64]AttestationAttempt
+	attestationCacheMutex sync.Mutex
 }
 
 type AttestationAttempt struct {
@@ -98,8 +100,8 @@ func NewUSDCOffchainTokenDataService(sourceChainEvents ccipevents.Client, usdcTo
 	}
 }
 
-func (usdc *OffchainTokenDataService) IsAttestationComplete(ctx context.Context, seqNum uint64) (success bool, attestation []byte, err error) {
-	response, err := usdc.GetUpdatedAttestation(ctx, seqNum)
+func (s *OffchainTokenDataService) IsTokenDataReady(ctx context.Context, seqNum uint64) (success bool, attestation []byte, err error) {
+	response, err := s.GetUpdatedAttestation(ctx, seqNum)
 	if err != nil {
 		return false, []byte{}, err
 	}
@@ -114,9 +116,11 @@ func (usdc *OffchainTokenDataService) IsAttestationComplete(ctx context.Context,
 	return false, []byte{}, nil
 }
 
-func (usdc *OffchainTokenDataService) GetUpdatedAttestation(ctx context.Context, seqNum uint64) (AttestationResponse, error) {
+func (s *OffchainTokenDataService) GetUpdatedAttestation(ctx context.Context, seqNum uint64) (AttestationResponse, error) {
 	// Try to get information from cache to reduce the number of database and external calls
-	attestationAttempt, ok := usdc.attestationCache[seqNum]
+	s.attestationCacheMutex.Lock()
+	defer s.attestationCacheMutex.Unlock()
+	attestationAttempt, ok := s.attestationCache[seqNum]
 	if ok && attestationAttempt.USDCAttestationResponse.Status == AttestationStatusSuccess {
 		// If successful, return the cached response
 		return attestationAttempt.USDCAttestationResponse, nil
@@ -125,29 +129,29 @@ func (usdc *OffchainTokenDataService) GetUpdatedAttestation(ctx context.Context,
 	// If no attempt for this message id exists, get the required data to make one
 	if !ok {
 		var err error
-		attestationAttempt, err = usdc.getAttemptInfoFromCCIPMessageId(ctx, seqNum)
+		attestationAttempt, err = s.getAttemptInfoFromCCIPMessageId(ctx, seqNum)
 		if err != nil {
 			return AttestationResponse{}, err
 		}
 		// Save the attempt in the cache in case the external call fails
-		usdc.attestationCache[seqNum] = attestationAttempt
+		s.attestationCache[seqNum] = attestationAttempt
 	}
 
-	response, err := usdc.callAttestationApi(ctx, attestationAttempt.USDCMessageHash)
+	response, err := s.callAttestationApi(ctx, attestationAttempt.USDCMessageHash)
 	if err != nil {
 		return AttestationResponse{}, err
 	}
 
 	// Save the response in the cache
 	attestationAttempt.USDCAttestationResponse = response
-	usdc.attestationCache[seqNum] = attestationAttempt
+	s.attestationCache[seqNum] = attestationAttempt
 
 	return response, nil
 }
 
-func (usdc *OffchainTokenDataService) getAttemptInfoFromCCIPMessageId(ctx context.Context, seqNum uint64) (AttestationAttempt, error) {
+func (s *OffchainTokenDataService) getAttemptInfoFromCCIPMessageId(ctx context.Context, seqNum uint64) (AttestationAttempt, error) {
 	// Get the CCIP message send event from the log poller
-	ccipSendRequests, err := usdc.sourceChainEvents.GetSendRequestsBetweenSeqNums(ctx, usdc.onRampAddress, seqNum, seqNum, 0)
+	ccipSendRequests, err := s.sourceChainEvents.GetSendRequestsBetweenSeqNums(ctx, s.onRampAddress, seqNum, seqNum, 0)
 	if err != nil {
 		return AttestationAttempt{}, err
 	}
@@ -162,7 +166,7 @@ func (usdc *OffchainTokenDataService) getAttemptInfoFromCCIPMessageId(ctx contex
 	ccipSendLogIndex := int64(ccipSendRequest.Data.Raw.Index)
 
 	// Get the USDC message body
-	usdcMessageBody, err := usdc.sourceChainEvents.GetLastUSDCMessagePriorToLogIndexInTx(ctx, ccipSendLogIndex, ccipSendTxHash)
+	usdcMessageBody, err := s.sourceChainEvents.GetLastUSDCMessagePriorToLogIndexInTx(ctx, ccipSendLogIndex, ccipSendTxHash)
 	if err != nil {
 		return AttestationAttempt{}, err
 	}
@@ -179,8 +183,8 @@ func (usdc *OffchainTokenDataService) getAttemptInfoFromCCIPMessageId(ctx contex
 	}, nil
 }
 
-func (usdc *OffchainTokenDataService) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (AttestationResponse, error) {
-	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%x", usdc.attestationApi, version, attestationPath, usdcMessageHash)
+func (s *OffchainTokenDataService) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (AttestationResponse, error) {
+	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%x", s.attestationApi, version, attestationPath, usdcMessageHash)
 	req, err := http.NewRequestWithContext(ctx, "GET", fullAttestationUrl, nil)
 	if err != nil {
 		return AttestationResponse{}, err
@@ -204,16 +208,16 @@ func (usdc *OffchainTokenDataService) callAttestationApi(ctx context.Context, us
 	return response, nil
 }
 
-func (usdc *OffchainTokenDataService) GetSourceToken() common.Address {
-	return usdc.sourceToken
+func (s *OffchainTokenDataService) GetSourceToken() common.Address {
+	return s.sourceToken
 }
 
-func (usdc *OffchainTokenDataService) GetSourceLogPollerFilters() []logpoller.Filter {
+func (s *OffchainTokenDataService) GetSourceLogPollerFilters() []logpoller.Filter {
 	return []logpoller.Filter{
 		{
-			Name:      logpoller.FilterName(MESSAGE_SENT_FILTER_NAME, usdc.messageTransmitter.Hex()),
+			Name:      logpoller.FilterName(MESSAGE_SENT_FILTER_NAME, s.messageTransmitter.Hex()),
 			EventSigs: []common.Hash{abihelpers.EventSignatures.USDCMessageSent},
-			Addresses: []common.Address{usdc.messageTransmitter},
+			Addresses: []common.Address{s.messageTransmitter},
 		},
 	}
 }
