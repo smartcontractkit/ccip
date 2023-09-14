@@ -101,48 +101,7 @@ type CCIPCommon struct {
 	PriceRegistry      *contracts.PriceRegistry
 	WrappedNative      common.Address
 	ExistingDeployment bool
-	deploy             *errgroup.Group
 	poolFunds          *big.Int
-}
-
-func (ccipModule *CCIPCommon) CopyAddresses(ctx context.Context, chainClient blockchain.EVMClient, existingDeployment bool) *CCIPCommon {
-	var pools []*contracts.LockReleaseTokenPool
-	for _, pool := range ccipModule.BridgeTokenPools {
-		pools = append(pools, &contracts.LockReleaseTokenPool{EthAddress: pool.EthAddress})
-	}
-	var tokens []*contracts.ERC20Token
-	for _, token := range ccipModule.BridgeTokens {
-		tokens = append(tokens, &contracts.ERC20Token{
-			ContractAddress: token.ContractAddress,
-		})
-	}
-
-	grp, _ := errgroup.WithContext(ctx)
-	c := &CCIPCommon{
-		ChainClient: chainClient,
-		Deployer:    nil,
-		FeeToken: &contracts.LinkToken{
-			EthAddress: ccipModule.FeeToken.EthAddress,
-		},
-		ExistingDeployment: existingDeployment,
-		BridgeTokens:       tokens,
-		TokenPrices:        ccipModule.TokenPrices,
-		BridgeTokenPools:   pools,
-		RateLimiterConfig:  ccipModule.RateLimiterConfig,
-		ARMContract:        ccipModule.ARMContract,
-		Router: &contracts.Router{
-			EthAddress: ccipModule.Router.EthAddress,
-		},
-		WrappedNative: ccipModule.WrappedNative,
-		deploy:        grp,
-		poolFunds:     ccipModule.poolFunds,
-	}
-	if ccipModule.ARM != nil {
-		c.ARM = &contracts.ARM{
-			EthAddress: ccipModule.ARM.EthAddress,
-		}
-	}
-	return c
 }
 
 func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig) {
@@ -414,15 +373,13 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	return nil
 }
 
-func DefaultCCIPModule(ctx context.Context, chainClient blockchain.EVMClient, existingDeployment bool) (*CCIPCommon, error) {
-	grp, _ := errgroup.WithContext(ctx)
+func DefaultCCIPModule(chainClient blockchain.EVMClient, existingDeployment bool) (*CCIPCommon, error) {
 	cd, err := contracts.NewCCIPContractsDeployer(chainClient)
 	if err != nil {
 		return nil, err
 	}
 	return &CCIPCommon{
 		ChainClient: chainClient,
-		deploy:      grp,
 		Deployer:    cd,
 		RateLimiterConfig: contracts.RateLimiterConfig{
 			Rate:     contracts.HundredCoins,
@@ -467,10 +424,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 	var err error
 	contractDeployer := sourceCCIP.Common.Deployer
 	log.Info().Msg("Deploying source chain specific contracts")
-	err = sourceCCIP.Common.deploy.Wait()
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
 	err = sourceCCIP.Common.ApproveTokens()
 	if err != nil {
@@ -908,18 +861,11 @@ func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 // DeployContracts deploys all CCIP contracts specific to the destination chain
 func (destCCIP *DestCCIPModule) DeployContracts(
 	sourceCCIP SourceCCIPModule,
-	wg *sync.WaitGroup,
 	lane *laneconfig.LaneConfig,
 ) error {
 	var err error
 	contractDeployer := destCCIP.Common.Deployer
 	log.Info().Msg("Deploying destination chain specific contracts")
-
-	err = destCCIP.Common.deploy.Wait()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
 	destCCIP.LoadContracts(lane)
 	sourceChainSelector, err := chainselectors.SelectorFromChainId(destCCIP.SourceChainId)
 	if err != nil {
@@ -1007,11 +953,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		if err != nil {
 			return fmt.Errorf("getting new commitstore shouldn't fail %+v", err)
 		}
-	}
-
-	// notify that all common contracts and commit store has been deployed so that the set-up in reverse lane can be triggered.
-	if wg != nil {
-		wg.Done()
 	}
 
 	var sourceTokens, destTokens, pools []common.Address
@@ -1422,7 +1363,6 @@ type CCIPLane struct {
 	TotalFee                *big.Int // total fee for all the requests. Used for balance validation.
 	ValidationTimeout       time.Duration
 	Context                 context.Context
-	CommonContractsWg       *sync.WaitGroup
 	SrcNetworkLaneCfg       *laneconfig.LaneConfig
 	DstNetworkLaneCfg       *laneconfig.LaneConfig
 	Subscriptions           []event.Subscription
@@ -1721,10 +1661,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	sourceCommon *CCIPCommon,
 	destCommon *CCIPCommon,
 	transferAmounts []*big.Int,
-	tokenDeployerFns []blockchain.ContractDeployer,
 	newBootstrap bool,
 	configureCLNodes bool,
-	existingDeployment bool,
 ) error {
 	var err error
 	env := lane.TestEnv
@@ -1732,17 +1670,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	destChainClient := lane.DestChain
 
 	if sourceCommon == nil {
-		sourceCommon, err = DefaultCCIPModule(lane.Context, sourceChainClient, existingDeployment)
-		if err != nil {
-			return errors.WithStack(err)
-		}
+		return errors.WithStack(fmt.Errorf("common contracts for source chain %s not found", sourceChainClient.GetChainID().String()))
 	}
 
 	if destCommon == nil {
-		destCommon, err = DefaultCCIPModule(lane.Context, destChainClient, existingDeployment)
-		if err != nil {
-			return errors.WithStack(err)
-		}
+		return errors.WithStack(fmt.Errorf("common contracts for destination chain %s not found", destChainClient.GetChainID().String()))
 	}
 
 	lane.Source = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon)
@@ -1752,22 +1684,13 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	destConf := lane.DstNetworkLaneCfg
 
-	// deploy all common contracts in parallel
-	lane.Source.Common.deploy.Go(func() error {
-		return lane.Source.Common.DeployContracts(len(lane.Source.TransferAmount), tokenDeployerFns, srcConf)
-	})
-
-	lane.Dest.Common.deploy.Go(func() error {
-		return lane.Dest.Common.DeployContracts(len(lane.Source.TransferAmount), tokenDeployerFns, destConf)
-	})
-
 	// deploy all source contracts
 	err = lane.Source.DeployContracts(srcConf)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	// deploy all destination contracts
-	err = lane.Dest.DeployContracts(*lane.Source, lane.CommonContractsWg, destConf)
+	err = lane.Dest.DeployContracts(*lane.Source, destConf)
 	if err != nil {
 		return errors.WithStack(err)
 	}

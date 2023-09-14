@@ -463,7 +463,6 @@ type CCIPTestSetUpOutputs struct {
 }
 
 func (o *CCIPTestSetUpOutputs) DeployChainContracts(
-	ctx context.Context,
 	chainClient blockchain.EVMClient,
 	noOfTokens int,
 	tokenDeployerFns []blockchain.ContractDeployer,
@@ -481,7 +480,7 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 
 	chain.ParallelTransactions(true)
 
-	ccipCommon, err := actions.DefaultCCIPModule(ctx, chain, o.Cfg.ExistingDeployment)
+	ccipCommon, err := actions.DefaultCCIPModule(chain, o.Cfg.ExistingDeployment)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %v", net.Name, err))
 	}
@@ -502,7 +501,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	networkA, networkB blockchain.EVMNetwork,
 	chainClientA, chainClientB blockchain.EVMClient,
 	transferAmounts []*big.Int,
-	tokenDeployerFns []blockchain.ContractDeployer,
 	numOfCommitNodes int,
 	commitAndExecOnSameDON, bidirectional bool,
 	newBootstrap bool,
@@ -546,7 +544,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		TotalFee:          big.NewInt(0),
 		Balance:           o.Balance,
 		Context:           ctx,
-		CommonContractsWg: &sync.WaitGroup{},
 	}
 	ccipLaneA2B.SrcNetworkLaneCfg, err = o.LaneConfig.ReadLaneConfig(networkA.Name)
 	require.NoError(t, err, "Reading lane config shouldn't fail")
@@ -588,7 +585,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			SentReqs:          make(map[int64]actions.CCIPRequest),
 			TotalFee:          big.NewInt(0),
 			Context:           ctx,
-			CommonContractsWg: &sync.WaitGroup{},
 			SrcNetworkLaneCfg: ccipLaneA2B.DstNetworkLaneCfg,
 			DstNetworkLaneCfg: ccipLaneA2B.SrcNetworkLaneCfg,
 		}
@@ -600,39 +596,38 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	}
 	o.Lanes = append(o.Lanes, bidirectionalLane)
 
-	ccipLaneA2B.CommonContractsWg.Add(1)
+	c1, ok := o.CommonContractsByNetwork.Load(networkA.ChainID)
+	var networkACmn *actions.CCIPCommon
+	if ok {
+		networkACmn = c1.(*actions.CCIPCommon)
+	}
+	if networkACmn == nil {
+		return errors.WithStack(fmt.Errorf("chain contracts for network %s not found", networkA.Name))
+	}
+	c2, ok := o.CommonContractsByNetwork.Load(networkB.ChainID)
+	var networkBCmn *actions.CCIPCommon
+	if ok {
+		networkBCmn = c2.(*actions.CCIPCommon)
+	}
+	if networkBCmn == nil {
+		return errors.WithStack(fmt.Errorf("chain contracts for network %s not found", networkB.Name))
+	}
+
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
-		src, ok := o.CommonContractsByNetwork.Load(networkA.ChainID)
-		var srcCommon *actions.CCIPCommon
-		if ok {
-			srcCommon = src.(*actions.CCIPCommon)
-		}
-		dest, ok := o.CommonContractsByNetwork.Load(networkB.ChainID)
-		var destCommon *actions.CCIPCommon
-		if ok {
-			destCommon = dest.(*actions.CCIPCommon)
-		}
-		err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, srcCommon, destCommon,
-			transferAmounts, tokenDeployerFns, newBootstrap, configureCLNode, o.Cfg.ExistingDeployment)
+		err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkACmn, networkBCmn,
+			transferAmounts, newBootstrap, configureCLNode)
 		if err != nil {
 			allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err - %+v", networkA.Name, networkB.Name, err))
 		}
 		return err
 	})
 
-	if ccipLaneB2A != nil {
-		ccipLaneB2A.CommonContractsWg.Add(1)
-	}
-
 	setUpFuncs.Go(func() error {
 		if bidirectional {
-			ccipLaneA2B.CommonContractsWg.Wait()
-			srcCommon := ccipLaneA2B.Dest.Common.CopyAddresses(ccipLaneB2A.Context, ccipLaneB2A.SourceChain, o.Cfg.ExistingDeployment)
-			destCommon := ccipLaneA2B.Source.Common.CopyAddresses(ccipLaneB2A.Context, ccipLaneB2A.DestChain, o.Cfg.ExistingDeployment)
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
-			err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, srcCommon, destCommon,
-				transferAmounts, tokenDeployerFns, false, configureCLNode, o.Cfg.ExistingDeployment)
+			err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkBCmn, networkACmn,
+				transferAmounts, false, configureCLNode)
 			if err != nil {
 				allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err -  %+v", networkB.Name, networkA.Name, err))
 			}
@@ -826,7 +821,7 @@ func CCIPDefaultTestSetUp(
 	for _, chain := range chainByChainID {
 		chain := chain
 		chainAddGrp.Go(func() error {
-			return setUpArgs.DeployChainContracts(parent, chain, len(transferAmounts), tokenDeployerFns)
+			return setUpArgs.DeployChainContracts(chain, len(transferAmounts), tokenDeployerFns)
 		})
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
@@ -858,7 +853,7 @@ func CCIPDefaultTestSetUp(
 			return setUpArgs.AddLanesForNetworkPair(
 				lggr, n.NetworkA, n.NetworkB,
 				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID],
-				transferAmounts, tokenDeployerFns, numOfCommitNodes, commitAndExecOnSameDON,
+				transferAmounts, numOfCommitNodes, commitAndExecOnSameDON,
 				bidirectional, newBootstrap)
 
 		})
