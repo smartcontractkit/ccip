@@ -18,13 +18,24 @@ contract LockReleaseTokenPool is TokenPool {
 
   error InsufficientLiquidity();
   error WithdrawalTooHigh();
+  error LiquidityNotAccepted();
 
   // The unique lock release pool flag to signal through EIP 165.
   bytes4 private constant LOCK_RELEASE_INTERFACE_ID = bytes4(keccak256("LockReleaseTokenPool"));
 
+  // Whether or not the pool accepts liquidity.
+  bool internal immutable i_acceptLiquidity;
+
   mapping(address provider => uint256 balance) internal s_liquidityProviderBalances;
 
-  constructor(IERC20 token, address[] memory allowlist, address armProxy) TokenPool(token, allowlist, armProxy) {}
+  constructor(
+    IERC20 token,
+    address[] memory allowlist,
+    address armProxy,
+    bool acceptLiquidity
+  ) TokenPool(token, allowlist, armProxy) {
+    i_acceptLiquidity = acceptLiquidity;
+  }
 
   /// @notice Locks the token in the pool
   /// @param amount Amount to lock
@@ -79,6 +90,7 @@ contract LockReleaseTokenPool is TokenPool {
   /// @notice Adds liquidity to the pool. The tokens should be approved first.
   /// @param amount The amount of liquidity to provide.
   function addLiquidity(uint256 amount) external {
+    if (!i_acceptLiquidity) revert LiquidityNotAccepted();
     i_token.safeTransferFrom(msg.sender, address(this), amount);
     s_liquidityProviderBalances[msg.sender] += amount;
     emit LiquidityAdded(msg.sender, amount);
