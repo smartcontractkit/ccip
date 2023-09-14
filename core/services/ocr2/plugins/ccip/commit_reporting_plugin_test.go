@@ -166,9 +166,8 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		tokenPriceUpdates []ccipevents.Event[price_registry.PriceRegistryUsdPerTokenUpdated]
 		sendRequests      []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 
-		expCommitReport commit_store.CommitStoreCommitReport
+		expCommitReport *commit_store.CommitStoreCommitReport
 		expSeqNumRange  commit_store.CommitStoreInterval
-		shouldGetReport bool
 		expErr          bool
 	}{
 		{
@@ -188,7 +187,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				},
 			},
 			expSeqNumRange: commit_store.CommitStoreInterval{Min: 1, Max: 1},
-			expCommitReport: commit_store.CommitStoreCommitReport{
+			expCommitReport: &commit_store.CommitStoreCommitReport{
 				MerkleRoot: [32]byte{123},
 				Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 1},
 				PriceUpdates: commit_store.InternalPriceUpdates{
@@ -197,8 +196,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 					UsdPerUnitGas:     big.NewInt(0),
 				},
 			},
-			shouldGetReport: true,
-			expErr:          false,
+			expErr: false,
 		},
 		{
 			name: "not enough observations",
@@ -273,12 +271,11 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
-
 			assert.NoError(t, err)
-			assert.Equal(t, tc.shouldGetReport, gotSomeReport)
 
-			if tc.shouldGetReport {
-				encodedExpectedReport, err := abihelpers.EncodeCommitReport(tc.expCommitReport)
+			if tc.expCommitReport != nil {
+				assert.True(t, gotSomeReport)
+				encodedExpectedReport, err := abihelpers.EncodeCommitReport(*tc.expCommitReport)
 				assert.NoError(t, err)
 				assert.Equal(t, types.Report(encodedExpectedReport), gotReport)
 			}
