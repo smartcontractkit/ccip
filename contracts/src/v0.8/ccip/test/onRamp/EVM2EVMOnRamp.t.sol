@@ -712,7 +712,7 @@ contract EVM2EVMOnRamp_getDataAvailabilityCostUSD is EVM2EVMOnRamp_getFeeSetup {
     uint32 tokenTransferBytesOverhead
   ) public {
     vm.assume(messageDataLength < type(uint64).max);
-    vm.assume(numberOfTokens < type(uint64).max);
+    vm.assume(numberOfTokens < type(uint32).max);
 
     uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(
       0,
@@ -735,7 +735,7 @@ contract EVM2EVMOnRamp_getDataAvailabilityCostUSD is EVM2EVMOnRamp_getFeeSetup {
   ) public {
     // Using large yet reasonable numbers to avoid overflows.
     vm.assume(messageDataLength < type(uint64).max);
-    vm.assume(numberOfTokens < type(uint64).max);
+    vm.assume(numberOfTokens < type(uint32).max);
 
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
     dynamicConfig.destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
