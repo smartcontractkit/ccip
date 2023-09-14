@@ -227,6 +227,7 @@
     },
     "Base Mainnet": {
       "fee_token": "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196",
+      "is_native_fee_token": true,
       "bridge_tokens": [
         "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196"
       ],
@@ -569,6 +570,7 @@
     },
     "Base Goerli": {
       "fee_token": "0xd886e2286fd1073df82462ea1822119600af80b6",
+      "is_native_fee_token": true,
       "arm": "0xe5bd6bcb6fa8e5236984d5ea127de5047f93b5ff",
       "arm_proxy": "0x4c10d67e4b8e18a67a7606defdce42ccc281d39b",
       "router": "0xa8c0c11bf64af62cdca6f93d3769b88bdd7cb93d",
