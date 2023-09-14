@@ -451,14 +451,50 @@ type BiDirectionalLaneConfig struct {
 }
 
 type CCIPTestSetUpOutputs struct {
-	Cfg            *CCIPTestConfig
-	Lanes          []*BiDirectionalLaneConfig
-	Reporter       *testreporters.CCIPTestReporter
-	LaneConfigFile string
-	LaneConfig     *laneconfig.Lanes
-	TearDown       func()
-	Env            *actions.CCIPTestEnv
-	Balance        *actions.BalanceSheet
+	Cfg                      *CCIPTestConfig
+	Lanes                    []*BiDirectionalLaneConfig
+	CommonContractsByNetwork sync.Map
+	Reporter                 *testreporters.CCIPTestReporter
+	LaneConfigFile           string
+	LaneConfig               *laneconfig.Lanes
+	TearDown                 func()
+	Env                      *actions.CCIPTestEnv
+	Balance                  *actions.BalanceSheet
+}
+
+func (o *CCIPTestSetUpOutputs) DeployChainContracts(
+	ctx context.Context,
+	chainClient blockchain.EVMClient,
+	noOfTokens int,
+	tokenDeployerFns []blockchain.ContractDeployer,
+) error {
+	var k8Env *environment.Environment
+	ccipEnv := o.Env
+	if ccipEnv != nil {
+		k8Env = ccipEnv.K8Env
+	}
+	net := chainClient.GetNetworkConfig()
+	chain, err := blockchain.ConcurrentEVMClient(*net, k8Env, chainClient)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", net.Name, err))
+	}
+
+	chain.ParallelTransactions(true)
+
+	ccipCommon, err := actions.DefaultCCIPModule(ctx, chain, o.Cfg.ExistingDeployment)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %v", net.Name, err))
+	}
+	cfg, err := o.LaneConfig.ReadLaneConfig(net.Name)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to read lane config for %s: %v", net.Name, err))
+	}
+	err = ccipCommon.DeployContracts(noOfTokens, tokenDeployerFns, cfg)
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to deploy common ccip contracts for %s: %v", net.Name, err))
+	}
+	o.CommonContractsByNetwork.Store(net.ChainID, ccipCommon)
+	return nil
 }
 
 func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
@@ -567,7 +603,17 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	ccipLaneA2B.CommonContractsWg.Add(1)
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
-		err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, nil, nil,
+		src, ok := o.CommonContractsByNetwork.Load(networkA.ChainID)
+		var srcCommon *actions.CCIPCommon
+		if ok {
+			srcCommon = src.(*actions.CCIPCommon)
+		}
+		dest, ok := o.CommonContractsByNetwork.Load(networkB.ChainID)
+		var destCommon *actions.CCIPCommon
+		if ok {
+			destCommon = dest.(*actions.CCIPCommon)
+		}
+		err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, srcCommon, destCommon,
 			transferAmounts, tokenDeployerFns, newBootstrap, configureCLNode, o.Cfg.ExistingDeployment)
 		if err != nil {
 			allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err - %+v", networkA.Name, networkB.Name, err))
@@ -647,6 +693,9 @@ func CCIPDefaultTestSetUp(
 	)
 	filename := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
 	inputs.Test = t
+	if inputs.MsgType == actions.DataOnlyTransfer {
+		transferAmounts = []*big.Int{}
+	}
 	setUpArgs := &CCIPTestSetUpOutputs{
 		Cfg:            inputs,
 		Reporter:       testreporters.NewCCIPTestReporter(t, lggr),
@@ -772,9 +821,18 @@ func CCIPDefaultTestSetUp(
 			return ccipEnv.SetUpNodesAndKeys(ctx, inputs.NodeFunding, chains)
 		})
 	}
-	if inputs.MsgType == actions.DataOnlyTransfer {
-		transferAmounts = []*big.Int{}
+	// deploy all chain specific common contracts
+	chainAddGrp, _ := errgroup.WithContext(parent)
+	for _, chain := range chainByChainID {
+		chain := chain
+		chainAddGrp.Go(func() error {
+			return setUpArgs.DeployChainContracts(parent, chain, len(transferAmounts), tokenDeployerFns)
+		})
 	}
+	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
+
+	// deploy all lane specific contracts
+	laneAddGrp, _ := errgroup.WithContext(parent)
 	for i, n := range inputs.NetworkPairs {
 		newBootstrap := false
 		if i == 0 {
@@ -796,15 +854,18 @@ func CCIPDefaultTestSetUp(
 		if i > 0 && inputs.SequentialLaneAddition {
 			continue
 		}
-		err = setUpArgs.AddLanesForNetworkPair(
-			lggr, n.NetworkA, n.NetworkB,
-			chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID],
-			transferAmounts, tokenDeployerFns, numOfCommitNodes, commitAndExecOnSameDON,
-			bidirectional, newBootstrap)
-		require.NoError(t, err)
-		err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
-		require.NoError(t, err)
+		laneAddGrp.Go(func() error {
+			return setUpArgs.AddLanesForNetworkPair(
+				lggr, n.NetworkA, n.NetworkB,
+				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID],
+				transferAmounts, tokenDeployerFns, numOfCommitNodes, commitAndExecOnSameDON,
+				bidirectional, newBootstrap)
+
+		})
 	}
+	require.NoError(t, laneAddGrp.Wait())
+	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
+	require.NoError(t, err)
 
 	setUpArgs.TearDown = func() {
 		for _, lanes := range setUpArgs.Lanes {

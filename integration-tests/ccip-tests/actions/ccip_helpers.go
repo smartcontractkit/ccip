@@ -414,18 +414,23 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	return nil
 }
 
-func DefaultCCIPModule(ctx context.Context, chainClient blockchain.EVMClient, existingDeployment bool) *CCIPCommon {
+func DefaultCCIPModule(ctx context.Context, chainClient blockchain.EVMClient, existingDeployment bool) (*CCIPCommon, error) {
 	grp, _ := errgroup.WithContext(ctx)
+	cd, err := contracts.NewCCIPContractsDeployer(chainClient)
+	if err != nil {
+		return nil, err
+	}
 	return &CCIPCommon{
 		ChainClient: chainClient,
 		deploy:      grp,
+		Deployer:    cd,
 		RateLimiterConfig: contracts.RateLimiterConfig{
 			Rate:     contracts.HundredCoins,
 			Capacity: contracts.HundredCoins,
 		},
 		ExistingDeployment: existingDeployment,
 		poolFunds:          testhelpers.Link(1000),
-	}
+	}, nil
 }
 
 type SourceCCIPModule struct {
@@ -850,8 +855,8 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	return sendTx.Hash(), time.Since(timeNow), fee, nil
 }
 
-func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64, transferAmount []*big.Int, ccipCommon *CCIPCommon) (*SourceCCIPModule, error) {
-	sourceCCIP := &SourceCCIPModule{
+func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64, transferAmount []*big.Int, ccipCommon *CCIPCommon) *SourceCCIPModule {
+	return &SourceCCIPModule{
 		Common:                     ccipCommon,
 		TransferAmount:             transferAmount,
 		DestinationChainId:         destChain,
@@ -859,13 +864,6 @@ func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64,
 		CCIPSendRequestedWatcher:   make(map[string]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested),
 		CCIPSendRequestedWatcherMu: &sync.Mutex{},
 	}
-	var err error
-	sourceCCIP.Common.Deployer, err = contracts.NewCCIPContractsDeployer(chainClient)
-	if err != nil {
-		return nil, fmt.Errorf("contract deployer should be created successfully %+v", err)
-	}
-
-	return sourceCCIP, nil
 }
 
 type DestCCIPModule struct {
@@ -1367,8 +1365,8 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 	}
 }
 
-func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain uint64, ccipCommon *CCIPCommon) (*DestCCIPModule, error) {
-	destCCIP := &DestCCIPModule{
+func DefaultDestinationCCIPModule(sourceChain uint64, ccipCommon *CCIPCommon) *DestCCIPModule {
+	return &DestCCIPModule{
 		Common:                  ccipCommon,
 		SourceChainId:           sourceChain,
 		ReportAcceptedWatcherMu: &sync.Mutex{},
@@ -1379,13 +1377,6 @@ func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain 
 		ReportBlessedWatcher:    make(map[[32]byte]*types.Log),
 		NextSeqNumToCommit:      atomic.NewUint64(1),
 	}
-
-	var err error
-	destCCIP.Common.Deployer, err = contracts.NewCCIPContractsDeployer(chainClient)
-	if err != nil {
-		return nil, err
-	}
-	return destCCIP, nil
 }
 
 type CCIPRequest struct {
@@ -1741,21 +1732,21 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	destChainClient := lane.DestChain
 
 	if sourceCommon == nil {
-		sourceCommon = DefaultCCIPModule(lane.Context, sourceChainClient, existingDeployment)
+		sourceCommon, err = DefaultCCIPModule(lane.Context, sourceChainClient, existingDeployment)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 
 	if destCommon == nil {
-		destCommon = DefaultCCIPModule(lane.Context, destChainClient, existingDeployment)
+		destCommon, err = DefaultCCIPModule(lane.Context, destChainClient, existingDeployment)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 
-	lane.Source, err = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	lane.Dest, err = DefaultDestinationCCIPModule(destChainClient, sourceChainClient.GetChainID().Uint64(), destCommon)
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	lane.Source = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon)
+	lane.Dest = DefaultDestinationCCIPModule(sourceChainClient.GetChainID().Uint64(), destCommon)
 
 	srcConf := lane.SrcNetworkLaneCfg
 
