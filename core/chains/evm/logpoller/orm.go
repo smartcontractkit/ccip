@@ -493,11 +493,11 @@ func (o *ORM) SelectIndexedLogsByTxHash(eventSig common.Hash, txHash common.Hash
 	q := o.q.WithOpts(qopts...)
 	var logs []Log
 	err := q.Select(&logs, `
-		SELECT * FROM evm_logs 
-			WHERE evm_logs.evm_chain_id = $1
+		SELECT * FROM evm.logs 
+			WHERE evm.logs.evm_chain_id = $1
 			AND tx_hash = $2
 			AND event_sig = $3
-			ORDER BY (evm_logs.block_number, evm_logs.log_index)`,
+			ORDER BY (evm.logs.block_number, evm.logs.log_index)`,
 		utils.NewBig(o.chainID), txHash.Bytes(), eventSig.Bytes())
 	if err != nil {
 		return nil, err
