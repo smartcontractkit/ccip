@@ -151,7 +151,8 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			}
 			assert.NoError(t, err)
 
-			expObsBytes, _ := tc.expObs.Marshal()
+			expObsBytes, err := tc.expObs.Marshal()
+			assert.NoError(t, err)
 			assert.Equal(t, expObsBytes, []byte(obs))
 		})
 	}
