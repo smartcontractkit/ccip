@@ -217,6 +217,9 @@ func (p *CCIPTestConfig) SetNetworkPairs(t *testing.T, lggr zerolog.Logger) erro
 				networkMap[nets[1].ChainID] = nets[1]
 			}
 		}
+		for _, net := range networkMap {
+			p.AllNetworks = append(p.AllNetworks, net)
+		}
 		return allError
 	}
 	// if network pairs are not provided with CCIP_NETWORK_PAIRS, then form all possible network pair combination from SELECTED_NETWORKS
