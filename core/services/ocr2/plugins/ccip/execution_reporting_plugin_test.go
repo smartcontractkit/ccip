@@ -879,7 +879,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			offRamp.On("Address").Return(offRampAddr)
 			p.config.offRamp = offRamp
 
-			p.customTokenPoolFactory = func(ctx context.Context, _ bind.ContractBackend, poolAddress common.Address) (custom_token_pool.CustomTokenPoolInterface, error) {
+			p.customTokenPoolFactory = func(ctx context.Context, poolAddress common.Address, _ bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
 				mp := &mockPool{}
 				mp.On("CurrentOffRampRateLimiterState", mock.Anything, offRampAddr).Return(tc.poolRateLimits[poolAddress], nil)
 				return mp, nil

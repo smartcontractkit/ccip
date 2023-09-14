@@ -79,7 +79,7 @@ type ExecutionReportingPlugin struct {
 	offchainConfig         ccipconfig.ExecOffchainConfig
 	cachedSourceFeeTokens  cache.AutoSync[[]common.Address]
 	cachedDestTokens       cache.AutoSync[cache.CachedTokens]
-	customTokenPoolFactory func(ctx context.Context, bind bind.ContractBackend, poolAddress common.Address) (custom_token_pool.CustomTokenPoolInterface, error)
+	customTokenPoolFactory func(ctx context.Context, poolAddress common.Address, bind bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error)
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -142,7 +142,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig:        offchainConfig,
 			cachedDestTokens:      cachedDestTokens,
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
-			customTokenPoolFactory: func(ctx context.Context, contractBackend bind.ContractBackend, poolAddress common.Address) (custom_token_pool.CustomTokenPoolInterface, error) {
+			customTokenPoolFactory: func(ctx context.Context, poolAddress common.Address, contractBackend bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
 				return custom_token_pool.NewCustomTokenPool(poolAddress, contractBackend)
 			},
 		}, types.ReportingPluginInfo{
@@ -393,7 +393,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 			return nil, fmt.Errorf("get pool by dest token (%s): %w", dstToken, err)
 		}
 
-		tokenPool, err := r.customTokenPoolFactory(ctx, r.config.destClient, poolAddress)
+		tokenPool, err := r.customTokenPoolFactory(ctx, poolAddress, r.config.destClient)
 		if err != nil {
 			return nil, fmt.Errorf("new custom dest token pool %s: %w", poolAddress, err)
 		}
