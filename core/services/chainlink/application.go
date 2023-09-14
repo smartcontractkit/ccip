@@ -47,7 +47,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/services/promreporter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/mercury"
-	"github.com/smartcontractkit/chainlink/v2/core/services/synchronization"
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/vrf"
 	"github.com/smartcontractkit/chainlink/v2/core/services/webhook"
@@ -217,34 +216,10 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 		globalLogger.Info("Nurse service (automatic pprof profiling) is disabled")
 	}
 
-	telemetryIngressClient := synchronization.TelemetryIngressClient(&synchronization.NoopTelemetryIngressClient{})
-	telemetryIngressBatchClient := synchronization.TelemetryIngressBatchClient(&synchronization.NoopTelemetryIngressBatchClient{})
-	monitoringEndpointGen := telemetry.MonitoringEndpointGenerator(&telemetry.NoopAgent{})
+	healthChecker := services.NewChecker()
 
-	//TODO: @george-dorin: change this when https://github.com/smartcontractkit/chainlink/pull/10581 is merged
-	if cfg.Explorer().URL() != nil && len(cfg.TelemetryIngress().Endpoints()) > 0 {
-		globalLogger.Warn("Both ExplorerUrl and TelemetryIngress.Url are set, defaulting to Explorer")
-	}
-
-	if cfg.Explorer().URL() != nil {
-		explorerClient = synchronization.NewExplorerClient(cfg.Explorer().URL(), cfg.Explorer().AccessKey(), cfg.Explorer().Secret(), globalLogger)
-		monitoringEndpointGen = telemetry.NewExplorerAgent(explorerClient)
-	}
-
-	ticfg := cfg.TelemetryIngress()
-	// Use Explorer over TelemetryIngress if both URLs are set
-	//TODO: @george-dorin: change this when https://github.com/smartcontractkit/chainlink/pull/10581 is merged
-	if cfg.Explorer().URL() == nil && len(cfg.TelemetryIngress().Endpoints()) > 0 {
-		if ticfg.UseBatchSend() {
-			telemetryIngressBatchClient = synchronization.NewTelemetryIngressBatchClient(ticfg, keyStore.CSA(), globalLogger)
-			monitoringEndpointGen = telemetry.NewIngressAgentBatchWrapper(telemetryIngressBatchClient)
-
-		} else {
-			telemetryIngressClient = synchronization.NewTelemetryIngressClient(keyStore.CSA(), ticfg.Logging(), globalLogger, ticfg.BufferSize(), ticfg.Endpoints())
-			monitoringEndpointGen = telemetry.NewIngressAgentWrapper(telemetryIngressClient)
-		}
-	}
-	srvcs = append(srvcs, telemetryIngressClient, telemetryIngressBatchClient)
+	telemetryManager := telemetry.NewManager(cfg.TelemetryIngress(), keyStore.CSA(), globalLogger)
+	srvcs = append(srvcs, telemetryManager)
 
 	backupCfg := cfg.Database().Backup()
 	if backupCfg.Mode() != config.DatabaseBackupModeNone && backupCfg.Frequency() > 0 {
@@ -369,7 +344,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			keyStore,
 			pipelineRunner,
 			peerWrapper,
-			monitoringEndpointGen,
+			telemetryManager,
 			legacyEVMChains,
 			globalLogger,
 			cfg.Database(),
@@ -389,7 +364,7 @@ func NewApplication(opts ApplicationOpts) (Application, error) {
 			mercuryORM,
 			pipelineRunner,
 			peerWrapper,
-			monitoringEndpointGen,
+			telemetryManager,
 			legacyEVMChains,
 			globalLogger,
 			ocr2DelegateConfig,
