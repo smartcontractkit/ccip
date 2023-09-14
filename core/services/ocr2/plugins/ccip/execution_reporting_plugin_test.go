@@ -35,9 +35,9 @@ import (
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
@@ -166,10 +166,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			priceRegistry := mock_contracts.NewPriceRegistryInterface(t)
 			priceRegistry.On("Address").Return(priceRegistryAddr).Maybe()
 			priceRegistry.On("GetTokenPrices", mock.Anything, mock.Anything).
-				Return([]price_registry.InternalTimestampedUint192Value{
+				Return([]price_registry.InternalTimestampedPackedUint224{
 					{
 						Value:     big.NewInt(123),
-						Timestamp: uint64(time.Now().Unix()),
+						Timestamp: uint32(time.Now().Unix()),
 					},
 				}, nil).Maybe()
 			p.destPriceRegistry = priceRegistry
@@ -1317,7 +1317,7 @@ func Test_getTokensPrices(t *testing.T) {
 		name      string
 		feeTokens []common.Address
 		tokens    []common.Address
-		retPrices []price_registry.InternalTimestampedUint192Value
+		retPrices []price_registry.InternalTimestampedPackedUint224
 		expPrices map[common.Address]*big.Int
 		expErr    bool
 	}{
@@ -1325,7 +1325,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "base",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 				{Value: big.NewInt(30)},
@@ -1341,7 +1341,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "token is both fee token and normal token",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3, tk1},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 				{Value: big.NewInt(30)},
@@ -1358,7 +1358,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "token is both fee token and normal token and price registry gave different price",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3, tk1},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 				{Value: big.NewInt(30)},
@@ -1370,7 +1370,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "zero price should lead to an error",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(0)},
 				{Value: big.NewInt(30)},
@@ -1381,7 +1381,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "contract returns less prices than requested",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 			},
