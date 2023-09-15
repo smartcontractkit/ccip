@@ -18,15 +18,16 @@ var (
 )
 
 type CommonContracts struct {
-	IsNativeFeeToken bool     `json:"is_native_fee_token,omitempty"`
-	IsMockARM        bool     `json:"is_mock_arm,omitempty"`
-	FeeToken         string   `json:"fee_token"`
-	BridgeTokens     []string `json:"bridge_tokens"`
-	BridgeTokenPools []string `json:"bridge_tokens_pools"`
-	ARM              string   `json:"arm"`
-	Router           string   `json:"router"`
-	PriceRegistry    string   `json:"price_registry"`
-	WrappedNative    string   `json:"wrapped_native"`
+	IsNativeFeeToken        bool     `json:"is_native_fee_token,omitempty"`
+	IsMockARM               bool     `json:"is_mock_arm,omitempty"`
+	FeeToken                string   `json:"fee_token"`
+	BridgeTokens            []string `json:"bridge_tokens"`
+	BridgeTokenPools        []string `json:"bridge_tokens_pools"`
+	ARM                     string   `json:"arm"`
+	Router                  string   `json:"router"`
+	PriceRegistry           string   `json:"price_registry"`
+	PriceUpdatesToWatchFrom uint64   `json:"price_updates_started_at"`
+	WrappedNative           string   `json:"wrapped_native"`
 }
 
 type SourceContracts struct {
@@ -110,6 +111,29 @@ func (l *Lanes) WriteLaneConfig(networkA string, cfg *LaneConfig) error {
 		return err
 	}
 	l.LaneConfigs[networkA] = cfg
+	return nil
+}
+
+// ResetLaneConfig resets the lane config to the default values. It is used when a new lane is to be deployed with same
+// priceRegistry, tokens and pool contracts.
+func (l *Lanes) ResetLaneConfig() error {
+	laneMu.Lock()
+	defer laneMu.Unlock()
+	for k, cfg := range l.LaneConfigs {
+		l.LaneConfigs[k] = &LaneConfig{
+			SrcContracts:  make(map[uint64]SourceContracts),
+			DestContracts: make(map[uint64]DestContracts),
+			CommonContracts: CommonContracts{
+				BridgeTokens:            cfg.BridgeTokens,
+				BridgeTokenPools:        cfg.BridgeTokenPools,
+				IsNativeFeeToken:        cfg.IsNativeFeeToken,
+				FeeToken:                cfg.FeeToken,
+				PriceRegistry:           cfg.PriceRegistry,
+				PriceUpdatesToWatchFrom: cfg.PriceUpdatesToWatchFrom,
+				WrappedNative:           cfg.WrappedNative,
+			},
+		}
+	}
 	return nil
 }
 

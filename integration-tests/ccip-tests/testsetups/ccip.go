@@ -620,6 +620,12 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		if err != nil {
 			allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err - %+v", networkA.Name, networkB.Name, err))
 		}
+		if ccipLaneA2B.Source.Common.ChainClient.NetworkSimulated() {
+			err = ccipLaneA2B.Source.WaitForPriceUpdates(ccipLaneA2B.Logger, ccipLaneA2B.ValidationTimeout, ccipLaneA2B.Source.DestinationChainId)
+			if err != nil {
+				allErrors = multierr.Append(allErrors, fmt.Errorf("waiting for price updates on lane %s to %s; err - %+v", networkA.Name, networkB.Name, err))
+			}
+		}
 		return err
 	})
 
@@ -630,6 +636,13 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 				transferAmounts, false, configureCLNode)
 			if err != nil {
 				allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err -  %+v", networkB.Name, networkA.Name, err))
+			}
+			if ccipLaneB2A.Source.Common.ChainClient.NetworkSimulated() {
+				err = ccipLaneB2A.Source.WaitForPriceUpdates(ccipLaneB2A.Logger, ccipLaneB2A.ValidationTimeout, ccipLaneB2A.Source.DestinationChainId)
+				if err != nil {
+					allErrors = multierr.Append(allErrors,
+						fmt.Errorf("waiting for price updates on lane %s to %s; err - %+v", networkB.Name, networkA.Name, err))
+				}
 			}
 			return err
 		}
@@ -709,6 +722,7 @@ func CCIPDefaultTestSetUp(
 	} else {
 		setUpArgs.LaneConfig, err = laneconfig.CreateDeploymentJSON(setUpArgs.LaneConfigFile)
 		require.NoError(t, err)
+
 		if setUpArgs.LaneConfig == nil {
 			setUpArgs.LaneConfig = &laneconfig.Lanes{LaneConfigs: make(map[string]*laneconfig.LaneConfig)}
 		}
@@ -829,6 +843,8 @@ func CCIPDefaultTestSetUp(
 	// deploy all lane specific contracts
 	laneAddGrp, _ := errgroup.WithContext(parent)
 	for i, n := range inputs.NetworkPairs {
+		i := i
+		n := n
 		newBootstrap := false
 		if i == 0 {
 			// create bootstrap job once
