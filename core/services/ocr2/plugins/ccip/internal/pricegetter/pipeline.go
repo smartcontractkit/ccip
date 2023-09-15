@@ -1,4 +1,4 @@
-package ccip
+package pricegetter
 
 import (
 	"context"
@@ -14,14 +14,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-type PriceGetter interface {
-	// Returns token prices in USD
-	TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error)
-}
+var _ PriceGetter = &PipelineGetter{}
 
-var _ PriceGetter = &priceGetter{}
-
-type priceGetter struct {
+type PipelineGetter struct {
 	source        string
 	runner        pipeline.Runner
 	jobID         int32
@@ -30,12 +25,13 @@ type priceGetter struct {
 	lggr          logger.Logger
 }
 
-func NewPriceGetter(source string, runner pipeline.Runner, jobID int32, externalJobID uuid.UUID, name string, lggr logger.Logger) (*priceGetter, error) {
+func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, externalJobID uuid.UUID, name string, lggr logger.Logger) (*PipelineGetter, error) {
 	_, err := pipeline.Parse(source)
 	if err != nil {
 		return nil, err
 	}
-	return &priceGetter{
+
+	return &PipelineGetter{
 		source:        source,
 		runner:        runner,
 		jobID:         jobID,
@@ -45,7 +41,7 @@ func NewPriceGetter(source string, runner pipeline.Runner, jobID int32, external
 	}, nil
 }
 
-func (d *priceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
+func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	_, trrs, err := d.runner.ExecuteRun(ctx, pipeline.Spec{
 		ID:           d.jobID,
 		DotDagSource: d.source,

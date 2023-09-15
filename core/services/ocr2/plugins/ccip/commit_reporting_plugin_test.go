@@ -38,6 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -65,7 +66,7 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 	).Maybe().Return(gas.EvmFee{Legacy: assets.NewWei(defaultGasPrice)}, uint32(200e3), nil)
 
 	lggr := logger.TestLogger(t)
-	priceGetter := newMockPriceGetter()
+	priceGetter := pricegetter.NewMockPriceGetter()
 
 	backendClient := client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID))
 	plugin := CommitReportingPlugin{
@@ -782,7 +783,7 @@ func TestGeneratePriceUpdates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			priceGetter := newMockPriceGetter()
+			priceGetter := pricegetter.NewMockPriceGetter()
 			defer priceGetter.AssertExpectations(t)
 
 			sourceFeeEstimator := mocks.NewEvmFeeEstimator(t)
