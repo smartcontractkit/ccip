@@ -27,8 +27,10 @@ import (
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -38,7 +40,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
@@ -55,6 +56,7 @@ type execTestHarness = struct {
 func setupExecTestHarness(t *testing.T) execTestHarness {
 	th := plugintesthelpers.SetupCCIPTestHarness(t)
 
+	lggr := logger.TestLogger(t)
 	destFeeEstimator := mocks.NewEvmFeeEstimator(t)
 
 	destFeeEstimator.On(
@@ -79,13 +81,16 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 			lggr:                     th.Lggr,
 			sourceLP:                 th.SourceLP,
 			destLP:                   th.DestLP,
+			sourceEvents:             ccipevents.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient),
+			destEvents:               ccipevents.NewLogPollerClient(th.DestLP, lggr, th.DestClient),
 			sourcePriceRegistry:      th.Source.PriceRegistry,
 			onRamp:                   th.Source.OnRamp,
 			commitStore:              th.Dest.CommitStore,
 			offRamp:                  th.Dest.OffRamp,
 			destClient:               th.DestClient,
+			sourceClient:             th.SourceClient,
 			sourceWrappedNativeToken: th.Source.WrappedNative.Address(),
-			leafHasher:               hasher.NewLeafHasher(th.Source.ChainSelector, th.Dest.ChainSelector, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
+			leafHasher:               hashlib.NewLeafHasher(th.Source.ChainSelector, th.Dest.ChainSelector, th.Source.OnRamp.Address(), hashlib.NewKeccakCtx()),
 			destGasEstimator:         destFeeEstimator,
 		},
 		onchainConfig:         th.ExecOnchainConfig,
@@ -879,7 +884,7 @@ func Test_getTokensPrices(t *testing.T) {
 		name      string
 		feeTokens []common.Address
 		tokens    []common.Address
-		retPrices []price_registry.InternalTimestampedUint192Value
+		retPrices []price_registry.InternalTimestampedPackedUint224
 		expPrices map[common.Address]*big.Int
 		expErr    bool
 	}{
@@ -887,7 +892,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "base",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 				{Value: big.NewInt(30)},
@@ -903,7 +908,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "token is both fee token and normal token",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3, tk1},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 				{Value: big.NewInt(30)},
@@ -920,7 +925,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "token is both fee token and normal token and price registry gave different price",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3, tk1},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 				{Value: big.NewInt(30)},
@@ -932,7 +937,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "zero price should lead to an error",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(0)},
 				{Value: big.NewInt(30)},
@@ -943,7 +948,7 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "contract returns less prices than requested",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedUint192Value{
+			retPrices: []price_registry.InternalTimestampedPackedUint224{
 				{Value: big.NewInt(10)},
 				{Value: big.NewInt(20)},
 			},

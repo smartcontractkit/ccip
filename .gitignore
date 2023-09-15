@@ -75,7 +75,7 @@ MacOSX*
 cache
 core/services/ocr2/plugins/ccip/transactions.rlp
 lcov.info
-!core/services/ocr2/plugins/ccip/cache/
+!core/services/ocr2/plugins/ccip/internal/cache/
 
 
 core/scripts/ccip/json/credentials
@@ -93,4 +93,6 @@ contracts/yarn.lock
 # Ignore DevSpace cache and log folder
 .devspace/
 
-core/scripts/ccip/json/credentials
+/core/scripts/ccip/json/credentials
+/core/scripts/ccip/revert-reason/bin/ccip-revert-reason
+

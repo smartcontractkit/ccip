@@ -1,6 +1,7 @@
 package test_env
 
 import (
+	"fmt"
 	"math/big"
 	"os"
 
@@ -8,12 +9,13 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/logwatch"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
-	"github.com/smartcontractkit/chainlink/integration-tests/networks"
 	"github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 )
 
@@ -31,11 +33,6 @@ type CLTestEnvBuilder struct {
 
 	/* funding */
 	ETHFunds *big.Float
-}
-
-type InternalDockerUrls struct {
-	HttpUrl string
-	WsUrl   string
 }
 
 func NewCLTestEnvBuilder() *CLTestEnvBuilder {
@@ -139,21 +136,24 @@ func (b *CLTestEnvBuilder) buildNewEnv(cfg *TestEnvConfig) (*CLClusterTestEnv, e
 			return nil, err
 		}
 	}
-
 	if b.nonDevGethNetworks != nil {
-		te.WithPrivateGethChain(b.nonDevGethNetworks)
-		err := te.StartPrivateGethChain()
+		te.WithPrivateChain(b.nonDevGethNetworks)
+		err := te.StartPrivateChain()
 		if err != nil {
 			return te, err
 		}
-		var nonDevGethNetworks []blockchain.EVMNetwork
-		for i, n := range te.PrivateGethChain {
-			nonDevGethNetworks = append(nonDevGethNetworks, *n.NetworkConfig)
-			nonDevGethNetworks[i].URLs = []string{n.PrimaryNode.InternalWsUrl}
-			nonDevGethNetworks[i].HTTPURLs = []string{n.PrimaryNode.InternalHttpUrl}
+		var nonDevNetworks []blockchain.EVMNetwork
+		for i, n := range te.PrivateChain {
+			primaryNode := n.GetPrimaryNode()
+			if primaryNode == nil {
+				return te, errors.WithStack(fmt.Errorf("Primary node is nil in PrivateChain interface"))
+			}
+			nonDevNetworks = append(nonDevNetworks, *n.GetNetworkConfig())
+			nonDevNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
+			nonDevNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
 		}
-		if nonDevGethNetworks == nil {
-			return nil, errors.New("cannot create nodes with custom config without nonDevGethNetworks")
+		if nonDevNetworks == nil {
+			return nil, errors.New("cannot create nodes with custom config without nonDevNetworks")
 		}
 
 		err = te.StartClNodes(b.clNodeConfig, b.clNodesCount)
@@ -163,7 +163,7 @@ func (b *CLTestEnvBuilder) buildNewEnv(cfg *TestEnvConfig) (*CLClusterTestEnv, e
 		return te, nil
 	}
 	networkConfig := networks.SelectedNetwork
-	var internalDockerUrls InternalDockerUrls
+	var internalDockerUrls test_env.InternalDockerUrls
 	if b.hasGeth && networkConfig.Simulated {
 		networkConfig, internalDockerUrls, err = te.StartGeth()
 		if err != nil {
@@ -191,29 +191,6 @@ func (b *CLTestEnvBuilder) buildNewEnv(cfg *TestEnvConfig) (*CLClusterTestEnv, e
 	}
 	te.ContractLoader = cl
 
-	if b.nonDevGethNetworks != nil {
-		te.WithPrivateGethChain(b.nonDevGethNetworks)
-		err := te.StartPrivateGethChain()
-		if err != nil {
-			return te, err
-		}
-		var nonDevGethNetworks []blockchain.EVMNetwork
-		for i, n := range te.PrivateGethChain {
-			nonDevGethNetworks = append(nonDevGethNetworks, *n.NetworkConfig)
-			nonDevGethNetworks[i].URLs = []string{n.PrimaryNode.InternalWsUrl}
-			nonDevGethNetworks[i].HTTPURLs = []string{n.PrimaryNode.InternalHttpUrl}
-		}
-		if nonDevGethNetworks == nil {
-			return nil, errors.New("cannot create nodes with custom config without nonDevGethNetworks")
-		}
-
-		err = te.StartClNodes(b.clNodeConfig, b.clNodesCount)
-		if err != nil {
-			return nil, err
-		}
-		return te, nil
-	}
-
 	var nodeCsaKeys []string
 
 	// Start Chainlink Nodes
@@ -222,7 +199,7 @@ func (b *CLTestEnvBuilder) buildNewEnv(cfg *TestEnvConfig) (*CLClusterTestEnv, e
 		if b.clNodeConfig != nil {
 			cfg = b.clNodeConfig
 		} else {
-			cfg = node.NewConfig(node.BaseConf,
+			cfg = node.NewConfig(node.NewBaseConfig(),
 				node.WithOCR1(),
 				node.WithP2Pv1(),
 			)

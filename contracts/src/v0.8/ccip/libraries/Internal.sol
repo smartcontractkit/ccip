@@ -8,19 +8,24 @@ import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 library Internal {
   struct PriceUpdates {
     TokenPriceUpdate[] tokenPriceUpdates;
-    uint64 destChainSelector; // --┐ Destination chain selector
-    uint192 usdPerUnitGas; // -----┘ 1e18 USD per smallest unit (e.g. wei) of destination chain gas
+    uint64 destChainSelector; // ──╮ Destination chain selector
+    uint224 usdPerUnitGas; // ─────╯ 1e18 USD per smallest unit (e.g. wei) of destination chain gas
   }
 
   struct TokenPriceUpdate {
     address sourceToken; // Source token
-    uint192 usdPerToken; // 1e18 USD per smallest unit of token
+    uint224 usdPerToken; // 1e18 USD per smallest unit of token
   }
 
-  struct TimestampedUint192Value {
-    uint192 value; // -------┐ The price, in 1e18 USD.
-    uint64 timestamp; // ----┘ Timestamp of the most recent price update.
+  struct TimestampedPackedUint224 {
+    uint224 value; // ───────╮ Value in uint224, packed.
+    uint32 timestamp; // ────╯ Timestamp of the most recent price update.
   }
+
+  /// @dev Gas price is stored in 112-bit unsigned int. uint224 can pack 2 prices.
+  /// When packing L1 and L2 gas prices, L1 gas price is left-shifted to the higher-order bits.
+  /// Using uint8, which is strictly lower than 1st shift operand, to avoid shift operand type warning.
+  uint8 public constant GAS_PRICE_BITS = 112;
 
   struct PoolUpdate {
     address token; // The IERC20 token address
@@ -29,8 +34,7 @@ library Internal {
 
   struct ExecutionReport {
     EVM2EVMMessage[] messages;
-    // Contains a bytes array for each message
-    // each inner bytes array contains bytes per transferred token
+    // Contains a bytes array for each message, each inner bytes array contains bytes per transferred token
     bytes[][] offchainTokenData;
     bytes32[] proofs;
     uint256 proofFlagBits;
@@ -38,20 +42,31 @@ library Internal {
 
   // @notice The cross chain message that gets committed to EVM chains
   struct EVM2EVMMessage {
-    uint64 sourceChainSelector;
-    uint64 sequenceNumber;
-    uint256 feeTokenAmount;
-    address sender;
-    uint64 nonce;
-    uint256 gasLimit;
-    bool strict;
-    // User fields
-    address receiver;
-    bytes data;
-    Client.EVMTokenAmount[] tokenAmounts;
-    address feeToken;
-    bytes32 messageId;
+    uint64 sourceChainSelector; // ─────────╮ the chain selector of the source chain, note: not chainId
+    address sender; // ─────────────────────╯ sender address on the source chain
+    address receiver; // ───────────────────╮ receiver address on the destination chain
+    uint64 sequenceNumber; // ──────────────╯ sequence number, not unique across lanes
+    uint256 gasLimit; //                      user supplied maximum gas amount available for dest chain execution
+    bool strict; // ────────────────────────╮ DEPRECATED
+    uint64 nonce; //                        │ nonce for this lane for this sender, not unique across senders/lanes
+    address feeToken; // ───────────────────╯ fee token
+    uint256 feeTokenAmount; //                fee token amount
+    bytes data; //                            arbitrary data payload supplied by the message sender
+    Client.EVMTokenAmount[] tokenAmounts; //  array of tokens and amounts to transfer
+    bytes[] sourceTokenData; //               array of token pool return values, one per token
+    bytes32 messageId; //                     a hash of the message data
   }
+
+  /// @dev EVM2EVMMessage struct has 13 fields, including 3 variable arrays.
+  /// Each variable array takes 1 more slot to store its length.
+  /// When abi encoded, excluding array contents,
+  /// EVM2EVMMessage takes up a fixed number of 16 lots, 32 bytes each.
+  /// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 17.
+  uint256 public constant MESSAGE_FIXED_BYTES = 32 * 17;
+
+  /// @dev Each token transfer adds 1 EVMTokenAmount and 1 bytes.
+  /// When abiEncoded, each EVMTokenAmount takes 2 slots, each bytes takes 2 slots.
+  uint256 public constant MESSAGE_BYTES_PER_TOKEN = 32 * 4;
 
   function _toAny2EVMMessage(
     EVM2EVMMessage memory original,
@@ -69,21 +84,25 @@ library Internal {
   bytes32 internal constant EVM_2_EVM_MESSAGE_HASH = keccak256("EVM2EVMMessageEvent");
 
   function _hash(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
+    /// @dev Fields split into 2 abi.encode calls due to number of parameters triggering stack too deep.
+    /// If a dynamic type, e.g. an array is to be added, make sure it is placed in the last abi.encode call.
     return
       keccak256(
-        abi.encode(
-          MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
-          metadataHash,
-          original.sequenceNumber,
-          original.nonce,
-          original.sender,
-          original.receiver,
-          keccak256(original.data),
-          keccak256(abi.encode(original.tokenAmounts)),
-          original.gasLimit,
-          original.strict,
-          original.feeToken,
-          original.feeTokenAmount
+        bytes.concat(
+          abi.encode(
+            MerkleMultiProof.LEAF_DOMAIN_SEPARATOR,
+            metadataHash,
+            original.sequenceNumber,
+            original.nonce,
+            original.sender,
+            original.receiver,
+            keccak256(original.data),
+            keccak256(abi.encode(original.tokenAmounts)),
+            keccak256(abi.encode(original.sourceTokenData)),
+            original.gasLimit,
+            original.strict
+          ),
+          abi.encode(original.feeToken, original.feeTokenAmount)
         )
       );
   }

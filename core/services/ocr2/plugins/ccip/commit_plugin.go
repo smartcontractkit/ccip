@@ -9,23 +9,24 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-
 	chainselectors "github.com/smartcontractkit/chain-selectors"
+
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
@@ -36,7 +37,7 @@ const (
 	COMMIT_CCIP_SENDS    = "Commit ccip sends"
 )
 
-func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
@@ -94,7 +95,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 		return nil, err
 	}
 
-	leafHasher := hasher.NewLeafHasher(staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), hasher.NewKeccakCtx())
+	leafHasher := hashlib.NewLeafHasher(staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), hashlib.NewKeccakCtx())
 	// Note that lggr already has the jobName and contractID (commit store)
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(int64(chainId)),
@@ -104,6 +105,8 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 			lggr:                commitLggr,
 			sourceLP:            sourceChain.LogPoller(),
 			destLP:              destChain.LogPoller(),
+			sourceEvents:        ccipevents.NewLogPollerClient(sourceChain.LogPoller(), commitLggr, sourceChain.Client()),
+			destEvents:          ccipevents.NewLogPollerClient(destChain.LogPoller(), commitLggr, destChain.Client()),
 			offRamp:             offRamp,
 			onRampAddress:       onRamp.Address(),
 			priceGetter:         priceGetterObject,
@@ -114,11 +117,10 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 			sourceClient:        sourceChain.Client(),
 			commitStore:         commitStore,
 			leafHasher:          leafHasher,
-			getSeqNumFromLog:    getSeqNumFromLog(onRamp),
 			checkFinalityTags:   sourceChain.Config().EVM().FinalityTagEnabled(),
 		})
 
-	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress)
+	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress, qopts...)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +139,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 		"sourceRouter", sourceRouter.Address())
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
-		return []job.ServiceCtx{NewBackfilledOracle(
+		return []job.ServiceCtx{oraclelib.NewBackfilledOracle(
 			commitLggr,
 			sourceChain.LogPoller(),
 			destChain.LogPoller(),
@@ -147,16 +149,6 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 		}, nil
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
-}
-
-func getSeqNumFromLog(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface) func(log logpoller.Log) (uint64, error) {
-	return func(log logpoller.Log) (uint64, error) {
-		req, err := onRamp.ParseCCIPSendRequested(log.ToGethLog())
-		if err != nil {
-			return 0, err
-		}
-		return req.Message.SequenceNumber, nil
-	}
 }
 
 // CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
@@ -217,7 +209,7 @@ func getCommitPluginDestLpFilters(priceRegistry common.Address, offRamp common.A
 }
 
 // UnregisterCommitPluginLpFilters unregisters all the registered filters for both source and dest chains.
-func UnregisterCommitPluginLpFilters(ctx context.Context, q pg.Queryer, spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer) error {
+func UnregisterCommitPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
 	if spec == nil {
 		return errors.New("spec is nil")
 	}
@@ -260,10 +252,10 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, q pg.Queryer, spec *jo
 	if err != nil {
 		return err
 	}
-	return unregisterCommitPluginFilters(ctx, q, sourceChain.LogPoller(), destChain.LogPoller(), commitStore, common.HexToAddress(pluginConfig.OffRamp))
+	return unregisterCommitPluginFilters(ctx, sourceChain.LogPoller(), destChain.LogPoller(), commitStore, common.HexToAddress(pluginConfig.OffRamp), qopts...)
 }
 
-func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, sourceLP, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address) error {
+func unregisterCommitPluginFilters(ctx context.Context, sourceLP, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address, qopts ...pg.QOpt) error {
 	staticCfg, err := destCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
@@ -275,16 +267,16 @@ func unregisterCommitPluginFilters(ctx context.Context, q pg.Queryer, sourceLP, 
 	}
 
 	if err := unregisterLpFilters(
-		q,
 		sourceLP,
 		getCommitPluginSourceLpFilters(staticCfg.OnRamp),
+		qopts...,
 	); err != nil {
 		return err
 	}
 
 	return unregisterLpFilters(
-		q,
 		destLP,
 		getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry, offRamp),
+		qopts...,
 	)
 }

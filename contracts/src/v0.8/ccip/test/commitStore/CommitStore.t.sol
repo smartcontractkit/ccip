@@ -137,7 +137,7 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
     // CommitStore initial values
     assertEq(0, commitStore.getLatestPriceEpochAndRound());
     assertEq(1, commitStore.getExpectedNextSequenceNumber());
-    assertEq(commitStore.typeAndVersion(), "CommitStore 1.1.0");
+    assertEq(commitStore.typeAndVersion(), "CommitStore 1.2.0");
     assertEq(OWNER, commitStore.owner());
     assertTrue(commitStore.isUnpausedAndARMHealthy());
   }
@@ -362,7 +362,7 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testStaleReportWithRootSuccess() public {
     uint64 maxSeq = 12;
-    uint192 tokenStartPrice = IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry)
+    uint224 tokenStartPrice = IPriceRegistry(s_commitStore.getDynamicConfig().priceRegistry)
       .getTokenPrice(s_sourceFeeToken)
       .value;
 
@@ -413,8 +413,8 @@ contract CommitStore_report is CommitStoreSetup {
 
   function testValidPriceUpdateThenStaleReportWithRootSuccess() public {
     uint64 maxSeq = 12;
-    uint192 tokenPrice1 = 4e18;
-    uint192 tokenPrice2 = 5e18;
+    uint224 tokenPrice1 = 4e18;
+    uint224 tokenPrice2 = 5e18;
 
     CommitStore.CommitReport memory report = CommitStore.CommitReport({
       priceUpdates: getSinglePriceUpdateStruct(s_sourceFeeToken, tokenPrice1),

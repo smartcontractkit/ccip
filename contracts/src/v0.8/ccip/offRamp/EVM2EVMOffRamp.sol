@@ -96,7 +96,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
-  string public constant override typeAndVersion = "EVM2EVMOffRamp 1.1.0";
+  string public constant override typeAndVersion = "EVM2EVMOffRamp 1.2.0";
   /// @dev The minimum amount of gas to perform the call with exact gas.
   /// We include this in the offramp so that we can redeploy to adjust it
   /// should a hardfork change the gas costs of relevant opcodes in callWithExactGas.
@@ -407,6 +407,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
         message.tokenAmounts,
         abi.encode(message.sender),
         message.receiver,
+        message.sourceTokenData,
         offchainTokenData
       );
     }
@@ -573,6 +574,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     Client.EVMTokenAmount[] memory sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
+    bytes[] memory sourceTokenData,
     bytes[] memory offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory) {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
@@ -585,7 +587,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
           receiver,
           sourceTokenAmounts[i].amount,
           i_sourceChainSelector,
-          offchainTokenData[i]
+          abi.encode(sourceTokenData[i], offchainTokenData[i])
         )
       {} catch (
         /// @dev we only want to revert on rate limiting errors, any other errors are

@@ -33,11 +33,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
-
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -64,6 +64,7 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 		mock.Anything,
 	).Maybe().Return(gas.EvmFee{Legacy: assets.NewWei(defaultGasPrice)}, uint32(200e3), nil)
 
+	lggr := logger.TestLogger(t)
 	priceGetter := newMockPriceGetter()
 
 	backendClient := client.NewSimulatedBackendClient(t, th.Dest.Chain, new(big.Int).SetUint64(th.Dest.ChainID))
@@ -72,6 +73,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			lggr:                th.Lggr,
 			sourceLP:            th.SourceLP,
 			destLP:              th.DestLP,
+			sourceEvents:        ccipevents.NewLogPollerClient(th.SourceLP, lggr, backendClient),
+			destEvents:          ccipevents.NewLogPollerClient(th.DestLP, lggr, backendClient),
 			offRamp:             th.Dest.OffRamp,
 			onRampAddress:       th.Source.OnRamp.Address(),
 			commitStore:         th.Dest.CommitStore,
@@ -80,8 +83,8 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			sourceFeeEstimator:  sourceFeeEstimator,
 			sourceChainSelector: th.Source.ChainSelector,
 			destClient:          backendClient,
-			leafHasher:          hasher.NewLeafHasher(th.Source.ChainSelector, th.Dest.ChainSelector, th.Source.OnRamp.Address(), hasher.NewKeccakCtx()),
-			getSeqNumFromLog:    getSeqNumFromLog(th.Source.OnRamp),
+			sourceClient:        backendClient,
+			leafHasher:          hashlib.NewLeafHasher(th.Source.ChainSelector, th.Dest.ChainSelector, th.Source.OnRamp.Address(), hashlib.NewKeccakCtx()),
 		},
 		inflightReports: newInflightCommitReportsContainer(time.Hour),
 		onchainConfig:   th.CommitOnchainConfig,
@@ -92,9 +95,9 @@ func setupCommitTestHarness(t *testing.T) commitTestHarness {
 			FeeUpdateHeartBeat:    models.MustMakeDuration(12 * time.Hour),
 			MaxGasPrice:           200e9,
 		},
-		lggr:                  th.Lggr,
-		destPriceRegistry:     th.Dest.PriceRegistry,
-		tokenToDecimalMapping: cache.NewTokenToDecimals(th.Lggr, th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, backendClient, 0),
+		lggr:               th.Lggr,
+		destPriceRegistry:  th.Dest.PriceRegistry,
+		tokenDecimalsCache: cache.NewTokenToDecimals(th.Lggr, th.DestLP, th.Dest.OffRamp, th.Dest.PriceRegistry, backendClient, 0),
 	}
 
 	priceGetter.On("TokenPricesUSD", mock.Anything, mock.Anything).Return(map[common.Address]*big.Int{
@@ -138,7 +141,7 @@ func TestCommitReportEncoding(t *testing.T) {
 	newGasPrice := big.NewInt(2000e9) // $2000 per eth * 1gwei
 
 	// Send a report.
-	mctx := hasher.NewKeccakCtx()
+	mctx := hashlib.NewKeccakCtx()
 	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
 	require.NoError(t, err)
 	report := commit_store.CommitStoreCommitReport{
@@ -850,11 +853,11 @@ func TestUpdateTokenToDecimalMapping(t *testing.T) {
 			offRamp:    mockOffRamp,
 			destClient: backendClient,
 		},
-		destPriceRegistry:     mockPriceRegistry,
-		tokenToDecimalMapping: cache.NewTokenToDecimals(th.Lggr, th.DestLP, mockOffRamp, mockPriceRegistry, backendClient, 0),
+		destPriceRegistry:  mockPriceRegistry,
+		tokenDecimalsCache: cache.NewTokenToDecimals(th.Lggr, th.DestLP, mockOffRamp, mockPriceRegistry, backendClient, 0),
 	}
 
-	tokenMapping, err := plugin.tokenToDecimalMapping.Get(testutils.Context(t))
+	tokenMapping, err := plugin.tokenDecimalsCache.Get(testutils.Context(t))
 	require.NoError(t, err)
 	assert.Equal(t, len(tokens), len(tokenMapping))
 	assert.Equal(t, uint8(18), tokenMapping[destToken])
@@ -1092,7 +1095,7 @@ func TestShouldAcceptFinalizedReport(t *testing.T) {
 }
 
 func TestCommitReportToEthTxMeta(t *testing.T) {
-	mctx := hasher.NewKeccakCtx()
+	mctx := hashlib.NewKeccakCtx()
 	tree, err := merklemulti.NewTree(mctx, [][32]byte{mctx.Hash([]byte{0xaa})})
 	require.NoError(t, err)
 
