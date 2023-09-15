@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 )
@@ -22,9 +22,9 @@ func getProofData(
 	lggr logger.Logger,
 	hashLeaf hashlib.LeafHasherInterface[[32]byte],
 	onRampAddress common.Address,
-	sourceEventsClient ccipevents.Client,
+	sourceEventsClient ccipdata.Reader,
 	interval commit_store.CommitStoreInterval,
-) (sendReqsInRoot []ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
+) (sendReqsInRoot []ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
 	sendReqs, err := sourceEventsClient.GetSendRequestsBetweenSeqNums(
 		ctx,
 		onRampAddress,
@@ -97,7 +97,7 @@ func validateSeqNumbers(serviceCtx context.Context, commitStore commit_store.Com
 }
 
 // Gets the commit report from the saved logs for a given sequence number.
-func getCommitReportForSeqNum(ctx context.Context, destEvents ccipevents.Client, commitStore commit_store.CommitStoreInterface, seqNum uint64) (commit_store.CommitStoreCommitReport, error) {
+func getCommitReportForSeqNum(ctx context.Context, destEvents ccipdata.Reader, commitStore commit_store.CommitStoreInterface, seqNum uint64) (commit_store.CommitStoreCommitReport, error) {
 	acceptedReports, err := destEvents.GetAcceptedCommitReportsGteSeqNum(ctx, commitStore.Address(), seqNum, 0)
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
