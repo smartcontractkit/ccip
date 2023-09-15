@@ -872,17 +872,12 @@ func CCIPDefaultTestSetUp(
 			if err != nil {
 				return err
 			}
-			if lanes.ReverseLane != nil {
-				err = lanes.ReverseLane.Source.Common.WaitForPriceUpdates(
-					lanes.ReverseLane.Logger,
-					lanes.ReverseLane.ValidationTimeout,
-					lanes.ReverseLane.Source.DestinationChainId,
-				)
-				if err != nil {
-					return err
-				}
-			}
-			return nil
+
+			return lanes.ReverseLane.Source.Common.WaitForPriceUpdates(
+				lanes.ReverseLane.Logger,
+				lanes.ReverseLane.ValidationTimeout,
+				lanes.ReverseLane.Source.DestinationChainId,
+			)
 		})
 	}
 	require.NoError(t, priceUpdateGrp.Wait())
