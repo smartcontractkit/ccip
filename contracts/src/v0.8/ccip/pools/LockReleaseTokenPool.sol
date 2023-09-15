@@ -20,10 +20,13 @@ contract LockReleaseTokenPool is TokenPool {
   error WithdrawalTooHigh();
   error LiquidityNotAccepted();
 
-  // The unique lock release pool flag to signal through EIP 165.
+  /// @dev The unique lock release pool flag to signal through EIP 165.
   bytes4 private constant LOCK_RELEASE_INTERFACE_ID = bytes4(keccak256("LockReleaseTokenPool"));
 
-  // Whether or not the pool accepts liquidity.
+  /// @dev Whether or not the pool accepts liquidity.
+  /// External liquidity is not required when there is one canonical token deployed to a chain,
+  /// and CCIP is facilitating mint/burn on all the other chains, in which case the invariant
+  /// balanceOf(pool) on home chain == sum(totalSupply(mint/burn "wrapped" token) on all remote chains) should always hold
   bool internal immutable i_acceptLiquidity;
 
   mapping(address provider => uint256 balance) internal s_liquidityProviderBalances;
