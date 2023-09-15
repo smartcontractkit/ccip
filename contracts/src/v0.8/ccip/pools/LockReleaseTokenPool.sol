@@ -87,6 +87,12 @@ contract LockReleaseTokenPool is TokenPool {
     return s_liquidityProviderBalances[provider];
   }
 
+  /// @notice Checks if the pool can accept liquidity.
+  /// @return true if the pool can accept liquidity, false otherwise.
+  function canAcceptLiquidity() external view returns (bool) {
+    return i_acceptLiquidity;
+  }
+
   /// @notice Adds liquidity to the pool. The tokens should be approved first.
   /// @param amount The amount of liquidity to provide.
   function addLiquidity(uint256 amount) external {

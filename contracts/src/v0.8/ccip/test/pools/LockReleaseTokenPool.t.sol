@@ -148,6 +148,15 @@ contract LockReleaseTokenPool_getProvidedLiquidity is LockReleaseTokenPoolSetup 
   }
 }
 
+contract LockReleaseTokenPool_canAcceptLiquidity is LockReleaseTokenPoolSetup {
+  function test_CanAcceptLiquiditySuccess() public {
+    assertEq(true, s_lockReleaseTokenPool.canAcceptLiquidity());
+
+    s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, new address[](0), address(s_mockARM), false);
+    assertEq(false, s_lockReleaseTokenPool.canAcceptLiquidity());
+  }
+}
+
 contract LockReleaseTokenPool_addLiquidity is LockReleaseTokenPoolSetup {
   function testFuzz_AddLiquiditySuccess(uint256 amount) public {
     uint256 balancePre = s_token.balanceOf(OWNER);
