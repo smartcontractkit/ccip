@@ -114,29 +114,6 @@ func (l *Lanes) WriteLaneConfig(networkA string, cfg *LaneConfig) error {
 	return nil
 }
 
-// ResetLaneConfig resets the lane config to the default values. It is used when a new lane is to be deployed with same
-// priceRegistry, tokens and pool contracts.
-func (l *Lanes) ResetLaneConfig() error {
-	laneMu.Lock()
-	defer laneMu.Unlock()
-	for k, cfg := range l.LaneConfigs {
-		l.LaneConfigs[k] = &LaneConfig{
-			SrcContracts:  make(map[uint64]SourceContracts),
-			DestContracts: make(map[uint64]DestContracts),
-			CommonContracts: CommonContracts{
-				BridgeTokens:            cfg.BridgeTokens,
-				BridgeTokenPools:        cfg.BridgeTokenPools,
-				IsNativeFeeToken:        cfg.IsNativeFeeToken,
-				FeeToken:                cfg.FeeToken,
-				PriceRegistry:           cfg.PriceRegistry,
-				PriceUpdatesToWatchFrom: cfg.PriceUpdatesToWatchFrom,
-				WrappedNative:           cfg.WrappedNative,
-			},
-		}
-	}
-	return nil
-}
-
 func ReadLanesFromExistingDeployment() (*Lanes, error) {
 	var lanes Lanes
 	if err := json.Unmarshal(ExistingContracts, &lanes); err != nil {
