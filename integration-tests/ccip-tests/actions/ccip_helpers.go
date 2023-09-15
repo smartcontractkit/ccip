@@ -104,8 +104,10 @@ type CCIPCommon struct {
 	WrappedNative           common.Address
 	ExistingDeployment      bool
 	poolFunds               *big.Int
-	PriceUpdateWatcherMu    *sync.Mutex
-	PriceUpdateWatcher      map[uint64]*big.Int
+	gasUpdateWatcherMu      *sync.Mutex
+	gasUpdateWatcher        map[uint64]*big.Int // key - destchain id; value - timestamp of update
+	priceUpdateWatcherMu    *sync.Mutex
+	priceUpdateWatcher      map[string]*big.Int // key - token address; value - timestamp of update
 }
 
 func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig) {
@@ -227,6 +229,87 @@ func (ccipModule *CCIPCommon) CleanUp() error {
 	return nil
 }
 
+func (ccipModule *CCIPCommon) WaitForPriceUpdates(
+	lggr zerolog.Logger,
+	timeout time.Duration,
+	destChainId uint64,
+) error {
+	lggr.Info().Msgf("Waiting for PriceUpdates for dest chain %d", destChainId)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	tokens := []string{ccipModule.WrappedNative.Hex(), ccipModule.FeeToken.Address()}
+	for {
+		select {
+		case <-ticker.C:
+			ccipModule.gasUpdateWatcherMu.Lock()
+			timestampOfUpdate, ok := ccipModule.gasUpdateWatcher[destChainId]
+			ccipModule.gasUpdateWatcherMu.Unlock()
+			ccipModule.priceUpdateWatcherMu.Lock()
+			priceUpdates := ccipModule.priceUpdateWatcher
+			ccipModule.priceUpdateWatcherMu.Unlock()
+			receivedAllUpdates := true
+			for _, token := range tokens {
+				if _, ok := priceUpdates[token]; !ok {
+					receivedAllUpdates = false
+					break
+				}
+			}
+			if ok && timestampOfUpdate.Cmp(big.NewInt(0)) == 1 && receivedAllUpdates {
+				return nil
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("price update is not found for chain %d", destChainId)
+		}
+	}
+}
+
+func (ccipModule *CCIPCommon) WatchForPriceUpdates(lggr zerolog.Logger) ([]event.Subscription, error) {
+	gasUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
+	blockNum := ccipModule.PriceUpdatesToWatchFrom
+	var opts *bind.WatchOpts
+	if blockNum > 0 {
+		opts = &bind.WatchOpts{Start: &blockNum}
+	}
+	var subs []event.Subscription
+	sub, err := ccipModule.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(opts, gasUpdateEvent, nil)
+	if err != nil {
+		return nil, err
+	}
+	subs = append(subs, sub)
+	go func() {
+		for {
+			e := <-gasUpdateEvent
+			destChain, err := chainselectors.ChainIdFromSelector(e.DestChain)
+			if err != nil {
+				continue
+			}
+			lggr.Info().Msgf("priceUpdateEvent event received for dest chain %d", destChain)
+			ccipModule.gasUpdateWatcherMu.Lock()
+			ccipModule.gasUpdateWatcher[destChain] = e.Timestamp
+			ccipModule.gasUpdateWatcherMu.Unlock()
+		}
+	}()
+
+	priceUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
+	sub, err = ccipModule.PriceRegistry.Instance.WatchUsdPerTokenUpdated(opts, priceUpdateEvent, nil)
+	if err != nil {
+		return nil, err
+	}
+	subs = append(subs, sub)
+	go func() {
+		for {
+			e := <-priceUpdateEvent
+			lggr.Info().Msgf("priceUpdateEvent event received for token %s", e.Token.Hex())
+			ccipModule.priceUpdateWatcherMu.Lock()
+			ccipModule.priceUpdateWatcher[e.Token.Hex()] = e.Timestamp
+			ccipModule.priceUpdateWatcherMu.Unlock()
+		}
+	}()
+	return subs, nil
+}
+
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
 // This reuses common contracts for bidirectional lanes
 func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
@@ -332,7 +415,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		ccipModule.TokenPrices = append(ccipModule.TokenPrices, big.NewInt(6e18))
 	}
 
-	if ccipModule.Router == nil {
+	if ccipModule.WrappedNative == common.HexToAddress("0x0") {
 		weth9addr, err := cd.DeployWrappedNative()
 		if err != nil {
 			return fmt.Errorf("deploying wrapped native shouldn't fail %+v", err)
@@ -343,7 +426,9 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 			return fmt.Errorf("waiting for deploying wrapped native shouldn't fail %+v", err)
 		}
 		ccipModule.WrappedNative = *weth9addr
+	}
 
+	if ccipModule.Router == nil {
 		ccipModule.Router, err = cd.DeployRouter(ccipModule.WrappedNative, *ccipModule.ARMContract)
 		if err != nil {
 			return fmt.Errorf("deploying router shouldn't fail %+v", err)
@@ -361,7 +446,10 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	}
 	if ccipModule.PriceRegistry == nil {
 		// we will update the price updates later based on source and dest PriceUpdates
-		ccipModule.PriceRegistry, err = cd.DeployPriceRegistry()
+		ccipModule.PriceRegistry, err = cd.DeployPriceRegistry([]common.Address{
+			common.HexToAddress(ccipModule.FeeToken.Address()),
+			common.HexToAddress(ccipModule.WrappedNative.Hex()),
+		})
 		if err != nil {
 			return fmt.Errorf("deploying PriceRegistry shouldn't fail %+v", err)
 		}
@@ -378,30 +466,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		ccipModule.PriceRegistry, err = cd.NewPriceRegistry(ccipModule.PriceRegistry.EthAddress)
 		if err != nil {
 			return fmt.Errorf("getting new PriceRegistry contract shouldn't fail %+v", err)
-		}
-	}
-	if !ccipModule.ExistingDeployment {
-		existingFeeTokens, err := ccipModule.PriceRegistry.Instance.GetFeeTokens(nil)
-		if err != nil {
-			return fmt.Errorf("getting fee tokens shouldn't fail %+v", err)
-		}
-		exists := false
-		for _, token := range existingFeeTokens {
-			if token == common.HexToAddress(ccipModule.FeeToken.Address()) {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			// ensure token is a feeToken
-			err = ccipModule.PriceRegistry.AddFeeToken(common.HexToAddress(ccipModule.FeeToken.Address()))
-			if err != nil {
-				return fmt.Errorf("addFeeTokens shouldn't fail %+v", err)
-			}
-			err = ccipModule.ChainClient.WaitForEvents()
-			if err != nil {
-				return fmt.Errorf("waiting for addFeeTokens shouldn't fail %+v", err)
-			}
 		}
 	}
 
@@ -423,8 +487,10 @@ func DefaultCCIPModule(chainClient blockchain.EVMClient, existingDeployment bool
 		},
 		ExistingDeployment:   existingDeployment,
 		poolFunds:            testhelpers.Link(1000),
-		PriceUpdateWatcherMu: &sync.Mutex{},
-		PriceUpdateWatcher:   make(map[uint64]*big.Int),
+		gasUpdateWatcherMu:   &sync.Mutex{},
+		gasUpdateWatcher:     make(map[uint64]*big.Int),
+		priceUpdateWatcherMu: &sync.Mutex{},
+		priceUpdateWatcher:   make(map[string]*big.Int),
 	}, nil
 }
 
@@ -732,32 +798,6 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 	}
 }
 
-func (sourceCCIP *SourceCCIPModule) WaitForPriceUpdates(
-	lggr zerolog.Logger,
-	timeout time.Duration,
-	destChainId uint64,
-) error {
-	lggr.Info().Msgf("Waiting for PriceUpdates for chain %d", destChainId)
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	for {
-		select {
-		case <-ticker.C:
-			sourceCCIP.Common.PriceUpdateWatcherMu.Lock()
-			timestampOfUpdate, ok := sourceCCIP.Common.PriceUpdateWatcher[destChainId]
-			sourceCCIP.Common.PriceUpdateWatcherMu.Unlock()
-			if ok && timestampOfUpdate.Cmp(big.NewInt(0)) == 1 {
-				return nil
-			}
-		case <-ctx.Done():
-			return fmt.Errorf("price update is not found for chain %d", destChainId)
-		}
-	}
-}
-
 func (sourceCCIP *SourceCCIPModule) SendRequest(
 	receiver common.Address,
 	msgType,
@@ -935,11 +975,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		pool := destCCIP.Common.BridgeTokenPools[i]
 		pools = append(pools, pool.EthAddress)
 		if !destCCIP.Common.ExistingDeployment {
-			bal, err := token.BalanceOf(context.Background(), destCCIP.Common.ChainClient.GetDefaultWallet().Address())
-			if err != nil {
-				return err
-			}
-			log.Info().Msg(fmt.Sprintf("dest token %s balance %s", token.Address(), bal.String()))
 			err = pool.AddLiquidity(token.Approve, token.Address(), destCCIP.Common.poolFunds)
 			if err != nil {
 				return fmt.Errorf("adding liquidity token to dest pool shouldn't fail %+v", err)
@@ -1534,34 +1569,14 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			return err
 		}
 	}
-
-	priceUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
-	blockNum := lane.SrcNetworkLaneCfg.PriceUpdatesToWatchFrom
-	var opts *bind.WatchOpts
-	if blockNum > 0 {
-		opts = &bind.WatchOpts{Start: &blockNum}
-	}
-	sub, err := lane.Source.Common.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(opts, priceUpdateEvent, nil)
+	subs, err := lane.Source.Common.WatchForPriceUpdates(lane.Logger)
 	if err != nil {
 		return err
 	}
-	lane.Subscriptions = append(lane.Subscriptions, sub)
-	go func() {
-		for {
-			e := <-priceUpdateEvent
-			destChain, err := chainselectors.ChainIdFromSelector(e.DestChain)
-			if err != nil {
-				continue
-			}
-			lane.Logger.Info().Msgf("priceUpdateEvent event received for dest chain %d", destChain)
-			lane.Source.Common.PriceUpdateWatcherMu.Lock()
-			lane.Source.Common.PriceUpdateWatcher[destChain] = e.Timestamp
-			lane.Source.Common.PriceUpdateWatcherMu.Unlock()
-		}
-	}()
+	lane.Subscriptions = append(lane.Subscriptions, subs...)
 
 	sendReqEvent := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
-	sub, err = lane.Source.OnRamp.Instance.WatchCCIPSendRequested(nil, sendReqEvent)
+	sub, err := lane.Source.OnRamp.Instance.WatchCCIPSendRequested(nil, sendReqEvent)
 	if err != nil {
 		return err
 	}
@@ -1656,7 +1671,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	sourceCommon *CCIPCommon,
 	destCommon *CCIPCommon,
 	transferAmounts []*big.Int,
-	newBootstrap bool,
+	bootstrapAdded *atomic.Bool,
 	configureCLNodes bool,
 ) error {
 	var err error
@@ -1723,10 +1738,9 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	tokenUSDMap[lane.Dest.Common.FeeToken.Address()] = LinkToUSD.String()
-	tokenUSDMap[lane.Dest.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
-	tokenUSDMap[lane.Source.Common.FeeToken.Address()] = LinkToUSD.String()
 	tokenUSDMap[lane.Source.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
-	log.Info().Interface("tokenUSDMap", tokenUSDMap).Msg("tokenUSDMap")
+	tokenUSDMap[lane.Dest.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
+	lane.Logger.Info().Interface("tokenUSDMap", tokenUSDMap).Msg("tokenUSDMap")
 
 	// first node is the bootstrapper
 	bootstrapCommit := clNodes[0]
@@ -1771,12 +1785,13 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		SourceStartBlock: lane.Source.SrcStartBlock,
 		DestStartBlock:   currentBlockOnDest,
 	}
-
-	if newBootstrap {
+	addedBootstrap := bootstrapAdded.Load()
+	if !addedBootstrap {
 		err := CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
 		if err != nil {
 			return errors.WithStack(err)
 		}
+		bootstrapAdded.Store(true)
 	}
 
 	bootstrapCommitP2PId := bootstrapCommit.KeysBundle.P2PKeys.Data[0].Attributes.PeerID

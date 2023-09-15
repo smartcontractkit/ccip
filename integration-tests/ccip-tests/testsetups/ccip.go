@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 	"go.uber.org/multierr"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
@@ -460,6 +461,7 @@ type CCIPTestSetUpOutputs struct {
 	TearDown                 func()
 	Env                      *actions.CCIPTestEnv
 	Balance                  *actions.BalanceSheet
+	BootstrapAdded           *atomic.Bool
 }
 
 func (o *CCIPTestSetUpOutputs) DeployChainContracts(
@@ -503,7 +505,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	transferAmounts []*big.Int,
 	numOfCommitNodes int,
 	commitAndExecOnSameDON, bidirectional bool,
-	newBootstrap bool,
 ) error {
 	var allErrors error
 	t := o.Cfg.Test
@@ -616,15 +617,9 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
 		err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkACmn, networkBCmn,
-			transferAmounts, newBootstrap, configureCLNode)
+			transferAmounts, o.BootstrapAdded, configureCLNode)
 		if err != nil {
 			allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err - %+v", networkA.Name, networkB.Name, err))
-		}
-		if ccipLaneA2B.Source.Common.ChainClient.NetworkSimulated() {
-			err = ccipLaneA2B.Source.WaitForPriceUpdates(ccipLaneA2B.Logger, ccipLaneA2B.ValidationTimeout, ccipLaneA2B.Source.DestinationChainId)
-			if err != nil {
-				allErrors = multierr.Append(allErrors, fmt.Errorf("waiting for price updates on lane %s to %s; err - %+v", networkA.Name, networkB.Name, err))
-			}
 		}
 		return err
 	})
@@ -633,16 +628,9 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		if bidirectional {
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
 			err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkBCmn, networkACmn,
-				transferAmounts, false, configureCLNode)
+				transferAmounts, o.BootstrapAdded, configureCLNode)
 			if err != nil {
 				allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err -  %+v", networkB.Name, networkA.Name, err))
-			}
-			if ccipLaneB2A.Source.Common.ChainClient.NetworkSimulated() {
-				err = ccipLaneB2A.Source.WaitForPriceUpdates(ccipLaneB2A.Logger, ccipLaneB2A.ValidationTimeout, ccipLaneB2A.Source.DestinationChainId)
-				if err != nil {
-					allErrors = multierr.Append(allErrors,
-						fmt.Errorf("waiting for price updates on lane %s to %s; err - %+v", networkB.Name, networkA.Name, err))
-				}
 			}
 			return err
 		}
@@ -709,6 +697,7 @@ func CCIPDefaultTestSetUp(
 		Reporter:       testreporters.NewCCIPTestReporter(t, lggr),
 		LaneConfigFile: filename,
 		Balance:        actions.NewBalanceSheet(),
+		BootstrapAdded: atomic.NewBool(false),
 	}
 	_, err = os.Stat(setUpArgs.LaneConfigFile)
 	if err == nil {
@@ -843,13 +832,6 @@ func CCIPDefaultTestSetUp(
 	// deploy all lane specific contracts
 	laneAddGrp, _ := errgroup.WithContext(parent)
 	for i, n := range inputs.NetworkPairs {
-		i := i
-		n := n
-		newBootstrap := false
-		if i == 0 {
-			// create bootstrap job once
-			newBootstrap = true
-		}
 		var ok bool
 		inputs.NetworkPairs[i].ChainClientA, ok = chainByChainID[n.NetworkA.ChainID]
 		require.True(t, ok, "Chain client for chainID %d not found", n.NetworkA.ChainID)
@@ -870,13 +852,40 @@ func CCIPDefaultTestSetUp(
 				lggr, n.NetworkA, n.NetworkB,
 				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID],
 				transferAmounts, numOfCommitNodes, commitAndExecOnSameDON,
-				bidirectional, newBootstrap)
-
+				bidirectional)
 		})
 	}
 	require.NoError(t, laneAddGrp.Wait())
 	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
 	require.NoError(t, err)
+
+	// wait for price updates to be available
+	priceUpdateGrp, _ := errgroup.WithContext(parent)
+	for _, lanes := range setUpArgs.Lanes {
+		lanes := lanes
+		priceUpdateGrp.Go(func() error {
+			err = lanes.ForwardLane.Source.Common.WaitForPriceUpdates(
+				lanes.ForwardLane.Logger,
+				lanes.ForwardLane.ValidationTimeout,
+				lanes.ForwardLane.Source.DestinationChainId,
+			)
+			if err != nil {
+				return err
+			}
+			if lanes.ReverseLane != nil {
+				err = lanes.ReverseLane.Source.Common.WaitForPriceUpdates(
+					lanes.ReverseLane.Logger,
+					lanes.ReverseLane.ValidationTimeout,
+					lanes.ReverseLane.Source.DestinationChainId,
+				)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+	require.NoError(t, priceUpdateGrp.Wait())
 
 	setUpArgs.TearDown = func() {
 		for _, lanes := range setUpArgs.Lanes {
