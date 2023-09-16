@@ -200,12 +200,14 @@ func (p *CCIPTestConfig) AddPairtoNetworkList(networkA, networkB blockchain.EVMN
 	}
 	firstOfPairs := []blockchain.EVMNetwork{networkA}
 	secondOfPairs := []blockchain.EVMNetwork{networkB}
-	if p.NoOfLanesPerPair > 0 {
-		for i := 0; i < p.NoOfLanesPerPair; i++ {
+	if p.NoOfLanesPerPair > 1 {
+		firstOfPairs[0].Name = fmt.Sprintf("%s-%d", firstOfPairs[0].Name, 1)
+		secondOfPairs[0].Name = fmt.Sprintf("%s-%d", secondOfPairs[0].Name, 1)
+		for i := 1; i < p.NoOfLanesPerPair; i++ {
 			netsA := networkA
-			netsA.Name = fmt.Sprintf("%s-%d", netsA.Name, i)
+			netsA.Name = fmt.Sprintf("%s-%d", netsA.Name, i+1)
 			netsB := networkB
-			netsB.Name = fmt.Sprintf("%s-%d", netsB.Name, i)
+			netsB.Name = fmt.Sprintf("%s-%d", netsB.Name, i+1)
 			firstOfPairs = append(firstOfPairs, netsA)
 			secondOfPairs = append(secondOfPairs, netsB)
 		}
