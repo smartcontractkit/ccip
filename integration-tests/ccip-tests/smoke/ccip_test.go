@@ -205,6 +205,8 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				big.NewInt(1e18),
 				new(big.Int).Div(rlOnRamp.Capacity, tokenPrice.Value))
 
+			tc.lane.Source.Common.ChainClient.ParallelTransactions(true)
+
 			// current tokens are equal to the full capacity  - should fail
 			src.TransferAmount[0] = rlOnRamp.Tokens
 			tc.lane.Logger.Info().Str("tokensTobeSent", rlOnRamp.Tokens.String()).Msg("Aggregated Capacity")

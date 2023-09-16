@@ -110,27 +110,44 @@ type CCIPCommon struct {
 	priceUpdateWatcher      map[string]*big.Int // key - token address; value - timestamp of update
 }
 
-func (ccipModule *CCIPCommon) SetChainClient(chainClient blockchain.EVMClient) (err error) {
-	ccipModule.ChainClient = chainClient
-	ccipModule.Deployer, err = contracts.NewCCIPContractsDeployer(chainClient)
+func (ccipModule *CCIPCommon) Copy(chainClient blockchain.EVMClient) (*CCIPCommon, error) {
+	newCD, err := contracts.NewCCIPContractsDeployer(chainClient)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	ccipModule.FeeToken.SetClient(chainClient)
-	ccipModule.Router.SetClient(chainClient)
-	ccipModule.PriceRegistry.SetClient(chainClient)
+	var arm *contracts.ARM
 	if ccipModule.ARM != nil {
-		ccipModule.ARM.SetClient(chainClient)
+		arm = ccipModule.ARM.Copy(chainClient)
 	}
+	var pools []*contracts.LockReleaseTokenPool
 	for i := range ccipModule.BridgeTokenPools {
-		ccipModule.BridgeTokenPools[i].SetClient(chainClient)
+		pools = append(pools, ccipModule.BridgeTokenPools[i].Copy(chainClient))
 	}
-
+	var tokens []*contracts.ERC20Token
 	for i := range ccipModule.BridgeTokens {
-		ccipModule.BridgeTokens[i].SetClient(chainClient)
+		tokens = append(tokens, ccipModule.BridgeTokens[i].Copy(chainClient))
 	}
-
-	return nil
+	return &CCIPCommon{
+		ChainClient:             chainClient,
+		Deployer:                newCD,
+		FeeToken:                ccipModule.FeeToken.Copy(chainClient),
+		BridgeTokens:            tokens,
+		TokenPrices:             ccipModule.TokenPrices,
+		BridgeTokenPools:        pools,
+		RateLimiterConfig:       ccipModule.RateLimiterConfig,
+		ARMContract:             ccipModule.ARMContract,
+		ARM:                     arm,
+		Router:                  ccipModule.Router.Copy(chainClient),
+		PriceRegistry:           ccipModule.PriceRegistry.Copy(chainClient),
+		PriceUpdatesToWatchFrom: ccipModule.PriceUpdatesToWatchFrom,
+		WrappedNative:           ccipModule.WrappedNative,
+		ExistingDeployment:      ccipModule.ExistingDeployment,
+		poolFunds:               ccipModule.poolFunds,
+		gasUpdateWatcherMu:      &sync.Mutex{},
+		gasUpdateWatcher:        make(map[uint64]*big.Int),
+		priceUpdateWatcherMu:    &sync.Mutex{},
+		priceUpdateWatcher:      make(map[string]*big.Int),
+	}, nil
 }
 
 func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig) {
@@ -893,9 +910,8 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	return sendTx.Hash(), time.Since(timeNow), fee, nil
 }
 
-func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64, transferAmount []*big.Int, ccipCommon CCIPCommon) (*SourceCCIPModule, error) {
-	cmn := &ccipCommon
-	err := cmn.SetChainClient(chainClient)
+func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64, transferAmount []*big.Int, ccipCommon *CCIPCommon) (*SourceCCIPModule, error) {
+	cmn, err := ccipCommon.Copy(chainClient)
 	if err != nil {
 		return nil, err
 	}
@@ -1332,9 +1348,8 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 	}
 }
 
-func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain uint64, ccipCommon CCIPCommon) (*DestCCIPModule, error) {
-	cmn := &ccipCommon
-	err := cmn.SetChainClient(chainClient)
+func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain uint64, ccipCommon *CCIPCommon) (*DestCCIPModule, error) {
+	cmn, err := ccipCommon.Copy(chainClient)
 	if err != nil {
 		return nil, err
 	}
@@ -1489,7 +1504,7 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 func (lane *CCIPLane) AddToSentReqs(txHash common.Hash) (*types.Receipt, error) {
 	request, rcpt, err := CCIPRequestFromTxHash(txHash, lane.Source.Common.ChainClient)
 	if err != nil {
-		return rcpt, fmt.Errorf("could not get request from tx hash: %+v", err)
+		return rcpt, fmt.Errorf("could not get request from tx hash %s: %+v", txHash.Hex(), err)
 	}
 	lane.SentReqs[int64(lane.NumberOfReq+1)] = request
 	lane.NumberOfReq++
@@ -1714,11 +1729,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return errors.WithStack(fmt.Errorf("common contracts for destination chain %s not found", destChainClient.GetChainID().String()))
 	}
 
-	lane.Source, err = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, *sourceCommon)
+	lane.Source, err = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	lane.Dest, err = DefaultDestinationCCIPModule(destChainClient, sourceChainClient.GetChainID().Uint64(), *destCommon)
+	lane.Dest, err = DefaultDestinationCCIPModule(destChainClient, sourceChainClient.GetChainID().Uint64(), destCommon)
 	if err != nil {
 		return errors.WithStack(err)
 	}
