@@ -110,6 +110,29 @@ type CCIPCommon struct {
 	priceUpdateWatcher      map[string]*big.Int // key - token address; value - timestamp of update
 }
 
+func (ccipModule *CCIPCommon) SetChainClient(chainClient blockchain.EVMClient) (err error) {
+	ccipModule.ChainClient = chainClient
+	ccipModule.Deployer, err = contracts.NewCCIPContractsDeployer(chainClient)
+	if err != nil {
+		return err
+	}
+	ccipModule.FeeToken.SetClient(chainClient)
+	ccipModule.Router.SetClient(chainClient)
+	ccipModule.PriceRegistry.SetClient(chainClient)
+	if ccipModule.ARM != nil {
+		ccipModule.ARM.SetClient(chainClient)
+	}
+	for i := range ccipModule.BridgeTokenPools {
+		ccipModule.BridgeTokenPools[i].SetClient(chainClient)
+	}
+
+	for i := range ccipModule.BridgeTokens {
+		ccipModule.BridgeTokens[i].SetClient(chainClient)
+	}
+
+	return nil
+}
+
 func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig) {
 	if conf != nil {
 		if common.IsHexAddress(conf.FeeToken) {
@@ -397,6 +420,10 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 				return fmt.Errorf("deploying bridge Token pool shouldn't fail %+v", err)
 			}
 			ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, btp)
+			err = btp.AddLiquidity(token.Approve, token.Address(), ccipModule.poolFunds)
+			if err != nil {
+				return fmt.Errorf("adding liquidity token to dest pool shouldn't fail %+v", err)
+			}
 		}
 	} else {
 		var pools []*contracts.LockReleaseTokenPool
@@ -866,15 +893,20 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	return sendTx.Hash(), time.Since(timeNow), fee, nil
 }
 
-func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64, transferAmount []*big.Int, ccipCommon *CCIPCommon) *SourceCCIPModule {
+func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64, transferAmount []*big.Int, ccipCommon CCIPCommon) (*SourceCCIPModule, error) {
+	cmn := &ccipCommon
+	err := cmn.SetChainClient(chainClient)
+	if err != nil {
+		return nil, err
+	}
 	return &SourceCCIPModule{
-		Common:                     ccipCommon,
+		Common:                     cmn,
 		TransferAmount:             transferAmount,
 		DestinationChainId:         destChain,
 		Sender:                     common.HexToAddress(chainClient.GetDefaultWallet().Address()),
 		CCIPSendRequestedWatcher:   make(map[string]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested),
 		CCIPSendRequestedWatcherMu: &sync.Mutex{},
-	}
+	}, nil
 }
 
 type DestCCIPModule struct {
@@ -974,16 +1006,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		destTokens = append(destTokens, common.HexToAddress(token.Address()))
 		pool := destCCIP.Common.BridgeTokenPools[i]
 		pools = append(pools, pool.EthAddress)
-		if !destCCIP.Common.ExistingDeployment {
-			err = pool.AddLiquidity(token.Approve, token.Address(), destCCIP.Common.poolFunds)
-			if err != nil {
-				return fmt.Errorf("adding liquidity token to dest pool shouldn't fail %+v", err)
-			}
-			err = destCCIP.Common.ChainClient.WaitForEvents()
-			if err != nil {
-				return fmt.Errorf("waiting for adding liquidity token to dest pool shouldn't fail %+v", err)
-			}
-		}
 	}
 
 	if destCCIP.OffRamp == nil {
@@ -1310,9 +1332,14 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 	}
 }
 
-func DefaultDestinationCCIPModule(sourceChain uint64, ccipCommon *CCIPCommon) *DestCCIPModule {
+func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain uint64, ccipCommon CCIPCommon) (*DestCCIPModule, error) {
+	cmn := &ccipCommon
+	err := cmn.SetChainClient(chainClient)
+	if err != nil {
+		return nil, err
+	}
 	return &DestCCIPModule{
-		Common:                  ccipCommon,
+		Common:                  cmn,
 		SourceChainId:           sourceChain,
 		ReportAcceptedWatcherMu: &sync.Mutex{},
 		ReportAcceptedWatcher:   make(map[uint64]*commit_store.CommitStoreReportAccepted),
@@ -1321,7 +1348,7 @@ func DefaultDestinationCCIPModule(sourceChain uint64, ccipCommon *CCIPCommon) *D
 		ReportBlessedWatcherMu:  &sync.Mutex{},
 		ReportBlessedWatcher:    make(map[[32]byte]*types.Log),
 		NextSeqNumToCommit:      atomic.NewUint64(1),
-	}
+	}, nil
 }
 
 type CCIPRequest struct {
@@ -1687,8 +1714,14 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return errors.WithStack(fmt.Errorf("common contracts for destination chain %s not found", destChainClient.GetChainID().String()))
 	}
 
-	lane.Source = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon)
-	lane.Dest = DefaultDestinationCCIPModule(sourceChainClient.GetChainID().Uint64(), destCommon)
+	lane.Source, err = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, *sourceCommon)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	lane.Dest, err = DefaultDestinationCCIPModule(destChainClient, sourceChainClient.GetChainID().Uint64(), *destCommon)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 
 	srcConf := lane.SrcNetworkLaneCfg
 
@@ -1835,6 +1868,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if err != nil {
 		return errors.WithStack(err)
 	}
+	lane.Dest.Common.ChainClient.ParallelTransactions(false)
+	lane.Source.Common.ChainClient.ParallelTransactions(false)
 
 	return nil
 }
