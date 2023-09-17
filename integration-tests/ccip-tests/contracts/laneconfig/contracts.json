@@ -1,20 +1,18 @@
 {
   "lane_configs": {
     "Arbitrum Goerli": {
-      "CommonContracts": {
-        "fee_token": "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
-        "bridge_tokens": [
-          "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28"
-        ],
-        "bridge_tokens_pools": [
-          "0x044a6b4b561af69d2319a2f4be5ec327a6975d0a"
-        ],
-        "arm": "0x8af4204e30565df93352fe8e1de78925f6664da7",
-        "router": "0x88e492127709447a5abefdab8788a15b4567589e",
-        "price_registry": "0x114a20a10b43d4115e5aeef7345a1a71d2a60c57",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a"
-      },
+      "fee_token": "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
+      "bridge_tokens": [
+        "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28"
+      ],
+      "bridge_tokens_pools": [
+        "0x044a6b4b561af69d2319a2f4be5ec327a6975d0a"
+      ],
+      "arm": "0x8af4204e30565df93352fe8e1de78925f6664da7",
+      "router": "0x88e492127709447a5abefdab8788a15b4567589e",
+      "price_registry": "0x114a20a10b43d4115e5aeef7345a1a71d2a60c57",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a",
       "src_contracts": {
         "BSC Testnet": {
           "on_ramp": "0x17e7963bb9a8265b316375268504c2706fd5c967",
@@ -48,20 +46,18 @@
       }
     },
     "Arbitrum Mainnet": {
-      "CommonContracts": {
-        "fee_token": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
-        "bridge_tokens": [
-          "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"
-        ],
-        "bridge_tokens_pools": [
-          ""
-        ],
-        "arm": "0xe06b0e8c4bd455153e8794ad7Ea8Ff5A14B64E4b",
-        "router": "0xE92634289A1841A979C11C2f618B33D376e4Ba85",
-        "price_registry": "0xeBec5Cb8651FCD0Fd86Bd1BBb8562f5028D5102E",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1"
-      },
+      "fee_token": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
+      "bridge_tokens": [
+        "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4"
+      ],
+      "bridge_tokens_pools": [
+        ""
+      ],
+      "arm": "0xe06b0e8c4bd455153e8794ad7Ea8Ff5A14B64E4b",
+      "router": "0xE92634289A1841A979C11C2f618B33D376e4Ba85",
+      "price_registry": "0xeBec5Cb8651FCD0Fd86Bd1BBb8562f5028D5102E",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
       "src_contracts": {
         "Ethereum Mainnet": {
           "on_ramp": "0x98dd9E9b8AE458225119Ab5B8c947A9d1cd0B648",
@@ -77,20 +73,18 @@
       }
     },
     "Avalanche Fuji": {
-      "CommonContracts": {
-        "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
-        "bridge_tokens": [
-          "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"
-        ],
-        "bridge_tokens_pools": [
-          "0x658af0d8ecbb13c5fd5b545ac7316e50cc07cf6e"
-        ],
-        "arm": "0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f",
-        "router": "0x554472a2720e5e7d5d3c817529aba05eed5f82d8",
-        "price_registry": "0xe42ecce39ce5bd2bbf2443660ba6979eeafd48df",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c"
-      },
+      "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
+      "bridge_tokens": [
+        "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"
+      ],
+      "bridge_tokens_pools": [
+        "0x658af0d8ecbb13c5fd5b545ac7316e50cc07cf6e"
+      ],
+      "arm": "0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f",
+      "router": "0x554472a2720e5e7d5d3c817529aba05eed5f82d8",
+      "price_registry": "0xe42ecce39ce5bd2bbf2443660ba6979eeafd48df",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
       "src_contracts": {
         "Optimism Goerli": {
           "on_ramp": "0x097076fbd8573418c77d2600606ad063c0e3cc7c",
@@ -124,20 +118,18 @@
       }
     },
     "Avalanche Mainnet": {
-      "CommonContracts": {
-        "fee_token": "0x5947BB275c521040051D82396192181b413227A3",
-        "bridge_tokens": [
-          "0x5947BB275c521040051D82396192181b413227A3"
-        ],
-        "bridge_tokens_pools": [
-          "0x8A3e8D8614189d7ad0CF3f1a0D787Da79eBCEc17"
-        ],
-        "arm": "0xdFD6C0dc67666DE3bB36b31eec5c7B1542A82C1E",
-        "router": "0x27F39D0af3303703750D4001fCc1844c6491563c",
-        "price_registry": "0x2d3b38E0a4DFFDad2A613f7760bE1683F272eA18",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7"
-      },
+      "fee_token": "0x5947BB275c521040051D82396192181b413227A3",
+      "bridge_tokens": [
+        "0x5947BB275c521040051D82396192181b413227A3"
+      ],
+      "bridge_tokens_pools": [
+        "0x8A3e8D8614189d7ad0CF3f1a0D787Da79eBCEc17"
+      ],
+      "arm": "0xdFD6C0dc67666DE3bB36b31eec5c7B1542A82C1E",
+      "router": "0x27F39D0af3303703750D4001fCc1844c6491563c",
+      "price_registry": "0x2d3b38E0a4DFFDad2A613f7760bE1683F272eA18",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7",
       "src_contracts": {
         "Ethereum Mainnet": {
           "on_ramp": "0x3D3817270db2b89e9F68bA27297fb4672082f942",
@@ -162,20 +154,18 @@
       }
     },
     "BSC Testnet": {
-      "CommonContracts": {
-        "fee_token": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
-        "bridge_tokens": [
-          "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06"
-        ],
-        "bridge_tokens_pools": [
-          "0x8a710bbd77661d168d5a6725bd2e514ba1bff59d"
-        ],
-        "arm": "0xf9a21b587111e7e8745fb8b13750014f19db0014",
-        "router": "0x9527e2d01a3064ef6b50c1da1c0cc523803bcff2",
-        "price_registry": "0xa8bfa4fc9f97793297793291e7f63da18eccbe05",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
-      },
+      "fee_token": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
+      "bridge_tokens": [
+        "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06"
+      ],
+      "bridge_tokens_pools": [
+        "0x8a710bbd77661d168d5a6725bd2e514ba1bff59d"
+      ],
+      "arm": "0xf9a21b587111e7e8745fb8b13750014f19db0014",
+      "router": "0x9527e2d01a3064ef6b50c1da1c0cc523803bcff2",
+      "price_registry": "0xa8bfa4fc9f97793297793291e7f63da18eccbe05",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
       "src_contracts": {
         "Base Goerli": {
           "on_ramp": "0x0648fe506f5ae251979ea0a1c3c2a14e33255cbc",
@@ -209,16 +199,14 @@
       }
     },
     "Base Goerli": {
-      "CommonContracts": {
-        "fee_token": "0xd886e2286fd1073df82462ea1822119600af80b6",
-        "bridge_tokens": null,
-        "bridge_tokens_pools": null,
-        "arm": "0xe5bd6bcb6fa8e5236984d5ea127de5047f93b5ff",
-        "router": "0xa8c0c11bf64af62cdca6f93d3769b88bdd7cb93d",
-        "price_registry": "0x8a710bbd77661d168d5a6725bd2e514ba1bff59d",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0x4200000000000000000000000000000000000006"
-      },
+      "fee_token": "0xd886e2286fd1073df82462ea1822119600af80b6",
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
+      "arm": "0xe5bd6bcb6fa8e5236984d5ea127de5047f93b5ff",
+      "router": "0xa8c0c11bf64af62cdca6f93d3769b88bdd7cb93d",
+      "price_registry": "0x8a710bbd77661d168d5a6725bd2e514ba1bff59d",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
         "Arbitrum Goerli": {
           "on_ramp": "0x2e8fc2ec6f18542cf2185a450c2dc652d7e221b6",
@@ -261,20 +249,18 @@
       }
     },
     "Base Mainnet": {
-      "CommonContracts": {
-        "fee_token": "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196",
-        "bridge_tokens": [
-          "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196"
-        ],
-        "bridge_tokens_pools": [
-          ""
-        ],
-        "arm": "0x38660c8CC222c0192b635c2ac09687B4F25cCE5F",
-        "router": "0x673AA85efd75080031d44fcA061575d1dA427A28",
-        "price_registry": "0x1bA15c57c8b74cD32443D7583E7f6d7c638aCf46",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0x4200000000000000000000000000000000000006"
-      },
+      "fee_token": "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196",
+      "bridge_tokens": [
+        "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196"
+      ],
+      "bridge_tokens_pools": [
+        ""
+      ],
+      "arm": "0x38660c8CC222c0192b635c2ac09687B4F25cCE5F",
+      "router": "0x673AA85efd75080031d44fcA061575d1dA427A28",
+      "price_registry": "0x1bA15c57c8b74cD32443D7583E7f6d7c638aCf46",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
         "Ethereum Mainnet": {
           "on_ramp": "0xD44371bFDe87f2db3eA6Df242091351A06c2e181",
@@ -290,20 +276,18 @@
       }
     },
     "Bsc Mainnet": {
-      "CommonContracts": {
-        "fee_token": "0x404460C6A5EdE2D891e8297795264fDe62ADBB75",
-        "bridge_tokens": [
-          "0x404460C6A5EdE2D891e8297795264fDe62ADBB75"
-        ],
-        "bridge_tokens_pools": [
-          ""
-        ],
-        "arm": "0x3DB43b96B2625F4232e9Df900d464dd2c64C0021",
-        "router": "0x536d7E53D0aDeB1F20E7c81fea45d02eC9dBD698",
-        "price_registry": "0x18C3D917D55Bc1784a3d4729AA3e2C1ecd662fFd",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
-      },
+      "fee_token": "0x404460C6A5EdE2D891e8297795264fDe62ADBB75",
+      "bridge_tokens": [
+        "0x404460C6A5EdE2D891e8297795264fDe62ADBB75"
+      ],
+      "bridge_tokens_pools": [
+        ""
+      ],
+      "arm": "0x3DB43b96B2625F4232e9Df900d464dd2c64C0021",
+      "router": "0x536d7E53D0aDeB1F20E7c81fea45d02eC9dBD698",
+      "price_registry": "0x18C3D917D55Bc1784a3d4729AA3e2C1ecd662fFd",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
       "src_contracts": {
         "Ethereum Mainnet": {
           "on_ramp": "0x1f17D464652f5Bd74a03446FeA20590CCfB3332D",
@@ -319,20 +303,18 @@
       }
     },
     "Ethereum Mainnet": {
-      "CommonContracts": {
-        "fee_token": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
-        "bridge_tokens": [
-          "0x514910771AF9Ca656af840dff83E8264EcF986CA"
-        ],
-        "bridge_tokens_pools": [
-          "0xC2291992A08eBFDfedfE248F2CCD34Da63570DF4"
-        ],
-        "arm": "0x8B63b3DE93431C0f756A493644d128134291fA1b",
-        "router": "0xE561d5E02207fb5eB32cca20a699E0d8919a1476",
-        "price_registry": "0x020082A7a9c2510e1921116001152DEE4da81985",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
-      },
+      "fee_token": "0x514910771AF9Ca656af840dff83E8264EcF986CA",
+      "bridge_tokens": [
+        "0x514910771AF9Ca656af840dff83E8264EcF986CA"
+      ],
+      "bridge_tokens_pools": [
+        "0xC2291992A08eBFDfedfE248F2CCD34Da63570DF4"
+      ],
+      "arm": "0x8B63b3DE93431C0f756A493644d128134291fA1b",
+      "router": "0xE561d5E02207fb5eB32cca20a699E0d8919a1476",
+      "price_registry": "0x020082A7a9c2510e1921116001152DEE4da81985",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
       "src_contracts": {
         "Arbitrum Mainnet": {
           "on_ramp": "0x333f976915195ba9044fD0cd603cEcE936f6264e",
@@ -393,20 +375,18 @@
       }
     },
     "Optimism Goerli": {
-      "CommonContracts": {
-        "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
-        "bridge_tokens": [
-          "0xdc2CC710e42857672E7907CF474a69B63B93089f"
-        ],
-        "bridge_tokens_pools": [
-          "0xdecfaf632175915bdf38c00d9d9746e8a90a56c4"
-        ],
-        "arm": "0xeaf6968fab9c54ac31c3679f120705b5019d3546",
-        "router": "0xeb52e9ae4a9fb37172978642d4c141ef53876f26",
-        "price_registry": "0x490f3b46fba6af0d7499867a73469a077251c2bb",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0x4200000000000000000000000000000000000006"
-      },
+      "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
+      "bridge_tokens": [
+        "0xdc2CC710e42857672E7907CF474a69B63B93089f"
+      ],
+      "bridge_tokens_pools": [
+        "0xdecfaf632175915bdf38c00d9d9746e8a90a56c4"
+      ],
+      "arm": "0xeaf6968fab9c54ac31c3679f120705b5019d3546",
+      "router": "0xeb52e9ae4a9fb37172978642d4c141ef53876f26",
+      "price_registry": "0x490f3b46fba6af0d7499867a73469a077251c2bb",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
         "Arbitrum Goerli": {
           "on_ramp": "0x6bb8d729c35f29df532eb3998ddace336187c84b",
@@ -449,20 +429,18 @@
       }
     },
     "Optimism Mainnet": {
-      "CommonContracts": {
-        "fee_token": "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6",
-        "bridge_tokens": [
-          "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6"
-        ],
-        "bridge_tokens_pools": [
-          "0x841b32B5309ba30cFbf4534667fC3D99EdF05B7A"
-        ],
-        "arm": "0x8C7C2C3362a42308BB5c368677Ad321D11693b81",
-        "router": "0x261c05167db67B2b619f9d312e0753f3721ad6E8",
-        "price_registry": "0x9270AAA75F4B9038f4c25fEc665B02a150a90361",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0x4200000000000000000000000000000000000006"
-      },
+      "fee_token": "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6",
+      "bridge_tokens": [
+        "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6"
+      ],
+      "bridge_tokens_pools": [
+        "0x841b32B5309ba30cFbf4534667fC3D99EdF05B7A"
+      ],
+      "arm": "0x8C7C2C3362a42308BB5c368677Ad321D11693b81",
+      "router": "0x261c05167db67B2b619f9d312e0753f3721ad6E8",
+      "price_registry": "0x9270AAA75F4B9038f4c25fEc665B02a150a90361",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
         "Ethereum Mainnet": {
           "on_ramp": "0xad1b1F2A6DD55627e3893B771A00Cd43F69DcE35",
@@ -478,20 +456,18 @@
       }
     },
     "Polygon Mainnet": {
-      "CommonContracts": {
-        "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
-        "bridge_tokens": [
-          "0xb0897686c545045aFc77CF20eC7A532E3120E0F1"
-        ],
-        "bridge_tokens_pools": [
-          "0x086892015567fb8764d02c6845C85C25C8FcA389"
-        ],
-        "arm": "0xD7AcF65dA1E1f34b663aB199a474F209bF2b0523",
-        "router": "0x3C3D92629A02a8D95D5CB9650fe49C3544f69B43",
-        "price_registry": "0x68590799942eed65f9f1fB2277B9F6584A5957B8",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270"
-      },
+      "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
+      "bridge_tokens": [
+        "0xb0897686c545045aFc77CF20eC7A532E3120E0F1"
+      ],
+      "bridge_tokens_pools": [
+        "0x086892015567fb8764d02c6845C85C25C8FcA389"
+      ],
+      "arm": "0xD7AcF65dA1E1f34b663aB199a474F209bF2b0523",
+      "router": "0x3C3D92629A02a8D95D5CB9650fe49C3544f69B43",
+      "price_registry": "0x68590799942eed65f9f1fB2277B9F6584A5957B8",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270",
       "src_contracts": {
         "Avalanche Mainnet": {
           "on_ramp": "0x47D945f7bbb814B65775a89c71F5D2229BE96CE9",
@@ -516,20 +492,18 @@
       }
     },
     "Polygon Mumbai": {
-      "CommonContracts": {
-        "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
-        "bridge_tokens": [
-          "0x326C977E6efc84E512bB9C30f76E30c160eD06FB"
-        ],
-        "bridge_tokens_pools": [
-          "0x6fce09b2e74f649a4494a1844219cb0d86cfe8b7"
-        ],
-        "arm": "0x917a6913f785094f8b06785aa8a884f922a650d8",
-        "router": "0x70499c328e1e2a3c41108bd3730f6670a44595d1",
-        "price_registry": "0x9bd312170aa145ef98453940dc9ab894235b063e",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889"
-      },
+      "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
+      "bridge_tokens": [
+        "0x326C977E6efc84E512bB9C30f76E30c160eD06FB"
+      ],
+      "bridge_tokens_pools": [
+        "0x6fce09b2e74f649a4494a1844219cb0d86cfe8b7"
+      ],
+      "arm": "0x917a6913f785094f8b06785aa8a884f922a650d8",
+      "router": "0x70499c328e1e2a3c41108bd3730f6670a44595d1",
+      "price_registry": "0x9bd312170aa145ef98453940dc9ab894235b063e",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
       "src_contracts": {
         "Avalanche Fuji": {
           "on_ramp": "0x48601a62aa4cb289d006ff4c14023e9d8a7e5a88",
@@ -563,20 +537,18 @@
       }
     },
     "Sepolia Testnet": {
-      "CommonContracts": {
-        "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
-        "bridge_tokens": [
-          "0x779877A7B0D9E8603169DdbD7836e478b4624789"
-        ],
-        "bridge_tokens_pools": [
-          "0x5344b4bf5ae39038a591866d2853b2b1db622911"
-        ],
-        "arm": "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
-        "router": "0xd0daae2231e9cb96b94c8512223533293c3693bf",
-        "price_registry": "0x8737a1c3d55779d03b7a08188e97af87b4110946",
-        "price_updates_started_at": 0,
-        "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534"
-      },
+      "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+      "bridge_tokens": [
+        "0x779877A7B0D9E8603169DdbD7836e478b4624789"
+      ],
+      "bridge_tokens_pools": [
+        "0x5344b4bf5ae39038a591866d2853b2b1db622911"
+      ],
+      "arm": "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
+      "router": "0xd0daae2231e9cb96b94c8512223533293c3693bf",
+      "price_registry": "0x8737a1c3d55779d03b7a08188e97af87b4110946",
+      "price_updates_started_at": 0,
+      "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
       "src_contracts": {
         "Arbitrum Goerli": {
           "on_ramp": "0x2c0b51f491ceaefe8c24c0199fce62d7b040470a",

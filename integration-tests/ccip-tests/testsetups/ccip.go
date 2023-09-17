@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -262,7 +263,7 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	p.SelectedNetworks = networks.SelectedNetworks[1:]
 	simulated := p.SelectedNetworks[0].Simulated
 	for i := 1; i < len(p.SelectedNetworks); i++ {
-		if simulated && !p.SelectedNetworks[i].Simulated {
+		if p.SelectedNetworks[i].Simulated != simulated {
 			lggr.Fatal().Msg("networks must be of the same type either simulated or real")
 		}
 	}
@@ -309,12 +310,6 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 			}
 		}
 	}
-	// if the networks are not simulated use the first p.NoOfNetworks networks from the selected networks
-	if !simulated && len(p.SelectedNetworks) != p.NoOfNetworks {
-		if len(p.SelectedNetworks) != p.NoOfNetworks {
-			allError = multierr.Append(allError, fmt.Errorf("no of networks and no of selected networks are not equal"))
-		}
-	}
 
 	if p.NoOfNetworks > 2 {
 		p.FormNetworkPairCombinations()
@@ -325,6 +320,7 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	for _, n := range p.NetworkPairs {
 		lggr.Info().Str("NetworkA", n.NetworkA.Name).Str("NetworkB", n.NetworkB.Name).Msg("Network Pairs")
 	}
+	lggr.Info().Int("Pairs", len(p.NetworkPairs)).Msg("No Of Lanes")
 
 	return allError
 }
@@ -361,7 +357,6 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	}
 
 	allError = multierr.Append(allError, p.SetNetworkPairs(lggr))
-	lggr.Info().Interface("Networks", p.AllNetworks).Msg("Running tests with networks")
 
 	ttlDuration, _ := utils.GetEnv("CCIP_KEEP_ENV_TTL")
 	if ttlDuration != "" {
@@ -483,6 +478,7 @@ type BiDirectionalLaneConfig struct {
 
 type CCIPTestSetUpOutputs struct {
 	Cfg                      *CCIPTestConfig
+	LaneContractsByNetwork   sync.Map
 	Lanes                    []*BiDirectionalLaneConfig
 	CommonContractsByNetwork sync.Map
 	Reporter                 *testreporters.CCIPTestReporter
@@ -511,16 +507,19 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 		return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", net.Name, err))
 	}
 
+	defer chain.Close()
 	chain.ParallelTransactions(true)
 
 	ccipCommon, err := actions.DefaultCCIPModule(lggr, chain, o.Cfg.ExistingDeployment)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %v", net.Name, err))
 	}
+
 	cfg, err := o.LaneConfig.ReadLaneConfig(net.Name)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to read lane config for %s: %v", net.Name, err))
 	}
+	o.LaneContractsByNetwork.Store(net.Name, cfg)
 	err = ccipCommon.DeployContracts(noOfTokens, tokenDeployerFns, cfg)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to deploy common ccip contracts for %s: %v", net.Name, err))
@@ -577,10 +576,16 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		Balance:           o.Balance,
 		Context:           ctx,
 	}
-	ccipLaneA2B.SrcNetworkLaneCfg, err = o.LaneConfig.ReadLaneConfig(networkA.Name)
-	require.NoError(t, err, "Reading lane config shouldn't fail")
-	ccipLaneA2B.DstNetworkLaneCfg, err = o.LaneConfig.ReadLaneConfig(networkB.Name)
-	require.NoError(t, err, "Reading lane config shouldn't fail")
+	contractsA, ok := o.LaneContractsByNetwork.Load(networkA.Name)
+	if !ok {
+		return errors.WithStack(fmt.Errorf("failed to load lane contracts for %s", networkA.Name))
+	}
+	ccipLaneA2B.SrcNetworkLaneCfg = contractsA.(*laneconfig.LaneConfig)
+	contractsB, ok := o.LaneContractsByNetwork.Load(networkB.Name)
+	if !ok {
+		return errors.WithStack(fmt.Errorf("failed to load lane contracts for %s", networkB.Name))
+	}
+	ccipLaneA2B.DstNetworkLaneCfg = contractsB.(*laneconfig.LaneConfig)
 
 	ccipLaneA2B.Logger = lggr.With().Str("env", namespace).Str("Lane",
 		fmt.Sprintf("%s-->%s", ccipLaneA2B.SourceNetworkName, ccipLaneA2B.DestNetworkName)).Logger()
@@ -850,6 +855,15 @@ func CCIPDefaultTestSetUp(
 			return ccipEnv.SetUpNodesAndKeys(ctx, inputs.NodeFunding, chains, lggr)
 		})
 	}
+
+	for n := range inputs.AllNetworks {
+		if setUpArgs.Cfg.NoOfLanesPerPair > 1 {
+			regex := regexp.MustCompile(`-(\d+)$`)
+			networkNameToReadCfg := regex.ReplaceAllString(n, "")
+			setUpArgs.LaneConfig.CopyLaneConfig(networkNameToReadCfg, n, inputs.ReuseContracts, inputs.MsgType == actions.TokenTransfer)
+		}
+	}
+
 	// deploy all chain specific common contracts
 	chainAddGrp, _ := errgroup.WithContext(parent)
 	for _, chain := range chainByChainID {

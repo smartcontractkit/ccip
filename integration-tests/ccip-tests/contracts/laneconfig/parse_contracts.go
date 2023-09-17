@@ -100,6 +100,43 @@ func (l *Lanes) ReadLaneConfig(networkA string) (*LaneConfig, error) {
 	return l.LaneConfigs[networkA], nil
 }
 
+// CopyLaneConfig copies network config for common contracts from one network to another
+// If reuse is set to false, it only retains the token contracts
+func (l *Lanes) CopyLaneConfig(fromNetwork, toNetwork string, reuse, isTokenTransfer bool) {
+	laneMu.Lock()
+	defer laneMu.Unlock()
+	existing, ok := l.LaneConfigs[fromNetwork]
+	if !ok {
+		l.LaneConfigs[toNetwork] = &LaneConfig{
+			SrcContracts:  make(map[string]SourceContracts),
+			DestContracts: make(map[string]DestContracts),
+		}
+	}
+	cfg := &LaneConfig{
+		SrcContracts:  make(map[string]SourceContracts),
+		DestContracts: make(map[string]DestContracts),
+		CommonContracts: CommonContracts{
+			FeeToken: existing.FeeToken,
+		},
+	}
+	if reuse {
+		cfg.CommonContracts.PriceRegistry = existing.PriceRegistry
+		cfg.CommonContracts.Router = existing.Router
+		cfg.CommonContracts.ARM = existing.ARM
+		cfg.CommonContracts.WrappedNative = existing.WrappedNative
+		cfg.CommonContracts.IsNativeFeeToken = existing.IsNativeFeeToken
+		cfg.CommonContracts.IsMockARM = existing.IsMockARM
+		cfg.CommonContracts.PriceUpdatesToWatchFrom = existing.PriceUpdatesToWatchFrom
+	}
+	if isTokenTransfer {
+		cfg.CommonContracts.BridgeTokens = existing.BridgeTokens
+		if reuse {
+			cfg.CommonContracts.BridgeTokenPools = existing.BridgeTokenPools
+		}
+	}
+	l.LaneConfigs[toNetwork] = cfg
+}
+
 func (l *Lanes) WriteLaneConfig(networkA string, cfg *LaneConfig) error {
 	laneMu.Lock()
 	defer laneMu.Unlock()
