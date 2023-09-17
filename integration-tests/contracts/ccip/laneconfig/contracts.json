@@ -192,7 +192,7 @@
         }
       }
     },
-    "Bsc Mainnet": {
+    "BSC Mainnet": {
       "fee_token": "0x404460C6A5EdE2D891e8297795264fDe62ADBB75",
       "arm": "0x3DB43b96B2625F4232e9Df900d464dd2c64C0021",
       "arm_proxy": "0x9e09697842194f77d315E0907F1Bda77922e8f84",
