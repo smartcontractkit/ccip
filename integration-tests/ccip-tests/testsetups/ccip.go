@@ -935,6 +935,8 @@ func CCIPDefaultTestSetUp(
 	for _, net := range inputs.AllNetworks {
 		chain := chainByChainID[net.ChainID]
 		net := net
+		net.HTTPURLs = chain.GetNetworkConfig().HTTPURLs
+		net.URLs = chain.GetNetworkConfig().URLs
 		chainAddGrp.Go(func() error {
 			return setUpArgs.DeployChainContracts(chain, net, len(transferAmounts), tokenDeployerFns, lggr)
 		})

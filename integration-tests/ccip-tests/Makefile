@@ -5,6 +5,7 @@ test_smoke_ccip_simulated_local:
 	DATABASE_URL="postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable" \
     SELECTED_NETWORKS="SIMULATED,SIMULATED_1,SIMULATED_2"  \
     CCIP_DEPLOY_ON_LOCAL=True  \
+    CCIP_NETWORK_PAIRS="" \
     CCIP_NO_OF_NETWORKS=2  \
     CCIP_MSG_TYPE=WithToken \
     CHAINLINK_IMAGE=$(image)  \
