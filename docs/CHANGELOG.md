@@ -9,16 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [dev]
 
-...
-
-## 2.6.0 - UNRELEASED
-
 ### Added
-
-- Simple password use in production builds is now disallowed - nodes with this configuration will not boot and will not pass config validation.
-- Helper migrations function for injecting env vars into goose migrations. This was done to inject chainID into evm chain id not null in specs migrations.
-- OCR2 jobs now support querying the state contract for configurations if it has been deployed. This can help on chains such as BSC which "manage" state bloat by arbitrarily deleting logs older than a certain date. In this case, if logs are missing we will query the contract directly and retrieve the latest config from chain state. Chainlink will perform no extra RPC calls unless the job spec has this feature explicitly enabled. On chains that require this, nops may see an increase in RPC calls. This can be enabled for OCR2 jobs by specifying `ConfigContractAddress` in the relay config TOML.
-
+- Added multichain telemetry support. All nodes have to remove the following configuration fields:
+  - `TelemetryIngress.URL`
+  - `TelemetryIngress.ServerPubKey`
+  
+  All nodes have to add the following configuration fields for each network-chainID pair they want to send telemetry for:
+  ```toml
+  [[TelemetryIngressEndpoint]]
+  Network = '...' # e.g. EVM. Solana, Starknet, Cosmos
+  ChainID = '...' # e.g. 1, 5, devnet, mainnet-beta
+  URL = '...'
+  ServerPubKey = '...'
+  ```
+  
 ### Removed
 
 - Removed support for sending telemetry to the deprecated Explorer service. All nodes will have to remove `Explorer` related keys from TOML configuration and env vars.
