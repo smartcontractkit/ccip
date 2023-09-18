@@ -381,6 +381,10 @@
         "84531": {
           "on_ramp": "0x1a674645f3eb4147543fca7d40c5719cbd997362",
           "deployed_at": 14537696
+        },
+        "80001": {
+          "on_ramp": "0x31eaaae4f5906cd06bc419517fcb61a67c5eb9ef",
+          "deployed_at": 14812241
         }
       },
       "dest_contracts": {
@@ -402,6 +406,11 @@
         "84531": {
           "off_ramp": "0xd0a9f52562f9111a4cd66d6615b8773bf96e6b74",
           "commit_store": "0x7d8fb097848183cd12420e0fbe813ec697a07198",
+          "receiver_dapp": "0xda9e8e71bB750a996Af33ebB8aBb18cd9EB9DC75"
+        },
+        "80001": {
+          "off_ramp": "0x87b05912bfa058d0f893da25f3da07a621337da8",
+          "commit_store": "0x1851d1e97e0a1a60ef72a2a45789c7d926bb2c78",
           "receiver_dapp": "0xda9e8e71bB750a996Af33ebB8aBb18cd9EB9DC75"
         }
       }
@@ -485,7 +494,11 @@
         "97": {
           "on_ramp": "0xfffd50b1e72974e225529d0797d12581bccb22b9",
           "deployed_at": 40030102
-        }
+        },
+        "420": {
+          "on_ramp": "0x303a67f29ebd2a42b0afea3e63d7dfdd882b8ab4",
+          "deployed_at": 40247398
+        },
       },
       "dest_contracts": {
         "43113": {
@@ -501,6 +514,11 @@
         "97": {
           "off_ramp": "0xa52d36272621dbb9b6c0d51e9f4f57b7eae2ebdb",
           "commit_store": "0x502709022c3aab16c9cf72600932806061667333",
+          "receiver_dapp": "0xda9e8e71bB750a996Af33ebB8aBb18cd9EB9DC75"
+        },
+        "420": {
+          "off_ramp": "0x86012544452dddfefd605d4e0fc163d9e32066e0",
+          "commit_store": "0xa6323a13a9f76e9960016760ea94bb72f4bfcb7c",
           "receiver_dapp": "0xda9e8e71bB750a996Af33ebB8aBb18cd9EB9DC75"
         }
       }
