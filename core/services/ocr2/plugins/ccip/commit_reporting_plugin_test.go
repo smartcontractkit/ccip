@@ -37,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -113,13 +114,13 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				tokenDecimalsCache.On("Get", ctx).Return(tc.tokenDecimals, nil)
 			}
 
-			priceGet := newMockPriceGetter()
+			priceGet := pricegetter.NewMockPriceGetter(t)
 			if len(tc.tokenPrices) > 0 {
 				addrs := []common.Address{sourceNativeTokenAddr}
 				for addr := range tc.tokenDecimals {
 					addrs = append(addrs, addr)
 				}
-				priceGet.On("TokenPricesUSD", addrs).Return(tc.tokenPrices, nil)
+				priceGet.On("TokenPricesUSD", mock.Anything, addrs).Return(tc.tokenPrices, nil)
 			}
 
 			sourceFeeEst := mocks.NewEvmFeeEstimator(t)
@@ -811,7 +812,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			priceGetter := newMockPriceGetter()
+			priceGetter := pricegetter.NewMockPriceGetter(t)
 			defer priceGetter.AssertExpectations(t)
 
 			sourceFeeEstimator := mocks.NewEvmFeeEstimator(t)
@@ -825,7 +826,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			sort.Slice(tokens, func(i, j int) bool { return tokens[i].String() < tokens[j].String() })
 
 			if len(tokens) > 0 {
-				priceGetter.On("TokenPricesUSD", tokens).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
+				priceGetter.On("TokenPricesUSD", mock.Anything, tokens).Return(tc.priceGetterRespData, tc.priceGetterRespErr)
 			}
 
 			if tc.maxGasPrice > 0 {

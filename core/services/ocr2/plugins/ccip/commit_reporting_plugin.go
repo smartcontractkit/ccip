@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -60,7 +61,7 @@ type CommitPluginConfig struct {
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	onRampAddress            common.Address
 	commitStore              commit_store.CommitStoreInterface
-	priceGetter              PriceGetter
+	priceGetter              pricegetter.PriceGetter
 	sourceChainSelector      uint64
 	sourceNative             common.Address
 	sourceFeeEstimator       gas.EvmFeeEstimator
