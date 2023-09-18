@@ -43,8 +43,10 @@ type DestContracts struct {
 
 type LaneConfig struct {
 	CommonContracts
-	SrcContracts  map[string]SourceContracts `json:"src_contracts"`  // key destination chain id
-	DestContracts map[string]DestContracts   `json:"dest_contracts"` // key source chain id
+	SrcContractsMu  *sync.Mutex                `json:"-"`
+	SrcContracts    map[string]SourceContracts `json:"src_contracts"` // key destination chain id
+	DestContractsMu *sync.Mutex                `json:"-"`
+	DestContracts   map[string]DestContracts   `json:"dest_contracts"` // key source chain id
 }
 
 func (l *LaneConfig) Validate() error {
@@ -54,22 +56,18 @@ func (l *LaneConfig) Validate() error {
 		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for arm"))
 	}
 
-	if l.FeeToken == "" || !common.IsHexAddress(l.FeeToken) {
+	if l.FeeToken != "" && !common.IsHexAddress(l.FeeToken) {
 		laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for fee_token"))
 	}
-	if len(l.BridgeTokens) < 1 {
-		laneConfigError = multierr.Append(laneConfigError, errors.New("must set at least 1 bridge_tokens"))
-	}
+
 	for _, token := range l.BridgeTokens {
-		if token == "" || !common.IsHexAddress(token) {
+		if token != "" && !common.IsHexAddress(token) {
 			laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for bridge_tokens"))
 		}
 	}
-	if len(l.BridgeTokenPools) < 1 {
-		laneConfigError = multierr.Append(laneConfigError, errors.New("must set at least 1 bridge_tokens_pools"))
-	}
+
 	for _, pool := range l.BridgeTokenPools {
-		if pool == "" || !common.IsHexAddress(pool) {
+		if pool != "" && !common.IsHexAddress(pool) {
 			laneConfigError = multierr.Append(laneConfigError, errors.New("must set proper address for bridge_tokens_pools"))
 		}
 	}
@@ -92,42 +90,63 @@ type Lanes struct {
 func (l *Lanes) ReadLaneConfig(networkA string) (*LaneConfig, error) {
 	laneMu.Lock()
 	defer laneMu.Unlock()
-	_, ok := l.LaneConfigs[networkA]
+	cfg, ok := l.LaneConfigs[networkA]
 	if !ok {
-		l.LaneConfigs[networkA] = &LaneConfig{}
-
+		l.LaneConfigs[networkA] = &LaneConfig{
+			SrcContracts:    make(map[string]SourceContracts),
+			DestContracts:   make(map[string]DestContracts),
+			SrcContractsMu:  &sync.Mutex{},
+			DestContractsMu: &sync.Mutex{},
+		}
+		return l.LaneConfigs[networkA], nil
+	}
+	if cfg.SrcContractsMu == nil {
+		l.LaneConfigs[networkA].SrcContractsMu = &sync.Mutex{}
+	}
+	if cfg.DestContractsMu == nil {
+		l.LaneConfigs[networkA].DestContractsMu = &sync.Mutex{}
 	}
 	return l.LaneConfigs[networkA], nil
 }
 
-// CopyLaneConfig copies network config for common contracts from one network to another
+// CopyCommonContracts copies network config for common contracts from fromNetwork to toNetwork
+// if the toNetwork already exists, it does nothing
 // If reuse is set to false, it only retains the token contracts
-func (l *Lanes) CopyLaneConfig(fromNetwork, toNetwork string, reuse, isTokenTransfer bool) {
+func (l *Lanes) CopyCommonContracts(fromNetwork, toNetwork string, reuse, isTokenTransfer bool) {
 	laneMu.Lock()
 	defer laneMu.Unlock()
+	// if the toNetwork already exists, return
+	if _, ok := l.LaneConfigs[toNetwork]; ok {
+		return
+	}
 	existing, ok := l.LaneConfigs[fromNetwork]
 	if !ok {
 		l.LaneConfigs[toNetwork] = &LaneConfig{
-			SrcContracts:  make(map[string]SourceContracts),
-			DestContracts: make(map[string]DestContracts),
+			SrcContracts:    make(map[string]SourceContracts),
+			DestContracts:   make(map[string]DestContracts),
+			SrcContractsMu:  &sync.Mutex{},
+			DestContractsMu: &sync.Mutex{},
 		}
 	}
 	cfg := &LaneConfig{
-		SrcContracts:  make(map[string]SourceContracts),
-		DestContracts: make(map[string]DestContracts),
+		SrcContracts:    make(map[string]SourceContracts),
+		SrcContractsMu:  &sync.Mutex{},
+		DestContractsMu: &sync.Mutex{},
+		DestContracts:   make(map[string]DestContracts),
 		CommonContracts: CommonContracts{
 			FeeToken: existing.FeeToken,
 		},
 	}
+	// if reuse is set to true, it copies all the common contracts except the router
 	if reuse {
 		cfg.CommonContracts.PriceRegistry = existing.PriceRegistry
-		cfg.CommonContracts.Router = existing.Router
 		cfg.CommonContracts.ARM = existing.ARM
 		cfg.CommonContracts.WrappedNative = existing.WrappedNative
 		cfg.CommonContracts.IsNativeFeeToken = existing.IsNativeFeeToken
 		cfg.CommonContracts.IsMockARM = existing.IsMockARM
 		cfg.CommonContracts.PriceUpdatesToWatchFrom = existing.PriceUpdatesToWatchFrom
 	}
+	// if it is a token transfer, it copies the bridge token contracts
 	if isTokenTransfer {
 		cfg.CommonContracts.BridgeTokens = existing.BridgeTokens
 		if reuse {

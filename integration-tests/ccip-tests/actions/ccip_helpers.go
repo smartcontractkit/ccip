@@ -1413,8 +1413,8 @@ type CCIPLane struct {
 	TotalFee                *big.Int // total fee for all the requests. Used for balance validation.
 	ValidationTimeout       time.Duration
 	Context                 context.Context
-	SrcNetworkLaneCfg       *laneconfig.LaneConfig
-	DstNetworkLaneCfg       *laneconfig.LaneConfig
+	SrcNetworkLaneCfg       laneconfig.LaneConfig
+	DstNetworkLaneCfg       laneconfig.LaneConfig
 	Subscriptions           []event.Subscription
 }
 
@@ -1438,20 +1438,14 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 	if lane.Source.Common.ARM == nil {
 		lane.SrcNetworkLaneCfg.CommonContracts.IsMockARM = true
 	}
-	if lane.SrcNetworkLaneCfg.SrcContracts == nil {
-		lane.SrcNetworkLaneCfg.SrcContracts = map[string]laneconfig.SourceContracts{
-			lane.Source.DestNetworkName: {
-				OnRamp:     lane.Source.OnRamp.Address(),
-				DepolyedAt: lane.Source.SrcStartBlock,
-			},
-		}
-	} else {
-		lane.SrcNetworkLaneCfg.SrcContracts[lane.Source.DestNetworkName] = laneconfig.SourceContracts{
-			OnRamp:     lane.Source.OnRamp.Address(),
-			DepolyedAt: lane.Source.SrcStartBlock,
-		}
+	lane.SrcNetworkLaneCfg.SrcContractsMu.Lock()
+	lane.SrcNetworkLaneCfg.SrcContracts[lane.Source.DestNetworkName] = laneconfig.SourceContracts{
+		OnRamp:     lane.Source.OnRamp.Address(),
+		DepolyedAt: lane.Source.SrcStartBlock,
 	}
+	lane.SrcNetworkLaneCfg.SrcContractsMu.Unlock()
 	btAddresses, btpAddresses = []string{}, []string{}
+
 	for i, bt := range lane.Dest.Common.BridgeTokens {
 		btAddresses = append(btAddresses, bt.Address())
 		btpAddresses = append(btpAddresses, lane.Dest.Common.BridgeTokenPools[i].Address())
@@ -1468,21 +1462,13 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 	if lane.Dest.Common.ARM == nil {
 		lane.DstNetworkLaneCfg.CommonContracts.IsMockARM = true
 	}
-	if lane.DstNetworkLaneCfg.DestContracts == nil {
-		lane.DstNetworkLaneCfg.DestContracts = map[string]laneconfig.DestContracts{
-			lane.Dest.SourceNetworkName: {
-				OffRamp:      lane.Dest.OffRamp.Address(),
-				CommitStore:  lane.Dest.CommitStore.Address(),
-				ReceiverDapp: lane.Dest.ReceiverDapp.Address(),
-			},
-		}
-	} else {
-		lane.DstNetworkLaneCfg.DestContracts[lane.Dest.SourceNetworkName] = laneconfig.DestContracts{
-			OffRamp:      lane.Dest.OffRamp.Address(),
-			CommitStore:  lane.Dest.CommitStore.Address(),
-			ReceiverDapp: lane.Dest.ReceiverDapp.Address(),
-		}
+	lane.DstNetworkLaneCfg.DestContractsMu.Lock()
+	lane.DstNetworkLaneCfg.DestContracts[lane.Dest.SourceNetworkName] = laneconfig.DestContracts{
+		OffRamp:      lane.Dest.OffRamp.Address(),
+		CommitStore:  lane.Dest.CommitStore.Address(),
+		ReceiverDapp: lane.Dest.ReceiverDapp.Address(),
 	}
+	lane.DstNetworkLaneCfg.DestContractsMu.Unlock()
 }
 
 func (lane *CCIPLane) RecordStateBeforeTransfer() {
@@ -1719,18 +1705,18 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	transferAmounts []*big.Int,
 	bootstrapAdded *atomic.Bool,
 	configureCLNodes bool,
-) error {
+) (*laneconfig.LaneConfig, *laneconfig.LaneConfig, error) {
 	var err error
 	env := lane.TestEnv
 	sourceChainClient := lane.SourceChain
 	destChainClient := lane.DestChain
 
 	if sourceCommon == nil {
-		return errors.WithStack(fmt.Errorf("common contracts for source chain %s not found", sourceChainClient.GetChainID().String()))
+		return nil, nil, errors.WithStack(fmt.Errorf("common contracts for source chain %s not found", sourceChainClient.GetChainID().String()))
 	}
 
 	if destCommon == nil {
-		return errors.WithStack(fmt.Errorf("common contracts for destination chain %s not found", destChainClient.GetChainID().String()))
+		return nil, nil, errors.WithStack(fmt.Errorf("common contracts for destination chain %s not found", destChainClient.GetChainID().String()))
 	}
 
 	lane.Source, err = DefaultSourceCCIPModule(
@@ -1738,14 +1724,14 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
 		destChainClient.GetNetworkName(), transferAmounts, sourceCommon)
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, nil, errors.WithStack(err)
 	}
 	lane.Dest, err = DefaultDestinationCCIPModule(
 		lane.Logger,
 		destChainClient, sourceChainClient.GetChainID().Uint64(),
 		sourceChainClient.GetNetworkName(), destCommon)
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, nil, errors.WithStack(err)
 	}
 
 	srcConf := lane.SrcNetworkLaneCfg
@@ -1753,35 +1739,30 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	destConf := lane.DstNetworkLaneCfg
 
 	// deploy all source contracts
-	err = lane.Source.DeployContracts(srcConf)
+	err = lane.Source.DeployContracts(&srcConf)
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, nil, errors.WithStack(err)
 	}
 	// deploy all destination contracts
-	err = lane.Dest.DeployContracts(*lane.Source, destConf)
+	err = lane.Dest.DeployContracts(*lane.Source, &destConf)
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, nil, errors.WithStack(err)
 	}
 	lane.UpdateLaneConfig()
 
-	// start event watchers
-	err = lane.StartEventWatchers()
-	if err != nil {
-		return errors.WithStack(err)
-	}
 	// if lane is being set up for already configured CL nodes and contracts
 	// no further action is necessary
 	if !configureCLNodes {
-		return nil
+		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, nil
 	}
 
 	if env == nil {
-		return errors.WithStack(errors.New("test environment not set"))
+		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(errors.New("test environment not set"))
 	}
 	// wait for the CL nodes to be ready before moving ahead with job creation
 	err = env.CLNodeWithKeyReady.Wait()
 	if err != nil {
-		return errors.WithStack(err)
+		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 	clNodesWithKeys := env.CLNodesWithKeys
 	mockServer := env.MockServer
@@ -1792,7 +1773,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	clNodes, exists := clNodesWithKeys[lane.Dest.Common.ChainClient.GetChainID().String()]
 	if !exists {
-		return fmt.Errorf("could not find CL nodes for %s", lane.Dest.Common.ChainClient.GetChainID().String())
+		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, fmt.Errorf("could not find CL nodes for %s", lane.Dest.Common.ChainClient.GetChainID().String())
 	}
 
 	tokenUSDMap[lane.Dest.Common.FeeToken.Address()] = LinkToUSD.String()
@@ -1813,7 +1794,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	env.numOfExecNodes = numOfCommitNodes
 	if !commitAndExecOnSameDON {
 		if len(clNodes) < 11 {
-			return fmt.Errorf("not enough CL nodes for separate commit and execution nodes")
+			return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, fmt.Errorf("not enough CL nodes for separate commit and execution nodes")
 		}
 		bootstrapExec = clNodes[1] // for a set-up of different commit and execution nodes second node is the bootstrapper for execution nodes
 		commitNodes = clNodes[2 : 2+numOfCommitNodes]
@@ -1831,7 +1812,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// Here for simplicity we are just taking the current block number just before the job is created.
 	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
 	if err != nil {
-		return fmt.Errorf("getting current block should be successful in destination chain %+v", err)
+		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, fmt.Errorf("getting current block should be successful in destination chain %+v", err)
 	}
 
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
@@ -1843,13 +1824,13 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		SourceStartBlock: lane.Source.SrcStartBlock,
 		DestStartBlock:   currentBlockOnDest,
 	}
-	addedBootstrap := bootstrapAdded.Load()
-	if !addedBootstrap {
+
+	if !bootstrapAdded.Load() {
+		bootstrapAdded.Store(true)
 		err := CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
 		if err != nil {
-			return errors.WithStack(err)
+			return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 		}
-		bootstrapAdded.Store(true)
 	}
 
 	bootstrapCommitP2PId := bootstrapCommit.KeysBundle.P2PKeys.Data[0].Attributes.PeerID
@@ -1875,7 +1856,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// set up ocr2 config
 	err = SetOCR2Configs(commitNodes, execNodes, *lane.Dest)
 	if err != nil {
-		return errors.WithStack(err)
+		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 
 	err = CreateOCR2CCIPCommitJobs(
@@ -1884,19 +1865,19 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		tokenUSDMap, mockServer,
 	)
 	if err != nil {
-		return errors.WithStack(err)
+		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 	if p2pBootstrappersExec != nil {
 		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
 	}
 	err = CreateOCR2CCIPExecutionJobs(jobParams, execNodes)
 	if err != nil {
-		return errors.WithStack(err)
+		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 	lane.Dest.Common.ChainClient.ParallelTransactions(false)
 	lane.Source.Common.ChainClient.ParallelTransactions(false)
 
-	return nil
+	return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, nil
 }
 
 // SetOCR2Configs sets the oracle config in ocr2 contracts

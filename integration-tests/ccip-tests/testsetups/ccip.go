@@ -195,12 +195,24 @@ func (p *CCIPTestConfig) setLoadInputs() {
 	}
 }
 
-func (p *CCIPTestConfig) AddPairtoNetworkList(networkA, networkB blockchain.EVMNetwork) {
+func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMNetwork) {
 	if p.AllNetworks == nil {
 		p.AllNetworks = make(map[string]blockchain.EVMNetwork)
 	}
+	// TODO remove this when CTF network timeout is fixed
+	networkA.Timeout = blockchain.JSONStrDuration{
+		Duration: 3 * time.Minute,
+	}
+	networkB.Timeout = blockchain.JSONStrDuration{
+		Duration: 3 * time.Minute,
+	}
 	firstOfPairs := []blockchain.EVMNetwork{networkA}
 	secondOfPairs := []blockchain.EVMNetwork{networkB}
+	// if no of lanes per pair is greater than 1, copy common contracts from the same network
+	// if no of lanes per pair is more than 1, the networks are added into the inputs.AllNetworks with a suffix of -<lane number>
+	// for example, if no of lanes per pair is 2, and the network pairs are called "testnetA", "testnetB",
+	//	the network will be added as "testnetA-1", testnetA-2","testnetB-1", testnetB-2"
+	// to deploy 2 lanes between same network pair "testnetA", "testnetB".
 	if p.NoOfLanesPerPair > 1 {
 		firstOfPairs[0].Name = fmt.Sprintf("%s-%d", firstOfPairs[0].Name, 1)
 		secondOfPairs[0].Name = fmt.Sprintf("%s-%d", secondOfPairs[0].Name, 1)
@@ -241,15 +253,25 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	if lanes != "" {
 		p.NetworkPairs = []NetworkPair{}
 		networkPairs := strings.Split(lanes, "|")
+		networkByChainID := make(map[int64]blockchain.EVMNetwork)
 		for _, pair := range networkPairs {
 			networkNames := strings.Split(pair, ",")
 			if len(networkNames) != 2 {
 				allError = multierr.Append(allError, fmt.Errorf("invalid network pair"))
 			}
 			nets := networks.SetNetworks(networkNames)
-			p.AddPairtoNetworkList(nets[0], nets[1])
+			if _, ok := networkByChainID[nets[0].ChainID]; !ok {
+				networkByChainID[nets[0].ChainID] = nets[0]
+			}
+			if _, ok := networkByChainID[nets[1].ChainID]; !ok {
+				networkByChainID[nets[1].ChainID] = nets[1]
+			}
+			p.AddPairToNetworkList(nets[0], nets[1])
 		}
 
+		for _, net := range networkByChainID {
+			p.SelectedNetworks = append(p.SelectedNetworks, net)
+		}
 		return allError
 	}
 	// if network pairs are not provided with CCIP_NETWORK_PAIRS, then form all possible network pair combination from SELECTED_NETWORKS
@@ -261,6 +283,12 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 
 	// skip the first index as it is generally set to Simulated EVM in dev mode to be used by other tests
 	p.SelectedNetworks = networks.SelectedNetworks[1:]
+	// TODO remove this when CTF network timeout is fixed
+	for i := range p.SelectedNetworks {
+		p.SelectedNetworks[i].Timeout = blockchain.JSONStrDuration{
+			Duration: 3 * time.Minute,
+		}
+	}
 	simulated := p.SelectedNetworks[0].Simulated
 	for i := 1; i < len(p.SelectedNetworks); i++ {
 		if p.SelectedNetworks[i].Simulated != simulated {
@@ -314,7 +342,7 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	if p.NoOfNetworks > 2 {
 		p.FormNetworkPairCombinations()
 	} else {
-		p.AddPairtoNetworkList(p.SelectedNetworks[0], p.SelectedNetworks[1])
+		p.AddPairToNetworkList(p.SelectedNetworks[0], p.SelectedNetworks[1])
 	}
 
 	for _, n := range p.NetworkPairs {
@@ -328,7 +356,7 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 func (p *CCIPTestConfig) FormNetworkPairCombinations() {
 	for i := 0; i < p.NoOfNetworks; i++ {
 		for j := i + 1; j < p.NoOfNetworks; j++ {
-			p.AddPairtoNetworkList(p.SelectedNetworks[i], p.SelectedNetworks[j])
+			p.AddPairToNetworkList(p.SelectedNetworks[i], p.SelectedNetworks[j])
 		}
 	}
 }
@@ -492,6 +520,7 @@ type CCIPTestSetUpOutputs struct {
 
 func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	chainClient blockchain.EVMClient,
+	networkCfg blockchain.EVMNetwork,
 	noOfTokens int,
 	tokenDeployerFns []blockchain.ContractDeployer,
 	lggr zerolog.Logger,
@@ -501,30 +530,30 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	if ccipEnv != nil {
 		k8Env = ccipEnv.K8Env
 	}
-	net := chainClient.GetNetworkConfig()
-	chain, err := blockchain.ConcurrentEVMClient(*net, k8Env, chainClient, lggr)
+
+	chain, err := blockchain.ConcurrentEVMClient(networkCfg, k8Env, chainClient, lggr)
 	if err != nil {
-		return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", net.Name, err))
+		return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", networkCfg.Name, err))
 	}
 
-	defer chain.Close()
 	chain.ParallelTransactions(true)
 
 	ccipCommon, err := actions.DefaultCCIPModule(lggr, chain, o.Cfg.ExistingDeployment)
 	if err != nil {
-		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %v", net.Name, err))
+		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %v", networkCfg.Name, err))
 	}
 
-	cfg, err := o.LaneConfig.ReadLaneConfig(net.Name)
+	cfg, err := o.LaneConfig.ReadLaneConfig(networkCfg.Name)
 	if err != nil {
-		return errors.WithStack(fmt.Errorf("failed to read lane config for %s: %v", net.Name, err))
+		return errors.WithStack(fmt.Errorf("failed to read lane config for %s: %v", networkCfg.Name, err))
 	}
-	o.LaneContractsByNetwork.Store(net.Name, cfg)
+
 	err = ccipCommon.DeployContracts(noOfTokens, tokenDeployerFns, cfg)
 	if err != nil {
-		return errors.WithStack(fmt.Errorf("failed to deploy common ccip contracts for %s: %v", net.Name, err))
+		return errors.WithStack(fmt.Errorf("failed to deploy common ccip contracts for %s: %v", networkCfg.Name, err))
 	}
-	o.CommonContractsByNetwork.Store(net.ChainID, ccipCommon)
+	o.LaneContractsByNetwork.Store(networkCfg.Name, cfg)
+	o.CommonContractsByNetwork.Store(networkCfg.Name, ccipCommon)
 	return nil
 }
 
@@ -580,17 +609,19 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	if !ok {
 		return errors.WithStack(fmt.Errorf("failed to load lane contracts for %s", networkA.Name))
 	}
-	ccipLaneA2B.SrcNetworkLaneCfg = contractsA.(*laneconfig.LaneConfig)
+	srcCfg := contractsA.(*laneconfig.LaneConfig)
+	ccipLaneA2B.SrcNetworkLaneCfg = *srcCfg
 	contractsB, ok := o.LaneContractsByNetwork.Load(networkB.Name)
 	if !ok {
 		return errors.WithStack(fmt.Errorf("failed to load lane contracts for %s", networkB.Name))
 	}
-	ccipLaneA2B.DstNetworkLaneCfg = contractsB.(*laneconfig.LaneConfig)
+	destCfg := contractsB.(*laneconfig.LaneConfig)
+	ccipLaneA2B.DstNetworkLaneCfg = *destCfg
 
 	ccipLaneA2B.Logger = lggr.With().Str("env", namespace).Str("Lane",
 		fmt.Sprintf("%s-->%s", ccipLaneA2B.SourceNetworkName, ccipLaneA2B.DestNetworkName)).Logger()
-	ccipLaneA2B.Reports = o.Reporter.AddNewLane(fmt.Sprintf("%d To %d",
-		networkA.ChainID, networkB.ChainID), ccipLaneA2B.Logger)
+	ccipLaneA2B.Reports = o.Reporter.AddNewLane(fmt.Sprintf("%s To %s",
+		networkA.Name, networkB.Name), ccipLaneA2B.Logger)
 
 	bidirectionalLane := &BiDirectionalLaneConfig{
 		NetworkA:     networkA,
@@ -628,12 +659,12 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		ccipLaneB2A.Logger = lggr.With().Str("env", namespace).Str("Lane",
 			fmt.Sprintf("%s-->%s", ccipLaneB2A.SourceNetworkName, ccipLaneB2A.DestNetworkName)).Logger()
 		ccipLaneB2A.Reports = o.Reporter.AddNewLane(
-			fmt.Sprintf("%d To %d", networkB.ChainID, networkA.ChainID), ccipLaneB2A.Logger)
+			fmt.Sprintf("%s To %s", networkB.Name, networkA.Name), ccipLaneB2A.Logger)
 		bidirectionalLane.ReverseLane = ccipLaneB2A
 	}
 	o.Lanes = append(o.Lanes, bidirectionalLane)
 
-	c1, ok := o.CommonContractsByNetwork.Load(networkA.ChainID)
+	c1, ok := o.CommonContractsByNetwork.Load(networkA.Name)
 	var networkACmn *actions.CCIPCommon
 	if ok {
 		networkACmn = c1.(*actions.CCIPCommon)
@@ -641,7 +672,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	if networkACmn == nil {
 		return errors.WithStack(fmt.Errorf("chain contracts for network %s not found", networkA.Name))
 	}
-	c2, ok := o.CommonContractsByNetwork.Load(networkB.ChainID)
+	c2, ok := o.CommonContractsByNetwork.Load(networkB.Name)
 	var networkBCmn *actions.CCIPCommon
 	if ok {
 		networkBCmn = c2.(*actions.CCIPCommon)
@@ -652,23 +683,46 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
-		err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkACmn, networkBCmn,
+		srcConfig, destConfig, err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkACmn, networkBCmn,
 			transferAmounts, o.BootstrapAdded, configureCLNode)
 		if err != nil {
 			allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err - %+v", networkA.Name, networkB.Name, err))
+			return err
 		}
-		return err
+		err = o.LaneConfig.WriteLaneConfig(networkA.Name, srcConfig)
+		if err != nil {
+			allErrors = multierr.Append(allErrors, fmt.Errorf("writing lane config for %s; err - %+v", networkA.Name, err))
+			return err
+		}
+		err = o.LaneConfig.WriteLaneConfig(networkB.Name, destConfig)
+		if err != nil {
+			allErrors = multierr.Append(allErrors, fmt.Errorf("writing lane config for %s; err - %+v", networkB.Name, err))
+			return err
+		}
+		return nil
 	})
 
 	setUpFuncs.Go(func() error {
 		if bidirectional {
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
-			err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkBCmn, networkACmn,
+			srcConfig, destConfig, err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkBCmn, networkACmn,
 				transferAmounts, o.BootstrapAdded, configureCLNode)
 			if err != nil {
 				allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err -  %+v", networkB.Name, networkA.Name, err))
+				return err
 			}
-			return err
+
+			err = o.LaneConfig.WriteLaneConfig(networkB.Name, srcConfig)
+			if err != nil {
+				allErrors = multierr.Append(allErrors, fmt.Errorf("writing lane config for %s; err - %+v", networkA.Name, err))
+				return err
+			}
+			err = o.LaneConfig.WriteLaneConfig(networkA.Name, destConfig)
+			if err != nil {
+				allErrors = multierr.Append(allErrors, fmt.Errorf("writing lane config for %s; err - %+v", networkB.Name, err))
+				return err
+			}
+			return nil
 		}
 		return nil
 	})
@@ -815,11 +869,14 @@ func CCIPDefaultTestSetUp(
 			chains = append(chains, primaryNode.GetEVMClient())
 		}
 	} else {
-		for _, network := range inputs.AllNetworks {
-			ec, err := blockchain.NewEVMClient(network, k8Env, lggr)
+		for _, n := range inputs.SelectedNetworks {
+			if _, ok := chainByChainID[n.ChainID]; ok {
+				continue
+			}
+			ec, err := blockchain.NewEVMClient(n, k8Env, lggr)
 			require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 			chains = append(chains, ec)
-			chainByChainID[network.ChainID] = ec
+			chainByChainID[n.ChainID] = ec
 		}
 	}
 
@@ -856,35 +913,50 @@ func CCIPDefaultTestSetUp(
 		})
 	}
 
+	// if no of lanes per pair is greater than 1, copy common contracts from the same network
+	// if no of lanes per pair is more than 1, the networks are added into the inputs.AllNetworks with a suffix of -<lane number>
+	// for example, if no of lanes per pair is 2, and the network pairs are called "testnetA", "testnetB",
+	//	the network will be added as "testnetA-1", testnetA-2","testnetB-1", testnetB-2"
+	// to deploy 2 lanes between same network pair "testnetA", "testnetB".
+	// In the following the common contracts will be copied from "testnetA" to "testnetA-1" and "testnetA-2" and
+	// from "testnetB" to "testnetB-1" and "testnetB-2"
 	for n := range inputs.AllNetworks {
 		if setUpArgs.Cfg.NoOfLanesPerPair > 1 {
 			regex := regexp.MustCompile(`-(\d+)$`)
 			networkNameToReadCfg := regex.ReplaceAllString(n, "")
-			setUpArgs.LaneConfig.CopyLaneConfig(networkNameToReadCfg, n, inputs.ReuseContracts, inputs.MsgType == actions.TokenTransfer)
+			// if reuse contracts is true, copy common contracts from the same network except the router contract
+			setUpArgs.LaneConfig.CopyCommonContracts(networkNameToReadCfg, n, inputs.ReuseContracts, inputs.MsgType == actions.TokenTransfer)
 		}
 	}
 
 	// deploy all chain specific common contracts
 	chainAddGrp, _ := errgroup.WithContext(parent)
-	for _, chain := range chainByChainID {
-		chain := chain
+	lggr.Info().Msg("Deploying common contracts")
+	for _, net := range inputs.AllNetworks {
+		chain := chainByChainID[net.ChainID]
+		net := net
 		chainAddGrp.Go(func() error {
-			return setUpArgs.DeployChainContracts(chain, len(transferAmounts), tokenDeployerFns, lggr)
+			return setUpArgs.DeployChainContracts(chain, net, len(transferAmounts), tokenDeployerFns, lggr)
 		})
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
 
 	// deploy all lane specific contracts
+	lggr.Info().Msg("Deploying chain specific contracts")
 	laneAddGrp, _ := errgroup.WithContext(parent)
 	for i, n := range inputs.NetworkPairs {
+		i := i
+		n := n
 		var ok bool
 		inputs.NetworkPairs[i].ChainClientA, ok = chainByChainID[n.NetworkA.ChainID]
 		require.True(t, ok, "Chain client for chainID %d not found", n.NetworkA.ChainID)
 		inputs.NetworkPairs[i].ChainClientB, ok = chainByChainID[n.NetworkB.ChainID]
 		require.True(t, ok, "Chain client for chainID %d not found", n.NetworkB.ChainID)
 
-		n.NetworkA = *inputs.NetworkPairs[i].ChainClientA.GetNetworkConfig()
-		n.NetworkB = *inputs.NetworkPairs[i].ChainClientB.GetNetworkConfig()
+		n.NetworkA.HTTPURLs = inputs.NetworkPairs[i].ChainClientA.GetNetworkConfig().HTTPURLs
+		n.NetworkA.URLs = inputs.NetworkPairs[i].ChainClientA.GetNetworkConfig().URLs
+		n.NetworkB.HTTPURLs = inputs.NetworkPairs[i].ChainClientB.GetNetworkConfig().HTTPURLs
+		n.NetworkB.URLs = inputs.NetworkPairs[i].ChainClientB.GetNetworkConfig().URLs
 
 		// if sequential lane addition is true, continue after adding the first bidirectional lane
 		// and add rest of the lanes later, after the previously added lane(s) starts getting requests
@@ -904,10 +976,12 @@ func CCIPDefaultTestSetUp(
 	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
 	require.NoError(t, err)
 
-	// wait for price updates to be available
+	// wait for price updates to be available and start event watchers
 	priceUpdateGrp, _ := errgroup.WithContext(parent)
 	for _, lanes := range setUpArgs.Lanes {
 		lanes := lanes
+		require.NoError(t, lanes.ForwardLane.StartEventWatchers())
+		require.NoError(t, lanes.ReverseLane.StartEventWatchers())
 		priceUpdateGrp.Go(func() error {
 			err = lanes.ForwardLane.Source.Common.WaitForPriceUpdates(
 				lanes.ForwardLane.Logger,
