@@ -49,26 +49,26 @@ import (
 
 func TestExecutionReportingPlugin_Observation(t *testing.T) {
 	testCases := []struct {
-		name             string
-		commitStoreDown  bool
-		inflightReports  []InflightInternalExecutionReport
-		unexpiredReports []ccipdata.Event[commit_store.CommitStoreReportAccepted]
-		sendRequests     []ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
-		executedSeqNums  []uint64
-		blessedRoots     [][32]byte
-		senderNonce      uint64
-		rateLimiterState evm_2_evm_offramp.RateLimiterTokenBucket
-		expErr           bool
+		name              string
+		commitStorePaused bool
+		inflightReports   []InflightInternalExecutionReport
+		unexpiredReports  []ccipdata.Event[commit_store.CommitStoreReportAccepted]
+		sendRequests      []ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
+		executedSeqNums   []uint64
+		blessedRoots      map[[32]byte]bool
+		senderNonce       uint64
+		rateLimiterState  evm_2_evm_offramp.RateLimiterTokenBucket
+		expErr            bool
 	}{
 		{
-			name:            "commit store is down",
-			commitStoreDown: true,
-			expErr:          true,
+			name:              "commit store is down",
+			commitStorePaused: true,
+			expErr:            true,
 		},
 		{
-			name:            "happy flow",
-			commitStoreDown: false,
-			inflightReports: []InflightInternalExecutionReport{},
+			name:              "happy flow",
+			commitStorePaused: false,
+			inflightReports:   []InflightInternalExecutionReport{},
 			unexpiredReports: []ccipdata.Event[commit_store.CommitStoreReportAccepted]{
 				{
 					Data: commit_store.CommitStoreReportAccepted{
@@ -80,8 +80,8 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 					},
 				},
 			},
-			blessedRoots: [][32]byte{
-				{123},
+			blessedRoots: map[[32]byte]bool{
+				[32]byte{123}: true,
 			},
 			rateLimiterState: evm_2_evm_offramp.RateLimiterTokenBucket{
 				IsEnabled: false,
@@ -115,20 +115,13 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
 
-			commitStoreAddr := utils.RandomAddress()
-			commitStore := mock_contracts.NewCommitStoreInterface(t)
-			commitStore.On("IsUnpausedAndARMHealthy", mock.Anything).Return(!tc.commitStoreDown, nil)
-			commitStore.On("Address").Return(commitStoreAddr).Maybe()
-			for _, root := range tc.blessedRoots {
-				commitStore.On("IsBlessed", mock.Anything, root).Return(true, nil)
-			}
+			commitStore, commitStoreAddr := testhelpers.NewFakeCommitStore(t, 1)
+			commitStore.SetPaused(tc.commitStorePaused)
+			commitStore.SetBlessedRoots(tc.blessedRoots)
 			p.config.commitStore = commitStore
 
-			offRampAddr := utils.RandomAddress()
-			offRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
-			offRamp.On("Address").Return(offRampAddr).Maybe()
-			offRamp.On("CurrentRateLimiterState", mock.Anything).Return(tc.rateLimiterState, nil).Maybe()
-			offRamp.On("GetSenderNonce", mock.Anything, mock.Anything).Return(tc.senderNonce, nil).Maybe()
+			offRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
+			offRamp.SetRateLimiterState(tc.rateLimiterState)
 			p.config.offRamp = offRamp
 
 			destEvents := ccipdata.NewMockReader(t)
@@ -145,9 +138,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				Return(executionEvents, nil).Maybe()
 			p.config.destEvents = destEvents
 
-			onRampAddr := utils.RandomAddress()
-			onRamp := mock_contracts.NewEVM2EVMOnRampInterface(t)
-			onRamp.On("Address").Return(onRampAddr).Maybe()
+			onRamp, onRampAddr := testhelpers.NewFakeOnRamp(t)
 			p.config.onRamp = onRamp
 
 			sourceEvents := ccipdata.NewMockReader(t)
@@ -162,16 +153,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			}, nil).Maybe()
 			p.cachedDestTokens = cachedDestTokens
 
-			priceRegistryAddr := utils.RandomAddress()
-			priceRegistry := mock_contracts.NewPriceRegistryInterface(t)
-			priceRegistry.On("Address").Return(priceRegistryAddr).Maybe()
-			priceRegistry.On("GetTokenPrices", mock.Anything, mock.Anything).
-				Return([]price_registry.InternalTimestampedPackedUint224{
-					{
-						Value:     big.NewInt(123),
-						Timestamp: uint32(time.Now().Unix()),
-					},
-				}, nil).Maybe()
+			priceRegistry, _ := testhelpers.NewFakePriceRegistry(t)
+			priceRegistry.SetTokenPrices([]price_registry.InternalTimestampedPackedUint224{
+				{Value: big.NewInt(123), Timestamp: uint32(time.Now().Unix())},
+			})
 			p.destPriceRegistry = priceRegistry
 			p.config.sourcePriceRegistry = priceRegistry
 
@@ -230,10 +215,8 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 			p.lggr = logger.TestLogger(t)
 			p.F = tc.f
 
-			commitStoreAddr := utils.RandomAddress()
-			commitStore := mock_contracts.NewCommitStoreInterface(t)
-			commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.committedSeqNum+1, nil).Maybe()
-			commitStore.On("Address").Return(commitStoreAddr, nil).Maybe()
+			commitStore, _ := testhelpers.NewFakeCommitStore(t, tc.committedSeqNum)
+
 			p.config.commitStore = commitStore
 
 			observations := make([]types.AttributedObservation, len(tc.observations))
@@ -277,7 +260,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	encodedReport, err := abihelpers.EncodeExecutionReport(report)
 	require.NoError(t, err)
 
-	mockOffRamp := &mock_contracts.EVM2EVMOffRampInterface{}
+	mockOffRamp, _ := testhelpers.NewFakeOffRamp(t)
 	plugin := ExecutionReportingPlugin{
 		config: ExecutionPluginConfig{
 			offRamp: mockOffRamp,
@@ -368,11 +351,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p := &ExecutionReportingPlugin{}
 	p.lggr = logger.TestLogger(t)
 
-	commitStoreAddress := utils.RandomAddress()
-	commitStore := mock_contracts.NewCommitStoreInterface(t)
-	commitStore.On("Address").Return(commitStoreAddress)
-	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
-		Return(executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1, nil)
+	commitStore, commitStoreAddress := testhelpers.NewFakeCommitStore(t, executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1)
 	commitStore.On("Verify", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(math.MaxInt64), nil)
 	p.config.commitStore = commitStore
 
@@ -395,9 +374,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 
 	p.config.leafHasher = leafHasher123{}
 
-	onRampAddr := utils.RandomAddress()
-	onRamp := mock_contracts.NewEVM2EVMOnRampInterface(t)
-	onRamp.On("Address").Return(onRampAddr)
+	onRamp, onRampAddr := testhelpers.NewFakeOnRamp(t)
 	p.config.onRamp = onRamp
 
 	sendReqs := make([]ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], len(observations))
@@ -431,7 +408,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 
 func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	c, _ := testhelpers.SetupChain(t)
-	mockOffRamp := mock_contracts.EVM2EVMOffRampInterface{}
+	offRamp, _ := testhelpers.NewFakeOffRamp(t)
 	// We do this just to have the parsing available.
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress("0x1"), c)
 	require.NoError(t, err)
@@ -442,9 +419,8 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	srcNative := common.HexToAddress("0xc")
 	plugin := ExecutionReportingPlugin{
 		config: ExecutionPluginConfig{
-			offRamp: &mockOffRamp,
-			// We use a real onRamp for parsing
-			onRamp: onRamp,
+			offRamp: offRamp,
+			onRamp:  onRamp,
 		},
 		destWrappedNative: destNative,
 		offchainConfig: ccipconfig.ExecOffchainConfig{
@@ -662,10 +638,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	for _, tc := range tt {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			for sender, nonce := range tc.offRampNoncesBySender {
-				mockOffRamp.On("GetSenderNonce", mock.Anything, sender).Return(nonce, nil)
-			}
-
+			offRamp.SetSenderNonces(tc.offRampNoncesBySender)
 			seqNrs := plugin.buildBatch(
 				lggr,
 				commitReportWithSendRequests{sendRequestsWithMeta: tc.reqs},
@@ -871,12 +844,8 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			p := &ExecutionReportingPlugin{}
 			p.lggr = lggr
 
-			offRampAddr := utils.RandomAddress()
-			offRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
-			for destTk, pool := range tc.destPools {
-				offRamp.On("GetPoolByDestToken", mock.Anything, destTk).Return(pool, nil)
-			}
-			offRamp.On("Address").Return(offRampAddr)
+			offRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
+			offRamp.SetTokenPools(tc.destPools)
 			p.config.offRamp = offRamp
 
 			p.customTokenPoolFactory = func(ctx context.Context, poolAddress common.Address, _ bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
@@ -1045,14 +1014,10 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			p := &ExecutionReportingPlugin{}
 			p.lggr = lggr
 
-			onRampAddr := utils.RandomAddress()
-			onRamp := mock_contracts.NewEVM2EVMOnRampInterface(t)
-			onRamp.On("Address").Return(onRampAddr).Maybe()
+			onRamp, onRampAddr := testhelpers.NewFakeOnRamp(t)
 			p.config.onRamp = onRamp
 
-			offRampAddr := utils.RandomAddress()
-			offRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
-			offRamp.On("Address").Return(offRampAddr).Maybe()
+			offRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
 			p.config.offRamp = offRamp
 
 			sourceEvents := ccipdata.NewMockReader(t)
@@ -1106,17 +1071,10 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 	destLP := lpMocks.NewLogPoller(t)
 	sourceLP := lpMocks.NewLogPoller(t)
 
-	onRamp := mock_contracts.NewEVM2EVMOnRampInterface(t)
-	onRamp.On("Address").Return(utils.RandomAddress(), nil)
-
-	sourcePriceRegistry := mock_contracts.NewPriceRegistryInterface(t)
-	sourcePriceRegistry.On("Address").Return(utils.RandomAddress(), nil)
-
-	commitStore := mock_contracts.NewCommitStoreInterface(t)
-	commitStore.On("Address").Return(utils.RandomAddress(), nil)
-
-	offRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
-	offRamp.On("Address").Return(utils.RandomAddress(), nil)
+	onRamp, _ := testhelpers.NewFakeOnRamp(t)
+	sourcePriceRegistry, _ := testhelpers.NewFakePriceRegistry(t)
+	commitStore, _ := testhelpers.NewFakeCommitStore(t, 1)
+	offRamp, _ := testhelpers.NewFakeOffRamp(t)
 
 	destPriceRegistryAddr := utils.RandomAddress()
 
@@ -1391,11 +1349,8 @@ func Test_getTokensPrices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			priceReg := mock_contracts.NewPriceRegistryInterface(t)
-
-			priceReg.On("GetTokenPrices", mock.Anything, append(tc.feeTokens, tc.tokens...)).
-				Return(tc.retPrices, nil)
-			priceReg.On("Address").Return(common.HexToAddress("1234"), nil)
+			priceReg, _ := testhelpers.NewFakePriceRegistry(t)
+			priceReg.SetTokenPrices(tc.retPrices)
 
 			prices, err := getTokensPrices(context.Background(), tc.feeTokens, priceReg, tc.tokens)
 			if tc.expErr {

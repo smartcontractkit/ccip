@@ -29,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
-	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -38,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -99,11 +99,8 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			onRampAddress := utils.RandomAddress()
 			sourceFinalityDepth := 10
 
-			commitStore := mock_contracts.NewCommitStoreInterface(t)
-			commitStore.On("IsUnpausedAndARMHealthy", mock.Anything).Return(!tc.commitStoreIsPaused, nil)
-			if tc.commitStoreSeqNum > 0 {
-				commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.commitStoreSeqNum, nil)
-			}
+			commitStore, _ := testhelpers.NewFakeCommitStore(t, tc.commitStoreSeqNum)
+			commitStore.SetPaused(tc.commitStoreIsPaused)
 
 			sourceEvents := ccipdata.NewMockReader(t)
 			if len(tc.sendReqs) > 0 {
@@ -159,6 +156,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 }
 
 func TestCommitReportingPlugin_Report(t *testing.T) {
+
 	testCases := []struct {
 		name              string
 		observations      []CommitObservation
@@ -232,14 +230,12 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 	}
 
 	ctx := testutils.Context(t)
-	destPriceRegistryAddress := utils.RandomAddress()
 	onRampAddress := utils.RandomAddress()
 	sourceChainSelector := rand.Int()
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			destPriceRegistry := mock_contracts.NewPriceRegistryInterface(t)
-			destPriceRegistry.On("Address").Return(destPriceRegistryAddress)
+			destPriceRegistry, destPriceRegistryAddress := testhelpers.NewFakePriceRegistry(t)
 
 			destEvents := ccipdata.NewMockReader(t)
 			destEvents.On("GetGasPriceUpdatesCreatedAfter", ctx, destPriceRegistryAddress, uint64(sourceChainSelector), mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
@@ -317,8 +313,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	t.Run("stale report should not be accepted", func(t *testing.T) {
 		onChainSeqNum := uint64(100)
 
-		commitStore := mock_contracts.NewCommitStoreInterface(t)
-		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+		commitStore, _ := testhelpers.NewFakeCommitStore(t, onChainSeqNum)
 
 		p := newPlugin()
 		p.config.commitStore = commitStore
@@ -341,8 +336,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	t.Run("non-stale report should be accepted and added inflight", func(t *testing.T) {
 		onChainSeqNum := uint64(100)
 
-		commitStore := mock_contracts.NewCommitStoreInterface(t)
-		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+		commitStore, _ := testhelpers.NewFakeCommitStore(t, onChainSeqNum)
 
 		p := newPlugin()
 		p.config.commitStore = commitStore
@@ -391,14 +385,14 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 
 	ctx := testutils.Context(t)
 	p := &CommitReportingPlugin{}
-	commitStore := mock_contracts.NewCommitStoreInterface(t)
+	commitStore, _ := testhelpers.NewFakeCommitStore(t, 0)
 	p.config.commitStore = commitStore
 	p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 	p.lggr = logger.TestLogger(t)
 
 	t.Run("should transmit when report is not stale", func(t *testing.T) {
 		onChainSeqNum := uint64(100)
-		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+		commitStore.SetNextSequenceNumber(onChainSeqNum)
 		// not-stale since report interval is not behind on chain seq num
 		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum, Max: onChainSeqNum + 10}
 		encodedReport, err := abihelpers.EncodeCommitReport(report)
@@ -410,7 +404,7 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 
 	t.Run("should not transmit when report is stale", func(t *testing.T) {
 		onChainSeqNum := uint64(100)
-		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil).Once()
+		commitStore.SetNextSequenceNumber(onChainSeqNum)
 		// stale since report interval is behind on chain seq num
 		report.Interval = commit_store.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
 		encodedReport, err := abihelpers.EncodeCommitReport(report)
@@ -427,8 +421,6 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 }
 
 func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
-	t.Parallel()
-
 	const defaultSourceChainSelector = 10 // we reuse this value across all test cases
 	feeToken1 := common.HexToAddress("0xa")
 	feeToken2 := common.HexToAddress("0xb")
@@ -654,8 +646,6 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 }
 
 func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
-	t.Parallel()
-
 	val1e18 := func(val int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(val)) }
 
 	const nTokens = 10
@@ -866,9 +856,8 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 
 func TestCommitReportingPlugin_nextMinSeqNum(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	commitStore := mock_contracts.CommitStoreInterface{}
-	cp := CommitReportingPlugin{config: CommitPluginConfig{commitStore: &commitStore}, inflightReports: newInflightCommitReportsContainer(time.Hour)}
 	root1 := utils.Keccak256Fixed(hexutil.MustDecode("0xaa"))
+
 	var tt = []struct {
 		onChainMin          uint64
 		inflight            []commit_store.CommitStoreCommitReport
@@ -904,7 +893,8 @@ func TestCommitReportingPlugin_nextMinSeqNum(t *testing.T) {
 		},
 	}
 	for _, tc := range tt {
-		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.onChainMin, nil)
+		commitStore, _ := testhelpers.NewFakeCommitStore(t, tc.onChainMin)
+		cp := CommitReportingPlugin{config: CommitPluginConfig{commitStore: commitStore}, inflightReports: newInflightCommitReportsContainer(time.Hour)}
 		epochAndRound := uint64(1)
 		for _, rep := range tc.inflight {
 			rc := rep
@@ -927,7 +917,7 @@ func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 	merkleRoot2 := utils.Keccak256Fixed([]byte("some merkle root 2"))
 
 	t.Run("empty report", func(t *testing.T) {
-		commitStore := mock_contracts.NewCommitStoreInterface(t)
+		commitStore, _ := testhelpers.NewFakeCommitStore(t, 1)
 		r := &CommitReportingPlugin{config: CommitPluginConfig{commitStore: commitStore}}
 		isStale := r.isStaleReport(ctx, lggr, commit_store.CommitStoreCommitReport{}, false, types.ReportTimestamp{})
 		assert.True(t, isStale)
@@ -935,9 +925,7 @@ func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 
 	t.Run("merkle root", func(t *testing.T) {
 		const expNextSeqNum = uint64(9)
-
-		commitStore := mock_contracts.NewCommitStoreInterface(t)
-		commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(expNextSeqNum, nil)
+		commitStore, _ := testhelpers.NewFakeCommitStore(t, expNextSeqNum)
 
 		r := &CommitReportingPlugin{
 			config: CommitPluginConfig{commitStore: commitStore},
@@ -1030,8 +1018,7 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &CommitReportingPlugin{}
-			commitStore := mock_contracts.NewCommitStoreInterface(t)
-			commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.commitStoreSeqNum, nil)
+			commitStore, _ := testhelpers.NewFakeCommitStore(t, tc.commitStoreSeqNum)
 			p.config.commitStore = commitStore
 
 			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
@@ -1119,8 +1106,7 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 			p := &CommitReportingPlugin{}
 			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 			p.lggr = lggr
-			destPriceRegistry := mock_contracts.NewPriceRegistryInterface(t)
-			destPriceRegistry.On("Address").Return(utils.RandomAddress()).Maybe()
+			destPriceRegistry, _ := testhelpers.NewFakePriceRegistry(t)
 			p.destPriceRegistry = destPriceRegistry
 
 			if tc.inflightGasPriceUpdate != nil {
@@ -1230,9 +1216,7 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &CommitReportingPlugin{}
 
-			priceRegAddr := utils.RandomAddress()
-			priceReg := mock_contracts.NewPriceRegistryInterface(t)
-			priceReg.On("Address").Return(priceRegAddr)
+			priceReg, priceRegAddr := testhelpers.NewFakePriceRegistry(t)
 			p.destPriceRegistry = priceReg
 
 			destEvents := ccipdata.NewMockReader(t)
@@ -1302,8 +1286,6 @@ func Test_commitReportSize(t *testing.T) {
 }
 
 func Test_calculateIntervalConsensus(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name       string
 		intervals  []commit_store.CommitStoreInterval
@@ -1347,8 +1329,6 @@ func Test_calculateIntervalConsensus(t *testing.T) {
 }
 
 func Test_calculateUsdPer1e18TokenAmount(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
 		name       string
 		price      *big.Int
