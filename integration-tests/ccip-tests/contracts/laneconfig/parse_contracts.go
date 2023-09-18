@@ -43,8 +43,8 @@ type DestContracts struct {
 
 type LaneConfig struct {
 	CommonContracts
-	SrcContracts  map[uint64]SourceContracts `json:"src_contracts"`  // key destination chain id
-	DestContracts map[uint64]DestContracts   `json:"dest_contracts"` // key source chain id
+	SrcContracts  map[string]SourceContracts `json:"src_contracts"`  // key destination chain id
+	DestContracts map[string]DestContracts   `json:"dest_contracts"` // key source chain id
 }
 
 func (l *LaneConfig) Validate() error {

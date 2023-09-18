@@ -110,8 +110,8 @@ type CCIPCommon struct {
 	priceUpdateWatcher      map[string]*big.Int // key - token address; value - timestamp of update
 }
 
-func (ccipModule *CCIPCommon) Copy(chainClient blockchain.EVMClient, logger zerolog.Logger) (*CCIPCommon, error) {
-	newCD, err := contracts.NewCCIPContractsDeployer(chainClient, logger)
+func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain.EVMClient) (*CCIPCommon, error) {
+	newCD, err := contracts.NewCCIPContractsDeployer(logger, chainClient)
 	if err != nil {
 		return nil, err
 	}
@@ -517,8 +517,8 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	return nil
 }
 
-func DefaultCCIPModule(chainClient blockchain.EVMClient, existingDeployment bool, logger zerolog.Logger) (*CCIPCommon, error) {
-	cd, err := contracts.NewCCIPContractsDeployer(chainClient, logger)
+func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, existingDeployment bool) (*CCIPCommon, error) {
+	cd, err := contracts.NewCCIPContractsDeployer(logger, chainClient)
 	if err != nil {
 		return nil, err
 	}
@@ -543,6 +543,7 @@ type SourceCCIPModule struct {
 	Sender                     common.Address
 	TransferAmount             []*big.Int
 	DestinationChainId         uint64
+	DestNetworkName            string
 	OnRamp                     *contracts.OnRamp
 	SrcStartBlock              uint64
 	CCIPSendRequestedWatcherMu *sync.Mutex
@@ -553,7 +554,7 @@ type SourceCCIPModule struct {
 
 func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	if conf != nil {
-		cfg, ok := conf.SrcContracts[sourceCCIP.DestinationChainId]
+		cfg, ok := conf.SrcContracts[sourceCCIP.DestNetworkName]
 		if ok {
 			if common.IsHexAddress(cfg.OnRamp) {
 				sourceCCIP.OnRamp = &contracts.OnRamp{
@@ -910,15 +911,16 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	return sendTx.Hash(), time.Since(timeNow), fee, nil
 }
 
-func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64, transferAmount []*big.Int, ccipCommon *CCIPCommon, logger zerolog.Logger) (*SourceCCIPModule, error) {
-	cmn, err := ccipCommon.Copy(chainClient, logger)
+func DefaultSourceCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, destChainId uint64, destChain string, transferAmount []*big.Int, ccipCommon *CCIPCommon) (*SourceCCIPModule, error) {
+	cmn, err := ccipCommon.Copy(logger, chainClient)
 	if err != nil {
 		return nil, err
 	}
 	return &SourceCCIPModule{
 		Common:                     cmn,
 		TransferAmount:             transferAmount,
-		DestinationChainId:         destChain,
+		DestinationChainId:         destChainId,
+		DestNetworkName:            destChain,
 		Sender:                     common.HexToAddress(chainClient.GetDefaultWallet().Address()),
 		CCIPSendRequestedWatcher:   make(map[string]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested),
 		CCIPSendRequestedWatcherMu: &sync.Mutex{},
@@ -928,6 +930,7 @@ func DefaultSourceCCIPModule(chainClient blockchain.EVMClient, destChain uint64,
 type DestCCIPModule struct {
 	Common                  *CCIPCommon
 	SourceChainId           uint64
+	SourceNetworkName       string
 	CommitStore             *contracts.CommitStore
 	ReceiverDapp            *contracts.ReceiverDapp
 	OffRamp                 *contracts.OffRamp
@@ -943,7 +946,7 @@ type DestCCIPModule struct {
 
 func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	if conf != nil {
-		cfg, ok := conf.DestContracts[destCCIP.SourceChainId]
+		cfg, ok := conf.DestContracts[destCCIP.SourceNetworkName]
 		if ok {
 			if common.IsHexAddress(cfg.OffRamp) {
 				destCCIP.OffRamp = &contracts.OffRamp{
@@ -1348,14 +1351,15 @@ func (destCCIP *DestCCIPModule) AssertSeqNumberExecuted(
 	}
 }
 
-func DefaultDestinationCCIPModule(chainClient blockchain.EVMClient, sourceChain uint64, ccipCommon *CCIPCommon, logger zerolog.Logger) (*DestCCIPModule, error) {
-	cmn, err := ccipCommon.Copy(chainClient, logger)
+func DefaultDestinationCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, sourceChainId uint64, sourceChain string, ccipCommon *CCIPCommon) (*DestCCIPModule, error) {
+	cmn, err := ccipCommon.Copy(logger, chainClient)
 	if err != nil {
 		return nil, err
 	}
 	return &DestCCIPModule{
 		Common:                  cmn,
-		SourceChainId:           sourceChain,
+		SourceChainId:           sourceChainId,
+		SourceNetworkName:       sourceChain,
 		ReportAcceptedWatcherMu: &sync.Mutex{},
 		ReportAcceptedWatcher:   make(map[uint64]*commit_store.CommitStoreReportAccepted),
 		ExecStateChangedMu:      &sync.Mutex{},
@@ -1435,14 +1439,14 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		lane.SrcNetworkLaneCfg.CommonContracts.IsMockARM = true
 	}
 	if lane.SrcNetworkLaneCfg.SrcContracts == nil {
-		lane.SrcNetworkLaneCfg.SrcContracts = map[uint64]laneconfig.SourceContracts{
-			lane.Source.DestinationChainId: {
+		lane.SrcNetworkLaneCfg.SrcContracts = map[string]laneconfig.SourceContracts{
+			lane.Source.DestNetworkName: {
 				OnRamp:     lane.Source.OnRamp.Address(),
 				DepolyedAt: lane.Source.SrcStartBlock,
 			},
 		}
 	} else {
-		lane.SrcNetworkLaneCfg.SrcContracts[lane.Source.DestinationChainId] = laneconfig.SourceContracts{
+		lane.SrcNetworkLaneCfg.SrcContracts[lane.Source.DestNetworkName] = laneconfig.SourceContracts{
 			OnRamp:     lane.Source.OnRamp.Address(),
 			DepolyedAt: lane.Source.SrcStartBlock,
 		}
@@ -1465,15 +1469,15 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		lane.DstNetworkLaneCfg.CommonContracts.IsMockARM = true
 	}
 	if lane.DstNetworkLaneCfg.DestContracts == nil {
-		lane.DstNetworkLaneCfg.DestContracts = map[uint64]laneconfig.DestContracts{
-			lane.Dest.SourceChainId: {
+		lane.DstNetworkLaneCfg.DestContracts = map[string]laneconfig.DestContracts{
+			lane.Dest.SourceNetworkName: {
 				OffRamp:      lane.Dest.OffRamp.Address(),
 				CommitStore:  lane.Dest.CommitStore.Address(),
 				ReceiverDapp: lane.Dest.ReceiverDapp.Address(),
 			},
 		}
 	} else {
-		lane.DstNetworkLaneCfg.DestContracts[lane.Dest.SourceChainId] = laneconfig.DestContracts{
+		lane.DstNetworkLaneCfg.DestContracts[lane.Dest.SourceNetworkName] = laneconfig.DestContracts{
 			OffRamp:      lane.Dest.OffRamp.Address(),
 			CommitStore:  lane.Dest.CommitStore.Address(),
 			ReceiverDapp: lane.Dest.ReceiverDapp.Address(),
@@ -1729,11 +1733,17 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return errors.WithStack(fmt.Errorf("common contracts for destination chain %s not found", destChainClient.GetChainID().String()))
 	}
 
-	lane.Source, err = DefaultSourceCCIPModule(sourceChainClient, destChainClient.GetChainID().Uint64(), transferAmounts, sourceCommon, lane.Logger)
+	lane.Source, err = DefaultSourceCCIPModule(
+		lane.Logger,
+		sourceChainClient, destChainClient.GetChainID().Uint64(),
+		destChainClient.GetNetworkName(), transferAmounts, sourceCommon)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	lane.Dest, err = DefaultDestinationCCIPModule(destChainClient, sourceChainClient.GetChainID().Uint64(), destCommon, lane.Logger)
+	lane.Dest, err = DefaultDestinationCCIPModule(
+		lane.Logger,
+		destChainClient, sourceChainClient.GetChainID().Uint64(),
+		sourceChainClient.GetNetworkName(), destCommon)
 	if err != nil {
 		return errors.WithStack(err)
 	}
