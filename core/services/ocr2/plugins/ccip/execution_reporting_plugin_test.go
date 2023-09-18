@@ -767,6 +767,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 		tokenAmounts      []evm_2_evm_offramp.ClientEVMTokenAmount
 		sourceToDestToken map[common.Address]common.Address
 		destPools         map[common.Address]common.Address
+		destPoolsCacheErr error
 		poolRateLimits    map[common.Address]custom_token_pool.RateLimiterTokenBucket
 
 		expRateLimits map[common.Address]*big.Int
@@ -841,6 +842,20 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			},
 			expErr: false,
 		},
+		{
+			name:              "dest pool cache error",
+			tokenAmounts:      []evm_2_evm_offramp.ClientEVMTokenAmount{{Token: tk1}},
+			sourceToDestToken: map[common.Address]common.Address{tk1: tk1dest},
+			destPoolsCacheErr: errors.New("some random error"),
+			expErr:            true,
+		},
+		{
+			name:              "pool for token not found",
+			tokenAmounts:      []evm_2_evm_offramp.ClientEVMTokenAmount{{Token: tk1}},
+			sourceToDestToken: map[common.Address]common.Address{tk1: tk1dest},
+			destPools:         map[common.Address]common.Address{},
+			expErr:            true,
+		},
 	}
 
 	ctx := testutils.Context(t)
@@ -851,11 +866,10 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			p.lggr = lggr
 
 			tokenPoolsCache := cache.NewMockAutoSync[map[common.Address]common.Address](t)
-			tokenPoolsCache.On("Get", ctx).Return(tc.destPools, nil).Maybe()
+			tokenPoolsCache.On("Get", ctx).Return(tc.destPools, tc.destPoolsCacheErr).Maybe()
 			p.cachedTokenPools = tokenPoolsCache
 
 			offRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
-			offRamp.SetTokenPools(tc.destPools)
 			p.config.offRamp = offRamp
 
 			p.customTokenPoolFactory = func(ctx context.Context, poolAddress common.Address, _ bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
