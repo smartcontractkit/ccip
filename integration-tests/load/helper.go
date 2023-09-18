@@ -181,7 +181,7 @@ func (l *loadArgs) Start() {
 
 				ccipLoad := NewCCIPLoad(l.TestCfg.Test, lane, l.TestCfg.PhaseTimeout, 100000, lane.Reports)
 				ccipLoad.BeforeAllCall(l.TestCfg.MsgType)
-				if lane.TestEnv != nil && lane.TestEnv.K8Env != nil && lane.TestEnv.K8Env.Cfg != nil {
+				if namespace == "" && lane.TestEnv != nil && lane.TestEnv.K8Env != nil && lane.TestEnv.K8Env.Cfg != nil {
 					namespace = lane.TestEnv.K8Env.Cfg.Namespace
 				}
 
