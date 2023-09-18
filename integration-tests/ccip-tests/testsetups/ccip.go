@@ -212,7 +212,8 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 	// if no of lanes per pair is more than 1, the networks are added into the inputs.AllNetworks with a suffix of -<lane number>
 	// for example, if no of lanes per pair is 2, and the network pairs are called "testnetA", "testnetB",
 	//	the network will be added as "testnetA-1", testnetA-2","testnetB-1", testnetB-2"
-	// to deploy 2 lanes between same network pair "testnetA", "testnetB".
+	// to deploy 4 lanes between same network pair "testnetA", "testnetB".
+	// lanes - testnetA-1<->testnetB-1, testnetA-1<-->testnetB-2 , testnetA-2<--> testnetB-1, testnetA-2<--> testnetB-2
 	if p.NoOfLanesPerPair > 1 {
 		firstOfPairs[0].Name = fmt.Sprintf("%s-%d", firstOfPairs[0].Name, 1)
 		secondOfPairs[0].Name = fmt.Sprintf("%s-%d", secondOfPairs[0].Name, 1)
@@ -229,10 +230,12 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 	for i := range firstOfPairs {
 		p.AllNetworks[firstOfPairs[i].Name] = firstOfPairs[i]
 		p.AllNetworks[secondOfPairs[i].Name] = secondOfPairs[i]
-		p.NetworkPairs = append(p.NetworkPairs, NetworkPair{
-			NetworkA: firstOfPairs[i],
-			NetworkB: secondOfPairs[i],
-		})
+		for j := range secondOfPairs {
+			p.NetworkPairs = append(p.NetworkPairs, NetworkPair{
+				NetworkA: firstOfPairs[i],
+				NetworkB: secondOfPairs[j],
+			})
+		}
 	}
 }
 
