@@ -22,10 +22,10 @@ func getProofData(
 	lggr logger.Logger,
 	hashLeaf hashlib.LeafHasherInterface[[32]byte],
 	onRampAddress common.Address,
-	sourceEventsClient ccipdata.Reader,
+	sourceReader ccipdata.Reader,
 	interval commit_store.CommitStoreInterval,
 ) (sendReqsInRoot []ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
-	sendReqs, err := sourceEventsClient.GetSendRequestsBetweenSeqNums(
+	sendReqs, err := sourceReader.GetSendRequestsBetweenSeqNums(
 		ctx,
 		onRampAddress,
 		interval.Min,
@@ -97,8 +97,8 @@ func validateSeqNumbers(serviceCtx context.Context, commitStore commit_store.Com
 }
 
 // Gets the commit report from the saved logs for a given sequence number.
-func getCommitReportForSeqNum(ctx context.Context, destEvents ccipdata.Reader, commitStore commit_store.CommitStoreInterface, seqNum uint64) (commit_store.CommitStoreCommitReport, error) {
-	acceptedReports, err := destEvents.GetAcceptedCommitReportsGteSeqNum(ctx, commitStore.Address(), seqNum, 0)
+func getCommitReportForSeqNum(ctx context.Context, destReader ccipdata.Reader, commitStore commit_store.CommitStoreInterface, seqNum uint64) (commit_store.CommitStoreCommitReport, error) {
+	acceptedReports, err := destReader.GetAcceptedCommitReportsGteSeqNum(ctx, commitStore.Address(), seqNum, 0)
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
 	}

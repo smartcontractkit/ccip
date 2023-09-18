@@ -112,8 +112,8 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 			lggr:                     execLggr,
 			sourceLP:                 sourceChain.LogPoller(),
 			destLP:                   destChain.LogPoller(),
-			sourceEvents:             ccipdata.NewLogPollerReader(sourceChain.LogPoller(), execLggr, sourceChain.Client()),
-			destEvents:               ccipdata.NewLogPollerReader(destChain.LogPoller(), execLggr, destChain.Client()),
+			sourceReader:             ccipdata.NewLogPollerReader(sourceChain.LogPoller(), execLggr, sourceChain.Client()),
+			destReader:               ccipdata.NewLogPollerReader(destChain.LogPoller(), execLggr, destChain.Client()),
 			onRamp:                   onRamp,
 			offRamp:                  offRamp,
 			commitStore:              commitStore,
@@ -130,7 +130,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 		return nil, err
 	}
 
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), destChain.ID())
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", spec.Relay, destChain.ID())
 	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(execLggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {

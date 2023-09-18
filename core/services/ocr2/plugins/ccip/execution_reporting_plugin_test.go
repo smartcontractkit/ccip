@@ -124,27 +124,27 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			offRamp.SetRateLimiterState(tc.rateLimiterState)
 			p.config.offRamp = offRamp
 
-			destEvents := ccipdata.NewMockReader(t)
-			destEvents.On("GetAcceptedCommitReportsGteTimestamp", ctx, commitStoreAddr, mock.Anything, 0).
+			destReader := ccipdata.NewMockReader(t)
+			destReader.On("GetAcceptedCommitReportsGteTimestamp", ctx, commitStoreAddr, mock.Anything, 0).
 				Return(tc.unexpiredReports, nil).Maybe()
-			destEvents.On("LatestBlock", ctx).Return(int64(1234), nil).Maybe()
+			destReader.On("LatestBlock", ctx).Return(int64(1234), nil).Maybe()
 			var executionEvents []ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]
 			for _, seqNum := range tc.executedSeqNums {
 				executionEvents = append(executionEvents, ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]{
 					Data: evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged{SequenceNumber: seqNum},
 				})
 			}
-			destEvents.On("GetExecutionStateChangesBetweenSeqNums", ctx, offRampAddr, mock.Anything, mock.Anything, 0).
+			destReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, offRampAddr, mock.Anything, mock.Anything, 0).
 				Return(executionEvents, nil).Maybe()
-			p.config.destEvents = destEvents
+			p.config.destReader = destReader
 
 			onRamp, onRampAddr := testhelpers.NewFakeOnRamp(t)
 			p.config.onRamp = onRamp
 
-			sourceEvents := ccipdata.NewMockReader(t)
-			sourceEvents.On("GetSendRequestsBetweenSeqNums", ctx, onRampAddr, mock.Anything, mock.Anything, 0).
+			sourceReader := ccipdata.NewMockReader(t)
+			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, onRampAddr, mock.Anything, mock.Anything, 0).
 				Return(tc.sendRequests, nil).Maybe()
-			p.config.sourceEvents = sourceEvents
+			p.config.sourceReader = sourceReader
 
 			cachedDestTokens := cache.NewMockAutoSync[cache.CachedTokens](t)
 			cachedDestTokens.On("Get", ctx).Return(cache.CachedTokens{
@@ -355,9 +355,8 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	commitStore.On("Verify", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(math.MaxInt64), nil)
 	p.config.commitStore = commitStore
 
-	destEvents := ccipdata.NewMockReader(t)
-
-	destEvents.On("GetAcceptedCommitReportsGteSeqNum", ctx, commitStoreAddress, observations[0].SeqNr, 0).
+	destReader := ccipdata.NewMockReader(t)
+	destReader.On("GetAcceptedCommitReportsGteSeqNum", ctx, commitStoreAddress, observations[0].SeqNr, 0).
 		Return([]ccipdata.Event[commit_store.CommitStoreReportAccepted]{
 			{
 				Data: commit_store.CommitStoreReportAccepted{
@@ -370,7 +369,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 				},
 			},
 		}, nil)
-	p.config.destEvents = destEvents
+	p.config.destReader = destReader
 
 	p.config.leafHasher = leafHasher123{}
 
@@ -396,10 +395,10 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 			}},
 		}
 	}
-	sourceEvents := ccipdata.NewMockReader(t)
-	sourceEvents.On("GetSendRequestsBetweenSeqNums",
+	sourceReader := ccipdata.NewMockReader(t)
+	sourceReader.On("GetSendRequestsBetweenSeqNums",
 		ctx, onRampAddr, observations[0].SeqNr, observations[len(observations)-1].SeqNr, 0).Return(sendReqs, nil)
-	p.config.sourceEvents = sourceEvents
+	p.config.sourceReader = sourceReader
 
 	execReport, err := p.buildReport(ctx, p.lggr, observations)
 	assert.NoError(t, err)
@@ -1020,13 +1019,13 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			offRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
 			p.config.offRamp = offRamp
 
-			sourceEvents := ccipdata.NewMockReader(t)
-			sourceEvents.On("GetSendRequestsBetweenSeqNums", ctx, onRampAddr, tc.expQueryMin, tc.expQueryMax, 0).
+			sourceReader := ccipdata.NewMockReader(t)
+			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, onRampAddr, tc.expQueryMin, tc.expQueryMax, 0).
 				Return(tc.onchainEvents, nil).Maybe()
-			p.config.sourceEvents = sourceEvents
+			p.config.sourceReader = sourceReader
 
-			destEvents := ccipdata.NewMockReader(t)
-			destEvents.On("LatestBlock", ctx).Return(tc.destLatestBlock, nil).Maybe()
+			destReader := ccipdata.NewMockReader(t)
+			destReader.On("LatestBlock", ctx).Return(tc.destLatestBlock, nil).Maybe()
 			var executedEvents []ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]
 			for _, executedSeqNum := range tc.destExecutedSeqNums {
 				executedEvents = append(executedEvents, ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]{
@@ -1034,8 +1033,8 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 					BlockMeta: ccipdata.BlockMeta{BlockNumber: tc.destLatestBlock - 10},
 				})
 			}
-			destEvents.On("GetExecutionStateChangesBetweenSeqNums", ctx, offRampAddr, tc.expQueryMin, tc.expQueryMax, 0).Return(executedEvents, nil).Maybe()
-			p.config.destEvents = destEvents
+			destReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, offRampAddr, tc.expQueryMin, tc.expQueryMax, 0).Return(executedEvents, nil).Maybe()
+			p.config.destReader = destReader
 
 			populatedReports, err := p.getReportsWithSendRequests(ctx, tc.reports)
 			if tc.expErr {

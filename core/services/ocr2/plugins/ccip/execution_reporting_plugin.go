@@ -54,8 +54,8 @@ var (
 type ExecutionPluginConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
-	sourceEvents             ccipdata.Reader
-	destEvents               ccipdata.Reader
+	sourceReader             ccipdata.Reader
+	destReader               ccipdata.Reader
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStore              commit_store.CommitStoreInterface
@@ -238,7 +238,7 @@ type evm2EVMOnRampCCIPSendRequestedWithMeta struct {
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(
 		ctx,
-		r.config.destEvents,
+		r.config.destReader,
 		r.config.commitStore,
 		r.onchainConfig.PermissionLessExecutionThresholdDuration(),
 	)
@@ -441,7 +441,7 @@ func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) 
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
-	stateChanges, err := r.config.destEvents.GetExecutionStateChangesBetweenSeqNums(
+	stateChanges, err := r.config.destReader.GetExecutionStateChangesBetweenSeqNums(
 		ctx,
 		r.config.offRamp.Address(),
 		min,
@@ -738,7 +738,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 	var sendRequests []ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 	eg.Go(func() error {
-		sendReqs, err := r.config.sourceEvents.GetSendRequestsBetweenSeqNums(
+		sendReqs, err := r.config.sourceReader.GetSendRequestsBetweenSeqNums(
 			ctx,
 			r.config.onRamp.Address(),
 			intervalMin,
@@ -754,7 +754,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 	var executedSeqNums map[uint64]bool
 	eg.Go(func() error {
-		latestBlock, err := r.config.destEvents.LatestBlock(ctx)
+		latestBlock, err := r.config.destReader.LatestBlock(ctx)
 		if err != nil {
 			return err
 		}
@@ -823,13 +823,13 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	if err := validateSeqNumbers(ctx, r.config.commitStore, observedMessages); err != nil {
 		return nil, err
 	}
-	commitReport, err := getCommitReportForSeqNum(ctx, r.config.destEvents, r.config.commitStore, observedMessages[0].SeqNr)
+	commitReport, err := getCommitReportForSeqNum(ctx, r.config.destReader, r.config.commitStore, observedMessages[0].SeqNr)
 	if err != nil {
 		return nil, err
 	}
 	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
-	sendReqsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.config.onRamp.Address(), r.config.sourceEvents, commitReport.Interval)
+	sendReqsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.config.onRamp.Address(), r.config.sourceReader, commitReport.Interval)
 	if err != nil {
 		return nil, err
 	}
@@ -1126,11 +1126,11 @@ func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegis
 
 func getUnexpiredCommitReports(
 	ctx context.Context,
-	destEvents ccipdata.Reader,
+	destReader ccipdata.Reader,
 	commitStore commit_store.CommitStoreInterface,
 	permissionExecutionThreshold time.Duration,
 ) ([]commit_store.CommitStoreCommitReport, error) {
-	acceptedReports, err := destEvents.GetAcceptedCommitReportsGteTimestamp(
+	acceptedReports, err := destReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
 		commitStore.Address(),
 		time.Now().Add(-permissionExecutionThreshold),
