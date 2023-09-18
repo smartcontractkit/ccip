@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/smartcontractkit/chainlink-env/client"
@@ -484,8 +483,6 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 		envName, _ := utils.GetEnv("CCIP_EXISTING_ENV")
 		if envName != "" {
 			p.ExistingEnv = envName
-		} else {
-			p.ExistingEnv = fmt.Sprintf("Existing-Deployment-%s", uuid.NewString()[0:5])
 		}
 	}
 
