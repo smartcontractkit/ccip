@@ -1150,7 +1150,7 @@ func DeployEnvironments(
 	tomlStr, err := tomlCfg.TOMLString()
 	require.NoError(t, err)
 	clProps["toml"] = tomlStr
-
+	clProps["prometheus"] = true
 	err = testEnvironment.
 		AddHelm(chainlink.New(0, clProps)).
 		Run()
