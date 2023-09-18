@@ -498,7 +498,7 @@
         "420": {
           "on_ramp": "0x303a67f29ebd2a42b0afea3e63d7dfdd882b8ab4",
           "deployed_at": 40247398
-        },
+        }
       },
       "dest_contracts": {
         "43113": {
