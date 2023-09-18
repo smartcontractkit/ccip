@@ -154,7 +154,9 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 			auth,
 			backend,
 			token,
-			[]common.Address{}, armProxy)
+			[]common.Address{},
+			armProxy,
+			true)
 	})
 
 	if err != nil {
@@ -337,12 +339,11 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployPriceRegistry() (*PriceRegistry, error) {
+func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*PriceRegistry, error) {
 	address, _, instance, err := e.evmClient.DeployContract("PriceRegistry", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		var tokens []common.Address
 		return price_registry.DeployPriceRegistry(auth, backend, nil, tokens, 60*60*24*14)
 	})
 	if err != nil {
