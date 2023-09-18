@@ -393,10 +393,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 	for dstToken := range dstTokens {
 		poolAddress, exists := tokenPools[dstToken]
 		if !exists {
-			poolAddress, err = r.config.offRamp.GetPoolByDestToken(&bind.CallOpts{Context: ctx}, dstToken)
-			if err != nil {
-				return nil, fmt.Errorf("get pool by dest token (%s): %w", dstToken, err)
-			}
+			return nil, fmt.Errorf("pool for token '%s' does not exist", dstToken)
 		}
 
 		tokenPool, err := custom_token_pool.NewCustomTokenPool(poolAddress, r.config.destClient)
