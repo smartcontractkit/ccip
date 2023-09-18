@@ -1042,21 +1042,22 @@ func DeployLocalCluster(
 		WithMockServer(1).
 		Build()
 	require.NoError(t, err)
+	for _, n := range env.PrivateChain {
+		primaryNode := n.GetPrimaryNode()
+		require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
+		for i, networkCfg := range networks {
+			if networkCfg.ChainID == n.GetNetworkConfig().ChainID {
+				networks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
+				networks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
+			}
+		}
+	}
+	require.NoError(t, errors.New("cannot create nodes with custom config without nonDevGethNetworks"))
+
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
-		var nonDevGethNetworks []blockchain.EVMNetwork
-		for i, n := range env.PrivateChain {
-			primaryNode := n.GetPrimaryNode()
-			require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
-			nonDevGethNetworks = append(nonDevGethNetworks, *n.GetNetworkConfig())
-			nonDevGethNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
-			nonDevGethNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
-		}
-		if nonDevGethNetworks == nil {
-			return errors.New("cannot create nodes with custom config without nonDevGethNetworks")
-		}
 		toml, err := node.NewConfigFromToml(ccipnode.CCIPTOML,
-			node.WithPrivateEVMs(nonDevGethNetworks))
+			node.WithPrivateEVMs(networks))
 		if err != nil {
 			return err
 		}
