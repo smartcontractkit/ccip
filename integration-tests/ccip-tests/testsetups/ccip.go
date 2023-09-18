@@ -1052,7 +1052,6 @@ func DeployLocalCluster(
 			}
 		}
 	}
-	require.NoError(t, errors.New("cannot create nodes with custom config without nonDevGethNetworks"))
 
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
