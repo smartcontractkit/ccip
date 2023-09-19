@@ -2,10 +2,12 @@ package contractutil
 
 import (
 	"context"
+	"encoding/hex"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -18,4 +20,12 @@ func IsCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore c
 		return true
 	}
 	return !unPausedAndHealthy
+}
+
+func GetMessageIDsAsHexString(messages []evm_2_evm_offramp.InternalEVM2EVMMessage) []string {
+	messageIDs := make([]string, 0, len(messages))
+	for _, m := range messages {
+		messageIDs = append(messageIDs, "0x"+hex.EncodeToString(m.MessageId[:]))
+	}
+	return messageIDs
 }

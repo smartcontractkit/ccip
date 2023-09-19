@@ -933,7 +933,7 @@ func calculateObservedMessagesConsensus(observations []ExecutionObservation, f i
 	tally := make(map[tallyKey]tallyVal)
 	for _, obs := range observations {
 		for seqNr, msgData := range obs.Messages {
-			tokenDataHash, err := bytesOfBytesKeccak(msgData.TokenData)
+			tokenDataHash, err := hashlib.BytesOfBytesKeccak(msgData.TokenData)
 			if err != nil {
 				return nil, fmt.Errorf("bytes of bytes keccak: %w", err)
 			}
@@ -986,7 +986,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, err
 	}
-	lggr = lggr.With("messageIDs", getMessageIDsAsHexString(messages))
+	lggr = lggr.With("messageIDs", contractutil.GetMessageIDsAsHexString(messages))
 
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(messages)
@@ -1012,7 +1012,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, nil
 	}
-	lggr = lggr.With("messageIDs", getMessageIDsAsHexString(messages))
+	lggr = lggr.With("messageIDs", contractutil.GetMessageIDsAsHexString(messages))
 
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
