@@ -78,11 +78,11 @@ var (
 		"resources": map[string]interface{}{
 			"requests": map[string]interface{}{
 				"cpu":    "2",
-				"memory": "4Gi",
+				"memory": "6Gi",
 			},
 			"limits": map[string]interface{}{
 				"cpu":    "2",
-				"memory": "4Gi",
+				"memory": "6Gi",
 			},
 		},
 	}
@@ -100,6 +100,7 @@ type NetworkPair struct {
 type CCIPTestConfig struct {
 	Test                    *testing.T
 	EnvTTL                  time.Duration
+	KeepEnvAlive            bool
 	MsgType                 string
 	PhaseTimeout            time.Duration
 	TestDuration            time.Duration
@@ -457,6 +458,16 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			allError = multierr.Append(allError, err)
 		} else {
 			p.LocalCluster = e
+		}
+	}
+
+	alive, _ := utils.GetEnv("CCIP_KEEP_ENV_ALIVE")
+	if alive != "" {
+		e, err := strconv.ParseBool(alive)
+		if err != nil {
+			allError = multierr.Append(allError, err)
+		} else {
+			p.KeepEnvAlive = e
 		}
 	}
 
@@ -883,6 +894,9 @@ func CCIPDefaultTestSetUp(
 	}
 
 	t.Cleanup(func() {
+		if inputs.KeepEnvAlive {
+			return
+		}
 		if configureCLNode {
 			lggr.Info().Msg("Tearing down the environment")
 			if ccipEnv.LocalCluster != nil {
