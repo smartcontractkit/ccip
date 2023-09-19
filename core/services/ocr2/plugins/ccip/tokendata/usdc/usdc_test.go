@@ -114,12 +114,11 @@ func TestUSDCService_IsAttestationComplete(t *testing.T) {
 	require.NoError(t, err)
 
 	usdcService := NewUSDCTokenDataReader(&eventsClient, mockUSDCTokenAddress, mockOnRampAddress, attestationURI, 420)
-	isReady, attestation, err := usdcService.IsTokenDataReady(context.Background(), seqNum, uint(logIndex), txHash)
+	attestation, err := usdcService.ReadTokenData(context.Background(), seqNum, uint(logIndex), txHash)
 	require.NoError(t, err)
 
-	require.True(t, isReady)
 	require.Equal(t, attestationBytes, attestation)
-	require.Equal(t, isReady, response.Status == AttestationStatusSuccess)
+	require.Equal(t, response.Status, AttestationStatusSuccess)
 }
 
 func getMockUSDCEndpoint(t *testing.T, response attestationResponse) *httptest.Server {

@@ -641,13 +641,14 @@ func (r *ExecutionReportingPlugin) buildBatch(
 func getTokenData(ctx context.Context, msg evm2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader) (tokenData [][]byte, allReady bool, err error) {
 	for _, token := range msg.TokenAmounts {
 		if offchainTokenDataProvider, ok := tokenDataProviders[token.Token]; ok {
-			ready, attestation, err2 := offchainTokenDataProvider.IsTokenDataReady(ctx, msg.SequenceNumber, msg.logIndex, msg.txHash)
+			attestation, err2 := offchainTokenDataProvider.ReadTokenData(ctx, msg.SequenceNumber, msg.logIndex, msg.txHash)
 			if err2 != nil {
+				if errors.Is(err2, tokendata.ErrNotReady) {
+					return [][]byte{}, false, nil
+				}
 				return [][]byte{}, false, err2
 			}
-			if !ready {
-				return [][]byte{}, false, nil
-			}
+
 			tokenData = append(tokenData, attestation)
 			continue
 		}

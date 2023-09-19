@@ -121,12 +121,12 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse USDC attestation API")
 		}
-		tokenDataProviders[usdc.TokenMapping[chainId]] = usdc.NewUSDCTokenDataReader(
+		tokenDataProviders[usdc.TokenMapping[chainId]] = tokendata.NewCachedReader(usdc.NewUSDCTokenDataReader(
 			sourceChainEventClient,
 			usdc.TokenMapping[chainId],
 			offRampConfig.OnRamp,
 			attestationURI,
-			chainId)
+			chainId))
 	}
 
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(

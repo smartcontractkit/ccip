@@ -30,10 +30,6 @@ type TokenDataReader struct {
 	// Cache of sequence number -> usdc message body
 	usdcMessageHashCache      map[uint64][32]byte
 	usdcMessageHashCacheMutex sync.Mutex
-
-	// Cache of sequence number -> attestation attempt
-	attestationCache      map[uint64]attestationAttempt
-	attestationCacheMutex sync.Mutex
 }
 
 type attestationAttempt struct {
@@ -97,37 +93,27 @@ func NewUSDCTokenDataReader(sourceChainEvents ccipdata.Reader, usdcTokenAddress,
 		messageTransmitter:   messageTransmitterMapping[sourceChainId],
 		onRampAddress:        onRampAddress,
 		sourceToken:          usdcTokenAddress,
-		attestationCache:     make(map[uint64]attestationAttempt),
 		usdcMessageHashCache: make(map[uint64][32]byte),
 	}
 }
 
-func (s *TokenDataReader) IsTokenDataReady(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) (success bool, attestation []byte, err error) {
+func (s *TokenDataReader) ReadTokenData(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) (attestation []byte, err error) {
 	response, err := s.getUpdatedAttestation(ctx, seqNum, logIndex, txHash)
 	if err != nil {
-		return false, []byte{}, err
+		return []byte{}, err
 	}
 
 	if response.Status == AttestationStatusSuccess {
 		attestationBytes, err := hex.DecodeString(response.Attestation)
 		if err != nil {
-			return false, nil, fmt.Errorf("decode response attestation: %w", err)
+			return nil, fmt.Errorf("decode response attestation: %w", err)
 		}
-		return true, attestationBytes, nil
+		return attestationBytes, nil
 	}
-	return false, []byte{}, nil
+	return []byte{}, tokendata.ErrNotReady
 }
 
 func (s *TokenDataReader) getUpdatedAttestation(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) (attestationResponse, error) {
-	// Try to get information from cache to reduce the number of database and external calls
-	s.attestationCacheMutex.Lock()
-	defer s.attestationCacheMutex.Unlock()
-	attempt, ok := s.attestationCache[seqNum]
-	if ok && attempt.USDCAttestationResponse.Status == AttestationStatusSuccess {
-		// If successful, return the cached response
-		return attempt.USDCAttestationResponse, nil
-	}
-
 	messageBody, err := s.getUSDCMessageBody(ctx, seqNum, logIndex, txHash)
 	if err != nil {
 		return attestationResponse{}, errors.Wrap(err, "failed getting the USDC message body")
@@ -135,12 +121,8 @@ func (s *TokenDataReader) getUpdatedAttestation(ctx context.Context, seqNum uint
 
 	response, err := s.callAttestationApi(ctx, messageBody)
 	if err != nil {
-		return attestationResponse{}, err
+		return attestationResponse{}, errors.Wrap(err, "failed calling usdc attestation API ")
 	}
-
-	// Save the response in the cache
-	attempt.USDCAttestationResponse = response
-	s.attestationCache[seqNum] = attempt
 
 	return response, nil
 }
