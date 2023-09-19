@@ -528,6 +528,29 @@ type CCIPTestSetUpOutputs struct {
 	Balance                  *actions.BalanceSheet
 	BootstrapAdded           *atomic.Bool
 	JobAdd                   *sync.Mutex
+	allTokenValues           map[string]interface{}
+}
+
+func (o *CCIPTestSetUpOutputs) setTokenValues(ctx context.Context, lggr zerolog.Logger, n []blockchain.EVMNetwork) error {
+	env := o.Env
+	if env == nil {
+		return fmt.Errorf("env is nil")
+	}
+	o.allTokenValues = make(map[string]interface{})
+	o.CommonContractsByNetwork.Range(func(key, value interface{}) bool {
+		if value != nil {
+			for _, network := range n {
+				if key.(string) == network.Name {
+					chainContracts := value.(*actions.CCIPCommon)
+					if chainContracts != nil {
+						chainContracts.TokenValues(lggr, o.allTokenValues)
+					}
+				}
+			}
+		}
+		return true
+	})
+	return actions.SetMockServerWithSameTokenFeeConversionValue(context.Background(), o.allTokenValues, env.MockServer)
 }
 
 func (o *CCIPTestSetUpOutputs) DeployChainContracts(
@@ -958,6 +981,10 @@ func CCIPDefaultTestSetUp(
 		})
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
+	// set token values for all networks for the job pipeline
+	if configureCLNode {
+		require.NoError(t, setUpArgs.setTokenValues(context.Background(), lggr, inputs.SelectedNetworks))
+	}
 
 	// deploy all lane specific contracts
 	lggr.Info().Msg("Deploying chain specific contracts")

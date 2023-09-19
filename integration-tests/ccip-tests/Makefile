@@ -7,6 +7,7 @@ test_smoke_ccip_simulated_local:
     CCIP_DEPLOY_ON_LOCAL=True  \
     CCIP_NETWORK_PAIRS="" \
     CCIP_NO_OF_NETWORKS=2  \
+    CCIP_NO_OF_LANES_PER_PAIR=1  \
     CCIP_MSG_TYPE=WithToken \
     CHAINLINK_IMAGE=$(image)  \
     CHAINLINK_VERSION=$(tag)  \

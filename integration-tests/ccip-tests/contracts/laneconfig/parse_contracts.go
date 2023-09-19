@@ -127,6 +127,7 @@ func (l *Lanes) CopyCommonContracts(fromNetwork, toNetwork string, reuse, isToke
 			SrcContractsMu:  &sync.Mutex{},
 			DestContractsMu: &sync.Mutex{},
 		}
+		return
 	}
 	cfg := &LaneConfig{
 		SrcContracts:    make(map[string]SourceContracts),

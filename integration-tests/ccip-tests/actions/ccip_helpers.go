@@ -350,6 +350,16 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(lggr zerolog.Logger) ([]event
 	return subs, nil
 }
 
+func (ccipModule *CCIPCommon) TokenValues(lggr zerolog.Logger, tokenUSDMap map[string]interface{}) {
+	for _, token := range ccipModule.BridgeTokens {
+		tokenUSDMap[token.Address()] = LinkToUSD.String()
+	}
+
+	tokenUSDMap[ccipModule.FeeToken.Address()] = LinkToUSD.String()
+	tokenUSDMap[ccipModule.WrappedNative.Hex()] = WrappedNativeToUSD.String()
+	lggr.Info().Interface("tokenUSDMap", tokenUSDMap).Msg("tokenUSDMap")
+}
+
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
 // This reuses common contracts for bidirectional lanes
 func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
@@ -1768,19 +1778,10 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	clNodesWithKeys := env.CLNodesWithKeys
 	mockServer := env.MockServer
 	// set up ocr2 jobs
-	tokenUSDMap := make(map[string]string)
-	for _, token := range lane.Dest.Common.BridgeTokens {
-		tokenUSDMap[token.Address()] = LinkToUSD.String()
-	}
 	clNodes, exists := clNodesWithKeys[lane.Dest.Common.ChainClient.GetChainID().String()]
 	if !exists {
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, fmt.Errorf("could not find CL nodes for %s", lane.Dest.Common.ChainClient.GetChainID().String())
 	}
-
-	tokenUSDMap[lane.Dest.Common.FeeToken.Address()] = LinkToUSD.String()
-	tokenUSDMap[lane.Source.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
-	tokenUSDMap[lane.Dest.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
-	lane.Logger.Info().Interface("tokenUSDMap", tokenUSDMap).Msg("tokenUSDMap")
 
 	// first node is the bootstrapper
 	bootstrapCommit := clNodes[0]
@@ -1860,14 +1861,21 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 
+	// collect all tokenAddresses
+	var tokenAddresses []string
+	for _, token := range lane.Dest.Common.BridgeTokens {
+		tokenAddresses = append(tokenAddresses, token.Address())
+	}
+
+	tokenAddresses = append(tokenAddresses,
+		lane.Dest.Common.FeeToken.Address(),
+		lane.Dest.Common.WrappedNative.Hex(),
+		lane.Source.Common.WrappedNative.Hex())
+
 	// job creation is buggy when done for too many lanes in parallel
 	// therefore we create the jobs sequentially with a lock
 	jobAddMu.Lock()
-	err = CreateOCR2CCIPCommitJobs(
-		lane.Context, jobParams,
-		commitNodes,
-		tokenUSDMap, mockServer,
-	)
+	err = CreateOCR2CCIPCommitJobs(jobParams, commitNodes, mockServer, tokenAddresses)
 	jobAddMu.Unlock()
 	if err != nil {
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
@@ -1968,32 +1976,17 @@ func CreateBootstrapJob(
 }
 
 func CreateOCR2CCIPCommitJobs(
-	ctx context.Context,
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	commitNodes []*client.CLNodesWithKeys,
-	tokenUSDMap map[string]string,
 	mockServer *ctfClient.MockserverClient,
+	tokenAddrs []string,
 ) error {
-	tokenFeeConv := make(map[string]interface{})
-	var tokenAddr []string
-	// Collect all dest tokens for price pipeline
-	for token, value := range tokenUSDMap {
-		tokenFeeConv[token] = value
-		tokenAddr = append(tokenAddr, token)
-	}
-
-	err := SetMockServerWithSameTokenFeeConversionValue(ctx, tokenFeeConv, commitNodes, mockServer)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 	ocr2SpecCommit, err := jobParams.CommitJobSpec()
 	if err != nil {
 		return errors.WithStack(err)
 	}
-
+	tokenPricesUSDPipeline := TokenFeeForMultipleTokenAddr(tokenAddrs, mockServer)
 	for i, node := range commitNodes {
-		tokenPricesUSDPipeline := TokenFeeForMultipleTokenAddr(node, tokenAddr, mockServer)
-
 		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
 		ocr2SpecCommit.OCR2OracleSpec.PluginConfig["tokenPricesUSDPipeline"] = fmt.Sprintf(`"""
@@ -2029,12 +2022,11 @@ func CreateOCR2CCIPExecutionJobs(jobParams integrationtesthelpers.CCIPJobSpecPar
 	return nil
 }
 
-func TokenFeeForMultipleTokenAddr(node *client.CLNodesWithKeys, linkTokenAddr []string, mockserver *ctfClient.MockserverClient) string {
+func TokenFeeForMultipleTokenAddr(tokenAddr []string, mockserver *ctfClient.MockserverClient) string {
 	source := ""
 	right := ""
-	for i, addr := range linkTokenAddr {
-		url := fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL,
-			nodeContractPair(node.KeysBundle.EthAddress, addr))
+	for i, addr := range tokenAddr {
+		url := fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL, addr)
 		source = source + fmt.Sprintf(`
 token%d [type=http method=GET url="%s"];
 token%d_parse [type=jsonparse path="Data,Result"];
@@ -2053,28 +2045,20 @@ merge [type=merge left="{}" right="{%s}"];`, source, right)
 func SetMockServerWithSameTokenFeeConversionValue(
 	ctx context.Context,
 	tokenValueAddress map[string]interface{},
-	chainlinkNodes []*client.CLNodesWithKeys,
 	mockserver *ctfClient.MockserverClient,
 ) error {
 	valueAdditions, _ := errgroup.WithContext(ctx)
 	for tokenAddr, value := range tokenValueAddress {
-		for _, n := range chainlinkNodes {
-			nodeTokenPairID := nodeContractPair(n.KeysBundle.EthAddress, tokenAddr)
-			path := fmt.Sprintf("/%s", nodeTokenPairID)
-			tokenValue := value
-			valueAdditions.Go(func() error {
-				log.Info().Str("path", path).
-					Str("value", fmt.Sprintf("%v", tokenValue)).
-					Msg(fmt.Sprintf("Setting mockserver response"))
-				return mockserver.SetAnyValuePath(path, tokenValue)
-			})
-		}
+		path := fmt.Sprintf("/%s", tokenAddr)
+		tokenValue := value
+		valueAdditions.Go(func() error {
+			log.Debug().Str("path", path).
+				Str("value", fmt.Sprintf("%v", tokenValue)).
+				Msg(fmt.Sprintf("Setting mockserver response"))
+			return mockserver.SetAnyValuePath(path, tokenValue)
+		})
 	}
 	return valueAdditions.Wait()
-}
-
-func nodeContractPair(nodeAddr, contractAddr string) string {
-	return fmt.Sprintf("node_%s_contract_%s", nodeAddr[2:12], contractAddr[2:12])
 }
 
 type CCIPTestEnv struct {
