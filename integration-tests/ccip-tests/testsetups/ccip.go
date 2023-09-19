@@ -992,6 +992,8 @@ func CCIPDefaultTestSetUp(
 	require.NoError(t, laneAddGrp.Wait())
 	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
 	require.NoError(t, err)
+	require.Equal(t, len(setUpArgs.Lanes), len(inputs.NetworkPairs),
+		"Number of bi-directional lanes should be equal to number of network pairs")
 
 	// wait for price updates to be available and start event watchers
 	priceUpdateGrp, _ := errgroup.WithContext(parent)
@@ -1125,10 +1127,8 @@ func DeployEnvironments(
 				},
 			}))
 	}
-	if isSimulated {
-		err := testEnvironment.Run()
-		require.NoError(t, err)
-	}
+	err := testEnvironment.Run()
+	require.NoError(t, err)
 
 	if testEnvironment.WillUseRemoteRunner() {
 		return testEnvironment
