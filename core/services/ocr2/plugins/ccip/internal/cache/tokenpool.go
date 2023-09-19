@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -81,7 +80,8 @@ func (t *tokenPools) CallOrigin(ctx context.Context) (map[common.Address]common.
 		eg.Go(func() error {
 			poolAddress, err := t.offRamp.GetPoolByDestToken(&bind.CallOpts{Context: ctx}, token)
 			if err != nil {
-				return fmt.Errorf("get token pool for token '%s': %w", token, err)
+				t.lggr.Errorf("get token pool for token '%s': %s", token, err)
+				return nil
 			}
 
 			mu.Lock()
