@@ -1705,6 +1705,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	transferAmounts []*big.Int,
 	bootstrapAdded *atomic.Bool,
 	configureCLNodes bool,
+	jobAddMu *sync.Mutex,
 ) (*laneconfig.LaneConfig, *laneconfig.LaneConfig, error) {
 	var err error
 	env := lane.TestEnv
@@ -1859,21 +1860,28 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 
+	// job creation is buggy when done for too many lanes in parallel
+	// therefore we create the jobs sequentially with a lock
+	jobAddMu.Lock()
 	err = CreateOCR2CCIPCommitJobs(
 		lane.Context, jobParams,
 		commitNodes,
 		tokenUSDMap, mockServer,
 	)
+	jobAddMu.Unlock()
 	if err != nil {
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 	if p2pBootstrappersExec != nil {
 		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
 	}
+	jobAddMu.Lock()
 	err = CreateOCR2CCIPExecutionJobs(jobParams, execNodes)
+	jobAddMu.Unlock()
 	if err != nil {
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
+
 	lane.Dest.Common.ChainClient.ParallelTransactions(false)
 	lane.Source.Common.ChainClient.ParallelTransactions(false)
 
@@ -2145,7 +2153,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	logger zerolog.Logger,
 ) error {
 	chainlinkNodes := make([]*client.ChainlinkClient, 0)
-	var err error
+	//var err error
 	if c.LocalCluster != nil {
 		// for local cluster, fetch the values from the local cluster
 		c.MockServer = c.LocalCluster.MockServer.Client
@@ -2164,6 +2172,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		}
 
 		for _, chainlinkNode := range chainlinkK8sNodes {
+			chainlinkNode.ChainlinkClient.SetLogger(logger)
 			chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient)
 		}
 
@@ -2176,56 +2185,54 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 
 	nodesWithKeys := make(map[string][]*client.CLNodesWithKeys)
 	mu := &sync.Mutex{}
-	grp, _ := errgroup.WithContext(ctx)
-	populateKeys := func(chain blockchain.EVMClient) {
-		grp.Go(func() error {
-			_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", chain.GetChainID().String())
-			if err != nil {
-				return errors.WithStack(err)
-			}
-			if len(clNodes) == 0 {
-				return fmt.Errorf("no CL node with keys found for chain %s", chain.GetNetworkName())
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			nodesWithKeys[chain.GetChainID().String()] = clNodes
-			return nil
-		})
+	//grp, _ := errgroup.WithContext(ctx)
+	populateKeys := func(chain blockchain.EVMClient) error {
+		_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", chain.GetChainID().String())
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if len(clNodes) == 0 {
+			return fmt.Errorf("no CL node with keys found for chain %s", chain.GetNetworkName())
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		nodesWithKeys[chain.GetChainID().String()] = clNodes
+		return nil
 	}
 
-	fund := func(ec blockchain.EVMClient) {
-		grp.Go(func() error {
-			cfg := ec.GetNetworkConfig()
-			if cfg == nil {
-				return fmt.Errorf("blank network config")
+	fund := func(ec blockchain.EVMClient) error {
+		cfg := ec.GetNetworkConfig()
+		if cfg == nil {
+			return fmt.Errorf("blank network config")
+		}
+		c1, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec, logger)
+		if err != nil {
+			return fmt.Errorf("getting concurrent evmclient chain %s %+v", ec.GetNetworkName(), err)
+		}
+		defer func() {
+			if c1 != nil {
+				c1.Close()
 			}
-			c1, err := blockchain.ConcurrentEVMClient(*cfg, c.K8Env, ec, logger)
-			if err != nil {
-				return fmt.Errorf("getting concurrent evmclient chain %s %+v", ec.GetNetworkName(), err)
-			}
-			defer func() {
-				if c1 != nil {
-					c1.Close()
-				}
-			}()
-			err = actions.FundChainlinkNodesAddresses(chainlinkNodes[1:], c1, nodeFund)
-			if err != nil {
-				return fmt.Errorf("funding nodes for chain %s %+v", c1.GetNetworkName(), err)
-			}
-			return nil
-		})
+		}()
+
+		err = actions.FundChainlinkNodesAddresses(chainlinkNodes[1:], c1, nodeFund)
+		if err != nil {
+			return fmt.Errorf("funding nodes for chain %s %+v", c1.GetNetworkName(), err)
+		}
+		return nil
 	}
 
 	for _, chain := range chains {
 		log.Info().Msg("creating node keys")
-		populateKeys(chain)
+		err := populateKeys(chain)
+		if err != nil {
+			return err
+		}
 		log.Info().Msg("Funding Chainlink nodes for both the chains")
-		fund(chain)
-	}
-
-	err = grp.Wait()
-	if err != nil {
-		return errors.WithStack(err)
+		err = fund(chain)
+		if err != nil {
+			return err
+		}
 	}
 
 	c.CLNodesWithKeys = nodesWithKeys

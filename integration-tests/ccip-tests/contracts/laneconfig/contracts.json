@@ -1385,6 +1385,10 @@
           "on_ramp": "0x19fBF8B7Ad21176ee764B3AA51fF0BC08Bcc5164",
           "deployed_at": 9907580
         },
+        "Optimism Goerli-2": {
+          "on_ramp": "0x7723A1B6FFF2172A8D367740440B8dcC198321a7",
+          "deployed_at": 9952517
+        },
         "Polygon Mumbai-1": {
           "on_ramp": "0x72079522C4F59deA6b964d766D5c61d1DAe99696",
           "deployed_at": 9907582
@@ -1437,6 +1441,11 @@
           "off_ramp": "0x91D244Cf5F23A4069EfC717a3a0341A6ae37c3D0",
           "commit_store": "0x8D41685b4e8B5299DA4656BbBBa638FCDBCDF195",
           "receiver_dapp": "0xb5fc84BA93f706f7435A40BcBc4f94Db6a54c2C6"
+        },
+        "Optimism Goerli-2": {
+          "off_ramp": "0xF0b936868A29E17f8Dcf7df65741d1EbF1E913F5",
+          "commit_store": "0xDC04b84443D3B35fF2D44Ba1866DF087371AD051",
+          "receiver_dapp": "0xAbe9C118f9b447D31F80FFcBB3858c9C50cfa899"
         },
         "Polygon Mumbai-1": {
           "off_ramp": "0x616446a7dE7Ac9D0bcE7273311B06151dbcc0ba1",
@@ -1709,8 +1718,8 @@
     "Optimism Goerli-2": {
       "is_mock_arm": true,
       "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
-      "bridge_tokens": [],
-      "bridge_tokens_pools": [],
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
       "arm": "0xCDf3e84C43BC9351C971dFbbcf3e5F5cBCEda37c",
       "router": "0x592F2f604cBD85B68BCd33AC9801D20A4eAed954",
       "price_registry": "0xabD1eB6d362Eb2921C6eab100Af7FC8E518BF420",
@@ -1741,9 +1750,17 @@
           "on_ramp": "0xe7872664a1adB3EB7c9F4C207aBB99AF37bA7673",
           "deployed_at": 14790350
         },
+        "Base Goerli-1": {
+          "on_ramp": "0x81f2E0A86C19D80E0432D453474c1BEa80b1Ee9E",
+          "deployed_at": 14835291
+        },
         "Base Goerli-2": {
           "on_ramp": "0x290F0B5bF80aaEb3c0aee681AB4CD6909Ca03341",
           "deployed_at": 14790347
+        },
+        "Polygon Mumbai-1": {
+          "on_ramp": "0x9dEa92C620Eefa12AaDd177544dE1990913E79Ec",
+          "deployed_at": 14835321
         },
         "Polygon Mumbai-2": {
           "on_ramp": "0x3F1a1Cb24BD8eA08d741599d20C03Be8f9BE0f24",
@@ -1789,10 +1806,20 @@
           "commit_store": "0x132385fA34bFe9C31EfAA42680c0539f9cA41a80",
           "receiver_dapp": "0x6f287E094C5096E1aA7ec017a02D3A2C8B8A2e99"
         },
+        "Base Goerli-1": {
+          "off_ramp": "0x93E60a8c303010ae726e47C5Ed711F9AEA3939d7",
+          "commit_store": "0xbFE222f0eA3eF3B754213022fFfA14C9681D96b2",
+          "receiver_dapp": "0xa691803803C8a7A5582700884f8dB67059939978"
+        },
         "Base Goerli-2": {
           "off_ramp": "0xB1E82a291556065f3f9120f4235Db4Ca44820f82",
           "commit_store": "0x061adba3fe0e76476BA99176BB287bDB827E1D35",
           "receiver_dapp": "0x158af686fEc7395C20a783b7c11F550087ab9d06"
+        },
+        "Polygon Mumbai-1": {
+          "off_ramp": "0x5002905051c365904A3Bf093E139E4143DF4C13f",
+          "commit_store": "0x7011475d7782E5FF2ac5507B0F7449CAB684d10a",
+          "receiver_dapp": "0xD6d58dB4D31cAb2fEC92df834e03A25Fd95ea43d"
         },
         "Polygon Mumbai-2": {
           "off_ramp": "0x169f45D3f7c3CB1Ada3d36417fd2FBA7384050e2",
@@ -1858,6 +1885,10 @@
           "on_ramp": "0x8c731268876a7E2D90236C4876B3B6FCCD4E12d7",
           "deployed_at": 40230807
         },
+        "Optimism Goerli-2": {
+          "on_ramp": "0xF50746357ce1Cc5b765D56ac0ebe8D97D80b558A",
+          "deployed_at": 40267091
+        },
         "Sepolia Testnet-1": {
           "on_ramp": "0xBc201e4e3517F4cAa08Ee372AE5D6f6f3bE2fb82",
           "deployed_at": 40230800
@@ -1912,6 +1943,11 @@
           "off_ramp": "0xd3049316254731438D9E6Bb695b6de82cA86CaDf",
           "commit_store": "0x0cc16E3AbEec5a911B1eE3E215Bbc5Fc35DE6363",
           "receiver_dapp": "0x98e4Fd0F4394D1e0DD42b98578F1dCE3a9704274"
+        },
+        "Optimism Goerli-2": {
+          "off_ramp": "0xf21C1eE439e9E4cbcAb3fb5962992c20D2DB3807",
+          "commit_store": "0x660Aaa3F7cDe5d25c2f4AEc9dd32C05fb9584398",
+          "receiver_dapp": "0x7b6A3A81345b5C6a5aaEb1a0AbB808A33C36032c"
         },
         "Sepolia Testnet-1": {
           "off_ramp": "0xb1ba3418019EFA5503f9cffEB01365406CF18Ed0",
