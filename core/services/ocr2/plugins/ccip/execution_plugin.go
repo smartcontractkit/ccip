@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
@@ -285,7 +286,7 @@ func unregisterExecutionPluginLpFilters(
 		return err
 	}
 
-	if err := unregisterLpFilters(
+	if err := logpollerutil.UnregisterLpFilters(
 		sourceLP,
 		getExecutionPluginSourceLpChainFilters(destOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry),
 		qopts...,
@@ -293,7 +294,7 @@ func unregisterExecutionPluginLpFilters(
 		return err
 	}
 
-	return unregisterLpFilters(
+	return logpollerutil.UnregisterLpFilters(
 		destLP,
 		getExecutionPluginDestLpChainFilters(destOffRampConfig.CommitStore, destOffRamp.Address(), destOffRampDynCfg.PriceRegistry),
 		qopts...,
