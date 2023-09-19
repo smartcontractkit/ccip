@@ -239,6 +239,8 @@ type evm2EVMOnRampCCIPSendRequestedWithMeta struct {
 	blockTimestamp time.Time
 	executed       bool
 	finalized      bool
+	logIndex       uint
+	txHash         common.Hash
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
@@ -639,7 +641,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 func getTokenData(ctx context.Context, msg evm2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader) (tokenData [][]byte, allReady bool, err error) {
 	for _, token := range msg.TokenAmounts {
 		if offchainTokenDataProvider, ok := tokenDataProviders[token.Token]; ok {
-			ready, attestation, err2 := offchainTokenDataProvider.IsTokenDataReady(ctx, msg.SequenceNumber)
+			ready, attestation, err2 := offchainTokenDataProvider.IsTokenDataReady(ctx, msg.SequenceNumber, msg.logIndex, msg.txHash)
 			if err2 != nil {
 				return [][]byte{}, false, err2
 			}
@@ -831,6 +833,8 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 			blockTimestamp:         sendReq.BlockTimestamp,
 			executed:               executed,
 			finalized:              finalized,
+			logIndex:               sendReq.Data.Raw.Index,
+			txHash:                 sendReq.Data.Raw.TxHash,
 		}
 
 		// attach the msg to the appropriate reports

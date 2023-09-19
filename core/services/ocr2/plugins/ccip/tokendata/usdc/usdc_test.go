@@ -114,7 +114,7 @@ func TestUSDCService_IsAttestationComplete(t *testing.T) {
 	require.NoError(t, err)
 
 	usdcService := NewUSDCTokenDataReader(&eventsClient, mockUSDCTokenAddress, mockOnRampAddress, attestationURI, 420)
-	isReady, attestation, err := usdcService.IsTokenDataReady(context.Background(), seqNum)
+	isReady, attestation, err := usdcService.IsTokenDataReady(context.Background(), seqNum, uint(logIndex), txHash)
 	require.NoError(t, err)
 
 	require.True(t, isReady)

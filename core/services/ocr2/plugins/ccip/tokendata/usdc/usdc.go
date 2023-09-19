@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -26,16 +27,16 @@ type TokenDataReader struct {
 	sourceToken        common.Address
 	onRampAddress      common.Address
 
+	// Cache of sequence number -> usdc message body
+	usdcMessageHashCache      map[uint64][32]byte
+	usdcMessageHashCacheMutex sync.Mutex
+
 	// Cache of sequence number -> attestation attempt
 	attestationCache      map[uint64]attestationAttempt
 	attestationCacheMutex sync.Mutex
 }
 
 type attestationAttempt struct {
-	USDCMessageBody         []byte
-	USDCMessageHash         [32]byte
-	CCIPSendTxHash          common.Hash
-	CCIPSendLogIndex        int64
 	USDCAttestationResponse attestationResponse
 }
 
@@ -83,26 +84,26 @@ const (
 type AttestationStatus string
 
 const (
-	AttestationStatusSuccess   AttestationStatus = "complete"
-	AttestationStatusPending   AttestationStatus = "pending_confirmations"
-	AttestationStatusUnchecked AttestationStatus = "unchecked"
+	AttestationStatusSuccess AttestationStatus = "complete"
+	AttestationStatusPending AttestationStatus = "pending_confirmations"
 )
 
 var _ tokendata.Reader = &TokenDataReader{}
 
 func NewUSDCTokenDataReader(sourceChainEvents ccipdata.Reader, usdcTokenAddress, onRampAddress common.Address, usdcAttestationApi *url.URL, sourceChainId uint64) *TokenDataReader {
 	return &TokenDataReader{
-		sourceChainEvents:  sourceChainEvents,
-		attestationApi:     usdcAttestationApi,
-		messageTransmitter: messageTransmitterMapping[sourceChainId],
-		onRampAddress:      onRampAddress,
-		sourceToken:        usdcTokenAddress,
-		attestationCache:   make(map[uint64]attestationAttempt),
+		sourceChainEvents:    sourceChainEvents,
+		attestationApi:       usdcAttestationApi,
+		messageTransmitter:   messageTransmitterMapping[sourceChainId],
+		onRampAddress:        onRampAddress,
+		sourceToken:          usdcTokenAddress,
+		attestationCache:     make(map[uint64]attestationAttempt),
+		usdcMessageHashCache: make(map[uint64][32]byte),
 	}
 }
 
-func (s *TokenDataReader) IsTokenDataReady(ctx context.Context, seqNum uint64) (success bool, attestation []byte, err error) {
-	response, err := s.GetUpdatedAttestation(ctx, seqNum)
+func (s *TokenDataReader) IsTokenDataReady(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) (success bool, attestation []byte, err error) {
+	response, err := s.getUpdatedAttestation(ctx, seqNum, logIndex, txHash)
 	if err != nil {
 		return false, []byte{}, err
 	}
@@ -117,71 +118,51 @@ func (s *TokenDataReader) IsTokenDataReady(ctx context.Context, seqNum uint64) (
 	return false, []byte{}, nil
 }
 
-func (s *TokenDataReader) GetUpdatedAttestation(ctx context.Context, seqNum uint64) (attestationResponse, error) {
+func (s *TokenDataReader) getUpdatedAttestation(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) (attestationResponse, error) {
 	// Try to get information from cache to reduce the number of database and external calls
 	s.attestationCacheMutex.Lock()
 	defer s.attestationCacheMutex.Unlock()
-	attestationAttempt, ok := s.attestationCache[seqNum]
-	if ok && attestationAttempt.USDCAttestationResponse.Status == AttestationStatusSuccess {
+	attempt, ok := s.attestationCache[seqNum]
+	if ok && attempt.USDCAttestationResponse.Status == AttestationStatusSuccess {
 		// If successful, return the cached response
-		return attestationAttempt.USDCAttestationResponse, nil
+		return attempt.USDCAttestationResponse, nil
 	}
 
-	// If no attempt for this message id exists, get the required data to make one
-	if !ok {
-		var err error
-		attestationAttempt, err = s.getAttemptInfoFromCCIPMessageId(ctx, seqNum)
-		if err != nil {
-			return attestationResponse{}, err
-		}
-		// Save the attempt in the cache in case the external call fails
-		s.attestationCache[seqNum] = attestationAttempt
+	messageBody, err := s.getUSDCMessageBody(ctx, seqNum, logIndex, txHash)
+	if err != nil {
+		return attestationResponse{}, errors.Wrap(err, "failed getting the USDC message body")
 	}
 
-	response, err := s.callAttestationApi(ctx, attestationAttempt.USDCMessageHash)
+	response, err := s.callAttestationApi(ctx, messageBody)
 	if err != nil {
 		return attestationResponse{}, err
 	}
 
 	// Save the response in the cache
-	attestationAttempt.USDCAttestationResponse = response
-	s.attestationCache[seqNum] = attestationAttempt
+	attempt.USDCAttestationResponse = response
+	s.attestationCache[seqNum] = attempt
 
 	return response, nil
 }
 
-func (s *TokenDataReader) getAttemptInfoFromCCIPMessageId(ctx context.Context, seqNum uint64) (attestationAttempt, error) {
-	// Get the CCIP message send event from the log poller
-	ccipSendRequests, err := s.sourceChainEvents.GetSendRequestsBetweenSeqNums(ctx, s.onRampAddress, seqNum, seqNum, 0)
+func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) ([32]byte, error) {
+	s.usdcMessageHashCacheMutex.Lock()
+	defer s.usdcMessageHashCacheMutex.Unlock()
+
+	if body, ok := s.usdcMessageHashCache[seqNum]; ok {
+		return body, nil
+	}
+
+	usdcMessageBody, err := s.sourceChainEvents.GetLastUSDCMessagePriorToLogIndexInTx(ctx, int64(logIndex), txHash)
 	if err != nil {
-		return attestationAttempt{}, err
+		return [32]byte{}, err
 	}
 
-	if len(ccipSendRequests) != 1 {
-		return attestationAttempt{}, fmt.Errorf("expected 1 CCIP send request, got %d", len(ccipSendRequests))
-	}
+	msgBodyHash := utils.Keccak256Fixed(usdcMessageBody)
 
-	ccipSendRequest := ccipSendRequests[0]
-
-	ccipSendTxHash := ccipSendRequest.Data.Raw.TxHash
-	ccipSendLogIndex := int64(ccipSendRequest.Data.Raw.Index)
-
-	// Get the USDC message body
-	usdcMessageBody, err := s.sourceChainEvents.GetLastUSDCMessagePriorToLogIndexInTx(ctx, ccipSendLogIndex, ccipSendTxHash)
-	if err != nil {
-		return attestationAttempt{}, err
-	}
-
-	return attestationAttempt{
-		USDCMessageBody:  usdcMessageBody,
-		USDCMessageHash:  utils.Keccak256Fixed(usdcMessageBody),
-		CCIPSendTxHash:   ccipSendTxHash,
-		CCIPSendLogIndex: ccipSendLogIndex,
-		USDCAttestationResponse: attestationResponse{
-			Status:      AttestationStatusUnchecked,
-			Attestation: "",
-		},
-	}, nil
+	// Save the attempt in the cache in case the external call fails
+	s.usdcMessageHashCache[seqNum] = msgBodyHash
+	return msgBodyHash, nil
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {

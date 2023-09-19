@@ -13,7 +13,7 @@ type Reader interface {
 	// IsTokenDataReady returns true if the attestation for the given sequence number is complete
 	// and returns the attestation bytes if it is complete.
 	// Note: this function can be called many times, the implementation should cache the result.
-	IsTokenDataReady(ctx context.Context, seqNum uint64) (ready bool, tokenData []byte, err error)
+	IsTokenDataReady(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) (ready bool, tokenData []byte, err error)
 
 	// GetSourceLogPollerFilters returns the filters that should be used for the source chain log poller
 	GetSourceLogPollerFilters() []logpoller.Filter
