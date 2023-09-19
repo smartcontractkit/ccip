@@ -24,11 +24,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipevents"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -53,17 +56,17 @@ type update struct {
 type CommitPluginConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
-	sourceEvents             ccipevents.Client
-	destEvents               ccipevents.Client
+	sourceReader             ccipdata.Reader
+	destReader               ccipdata.Reader
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	onRampAddress            common.Address
 	commitStore              commit_store.CommitStoreInterface
-	priceGetter              PriceGetter
+	priceGetter              pricegetter.PriceGetter
 	sourceChainSelector      uint64
 	sourceNative             common.Address
 	sourceFeeEstimator       gas.EvmFeeEstimator
 	sourceClient, destClient evmclient.Client
-	leafHasher               hasher.LeafHasherInterface[[32]byte]
+	leafHasher               hashlib.LeafHasherInterface[[32]byte]
 	checkFinalityTags        bool
 }
 
@@ -200,17 +203,17 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
 // pass zeroAddress if destPriceRegistry is unknown, filters with zero address are omitted.
-func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address) error {
+func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address, qopts ...pg.QOpt) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
 
 	// source chain filters
 	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getCommitPluginSourceLpFilters(rf.config.onRampAddress)
 	created, deleted := filtersDiff(sourceFiltersBefore, sourceFiltersNow)
-	if err := unregisterLpFilters(nilQueryer, rf.config.sourceLP, deleted); err != nil {
+	if err := unregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
 		return err
 	}
-	if err := registerLpFilters(nilQueryer, rf.config.sourceLP, created); err != nil {
+	if err := registerLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
 		return err
 	}
 	rf.sourceChainFilters = sourceFiltersNow
@@ -218,10 +221,10 @@ func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry
 	// destination chain filters
 	destFiltersBefore, destFiltersNow := rf.destChainFilters, getCommitPluginDestLpFilters(destPriceRegistry, rf.config.offRamp.Address())
 	created, deleted = filtersDiff(destFiltersBefore, destFiltersNow)
-	if err := unregisterLpFilters(nilQueryer, rf.config.destLP, deleted); err != nil {
+	if err := unregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
 		return err
 	}
-	if err := registerLpFilters(nilQueryer, rf.config.destLP, created); err != nil {
+	if err := registerLpFilters(rf.config.destLP, created, qopts...); err != nil {
 		return err
 	}
 	rf.destChainFilters = destFiltersNow
@@ -235,7 +238,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 
-	msgRequests, err := r.config.sourceEvents.GetSendRequestsGteSeqNum(ctx, r.config.onRampAddress, nextInflightMin, r.config.checkFinalityTags, int(r.offchainConfig.SourceFinalityDepth))
+	msgRequests, err := r.config.sourceReader.GetSendRequestsGteSeqNum(ctx, r.config.onRampAddress, nextInflightMin, r.config.checkFinalityTags, int(r.offchainConfig.SourceFinalityDepth))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -364,7 +367,7 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 // Gets the latest token price updates based on logs within the heartbeat
 // The updates returned by this function are guaranteed to not contain nil values.
 func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, checkInflight bool) (map[common.Address]update, error) {
-	tokenPriceUpdates, err := r.config.destEvents.GetTokenPriceUpdatesCreatedAfter(
+	tokenPriceUpdates, err := r.config.destReader.GetTokenPriceUpdatesCreatedAfter(
 		ctx,
 		r.destPriceRegistry.Address(),
 		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
@@ -420,7 +423,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 	}
 
 	// If there are no price updates inflight, check latest prices onchain
-	gasPriceUpdates, err := r.config.destEvents.GetGasPriceUpdatesCreatedAfter(
+	gasPriceUpdates, err := r.config.destReader.GetGasPriceUpdatesCreatedAfter(
 		ctx,
 		r.destPriceRegistry.Address(),
 		r.config.sourceChainSelector,
@@ -654,7 +657,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	sendRequests, err := r.config.sourceEvents.GetSendRequestsBetweenSeqNums(
+	sendRequests, err := r.config.sourceReader.GetSendRequestsBetweenSeqNums(
 		ctx,
 		r.config.onRampAddress,
 		interval.Min,
@@ -677,7 +680,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 		return commit_store.CommitStoreCommitReport{}, fmt.Errorf("tried building a tree without leaves")
 	}
 
-	tree, err := merklemulti.NewTree(hasher.NewKeccakCtx(), leaves)
+	tree, err := merklemulti.NewTree(hashlib.NewKeccakCtx(), leaves)
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
 	}

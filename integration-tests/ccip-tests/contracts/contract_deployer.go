@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ocrConfigHelper2 "github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
@@ -43,10 +44,10 @@ type CCIPContractsDeployer struct {
 }
 
 // NewCCIPContractsDeployer returns an instance of a contract deployer for CCIP
-func NewCCIPContractsDeployer(bcClient blockchain.EVMClient) (*CCIPContractsDeployer, error) {
+func NewCCIPContractsDeployer(bcClient blockchain.EVMClient, logger zerolog.Logger) (*CCIPContractsDeployer, error) {
 	return &CCIPContractsDeployer{
 		evmClient:   bcClient,
-		EthDeployer: contracts.NewEthereumContractDeployer(bcClient),
+		EthDeployer: contracts.NewEthereumContractDeployer(bcClient, logger),
 	}, nil
 }
 
@@ -154,7 +155,9 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 			auth,
 			backend,
 			token,
-			[]common.Address{}, armProxy)
+			[]common.Address{},
+			armProxy,
+			true)
 	})
 
 	if err != nil {
@@ -337,12 +340,11 @@ func (e *CCIPContractsDeployer) NewPriceRegistry(addr common.Address) (
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployPriceRegistry() (*PriceRegistry, error) {
+func (e *CCIPContractsDeployer) DeployPriceRegistry(tokens []common.Address) (*PriceRegistry, error) {
 	address, _, instance, err := e.evmClient.DeployContract("PriceRegistry", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		var tokens []common.Address
 		return price_registry.DeployPriceRegistry(auth, backend, nil, tokens, 60*60*24*14)
 	})
 	if err != nil {

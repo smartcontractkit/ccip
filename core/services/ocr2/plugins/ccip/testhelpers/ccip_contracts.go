@@ -38,8 +38,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -576,6 +576,7 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		sourceTokenAddress,
 		[]common.Address{}, // empty allowList at deploy time indicates pool has no original sender restrictions
 		c.Source.ARMProxy.Address(),
+		true,
 	)
 	if err != nil {
 		return [20]byte{}, nil, err
@@ -782,7 +783,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		sourceChain,
 		sourceLinkTokenAddress,
 		[]common.Address{},
-		armProxySourceAddress)
+		armProxySourceAddress,
+		true,
+	)
 	require.NoError(t, err)
 	sourceChain.Commit()
 	sourcePool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourcePoolAddress, sourceChain)
@@ -798,7 +801,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		destUser,
 		destChain,
 		destLinkTokenAddress,
-		[]common.Address{}, armProxyDestAddress)
+		[]common.Address{},
+		armProxyDestAddress,
+		true,
+	)
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -838,7 +844,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		sourceUser,
 		sourceChain,
 		sourceWeth9addr,
-		[]common.Address{}, armProxySourceAddress)
+		[]common.Address{},
+		armProxySourceAddress,
+		true,
+	)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -989,7 +998,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		destUser,
 		destChain,
 		destWeth9addr,
-		[]common.Address{}, armProxyDestAddress)
+		[]common.Address{},
+		armProxyDestAddress,
+		true,
+	)
 	require.NoError(t, err)
 	destWrappedPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destWrappedPoolAddress, destChain)
 	require.NoError(t, err)
@@ -1345,8 +1357,8 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	log.Info().Msg("Executing request manually")
 	seqNr := args.seqNr
 	// Build a merkle tree for the report
-	mctx := hasher.NewKeccakCtx()
-	leafHasher := hasher.NewLeafHasher(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx)
+	mctx := hashlib.NewKeccakCtx()
+	leafHasher := hashlib.NewLeafHasher(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx)
 	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(args.OnRamp), args.SourceChain)
 	if err != nil {
 		return nil, err
