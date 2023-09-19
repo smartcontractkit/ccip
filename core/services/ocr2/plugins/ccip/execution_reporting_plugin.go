@@ -257,28 +257,28 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	// Since this will only increase over time, the highest observed value will
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
-	getAllowedTokenAmount := LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+	getAllowedTokenAmount := cache.LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
 		return r.config.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 	})
 	sourceToDestTokens, supportedDestTokens, err := r.sourceDestinationTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
-	getSourceTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
+	getSourceTokensPrices := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
 		sourceFeeTokens, err1 := r.cachedSourceFeeTokens.Get(ctx)
 		if err1 != nil {
 			return nil, err1
 		}
 		return getTokensPrices(ctx, sourceFeeTokens, r.config.sourcePriceRegistry, []common.Address{r.config.sourceWrappedNativeToken})
 	})
-	getDestTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
+	getDestTokensPrices := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
 		dstTokens, err1 := r.cachedDestTokens.Get(ctx)
 		if err1 != nil {
 			return nil, err1
 		}
 		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	})
-	getDestGasPrice := LazyFetch(func() (*big.Int, error) {
+	getDestGasPrice := cache.LazyFetch(func() (*big.Int, error) {
 		return r.estimateDestinationGasPrice(ctx)
 	})
 
@@ -294,7 +294,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return nil, err
 	}
 
-	getDestPoolRateLimits := LazyFetch(func() (map[common.Address]*big.Int, error) {
+	getDestPoolRateLimits := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
 		return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, sourceToDestTokens)
 	})
 
@@ -471,7 +471,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	aggregateTokenLimit *big.Int,
 	sourceTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
-	execGasPriceEstimate LazyFunction[*big.Int],
+	execGasPriceEstimate cache.LazyFunction[*big.Int],
 	sourceToDestToken map[common.Address]common.Address,
 	destTokenPoolRateLimits map[common.Address]*big.Int,
 ) (executableMessages []ObservedMessage) {
