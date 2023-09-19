@@ -17,8 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver"
-	mockserver_cfg "github.com/smartcontractkit/chainlink-env/pkg/helm/mockserver-cfg"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
@@ -531,28 +529,6 @@ type CCIPTestSetUpOutputs struct {
 	allTokenValues           map[string]interface{}
 }
 
-func (o *CCIPTestSetUpOutputs) setTokenValues(ctx context.Context, lggr zerolog.Logger, n []blockchain.EVMNetwork) error {
-	env := o.Env
-	if env == nil {
-		return fmt.Errorf("env is nil")
-	}
-	o.allTokenValues = make(map[string]interface{})
-	o.CommonContractsByNetwork.Range(func(key, value interface{}) bool {
-		if value != nil {
-			for _, network := range n {
-				if key.(string) == network.Name {
-					chainContracts := value.(*actions.CCIPCommon)
-					if chainContracts != nil {
-						chainContracts.TokenValues(lggr, o.allTokenValues)
-					}
-				}
-			}
-		}
-		return true
-	})
-	return actions.SetMockServerWithSameTokenFeeConversionValue(context.Background(), o.allTokenValues, env.MockServer)
-}
-
 func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	chainClient blockchain.EVMClient,
 	networkCfg blockchain.EVMNetwork,
@@ -981,10 +957,6 @@ func CCIPDefaultTestSetUp(
 		})
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
-	// set token values for all networks for the job pipeline
-	if configureCLNode {
-		require.NoError(t, setUpArgs.setTokenValues(context.Background(), lggr, inputs.SelectedNetworks))
-	}
 
 	// deploy all lane specific contracts
 	lggr.Info().Msg("Deploying chain specific contracts")
@@ -1085,7 +1057,6 @@ func DeployLocalCluster(
 ) (*test_env.CLClusterTestEnv, func() error) {
 	env, err := test_env.NewCLTestEnvBuilder().
 		WithPrivateGethChains(networks).
-		WithMockServer(1).
 		Build()
 	require.NoError(t, err)
 	for _, n := range env.PrivateChain {
@@ -1124,39 +1095,41 @@ func DeployEnvironments(
 ) *environment.Environment {
 	testEnvironment := environment.New(envconfig)
 	numOfTxNodes := 1
+	isSimulated := false
 	for _, network := range networks {
-		if network.Simulated {
-			testEnvironment.
-				AddHelm(reorg.New(&reorg.Props{
-					NetworkName: network.Name,
-					NetworkType: "simulated-geth-non-dev",
-					Values: map[string]interface{}{
-						"geth": map[string]interface{}{
-							"genesis": map[string]interface{}{
-								"networkId": fmt.Sprint(network.ChainID),
-							},
-							"tx": map[string]interface{}{
-								"replicas":  strconv.Itoa(numOfTxNodes),
-								"resources": gethResource,
-							},
-							"miner": map[string]interface{}{
-								"replicas":  "0",
-								"resources": gethResource,
-							},
+		if !network.Simulated {
+			continue
+		}
+		isSimulated = true
+		testEnvironment.
+			AddHelm(reorg.New(&reorg.Props{
+				NetworkName: network.Name,
+				NetworkType: "simulated-geth-non-dev",
+				Values: map[string]interface{}{
+					"geth": map[string]interface{}{
+						"genesis": map[string]interface{}{
+							"networkId": fmt.Sprint(network.ChainID),
 						},
-						"bootnode": map[string]interface{}{
-							"replicas": "1",
+						"tx": map[string]interface{}{
+							"replicas":  strconv.Itoa(numOfTxNodes),
+							"resources": gethResource,
+						},
+						"miner": map[string]interface{}{
+							"replicas":  "0",
+							"resources": gethResource,
 						},
 					},
-				}))
-		}
+					"bootnode": map[string]interface{}{
+						"replicas": "1",
+					},
+				},
+			}))
+	}
+	if isSimulated {
+		err := testEnvironment.Run()
+		require.NoError(t, err)
 	}
 
-	err := testEnvironment.
-		AddHelm(mockserver_cfg.New(nil)).
-		AddHelm(mockserver.New(nil)).
-		Run()
-	require.NoError(t, err)
 	if testEnvironment.WillUseRemoteRunner() {
 		return testEnvironment
 	}

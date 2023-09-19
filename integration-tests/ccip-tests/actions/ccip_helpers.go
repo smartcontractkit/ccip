@@ -350,16 +350,6 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(lggr zerolog.Logger) ([]event
 	return subs, nil
 }
 
-func (ccipModule *CCIPCommon) TokenValues(lggr zerolog.Logger, tokenUSDMap map[string]interface{}) {
-	for _, token := range ccipModule.BridgeTokens {
-		tokenUSDMap[token.Address()] = LinkToUSD.String()
-	}
-
-	tokenUSDMap[ccipModule.FeeToken.Address()] = LinkToUSD.String()
-	tokenUSDMap[ccipModule.WrappedNative.Hex()] = WrappedNativeToUSD.String()
-	lggr.Info().Interface("tokenUSDMap", tokenUSDMap).Msg("tokenUSDMap")
-}
-
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
 // This reuses common contracts for bidirectional lanes
 func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
@@ -1776,7 +1766,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 	clNodesWithKeys := env.CLNodesWithKeys
-	mockServer := env.MockServer
 	// set up ocr2 jobs
 	clNodes, exists := clNodesWithKeys[lane.Dest.Common.ChainClient.GetChainID().String()]
 	if !exists {
@@ -1817,14 +1806,25 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, fmt.Errorf("getting current block should be successful in destination chain %+v", err)
 	}
 
+	tokenUSDMap := make(map[string]string)
+	for _, token := range lane.Dest.Common.BridgeTokens {
+		tokenUSDMap[token.Address()] = LinkToUSD.String()
+	}
+
+	tokenUSDMap[lane.Dest.Common.FeeToken.Address()] = LinkToUSD.String()
+	tokenUSDMap[lane.Source.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
+	tokenUSDMap[lane.Dest.Common.WrappedNative.Hex()] = WrappedNativeToUSD.String()
+	lane.Logger.Info().Interface("tokenUSDMap", tokenUSDMap).Msg("tokenUSDMap")
+
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
-		OffRamp:          lane.Dest.OffRamp.EthAddress,
-		CommitStore:      lane.Dest.CommitStore.EthAddress,
-		SourceChainName:  sourceChainClient.GetNetworkName(),
-		DestChainName:    destChainClient.GetNetworkName(),
-		DestEvmChainId:   destChainClient.GetChainID().Uint64(),
-		SourceStartBlock: lane.Source.SrcStartBlock,
-		DestStartBlock:   currentBlockOnDest,
+		OffRamp:                lane.Dest.OffRamp.EthAddress,
+		CommitStore:            lane.Dest.CommitStore.EthAddress,
+		SourceChainName:        sourceChainClient.GetNetworkName(),
+		DestChainName:          destChainClient.GetNetworkName(),
+		DestEvmChainId:         destChainClient.GetChainID().Uint64(),
+		SourceStartBlock:       lane.Source.SrcStartBlock,
+		TokenPricesUSDPipeline: StaticTokenFeeForMultipleTokenAddr(tokenUSDMap),
+		DestStartBlock:         currentBlockOnDest,
 	}
 
 	if !bootstrapAdded.Load() {
@@ -1875,7 +1875,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// job creation is buggy when done for too many lanes in parallel
 	// therefore we create the jobs sequentially with a lock
 	jobAddMu.Lock()
-	err = CreateOCR2CCIPCommitJobs(jobParams, commitNodes, mockServer, tokenAddresses)
+	err = CreateOCR2CCIPCommitJobs(jobParams, commitNodes)
 	jobAddMu.Unlock()
 	if err != nil {
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
@@ -1978,20 +1978,14 @@ func CreateBootstrapJob(
 func CreateOCR2CCIPCommitJobs(
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	commitNodes []*client.CLNodesWithKeys,
-	mockServer *ctfClient.MockserverClient,
-	tokenAddrs []string,
 ) error {
 	ocr2SpecCommit, err := jobParams.CommitJobSpec()
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	tokenPricesUSDPipeline := TokenFeeForMultipleTokenAddr(tokenAddrs, mockServer)
 	for i, node := range commitNodes {
 		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
-		ocr2SpecCommit.OCR2OracleSpec.PluginConfig["tokenPricesUSDPipeline"] = fmt.Sprintf(`"""
-%s
-"""`, tokenPricesUSDPipeline)
 
 		_, err = node.Node.MustCreateJob(ocr2SpecCommit)
 		if err != nil {
@@ -2022,7 +2016,8 @@ func CreateOCR2CCIPExecutionJobs(jobParams integrationtesthelpers.CCIPJobSpecPar
 	return nil
 }
 
-func TokenFeeForMultipleTokenAddr(tokenAddr []string, mockserver *ctfClient.MockserverClient) string {
+// TODO : keep it if there is a better mockserver implementation is found
+func _(tokenAddr []string, mockserver *ctfClient.MockserverClient) string {
 	source := ""
 	right := ""
 	for i, addr := range tokenAddr {
@@ -2036,6 +2031,17 @@ token%d->token%d_parse;`, i+1, url, i+1, i+1, i+1)
 	right = right[:len(right)-1]
 	source = fmt.Sprintf(`%s
 merge [type=merge left="{}" right="{%s}"];`, source, right)
+
+	return source
+}
+
+func StaticTokenFeeForMultipleTokenAddr(tokenUSD map[string]string) string {
+	right := ""
+	for addr, value := range tokenUSD {
+		right = right + fmt.Sprintf(`\\"%s\\":\\"%s\\",`, addr, value)
+	}
+	right = right[:len(right)-1]
+	source := fmt.Sprintf(`merge [type=merge left="{}" right="{%s}"];`, right)
 
 	return source
 }
