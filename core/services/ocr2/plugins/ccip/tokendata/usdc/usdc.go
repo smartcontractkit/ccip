@@ -14,13 +14,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type TokenDataReader struct {
-	sourceChainEvents  ccipevents.Client
+	sourceChainEvents  ccipdata.Reader
 	attestationApi     *url.URL
 	messageTransmitter common.Address
 	sourceToken        common.Address
@@ -90,7 +90,7 @@ const (
 
 var _ tokendata.Reader = &TokenDataReader{}
 
-func NewUSDCTokenDataReader(sourceChainEvents ccipevents.Client, usdcTokenAddress, onRampAddress common.Address, usdcAttestationApi *url.URL, sourceChainId uint64) *TokenDataReader {
+func NewUSDCTokenDataReader(sourceChainEvents ccipdata.Reader, usdcTokenAddress, onRampAddress common.Address, usdcAttestationApi *url.URL, sourceChainId uint64) *TokenDataReader {
 	return &TokenDataReader{
 		sourceChainEvents:  sourceChainEvents,
 		attestationApi:     usdcAttestationApi,

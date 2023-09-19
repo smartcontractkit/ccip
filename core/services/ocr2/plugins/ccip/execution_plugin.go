@@ -17,7 +17,7 @@ import (
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 
@@ -111,7 +111,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 		"sourceChain", ChainName(int64(chainId)),
 		"destChain", ChainName(destChainID))
 
-	sourceChainEventClient := ccipevents.NewLogPollerClient(sourceChain.LogPoller(), execLggr, sourceChain.Client())
+	sourceChainEventClient := ccipdata.NewLogPollerReader(sourceChain.LogPoller(), execLggr, sourceChain.Client())
 
 	tokenDataProviders := make(map[common.Address]tokendata.Reader)
 
@@ -134,8 +134,8 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 			lggr:                     execLggr,
 			sourceLP:                 sourceChain.LogPoller(),
 			destLP:                   destChain.LogPoller(),
-			sourceEvents:             sourceChainEventClient,
-			destEvents:               ccipevents.NewLogPollerClient(destChain.LogPoller(), execLggr, destChain.Client()),
+			sourceReader:             sourceChainEventClient,
+			destReader:               ccipdata.NewLogPollerReader(destChain.LogPoller(), execLggr, destChain.Client()),
 			onRamp:                   onRamp,
 			offRamp:                  offRamp,
 			commitStore:              commitStore,
@@ -153,7 +153,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 		return nil, err
 	}
 
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), destChain.ID())
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", spec.Relay, destChain.ID())
 	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(execLggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
@@ -342,10 +342,9 @@ func unregisterExecutionPluginLpFilters(
 }
 
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
-// all the message ids will be added to the tx metadata.
+// Only MessageIDs will be populated in the TxMeta.
 func ExecutionReportToEthTxMeta(report []byte) (*txmgr.TxMeta, error) {
 	execReport, err := abihelpers.DecodeExecutionReport(report)
-
 	if err != nil {
 		return nil, err
 	}

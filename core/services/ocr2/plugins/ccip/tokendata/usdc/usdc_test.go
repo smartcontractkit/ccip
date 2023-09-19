@@ -16,7 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -87,14 +87,14 @@ func TestUSDCService_IsAttestationComplete(t *testing.T) {
 	txHash := utils.RandomBytes32()
 	logIndex := int64(4)
 
-	eventsClient := ccipevents.MockClient{}
+	eventsClient := ccipdata.MockReader{}
 	eventsClient.On("GetSendRequestsBetweenSeqNums",
 		mock.Anything,
 		mockOnRampAddress,
 		seqNum,
 		seqNum,
 		0,
-	).Return([]ccipevents.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{
+	).Return([]ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{
 		{
 			Data: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{
 				Raw: types.Log{
