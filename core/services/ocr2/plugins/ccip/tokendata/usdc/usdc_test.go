@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,7 +28,9 @@ var (
 func TestUSDCService_callAttestationApi(t *testing.T) {
 	t.Skipf("Skipping test because it uses the real USDC attestation API")
 	usdcMessageHash := "912f22a13e9ccb979b621500f6952b2afd6e75be7eadaed93fc2625fe11c52a2"
-	usdcService := NewUSDCOffchainTokenDataService(nil, mockUSDCTokenAddress, mockOnRampAddress, "https://iris-api-sandbox.circle.com", 420)
+	attestationURI, err := url.ParseRequestURI("https://iris-api-sandbox.circle.com")
+	require.NoError(t, err)
+	usdcService := NewUSDCTokenDataReader(nil, mockUSDCTokenAddress, mockOnRampAddress, attestationURI, 420)
 
 	attestation, err := usdcService.callAttestationApi(context.Background(), [32]byte(common.FromHex(usdcMessageHash)))
 	require.NoError(t, err)
@@ -37,15 +40,17 @@ func TestUSDCService_callAttestationApi(t *testing.T) {
 }
 
 func TestUSDCService_callAttestationApiMock(t *testing.T) {
-	response := AttestationResponse{
+	response := attestationResponse{
 		Status:      AttestationStatusSuccess,
 		Attestation: "720502893578a89a8a87982982ef781c18b193",
 	}
 
 	ts := getMockUSDCEndpoint(t, response)
 	defer ts.Close()
+	attestationURI, err := url.ParseRequestURI(ts.URL)
+	require.NoError(t, err)
 
-	usdcService := NewUSDCOffchainTokenDataService(nil, mockUSDCTokenAddress, mockOnRampAddress, ts.URL, 420)
+	usdcService := NewUSDCTokenDataReader(nil, mockUSDCTokenAddress, mockOnRampAddress, attestationURI, 420)
 	attestation, err := usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 	require.NoError(t, err)
 
@@ -58,14 +63,16 @@ func TestUSDCService_callAttestationApiMockError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer ts.Close()
+	attestationURI, err := url.ParseRequestURI(ts.URL)
+	require.NoError(t, err)
 
-	usdcService := NewUSDCOffchainTokenDataService(nil, mockUSDCTokenAddress, mockOnRampAddress, ts.URL, 420)
-	_, err := usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
+	usdcService := NewUSDCTokenDataReader(nil, mockUSDCTokenAddress, mockOnRampAddress, attestationURI, 420)
+	_, err = usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 	require.Error(t, err)
 }
 
 func TestUSDCService_IsAttestationComplete(t *testing.T) {
-	response := AttestationResponse{
+	response := attestationResponse{
 		Status:      AttestationStatusSuccess,
 		Attestation: "720502893578a89a8a87982982ef781c18b193",
 	}
@@ -103,8 +110,10 @@ func TestUSDCService_IsAttestationComplete(t *testing.T) {
 		logIndex,
 		common.Hash(txHash),
 	).Return(attestationBytes, nil)
+	attestationURI, err := url.ParseRequestURI(ts.URL)
+	require.NoError(t, err)
 
-	usdcService := NewUSDCOffchainTokenDataService(&eventsClient, mockUSDCTokenAddress, mockOnRampAddress, ts.URL, 420)
+	usdcService := NewUSDCTokenDataReader(&eventsClient, mockUSDCTokenAddress, mockOnRampAddress, attestationURI, 420)
 	isReady, attestation, err := usdcService.IsTokenDataReady(context.Background(), seqNum)
 	require.NoError(t, err)
 
@@ -113,7 +122,7 @@ func TestUSDCService_IsAttestationComplete(t *testing.T) {
 	require.Equal(t, isReady, response.Status == AttestationStatusSuccess)
 }
 
-func getMockUSDCEndpoint(t *testing.T, response AttestationResponse) *httptest.Server {
+func getMockUSDCEndpoint(t *testing.T, response attestationResponse) *httptest.Server {
 	responseBytes, err := json.Marshal(response)
 	require.NoError(t, err)
 
@@ -126,7 +135,7 @@ func getMockUSDCEndpoint(t *testing.T, response AttestationResponse) *httptest.S
 // Asserts the hard coded event signature matches Keccak256("MessageSent(bytes)")
 func TestGetUSDCServiceSourceLPFilters(t *testing.T) {
 	chainId := uint64(420)
-	usdcService := NewUSDCOffchainTokenDataService(nil, mockUSDCTokenAddress, mockOnRampAddress, "", chainId)
+	usdcService := NewUSDCTokenDataReader(nil, mockUSDCTokenAddress, mockOnRampAddress, nil, chainId)
 
 	filters := usdcService.GetSourceLogPollerFilters()
 	expectedTransmitterAddress := messageTransmitterMapping[chainId]

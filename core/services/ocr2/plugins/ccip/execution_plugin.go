@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,6 +16,7 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
@@ -31,8 +33,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/offchaintokendata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/offchaintokendata/usdc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -111,15 +113,19 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 
 	sourceChainEventClient := ccipevents.NewLogPollerClient(sourceChain.LogPoller(), execLggr, sourceChain.Client())
 
-	tokenDataProviders := make(map[common.Address]offchaintokendata.Provider)
+	tokenDataProviders := make(map[common.Address]tokendata.Reader)
 
 	// Subscribe all token data providers
 	if pluginConfig.USDCAttestationApi != "" {
-		tokenDataProviders[usdc.TokenMapping[chainId]] = usdc.NewUSDCOffchainTokenDataService(
+		attestationURI, err := url.ParseRequestURI(pluginConfig.USDCAttestationApi)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse USDC attestation API")
+		}
+		tokenDataProviders[usdc.TokenMapping[chainId]] = usdc.NewUSDCTokenDataReader(
 			sourceChainEventClient,
 			usdc.TokenMapping[chainId],
 			offRampConfig.OnRamp,
-			pluginConfig.USDCAttestationApi,
+			attestationURI,
 			chainId)
 	}
 
@@ -175,7 +181,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address, tokenDataProviders map[common.Address]offchaintokendata.Provider) []logpoller.Filter {
+func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address, tokenDataProviders map[common.Address]tokendata.Reader) []logpoller.Filter {
 	var filters []logpoller.Filter
 	for _, provider := range tokenDataProviders {
 		filters = append(filters, provider.GetSourceLogPollerFilters()...)
@@ -310,13 +316,14 @@ func unregisterExecutionPluginLpFilters(
 		return err
 	}
 
-	tokenDataProviders := make(map[common.Address]offchaintokendata.Provider)
+	tokenDataProviders := make(map[common.Address]tokendata.Reader)
 
 	// TODO the called function only uses the chainId to get the message transmitter address
-	tokenDataProviders[usdc.TokenMapping[chainId]] = usdc.NewUSDCOffchainTokenDataService(nil,
+	tokenDataProviders[usdc.TokenMapping[chainId]] = usdc.NewUSDCTokenDataReader(
+		nil,
 		usdc.TokenMapping[chainId],
 		common.Address{},
-		"",
+		nil,
 		chainId)
 
 	if err = unregisterLpFilters(

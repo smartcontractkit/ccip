@@ -31,9 +31,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/offchaintokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	plugintesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/plugins"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
@@ -78,7 +78,7 @@ func setupExecTestHarness(t *testing.T) execTestHarness {
 		RelativeBoostPerWaitHour:    0.07,
 	}
 	sourceChainEventClient := ccipevents.NewLogPollerClient(th.SourceLP, lggr, th.SourceClient)
-	tokenDataProviders := make(map[common.Address]offchaintokendata.Provider)
+	tokenDataProviders := make(map[common.Address]tokendata.Reader)
 
 	plugin := ExecutionReportingPlugin{
 		config: ExecutionPluginConfig{
@@ -1160,7 +1160,7 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 			commitStore:         commitStore,
 			offRamp:             offRamp,
 			sourcePriceRegistry: sourcePriceRegistry,
-			tokenDataProviders:  make(map[common.Address]offchaintokendata.Provider),
+			tokenDataProviders:  make(map[common.Address]tokendata.Reader),
 		},
 	}
 

@@ -36,7 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/offchaintokendata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
@@ -67,7 +67,7 @@ type ExecutionPluginConfig struct {
 	sourceClient             evmclient.Client
 	destGasEstimator         gas.EvmFeeEstimator
 	leafHasher               hashlib.LeafHasherInterface[[32]byte]
-	tokenDataProviders       map[common.Address]offchaintokendata.Provider
+	tokenDataProviders       map[common.Address]tokendata.Reader
 }
 
 type ExecutionReportingPlugin struct {
@@ -631,7 +631,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	return executableMessages
 }
 
-func getTokenData(ctx context.Context, msg evm2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]offchaintokendata.Provider) (tokenData [][]byte, allReady bool, err error) {
+func getTokenData(ctx context.Context, msg evm2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader) (tokenData [][]byte, allReady bool, err error) {
 	for _, token := range msg.TokenAmounts {
 		if offchainTokenDataProvider, ok := tokenDataProviders[token.Token]; ok {
 			ready, attestation, err2 := offchainTokenDataProvider.IsTokenDataReady(ctx, msg.SequenceNumber)
