@@ -1013,6 +1013,7 @@ func CCIPDefaultTestSetUp(
 			}
 		}
 	}
+	lggr.Info().Msg("Test setup completed")
 	return setUpArgs
 }
 
