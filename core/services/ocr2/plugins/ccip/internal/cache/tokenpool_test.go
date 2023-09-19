@@ -66,7 +66,7 @@ func TestNewTokenPools(t *testing.T) {
 			},
 			feeTokens:   []common.Address{tk1dst},
 			tokenToPool: map[common.Address]common.Address{},
-			expErr:      true,
+			expErr:      false,
 		},
 	}
 
