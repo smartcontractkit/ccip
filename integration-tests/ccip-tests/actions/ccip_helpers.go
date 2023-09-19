@@ -2187,6 +2187,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	mu := &sync.Mutex{}
 	//grp, _ := errgroup.WithContext(ctx)
 	populateKeys := func(chain blockchain.EVMClient) error {
+		log.Info().Str("chain id", chain.GetChainID().String()).Msg("creating node keys for chain")
 		_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", chain.GetChainID().String())
 		if err != nil {
 			return errors.WithStack(err)
@@ -2214,7 +2215,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 				c1.Close()
 			}
 		}()
-
+		log.Info().Str("chain id", c1.GetChainID().String()).Msg("Funding Chainlink nodes for chain")
 		err = actions.FundChainlinkNodesAddresses(chainlinkNodes[1:], c1, nodeFund)
 		if err != nil {
 			return fmt.Errorf("funding nodes for chain %s %+v", c1.GetNetworkName(), err)
@@ -2223,12 +2224,10 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	}
 
 	for _, chain := range chains {
-		log.Info().Msg("creating node keys")
 		err := populateKeys(chain)
 		if err != nil {
 			return err
 		}
-		log.Info().Msg("Funding Chainlink nodes for both the chains")
 		err = fund(chain)
 		if err != nil {
 			return err
