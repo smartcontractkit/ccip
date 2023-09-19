@@ -1097,12 +1097,10 @@ func DeployEnvironments(
 ) *environment.Environment {
 	testEnvironment := environment.New(envconfig)
 	numOfTxNodes := 1
-	isSimulated := false
 	for _, network := range networks {
 		if !network.Simulated {
 			continue
 		}
-		isSimulated = true
 		testEnvironment.
 			AddHelm(reorg.New(&reorg.Props{
 				NetworkName: network.Name,

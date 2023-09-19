@@ -2069,7 +2069,6 @@ func SetMockServerWithSameTokenFeeConversionValue(
 
 type CCIPTestEnv struct {
 	LocalCluster             *test_env.CLClusterTestEnv
-	MockServer               *ctfClient.MockserverClient
 	CLNodesWithKeys          map[string][]*client.CLNodesWithKeys // key - network chain-id
 	CLNodes                  []*client.ChainlinkK8sClient
 	execNodeStartIndex       int
@@ -2146,7 +2145,6 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	//var err error
 	if c.LocalCluster != nil {
 		// for local cluster, fetch the values from the local cluster
-		c.MockServer = c.LocalCluster.MockServer.Client
 		for _, chainlinkNode := range c.LocalCluster.CLNodes {
 			chainlinkNodes = append(chainlinkNodes, chainlinkNode.API)
 		}
@@ -2164,11 +2162,6 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		for _, chainlinkNode := range chainlinkK8sNodes {
 			chainlinkNode.ChainlinkClient.SetLogger(logger)
 			chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient)
-		}
-
-		c.MockServer, err = ctfClient.ConnectMockServer(c.K8Env)
-		if err != nil {
-			return fmt.Errorf("creating mockserver clients shouldn't fail %+v", err)
 		}
 		c.CLNodes = chainlinkK8sNodes
 	}
