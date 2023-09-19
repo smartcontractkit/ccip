@@ -22,6 +22,7 @@ func NewTokenPools(
 	offRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
 	priceRegistry price_registry.PriceRegistryInterface,
 	optimisticConfirmations int64,
+	numWorkers int,
 ) *CachedChain[map[common.Address]common.Address] {
 	return &CachedChain[map[common.Address]common.Address]{
 		observedEvents: []common.Hash{
@@ -36,15 +37,20 @@ func NewTokenPools(
 		lock:                    &sync.RWMutex{},
 		value:                   make(map[common.Address]common.Address),
 		lastChangeBlock:         0,
-		origin:                  newTokenPoolsOrigin(lggr, offRamp, priceRegistry),
+		origin:                  newTokenPoolsOrigin(lggr, offRamp, priceRegistry, numWorkers),
 	}
 }
 
-func newTokenPoolsOrigin(lggr logger.Logger, offRamp evm_2_evm_offramp.EVM2EVMOffRampInterface, priceReg price_registry.PriceRegistryInterface) *tokenPools {
+func newTokenPoolsOrigin(
+	lggr logger.Logger,
+	offRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
+	priceReg price_registry.PriceRegistryInterface,
+	numWorkers int) *tokenPools {
 	return &tokenPools{
 		lggr:          lggr,
 		offRamp:       offRamp,
 		priceRegistry: priceReg,
+		numWorkers:    numWorkers,
 	}
 }
 
@@ -52,6 +58,7 @@ type tokenPools struct {
 	lggr          logger.Logger
 	offRamp       evm_2_evm_offramp.EVM2EVMOffRampInterface
 	priceRegistry price_registry.PriceRegistryInterface
+	numWorkers    int
 }
 
 func (t *tokenPools) Copy(value map[common.Address]common.Address) map[common.Address]common.Address {
@@ -59,15 +66,13 @@ func (t *tokenPools) Copy(value map[common.Address]common.Address) map[common.Ad
 }
 
 func (t *tokenPools) CallOrigin(ctx context.Context) (map[common.Address]common.Address, error) {
-	const numWorkers = 5
-
 	destTokens, err := getDestinationAndFeeTokens(ctx, t.offRamp, t.priceRegistry)
 	if err != nil {
 		return nil, err
 	}
 
 	eg := new(errgroup.Group)
-	eg.SetLimit(numWorkers)
+	eg.SetLimit(t.numWorkers)
 	var mu sync.Mutex
 
 	mapping := make(map[common.Address]common.Address, len(destTokens))
