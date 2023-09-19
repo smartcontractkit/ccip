@@ -38,8 +38,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -224,13 +224,16 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			ArmProxy:          c.Source.ARM.Address(), // ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
-			Router:                c.Source.Router.Address(),
-			MaxTokensLength:       5,
-			DestGasOverhead:       350_000,
-			DestGasPerPayloadByte: 16,
-			PriceRegistry:         c.Source.PriceRegistry.Address(),
-			MaxDataSize:           1e5,
-			MaxGasLimit:           4_000_000,
+			Router:                          c.Source.Router.Address(),
+			MaxTokensLength:                 5,
+			DestGasOverhead:                 350_000,
+			DestGasPerPayloadByte:           16,
+			DestDataAvailabilityOverheadGas: 33_596,
+			DestGasPerDataAvailabilityByte:  16,
+			DestDataAvailabilityMultiplier:  6840, // 0.684
+			PriceRegistry:                   c.Source.PriceRegistry.Address(),
+			MaxDataSize:                     1e5,
+			MaxGasLimit:                     4_000_000,
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
@@ -265,9 +268,10 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 			{
-				Token:           c.Source.LinkToken.Address(),
-				Ratio:           5_0, // 5 bps
-				DestGasOverhead: 34_000,
+				Token:             c.Source.LinkToken.Address(),
+				Ratio:             5_0, // 5 bps
+				DestGasOverhead:   34_000,
+				DestBytesOverhead: 0,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -572,6 +576,7 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		sourceTokenAddress,
 		[]common.Address{}, // empty allowList at deploy time indicates pool has no original sender restrictions
 		c.Source.ARMProxy.Address(),
+		true,
 	)
 	if err != nil {
 		return [20]byte{}, nil, err
@@ -778,7 +783,9 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		sourceChain,
 		sourceLinkTokenAddress,
 		[]common.Address{},
-		armProxySourceAddress)
+		armProxySourceAddress,
+		true,
+	)
 	require.NoError(t, err)
 	sourceChain.Commit()
 	sourcePool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourcePoolAddress, sourceChain)
@@ -794,7 +801,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		destUser,
 		destChain,
 		destLinkTokenAddress,
-		[]common.Address{}, armProxyDestAddress)
+		[]common.Address{},
+		armProxyDestAddress,
+		true,
+	)
 	require.NoError(t, err)
 	destChain.Commit()
 	destPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destPoolAddress, destChain)
@@ -834,7 +844,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		sourceUser,
 		sourceChain,
 		sourceWeth9addr,
-		[]common.Address{}, armProxySourceAddress)
+		[]common.Address{},
+		armProxySourceAddress,
+		true,
+	)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
@@ -891,13 +904,16 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			ArmProxy:          armProxySourceAddress, // ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
-			Router:                sourceRouterAddress,
-			MaxTokensLength:       5,
-			DestGasOverhead:       350_000,
-			DestGasPerPayloadByte: 16,
-			PriceRegistry:         sourcePricesAddress,
-			MaxDataSize:           1e5,
-			MaxGasLimit:           4_000_000,
+			Router:                          sourceRouterAddress,
+			MaxTokensLength:                 5,
+			DestGasOverhead:                 350_000,
+			DestGasPerPayloadByte:           16,
+			DestDataAvailabilityOverheadGas: 33_596,
+			DestGasPerDataAvailabilityByte:  16,
+			DestDataAvailabilityMultiplier:  6840, // 0.684
+			PriceRegistry:                   sourcePricesAddress,
+			MaxDataSize:                     1e5,
+			MaxGasLimit:                     4_000_000,
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
@@ -936,9 +952,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 			{
-				Token:           sourceLinkTokenAddress,
-				Ratio:           5_0, // 5 bps
-				DestGasOverhead: 34_000,
+				Token:             sourceLinkTokenAddress,
+				Ratio:             5_0, // 5 bps
+				DestGasOverhead:   34_000,
+				DestBytesOverhead: 0,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{},
@@ -981,7 +998,10 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		destUser,
 		destChain,
 		destWeth9addr,
-		[]common.Address{}, armProxyDestAddress)
+		[]common.Address{},
+		armProxyDestAddress,
+		true,
+	)
 	require.NoError(t, err)
 	destWrappedPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destWrappedPoolAddress, destChain)
 	require.NoError(t, err)
@@ -1337,8 +1357,8 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	log.Info().Msg("Executing request manually")
 	seqNr := args.seqNr
 	// Build a merkle tree for the report
-	mctx := hasher.NewKeccakCtx()
-	leafHasher := hasher.NewLeafHasher(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx)
+	mctx := hashlib.NewKeccakCtx()
+	leafHasher := hashlib.NewLeafHasher(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx)
 	onRampContract, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(common.HexToAddress(args.OnRamp), args.SourceChain)
 	if err != nil {
 		return nil, err

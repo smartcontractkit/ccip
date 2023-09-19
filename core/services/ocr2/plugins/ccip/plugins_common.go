@@ -17,9 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -34,8 +36,6 @@ const (
 )
 
 var zeroAddress = common.HexToAddress("0")
-
-var nilQueryer pg.Queryer
 
 var ErrCommitStoreIsDown = errors.New("commitStore is down")
 
@@ -70,15 +70,32 @@ func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, cli
 		if err != nil {
 			return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
 		}
-
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:          legacyDynamicConfig.Router,
 			MaxTokensLength: legacyDynamicConfig.MaxTokensLength,
 			PriceRegistry:   legacyDynamicConfig.PriceRegistry,
 			MaxDataSize:     legacyDynamicConfig.MaxDataSize,
-			MaxGasLimit:     legacyDynamicConfig.MaxGasLimit,
+			MaxGasLimit:     uint32(legacyDynamicConfig.MaxGasLimit),
 		}, nil
-	case "1.1.0", "1.2.0":
+	case "1.1.0":
+		legacyOnramp, err := evm_2_evm_onramp_1_1_0.NewEVM2EVMOnRamp(onRamp.Address(), client)
+		if err != nil {
+			return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+		}
+		legacyDynamicConfig, err := legacyOnramp.GetDynamicConfig(opts)
+		if err != nil {
+			return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+		}
+		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
+			Router:                legacyDynamicConfig.Router,
+			MaxTokensLength:       legacyDynamicConfig.MaxTokensLength,
+			DestGasOverhead:       legacyDynamicConfig.DestGasOverhead,
+			DestGasPerPayloadByte: legacyDynamicConfig.DestGasPerPayloadByte,
+			PriceRegistry:         legacyDynamicConfig.PriceRegistry,
+			MaxDataSize:           legacyDynamicConfig.MaxDataSize,
+			MaxGasLimit:           uint32(legacyDynamicConfig.MaxGasLimit),
+		}, nil
+	case "1.2.0":
 		return onRamp.GetDynamicConfig(opts)
 	default:
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, errors.Errorf("Invalid onramp version: %s", version)
@@ -123,25 +140,22 @@ func calculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *bi
 // Extracts the hashed leaves from a given set of logs
 func leavesFromIntervals(
 	lggr logger.Logger,
-	seqParser func(logpoller.Log) (uint64, error),
 	interval commit_store.CommitStoreInterval,
-	hasher hasher.LeafHasherInterface[[32]byte],
-	logs []logpoller.Log,
+	hasher hashlib.LeafHasherInterface[[32]byte],
+	sendReqs []ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested],
 ) ([][32]byte, error) {
 	var seqNrs []uint64
-	for _, log := range logs {
-		seqNr, err2 := seqParser(log)
-		if err2 != nil {
-			return nil, err2
-		}
-		seqNrs = append(seqNrs, seqNr)
+	for _, req := range sendReqs {
+		seqNrs = append(seqNrs, req.Data.Message.SequenceNumber)
 	}
+
 	if !contiguousReqs(lggr, interval.Min, interval.Max, seqNrs) {
 		return nil, errors.Errorf("do not have full range [%v, %v] have %v", interval.Min, interval.Max, seqNrs)
 	}
 	var leaves [][32]byte
-	for _, log := range logs {
-		hash, err2 := hasher.HashLeaf(log.ToGethLog())
+
+	for _, sendReq := range sendReqs {
+		hash, err2 := hasher.HashLeaf(sendReq.Data.Raw)
 		if err2 != nil {
 			return nil, err2
 		}
@@ -171,24 +185,24 @@ func filterContainsZeroAddress(addrs []common.Address) bool {
 	return false
 }
 
-func registerLpFilters(q pg.Queryer, lp logpoller.LogPoller, filters []logpoller.Filter) error {
+func registerLpFilters(lp logpoller.LogPoller, filters []logpoller.Filter, qopts ...pg.QOpt) error {
 	for _, lpFilter := range filters {
 		if filterContainsZeroAddress(lpFilter.Addresses) {
 			continue
 		}
-		if err := lp.RegisterFilter(lpFilter); err != nil {
+		if err := lp.RegisterFilter(lpFilter, qopts...); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func unregisterLpFilters(q pg.Queryer, lp logpoller.LogPoller, filters []logpoller.Filter) error {
+func unregisterLpFilters(lp logpoller.LogPoller, filters []logpoller.Filter, qopts ...pg.QOpt) error {
 	for _, lpFilter := range filters {
 		if filterContainsZeroAddress(lpFilter.Addresses) {
 			continue
 		}
-		if err := lp.UnregisterFilter(lpFilter.Name, pg.WithQueryer(q)); err != nil {
+		if err := lp.UnregisterFilter(lpFilter.Name, qopts...); err != nil {
 			return err
 		}
 	}

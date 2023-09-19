@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/pkg/errors"
@@ -31,9 +30,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cache"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/hasher"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -54,28 +54,32 @@ var (
 type ExecutionPluginConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
+	sourceReader             ccipdata.Reader
+	destReader               ccipdata.Reader
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStore              commit_store.CommitStoreInterface
 	sourcePriceRegistry      price_registry.PriceRegistryInterface
 	sourceWrappedNativeToken common.Address
 	destClient               evmclient.Client
+	sourceClient             evmclient.Client
 	destGasEstimator         gas.EvmFeeEstimator
-	leafHasher               hasher.LeafHasherInterface[[32]byte]
+	leafHasher               hashlib.LeafHasherInterface[[32]byte]
 }
 
 type ExecutionReportingPlugin struct {
-	config                ExecutionPluginConfig
-	F                     int
-	lggr                  logger.Logger
-	inflightReports       *inflightExecReportsContainer
-	snoozedRoots          cache.SnoozedRoots
-	destPriceRegistry     price_registry.PriceRegistryInterface
-	destWrappedNative     common.Address
-	onchainConfig         ccipconfig.ExecOnchainConfig
-	offchainConfig        ccipconfig.ExecOffchainConfig
-	cachedSourceFeeTokens cache.AutoSync[[]common.Address]
-	cachedDestTokens      cache.AutoSync[cache.CachedTokens]
+	config                 ExecutionPluginConfig
+	F                      int
+	lggr                   logger.Logger
+	inflightReports        *inflightExecReportsContainer
+	snoozedRoots           cache.SnoozedRoots
+	destPriceRegistry      price_registry.PriceRegistryInterface
+	destWrappedNative      common.Address
+	onchainConfig          ccipconfig.ExecOnchainConfig
+	offchainConfig         ccipconfig.ExecOffchainConfig
+	cachedSourceFeeTokens  cache.AutoSync[[]common.Address]
+	cachedDestTokens       cache.AutoSync[cache.CachedTokens]
+	customTokenPoolFactory func(ctx context.Context, poolAddress common.Address, bind bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error)
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -138,6 +142,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig:        offchainConfig,
 			cachedDestTokens:      cachedDestTokens,
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
+			customTokenPoolFactory: func(ctx context.Context, poolAddress common.Address, contractBackend bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
+				return custom_token_pool.NewCustomTokenPool(poolAddress, contractBackend)
+			},
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -191,17 +198,17 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
 // pass zeroAddress if dstPriceRegistry is unknown, filters with zero address are omitted.
-func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address) error {
+func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address, qopts ...pg.QOpt) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
 
 	// source chain filters
 	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(rf.config.onRamp.Address(), rf.config.sourcePriceRegistry.Address())
 	created, deleted := filtersDiff(sourceFiltersBefore, sourceFiltersNow)
-	if err := unregisterLpFilters(nilQueryer, rf.config.sourceLP, deleted); err != nil {
+	if err := unregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
 		return err
 	}
-	if err := registerLpFilters(nilQueryer, rf.config.sourceLP, created); err != nil {
+	if err := registerLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
 		return err
 	}
 	rf.sourceChainFilters = sourceFiltersNow
@@ -209,10 +216,10 @@ func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegis
 	// destination chain filters
 	destFiltersBefore, destFiltersNow := rf.destChainFilters, getExecutionPluginDestLpChainFilters(rf.config.commitStore.Address(), rf.config.offRamp.Address(), destPriceRegistry)
 	created, deleted = filtersDiff(destFiltersBefore, destFiltersNow)
-	if err := unregisterLpFilters(nilQueryer, rf.config.destLP, deleted); err != nil {
+	if err := unregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
 		return err
 	}
-	if err := registerLpFilters(nilQueryer, rf.config.destLP, created); err != nil {
+	if err := registerLpFilters(rf.config.destLP, created, qopts...); err != nil {
 		return err
 	}
 	rf.destChainFilters = destFiltersNow
@@ -231,7 +238,7 @@ type evm2EVMOnRampCCIPSendRequestedWithMeta struct {
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(
 		ctx,
-		r.config.destLP,
+		r.config.destReader,
 		r.config.commitStore,
 		r.onchainConfig.PermissionLessExecutionThresholdDuration(),
 	)
@@ -362,6 +369,8 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	return []ObservedMessage{}, nil
 }
 
+// destPoolRateLimits returns a map that consists of the rate limits of each destination tokens of the provided reports.
+// If a token is missing from the returned map it either means that token was not found or token pool is disabled for this token.
 func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commitReports []commitReportWithSendRequests, sourceToDestToken map[common.Address]common.Address) (map[common.Address]*big.Int, error) {
 	dstTokens := make(map[common.Address]struct{}) // todo: replace with a set or uniqueSlice data structure
 	for _, msg := range commitReports {
@@ -384,7 +393,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 			return nil, fmt.Errorf("get pool by dest token (%s): %w", dstToken, err)
 		}
 
-		tokenPool, err := custom_token_pool.NewCustomTokenPool(poolAddress, r.config.destClient)
+		tokenPool, err := r.customTokenPoolFactory(ctx, poolAddress, r.config.destClient)
 		if err != nil {
 			return nil, fmt.Errorf("new custom dest token pool %s: %w", poolAddress, err)
 		}
@@ -428,26 +437,20 @@ func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) 
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
-	executedLogs, err := r.config.destLP.IndexedLogsTopicRange(
-		abihelpers.EventSignatures.ExecutionStateChanged,
+	stateChanges, err := r.config.destReader.GetExecutionStateChangesBetweenSeqNums(
+		ctx,
 		r.config.offRamp.Address(),
-		abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
-		logpoller.EvmWord(min),
-		logpoller.EvmWord(max),
+		min,
+		max,
 		int(r.offchainConfig.DestOptimisticConfirmations),
-		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
 		return nil, err
 	}
-	executedMp := make(map[uint64]bool)
-	for _, executedLog := range executedLogs {
-		exec, err := r.config.offRamp.ParseExecutionStateChanged(executedLog.ToGethLog())
-		if err != nil {
-			return nil, err
-		}
-		finalized := (latestBlock - executedLog.BlockNumber) >= int64(r.offchainConfig.DestFinalityDepth)
-		executedMp[exec.SequenceNumber] = finalized
+	executedMp := make(map[uint64]bool, len(stateChanges))
+	for _, stateChange := range stateChanges {
+		finalized := (latestBlock - stateChange.BlockNumber) >= int64(r.offchainConfig.DestFinalityDepth)
+		executedMp[stateChange.Data.SequenceNumber] = finalized
 	}
 	return executedMp, nil
 }
@@ -729,31 +732,29 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	// use errgroup to fetch send request logs and executed sequence numbers in parallel
 	eg := &errgroup.Group{}
 
-	var sendRequestLogs []logpoller.Log
+	var sendRequests []ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 	eg.Go(func() error {
-		// get logs from all the reports
-		rawLogs, err := r.config.sourceLP.LogsDataWordRange(
-			abihelpers.EventSignatures.SendRequested,
+		sendReqs, err := r.config.sourceReader.GetSendRequestsBetweenSeqNums(
+			ctx,
 			r.config.onRamp.Address(),
-			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-			logpoller.EvmWord(intervalMin),
-			logpoller.EvmWord(intervalMax),
+			intervalMin,
+			intervalMax,
 			int(r.offchainConfig.SourceFinalityDepth),
-			pg.WithParentCtx(ctx),
 		)
 		if err != nil {
 			return err
 		}
-		sendRequestLogs = rawLogs
+		sendRequests = sendReqs
 		return nil
 	})
 
 	var executedSeqNums map[uint64]bool
 	eg.Go(func() error {
-		latestBlock, err := r.config.destLP.LatestBlock()
+		latestBlock, err := r.config.destReader.LatestBlock(ctx)
 		if err != nil {
 			return err
 		}
+
 		// get executable sequence numbers
 		executedMp, err := r.getExecutedSeqNrsInRange(ctx, intervalMin, intervalMax, latestBlock)
 		if err != nil {
@@ -775,32 +776,24 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 		}
 	}
 
-	for _, rawLog := range sendRequestLogs {
-		ccipSendRequested, err := r.config.onRamp.ParseCCIPSendRequested(gethtypes.Log{
-			Topics: rawLog.GetTopics(),
-			Data:   rawLog.Data,
-		})
-		if err != nil {
-			r.lggr.Errorw("unable to parse message", "err", err, "tx", rawLog.TxHash, "logIdx", rawLog.LogIndex)
-			continue
-		}
-		msg := abihelpers.OnRampMessageToOffRampMessage(ccipSendRequested.Message)
+	for _, sendReq := range sendRequests {
+		msg := abihelpers.OnRampMessageToOffRampMessage(sendReq.Data.Message)
 
 		// if value exists in the map then it's executed
 		// if value exists, and it's true then it's considered finalized
 		finalized, executed := executedSeqNums[msg.SequenceNumber]
 
-		sendReq := evm2EVMOnRampCCIPSendRequestedWithMeta{
+		reqWithMeta := evm2EVMOnRampCCIPSendRequestedWithMeta{
 			InternalEVM2EVMMessage: msg,
-			blockTimestamp:         rawLog.BlockTimestamp,
+			blockTimestamp:         sendReq.BlockTimestamp,
 			executed:               executed,
 			finalized:              finalized,
 		}
 
 		// attach the msg to the appropriate reports
 		for i := range reportsWithSendReqs {
-			if reportsWithSendReqs[i].sendReqFits(sendReq) {
-				reportsWithSendReqs[i].sendRequestsWithMeta = append(reportsWithSendReqs[i].sendRequestsWithMeta, sendReq)
+			if reportsWithSendReqs[i].sendReqFits(reqWithMeta) {
+				reportsWithSendReqs[i].sendRequestsWithMeta = append(reportsWithSendReqs[i].sendRequestsWithMeta, reqWithMeta)
 			}
 		}
 	}
@@ -820,45 +813,34 @@ func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, sourceT
 	return sum, nil
 }
 
-func (r *ExecutionReportingPlugin) parseSeqNr(log logpoller.Log) (uint64, error) {
-	s, err := r.config.onRamp.ParseCCIPSendRequested(log.ToGethLog())
-	if err != nil {
-		return 0, err
-	}
-	return s.Message.SequenceNumber, nil
-}
-
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
 func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ObservedMessage) ([]byte, error) {
 	if err := validateSeqNumbers(ctx, r.config.commitStore, observedMessages); err != nil {
 		return nil, err
 	}
-	commitReport, err := getCommitReportForSeqNum(ctx, r.config.destLP, r.config.commitStore, observedMessages[0].SeqNr)
+	commitReport, err := getCommitReportForSeqNum(ctx, r.config.destReader, r.config.commitStore, observedMessages[0].SeqNr)
 	if err != nil {
 		return nil, err
 	}
 	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
-	msgsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.parseSeqNr, r.config.onRamp.Address(), r.config.sourceLP, commitReport.Interval)
+	sendReqsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.config.onRamp.Address(), r.config.sourceReader, commitReport.Interval)
 	if err != nil {
 		return nil, err
 	}
 
-	messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(msgsInRoot))
-	for i, msg := range msgsInRoot {
-		decodedMessage, err2 := abihelpers.DecodeOffRampMessage(msg.Data)
-		if err2 != nil {
-			return nil, err
-		}
-		messages[i] = decodedMessage
+	messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(sendReqsInRoot))
+	for i, msg := range sendReqsInRoot {
+		offRampMsg := abihelpers.OnRampMessageToOffRampMessage(msg.Data.Message)
+		messages[i] = &offRampMsg
 	}
 
 	// cap messages which fits MaxExecutionReportLength (after serialized)
 	capped := sort.Search(len(observedMessages), func(i int) bool {
 		report, _, err2 := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:i+1])
 		if err2 != nil {
-			r.lggr.Errorw("build execution report", "err", err)
+			r.lggr.Errorw("build execution report", "err", err2)
 			return false
 		}
 
@@ -1140,30 +1122,23 @@ func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegis
 
 func getUnexpiredCommitReports(
 	ctx context.Context,
-	dstLogPoller logpoller.LogPoller,
+	destReader ccipdata.Reader,
 	commitStore commit_store.CommitStoreInterface,
 	permissionExecutionThreshold time.Duration,
 ) ([]commit_store.CommitStoreCommitReport, error) {
-	logs, err := dstLogPoller.LogsCreatedAfter(
-		abihelpers.EventSignatures.ReportAccepted,
+	acceptedReports, err := destReader.GetAcceptedCommitReportsGteTimestamp(
+		ctx,
 		commitStore.Address(),
 		time.Now().Add(-permissionExecutionThreshold),
 		0,
-		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
 		return nil, err
 	}
+
 	var reports []commit_store.CommitStoreCommitReport
-	for _, log := range logs {
-		reportAccepted, err := commitStore.ParseReportAccepted(gethtypes.Log{
-			Topics: log.GetTopics(),
-			Data:   log.Data,
-		})
-		if err != nil {
-			return nil, err
-		}
-		reports = append(reports, reportAccepted.Report)
+	for _, acceptedReport := range acceptedReports {
+		reports = append(reports, acceptedReport.Data.Report)
 	}
 	return reports, nil
 }

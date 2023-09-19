@@ -12,8 +12,9 @@ import (
 
 // Constraints specifies the global storage constraints.
 type Constraints struct {
-	MaxPayloadSizeBytes uint `json:"maxPayloadSizeBytes"`
-	MaxSlotsPerUser     uint `json:"maxSlotsPerUser"`
+	MaxPayloadSizeBytes    uint   `json:"maxPayloadSizeBytes"`
+	MaxSlotsPerUser        uint   `json:"maxSlotsPerUser"`
+	MaxExpirationLengthSec uint64 `json:"maxExpirationLengthSec"`
 }
 
 // Key identifies a versioned user record.
@@ -75,7 +76,7 @@ var _ Storage = (*storage)(nil)
 
 func NewStorage(lggr logger.Logger, contraints Constraints, orm ORM, clock utils.Clock) Storage {
 	return &storage{
-		lggr:       lggr.Named("s4_storage"),
+		lggr:       lggr.Named("S4Storage"),
 		contraints: contraints,
 		orm:        orm,
 		clock:      clock,
@@ -128,8 +129,12 @@ func (s *storage) Put(ctx context.Context, key *Key, record *Record, signature [
 	if len(record.Payload) > int(s.contraints.MaxPayloadSizeBytes) {
 		return ErrPayloadTooBig
 	}
-	if s.clock.Now().UnixMilli() > record.Expiration {
+	now := s.clock.Now().UnixMilli()
+	if now > record.Expiration {
 		return ErrPastExpiration
+	}
+	if record.Expiration-now > int64(s.contraints.MaxExpirationLengthSec)*1000 {
+		return ErrExpirationTooLong
 	}
 
 	envelope := NewEnvelopeFromRecord(key, record)

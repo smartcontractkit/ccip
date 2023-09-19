@@ -7,6 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/lib/pq"
 
+	"github.com/smartcontractkit/chainlink-relay/pkg/types"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -81,7 +83,7 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 	}
 	ocrSpec := job.OCR2OracleSpec{
 		Relay:                             relay.EVM,
-		PluginType:                        job.CCIPCommit,
+		PluginType:                        types.CCIPCommit,
 		ContractID:                        params.CommitStore.Hex(),
 		ContractConfigConfirmations:       1,
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
@@ -118,7 +120,7 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 	}
 	ocrSpec := job.OCR2OracleSpec{
 		Relay:                             relay.EVM,
-		PluginType:                        job.CCIPExecution,
+		PluginType:                        types.CCIPExecution,
 		ContractID:                        params.OffRamp.Hex(),
 		ContractConfigConfirmations:       1,
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
