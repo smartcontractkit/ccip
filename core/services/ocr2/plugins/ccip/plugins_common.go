@@ -34,8 +34,6 @@ const (
 	ExecPluginLabel      = "exec"
 )
 
-var zeroAddress = common.HexToAddress("0")
-
 var ErrCommitStoreIsDown = errors.New("commitStore is down")
 
 func LoadOnRamp(onRampAddress common.Address, pluginName string, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampInterface, error) {
@@ -177,7 +175,7 @@ func isCommitStoreDownNow(ctx context.Context, lggr logger.Logger, commitStore c
 
 func filterContainsZeroAddress(addrs []common.Address) bool {
 	for _, addr := range addrs {
-		if addr == zeroAddress {
+		if addr == utils.ZeroAddress {
 			return true
 		}
 	}
