@@ -2052,7 +2052,7 @@ func SetMockServerWithSameTokenFeeConversionValue(
 		path := fmt.Sprintf("/%s", tokenAddr)
 		tokenValue := value
 		valueAdditions.Go(func() error {
-			log.Debug().Str("path", path).
+			log.Info().Str("path", path).
 				Str("value", fmt.Sprintf("%v", tokenValue)).
 				Msg(fmt.Sprintf("Setting mockserver response"))
 			return mockserver.SetAnyValuePath(path, tokenValue)
