@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -161,7 +162,7 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
 	// If the commit store is down the protocol should halt.
-	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
+	if contractutil.IsCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
 	r.inflightReports.expire(lggr)

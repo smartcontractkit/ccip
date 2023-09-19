@@ -33,6 +33,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -163,7 +164,7 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
+	if contractutil.IsCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
 	// Expire any inflight reports.
