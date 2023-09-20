@@ -25,6 +25,7 @@ import (
 var (
 	mockOnRampAddress    = utils.RandomAddress()
 	mockUSDCTokenAddress = utils.RandomAddress()
+	mockMsgTransmitter   = utils.RandomAddress()
 )
 
 type attestationResponse struct {
@@ -81,7 +82,7 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	usdcService := usdc.NewUSDCTokenDataReader(&eventsClient, mockUSDCTokenAddress, mockOnRampAddress, attestationURI, 420)
+	usdcService := usdc.NewUSDCTokenDataReader(&eventsClient, mockUSDCTokenAddress, mockMsgTransmitter, mockOnRampAddress, attestationURI)
 	attestation, err := usdcService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 		InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
 			SequenceNumber: seqNum,

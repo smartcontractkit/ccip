@@ -116,7 +116,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 
 	sourceChainEventClient := ccipdata.NewLogPollerReader(sourceChain.LogPoller(), execLggr, sourceChain.Client())
 
-	tokenDataProviders, err := getTokenDataProviders(pluginConfig, chainId, offRampConfig.OnRamp, sourceChainEventClient)
+	tokenDataProviders, err := getTokenDataProviders(pluginConfig, offRampConfig.OnRamp, sourceChainEventClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get token data providers")
 	}
@@ -173,25 +173,29 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func getTokenDataProviders(pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceChainId uint64, onRampAddress common.Address, sourceChainEventClient *ccipdata.LogPollerReader) (map[common.Address]tokendata.Reader, error) {
+func getTokenDataProviders(pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, onRampAddress common.Address, sourceChainEventClient *ccipdata.LogPollerReader) (map[common.Address]tokendata.Reader, error) {
 	tokenDataProviders := make(map[common.Address]tokendata.Reader)
 
-	if pluginConfig.USDCAttestationApi != "" {
-		attestationURI, err2 := url.ParseRequestURI(pluginConfig.USDCAttestationApi)
+	if pluginConfig.USDCConfig.AttestationAPI != "" {
+		err := pluginConfig.USDCConfig.ValidateUSDCConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		attestationURI, err2 := url.ParseRequestURI(pluginConfig.USDCConfig.AttestationAPI)
 		if err2 != nil {
 			return nil, errors.Wrap(err2, "failed to parse USDC attestation API")
 		}
-		usdcTokenAddress, err2 := usdc.GetUSDCTokenAddress(sourceChainId)
-		if err2 != nil {
-			return nil, errors.Wrap(err2, "failed to get USDC token address")
-		}
 
-		tokenDataProviders[usdcTokenAddress] = tokendata.NewCachedReader(usdc.NewUSDCTokenDataReader(
-			sourceChainEventClient,
-			usdcTokenAddress,
-			onRampAddress,
-			attestationURI,
-			sourceChainId))
+		tokenDataProviders[pluginConfig.USDCConfig.SourceTokenAddress] = tokendata.NewCachedReader(
+			usdc.NewUSDCTokenDataReader(
+				sourceChainEventClient,
+				pluginConfig.USDCConfig.SourceTokenAddress,
+				pluginConfig.USDCConfig.SourceMessageTransmitterAddress,
+				onRampAddress,
+				attestationURI,
+			),
+		)
 	}
 
 	return tokenDataProviders, nil
@@ -305,7 +309,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSpec
 		return errors.Wrap(err, "failed loading onRamp")
 	}
 
-	return unregisterExecutionPluginLpFilters(ctx, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, sourceOnRamp, sourceChain.Client(), qopts...)
+	return unregisterExecutionPluginLpFilters(ctx, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, sourceOnRamp, sourceChain.Client(), pluginConfig, qopts...)
 }
 
 func unregisterExecutionPluginLpFilters(
@@ -316,6 +320,7 @@ func unregisterExecutionPluginLpFilters(
 	destOffRampConfig evm_2_evm_offramp.EVM2EVMOffRampStaticConfig,
 	sourceOnRamp evm_2_evm_onramp.EVM2EVMOnRampInterface,
 	sourceChainClient client.Client,
+	pluginConfig ccipconfig.ExecutionPluginJobSpecConfig,
 	qopts ...pg.QOpt) error {
 	destOffRampDynCfg, err := destOffRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
@@ -327,24 +332,11 @@ func unregisterExecutionPluginLpFilters(
 		return err
 	}
 
-	chainId, err := chainselectors.ChainIdFromSelector(destOffRampConfig.SourceChainSelector)
+	// SourceChainEventClient can be nil because it is not used in unregisterExecutionPluginLpFilters
+	tokenDataProviders, err := getTokenDataProviders(pluginConfig, destOffRampConfig.OnRamp, nil)
 	if err != nil {
 		return err
 	}
-
-	tokenDataProviders := make(map[common.Address]tokendata.Reader)
-
-	usdcTokenAddress, err := usdc.GetUSDCTokenAddress(chainId)
-	if err != nil {
-		return errors.Wrap(err, "failed to get USDC token address")
-	}
-	// TODO the called function only uses the chainId to get the message transmitter address
-	tokenDataProviders[usdcTokenAddress] = usdc.NewUSDCTokenDataReader(
-		nil,
-		usdcTokenAddress,
-		common.Address{},
-		nil,
-		chainId)
 
 	if err = logpollerutil.UnregisterLpFilters(
 		sourceLP,
