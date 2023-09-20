@@ -32,7 +32,7 @@ const (
 	MaxObservationLength   = 250_000 // plugins's Observation should make sure to cap to this limit
 	CommitPluginLabel      = "commit"
 	ExecPluginLabel        = "exec"
-	GasPriceEncodingLength = 112
+	GasPriceEncodingLength = 112 // Each gas price takes up at most GasPriceEncodingLength number of bits
 )
 
 var zeroAddress = common.HexToAddress("0")
@@ -290,4 +290,12 @@ func getMessageIDsAsHexString(messages []evm_2_evm_offramp.InternalEVM2EVMMessag
 		messageIDs = append(messageIDs, "0x"+hex.EncodeToString(m.MessageId[:]))
 	}
 	return messageIDs
+}
+
+func parseEncodedGasPrice(gasPrice *big.Int) (*big.Int, *big.Int) {
+	l1GasPrice := new(big.Int).Rsh(gasPrice, GasPriceEncodingLength)
+
+	l1Start := new(big.Int).Lsh(big.NewInt(1), GasPriceEncodingLength)
+	nativeGasPrice := new(big.Int).Mod(gasPrice, l1Start)
+	return l1GasPrice, nativeGasPrice
 }
