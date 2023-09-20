@@ -106,8 +106,6 @@ type CCIPCommon struct {
 	poolFunds               *big.Int
 	gasUpdateWatcherMu      *sync.Mutex
 	gasUpdateWatcher        map[uint64]*big.Int // key - destchain id; value - timestamp of update
-	priceUpdateWatcherMu    *sync.Mutex
-	priceUpdateWatcher      map[string]*big.Int // key - token address; value - timestamp of update
 }
 
 func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain.EVMClient) (*CCIPCommon, error) {
@@ -145,8 +143,6 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 		poolFunds:               ccipModule.poolFunds,
 		gasUpdateWatcherMu:      &sync.Mutex{},
 		gasUpdateWatcher:        make(map[uint64]*big.Int),
-		priceUpdateWatcherMu:    &sync.Mutex{},
-		priceUpdateWatcher:      make(map[string]*big.Int),
 	}, nil
 }
 
@@ -274,38 +270,27 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	timeout time.Duration,
 	destChainId uint64,
 ) error {
-	lggr.Info().Msgf("Waiting for PriceUpdates for dest chain %d", destChainId)
+	lggr.Info().Msgf("Waiting for UsdPerUnitGas for dest chain %d", destChainId)
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	tokens := []string{ccipModule.WrappedNative.Hex(), ccipModule.FeeToken.Address()}
 	for {
 		select {
 		case <-ticker.C:
 			ccipModule.gasUpdateWatcherMu.Lock()
 			timestampOfUpdate, ok := ccipModule.gasUpdateWatcher[destChainId]
 			ccipModule.gasUpdateWatcherMu.Unlock()
-			ccipModule.priceUpdateWatcherMu.Lock()
-			priceUpdates := ccipModule.priceUpdateWatcher
-			ccipModule.priceUpdateWatcherMu.Unlock()
-			receivedAllUpdates := true
-			for _, token := range tokens {
-				if _, ok := priceUpdates[token]; !ok {
-					receivedAllUpdates = false
-					break
-				}
-			}
-			if ok && timestampOfUpdate.Cmp(big.NewInt(0)) == 1 && receivedAllUpdates {
+			if ok && timestampOfUpdate.Cmp(big.NewInt(0)) == 1 {
 				return nil
 			}
 		case <-ctx.Done():
-			return fmt.Errorf("price update is not found for chain %d", destChainId)
+			return fmt.Errorf("UsdPerUnitGasUpdated is not found for chain %d", destChainId)
 		}
 	}
 }
 
-func (ccipModule *CCIPCommon) WatchForPriceUpdates(lggr zerolog.Logger) ([]event.Subscription, error) {
+func (ccipModule *CCIPCommon) WatchForPriceUpdates() ([]event.Subscription, error) {
 	gasUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	blockNum := ccipModule.PriceUpdatesToWatchFrom
 	var opts *bind.WatchOpts
@@ -320,35 +305,18 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(lggr zerolog.Logger) ([]event
 	subs = append(subs, sub)
 	go func() {
 		for {
-			lggr := lggr
 			e := <-gasUpdateEvent
 			destChain, err := chainselectors.ChainIdFromSelector(e.DestChain)
 			if err != nil {
 				continue
 			}
-			lggr.Info().Msgf("priceUpdateEvent event received for dest chain %d", destChain)
+			log.Info().Msgf("UsdPerUnitGasUpdated event received for dest chain %d", destChain)
 			ccipModule.gasUpdateWatcherMu.Lock()
 			ccipModule.gasUpdateWatcher[destChain] = e.Timestamp
 			ccipModule.gasUpdateWatcherMu.Unlock()
 		}
 	}()
 
-	priceUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerTokenUpdated)
-	sub, err = ccipModule.PriceRegistry.Instance.WatchUsdPerTokenUpdated(opts, priceUpdateEvent, nil)
-	if err != nil {
-		return nil, err
-	}
-	subs = append(subs, sub)
-	go func() {
-		for {
-			lggr := lggr
-			e := <-priceUpdateEvent
-			lggr.Info().Msgf("priceUpdateEvent event received for token %s", e.Token.Hex())
-			ccipModule.priceUpdateWatcherMu.Lock()
-			ccipModule.priceUpdateWatcher[e.Token.Hex()] = e.Timestamp
-			ccipModule.priceUpdateWatcherMu.Unlock()
-		}
-	}()
 	return subs, nil
 }
 
@@ -531,12 +499,10 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 			Rate:     contracts.HundredCoins,
 			Capacity: contracts.HundredCoins,
 		},
-		ExistingDeployment:   existingDeployment,
-		poolFunds:            testhelpers.Link(1000),
-		gasUpdateWatcherMu:   &sync.Mutex{},
-		gasUpdateWatcher:     make(map[uint64]*big.Int),
-		priceUpdateWatcherMu: &sync.Mutex{},
-		priceUpdateWatcher:   make(map[string]*big.Int),
+		ExistingDeployment: existingDeployment,
+		poolFunds:          testhelpers.Link(1000),
+		gasUpdateWatcherMu: &sync.Mutex{},
+		gasUpdateWatcher:   make(map[uint64]*big.Int),
 	}, nil
 }
 
@@ -1453,13 +1419,14 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		btpAddresses = append(btpAddresses, lane.Dest.Common.BridgeTokenPools[i].Address())
 	}
 	lane.DstNetworkLaneCfg.CommonContracts = laneconfig.CommonContracts{
-		FeeToken:         lane.Dest.Common.FeeToken.Address(),
-		BridgeTokens:     btAddresses,
-		BridgeTokenPools: btpAddresses,
-		ARM:              lane.Dest.Common.ARMContract.Hex(),
-		Router:           lane.Dest.Common.Router.Address(),
-		PriceRegistry:    lane.Dest.Common.PriceRegistry.Address(),
-		WrappedNative:    lane.Dest.Common.WrappedNative.Hex(),
+		FeeToken:                lane.Dest.Common.FeeToken.Address(),
+		BridgeTokens:            btAddresses,
+		BridgeTokenPools:        btpAddresses,
+		ARM:                     lane.Dest.Common.ARMContract.Hex(),
+		Router:                  lane.Dest.Common.Router.Address(),
+		PriceRegistry:           lane.Dest.Common.PriceRegistry.Address(),
+		WrappedNative:           lane.Dest.Common.WrappedNative.Hex(),
+		PriceUpdatesToWatchFrom: lane.Dest.Common.PriceUpdatesToWatchFrom,
 	}
 	if lane.Dest.Common.ARM == nil {
 		lane.DstNetworkLaneCfg.CommonContracts.IsMockARM = true
@@ -1603,7 +1570,7 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			return err
 		}
 	}
-	subs, err := lane.Source.Common.WatchForPriceUpdates(lane.Logger)
+	subs, err := lane.Source.Common.WatchForPriceUpdates()
 	if err != nil {
 		return err
 	}

@@ -251,12 +251,6 @@
     },
     "Base Mainnet": {
       "fee_token": "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196",
-      "bridge_tokens": [
-        "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196"
-      ],
-      "bridge_tokens_pools": [
-        ""
-      ],
       "arm": "0x38660c8CC222c0192b635c2ac09687B4F25cCE5F",
       "router": "0x673AA85efd75080031d44fcA061575d1dA427A28",
       "price_registry": "0x1bA15c57c8b74cD32443D7583E7f6d7c638aCf46",
