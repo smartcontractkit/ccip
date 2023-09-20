@@ -113,25 +113,9 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 
 	sourceChainEventClient := ccipdata.NewLogPollerReader(sourceChain.LogPoller(), execLggr, sourceChain.Client())
 
-	tokenDataProviders := make(map[common.Address]tokendata.Reader)
-
-	// Subscribe all token data providers
-	if pluginConfig.USDCAttestationApi != "" {
-		attestationURI, err2 := url.ParseRequestURI(pluginConfig.USDCAttestationApi)
-		if err2 != nil {
-			return nil, errors.Wrap(err2, "failed to parse USDC attestation API")
-		}
-		usdcTokenAddress, err2 := usdc.GetUSDCTokenAddress(chainId)
-		if err2 != nil {
-			return nil, errors.Wrap(err2, "failed to get USDC token address")
-		}
-
-		tokenDataProviders[usdcTokenAddress] = tokendata.NewCachedReader(usdc.NewUSDCTokenDataReader(
-			sourceChainEventClient,
-			usdcTokenAddress,
-			offRampConfig.OnRamp,
-			attestationURI,
-			chainId))
+	tokenDataProviders, err := getTokenDataProviders(pluginConfig, chainId, offRampConfig.OnRamp, sourceChainEventClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get token data providers")
 	}
 
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
@@ -184,6 +168,30 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 		}, nil
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+}
+
+func getTokenDataProviders(pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceChainId uint64, onRampAddress common.Address, sourceChainEventClient *ccipdata.LogPollerReader) (map[common.Address]tokendata.Reader, error) {
+	tokenDataProviders := make(map[common.Address]tokendata.Reader)
+
+	if pluginConfig.USDCAttestationApi != "" {
+		attestationURI, err2 := url.ParseRequestURI(pluginConfig.USDCAttestationApi)
+		if err2 != nil {
+			return nil, errors.Wrap(err2, "failed to parse USDC attestation API")
+		}
+		usdcTokenAddress, err2 := usdc.GetUSDCTokenAddress(sourceChainId)
+		if err2 != nil {
+			return nil, errors.Wrap(err2, "failed to get USDC token address")
+		}
+
+		tokenDataProviders[usdcTokenAddress] = tokendata.NewCachedReader(usdc.NewUSDCTokenDataReader(
+			sourceChainEventClient,
+			usdcTokenAddress,
+			onRampAddress,
+			attestationURI,
+			sourceChainId))
+	}
+
+	return tokenDataProviders, nil
 }
 
 func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address, tokenDataProviders map[common.Address]tokendata.Reader) []logpoller.Filter {

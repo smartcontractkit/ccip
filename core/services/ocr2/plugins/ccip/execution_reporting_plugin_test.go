@@ -641,6 +641,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			offRamp.SetSenderNonces(tc.offRampNoncesBySender)
 			seqNrs := plugin.buildBatch(
+				context.Background(),
 				lggr,
 				commitReportWithSendRequests{sendRequestsWithMeta: tc.reqs},
 				tc.inflight,

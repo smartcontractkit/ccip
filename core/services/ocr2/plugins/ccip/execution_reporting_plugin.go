@@ -358,6 +358,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 
 		buildBatchDuration := time.Now()
 		batch := r.buildBatch(
+			ctx,
 			rootLggr,
 			rep,
 			inflight,
@@ -470,6 +471,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context,
 // the available gas, rate limiting, execution state, nonce state, and
 // profitability of execution.
 func (r *ExecutionReportingPlugin) buildBatch(
+	ctx context.Context,
 	lggr logger.Logger,
 	report commitReportWithSendRequests,
 	inflight []InflightInternalExecutionReport,
@@ -538,7 +540,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		tokenData, ready, err2 := getTokenData(context.TODO(), msg, r.config.tokenDataProviders)
+		tokenData, ready, err2 := getTokenData(ctx, msg, r.config.tokenDataProviders)
 		if err2 != nil {
 			msgLggr.Errorw("Skipping message unable to check attestation", "err", err2)
 			continue

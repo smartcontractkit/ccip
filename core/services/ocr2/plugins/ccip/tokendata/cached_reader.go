@@ -11,7 +11,7 @@ type CachedReader struct {
 	Reader
 
 	cache      map[uint64][]byte
-	cacheMutex sync.Mutex
+	cacheMutex sync.RWMutex
 }
 
 func NewCachedReader(reader Reader) *CachedReader {
@@ -21,11 +21,14 @@ func NewCachedReader(reader Reader) *CachedReader {
 	}
 }
 
+// ReadTokenData tries to get the tokenData from cache, if not found then calls the underlying reader
+// and updates the cache.
 func (r *CachedReader) ReadTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([]byte, error) {
-	r.cacheMutex.Lock()
-	defer r.cacheMutex.Unlock()
+	r.cacheMutex.RLock()
+	data, ok := r.cache[msg.SequenceNumber]
+	r.cacheMutex.RUnlock()
 
-	if data, ok := r.cache[msg.SequenceNumber]; ok {
+	if ok {
 		return data, nil
 	}
 
@@ -34,6 +37,10 @@ func (r *CachedReader) ReadTokenData(ctx context.Context, msg internal.EVM2EVMOn
 		return []byte{}, err
 	}
 
+	r.cacheMutex.Lock()
+	defer r.cacheMutex.Unlock()
+
+	// Update the cache
 	r.cache[msg.SequenceNumber] = tokenData
 
 	return tokenData, nil

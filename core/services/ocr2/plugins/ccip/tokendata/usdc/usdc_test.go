@@ -9,9 +9,12 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -92,4 +95,28 @@ func TestGetUSDCReaderSourceLPFilters(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, hash, filter.EventSigs[0].Bytes())
 	require.Equal(t, expectedTransmitterAddress, filter.Addresses[0])
+}
+
+func TestGetUSDCMessageBody(t *testing.T) {
+	chainId := uint64(420)
+	expectedBody := []byte("TestGetUSDCMessageBody")
+	expectedBodyHash := utils.Keccak256Fixed(expectedBody)
+
+	sourceChainEventsMock := ccipdata.MockReader{}
+	sourceChainEventsMock.On("GetLastUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything).Return(expectedBody, nil)
+
+	usdcService := NewUSDCTokenDataReader(&sourceChainEventsMock, mockUSDCTokenAddress, mockOnRampAddress, nil, chainId)
+
+	// Make the first call and assert the underlying function is called
+	body, err := usdcService.getUSDCMessageBody(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{})
+	require.NoError(t, err)
+	require.Equal(t, body, expectedBodyHash)
+
+	sourceChainEventsMock.AssertNumberOfCalls(t, "GetLastUSDCMessagePriorToLogIndexInTx", 1)
+
+	// Make another call and assert that the cache is used
+	body, err = usdcService.getUSDCMessageBody(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{})
+	require.NoError(t, err)
+	require.Equal(t, body, expectedBodyHash)
+	sourceChainEventsMock.AssertNumberOfCalls(t, "GetLastUSDCMessagePriorToLogIndexInTx", 1)
 }
