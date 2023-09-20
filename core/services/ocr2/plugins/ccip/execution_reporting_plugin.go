@@ -51,6 +51,12 @@ var (
 	_ types.ReportingPlugin        = &ExecutionReportingPlugin{}
 )
 
+type FeeEstimationConfig struct {
+	daOverheadGas uint32
+	gasPerDAByte  uint16
+	daMultiplier  uint16
+}
+
 type ExecutionPluginConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
@@ -65,6 +71,7 @@ type ExecutionPluginConfig struct {
 	sourceClient             evmclient.Client
 	destGasEstimator         gas.EvmFeeEstimator
 	leafHasher               hashlib.LeafHasherInterface[[32]byte]
+	feeEstConfig             FeeEstimationConfig
 }
 
 type ExecutionReportingPlugin struct {
@@ -560,7 +567,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		execCostUsd := computeExecCost(msg, execGasPriceEstimateValue, dstWrappedNativePrice)
+		execCostUsd := computeMsgCost(msg, r.config.feeEstConfig, execGasPriceEstimateValue, dstWrappedNativePrice)
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),

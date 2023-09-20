@@ -15,6 +15,7 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
@@ -123,6 +124,11 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 			sourceClient:             sourceChain.Client(),
 			destGasEstimator:         destChain.GasEstimator(),
 			leafHasher:               hashlib.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hashlib.NewKeccakCtx()),
+			feeEstConfig: FeeEstimationConfig{
+				daOverheadGas: dynamicOnRampConfig.DestDataAvailabilityOverheadGas,
+				gasPerDAByte:  dynamicOnRampConfig.DestGasPerDataAvailabilityByte,
+				daMultiplier:  dynamicOnRampConfig.DestDataAvailabilityMultiplier,
+			},
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress, qopts...)

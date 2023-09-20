@@ -26,6 +26,9 @@ const (
 	EXECUTION_STATE_PROCESSING_OVERHEAD_GAS = 2_100 + // COLD_SLOAD_COST for first reading the state
 		20_000 + // SSTORE_SET_GAS for writing from 0 (untouched) to non-zero (in-progress)
 		100 //# SLOAD_GAS = WARM_STORAGE_READ_COST for rewriting from non-zero (in-progress) to non-zero (success/failure)
+	EVM_MESSAGE_FIXED_BYTES     = 448 // Byte size of fixed-size fields in EVM2EVMMessage
+	EVM_MESSAGE_BYTES_PER_TOKEN = 128
+	DA_MULTIPLIER_BASE          = int64(10000)
 )
 
 // return the size of bytes for msg tokens
@@ -64,31 +67,44 @@ func maxGasOverHeadGas(numMsgs, dataLength, numTokens int) uint64 {
 }
 
 // computeExecCost calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
-func computeExecCost(msg evm2EVMOnRampCCIPSendRequestedWithMeta, gasPriceEstimate, wrappedNativePrice *big.Int) *big.Int {
-	l1GasPrice, nativeGasPrice := parseEncodedGasPrice(gasPriceEstimate)
+func computeMsgCost(msg evm2EVMOnRampCCIPSendRequestedWithMeta, config FeeEstimationConfig, gasPrice, wrappedNativePrice *big.Int) *big.Int {
+	daGasPrice, execGasPrice := parseEncodedGasPrice(gasPrice)
 
-	execGas := new(big.Int).Add(big.NewInt(FEE_BOOSTING_OVERHEAD_GAS), msg.GasLimit)
-	execGasCost := new(big.Int).Mul(execGas, nativeGasPrice)
+	execCost := computeExecCost(msg.GasLimit, execGasPrice, wrappedNativePrice)
 
-	if l1GasPrice.Cmp(big.NewInt(0)) > 0 {
-		// If there is l1GasPrice, then include data availability cost in fee estimation
-		MESSAGE_FIXED_BYTES := 448
-		DON_FIXED_OVERHEAD_GAS := int64(33_084)
-		BYTES_PER_TOKEN := 128
-		GAS_PER_DATA_AVAILABILITY_BYTE := int64(16)
-		DATA_AVAILABILITY_MULTIPLIER := int64(6840)
-		DATA_AVAILABILITY_MULTIPLIER_BASE := int64(10000)
+	// If there is data availability price component, then include data availability cost in fee estimation
+	if daGasPrice.Cmp(big.NewInt(0)) > 0 {
+		daGasCost := computeDACost(msg, config, daGasPrice, wrappedNativePrice)
+		execCost = new(big.Int).Add(execCost, daGasCost)
+	}
+	return execCost
+}
 
-		dataLength := MESSAGE_FIXED_BYTES + len(msg.Data) + len(msg.TokenAmounts)*BYTES_PER_TOKEN // skipping tokenTransferBytesOverhead
-		dataGas := big.NewInt((int64(dataLength) * GAS_PER_DATA_AVAILABILITY_BYTE) + DON_FIXED_OVERHEAD_GAS)
+func computeDACost(msg evm2EVMOnRampCCIPSendRequestedWithMeta, config FeeEstimationConfig, daGasPrice, wrappedNativePrice *big.Int) *big.Int {
+	daOverheadGas := int64(config.daOverheadGas)
+	gasPerDAByte := int64(config.gasPerDAByte)
+	daMultiplier := int64(config.daMultiplier)
 
-		dataGasCost := new(big.Int).Mul(dataGas, l1GasPrice)
-		dataGasCost = new(big.Int).Div(new(big.Int).Mul(dataGasCost, big.NewInt(DATA_AVAILABILITY_MULTIPLIER)), big.NewInt(DATA_AVAILABILITY_MULTIPLIER_BASE))
-
-		execGasCost = new(big.Int).Add(execGasCost, dataGasCost)
+	var sourceTokenDataLen int
+	for _, tokenData := range msg.SourceTokenData {
+		sourceTokenDataLen += len(tokenData)
 	}
 
-	return calculateUsdPerUnitGas(execGasCost, wrappedNativePrice)
+	dataLen := EVM_MESSAGE_FIXED_BYTES + len(msg.Data) + len(msg.TokenAmounts)*EVM_MESSAGE_BYTES_PER_TOKEN + sourceTokenDataLen
+	dataGas := big.NewInt(int64(dataLen)*gasPerDAByte + daOverheadGas)
+
+	dataGasEstimate := new(big.Int).Mul(dataGas, daGasPrice)
+	dataGasEstimate = new(big.Int).Div(new(big.Int).Mul(dataGasEstimate, big.NewInt(daMultiplier)), big.NewInt(DA_MULTIPLIER_BASE))
+
+	return calculateUsdPerUnitGas(dataGasEstimate, wrappedNativePrice)
+}
+
+// computeExecCost calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
+func computeExecCost(gasLimit *big.Int, execGasPrice, wrappedNativePrice *big.Int) *big.Int {
+	execGasEstimate := new(big.Int).Add(big.NewInt(FEE_BOOSTING_OVERHEAD_GAS), gasLimit)
+	execGasEstimate.Mul(execGasEstimate, execGasPrice)
+
+	return calculateUsdPerUnitGas(execGasEstimate, wrappedNativePrice)
 }
 
 // waitBoostedFee boosts the given fee according to the time passed since the msg was sent.

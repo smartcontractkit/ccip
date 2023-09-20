@@ -104,7 +104,7 @@ func TestComputeExecCost(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := evm2EVMOnRampCCIPSendRequestedWithMeta{}
 			msg.GasLimit = tc.gasLimit
-			execCostUsd := computeExecCost(msg, tc.execGasEstimate, tc.tokenPriceUSD)
+			execCostUsd := computeExecCost(msg.GasLimit, tc.execGasEstimate, tc.tokenPriceUSD)
 			require.Equal(t, tc.execCostUsd, execCostUsd)
 		})
 	}
