@@ -1011,25 +1011,33 @@ func CCIPDefaultTestSetUp(
 
 	// wait for price updates to be available and start event watchers
 	priceUpdateGrp, _ := errgroup.WithContext(parent)
+	var priceUpdateMap sync.Map
 	for _, lanes := range setUpArgs.ReadLanes() {
 		lanes := lanes
 		require.NoError(t, lanes.ForwardLane.StartEventWatchers())
 		require.NoError(t, lanes.ReverseLane.StartEventWatchers())
-		priceUpdateGrp.Go(func() error {
-			err := lanes.ForwardLane.Source.Common.WaitForPriceUpdates(
-				lanes.ForwardLane.Logger,
-				lanes.ForwardLane.ValidationTimeout,
-				lanes.ForwardLane.Source.DestinationChainId,
+		waitForUpdate := func(lane *actions.CCIPLane) error {
+			if id, ok := priceUpdateMap.Load(lane.Source.Common.PriceRegistry.Address()); ok &&
+				id.(uint64) == lane.Source.DestinationChainId {
+				return nil
+			}
+			err := lane.Source.Common.WaitForPriceUpdates(
+				lane.Logger,
+				lane.ValidationTimeout,
+				lane.Source.DestinationChainId,
 			)
 			if err != nil {
 				return err
 			}
+			priceUpdateMap.Store(lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
+			return nil
+		}
 
-			return lanes.ReverseLane.Source.Common.WaitForPriceUpdates(
-				lanes.ReverseLane.Logger,
-				lanes.ReverseLane.ValidationTimeout,
-				lanes.ReverseLane.Source.DestinationChainId,
-			)
+		priceUpdateGrp.Go(func() error {
+			return waitForUpdate(lanes.ForwardLane)
+		})
+		priceUpdateGrp.Go(func() error {
+			return waitForUpdate(lanes.ReverseLane)
 		})
 	}
 	require.NoError(t, priceUpdateGrp.Wait())
