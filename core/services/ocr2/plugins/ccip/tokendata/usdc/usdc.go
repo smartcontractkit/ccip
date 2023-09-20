@@ -32,10 +32,6 @@ type TokenDataReader struct {
 	usdcMessageHashCacheMutex sync.Mutex
 }
 
-type attestationAttempt struct {
-	USDCAttestationResponse attestationResponse
-}
-
 type attestationResponse struct {
 	Status      AttestationStatus `json:"status"`
 	Attestation string            `json:"attestation"`
@@ -43,7 +39,7 @@ type attestationResponse struct {
 
 // Hard coded mapping of chain id to USDC token addresses
 // Will be removed in favour of more flexible solution.
-var TokenMapping = map[uint64]common.Address{
+var tokenMapping = map[uint64]common.Address{
 	// Mainnet
 	1:     common.HexToAddress("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"), // Ethereum
 	10:    common.HexToAddress("0x0b2c639c533813f4aa9d7837caf62653d097ff85"), // Optimism
@@ -55,6 +51,13 @@ var TokenMapping = map[uint64]common.Address{
 	420:    common.HexToAddress("0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6"), // Optimism Goerli
 	43113:  common.HexToAddress("0x5425890298aed601595a70ab815c96711a31bc65"), // Avalanche Fuji
 	421613: common.HexToAddress("0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63"), // Arbitrum Goerli
+}
+
+func GetUSDCTokenAddress(chain uint64) (common.Address, error) {
+	if tokenAddress, ok := tokenMapping[chain]; ok {
+		return tokenAddress, nil
+	}
+	return common.Address{}, errors.New("token not found")
 }
 
 var messageTransmitterMapping = map[uint64]common.Address{
@@ -69,6 +72,13 @@ var messageTransmitterMapping = map[uint64]common.Address{
 	420:    common.HexToAddress("0x9ff9a4da6f2157a9c82ce756f8fd7e0d75be8895"), // Optimism Goerli
 	43113:  common.HexToAddress("0xa9fb1b3009dcb79e2fe346c16a604b8fa8ae0a79"), // Avalanche Fuji
 	421613: common.HexToAddress("0x109bc137cb64eab7c0b1dddd1edf341467dc2d35"), // Arbitrum Goerli
+}
+
+func GetUSDCMessageTransmitterAddress(chain uint64) (common.Address, error) {
+	if transmitterAddress, ok := messageTransmitterMapping[chain]; ok {
+		return transmitterAddress, nil
+	}
+	return common.Address{}, errors.New("usdc transmitter not found")
 }
 
 const (

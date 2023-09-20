@@ -117,13 +117,18 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 
 	// Subscribe all token data providers
 	if pluginConfig.USDCAttestationApi != "" {
-		attestationURI, err := url.ParseRequestURI(pluginConfig.USDCAttestationApi)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse USDC attestation API")
+		attestationURI, err2 := url.ParseRequestURI(pluginConfig.USDCAttestationApi)
+		if err2 != nil {
+			return nil, errors.Wrap(err2, "failed to parse USDC attestation API")
 		}
-		tokenDataProviders[usdc.TokenMapping[chainId]] = tokendata.NewCachedReader(usdc.NewUSDCTokenDataReader(
+		usdcTokenAddress, err2 := usdc.GetUSDCTokenAddress(chainId)
+		if err2 != nil {
+			return nil, errors.Wrap(err2, "failed to get USDC token address")
+		}
+
+		tokenDataProviders[usdcTokenAddress] = tokendata.NewCachedReader(usdc.NewUSDCTokenDataReader(
 			sourceChainEventClient,
-			usdc.TokenMapping[chainId],
+			usdcTokenAddress,
 			offRampConfig.OnRamp,
 			attestationURI,
 			chainId))
@@ -318,10 +323,14 @@ func unregisterExecutionPluginLpFilters(
 
 	tokenDataProviders := make(map[common.Address]tokendata.Reader)
 
+	usdcTokenAddress, err := usdc.GetUSDCTokenAddress(chainId)
+	if err != nil {
+		return errors.Wrap(err, "failed to get USDC token address")
+	}
 	// TODO the called function only uses the chainId to get the message transmitter address
-	tokenDataProviders[usdc.TokenMapping[chainId]] = usdc.NewUSDCTokenDataReader(
+	tokenDataProviders[usdcTokenAddress] = usdc.NewUSDCTokenDataReader(
 		nil,
-		usdc.TokenMapping[chainId],
+		usdcTokenAddress,
 		common.Address{},
 		nil,
 		chainId)
