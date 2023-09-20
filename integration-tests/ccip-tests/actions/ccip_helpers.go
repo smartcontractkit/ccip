@@ -1830,7 +1830,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 
-	err = CreateOCR2CCIPCommitJobs(jobParams, commitNodes, env.nodeMutexes, jobErrGroup)
+	err = CreateOCR2CCIPCommitJobs(lane.Logger, jobParams, commitNodes, env.nodeMutexes, jobErrGroup)
 	if err != nil {
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
@@ -1838,7 +1838,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
 	}
 
-	err = CreateOCR2CCIPExecutionJobs(jobParams, execNodes, env.nodeMutexes, jobErrGroup)
+	err = CreateOCR2CCIPExecutionJobs(lane.Logger, jobParams, execNodes, env.nodeMutexes, jobErrGroup)
 	if err != nil {
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
@@ -1929,6 +1929,7 @@ func CreateBootstrapJob(
 }
 
 func CreateOCR2CCIPCommitJobs(
+	lggr zerolog.Logger,
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	commitNodes []*client.CLNodesWithKeys,
 	mutexes []*sync.Mutex,
@@ -1938,12 +1939,13 @@ func CreateOCR2CCIPCommitJobs(
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecCommit *client.OCR2TaskJobSpec, mu *sync.Mutex) error {
+	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecCommit client.OCR2TaskJobSpec, mu *sync.Mutex) error {
 		mu.Lock()
 		defer mu.Unlock()
 		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
-		_, err = node.Node.MustCreateJob(ocr2SpecCommit)
+		lggr.Info().Msgf("Creating CCIP-Commit job on OCR node %d job name %s", index+1, ocr2SpecCommit.Name)
+		_, err = node.Node.MustCreateJob(&ocr2SpecCommit)
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating CCIP-Commit job on OCR node %d job name %s - %+v", index+1, ocr2SpecCommit.Name, err)
 		}
@@ -1953,13 +1955,14 @@ func CreateOCR2CCIPCommitJobs(
 		node := node
 		i := i
 		group.Go(func() error {
-			return createJob(i, node, ocr2SpecCommit, mutexes[i])
+			return createJob(i, node, *ocr2SpecCommit, mutexes[i])
 		})
 	}
 	return nil
 }
 
 func CreateOCR2CCIPExecutionJobs(
+	lggr zerolog.Logger,
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	execNodes []*client.CLNodesWithKeys,
 	mutexes []*sync.Mutex,
@@ -1969,12 +1972,13 @@ func CreateOCR2CCIPExecutionJobs(
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecCommit *client.OCR2TaskJobSpec, mu *sync.Mutex) error {
+	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecExec client.OCR2TaskJobSpec, mu *sync.Mutex) error {
 		mu.Lock()
 		defer mu.Unlock()
 		ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
-		_, err = node.Node.MustCreateJob(ocr2SpecExec)
+		lggr.Info().Msgf("Creating CCIP-Exec job on OCR node %d job name %s", index+1, ocr2SpecExec.Name)
+		_, err = node.Node.MustCreateJob(&ocr2SpecExec)
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %+v", index+1,
 				ocr2SpecExec.Name, err)
@@ -1986,7 +1990,7 @@ func CreateOCR2CCIPExecutionJobs(
 			node := node
 			i := i
 			group.Go(func() error {
-				return createJob(i, node, ocr2SpecExec, mutexes[i])
+				return createJob(i, node, *ocr2SpecExec, mutexes[i])
 			})
 		}
 	}
@@ -2120,11 +2124,13 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	logger zerolog.Logger,
 ) error {
 	chainlinkNodes := make([]*client.ChainlinkClient, 0)
+
 	//var err error
 	if c.LocalCluster != nil {
 		// for local cluster, fetch the values from the local cluster
 		for _, chainlinkNode := range c.LocalCluster.CLNodes {
 			chainlinkNodes = append(chainlinkNodes, chainlinkNode.API)
+			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}
 	} else {
 		// in case of k8s, we need to connect to the chainlink nodes
@@ -2140,6 +2146,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		for _, chainlinkNode := range chainlinkK8sNodes {
 			chainlinkNode.ChainlinkClient.SetLogger(logger)
 			chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient)
+			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}
 		c.CLNodes = chainlinkK8sNodes
 	}
@@ -2196,9 +2203,6 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	}
 
 	c.CLNodesWithKeys = nodesWithKeys
-	for range c.CLNodes {
-		c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
-	}
 	return nil
 }
 
