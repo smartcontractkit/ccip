@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 )
 
 type CachedReader struct {
@@ -21,20 +21,20 @@ func NewCachedReader(reader Reader) *CachedReader {
 	}
 }
 
-func (r *CachedReader) ReadTokenData(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) ([]byte, error) {
+func (r *CachedReader) ReadTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([]byte, error) {
 	r.cacheMutex.Lock()
 	defer r.cacheMutex.Unlock()
 
-	if data, ok := r.cache[seqNum]; ok {
+	if data, ok := r.cache[msg.SequenceNumber]; ok {
 		return data, nil
 	}
 
-	tokenData, err := r.Reader.ReadTokenData(ctx, seqNum, logIndex, txHash)
+	tokenData, err := r.Reader.ReadTokenData(ctx, msg)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	r.cache[seqNum] = tokenData
+	r.cache[msg.SequenceNumber] = tokenData
 
 	return tokenData, nil
 }

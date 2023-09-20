@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -107,8 +108,8 @@ func NewUSDCTokenDataReader(sourceChainEvents ccipdata.Reader, usdcTokenAddress,
 	}
 }
 
-func (s *TokenDataReader) ReadTokenData(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) (attestation []byte, err error) {
-	response, err := s.getUpdatedAttestation(ctx, seqNum, logIndex, txHash)
+func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) (attestation []byte, err error) {
+	response, err := s.getUpdatedAttestation(ctx, msg)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -123,8 +124,8 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, seqNum uint64, logI
 	return []byte{}, tokendata.ErrNotReady
 }
 
-func (s *TokenDataReader) getUpdatedAttestation(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) (attestationResponse, error) {
-	messageBody, err := s.getUSDCMessageBody(ctx, seqNum, logIndex, txHash)
+func (s *TokenDataReader) getUpdatedAttestation(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) (attestationResponse, error) {
+	messageBody, err := s.getUSDCMessageBody(ctx, msg)
 	if err != nil {
 		return attestationResponse{}, errors.Wrap(err, "failed getting the USDC message body")
 	}
@@ -137,15 +138,15 @@ func (s *TokenDataReader) getUpdatedAttestation(ctx context.Context, seqNum uint
 	return response, nil
 }
 
-func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, seqNum uint64, logIndex uint, txHash common.Hash) ([32]byte, error) {
+func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([32]byte, error) {
 	s.usdcMessageHashCacheMutex.Lock()
 	defer s.usdcMessageHashCacheMutex.Unlock()
 
-	if body, ok := s.usdcMessageHashCache[seqNum]; ok {
+	if body, ok := s.usdcMessageHashCache[msg.SequenceNumber]; ok {
 		return body, nil
 	}
 
-	usdcMessageBody, err := s.sourceChainEvents.GetLastUSDCMessagePriorToLogIndexInTx(ctx, int64(logIndex), txHash)
+	usdcMessageBody, err := s.sourceChainEvents.GetLastUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), msg.TxHash)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -153,7 +154,7 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, seqNum uint64,
 	msgBodyHash := utils.Keccak256Fixed(usdcMessageBody)
 
 	// Save the attempt in the cache in case the external call fails
-	s.usdcMessageHashCache[seqNum] = msgBodyHash
+	s.usdcMessageHashCache[msg.SequenceNumber] = msgBodyHash
 	return msgBodyHash, nil
 }
 
@@ -180,10 +181,6 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 		return attestationResponse{}, err
 	}
 	return response, nil
-}
-
-func (s *TokenDataReader) GetSourceToken() common.Address {
-	return s.sourceToken
 }
 
 func (s *TokenDataReader) GetSourceLogPollerFilters() []logpoller.Filter {

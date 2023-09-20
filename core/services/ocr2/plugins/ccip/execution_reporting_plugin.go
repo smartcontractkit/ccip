@@ -31,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -231,16 +232,6 @@ func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegis
 	rf.destChainFilters = destFiltersNow
 
 	return nil
-}
-
-// helper struct to hold the send request and some metadata
-type evm2EVMOnRampCCIPSendRequestedWithMeta struct {
-	evm_2_evm_offramp.InternalEVM2EVMMessage
-	blockTimestamp time.Time
-	executed       bool
-	finalized      bool
-	logIndex       uint
-	txHash         common.Hash
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
@@ -500,7 +491,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
-		if msg.executed {
+		if msg.Executed {
 			msgLggr.Infow("Skipping message already executed", "seqNr", msg.SequenceNumber)
 			continue
 		}
@@ -590,10 +581,10 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 		availableFee := big.NewInt(0).Mul(msg.FeeTokenAmount, sourceFeeTokenPrice)
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
-		availableFeeUsd := waitBoostedFee(time.Since(msg.blockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
+		availableFeeUsd := waitBoostedFee(time.Since(msg.BlockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
 		if availableFeeUsd.Cmp(execCostUsd) < 0 {
 			msgLggr.Infow("Insufficient remaining fee", "availableFeeUsd", availableFeeUsd, "execCostUsd", execCostUsd,
-				"sourceBlockTimestamp", msg.blockTimestamp, "waitTime", time.Since(msg.blockTimestamp), "boost", r.offchainConfig.RelativeBoostPerWaitHour)
+				"sourceBlockTimestamp", msg.BlockTimestamp, "waitTime", time.Since(msg.BlockTimestamp), "boost", r.offchainConfig.RelativeBoostPerWaitHour)
 			continue
 		}
 
@@ -638,10 +629,10 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	return executableMessages
 }
 
-func getTokenData(ctx context.Context, msg evm2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader) (tokenData [][]byte, allReady bool, err error) {
+func getTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader) (tokenData [][]byte, allReady bool, err error) {
 	for _, token := range msg.TokenAmounts {
 		if offchainTokenDataProvider, ok := tokenDataProviders[token.Token]; ok {
-			attestation, err2 := offchainTokenDataProvider.ReadTokenData(ctx, msg.SequenceNumber, msg.logIndex, msg.txHash)
+			attestation, err2 := offchainTokenDataProvider.ReadTokenData(ctx, msg)
 			if err2 != nil {
 				if errors.Is(err2, tokendata.ErrNotReady) {
 					return [][]byte{}, false, nil
@@ -726,7 +717,7 @@ func calculateMessageMaxGas(gasLimit *big.Int, numRequests, dataLen, numTokens i
 // helper struct to hold the commitReport and the related send requests
 type commitReportWithSendRequests struct {
 	commitReport         commit_store.CommitStoreCommitReport
-	sendRequestsWithMeta []evm2EVMOnRampCCIPSendRequestedWithMeta
+	sendRequestsWithMeta []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
 }
 
 func (r *commitReportWithSendRequests) validate() error {
@@ -741,7 +732,7 @@ func (r *commitReportWithSendRequests) validate() error {
 
 func (r *commitReportWithSendRequests) allRequestsAreExecutedAndFinalized() bool {
 	for _, req := range r.sendRequestsWithMeta {
-		if !req.executed || !req.finalized {
+		if !req.Executed || !req.Finalized {
 			return false
 		}
 	}
@@ -749,7 +740,7 @@ func (r *commitReportWithSendRequests) allRequestsAreExecutedAndFinalized() bool
 }
 
 // checks if the send request fits the commit report interval
-func (r *commitReportWithSendRequests) sendReqFits(sendReq evm2EVMOnRampCCIPSendRequestedWithMeta) bool {
+func (r *commitReportWithSendRequests) sendReqFits(sendReq internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) bool {
 	return sendReq.SequenceNumber >= r.commitReport.Interval.Min &&
 		sendReq.SequenceNumber <= r.commitReport.Interval.Max
 }
@@ -818,7 +809,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	for i, report := range reports {
 		reportsWithSendReqs[i] = commitReportWithSendRequests{
 			commitReport:         report,
-			sendRequestsWithMeta: make([]evm2EVMOnRampCCIPSendRequestedWithMeta, 0, report.Interval.Max-report.Interval.Min+1),
+			sendRequestsWithMeta: make([]internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, 0, report.Interval.Max-report.Interval.Min+1),
 		}
 	}
 
@@ -829,13 +820,13 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 		// if value exists, and it's true then it's considered finalized
 		finalized, executed := executedSeqNums[msg.SequenceNumber]
 
-		reqWithMeta := evm2EVMOnRampCCIPSendRequestedWithMeta{
+		reqWithMeta := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 			InternalEVM2EVMMessage: msg,
-			blockTimestamp:         sendReq.BlockTimestamp,
-			executed:               executed,
-			finalized:              finalized,
-			logIndex:               sendReq.Data.Raw.Index,
-			txHash:                 sendReq.Data.Raw.TxHash,
+			BlockTimestamp:         sendReq.BlockTimestamp,
+			Executed:               executed,
+			Finalized:              finalized,
+			LogIndex:               sendReq.Data.Raw.Index,
+			TxHash:                 sendReq.Data.Raw.TxHash,
 		}
 
 		// attach the msg to the appropriate reports
