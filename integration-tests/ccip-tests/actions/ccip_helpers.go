@@ -1674,7 +1674,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	transferAmounts []*big.Int,
 	bootstrapAdded *atomic.Bool,
 	configureCLNodes bool,
-	jobAddMu *sync.Mutex,
+	jobErrGroup *errgroup.Group,
 ) (*laneconfig.LaneConfig, *laneconfig.LaneConfig, error) {
 	var err error
 	env := lane.TestEnv
@@ -1830,31 +1830,15 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 
-	// collect all tokenAddresses
-	var tokenAddresses []string
-	for _, token := range lane.Dest.Common.BridgeTokens {
-		tokenAddresses = append(tokenAddresses, token.Address())
-	}
-
-	tokenAddresses = append(tokenAddresses,
-		lane.Dest.Common.FeeToken.Address(),
-		lane.Dest.Common.WrappedNative.Hex(),
-		lane.Source.Common.WrappedNative.Hex())
-
-	// job creation is buggy when done for too many lanes in parallel
-	// therefore we create the jobs sequentially with a lock
-	jobAddMu.Lock()
-	err = CreateOCR2CCIPCommitJobs(jobParams, commitNodes)
-	jobAddMu.Unlock()
+	err = CreateOCR2CCIPCommitJobs(jobParams, commitNodes, env.nodeMutexes, jobErrGroup)
 	if err != nil {
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 	if p2pBootstrappersExec != nil {
 		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
 	}
-	jobAddMu.Lock()
-	err = CreateOCR2CCIPExecutionJobs(jobParams, execNodes)
-	jobAddMu.Unlock()
+
+	err = CreateOCR2CCIPExecutionJobs(jobParams, execNodes, env.nodeMutexes, jobErrGroup)
 	if err != nil {
 		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
@@ -1947,39 +1931,63 @@ func CreateBootstrapJob(
 func CreateOCR2CCIPCommitJobs(
 	jobParams integrationtesthelpers.CCIPJobSpecParams,
 	commitNodes []*client.CLNodesWithKeys,
+	mutexes []*sync.Mutex,
+	group *errgroup.Group,
 ) error {
 	ocr2SpecCommit, err := jobParams.CommitJobSpec()
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	for i, node := range commitNodes {
+	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecCommit *client.OCR2TaskJobSpec, mu *sync.Mutex) error {
+		mu.Lock()
+		defer mu.Unlock()
 		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
-
 		_, err = node.Node.MustCreateJob(ocr2SpecCommit)
 		if err != nil {
-			return fmt.Errorf("shouldn't fail creating CCIP-Commit job on OCR node %d job name %s - %+v", i+1, ocr2SpecCommit.Name, err)
+			return fmt.Errorf("shouldn't fail creating CCIP-Commit job on OCR node %d job name %s - %+v", index+1, ocr2SpecCommit.Name, err)
 		}
+		return nil
+	}
+	for i, node := range commitNodes {
+		node := node
+		i := i
+		group.Go(func() error {
+			return createJob(i, node, ocr2SpecCommit, mutexes[i])
+		})
 	}
 	return nil
 }
 
-func CreateOCR2CCIPExecutionJobs(jobParams integrationtesthelpers.CCIPJobSpecParams, execNodes []*client.CLNodesWithKeys) error {
+func CreateOCR2CCIPExecutionJobs(
+	jobParams integrationtesthelpers.CCIPJobSpecParams,
+	execNodes []*client.CLNodesWithKeys,
+	mutexes []*sync.Mutex,
+	group *errgroup.Group,
+) error {
 	ocr2SpecExec, err := jobParams.ExecutionJobSpec()
 	if err != nil {
 		return errors.WithStack(err)
 	}
-
+	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecCommit *client.OCR2TaskJobSpec, mu *sync.Mutex) error {
+		mu.Lock()
+		defer mu.Unlock()
+		ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
+		ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
+		_, err = node.Node.MustCreateJob(ocr2SpecExec)
+		if err != nil {
+			return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %+v", index+1,
+				ocr2SpecExec.Name, err)
+		}
+		return nil
+	}
 	if ocr2SpecExec != nil {
 		for i, node := range execNodes {
-			ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
-			ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
-
-			_, err = node.Node.MustCreateJob(ocr2SpecExec)
-			if err != nil {
-				return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %+v", i+1,
-					ocr2SpecExec.Name, err)
-			}
+			node := node
+			i := i
+			group.Go(func() error {
+				return createJob(i, node, ocr2SpecExec, mutexes[i])
+			})
 		}
 	}
 	return nil
@@ -2040,6 +2048,7 @@ type CCIPTestEnv struct {
 	LocalCluster             *test_env.CLClusterTestEnv
 	CLNodesWithKeys          map[string][]*client.CLNodesWithKeys // key - network chain-id
 	CLNodes                  []*client.ChainlinkK8sClient
+	nodeMutexes              []*sync.Mutex
 	execNodeStartIndex       int
 	commitNodeStartIndex     int
 	numOfAllowedFaultyCommit int
@@ -2187,6 +2196,9 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	}
 
 	c.CLNodesWithKeys = nodesWithKeys
+	for range c.CLNodes {
+		c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
+	}
 	return nil
 }
 
