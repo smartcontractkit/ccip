@@ -45,7 +45,7 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 	require.NoError(t, err)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write(responseBytes)
+		_, err = w.Write(responseBytes)
 		require.NoError(t, err)
 	}))
 

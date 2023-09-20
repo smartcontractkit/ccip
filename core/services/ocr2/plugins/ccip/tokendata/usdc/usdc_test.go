@@ -82,7 +82,8 @@ func TestGetUSDCReaderSourceLPFilters(t *testing.T) {
 	usdcService := NewUSDCTokenDataReader(nil, mockUSDCTokenAddress, mockOnRampAddress, nil, chainId)
 
 	filters := usdcService.GetSourceLogPollerFilters()
-	expectedTransmitterAddress := messageTransmitterMapping[chainId]
+	expectedTransmitterAddress, err := GetUSDCMessageTransmitterAddress(chainId)
+	require.NoError(t, err)
 
 	require.Equal(t, 1, len(filters))
 	filter := filters[0]
