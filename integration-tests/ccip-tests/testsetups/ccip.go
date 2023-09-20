@@ -516,6 +516,7 @@ type BiDirectionalLaneConfig struct {
 type CCIPTestSetUpOutputs struct {
 	Cfg                      *CCIPTestConfig
 	LaneContractsByNetwork   sync.Map
+	laneMutex                *sync.Mutex
 	Lanes                    []*BiDirectionalLaneConfig
 	CommonContractsByNetwork sync.Map
 	Reporter                 *testreporters.CCIPTestReporter
@@ -527,6 +528,18 @@ type CCIPTestSetUpOutputs struct {
 	BootstrapAdded           *atomic.Bool
 	JobAdd                   *sync.Mutex
 	allTokenValues           map[string]interface{}
+}
+
+func (o *CCIPTestSetUpOutputs) AddToLanes(lane *BiDirectionalLaneConfig) {
+	o.laneMutex.Lock()
+	defer o.laneMutex.Unlock()
+	o.Lanes = append(o.Lanes, lane)
+}
+
+func (o *CCIPTestSetUpOutputs) ReadLanes() []*BiDirectionalLaneConfig {
+	o.laneMutex.Lock()
+	defer o.laneMutex.Unlock()
+	return o.Lanes
 }
 
 func (o *CCIPTestSetUpOutputs) DeployChainContracts(
@@ -673,7 +686,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			fmt.Sprintf("%s To %s", networkB.Name, networkA.Name), ccipLaneB2A.Logger)
 		bidirectionalLane.ReverseLane = ccipLaneB2A
 	}
-	o.Lanes = append(o.Lanes, bidirectionalLane)
+	o.AddToLanes(bidirectionalLane)
 
 	c1, ok := o.CommonContractsByNetwork.Load(networkA.Name)
 	var networkACmn *actions.CCIPCommon
@@ -916,6 +929,7 @@ func CCIPDefaultTestSetUp(
 			}
 		}
 	})
+
 	if configureCLNode {
 		ccipEnv.CLNodeWithKeyReady.Go(func() error {
 			if ccipEnv.LocalCluster != nil {
@@ -997,12 +1011,12 @@ func CCIPDefaultTestSetUp(
 
 	// wait for price updates to be available and start event watchers
 	priceUpdateGrp, _ := errgroup.WithContext(parent)
-	for _, lanes := range setUpArgs.Lanes {
+	for _, lanes := range setUpArgs.ReadLanes() {
 		lanes := lanes
 		require.NoError(t, lanes.ForwardLane.StartEventWatchers())
 		require.NoError(t, lanes.ReverseLane.StartEventWatchers())
 		priceUpdateGrp.Go(func() error {
-			err = lanes.ForwardLane.Source.Common.WaitForPriceUpdates(
+			err := lanes.ForwardLane.Source.Common.WaitForPriceUpdates(
 				lanes.ForwardLane.Logger,
 				lanes.ForwardLane.ValidationTimeout,
 				lanes.ForwardLane.Source.DestinationChainId,

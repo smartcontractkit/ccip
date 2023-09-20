@@ -320,6 +320,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(lggr zerolog.Logger) ([]event
 	subs = append(subs, sub)
 	go func() {
 		for {
+			lggr := lggr
 			e := <-gasUpdateEvent
 			destChain, err := chainselectors.ChainIdFromSelector(e.DestChain)
 			if err != nil {
@@ -340,6 +341,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates(lggr zerolog.Logger) ([]event
 	subs = append(subs, sub)
 	go func() {
 		for {
+			lggr := lggr
 			e := <-priceUpdateEvent
 			lggr.Info().Msgf("priceUpdateEvent event received for token %s", e.Token.Hex())
 			ccipModule.priceUpdateWatcherMu.Lock()
