@@ -526,8 +526,7 @@ type CCIPTestSetUpOutputs struct {
 	Env                      *actions.CCIPTestEnv
 	Balance                  *actions.BalanceSheet
 	BootstrapAdded           *atomic.Bool
-	JobAdd                   *sync.Mutex
-	allTokenValues           map[string]interface{}
+	JobAddMu                 *sync.Mutex
 }
 
 func (o *CCIPTestSetUpOutputs) AddToLanes(lane *BiDirectionalLaneConfig) {
@@ -708,7 +707,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
 		srcConfig, destConfig, err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkACmn, networkBCmn,
-			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAdd)
+			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddMu)
 		if err != nil {
 			allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err - %+v", networkA.Name, networkB.Name, err))
 			return err
@@ -730,7 +729,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		if bidirectional {
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
 			srcConfig, destConfig, err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkBCmn, networkACmn,
-				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAdd)
+				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddMu)
 			if err != nil {
 				allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err -  %+v", networkB.Name, networkA.Name, err))
 				return err
@@ -812,7 +811,8 @@ func CCIPDefaultTestSetUp(
 		LaneConfigFile: filename,
 		Balance:        actions.NewBalanceSheet(),
 		BootstrapAdded: atomic.NewBool(false),
-		JobAdd:         &sync.Mutex{},
+		JobAddMu:       &sync.Mutex{},
+		laneMutex:      &sync.Mutex{},
 	}
 	_, err = os.Stat(setUpArgs.LaneConfigFile)
 	if err == nil {
