@@ -41,8 +41,6 @@ const (
 	// and restart from the chain's minSeqNum. Want to set it high to allow for large throughput,
 	// but low enough to minimize wasted revert cost.
 	MaxInflightSeqNumGap = 500
-
-	MinimumGasPriceResolution = 500
 )
 
 var (

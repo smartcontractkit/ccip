@@ -8,9 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink/v2/core/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 )
 
 func TestOverheadGas(t *testing.T) {
@@ -107,7 +104,7 @@ func TestComputeExecCost(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			msg := evm2EVMOnRampCCIPSendRequestedWithMeta{}
 			msg.GasLimit = tc.gasLimit
-			execCostUsd := computeExecCost(msg, gas.EvmFee{Legacy: assets.NewWei(tc.execGasEstimate)}, tc.tokenPriceUSD)
+			execCostUsd := computeExecCost(msg, tc.execGasEstimate, tc.tokenPriceUSD)
 			require.Equal(t, tc.execCostUsd, execCostUsd)
 		})
 	}

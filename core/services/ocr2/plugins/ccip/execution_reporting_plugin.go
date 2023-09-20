@@ -276,7 +276,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	})
-	getDestGasPrice := LazyFetch(func() (gas.EvmFee, error) {
+	getDestGasPrice := LazyFetch(func() (*big.Int, error) {
 		return r.estimateDestinationGasPrice(ctx)
 	})
 
@@ -411,11 +411,33 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 	return res, nil
 }
 
-func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (gas.EvmFee, error) {
-	destGasPrice, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
+func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (*big.Int, error) {
+	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
 	if err != nil {
-		return gas.EvmFee{}, errors.Wrap(err, "could not estimate destination gas price")
+		return nil, errors.Wrap(err, "could not estimate destination gas price")
 	}
+	destGasPrice := destGasPriceWei.Legacy.ToInt()
+	if destGasPriceWei.DynamicFeeCap != nil {
+		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
+	}
+	if destGasPrice == nil {
+		return nil, fmt.Errorf("missing gas price %+v", destGasPrice)
+	}
+
+	// If l1 oracle exists, l1 gas price is a price component of overall tx, need to fetch and encode l1 gas price.
+	if l1Oracle := r.config.destGasEstimator.L1Oracle(); l1Oracle != nil {
+		l1GasPriceWei, err := l1Oracle.GasPrice(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		if l1GasPrice := l1GasPriceWei.ToInt(); l1GasPrice.Cmp(big.NewInt(0)) > 0 {
+			// Encode l1 and l2 gas prices into same value, l1 is on higher-order bits, l2 is on lower-order bits.
+			l1GasPrice = new(big.Int).Lsh(l1GasPrice, GasPriceEncodingLength)
+			destGasPrice = new(big.Int).Add(l1GasPrice, destGasPrice)
+		}
+	}
+
 	return destGasPrice, nil
 }
 
@@ -465,7 +487,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	aggregateTokenLimit *big.Int,
 	sourceTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
-	execGasPriceEstimate LazyFunction[gas.EvmFee],
+	execGasPriceEstimate LazyFunction[*big.Int],
 	sourceToDestToken map[common.Address]common.Address,
 	destTokenPoolRateLimits map[common.Address]*big.Int,
 ) (executableMessages []ObservedMessage) {

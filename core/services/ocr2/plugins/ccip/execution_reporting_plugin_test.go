@@ -645,7 +645,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 				tc.tokenLimit,
 				tc.srcPrices,
 				tc.dstPrices,
-				func() (gas.EvmFee, error) { return gas.EvmFee{Legacy: assets.NewWei(tc.destGasPrice)}, nil },
+				func() (*big.Int, error) { return tc.destGasPrice, nil },
 				tc.srcToDestTokens,
 				tc.destRateLimits,
 			)
