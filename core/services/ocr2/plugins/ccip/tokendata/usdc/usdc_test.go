@@ -34,13 +34,13 @@ func TestUSDCReader_callAttestationApi(t *testing.T) {
 	attestation, err := usdcService.callAttestationApi(context.Background(), [32]byte(common.FromHex(usdcMessageHash)))
 	require.NoError(t, err)
 
-	require.Equal(t, AttestationStatusPending, attestation.Status)
+	require.Equal(t, attestationStatusPending, attestation.Status)
 	require.Equal(t, "PENDING", attestation.Attestation)
 }
 
 func TestUSDCReader_callAttestationApiMock(t *testing.T) {
 	response := attestationResponse{
-		Status:      AttestationStatusSuccess,
+		Status:      attestationStatusSuccess,
 		Attestation: "720502893578a89a8a87982982ef781c18b193",
 	}
 

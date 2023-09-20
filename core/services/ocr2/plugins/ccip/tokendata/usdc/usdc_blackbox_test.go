@@ -29,13 +29,13 @@ var (
 )
 
 type attestationResponse struct {
-	Status      usdc.AttestationStatus `json:"status"`
-	Attestation string                 `json:"attestation"`
+	Status      string `json:"status"`
+	Attestation string `json:"attestation"`
 }
 
 func TestUSDCReader_ReadTokenData(t *testing.T) {
 	response := attestationResponse{
-		Status:      usdc.AttestationStatusSuccess,
+		Status:      "complete",
 		Attestation: "720502893578a89a8a87982982ef781c18b193",
 	}
 
@@ -93,5 +93,4 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, attestationBytes, attestation)
-	require.Equal(t, response.Status, usdc.AttestationStatusSuccess)
 }

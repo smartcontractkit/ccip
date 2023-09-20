@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -56,7 +57,7 @@ func TestGetExecutionPluginFilterNamesFromSpec(t *testing.T) {
 	for _, tc := range testCases {
 		chainSet := &mocks.LegacyChainContainer{}
 		t.Run(tc.description, func(t *testing.T) {
-			err := UnregisterExecPluginLpFilters(context.Background(), tc.spec, chainSet)
+			err := UnregisterExecPluginLpFilters(context.Background(), logger.TestLogger(t), tc.spec, chainSet)
 			if tc.expectingErr {
 				assert.Error(t, err)
 			} else {
@@ -111,6 +112,7 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 
 	err := unregisterExecutionPluginLpFilters(
 		context.Background(),
+		logger.TestLogger(t),
 		srcLP,
 		dstLP,
 		mockOffRamp,

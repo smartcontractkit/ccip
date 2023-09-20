@@ -513,7 +513,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 				// Chain holds existing nonce.
 				nonce, err := r.config.offRamp.GetSenderNonce(nil, msg.Sender)
 				if err != nil {
-					lggr.Errorw("unable to get sender nonce", "err", err)
+					lggr.Errorw("unable to get sender nonce", "err", err, "seqNr", msg.SequenceNumber)
 					continue
 				}
 				expectedNonces[msg.Sender] = nonce + 1
@@ -542,9 +542,9 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		tokenData, ready, err2 := getTokenData(ctx, msg, r.config.tokenDataProviders)
+		tokenData, ready, err2 := getTokenData(ctx, msgLggr, msg, r.config.tokenDataProviders)
 		if err2 != nil {
-			msgLggr.Errorw("Skipping message unable to check attestation", "err", err2)
+			msgLggr.Errorw("Skipping message unable to check token data", "err", err2)
 			continue
 		}
 		if !ready {
@@ -633,23 +633,25 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	return executableMessages
 }
 
-func getTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader) (tokenData [][]byte, allReady bool, err error) {
+func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader) (tokenData [][]byte, allReady bool, err error) {
 	for _, token := range msg.TokenAmounts {
-		if offchainTokenDataProvider, ok := tokenDataProviders[token.Token]; ok {
-			attestation, err2 := offchainTokenDataProvider.ReadTokenData(ctx, msg)
-			if err2 != nil {
-				if errors.Is(err2, tokendata.ErrNotReady) {
-					return [][]byte{}, false, nil
-				}
-				return [][]byte{}, false, err2
-			}
-
-			tokenData = append(tokenData, attestation)
+		offchainTokenDataProvider, ok := tokenDataProviders[token.Token]
+		if !ok {
+			// No token data required
+			tokenData = append(tokenData, []byte{})
 			continue
 		}
+		lggr.Infow("Fetching token data", "token", token.Token.Hex())
+		tknData, err2 := offchainTokenDataProvider.ReadTokenData(ctx, msg)
+		if err2 != nil {
+			if errors.Is(err2, tokendata.ErrNotReady) {
+				lggr.Infof("Token data not ready yet for token %s", token.Token.Hex())
+				return [][]byte{}, false, nil
+			}
+			return [][]byte{}, false, err2
+		}
 
-		// No token data required
-		tokenData = append(tokenData, []byte{})
+		tokenData = append(tokenData, tknData)
 	}
 	return tokenData, true, nil
 }

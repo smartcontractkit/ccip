@@ -116,7 +116,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 
 	sourceChainEventClient := ccipdata.NewLogPollerReader(sourceChain.LogPoller(), execLggr, sourceChain.Client())
 
-	tokenDataProviders, err := getTokenDataProviders(pluginConfig, offRampConfig.OnRamp, sourceChainEventClient)
+	tokenDataProviders, err := getTokenDataProviders(lggr, pluginConfig, offRampConfig.OnRamp, sourceChainEventClient)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get token data providers")
 	}
@@ -173,10 +173,11 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func getTokenDataProviders(pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, onRampAddress common.Address, sourceChainEventClient *ccipdata.LogPollerReader) (map[common.Address]tokendata.Reader, error) {
+func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, onRampAddress common.Address, sourceChainEventClient *ccipdata.LogPollerReader) (map[common.Address]tokendata.Reader, error) {
 	tokenDataProviders := make(map[common.Address]tokendata.Reader)
 
 	if pluginConfig.USDCConfig.AttestationAPI != "" {
+		lggr.Infof("USDC token data provider enabled")
 		err := pluginConfig.USDCConfig.ValidateUSDCConfig()
 		if err != nil {
 			return nil, err
@@ -262,7 +263,7 @@ func getExecutionPluginDestLpChainFilters(commitStore, offRamp, priceRegistry co
 }
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
-func UnregisterExecPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
+func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
 	if spec == nil {
 		return errors.New("spec is nil")
 	}
@@ -309,11 +310,12 @@ func UnregisterExecPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSpec
 		return errors.Wrap(err, "failed loading onRamp")
 	}
 
-	return unregisterExecutionPluginLpFilters(ctx, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, sourceOnRamp, sourceChain.Client(), pluginConfig, qopts...)
+	return unregisterExecutionPluginLpFilters(ctx, lggr, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, sourceOnRamp, sourceChain.Client(), pluginConfig, qopts...)
 }
 
 func unregisterExecutionPluginLpFilters(
 	ctx context.Context,
+	lggr logger.Logger,
 	sourceLP logpoller.LogPoller,
 	destLP logpoller.LogPoller,
 	destOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
@@ -333,7 +335,7 @@ func unregisterExecutionPluginLpFilters(
 	}
 
 	// SourceChainEventClient can be nil because it is not used in unregisterExecutionPluginLpFilters
-	tokenDataProviders, err := getTokenDataProviders(pluginConfig, destOffRampConfig.OnRamp, nil)
+	tokenDataProviders, err := getTokenDataProviders(lggr, pluginConfig, destOffRampConfig.OnRamp, nil)
 	if err != nil {
 		return err
 	}

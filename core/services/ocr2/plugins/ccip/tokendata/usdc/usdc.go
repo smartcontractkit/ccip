@@ -34,7 +34,7 @@ type TokenDataReader struct {
 }
 
 type attestationResponse struct {
-	Status      AttestationStatus `json:"status"`
+	Status      attestationStatus `json:"status"`
 	Attestation string            `json:"attestation"`
 }
 
@@ -44,11 +44,11 @@ const (
 	MESSAGE_SENT_FILTER_NAME = "USDC message sent"
 )
 
-type AttestationStatus string
+type attestationStatus string
 
 const (
-	AttestationStatusSuccess AttestationStatus = "complete"
-	AttestationStatusPending AttestationStatus = "pending_confirmations"
+	attestationStatusSuccess attestationStatus = "complete"
+	attestationStatusPending attestationStatus = "pending_confirmations"
 )
 
 var _ tokendata.Reader = &TokenDataReader{}
@@ -70,7 +70,7 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EV
 		return []byte{}, err
 	}
 
-	if response.Status == AttestationStatusSuccess {
+	if response.Status == attestationStatusSuccess {
 		attestationBytes, err := hex.DecodeString(response.Attestation)
 		if err != nil {
 			return nil, fmt.Errorf("decode response attestation: %w", err)
