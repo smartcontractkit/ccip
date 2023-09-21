@@ -51,6 +51,10 @@ func NewCCIPContractsDeployer(logger zerolog.Logger, bcClient blockchain.EVMClie
 	}, nil
 }
 
+func (e *CCIPContractsDeployer) Client() blockchain.EVMClient {
+	return e.evmClient
+}
+
 func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	address, _, instance, err := e.evmClient.DeployContract("Link Token", func(
 		auth *bind.TransactOpts,

@@ -197,13 +197,6 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 	if p.AllNetworks == nil {
 		p.AllNetworks = make(map[string]blockchain.EVMNetwork)
 	}
-	// TODO remove this when CTF network timeout is fixed
-	networkA.Timeout = blockchain.JSONStrDuration{
-		Duration: 3 * time.Minute,
-	}
-	networkB.Timeout = blockchain.JSONStrDuration{
-		Duration: 3 * time.Minute,
-	}
 	firstOfPairs := []blockchain.EVMNetwork{networkA}
 	secondOfPairs := []blockchain.EVMNetwork{networkB}
 	// if no of lanes per pair is greater than 1, copy common contracts from the same network
@@ -228,12 +221,10 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 	for i := range firstOfPairs {
 		p.AllNetworks[firstOfPairs[i].Name] = firstOfPairs[i]
 		p.AllNetworks[secondOfPairs[i].Name] = secondOfPairs[i]
-		for j := range secondOfPairs {
-			p.NetworkPairs = append(p.NetworkPairs, NetworkPair{
-				NetworkA: firstOfPairs[i],
-				NetworkB: secondOfPairs[j],
-			})
-		}
+		p.NetworkPairs = append(p.NetworkPairs, NetworkPair{
+			NetworkA: firstOfPairs[i],
+			NetworkB: secondOfPairs[i],
+		})
 	}
 }
 
@@ -553,6 +544,9 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	if ccipEnv != nil {
 		k8Env = ccipEnv.K8Env
 	}
+	if k8Env != nil && chainClient.NetworkSimulated() {
+		networkCfg.URLs = k8Env.URLs[chainClient.GetNetworkConfig().Name]
+	}
 
 	chain, err := blockchain.ConcurrentEVMClient(networkCfg, k8Env, chainClient, lggr)
 	if err != nil {
@@ -560,16 +554,13 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 	}
 
 	chain.ParallelTransactions(true)
-
+	//	defer chain.Close()
 	ccipCommon, err := actions.DefaultCCIPModule(lggr, chain, o.Cfg.ExistingDeployment)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %v", networkCfg.Name, err))
 	}
 
-	cfg, err := o.LaneConfig.ReadLaneConfig(networkCfg.Name)
-	if err != nil {
-		return errors.WithStack(fmt.Errorf("failed to read lane config for %s: %v", networkCfg.Name, err))
-	}
+	cfg := o.LaneConfig.ReadLaneConfig(networkCfg.Name)
 
 	err = ccipCommon.DeployContracts(noOfTokens, tokenDeployerFns, cfg)
 	if err != nil {
@@ -638,13 +629,13 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		return errors.WithStack(fmt.Errorf("failed to load lane contracts for %s", networkA.Name))
 	}
 	srcCfg := contractsA.(*laneconfig.LaneConfig)
-	ccipLaneA2B.SrcNetworkLaneCfg = *srcCfg
+	ccipLaneA2B.SrcNetworkLaneCfg = srcCfg
 	contractsB, ok := o.LaneContractsByNetwork.Load(networkB.Name)
 	if !ok {
 		return errors.WithStack(fmt.Errorf("failed to load lane contracts for %s", networkB.Name))
 	}
 	destCfg := contractsB.(*laneconfig.LaneConfig)
-	ccipLaneA2B.DstNetworkLaneCfg = *destCfg
+	ccipLaneA2B.DstNetworkLaneCfg = destCfg
 
 	ccipLaneA2B.Logger = lggr.With().Str("env", namespace).Str("Lane",
 		fmt.Sprintf("%s-->%s", ccipLaneA2B.SourceNetworkName, ccipLaneA2B.DestNetworkName)).Logger()
@@ -661,13 +652,13 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	var ccipLaneB2A *actions.CCIPLane
 
 	if bidirectional {
-		sourceChainClientB2A, err := blockchain.ConcurrentEVMClient(networkB, k8Env, destChainClientA2B, lggr)
+		sourceChainClientB2A, err := blockchain.ConcurrentEVMClient(networkB, k8Env, chainClientB, lggr)
 		if err != nil {
 			return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", networkB.Name, err))
 		}
 		sourceChainClientB2A.ParallelTransactions(true)
 
-		destChainClientB2A, err := blockchain.ConcurrentEVMClient(networkA, k8Env, sourceChainClientA2B, lggr)
+		destChainClientB2A, err := blockchain.ConcurrentEVMClient(networkA, k8Env, chainClientA, lggr)
 		if err != nil {
 			return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", networkA.Name, err))
 		}
@@ -780,7 +771,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 
 func (o *CCIPTestSetUpOutputs) StartEventWatchers() {
 	for _, lane := range o.ReadLanes() {
-		lane := lane
 		err := lane.ForwardLane.StartEventWatchers()
 		require.NoError(o.Cfg.Test, err)
 		err = lane.ReverseLane.StartEventWatchers()
@@ -1070,12 +1060,13 @@ func CCIPDefaultTestSetUp(
 	require.Equal(t, len(setUpArgs.Lanes), len(inputs.NetworkPairs),
 		"Number of bi-directional lanes should be equal to number of network pairs")
 
-	// now wait for all jobs to get created
-	lggr.Info().Msg("Waiting for jobs to be created")
-	require.NoError(t, setUpArgs.JobAddGrp.Wait(), "Creating jobs shouldn't fail")
-
-	// wait for price updates to be available and start event watchers
-	setUpArgs.WaitForPriceUpdates(parent)
+	if !inputs.ExistingDeployment {
+		// wait for all jobs to get created
+		lggr.Info().Msg("Waiting for jobs to be created")
+		require.NoError(t, setUpArgs.JobAddGrp.Wait(), "Creating jobs shouldn't fail")
+		// wait for price updates to be available and start event watchers
+		setUpArgs.WaitForPriceUpdates(parent)
+	}
 
 	// start event watchers for all lanes
 	setUpArgs.StartEventWatchers()

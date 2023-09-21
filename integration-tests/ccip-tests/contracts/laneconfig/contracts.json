@@ -1344,6 +1344,7 @@
     "Base Goerli-1": {
       "is_mock_arm": true,
       "fee_token": "0xD886E2286Fd1073df82462ea1822119600Af80b6",
+      "is_native_fee_token" : true,
       "bridge_tokens": null,
       "bridge_tokens_pools": null,
       "arm": "0xe693aFe637DF8664CfcB8Fa5f488d29f492ff2B2",
@@ -1467,6 +1468,7 @@
     "Base Goerli-2": {
       "is_mock_arm": true,
       "fee_token": "0xD886E2286Fd1073df82462ea1822119600Af80b6",
+      "is_native_fee_token" : true,
       "bridge_tokens": null,
       "bridge_tokens_pools": null,
       "arm": "0x19a2422E6807622C44bde1194e9648A7E2E2e9C5",

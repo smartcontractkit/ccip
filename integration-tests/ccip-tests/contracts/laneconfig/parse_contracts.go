@@ -87,7 +87,7 @@ type Lanes struct {
 	LaneConfigs map[string]*LaneConfig `json:"lane_configs"`
 }
 
-func (l *Lanes) ReadLaneConfig(networkA string) (*LaneConfig, error) {
+func (l *Lanes) ReadLaneConfig(networkA string) *LaneConfig {
 	laneMu.Lock()
 	defer laneMu.Unlock()
 	cfg, ok := l.LaneConfigs[networkA]
@@ -98,7 +98,7 @@ func (l *Lanes) ReadLaneConfig(networkA string) (*LaneConfig, error) {
 			SrcContractsMu:  &sync.Mutex{},
 			DestContractsMu: &sync.Mutex{},
 		}
-		return l.LaneConfigs[networkA], nil
+		return l.LaneConfigs[networkA]
 	}
 	if cfg.SrcContractsMu == nil {
 		l.LaneConfigs[networkA].SrcContractsMu = &sync.Mutex{}
@@ -106,7 +106,7 @@ func (l *Lanes) ReadLaneConfig(networkA string) (*LaneConfig, error) {
 	if cfg.DestContractsMu == nil {
 		l.LaneConfigs[networkA].DestContractsMu = &sync.Mutex{}
 	}
-	return l.LaneConfigs[networkA], nil
+	return l.LaneConfigs[networkA]
 }
 
 // CopyCommonContracts copies network config for common contracts from fromNetwork to toNetwork

@@ -894,7 +894,11 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		}
 	}
 
-	log.Info().Str("Send token transaction", sendTx.Hash().String()).Msg("Sending token")
+	log.Info().
+		Str("Network", sourceCCIP.Common.ChainClient.GetNetworkName()).
+		Str("Send token transaction", sendTx.Hash().String()).
+		Str("lane", fmt.Sprintf("%s-->%s", sourceCCIP.Common.ChainClient.GetNetworkName(), sourceCCIP.DestNetworkName)).
+		Msg("Sending token")
 	return sendTx.Hash(), time.Since(timeNow), fee, nil
 }
 
@@ -1400,8 +1404,8 @@ type CCIPLane struct {
 	TotalFee                *big.Int // total fee for all the requests. Used for balance validation.
 	ValidationTimeout       time.Duration
 	Context                 context.Context
-	SrcNetworkLaneCfg       laneconfig.LaneConfig
-	DstNetworkLaneCfg       laneconfig.LaneConfig
+	SrcNetworkLaneCfg       *laneconfig.LaneConfig
+	DstNetworkLaneCfg       *laneconfig.LaneConfig
 	Subscriptions           []event.Subscription
 }
 
@@ -1723,12 +1727,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	destConf := lane.DstNetworkLaneCfg
 
 	// deploy all source contracts
-	err = lane.Source.DeployContracts(&srcConf)
+	err = lane.Source.DeployContracts(srcConf)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
 	// deploy all destination contracts
-	err = lane.Dest.DeployContracts(*lane.Source, &destConf)
+	err = lane.Dest.DeployContracts(*lane.Source, destConf)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}
@@ -1737,22 +1741,22 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// if lane is being set up for already configured CL nodes and contracts
 	// no further action is necessary
 	if !configureCLNodes {
-		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, nil
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, nil
 	}
 
 	if env == nil {
-		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(errors.New("test environment not set"))
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(errors.New("test environment not set"))
 	}
 	// wait for the CL nodes to be ready before moving ahead with job creation
 	err = env.CLNodeWithKeyReady.Wait()
 	if err != nil {
-		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 	clNodesWithKeys := env.CLNodesWithKeys
 	// set up ocr2 jobs
 	clNodes, exists := clNodesWithKeys[lane.Dest.Common.ChainClient.GetChainID().String()]
 	if !exists {
-		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, fmt.Errorf("could not find CL nodes for %s", lane.Dest.Common.ChainClient.GetChainID().String())
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("could not find CL nodes for %s", lane.Dest.Common.ChainClient.GetChainID().String())
 	}
 
 	// first node is the bootstrapper
@@ -1768,7 +1772,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	env.numOfExecNodes = numOfCommitNodes
 	if !commitAndExecOnSameDON {
 		if len(clNodes) < 11 {
-			return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, fmt.Errorf("not enough CL nodes for separate commit and execution nodes")
+			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("not enough CL nodes for separate commit and execution nodes")
 		}
 		bootstrapExec = clNodes[1] // for a set-up of different commit and execution nodes second node is the bootstrapper for execution nodes
 		commitNodes = clNodes[2 : 2+numOfCommitNodes]
@@ -1786,7 +1790,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// Here for simplicity we are just taking the current block number just before the job is created.
 	currentBlockOnDest, err := destChainClient.LatestBlockNumber(context.Background())
 	if err != nil {
-		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, fmt.Errorf("getting current block should be successful in destination chain %+v", err)
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("getting current block should be successful in destination chain %+v", err)
 	}
 
 	tokenUSDMap := make(map[string]string)
@@ -1814,7 +1818,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		bootstrapAdded.Store(true)
 		err := CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
 		if err != nil {
-			return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
+			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
 		}
 	}
 
@@ -1841,12 +1845,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// set up ocr2 config
 	err = SetOCR2Configs(commitNodes, execNodes, *lane.Dest)
 	if err != nil {
-		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 
 	err = CreateOCR2CCIPCommitJobs(lane.Logger, jobParams, commitNodes, env.nodeMutexes, jobErrGroup)
 	if err != nil {
-		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 	if p2pBootstrappersExec != nil {
 		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
@@ -1854,13 +1858,13 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	err = CreateOCR2CCIPExecutionJobs(lane.Logger, jobParams, execNodes, env.nodeMutexes, jobErrGroup)
 	if err != nil {
-		return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, errors.WithStack(err)
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
 	}
 
 	lane.Dest.Common.ChainClient.ParallelTransactions(false)
 	lane.Source.Common.ChainClient.ParallelTransactions(false)
 
-	return &lane.SrcNetworkLaneCfg, &lane.DstNetworkLaneCfg, nil
+	return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, nil
 }
 
 // SetOCR2Configs sets the oracle config in ocr2 contracts
