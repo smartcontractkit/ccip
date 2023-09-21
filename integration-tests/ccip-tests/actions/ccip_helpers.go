@@ -106,11 +106,11 @@ type CCIPCommon struct {
 	poolFunds               *big.Int
 	gasUpdateWatcherMu      *sync.Mutex
 	gasUpdateWatcher        map[uint64]*big.Int // key - destchain id; value - timestamp of update
-	subs                    []event.Subscription
+	priceUpdateSubs         []event.Subscription
 }
 
 func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
-	for _, sub := range ccipModule.subs {
+	for _, sub := range ccipModule.priceUpdateSubs {
 		sub.Unsubscribe()
 	}
 }
@@ -323,7 +323,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 			ccipModule.gasUpdateWatcherMu.Unlock()
 		}
 	}()
-	ccipModule.subs = append(ccipModule.subs, sub)
+	ccipModule.priceUpdateSubs = append(ccipModule.priceUpdateSubs, sub)
 
 	return nil
 }

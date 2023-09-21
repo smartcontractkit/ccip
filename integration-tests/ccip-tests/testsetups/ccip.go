@@ -769,6 +769,46 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	}
 }
 
+func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
+	t := o.Cfg.Test
+	priceUpdateGrp, _ := errgroup.WithContext(ctx)
+	priceUpdateTracker := sync.Map{}
+	for _, lanes := range o.ReadLanes() {
+		lanes := lanes
+		require.NoError(t, lanes.ForwardLane.StartEventWatchers())
+		require.NoError(t, lanes.ReverseLane.StartEventWatchers())
+		waitForUpdate := func(lane *actions.CCIPLane) error {
+			if id, ok := priceUpdateTracker.Load(lane.Source.Common.PriceRegistry.Address()); ok &&
+				id.(uint64) == lane.Source.DestinationChainId {
+				return nil
+			}
+			priceUpdateTracker.Store(lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
+			err := lane.Source.Common.WatchForPriceUpdates()
+			if err != nil {
+				return err
+			}
+			err = lane.Source.Common.WaitForPriceUpdates(
+				lane.Logger,
+				lane.ValidationTimeout,
+				lane.Source.DestinationChainId,
+			)
+			defer lane.Source.Common.StopWatchingPriceUpdates()
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+
+		priceUpdateGrp.Go(func() error {
+			return waitForUpdate(lanes.ForwardLane)
+		})
+		priceUpdateGrp.Go(func() error {
+			return waitForUpdate(lanes.ReverseLane)
+		})
+	}
+	require.NoError(t, priceUpdateGrp.Wait())
+}
+
 // CCIPDefaultTestSetUp sets up the environment for CCIP tests
 // if configureCLNode is set as false, it assumes:
 // 1. contracts are already deployed on live networks
@@ -1014,42 +1054,7 @@ func CCIPDefaultTestSetUp(
 	require.NoError(t, setUpArgs.JobAddGrp.Wait(), "Creating jobs shouldn't fail")
 
 	// wait for price updates to be available and start event watchers
-	priceUpdateGrp, _ := errgroup.WithContext(parent)
-	priceUpdateTracker := sync.Map{}
-	for _, lanes := range setUpArgs.ReadLanes() {
-		lanes := lanes
-		require.NoError(t, lanes.ForwardLane.StartEventWatchers())
-		require.NoError(t, lanes.ReverseLane.StartEventWatchers())
-		waitForUpdate := func(lane *actions.CCIPLane) error {
-			if id, ok := priceUpdateTracker.Load(lane.Source.Common.PriceRegistry.Address()); ok &&
-				id.(uint64) == lane.Source.DestinationChainId {
-				return nil
-			}
-			priceUpdateTracker.Store(lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
-			err := lane.Source.Common.WatchForPriceUpdates()
-			if err != nil {
-				return err
-			}
-			err = lane.Source.Common.WaitForPriceUpdates(
-				lane.Logger,
-				lane.ValidationTimeout,
-				lane.Source.DestinationChainId,
-			)
-			defer lane.Source.Common.StopWatchingPriceUpdates()
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-
-		priceUpdateGrp.Go(func() error {
-			return waitForUpdate(lanes.ForwardLane)
-		})
-		priceUpdateGrp.Go(func() error {
-			return waitForUpdate(lanes.ReverseLane)
-		})
-	}
-	require.NoError(t, priceUpdateGrp.Wait())
+	setUpArgs.WaitForPriceUpdates(parent)
 
 	setUpArgs.TearDown = func() {
 		for _, lanes := range setUpArgs.Lanes {
