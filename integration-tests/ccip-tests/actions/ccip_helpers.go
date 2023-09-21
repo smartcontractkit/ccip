@@ -277,6 +277,16 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	timeout time.Duration,
 	destChainId uint64,
 ) error {
+	// check if price is already updated
+	price, err := ccipModule.PriceRegistry.Instance.GetDestinationChainGasPrice(nil, destChainId)
+	if err != nil {
+		return err
+	}
+	if price.Timestamp > 0 && price.Value.Cmp(big.NewInt(0)) > 0 {
+		lggr.Info().Msgf("Price already updated on %s dest chain %d", ccipModule.PriceRegistry.Address(), destChainId)
+		return nil
+	}
+	// if not, wait for price update
 	lggr.Info().Msgf("Waiting for UsdPerUnitGas for dest chain %d Price Registry %s", destChainId, ccipModule.PriceRegistry.Address())
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -289,6 +299,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 			timestampOfUpdate, ok := ccipModule.gasUpdateWatcher[destChainId]
 			ccipModule.gasUpdateWatcherMu.Unlock()
 			if ok && timestampOfUpdate.Cmp(big.NewInt(0)) == 1 {
+				lggr.Info().Msgf("Price updated on %s dest chain %d", ccipModule.PriceRegistry.Address(), destChainId)
 				return nil
 			}
 		case <-ctx.Done():
@@ -1864,7 +1875,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2Config(commitNodes, ccipConfig.CommitOffchainConfig{
 		SourceFinalityDepth:   1,
 		DestFinalityDepth:     1,
-		FeeUpdateHeartBeat:    models.MustMakeDuration(10 * time.Second), // reduce the heartbeat to 10 sec for faster fee updates
+		FeeUpdateHeartBeat:    models.MustMakeDuration(3 * time.Minute), // reduce the heartbeat to 10 sec for faster fee updates
 		FeeUpdateDeviationPPB: 5e6,
 		MaxGasPrice:           200e9,
 		InflightCacheExpiry:   inflightExpiry,

@@ -608,11 +608,16 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	// Currently for simulated network clients(from same network) created with NewEVMClient does not sync nonce
 	// ConcurrentEVMClient is a work-around for that.
 	sourceChainClientA2B, err := blockchain.ConcurrentEVMClient(networkA, k8Env, chainClientA, lggr)
-	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", networkA.Name, err))
+	}
+
 	sourceChainClientA2B.ParallelTransactions(true)
 
 	destChainClientA2B, err := blockchain.ConcurrentEVMClient(networkB, k8Env, chainClientB, lggr)
-	require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
+	if err != nil {
+		return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", networkB.Name, err))
+	}
 	destChainClientA2B.ParallelTransactions(true)
 
 	ccipLaneA2B := &actions.CCIPLane{
@@ -657,11 +662,15 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 
 	if bidirectional {
 		sourceChainClientB2A, err := blockchain.ConcurrentEVMClient(networkB, k8Env, destChainClientA2B, lggr)
-		require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", networkB.Name, err))
+		}
 		sourceChainClientB2A.ParallelTransactions(true)
 
 		destChainClientB2A, err := blockchain.ConcurrentEVMClient(networkA, k8Env, sourceChainClientA2B, lggr)
-		require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
+		if err != nil {
+			return errors.WithStack(fmt.Errorf("failed to create chain client for %s: %v", networkA.Name, err))
+		}
 		destChainClientB2A.ParallelTransactions(true)
 
 		ccipLaneB2A = &actions.CCIPLane{
