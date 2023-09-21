@@ -14,6 +14,7 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
@@ -62,6 +63,14 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed getting the static config from the commitStore")
+	}
+	typeAndVersion, err := commitStore.TypeAndVersion(&bind.CallOpts{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get type and version")
+	}
+	_, commitStoreVersion, err := ccipconfig.ParseTypeAndVersion(typeAndVersion)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse commitStore type and version")
 	}
 	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {
@@ -119,6 +128,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 			commitStore:         commitStore,
 			leafHasher:          leafHasher,
 			checkFinalityTags:   sourceChain.Config().EVM().FinalityTagEnabled(),
+			commitStoreVersion:  commitStoreVersion,
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress, qopts...)

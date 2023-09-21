@@ -48,12 +48,12 @@ func LoadOnRamp(onRampAddress common.Address, pluginName string, client client.C
 }
 
 func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
-	versionString, err := onRamp.TypeAndVersion(&bind.CallOpts{})
+	typeAndVersion, err := onRamp.TypeAndVersion(&bind.CallOpts{})
 	if err != nil {
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
 	}
 
-	_, version, err := ccipconfig.ParseTypeAndVersion(versionString)
+	_, version, err := ccipconfig.ParseTypeAndVersion(typeAndVersion)
 	if err != nil {
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
 	}
@@ -125,6 +125,33 @@ func LoadCommitStore(commitStoreAddress common.Address, pluginName string, clien
 		return nil, errors.Wrap(err, "Invalid commitStore contract")
 	}
 	return observability.NewObservedCommitStore(commitStoreAddress, pluginName, client)
+}
+
+func DecodeCommitStoreOffchainConfig(version string, offchainConfig []byte) (ccipconfig.CommitOffchainConfigV2, error) {
+	switch version {
+	case "1.0.0", "1.1.0":
+		offchainConfigV1, err := ccipconfig.DecodeOffchainConfig[ccipconfig.CommitOffchainConfigV1](offchainConfig)
+		if err != nil {
+			return ccipconfig.CommitOffchainConfigV2{}, err
+		}
+
+		return ccipconfig.CommitOffchainConfigV2{
+			SourceFinalityDepth:        offchainConfigV1.SourceFinalityDepth,
+			DestFinalityDepth:          offchainConfigV1.DestFinalityDepth,
+			GasPriceHeartBeat:          offchainConfigV1.FeeUpdateHeartBeat,
+			DAGasPriceDeviationPPB:     offchainConfigV1.FeeUpdateDeviationPPB,
+			NativeGasPriceDeviationPPB: offchainConfigV1.FeeUpdateDeviationPPB,
+			TokenPriceHeartBeat:        offchainConfigV1.FeeUpdateHeartBeat,
+			TokenPriceDeviationPPB:     offchainConfigV1.FeeUpdateDeviationPPB,
+			MaxGasPrice:                offchainConfigV1.MaxGasPrice,
+			InflightCacheExpiry:        offchainConfigV1.InflightCacheExpiry,
+		}, nil
+	case "1.2.0":
+		offchainConfig, err := ccipconfig.DecodeOffchainConfig[ccipconfig.CommitOffchainConfigV2](offchainConfig)
+		return offchainConfig, err
+	default:
+		return ccipconfig.CommitOffchainConfigV2{}, errors.Errorf("Invalid commitStore version: %s", version)
+	}
 }
 
 func contiguousReqs(lggr logger.Logger, min, max uint64, seqNrs []uint64) bool {

@@ -27,7 +27,7 @@ const (
 		20_000 + // SSTORE_SET_GAS for writing from 0 (untouched) to non-zero (in-progress)
 		100 //# SLOAD_GAS = WARM_STORAGE_READ_COST for rewriting from non-zero (in-progress) to non-zero (success/failure)
 	EVM_MESSAGE_FIXED_BYTES     = 448 // Byte size of fixed-size fields in EVM2EVMMessage
-	EVM_MESSAGE_BYTES_PER_TOKEN = 128
+	EVM_MESSAGE_BYTES_PER_TOKEN = 128 // Byte size of each token transfer, consisting of 1 EVMTokenAmount and 1 bytes, excl length of bytes
 	DA_MULTIPLIER_BASE          = int64(10000)
 )
 
