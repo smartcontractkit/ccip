@@ -1864,8 +1864,8 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2Config(commitNodes, ccipConfig.CommitOffchainConfig{
 		SourceFinalityDepth:   1,
 		DestFinalityDepth:     1,
-		FeeUpdateHeartBeat:    models.MustMakeDuration(3 * time.Minute),
-		FeeUpdateDeviationPPB: 5e7,
+		FeeUpdateHeartBeat:    models.MustMakeDuration(10 * time.Second), // reduce the heartbeat to 10 sec for faster fee updates
+		FeeUpdateDeviationPPB: 5e6,
 		MaxGasPrice:           200e9,
 		InflightCacheExpiry:   inflightExpiry,
 	}, ccipConfig.CommitOnchainConfig{
