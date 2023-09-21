@@ -1015,25 +1015,30 @@ func CCIPDefaultTestSetUp(
 
 	// wait for price updates to be available and start event watchers
 	priceUpdateGrp, _ := errgroup.WithContext(parent)
-	var priceUpdateMap sync.Map
+	priceUpdateTracker := sync.Map{}
 	for _, lanes := range setUpArgs.ReadLanes() {
 		lanes := lanes
 		require.NoError(t, lanes.ForwardLane.StartEventWatchers())
 		require.NoError(t, lanes.ReverseLane.StartEventWatchers())
 		waitForUpdate := func(lane *actions.CCIPLane) error {
-			if id, ok := priceUpdateMap.Load(lane.Source.Common.PriceRegistry.Address()); ok &&
+			if id, ok := priceUpdateTracker.Load(lane.Source.Common.PriceRegistry.Address()); ok &&
 				id.(uint64) == lane.Source.DestinationChainId {
 				return nil
 			}
-			err := lane.Source.Common.WaitForPriceUpdates(
+			priceUpdateTracker.Store(lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
+			err := lane.Source.Common.WatchForPriceUpdates()
+			if err != nil {
+				return err
+			}
+			err = lane.Source.Common.WaitForPriceUpdates(
 				lane.Logger,
 				lane.ValidationTimeout,
 				lane.Source.DestinationChainId,
 			)
+			defer lane.Source.Common.StopWatchingPriceUpdates()
 			if err != nil {
 				return err
 			}
-			priceUpdateMap.Store(lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
 			return nil
 		}
 

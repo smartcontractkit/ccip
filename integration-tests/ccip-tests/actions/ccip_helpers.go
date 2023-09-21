@@ -106,6 +106,13 @@ type CCIPCommon struct {
 	poolFunds               *big.Int
 	gasUpdateWatcherMu      *sync.Mutex
 	gasUpdateWatcher        map[uint64]*big.Int // key - destchain id; value - timestamp of update
+	subs                    []event.Subscription
+}
+
+func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
+	for _, sub := range ccipModule.subs {
+		sub.Unsubscribe()
+	}
 }
 
 func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain.EVMClient) (*CCIPCommon, error) {
@@ -290,19 +297,19 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	}
 }
 
-func (ccipModule *CCIPCommon) WatchForPriceUpdates() ([]event.Subscription, error) {
+func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 	gasUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	blockNum := ccipModule.PriceUpdatesToWatchFrom
 	var opts *bind.WatchOpts
 	if blockNum > 0 {
 		opts = &bind.WatchOpts{Start: &blockNum}
 	}
-	var subs []event.Subscription
+
 	sub, err := ccipModule.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(opts, gasUpdateEvent, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	subs = append(subs, sub)
+
 	go func() {
 		for {
 			e := <-gasUpdateEvent
@@ -316,8 +323,9 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() ([]event.Subscription, erro
 			ccipModule.gasUpdateWatcherMu.Unlock()
 		}
 	}()
+	ccipModule.subs = append(ccipModule.subs, sub)
 
-	return subs, nil
+	return nil
 }
 
 // DeployContracts deploys the contracts which are necessary in both source and dest chain
@@ -1570,11 +1578,6 @@ func (lane *CCIPLane) StartEventWatchers() error {
 			return err
 		}
 	}
-	subs, err := lane.Source.Common.WatchForPriceUpdates()
-	if err != nil {
-		return err
-	}
-	lane.Subscriptions = append(lane.Subscriptions, subs...)
 
 	sendReqEvent := make(chan *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested)
 	sub, err := lane.Source.OnRamp.Instance.WatchCCIPSendRequested(nil, sendReqEvent)
