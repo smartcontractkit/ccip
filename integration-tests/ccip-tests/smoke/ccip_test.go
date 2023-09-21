@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils"
+	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
@@ -22,7 +22,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 		testName string
 		lane     *actions.CCIPLane
 	}
-	l := utils.GetTestLogger(t)
+	l := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, l, testsetups.Smoke)
 	transferAmounts := []*big.Int{big.NewInt(1e14), big.NewInt(1e14)}
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", 6, transferAmounts, nil, 5, true, true, TestCfg)
@@ -74,13 +74,13 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 		testName string
 		lane     *actions.CCIPLane
 	}
-	l := utils.GetTestLogger(t)
+	l := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, l, testsetups.Smoke)
 	require.Equal(t, actions.TokenTransfer, TestCfg.MsgType, "Test config should have token transfer message type")
 	transferAmounts := []*big.Int{big.NewInt(1e14)}
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(
 		t, l, "smoke-ccip", 6, transferAmounts, nil,
-		5, true, false, TestCfg)
+		5, true, true, TestCfg)
 	var tcs []subtestInput
 	if len(setUpOutput.Lanes) == 0 {
 		return
@@ -96,13 +96,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				setUpOutput.Lanes[i].ForwardLane.SourceNetworkName, setUpOutput.Lanes[i].ForwardLane.DestNetworkName),
 			lane: setUpOutput.Lanes[i].ForwardLane,
 		})
-		if setUpOutput.Lanes[i].ReverseLane != nil {
-			tcs = append(tcs, subtestInput{
-				testName: fmt.Sprintf("Network %s to network %s",
-					setUpOutput.Lanes[i].ReverseLane.SourceNetworkName, setUpOutput.Lanes[i].ReverseLane.DestNetworkName),
-				lane: setUpOutput.Lanes[i].ReverseLane,
-			})
-		}
 	}
 
 	// if we are running in simulated or in testnet mode, we can set the rate limit to test friendly values
@@ -211,6 +204,8 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			totalTokensForOnRampCapacity := new(big.Int).Mul(
 				big.NewInt(1e18),
 				new(big.Int).Div(rlOnRamp.Capacity, tokenPrice.Value))
+
+			tc.lane.Source.Common.ChainClient.ParallelTransactions(true)
 
 			// current tokens are equal to the full capacity  - should fail
 			src.TransferAmount[0] = rlOnRamp.Tokens

@@ -642,11 +642,13 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
     // Add additional pool addresses for test tokens to mark them as supported
     Internal.PoolUpdate[] memory newRamps = new Internal.PoolUpdate[](2);
     address wrappedNativePool = address(
-      new LockReleaseTokenPool(IERC20(s_sourceRouter.getWrappedNative()), new address[](0), address(s_mockARM))
+      new LockReleaseTokenPool(IERC20(s_sourceRouter.getWrappedNative()), new address[](0), address(s_mockARM), true)
     );
     newRamps[0] = Internal.PoolUpdate({token: s_sourceRouter.getWrappedNative(), pool: wrappedNativePool});
 
-    address customPool = address(new LockReleaseTokenPool(IERC20(CUSTOM_TOKEN), new address[](0), address(s_mockARM)));
+    address customPool = address(
+      new LockReleaseTokenPool(IERC20(CUSTOM_TOKEN), new address[](0), address(s_mockARM), true)
+    );
     newRamps[1] = Internal.PoolUpdate({token: CUSTOM_TOKEN, pool: customPool});
     s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), newRamps);
 
@@ -707,13 +709,10 @@ contract EVM2EVMOnRamp_getDataAvailabilityCostUSD is EVM2EVMOnRamp_getFeeSetup {
   }
 
   function testFuzz_ZeroDataAvailabilityGasPriceAlwaysCalculatesZeroDataAvailabilityCostSuccess(
-    uint256 messageDataLength,
-    uint256 numberOfTokens,
+    uint64 messageDataLength,
+    uint32 numberOfTokens,
     uint32 tokenTransferBytesOverhead
   ) public {
-    vm.assume(messageDataLength < type(uint64).max);
-    vm.assume(numberOfTokens < type(uint64).max);
-
     uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(
       0,
       messageDataLength,
@@ -729,14 +728,10 @@ contract EVM2EVMOnRamp_getDataAvailabilityCostUSD is EVM2EVMOnRamp_getFeeSetup {
     uint16 destGasPerDataAvailabilityByte,
     uint16 destDataAvailabilityMultiplier,
     uint112 dataAvailabilityGasPrice,
-    uint256 messageDataLength,
-    uint256 numberOfTokens,
+    uint64 messageDataLength,
+    uint32 numberOfTokens,
     uint32 tokenTransferBytesOverhead
   ) public {
-    // Using large yet reasonable numbers to avoid overflows.
-    vm.assume(messageDataLength < type(uint64).max);
-    vm.assume(numberOfTokens < type(uint64).max);
-
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
     dynamicConfig.destDataAvailabilityOverheadGas = destDataAvailabilityOverheadGas;
     dynamicConfig.destGasPerDataAvailabilityByte = destGasPerDataAvailabilityByte;

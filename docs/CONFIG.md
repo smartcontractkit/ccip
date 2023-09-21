@@ -20,18 +20,11 @@ HTTPURL = 'https://foo.bar' # Required
 
 ## Global
 ```toml
-ExplorerURL = 'ws://explorer.url' # Example
 InsecureFastScrypt = false # Default
 RootDir = '~/.chainlink' # Default
 ShutdownGracePeriod = '5s' # Default
 ```
 
-
-### ExplorerURL
-```toml
-ExplorerURL = 'ws://explorer.url' # Example
-```
-ExplorerURL is the websocket URL used by the node to push stats. This variable is required to deliver telemetry.
 
 ### InsecureFastScrypt
 :warning: **_ADVANCED_**: _Do not change this setting unless you know what you are doing._
@@ -3385,7 +3378,7 @@ ObservationGracePeriod = '1s'
 
 [OCR2]
 [OCR2.Automation]
-GasLimit = 5300000
+GasLimit = 14500000
 ```
 
 </p></details>
@@ -4089,7 +4082,7 @@ ObservationGracePeriod = '1s'
 
 [OCR2]
 [OCR2.Automation]
-GasLimit = 5300000
+GasLimit = 14500000
 ```
 
 </p></details>

@@ -17,6 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
@@ -33,7 +35,7 @@ func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
 		{
 			description: "invalid config",
 			spec: &job.OCR2OracleSpec{
-				ContractID:   zeroAddress.String(),
+				ContractID:   utils.ZeroAddress.String(),
 				PluginConfig: map[string]interface{}{},
 			},
 			expectingErr: true,
@@ -48,7 +50,7 @@ func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
 		{
 			description: "valid config",
 			spec: &job.OCR2OracleSpec{
-				ContractID:   zeroAddress.String(),
+				ContractID:   utils.ZeroAddress.String(),
 				PluginConfig: map[string]interface{}{},
 				RelayConfig: map[string]interface{}{
 					"chainID": 1234.0,
@@ -87,13 +89,10 @@ func TestGetCommitPluginFilterNames(t *testing.T) {
 	onRampAddr := common.HexToAddress("0xdafea492d9c6733ae3d56b7ed1adb60692c98bc2")
 	priceRegAddr := common.HexToAddress("0xdafea492d9c6733ae3d56b7ed1adb60692c98bc3")
 	offRampAddr := common.HexToAddress("0xDAFeA492D9c6733Ae3D56b7eD1AdB60692C98BC4")
-	mockCommitStore := mock_contracts.NewCommitStoreInterface(t)
-	mockCommitStore.On("GetStaticConfig", mock.Anything).Return(commit_store.CommitStoreStaticConfig{
-		OnRamp: onRampAddr,
-	}, nil)
-	mockCommitStore.On("GetDynamicConfig", mock.Anything).Return(commit_store.CommitStoreDynamicConfig{
-		PriceRegistry: priceRegAddr,
-	}, nil)
+
+	mockCommitStore, _ := testhelpers.NewFakeCommitStore(t, 1)
+	mockCommitStore.SetStaticConfig(commit_store.CommitStoreStaticConfig{OnRamp: onRampAddr})
+	mockCommitStore.SetDynamicConfig(commit_store.CommitStoreDynamicConfig{PriceRegistry: priceRegAddr})
 
 	srcLP := mocklp.NewLogPoller(t)
 	dstLP := mocklp.NewLogPoller(t)

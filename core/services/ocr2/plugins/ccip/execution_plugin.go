@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,9 +16,13 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipevents"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -31,6 +36,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -62,7 +69,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	if err != nil {
 		return nil, errors.Wrap(err, "get chainset")
 	}
-	offRamp, err := LoadOffRamp(common.HexToAddress(spec.ContractID), ExecPluginLabel, destChain.Client())
+	offRamp, err := contractutil.LoadOffRamp(common.HexToAddress(spec.ContractID), ExecPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
@@ -78,15 +85,15 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
-	commitStore, err := LoadCommitStore(offRampConfig.CommitStore, ExecPluginLabel, destChain.Client())
+	commitStore, err := contractutil.LoadCommitStore(offRampConfig.CommitStore, ExecPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
-	onRamp, err := LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
+	onRamp, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp")
 	}
-	dynamicOnRampConfig, err := LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
+	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp config")
 	}
@@ -107,13 +114,20 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 		"sourceChain", ChainName(int64(chainId)),
 		"destChain", ChainName(destChainID))
 
+	sourceChainEventClient := ccipdata.NewLogPollerReader(sourceChain.LogPoller(), execLggr, sourceChain.Client())
+
+	tokenDataProviders, err := getTokenDataProviders(lggr, pluginConfig, offRampConfig.OnRamp, sourceChainEventClient)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get token data providers")
+	}
+
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(
 		ExecutionPluginConfig{
 			lggr:                     execLggr,
 			sourceLP:                 sourceChain.LogPoller(),
 			destLP:                   destChain.LogPoller(),
-			sourceEvents:             ccipevents.NewLogPollerClient(sourceChain.LogPoller(), execLggr, sourceChain.Client()),
-			destEvents:               ccipevents.NewLogPollerClient(destChain.LogPoller(), execLggr, destChain.Client()),
+			sourceReader:             sourceChainEventClient,
+			destReader:               ccipdata.NewLogPollerReader(destChain.LogPoller(), execLggr, destChain.Client()),
 			onRamp:                   onRamp,
 			offRamp:                  offRamp,
 			commitStore:              commitStore,
@@ -123,14 +137,15 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 			sourceClient:             sourceChain.Client(),
 			destGasEstimator:         destChain.GasEstimator(),
 			leafHasher:               hashlib.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hashlib.NewKeccakCtx()),
+			tokenDataProviders:       tokenDataProviders,
 		})
 
-	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress, qopts...)
+	err = wrappedPluginFactory.UpdateLogPollerFilters(utils.ZeroAddress, qopts...)
 	if err != nil {
 		return nil, err
 	}
 
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", string(spec.Relay), destChain.ID())
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", spec.Relay, destChain.ID())
 	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(execLggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
@@ -158,8 +173,42 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address) []logpoller.Filter {
-	return []logpoller.Filter{
+func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, onRampAddress common.Address, sourceChainEventClient *ccipdata.LogPollerReader) (map[common.Address]tokendata.Reader, error) {
+	tokenDataProviders := make(map[common.Address]tokendata.Reader)
+
+	if pluginConfig.USDCConfig.AttestationAPI != "" {
+		lggr.Infof("USDC token data provider enabled")
+		err := pluginConfig.USDCConfig.ValidateUSDCConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		attestationURI, err2 := url.ParseRequestURI(pluginConfig.USDCConfig.AttestationAPI)
+		if err2 != nil {
+			return nil, errors.Wrap(err2, "failed to parse USDC attestation API")
+		}
+
+		tokenDataProviders[pluginConfig.USDCConfig.SourceTokenAddress] = tokendata.NewCachedReader(
+			usdc.NewUSDCTokenDataReader(
+				sourceChainEventClient,
+				pluginConfig.USDCConfig.SourceTokenAddress,
+				pluginConfig.USDCConfig.SourceMessageTransmitterAddress,
+				onRampAddress,
+				attestationURI,
+			),
+		)
+	}
+
+	return tokenDataProviders, nil
+}
+
+func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address, tokenDataProviders map[common.Address]tokendata.Reader) []logpoller.Filter {
+	var filters []logpoller.Filter
+	for _, provider := range tokenDataProviders {
+		filters = append(filters, provider.GetSourceLogPollerFilters()...)
+	}
+
+	return append(filters, []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_CCIP_SENDS, onRamp.String()),
 			EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
@@ -175,7 +224,7 @@ func getExecutionPluginSourceLpChainFilters(onRamp, priceRegistry common.Address
 			EventSigs: []common.Hash{abihelpers.EventSignatures.FeeTokenRemoved},
 			Addresses: []common.Address{priceRegistry},
 		},
-	}
+	}...)
 }
 
 func getExecutionPluginDestLpChainFilters(commitStore, offRamp, priceRegistry common.Address) []logpoller.Filter {
@@ -214,7 +263,7 @@ func getExecutionPluginDestLpChainFilters(commitStore, offRamp, priceRegistry co
 }
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
-func UnregisterExecPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
+func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
 	if spec == nil {
 		return errors.New("spec is nil")
 	}
@@ -239,7 +288,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSpec
 	}
 
 	offRampAddress := common.HexToAddress(spec.ContractID)
-	offRamp, err := LoadOffRamp(offRampAddress, ExecPluginLabel, destChain.Client())
+	offRamp, err := contractutil.LoadOffRamp(offRampAddress, ExecPluginLabel, destChain.Client())
 	if err != nil {
 		return err
 	}
@@ -256,42 +305,50 @@ func UnregisterExecPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSpec
 	if err != nil {
 		return errors.Wrap(err, "unable to open source chain")
 	}
-	sourceOnRamp, err := LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
+	sourceOnRamp, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
 		return errors.Wrap(err, "failed loading onRamp")
 	}
 
-	return unregisterExecutionPluginLpFilters(ctx, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, sourceOnRamp, sourceChain.Client(), qopts...)
+	return unregisterExecutionPluginLpFilters(ctx, lggr, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, sourceOnRamp, sourceChain.Client(), pluginConfig, qopts...)
 }
 
 func unregisterExecutionPluginLpFilters(
 	ctx context.Context,
+	lggr logger.Logger,
 	sourceLP logpoller.LogPoller,
 	destLP logpoller.LogPoller,
 	destOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
 	destOffRampConfig evm_2_evm_offramp.EVM2EVMOffRampStaticConfig,
 	sourceOnRamp evm_2_evm_onramp.EVM2EVMOnRampInterface,
 	sourceChainClient client.Client,
+	pluginConfig ccipconfig.ExecutionPluginJobSpecConfig,
 	qopts ...pg.QOpt) error {
 	destOffRampDynCfg, err := destOffRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
 	}
 
-	onRampDynCfg, err := LoadOnRampDynamicConfig(sourceOnRamp, sourceChainClient)
+	onRampDynCfg, err := contractutil.LoadOnRampDynamicConfig(sourceOnRamp, sourceChainClient)
 	if err != nil {
 		return err
 	}
 
-	if err := unregisterLpFilters(
+	// SourceChainEventClient can be nil because it is not used in unregisterExecutionPluginLpFilters
+	tokenDataProviders, err := getTokenDataProviders(lggr, pluginConfig, destOffRampConfig.OnRamp, nil)
+	if err != nil {
+		return err
+	}
+
+	if err = logpollerutil.UnregisterLpFilters(
 		sourceLP,
-		getExecutionPluginSourceLpChainFilters(destOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry),
+		getExecutionPluginSourceLpChainFilters(destOffRampConfig.OnRamp, onRampDynCfg.PriceRegistry, tokenDataProviders),
 		qopts...,
 	); err != nil {
 		return err
 	}
 
-	return unregisterLpFilters(
+	return logpollerutil.UnregisterLpFilters(
 		destLP,
 		getExecutionPluginDestLpChainFilters(destOffRampConfig.CommitStore, destOffRamp.Address(), destOffRampDynCfg.PriceRegistry),
 		qopts...,
@@ -299,10 +356,9 @@ func unregisterExecutionPluginLpFilters(
 }
 
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
-// all the message ids will be added to the tx metadata.
+// Only MessageIDs will be populated in the TxMeta.
 func ExecutionReportToEthTxMeta(report []byte) (*txmgr.TxMeta, error) {
 	execReport, err := abihelpers.DecodeExecutionReport(report)
-
 	if err != nil {
 		return nil, err
 	}
