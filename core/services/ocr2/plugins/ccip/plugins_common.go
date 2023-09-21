@@ -328,10 +328,27 @@ func getMessageIDsAsHexString(messages []evm_2_evm_offramp.InternalEVM2EVMMessag
 	return messageIDs
 }
 
-func parseEncodedGasPrice(gasPrice *big.Int) (*big.Int, *big.Int) {
-	l1GasPrice := new(big.Int).Rsh(gasPrice, GasPriceEncodingLength)
+type GasPrice struct {
+	DAGasPrice     *big.Int `json:"daGasPrice"`
+	NativeGasPrice *big.Int `json:"nativeGasPrice"`
+}
+
+func (g GasPrice) encode() *big.Int {
+	daGasPrice := new(big.Int).Lsh(g.DAGasPrice, GasPriceEncodingLength)
+	return new(big.Int).Add(daGasPrice, g.NativeGasPrice)
+}
+
+func parseEncodedGasPrice(gasPrice *big.Int) GasPrice {
+	if gasPrice == nil {
+		return GasPrice{}
+	}
+
+	daGasPrice := new(big.Int).Rsh(gasPrice, GasPriceEncodingLength)
 
 	l1Start := new(big.Int).Lsh(big.NewInt(1), GasPriceEncodingLength)
 	nativeGasPrice := new(big.Int).Mod(gasPrice, l1Start)
-	return l1GasPrice, nativeGasPrice
+	return GasPrice{
+		DAGasPrice:     daGasPrice,
+		NativeGasPrice: nativeGasPrice,
+	}
 }

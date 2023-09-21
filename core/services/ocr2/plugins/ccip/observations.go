@@ -14,7 +14,7 @@ import (
 type CommitObservation struct {
 	Interval          commit_store.CommitStoreInterval `json:"interval"`
 	TokenPricesUSD    map[common.Address]*big.Int      `json:"tokensPerFeeCoin"`
-	SourceGasPriceUSD *big.Int                         `json:"sourceGasPrice"`
+	SourceGasPriceUSD GasPrice                         `json:"sourceGasPrice"`
 }
 
 func (o CommitObservation) Marshal() ([]byte, error) {

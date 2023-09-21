@@ -68,10 +68,10 @@ func (c *inflightCommitReportsContainer) maxInflightSeqNr() uint64 {
 }
 
 // latestGasPriceUpdate return the latest inflight gas price update or nil if there is no inflight gas price update.
-func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *update {
+func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *gasPriceUpdate {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
-	var latestGasPriceUpdate *update
+	var latestGasPriceUpdate *gasPriceUpdate
 	var latestEpochAndRound uint64
 	for _, inflight := range c.inFlightPriceUpdates {
 		if inflight.priceUpdates.DestChainSelector == 0 {
@@ -80,9 +80,9 @@ func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *upda
 		}
 		if latestGasPriceUpdate == nil || inflight.epochAndRound > latestEpochAndRound {
 			// First price found or found later update, set it
-			latestGasPriceUpdate = &update{
+			latestGasPriceUpdate = &gasPriceUpdate{
 				timestamp: inflight.createdAt,
-				value:     inflight.priceUpdates.UsdPerUnitGas,
+				value:     parseEncodedGasPrice(inflight.priceUpdates.UsdPerUnitGas),
 			}
 			latestEpochAndRound = inflight.epochAndRound
 			continue
@@ -92,22 +92,22 @@ func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *upda
 }
 
 // latestInflightTokenPriceUpdates returns a map of the latest token price updates
-func (c *inflightCommitReportsContainer) latestInflightTokenPriceUpdates() map[common.Address]update {
+func (c *inflightCommitReportsContainer) latestInflightTokenPriceUpdates() map[common.Address]tokenPriceUpdate {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
-	latestTokenPriceUpdates := make(map[common.Address]update)
+	latestTokenPriceUpdates := make(map[common.Address]tokenPriceUpdate)
 	latestEpochAndRounds := make(map[common.Address]uint64)
 	for _, inflight := range c.inFlightPriceUpdates {
 		for _, inflightTokenUpdate := range inflight.priceUpdates.TokenPriceUpdates {
 			if _, ok := latestTokenPriceUpdates[inflightTokenUpdate.SourceToken]; !ok {
-				latestTokenPriceUpdates[inflightTokenUpdate.SourceToken] = update{
+				latestTokenPriceUpdates[inflightTokenUpdate.SourceToken] = tokenPriceUpdate{
 					value:     inflightTokenUpdate.UsdPerToken,
 					timestamp: inflight.createdAt,
 				}
 				latestEpochAndRounds[inflightTokenUpdate.SourceToken] = inflight.epochAndRound
 			}
 			if inflight.epochAndRound > latestEpochAndRounds[inflightTokenUpdate.SourceToken] {
-				latestTokenPriceUpdates[inflightTokenUpdate.SourceToken] = update{
+				latestTokenPriceUpdates[inflightTokenUpdate.SourceToken] = tokenPriceUpdate{
 					value:     inflightTokenUpdate.UsdPerToken,
 					timestamp: inflight.createdAt,
 				}

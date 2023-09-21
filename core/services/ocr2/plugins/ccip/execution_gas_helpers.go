@@ -67,14 +67,12 @@ func maxGasOverHeadGas(numMsgs, dataLength, numTokens int) uint64 {
 }
 
 // computeExecCost calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
-func computeMsgCost(msg evm2EVMOnRampCCIPSendRequestedWithMeta, config FeeEstimationConfig, gasPrice, wrappedNativePrice *big.Int) *big.Int {
-	daGasPrice, execGasPrice := parseEncodedGasPrice(gasPrice)
-
-	execCost := computeExecCost(msg.GasLimit, execGasPrice, wrappedNativePrice)
+func computeMsgCost(msg evm2EVMOnRampCCIPSendRequestedWithMeta, config FeeEstimationConfig, gasPrice GasPrice, wrappedNativePrice *big.Int) *big.Int {
+	execCost := computeExecCost(msg.GasLimit, gasPrice.NativeGasPrice, wrappedNativePrice)
 
 	// If there is data availability price component, then include data availability cost in fee estimation
-	if daGasPrice.Cmp(big.NewInt(0)) > 0 {
-		daGasCost := computeDACost(msg, config, daGasPrice, wrappedNativePrice)
+	if gasPrice.DAGasPrice.Cmp(big.NewInt(0)) > 0 {
+		daGasCost := computeDACost(msg, config, gasPrice.DAGasPrice, wrappedNativePrice)
 		execCost = new(big.Int).Add(execCost, daGasCost)
 	}
 	return execCost
