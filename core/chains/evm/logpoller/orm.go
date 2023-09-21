@@ -489,22 +489,6 @@ func (o *ORM) SelectIndexedLogsByBlockRangeFilter(start, end int64, address comm
 	return logs, nil
 }
 
-func (o *ORM) SelectIndexedLogsByTxHash(eventSig common.Hash, txHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
-	q := o.q.WithOpts(qopts...)
-	var logs []Log
-	err := q.Select(&logs, `
-		SELECT * FROM evm.logs 
-			WHERE evm.logs.evm_chain_id = $1
-			AND tx_hash = $2
-			AND event_sig = $3
-			ORDER BY (evm.logs.block_number, evm.logs.log_index)`,
-		utils.NewBig(o.chainID), txHash.Bytes(), eventSig.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	return logs, nil
-}
-
 func validateTopicIndex(index int) error {
 	// Only topicIndex 1 through 3 is valid. 0 is the event sig and only 4 total topics are allowed
 	if !(index == 1 || index == 2 || index == 3) {
@@ -526,6 +510,22 @@ func (o *ORM) SelectIndexedLogsCreatedAfter(address common.Address, eventSig com
 			AND created_at > $6
 			AND block_number <= (SELECT COALESCE(block_number, 0) FROM evm.log_poller_blocks WHERE evm_chain_id = $1 ORDER BY block_number DESC LIMIT 1) - $7
 			ORDER BY created_at ASC`, utils.NewBig(o.chainID), address, eventSig.Bytes(), topicIndex+1, topicValuesBytes, after, confs)
+	if err != nil {
+		return nil, err
+	}
+	return logs, nil
+}
+
+func (o *ORM) SelectIndexedLogsByTxHash(eventSig common.Hash, txHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	q := o.q.WithOpts(qopts...)
+	var logs []Log
+	err := q.Select(&logs, `
+		SELECT * FROM evm.logs 
+			WHERE evm.logs.evm_chain_id = $1
+			AND tx_hash = $2
+			AND event_sig = $3
+			ORDER BY (evm.logs.block_number, evm.logs.log_index)`,
+		utils.NewBig(o.chainID), txHash.Bytes(), eventSig.Bytes())
 	if err != nil {
 		return nil, err
 	}

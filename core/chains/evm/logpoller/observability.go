@@ -92,12 +92,6 @@ func (o *ObservedLogPoller) LatestBlockByEventSigsAddrsWithConfs(fromBlock int64
 	})
 }
 
-func (o *ObservedLogPoller) IndexedLogsByTxHash(eventSig common.Hash, txHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
-	return withObservedQueryAndResults(o, "IndexedLogsByTxHash", func() ([]Log, error) {
-		return o.LogPoller.IndexedLogsByTxHash(eventSig, txHash, qopts...)
-	})
-}
-
 func (o *ObservedLogPoller) IndexedLogs(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error) {
 	return withObservedQueryAndResults(o, "IndexedLogs", func() ([]Log, error) {
 		return o.LogPoller.IndexedLogs(eventSig, address, topicIndex, topicValues, confs, qopts...)
@@ -113,6 +107,12 @@ func (o *ObservedLogPoller) IndexedLogsByBlockRange(start, end int64, eventSig c
 func (o *ObservedLogPoller) IndexedLogsCreatedAfter(eventSig common.Hash, address common.Address, topicIndex int, topicValues []common.Hash, after time.Time, confs int, qopts ...pg.QOpt) ([]Log, error) {
 	return withObservedQueryAndResults(o, "IndexedLogsCreatedAfter", func() ([]Log, error) {
 		return o.LogPoller.IndexedLogsCreatedAfter(eventSig, address, topicIndex, topicValues, after, confs, qopts...)
+	})
+}
+
+func (o *ObservedLogPoller) IndexedLogsByTxHash(eventSig common.Hash, txHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	return withObservedQueryAndResults(o, "IndexedLogsByTxHash", func() ([]Log, error) {
+		return o.LogPoller.IndexedLogsByTxHash(eventSig, txHash, qopts...)
 	})
 }
 
