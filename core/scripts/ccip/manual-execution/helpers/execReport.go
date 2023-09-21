@@ -150,7 +150,7 @@ func NewLeafHasher(sourceChainId uint64, destChainId uint64, onRampId common.Add
 	geABI, _ := abi.JSON(strings.NewReader(OnRampABI))
 	return &LeafHasher{
 		geABI:        geABI,
-		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMMessageHash")), sourceChainId, onRampId, destChainId),
+		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMMessageHashV2")), sourceChainId, onRampId, destChainId),
 		ctx:          ctx,
 	}
 }

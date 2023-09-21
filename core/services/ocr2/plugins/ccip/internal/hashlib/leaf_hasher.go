@@ -30,7 +30,7 @@ type LeafHasher struct {
 
 func NewLeafHasher(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx Ctx[[32]byte]) *LeafHasher {
 	return &LeafHasher{
-		metaDataHash: GetMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMMessageHash")), sourceChainSelector, onRampId, destChainSelector),
+		metaDataHash: GetMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMMessageHashV2")), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
 	}
 }
