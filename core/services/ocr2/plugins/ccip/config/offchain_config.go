@@ -14,7 +14,7 @@ type OffchainConfig interface {
 
 // Do not change the JSON format of this struct without consulting with
 // the RDD people first.
-type CommitOffchainConfigV2 struct {
+type CommitOffchainConfig struct {
 	SourceFinalityDepth        uint32
 	DestFinalityDepth          uint32
 	GasPriceHeartBeat          models.Duration
@@ -26,7 +26,7 @@ type CommitOffchainConfigV2 struct {
 	InflightCacheExpiry        models.Duration
 }
 
-func (c CommitOffchainConfigV2) Validate() error {
+func (c CommitOffchainConfig) Validate() error {
 	if c.SourceFinalityDepth == 0 {
 		return errors.New("must set SourceFinalityDepth")
 	}

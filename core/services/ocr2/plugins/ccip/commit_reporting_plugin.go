@@ -82,7 +82,7 @@ type CommitReportingPlugin struct {
 	lggr               logger.Logger
 	inflightReports    *inflightCommitReportsContainer
 	destPriceRegistry  price_registry.PriceRegistryInterface
-	offchainConfig     ccipconfig.CommitOffchainConfigV2
+	offchainConfig     ccipconfig.CommitOffchainConfig
 	onchainConfig      ccipconfig.CommitOnchainConfig
 	tokenDecimalsCache cache.AutoSync[map[common.Address]uint8]
 }
