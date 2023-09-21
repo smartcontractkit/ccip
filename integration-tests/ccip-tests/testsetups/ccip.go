@@ -769,32 +769,44 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	}
 }
 
+func (o *CCIPTestSetUpOutputs) StartEventWatchers() {
+	for _, lane := range o.ReadLanes() {
+		lane := lane
+		err := lane.ForwardLane.StartEventWatchers()
+		require.NoError(o.Cfg.Test, err)
+		err = lane.ReverseLane.StartEventWatchers()
+		require.NoError(o.Cfg.Test, err)
+	}
+}
+
 func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 	t := o.Cfg.Test
 	priceUpdateGrp, _ := errgroup.WithContext(ctx)
 	priceUpdateTracker := sync.Map{}
 	for _, lanes := range o.ReadLanes() {
 		lanes := lanes
-		require.NoError(t, lanes.ForwardLane.StartEventWatchers())
-		require.NoError(t, lanes.ReverseLane.StartEventWatchers())
 		waitForUpdate := func(lane *actions.CCIPLane) error {
 			if id, ok := priceUpdateTracker.Load(lane.Source.Common.PriceRegistry.Address()); ok &&
 				id.(uint64) == lane.Source.DestinationChainId {
 				return nil
 			}
 			priceUpdateTracker.Store(lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
+			lane.Logger.Info().Msgf("Waiting for price update on %s dest chain %d", lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
 			err := lane.Source.Common.WatchForPriceUpdates()
 			if err != nil {
 				return err
 			}
+			defer func() {
+				lane.Logger.Info().Msgf("Stopping price update watch on %s dest chain %d", lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
+				lane.Source.Common.StopWatchingPriceUpdates()
+			}()
 			err = lane.Source.Common.WaitForPriceUpdates(
 				lane.Logger,
 				lane.ValidationTimeout,
 				lane.Source.DestinationChainId,
 			)
-			defer lane.Source.Common.StopWatchingPriceUpdates()
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "waiting for price update failed on lane %s-->%s", lane.SourceNetworkName, lane.DestNetworkName)
 			}
 			return nil
 		}
@@ -1055,6 +1067,9 @@ func CCIPDefaultTestSetUp(
 
 	// wait for price updates to be available and start event watchers
 	setUpArgs.WaitForPriceUpdates(parent)
+
+	// start event watchers for all lanes
+	setUpArgs.StartEventWatchers()
 
 	setUpArgs.TearDown = func() {
 		for _, lanes := range setUpArgs.Lanes {
