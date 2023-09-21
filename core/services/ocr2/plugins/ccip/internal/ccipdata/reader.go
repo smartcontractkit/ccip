@@ -14,12 +14,14 @@ import (
 
 type Event[T any] struct {
 	Data T
-	BlockMeta
+	Meta
 }
 
-type BlockMeta struct {
+type Meta struct {
 	BlockTimestamp time.Time
 	BlockNumber    int64
+	TxHash         common.Hash
+	LogIndex       int64
 }
 
 // Client can be used to fetch CCIP related parsed on-chain data.
@@ -47,7 +49,6 @@ type Reader interface {
 
 	// GetAcceptedCommitReportsGteTimestamp returns all the commit reports with timestamp greater than or equal to the provided.
 	GetAcceptedCommitReportsGteTimestamp(ctx context.Context, commitStoreAddress common.Address, ts time.Time, confs int) ([]Event[commit_store.CommitStoreReportAccepted], error)
-
 	// GetLastUSDCMessagePriorToLogIndexInTx returns the last USDC message that was sent before the provided log index in the given transaction.
 	GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error)
 

@@ -300,9 +300,11 @@ func parseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(l
 		if err == nil {
 			reqs = append(reqs, Event[T]{
 				Data: *data,
-				BlockMeta: BlockMeta{
+				Meta: Meta{
 					BlockTimestamp: log.BlockTimestamp,
 					BlockNumber:    log.BlockNumber,
+					TxHash:         log.TxHash,
+					LogIndex:       log.LogIndex,
 				},
 			})
 		}

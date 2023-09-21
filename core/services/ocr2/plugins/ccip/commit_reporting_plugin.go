@@ -60,7 +60,7 @@ type update struct {
 type CommitPluginConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
-	sourceReader             ccipdata.Reader
+	sourceReader             ccipdata.OnRampReader
 	destReader               ccipdata.Reader
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	onRampAddress            common.Address
@@ -242,7 +242,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 
-	msgRequests, err := r.config.sourceReader.GetSendRequestsGteSeqNum(ctx, r.config.onRampAddress, nextInflightMin, r.config.checkFinalityTags, int(r.offchainConfig.SourceFinalityDepth))
+	msgRequests, err := r.config.sourceReader.GetSendRequestsGteSeqNum(ctx, nextInflightMin, int(r.offchainConfig.SourceFinalityDepth))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -252,7 +252,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	}
 	seqNrs := make([]uint64, 0, len(msgRequests))
 	for _, msgReq := range msgRequests {
-		seqNrs = append(seqNrs, msgReq.Data.Message.SequenceNumber)
+		seqNrs = append(seqNrs, msgReq.Data.SequenceNumber)
 	}
 
 	minSeqNr := seqNrs[0]
@@ -663,7 +663,6 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 	// and the contract's seq num is auto-incrementing.
 	sendRequests, err := r.config.sourceReader.GetSendRequestsBetweenSeqNums(
 		ctx,
-		r.config.onRampAddress,
 		interval.Min,
 		interval.Max,
 		int(r.offchainConfig.SourceFinalityDepth),
@@ -672,17 +671,21 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 		return commit_store.CommitStoreCommitReport{}, err
 	}
 
-	leaves, err := hashlib.LeavesFromIntervals(lggr, interval, r.config.leafHasher, sendRequests)
-	if err != nil {
-		return commit_store.CommitStoreCommitReport{}, err
+	leaves := make([][32]byte, 0, len(sendRequests))
+	for _, req := range sendRequests {
+		leaves = append(leaves, req.Data.Hash)
 	}
-
-	if len(leaves) == 0 {
-		lggr.Warn("No leaves found in interval",
-			"minSeqNr", interval.Min,
-			"maxSeqNr", interval.Max)
-		return commit_store.CommitStoreCommitReport{}, fmt.Errorf("tried building a tree without leaves")
-	}
+	//leaves, err := hashlib.LeavesFromIntervals(lggr, interval, r.config.leafHasher, sendRequests)
+	//if err != nil {
+	//	return commit_store.CommitStoreCommitReport{}, err
+	//}
+	//
+	//if len(leaves) == 0 {
+	//	lggr.Warn("No leaves found in interval",
+	//		"minSeqNr", interval.Min,
+	//		"maxSeqNr", interval.Max)
+	//	return commit_store.CommitStoreCommitReport{}, fmt.Errorf("tried building a tree without leaves")
+	//}
 
 	tree, err := merklemulti.NewTree(hashlib.NewKeccakCtx(), leaves)
 	if err != nil {

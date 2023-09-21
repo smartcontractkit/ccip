@@ -14,9 +14,9 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -99,17 +99,18 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 		return nil, err
 	}
 
-	leafHasher := hashlib.NewLeafHasher(staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), hashlib.NewKeccakCtx())
+	//leafHasher := hashlib.NewLeafHasher(staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), hashlib.NewKeccakCtx())
 	// Note that lggr already has the jobName and contractID (commit store)
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(int64(chainId)),
 		"destChain", ChainName(destChainID))
+	onRampReader, _ := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
 			lggr:                commitLggr,
 			sourceLP:            sourceChain.LogPoller(),
 			destLP:              destChain.LogPoller(),
-			sourceReader:        ccipdata.NewLogPollerReader(sourceChain.LogPoller(), commitLggr, sourceChain.Client()),
+			sourceReader:        onRampReader,
 			destReader:          ccipdata.NewLogPollerReader(destChain.LogPoller(), commitLggr, destChain.Client()),
 			offRamp:             offRamp,
 			onRampAddress:       onRamp.Address(),
@@ -120,8 +121,8 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 			destClient:          destChain.Client(),
 			sourceClient:        sourceChain.Client(),
 			commitStore:         commitStore,
-			leafHasher:          leafHasher,
-			checkFinalityTags:   sourceChain.Config().EVM().FinalityTagEnabled(),
+			//leafHasher:          leafHasher,
+			//checkFinalityTags:   sourceChain.Config().EVM().FinalityTagEnabled(),
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(utils.ZeroAddress, qopts...)
