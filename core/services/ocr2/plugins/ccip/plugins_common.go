@@ -334,8 +334,23 @@ type GasPrice struct {
 }
 
 func (g GasPrice) encode() *big.Int {
-	daGasPrice := new(big.Int).Lsh(g.DAGasPrice, GasPriceEncodingLength)
+	if g.isNil() {
+		return nil
+	}
+	daGasPrice := big.NewInt(0)
+	if g.DAGasPrice != nil {
+		daGasPrice = new(big.Int).Lsh(g.DAGasPrice, GasPriceEncodingLength)
+	}
 	return new(big.Int).Add(daGasPrice, g.NativeGasPrice)
+}
+
+// Using NativeGasPrice as
+func (g GasPrice) isNil() bool {
+	return g.NativeGasPrice == nil
+}
+
+func (g GasPrice) notNil() bool {
+	return g.NativeGasPrice != nil
 }
 
 func parseEncodedGasPrice(gasPrice *big.Int) GasPrice {

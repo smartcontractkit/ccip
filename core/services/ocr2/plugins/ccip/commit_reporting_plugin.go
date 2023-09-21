@@ -438,7 +438,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 			gasUpdate = *latestInflightGasPriceUpdate
 		}
 
-		if gasUpdate.value.NativeGasPrice != nil {
+		if gasUpdate.value.notNil() {
 			r.lggr.Infow("Latest gas price from inflight", "gasPriceUpdateVal", gasUpdate.value, "gasPriceUpdateTs", gasUpdate.timestamp)
 			// Gas price can fluctuate frequently, many updates may be in flight.
 			// If there is gas price update inflight, use it as source of truth, no need to check onchain.
@@ -469,7 +469,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 		}
 	}
 
-	if gasUpdate.value.NativeGasPrice != nil {
+	if gasUpdate.value.notNil() {
 		r.lggr.Infow("Latest gas price from log poller", "gasPriceUpdateVal", gasUpdate.value, "gasPriceUpdateTs", gasUpdate.timestamp)
 	}
 
@@ -601,7 +601,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 	var sourceGasObservations []GasPrice
 
 	for _, obs := range observations {
-		if obs.SourceGasPriceUSD.NativeGasPrice != nil {
+		if obs.SourceGasPriceUSD.notNil() {
 			// Add only non-nil source gas price
 			sourceGasObservations = append(sourceGasObservations, obs.SourceGasPriceUSD)
 		}
@@ -661,7 +661,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 
 		destChainSelector = r.config.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
 
-		if latestGasPrice.value.NativeGasPrice != nil {
+		if latestGasPrice.value.notNil() {
 			gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
 			gasPriceNotChanged := !deviates(newGasPrice.DAGasPrice, latestGasPrice.value.DAGasPrice, int64(r.offchainConfig.DAGasPriceDeviationPPB)) && !deviates(newGasPrice.NativeGasPrice, latestGasPrice.value.NativeGasPrice, int64(r.offchainConfig.NativeGasPriceDeviationPPB))
 
@@ -861,7 +861,7 @@ func (r *CommitReportingPlugin) isStaleGasPrice(ctx context.Context, lggr logger
 		return true
 	}
 
-	if latestGasPrice.value.NativeGasPrice != nil {
+	if latestGasPrice.value.notNil() {
 		newGasPrice := parseEncodedGasPrice(priceUpdates.UsdPerUnitGas)
 		gasPriceNotChanged := !deviates(newGasPrice.DAGasPrice, latestGasPrice.value.NativeGasPrice, int64(r.offchainConfig.DAGasPriceDeviationPPB)) && !deviates(newGasPrice.NativeGasPrice, latestGasPrice.value.NativeGasPrice, int64(r.offchainConfig.NativeGasPriceDeviationPPB))
 
