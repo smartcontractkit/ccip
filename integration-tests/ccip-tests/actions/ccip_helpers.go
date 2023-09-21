@@ -277,7 +277,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	timeout time.Duration,
 	destChainId uint64,
 ) error {
-	lggr.Info().Msgf("Waiting for UsdPerUnitGas for dest chain %d", destChainId)
+	lggr.Info().Msgf("Waiting for UsdPerUnitGas for dest chain %d Price Registry %s", destChainId, ccipModule.PriceRegistry.Address())
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
