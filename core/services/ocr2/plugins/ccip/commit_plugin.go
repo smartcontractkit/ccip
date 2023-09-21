@@ -78,19 +78,23 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
-	onRamp, err := contractutil.LoadOnRamp(staticConfig.OnRamp, CommitPluginLabel, sourceChain.Client())
-	if err != nil {
-		return nil, errors.Wrap(err, "failed loading onRamp")
-	}
+	commitLggr := lggr.Named("CCIPCommit").With(
+		"sourceChain", ChainName(int64(chainId)),
+		"destChain", ChainName(destChainID))
+	onRampReader, _ := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
+	//onRamp, err := contractutil.LoadOnRamp(staticConfig.OnRamp, CommitPluginLabel, sourceChain.Client())
+	//if err != nil {
+	//	return nil, errors.Wrap(err, "failed loading onRamp")
+	//}
 	priceGetterObject, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
 		return nil, err
 	}
-	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
-	if err != nil {
-		return nil, err
-	}
-	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
+	//dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
+	//if err != nil {
+	//	return nil, err
+	//}
+	sourceRouter, err := router.NewRouter(onRampReader.Router(), sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -101,10 +105,6 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 
 	//leafHasher := hashlib.NewLeafHasher(staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), hashlib.NewKeccakCtx())
 	// Note that lggr already has the jobName and contractID (commit store)
-	commitLggr := lggr.Named("CCIPCommit").With(
-		"sourceChain", ChainName(int64(chainId)),
-		"destChain", ChainName(destChainID))
-	onRampReader, _ := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
 			lggr:                commitLggr,
@@ -113,7 +113,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 			sourceReader:        onRampReader,
 			destReader:          ccipdata.NewLogPollerReader(destChain.LogPoller(), commitLggr, destChain.Client()),
 			offRamp:             offRamp,
-			onRampAddress:       onRamp.Address(),
+			onRampAddress:       staticConfig.OnRamp,
 			priceGetter:         priceGetterObject,
 			sourceNative:        sourceNative,
 			sourceFeeEstimator:  sourceChain.GasEstimator(),
@@ -139,7 +139,8 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	commitLggr.Infow("NewCommitServices",
 		"pluginConfig", pluginConfig,
 		"staticConfig", staticConfig,
-		"dynamicOnRampConfig", dynamicOnRampConfig,
+		// TODO bring back
+		//"dynamicOnRampConfig", dynamicOnRampConfig,
 		"sourceNative", sourceNative,
 		"sourceRouter", sourceRouter.Address())
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.

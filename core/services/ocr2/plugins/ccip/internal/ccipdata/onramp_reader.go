@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -36,6 +37,9 @@ type OnRampReader interface {
 
 	// GetSendRequestsBetweenSeqNums returns all the message send requests in the provided sequence numbers range (inclusive).
 	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[EVM2EVMMessage], error)
+
+	// Get router configured in the onRamp
+	Router() common.Address
 }
 
 var _ OnRampReader = &OnRamp1_0_0{}
@@ -152,9 +156,38 @@ func (o *OnRamp1_0_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint6
 	)
 }
 
+func (o *OnRamp1_0_0) Router() common.Address {
+	config, _ := o.onRamp.GetDynamicConfig(nil)
+	return config.Router
+}
+
 func (o *OnRamp1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[EVM2EVMMessage], error) {
 	//TODO implement me
 	panic("implement me")
+}
+
+var _ OnRampReader = &OnRampV1_1_0{}
+
+// OnRampV1_1_0 The only difference that the plugins care about in 1.1 is that the dynamic config struct has changed.
+type OnRampV1_1_0 struct {
+	*OnRamp1_0_0
+	onRamp *evm_2_evm_onramp_1_1_0.EVM2EVMOnRamp
+}
+
+func NewOnRamp1_1_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, finalityTags bool) *OnRampV1_1_0 {
+	onRamp, err := evm_2_evm_onramp_1_1_0.NewEVM2EVMOnRamp(onRampAddress, source)
+	if err != nil {
+		panic(err) // ABI failure ok to panic
+	}
+	return &OnRampV1_1_0{
+		OnRamp1_0_0: NewOnRamp1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, finalityTags),
+		onRamp:      onRamp,
+	}
+}
+
+func (o *OnRampV1_1_0) Router() common.Address {
+	config, _ := o.onRamp.GetDynamicConfig(nil)
+	return config.Router
 }
 
 // NewOnRampReader determines the appropriate version of the onramp and returns a reader for it
@@ -166,6 +199,8 @@ func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	switch version.String() {
 	case "1.0.0":
 		return NewOnRamp1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, finalityTags), nil
+	case "1.1.0":
+		return NewOnRamp1_1_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, finalityTags), nil
 	default:
 		return nil, errors.Errorf("expected version 1.0.0 got %v", version.String())
 	}
