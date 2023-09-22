@@ -52,6 +52,7 @@ FeedsManager = true # Default
 LogPoller = false # Default
 UICSAKeys = false # Default
 CCIP = false # Default
+EAL = false # Default
 ```
 
 
@@ -78,6 +79,12 @@ UICSAKeys enables CSA Keys in the UI.
 CCIP = false # Default
 ```
 CCIP enables the CCIP service.
+
+### EAL
+```toml
+EAL = false # Default
+```
+EAL enables API endpoints for connecting to blockchain.
 
 ## Database
 ```toml

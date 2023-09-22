@@ -287,6 +287,7 @@ type Feature struct {
 	LogPoller    *bool
 	UICSAKeys    *bool
 	CCIP         *bool
+	EAL          *bool
 }
 
 func (f *Feature) setFrom(f2 *Feature) {
@@ -301,6 +302,9 @@ func (f *Feature) setFrom(f2 *Feature) {
 	}
 	if v := f2.CCIP; v != nil {
 		f.CCIP = v
+	}
+	if v := f2.EAL; v != nil {
+		f.EAL = v
 	}
 }
 

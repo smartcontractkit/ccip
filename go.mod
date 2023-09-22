@@ -67,6 +67,8 @@ require (
 	github.com/shirou/gopsutil/v3 v3.23.8
 	github.com/shopspring/decimal v1.3.1
 	github.com/smartcontractkit/caigo v0.0.0-20230621050857-b29a4ca8c704
+    github.com/smartcontractkit/capital-markets-projects v0.0.0-20230920170817-e3cbe3d863bd
+    github.com/smartcontractkit/capital-markets-projects/lib v0.0.0-20230920170817-e3cbe3d863bd
 	github.com/smartcontractkit/chain-selectors v1.0.1
 	github.com/smartcontractkit/chainlink-cosmos v0.4.1-0.20230913032705-f924d753cc47
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20230918212835-8a0b08df72a3
@@ -101,7 +103,7 @@ require (
 	golang.org/x/term v0.11.0
 	golang.org/x/text v0.12.0
 	golang.org/x/time v0.3.0
-	golang.org/x/tools v0.11.0
+	golang.org/x/tools v0.12.0
 	gonum.org/v1/gonum v0.13.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/guregu/null.v2 v2.1.2
@@ -240,7 +242,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/yamux v0.0.0-20200609203250-aecfd211c9ce // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.2 // indirect
+	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/huandu/skiplist v1.2.0 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
@@ -450,4 +452,7 @@ replace (
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.4
 	k8s.io/client-go => k8s.io/client-go v0.25.4
+    
+    github.com/smartcontractkit/capital-markets-projects => /Users/jinbang/development/capital-markets-projects
+    github.com/smartcontractkit/capital-markets-projects/lib => /Users/jinbang/development/capital-markets-projects/lib
 )

@@ -21,3 +21,7 @@ func (f *featureConfig) UICSAKeys() bool {
 func (f *featureConfig) CCIP() bool {
 	return *f.c.CCIP
 }
+
+func (f *featureConfig) EAL() bool {
+	return *f.c.EAL
+}

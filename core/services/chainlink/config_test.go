@@ -243,6 +243,7 @@ func TestConfig_Marshal(t *testing.T) {
 		LogPoller:    ptr(true),
 		UICSAKeys:    ptr(true),
 		CCIP:         ptr(true),
+		EAL:          ptr(true),
 	}
 	full.Database = toml.Database{
 		DefaultIdleInTxSessionTimeout: models.MustNewDuration(time.Minute),
@@ -656,6 +657,7 @@ FeedsManager = true
 LogPoller = true
 UICSAKeys = true
 CCIP = true
+EAL = true
 `},
 		{"Database", Config{Core: toml.Core{Database: full.Database}}, `[Database]
 DefaultIdleInTxSessionTimeout = '1m0s'
