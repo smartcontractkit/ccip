@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
@@ -34,6 +35,36 @@ var (
 type attestationResponse struct {
 	Status      string `json:"status"`
 	Attestation string `json:"attestation"`
+}
+
+type messageAndAttestation struct {
+	Message     []byte
+	Attestation []byte
+}
+
+func (m messageAndAttestation) AbiString() string {
+	return `
+	[{
+		"components": [
+			{"name": "message", "type": "bytes"},
+			{"name": "attestation", "type": "bytes"}
+		],
+		"type": "tuple"
+	}]`
+}
+
+func (m messageAndAttestation) Validate() error {
+	return nil
+}
+
+type usdcPayload []byte
+
+func (d usdcPayload) AbiString() string {
+	return `[{"type": "bytes"}]`
+}
+
+func (d usdcPayload) Validate() error {
+	return nil
 }
 
 func TestUSDCReader_ReadTokenData(t *testing.T) {
@@ -89,7 +120,7 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 	require.NoError(t, err)
 
 	usdcService := usdc.NewUSDCTokenDataReader(logger.TestLogger(t), &eventsClient, mockUSDCTokenAddress, mockMsgTransmitter, mockOnRampAddress, attestationURI)
-	attestation, err := usdcService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+	msgAndAttestation, err := usdcService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 		InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
 			SequenceNumber: seqNum,
 		},
@@ -98,5 +129,14 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Equal(t, attestationBytes, attestation)
+	rawBytesMessage, err := abihelpers.DecodeAbiStruct[usdcPayload](expectedBody)
+	require.NoError(t, err)
+
+	encodeAbiStruct, err := abihelpers.EncodeAbiStruct[messageAndAttestation](messageAndAttestation{
+		Message:     rawBytesMessage,
+		Attestation: attestationBytes,
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, encodeAbiStruct, msgAndAttestation)
 }

@@ -23,7 +23,7 @@ import (
 // To configure an RPC endpoint, set the RPC_<chain_id> environment variable to the RPC endpoint.
 // e.g. RPC_420=https://rpc.<chain_id>.com
 const (
-	ErrorCodeString = "0x4e487b710000000000000000000000000000000000000000000000000000000000000032"
+	ErrorCodeString = "E1CD550900000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000"
 
 	// The following inputs are only used if ERROR_CODE_STRING is empty
 	// Need a node URL
