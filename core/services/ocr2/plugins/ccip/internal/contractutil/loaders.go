@@ -136,10 +136,6 @@ type GasPrice struct {
 	NativeGasPrice *big.Int `json:"nativeGasPrice"`
 }
 
-const (
-	GasPriceEncodingLength = 112 // Each gas price takes up at most GasPriceEncodingLength number of bits
-)
-
 func (g GasPrice) Encode() *big.Int {
 	if g.IsNil() {
 		return nil
