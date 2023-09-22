@@ -7,14 +7,11 @@ env:
   ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:develop
 jobs:
   build-test-image:
-    permissions:
-      id-token: write
-      contents: read
     name: Build Test Image
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
-        uses: actions/checkout@v3.6.0
+        uses: actions/checkout@v2
         with:
           ref: ${{ github.sha }} 
       - name: Build Image
