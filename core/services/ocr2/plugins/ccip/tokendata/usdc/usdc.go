@@ -54,6 +54,19 @@ const (
 	attestationStatusPending attestationStatus = "pending_confirmations"
 )
 
+type usdcPayload []byte
+
+func (d usdcPayload) AbiString() string {
+	return `[{"type": "bytes"}]`
+}
+
+func (d usdcPayload) Validate() error {
+	if len(d) == 0 {
+		return errors.New("must be non-empty")
+	}
+	return nil
+}
+
 var _ tokendata.Reader = &TokenDataReader{}
 
 func NewUSDCTokenDataReader(lggr logger.Logger, sourceChainEvents ccipdata.Reader, usdcTokenAddress, usdcMessageTransmitterAddress, onRampAddress common.Address, usdcAttestationApi *url.URL) *TokenDataReader {
@@ -115,7 +128,7 @@ func (s *TokenDataReader) getUSDCMessageBodyHash(ctx context.Context, msg intern
 
 	s.lggr.Infow("Got USDC message body", "messageBody", hexutil.Encode(usdcMessageBody), "messageID", hexutil.Encode(msg.MessageId[:]))
 
-	parsedMsgBody, err := parseSolidityStruct(usdcMessageBody)
+	parsedMsgBody, err := decodeUSDCMessageSent(usdcMessageBody)
 	if err != nil {
 		return [32]byte{}, errors.Wrap(err, "failed parsing solidity struct")
 	}
@@ -126,13 +139,12 @@ func (s *TokenDataReader) getUSDCMessageBodyHash(ctx context.Context, msg intern
 	return msgBodyHash, nil
 }
 
-func parseSolidityStruct(logData []byte) ([]byte, error) {
-	abiStruct, err := utils.ABIDecode(`[{ "type": "bytes" }]`, logData)
+func decodeUSDCMessageSent(logData []byte) ([]byte, error) {
+	decodeAbiStruct, err := abihelpers.DecodeAbiStruct[usdcPayload](logData)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
-
-	return abiStruct[0].([]byte), nil
+	return decodeAbiStruct, nil
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
