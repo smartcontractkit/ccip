@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -89,7 +90,7 @@ func (s *TokenDataReader) getUpdatedAttestation(ctx context.Context, msg interna
 		return attestationResponse{}, errors.Wrap(err, "failed getting the USDC message body")
 	}
 
-	s.lggr.Infow("Calling attestation API", "messageBody", messageBodyHash, "messageID", msg.MessageId)
+	s.lggr.Infow("Calling attestation API", "messageBodyHash", hexutil.Encode(messageBodyHash[:]), "messageID", hexutil.Encode(msg.MessageId[:]))
 
 	response, err := s.callAttestationApi(ctx, messageBodyHash)
 	if err != nil {
@@ -112,13 +113,26 @@ func (s *TokenDataReader) getUSDCMessageBodyHash(ctx context.Context, msg intern
 		return [32]byte{}, err
 	}
 
-	s.lggr.Infow("Got USDC message body", "messageBody", usdcMessageBody, "messageID", msg.MessageId)
+	s.lggr.Infow("Got USDC message body", "messageBody", hexutil.Encode(usdcMessageBody), "messageID", hexutil.Encode(msg.MessageId[:]))
 
-	msgBodyHash := utils.Keccak256Fixed(usdcMessageBody)
+	parsedMsgBody, err := parseSolidityStruct(usdcMessageBody)
+	if err != nil {
+		return [32]byte{}, errors.Wrap(err, "failed parsing solidity struct")
+	}
+	msgBodyHash := utils.Keccak256Fixed(parsedMsgBody)
 
 	// Save the attempt in the cache in case the external call fails
 	s.usdcMessageHashCache[msg.SequenceNumber] = msgBodyHash
 	return msgBodyHash, nil
+}
+
+func parseSolidityStruct(logData []byte) ([]byte, error) {
+	abiStruct, err := utils.ABIDecode(`[{ "type": "bytes" }]`, logData)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return abiStruct[0].([]byte), nil
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
@@ -143,6 +157,11 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 	if err != nil {
 		return attestationResponse{}, err
 	}
+
+	if response.Status == "" {
+		return attestationResponse{}, fmt.Errorf("invalid attestation response: %s", string(body))
+	}
+
 	return response, nil
 }
 
