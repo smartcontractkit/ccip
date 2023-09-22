@@ -344,15 +344,22 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 
 	go func() {
 		for {
-			e := <-gasUpdateEvent
-			destChain, err := chainselectors.ChainIdFromSelector(e.DestChain)
-			if err != nil {
-				continue
+			select {
+			case e := <-gasUpdateEvent:
+				destChain, err := chainselectors.ChainIdFromSelector(e.DestChain)
+				if err != nil {
+					continue
+				}
+				log.Info().Msgf("UsdPerUnitGasUpdated event received for dest chain %d source chain %w",
+					destChain, ccipModule.ChainClient.GetNetworkName())
+				ccipModule.gasUpdateWatcherMu.Lock()
+				ccipModule.gasUpdateWatcher[destChain] = e.Timestamp
+				ccipModule.gasUpdateWatcherMu.Unlock()
+			case <-sub.Err():
+				log.Info().Msgf("UsdPerUnitGasUpdated event subscription error %+v", sub.Err())
+				return
 			}
-			log.Info().Msgf("UsdPerUnitGasUpdated event received for dest chain %d", destChain)
-			ccipModule.gasUpdateWatcherMu.Lock()
-			ccipModule.gasUpdateWatcher[destChain] = e.Timestamp
-			ccipModule.gasUpdateWatcherMu.Unlock()
+
 		}
 	}()
 	ccipModule.priceUpdateSubs = append(ccipModule.priceUpdateSubs, sub)
