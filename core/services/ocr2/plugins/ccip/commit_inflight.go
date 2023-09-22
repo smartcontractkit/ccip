@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 )
 
 const (
@@ -82,7 +83,7 @@ func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *gasP
 			// First price found or found later update, set it
 			latestGasPriceUpdate = &gasPriceUpdate{
 				timestamp: inflight.createdAt,
-				value:     parseEncodedGasPrice(inflight.priceUpdates.UsdPerUnitGas),
+				value:     contractutil.ParseEncodedGasPrice(inflight.priceUpdates.UsdPerUnitGas),
 			}
 			latestEpochAndRound = inflight.epochAndRound
 			continue

@@ -16,9 +16,12 @@ import (
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -56,7 +59,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, errors.Wrap(err, "get chainset")
 	}
-	commitStore, err := LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
+	commitStore, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
@@ -80,11 +83,11 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
-	offRamp, err := LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), CommitPluginLabel, destChain.Client())
+	offRamp, err := contractutil.LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), CommitPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
-	onRamp, err := LoadOnRamp(staticConfig.OnRamp, CommitPluginLabel, sourceChain.Client())
+	onRamp, err := contractutil.LoadOnRamp(staticConfig.OnRamp, CommitPluginLabel, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp")
 	}
@@ -92,7 +95,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, err
 	}
-	dynamicOnRampConfig, err := LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
+	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +134,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 			commitStoreVersion:  commitStoreVersion,
 		})
 
-	err = wrappedPluginFactory.UpdateLogPollerFilters(zeroAddress, qopts...)
+	err = wrappedPluginFactory.UpdateLogPollerFilters(utils.ZeroAddress, qopts...)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +250,7 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSp
 	if err != nil {
 		return err
 	}
-	commitStore, err := LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
+	commitStore, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
 	if err != nil {
 		return err
 	}
@@ -277,7 +280,7 @@ func unregisterCommitPluginFilters(ctx context.Context, sourceLP, destLP logpoll
 		return err
 	}
 
-	if err := unregisterLpFilters(
+	if err := logpollerutil.UnregisterLpFilters(
 		sourceLP,
 		getCommitPluginSourceLpFilters(staticCfg.OnRamp),
 		qopts...,
@@ -285,7 +288,7 @@ func unregisterCommitPluginFilters(ctx context.Context, sourceLP, destLP logpoll
 		return err
 	}
 
-	return unregisterLpFilters(
+	return logpollerutil.UnregisterLpFilters(
 		destLP,
 		getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry, offRamp),
 		qopts...,

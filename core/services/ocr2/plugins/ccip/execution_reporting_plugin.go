@@ -31,10 +31,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
@@ -72,6 +76,7 @@ type ExecutionPluginConfig struct {
 	destGasEstimator         gas.EvmFeeEstimator
 	leafHasher               hashlib.LeafHasherInterface[[32]byte]
 	feeEstConfig             FeeEstimationConfig
+	tokenDataProviders       map[common.Address]tokendata.Reader
 }
 
 type ExecutionReportingPlugin struct {
@@ -170,7 +175,7 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if isCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
+	if contractutil.IsCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
 	// Expire any inflight reports.
@@ -210,36 +215,32 @@ func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegis
 	defer rf.filtersMu.Unlock()
 
 	// source chain filters
-	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(rf.config.onRamp.Address(), rf.config.sourcePriceRegistry.Address())
-	created, deleted := filtersDiff(sourceFiltersBefore, sourceFiltersNow)
-	if err := unregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
+	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(
+		rf.config.onRamp.Address(),
+		rf.config.sourcePriceRegistry.Address(),
+		rf.config.tokenDataProviders,
+	)
+	created, deleted := logpollerutil.FiltersDiff(sourceFiltersBefore, sourceFiltersNow)
+	if err := logpollerutil.UnregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
 		return err
 	}
-	if err := registerLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
+	if err := logpollerutil.RegisterLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
 		return err
 	}
 	rf.sourceChainFilters = sourceFiltersNow
 
 	// destination chain filters
 	destFiltersBefore, destFiltersNow := rf.destChainFilters, getExecutionPluginDestLpChainFilters(rf.config.commitStore.Address(), rf.config.offRamp.Address(), destPriceRegistry)
-	created, deleted = filtersDiff(destFiltersBefore, destFiltersNow)
-	if err := unregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
+	created, deleted = logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
+	if err := logpollerutil.UnregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
 		return err
 	}
-	if err := registerLpFilters(rf.config.destLP, created, qopts...); err != nil {
+	if err := logpollerutil.RegisterLpFilters(rf.config.destLP, created, qopts...); err != nil {
 		return err
 	}
 	rf.destChainFilters = destFiltersNow
 
 	return nil
-}
-
-// helper struct to hold the send request and some metadata
-type evm2EVMOnRampCCIPSendRequestedWithMeta struct {
-	evm_2_evm_offramp.InternalEVM2EVMMessage
-	blockTimestamp time.Time
-	executed       bool
-	finalized      bool
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
@@ -262,28 +263,28 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	// Since this will only increase over time, the highest observed value will
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
-	getAllowedTokenAmount := LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+	getAllowedTokenAmount := cache.LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
 		return r.config.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 	})
 	sourceToDestTokens, supportedDestTokens, err := r.sourceDestinationTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
-	getSourceTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
+	getSourceTokensPrices := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
 		sourceFeeTokens, err1 := r.cachedSourceFeeTokens.Get(ctx)
 		if err1 != nil {
 			return nil, err1
 		}
 		return getTokensPrices(ctx, sourceFeeTokens, r.config.sourcePriceRegistry, []common.Address{r.config.sourceWrappedNativeToken})
 	})
-	getDestTokensPrices := LazyFetch(func() (map[common.Address]*big.Int, error) {
+	getDestTokensPrices := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
 		dstTokens, err1 := r.cachedDestTokens.Get(ctx)
 		if err1 != nil {
 			return nil, err1
 		}
 		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	})
-	getDestGasPrice := LazyFetch(func() (GasPrice, error) {
+	getDestGasPrice := cache.LazyFetch(func() (contractutil.GasPrice, error) {
 		return r.estimateDestinationGasPrice(ctx)
 	})
 
@@ -299,7 +300,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return nil, err
 	}
 
-	getDestPoolRateLimits := LazyFetch(func() (map[common.Address]*big.Int, error) {
+	getDestPoolRateLimits := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
 		return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, sourceToDestTokens)
 	})
 
@@ -365,8 +366,17 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 
 		buildBatchDuration := time.Now()
-		batch := r.buildBatch(rootLggr, rep, inflight, allowedTokenAmountValue.Tokens,
-			sourceTokensPricesValue, destTokensPricesValue, getDestGasPrice, sourceToDestTokens, destPoolRateLimits)
+		batch := r.buildBatch(
+			ctx,
+			rootLggr,
+			rep,
+			inflight,
+			allowedTokenAmountValue.Tokens,
+			sourceTokensPricesValue,
+			destTokensPricesValue,
+			getDestGasPrice,
+			sourceToDestTokens,
+			destPoolRateLimits)
 		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 		if len(batch) != 0 {
 			return batch, nil
@@ -418,20 +428,20 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 	return res, nil
 }
 
-func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (GasPrice, error) {
+func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (contractutil.GasPrice, error) {
 	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
 	if err != nil {
-		return GasPrice{}, errors.Wrap(err, "could not estimate destination gas price")
+		return contractutil.GasPrice{}, errors.Wrap(err, "could not estimate destination gas price")
 	}
 	destNativeGasPrice := destGasPriceWei.Legacy.ToInt()
 	if destGasPriceWei.DynamicFeeCap != nil {
 		destNativeGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
 	}
 	if destNativeGasPrice == nil {
-		return GasPrice{}, fmt.Errorf("missing gas price %+v", destGasPriceWei)
+		return contractutil.GasPrice{}, fmt.Errorf("missing gas price %+v", destGasPriceWei)
 	}
 
-	gasPrice := GasPrice{
+	gasPrice := contractutil.GasPrice{
 		DAGasPrice:     big.NewInt(0),
 		NativeGasPrice: destNativeGasPrice,
 	}
@@ -440,7 +450,7 @@ func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Conte
 	if l1Oracle := r.config.destGasEstimator.L1Oracle(); l1Oracle != nil {
 		l1GasPriceWei, err := l1Oracle.GasPrice(ctx)
 		if err != nil {
-			return GasPrice{}, err
+			return contractutil.GasPrice{}, err
 		}
 
 		if l1GasPrice := l1GasPriceWei.ToInt(); l1GasPrice.Cmp(big.NewInt(0)) > 0 {
@@ -491,13 +501,14 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context,
 // the available gas, rate limiting, execution state, nonce state, and
 // profitability of execution.
 func (r *ExecutionReportingPlugin) buildBatch(
+	ctx context.Context,
 	lggr logger.Logger,
 	report commitReportWithSendRequests,
 	inflight []InflightInternalExecutionReport,
 	aggregateTokenLimit *big.Int,
 	sourceTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
-	gasPriceEstimate LazyFunction[GasPrice],
+	gasPriceEstimate cache.LazyFunction[contractutil.GasPrice],
 	sourceToDestToken map[common.Address]common.Address,
 	destTokenPoolRateLimits map[common.Address]*big.Int,
 ) (executableMessages []ObservedMessage) {
@@ -512,7 +523,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
-		if msg.executed {
+		if msg.Executed {
 			msgLggr.Infow("Skipping message already executed", "seqNr", msg.SequenceNumber)
 			continue
 		}
@@ -530,7 +541,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 				// Chain holds existing nonce.
 				nonce, err := r.config.offRamp.GetSenderNonce(nil, msg.Sender)
 				if err != nil {
-					lggr.Errorw("unable to get sender nonce", "err", err)
+					lggr.Errorw("unable to get sender nonce", "err", err, "seqNr", msg.SequenceNumber)
 					continue
 				}
 				expectedNonces[msg.Sender] = nonce + 1
@@ -552,11 +563,23 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			msgLggr.Errorw("Skipping message unable to compute aggregate value", "err", err)
 			continue
 		}
+
 		// if token limit is smaller than message value skip message
 		if tokensLeft, hasCapacity := hasEnoughTokens(aggregateTokenLimit, msgValue, inflightAggregateValue); !hasCapacity {
 			msgLggr.Warnw("token limit is smaller than message value", "aggregateTokenLimit", tokensLeft.String(), "msgValue", msgValue.String())
 			continue
 		}
+
+		tokenData, ready, err2 := getTokenData(ctx, msgLggr, msg, r.config.tokenDataProviders)
+		if err2 != nil {
+			msgLggr.Errorw("Skipping message unable to check token data", "err", err2)
+			continue
+		}
+		if !ready {
+			msgLggr.Warnw("Skipping message attestation not ready")
+			continue
+		}
+
 		// Fee boosting
 		gasPriceValue, err := gasPriceEstimate()
 		if err != nil {
@@ -590,10 +613,10 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 		availableFee := big.NewInt(0).Mul(msg.FeeTokenAmount, sourceFeeTokenPrice)
 		availableFee = availableFee.Div(availableFee, big.NewInt(1e18))
-		availableFeeUsd := waitBoostedFee(time.Since(msg.blockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
+		availableFeeUsd := waitBoostedFee(time.Since(msg.BlockTimestamp), availableFee, r.offchainConfig.RelativeBoostPerWaitHour)
 		if availableFeeUsd.Cmp(execCostUsd) < 0 {
 			msgLggr.Infow("Insufficient remaining fee", "availableFeeUsd", availableFeeUsd, "execCostUsd", execCostUsd,
-				"sourceBlockTimestamp", msg.blockTimestamp, "waitTime", time.Since(msg.blockTimestamp), "boost", r.offchainConfig.RelativeBoostPerWaitHour)
+				"sourceBlockTimestamp", msg.BlockTimestamp, "waitTime", time.Since(msg.BlockTimestamp), "boost", r.offchainConfig.RelativeBoostPerWaitHour)
 			continue
 		}
 
@@ -626,13 +649,6 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			}
 		}
 
-		var tokenData [][]byte
-
-		// TODO add attestation data for USDC here
-		for range msg.TokenAmounts {
-			tokenData = append(tokenData, []byte{})
-		}
-
 		msgLggr.Infow("Adding msg to batch", "seqNum", msg.SequenceNumber, "nonce", msg.Nonce,
 			"value", msgValue, "aggregateTokenLimit", aggregateTokenLimit)
 		executableMessages = append(executableMessages, NewObservedMessage(msg.SequenceNumber, tokenData))
@@ -643,6 +659,29 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		expectedNonces[msg.Sender] = msg.Nonce + 1
 	}
 	return executableMessages
+}
+
+func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader) (tokenData [][]byte, allReady bool, err error) {
+	for _, token := range msg.TokenAmounts {
+		offchainTokenDataProvider, ok := tokenDataProviders[token.Token]
+		if !ok {
+			// No token data required
+			tokenData = append(tokenData, []byte{})
+			continue
+		}
+		lggr.Infow("Fetching token data", "token", token.Token.Hex())
+		tknData, err2 := offchainTokenDataProvider.ReadTokenData(ctx, msg)
+		if err2 != nil {
+			if errors.Is(err2, tokendata.ErrNotReady) {
+				lggr.Infof("Token data not ready yet for token %s", token.Token.Hex())
+				return [][]byte{}, false, nil
+			}
+			return [][]byte{}, false, err2
+		}
+
+		tokenData = append(tokenData, tknData)
+	}
+	return tokenData, true, nil
 }
 
 func (r *ExecutionReportingPlugin) isRateLimitEnoughForTokenPool(
@@ -712,7 +751,7 @@ func calculateMessageMaxGas(gasLimit *big.Int, numRequests, dataLen, numTokens i
 // helper struct to hold the commitReport and the related send requests
 type commitReportWithSendRequests struct {
 	commitReport         commit_store.CommitStoreCommitReport
-	sendRequestsWithMeta []evm2EVMOnRampCCIPSendRequestedWithMeta
+	sendRequestsWithMeta []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
 }
 
 func (r *commitReportWithSendRequests) validate() error {
@@ -727,7 +766,7 @@ func (r *commitReportWithSendRequests) validate() error {
 
 func (r *commitReportWithSendRequests) allRequestsAreExecutedAndFinalized() bool {
 	for _, req := range r.sendRequestsWithMeta {
-		if !req.executed || !req.finalized {
+		if !req.Executed || !req.Finalized {
 			return false
 		}
 	}
@@ -735,7 +774,7 @@ func (r *commitReportWithSendRequests) allRequestsAreExecutedAndFinalized() bool
 }
 
 // checks if the send request fits the commit report interval
-func (r *commitReportWithSendRequests) sendReqFits(sendReq evm2EVMOnRampCCIPSendRequestedWithMeta) bool {
+func (r *commitReportWithSendRequests) sendReqFits(sendReq internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) bool {
 	return sendReq.SequenceNumber >= r.commitReport.Interval.Min &&
 		sendReq.SequenceNumber <= r.commitReport.Interval.Max
 }
@@ -804,7 +843,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	for i, report := range reports {
 		reportsWithSendReqs[i] = commitReportWithSendRequests{
 			commitReport:         report,
-			sendRequestsWithMeta: make([]evm2EVMOnRampCCIPSendRequestedWithMeta, 0, report.Interval.Max-report.Interval.Min+1),
+			sendRequestsWithMeta: make([]internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, 0, report.Interval.Max-report.Interval.Min+1),
 		}
 	}
 
@@ -815,11 +854,13 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 		// if value exists, and it's true then it's considered finalized
 		finalized, executed := executedSeqNums[msg.SequenceNumber]
 
-		reqWithMeta := evm2EVMOnRampCCIPSendRequestedWithMeta{
+		reqWithMeta := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 			InternalEVM2EVMMessage: msg,
-			blockTimestamp:         sendReq.BlockTimestamp,
-			executed:               executed,
-			finalized:              finalized,
+			BlockTimestamp:         sendReq.BlockTimestamp,
+			Executed:               executed,
+			Finalized:              finalized,
+			LogIndex:               sendReq.Data.Raw.Index,
+			TxHash:                 sendReq.Data.Raw.TxHash,
 		}
 
 		// attach the msg to the appropriate reports
@@ -959,7 +1000,7 @@ func calculateObservedMessagesConsensus(observations []ExecutionObservation, f i
 	tally := make(map[tallyKey]tallyVal)
 	for _, obs := range observations {
 		for seqNr, msgData := range obs.Messages {
-			tokenDataHash, err := bytesOfBytesKeccak(msgData.TokenData)
+			tokenDataHash, err := hashlib.BytesOfBytesKeccak(msgData.TokenData)
 			if err != nil {
 				return nil, fmt.Errorf("bytes of bytes keccak: %w", err)
 			}
@@ -1012,7 +1053,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, err
 	}
-	lggr = lggr.With("messageIDs", getMessageIDsAsHexString(messages))
+	lggr = lggr.With("messageIDs", contractutil.GetMessageIDsAsHexString(messages))
 
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(messages)
@@ -1038,7 +1079,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, nil
 	}
-	lggr = lggr.With("messageIDs", getMessageIDsAsHexString(messages))
+	lggr = lggr.With("messageIDs", contractutil.GetMessageIDsAsHexString(messages))
 
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,

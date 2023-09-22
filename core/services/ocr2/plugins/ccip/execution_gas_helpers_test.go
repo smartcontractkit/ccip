@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 )
 
 func TestOverheadGas(t *testing.T) {
@@ -102,7 +104,7 @@ func TestComputeExecCost(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			msg := evm2EVMOnRampCCIPSendRequestedWithMeta{}
+			msg := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{}
 			msg.GasLimit = tc.gasLimit
 			execCostUsd := computeExecCost(msg.GasLimit, tc.execGasEstimate, tc.tokenPriceUSD)
 			require.Equal(t, tc.execCostUsd, execCostUsd)
