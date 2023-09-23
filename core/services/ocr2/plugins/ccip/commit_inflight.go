@@ -9,7 +9,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 )
 
 const (
@@ -69,10 +68,10 @@ func (c *inflightCommitReportsContainer) maxInflightSeqNr() uint64 {
 }
 
 // latestGasPriceUpdate return the latest inflight gas price update or nil if there is no inflight gas price update.
-func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *gasPriceUpdate {
+func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *update {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
-	var latestGasPriceUpdate *gasPriceUpdate
+	var latestGasPriceUpdate *update
 	var latestEpochAndRound uint64
 	for _, inflight := range c.inFlightPriceUpdates {
 		if inflight.priceUpdates.DestChainSelector == 0 {
@@ -81,9 +80,9 @@ func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *gasP
 		}
 		if latestGasPriceUpdate == nil || inflight.epochAndRound > latestEpochAndRound {
 			// First price found or found later update, set it
-			latestGasPriceUpdate = &gasPriceUpdate{
+			latestGasPriceUpdate = &update{
 				timestamp: inflight.createdAt,
-				value:     contractutil.ParseEncodedGasPrice(inflight.priceUpdates.UsdPerUnitGas),
+				value:     inflight.priceUpdates.UsdPerUnitGas,
 			}
 			latestEpochAndRound = inflight.epochAndRound
 			continue
@@ -93,22 +92,22 @@ func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() *gasP
 }
 
 // latestInflightTokenPriceUpdates returns a map of the latest token price updates
-func (c *inflightCommitReportsContainer) latestInflightTokenPriceUpdates() map[common.Address]tokenPriceUpdate {
+func (c *inflightCommitReportsContainer) latestInflightTokenPriceUpdates() map[common.Address]update {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
-	latestTokenPriceUpdates := make(map[common.Address]tokenPriceUpdate)
+	latestTokenPriceUpdates := make(map[common.Address]update)
 	latestEpochAndRounds := make(map[common.Address]uint64)
 	for _, inflight := range c.inFlightPriceUpdates {
 		for _, inflightTokenUpdate := range inflight.priceUpdates.TokenPriceUpdates {
 			if _, ok := latestTokenPriceUpdates[inflightTokenUpdate.SourceToken]; !ok {
-				latestTokenPriceUpdates[inflightTokenUpdate.SourceToken] = tokenPriceUpdate{
+				latestTokenPriceUpdates[inflightTokenUpdate.SourceToken] = update{
 					value:     inflightTokenUpdate.UsdPerToken,
 					timestamp: inflight.createdAt,
 				}
 				latestEpochAndRounds[inflightTokenUpdate.SourceToken] = inflight.epochAndRound
 			}
 			if inflight.epochAndRound > latestEpochAndRounds[inflightTokenUpdate.SourceToken] {
-				latestTokenPriceUpdates[inflightTokenUpdate.SourceToken] = tokenPriceUpdate{
+				latestTokenPriceUpdates[inflightTokenUpdate.SourceToken] = update{
 					value:     inflightTokenUpdate.UsdPerToken,
 					timestamp: inflight.createdAt,
 				}

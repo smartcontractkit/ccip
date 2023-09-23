@@ -14,7 +14,7 @@ import (
 type ExecGasPriceEstimator struct {
 	estimator    gas.EvmFeeEstimator
 	maxGasPrice  *big.Int
-	deviationPPB uint32
+	deviationPPB int64
 }
 
 func (g ExecGasPriceEstimator) GetGasPrice(ctx context.Context) (GasPrice, error) {
@@ -50,11 +50,11 @@ func (g ExecGasPriceEstimator) Median(gasPrices []GasPrice) (GasPrice, error) {
 }
 
 func (g ExecGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice) (bool, error) {
-	return ccipcalc.Deviates(p1, p2, int64(g.deviationPPB)), nil
+	return ccipcalc.Deviates(p1, p2, g.deviationPPB), nil
 }
 
 func (g ExecGasPriceEstimator) EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, _ MsgCostConfig) (*big.Int, error) {
-	execGasEstimate := new(big.Int).Add(big.NewInt(FEE_BOOSTING_OVERHEAD_GAS), msg.GasLimit)
+	execGasEstimate := new(big.Int).Add(big.NewInt(FeeBoostingOverheadGas), msg.GasLimit)
 	execGasEstimate.Mul(execGasEstimate, p)
 
 	return ccipcalc.CalculateUsdPerUnitGas(execGasEstimate, wrappedNativePrice), nil

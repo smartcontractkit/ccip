@@ -4,14 +4,18 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/pkg/errors"
+
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 )
 
 const (
-	FEE_BOOSTING_OVERHEAD_GAS   = 200_000
-	EVM_MESSAGE_FIXED_BYTES     = 448 // Byte size of fixed-size fields in EVM2EVMMessage
-	EVM_MESSAGE_BYTES_PER_TOKEN = 128 // Byte size of each token transfer, consisting of 1 EVMTokenAmount and 1 bytes, excl length of bytes
-	DA_MULTIPLIER_BASE          = int64(10000)
+	FeeBoostingOverheadGas   = 200_000
+	EvmMessageFixedBytes     = 448 // Byte size of fixed-size fields in EVM2EVMMessage
+	EvmMessageBytesPerToken  = 128 // Byte size of each token transfer, consisting of 1 EVMTokenAmount and 1 bytes, excl length of bytes
+	DAMultiplierBase         = int64(10000)
+	DAGasPriceEncodingLength = 112 // Each gas price takes up at most GasPriceEncodingLength number of bits
 )
 
 type MsgCostConfig struct {
@@ -33,4 +37,34 @@ type GasPriceEstimator interface {
 	Deviates(GasPrice, GasPrice) (bool, error)
 	EstimateMsgCostUSD(GasPrice, *big.Int, internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, MsgCostConfig) (*big.Int, error)
 	String(GasPrice) string
+}
+
+func NewGasPriceEstimator(
+	commitStoreVersion string,
+	estimator gas.EvmFeeEstimator,
+	maxExecGasPrice *big.Int,
+	execDeviationPPB int64,
+	daDeviationPPB int64,
+) (GasPriceEstimator, error) {
+	switch commitStoreVersion {
+	case "1.0.0", "1.1.0":
+		return ExecGasPriceEstimator{
+			estimator:    estimator,
+			maxGasPrice:  maxExecGasPrice,
+			deviationPPB: execDeviationPPB,
+		}, nil
+	case "1.2.0":
+		return DAGasPriceEstimator{
+			execEstimator: ExecGasPriceEstimator{
+				estimator:    estimator,
+				maxGasPrice:  maxExecGasPrice,
+				deviationPPB: execDeviationPPB,
+			},
+			daDeviationPPB:      daDeviationPPB,
+			execDeviationPPB:    execDeviationPPB,
+			priceEncodingLength: DAGasPriceEncodingLength,
+		}, nil
+	default:
+		return nil, errors.Errorf("Invalid commitStore version: %s", commitStoreVersion)
+	}
 }

@@ -15,15 +15,15 @@ type OffchainConfig interface {
 // Do not change the JSON format of this struct without consulting with
 // the RDD people first.
 type CommitOffchainConfig struct {
-	SourceFinalityDepth        uint32
-	DestFinalityDepth          uint32
-	GasPriceHeartBeat          models.Duration
-	DAGasPriceDeviationPPB     uint32
-	NativeGasPriceDeviationPPB uint32
-	TokenPriceHeartBeat        models.Duration
-	TokenPriceDeviationPPB     uint32
-	MaxGasPrice                uint64
-	InflightCacheExpiry        models.Duration
+	SourceFinalityDepth      uint32
+	DestFinalityDepth        uint32
+	GasPriceHeartBeat        models.Duration
+	DAGasPriceDeviationPPB   uint32
+	ExecGasPriceDeviationPPB uint32
+	TokenPriceHeartBeat      models.Duration
+	TokenPriceDeviationPPB   uint32
+	MaxGasPrice              uint64
+	InflightCacheExpiry      models.Duration
 }
 
 func (c CommitOffchainConfig) Validate() error {
@@ -39,7 +39,7 @@ func (c CommitOffchainConfig) Validate() error {
 	if c.DAGasPriceDeviationPPB == 0 {
 		return errors.New("must set FeeUpdateDeviationPPB")
 	}
-	if c.NativeGasPriceDeviationPPB == 0 {
+	if c.ExecGasPriceDeviationPPB == 0 {
 		return errors.New("must set FeeUpdateDeviationPPB")
 	}
 	if c.TokenPriceHeartBeat.Duration() == 0 {

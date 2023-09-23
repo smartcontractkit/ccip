@@ -9,10 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
 
-const (
-	daGasPriceEncodingLength = 112 // Each gas price takes up at most GasPriceEncodingLength number of bits
-)
-
 type DAGasPriceEstimator struct {
 	execEstimator       ExecGasPriceEstimator
 	daDeviationPPB      int64
@@ -150,11 +146,11 @@ func (g DAGasPriceEstimator) estimateDACostUSD(daGasPrice GasPrice, wrappedNativ
 		sourceTokenDataLen += len(tokenData)
 	}
 
-	dataLen := EVM_MESSAGE_FIXED_BYTES + len(msg.Data) + len(msg.TokenAmounts)*EVM_MESSAGE_BYTES_PER_TOKEN + sourceTokenDataLen
+	dataLen := EvmMessageFixedBytes + len(msg.Data) + len(msg.TokenAmounts)*EvmMessageBytesPerToken + sourceTokenDataLen
 	dataGas := big.NewInt(int64(dataLen)*config.gasPerDAByte + config.daOverheadGas)
 
 	dataGasEstimate := new(big.Int).Mul(dataGas, daGasPrice)
-	dataGasEstimate = new(big.Int).Div(new(big.Int).Mul(dataGasEstimate, big.NewInt(config.daMultiplier)), big.NewInt(DA_MULTIPLIER_BASE))
+	dataGasEstimate = new(big.Int).Div(new(big.Int).Mul(dataGasEstimate, big.NewInt(config.daMultiplier)), big.NewInt(DAMultiplierBase))
 
 	return ccipcalc.CalculateUsdPerUnitGas(dataGasEstimate, wrappedNativePrice)
 }

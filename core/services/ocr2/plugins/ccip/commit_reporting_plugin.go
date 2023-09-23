@@ -15,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -30,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/priceEstimator"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -52,14 +52,9 @@ var (
 	_ types.ReportingPlugin        = &CommitReportingPlugin{}
 )
 
-type tokenPriceUpdate struct {
+type update struct {
 	timestamp time.Time
 	value     *big.Int
-}
-
-type gasPriceUpdate struct {
-	timestamp time.Time
-	value     contractutil.GasPrice
 }
 
 type CommitPluginConfig struct {
@@ -89,6 +84,7 @@ type CommitReportingPlugin struct {
 	offchainConfig     ccipconfig.CommitOffchainConfig
 	onchainConfig      ccipconfig.CommitOnchainConfig
 	tokenDecimalsCache cache.AutoSync[map[common.Address]uint8]
+	gasPriceEstimator  priceEstimator.GasPriceEstimator
 }
 
 type CommitReportingPluginFactory struct {
@@ -132,6 +128,17 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		"onchainConfig", onchainConfig,
 	)
 
+	gasPriceEstimator, err := priceEstimator.NewGasPriceEstimator(
+		rf.config.commitStoreVersion,
+		rf.config.sourceFeeEstimator,
+		big.NewInt(int64(offchainConfig.MaxGasPrice)),
+		int64(offchainConfig.ExecGasPriceDeviationPPB),
+		int64(offchainConfig.DAGasPriceDeviationPPB),
+	)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+
 	return &CommitReportingPlugin{
 			config:            rf.config,
 			F:                 config.F,
@@ -148,6 +155,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				rf.config.destClient,
 				int64(offchainConfig.DestFinalityDepth),
 			),
+			gasPriceEstimator: gasPriceEstimator,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -306,7 +314,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 	tokenDecimals map[common.Address]uint8,
-) (sourceGasPriceUSD contractutil.GasPrice, tokenPricesUSD map[common.Address]*big.Int, err error) {
+) (sourceGasPriceUSD priceEstimator.GasPrice, tokenPricesUSD map[common.Address]*big.Int, err error) {
 	tokensWithDecimal := make([]common.Address, 0, len(tokenDecimals))
 	for token := range tokenDecimals {
 		tokensWithDecimal = append(tokensWithDecimal, token)
@@ -319,20 +327,20 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 
 	rawTokenPricesUSD, err := r.config.priceGetter.TokenPricesUSD(ctx, queryTokens)
 	if err != nil {
-		return contractutil.GasPrice{}, nil, err
+		return nil, nil, err
 	}
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
 	// make sure that we got prices for all the tokens of our query
 	for _, token := range queryTokens {
 		if rawTokenPricesUSD[token] == nil {
-			return contractutil.GasPrice{}, nil, errors.Errorf("missing token price: %+v", token)
+			return nil, nil, errors.Errorf("missing token price: %+v", token)
 		}
 	}
 
 	sourceNativePriceUSD, exists := rawTokenPricesUSD[r.config.sourceNative]
 	if !exists {
-		return contractutil.GasPrice{}, nil, fmt.Errorf("missing source native (%s) price", r.config.sourceNative)
+		return nil, nil, fmt.Errorf("missing source native (%s) price", r.config.sourceNative)
 	}
 
 	tokenPricesUSD = make(map[common.Address]*big.Int, len(rawTokenPricesUSD))
@@ -346,40 +354,16 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], decimals)
 	}
 
-	// Observe a source chain price for pricing.
-	sourceGasPriceWei, _, err := r.config.sourceFeeEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
+	sourceGasPrice, err := r.gasPriceEstimator.GetGasPrice(ctx)
 	if err != nil {
-		return contractutil.GasPrice{}, nil, err
+		return nil, nil, err
 	}
-	// Use legacy if no dynamic is available.
-	gasPrice := sourceGasPriceWei.Legacy.ToInt()
-	if sourceGasPriceWei.DynamicFeeCap != nil {
-		gasPrice = sourceGasPriceWei.DynamicFeeCap.ToInt()
-	}
-	if gasPrice == nil {
-		return contractutil.GasPrice{}, nil, fmt.Errorf("missing gas price %+v", sourceGasPriceWei)
+	sourceGasPriceUSD, err = r.gasPriceEstimator.DenoteInUSD(sourceGasPrice, sourceNativePriceUSD)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	sourceNativeGasPriceUSD := ccipcalc.CalculateUsdPerUnitGas(gasPrice, sourceNativePriceUSD)
-	sourceGasPriceUSD = contractutil.GasPrice{
-		DAGasPrice:     big.NewInt(0),
-		NativeGasPrice: sourceNativeGasPriceUSD,
-	}
-
-	// If l1 oracle exists, l1 gas price is a price component of overall tx, need to fetch and encode l1 gas price.
-	if l1Oracle := r.config.sourceFeeEstimator.L1Oracle(); l1Oracle != nil {
-		l1GasPriceWei, err := l1Oracle.GasPrice(ctx)
-		if err != nil {
-			return contractutil.GasPrice{}, nil, err
-		}
-
-		if l1GasPrice := l1GasPriceWei.ToInt(); l1GasPrice.Cmp(big.NewInt(0)) > 0 {
-			// This assumes l1GasPrice is priced using the same native token as l2 native
-			sourceGasPriceUSD.DAGasPrice = ccipcalc.CalculateUsdPerUnitGas(l1GasPrice, sourceNativePriceUSD)
-		}
-	}
-
-	lggr.Infow("Observing gas price", "observedGasPriceWei", gasPrice, "observedGasPriceUSD", sourceGasPriceUSD)
+	lggr.Infow("Observing gas price", "observedGasPriceWei", sourceGasPrice, "observedGasPriceUSD", sourceGasPriceUSD)
 	lggr.Infow("Observing token prices", "tokenPrices", tokenPricesUSD, "sourceNativePriceUSD", sourceNativePriceUSD)
 	return sourceGasPriceUSD, tokenPricesUSD, nil
 }
@@ -394,7 +378,7 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 
 // Gets the latest token price updates based on logs within the heartbeat
 // The updates returned by this function are guaranteed to not contain nil values.
-func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, checkInflight bool) (map[common.Address]tokenPriceUpdate, error) {
+func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, checkInflight bool) (map[common.Address]update, error) {
 	tokenPriceUpdates, err := r.config.destReader.GetTokenPriceUpdatesCreatedAfter(
 		ctx,
 		r.destPriceRegistry.Address(),
@@ -405,13 +389,13 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 		return nil, err
 	}
 
-	latestUpdates := make(map[common.Address]tokenPriceUpdate)
+	latestUpdates := make(map[common.Address]update)
 	for _, tokenUpdate := range tokenPriceUpdates {
 		priceUpdate := tokenUpdate.Data
 		// Ordered by ascending timestamps
 		timestamp := time.Unix(priceUpdate.Timestamp.Int64(), 0)
 		if priceUpdate.Value != nil && !timestamp.Before(latestUpdates[priceUpdate.Token].timestamp) {
-			latestUpdates[priceUpdate.Token] = tokenPriceUpdate{
+			latestUpdates[priceUpdate.Token] = update{
 				timestamp: timestamp,
 				value:     priceUpdate.Value,
 			}
@@ -435,14 +419,14 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 }
 
 // Gets the latest gas price updates based on logs within the heartbeat
-func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasUpdate gasPriceUpdate, error error) {
+func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasUpdate update, error error) {
 	if checkInflight {
 		latestInflightGasPriceUpdate := r.inflightReports.getLatestInflightGasPriceUpdate()
 		if latestInflightGasPriceUpdate != nil && latestInflightGasPriceUpdate.timestamp.After(gasUpdate.timestamp) {
 			gasUpdate = *latestInflightGasPriceUpdate
 		}
 
-		if gasUpdate.value.NotNil() {
+		if gasUpdate.value != nil {
 			r.lggr.Infow("Latest gas price from inflight", "gasPriceUpdateVal", gasUpdate.value, "gasPriceUpdateTs", gasUpdate.timestamp)
 			// Gas price can fluctuate frequently, many updates may be in flight.
 			// If there is gas price update inflight, use it as source of truth, no need to check onchain.
@@ -459,21 +443,21 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 		0,
 	)
 	if err != nil {
-		return gasPriceUpdate{}, err
+		return update{}, err
 	}
 
 	for _, priceUpdate := range gasPriceUpdates {
 		// Ordered by ascending timestamps
 		timestamp := time.Unix(priceUpdate.Data.Timestamp.Int64(), 0)
 		if !timestamp.Before(gasUpdate.timestamp) {
-			gasUpdate = gasPriceUpdate{
+			gasUpdate = update{
 				timestamp: timestamp,
-				value:     contractutil.ParseEncodedGasPrice(priceUpdate.Data.Value),
+				value:     priceUpdate.Data.Value,
 			}
 		}
 	}
 
-	if gasUpdate.value.NotNil() {
+	if gasUpdate.value != nil {
 		r.lggr.Infow("Latest gas price from log poller", "gasPriceUpdateVal", gasUpdate.value, "gasPriceUpdateTs", gasUpdate.timestamp)
 	}
 
@@ -504,7 +488,10 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		return false, nil, err
 	}
 
-	priceUpdates := r.calculatePriceUpdates(parsableObservations, latestGasPrice, latestTokenPrices)
+	priceUpdates, err := r.calculatePriceUpdates(parsableObservations, latestGasPrice, latestTokenPrices)
+	if err != nil {
+		return false, nil, err
+	}
 	// If there are no fee updates and the interval is zero there is no report to produce.
 	if len(priceUpdates.TokenPriceUpdates) == 0 && priceUpdates.DestChainSelector == 0 && agreedInterval.Min == 0 {
 		lggr.Infow("Empty report, skipping")
@@ -600,12 +587,12 @@ func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f 
 
 // Note priceUpdates must be deterministic.
 // The provided latestTokenPrices should not contain nil values.
-func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObservation, latestGasPrice gasPriceUpdate, latestTokenPrices map[common.Address]tokenPriceUpdate) commit_store.InternalPriceUpdates {
+func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObservation, latestGasPrice update, latestTokenPrices map[common.Address]update) (commit_store.InternalPriceUpdates, error) {
 	priceObservations := make(map[common.Address][]*big.Int)
-	var sourceGasObservations []contractutil.GasPrice
+	var sourceGasObservations []priceEstimator.GasPrice
 
 	for _, obs := range observations {
-		if obs.SourceGasPriceUSD.NotNil() {
+		if obs.SourceGasPriceUSD != nil {
 			// Add only non-nil source gas price
 			sourceGasObservations = append(sourceGasObservations, obs.SourceGasPriceUSD)
 		}
@@ -648,32 +635,24 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 		return bytes.Compare(tokenPriceUpdates[i].SourceToken[:], tokenPriceUpdates[j].SourceToken[:]) == -1
 	})
 
-	newGasPrice := contractutil.GasPrice{}
+	newGasPrice := big.NewInt(0)
 	destChainSelector := uint64(0)
 
 	if len(sourceGasObservations) > r.F {
-		var daGasPrices []*big.Int
-		var nativeGasPrices []*big.Int
-		for _, o := range sourceGasObservations {
-			daGasPrices = append(daGasPrices, o.DAGasPrice)
-			nativeGasPrices = append(nativeGasPrices, o.NativeGasPrice)
+		newGasPrice, err := r.gasPriceEstimator.Median(sourceGasObservations) // Compute the median price
+		if err != nil {
+			return commit_store.InternalPriceUpdates{}, err
 		}
-		newGasPrice = contractutil.GasPrice{
-			DAGasPrice:     ccipcalc.BigIntMedian(daGasPrices),     // Compute the median data availability gas price
-			NativeGasPrice: ccipcalc.BigIntMedian(nativeGasPrices), // Compute the median nativ gas price
-		}
-
 		destChainSelector = r.config.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
 
-		if latestGasPrice.value.NotNil() {
+		if latestGasPrice.value != nil {
 			gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
-			gasPriceNotChanged := !ccipcalc.Deviates(newGasPrice.DAGasPrice, latestGasPrice.value.DAGasPrice, int64(r.offchainConfig.DAGasPriceDeviationPPB)) && !ccipcalc.Deviates(newGasPrice.NativeGasPrice, latestGasPrice.value.NativeGasPrice, int64(r.offchainConfig.NativeGasPriceDeviationPPB))
-
+			gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value)
+			if err != nil {
+				return commit_store.InternalPriceUpdates{}, err
+			}
 			if gasPriceUpdatedRecently && gasPriceNotChanged {
-				newGasPrice = contractutil.GasPrice{
-					DAGasPrice:     big.NewInt(0),
-					NativeGasPrice: big.NewInt(0),
-				}
+				newGasPrice = big.NewInt(0)
 				destChainSelector = uint64(0)
 			}
 		}
@@ -682,8 +661,8 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 	return commit_store.InternalPriceUpdates{
 		TokenPriceUpdates: tokenPriceUpdates,
 		DestChainSelector: destChainSelector,
-		UsdPerUnitGas:     newGasPrice.Encode(), // we MUST pass zero to skip the update (never nil)
-	}
+		UsdPerUnitGas:     newGasPrice, // we MUST pass zero to skip the update (never nil)
+	}, nil
 }
 
 // buildReport assumes there is at least one message in reqs.
@@ -862,12 +841,16 @@ func (r *CommitReportingPlugin) isStaleMerkleRoot(ctx context.Context, lggr logg
 func (r *CommitReportingPlugin) isStaleGasPrice(ctx context.Context, lggr logger.Logger, priceUpdates commit_store.InternalPriceUpdates, checkInflight bool) bool {
 	latestGasPrice, err := r.getLatestGasPriceUpdate(ctx, time.Now(), checkInflight)
 	if err != nil {
+		lggr.Errorw("Report is stale because getLatestGasPriceUpdate failed", "errorMsg", err.Error())
 		return true
 	}
 
-	if latestGasPrice.value.NotNil() {
-		newGasPrice := contractutil.ParseEncodedGasPrice(priceUpdates.UsdPerUnitGas)
-		gasPriceNotChanged := !ccipcalc.Deviates(newGasPrice.DAGasPrice, latestGasPrice.value.DAGasPrice, int64(r.offchainConfig.DAGasPriceDeviationPPB)) && !ccipcalc.Deviates(newGasPrice.NativeGasPrice, latestGasPrice.value.NativeGasPrice, int64(r.offchainConfig.NativeGasPriceDeviationPPB))
+	if latestGasPrice.value != nil {
+		gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(priceUpdates.UsdPerUnitGas, latestGasPrice.value)
+		if err != nil {
+			lggr.Errorw("Report is stale because deviation check failed", "errorMsg", err.Error())
+			return true
+		}
 
 		if gasPriceNotChanged {
 			lggr.Infow("Report is stale because of gas price",

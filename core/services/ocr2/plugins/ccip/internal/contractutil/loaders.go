@@ -1,8 +1,6 @@
 package contractutil
 
 import (
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -113,60 +111,20 @@ func DecodeCommitStoreOffchainConfig(version string, offchainConfig []byte) (cci
 		}
 
 		return ccipconfig.CommitOffchainConfig{
-			SourceFinalityDepth:        offchainConfigV1.SourceFinalityDepth,
-			DestFinalityDepth:          offchainConfigV1.DestFinalityDepth,
-			GasPriceHeartBeat:          offchainConfigV1.FeeUpdateHeartBeat,
-			DAGasPriceDeviationPPB:     offchainConfigV1.FeeUpdateDeviationPPB,
-			NativeGasPriceDeviationPPB: offchainConfigV1.FeeUpdateDeviationPPB,
-			TokenPriceHeartBeat:        offchainConfigV1.FeeUpdateHeartBeat,
-			TokenPriceDeviationPPB:     offchainConfigV1.FeeUpdateDeviationPPB,
-			MaxGasPrice:                offchainConfigV1.MaxGasPrice,
-			InflightCacheExpiry:        offchainConfigV1.InflightCacheExpiry,
+			SourceFinalityDepth:      offchainConfigV1.SourceFinalityDepth,
+			DestFinalityDepth:        offchainConfigV1.DestFinalityDepth,
+			GasPriceHeartBeat:        offchainConfigV1.FeeUpdateHeartBeat,
+			DAGasPriceDeviationPPB:   offchainConfigV1.FeeUpdateDeviationPPB,
+			ExecGasPriceDeviationPPB: offchainConfigV1.FeeUpdateDeviationPPB,
+			TokenPriceHeartBeat:      offchainConfigV1.FeeUpdateHeartBeat,
+			TokenPriceDeviationPPB:   offchainConfigV1.FeeUpdateDeviationPPB,
+			MaxGasPrice:              offchainConfigV1.MaxGasPrice,
+			InflightCacheExpiry:      offchainConfigV1.InflightCacheExpiry,
 		}, nil
 	case "1.2.0":
 		offchainConfig, err := ccipconfig.DecodeOffchainConfig[ccipconfig.CommitOffchainConfig](offchainConfig)
 		return offchainConfig, err
 	default:
 		return ccipconfig.CommitOffchainConfig{}, errors.Errorf("Invalid commitStore version: %s", version)
-	}
-}
-
-type GasPrice struct {
-	DAGasPrice     *big.Int `json:"daGasPrice"`
-	NativeGasPrice *big.Int `json:"nativeGasPrice"`
-}
-
-func (g GasPrice) Encode() *big.Int {
-	if g.IsNil() {
-		return nil
-	}
-	daGasPrice := big.NewInt(0)
-	if g.DAGasPrice != nil {
-		daGasPrice = new(big.Int).Lsh(g.DAGasPrice, GasPriceEncodingLength)
-	}
-	return new(big.Int).Add(daGasPrice, g.NativeGasPrice)
-}
-
-// Using NativeGasPrice as
-func (g GasPrice) IsNil() bool {
-	return g.NativeGasPrice == nil
-}
-
-func (g GasPrice) NotNil() bool {
-	return g.NativeGasPrice != nil
-}
-
-func ParseEncodedGasPrice(gasPrice *big.Int) GasPrice {
-	if gasPrice == nil {
-		return GasPrice{}
-	}
-
-	daGasPrice := new(big.Int).Rsh(gasPrice, GasPriceEncodingLength)
-
-	l1Start := new(big.Int).Lsh(big.NewInt(1), GasPriceEncodingLength)
-	nativeGasPrice := new(big.Int).Mod(gasPrice, l1Start)
-	return GasPrice{
-		DAGasPrice:     daGasPrice,
-		NativeGasPrice: nativeGasPrice,
 	}
 }
