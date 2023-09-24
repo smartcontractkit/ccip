@@ -20,10 +20,15 @@ const (
 	DAGasPriceEncodingLength = 112 // Each gas price takes up at most GasPriceEncodingLength number of bits
 )
 
-type MsgCostConfig struct {
-	daOverheadGas int64
-	gasPerDAByte  int64
-	daMultiplier  int64
+type GasPriceDeviationOptions struct {
+	DADeviationPPB   int64
+	ExecDeviationPPB int64
+}
+
+type MsgCostOptions struct {
+	DAOverheadGas int64
+	GasPerDAByte  int64
+	DAMultiplier  int64
 }
 
 // GasPrice represents gas price as a single big.Int, same as gas price representation onchain.
@@ -37,8 +42,10 @@ type GasPriceEstimator interface {
 	GetGasPrice(context.Context) (GasPrice, error)
 	DenoteInUSD(GasPrice, *big.Int) (GasPrice, error)
 	Median([]GasPrice) (GasPrice, error)
-	Deviates(GasPrice, GasPrice) (bool, error)
-	EstimateMsgCostUSD(GasPrice, *big.Int, internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, MsgCostConfig) (*big.Int, error)
+	Deviates(GasPrice, GasPrice, GasPriceDeviationOptions) (bool, error)
+
+	// EstimateMsgCostUSD calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
+	EstimateMsgCostUSD(GasPrice, *big.Int, internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, MsgCostOptions) (*big.Int, error)
 	String(GasPrice) string
 }
 
@@ -46,25 +53,19 @@ func NewGasPriceEstimator(
 	commitStoreVersion string,
 	estimator gas.EvmFeeEstimator,
 	maxExecGasPrice *big.Int,
-	execDeviationPPB *int64,
-	daDeviationPPB *int64,
 ) (GasPriceEstimator, error) {
 	switch commitStoreVersion {
 	case "1.0.0", "1.1.0":
 		return ExecGasPriceEstimator{
-			estimator:    estimator,
-			maxGasPrice:  maxExecGasPrice,
-			deviationPPB: execDeviationPPB,
+			estimator:   estimator,
+			maxGasPrice: maxExecGasPrice,
 		}, nil
 	case "1.2.0":
 		return DAGasPriceEstimator{
 			execEstimator: ExecGasPriceEstimator{
-				estimator:    estimator,
-				maxGasPrice:  maxExecGasPrice,
-				deviationPPB: execDeviationPPB,
+				estimator:   estimator,
+				maxGasPrice: maxExecGasPrice,
 			},
-			daDeviationPPB:      daDeviationPPB,
-			execDeviationPPB:    execDeviationPPB,
 			priceEncodingLength: DAGasPriceEncodingLength,
 		}, nil
 	default:

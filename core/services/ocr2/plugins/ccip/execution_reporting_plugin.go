@@ -18,7 +18,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -38,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -55,12 +55,6 @@ var (
 	_ types.ReportingPlugin        = &ExecutionReportingPlugin{}
 )
 
-type FeeEstimationConfig struct {
-	daOverheadGas uint32
-	gasPerDAByte  uint16
-	daMultiplier  uint16
-}
-
 type ExecutionPluginConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
@@ -69,14 +63,15 @@ type ExecutionPluginConfig struct {
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStore              commit_store.CommitStoreInterface
+	commitStoreVersion       string
 	sourcePriceRegistry      price_registry.PriceRegistryInterface
 	sourceWrappedNativeToken common.Address
 	destClient               evmclient.Client
 	sourceClient             evmclient.Client
 	destGasEstimator         gas.EvmFeeEstimator
 	leafHasher               hashlib.LeafHasherInterface[[32]byte]
-	feeEstConfig             FeeEstimationConfig
 	tokenDataProviders       map[common.Address]tokendata.Reader
+	msgCostOpt               prices.MsgCostOptions
 }
 
 type ExecutionReportingPlugin struct {
@@ -92,6 +87,7 @@ type ExecutionReportingPlugin struct {
 	cachedSourceFeeTokens  cache.AutoSync[[]common.Address]
 	cachedDestTokens       cache.AutoSync[cache.CachedTokens]
 	customTokenPoolFactory func(ctx context.Context, poolAddress common.Address, bind bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error)
+	gasPriceEstimator      prices.GasPriceEstimator
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -142,6 +138,15 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		"offchainConfig", offchainConfig,
 		"onchainConfig", onchainConfig)
 
+	gasPriceEstimator, err := prices.NewGasPriceEstimator(
+		rf.config.commitStoreVersion,
+		rf.config.destGasEstimator,
+		big.NewInt(int64(offchainConfig.MaxGasPrice)),
+	)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+
 	return &ExecutionReportingPlugin{
 			config:                rf.config,
 			F:                     config.F,
@@ -157,6 +162,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			customTokenPoolFactory: func(ctx context.Context, poolAddress common.Address, contractBackend bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
 				return custom_token_pool.NewCustomTokenPool(poolAddress, contractBackend)
 			},
+			gasPriceEstimator: gasPriceEstimator,
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -284,7 +290,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	})
-	getDestGasPrice := cache.LazyFetch(func() (contractutil.GasPrice, error) {
+	getDestGasPrice := cache.LazyFetch(func() (prices.GasPrice, error) {
 		return r.estimateDestinationGasPrice(ctx)
 	})
 
@@ -428,37 +434,13 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 	return res, nil
 }
 
-func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (contractutil.GasPrice, error) {
-	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
+func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (prices.GasPrice, error) {
+	destGasPrice, err := r.gasPriceEstimator.GetGasPrice(ctx)
 	if err != nil {
-		return contractutil.GasPrice{}, errors.Wrap(err, "could not estimate destination gas price")
-	}
-	destNativeGasPrice := destGasPriceWei.Legacy.ToInt()
-	if destGasPriceWei.DynamicFeeCap != nil {
-		destNativeGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
-	}
-	if destNativeGasPrice == nil {
-		return contractutil.GasPrice{}, fmt.Errorf("missing gas price %+v", destGasPriceWei)
+		return nil, err
 	}
 
-	gasPrice := contractutil.GasPrice{
-		DAGasPrice:     big.NewInt(0),
-		NativeGasPrice: destNativeGasPrice,
-	}
-
-	// If l1 oracle exists, l1 gas price is a price component of overall tx.
-	if l1Oracle := r.config.destGasEstimator.L1Oracle(); l1Oracle != nil {
-		l1GasPriceWei, err := l1Oracle.GasPrice(ctx)
-		if err != nil {
-			return contractutil.GasPrice{}, err
-		}
-
-		if l1GasPrice := l1GasPriceWei.ToInt(); l1GasPrice.Cmp(big.NewInt(0)) > 0 {
-			gasPrice.DAGasPrice = l1GasPrice
-		}
-	}
-
-	return gasPrice, nil
+	return destGasPrice, nil
 }
 
 func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) (map[common.Address]common.Address, []common.Address, error) {
@@ -508,7 +490,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	aggregateTokenLimit *big.Int,
 	sourceTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
-	gasPriceEstimate cache.LazyFunction[contractutil.GasPrice],
+	gasPriceEstimate cache.LazyFunction[prices.GasPrice],
 	sourceToDestToken map[common.Address]common.Address,
 	destTokenPoolRateLimits map[common.Address]*big.Int,
 ) (executableMessages []ObservedMessage) {
@@ -593,7 +575,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		execCostUsd := computeMsgCost(msg, r.config.feeEstConfig, gasPriceValue, dstWrappedNativePrice)
+		execCostUsd, err := r.gasPriceEstimator.EstimateMsgCostUSD(gasPriceValue, dstWrappedNativePrice, msg, r.config.msgCostOpt)
+		if err != nil {
+			msgLggr.Errorw("failed to estimate message cost USD", "err", err)
+			return []ObservedMessage{}
+		}
+
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),

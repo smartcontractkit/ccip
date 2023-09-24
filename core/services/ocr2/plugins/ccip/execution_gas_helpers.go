@@ -4,10 +4,6 @@ import (
 	"math"
 	"math/big"
 	"time"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 )
 
 const (
@@ -68,45 +64,6 @@ func maxGasOverHeadGas(numMsgs, dataLength, numTokens int) uint64 {
 	merkleGasShare := uint64(merkleProofBytes * CALLDATA_GAS_PER_BYTE)
 
 	return overheadGas(dataLength, numTokens) + merkleGasShare
-}
-
-// computeExecCost calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
-func computeMsgCost(msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, config FeeEstimationConfig, gasPrice contractutil.GasPrice, wrappedNativePrice *big.Int) *big.Int {
-	execCost := computeExecCost(msg.GasLimit, gasPrice.NativeGasPrice, wrappedNativePrice)
-
-	// If there is data availability price component, then include data availability cost in fee estimation
-	if gasPrice.DAGasPrice.Cmp(big.NewInt(0)) > 0 {
-		daGasCost := computeDACost(msg, config, gasPrice.DAGasPrice, wrappedNativePrice)
-		execCost = new(big.Int).Add(execCost, daGasCost)
-	}
-	return execCost
-}
-
-func computeDACost(msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, config FeeEstimationConfig, daGasPrice, wrappedNativePrice *big.Int) *big.Int {
-	daOverheadGas := int64(config.daOverheadGas)
-	gasPerDAByte := int64(config.gasPerDAByte)
-	daMultiplier := int64(config.daMultiplier)
-
-	var sourceTokenDataLen int
-	for _, tokenData := range msg.SourceTokenData {
-		sourceTokenDataLen += len(tokenData)
-	}
-
-	dataLen := EVM_MESSAGE_FIXED_BYTES + len(msg.Data) + len(msg.TokenAmounts)*EVM_MESSAGE_BYTES_PER_TOKEN + sourceTokenDataLen
-	dataGas := big.NewInt(int64(dataLen)*gasPerDAByte + daOverheadGas)
-
-	dataGasEstimate := new(big.Int).Mul(dataGas, daGasPrice)
-	dataGasEstimate = new(big.Int).Div(new(big.Int).Mul(dataGasEstimate, big.NewInt(daMultiplier)), big.NewInt(DA_MULTIPLIER_BASE))
-
-	return ccipcalc.CalculateUsdPerUnitGas(dataGasEstimate, wrappedNativePrice)
-}
-
-// computeExecCost calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
-func computeExecCost(gasLimit *big.Int, execGasPrice, wrappedNativePrice *big.Int) *big.Int {
-	execGasEstimate := new(big.Int).Add(big.NewInt(FEE_BOOSTING_OVERHEAD_GAS), gasLimit)
-	execGasEstimate.Mul(execGasEstimate, execGasPrice)
-
-	return ccipcalc.CalculateUsdPerUnitGas(execGasEstimate, wrappedNativePrice)
 }
 
 // waitBoostedFee boosts the given fee according to the time passed since the msg was sent.

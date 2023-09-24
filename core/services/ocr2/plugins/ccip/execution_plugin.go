@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
@@ -89,6 +90,14 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
+	typeAndVersion, err := commitStore.TypeAndVersion(&bind.CallOpts{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get commitStore type and version")
+	}
+	_, commitStoreVersion, err := ccipconfig.ParseTypeAndVersion(typeAndVersion)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse commitStore type and version")
+	}
 	onRamp, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp")
@@ -131,18 +140,19 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 			onRamp:                   onRamp,
 			offRamp:                  offRamp,
 			commitStore:              commitStore,
+			commitStoreVersion:       commitStoreVersion,
 			sourcePriceRegistry:      sourcePriceRegistry,
 			sourceWrappedNativeToken: sourceWrappedNative,
 			destClient:               destChain.Client(),
 			sourceClient:             sourceChain.Client(),
 			destGasEstimator:         destChain.GasEstimator(),
 			leafHasher:               hashlib.NewLeafHasher(offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRamp.Address(), hashlib.NewKeccakCtx()),
-			feeEstConfig: FeeEstimationConfig{
-				daOverheadGas: dynamicOnRampConfig.DestDataAvailabilityOverheadGas,
-				gasPerDAByte:  dynamicOnRampConfig.DestGasPerDataAvailabilityByte,
-				daMultiplier:  dynamicOnRampConfig.DestDataAvailabilityMultiplier,
+			tokenDataProviders:       tokenDataProviders,
+			msgCostOpt: prices.MsgCostOptions{
+				DAOverheadGas: int64(dynamicOnRampConfig.DestDataAvailabilityOverheadGas),
+				GasPerDAByte:  int64(dynamicOnRampConfig.DestGasPerDataAvailabilityByte),
+				DAMultiplier:  int64(dynamicOnRampConfig.DestDataAvailabilityMultiplier),
 			},
-			tokenDataProviders: tokenDataProviders,
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(utils.ZeroAddress, qopts...)

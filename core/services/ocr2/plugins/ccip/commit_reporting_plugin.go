@@ -65,6 +65,7 @@ type CommitPluginConfig struct {
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	onRampAddress            common.Address
 	commitStore              commit_store.CommitStoreInterface
+	commitStoreVersion       string
 	priceGetter              pricegetter.PriceGetter
 	sourceChainSelector      uint64
 	sourceNative             common.Address
@@ -72,19 +73,19 @@ type CommitPluginConfig struct {
 	sourceClient, destClient evmclient.Client
 	leafHasher               hashlib.LeafHasherInterface[[32]byte]
 	checkFinalityTags        bool
-	commitStoreVersion       string
 }
 
 type CommitReportingPlugin struct {
-	config             CommitPluginConfig
-	F                  int
-	lggr               logger.Logger
-	inflightReports    *inflightCommitReportsContainer
-	destPriceRegistry  price_registry.PriceRegistryInterface
-	offchainConfig     ccipconfig.CommitOffchainConfig
-	onchainConfig      ccipconfig.CommitOnchainConfig
-	tokenDecimalsCache cache.AutoSync[map[common.Address]uint8]
-	gasPriceEstimator  prices.GasPriceEstimator
+	config               CommitPluginConfig
+	F                    int
+	lggr                 logger.Logger
+	inflightReports      *inflightCommitReportsContainer
+	destPriceRegistry    price_registry.PriceRegistryInterface
+	offchainConfig       ccipconfig.CommitOffchainConfig
+	onchainConfig        ccipconfig.CommitOnchainConfig
+	tokenDecimalsCache   cache.AutoSync[map[common.Address]uint8]
+	gasPriceEstimator    prices.GasPriceEstimator
+	gasPriceDeviationOpt prices.GasPriceDeviationOptions
 }
 
 type CommitReportingPluginFactory struct {
@@ -132,8 +133,6 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		rf.config.commitStoreVersion,
 		rf.config.sourceFeeEstimator,
 		big.NewInt(int64(offchainConfig.MaxGasPrice)),
-		int64(offchainConfig.ExecGasPriceDeviationPPB),
-		int64(offchainConfig.DAGasPriceDeviationPPB),
 	)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
@@ -156,6 +155,10 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				int64(offchainConfig.DestFinalityDepth),
 			),
 			gasPriceEstimator: gasPriceEstimator,
+			gasPriceDeviationOpt: prices.GasPriceDeviationOptions{
+				DADeviationPPB:   int64(offchainConfig.DAGasPriceDeviationPPB),
+				ExecDeviationPPB: int64(offchainConfig.ExecGasPriceDeviationPPB),
+			},
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -647,7 +650,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 
 		if latestGasPrice.value != nil {
 			gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
-			gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value)
+			gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value, r.gasPriceDeviationOpt)
 			if err != nil {
 				return commit_store.InternalPriceUpdates{}, err
 			}
@@ -841,14 +844,14 @@ func (r *CommitReportingPlugin) isStaleMerkleRoot(ctx context.Context, lggr logg
 func (r *CommitReportingPlugin) isStaleGasPrice(ctx context.Context, lggr logger.Logger, priceUpdates commit_store.InternalPriceUpdates, checkInflight bool) bool {
 	latestGasPrice, err := r.getLatestGasPriceUpdate(ctx, time.Now(), checkInflight)
 	if err != nil {
-		lggr.Errorw("Report is stale because getLatestGasPriceUpdate failed", "errorMsg", err.Error())
+		lggr.Errorw("Report is stale because getLatestGasPriceUpdate failed", "err", err)
 		return true
 	}
 
 	if latestGasPrice.value != nil {
-		gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(priceUpdates.UsdPerUnitGas, latestGasPrice.value)
+		gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(priceUpdates.UsdPerUnitGas, latestGasPrice.value, r.gasPriceDeviationOpt)
 		if err != nil {
-			lggr.Errorw("Report is stale because deviation check failed", "errorMsg", err.Error())
+			lggr.Errorw("Report is stale because deviation check failed", "err", err)
 			return true
 		}
 

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/pkg/errors"
-
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
@@ -14,9 +12,8 @@ import (
 )
 
 type ExecGasPriceEstimator struct {
-	estimator    gas.EvmFeeEstimator
-	maxGasPrice  *big.Int
-	deviationPPB *int64
+	estimator   gas.EvmFeeEstimator
+	maxGasPrice *big.Int
 }
 
 func (g ExecGasPriceEstimator) GetGasPrice(ctx context.Context) (GasPrice, error) {
@@ -51,15 +48,11 @@ func (g ExecGasPriceEstimator) Median(gasPrices []GasPrice) (GasPrice, error) {
 	return ccipcalc.BigIntMedian(prices), nil
 }
 
-func (g ExecGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice) (bool, error) {
-	if g.deviationPPB == nil {
-		return false, errors.New("missing gas price deviation ppb")
-	}
-	return ccipcalc.Deviates(p1, p2, *g.deviationPPB), nil
+func (g ExecGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice, opt GasPriceDeviationOptions) (bool, error) {
+	return ccipcalc.Deviates(p1, p2, opt.ExecDeviationPPB), nil
 }
 
-// EstimateMsgCostUSD calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
-func (g ExecGasPriceEstimator) EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, _ MsgCostConfig) (*big.Int, error) {
+func (g ExecGasPriceEstimator) EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, _ MsgCostOptions) (*big.Int, error) {
 	execGasAmount := new(big.Int).Add(big.NewInt(FeeBoostingOverheadGas), msg.GasLimit)
 	execGasAmount = new(big.Int).Add(execGasAmount, new(big.Int).Mul(big.NewInt(int64(len(msg.Data))), big.NewInt(ExecGasPerPayloadByte)))
 	execGasAmount = new(big.Int).Add(execGasAmount, new(big.Int).Mul(big.NewInt(int64(len(msg.TokenAmounts))), big.NewInt(ExecGasPerToken)))

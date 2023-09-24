@@ -69,7 +69,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	}
 	typeAndVersion, err := commitStore.TypeAndVersion(&bind.CallOpts{})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get type and version")
+		return nil, errors.Wrap(err, "failed to get commitStore type and version")
 	}
 	_, commitStoreVersion, err := ccipconfig.ParseTypeAndVersion(typeAndVersion)
 	if err != nil {
@@ -129,9 +129,9 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 			destClient:          destChain.Client(),
 			sourceClient:        sourceChain.Client(),
 			commitStore:         commitStore,
+			commitStoreVersion:  commitStoreVersion,
 			leafHasher:          leafHasher,
 			checkFinalityTags:   sourceChain.Config().EVM().FinalityTagEnabled(),
-			commitStoreVersion:  commitStoreVersion,
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(utils.ZeroAddress, qopts...)
