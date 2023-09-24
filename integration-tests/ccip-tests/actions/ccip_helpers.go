@@ -1899,12 +1899,15 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		inflightExpiry = models.MustMakeDuration(InflightExpirySimulated)
 	}
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2Config(commitNodes, ccipConfig.CommitOffchainConfig{
-		SourceFinalityDepth:   1,
-		DestFinalityDepth:     1,
-		FeeUpdateHeartBeat:    models.MustMakeDuration(24 * time.Hour),
-		FeeUpdateDeviationPPB: 5e7,
-		MaxGasPrice:           200e9,
-		InflightCacheExpiry:   inflightExpiry,
+		SourceFinalityDepth:      1,
+		DestFinalityDepth:        1,
+		GasPriceHeartBeat:        models.MustMakeDuration(24 * time.Hour),
+		DAGasPriceDeviationPPB:   5e7,
+		ExecGasPriceDeviationPPB: 5e7,
+		TokenPriceHeartBeat:      models.MustMakeDuration(24 * time.Hour),
+		TokenPriceDeviationPPB:   5e7,
+		MaxGasPrice:              200e9,
+		InflightCacheExpiry:      inflightExpiry,
 	}, ccipConfig.CommitOnchainConfig{
 		PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
 	})

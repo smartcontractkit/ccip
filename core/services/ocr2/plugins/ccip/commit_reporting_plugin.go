@@ -29,7 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/priceEstimator"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -84,7 +84,7 @@ type CommitReportingPlugin struct {
 	offchainConfig     ccipconfig.CommitOffchainConfig
 	onchainConfig      ccipconfig.CommitOnchainConfig
 	tokenDecimalsCache cache.AutoSync[map[common.Address]uint8]
-	gasPriceEstimator  priceEstimator.GasPriceEstimator
+	gasPriceEstimator  prices.GasPriceEstimator
 }
 
 type CommitReportingPluginFactory struct {
@@ -128,7 +128,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		"onchainConfig", onchainConfig,
 	)
 
-	gasPriceEstimator, err := priceEstimator.NewGasPriceEstimator(
+	gasPriceEstimator, err := prices.NewGasPriceEstimator(
 		rf.config.commitStoreVersion,
 		rf.config.sourceFeeEstimator,
 		big.NewInt(int64(offchainConfig.MaxGasPrice)),
@@ -314,7 +314,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
 	tokenDecimals map[common.Address]uint8,
-) (sourceGasPriceUSD priceEstimator.GasPrice, tokenPricesUSD map[common.Address]*big.Int, err error) {
+) (sourceGasPriceUSD prices.GasPrice, tokenPricesUSD map[common.Address]*big.Int, err error) {
 	tokensWithDecimal := make([]common.Address, 0, len(tokenDecimals))
 	for token := range tokenDecimals {
 		tokensWithDecimal = append(tokensWithDecimal, token)
@@ -589,7 +589,7 @@ func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f 
 // The provided latestTokenPrices should not contain nil values.
 func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObservation, latestGasPrice update, latestTokenPrices map[common.Address]update) (commit_store.InternalPriceUpdates, error) {
 	priceObservations := make(map[common.Address][]*big.Int)
-	var sourceGasObservations []priceEstimator.GasPrice
+	var sourceGasObservations []prices.GasPrice
 
 	for _, obs := range observations {
 		if obs.SourceGasPriceUSD != nil {

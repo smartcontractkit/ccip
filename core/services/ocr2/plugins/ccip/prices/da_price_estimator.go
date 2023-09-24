@@ -1,9 +1,11 @@
-package priceEstimator
+package prices
 
 import (
 	"context"
 	"fmt"
 	"math/big"
+
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -11,8 +13,8 @@ import (
 
 type DAGasPriceEstimator struct {
 	execEstimator       ExecGasPriceEstimator
-	daDeviationPPB      int64
-	execDeviationPPB    int64
+	daDeviationPPB      *int64
+	execDeviationPPB    *int64
 	priceEncodingLength uint
 }
 
@@ -87,6 +89,10 @@ func (g DAGasPriceEstimator) Median(gasPrices []GasPrice) (GasPrice, error) {
 }
 
 func (g DAGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice) (bool, error) {
+	if g.daDeviationPPB == nil || g.execDeviationPPB == nil {
+		return false, errors.New("missing gas price deviation ppb")
+	}
+
 	p1DAGasPrice, p1ExecGasPrice, err := g.parseEncodedGasPrice(p1)
 	if err != nil {
 		return false, err
@@ -96,7 +102,7 @@ func (g DAGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice) (bool, error) {
 		return false, err
 	}
 
-	deviated := ccipcalc.Deviates(p1DAGasPrice, p2DAGasPrice, g.daDeviationPPB) || ccipcalc.Deviates(p1ExecGasPrice, p2ExecGasPrice, g.execDeviationPPB)
+	deviated := ccipcalc.Deviates(p1DAGasPrice, p2DAGasPrice, *g.daDeviationPPB) || ccipcalc.Deviates(p1ExecGasPrice, p2ExecGasPrice, *g.execDeviationPPB)
 	return deviated, nil
 }
 
