@@ -1386,7 +1386,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 			leaves = append(leaves, hash)
 			if sendRequestedIterator.Event.Message.SequenceNumber == seqNr {
 				fmt.Printf("Found proving %d %+v\n", curr, sendRequestedIterator.Event.Message)
-				msg, err2 := abihelpers.DecodeOffRampMessage(sendRequestedIterator.Event.Raw.Data)
+				msg, err2 := ccipdata.DecodeOffRampMessageV1_2_0(sendRequestedIterator.Event.Raw.Data)
 				if err2 != nil {
 					return nil, err2
 				}

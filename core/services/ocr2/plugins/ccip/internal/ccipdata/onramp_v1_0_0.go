@@ -51,7 +51,7 @@ func (t *LeafHasherV1_0_0) HashLeaf(log types.Log) ([32]byte, error) {
 	}
 	encodedTokens, err := utils.ABIEncode(
 		`[
-{"components": [{"name":"token","type":"address"},{"name":"amount","type":"uint256"}], "type":"tuple"}]`, message.Message.TokenAmounts)
+{"components": [{"name":"token","type":"address"},{"name":"amount","type":"uint256"}], "type":"tuple[]"}]`, message.Message.TokenAmounts)
 	if err != nil {
 		return [32]byte{}, err
 	}

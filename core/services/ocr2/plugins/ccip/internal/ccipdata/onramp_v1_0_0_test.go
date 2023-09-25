@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 )
 
-func TestHasher(t *testing.T) {
+func TestHasherV1_0_0(t *testing.T) {
 	sourceChainSelector, destChainSelector := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp_1_0_0.EVM2EVMOnRampABI))
@@ -48,7 +48,7 @@ func TestHasher(t *testing.T) {
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
-	require.Equal(t, "46ad031bfb052db2e4a2514fed8dc480b98e5ce4acb55d5640d91407e0d8a3e9", hex.EncodeToString(hash[:]))
+	require.Equal(t, "26f282c6ac8231933b1799648d01ff6cec792a33fb37408b4d135968f9168ace", hex.EncodeToString(hash[:]))
 
 	message = evm_2_evm_onramp_1_0_0.InternalEVM2EVMMessage{
 		SourceChainSelector: sourceChainSelector,
@@ -74,7 +74,7 @@ func TestHasher(t *testing.T) {
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
-	require.Equal(t, "4362a13a42e52ff5ce4324e7184dc7aa41704c3146bc842d35d95b94b32a78b6", hex.EncodeToString(hash[:]))
+	require.Equal(t, "05cee92e7cb86a37b6536554828a5b21ff20ac3d4ef821ec47056f1d963313de", hex.EncodeToString(hash[:]))
 }
 
 func TestMetaDataHash(t *testing.T) {

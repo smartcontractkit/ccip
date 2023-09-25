@@ -3,6 +3,7 @@ package ccipdata
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -37,6 +38,71 @@ func init() {
 	CCIPSendRequestEventSigV1_2_0 = abihelpers.GetIDOrPanic("CCIPSendRequested", onRampABI)
 }
 
+// Backwards compat for integration tests
+func DecodeOffRampMessageV1_2_0(b []byte) (*evm_2_evm_offramp.InternalEVM2EVMMessage, error) {
+	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_offramp.EVM2EVMOffRampABI))
+	if err != nil {
+		panic(err)
+	}
+	event, ok := offRampABI.Events["EVM2EVMMessage"]
+	if !ok {
+		panic("no such event")
+	}
+	unpacked, err := event.Inputs.Unpack(b)
+	if err != nil {
+		return nil, err
+	}
+	if len(unpacked) == 0 {
+		return nil, fmt.Errorf("no message found when unpacking")
+	}
+
+	// Note must use unnamed type here
+	receivedCp, ok := unpacked[0].(struct {
+		SourceChainSelector uint64         `json:"sourceChainSelector"`
+		Sender              common.Address `json:"sender"`
+		Receiver            common.Address `json:"receiver"`
+		SequenceNumber      uint64         `json:"sequenceNumber"`
+		GasLimit            *big.Int       `json:"gasLimit"`
+		Strict              bool           `json:"strict"`
+		Nonce               uint64         `json:"nonce"`
+		FeeToken            common.Address `json:"feeToken"`
+		FeeTokenAmount      *big.Int       `json:"feeTokenAmount"`
+		Data                []uint8        `json:"data"`
+		TokenAmounts        []struct {
+			Token  common.Address `json:"token"`
+			Amount *big.Int       `json:"amount"`
+		} `json:"tokenAmounts"`
+		SourceTokenData [][]byte `json:"sourceTokenData"`
+		MessageId       [32]byte `json:"messageId"`
+	})
+	if !ok {
+		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
+	}
+	var tokensAndAmounts []evm_2_evm_offramp.ClientEVMTokenAmount
+	for _, tokenAndAmount := range receivedCp.TokenAmounts {
+		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_offramp.ClientEVMTokenAmount{
+			Token:  tokenAndAmount.Token,
+			Amount: tokenAndAmount.Amount,
+		})
+	}
+
+	return &evm_2_evm_offramp.InternalEVM2EVMMessage{
+		SourceChainSelector: receivedCp.SourceChainSelector,
+		Sender:              receivedCp.Sender,
+		Receiver:            receivedCp.Receiver,
+		SequenceNumber:      receivedCp.SequenceNumber,
+		GasLimit:            receivedCp.GasLimit,
+		Strict:              receivedCp.Strict,
+		Nonce:               receivedCp.Nonce,
+		FeeToken:            receivedCp.FeeToken,
+		FeeTokenAmount:      receivedCp.FeeTokenAmount,
+		Data:                receivedCp.Data,
+		TokenAmounts:        tokensAndAmounts,
+		SourceTokenData:     receivedCp.SourceTokenData,
+		MessageId:           receivedCp.MessageId,
+	}, nil
+}
+
 type LeafHasherV1_2_0 struct {
 	metaDataHash [32]byte
 	ctx          hashlib.Ctx[[32]byte]
@@ -57,7 +123,9 @@ func (t *LeafHasherV1_2_0) HashLeaf(log types.Log) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 	message := msg.Message
-	encodedTokens, err := abihelpers.TokenAmountsArgs.PackValues([]interface{}{message.TokenAmounts})
+	encodedTokens, err := utils.ABIEncode(
+		`[
+{"components": [{"name":"token","type":"address"},{"name":"amount","type":"uint256"}], "type":"tuple[]"}]`, message.TokenAmounts)
 	if err != nil {
 		return [32]byte{}, err
 	}
