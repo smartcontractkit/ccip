@@ -253,25 +253,24 @@ func NewOnRampV1_2_0(
 	if err != nil {
 		panic(err) // ABI failure ok to panic
 	}
-	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
-	if err != nil {
-		return nil, err
-	}
 	// Subscribe to the relevant logs
 	// Note we can keep the same prefix across 1.0/1.1 and 1.2 because the onramp addresses will be different
 	name := logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress)
 	err = sourceLP.RegisterFilter(logpoller.Filter{
 		Name:      name,
-		EventSigs: []common.Hash{abihelpers.GetIDOrPanic("CCIPSendRequested", onRampABI)},
+		EventSigs: []common.Hash{CCIPSendRequestEventSigV1_2_0},
 		Addresses: []common.Address{onRampAddress},
 	})
 	return &OnRampV1_2_0{
-		finalityTags: finalityTags,
-		lggr:         lggr,
-		client:       source,
-		lp:           sourceLP,
-		leafHasher:   NewLeafHasherV1_2_0(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
-		onRamp:       onRamp,
-		filterName:   name,
+		finalityTags:               finalityTags,
+		lggr:                       lggr,
+		client:                     source,
+		lp:                         sourceLP,
+		leafHasher:                 NewLeafHasherV1_2_0(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
+		onRamp:                     onRamp,
+		filterName:                 name,
+		address:                    onRampAddress,
+		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndexV1_2_0,
+		sendRequestedEventSig:      CCIPSendRequestEventSigV1_2_0,
 	}, nil
 }
