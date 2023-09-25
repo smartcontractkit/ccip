@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -63,7 +64,7 @@ type ExecutionPluginConfig struct {
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStore              commit_store.CommitStoreInterface
-	commitStoreVersion       string
+	commitStoreVersion       semver.Version
 	sourcePriceRegistry      price_registry.PriceRegistryInterface
 	sourceWrappedNativeToken common.Address
 	destClient               evmclient.Client

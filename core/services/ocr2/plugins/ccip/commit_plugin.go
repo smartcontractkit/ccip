@@ -59,21 +59,13 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, errors.Wrap(err, "get chainset")
 	}
-	commitStore, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
+	commitStore, commitStoreVersion, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
 	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed getting the static config from the commitStore")
-	}
-	typeAndVersion, err := commitStore.TypeAndVersion(&bind.CallOpts{})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get commitStore type and version")
-	}
-	_, commitStoreVersion, err := ccipconfig.ParseTypeAndVersion(typeAndVersion)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse commitStore type and version")
 	}
 	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {
@@ -83,11 +75,11 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
-	offRamp, err := contractutil.LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), CommitPluginLabel, destChain.Client())
+	offRamp, _, err := contractutil.LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), CommitPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
-	onRamp, err := contractutil.LoadOnRamp(staticConfig.OnRamp, CommitPluginLabel, sourceChain.Client())
+	onRamp, onRampVersion, err := contractutil.LoadOnRamp(staticConfig.OnRamp, CommitPluginLabel, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp")
 	}
@@ -95,7 +87,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, err
 	}
-	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
+	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, onRampVersion, sourceChain.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +242,7 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSp
 	if err != nil {
 		return err
 	}
-	commitStore, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
+	commitStore, _, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
 	if err != nil {
 		return err
 	}

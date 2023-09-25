@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -65,7 +66,7 @@ type CommitPluginConfig struct {
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	onRampAddress            common.Address
 	commitStore              commit_store.CommitStoreInterface
-	commitStoreVersion       string
+	commitStoreVersion       semver.Version
 	priceGetter              pricegetter.PriceGetter
 	sourceChainSelector      uint64
 	sourceNative             common.Address
@@ -424,9 +425,9 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 // Gets the latest gas price updates based on logs within the heartbeat
 func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasUpdate update, error error) {
 	if checkInflight {
-		latestInflightGasPriceUpdate := r.inflightReports.getLatestInflightGasPriceUpdate()
-		if latestInflightGasPriceUpdate != nil && latestInflightGasPriceUpdate.timestamp.After(gasUpdate.timestamp) {
-			gasUpdate = *latestInflightGasPriceUpdate
+		latestInflightGasPriceUpdate, latestUpdateFound := r.inflightReports.getLatestInflightGasPriceUpdate()
+		if latestUpdateFound && latestInflightGasPriceUpdate.timestamp.After(gasUpdate.timestamp) {
+			gasUpdate = latestInflightGasPriceUpdate
 		}
 
 		if gasUpdate.value != nil {

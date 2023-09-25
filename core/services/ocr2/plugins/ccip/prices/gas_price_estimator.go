@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -54,11 +55,11 @@ type GasPriceEstimator interface {
 }
 
 func NewGasPriceEstimator(
-	commitStoreVersion string,
+	commitStoreVersion semver.Version,
 	estimator gas.EvmFeeEstimator,
 	maxExecGasPrice *big.Int,
 ) (GasPriceEstimator, error) {
-	switch commitStoreVersion {
+	switch commitStoreVersion.String() {
 	case "1.0.0", "1.1.0":
 		return ExecGasPriceEstimator{
 			estimator:   estimator,

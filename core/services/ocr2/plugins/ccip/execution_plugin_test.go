@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -77,6 +78,7 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 
 	mockOnRamp, onRampAddr := testhelpers.NewFakeOnRamp(t)
 	mockOnRamp.SetDynamicCfg(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{PriceRegistry: srcPriceRegAddr})
+	mockOnRampVersion, _ := semver.NewVersion(testhelpers.FakeOnRampVersion)
 
 	pluginConfig := config.ExecutionPluginJobSpecConfig{
 		USDCConfig: config.USDCConfig{
@@ -122,6 +124,7 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 			SourceChainSelector: 5009297550715157269,
 		},
 		mockOnRamp,
+		*mockOnRampVersion,
 		nil,
 		pluginConfig,
 	)

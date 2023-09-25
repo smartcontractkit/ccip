@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -70,7 +71,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	if err != nil {
 		return nil, errors.Wrap(err, "get chainset")
 	}
-	offRamp, err := contractutil.LoadOffRamp(common.HexToAddress(spec.ContractID), ExecPluginLabel, destChain.Client())
+	offRamp, _, err := contractutil.LoadOffRamp(common.HexToAddress(spec.ContractID), ExecPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading offRamp")
 	}
@@ -86,23 +87,15 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to open source chain")
 	}
-	commitStore, err := contractutil.LoadCommitStore(offRampConfig.CommitStore, ExecPluginLabel, destChain.Client())
+	commitStore, commitStoreVersion, err := contractutil.LoadCommitStore(offRampConfig.CommitStore, ExecPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading commitStore")
 	}
-	typeAndVersion, err := commitStore.TypeAndVersion(&bind.CallOpts{})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get commitStore type and version")
-	}
-	_, commitStoreVersion, err := ccipconfig.ParseTypeAndVersion(typeAndVersion)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse commitStore type and version")
-	}
-	onRamp, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
+	onRamp, onRampVersion, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp")
 	}
-	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
+	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, onRampVersion, sourceChain.Client())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed loading onRamp config")
 	}
@@ -303,7 +296,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, spec
 	}
 
 	offRampAddress := common.HexToAddress(spec.ContractID)
-	offRamp, err := contractutil.LoadOffRamp(offRampAddress, ExecPluginLabel, destChain.Client())
+	offRamp, _, err := contractutil.LoadOffRamp(offRampAddress, ExecPluginLabel, destChain.Client())
 	if err != nil {
 		return err
 	}
@@ -320,12 +313,12 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, spec
 	if err != nil {
 		return errors.Wrap(err, "unable to open source chain")
 	}
-	sourceOnRamp, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
+	sourceOnRamp, sourceOnRampVersion, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
 		return errors.Wrap(err, "failed loading onRamp")
 	}
 
-	return unregisterExecutionPluginLpFilters(ctx, lggr, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, sourceOnRamp, sourceChain.Client(), pluginConfig, qopts...)
+	return unregisterExecutionPluginLpFilters(ctx, lggr, sourceChain.LogPoller(), destChain.LogPoller(), offRamp, offRampConfig, sourceOnRamp, sourceOnRampVersion, sourceChain.Client(), pluginConfig, qopts...)
 }
 
 func unregisterExecutionPluginLpFilters(
@@ -336,6 +329,7 @@ func unregisterExecutionPluginLpFilters(
 	destOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
 	destOffRampConfig evm_2_evm_offramp.EVM2EVMOffRampStaticConfig,
 	sourceOnRamp evm_2_evm_onramp.EVM2EVMOnRampInterface,
+	sourceOnRampVersion semver.Version,
 	sourceChainClient client.Client,
 	pluginConfig ccipconfig.ExecutionPluginJobSpecConfig,
 	qopts ...pg.QOpt) error {
@@ -344,7 +338,7 @@ func unregisterExecutionPluginLpFilters(
 		return err
 	}
 
-	onRampDynCfg, err := contractutil.LoadOnRampDynamicConfig(sourceOnRamp, sourceChainClient)
+	onRampDynCfg, err := contractutil.LoadOnRampDynamicConfig(sourceOnRamp, sourceOnRampVersion, sourceChainClient)
 	if err != nil {
 		return err
 	}

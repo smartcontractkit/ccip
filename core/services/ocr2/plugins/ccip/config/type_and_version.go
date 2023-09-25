@@ -24,15 +24,15 @@ var (
 	}
 )
 
-func VerifyTypeAndVersion(addr common.Address, client bind.ContractBackend, expectedType ContractType) error {
-	contractType, _, err := typeAndVersion(addr, client)
+func VerifyTypeAndVersion(addr common.Address, client bind.ContractBackend, expectedType ContractType) (semver.Version, error) {
+	contractType, version, err := typeAndVersion(addr, client)
 	if err != nil {
-		return errors.Errorf("failed getting type and version %v", err)
+		return semver.Version{}, errors.Errorf("failed getting type and version %v", err)
 	}
 	if contractType != expectedType {
-		return errors.Errorf("Wrong contract type %s", contractType)
+		return semver.Version{}, errors.Errorf("Wrong contract type %s", contractType)
 	}
-	return nil
+	return version, nil
 }
 
 func typeAndVersion(addr common.Address, client bind.ContractBackend) (ContractType, semver.Version, error) {

@@ -1,6 +1,7 @@
 package contractutil
 
 import (
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -15,28 +16,20 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 )
 
-func LoadOnRamp(onRampAddress common.Address, pluginName string, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampInterface, error) {
-	err := ccipconfig.VerifyTypeAndVersion(onRampAddress, client, ccipconfig.EVM2EVMOnRamp)
+func LoadOnRamp(onRampAddress common.Address, pluginName string, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampInterface, semver.Version, error) {
+	version, err := ccipconfig.VerifyTypeAndVersion(onRampAddress, client, ccipconfig.EVM2EVMOnRamp)
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid onRamp contract")
+		return nil, semver.Version{}, errors.Wrap(err, "Invalid onRamp contract")
 	}
-	return observability.NewObservedEvm2EvmOnRamp(onRampAddress, pluginName, client)
+
+	onRamp, err := observability.NewObservedEvm2EvmOnRamp(onRampAddress, pluginName, client)
+	return onRamp, version, err
 }
 
-func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
-	typeAndVersion, err := onRamp.TypeAndVersion(&bind.CallOpts{})
-	if err != nil {
-		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
-	}
-
-	_, version, err := ccipconfig.ParseTypeAndVersion(typeAndVersion)
-	if err != nil {
-		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
-	}
-
+func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, version semver.Version, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
 	opts := &bind.CallOpts{}
 
-	switch version {
+	switch version.String() {
 	case "1.0.0":
 		legacyOnramp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRamp.Address(), client)
 		if err != nil {
@@ -86,24 +79,28 @@ func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, cli
 	}
 }
 
-func LoadOffRamp(offRampAddress common.Address, pluginName string, client client.Client) (evm_2_evm_offramp.EVM2EVMOffRampInterface, error) {
-	err := ccipconfig.VerifyTypeAndVersion(offRampAddress, client, ccipconfig.EVM2EVMOffRamp)
+func LoadOffRamp(offRampAddress common.Address, pluginName string, client client.Client) (evm_2_evm_offramp.EVM2EVMOffRampInterface, semver.Version, error) {
+	version, err := ccipconfig.VerifyTypeAndVersion(offRampAddress, client, ccipconfig.EVM2EVMOffRamp)
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid offRamp contract")
+		return nil, semver.Version{}, errors.Wrap(err, "Invalid offRamp contract")
 	}
-	return observability.NewObservedEvm2EvmOffRamp(offRampAddress, pluginName, client)
+
+	offRamp, err := observability.NewObservedEvm2EvmOffRamp(offRampAddress, pluginName, client)
+	return offRamp, version, err
 }
 
-func LoadCommitStore(commitStoreAddress common.Address, pluginName string, client client.Client) (commit_store.CommitStoreInterface, error) {
-	err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
+func LoadCommitStore(commitStoreAddress common.Address, pluginName string, client client.Client) (commit_store.CommitStoreInterface, semver.Version, error) {
+	version, err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
 	if err != nil {
-		return nil, errors.Wrap(err, "Invalid commitStore contract")
+		return nil, semver.Version{}, errors.Wrap(err, "Invalid commitStore contract")
 	}
-	return observability.NewObservedCommitStore(commitStoreAddress, pluginName, client)
+
+	commitStore, err := observability.NewObservedCommitStore(commitStoreAddress, pluginName, client)
+	return commitStore, version, err
 }
 
-func DecodeCommitStoreOffchainConfig(version string, offchainConfig []byte) (ccipconfig.CommitOffchainConfig, error) {
-	switch version {
+func DecodeCommitStoreOffchainConfig(version semver.Version, offchainConfig []byte) (ccipconfig.CommitOffchainConfig, error) {
+	switch version.String() {
 	case "1.0.0", "1.1.0":
 		offchainConfigV1, err := ccipconfig.DecodeOffchainConfig[ccipconfig.CommitOffchainConfigV1](offchainConfig)
 		if err != nil {
