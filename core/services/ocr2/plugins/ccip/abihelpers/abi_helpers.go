@@ -29,9 +29,8 @@ const (
 	ExecutionStateFailure
 )
 
+// TODO: Deprecate in favour of version specific types
 var EventSignatures struct {
-	// OnRamp
-	//SendRequested common.Hash
 	// CommitStore
 	ReportAccepted common.Hash
 	// OffRamp
@@ -45,10 +44,6 @@ var EventSignatures struct {
 	FeeTokenAdded        common.Hash
 	FeeTokenRemoved      common.Hash
 
-	USDCMessageSent common.Hash
-
-	// offset || sourceChainID || seqNum || ...
-	SendRequestedSequenceNumberWord int
 	// offset || priceUpdatesOffset || minSeqNum || maxSeqNum || merkleRoot
 	ReportAcceptedMaxSequenceNumberWord int
 	// sig || seqNum || messageId || ...

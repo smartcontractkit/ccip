@@ -103,7 +103,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			commitStore, _ := testhelpers.NewFakeCommitStore(t, tc.commitStoreSeqNum)
 			commitStore.SetPaused(tc.commitStoreIsPaused)
 
-			sourceReader := ccipdata.NewMockReader(t)
+			sourceReader := ccipdata.NewMockOnRampReader(t)
 			if len(tc.sendReqs) > 0 {
 				sourceReader.On("GetSendRequestsGteSeqNum", ctx, onRampAddress, tc.commitStoreSeqNum, false, sourceFinalityDepth).
 					Return(tc.sendReqs, nil)
@@ -133,7 +133,6 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.lggr = logger.TestLogger(t)
 			p.inflightReports = newInflightCommitReportsContainer(time.Hour)
 			p.config.commitStore = commitStore
-			p.config.onRampAddress = onRampAddress
 			p.offchainConfig.SourceFinalityDepth = uint32(sourceFinalityDepth)
 			p.config.onRampReader = sourceReader
 			p.tokenDecimalsCache = tokenDecimalsCache
@@ -242,7 +241,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			destReader.On("GetGasPriceUpdatesCreatedAfter", ctx, destPriceRegistryAddress, uint64(sourceChainSelector), mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
 			destReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, destPriceRegistryAddress, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
 
-			sourceReader := ccipdata.NewMockReader(t)
+			sourceReader := ccipdata.NewMockOnRampReader(t)
 			if len(tc.sendRequests) > 0 {
 				sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, onRampAddress, tc.expSeqNumRange.Min, tc.expSeqNumRange.Max, 0).Return(tc.sendRequests, nil)
 			}
@@ -253,9 +252,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.destPriceRegistry = destPriceRegistry
 			p.config.destReader = destReader
 			p.config.onRampReader = sourceReader
-			p.config.onRampAddress = onRampAddress
 			p.config.sourceChainSelector = uint64(sourceChainSelector)
-			p.config.leafHasher = &leafHasher123{}
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
@@ -1034,7 +1031,7 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 				}
 			}
 
-			sourceReader := ccipdata.NewMockReader(t)
+			sourceReader := ccipdata.NewMockOnRampReader(t)
 			var sendReqs []ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
 			for _, seqNum := range tc.msgSeqNums {
 				sendReqs = append(sendReqs, ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{

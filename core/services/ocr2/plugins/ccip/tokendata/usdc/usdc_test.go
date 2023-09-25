@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -29,7 +28,9 @@ func TestUSDCReader_callAttestationApi(t *testing.T) {
 	usdcMessageHash := "912f22a13e9ccb979b621500f6952b2afd6e75be7eadaed93fc2625fe11c52a2"
 	attestationURI, err := url.ParseRequestURI("https://iris-api-sandbox.circle.com")
 	require.NoError(t, err)
-	usdcService := NewUSDCTokenDataReader(nil, mockUSDCTokenAddress, mockMsgTransmitter, mockOnRampAddress, attestationURI)
+	usdcReader, err := ccipdata.NewUSDCReader(mockMsgTransmitter, nil)
+	require.NoError(t, err)
+	usdcService := NewUSDCTokenDataReader(usdcReader, attestationURI)
 
 	attestation, err := usdcService.callAttestationApi(context.Background(), [32]byte(common.FromHex(usdcMessageHash)))
 	require.NoError(t, err)
@@ -49,7 +50,9 @@ func TestUSDCReader_callAttestationApiMock(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	usdcService := NewUSDCTokenDataReader(nil, mockUSDCTokenAddress, mockMsgTransmitter, mockOnRampAddress, attestationURI)
+	usdcReader, err := ccipdata.NewUSDCReader(mockMsgTransmitter, nil)
+	require.NoError(t, err)
+	usdcService := NewUSDCTokenDataReader(usdcReader, attestationURI)
 	attestation, err := usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 	require.NoError(t, err)
 
@@ -65,7 +68,9 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	usdcService := NewUSDCTokenDataReader(nil, mockUSDCTokenAddress, mockMsgTransmitter, mockOnRampAddress, attestationURI)
+	usdcReader, err := ccipdata.NewUSDCReader(mockMsgTransmitter, nil)
+	require.NoError(t, err)
+	usdcService := NewUSDCTokenDataReader(usdcReader, attestationURI)
 	_, err = usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 	require.Error(t, err)
 }
@@ -80,29 +85,16 @@ func getMockUSDCEndpoint(t *testing.T, response attestationResponse) *httptest.S
 	}))
 }
 
-// Asserts the hard coded event signature matches Keccak256("MessageSent(bytes)")
-func TestGetUSDCReaderSourceLPFilters(t *testing.T) {
-	usdcService := NewUSDCTokenDataReader(nil, mockUSDCTokenAddress, mockMsgTransmitter, mockOnRampAddress, nil)
-
-	filters := usdcService.GetSourceLogPollerFilters()
-
-	require.Equal(t, 1, len(filters))
-	filter := filters[0]
-	require.Equal(t, logpoller.FilterName(MESSAGE_SENT_FILTER_NAME, mockMsgTransmitter.Hex()), filter.Name)
-	hash, err := utils.Keccak256([]byte("MessageSent(bytes)"))
-	require.NoError(t, err)
-	require.Equal(t, hash, filter.EventSigs[0].Bytes())
-	require.Equal(t, mockMsgTransmitter, filter.Addresses[0])
-}
-
 func TestGetUSDCMessageBody(t *testing.T) {
 	expectedBody := []byte("TestGetUSDCMessageBody")
 	expectedBodyHash := utils.Keccak256Fixed(expectedBody)
 
-	sourceChainEventsMock := ccipdata.MockReader{}
+	sourceChainEventsMock := ccipdata.MockUSDCReader{}
 	sourceChainEventsMock.On("GetLastUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything).Return(expectedBody, nil)
 
-	usdcService := NewUSDCTokenDataReader(&sourceChainEventsMock, mockUSDCTokenAddress, mockMsgTransmitter, mockOnRampAddress, nil)
+	usdcReader, err := ccipdata.NewUSDCReader(mockMsgTransmitter, nil)
+	require.NoError(t, err)
+	usdcService := NewUSDCTokenDataReader(usdcReader, nil)
 
 	// Make the first call and assert the underlying function is called
 	body, err := usdcService.getUSDCMessageBody(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{})

@@ -38,6 +38,7 @@ type EVM2EVMMessage struct {
 	Log types.Log // Raw event data
 }
 
+//go:generate mockery --quiet --name OnRampReader --output . --filename onramp_reader_mock.go --inpackage --case=underscore
 type OnRampReader interface {
 	// GetSendRequestsGteSeqNum returns all the message send requests with sequence number greater than or equal to the provided.
 	// If checkFinalityTags is set to true then confs param is ignored, the latest finalized block is used in the query.

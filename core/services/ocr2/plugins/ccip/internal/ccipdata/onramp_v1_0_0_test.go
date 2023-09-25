@@ -3,13 +3,15 @@ package ccipdata
 import (
 	"encoding/hex"
 	"math/big"
+	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 )
@@ -17,12 +19,15 @@ import (
 func TestHasher(t *testing.T) {
 	sourceChainSelector, destChainSelector := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
+	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp_1_0_0.EVM2EVMOnRampABI))
+	require.NoError(t, err)
 
+	ramp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRampAddress, nil)
+	require.NoError(t, err)
 	hashingCtx := hashlib.NewKeccakCtx()
+	hasher := NewLeafHasherV1_0_0(sourceChainSelector, destChainSelector, onRampAddress, hashingCtx, ramp)
 
-	hasher := NewLeafHasherV1_0_0(sourceChainSelector, destChainSelector, onRampAddress, hashingCtx)
-
-	message := evm_2_evm_onramp.InternalEVM2EVMMessage{
+	message := evm_2_evm_onramp_1_0_0.InternalEVM2EVMMessage{
 		SourceChainSelector: sourceChainSelector,
 		Sender:              common.HexToAddress("0x1110000000000000000000000000000000000001"),
 		Receiver:            common.HexToAddress("0x2220000000000000000000000000000000000001"),
@@ -33,20 +38,19 @@ func TestHasher(t *testing.T) {
 		FeeToken:            common.Address{},
 		FeeTokenAmount:      big.NewInt(1),
 		Data:                []byte{},
-		TokenAmounts:        []evm_2_evm_onramp.ClientEVMTokenAmount{{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)}},
-		SourceTokenData:     [][]byte{},
+		TokenAmounts:        []evm_2_evm_onramp_1_0_0.ClientEVMTokenAmount{{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)}},
 		MessageId:           [32]byte{},
 	}
 
-	pack, err := abihelpers.MessageArgs.Pack(message)
+	data, err := onRampABI.Events["CCIPSendRequested"].Inputs.Pack(message)
 	require.NoError(t, err)
-	hash, err := hasher.HashLeaf(types.Log{Topics: []common.Hash{abihelpers.EventSignatures.SendRequested}, Data: pack})
+	hash, err := hasher.HashLeaf(types.Log{Topics: []common.Hash{abihelpers.GetIDOrPanic("CCIPSendRequested", onRampABI)}, Data: data})
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
 	require.Equal(t, "e0f22328cc83d50c2861629eaabcad5b39e8d30ba163228ff3574a0a229f5c9f", hex.EncodeToString(hash[:]))
 
-	message = evm_2_evm_onramp.InternalEVM2EVMMessage{
+	message = evm_2_evm_onramp_1_0_0.InternalEVM2EVMMessage{
 		SourceChainSelector: sourceChainSelector,
 		Sender:              common.HexToAddress("0x1110000000000000000000000000000000000001"),
 		Receiver:            common.HexToAddress("0x2220000000000000000000000000000000000001"),
@@ -57,17 +61,16 @@ func TestHasher(t *testing.T) {
 		FeeToken:            common.Address{},
 		FeeTokenAmount:      big.NewInt(1e12),
 		Data:                []byte("foo bar baz"),
-		TokenAmounts: []evm_2_evm_onramp.ClientEVMTokenAmount{
+		TokenAmounts: []evm_2_evm_onramp_1_0_0.ClientEVMTokenAmount{
 			{Token: common.HexToAddress("0x4440000000000000000000000000000000000001"), Amount: big.NewInt(12345678900)},
 			{Token: common.HexToAddress("0x6660000000000000000000000000000000000001"), Amount: big.NewInt(4204242)},
 		},
-		SourceTokenData: [][]byte{{0x2, 0x1}},
-		MessageId:       [32]byte{},
+		MessageId: [32]byte{},
 	}
 
-	pack, err = abihelpers.MessageArgs.Pack(message)
+	data, err = onRampABI.Events["CCIPSendRequested"].Inputs.Pack(message)
 	require.NoError(t, err)
-	hash, err = hasher.HashLeaf(types.Log{Topics: []common.Hash{abihelpers.EventSignatures.SendRequested}, Data: pack})
+	hash, err = hasher.HashLeaf(types.Log{Topics: []common.Hash{abihelpers.GetIDOrPanic("CCIPSendRequested", onRampABI)}, Data: data})
 	require.NoError(t, err)
 
 	// NOTE: Must match spec

@@ -143,10 +143,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			onRamp, onRampAddr := testhelpers.NewFakeOnRamp(t)
 			p.config.onRamp = onRamp
 
-			sourceReader := ccipdata.NewMockReader(t)
+			sourceReader := ccipdata.NewMockOnRampReader(t)
 			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, onRampAddr, mock.Anything, mock.Anything, 0).
 				Return(tc.sendRequests, nil).Maybe()
-			p.config.sourceReader = sourceReader
+			p.config.onRampReader = sourceReader
 
 			cachedDestTokens := cache.NewMockAutoSync[cache.CachedTokens](t)
 			cachedDestTokens.On("Get", ctx).Return(cache.CachedTokens{
@@ -373,8 +373,6 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 		}, nil)
 	p.config.destReader = destReader
 
-	p.config.leafHasher = leafHasher123{}
-
 	onRamp, onRampAddr := testhelpers.NewFakeOnRamp(t)
 	p.config.onRamp = onRamp
 
@@ -397,10 +395,10 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 			}},
 		}
 	}
-	sourceReader := ccipdata.NewMockReader(t)
+	sourceReader := ccipdata.NewMockOnRampReader(t)
 	sourceReader.On("GetSendRequestsBetweenSeqNums",
 		ctx, onRampAddr, observations[0].SeqNr, observations[len(observations)-1].SeqNr, 0).Return(sendReqs, nil)
-	p.config.sourceReader = sourceReader
+	p.config.onRampReader = sourceReader
 
 	execReport, err := p.buildReport(ctx, p.lggr, observations)
 	assert.NoError(t, err)
@@ -1022,18 +1020,18 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			offRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
 			p.config.offRamp = offRamp
 
-			sourceReader := ccipdata.NewMockReader(t)
+			sourceReader := ccipdata.NewMockOnRampReader(t)
 			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, onRampAddr, tc.expQueryMin, tc.expQueryMax, 0).
 				Return(tc.onchainEvents, nil).Maybe()
-			p.config.sourceReader = sourceReader
+			p.config.onRampReader = sourceReader
 
 			destReader := ccipdata.NewMockReader(t)
 			destReader.On("LatestBlock", ctx).Return(tc.destLatestBlock, nil).Maybe()
 			var executedEvents []ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]
 			for _, executedSeqNum := range tc.destExecutedSeqNums {
 				executedEvents = append(executedEvents, ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]{
-					Data:      evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged{SequenceNumber: executedSeqNum},
-					BlockMeta: ccipdata.BlockMeta{BlockNumber: tc.destLatestBlock - 10},
+					Data: evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged{SequenceNumber: executedSeqNum},
+					Meta: ccipdata.Meta{BlockNumber: tc.destLatestBlock - 10},
 				})
 			}
 			destReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, offRampAddr, tc.expQueryMin, tc.expQueryMax, 0).Return(executedEvents, nil).Maybe()
@@ -1097,7 +1095,7 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 		},
 	}
 
-	for _, f := range getExecutionPluginSourceLpChainFilters(onRamp.Address(), sourcePriceRegistry.Address(), tokenDataProviders) {
+	for _, f := range getExecutionPluginSourceLpChainFilters(sourcePriceRegistry.Address()) {
 		sourceLP.On("RegisterFilter", f).Return(nil)
 	}
 	for _, f := range getExecutionPluginDestLpChainFilters(commitStore.Address(), offRamp.Address(), destPriceRegistryAddr) {

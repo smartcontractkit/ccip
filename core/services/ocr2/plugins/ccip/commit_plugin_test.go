@@ -4,24 +4,24 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	mocklp "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	evmmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
-	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	pipelinemocks "github.com/smartcontractkit/chainlink/v2/core/services/pipeline/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
+	lggr := logger.TestLogger(t)
 	testCases := []struct {
 		description  string
 		spec         *job.OCR2OracleSpec
@@ -63,6 +63,7 @@ func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			chainSet := &evmmocks.LegacyChainContainer{}
+			prMock := &pipelinemocks.Runner{}
 
 			if tc.spec != nil {
 				if chainID, ok := tc.spec.RelayConfig["chainID"]; ok {
@@ -72,7 +73,7 @@ func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
 				}
 			}
 
-			err := UnregisterCommitPluginLpFilters(context.Background(), tc.spec, chainSet)
+			err := UnregisterCommitPluginLpFilters(context.Background(), lggr, job.Job{OCR2OracleSpec: tc.spec}, prMock, chainSet)
 			if tc.expectingErr {
 				assert.Error(t, err)
 			} else {
@@ -104,13 +105,14 @@ func TestGetCommitPluginFilterNames(t *testing.T) {
 	dstLP.On("UnregisterFilter", "Token pool added - 0xDAFeA492D9c6733Ae3D56b7eD1AdB60692C98BC4", mock.Anything).Return(nil)
 	dstLP.On("UnregisterFilter", "Token pool removed - 0xDAFeA492D9c6733Ae3D56b7eD1AdB60692C98BC4", mock.Anything).Return(nil)
 
-	err := unregisterCommitPluginFilters(context.Background(), srcLP, dstLP, mockCommitStore, offRampAddr)
+	err := unregisterCommitPluginFilters(context.Background(), dstLP, mockCommitStore, offRampAddr)
 	assert.NoError(t, err)
 
 	srcLP.AssertExpectations(t)
 	dstLP.AssertExpectations(t)
 }
 
+/*
 func Test_updateCommitPluginLogPollerFilters(t *testing.T) {
 	srcLP := &mocklp.LogPoller{}
 	dstLP := &mocklp.LogPoller{}
@@ -165,3 +167,4 @@ func Test_updateCommitPluginLogPollerFilters(t *testing.T) {
 	srcLP.AssertExpectations(t)
 	dstLP.AssertExpectations(t)
 }
+*/

@@ -25,7 +25,7 @@ type Meta struct {
 
 // Client can be used to fetch CCIP related parsed on-chain data.
 //
-//go:generate mockery --quiet --name Reader --output . --filename mock.go --inpackage --case=underscore
+//go:generate mockery --quiet --name Reader --output . --filename reader_mock.go --inpackage --case=underscore
 type Reader interface {
 	// GetTokenPriceUpdatesCreatedAfter returns all the token price updates that happened after the provided timestamp.
 	GetTokenPriceUpdatesCreatedAfter(ctx context.Context, priceRegistry common.Address, ts time.Time, confs int) ([]Event[price_registry.PriceRegistryUsdPerTokenUpdated], error)
@@ -41,8 +41,6 @@ type Reader interface {
 
 	// GetAcceptedCommitReportsGteTimestamp returns all the commit reports with timestamp greater than or equal to the provided.
 	GetAcceptedCommitReportsGteTimestamp(ctx context.Context, commitStoreAddress common.Address, ts time.Time, confs int) ([]Event[commit_store.CommitStoreReportAccepted], error)
-	// GetLastUSDCMessagePriorToLogIndexInTx returns the last USDC message that was sent before the provided log index in the given transaction.
-	GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error)
 
 	// LatestBlock returns the latest known/parsed block of the underlying implementation.
 	LatestBlock(ctx context.Context) (int64, error)

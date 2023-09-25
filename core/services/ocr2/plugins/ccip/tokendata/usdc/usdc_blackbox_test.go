@@ -10,12 +10,10 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
@@ -56,23 +54,23 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 	txHash := utils.RandomBytes32()
 	logIndex := int64(4)
 
-	eventsClient := ccipdata.MockReader{}
-	eventsClient.On("GetSendRequestsBetweenSeqNums",
-		mock.Anything,
-		mockOnRampAddress,
-		seqNum,
-		seqNum,
-		0,
-	).Return([]ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{
-		{
-			Data: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{
-				Raw: types.Log{
-					TxHash: txHash,
-					Index:  uint(logIndex),
-				},
-			},
-		},
-	}, nil)
+	eventsClient := ccipdata.MockUSDCReader{}
+	//eventsClient.On("GetSendRequestsBetweenSeqNums",
+	//	mock.Anything,
+	//	mockOnRampAddress,
+	//	seqNum,
+	//	seqNum,
+	//	0,
+	//).Return([]ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]{
+	//	{
+	//		Data: evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{
+	//			Raw: types.Log{
+	//				TxHash: txHash,
+	//				Index:  uint(logIndex),
+	//			},
+	//		},
+	//	},
+	//}, nil)
 
 	eventsClient.On("GetLastUSDCMessagePriorToLogIndexInTx",
 		mock.Anything,
@@ -82,7 +80,7 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	usdcService := usdc.NewUSDCTokenDataReader(&eventsClient, mockUSDCTokenAddress, mockMsgTransmitter, mockOnRampAddress, attestationURI)
+	usdcService := usdc.NewUSDCTokenDataReader(&eventsClient, attestationURI)
 	attestation, err := usdcService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 		InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
 			SequenceNumber: seqNum,

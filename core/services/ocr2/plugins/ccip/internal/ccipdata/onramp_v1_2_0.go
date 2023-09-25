@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -21,25 +20,44 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
+var (
+	// Backwards compat for integration tests
+	CCIPSendRequestEventSigV1_2_0 common.Hash
+)
+
+const (
+	CCIPSendRequestSeqNumIndexV1_2_0 = 4
+)
+
+func init() {
+	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
+	if err != nil {
+		panic(err)
+	}
+	CCIPSendRequestEventSigV1_2_0 = abihelpers.GetIDOrPanic("CCIPSendRequested", onRampABI)
+}
+
 type LeafHasherV1_2_0 struct {
 	metaDataHash [32]byte
 	ctx          hashlib.Ctx[[32]byte]
+	onRamp       *evm_2_evm_onramp.EVM2EVMOnRamp
 }
 
-func NewLeafHasherV1_2_0(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte]) *LeafHasherV1_2_0 {
+func NewLeafHasherV1_2_0(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp.EVM2EVMOnRamp) *LeafHasherV1_2_0 {
 	return &LeafHasherV1_2_0{
 		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMMessageHashV2")), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
+		onRamp:       onRamp,
 	}
 }
 
 func (t *LeafHasherV1_2_0) HashLeaf(log types.Log) ([32]byte, error) {
-	message, err := abihelpers.DecodeOffRampMessage(log.Data)
+	msg, err := t.onRamp.ParseCCIPSendRequested(log)
 	if err != nil {
 		return [32]byte{}, err
 	}
 
-	encodedTokens, err := abihelpers.TokenAmountsArgs.PackValues([]interface{}{message.TokenAmounts})
+	encodedTokens, err := abihelpers.TokenAmountsArgs.PackValues([]interface{}{msg.Message.TokenAmounts})
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -49,12 +67,11 @@ func (t *LeafHasherV1_2_0) HashLeaf(log types.Log) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
-	encodedSourceTokenData, err := abi.Arguments{abi.Argument{Type: bytesArray}}.PackValues([]interface{}{message.SourceTokenData})
+	encodedSourceTokenData, err := abi.Arguments{abi.Argument{Type: bytesArray}}.PackValues([]interface{}{msg.Message.SourceTokenData})
 	if err != nil {
 		return [32]byte{}, err
 	}
 
-	// TODO: Update according 1.2
 	packedValues, err := utils.ABIEncode(
 		`[
 {"name": "leafDomainSeparator","type":"bytes1"},
@@ -73,17 +90,17 @@ func (t *LeafHasherV1_2_0) HashLeaf(log types.Log) ([32]byte, error) {
 ]`,
 		leafDomainSeparator,
 		t.metaDataHash,
-		message.SequenceNumber,
-		message.Nonce,
-		message.Sender,
-		message.Receiver,
-		t.ctx.Hash(message.Data),
+		msg.Message.SequenceNumber,
+		msg.Message.Nonce,
+		msg.Message.Sender,
+		msg.Message.Receiver,
+		t.ctx.Hash(msg.Message.Data),
 		t.ctx.Hash(encodedTokens),
 		t.ctx.Hash(encodedSourceTokenData),
-		message.GasLimit,
-		message.Strict,
-		message.FeeToken,
-		message.FeeTokenAmount,
+		msg.Message.GasLimit,
+		msg.Message.Strict,
+		msg.Message.FeeToken,
+		msg.Message.FeeTokenAmount,
 	)
 	if err != nil {
 		return [32]byte{}, err
@@ -104,28 +121,8 @@ type OnRampV1_2_0 struct {
 	client                     client.Client
 	finalityTags               bool
 	filterName                 string
-	usdcMessageSent            common.Hash
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
-}
-
-func (o *OnRampV1_2_0) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
-	logs, err := o.lp.IndexedLogsByTxHash(
-		o.usdcMessageSent,
-		txHash,
-		pg.WithParentCtx(ctx),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range logs {
-		current := logs[len(logs)-i-1]
-		if current.LogIndex < logIndex {
-			return current.Data, nil
-		}
-	}
-	return nil, errors.Errorf("no USDC message found prior to log index %d in tx %s", logIndex, txHash.Hex())
 }
 
 func (o *OnRampV1_2_0) logToMessage(log types.Log) (*EVM2EVMMessage, error) {
@@ -258,13 +255,12 @@ func NewOnRampV1_2_0(
 		Addresses: []common.Address{onRampAddress},
 	})
 	return &OnRampV1_2_0{
-		finalityTags:    finalityTags,
-		lggr:            lggr,
-		client:          source,
-		lp:              sourceLP,
-		leafHasher:      NewLeafHasherV1_2_0(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx()),
-		onRamp:          onRamp,
-		filterName:      name,
-		usdcMessageSent: utils.Keccak256Fixed([]byte("MessageSent(bytes)")),
+		finalityTags: finalityTags,
+		lggr:         lggr,
+		client:       source,
+		lp:           sourceLP,
+		leafHasher:   NewLeafHasherV1_2_0(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
+		onRamp:       onRamp,
+		filterName:   name,
 	}, nil
 }
