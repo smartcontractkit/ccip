@@ -8,12 +8,15 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -22,6 +25,7 @@ import (
 )
 
 type TokenDataReader struct {
+	lggr               logger.Logger
 	sourceChainEvents  ccipdata.Reader
 	attestationApi     *url.URL
 	messageTransmitter common.Address
@@ -51,10 +55,24 @@ const (
 	attestationStatusPending attestationStatus = "pending_confirmations"
 )
 
+type usdcPayload []byte
+
+func (d usdcPayload) AbiString() string {
+	return `[{"type": "bytes"}]`
+}
+
+func (d usdcPayload) Validate() error {
+	if len(d) == 0 {
+		return errors.New("must be non-empty")
+	}
+	return nil
+}
+
 var _ tokendata.Reader = &TokenDataReader{}
 
-func NewUSDCTokenDataReader(sourceChainEvents ccipdata.Reader, usdcTokenAddress, usdcMessageTransmitterAddress, onRampAddress common.Address, usdcAttestationApi *url.URL) *TokenDataReader {
+func NewUSDCTokenDataReader(lggr logger.Logger, sourceChainEvents ccipdata.Reader, usdcTokenAddress, usdcMessageTransmitterAddress, onRampAddress common.Address, usdcAttestationApi *url.URL) *TokenDataReader {
 	return &TokenDataReader{
+		lggr:                 lggr.With("tokenDataProvider", "usdc"),
 		sourceChainEvents:    sourceChainEvents,
 		attestationApi:       usdcAttestationApi,
 		messageTransmitter:   usdcMessageTransmitterAddress,
@@ -71,7 +89,7 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EV
 	}
 
 	if response.Status == attestationStatusSuccess {
-		attestationBytes, err := hex.DecodeString(response.Attestation)
+		attestationBytes, err := hex.DecodeString(strings.TrimPrefix(response.Attestation, "0x"))
 		if err != nil {
 			return nil, fmt.Errorf("decode response attestation: %w", err)
 		}
@@ -81,12 +99,14 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EV
 }
 
 func (s *TokenDataReader) getUpdatedAttestation(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) (attestationResponse, error) {
-	messageBody, err := s.getUSDCMessageBody(ctx, msg)
+	messageBodyHash, err := s.getUSDCMessageBodyHash(ctx, msg)
 	if err != nil {
 		return attestationResponse{}, errors.Wrap(err, "failed getting the USDC message body")
 	}
 
-	response, err := s.callAttestationApi(ctx, messageBody)
+	s.lggr.Infow("Calling attestation API", "messageBodyHash", hexutil.Encode(messageBodyHash[:]), "messageID", hexutil.Encode(msg.MessageId[:]))
+
+	response, err := s.callAttestationApi(ctx, messageBodyHash)
 	if err != nil {
 		return attestationResponse{}, errors.Wrap(err, "failed calling usdc attestation API ")
 	}
@@ -94,7 +114,7 @@ func (s *TokenDataReader) getUpdatedAttestation(ctx context.Context, msg interna
 	return response, nil
 }
 
-func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([32]byte, error) {
+func (s *TokenDataReader) getUSDCMessageBodyHash(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([32]byte, error) {
 	s.usdcMessageHashCacheMutex.Lock()
 	defer s.usdcMessageHashCacheMutex.Unlock()
 
@@ -107,11 +127,25 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.E
 		return [32]byte{}, err
 	}
 
-	msgBodyHash := utils.Keccak256Fixed(usdcMessageBody)
+	s.lggr.Infow("Got USDC message body", "messageBody", hexutil.Encode(usdcMessageBody), "messageID", hexutil.Encode(msg.MessageId[:]))
+
+	parsedMsgBody, err := decodeUSDCMessageSent(usdcMessageBody)
+	if err != nil {
+		return [32]byte{}, errors.Wrap(err, "failed parsing solidity struct")
+	}
+	msgBodyHash := utils.Keccak256Fixed(parsedMsgBody)
 
 	// Save the attempt in the cache in case the external call fails
 	s.usdcMessageHashCache[msg.SequenceNumber] = msgBodyHash
 	return msgBodyHash, nil
+}
+
+func decodeUSDCMessageSent(logData []byte) ([]byte, error) {
+	decodeAbiStruct, err := abihelpers.DecodeAbiStruct[usdcPayload](logData)
+	if err != nil {
+		return nil, err
+	}
+	return decodeAbiStruct, nil
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
@@ -136,6 +170,11 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 	if err != nil {
 		return attestationResponse{}, err
 	}
+
+	if response.Status == "" {
+		return attestationResponse{}, fmt.Errorf("invalid attestation response: %s", string(body))
+	}
+
 	return response, nil
 }
 
