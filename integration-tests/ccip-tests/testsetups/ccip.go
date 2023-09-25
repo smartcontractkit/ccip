@@ -1184,11 +1184,6 @@ func DeployEnvironments(
 	}
 	urlFinder := func(network blockchain.EVMNetwork) ([]string, []string) {
 		if !network.Simulated {
-			// for live networks if more than one rpc url is available, use the urls from index1 onwards
-			// to ensure CL nodes are using different urls than test runner
-			if len(network.URLs) > 1 && len(network.HTTPURLs) > 1 {
-				return network.URLs[1:], network.HTTPURLs[1:]
-			}
 			return network.URLs, network.HTTPURLs
 		}
 		networkName := network.Name

@@ -107,6 +107,21 @@ type CCIPCommon struct {
 	gasUpdateWatcherMu      *sync.Mutex
 	gasUpdateWatcher        map[uint64]*big.Int // key - destchain id; value - timestamp of update
 	priceUpdateSubs         []event.Subscription
+	connectionIssues        *atomic.Bool
+	connectionRestored      *atomic.Bool
+}
+
+func (ccipModule *CCIPCommon) ConnectionRestored() {
+	for {
+		select {
+		case <-ccipModule.ChainClient.ConnectionRestored():
+			ccipModule.connectionRestored.Store(true)
+			ccipModule.connectionIssues.Store(false)
+		case <-ccipModule.ChainClient.ConnectionIssue():
+			ccipModule.connectionIssues.Store(true)
+			ccipModule.connectionRestored.Store(false)
+		}
+	}
 }
 
 func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
@@ -333,10 +348,14 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 	gasUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
 	blockNum := ccipModule.PriceUpdatesToWatchFrom
 	var opts *bind.WatchOpts
-	if blockNum > 0 {
-		opts = &bind.WatchOpts{Start: &blockNum}
+	var err error
+	if blockNum == 0 {
+		blockNum, err = ccipModule.ChainClient.LatestBlockNumber(context.Background())
+		if err != nil {
+			return err
+		}
 	}
-
+	opts = &bind.WatchOpts{Start: &blockNum}
 	sub, err := ccipModule.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(opts, gasUpdateEvent, nil)
 	if err != nil {
 		return err
@@ -350,16 +369,16 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 				if err != nil {
 					continue
 				}
-				log.Info().Msgf("UsdPerUnitGasUpdated event received for dest chain %d source chain %w",
-					destChain, ccipModule.ChainClient.GetNetworkName())
+				log.Info().
+					Str("source_chain", ccipModule.ChainClient.GetNetworkName()).
+					Uint64("dest_chain", destChain).
+					Str("price_registry", ccipModule.PriceRegistry.Address()).
+					Msgf("UsdPerUnitGasUpdated event received for dest chain %d source chain %s",
+						destChain, ccipModule.ChainClient.GetNetworkName())
 				ccipModule.gasUpdateWatcherMu.Lock()
 				ccipModule.gasUpdateWatcher[destChain] = e.Timestamp
 				ccipModule.gasUpdateWatcherMu.Unlock()
-			case <-sub.Err():
-				log.Info().Msgf("UsdPerUnitGasUpdated event subscription error %+v", sub.Err())
-				return
 			}
-
 		}
 	}()
 	ccipModule.priceUpdateSubs = append(ccipModule.priceUpdateSubs, sub)
@@ -1907,8 +1926,8 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2Config(commitNodes, ccipConfig.CommitOffchainConfig{
 		SourceFinalityDepth:   1,
 		DestFinalityDepth:     1,
-		FeeUpdateHeartBeat:    models.MustMakeDuration(3 * time.Minute), // reduce the heartbeat to 10 sec for faster fee updates
-		FeeUpdateDeviationPPB: 5e6,
+		FeeUpdateHeartBeat:    models.MustMakeDuration(10 * time.Second), // reduce the heartbeat to 10 sec for faster fee updates
+		FeeUpdateDeviationPPB: 1e6,
 		MaxGasPrice:           200e9,
 		InflightCacheExpiry:   inflightExpiry,
 	}, ccipConfig.CommitOnchainConfig{
