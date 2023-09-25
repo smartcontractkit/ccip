@@ -784,7 +784,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 	priceUpdateTracker := sync.Map{}
 	for _, lanes := range o.ReadLanes() {
 		lanes := lanes
-		waitForUpdate := func(lane *actions.CCIPLane) error {
+		waitForUpdate := func(lane actions.CCIPLane) error {
 			if id, ok := priceUpdateTracker.Load(lane.Source.Common.PriceRegistry.Address()); ok &&
 				id.(uint64) == lane.Source.DestinationChainId {
 				return nil
@@ -801,7 +801,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 			}()
 			err = lane.Source.Common.WaitForPriceUpdates(
 				lane.Logger,
-				lane.ValidationTimeout,
+				30*time.Minute,
 				lane.Source.DestinationChainId,
 			)
 			if err != nil {
@@ -811,12 +811,13 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 		}
 
 		priceUpdateGrp.Go(func() error {
-			return waitForUpdate(lanes.ForwardLane)
+			return waitForUpdate(*lanes.ForwardLane)
 		})
 		priceUpdateGrp.Go(func() error {
-			return waitForUpdate(lanes.ReverseLane)
+			return waitForUpdate(*lanes.ReverseLane)
 		})
 	}
+
 	require.NoError(t, priceUpdateGrp.Wait())
 }
 
@@ -871,16 +872,12 @@ func CCIPDefaultTestSetUp(
 		err = os.Remove(setUpArgs.LaneConfigFile)
 		require.NoError(t, err, "error while removing existing lane config file - %s", setUpArgs.LaneConfigFile)
 	}
-	if inputs.ExistingDeployment || inputs.ReuseContracts {
-		setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment()
-		require.NoError(t, err)
-	} else {
-		setUpArgs.LaneConfig, err = laneconfig.CreateDeploymentJSON(setUpArgs.LaneConfigFile)
-		require.NoError(t, err)
 
-		if setUpArgs.LaneConfig == nil {
-			setUpArgs.LaneConfig = &laneconfig.Lanes{LaneConfigs: make(map[string]*laneconfig.LaneConfig)}
-		}
+	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment()
+	require.NoError(t, err)
+
+	if setUpArgs.LaneConfig == nil {
+		setUpArgs.LaneConfig = &laneconfig.Lanes{LaneConfigs: make(map[string]*laneconfig.LaneConfig)}
 	}
 
 	parent, cancel := context.WithCancel(context.Background())

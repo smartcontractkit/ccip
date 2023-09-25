@@ -378,6 +378,8 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 				ccipModule.gasUpdateWatcherMu.Lock()
 				ccipModule.gasUpdateWatcher[destChain] = e.Timestamp
 				ccipModule.gasUpdateWatcherMu.Unlock()
+			case <-sub.Err():
+				return
 			}
 		}
 	}()
