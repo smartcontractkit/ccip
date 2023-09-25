@@ -324,11 +324,13 @@ func NewOnRampV1_2_0(
 	// Subscribe to the relevant logs
 	// Note we can keep the same prefix across 1.0/1.1 and 1.2 because the onramp addresses will be different
 	name := logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress)
-	err = sourceLP.RegisterFilter(logpoller.Filter{
+	if err = sourceLP.RegisterFilter(logpoller.Filter{
 		Name:      name,
 		EventSigs: []common.Hash{CCIPSendRequestEventSigV1_2_0},
 		Addresses: []common.Address{onRampAddress},
-	})
+	}); err != nil {
+		return nil, err
+	}
 	return &OnRampV1_2_0{
 		finalityTags:               finalityTags,
 		lggr:                       lggr,

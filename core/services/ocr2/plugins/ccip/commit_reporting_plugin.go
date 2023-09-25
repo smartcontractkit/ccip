@@ -671,23 +671,22 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
 	}
+	if len(sendRequests) == 0 {
+		lggr.Warn("No messages found in interval",
+			"minSeqNr", interval.Min,
+			"maxSeqNr", interval.Max)
+		return commit_store.CommitStoreCommitReport{}, fmt.Errorf("tried building a tree without leaves")
+	}
 
 	leaves := make([][32]byte, 0, len(sendRequests))
+	var seqNrs []uint64
 	for _, req := range sendRequests {
 		leaves = append(leaves, req.Data.Hash)
+		seqNrs = append(seqNrs, req.Data.SequenceNumber)
 	}
-	//leaves, err := hashlib.LeavesFromIntervals(lggr, interval, r.config.leafHasher, sendRequests)
-	//if err != nil {
-	//	return commit_store.CommitStoreCommitReport{}, err
-	//}
-	//
-	//if len(leaves) == 0 {
-	//	lggr.Warn("No leaves found in interval",
-	//		"minSeqNr", interval.Min,
-	//		"maxSeqNr", interval.Max)
-	//	return commit_store.CommitStoreCommitReport{}, fmt.Errorf("tried building a tree without leaves")
-	//}
-
+	if !ccipcalc.ContiguousReqs(lggr, interval.Min, interval.Max, seqNrs) {
+		return commit_store.CommitStoreCommitReport{}, errors.Errorf("do not have full range [%v, %v] have %v", interval.Min, interval.Max, seqNrs)
+	}
 	tree, err := merklemulti.NewTree(hashlib.NewKeccakCtx(), leaves)
 	if err != nil {
 		return commit_store.CommitStoreCommitReport{}, err
