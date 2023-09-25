@@ -72,14 +72,19 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 		Status:      "complete",
 		Attestation: "0x9049623e91719ef2aa63c55f357be2529b0e7122ae552c18aff8db58b4633c4d3920ff03d3a6d1ddf11f06bf64d7fd60d45447ac81f527ba628877dc5ca759651b08ffae25a6d3b1411749765244f0a1c131cbfe04430d687a2e12fd9d2e6dc08e118ad95d94ad832332cf3c4f7a4f3da0baa803b7be024b02db81951c0f0714de1b",
 	}
-
-	attestationBytes, err := hex.DecodeString(strings.TrimPrefix(response.Attestation, "0x"))
+	abiEncodedMessageBody, err := hexutil.Decode("0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000f80000000000000001000000020000000000048d71000000000000000000000000eb08f243e5d3fcff26a9e38ae5520a669f4019d000000000000000000000000023a04d5935ed8bc8e3eb78db3541f0abfb001c6e0000000000000000000000006cb3ed9b441eb674b58495c8b3324b59faff5243000000000000000000000000000000005425890298aed601595a70ab815c96711a31bc65000000000000000000000000ab4f961939bfe6a93567cc57c59eed7084ce2131000000000000000000000000000000000000000000000000000000000000271000000000000000000000000035e08285cfed1ef159236728f843286c55fc08610000000000000000")
 	require.NoError(t, err)
-
-	responseBytes, err := json.Marshal(response)
+	rawMessageBody, err := abihelpers.DecodeAbiStruct[usdcPayload](abiEncodedMessageBody)
 	require.NoError(t, err)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		messageHash := utils.Keccak256Fixed(rawMessageBody)
+		expectedUrl := "/v1/attestations/0x" + hex.EncodeToString(messageHash[:])
+		require.Equal(t, expectedUrl, r.URL.Path)
+
+		responseBytes, err := json.Marshal(response)
+		require.NoError(t, err)
+
 		_, err = w.Write(responseBytes)
 		require.NoError(t, err)
 	}))
@@ -108,14 +113,11 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 		},
 	}, nil)
 
-	expectedBody, err := hexutil.Decode("0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000f80000000000000001000000020000000000048d71000000000000000000000000eb08f243e5d3fcff26a9e38ae5520a669f4019d000000000000000000000000023a04d5935ed8bc8e3eb78db3541f0abfb001c6e0000000000000000000000006cb3ed9b441eb674b58495c8b3324b59faff5243000000000000000000000000000000005425890298aed601595a70ab815c96711a31bc65000000000000000000000000ab4f961939bfe6a93567cc57c59eed7084ce2131000000000000000000000000000000000000000000000000000000000000271000000000000000000000000035e08285cfed1ef159236728f843286c55fc08610000000000000000")
-	require.NoError(t, err)
-
 	eventsClient.On("GetLastUSDCMessagePriorToLogIndexInTx",
 		mock.Anything,
 		logIndex,
 		common.Hash(txHash),
-	).Return(expectedBody, nil)
+	).Return(abiEncodedMessageBody, nil)
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
@@ -129,11 +131,11 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	rawBytesMessage, err := abihelpers.DecodeAbiStruct[usdcPayload](expectedBody)
+	attestationBytes, err := hex.DecodeString(strings.TrimPrefix(response.Attestation, "0x"))
 	require.NoError(t, err)
 
 	encodeAbiStruct, err := abihelpers.EncodeAbiStruct[messageAndAttestation](messageAndAttestation{
-		Message:     rawBytesMessage,
+		Message:     rawMessageBody,
 		Attestation: attestationBytes,
 	})
 	require.NoError(t, err)
