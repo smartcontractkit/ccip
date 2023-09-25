@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
@@ -89,26 +88,25 @@ var (
 )
 
 type CCIPCommon struct {
-	ChainClient             blockchain.EVMClient
-	Deployer                *contracts.CCIPContractsDeployer
-	FeeToken                *contracts.LinkToken
-	BridgeTokens            []*contracts.ERC20Token // as of now considering the bridge token is same as link token
-	TokenPrices             []*big.Int
-	BridgeTokenPools        []*contracts.LockReleaseTokenPool
-	RateLimiterConfig       contracts.RateLimiterConfig
-	ARMContract             *common.Address
-	ARM                     *contracts.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events
-	Router                  *contracts.Router
-	PriceRegistry           *contracts.PriceRegistry
-	PriceUpdatesToWatchFrom uint64
-	WrappedNative           common.Address
-	ExistingDeployment      bool
-	poolFunds               *big.Int
-	gasUpdateWatcherMu      *sync.Mutex
-	gasUpdateWatcher        map[uint64]*big.Int // key - destchain id; value - timestamp of update
-	priceUpdateSubs         []event.Subscription
-	connectionIssues        *atomic.Bool
-	connectionRestored      *atomic.Bool
+	ChainClient        blockchain.EVMClient
+	Deployer           *contracts.CCIPContractsDeployer
+	FeeToken           *contracts.LinkToken
+	BridgeTokens       []*contracts.ERC20Token // as of now considering the bridge token is same as link token
+	TokenPrices        []*big.Int
+	BridgeTokenPools   []*contracts.LockReleaseTokenPool
+	RateLimiterConfig  contracts.RateLimiterConfig
+	ARMContract        *common.Address
+	ARM                *contracts.ARM // populate only if the ARM contracts is not a mock and can be used to verify various ARM events
+	Router             *contracts.Router
+	PriceRegistry      *contracts.PriceRegistry
+	WrappedNative      common.Address
+	ExistingDeployment bool
+	poolFunds          *big.Int
+	gasUpdateWatcherMu *sync.Mutex
+	gasUpdateWatcher   map[uint64]*big.Int // key - destchain id; value - timestamp of update
+	priceUpdateSubs    []event.Subscription
+	connectionIssues   *atomic.Bool
+	connectionRestored *atomic.Bool
 }
 
 func (ccipModule *CCIPCommon) ConnectionRestored() {
@@ -159,20 +157,19 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 		tokens = append(tokens, token)
 	}
 	newCommon := &CCIPCommon{
-		ChainClient:             chainClient,
-		Deployer:                newCD,
-		BridgeTokens:            tokens,
-		TokenPrices:             ccipModule.TokenPrices,
-		BridgeTokenPools:        pools,
-		RateLimiterConfig:       ccipModule.RateLimiterConfig,
-		ARMContract:             ccipModule.ARMContract,
-		ARM:                     arm,
-		PriceUpdatesToWatchFrom: ccipModule.PriceUpdatesToWatchFrom,
-		WrappedNative:           ccipModule.WrappedNative,
-		ExistingDeployment:      ccipModule.ExistingDeployment,
-		poolFunds:               ccipModule.poolFunds,
-		gasUpdateWatcherMu:      &sync.Mutex{},
-		gasUpdateWatcher:        make(map[uint64]*big.Int),
+		ChainClient:        chainClient,
+		Deployer:           newCD,
+		BridgeTokens:       tokens,
+		TokenPrices:        ccipModule.TokenPrices,
+		BridgeTokenPools:   pools,
+		RateLimiterConfig:  ccipModule.RateLimiterConfig,
+		ARMContract:        ccipModule.ARMContract,
+		ARM:                arm,
+		WrappedNative:      ccipModule.WrappedNative,
+		ExistingDeployment: ccipModule.ExistingDeployment,
+		poolFunds:          ccipModule.poolFunds,
+		gasUpdateWatcherMu: &sync.Mutex{},
+		gasUpdateWatcher:   make(map[uint64]*big.Int),
 	}
 	newCommon.FeeToken, err = newCommon.Deployer.NewLinkTokenContract(common.HexToAddress(ccipModule.FeeToken.Address()))
 	if err != nil {
@@ -220,9 +217,6 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 			ccipModule.PriceRegistry = &contracts.PriceRegistry{
 				EthAddress: common.HexToAddress(conf.PriceRegistry),
 			}
-		}
-		if conf.PriceUpdatesToWatchFrom > 0 {
-			ccipModule.PriceUpdatesToWatchFrom = conf.PriceUpdatesToWatchFrom
 		}
 		if common.IsHexAddress(conf.WrappedNative) {
 			ccipModule.WrappedNative = common.HexToAddress(conf.WrappedNative)
@@ -313,13 +307,21 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	timeout time.Duration,
 	destChainId uint64,
 ) error {
+	destChainSelector, err := chainselectors.SelectorFromChainId(destChainId)
+	if err != nil {
+		return err
+	}
 	// check if price is already updated
-	price, err := ccipModule.PriceRegistry.Instance.GetDestinationChainGasPrice(nil, destChainId)
+	price, err := ccipModule.PriceRegistry.Instance.GetDestinationChainGasPrice(nil, destChainSelector)
 	if err != nil {
 		return err
 	}
 	if price.Timestamp > 0 && price.Value.Cmp(big.NewInt(0)) > 0 {
-		lggr.Info().Msgf("Price already updated on %s dest chain %d", ccipModule.PriceRegistry.Address(), destChainId)
+		lggr.Info().
+			Str("Price Registry", ccipModule.PriceRegistry.Address()).
+			Uint64("dest chain", destChainId).
+			Str("source chain", ccipModule.ChainClient.GetNetworkName()).
+			Msg("Price already updated")
 		return nil
 	}
 	// if not, wait for price update
@@ -335,7 +337,11 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 			timestampOfUpdate, ok := ccipModule.gasUpdateWatcher[destChainId]
 			ccipModule.gasUpdateWatcherMu.Unlock()
 			if ok && timestampOfUpdate.Cmp(big.NewInt(0)) == 1 {
-				lggr.Info().Msgf("Price updated on %s dest chain %d", ccipModule.PriceRegistry.Address(), destChainId)
+				lggr.Info().
+					Str("Price Registry", ccipModule.PriceRegistry.Address()).
+					Uint64("dest chain", destChainId).
+					Str("source chain", ccipModule.ChainClient.GetNetworkName()).
+					Msg("Price updated")
 				return nil
 			}
 		case <-ctx.Done():
@@ -346,17 +352,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 
 func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 	gasUpdateEvent := make(chan *price_registry.PriceRegistryUsdPerUnitGasUpdated)
-	blockNum := ccipModule.PriceUpdatesToWatchFrom
-	var opts *bind.WatchOpts
-	var err error
-	if blockNum == 0 {
-		blockNum, err = ccipModule.ChainClient.LatestBlockNumber(context.Background())
-		if err != nil {
-			return err
-		}
-	}
-	opts = &bind.WatchOpts{Start: &blockNum}
-	sub, err := ccipModule.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(opts, gasUpdateEvent, nil)
+	sub, err := ccipModule.PriceRegistry.Instance.WatchUsdPerUnitGasUpdated(nil, gasUpdateEvent, nil)
 	if err != nil {
 		return err
 	}
@@ -369,15 +365,15 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 				if err != nil {
 					continue
 				}
+				ccipModule.gasUpdateWatcherMu.Lock()
+				ccipModule.gasUpdateWatcher[destChain] = e.Timestamp
+				ccipModule.gasUpdateWatcherMu.Unlock()
 				log.Info().
 					Str("source_chain", ccipModule.ChainClient.GetNetworkName()).
 					Uint64("dest_chain", destChain).
 					Str("price_registry", ccipModule.PriceRegistry.Address()).
 					Msgf("UsdPerUnitGasUpdated event received for dest chain %d source chain %s",
 						destChain, ccipModule.ChainClient.GetNetworkName())
-				ccipModule.gasUpdateWatcherMu.Lock()
-				ccipModule.gasUpdateWatcher[destChain] = e.Timestamp
-				ccipModule.gasUpdateWatcherMu.Unlock()
 			case <-sub.Err():
 				return
 			}
@@ -539,11 +535,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		if err != nil {
 			return fmt.Errorf("error in waiting for PriceRegistry deployment %+v", err)
 		}
-		latest, err := ccipModule.ChainClient.LatestBlockNumber(context.Background())
-		if err != nil {
-			return fmt.Errorf("error in getting latest block number %+v", err)
-		}
-		ccipModule.PriceUpdatesToWatchFrom = latest
 	} else {
 		ccipModule.PriceRegistry, err = cd.NewPriceRegistry(ccipModule.PriceRegistry.EthAddress)
 		if err != nil {
@@ -1466,14 +1457,13 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		btpAddresses = append(btpAddresses, lane.Source.Common.BridgeTokenPools[i].Address())
 	}
 	lane.SrcNetworkLaneCfg.CommonContracts = laneconfig.CommonContracts{
-		FeeToken:                lane.Source.Common.FeeToken.Address(),
-		BridgeTokens:            btAddresses,
-		BridgeTokenPools:        btpAddresses,
-		ARM:                     lane.Source.Common.ARMContract.Hex(),
-		Router:                  lane.Source.Common.Router.Address(),
-		PriceRegistry:           lane.Source.Common.PriceRegistry.Address(),
-		WrappedNative:           lane.Source.Common.WrappedNative.Hex(),
-		PriceUpdatesToWatchFrom: lane.Source.Common.PriceUpdatesToWatchFrom,
+		FeeToken:         lane.Source.Common.FeeToken.Address(),
+		BridgeTokens:     btAddresses,
+		BridgeTokenPools: btpAddresses,
+		ARM:              lane.Source.Common.ARMContract.Hex(),
+		Router:           lane.Source.Common.Router.Address(),
+		PriceRegistry:    lane.Source.Common.PriceRegistry.Address(),
+		WrappedNative:    lane.Source.Common.WrappedNative.Hex(),
 	}
 	if lane.Source.Common.ARM == nil {
 		lane.SrcNetworkLaneCfg.CommonContracts.IsMockARM = true
@@ -1491,14 +1481,13 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 		btpAddresses = append(btpAddresses, lane.Dest.Common.BridgeTokenPools[i].Address())
 	}
 	lane.DstNetworkLaneCfg.CommonContracts = laneconfig.CommonContracts{
-		FeeToken:                lane.Dest.Common.FeeToken.Address(),
-		BridgeTokens:            btAddresses,
-		BridgeTokenPools:        btpAddresses,
-		ARM:                     lane.Dest.Common.ARMContract.Hex(),
-		Router:                  lane.Dest.Common.Router.Address(),
-		PriceRegistry:           lane.Dest.Common.PriceRegistry.Address(),
-		WrappedNative:           lane.Dest.Common.WrappedNative.Hex(),
-		PriceUpdatesToWatchFrom: lane.Dest.Common.PriceUpdatesToWatchFrom,
+		FeeToken:         lane.Dest.Common.FeeToken.Address(),
+		BridgeTokens:     btAddresses,
+		BridgeTokenPools: btpAddresses,
+		ARM:              lane.Dest.Common.ARMContract.Hex(),
+		Router:           lane.Dest.Common.Router.Address(),
+		PriceRegistry:    lane.Dest.Common.PriceRegistry.Address(),
+		WrappedNative:    lane.Dest.Common.WrappedNative.Hex(),
 	}
 	if lane.Dest.Common.ARM == nil {
 		lane.DstNetworkLaneCfg.CommonContracts.IsMockARM = true
@@ -1982,12 +1971,12 @@ func CreateBootstrapJob(
 	bootstrapCommit *client.CLNodesWithKeys,
 	bootstrapExec *client.CLNodesWithKeys,
 ) error {
-	_, err := bootstrapCommit.Node.MustCreateJob(jobParams.BootstrapJob(jobParams.CommitStore.Hex()))
+	_, err := bootstrapCommit.Node.CreateJobsWithRetry(jobParams.BootstrapJob(jobParams.CommitStore.Hex()), 3)
 	if err != nil {
 		return fmt.Errorf("shouldn't fail creating bootstrap job on bootstrap node %+v", err)
 	}
 	if bootstrapExec != nil {
-		_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(jobParams.OffRamp.Hex()))
+		_, err := bootstrapExec.Node.CreateJobsWithRetry(jobParams.BootstrapJob(jobParams.OffRamp.Hex()), 3)
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating bootstrap job on bootstrap node %+v", err)
 		}
@@ -2012,7 +2001,7 @@ func CreateOCR2CCIPCommitJobs(
 		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
 		lggr.Info().Msgf("Creating CCIP-Commit job on OCR node %d job name %s", index+1, ocr2SpecCommit.Name)
-		_, err = node.Node.MustCreateJob(&ocr2SpecCommit)
+		_, err = node.Node.CreateJobsWithRetry(&ocr2SpecCommit, 3)
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating CCIP-Commit job on OCR node %d job name %s - %+v", index+1, ocr2SpecCommit.Name, err)
 		}
@@ -2045,7 +2034,7 @@ func CreateOCR2CCIPExecutionJobs(
 		ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
 		lggr.Info().Msgf("Creating CCIP-Exec job on OCR node %d job name %s", index+1, ocr2SpecExec.Name)
-		_, err = node.Node.MustCreateJob(&ocr2SpecExec)
+		_, err = node.Node.CreateJobsWithRetry(&ocr2SpecExec, 3)
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %+v", index+1,
 				ocr2SpecExec.Name, err)
@@ -2212,6 +2201,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 
 		for _, chainlinkNode := range chainlinkK8sNodes {
 			chainlinkNode.ChainlinkClient.SetLogger(logger)
+			chainlinkNode.ChainlinkClient.AddRetryAttempt(3)
 			chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient)
 			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}

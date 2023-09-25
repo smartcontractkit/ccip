@@ -3,7 +3,7 @@ LogPoller = true
 CCIP = true
 
 [Log]
-Level = 'info'
+Level = 'debug'
 JSONConsole = true
 
 [Log.File]

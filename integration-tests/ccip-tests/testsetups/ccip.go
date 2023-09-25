@@ -76,11 +76,11 @@ var (
 		"resources": map[string]interface{}{
 			"requests": map[string]interface{}{
 				"cpu":    "2",
-				"memory": "6Gi",
+				"memory": "4Gi",
 			},
 			"limits": map[string]interface{}{
 				"cpu":    "2",
-				"memory": "6Gi",
+				"memory": "4Gi",
 			},
 		},
 	}
@@ -493,6 +493,11 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 		p.setLoadInputs()
 	}
 
+	// if no of NetworkPairs are more than 3 , need to increase the db profile
+	if len(p.NetworkPairs) > 10 {
+		p.CLNodeDBResourceProfile = DONDBResourceProfile
+	}
+
 	return p
 }
 
@@ -790,13 +795,21 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 				return nil
 			}
 			priceUpdateTracker.Store(lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
-			lane.Logger.Info().Msgf("Waiting for price update on %s dest chain %d", lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
+			lane.Logger.Info().
+				Str("source_chain", lane.Source.Common.ChainClient.GetNetworkName()).
+				Uint64("dest_chain", lane.Source.DestinationChainId).
+				Str("price_registry", lane.Source.Common.PriceRegistry.Address()).
+				Msgf("Waiting for price update")
 			err := lane.Source.Common.WatchForPriceUpdates()
 			if err != nil {
 				return err
 			}
 			defer func() {
-				lane.Logger.Info().Msgf("Stopping price update watch on %s dest chain %d", lane.Source.Common.PriceRegistry.Address(), lane.Source.DestinationChainId)
+				lane.Logger.Info().
+					Str("source_chain", lane.Source.Common.ChainClient.GetNetworkName()).
+					Uint64("dest_chain", lane.Source.DestinationChainId).
+					Str("price_registry", lane.Source.Common.PriceRegistry.Address()).
+					Msg("Stopping price update watch")
 				lane.Source.Common.StopWatchingPriceUpdates()
 			}()
 			err = lane.Source.Common.WaitForPriceUpdates(

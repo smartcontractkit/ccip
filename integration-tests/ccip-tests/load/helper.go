@@ -167,7 +167,6 @@ func (l *loadArgs) Start() {
 	l.LoadStarterWg.Add(1)
 	waitForLoadRun := func(gen *wasp.Generator, ccipLoad *CCIPE2ELoad) error {
 		_, failed := gen.Wait()
-		defer ccipLoad.Lane.CleanUp()
 		if failed {
 			return fmt.Errorf("load run is failed")
 		}
