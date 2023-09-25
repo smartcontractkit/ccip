@@ -26,7 +26,6 @@ const (
 )
 
 type TelemPayload struct {
-	Ctx        context.Context
 	Telemetry  []byte
 	TelemType  TelemetryType
 	ContractID string
