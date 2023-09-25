@@ -1971,12 +1971,12 @@ func CreateBootstrapJob(
 	bootstrapCommit *client.CLNodesWithKeys,
 	bootstrapExec *client.CLNodesWithKeys,
 ) error {
-	_, err := bootstrapCommit.Node.CreateJobsWithRetry(jobParams.BootstrapJob(jobParams.CommitStore.Hex()), 3)
+	_, err := bootstrapCommit.Node.MustCreateJob(jobParams.BootstrapJob(jobParams.CommitStore.Hex()))
 	if err != nil {
 		return fmt.Errorf("shouldn't fail creating bootstrap job on bootstrap node %+v", err)
 	}
 	if bootstrapExec != nil {
-		_, err := bootstrapExec.Node.CreateJobsWithRetry(jobParams.BootstrapJob(jobParams.OffRamp.Hex()), 3)
+		_, err := bootstrapExec.Node.MustCreateJob(jobParams.BootstrapJob(jobParams.OffRamp.Hex()))
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating bootstrap job on bootstrap node %+v", err)
 		}
@@ -2001,7 +2001,7 @@ func CreateOCR2CCIPCommitJobs(
 		ocr2SpecCommit.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecCommit.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
 		lggr.Info().Msgf("Creating CCIP-Commit job on OCR node %d job name %s", index+1, ocr2SpecCommit.Name)
-		_, err = node.Node.CreateJobsWithRetry(&ocr2SpecCommit, 3)
+		_, err = node.Node.MustCreateJob(&ocr2SpecCommit)
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating CCIP-Commit job on OCR node %d job name %s - %+v", index+1, ocr2SpecCommit.Name, err)
 		}
@@ -2034,7 +2034,7 @@ func CreateOCR2CCIPExecutionJobs(
 		ocr2SpecExec.OCR2OracleSpec.OCRKeyBundleID.SetValid(node.KeysBundle.OCR2Key.Data.ID)
 		ocr2SpecExec.OCR2OracleSpec.TransmitterID.SetValid(node.KeysBundle.EthAddress)
 		lggr.Info().Msgf("Creating CCIP-Exec job on OCR node %d job name %s", index+1, ocr2SpecExec.Name)
-		_, err = node.Node.CreateJobsWithRetry(&ocr2SpecExec, 3)
+		_, err = node.Node.MustCreateJob(&ocr2SpecExec)
 		if err != nil {
 			return fmt.Errorf("shouldn't fail creating CCIP-Exec job on OCR node %d job name %s - %+v", index+1,
 				ocr2SpecExec.Name, err)
