@@ -58,9 +58,12 @@ type update struct {
 }
 
 type CommitPluginConfig struct {
-	lggr                     logger.Logger
-	sourceLP, destLP         logpoller.LogPoller
-	sourceReader             ccipdata.OnRampReader
+	lggr             logger.Logger
+	sourceLP, destLP logpoller.LogPoller
+	// Current onRamp reader
+	onRampReaderMu *sync.RWMutex
+	onRampReader   ccipdata.OnRampReader
+
 	destReader               ccipdata.Reader
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	onRampAddress            common.Address
@@ -212,19 +215,19 @@ func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry
 	defer rf.filtersMu.Unlock()
 
 	// source chain filters
-	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getCommitPluginSourceLpFilters(rf.config.onRampAddress)
-	created, deleted := logpollerutil.FiltersDiff(sourceFiltersBefore, sourceFiltersNow)
-	if err := logpollerutil.UnregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
-		return err
-	}
-	if err := logpollerutil.RegisterLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
-		return err
-	}
-	rf.sourceChainFilters = sourceFiltersNow
+	//sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getCommitPluginSourceLpFilters(rf.config.onRampAddress)
+	//created, deleted := logpollerutil.FiltersDiff(sourceFiltersBefore, sourceFiltersNow)
+	//if err := logpollerutil.UnregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
+	//	return err
+	//}
+	//if err := logpollerutil.RegisterLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
+	//	return err
+	//}
+	//rf.sourceChainFilters = sourceFiltersNow
 
 	// destination chain filters
 	destFiltersBefore, destFiltersNow := rf.destChainFilters, getCommitPluginDestLpFilters(destPriceRegistry, rf.config.offRamp.Address())
-	created, deleted = logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
+	created, deleted := logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
 	if err := logpollerutil.UnregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
 		return err
 	}
@@ -242,7 +245,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 
-	msgRequests, err := r.config.sourceReader.GetSendRequestsGteSeqNum(ctx, nextInflightMin, int(r.offchainConfig.SourceFinalityDepth))
+	msgRequests, err := r.config.onRampReader.GetSendRequestsGteSeqNum(ctx, nextInflightMin, int(r.offchainConfig.SourceFinalityDepth))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -661,7 +664,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	sendRequests, err := r.config.sourceReader.GetSendRequestsBetweenSeqNums(
+	sendRequests, err := r.config.onRampReader.GetSendRequestsBetweenSeqNums(
 		ctx,
 		interval.Min,
 		interval.Max,

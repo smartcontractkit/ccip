@@ -81,19 +81,14 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(int64(chainId)),
 		"destChain", ChainName(destChainID))
-	onRampReader, _ := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
-	//onRamp, err := contractutil.LoadOnRamp(staticConfig.OnRamp, CommitPluginLabel, sourceChain.Client())
-	//if err != nil {
-	//	return nil, errors.Wrap(err, "failed loading onRamp")
-	//}
+	onRampReader, err := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
+	if err != nil {
+		return nil, err
+	}
 	priceGetterObject, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
 		return nil, err
 	}
-	//dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
-	//if err != nil {
-	//	return nil, err
-	//}
 	sourceRouter, err := router.NewRouter(onRampReader.Router(), sourceChain.Client())
 	if err != nil {
 		return nil, err
@@ -103,14 +98,12 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 		return nil, err
 	}
 
-	//leafHasher := hashlib.NewLeafHasher(staticConfig.SourceChainSelector, staticConfig.ChainSelector, onRamp.Address(), hashlib.NewKeccakCtx())
-	// Note that lggr already has the jobName and contractID (commit store)
 	wrappedPluginFactory := NewCommitReportingPluginFactory(
 		CommitPluginConfig{
 			lggr:                commitLggr,
 			sourceLP:            sourceChain.LogPoller(),
 			destLP:              destChain.LogPoller(),
-			sourceReader:        onRampReader,
+			onRampReader:        onRampReader,
 			destReader:          ccipdata.NewLogPollerReader(destChain.LogPoller(), commitLggr, destChain.Client()),
 			offRamp:             offRamp,
 			onRampAddress:       staticConfig.OnRamp,
@@ -121,8 +114,6 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 			destClient:          destChain.Client(),
 			sourceClient:        sourceChain.Client(),
 			commitStore:         commitStore,
-			//leafHasher:          leafHasher,
-			//checkFinalityTags:   sourceChain.Config().EVM().FinalityTagEnabled(),
 		})
 
 	err = wrappedPluginFactory.UpdateLogPollerFilters(utils.ZeroAddress, qopts...)
@@ -215,7 +206,7 @@ func getCommitPluginDestLpFilters(priceRegistry common.Address, offRamp common.A
 }
 
 // UnregisterCommitPluginLpFilters unregisters all the registered filters for both source and dest chains.
-func UnregisterCommitPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
+func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
 	if spec == nil {
 		return errors.New("spec is nil")
 	}
@@ -258,27 +249,33 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSp
 	if err != nil {
 		return err
 	}
+	onRampReader, _ := ccipdata.NewOnRampReader(lggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
+	if err := onRampReader.Close(); err != nil {
+		return err
+	}
+
+	// TODO: once offramp/commit are abstracted, we can call Close on the offramp/commit readers to unregister filters.
 	return unregisterCommitPluginFilters(ctx, sourceChain.LogPoller(), destChain.LogPoller(), commitStore, common.HexToAddress(pluginConfig.OffRamp), qopts...)
 }
 
 func unregisterCommitPluginFilters(ctx context.Context, sourceLP, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address, qopts ...pg.QOpt) error {
-	staticCfg, err := destCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return err
-	}
+	//staticCfg, err := destCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
+	//if err != nil {
+	//	return err
+	//}
 
 	dynamicCfg, err := destCommitStore.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
 	}
 
-	if err := logpollerutil.UnregisterLpFilters(
-		sourceLP,
-		getCommitPluginSourceLpFilters(staticCfg.OnRamp),
-		qopts...,
-	); err != nil {
-		return err
-	}
+	//if err := logpollerutil.UnregisterLpFilters(
+	//	sourceLP,
+	//	getCommitPluginSourceLpFilters(staticCfg.OnRamp),
+	//	qopts...,
+	//); err != nil {
+	//	return err
+	//}
 
 	return logpollerutil.UnregisterLpFilters(
 		destLP,

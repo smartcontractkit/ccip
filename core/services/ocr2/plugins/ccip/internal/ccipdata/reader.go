@@ -21,7 +21,7 @@ type Meta struct {
 	BlockTimestamp time.Time
 	BlockNumber    int64
 	TxHash         common.Hash
-	LogIndex       int64
+	LogIndex       uint
 }
 
 // Client can be used to fetch CCIP related parsed on-chain data.

@@ -62,7 +62,7 @@ var (
 	ExecutionReportArgs abi.Arguments
 )
 
-func getIDOrPanic(name string, abi2 abi.ABI) common.Hash {
+func GetIDOrPanic(name string, abi2 abi.ABI) common.Hash {
 	event, ok := abi2.Events[name]
 	if !ok {
 		panic(fmt.Sprintf("missing event %s", name))
@@ -87,33 +87,33 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	EventSignatures.SendRequested = getIDOrPanic("CCIPSendRequested", onRampABI)
+	EventSignatures.SendRequested = GetIDOrPanic("CCIPSendRequested", onRampABI)
 	EventSignatures.SendRequestedSequenceNumberWord = 4
 
 	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
 	if err != nil {
 		panic(err)
 	}
-	EventSignatures.ReportAccepted = getIDOrPanic("ReportAccepted", commitStoreABI)
+	EventSignatures.ReportAccepted = GetIDOrPanic("ReportAccepted", commitStoreABI)
 	EventSignatures.ReportAcceptedMaxSequenceNumberWord = 3
 
 	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_offramp.EVM2EVMOffRampABI))
 	if err != nil {
 		panic(err)
 	}
-	EventSignatures.ExecutionStateChanged = getIDOrPanic("ExecutionStateChanged", offRampABI)
+	EventSignatures.ExecutionStateChanged = GetIDOrPanic("ExecutionStateChanged", offRampABI)
 	EventSignatures.ExecutionStateChangedSequenceNumberIndex = 1
-	EventSignatures.PoolAdded = getIDOrPanic("PoolAdded", offRampABI)
-	EventSignatures.PoolRemoved = getIDOrPanic("PoolRemoved", offRampABI)
+	EventSignatures.PoolAdded = GetIDOrPanic("PoolAdded", offRampABI)
+	EventSignatures.PoolRemoved = GetIDOrPanic("PoolRemoved", offRampABI)
 
 	priceRegistryABI, err := abi.JSON(strings.NewReader(price_registry.PriceRegistryABI))
 	if err != nil {
 		panic(err)
 	}
-	EventSignatures.UsdPerUnitGasUpdated = getIDOrPanic("UsdPerUnitGasUpdated", priceRegistryABI)
-	EventSignatures.UsdPerTokenUpdated = getIDOrPanic("UsdPerTokenUpdated", priceRegistryABI)
-	EventSignatures.FeeTokenAdded = getIDOrPanic("FeeTokenAdded", priceRegistryABI)
-	EventSignatures.FeeTokenRemoved = getIDOrPanic("FeeTokenRemoved", priceRegistryABI)
+	EventSignatures.UsdPerUnitGasUpdated = GetIDOrPanic("UsdPerUnitGasUpdated", priceRegistryABI)
+	EventSignatures.UsdPerTokenUpdated = GetIDOrPanic("UsdPerTokenUpdated", priceRegistryABI)
+	EventSignatures.FeeTokenAdded = GetIDOrPanic("FeeTokenAdded", priceRegistryABI)
+	EventSignatures.FeeTokenRemoved = GetIDOrPanic("FeeTokenRemoved", priceRegistryABI)
 
 	// arguments
 	MessageArgs = onRampABI.Events["CCIPSendRequested"].Inputs

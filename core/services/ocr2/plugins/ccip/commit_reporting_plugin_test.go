@@ -135,7 +135,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.config.commitStore = commitStore
 			p.config.onRampAddress = onRampAddress
 			p.offchainConfig.SourceFinalityDepth = uint32(sourceFinalityDepth)
-			p.config.sourceReader = sourceReader
+			p.config.onRampReader = sourceReader
 			p.tokenDecimalsCache = tokenDecimalsCache
 			p.config.priceGetter = priceGet
 			p.config.sourceFeeEstimator = sourceFeeEst
@@ -252,7 +252,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 			p.destPriceRegistry = destPriceRegistry
 			p.config.destReader = destReader
-			p.config.sourceReader = sourceReader
+			p.config.onRampReader = sourceReader
 			p.config.onRampAddress = onRampAddress
 			p.config.sourceChainSelector = uint64(sourceChainSelector)
 			p.config.leafHasher = &leafHasher123{}
@@ -1044,7 +1044,7 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 				})
 			}
 			sourceReader.On("GetSendRequestsGteSeqNum", ctx, mock.Anything, tc.expQueryMin, false, 0).Return(sendReqs, nil)
-			p.config.sourceReader = sourceReader
+			p.config.onRampReader = sourceReader
 
 			minSeqNum, maxSeqNum, err := p.calculateMinMaxSequenceNumbers(ctx, lggr)
 			if tc.expErr {

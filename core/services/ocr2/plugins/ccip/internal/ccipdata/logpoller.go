@@ -304,7 +304,7 @@ func parseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(l
 					BlockTimestamp: log.BlockTimestamp,
 					BlockNumber:    log.BlockNumber,
 					TxHash:         log.TxHash,
-					LogIndex:       log.LogIndex,
+					LogIndex:       uint(log.LogIndex),
 				},
 			})
 		}
