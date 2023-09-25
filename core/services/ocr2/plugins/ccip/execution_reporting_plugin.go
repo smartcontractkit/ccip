@@ -291,7 +291,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	})
 	getDestGasPrice := cache.LazyFetch(func() (prices.GasPrice, error) {
-		return r.estimateDestinationGasPrice(ctx)
+		return r.gasPriceEstimator.GetGasPrice(ctx)
 	})
 
 	lggr.Infow("Processing unexpired reports", "n", len(unexpiredReports))
@@ -432,15 +432,6 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 	}
 
 	return res, nil
-}
-
-func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (prices.GasPrice, error) {
-	destGasPrice, err := r.gasPriceEstimator.GetGasPrice(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return destGasPrice, nil
 }
 
 func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) (map[common.Address]common.Address, []common.Address, error) {

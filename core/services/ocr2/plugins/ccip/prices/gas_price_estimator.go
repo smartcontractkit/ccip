@@ -39,14 +39,18 @@ type GasPrice *big.Int
 //
 //go:generate mockery --quiet --name GasPriceEstimator --output . --filename gas_price_estimator_mock.go --inpackage --case=underscore
 type GasPriceEstimator interface {
-	GetGasPrice(context.Context) (GasPrice, error)
-	DenoteInUSD(GasPrice, *big.Int) (GasPrice, error)
-	Median([]GasPrice) (GasPrice, error)
-	Deviates(GasPrice, GasPrice, GasPriceDeviationOptions) (bool, error)
-
-	// EstimateMsgCostUSD calculates the costs for next execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
-	EstimateMsgCostUSD(GasPrice, *big.Int, internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, MsgCostOptions) (*big.Int, error)
-	String(GasPrice) string
+	// GetGasPrice fetches the current gas price.
+	GetGasPrice(ctx context.Context) (GasPrice, error)
+	// DenoteInUSD converts the gas price to be in units of USD.
+	DenoteInUSD(p GasPrice, wrappedNativePrice *big.Int) (GasPrice, error)
+	// Median finds the median gas price in slice. If gas price has multiple components, median of each individual component should be taken.
+	Median(gasPrices []GasPrice) (GasPrice, error)
+	// Deviates checks if p1 diffs from p2 by deviation options.
+	Deviates(p1 GasPrice, p2 GasPrice, opts GasPriceDeviationOptions) (bool, error)
+	// EstimateMsgCostUSD estimates the costs for msg execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
+	EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, opts MsgCostOptions) (*big.Int, error)
+	// String converts the gas price to string.
+	String(p GasPrice) string
 }
 
 func NewGasPriceEstimator(

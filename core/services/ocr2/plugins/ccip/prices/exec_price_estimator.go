@@ -48,8 +48,8 @@ func (g ExecGasPriceEstimator) Median(gasPrices []GasPrice) (GasPrice, error) {
 	return ccipcalc.BigIntMedian(prices), nil
 }
 
-func (g ExecGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice, opt GasPriceDeviationOptions) (bool, error) {
-	return ccipcalc.Deviates(p1, p2, opt.ExecDeviationPPB), nil
+func (g ExecGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice, opts GasPriceDeviationOptions) (bool, error) {
+	return ccipcalc.Deviates(p1, p2, opts.ExecDeviationPPB), nil
 }
 
 func (g ExecGasPriceEstimator) EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, _ MsgCostOptions) (*big.Int, error) {
