@@ -82,11 +82,11 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 		expectedUrl := "/v1/attestations/0x" + hex.EncodeToString(messageHash[:])
 		require.Equal(t, expectedUrl, r.URL.Path)
 
-		responseBytes, err := json.Marshal(response)
-		require.NoError(t, err)
+		responseBytes, err2 := json.Marshal(response)
+		require.NoError(t, err2)
 
-		_, err = w.Write(responseBytes)
-		require.NoError(t, err)
+		_, err2 = w.Write(responseBytes)
+		require.NoError(t, err2)
 	}))
 
 	defer ts.Close()
