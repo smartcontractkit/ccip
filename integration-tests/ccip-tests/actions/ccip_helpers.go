@@ -122,35 +122,56 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 	}
 	var arm *contracts.ARM
 	if ccipModule.ARM != nil {
-		arm = ccipModule.ARM.Copy(chainClient)
+		arm, err = newCD.NewARMContract(*ccipModule.ARMContract)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var pools []*contracts.LockReleaseTokenPool
 	for i := range ccipModule.BridgeTokenPools {
-		pools = append(pools, ccipModule.BridgeTokenPools[i].Copy(chainClient))
+		pool, err := newCD.NewLockReleaseTokenPoolContract(common.HexToAddress(ccipModule.BridgeTokenPools[i].Address()))
+		if err != nil {
+			return nil, err
+		}
+		pools = append(pools, pool)
 	}
 	var tokens []*contracts.ERC20Token
 	for i := range ccipModule.BridgeTokens {
-		tokens = append(tokens, ccipModule.BridgeTokens[i].Copy(chainClient))
+		token, err := newCD.NewERC20TokenContract(common.HexToAddress(ccipModule.BridgeTokens[i].Address()))
+		if err != nil {
+			return nil, err
+		}
+		tokens = append(tokens, token)
 	}
-	return &CCIPCommon{
+	newCommon := &CCIPCommon{
 		ChainClient:             chainClient,
 		Deployer:                newCD,
-		FeeToken:                ccipModule.FeeToken.Copy(chainClient),
 		BridgeTokens:            tokens,
 		TokenPrices:             ccipModule.TokenPrices,
 		BridgeTokenPools:        pools,
 		RateLimiterConfig:       ccipModule.RateLimiterConfig,
 		ARMContract:             ccipModule.ARMContract,
 		ARM:                     arm,
-		Router:                  ccipModule.Router.Copy(chainClient),
-		PriceRegistry:           ccipModule.PriceRegistry.Copy(chainClient),
 		PriceUpdatesToWatchFrom: ccipModule.PriceUpdatesToWatchFrom,
 		WrappedNative:           ccipModule.WrappedNative,
 		ExistingDeployment:      ccipModule.ExistingDeployment,
 		poolFunds:               ccipModule.poolFunds,
 		gasUpdateWatcherMu:      &sync.Mutex{},
 		gasUpdateWatcher:        make(map[uint64]*big.Int),
-	}, nil
+	}
+	newCommon.FeeToken, err = newCommon.Deployer.NewLinkTokenContract(common.HexToAddress(ccipModule.FeeToken.Address()))
+	if err != nil {
+		return nil, err
+	}
+	newCommon.PriceRegistry, err = newCommon.Deployer.NewPriceRegistry(common.HexToAddress(ccipModule.PriceRegistry.Address()))
+	if err != nil {
+		return nil, err
+	}
+	newCommon.Router, err = newCommon.Deployer.NewRouter(common.HexToAddress(ccipModule.Router.Address()))
+	if err != nil {
+		return nil, err
+	}
+	return newCommon, nil
 }
 
 func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig) {
