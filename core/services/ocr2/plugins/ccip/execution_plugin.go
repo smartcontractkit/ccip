@@ -199,12 +199,13 @@ func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Execution
 			return nil, errors.Wrap(err, "failed to parse USDC attestation API")
 		}
 
-		usdcReader, err := ccipdata.NewUSDCReader(pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceLP)
+		usdcReader, err := ccipdata.NewUSDCReader(lggr, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceLP)
 		if err != nil {
 			return nil, err
 		}
 		tokenDataProviders[pluginConfig.USDCConfig.SourceTokenAddress] = tokendata.NewCachedReader(
 			usdc.NewUSDCTokenDataReader(
+				lggr,
 				usdcReader,
 				attestationURI,
 			),

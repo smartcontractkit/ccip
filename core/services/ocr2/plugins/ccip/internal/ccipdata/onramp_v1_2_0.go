@@ -56,8 +56,8 @@ func (t *LeafHasherV1_2_0) HashLeaf(log types.Log) ([32]byte, error) {
 	if err != nil {
 		return [32]byte{}, err
 	}
-
-	encodedTokens, err := abihelpers.TokenAmountsArgs.PackValues([]interface{}{msg.Message.TokenAmounts})
+	message := msg.Message
+	encodedTokens, err := abihelpers.TokenAmountsArgs.PackValues([]interface{}{message.TokenAmounts})
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -67,40 +67,51 @@ func (t *LeafHasherV1_2_0) HashLeaf(log types.Log) ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
-	encodedSourceTokenData, err := abi.Arguments{abi.Argument{Type: bytesArray}}.PackValues([]interface{}{msg.Message.SourceTokenData})
+	encodedSourceTokenData, err := abi.Arguments{abi.Argument{Type: bytesArray}}.PackValues([]interface{}{message.SourceTokenData})
 	if err != nil {
 		return [32]byte{}, err
 	}
+
+	packedFixedSizeValues, err := utils.ABIEncode(
+		`[
+{"name": "sender", "type":"address"},
+{"name": "receiver", "type":"address"},
+{"name": "sequenceNumber", "type":"uint64"},
+{"name": "gasLimit", "type":"uint256"},
+{"name": "strict", "type":"bool"},
+{"name": "nonce", "type":"uint64"},
+{"name": "feeToken","type": "address"},
+{"name": "feeTokenAmount","type": "uint256"}
+]`,
+		message.Sender,
+		message.Receiver,
+		message.SequenceNumber,
+		message.GasLimit,
+		message.Strict,
+		message.Nonce,
+		message.FeeToken,
+		message.FeeTokenAmount,
+	)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	fixedSizeValuesHash := t.ctx.Hash(packedFixedSizeValues)
 
 	packedValues, err := utils.ABIEncode(
 		`[
 {"name": "leafDomainSeparator","type":"bytes1"},
 {"name": "metadataHash", "type":"bytes32"},
-{"name": "sequenceNumber", "type":"uint64"},
-{"name": "nonce", "type":"uint64"},
-{"name": "sender", "type":"address"},
-{"name": "receiver", "type":"address"},
+{"name": "fixedSizeValuesHash", "type":"bytes32"},
 {"name": "dataHash", "type":"bytes32"},
 {"name": "tokenAmountsHash", "type":"bytes32"},
-{"name": "sourceTokenDataHash", "type":"bytes32"},
-{"name": "gasLimit", "type":"uint256"},
-{"name": "strict", "type":"bool"},
-{"name": "feeToken","type": "address"},
-{"name": "feeTokenAmount","type": "uint256"}
+{"name": "sourceTokenDataHash", "type":"bytes32"}
 ]`,
 		leafDomainSeparator,
 		t.metaDataHash,
-		msg.Message.SequenceNumber,
-		msg.Message.Nonce,
-		msg.Message.Sender,
-		msg.Message.Receiver,
-		t.ctx.Hash(msg.Message.Data),
+		fixedSizeValuesHash,
+		t.ctx.Hash(message.Data),
 		t.ctx.Hash(encodedTokens),
 		t.ctx.Hash(encodedSourceTokenData),
-		msg.Message.GasLimit,
-		msg.Message.Strict,
-		msg.Message.FeeToken,
-		msg.Message.FeeTokenAmount,
 	)
 	if err != nil {
 		return [32]byte{}, err
