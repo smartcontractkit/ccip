@@ -111,7 +111,7 @@ func (l *Lanes) ReadLaneConfig(networkA string) *LaneConfig {
 // CopyCommonContracts copies network config for common contracts from fromNetwork to toNetwork
 // if the toNetwork already exists, it does nothing
 // If reuse is set to false, it only retains the token contracts
-func (l *Lanes) CopyCommonContracts(fromNetwork, toNetwork string, reuse, isTokenTransfer bool) {
+func (l *Lanes) CopyCommonContracts(fromNetwork, toNetwork string, reuse bool) {
 	laneMu.Lock()
 	defer laneMu.Unlock()
 	// if the toNetwork already exists, return
@@ -136,6 +136,7 @@ func (l *Lanes) CopyCommonContracts(fromNetwork, toNetwork string, reuse, isToke
 		CommonContracts: CommonContracts{
 			FeeToken:      existing.FeeToken,
 			WrappedNative: existing.WrappedNative,
+			BridgeTokens:  existing.BridgeTokens,
 		},
 	}
 	// if reuse is set to true, it copies all the common contracts except the router
@@ -144,14 +145,9 @@ func (l *Lanes) CopyCommonContracts(fromNetwork, toNetwork string, reuse, isToke
 		cfg.CommonContracts.ARM = existing.ARM
 		cfg.CommonContracts.IsNativeFeeToken = existing.IsNativeFeeToken
 		cfg.CommonContracts.IsMockARM = existing.IsMockARM
+		cfg.CommonContracts.BridgeTokenPools = existing.BridgeTokenPools
 	}
-	// if it is a token transfer, it copies the bridge token contracts
-	if isTokenTransfer {
-		cfg.CommonContracts.BridgeTokens = existing.BridgeTokens
-		if reuse {
-			cfg.CommonContracts.BridgeTokenPools = existing.BridgeTokenPools
-		}
-	}
+
 	l.LaneConfigs[toNetwork] = cfg
 }
 

@@ -497,6 +497,7 @@ func (r *Router) SetOnRamp(chainSelector uint64, onRamp common.Address) error {
 	}
 	log.Info().
 		Str("Router", r.Address()).
+		Str("OnRamp", onRamp.Hex()).
 		Str("ChainSelector", strconv.FormatUint(chainSelector, 10)).
 		Msg("Setting on ramp for r")
 

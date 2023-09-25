@@ -191,7 +191,7 @@ func (e *CCIPContractsDeployer) NewARMContract(addr common.Address) (*ARM, error
 	}
 	log.Info().
 		Str("Contract Address", addr.Hex()).
-		Str("Contract Name", "Mock ARM Contract").
+		Str("Contract Name", "ARM Contract").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
