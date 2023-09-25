@@ -120,17 +120,17 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EV
 	s.lggr.Infow("Calling attestation API", "messageBodyHash", hexutil.Encode(messageBody[:]), "messageID", hexutil.Encode(msg.MessageId[:]))
 
 	// The attestation API expects the hash of the message body
-	attestationResponse, err := s.callAttestationApi(ctx, utils.Keccak256Fixed(messageBody))
+	attestationResp, err := s.callAttestationApi(ctx, utils.Keccak256Fixed(messageBody))
 	if err != nil {
 		return []byte{}, errors.Wrap(err, "failed calling usdc attestation API ")
 	}
 
-	if attestationResponse.Status != attestationStatusSuccess {
+	if attestationResp.Status != attestationStatusSuccess {
 		return []byte{}, tokendata.ErrNotReady
 	}
 
 	// The USDC pool needs a combination of the message body and the attestation
-	messageAndAttestation, err = encodeMessageAndAttestation(messageBody, attestationResponse.Attestation)
+	messageAndAttestation, err = encodeMessageAndAttestation(messageBody, attestationResp.Attestation)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode messageAndAttestation : %w", err)
 	}
