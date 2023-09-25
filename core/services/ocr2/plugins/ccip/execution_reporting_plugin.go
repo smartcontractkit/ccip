@@ -59,7 +59,6 @@ type ExecutionPluginConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
 	onRampReader             ccipdata.OnRampReader
-	sourceReader             ccipdata.Reader
 	destReader               ccipdata.Reader
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
@@ -68,6 +67,7 @@ type ExecutionPluginConfig struct {
 	sourceWrappedNativeToken common.Address
 	destClient               evmclient.Client
 	sourceClient             evmclient.Client
+	destChainEVMID           *big.Int
 	destGasEstimator         gas.EvmFeeEstimator
 	tokenDataProviders       map[common.Address]tokendata.Reader
 }
@@ -209,9 +209,7 @@ func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegis
 
 	// source chain filters
 	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(
-		rf.config.onRamp.Address(),
 		rf.config.sourcePriceRegistry.Address(),
-		rf.config.tokenDataProviders,
 	)
 	created, deleted := logpollerutil.FiltersDiff(sourceFiltersBefore, sourceFiltersNow)
 	if err := logpollerutil.UnregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {

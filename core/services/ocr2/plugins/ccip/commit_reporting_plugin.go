@@ -58,23 +58,21 @@ type update struct {
 }
 
 type CommitPluginConfig struct {
-	lggr             logger.Logger
-	sourceLP, destLP logpoller.LogPoller
-	// Current onRamp reader
-	onRampReaderMu *sync.RWMutex
-	onRampReader   ccipdata.OnRampReader
-
-	destReader               ccipdata.Reader
-	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
-	onRampAddress            common.Address
-	commitStore              commit_store.CommitStoreInterface
-	priceGetter              pricegetter.PriceGetter
-	sourceChainSelector      uint64
-	sourceNative             common.Address
-	sourceFeeEstimator       gas.EvmFeeEstimator
-	sourceClient, destClient evmclient.Client
-	leafHasher               hashlib.LeafHasherInterface[[32]byte]
-	checkFinalityTags        bool
+	lggr logger.Logger
+	// Source
+	onRampReader        ccipdata.OnRampReader
+	sourceChainSelector uint64
+	sourceNative        common.Address
+	sourceFeeEstimator  gas.EvmFeeEstimator
+	// Dest
+	destLP         logpoller.LogPoller
+	destReader     ccipdata.Reader
+	offRamp        evm_2_evm_offramp.EVM2EVMOffRampInterface
+	commitStore    commit_store.CommitStoreInterface
+	destClient     evmclient.Client
+	destChainEVMID *big.Int
+	// Offchain
+	priceGetter pricegetter.PriceGetter
 }
 
 type CommitReportingPlugin struct {

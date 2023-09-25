@@ -8,7 +8,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 )
 
@@ -28,13 +27,6 @@ type Meta struct {
 //
 //go:generate mockery --quiet --name Reader --output . --filename mock.go --inpackage --case=underscore
 type Reader interface {
-	// GetSendRequestsGteSeqNum returns all the message send requests with sequence number greater than or equal to the provided.
-	// If checkFinalityTags is set to true then confs param is ignored, the latest finalized block is used in the query.
-	GetSendRequestsGteSeqNum(ctx context.Context, onRamp common.Address, seqNum uint64, checkFinalityTags bool, confs int) ([]Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], error)
-
-	// GetSendRequestsBetweenSeqNums returns all the message send requests in the provided sequence numbers range (inclusive).
-	GetSendRequestsBetweenSeqNums(ctx context.Context, onRamp common.Address, seqNumMin, seqNumMax uint64, confs int) ([]Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], error)
-
 	// GetTokenPriceUpdatesCreatedAfter returns all the token price updates that happened after the provided timestamp.
 	GetTokenPriceUpdatesCreatedAfter(ctx context.Context, priceRegistry common.Address, ts time.Time, confs int) ([]Event[price_registry.PriceRegistryUsdPerTokenUpdated], error)
 

@@ -3,7 +3,6 @@ package ccip
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -38,110 +37,123 @@ import (
 
 const (
 	COMMIT_PRICE_UPDATES = "Commit price updates"
-	COMMIT_CCIP_SENDS    = "Commit ccip sends"
 )
 
-func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	spec := jb.OCR2OracleSpec
+type BackfillArgs struct {
+	sourceLP, destLP                 logpoller.LogPoller
+	sourceStartBlock, destStartBlock int64
+}
 
+func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer) (*CommitPluginConfig, *BackfillArgs, error) {
+	if jb.OCR2OracleSpec == nil {
+		return nil, nil, errors.New("spec is nil")
+	}
+	spec := jb.OCR2OracleSpec
 	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
 	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	chainIDInterface, ok := spec.RelayConfig["chainID"]
 	if !ok {
-		return nil, errors.New("chainID must be provided in relay config")
+		return nil, nil, errors.New("chainID must be provided in relay config")
 	}
 	destChainID := int64(chainIDInterface.(float64))
 	destChain, err := chainSet.Get(strconv.FormatInt(destChainID, 10))
 	if err != nil {
-		return nil, errors.Wrap(err, "get chainset")
+		return nil, nil, errors.Wrap(err, "get chainset")
 	}
 	commitStore, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed loading commitStore")
+		return nil, nil, errors.Wrap(err, "failed loading commitStore")
 	}
 	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed getting the static config from the commitStore")
+		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
 	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sourceChain, err := chainSet.Get(strconv.FormatUint(chainId, 10))
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to open source chain")
+		return nil, nil, errors.Wrap(err, "unable to open source chain")
 	}
 	offRamp, err := contractutil.LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), CommitPluginLabel, destChain.Client())
 	if err != nil {
-		return nil, errors.Wrap(err, "failed loading offRamp")
+		return nil, nil, errors.Wrap(err, "failed loading offRamp")
 	}
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(int64(chainId)),
 		"destChain", ChainName(destChainID))
 	onRampReader, err := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	priceGetterObject, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sourceRouter, err := router.NewRouter(onRampReader.Router(), sourceChain.Client())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sourceNative, err := sourceRouter.GetWrappedNative(nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
-	wrappedPluginFactory := NewCommitReportingPluginFactory(
-		CommitPluginConfig{
-			lggr:                commitLggr,
-			sourceLP:            sourceChain.LogPoller(),
-			destLP:              destChain.LogPoller(),
-			onRampReader:        onRampReader,
-			destReader:          ccipdata.NewLogPollerReader(destChain.LogPoller(), commitLggr, destChain.Client()),
-			offRamp:             offRamp,
-			onRampAddress:       staticConfig.OnRamp,
-			priceGetter:         priceGetterObject,
-			sourceNative:        sourceNative,
-			sourceFeeEstimator:  sourceChain.GasEstimator(),
-			sourceChainSelector: staticConfig.SourceChainSelector,
-			destClient:          destChain.Client(),
-			sourceClient:        sourceChain.Client(),
-			commitStore:         commitStore,
-		})
-
-	err = wrappedPluginFactory.UpdateLogPollerFilters(utils.ZeroAddress, qopts...)
-	if err != nil {
-		return nil, err
-	}
-
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", string(spec.Relay), destChain.ID())
-	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(commitLggr, true, logError)
-	oracle, err := libocr2.NewOracle(argsNoPlugin)
-	if err != nil {
-		return nil, err
-	}
-	commitLggr.Infow("NewCommitServices",
+	lggr.Infow("NewCommitServices",
 		"pluginConfig", pluginConfig,
 		"staticConfig", staticConfig,
 		// TODO bring back
 		//"dynamicOnRampConfig", dynamicOnRampConfig,
 		"sourceNative", sourceNative,
 		"sourceRouter", sourceRouter.Address())
+	return &CommitPluginConfig{
+			lggr:                commitLggr,
+			destLP:              destChain.LogPoller(),
+			onRampReader:        onRampReader,
+			destReader:          ccipdata.NewLogPollerReader(destChain.LogPoller(), commitLggr, destChain.Client()),
+			offRamp:             offRamp,
+			priceGetter:         priceGetterObject,
+			sourceNative:        sourceNative,
+			sourceFeeEstimator:  sourceChain.GasEstimator(),
+			sourceChainSelector: staticConfig.SourceChainSelector,
+			destClient:          destChain.Client(),
+			commitStore:         commitStore,
+		}, &BackfillArgs{
+			sourceLP:         sourceChain.LogPoller(),
+			destLP:           destChain.LogPoller(),
+			sourceStartBlock: pluginConfig.SourceStartBlock,
+			destStartBlock:   pluginConfig.DestStartBlock,
+		}, nil
+}
+
+func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet)
+	if err != nil {
+		return nil, err
+	}
+	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
+	err = wrappedPluginFactory.UpdateLogPollerFilters(utils.ZeroAddress, qopts...)
+	if err != nil {
+		return nil, err
+	}
+
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, pluginConfig.destChainEVMID)
+	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
+	oracle, err := libocr2.NewOracle(argsNoPlugin)
+	if err != nil {
+		return nil, err
+	}
 	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
 	if new {
 		return []job.ServiceCtx{oraclelib.NewBackfilledOracle(
-			commitLggr,
-			sourceChain.LogPoller(),
-			destChain.LogPoller(),
-			pluginConfig.SourceStartBlock,
-			pluginConfig.DestStartBlock,
+			pluginConfig.lggr,
+			backfillArgs.sourceLP,
+			backfillArgs.destLP,
+			backfillArgs.sourceStartBlock,
+			backfillArgs.destStartBlock,
 			job.NewServiceAdapter(oracle)),
 		}, nil
 	}
@@ -165,15 +177,15 @@ func CommitReportToEthTxMeta(report []byte) (*txmgr.TxMeta, error) {
 	}, nil
 }
 
-func getCommitPluginSourceLpFilters(onRamp common.Address) []logpoller.Filter {
-	return []logpoller.Filter{
-		{
-			Name:      logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.String()),
-			EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
-			Addresses: []common.Address{onRamp},
-		},
-	}
-}
+//func getCommitPluginSourceLpFilters(onRamp common.Address) []logpoller.Filter {
+//	return []logpoller.Filter{
+//		{
+//			Name:      logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.String()),
+//			EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
+//			Addresses: []common.Address{onRamp},
+//		},
+//	}
+//}
 
 func getCommitPluginDestLpFilters(priceRegistry common.Address, offRamp common.Address) []logpoller.Filter {
 	return []logpoller.Filter{
@@ -206,59 +218,21 @@ func getCommitPluginDestLpFilters(priceRegistry common.Address, offRamp common.A
 }
 
 // UnregisterCommitPluginLpFilters unregisters all the registered filters for both source and dest chains.
-func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	if spec == nil {
+func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
+	commitPluginConfig, _, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet)
+	if err != nil {
 		return errors.New("spec is nil")
 	}
-	if !common.IsHexAddress(spec.ContractID) {
-		return fmt.Errorf("invalid contract id address: %s", spec.ContractID)
-	}
-
-	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
-	if err != nil {
-		return err
-	}
-
-	destChainIDInterface, ok := spec.RelayConfig["chainID"]
-	if !ok {
-		return errors.New("chainID must be provided in relay config")
-	}
-	destChainIDf64, is := destChainIDInterface.(float64)
-	if !is {
-		return fmt.Errorf("chain id '%v' is not float64", destChainIDInterface)
-	}
-	destChainID := int64(destChainIDf64)
-	destChain, err := chainSet.Get(strconv.FormatInt(destChainID, 10))
-	if err != nil {
-		return err
-	}
-	commitStore, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
-	if err != nil {
-		return err
-	}
-	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
-	if err != nil {
-		return err
-	}
-	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	sourceChain, err := chainSet.Get(strconv.FormatUint(chainId, 10))
-	if err != nil {
-		return err
-	}
-	onRampReader, _ := ccipdata.NewOnRampReader(lggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
-	if err := onRampReader.Close(); err != nil {
+	if err := commitPluginConfig.onRampReader.Close(); err != nil {
 		return err
 	}
 
 	// TODO: once offramp/commit are abstracted, we can call Close on the offramp/commit readers to unregister filters.
-	return unregisterCommitPluginFilters(ctx, sourceChain.LogPoller(), destChain.LogPoller(), commitStore, common.HexToAddress(pluginConfig.OffRamp), qopts...)
+	return unregisterCommitPluginFilters(ctx, commitPluginConfig.destLP, commitPluginConfig.commitStore,
+		commitPluginConfig.offRamp.Address(), qopts...)
 }
 
-func unregisterCommitPluginFilters(ctx context.Context, sourceLP, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address, qopts ...pg.QOpt) error {
+func unregisterCommitPluginFilters(ctx context.Context, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address, qopts ...pg.QOpt) error {
 	//staticCfg, err := destCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	//if err != nil {
 	//	return err

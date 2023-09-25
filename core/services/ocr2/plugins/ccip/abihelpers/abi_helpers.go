@@ -31,7 +31,7 @@ const (
 
 var EventSignatures struct {
 	// OnRamp
-	SendRequested common.Hash
+	//SendRequested common.Hash
 	// CommitStore
 	ReportAccepted common.Hash
 	// OffRamp
@@ -83,12 +83,12 @@ func getTupleNamedElem(name string, arg abi.Argument) *abi.Type {
 }
 
 func init() {
-	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
-	if err != nil {
-		panic(err)
-	}
-	EventSignatures.SendRequested = GetIDOrPanic("CCIPSendRequested", onRampABI)
-	EventSignatures.SendRequestedSequenceNumberWord = 4
+	//onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
+	//if err != nil {
+	//	panic(err)
+	//}
+	//EventSignatures.SendRequested = GetIDOrPanic("CCIPSendRequested", onRampABI)
+	//EventSignatures.SendRequestedSequenceNumberWord = 4
 
 	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
 	if err != nil {
@@ -116,12 +116,12 @@ func init() {
 	EventSignatures.FeeTokenRemoved = GetIDOrPanic("FeeTokenRemoved", priceRegistryABI)
 
 	// arguments
-	MessageArgs = onRampABI.Events["CCIPSendRequested"].Inputs
-	tokenAmountsTy := getTupleNamedElem("tokenAmounts", MessageArgs[0])
-	if tokenAmountsTy == nil {
-		panic(fmt.Sprintf("missing component '%s' in tuple %+v", "tokenAmounts", MessageArgs))
-	}
-	TokenAmountsArgs = abi.Arguments{{Type: *tokenAmountsTy, Name: "tokenAmounts"}}
+	//MessageArgs = onRampABI.Events["CCIPSendRequested"].Inputs
+	//tokenAmountsTy := getTupleNamedElem("tokenAmounts", MessageArgs[0])
+	//if tokenAmountsTy == nil {
+	//	panic(fmt.Sprintf("missing component '%s' in tuple %+v", "tokenAmounts", MessageArgs))
+	//}
+	//TokenAmountsArgs = abi.Arguments{{Type: *tokenAmountsTy, Name: "tokenAmounts"}}
 
 	CommitReportArgs = commitStoreABI.Events["ReportAccepted"].Inputs
 
@@ -131,7 +131,7 @@ func init() {
 	}
 	ExecutionReportArgs = manuallyExecuteMethod.Inputs[:1]
 
-	EventSignatures.USDCMessageSent = utils.Keccak256Fixed([]byte("MessageSent(bytes)"))
+	//EventSignatures.USDCMessageSent = utils.Keccak256Fixed([]byte("MessageSent(bytes)"))
 }
 
 func MessagesFromExecutionReport(report types.Report) ([]evm_2_evm_offramp.InternalEVM2EVMMessage, error) {

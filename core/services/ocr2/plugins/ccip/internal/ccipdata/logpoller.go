@@ -2,14 +2,11 @@ package ccipdata
 
 import (
 	"context"
-	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -40,99 +37,6 @@ func NewLogPollerReader(lp logpoller.LogPoller, lggr logger.Logger, client evmcl
 		lggr:   lggr,
 		client: client,
 	}
-}
-
-func (c *LogPollerReader) GetSendRequestsGteSeqNum(ctx context.Context, onRampAddress common.Address, seqNum uint64, checkFinalityTags bool, confs int) (sendReqs []Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], err error) {
-	onRamp, err := c.loadOnRamp(onRampAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	if !checkFinalityTags {
-		logs, err2 := c.lp.LogsDataWordGreaterThan(
-			abihelpers.EventSignatures.SendRequested,
-			onRampAddress,
-			abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-			abihelpers.EvmWord(seqNum),
-			confs,
-			pg.WithParentCtx(ctx),
-		)
-		if err2 != nil {
-			return nil, fmt.Errorf("logs data word greater than: %w", err2)
-		}
-		return parseLogs[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
-			logs,
-			c.lggr,
-			func(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, error) {
-				return onRamp.ParseCCIPSendRequested(log)
-			},
-		)
-	}
-
-	// If the chain is based on explicit finality we only examine logs less than or equal to the latest finalized block number.
-	// NOTE: there appears to be a bug in ethclient whereby BlockByNumber fails with "unsupported txtype" when trying to parse the block
-	// when querying L2s, headers however work.
-	// TODO (CCIP-778): Migrate to core finalized tags, below doesn't work for some chains e.g. Celo.
-	latestFinalizedHeader, err := c.client.HeaderByNumber(
-		ctx,
-		big.NewInt(rpc.FinalizedBlockNumber.Int64()),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if latestFinalizedHeader == nil {
-		return nil, errors.New("latest finalized header is nil")
-	}
-	if latestFinalizedHeader.Number == nil {
-		return nil, errors.New("latest finalized number is nil")
-	}
-	logs, err := c.lp.LogsUntilBlockHashDataWordGreaterThan(
-		abihelpers.EventSignatures.SendRequested,
-		onRampAddress,
-		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-		abihelpers.EvmWord(seqNum),
-		latestFinalizedHeader.Hash(),
-		pg.WithParentCtx(ctx),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("logs until block hash data word greater than: %w", err)
-	}
-
-	return parseLogs[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
-		logs,
-		c.lggr,
-		func(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, error) {
-			return onRamp.ParseCCIPSendRequested(log)
-		},
-	)
-}
-
-func (c *LogPollerReader) GetSendRequestsBetweenSeqNums(ctx context.Context, onRampAddress common.Address, seqNumMin, seqNumMax uint64, confs int) ([]Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested], error) {
-	onRamp, err := c.loadOnRamp(onRampAddress)
-	if err != nil {
-		return nil, err
-	}
-
-	logs, err := c.lp.LogsDataWordRange(
-		abihelpers.EventSignatures.SendRequested,
-		onRampAddress,
-		abihelpers.EventSignatures.SendRequestedSequenceNumberWord,
-		logpoller.EvmWord(seqNumMin),
-		logpoller.EvmWord(seqNumMax),
-		confs,
-		pg.WithParentCtx(ctx))
-	if err != nil {
-		return nil, err
-	}
-
-	return parseLogs[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested](
-		logs,
-		c.lggr,
-		func(log types.Log) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, error) {
-			return onRamp.ParseCCIPSendRequested(log)
-		},
-	)
 }
 
 func (c *LogPollerReader) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, priceRegistryAddress common.Address, ts time.Time, confs int) ([]Event[price_registry.PriceRegistryUsdPerTokenUpdated], error) {

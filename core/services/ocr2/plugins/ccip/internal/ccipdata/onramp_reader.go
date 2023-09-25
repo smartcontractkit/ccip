@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -33,6 +34,7 @@ type EVM2EVMMessage struct {
 	MessageId      [32]byte
 	Hash           [32]byte
 	// TODO: add more fields as we abstract exec plugin
+	// also this Log can eventually go away with destchain abstractions
 	Log types.Log // Raw event data
 }
 
@@ -71,4 +73,26 @@ func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	default:
 		return nil, errors.Errorf("expected version 1.0.0 got %v", version.String())
 	}
+}
+
+func latestFinalizedBlockHash(ctx context.Context, client client.Client) (common.Hash, error) {
+	// If the chain is based on explicit finality we only examine logs less than or equal to the latest finalized block number.
+	// NOTE: there appears to be a bug in ethclient whereby BlockByNumber fails with "unsupported txtype" when trying to parse the block
+	// when querying L2s, headers however work.
+	// TODO (CCIP-778): Migrate to core finalized tags, below doesn't work for some chains e.g. Celo.
+	latestFinalizedHeader, err := client.HeaderByNumber(
+		ctx,
+		big.NewInt(rpc.FinalizedBlockNumber.Int64()),
+	)
+	if err != nil {
+		return common.Hash{}, err
+	}
+
+	if latestFinalizedHeader == nil {
+		return common.Hash{}, errors.New("latest finalized header is nil")
+	}
+	if latestFinalizedHeader.Number == nil {
+		return common.Hash{}, errors.New("latest finalized number is nil")
+	}
+	return latestFinalizedHeader.Hash(), nil
 }

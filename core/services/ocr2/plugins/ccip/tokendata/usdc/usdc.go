@@ -10,11 +10,8 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
@@ -22,11 +19,8 @@ import (
 )
 
 type TokenDataReader struct {
-	sourceChainEvents  ccipdata.Reader
-	attestationApi     *url.URL
-	messageTransmitter common.Address
-	sourceToken        common.Address
-	onRampAddress      common.Address
+	usdcReader     ccipdata.USDCReader
+	attestationApi *url.URL
 
 	// Cache of sequence number -> usdc message body
 	usdcMessageHashCache      map[uint64][32]byte
@@ -39,9 +33,8 @@ type attestationResponse struct {
 }
 
 const (
-	version                  = "v1"
-	attestationPath          = "attestations"
-	MESSAGE_SENT_FILTER_NAME = "USDC message sent"
+	version         = "v1"
+	attestationPath = "attestations"
 )
 
 type attestationStatus string
@@ -53,13 +46,10 @@ const (
 
 var _ tokendata.Reader = &TokenDataReader{}
 
-func NewUSDCTokenDataReader(sourceChainEvents ccipdata.Reader, usdcTokenAddress, usdcMessageTransmitterAddress, onRampAddress common.Address, usdcAttestationApi *url.URL) *TokenDataReader {
+func NewUSDCTokenDataReader(usdcReader ccipdata.USDCReader, usdcAttestationApi *url.URL) *TokenDataReader {
 	return &TokenDataReader{
-		sourceChainEvents:    sourceChainEvents,
+		usdcReader:           usdcReader,
 		attestationApi:       usdcAttestationApi,
-		messageTransmitter:   usdcMessageTransmitterAddress,
-		onRampAddress:        onRampAddress,
-		sourceToken:          usdcTokenAddress,
 		usdcMessageHashCache: make(map[uint64][32]byte),
 	}
 }
@@ -102,7 +92,7 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.E
 		return body, nil
 	}
 
-	usdcMessageBody, err := s.sourceChainEvents.GetLastUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), msg.TxHash)
+	usdcMessageBody, err := s.usdcReader.GetLastUSDCMessagePriorToLogIndexInTx(ctx, int64(msg.LogIndex), msg.TxHash)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -139,12 +129,6 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 	return response, nil
 }
 
-func (s *TokenDataReader) GetSourceLogPollerFilters() []logpoller.Filter {
-	return []logpoller.Filter{
-		{
-			Name:      logpoller.FilterName(MESSAGE_SENT_FILTER_NAME, s.messageTransmitter.Hex()),
-			EventSigs: []common.Hash{abihelpers.EventSignatures.USDCMessageSent},
-			Addresses: []common.Address{s.messageTransmitter},
-		},
-	}
+func (s *TokenDataReader) Close() error {
+	return s.usdcReader.Close()
 }
