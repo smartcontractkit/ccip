@@ -403,13 +403,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		// deploy a mock ARM contract
 		if ccipModule.ARMContract == nil {
 			ccipModule.ARMContract, err = cd.DeployMockARMContract()
-			if err != nil {
-				return fmt.Errorf("deploying mock ARM contract shouldn't fail %+v", err)
-			}
-			err = ccipModule.ChainClient.WaitForEvents()
-			if err != nil {
-				return fmt.Errorf("error in waiting for mock ARM contract deployment %+v", err)
-			}
 		}
 	}
 	if ccipModule.FeeToken == nil {
@@ -471,18 +464,16 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	}
 	if len(ccipModule.BridgeTokenPools) == 0 {
 		// deploy native token pool
-		for i := len(ccipModule.BridgeTokenPools); i < len(ccipModule.BridgeTokens); i++ {
+		for i := len(ccipModule.BridgeTokenPools); i < noOfTokens; i++ {
 			token := ccipModule.BridgeTokens[i]
 			btp, err := cd.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.ARMContract)
 			if err != nil {
 				return fmt.Errorf("deploying bridge Token pool shouldn't fail %+v", err)
 			}
 			ccipModule.BridgeTokenPools = append(ccipModule.BridgeTokenPools, btp)
-			if ccipModule.poolFunds.Cmp(big.NewInt(0)) > 0 {
-				err = btp.AddLiquidity(token.Approve, token.Address(), ccipModule.poolFunds)
-				if err != nil {
-					return fmt.Errorf("adding liquidity token to dest pool shouldn't fail %+v", err)
-				}
+			err = btp.AddLiquidity(token.Approve, token.Address(), ccipModule.poolFunds)
+			if err != nil {
+				return fmt.Errorf("adding liquidity token to dest pool shouldn't fail %+v", err)
 			}
 		}
 	} else {
@@ -555,7 +546,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	return nil
 }
 
-func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, existingDeployment bool, msgType string) (*CCIPCommon, error) {
+func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, existingDeployment bool) (*CCIPCommon, error) {
 	cd, err := contracts.NewCCIPContractsDeployer(logger, chainClient)
 	if err != nil {
 		return nil, err
@@ -568,7 +559,7 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 			Capacity: contracts.HundredCoins,
 		},
 		ExistingDeployment: existingDeployment,
-		poolFunds:          testhelpers.Link(50),
+		poolFunds:          testhelpers.Link(1000),
 		gasUpdateWatcherMu: &sync.Mutex{},
 		gasUpdateWatcher:   make(map[uint64]*big.Int),
 	}, nil
@@ -1061,12 +1052,10 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
 	}
 
-	if len(sourceTokens) > 0 {
-		for i, token := range destCCIP.Common.BridgeTokens {
-			destTokens = append(destTokens, common.HexToAddress(token.Address()))
-			pool := destCCIP.Common.BridgeTokenPools[i]
-			pools = append(pools, pool.EthAddress)
-		}
+	for i, token := range destCCIP.Common.BridgeTokens {
+		destTokens = append(destTokens, common.HexToAddress(token.Address()))
+		pool := destCCIP.Common.BridgeTokenPools[i]
+		pools = append(pools, pool.EthAddress)
 	}
 
 	if destCCIP.OffRamp == nil {

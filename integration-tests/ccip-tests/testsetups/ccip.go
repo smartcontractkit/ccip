@@ -560,7 +560,7 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 
 	chain.ParallelTransactions(true)
 	defer chain.Close()
-	ccipCommon, err := actions.DefaultCCIPModule(lggr, chain, o.Cfg.ExistingDeployment, o.Cfg.MsgType)
+	ccipCommon, err := actions.DefaultCCIPModule(lggr, chain, o.Cfg.ExistingDeployment)
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %v", networkCfg.Name, err))
 	}
@@ -1015,7 +1015,7 @@ func CCIPDefaultTestSetUp(
 			regex := regexp.MustCompile(`-(\d+)$`)
 			networkNameToReadCfg := regex.ReplaceAllString(n, "")
 			// if reuse contracts is true, copy common contracts from the same network except the router contract
-			setUpArgs.LaneConfig.CopyCommonContracts(networkNameToReadCfg, n, inputs.ReuseContracts)
+			setUpArgs.LaneConfig.CopyCommonContracts(networkNameToReadCfg, n, inputs.ReuseContracts, inputs.MsgType == actions.TokenTransfer)
 		}
 	}
 

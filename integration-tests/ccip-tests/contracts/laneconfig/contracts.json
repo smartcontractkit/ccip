@@ -707,38 +707,6 @@
         }
       }
     },
-    "Arbitrum Goerli-3": {
-      "is_mock_arm": true,
-      "fee_token": "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
-      "bridge_tokens": [
-        "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28"
-      ],
-      "bridge_tokens_pools": [
-        "0xfF62f3607Bfad25ACfe89d4f10a5075E6E4c0c8b"
-      ],
-      "arm": "0x4b318890a8Dd9E15F1905cEB141044Ce5D9df985",
-      "router": "0xD1635feA436474B74a38c86467614eb5F683d014",
-      "price_registry": "0x461722E30ABC2532Ec1CF6D94405F1e98f61B370",
-      "wrapped_native": "0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "Arbitrum Goerli-4": {
-      "is_mock_arm": true,
-      "fee_token": "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
-      "bridge_tokens": [
-        "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28"
-      ],
-      "bridge_tokens_pools": [
-        "0x56F2f0a8091a8B9805F9e924e1195792faF2787B"
-      ],
-      "arm": "0x4b318890a8Dd9E15F1905cEB141044Ce5D9df985",
-      "router": "0x782198cD56662707B8A28998D98024F9D7D224b3",
-      "price_registry": "0x461722E30ABC2532Ec1CF6D94405F1e98f61B370",
-      "wrapped_native": "0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
     "BSC Testnet-1": {
       "is_mock_arm": true,
       "fee_token": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
@@ -856,30 +824,6 @@
           "receiver_dapp": "0xe41bA28D2673410228346B117efc903091c3551b"
         }
       }
-    },
-    "BSC Testnet-3": {
-      "is_mock_arm": true,
-      "fee_token": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
-      "bridge_tokens": null,
-      "bridge_tokens_pools": null,
-      "arm": "0x86b9af794d83DAe5452d48957109227A59E32bc4",
-      "router": "0x5b316Df920ddF216cfa5438685440F32f1c80f9D",
-      "price_registry": "0xd96C62E1D6a3EabB0f04d8900A3Bb3dA9014Fd59",
-      "wrapped_native": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "BSC Testnet-4": {
-      "is_mock_arm": true,
-      "fee_token": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
-      "bridge_tokens": null,
-      "bridge_tokens_pools": null,
-      "arm": "0x86b9af794d83DAe5452d48957109227A59E32bc4",
-      "router": "0xaA82516108e41A3872d208834aA4D60EE9a07b2D",
-      "price_registry": "0xd96C62E1D6a3EabB0f04d8900A3Bb3dA9014Fd59",
-      "wrapped_native": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
-      "src_contracts": {},
-      "dest_contracts": {}
     },
     "Base Goerli-1": {
       "is_mock_arm": true,
@@ -999,30 +943,6 @@
         }
       }
     },
-    "Base Goerli-3": {
-      "is_mock_arm": true,
-      "fee_token": "0xD886E2286Fd1073df82462ea1822119600Af80b6",
-      "bridge_tokens": null,
-      "bridge_tokens_pools": null,
-      "arm": "0xE42597d226Eab595893f1ad1B0d7F58d7F1Cc375",
-      "router": "0x43280b99c684573532CfBf806F447cc592156310",
-      "price_registry": "0x8d426F4A530618414c3C93eD39AD1e2368214C6e",
-      "wrapped_native": "0x4200000000000000000000000000000000000006",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "Base Goerli-4": {
-      "is_mock_arm": true,
-      "fee_token": "0xD886E2286Fd1073df82462ea1822119600Af80b6",
-      "bridge_tokens": null,
-      "bridge_tokens_pools": null,
-      "arm": "0xE42597d226Eab595893f1ad1B0d7F58d7F1Cc375",
-      "router": "0x2e2a036b1D35C83C17Aa947c2DE5161d2ee08e36",
-      "price_registry": "0x8d426F4A530618414c3C93eD39AD1e2368214C6e",
-      "wrapped_native": "0x4200000000000000000000000000000000000006",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
     "Optimism Goerli-1": {
       "is_mock_arm": true,
       "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
@@ -1140,38 +1060,6 @@
           "receiver_dapp": "0x471686D9713a4C0F11f623fE935A22f397949102"
         }
       }
-    },
-    "Optimism Goerli-3": {
-      "is_mock_arm": true,
-      "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
-      "bridge_tokens": [
-        "0xdc2CC710e42857672E7907CF474a69B63B93089f"
-      ],
-      "bridge_tokens_pools": [
-        "0x4F78e0e0c8b38DADc09f64012C8033ae646cCF87"
-      ],
-      "arm": "0x748f62a1C919DE20aE6CDECCC8A16519F828029f",
-      "router": "0x4f0848F22DB24660cA89a4821cc3847Cc1cf487F",
-      "price_registry": "0x30cD10363Be70109FBA90594DF35F18eFd78C8b9",
-      "wrapped_native": "0x4200000000000000000000000000000000000006",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "Optimism Goerli-4": {
-      "is_mock_arm": true,
-      "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
-      "bridge_tokens": [
-        "0xdc2CC710e42857672E7907CF474a69B63B93089f"
-      ],
-      "bridge_tokens_pools": [
-        "0x735420138938e524E2F5f53E3336089486b3c3D3"
-      ],
-      "arm": "0x748f62a1C919DE20aE6CDECCC8A16519F828029f",
-      "router": "0xa95db24200Ae1fdc61bD06b64B3971d16569FAEd",
-      "price_registry": "0x30cD10363Be70109FBA90594DF35F18eFd78C8b9",
-      "wrapped_native": "0x4200000000000000000000000000000000000006",
-      "src_contracts": {},
-      "dest_contracts": {}
     },
     "Sepolia Testnet-1": {
       "is_mock_arm": true,
@@ -1291,38 +1179,6 @@
         }
       }
     },
-    "Sepolia Testnet-3": {
-      "is_mock_arm": true,
-      "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
-      "bridge_tokens": [
-        "0x779877A7B0D9E8603169DdbD7836e478b4624789"
-      ],
-      "bridge_tokens_pools": [
-        "0x5888342a423C6432834c76f63B7F4efeC14bf7a7"
-      ],
-      "arm": "0x891847805D3D6766Ad515Abf9db986B8Aa147BB6",
-      "router": "0xa537a6377e0F1F5F4d301a7b1357ba2542068C69",
-      "price_registry": "0x779d3Dbc779BdF7ce35B0CF11438A7246831e41C",
-      "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "Sepolia Testnet-4": {
-      "is_mock_arm": true,
-      "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
-      "bridge_tokens": [
-        "0x779877A7B0D9E8603169DdbD7836e478b4624789"
-      ],
-      "bridge_tokens_pools": [
-        "0x8952391B1AC054C86d09c8f10B55153B557cFBd0"
-      ],
-      "arm": "0x891847805D3D6766Ad515Abf9db986B8Aa147BB6",
-      "router": "0xEdB80cf052355426Ca3D85D0Add689f975ce5728",
-      "price_registry": "0x779d3Dbc779BdF7ce35B0CF11438A7246831e41C",
-      "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
     "Avalanche Fuji-1": {
       "is_mock_arm": true,
       "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
@@ -1440,98 +1296,6 @@
           "receiver_dapp": "0x39902524F192C9ACe6B3C1a8b7be66842C4EA92A"
         }
       }
-    },
-    "Avalanche Fuji-3": {
-      "is_mock_arm": true,
-      "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
-      "bridge_tokens": [
-        "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"
-      ],
-      "bridge_tokens_pools": [
-        "0x4A84aE7b3CDF2311E459Dc7F8DFF35F9828D632E"
-      ],
-      "arm": "0x56cB819B2e13Aef5807e2c6eF4A4256a6121F1c4",
-      "router": "0x8d324016C91B4C994d340C03D20392A3540f56Ef",
-      "price_registry": "0x1C2C1B41B97FCFE1d427c08CCcf5c6ED8b897Ba1",
-      "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "Avalanche Fuji-4": {
-      "is_mock_arm": true,
-      "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
-      "bridge_tokens": [
-        "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"
-      ],
-      "bridge_tokens_pools": [
-        "0x8368898dB5f6D4871ec64978B309cFDb78231E6f"
-      ],
-      "arm": "0x56cB819B2e13Aef5807e2c6eF4A4256a6121F1c4",
-      "router": "0x9c4560fDFFc7104a8E6505C8C3Ca468D10AbA485",
-      "price_registry": "0x1C2C1B41B97FCFE1d427c08CCcf5c6ED8b897Ba1",
-      "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "Polygon Mumbai-1": {
-      "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
-      "bridge_tokens": [
-        "0x326C977E6efc84E512bB9C30f76E30c160eD06FB"
-      ],
-      "bridge_tokens_pools": [
-        "0xfbCe991b39eC278124Ff8D86a5fa3f9FD55347F0"
-      ],
-      "arm": "",
-      "router": "",
-      "price_registry": "",
-      "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "Polygon Mumbai-2": {
-      "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
-      "bridge_tokens": [
-        "0x326C977E6efc84E512bB9C30f76E30c160eD06FB"
-      ],
-      "bridge_tokens_pools": [
-        "0x02BC3626E81dB6224A51dd28594DC42F36C1e262"
-      ],
-      "arm": "",
-      "router": "0x63166FfD73EEEF4AF7a87A51181FE7751D3BC292",
-      "price_registry": "",
-      "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "Polygon Mumbai-3": {
-      "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
-      "bridge_tokens": [
-        "0x326C977E6efc84E512bB9C30f76E30c160eD06FB"
-      ],
-      "bridge_tokens_pools": [
-        "0x84305FA797354F5Fa00bF889787d1Ed9a355745c"
-      ],
-      "arm": "",
-      "router": "0x6198d532948386aC253Ad67A2052bAfC24e55902",
-      "price_registry": "0xDAEdD4D49d086397aDb123b8A587f1deEdb87254",
-      "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
-      "src_contracts": {},
-      "dest_contracts": {}
-    },
-    "Polygon Mumbai-4": {
-      "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
-      "bridge_tokens": [
-        "0x326C977E6efc84E512bB9C30f76E30c160eD06FB"
-      ],
-      "bridge_tokens_pools": [
-        "0x14c7Cc6611f12fEA69714A62f4582C48fa06fe9E"
-      ],
-      "arm": "0xA1Ce96662a7D6461D5dD6D9ADF338AeE9cfA3C61",
-      "router": "0x0cA65b8b7813b02D8FdaDc3Fd9041bEbddC7daD8",
-      "price_registry": "0x25c96fA92cbF9aD74B46ca7e6376187202d53F34",
-      "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
-      "src_contracts": {},
-      "dest_contracts": {}
     }
   }
 }
