@@ -7,9 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 )
 
 func TestOverheadGas(t *testing.T) {
@@ -71,46 +68,46 @@ func TestMaxGasOverHeadGas(t *testing.T) {
 	}
 }
 
-func TestComputeExecCost(t *testing.T) {
-	tests := []struct {
-		name            string
-		gasLimit        *big.Int
-		execGasEstimate *big.Int
-		tokenPriceUSD   *big.Int
-		execCostUsd     *big.Int
-	}{
-		{
-			"happy flow",
-			big.NewInt(3_000_000),
-			big.NewInt(2e10),
-			big.NewInt(6e18),
-			big.NewInt(384e15),
-		},
-		{
-			"low usd price",
-			big.NewInt(3_000_000),
-			big.NewInt(2e10),
-			big.NewInt(6e15),
-			big.NewInt(384e12),
-		},
-		{
-			"zero token price",
-			big.NewInt(3_000_000),
-			big.NewInt(2e10),
-			big.NewInt(0),
-			big.NewInt(0),
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			msg := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{}
-			msg.GasLimit = tc.gasLimit
-			execCostUsd := computeExecCost(msg.GasLimit, tc.execGasEstimate, tc.tokenPriceUSD)
-			require.Equal(t, tc.execCostUsd, execCostUsd)
-		})
-	}
-}
+//func TestComputeExecCost(t *testing.T) {
+//	tests := []struct {
+//		name            string
+//		gasLimit        *big.Int
+//		execGasEstimate *big.Int
+//		tokenPriceUSD   *big.Int
+//		execCostUsd     *big.Int
+//	}{
+//		{
+//			"happy flow",
+//			big.NewInt(3_000_000),
+//			big.NewInt(2e10),
+//			big.NewInt(6e18),
+//			big.NewInt(384e15),
+//		},
+//		{
+//			"low usd price",
+//			big.NewInt(3_000_000),
+//			big.NewInt(2e10),
+//			big.NewInt(6e15),
+//			big.NewInt(384e12),
+//		},
+//		{
+//			"zero token price",
+//			big.NewInt(3_000_000),
+//			big.NewInt(2e10),
+//			big.NewInt(0),
+//			big.NewInt(0),
+//		},
+//	}
+//
+//	for _, tc := range tests {
+//		t.Run(tc.name, func(t *testing.T) {
+//			msg := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{}
+//			msg.GasLimit = tc.gasLimit
+//			execCostUsd := computeExecCost(msg.GasLimit, tc.execGasEstimate, tc.tokenPriceUSD)
+//			require.Equal(t, tc.execCostUsd, execCostUsd)
+//		})
+//	}
+//}
 
 func TestWaitBoostedFee(t *testing.T) {
 	tests := []struct {

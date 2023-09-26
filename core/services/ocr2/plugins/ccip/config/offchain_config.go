@@ -34,19 +34,19 @@ func (c CommitOffchainConfig) Validate() error {
 		return errors.New("must set DestFinalityDepth")
 	}
 	if c.GasPriceHeartBeat.Duration() == 0 {
-		return errors.New("must set FeeUpdateHeartBeat")
+		return errors.New("must set GasPriceHeartBeat")
 	}
 	if c.DAGasPriceDeviationPPB == 0 {
-		return errors.New("must set FeeUpdateDeviationPPB")
+		return errors.New("must set DAGasPriceDeviationPPB")
 	}
 	if c.ExecGasPriceDeviationPPB == 0 {
-		return errors.New("must set FeeUpdateDeviationPPB")
+		return errors.New("must set ExecGasPriceDeviationPPB")
 	}
 	if c.TokenPriceHeartBeat.Duration() == 0 {
-		return errors.New("must set FeeUpdateHeartBeat")
+		return errors.New("must set TokenPriceHeartBeat")
 	}
 	if c.TokenPriceDeviationPPB == 0 {
-		return errors.New("must set FeeUpdateDeviationPPB")
+		return errors.New("must set TokenPriceDeviationPPB")
 	}
 	if c.MaxGasPrice == 0 {
 		return errors.New("must set MaxGasPrice")

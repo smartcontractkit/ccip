@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -38,6 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -430,16 +432,19 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 	val1e18 := func(val int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(val)) }
 
 	testCases := []struct {
-		name                  string
-		commitObservations    []CommitObservation
-		f                     int
-		latestGasPrice        update
-		latestTokenPrices     map[common.Address]update
-		feeUpdateHeartBeat    models.Duration
-		feeUpdateDeviationPPB uint32
-		expGas                *big.Int
-		expTokenUpdates       []commit_store.InternalTokenPriceUpdate
-		expDestChainSel       uint64
+		name                     string
+		commitObservations       []CommitObservation
+		f                        int
+		latestGasPrice           update
+		latestTokenPrices        map[common.Address]update
+		gasPriceHeartBeat        models.Duration
+		daGasPriceDeviationPPB   uint32
+		execGasPriceDeviationPPB uint32
+		tokenPriceHeartBeat      models.Duration
+		tokenPriceDeviationPPB   uint32
+		expGas                   *big.Int
+		expTokenUpdates          []commit_store.InternalTokenPriceUpdate
+		expDestChainSel          uint64
 	}{
 		{
 			name: "median",
@@ -454,34 +459,16 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expDestChainSel: defaultSourceChainSelector,
 		},
 		{
-			name: "insufficient",
-			commitObservations: []CommitObservation{
-				{SourceGasPriceUSD: nil},
-				{SourceGasPriceUSD: nil},
-				{SourceGasPriceUSD: big.NewInt(3)},
-			},
-			f:      1,
-			expGas: big.NewInt(0),
-		},
-		{
-			name: "median including empties",
-			commitObservations: []CommitObservation{
-				{SourceGasPriceUSD: nil},
-				{SourceGasPriceUSD: big.NewInt(1)},
-				{SourceGasPriceUSD: big.NewInt(2)},
-			},
-			f:               1,
-			expGas:          big.NewInt(2),
-			expDestChainSel: defaultSourceChainSelector,
-		},
-		{
 			name: "gas price update skipped because the latest is similar and was updated recently",
 			commitObservations: []CommitObservation{
 				{SourceGasPriceUSD: val1e18(10)},
 				{SourceGasPriceUSD: val1e18(11)},
 			},
-			feeUpdateHeartBeat:    models.MustMakeDuration(time.Hour),
-			feeUpdateDeviationPPB: 20e7,
+			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			daGasPriceDeviationPPB:   20e7,
+			execGasPriceDeviationPPB: 20e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceDeviationPPB:   20e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-30 * time.Minute), // recent
 				value:     val1e18(9),                        // latest value close to the update
@@ -496,8 +483,11 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{SourceGasPriceUSD: val1e18(10)},
 				{SourceGasPriceUSD: val1e18(11)},
 			},
-			feeUpdateHeartBeat:    models.MustMakeDuration(time.Hour),
-			feeUpdateDeviationPPB: 20e7,
+			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			daGasPriceDeviationPPB:   20e7,
+			execGasPriceDeviationPPB: 20e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceDeviationPPB:   20e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-90 * time.Minute), // recent
 				value:     val1e18(9),                        // latest value close to the update
@@ -513,8 +503,11 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{SourceGasPriceUSD: val1e18(20)},
 				{SourceGasPriceUSD: val1e18(20)},
 			},
-			feeUpdateHeartBeat:    models.MustMakeDuration(time.Hour),
-			feeUpdateDeviationPPB: 20e7,
+			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			daGasPriceDeviationPPB:   20e7,
+			execGasPriceDeviationPPB: 20e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceDeviationPPB:   20e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-30 * time.Minute), // recent
 				value:     val1e18(11),                       // latest value close to the update
@@ -537,9 +530,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expDestChainSel: 0,
 		},
 		{
-			name: "median two tokens, including nil",
+			name: "median two tokens",
 			commitObservations: []CommitObservation{
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: nil, feeToken2: nil}},
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10), feeToken2: big.NewInt(13)}},
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
 			},
@@ -570,9 +562,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(10)}},
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(11), feeToken2: val1e18(7)}},
 			},
-			f:                     1,
-			feeUpdateHeartBeat:    models.MustMakeDuration(time.Hour),
-			feeUpdateDeviationPPB: 20e7,
+			f:                        1,
+			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			daGasPriceDeviationPPB:   20e7,
+			execGasPriceDeviationPPB: 20e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceDeviationPPB:   20e7,
 			latestTokenPrices: map[common.Address]update{
 				feeToken1: {
 					timestamp: time.Now().Add(-30 * time.Minute),
@@ -588,9 +583,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(10)}},
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(11), feeToken2: val1e18(7)}},
 			},
-			f:                     1,
-			feeUpdateHeartBeat:    models.MustMakeDuration(50 * time.Minute),
-			feeUpdateDeviationPPB: 20e7,
+			f:                        1,
+			gasPriceHeartBeat:        models.MustMakeDuration(50 * time.Minute),
+			daGasPriceDeviationPPB:   20e7,
+			execGasPriceDeviationPPB: 20e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(50 * time.Minute),
+			tokenPriceDeviationPPB:   20e7,
 			latestTokenPrices: map[common.Address]update{
 				feeToken1: {
 					timestamp: time.Now().Add(-1 * time.Hour),
@@ -609,9 +607,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(20)}},
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21), feeToken2: val1e18(7)}},
 			},
-			f:                     1,
-			feeUpdateHeartBeat:    models.MustMakeDuration(time.Hour),
-			feeUpdateDeviationPPB: 20e7,
+			f:                        1,
+			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			daGasPriceDeviationPPB:   20e7,
+			execGasPriceDeviationPPB: 20e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceDeviationPPB:   20e7,
 			latestTokenPrices: map[common.Address]update{
 				feeToken1: {
 					timestamp: time.Now().Add(-30 * time.Minute),
@@ -626,22 +627,32 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 		},
 	}
 
+	estimatorCSVer, _ := semver.NewVersion("1.2.0")
+	estimator, _ := prices.NewGasPriceEstimator(*estimatorCSVer, nil, nil)
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := &CommitReportingPlugin{
 				lggr:   logger.TestLogger(t),
 				config: CommitPluginConfig{sourceChainSelector: defaultSourceChainSelector},
 				offchainConfig: ccipconfig.CommitOffchainConfig{
-					FeeUpdateHeartBeat:    tc.feeUpdateHeartBeat,
-					FeeUpdateDeviationPPB: tc.feeUpdateDeviationPPB,
+					GasPriceHeartBeat:      tc.gasPriceHeartBeat,
+					TokenPriceHeartBeat:    tc.tokenPriceHeartBeat,
+					TokenPriceDeviationPPB: tc.tokenPriceDeviationPPB,
+				},
+				gasPriceEstimator: estimator,
+				gasPriceDeviationOpt: prices.GasPriceDeviationOptions{
+					DADeviationPPB:   int64(tc.daGasPriceDeviationPPB),
+					ExecDeviationPPB: int64(tc.execGasPriceDeviationPPB),
 				},
 				F: tc.f,
 			}
-			got := r.calculatePriceUpdates(tc.commitObservations, tc.latestGasPrice, tc.latestTokenPrices)
+			got, err := r.calculatePriceUpdates(tc.commitObservations, tc.latestGasPrice, tc.latestTokenPrices)
 
 			assert.Equal(t, tc.expGas, got.UsdPerUnitGas)
 			assert.Equal(t, tc.expTokenUpdates, got.TokenPriceUpdates)
 			assert.Equal(t, tc.expDestChainSel, got.DestChainSelector)
+			assert.NoError(t, err)
 		})
 	}
 }

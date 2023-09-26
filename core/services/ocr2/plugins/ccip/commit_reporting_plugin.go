@@ -427,7 +427,7 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 }
 
 // getLatestGasPriceUpdate returns the latest gas price updates based on logs within the heartbeat.
-// The result should never contain an updated value that is nil.
+// If an update is found, it is not expected to contain a nil value. If no updates found, empty update with nil value is returned.
 func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasUpdate update, error error) {
 	if checkInflight {
 		latestInflightGasPriceUpdate, latestUpdateFound := r.inflightReports.getLatestInflightGasPriceUpdate()
@@ -624,7 +624,6 @@ func calculateIntervalConsensus(intervals []commit_store.CommitStoreInterval, f 
 
 // Note priceUpdates must be deterministic.
 // The provided latestTokenPrices should not contain nil values.
-// The resulting InternalPriceUpdates should not contain nil values.
 func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObservation, latestGasPrice update, latestTokenPrices map[common.Address]update) (commit_store.InternalPriceUpdates, error) {
 	priceObservations := make(map[common.Address][]*big.Int)
 	var sourceGasObservations []prices.GasPrice
@@ -672,14 +671,16 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 	}
 	destChainSelector = r.config.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
 
-	gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
-	gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value, r.gasPriceDeviationOpt)
-	if err != nil {
-		return commit_store.InternalPriceUpdates{}, err
-	}
-	if gasPriceUpdatedRecently && gasPriceNotChanged {
-		newGasPrice = big.NewInt(0)
-		destChainSelector = uint64(0)
+	if latestGasPrice.value != nil {
+		gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
+		gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value, r.gasPriceDeviationOpt)
+		if err != nil {
+			return commit_store.InternalPriceUpdates{}, err
+		}
+		if gasPriceUpdatedRecently && gasPriceNotChanged {
+			newGasPrice = big.NewInt(0)
+			destChainSelector = uint64(0)
+		}
 	}
 
 	return commit_store.InternalPriceUpdates{
