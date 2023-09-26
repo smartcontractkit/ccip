@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+option go_package = "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem";
+
+package telem;
+
+message CCIPBlockNumber {
+    uint64 timestamp = 1;
+    uint64 block_number = 2;
+    string block_hash = 3;
+    bytes config_digest = 4;
+}
+
+message CCIPNodeVersion {
+    uint64 timestamp = 1;
+    string node_version = 2;
+    bytes config_digest = 3;
+}
+
+message CCIPTelemWrapper{
+    oneof msg {
+        CCIPBlockNumber block_number = 1;
+        CCIPNodeVersion node_version = 2;
+    }
+}
