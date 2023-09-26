@@ -177,16 +177,6 @@ func CommitReportToEthTxMeta(report []byte) (*txmgr.TxMeta, error) {
 	}, nil
 }
 
-//func getCommitPluginSourceLpFilters(onRamp common.Address) []logpoller.Filter {
-//	return []logpoller.Filter{
-//		{
-//			Name:      logpoller.FilterName(COMMIT_CCIP_SENDS, onRamp.String()),
-//			EventSigs: []common.Hash{abihelpers.EventSignatures.SendRequested},
-//			Addresses: []common.Address{onRamp},
-//		},
-//	}
-//}
-
 func getCommitPluginDestLpFilters(priceRegistry common.Address, offRamp common.Address) []logpoller.Filter {
 	return []logpoller.Filter{
 		{
@@ -233,24 +223,10 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 }
 
 func unregisterCommitPluginFilters(ctx context.Context, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address, qopts ...pg.QOpt) error {
-	//staticCfg, err := destCommitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
-	//if err != nil {
-	//	return err
-	//}
-
 	dynamicCfg, err := destCommitStore.GetDynamicConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return err
 	}
-
-	//if err := logpollerutil.UnregisterLpFilters(
-	//	sourceLP,
-	//	getCommitPluginSourceLpFilters(staticCfg.OnRamp),
-	//	qopts...,
-	//); err != nil {
-	//	return err
-	//}
-
 	return logpollerutil.UnregisterLpFilters(
 		destLP,
 		getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry, offRamp),

@@ -90,9 +90,9 @@ type CommitReportingPluginFactory struct {
 	config CommitPluginConfig
 
 	// We keep track of the registered filters
-	sourceChainFilters []logpoller.Filter
-	destChainFilters   []logpoller.Filter
-	filtersMu          *sync.Mutex
+	// TODO: Can push this down into the readers
+	destChainFilters []logpoller.Filter
+	filtersMu        *sync.Mutex
 }
 
 // NewCommitReportingPluginFactory return a new CommitReportingPluginFactory.
@@ -208,20 +208,10 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
 // pass zeroAddress if destPriceRegistry is unknown, filters with zero address are omitted.
+// TODO: Should be able to Close and re-create readers to abstract filters.
 func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address, qopts ...pg.QOpt) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
-
-	// source chain filters
-	//sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getCommitPluginSourceLpFilters(rf.config.onRampAddress)
-	//created, deleted := logpollerutil.FiltersDiff(sourceFiltersBefore, sourceFiltersNow)
-	//if err := logpollerutil.UnregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
-	//	return err
-	//}
-	//if err := logpollerutil.RegisterLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
-	//	return err
-	//}
-	//rf.sourceChainFilters = sourceFiltersNow
 
 	// destination chain filters
 	destFiltersBefore, destFiltersNow := rf.destChainFilters, getCommitPluginDestLpFilters(destPriceRegistry, rf.config.offRamp.Address())

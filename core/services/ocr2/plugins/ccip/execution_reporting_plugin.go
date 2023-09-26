@@ -203,6 +203,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
 // pass zeroAddress if dstPriceRegistry is unknown, filters with zero address are omitted.
+// TODO: Should be able to Close and re-create readers to abstract filters.
 func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address, qopts ...pg.QOpt) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
@@ -818,7 +819,10 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	}
 
 	for _, sendReq := range sendRequests {
-		msg, _ := r.config.onRampReader.ToOffRampMessage(sendReq.Data)
+		msg, err := r.config.onRampReader.ToOffRampMessage(sendReq.Data)
+		if err != nil {
+			return nil, err
+		}
 
 		// if value exists in the map then it's executed
 		// if value exists, and it's true then it's considered finalized

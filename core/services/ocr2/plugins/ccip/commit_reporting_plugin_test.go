@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	gethtypes "github.com/ethereum/go-ethereum/core/types"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/leanovate/gopter"
@@ -1403,11 +1401,4 @@ func TestCommitReportToEthTxMeta(t *testing.T) {
 			require.EqualValues(t, tc.expectedRange, txMeta.SeqNumbers)
 		})
 	}
-}
-
-// leafHasher123 always returns '123' followed by zeroes in HashLeaf method.
-type leafHasher123 struct{}
-
-func (h leafHasher123) HashLeaf(_ gethtypes.Log) ([32]byte, error) {
-	return [32]byte{123}, nil
 }

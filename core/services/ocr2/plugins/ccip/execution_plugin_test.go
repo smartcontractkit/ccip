@@ -72,20 +72,12 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 	mockOffRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
 	mockOffRamp.SetDynamicConfig(evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig{PriceRegistry: dstPriceRegAddr})
 
-	mockOnRamp, onRampAddr := testhelpers.NewFakeOnRamp(t)
+	mockOnRamp, _ := testhelpers.NewFakeOnRamp(t)
 	mockOnRamp.SetDynamicCfg(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{PriceRegistry: srcPriceRegAddr})
-
-	//pluginConfig := config.ExecutionPluginJobSpecConfig{
-	//	USDCConfig: config.USDCConfig{
-	//		SourceTokenAddress:              utils.RandomAddress(),
-	//		SourceMessageTransmitterAddress: utils.RandomAddress(),
-	//		AttestationAPI:                  "http://localhost:8080",
-	//	},
-	//}
 
 	srcLP := mocklp.NewLogPoller(t)
 	srcFilters := []string{
-		"Exec ccip sends - " + onRampAddr.String(),
+		//"Exec ccip sends - " + onRampAddr.String(),
 		"Fee token added - 0xdAFea492D9c6733aE3d56B7ed1ADb60692c98bC9",
 		"Fee token removed - 0xdAFea492D9c6733aE3d56B7ed1ADb60692c98bC9",
 		//usdc.MESSAGE_SENT_FILTER_NAME + " - " + pluginConfig.USDCConfig.SourceMessageTransmitterAddress.Hex(),

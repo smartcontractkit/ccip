@@ -279,6 +279,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 			return err
 		}
 	}
+	// TODO: once offramp/commit/pricereg are abstracted, we can call Close on the offramp/commit readers to unregister filters.
 	return unregisterExecutionPluginLpFilters(ctx, execPluginConfig.sourceLP, execPluginConfig.destLP, execPluginConfig.offRamp,
 		execPluginConfig.commitStore.Address(), execPluginConfig.onRamp, execPluginConfig.sourceClient, qopts...)
 }

@@ -140,6 +140,11 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			sourceReader := ccipdata.NewMockOnRampReader(t)
 			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
 				Return(tc.sendRequests, nil).Maybe()
+			if !tc.expErr {
+				sourceReader.On("ToOffRampMessage", mock.Anything).Return(&evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 10}, nil)
+				sourceReader.On("ToOffRampMessage", mock.Anything).Return(&evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 11}, nil)
+				sourceReader.On("ToOffRampMessage", mock.Anything).Return(&evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 12}, nil)
+			}
 			p.config.onRampReader = sourceReader
 
 			cachedDestTokens := cache.NewMockAutoSync[cache.CachedTokens](t)
@@ -371,25 +376,29 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p.config.onRamp = onRamp
 
 	sendReqs := make([]ccipdata.Event[ccipdata.EVM2EVMMessage], len(observations))
+	sourceReader := ccipdata.NewMockOnRampReader(t)
 	for i := range observations {
+		msg := evm_2_evm_offramp.InternalEVM2EVMMessage{
+			SourceChainSelector: math.MaxUint64,
+			SequenceNumber:      uint64(i + 1),
+			FeeTokenAmount:      big.NewInt(math.MaxInt64),
+			Sender:              utils.RandomAddress(),
+			Nonce:               math.MaxUint64,
+			GasLimit:            big.NewInt(math.MaxInt64),
+			Strict:              false,
+			Receiver:            utils.RandomAddress(),
+			Data:                bytes.Repeat([]byte{0}, bytesPerMessage),
+			TokenAmounts:        nil,
+			FeeToken:            utils.RandomAddress(),
+			MessageId:           [32]byte{12},
+		}
 		sendReqs[i] = ccipdata.Event[ccipdata.EVM2EVMMessage]{
 			Data: ccipdata.EVM2EVMMessage{
-				//SourceChainSelector: math.MaxUint64,
-				SequenceNumber: uint64(i + 1),
-				//FeeTokenAmount:      big.NewInt(math.MaxInt64),
-				//Sender:              utils.RandomAddress(),
-				Nonce:    math.MaxUint64,
-				GasLimit: big.NewInt(math.MaxInt64),
-				//Strict:              false,
-				//Receiver:            utils.RandomAddress(),
-				//Data:                bytes.Repeat([]byte{0}, bytesPerMessage),
-				//TokenAmounts:        nil,
-				//FeeToken:            utils.RandomAddress(),
-				MessageId: [32]byte{12},
+				SequenceNumber: msg.SequenceNumber,
 			},
 		}
+		sourceReader.On("ToOffRampMessage", mock.Anything).Return(&msg, nil)
 	}
-	sourceReader := ccipdata.NewMockOnRampReader(t)
 	sourceReader.On("GetSendRequestsBetweenSeqNums",
 		ctx, observations[0].SeqNr, observations[len(observations)-1].SeqNr, 0).Return(sendReqs, nil)
 	p.config.onRampReader = sourceReader
@@ -1011,6 +1020,11 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			sourceReader := ccipdata.NewMockOnRampReader(t)
 			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expQueryMin, tc.expQueryMax, 0).
 				Return(tc.onchainEvents, nil).Maybe()
+			if len(tc.expReports) > 1 {
+				sourceReader.On("ToOffRampMessage", mock.Anything).Return(&evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 1}, nil).Once()
+				sourceReader.On("ToOffRampMessage", mock.Anything).Return(&evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 2}, nil).Once()
+				sourceReader.On("ToOffRampMessage", mock.Anything).Return(&evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 3}, nil).Once()
+			}
 			p.config.onRampReader = sourceReader
 
 			destReader := ccipdata.NewMockReader(t)
