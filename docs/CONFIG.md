@@ -823,7 +823,7 @@ KeyBundleID is a sha256 hexadecimal hash identifier.
 ```toml
 CaptureEATelemetry = false # Default
 ```
-CaptureEATelemetry toggles collecting extra information from External Adaptares
+CaptureEATelemetry toggles collecting extra information from External Adapters
 
 ### CaptureAutomationCustomTelemetry
 ```toml
@@ -933,7 +933,7 @@ TransmitterAddress is the default sending address to use for OCR. If you have an
 ```toml
 CaptureEATelemetry = false # Default
 ```
-CaptureEATelemetry toggles collecting extra information from External Adaptares
+CaptureEATelemetry toggles collecting extra information from External Adapters
 
 ### TraceLogging
 ```toml
@@ -4875,7 +4875,7 @@ In EIP-1559 mode, the following changes occur to how configuration works:
 - All new transactions will be sent as type 0x2 transactions specifying a TipCap and FeeCap. Be aware that existing pending legacy transactions will continue to be gas bumped in legacy mode.
 - `BlockHistoryEstimator` will apply its calculations (gas percentile etc) to the TipCap and this value will be used for new transactions (GasPrice will be ignored)
 - `FixedPriceEstimator` will use `GasTipCapDefault` instead of `GasPriceDefault` for the tip cap
-- `FixedPriceEstimator` will use `GasFeeCapDefault` instaed of `GasPriceDefault` for the fee cap
+- `FixedPriceEstimator` will use `GasFeeCapDefault` instead of `GasPriceDefault` for the fee cap
 - `PriceMin` is ignored for new transactions and `GasTipCapMinimum` is used instead (default 0)
 - `PriceMax` still represents that absolute upper limit that Chainlink will ever spend (total) on a single tx
 - `Keeper.GasTipCapBufferPercent` is ignored in EIP-1559 mode and `Keeper.GasTipCapBufferPercent` is used instead
@@ -5285,7 +5285,7 @@ GasLimitMultiplier scales the estimated gas limit.
 ```toml
 MaxMsgsPerBatch = 100 # Default
 ```
-MaxMsgsPerBatch limits the numbers of mesages per transaction batch.
+MaxMsgsPerBatch limits the number of messages per transaction batch.
 
 ### OCR2CachePollPeriod
 ```toml
