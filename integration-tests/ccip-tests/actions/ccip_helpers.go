@@ -272,10 +272,7 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 			}
 		}
 	}
-	err := ccipModule.ChainClient.WaitForEvents()
-	if err != nil {
-		return errors.WithStack(err)
-	}
+
 	return nil
 }
 
@@ -403,6 +400,13 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		// deploy a mock ARM contract
 		if ccipModule.ARMContract == nil {
 			ccipModule.ARMContract, err = cd.DeployMockARMContract()
+			if err != nil {
+				return fmt.Errorf("deploying mock ARM contract shouldn't fail %+v", err)
+			}
+			err = ccipModule.ChainClient.WaitForEvents()
+			if err != nil {
+				return fmt.Errorf("error in waiting for mock ARM deployment %+v", err)
+			}
 		}
 	}
 	if ccipModule.FeeToken == nil {
