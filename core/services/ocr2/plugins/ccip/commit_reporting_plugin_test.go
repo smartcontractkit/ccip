@@ -82,7 +82,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				TokenPricesUSD: map[common.Address]*big.Int{
 					someTokenAddr: big.NewInt(20000000000),
 				},
-				SourceGasPriceUSD: big.NewInt(0),
+				SourceGasPriceUSD: big.NewInt(200),
 				Interval: commit_store.CommitStoreInterval{
 					Min: 54,
 					Max: 55,
@@ -125,10 +125,12 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				priceGet.On("TokenPricesUSD", mock.Anything, addrs).Return(tc.tokenPrices, nil)
 			}
 
-			sourceFeeEst := mocks.NewEvmFeeEstimator(t)
+			gasPriceEstimator := prices.NewMockGasPriceEstimator(t)
 			if tc.fee != nil {
-				sourceFeeEst.On("GetFee", ctx, []byte(nil), uint32(0), assets.NewWei(big.NewInt(0))).
-					Return(gas.EvmFee{Legacy: assets.NewWei(tc.fee)}, uint32(0), nil)
+				var p prices.GasPrice = tc.fee
+				var pUSD prices.GasPrice = new(big.Int).Mul(tc.fee, tc.tokenPrices[sourceNativeTokenAddr])
+				gasPriceEstimator.On("GetGasPrice", ctx).Return(p, nil)
+				gasPriceEstimator.On("DenoteInUSD", p, tc.tokenPrices[sourceNativeTokenAddr]).Return(pUSD, nil)
 			}
 
 			p := &CommitReportingPlugin{}
@@ -140,8 +142,8 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.config.sourceReader = sourceReader
 			p.tokenDecimalsCache = tokenDecimalsCache
 			p.config.priceGetter = priceGet
-			p.config.sourceFeeEstimator = sourceFeeEst
 			p.config.sourceNative = sourceNativeTokenAddr
+			p.gasPriceEstimator = gasPriceEstimator
 
 			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
 
@@ -519,21 +521,21 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 		{
 			name: "median one token",
 			commitObservations: []CommitObservation{
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10)}},
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12)}},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10)}, SourceGasPriceUSD: val1e18(0)},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12)}, SourceGasPriceUSD: val1e18(0)},
 			},
 			f: 1,
 			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{
 				{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)},
 			},
 			expGas:          zero,
-			expDestChainSel: 0,
+			expDestChainSel: defaultSourceChainSelector,
 		},
 		{
 			name: "median two tokens",
 			commitObservations: []CommitObservation{
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10), feeToken2: big.NewInt(13)}},
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10), feeToken2: big.NewInt(13)}, SourceGasPriceUSD: val1e18(0)},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}, SourceGasPriceUSD: val1e18(0)},
 			},
 			f: 1,
 			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{
@@ -541,26 +543,13 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{SourceToken: feeToken2, UsdPerToken: big.NewInt(13)},
 			},
 			expGas:          zero,
-			expDestChainSel: 0,
-		},
-		{
-			name: "only one token with enough votes",
-			commitObservations: []CommitObservation{
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(10)}},
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: big.NewInt(12), feeToken2: big.NewInt(7)}},
-			},
-			f: 1,
-			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{
-				{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)},
-			},
-			expGas:          zero,
-			expDestChainSel: 0,
+			expDestChainSel: defaultSourceChainSelector,
 		},
 		{
 			name: "token price update skipped because it is close to the latest",
 			commitObservations: []CommitObservation{
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(10)}},
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(11), feeToken2: val1e18(7)}},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(10)}, SourceGasPriceUSD: val1e18(0)},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(11)}, SourceGasPriceUSD: val1e18(0)},
 			},
 			f:                        1,
 			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
@@ -575,48 +564,109 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				},
 			},
 			expGas:          zero,
-			expDestChainSel: 0,
+			expDestChainSel: defaultSourceChainSelector,
 		},
 		{
-			name: "token price update is close to the latest but included because it has not been updated recently",
+			name: "gas price and token price both included because they are not close to the latest",
 			commitObservations: []CommitObservation{
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(10)}},
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(11), feeToken2: val1e18(7)}},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(20)}, SourceGasPriceUSD: val1e18(10)},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21)}, SourceGasPriceUSD: val1e18(11)},
 			},
 			f:                        1,
-			gasPriceHeartBeat:        models.MustMakeDuration(50 * time.Minute),
-			daGasPriceDeviationPPB:   20e7,
-			execGasPriceDeviationPPB: 20e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(50 * time.Minute),
+			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			daGasPriceDeviationPPB:   10e7,
+			execGasPriceDeviationPPB: 10e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
 			tokenPriceDeviationPPB:   20e7,
+			latestGasPrice: update{
+				timestamp: time.Now().Add(-30 * time.Minute),
+				value:     val1e18(9),
+			},
 			latestTokenPrices: map[common.Address]update{
 				feeToken1: {
-					timestamp: time.Now().Add(-1 * time.Hour),
+					timestamp: time.Now().Add(-30 * time.Minute),
 					value:     val1e18(9),
 				},
 			},
 			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{
-				{SourceToken: feeToken1, UsdPerToken: val1e18(11)},
+				{SourceToken: feeToken1, UsdPerToken: val1e18(21)},
 			},
-			expGas:          zero,
-			expDestChainSel: 0,
+			expGas:          val1e18(11),
+			expDestChainSel: defaultSourceChainSelector,
 		},
 		{
-			name: "token price update included because it is not close to the latest",
+			name: "gas price and token price both included because they not been updated recently",
 			commitObservations: []CommitObservation{
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(20)}},
-				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21), feeToken2: val1e18(7)}},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(20)}, SourceGasPriceUSD: val1e18(10)},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21)}, SourceGasPriceUSD: val1e18(11)},
 			},
 			f:                        1,
 			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
-			daGasPriceDeviationPPB:   20e7,
-			execGasPriceDeviationPPB: 20e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			daGasPriceDeviationPPB:   10e7,
+			execGasPriceDeviationPPB: 10e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(2 * time.Hour),
 			tokenPriceDeviationPPB:   20e7,
+			latestGasPrice: update{
+				timestamp: time.Now().Add(-90 * time.Minute),
+				value:     val1e18(11),
+			},
+			latestTokenPrices: map[common.Address]update{
+				feeToken1: {
+					timestamp: time.Now().Add(-4 * time.Hour),
+					value:     val1e18(21),
+				},
+			},
+			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{
+				{SourceToken: feeToken1, UsdPerToken: val1e18(21)},
+			},
+			expGas:          val1e18(11),
+			expDestChainSel: defaultSourceChainSelector,
+		},
+		{
+			name: "gas price included because it deviates from latest and token price skipped because it does not deviate",
+			commitObservations: []CommitObservation{
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(20)}, SourceGasPriceUSD: val1e18(10)},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21)}, SourceGasPriceUSD: val1e18(11)},
+			},
+			f:                        1,
+			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			daGasPriceDeviationPPB:   10e7,
+			execGasPriceDeviationPPB: 10e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(2 * time.Hour),
+			tokenPriceDeviationPPB:   200e7,
+			latestGasPrice: update{
+				timestamp: time.Now().Add(-30 * time.Minute),
+				value:     val1e18(9),
+			},
 			latestTokenPrices: map[common.Address]update{
 				feeToken1: {
 					timestamp: time.Now().Add(-30 * time.Minute),
 					value:     val1e18(9),
+				},
+			},
+			expGas:          val1e18(11),
+			expDestChainSel: defaultSourceChainSelector,
+		},
+		{
+			name: "gas price skipped because it does not deviate and token price included because it has not been updated recently",
+			commitObservations: []CommitObservation{
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(20)}, SourceGasPriceUSD: val1e18(10)},
+				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21)}, SourceGasPriceUSD: val1e18(11)},
+			},
+			f:                        1,
+			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			daGasPriceDeviationPPB:   10e7,
+			execGasPriceDeviationPPB: 10e7,
+			tokenPriceHeartBeat:      models.MustMakeDuration(2 * time.Hour),
+			tokenPriceDeviationPPB:   20e7,
+			latestGasPrice: update{
+				timestamp: time.Now().Add(-30 * time.Minute),
+				value:     val1e18(11),
+			},
+			latestTokenPrices: map[common.Address]update{
+				feeToken1: {
+					timestamp: time.Now().Add(-4 * time.Hour),
+					value:     val1e18(21),
 				},
 			},
 			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{

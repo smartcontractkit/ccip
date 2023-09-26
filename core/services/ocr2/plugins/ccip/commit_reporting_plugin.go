@@ -313,8 +313,8 @@ func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context, lggr logger.L
 	return mathutil.Max(nextMinOnChain, maxInflight+1), nextMinOnChain, nil
 }
 
-// All prices are USD ($1=1e18) denominated. We only generate prices we think should be updated;
-// otherwise, omitting values means voting to skip updating them
+// All prices are USD ($1=1e18) denominated. All prices must be not nil.
+// Return token prices should contain the exact same tokens as in tokenDecimals.
 func (r *CommitReportingPlugin) generatePriceUpdates(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -474,15 +474,13 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	parsableObservations := getParsableObservations[CommitObservation](lggr, observations)
 
 	// Filters out parsable but faulty observations
-	validObservations := getValidObservations(lggr, parsableObservations)
-
-	// We require at least f+1 valid observations. This corresponds to the scenario where f of the 2f+1 are faulty.
-	if len(validObservations) <= r.F {
-		return false, nil, errors.Errorf("Not enough intervals to form consensus: #obs=%d, f=%d", len(validObservations), r.F)
+	validObservations, err := r.validateObservations(ctx, lggr, parsableObservations)
+	if err != nil {
+		return false, nil, err
 	}
 
 	var intervals []commit_store.CommitStoreInterval
-	for _, obs := range parsableObservations {
+	for _, obs := range validObservations {
 		intervals = append(intervals, obs.Interval)
 	}
 
@@ -501,7 +499,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		return false, nil, err
 	}
 
-	priceUpdates, err := r.calculatePriceUpdates(parsableObservations, latestGasPrice, latestTokenPrices)
+	priceUpdates, err := r.calculatePriceUpdates(validObservations, latestGasPrice, latestTokenPrices)
 	if err != nil {
 		return false, nil, err
 	}
@@ -531,34 +529,52 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	return true, encodedReport, nil
 }
 
-// getValidObservations validates the given observations.
+// validateObservations validates the given observations.
 // An observation is rejected if any of its gas price or token price is nil. With current CommitObservation implementation, prices
 // are checked to ensure no nil values before adding to Observation, hence an observation that contains nil values comes from a faulty node.
-func getValidObservations(lggr logger.Logger, observations []CommitObservation) []CommitObservation {
-	var validObs []CommitObservation
+func (r *CommitReportingPlugin) validateObservations(ctx context.Context, lggr logger.Logger, observations []CommitObservation) (validObs []CommitObservation, err error) {
+	tokenDecimals, err := r.tokenDecimalsCache.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, obs := range observations {
-		// if gas price is reported as nil, the observation is faulty, skip the observation
+		// If gas price is reported as nil, the observation is faulty, skip the observation.
 		if obs.SourceGasPriceUSD == nil {
-			lggr.Warnw("Rejecting observation due to nil SourceGasPriceUSD")
+			lggr.Warnw("Skipping observation due to nil SourceGasPriceUSD")
 			continue
 		}
-		// if any of the token prices is reported as nil, the observation is faulty, skip the observation
+		// If observed number of token prices does not match number of supported tokens on dest chain, skip the observation.
+		if len(tokenDecimals) != len(obs.TokenPricesUSD) {
+			lggr.Warnw("Skipping observation due to token count mismatch", "expecting", len(tokenDecimals), "got", len(obs.TokenPricesUSD))
+			continue
+		}
+		// If any of the observed token prices is reported as nil, or not supported on dest chain, skip the observation.
 		skipObservation := false
 		for token, price := range obs.TokenPricesUSD {
 			if price == nil {
-				lggr.Warnw("Nil value in TokenPricesUSD", "token", token.Hex())
+				lggr.Warnw("Nil value in observed TokenPricesUSD", "token", token.Hex())
+				skipObservation = true
+			}
+			if _, exists := tokenDecimals[token]; !exists {
+				lggr.Warnw("Unsupported token in observed TokenPricesUSD", "token", token.Hex())
 				skipObservation = true
 			}
 		}
 		if skipObservation {
-			lggr.Warnw("Rejecting observation due to nil value in TokenPricesUSD")
+			lggr.Warnw("Skipping observation due to invalid TokenPricesUSD")
 			continue
 		}
 
 		validObs = append(validObs, obs)
 	}
-	return validObs
+
+	// We require at least f+1 valid observations. This corresponds to the scenario where f of the 2f+1 are faulty.
+	if len(validObs) <= r.F {
+		return nil, errors.Errorf("Not enough valid observations to form consensus: #obs=%d, f=%d", len(validObs), r.F)
+	}
+
+	return validObs, nil
 }
 
 // calculateIntervalConsensus compresses a set of intervals into one interval
@@ -673,11 +689,11 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 
 	if latestGasPrice.value != nil {
 		gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
-		gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value, r.gasPriceDeviationOpt)
+		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value, r.gasPriceDeviationOpt)
 		if err != nil {
 			return commit_store.InternalPriceUpdates{}, err
 		}
-		if gasPriceUpdatedRecently && gasPriceNotChanged {
+		if gasPriceUpdatedRecently && !gasPriceDeviated {
 			newGasPrice = big.NewInt(0)
 			destChainSelector = uint64(0)
 		}
@@ -871,13 +887,13 @@ func (r *CommitReportingPlugin) isStaleGasPrice(ctx context.Context, lggr logger
 	}
 
 	if latestGasPrice.value != nil {
-		gasPriceNotChanged, err := r.gasPriceEstimator.Deviates(priceUpdates.UsdPerUnitGas, latestGasPrice.value, r.gasPriceDeviationOpt)
+		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(priceUpdates.UsdPerUnitGas, latestGasPrice.value, r.gasPriceDeviationOpt)
 		if err != nil {
 			lggr.Errorw("Report is stale because deviation check failed", "err", err)
 			return true
 		}
 
-		if gasPriceNotChanged {
+		if !gasPriceDeviated {
 			lggr.Infow("Report is stale because of gas price",
 				"latestGasPriceUpdate", latestGasPrice.value,
 				"usdPerUnitGas", priceUpdates.UsdPerUnitGas,
