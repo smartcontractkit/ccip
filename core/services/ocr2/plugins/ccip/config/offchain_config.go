@@ -58,6 +58,7 @@ func (c CommitOffchainConfig) Validate() error {
 	return nil
 }
 
+// CommitOffchainConfigV1 is a legacy version of CommitOffchainConfig, used for CommitStore version 1.0.0 and 1.1.0
 type CommitOffchainConfigV1 struct {
 	SourceFinalityDepth   uint32
 	DestFinalityDepth     uint32

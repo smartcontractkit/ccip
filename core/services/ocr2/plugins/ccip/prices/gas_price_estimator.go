@@ -12,13 +12,19 @@ import (
 )
 
 const (
-	FeeBoostingOverheadGas   = 200_000
-	ExecGasPerToken          = 25_000 // Reasonable estimation of ERC20 transfer cost (19_000-35_000 depending on receiver balances)
-	ExecGasPerPayloadByte    = 16     // Gas charged for passing each byte of `data` payload to CCIP receiver. This can be a constant as it is part of EVM spec. Changes should be rare.
-	EvmMessageFixedBytes     = 448    // Byte size of fixed-size fields in EVM2EVMMessage
-	EvmMessageBytesPerToken  = 128    // Byte size of each token transfer, consisting of 1 EVMTokenAmount and 1 bytes, excl length of bytes
-	DAMultiplierBase         = int64(10000)
-	DAGasPriceEncodingLength = 112 // Each gas price takes up at most GasPriceEncodingLength number of bits
+	FeeBoostingOverheadGas = 200_000
+	// ExecGasPerToken is lower-bound estimation of ERC20 releaseOrMint gas cost (Mint with static minter).
+	// Use this in per-token gas cost calc as heuristic to simplify estimation logic.
+	ExecGasPerToken = 10_000
+	// ExecGasPerPayloadByte is gas charged for passing each byte of `data` payload to CCIP receiver, ignores 4 gas per 0-byte rule.
+	// This can be a constant as it is part of EVM spec. Changes should be rare.
+	ExecGasPerPayloadByte = 16
+	// EvmMessageFixedBytes is byte size of fixed-size fields in EVM2EVMMessage
+	// Updating EVM2EVMMessage involves an offchain upgrade, safe to keep this as constant in code.
+	EvmMessageFixedBytes     = 448
+	EvmMessageBytesPerToken  = 128          // Byte size of each token transfer, consisting of 1 EVMTokenAmount and 1 bytes, excl length of bytes
+	DAMultiplierBase         = int64(10000) // DA multiplier is in multiples of 0.0001, i.e. 1/DAMultiplierBase
+	DAGasPriceEncodingLength = 112          // Each gas price takes up at most GasPriceEncodingLength number of bits
 )
 
 type GasPriceDeviationOptions struct {
