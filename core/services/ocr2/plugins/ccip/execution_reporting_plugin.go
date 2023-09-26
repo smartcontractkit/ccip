@@ -879,7 +879,6 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 	messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(sendReqsInRoot))
 	for i, msg := range sendReqsInRoot {
-		//offRampMsg := abihelpers.OnRampMessageToOffRampMessage(msg.Data.Message)
 		offRampMsg, _ := r.config.onRampReader.ToOffRampMessage(msg.Data)
 		messages[i] = offRampMsg
 	}

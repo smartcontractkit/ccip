@@ -77,10 +77,8 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 
 	srcLP := mocklp.NewLogPoller(t)
 	srcFilters := []string{
-		//"Exec ccip sends - " + onRampAddr.String(),
 		"Fee token added - 0xdAFea492D9c6733aE3d56B7ed1ADb60692c98bC9",
 		"Fee token removed - 0xdAFea492D9c6733aE3d56B7ed1ADb60692c98bC9",
-		//usdc.MESSAGE_SENT_FILTER_NAME + " - " + pluginConfig.USDCConfig.SourceMessageTransmitterAddress.Hex(),
 	}
 	for _, f := range srcFilters {
 		srcLP.On("UnregisterFilter", f, mock.Anything).Return(nil)

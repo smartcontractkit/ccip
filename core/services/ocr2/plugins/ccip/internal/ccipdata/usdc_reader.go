@@ -50,7 +50,7 @@ func (d usdcPayload) Validate() error {
 	return nil
 }
 
-func ParseUSDCMessageSent(logData []byte) ([]byte, error) {
+func parseUSDCMessageSent(logData []byte) ([]byte, error) {
 	decodeAbiStruct, err := abihelpers.DecodeAbiStruct[usdcPayload](logData)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ func (u *USDCReaderImpl) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Conte
 		current := logs[len(logs)-i-1]
 		if current.LogIndex < logIndex {
 			u.lggr.Infow("Found USDC message", "logIndex", current.LogIndex, "txHash", current.TxHash.Hex(), "data", hexutil.Encode(current.Data))
-			return ParseUSDCMessageSent(current.Data)
+			return parseUSDCMessageSent(current.Data)
 		}
 	}
 	return nil, errors.Errorf("no USDC message found prior to log index %d in tx %s", logIndex, txHash.Hex())
