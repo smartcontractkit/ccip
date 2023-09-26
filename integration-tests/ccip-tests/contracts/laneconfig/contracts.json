@@ -2010,8 +2010,8 @@
       "bridge_tokens": [],
       "bridge_tokens_pools": [],
       "arm": "0x5BDD59cde34F2f40DC34e0eac61057561175ba16",
-      "router": "",
-      "price_registry": "",
+      "router": "0x9125a9B0eEf57E55966C31C0A0095dAE7b5a885C",
+      "price_registry": "0x933fEB900212240EC19D2752529e0007F182B543",
       "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
       "src_contracts": {},
       "dest_contracts": {}
@@ -2021,8 +2021,8 @@
       "bridge_tokens": [],
       "bridge_tokens_pools": [],
       "arm": "0x5BDD59cde34F2f40DC34e0eac61057561175ba16",
-      "router": "",
-      "price_registry": "",
+      "router": "0x30cC62ad8BacF4f1e7bCDd0EE24d9a7874513B43",
+      "price_registry": "0x933fEB900212240EC19D2752529e0007F182B543",
       "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
       "src_contracts": {},
       "dest_contracts": {}
@@ -2032,8 +2032,8 @@
       "bridge_tokens": [],
       "bridge_tokens_pools": [],
       "arm": "0x5BDD59cde34F2f40DC34e0eac61057561175ba16",
-      "router": "",
-      "price_registry": "",
+      "router": "0x03073cD021f57661A689F944A35e0041a08B8E21",
+      "price_registry": "0x933fEB900212240EC19D2752529e0007F182B543",
       "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
       "src_contracts": {},
       "dest_contracts": {}
@@ -2044,7 +2044,7 @@
       "bridge_tokens_pools": [],
       "arm": "0x5BDD59cde34F2f40DC34e0eac61057561175ba16",
       "router": "0x1d30Aef5886907e4c59e5BA5a083fb9509BD4707",
-      "price_registry": "",
+      "price_registry": "0x933fEB900212240EC19D2752529e0007F182B543",
       "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
       "src_contracts": {},
       "dest_contracts": {}
