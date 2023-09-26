@@ -426,13 +426,19 @@ func (d *DatabaseBackup) setFrom(f *DatabaseBackup) {
 type TelemetryIngress struct {
 	UniConn      *bool
 	Logging      *bool
-	ServerPubKey *string
-	URL          *models.URL
 	BufferSize   *uint16
 	MaxBatchSize *uint16
 	SendInterval *models.Duration
 	SendTimeout  *models.Duration
 	UseBatchSend *bool
+	Endpoints    []TelemetryIngressEndpoint `toml:",omitempty"`
+}
+
+type TelemetryIngressEndpoint struct {
+	Network      *string
+	ChainID      *string
+	URL          *models.URL
+	ServerPubKey *string
 }
 
 func (t *TelemetryIngress) setFrom(f *TelemetryIngress) {
@@ -441,12 +447,6 @@ func (t *TelemetryIngress) setFrom(f *TelemetryIngress) {
 	}
 	if v := f.Logging; v != nil {
 		t.Logging = v
-	}
-	if v := f.ServerPubKey; v != nil {
-		t.ServerPubKey = v
-	}
-	if v := f.URL; v != nil {
-		t.URL = v
 	}
 	if v := f.BufferSize; v != nil {
 		t.BufferSize = v
@@ -462,6 +462,9 @@ func (t *TelemetryIngress) setFrom(f *TelemetryIngress) {
 	}
 	if v := f.UseBatchSend; v != nil {
 		t.UseBatchSend = v
+	}
+	if v := f.Endpoints; v != nil {
+		t.Endpoints = v
 	}
 }
 

@@ -274,7 +274,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) (services []job
 			effectiveTransmitterAddress,
 		)
 
-		runResults := make(chan pipeline.Run, chain.Config().JobPipeline().ResultWriteQueueDepth())
+		runResults := make(chan *pipeline.Run, chain.Config().JobPipeline().ResultWriteQueueDepth())
 
 		var configOverrider ocrtypes.ConfigOverrider
 		configOverriderService, err := d.maybeCreateConfigOverrider(lggr, chain, concreteSpec.ContractAddress)
@@ -297,7 +297,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) (services []job
 
 		enhancedTelemChan := make(chan ocrcommon.EnhancedTelemetryData, 100)
 		if ocrcommon.ShouldCollectEnhancedTelemetry(&jb) {
-			enhancedTelemService := ocrcommon.NewEnhancedTelemetryService(&jb, enhancedTelemChan, make(chan struct{}), d.monitoringEndpointGen.GenMonitoringEndpoint(concreteSpec.ContractAddress.String(), synchronization.EnhancedEA), lggr.Named("EnhancedTelemetry"))
+			enhancedTelemService := ocrcommon.NewEnhancedTelemetryService(&jb, enhancedTelemChan, make(chan struct{}), d.monitoringEndpointGen.GenMonitoringEndpoint(concreteSpec.ContractAddress.String(), synchronization.EnhancedEA, "EVM", chain.ID().String()), lggr.Named("EnhancedTelemetry"))
 			services = append(services, enhancedTelemService)
 		}
 
@@ -319,7 +319,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) (services []job
 			Logger:                       ocrLogger,
 			V1Bootstrappers:              v1BootstrapPeers,
 			V2Bootstrappers:              v2Bootstrappers,
-			MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(concreteSpec.ContractAddress.String(), synchronization.OCR),
+			MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(concreteSpec.ContractAddress.String(), synchronization.OCR, "EVM", chain.ID().String()),
 			ConfigOverrider:              configOverrider,
 		})
 		if err != nil {
