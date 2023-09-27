@@ -35,7 +35,7 @@ func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (GasPrice, error) 
 				return nil, fmt.Errorf("data availability gas price exceeded max range %+v", daGasPrice)
 			}
 
-			daGasPrice := new(big.Int).Lsh(daGasPrice, g.priceEncodingLength)
+			daGasPrice = new(big.Int).Lsh(daGasPrice, g.priceEncodingLength)
 			gasPrice = new(big.Int).Add(gasPrice, daGasPrice)
 		}
 	}
