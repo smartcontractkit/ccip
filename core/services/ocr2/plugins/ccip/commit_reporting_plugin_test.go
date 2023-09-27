@@ -2,6 +2,7 @@ package ccip
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -464,6 +465,156 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 		_, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, []byte("whatever"))
 		assert.Error(t, err)
 	})
+}
+
+func TestCommitReportingPlugin_validateObservations(t *testing.T) {
+	ctx := context.Background()
+
+	token1 := common.HexToAddress("0xa")
+	token2 := common.HexToAddress("0xb")
+	token1Price := big.NewInt(1)
+	token2Price := big.NewInt(2)
+	unsupportedToken := common.HexToAddress("0xc")
+	gasPrice := big.NewInt(100)
+
+	tokenDecimals := make(map[common.Address]uint8)
+	tokenDecimals[token1] = 18
+	tokenDecimals[token2] = 18
+	tokenDecimalsCache := cache.NewMockAutoSync[map[common.Address]uint8](t)
+	tokenDecimalsCache.On("Get", mock.Anything).Return(tokenDecimals, nil)
+
+	ob1 := CommitObservation{
+		Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0},
+		TokenPricesUSD: map[common.Address]*big.Int{
+			token1: token1Price,
+			token2: token2Price,
+		},
+		SourceGasPriceUSD: gasPrice,
+	}
+	ob1Bytes, err := ob1.Marshal()
+	assert.NoError(t, err)
+	var ob2, ob3 CommitObservation
+	_ = json.Unmarshal(ob1Bytes, &ob2)
+	_ = json.Unmarshal(ob1Bytes, &ob3)
+
+	faultyOb1 := CommitObservation{
+		Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0},
+		TokenPricesUSD: map[common.Address]*big.Int{
+			token1: token1Price,
+			token2: token2Price,
+		},
+		SourceGasPriceUSD: nil,
+	}
+	faultyOb2 := CommitObservation{
+		Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0},
+		TokenPricesUSD: map[common.Address]*big.Int{
+			token1: token1Price,
+			token2: nil,
+		},
+		SourceGasPriceUSD: gasPrice,
+	}
+	faultyOb3 := CommitObservation{
+		Interval:          commit_store.CommitStoreInterval{Min: 0, Max: 0},
+		TokenPricesUSD:    map[common.Address]*big.Int{},
+		SourceGasPriceUSD: gasPrice,
+	}
+	faultyOb4 := CommitObservation{
+		Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0},
+		TokenPricesUSD: map[common.Address]*big.Int{
+			token1:           token1Price,
+			token2:           token2Price,
+			unsupportedToken: token2Price,
+		},
+		SourceGasPriceUSD: gasPrice,
+	}
+	nilOb := CommitObservation{
+		Interval:          commit_store.CommitStoreInterval{Min: 0, Max: 0},
+		TokenPricesUSD:    nil,
+		SourceGasPriceUSD: nil,
+	}
+
+	testCases := []struct {
+		name               string
+		commitObservations []CommitObservation
+		f                  int
+		expValidObs        []CommitObservation
+		expError           bool
+	}{
+		{
+			name:               "base",
+			commitObservations: []CommitObservation{ob1, ob2},
+			f:                  1,
+			expValidObs:        []CommitObservation{ob1, ob2},
+			expError:           false,
+		},
+		{
+			name:               "pass with f=2",
+			commitObservations: []CommitObservation{ob1, ob2, ob3},
+			f:                  2,
+			expValidObs:        []CommitObservation{ob1, ob2, ob3},
+			expError:           false,
+		},
+		{
+			name:               "tolerate 1 faulty with f=2",
+			commitObservations: []CommitObservation{ob1, ob2, ob3, faultyOb1},
+			f:                  2,
+			expValidObs:        []CommitObservation{ob1, ob2, ob3},
+			expError:           false,
+		},
+		{
+			name:               "tolerate 1 faulty with f=1",
+			commitObservations: []CommitObservation{ob1, ob2, faultyOb2},
+			f:                  1,
+			expValidObs:        []CommitObservation{ob1, ob2},
+			expError:           false,
+		},
+		{
+			name:               "not enough valid observations",
+			commitObservations: []CommitObservation{ob1, ob2},
+			f:                  2,
+			expValidObs:        nil,
+			expError:           true,
+		},
+		{
+			name:               "too many faulty observations with f=2",
+			commitObservations: []CommitObservation{ob1, ob2, faultyOb3, faultyOb4},
+			f:                  2,
+			expValidObs:        nil,
+			expError:           true,
+		},
+		{
+			name:               "too many faulty observations with f=1",
+			commitObservations: []CommitObservation{ob1, nilOb},
+			f:                  1,
+			expValidObs:        nil,
+			expError:           true,
+		},
+		{
+			name:               "all faulty observations",
+			commitObservations: []CommitObservation{faultyOb1, faultyOb2, faultyOb3, faultyOb4, nilOb},
+			f:                  1,
+			expValidObs:        nil,
+			expError:           true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &CommitReportingPlugin{
+				lggr:               logger.TestLogger(t),
+				tokenDecimalsCache: tokenDecimalsCache,
+				F:                  tc.f,
+			}
+			obs, err := r.validateObservations(ctx, r.lggr, tc.commitObservations)
+
+			if tc.expError {
+				assert.Error(t, err)
+				return
+			}
+			assert.Equal(t, tc.expValidObs, obs)
+			assert.NoError(t, err)
+		})
+	}
 }
 
 func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
