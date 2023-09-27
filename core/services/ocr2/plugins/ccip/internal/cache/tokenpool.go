@@ -66,7 +66,7 @@ func (t *tokenPools) Copy(value map[common.Address]common.Address) map[common.Ad
 }
 
 func (t *tokenPools) CallOrigin(ctx context.Context) (map[common.Address]common.Address, error) {
-	destTokens, err := getDestinationAndFeeTokens(ctx, t.offRamp, t.priceRegistry)
+	destTokens, err := t.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, err
 	}
