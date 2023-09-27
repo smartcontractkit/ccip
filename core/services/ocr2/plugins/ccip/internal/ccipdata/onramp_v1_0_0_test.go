@@ -42,7 +42,7 @@ func TestHasherV1_0_0(t *testing.T) {
 		MessageId:           [32]byte{},
 	}
 
-	data, err := onRampABI.Events["CCIPSendRequested"].Inputs.Pack(message)
+	data, err := onRampABI.Events[CCIPSendRequestedEventNameV1_0_0].Inputs.Pack(message)
 	require.NoError(t, err)
 	hash, err := hasher.HashLeaf(types.Log{Topics: []common.Hash{abihelpers.GetIDOrPanic("CCIPSendRequested", onRampABI)}, Data: data})
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestHasherV1_0_0(t *testing.T) {
 		MessageId: [32]byte{},
 	}
 
-	data, err = onRampABI.Events["CCIPSendRequested"].Inputs.Pack(message)
+	data, err = onRampABI.Events[CCIPSendRequestedEventNameV1_0_0].Inputs.Pack(message)
 	require.NoError(t, err)
 	hash, err = hasher.HashLeaf(types.Log{Topics: []common.Hash{abihelpers.GetIDOrPanic("CCIPSendRequested", onRampABI)}, Data: data})
 	require.NoError(t, err)
@@ -81,6 +81,6 @@ func TestMetaDataHash(t *testing.T) {
 	sourceChainSelector, destChainSelector := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 	ctx := hashlib.NewKeccakCtx()
-	hash := getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMSubscriptionMessagePlus")), sourceChainSelector, onRampAddress, destChainSelector)
-	require.Equal(t, "e8b93c9d01a7a72ec6c7235e238701cf1511b267a31fdb78dd342649ee58c08d", hex.EncodeToString(hash[:]))
+	hash := getMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_0_0)), sourceChainSelector, onRampAddress, destChainSelector)
+	require.Equal(t, "1409948abde219f43870c3d6d1c16beabd8878eb5039a3fa765eb56e4b8ded9e", hex.EncodeToString(hash[:]))
 }

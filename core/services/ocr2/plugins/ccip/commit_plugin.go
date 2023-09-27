@@ -94,7 +94,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, err
 	}
-	sourceRouter, err := router.NewRouter(onRampReader.Router(), sourceChain.Client())
+	sourceRouter, err := router.NewRouter(onRampReader.RouterAddress(), sourceChain.Client())
 	if err != nil {
 		return nil, nil, err
 	}

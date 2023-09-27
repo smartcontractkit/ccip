@@ -28,6 +28,9 @@ var (
 
 const (
 	CCIPSendRequestSeqNumIndexV1_2_0 = 4
+	CCIPSendRequestedEventNameV1_2_0 = "CCIPSendRequested"
+	EVM2EVMOffRampEventNameV1_2_0    = "EVM2EVMMessage"
+	MetaDataHashPrefixV1_2_0         = "EVM2EVMMessageHashV2"
 )
 
 func init() {
@@ -35,7 +38,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	CCIPSendRequestEventSigV1_2_0 = abihelpers.GetIDOrPanic("CCIPSendRequested", onRampABI)
+	CCIPSendRequestEventSigV1_2_0 = abihelpers.GetIDOrPanic(CCIPSendRequestedEventNameV1_2_0, onRampABI)
 }
 
 // Backwards compat for integration tests
@@ -44,7 +47,7 @@ func DecodeOffRampMessageV1_2_0(b []byte) (*evm_2_evm_offramp.InternalEVM2EVMMes
 	if err != nil {
 		panic(err)
 	}
-	event, ok := offRampABI.Events["EVM2EVMMessage"]
+	event, ok := offRampABI.Events[EVM2EVMOffRampEventNameV1_2_0]
 	if !ok {
 		panic("no such event")
 	}
@@ -111,7 +114,7 @@ type LeafHasherV1_2_0 struct {
 
 func NewLeafHasherV1_2_0(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp.EVM2EVMOnRamp) *LeafHasherV1_2_0 {
 	return &LeafHasherV1_2_0{
-		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMMessageHashV2")), sourceChainSelector, onRampId, destChainSelector),
+		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_2_0)), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
 		onRamp:       onRamp,
 	}
@@ -270,7 +273,7 @@ func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNum
 	return parseLogs[EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
-func (o *OnRampV1_2_0) Router() common.Address {
+func (o *OnRampV1_2_0) RouterAddress() common.Address {
 	config, _ := o.onRamp.GetDynamicConfig(nil)
 	return config.Router
 }

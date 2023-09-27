@@ -99,9 +99,9 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			commitStore, _ := testhelpers.NewFakeCommitStore(t, tc.commitStoreSeqNum)
 			commitStore.SetPaused(tc.commitStoreIsPaused)
 
-			sourceReader := ccipdata.NewMockOnRampReader(t)
+			onRampReader := ccipdata.NewMockOnRampReader(t)
 			if len(tc.sendReqs) > 0 {
-				sourceReader.On("GetSendRequestsGteSeqNum", ctx, tc.commitStoreSeqNum, sourceFinalityDepth).
+				onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.commitStoreSeqNum, sourceFinalityDepth).
 					Return(tc.sendReqs, nil)
 			}
 
@@ -130,7 +130,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports = newInflightCommitReportsContainer(time.Hour)
 			p.config.commitStore = commitStore
 			p.offchainConfig.SourceFinalityDepth = uint32(sourceFinalityDepth)
-			p.config.onRampReader = sourceReader
+			p.config.onRampReader = onRampReader
 			p.tokenDecimalsCache = tokenDecimalsCache
 			p.config.priceGetter = priceGet
 			p.config.sourceFeeEstimator = sourceFeeEst
@@ -234,9 +234,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			destReader.On("GetGasPriceUpdatesCreatedAfter", ctx, destPriceRegistryAddress, uint64(sourceChainSelector), mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
 			destReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, destPriceRegistryAddress, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
 
-			sourceReader := ccipdata.NewMockOnRampReader(t)
+			onRampReader := ccipdata.NewMockOnRampReader(t)
 			if len(tc.sendRequests) > 0 {
-				sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expSeqNumRange.Min, tc.expSeqNumRange.Max, 0).Return(tc.sendRequests, nil)
+				onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expSeqNumRange.Min, tc.expSeqNumRange.Max, 0).Return(tc.sendRequests, nil)
 			}
 
 			p := &CommitReportingPlugin{}
@@ -244,7 +244,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 			p.destPriceRegistry = destPriceRegistry
 			p.config.destReader = destReader
-			p.config.onRampReader = sourceReader
+			p.config.onRampReader = onRampReader
 			p.config.sourceChainSelector = uint64(sourceChainSelector)
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
@@ -1024,7 +1024,7 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 				}
 			}
 
-			sourceReader := ccipdata.NewMockOnRampReader(t)
+			onRampReader := ccipdata.NewMockOnRampReader(t)
 			var sendReqs []ccipdata.Event[ccipdata.EVM2EVMMessage]
 			for _, seqNum := range tc.msgSeqNums {
 				sendReqs = append(sendReqs, ccipdata.Event[ccipdata.EVM2EVMMessage]{
@@ -1033,8 +1033,8 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 					},
 				})
 			}
-			sourceReader.On("GetSendRequestsGteSeqNum", ctx, tc.expQueryMin, 0).Return(sendReqs, nil)
-			p.config.onRampReader = sourceReader
+			onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.expQueryMin, 0).Return(sendReqs, nil)
+			p.config.onRampReader = onRampReader
 
 			minSeqNum, maxSeqNum, err := p.calculateMinMaxSequenceNumbers(ctx, lggr)
 			if tc.expErr {

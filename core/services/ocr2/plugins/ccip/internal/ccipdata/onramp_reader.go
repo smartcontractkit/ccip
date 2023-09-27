@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
@@ -25,14 +26,20 @@ const (
 	COMMIT_CCIP_SENDS = "Commit ccip sends"
 )
 
+type Hash [32]byte
+
+func (h Hash) String() string {
+	return hexutil.Encode(h[:])
+}
+
 // EVM2EVMMessage is the interface for a message sent from the offramp to the onramp
 // Plugin can operate against any lane version which has a message satisfying this interface.
 type EVM2EVMMessage struct {
 	SequenceNumber uint64
 	GasLimit       *big.Int
 	Nonce          uint64
-	MessageId      [32]byte
-	Hash           [32]byte
+	MessageId      Hash
+	Hash           Hash
 	// TODO: add more fields as we abstract exec plugin
 	// also this Log can eventually go away with destchain abstractions
 	Log types.Log // Raw event data
@@ -48,7 +55,7 @@ type OnRampReader interface {
 	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[EVM2EVMMessage], error)
 
 	// Get router configured in the onRamp
-	Router() common.Address
+	RouterAddress() common.Address
 
 	// TODO: temporary until we abstract offramp as well
 	// (currently this works since all versions are compatible with the same offramp ABI)

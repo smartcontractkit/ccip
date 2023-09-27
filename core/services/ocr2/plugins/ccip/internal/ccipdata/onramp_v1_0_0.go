@@ -23,6 +23,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
+const (
+	CCIPSendRequestedEventNameV1_0_0 = "CCIPSendRequested"
+	MetaDataHashPrefixV1_0_0         = "EVM2EVMMessageEvent"
+)
+
 var leafDomainSeparator = [1]byte{0x00}
 
 type LeafHasherV1_0_0 struct {
@@ -38,7 +43,7 @@ func getMetaDataHash[H hashlib.Hash](ctx hashlib.Ctx[H], prefix [32]byte, source
 
 func NewLeafHasherV1_0_0(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp) *LeafHasherV1_0_0 {
 	return &LeafHasherV1_0_0{
-		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte("EVM2EVMMessageEvent")), sourceChainSelector, onRampId, destChainSelector),
+		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_0_0)), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
 		onRamp:       onRamp,
 	}
@@ -120,7 +125,7 @@ func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	}
 	// Subscribe to the relevant logs
 	name := logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress)
-	eventSig := abihelpers.GetIDOrPanic("CCIPSendRequested", onRampABI)
+	eventSig := abihelpers.GetIDOrPanic(CCIPSendRequestedEventNameV1_0_0, onRampABI)
 	err = sourceLP.RegisterFilter(logpoller.Filter{
 		Name:      name,
 		EventSigs: []common.Hash{eventSig},
@@ -194,7 +199,7 @@ func (o *OnRampV1_0_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint
 	return parseLogs[EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
-func (o *OnRampV1_0_0) Router() common.Address {
+func (o *OnRampV1_0_0) RouterAddress() common.Address {
 	config, _ := o.onRamp.GetDynamicConfig(nil)
 	return config.Router
 }

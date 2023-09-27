@@ -32,7 +32,7 @@ func NewOnRampV1_1_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	}, nil
 }
 
-func (o *OnRampV1_1_0) Router() common.Address {
+func (o *OnRampV1_1_0) RouterAddress() common.Address {
 	config, _ := o.onRamp.GetDynamicConfig(nil)
 	return config.Router
 }
