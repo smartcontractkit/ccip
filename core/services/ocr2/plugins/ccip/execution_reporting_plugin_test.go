@@ -415,22 +415,6 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	sender1 := common.HexToAddress("0xa")
 	destNative := common.HexToAddress("0xb")
 	srcNative := common.HexToAddress("0xc")
-	plugin := ExecutionReportingPlugin{
-		config: ExecutionPluginConfig{
-			offRamp: offRamp,
-			onRamp:  onRamp,
-		},
-		destWrappedNative: destNative,
-		offchainConfig: ccipconfig.ExecOffchainConfig{
-			SourceFinalityDepth:         5,
-			DestOptimisticConfirmations: 1,
-			DestFinalityDepth:           5,
-			BatchGasLimit:               300_000,
-			RelativeBoostPerWaitHour:    1,
-			MaxGasPrice:                 1,
-		},
-		lggr: logger.TestLogger(t),
-	}
 
 	msg1 := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 		InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
@@ -637,6 +621,30 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			offRamp.SetSenderNonces(tc.offRampNoncesBySender)
+
+			gasPriceEstimator := prices.NewMockGasPriceEstimator(t)
+			if tc.expectedSeqNrs != nil {
+				gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), nil)
+			}
+
+			plugin := ExecutionReportingPlugin{
+				config: ExecutionPluginConfig{
+					offRamp: offRamp,
+					onRamp:  onRamp,
+				},
+				destWrappedNative: destNative,
+				offchainConfig: ccipconfig.ExecOffchainConfig{
+					SourceFinalityDepth:         5,
+					DestOptimisticConfirmations: 1,
+					DestFinalityDepth:           5,
+					BatchGasLimit:               300_000,
+					RelativeBoostPerWaitHour:    1,
+					MaxGasPrice:                 1,
+				},
+				lggr:              logger.TestLogger(t),
+				gasPriceEstimator: gasPriceEstimator,
+			}
+
 			seqNrs := plugin.buildBatch(
 				context.Background(),
 				lggr,
@@ -873,55 +881,6 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 		})
 	}
 }
-
-//func TestExecutionReportingPlugin_estimateDestinationGasPrice(t *testing.T) {
-//	testCases := []struct {
-//		name      string
-//		evmFee    gas.EvmFee
-//		evmFeeErr error
-//
-//		expRes *big.Int
-//		expErr bool
-//	}{
-//		{
-//			name: "dynamic fee cap has precedence over legacy",
-//			evmFee: gas.EvmFee{
-//				Legacy:        assets.NewWei(big.NewInt(1000)),
-//				DynamicFeeCap: assets.NewWei(big.NewInt(2000)),
-//			},
-//			expRes: big.NewInt(2000),
-//		},
-//		{
-//			name: "legacy is used if dynamic fee cap is not provided",
-//			evmFee: gas.EvmFee{
-//				Legacy: assets.NewWei(big.NewInt(1000)),
-//			},
-//			expRes: big.NewInt(1000),
-//		},
-//		{
-//			name:      "stop on error",
-//			evmFeeErr: errors.New("some error"),
-//			expErr:    true,
-//		},
-//	}
-//
-//	for _, tc := range testCases {
-//		t.Run(tc.name, func(t *testing.T) {
-//			p := &ExecutionReportingPlugin{}
-//			mockEstimator := mocks.NewEvmFeeEstimator(t)
-//			mockEstimator.On("GetFee", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.evmFee, uint32(0), tc.evmFeeErr)
-//			p.config.destGasEstimator = mockEstimator
-//
-//			res, err := p.estimateDestinationGasPrice(testutils.Context(t))
-//			if tc.expErr {
-//				assert.Error(t, err)
-//				return
-//			}
-//			assert.NoError(t, err)
-//			assert.Equal(t, tc.expRes, res)
-//		})
-//	}
-//}
 
 func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 	testCases := []struct {
