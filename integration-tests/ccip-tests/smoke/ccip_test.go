@@ -35,7 +35,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 		if TestCfg.MsgType == actions.TokenTransfer {
 			setUpOutput.Balance.Verify(t)
 		}
-		setUpOutput.TearDown()
+		require.NoError(t, setUpOutput.TearDown())
 	})
 	for i := range setUpOutput.Lanes {
 		tcs = append(tcs, subtestInput{
@@ -51,15 +51,17 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 			})
 		}
 	}
-
+	l.Info().Int("Total Lanes", len(tcs)).Msg("Starting CCIP test")
 	for _, testcase := range tcs {
 		tc := testcase
 		t.Run(tc.testName, func(t *testing.T) {
 			t.Parallel()
+			tc.lane.Test = t
 			l.Info().
 				Str("Source", tc.lane.SourceNetworkName).
 				Str("Destination", tc.lane.DestNetworkName).
 				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
+
 			tc.lane.RecordStateBeforeTransfer()
 			err := tc.lane.SendRequests(1, TestCfg.MsgType)
 			require.NoError(t, err)
@@ -87,7 +89,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		setUpOutput.TearDown()
+		require.NoError(t, setUpOutput.TearDown())
 	})
 
 	for i := range setUpOutput.Lanes {

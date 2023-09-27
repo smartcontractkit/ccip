@@ -20,7 +20,7 @@ import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/
 import {EnumerableMap} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/utils/structs/EnumerableMap.sol";
 
 /// @notice The onRamp is a contract that handles lane-specific fee logic, NOP payments and
-/// bridegable token support.
+/// bridgeable token support.
 /// @dev The EVM2EVMOnRamp, CommitStore and EVM2EVMOffRamp form an xchain upgradeable unit. Any change to one of them
 /// results an onchain upgrade of all 3.
 contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, TypeAndVersionInterface {
@@ -54,6 +54,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error LinkBalanceNotSettled();
   error InvalidNopAddress(address nop);
   error NotAFeeToken(address token);
+  error CannotSendZeroTokens();
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -66,71 +67,71 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @dev Struct that contains the static configuration
   struct StaticConfig {
-    address linkToken; // --------┐ Link token address
-    uint64 chainSelector; // -----┘ Source chainSelector
-    uint64 destChainSelector; // -┐ Destination chainSelector
-    uint64 defaultTxGasLimit; //  | Default gas limit for a tx
-    uint96 maxNopFeesJuels; // ---┘ Max nop fee balance onramp can have
+    address linkToken; // ────────╮ Link token address
+    uint64 chainSelector; // ─────╯ Source chainSelector
+    uint64 destChainSelector; // ─╮ Destination chainSelector
+    uint64 defaultTxGasLimit; //  │ Default gas limit for a tx
+    uint96 maxNopFeesJuels; // ───╯ Max nop fee balance onramp can have
     address prevOnRamp; //          Address of previous-version OnRamp
     address armProxy; //            Address of ARM proxy
   }
 
   /// @dev Struct to contains the dynamic configuration
   struct DynamicConfig {
-    address router; // -------------------------┐ Router address
-    uint16 maxTokensLength; //                  | Maximum number of ERC20 token transfers per message
-    uint32 destGasOverhead; //                  | Extra gas charged on top of the gasLimit
-    uint16 destGasPerPayloadByte; //            | Destination chain gas charged per byte of `data` payload
-    uint32 destDataAvailabilityOverheadGas; //  | Extra data availability gas charged on top of message data
-    uint16 destGasPerDataAvailabilityByte; // --┘ Amount of gas to charge per byte of data that needs availability
-    uint16 destDataAvailabilityMultiplier; // --┐ Multiplier for data availability gas, multples of 1e-4, or 0.0001
-    address priceRegistry; //                   | Price registry address
-    uint32 maxDataSize; //                      | Maximum payload data size, max 4GB
-    uint32 maxGasLimit; // ---------------------┘ Maximum gas limit for messages targeting EVMs, max 4 Billion gas
+    address router; // ─────────────────────────╮ Router address
+    uint16 maxTokensLength; //                  │ Maximum number of ERC20 token transfers per message
+    uint32 destGasOverhead; //                  │ Extra gas charged on top of the gasLimit
+    uint16 destGasPerPayloadByte; //            │ Destination chain gas charged per byte of `data` payload
+    uint32 destDataAvailabilityOverheadGas; //  │ Extra data availability gas charged on top of message data
+    uint16 destGasPerDataAvailabilityByte; // ──╯ Amount of gas to charge per byte of data that needs availability
+    uint16 destDataAvailabilityMultiplier; // ──╮ Multiplier for data availability gas, multiples of 1e-4, or 0.0001
+    address priceRegistry; //                   │ Price registry address
+    uint32 maxDataSize; //                      │ Maximum payload data size, max 4GB
+    uint32 maxGasLimit; // ─────────────────────╯ Maximum gas limit for messages targeting EVMs, max 4 Billion gas
   }
 
   /// @dev Struct to hold the execution fee configuration for a fee token
   struct FeeTokenConfig {
-    uint32 networkFeeUSD; // -----------┐ Flat network fee to charge for messages,  multiples of 0.01 USD
-    uint32 minTokenTransferFeeUSD; //   | Minimum fee to charge for token transfers, multiples of 0.01 USD
-    uint32 maxTokenTransferFeeUSD; //   | Maximum fee to charge for token transfers, multiples of 0.01 USD
-    uint64 gasMultiplier; //            | Price multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
-    uint64 premiumMultiplier; //        | Multiplier for fee-token-specific premiums
-    bool enabled; // -------------------┘ Whether this fee token is enabled
+    uint32 networkFeeUSD; // ───────────╮ Flat network fee to charge for messages,  multiples of 0.01 USD
+    uint32 minTokenTransferFeeUSD; //   │ Minimum fee to charge for token transfers, multiples of 0.01 USD
+    uint32 maxTokenTransferFeeUSD; //   │ Maximum fee to charge for token transfers, multiples of 0.01 USD
+    uint64 gasMultiplier; //            │ Price multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
+    uint64 premiumMultiplier; //        │ Multiplier for fee-token-specific premiums
+    bool enabled; // ───────────────────╯ Whether this fee token is enabled
   }
 
   /// @dev Struct to hold the fee configuration for a fee token, same as the FeeTokenConfig but with
   /// token included so that an array of these can be passed in to setFeeTokenConfig to set the mapping
   struct FeeTokenConfigArgs {
-    address token; // ------------------┐ Token address
-    uint32 networkFeeUSD; //            | Flat network fee to charge for messages,  multiples of 0.01 USD
-    uint32 minTokenTransferFeeUSD; //   | Minimum fee to charge for token transfers, multiples of 0.01 USD
-    uint32 maxTokenTransferFeeUSD; //---┘ Maximum fee to charge for token transfers, multiples of 0.01 USD
-    uint64 gasMultiplier; //         ---┐ Price multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost
-    uint64 premiumMultiplier; //        | Multiplier for fee-token-specific premiums
-    bool enabled; // -------------------┘ Whether this fee token is enabled
+    address token; // ──────────────────╮ Token address
+    uint32 networkFeeUSD; //            │ Flat network fee to charge for messages,  multiples of 0.01 USD
+    uint32 minTokenTransferFeeUSD; //   │ Minimum fee to charge for token transfers, multiples of 0.01 USD
+    uint32 maxTokenTransferFeeUSD; //───╯ Maximum fee to charge for token transfers, multiples of 0.01 USD
+    uint64 gasMultiplier; //         ───╮ Price multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost
+    uint64 premiumMultiplier; //        │ Multiplier for fee-token-specific premiums
+    bool enabled; // ───────────────────╯ Whether this fee token is enabled
   }
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
   struct TokenTransferFeeConfig {
-    uint16 ratio; // -------------------┐ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
-    uint32 destGasOverhead; //          | Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // -------┘ Extra data availability bytes on top of transfer data, e.g. USDC offchain data
+    uint16 ratio; // ───────────────────╮ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
+    uint32 destGasOverhead; //          │ Gas charged to execute the token transfer on the destination chain
+    uint32 destBytesOverhead; // ───────╯ Extra data availability bytes on top of transfer data, e.g. USDC offchain data
   }
 
   /// @dev Same as TokenTransferFeeConfig
   /// token included so that an array of these can be passed in to setTokenTransferFeeConfig
   struct TokenTransferFeeConfigArgs {
-    address token; // ------------------┐ Token address
-    uint16 ratio; //                    | Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
-    uint32 destGasOverhead; //          | Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // -------┘ Extra data availability bytes on top of transfer data, e.g. USDC offchain data
+    address token; // ──────────────────╮ Token address
+    uint16 ratio; //                    │ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
+    uint32 destGasOverhead; //          │ Gas charged to execute the token transfer on the destination chain
+    uint32 destBytesOverhead; // ───────╯ Extra data availability bytes on top of transfer data, e.g. USDC offchain data
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
   struct NopAndWeight {
-    address nop; // -----┐ Address of the node operator
-    uint16 weight; // ---┘ Weight for nop rewards
+    address nop; // ────╮ Address of the node operator
+    uint16 weight; // ──╯ Weight for nop rewards
   }
 
   // STATIC CONFIG
@@ -231,7 +232,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // |                          Messaging                           |
+  // │                          Messaging                           │
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
@@ -270,10 +271,18 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     // Validate the message with various checks
-    _validateMessage(message.data.length, gasLimit, message.tokenAmounts.length);
 
-    // Rate limit on aggregated token value
-    _rateLimitValue(message.tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
+    uint256 numberOfTokens = message.tokenAmounts.length;
+    _validateMessage(message.data.length, gasLimit, numberOfTokens);
+
+    // Only check token value if there are tokens
+    if (numberOfTokens > 0) {
+      for (uint256 i = 0; i < numberOfTokens; ++i) {
+        if (message.tokenAmounts[i].amount == 0) revert CannotSendZeroTokens();
+      }
+      // Rate limit on aggregated token value
+      _rateLimitValue(message.tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
+    }
 
     // Convert feeToken to link if not already in link
     if (message.feeToken == i_linkToken) {
@@ -306,13 +315,13 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       feeTokenAmount: feeTokenAmount,
       data: message.data,
       tokenAmounts: message.tokenAmounts,
-      sourceTokenData: new bytes[](message.tokenAmounts.length), // will be filled in later
+      sourceTokenData: new bytes[](numberOfTokens), // will be filled in later
       messageId: ""
     });
 
     // Lock the tokens as last step. TokenPools may not always be trusted.
     // There should be no state changes after external call to TokenPools.
-    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+    for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
       newMessage.sourceTokenData[i] = getPoolBySourceToken(IERC20(tokenAndAmount.token)).lockOrBurn(
         originalSender,
@@ -359,7 +368,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // |                           Config                             |
+  // │                           Config                             │
   // ================================================================
 
   /// @notice Returns the static onRamp config.
@@ -411,7 +420,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // |                      Tokens and pools                        |
+  // │                      Tokens and pools                        │
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
@@ -467,7 +476,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // |                             Fees                             |
+  // │                             Fees                             │
   // ================================================================
 
   /// @inheritdoc IEVM2AnyOnRamp
@@ -686,7 +695,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // |                         NOP payments                         |
+  // │                         NOP payments                         │
   // ================================================================
 
   /// @notice Get the total amount of fees to be paid to the Nops (in LINK)
@@ -796,7 +805,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // |                        Link monitoring                       |
+  // │                        Link monitoring                       │
   // ================================================================
 
   /// @notice Calculate remaining LINK balance after paying nops
@@ -812,7 +821,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   // ================================================================
-  // |                        Access and ARM                        |
+  // │                        Access and ARM                        │
   // ================================================================
 
   /// @dev Require that the sender is the owner or the fee admin or a nop
