@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Extract tag name
         id: extract_tag
-        run: echo "::set-output name=tag::$(git describe --tags --match 'v*.*.*' --exact-match 2>/dev/null)"
+        run: echo "::set-output name=tag::$(git describe --tags --match 'v*' --exact-match 2>/dev/null)"
       - name: Collect Metrics
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@d2c2b7bdc9012651230b2608a1bcb0c48538b6ec
