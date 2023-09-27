@@ -327,8 +327,9 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 					ChainlinkTransactionLimit: n.ChainlinkTransactionLimit,
 					Timeout:                   n.Timeout,
 					MinimumConfirmations:      n.MinimumConfirmations,
-					GasEstimationBuffer:       n.GasEstimationBuffer,
+					GasEstimationBuffer:       n.GasEstimationBuffer + 1000,
 					ClientImplementation:      n.ClientImplementation,
+					DefaultGasLimit:           n.DefaultGasLimit,
 				})
 			}
 		}
