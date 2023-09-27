@@ -82,7 +82,7 @@ func TestNewTokenPools(t *testing.T) {
 			priceReg, _ := testhelpers.NewFakePriceRegistry(t)
 			priceReg.SetFeeTokens(tc.feeTokens)
 
-			c := NewTokenPools(logger.TestLogger(t), mockLp, offRamp, priceReg, 0, 5)
+			c := NewTokenPools(logger.TestLogger(t), mockLp, offRamp, 0, 5)
 
 			res, err := c.Get(ctx)
 			if tc.expErr {
@@ -116,9 +116,7 @@ func Test_tokenPools_CallOrigin_concurrency(t *testing.T) {
 	offRamp.SetSourceToDestTokens(sourceToDestTokens)
 	offRamp.SetTokenPools(tokenToPool)
 
-	priceReg, _ := testhelpers.NewFakePriceRegistry(t)
-
-	origin := newTokenPoolsOrigin(logger.TestLogger(t), offRamp, priceReg, numWorkers)
+	origin := newTokenPoolsOrigin(logger.TestLogger(t), offRamp, numWorkers)
 	res, err := origin.CallOrigin(testutils.Context(t))
 	assert.NoError(t, err)
 
