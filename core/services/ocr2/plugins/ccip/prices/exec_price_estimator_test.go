@@ -11,9 +11,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 )
 
-func TestUSDCReader_GetGasPrice(t *testing.T) {
+func TestExecPriceEstimator_GetGasPrice(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := []struct {
@@ -104,7 +106,7 @@ func TestUSDCReader_GetGasPrice(t *testing.T) {
 	}
 }
 
-func TestUSDCReader_DenoteInUSD(t *testing.T) {
+func TestExecPriceEstimator_DenoteInUSD(t *testing.T) {
 	val1e18 := func(val int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(val)) }
 
 	testCases := []struct {
@@ -147,7 +149,7 @@ func TestUSDCReader_DenoteInUSD(t *testing.T) {
 	}
 }
 
-func TestUSDCReader_Median(t *testing.T) {
+func TestExecPriceEstimator_Median(t *testing.T) {
 	val1e18 := func(val int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(val)) }
 
 	testCases := []struct {
@@ -199,4 +201,159 @@ func TestUSDCReader_Median(t *testing.T) {
 			assert.True(t, ((*big.Int)(tc.expMedian)).Cmp(gasPrice) == 0)
 		})
 	}
+}
+
+func TestExecPriceEstimator_Deviates(t *testing.T) {
+	testCases := []struct {
+		name        string
+		gasPrice1   GasPrice
+		gasPrice2   GasPrice
+		opts        GasPriceDeviationOptions
+		expDeviates bool
+	}{
+		{
+			name:        "base",
+			gasPrice1:   big.NewInt(100e8),
+			gasPrice2:   big.NewInt(79e8),
+			opts:        GasPriceDeviationOptions{ExecDeviationPPB: 2e8},
+			expDeviates: true,
+		},
+		{
+			name:        "negative difference also deviates",
+			gasPrice1:   big.NewInt(100e8),
+			gasPrice2:   big.NewInt(121e8),
+			opts:        GasPriceDeviationOptions{ExecDeviationPPB: 2e8},
+			expDeviates: true,
+		},
+		{
+			name:        "larger difference deviates",
+			gasPrice1:   big.NewInt(100e8),
+			gasPrice2:   big.NewInt(70e8),
+			opts:        GasPriceDeviationOptions{ExecDeviationPPB: 2e8},
+			expDeviates: true,
+		},
+		{
+			name:        "smaller difference does not deviate",
+			gasPrice1:   big.NewInt(100e8),
+			gasPrice2:   big.NewInt(90e8),
+			opts:        GasPriceDeviationOptions{ExecDeviationPPB: 2e8},
+			expDeviates: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := ExecGasPriceEstimator{
+				estimator:   nil,
+				maxGasPrice: nil,
+			}
+
+			deviated, err := g.Deviates(tc.gasPrice1, tc.gasPrice2, tc.opts)
+			assert.NoError(t, err)
+			if tc.expDeviates {
+				assert.True(t, deviated)
+			} else {
+				assert.False(t, deviated)
+			}
+		})
+	}
+}
+
+func TestExecPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
+	testCases := []struct {
+		name               string
+		gasPrice           GasPrice
+		wrappedNativePrice *big.Int
+		msg                internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
+		expUSD             *big.Int
+	}{
+		{
+			name:               "base",
+			gasPrice:           big.NewInt(1e9),  // 1 gwei
+			wrappedNativePrice: big.NewInt(1e18), // $1
+			msg: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+					GasLimit:     big.NewInt(100_000),
+					Data:         []byte{},
+					TokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{},
+				},
+			},
+			expUSD: big.NewInt(300_000e9),
+		},
+		{
+			name:               "base with data",
+			gasPrice:           big.NewInt(1e9),  // 1 gwei
+			wrappedNativePrice: big.NewInt(1e18), // $1
+			msg: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+					GasLimit:     big.NewInt(100_000),
+					Data:         make([]byte, 1_000),
+					TokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{},
+				},
+			},
+			expUSD: big.NewInt(316_000e9),
+		},
+		{
+			name:               "base with data and tokens",
+			gasPrice:           big.NewInt(1e9),  // 1 gwei
+			wrappedNativePrice: big.NewInt(1e18), // $1
+			msg: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+					GasLimit:     big.NewInt(100_000),
+					Data:         make([]byte, 1_000),
+					TokenAmounts: make([]evm_2_evm_offramp.ClientEVMTokenAmount, 5),
+				},
+			},
+			expUSD: big.NewInt(366_000e9),
+		},
+		{
+			name:               "empty msg",
+			gasPrice:           big.NewInt(1e9),  // 1 gwei
+			wrappedNativePrice: big.NewInt(1e18), // $1
+			msg: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+					GasLimit:     big.NewInt(0),
+					Data:         []byte{},
+					TokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{},
+				},
+			},
+			expUSD: big.NewInt(200_000e9),
+		},
+		{
+			name:               "zero price",
+			gasPrice:           big.NewInt(0),    // 1 gwei
+			wrappedNativePrice: big.NewInt(1e18), // $1
+			msg: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+					GasLimit:     big.NewInt(0),
+					Data:         []byte{},
+					TokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{},
+				},
+			},
+			expUSD: big.NewInt(0),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := ExecGasPriceEstimator{
+				estimator:   nil,
+				maxGasPrice: nil,
+			}
+
+			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg, MsgCostOptions{})
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expUSD, costUSD)
+		})
+	}
+}
+
+func TestExecPriceEstimator_String(t *testing.T) {
+	g := ExecGasPriceEstimator{
+		estimator:   nil,
+		maxGasPrice: nil,
+	}
+
+	str := g.String(big.NewInt(1))
+	assert.Equal(t, "1", str)
 }
