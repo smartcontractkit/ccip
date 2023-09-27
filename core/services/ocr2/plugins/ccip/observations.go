@@ -9,13 +9,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 )
 
 type CommitObservation struct {
 	Interval          commit_store.CommitStoreInterval `json:"interval"`
 	TokenPricesUSD    map[common.Address]*big.Int      `json:"tokensPerFeeCoin"`
-	SourceGasPriceUSD prices.GasPrice                  `json:"sourceGasPrice"`
+	SourceGasPriceUSD *big.Int                         `json:"sourceGasPrice"`
 }
 
 func (o CommitObservation) Marshal() ([]byte, error) {

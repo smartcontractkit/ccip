@@ -431,14 +431,14 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasUpdate update, error error) {
 	if checkInflight {
 		latestInflightGasPriceUpdate, latestUpdateFound := r.inflightReports.getLatestInflightGasPriceUpdate()
-		if latestUpdateFound && latestInflightGasPriceUpdate.timestamp.After(gasUpdate.timestamp) {
+		if latestUpdateFound {
 			gasUpdate = latestInflightGasPriceUpdate
-		}
+			r.lggr.Infow("Latest gas price from inflight", "gasPriceUpdateVal", gasUpdate.value, "gasPriceUpdateTs", gasUpdate.timestamp)
 
-		r.lggr.Infow("Latest gas price from inflight", "gasPriceUpdateVal", gasUpdate.value, "gasPriceUpdateTs", gasUpdate.timestamp)
-		// Gas price can fluctuate frequently, many updates may be in flight.
-		// If there is gas price update inflight, use it as source of truth, no need to check onchain.
-		return gasUpdate, nil
+			// Gas price can fluctuate frequently, many updates may be in flight.
+			// If there is gas price update inflight, use it as source of truth, no need to check onchain.
+			return gasUpdate, nil
+		}
 	}
 
 	// If there are no price updates inflight, check latest prices onchain
@@ -678,14 +678,11 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 		return bytes.Compare(tokenPriceUpdates[i].SourceToken[:], tokenPriceUpdates[j].SourceToken[:]) == -1
 	})
 
-	newGasPrice := big.NewInt(0)
-	destChainSelector := uint64(0)
-
 	newGasPrice, err := r.gasPriceEstimator.Median(sourceGasObservations) // Compute the median price
 	if err != nil {
 		return commit_store.InternalPriceUpdates{}, err
 	}
-	destChainSelector = r.config.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
+	destChainSelector := r.config.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
 
 	if latestGasPrice.value != nil {
 		gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
