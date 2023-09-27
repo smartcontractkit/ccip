@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
@@ -215,6 +216,26 @@ func (c *LogPollerReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Con
 			return offRamp.ParseExecutionStateChanged(log)
 		},
 	)
+}
+
+func (c *LogPollerReader) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
+	logs, err := c.lp.IndexedLogsByTxHash(
+		abihelpers.EventSignatures.USDCMessageSent,
+		txHash,
+		pg.WithParentCtx(ctx),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range logs {
+		current := logs[len(logs)-i-1]
+		if current.LogIndex < logIndex {
+			c.lggr.Infow("Found USDC message", "logIndex", current.LogIndex, "txHash", current.TxHash.Hex(), "data", hexutil.Encode(current.Data))
+			return current.Data, nil
+		}
+	}
+	return nil, errors.Errorf("no USDC message found prior to log index %d in tx %s", logIndex, txHash.Hex())
 }
 
 func (c *LogPollerReader) LatestBlock(ctx context.Context) (int64, error) {

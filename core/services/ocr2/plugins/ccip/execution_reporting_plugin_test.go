@@ -36,9 +36,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
@@ -440,7 +442,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		lggr: logger.TestLogger(t),
 	}
 
-	msg1 := evm2EVMOnRampCCIPSendRequestedWithMeta{
+	msg1 := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 		InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
 			SequenceNumber: 1,
 			FeeTokenAmount: big.NewInt(1e9),
@@ -454,15 +456,15 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			FeeToken:       srcNative,
 			MessageId:      [32]byte{},
 		},
-		blockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+		BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 	}
 
 	msg2 := msg1
-	msg2.executed = true
+	msg2.Executed = true
 
 	msg3 := msg1
-	msg3.executed = true
-	msg3.finalized = true
+	msg3.Executed = true
+	msg3.Finalized = true
 
 	msg4 := msg1
 	msg4.TokenAmounts = []evm_2_evm_offramp.ClientEVMTokenAmount{
@@ -475,7 +477,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 
 	var tt = []struct {
 		name                     string
-		reqs                     []evm2EVMOnRampCCIPSendRequestedWithMeta
+		reqs                     []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
 		inflight                 []InflightInternalExecutionReport
 		tokenLimit, destGasPrice *big.Int
 		srcPrices, dstPrices     map[common.Address]*big.Int
@@ -486,7 +488,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	}{
 		{
 			name:                  "single message no tokens",
-			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg1},
+			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
@@ -497,7 +499,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 		{
 			name:                  "executed non finalized messages should be skipped",
-			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg2},
+			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
@@ -508,7 +510,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 		{
 			name:                  "finalized executed log",
-			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg3},
+			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg3},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
@@ -519,7 +521,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 		{
 			name:                  "dst token price does not exist",
-			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg2},
+			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
@@ -530,7 +532,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 		{
 			name:                  "src token price does not exist",
-			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg2},
+			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
@@ -541,7 +543,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 		{
 			name:                  "rate limit hit",
-			reqs:                  []evm2EVMOnRampCCIPSendRequestedWithMeta{msg4},
+			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg4},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -557,7 +559,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 		{
 			name:         "message with tokens is not executed if limit is reached",
-			reqs:         []evm2EVMOnRampCCIPSendRequestedWithMeta{msg4},
+			reqs:         []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg4},
 			inflight:     []InflightInternalExecutionReport{},
 			tokenLimit:   big.NewInt(2),
 			destGasPrice: big.NewInt(10),
@@ -571,7 +573,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 		{
 			name: "message with tokens is not executed if limit is reached when inflight is full",
-			reqs: []evm2EVMOnRampCCIPSendRequestedWithMeta{msg5},
+			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg5},
 			inflight: []InflightInternalExecutionReport{
 				{
 					createdAt: time.Now(),
@@ -590,7 +592,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 		{
 			name: "some messages skipped after hitting max batch data len",
-			reqs: []evm2EVMOnRampCCIPSendRequestedWithMeta{
+			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				{
 					InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
 						SequenceNumber: 10,
@@ -602,7 +604,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 						FeeToken:       srcNative,
 						MessageId:      [32]byte{},
 					},
-					blockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 				{
 					InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
@@ -615,7 +617,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 						FeeToken:       srcNative,
 						MessageId:      [32]byte{},
 					},
-					blockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 				{
 					InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
@@ -628,7 +630,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 						FeeToken:       srcNative,
 						MessageId:      [32]byte{},
 					},
-					blockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
+					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 			},
 			inflight:              []InflightInternalExecutionReport{},
@@ -646,6 +648,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			offRamp.SetSenderNonces(tc.offRampNoncesBySender)
 			seqNrs := plugin.buildBatch(
+				context.Background(),
 				lggr,
 				commitReportWithSendRequests{sendRequestsWithMeta: tc.reqs},
 				tc.inflight,
@@ -880,7 +883,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 
 			rateLimits, err := p.destPoolRateLimits(ctx, []commitReportWithSendRequests{
 				{
-					sendRequestsWithMeta: []evm2EVMOnRampCCIPSendRequestedWithMeta{
+					sendRequestsWithMeta: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 						{
 							InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
 								TokenAmounts: tc.tokenAmounts,
@@ -1000,16 +1003,16 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 						Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 2},
 						MerkleRoot: [32]byte{100},
 					},
-					sendRequestsWithMeta: []evm2EVMOnRampCCIPSendRequestedWithMeta{
+					sendRequestsWithMeta: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 						{
 							InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 1},
-							executed:               true,
-							finalized:              true,
+							Executed:               true,
+							Finalized:              true,
 						},
 						{
 							InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 2},
-							executed:               false,
-							finalized:              false,
+							Executed:               false,
+							Finalized:              false,
 						},
 					},
 				},
@@ -1018,11 +1021,11 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 						Interval:   commit_store.CommitStoreInterval{Min: 3, Max: 3},
 						MerkleRoot: [32]byte{200},
 					},
-					sendRequestsWithMeta: []evm2EVMOnRampCCIPSendRequestedWithMeta{
+					sendRequestsWithMeta: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 						{
 							InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 3},
-							executed:               false,
-							finalized:              false,
+							Executed:               false,
+							Finalized:              false,
 						},
 					},
 				},
@@ -1071,8 +1074,8 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			for i, expReport := range tc.expReports {
 				assert.Equal(t, len(expReport.sendRequestsWithMeta), len(populatedReports[i].sendRequestsWithMeta))
 				for j, expReq := range expReport.sendRequestsWithMeta {
-					assert.Equal(t, expReq.executed, populatedReports[i].sendRequestsWithMeta[j].executed)
-					assert.Equal(t, expReq.finalized, populatedReports[i].sendRequestsWithMeta[j].finalized)
+					assert.Equal(t, expReq.Executed, populatedReports[i].sendRequestsWithMeta[j].Executed)
+					assert.Equal(t, expReq.Finalized, populatedReports[i].sendRequestsWithMeta[j].Finalized)
 					assert.Equal(t, expReq.SequenceNumber, populatedReports[i].sendRequestsWithMeta[j].SequenceNumber)
 				}
 			}
@@ -1102,6 +1105,8 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 
 	destPriceRegistryAddr := utils.RandomAddress()
 
+	tokenDataProviders := make(map[common.Address]tokendata.Reader)
+
 	rf := &ExecutionReportingPluginFactory{
 		filtersMu:          &sync.Mutex{},
 		sourceChainFilters: filters[:5],
@@ -1113,10 +1118,11 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 			commitStore:         commitStore,
 			offRamp:             offRamp,
 			sourcePriceRegistry: sourcePriceRegistry,
+			tokenDataProviders:  tokenDataProviders,
 		},
 	}
 
-	for _, f := range getExecutionPluginSourceLpChainFilters(onRamp.Address(), sourcePriceRegistry.Address()) {
+	for _, f := range getExecutionPluginSourceLpChainFilters(onRamp.Address(), sourcePriceRegistry.Address(), tokenDataProviders) {
 		sourceLP.On("RegisterFilter", f).Return(nil)
 	}
 	for _, f := range getExecutionPluginDestLpChainFilters(commitStore.Address(), offRamp.Address(), destPriceRegistryAddr) {
@@ -1598,7 +1604,7 @@ func Test_commitReportWithSendRequests_validate(t *testing.T) {
 				commitReport: commit_store.CommitStoreCommitReport{
 					Interval: tc.reportInterval,
 				},
-				sendRequestsWithMeta: make([]evm2EVMOnRampCCIPSendRequestedWithMeta, tc.numReqs),
+				sendRequestsWithMeta: make([]internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tc.numReqs),
 			}
 			err := rep.validate()
 			isValid := err == nil
@@ -1610,38 +1616,38 @@ func Test_commitReportWithSendRequests_validate(t *testing.T) {
 func Test_commitReportWithSendRequests_allRequestsAreExecutedAndFinalized(t *testing.T) {
 	testCases := []struct {
 		name   string
-		reqs   []evm2EVMOnRampCCIPSendRequestedWithMeta
+		reqs   []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
 		expRes bool
 	}{
 		{
 			name: "all requests executed and finalized",
-			reqs: []evm2EVMOnRampCCIPSendRequestedWithMeta{
-				{executed: true, finalized: true},
-				{executed: true, finalized: true},
-				{executed: true, finalized: true},
+			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{Executed: true, Finalized: true},
+				{Executed: true, Finalized: true},
+				{Executed: true, Finalized: true},
 			},
 			expRes: true,
 		},
 		{
 			name:   "true when there are zero requests",
-			reqs:   []evm2EVMOnRampCCIPSendRequestedWithMeta{},
+			reqs:   []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{},
 			expRes: true,
 		},
 		{
 			name: "some request not executed",
-			reqs: []evm2EVMOnRampCCIPSendRequestedWithMeta{
-				{executed: true, finalized: true},
-				{executed: true, finalized: true},
-				{executed: false, finalized: true},
+			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{Executed: true, Finalized: true},
+				{Executed: true, Finalized: true},
+				{Executed: false, Finalized: true},
 			},
 			expRes: false,
 		},
 		{
 			name: "some request not finalized",
-			reqs: []evm2EVMOnRampCCIPSendRequestedWithMeta{
-				{executed: true, finalized: true},
-				{executed: true, finalized: true},
-				{executed: true, finalized: false},
+			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				{Executed: true, Finalized: true},
+				{Executed: true, Finalized: true},
+				{Executed: true, Finalized: false},
 			},
 			expRes: false,
 		},
@@ -1659,13 +1665,13 @@ func Test_commitReportWithSendRequests_allRequestsAreExecutedAndFinalized(t *tes
 func Test_commitReportWithSendRequests_sendReqFits(t *testing.T) {
 	testCases := []struct {
 		name   string
-		req    evm2EVMOnRampCCIPSendRequestedWithMeta
+		req    internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
 		report commit_store.CommitStoreCommitReport
 		expRes bool
 	}{
 		{
 			name: "all requests executed and finalized",
-			req: evm2EVMOnRampCCIPSendRequestedWithMeta{
+			req: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 1},
 			},
 			report: commit_store.CommitStoreCommitReport{
@@ -1675,7 +1681,7 @@ func Test_commitReportWithSendRequests_sendReqFits(t *testing.T) {
 		},
 		{
 			name: "all requests executed and finalized",
-			req: evm2EVMOnRampCCIPSendRequestedWithMeta{
+			req: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 10},
 			},
 			report: commit_store.CommitStoreCommitReport{
@@ -1685,7 +1691,7 @@ func Test_commitReportWithSendRequests_sendReqFits(t *testing.T) {
 		},
 		{
 			name: "all requests executed and finalized",
-			req: evm2EVMOnRampCCIPSendRequestedWithMeta{
+			req: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 11},
 			},
 			report: commit_store.CommitStoreCommitReport{
@@ -1695,7 +1701,7 @@ func Test_commitReportWithSendRequests_sendReqFits(t *testing.T) {
 		},
 		{
 			name: "all requests executed and finalized",
-			req: evm2EVMOnRampCCIPSendRequestedWithMeta{
+			req: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{SequenceNumber: 10},
 			},
 			report: commit_store.CommitStoreCommitReport{
