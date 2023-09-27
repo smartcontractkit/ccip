@@ -4,7 +4,7 @@ name: Integration Tests Publish
 on:
   push:
     branches:
-      - ccip-develop
+      - CCIP-1039-Publish-test-image-on-each-release-with-release-tag
     tags: [ v* ]
 
 env:
