@@ -6,6 +6,7 @@ on:
     branches:
       - ccip-develop
     tags: [ v* ]
+  workflow_dispatch:
 
 env:
   ECR_TAG: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:develop
