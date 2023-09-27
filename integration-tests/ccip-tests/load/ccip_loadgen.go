@@ -14,12 +14,12 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	ccipConfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
@@ -165,7 +165,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	var sendTx *types.Transaction
 	var err error
 
-	destChainSelector, err := chain_selectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
+	destChainSelector, err := ccipConfig.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
 		res.Error = err.Error()
 		res.Failed = true

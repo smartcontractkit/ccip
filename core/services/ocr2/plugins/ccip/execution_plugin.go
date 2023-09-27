@@ -11,8 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-
-	chainselectors "github.com/smartcontractkit/chain-selectors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
@@ -77,7 +75,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	if err != nil {
 		return nil, err
 	}
-	chainId, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
+	chainId, err := ccipconfig.ChainIdFromSelector(offRampConfig.SourceChainSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +296,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, spec
 	if err != nil {
 		return err
 	}
-	chainId, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
+	chainId, err := ccipconfig.ChainIdFromSelector(offRampConfig.SourceChainSelector)
 	if err != nil {
 		return err
 	}

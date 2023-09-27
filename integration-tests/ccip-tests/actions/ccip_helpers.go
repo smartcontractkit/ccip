@@ -17,7 +17,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -304,7 +303,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 	timeout time.Duration,
 	destChainId uint64,
 ) error {
-	destChainSelector, err := chainselectors.SelectorFromChainId(destChainId)
+	destChainSelector, err := ccipConfig.SelectorFromChainId(destChainId)
 	if err != nil {
 		return err
 	}
@@ -358,7 +357,7 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 		for {
 			select {
 			case e := <-gasUpdateEvent:
-				destChain, err := chainselectors.ChainIdFromSelector(e.DestChain)
+				destChain, err := ccipConfig.ChainIdFromSelector(e.DestChain)
 				if err != nil {
 					continue
 				}
@@ -615,11 +614,11 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 	if len(sourceCCIP.TransferAmount) != len(sourceCCIP.Common.BridgeTokens) && len(sourceCCIP.TransferAmount) > 0 {
 		sourceCCIP.TransferAmount = sourceCCIP.TransferAmount[:len(sourceCCIP.Common.BridgeTokens)]
 	}
-	sourceChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.Common.ChainClient.GetChainID().Uint64())
+	sourceChainSelector, err := ccipConfig.SelectorFromChainId(sourceCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
+	destChainSelector, err := ccipConfig.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -898,7 +897,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed encoding the options field: %+v", err)
 	}
-	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
+	destChainSelector, err := ccipConfig.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %+v", err)
 	}
@@ -1011,11 +1010,11 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	contractDeployer := destCCIP.Common.Deployer
 	log.Info().Msg("Deploying destination chain specific contracts")
 	destCCIP.LoadContracts(lane)
-	sourceChainSelector, err := chainselectors.SelectorFromChainId(destCCIP.SourceChainId)
+	sourceChainSelector, err := ccipConfig.SelectorFromChainId(destCCIP.SourceChainId)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	destChainSelector, err := chainselectors.SelectorFromChainId(destCCIP.Common.ChainClient.GetChainID().Uint64())
+	destChainSelector, err := ccipConfig.SelectorFromChainId(destCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
 		return errors.WithStack(err)
 	}

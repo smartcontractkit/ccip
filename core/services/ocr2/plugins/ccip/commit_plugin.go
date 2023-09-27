@@ -9,11 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	chainselectors "github.com/smartcontractkit/chain-selectors"
-
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -66,7 +65,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
-	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
+	chainId, err := ccipconfig.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +247,7 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, spec *job.OCR2OracleSp
 	if err != nil {
 		return err
 	}
-	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
+	chainId, err := ccipconfig.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {
 		return err
 	}
