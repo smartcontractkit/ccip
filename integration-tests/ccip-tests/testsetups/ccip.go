@@ -34,6 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
 	ccipnode "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+	ccipConfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
 const (
@@ -314,11 +315,13 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		if simulated {
 			actualNoOfNetworks := len(p.SelectedNetworks)
 			n := p.SelectedNetworks[0]
+			availableSimulatedChainIds := ccipConfig.AllSimulatedChainIds()
 			for i := 0; i < p.NoOfNetworks-actualNoOfNetworks; i++ {
-				chainID := networks.AdditionalSimulatedChainIds[i]
+				// get chain id from testselectors
+				chainID := availableSimulatedChainIds[i]
 				p.SelectedNetworks = append(p.SelectedNetworks, blockchain.EVMNetwork{
 					Name:                      fmt.Sprintf("simulated-non-dev%d", len(p.SelectedNetworks)+1),
-					ChainID:                   chainID,
+					ChainID:                   int64(chainID),
 					Simulated:                 true,
 					PrivateKeys:               []string{networks.AdditionalSimulatedPvtKeys[i]},
 					ChainlinkTransactionLimit: n.ChainlinkTransactionLimit,

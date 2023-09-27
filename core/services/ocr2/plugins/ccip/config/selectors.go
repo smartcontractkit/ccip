@@ -22,6 +22,14 @@ var testSelectors = map[uint64]uint64{
 	90000015: 6443235356619661032,
 }
 
+func AllSimulatedChainIds() []uint64 {
+	var chainIds []uint64
+	for k := range testSelectors {
+		chainIds = append(chainIds, k)
+	}
+	return chainIds
+}
+
 func ChainIdFromSelector(chainSelectorId uint64) (uint64, error) {
 	for k, v := range testSelectors {
 		if v == chainSelectorId {
