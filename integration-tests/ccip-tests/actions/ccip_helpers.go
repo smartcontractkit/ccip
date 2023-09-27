@@ -1742,7 +1742,7 @@ func (lane *CCIPLane) CleanUp(clearFees bool) error {
 		sub.Unsubscribe()
 	}
 	// recover fees from onRamp contract
-	if clearFees {
+	if clearFees && !lane.Source.Common.ChainClient.NetworkSimulated() {
 		err := lane.Source.PayCCIPFeeToOwnerAddress()
 		if err != nil {
 			return err
