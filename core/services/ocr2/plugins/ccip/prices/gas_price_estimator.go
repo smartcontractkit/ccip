@@ -77,6 +77,7 @@ func NewGasPriceEstimator(
 				estimator:   estimator,
 				maxGasPrice: maxExecGasPrice,
 			},
+			l1Oracle:            estimator.L1Oracle(),
 			priceEncodingLength: DAGasPriceEncodingLength,
 		}, nil
 	default:

@@ -118,8 +118,8 @@ func TestExecPriceEstimator_DenoteInUSD(t *testing.T) {
 		{
 			name:        "base",
 			gasPrice:    big.NewInt(1e9),
-			nativePrice: val1e18(2000),
-			expPrice:    big.NewInt(2000e9),
+			nativePrice: val1e18(2_000),
+			expPrice:    big.NewInt(2_000e9),
 		},
 		{
 			name:        "low price truncates to 0",
@@ -130,8 +130,8 @@ func TestExecPriceEstimator_DenoteInUSD(t *testing.T) {
 		{
 			name:        "high price",
 			gasPrice:    val1e18(1),
-			nativePrice: val1e18(2000),
-			expPrice:    val1e18(2000),
+			nativePrice: val1e18(2_000),
+			expPrice:    val1e18(2_000),
 		},
 	}
 
@@ -320,7 +320,20 @@ func TestExecPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 			expUSD: big.NewInt(200_000e9),
 		},
 		{
-			name:               "zero price",
+			name:               "double native price",
+			gasPrice:           big.NewInt(1e9),  // 1 gwei
+			wrappedNativePrice: big.NewInt(2e18), // $1
+			msg: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
+					GasLimit:     big.NewInt(0),
+					Data:         []byte{},
+					TokenAmounts: []evm_2_evm_offramp.ClientEVMTokenAmount{},
+				},
+			},
+			expUSD: big.NewInt(400_000e9),
+		},
+		{
+			name:               "zero gas price",
 			gasPrice:           big.NewInt(0),    // 1 gwei
 			wrappedNativePrice: big.NewInt(1e18), // $1
 			msg: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{

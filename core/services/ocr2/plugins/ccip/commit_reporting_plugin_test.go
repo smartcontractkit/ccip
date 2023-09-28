@@ -25,6 +25,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
@@ -869,8 +870,11 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 		},
 	}
 
+	evmEstimator := mocks.NewEvmFeeEstimator(t)
+	evmEstimator.On("L1Oracle").Return(nil)
+
 	estimatorCSVer, _ := semver.NewVersion("1.2.0")
-	estimator, _ := prices.NewGasPriceEstimator(*estimatorCSVer, nil, nil)
+	estimator, _ := prices.NewGasPriceEstimator(*estimatorCSVer, evmEstimator, nil)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

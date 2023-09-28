@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
 
 type DAGasPriceEstimator struct {
-	execEstimator       ExecGasPriceEstimator
+	execEstimator       GasPriceEstimator
+	l1Oracle            rollups.L1Oracle
 	priceEncodingLength uint
 }
 
@@ -24,8 +26,8 @@ func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (GasPrice, error) 
 		return nil, fmt.Errorf("native gas price exceeded max range %+v", gasPrice)
 	}
 
-	if l1Oracle := g.execEstimator.estimator.L1Oracle(); l1Oracle != nil {
-		daGasPriceWei, err := l1Oracle.GasPrice(ctx)
+	if g.l1Oracle != nil {
+		daGasPriceWei, err := g.l1Oracle.GasPrice(ctx)
 		if err != nil {
 			return nil, err
 		}
