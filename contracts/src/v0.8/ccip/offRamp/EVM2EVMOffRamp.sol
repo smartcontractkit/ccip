@@ -13,6 +13,7 @@ import {IAny2EVMOffRamp} from "../interfaces/IAny2EVMOffRamp.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
+import {CallWithExactGas} from "../libraries/CallWithExactGas.sol";
 import {OCR2BaseNoChecks} from "../ocr/OCR2BaseNoChecks.sol";
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
@@ -101,6 +102,12 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// We include this in the offramp so that we can redeploy to adjust it
   /// should a hardfork change the gas costs of relevant opcodes in callWithExactGas.
   uint16 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
+  /// @dev The maximum amount of gas to perform the releaseOrMint call with.
+  uint256 private constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 100_000;
+  // We limit return data to a selector plus 4 words. This is to avoid
+  // malicious contracts from returning large amounts of data and causing
+  // repeated out-of-gas scenarios.
+  uint16 public constant MAX_RET_BYTES = 4 + 4 * 32;
   /// @dev Commit store address on the destination chain
   address internal immutable i_commitStore;
   /// @dev ChainSelector of the source chain
@@ -397,7 +404,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// @param offchainTokenData Token transfer data to be passed to TokenPool.
   /// @dev We make this external and callable by the contract itself, in order to try/catch
   /// its execution and enforce atomicity among successful message processing and token transfer.
-  /// @dev We use 165 to check for the ccipReceive interface to permit sending tokens to contracts
+  /// @dev We use ERC-165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
   function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
@@ -580,22 +587,31 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
+      uint256 sourceTokenAmount = sourceTokenAmounts[i].amount;
 
-      try
-        pool.releaseOrMint(
+      // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
+      // _callWithExactGas also protects against return data bombs by capping the return data size
+      // at MAX_RET_BYTES.
+      (bool success, bytes memory returnData) = CallWithExactGas._callWithExactGas(
+        abi.encodeWithSelector(
+          pool.releaseOrMint.selector,
           originalSender,
           receiver,
-          sourceTokenAmounts[i].amount,
+          sourceTokenAmount,
           i_sourceChainSelector,
           abi.encode(sourceTokenData[i], offchainTokenData[i])
-        )
-      {} catch (bytes memory err) {
-        /// @dev wrap and rethrow the error so we can catch it lower in the stack
-        revert TokenHandlingError(err);
-      }
+        ),
+        address(pool),
+        MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
+        MAX_RET_BYTES,
+        GAS_FOR_CALL_EXACT_CHECK
+      );
+
+      // wrap and rethrow the error so we can catch it lower in the stack
+      if (!success) revert TokenHandlingError(returnData);
 
       destTokenAmounts[i].token = address(pool.getToken());
-      destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
+      destTokenAmounts[i].amount = sourceTokenAmount;
     }
     _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
     return destTokenAmounts;
