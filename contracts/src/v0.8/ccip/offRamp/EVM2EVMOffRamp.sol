@@ -98,16 +98,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMOffRamp 1.2.0";
-  /// @dev The minimum amount of gas to perform the call with exact gas.
-  /// We include this in the offramp so that we can redeploy to adjust it
-  /// should a hardfork change the gas costs of relevant opcodes in callWithExactGas.
-  uint16 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
-  /// @dev The maximum amount of gas to perform the releaseOrMint call with.
-  uint256 private constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 100_000;
-  // We limit return data to a selector plus 4 words. This is to avoid
-  // malicious contracts from returning large amounts of data and causing
-  // repeated out-of-gas scenarios.
-  uint16 public constant MAX_RET_BYTES = 4 + 4 * 32;
+  /// @dev The maximum amount of gas available to perform the releaseOrMint call with.
+  uint256 internal constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 200_000;
   /// @dev Commit store address on the destination chain
   address internal immutable i_commitStore;
   /// @dev ChainSelector of the source chain
@@ -424,7 +416,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
     (bool success, bytes memory returnData) = IRouter(s_dynamicConfig.router).routeMessage(
       Internal._toAny2EVMMessage(message, destTokenAmounts),
-      GAS_FOR_CALL_EXACT_CHECK,
+      Internal.GAS_FOR_CALL_EXACT_CHECK,
       message.gasLimit,
       message.receiver
     );
@@ -603,8 +595,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
         ),
         address(pool),
         MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
-        MAX_RET_BYTES,
-        GAS_FOR_CALL_EXACT_CHECK
+        Internal.MAX_RET_BYTES,
+        Internal.GAS_FOR_CALL_EXACT_CHECK
       );
 
       // wrap and rethrow the error so we can catch it lower in the stack
