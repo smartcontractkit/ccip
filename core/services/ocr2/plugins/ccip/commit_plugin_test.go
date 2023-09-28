@@ -126,7 +126,7 @@ func Test_updateCommitPluginLogPollerFilters(t *testing.T) {
 	newDestFilters := getCommitPluginDestLpFilters(priceRegAddr, offRampAddr)
 
 	rf := &CommitReportingPluginFactory{
-		config: CommitPluginConfig{
+		config: CommitPluginStaticConfig{
 			destLP:  dstLP,
 			offRamp: offRamp,
 		},

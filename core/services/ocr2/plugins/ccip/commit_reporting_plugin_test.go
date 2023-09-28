@@ -620,7 +620,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := &CommitReportingPlugin{
 				lggr:   logger.TestLogger(t),
-				config: CommitPluginConfig{sourceChainSelector: defaultSourceChainSelector},
+				config: CommitPluginStaticConfig{sourceChainSelector: defaultSourceChainSelector},
 				offchainConfig: ccipconfig.CommitOffchainConfig{
 					FeeUpdateHeartBeat:    tc.feeUpdateHeartBeat,
 					FeeUpdateDeviationPPB: tc.feeUpdateDeviationPPB,
@@ -825,7 +825,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			}
 
 			p := &CommitReportingPlugin{
-				config: CommitPluginConfig{
+				config: CommitPluginStaticConfig{
 					sourceNative:       tc.sourceNativeToken,
 					priceGetter:        priceGetter,
 					sourceFeeEstimator: sourceFeeEstimator,
@@ -885,7 +885,7 @@ func TestCommitReportingPlugin_nextMinSeqNum(t *testing.T) {
 	}
 	for _, tc := range tt {
 		commitStore, _ := testhelpers.NewFakeCommitStore(t, tc.onChainMin)
-		cp := CommitReportingPlugin{config: CommitPluginConfig{commitStore: commitStore}, inflightReports: newInflightCommitReportsContainer(time.Hour)}
+		cp := CommitReportingPlugin{config: CommitPluginStaticConfig{commitStore: commitStore}, inflightReports: newInflightCommitReportsContainer(time.Hour)}
 		epochAndRound := uint64(1)
 		for _, rep := range tc.inflight {
 			rc := rep
@@ -909,7 +909,7 @@ func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 
 	t.Run("empty report", func(t *testing.T) {
 		commitStore, _ := testhelpers.NewFakeCommitStore(t, 1)
-		r := &CommitReportingPlugin{config: CommitPluginConfig{commitStore: commitStore}}
+		r := &CommitReportingPlugin{config: CommitPluginStaticConfig{commitStore: commitStore}}
 		isStale := r.isStaleReport(ctx, lggr, commit_store.CommitStoreCommitReport{}, false, types.ReportTimestamp{})
 		assert.True(t, isStale)
 	})
@@ -919,7 +919,7 @@ func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 		commitStore, _ := testhelpers.NewFakeCommitStore(t, expNextSeqNum)
 
 		r := &CommitReportingPlugin{
-			config: CommitPluginConfig{commitStore: commitStore},
+			config: CommitPluginStaticConfig{commitStore: commitStore},
 			inflightReports: &inflightCommitReportsContainer{
 				inFlight: map[[32]byte]InflightCommitReport{
 					merkleRoot2: {

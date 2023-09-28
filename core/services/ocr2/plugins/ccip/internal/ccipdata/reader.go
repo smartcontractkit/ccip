@@ -8,7 +8,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 )
 
 type Event[T any] struct {
@@ -27,12 +26,6 @@ type Meta struct {
 //
 //go:generate mockery --quiet --name Reader --output . --filename reader_mock.go --inpackage --case=underscore
 type Reader interface {
-	// GetTokenPriceUpdatesCreatedAfter returns all the token price updates that happened after the provided timestamp.
-	GetTokenPriceUpdatesCreatedAfter(ctx context.Context, priceRegistry common.Address, ts time.Time, confs int) ([]Event[price_registry.PriceRegistryUsdPerTokenUpdated], error)
-
-	// GetGasPriceUpdatesCreatedAfter returns all the gas price updates that happened after the provided timestamp.
-	GetGasPriceUpdatesCreatedAfter(ctx context.Context, priceRegistry common.Address, chainSelector uint64, ts time.Time, confs int) ([]Event[price_registry.PriceRegistryUsdPerUnitGasUpdated], error)
-
 	// GetExecutionStateChangesBetweenSeqNums returns all the execution state change events for the provided message sequence numbers (inclusive).
 	GetExecutionStateChangesBetweenSeqNums(ctx context.Context, offRamp common.Address, seqNumMin, seqNumMax uint64, confs int) ([]Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged], error)
 

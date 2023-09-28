@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -58,7 +57,7 @@ type update struct {
 	value     *big.Int
 }
 
-type CommitPluginConfig struct {
+type CommitPluginStaticConfig struct {
 	lggr logger.Logger
 	// Source
 	onRampReader        ccipdata.OnRampReader
@@ -67,7 +66,6 @@ type CommitPluginConfig struct {
 	sourceFeeEstimator  gas.EvmFeeEstimator
 	// Dest
 	destLP         logpoller.LogPoller
-	destReader     ccipdata.Reader
 	offRamp        evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStore    commit_store.CommitStoreInterface
 	destClient     evmclient.Client
@@ -77,18 +75,27 @@ type CommitPluginConfig struct {
 }
 
 type CommitReportingPlugin struct {
-	config             CommitPluginConfig
-	F                  int
-	lggr               logger.Logger
-	inflightReports    *inflightCommitReportsContainer
-	destPriceRegistry  price_registry.PriceRegistryInterface
-	offchainConfig     ccipconfig.CommitOffchainConfig
-	onchainConfig      ccipconfig.CommitOnchainConfig
-	tokenDecimalsCache cache.AutoSync[map[common.Address]uint8]
+	lggr logger.Logger
+	// Source
+	onRampReader        ccipdata.OnRampReader
+	sourceChainSelector uint64
+	sourceNative        common.Address
+	sourceFeeEstimator  gas.EvmFeeEstimator
+	// Dest
+	commitStore             commit_store.CommitStoreInterface
+	destPriceRegistryReader ccipdata.PriceRegistryReader
+	offchainConfig          ccipconfig.CommitOffchainConfig
+	onchainConfig           ccipconfig.CommitOnchainConfig
+	tokenDecimalsCache      cache.AutoSync[map[common.Address]uint8]
+	F                       int
+	// Offchain
+	priceGetter pricegetter.PriceGetter
+	// State
+	inflightReports *inflightCommitReportsContainer
 }
 
 type CommitReportingPluginFactory struct {
-	config CommitPluginConfig
+	config CommitPluginStaticConfig
 
 	// We keep track of the registered filters
 	// TODO: Can push this down into the readers
@@ -97,7 +104,7 @@ type CommitReportingPluginFactory struct {
 }
 
 // NewCommitReportingPluginFactory return a new CommitReportingPluginFactory.
-func NewCommitReportingPluginFactory(config CommitPluginConfig) *CommitReportingPluginFactory {
+func NewCommitReportingPluginFactory(config CommitPluginStaticConfig) *CommitReportingPluginFactory {
 	return &CommitReportingPluginFactory{
 		config:    config,
 		filtersMu: &sync.Mutex{},
@@ -114,12 +121,13 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	destPriceRegistry, err := price_registry.NewPriceRegistry(onchainConfig.PriceRegistry, rf.config.destClient)
+	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, onchainConfig.PriceRegistry, rf.config.destLP, rf.config.destClient)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	if err = rf.UpdateLogPollerFilters(onchainConfig.PriceRegistry); err != nil {
+	// TODO can remove once offramp abstracted
+	if err = rf.UpdateLogPollerFilters(); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
@@ -129,18 +137,23 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 	)
 
 	return &CommitReportingPlugin{
-			config:            rf.config,
-			F:                 config.F,
-			lggr:              rf.config.lggr.Named("CommitReportingPlugin"),
-			inflightReports:   newInflightCommitReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			destPriceRegistry: destPriceRegistry,
-			onchainConfig:     onchainConfig,
-			offchainConfig:    offchainConfig,
+			sourceChainSelector:     rf.config.sourceChainSelector,
+			sourceNative:            rf.config.sourceNative,
+			sourceFeeEstimator:      rf.config.sourceFeeEstimator,
+			onRampReader:            rf.config.onRampReader,
+			commitStore:             rf.config.commitStore,
+			priceGetter:             rf.config.priceGetter,
+			F:                       config.F,
+			lggr:                    rf.config.lggr.Named("CommitReportingPlugin"),
+			inflightReports:         newInflightCommitReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
+			destPriceRegistryReader: destPriceRegistryReader,
+			onchainConfig:           onchainConfig,
+			offchainConfig:          offchainConfig,
 			tokenDecimalsCache: cache.NewTokenToDecimals(
 				rf.config.lggr,
 				rf.config.destLP,
 				rf.config.offRamp,
-				destPriceRegistry,
+				destPriceRegistryReader,
 				rf.config.destClient,
 				int64(offchainConfig.DestFinalityDepth),
 			),
@@ -167,7 +180,7 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
 	// If the commit store is down the protocol should halt.
-	if contractutil.IsCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
+	if contractutil.IsCommitStoreDownNow(ctx, lggr, r.commitStore) {
 		return nil, ErrCommitStoreIsDown
 	}
 	r.inflightReports.expire(lggr)
@@ -210,12 +223,12 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
 // pass zeroAddress if destPriceRegistry is unknown, filters with zero address are omitted.
 // TODO: Should be able to Close and re-create readers to abstract filters.
-func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address, qopts ...pg.QOpt) error {
+func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(qopts ...pg.QOpt) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
 
 	// destination chain filters
-	destFiltersBefore, destFiltersNow := rf.destChainFilters, getCommitPluginDestLpFilters(destPriceRegistry, rf.config.offRamp.Address())
+	destFiltersBefore, destFiltersNow := rf.destChainFilters, getCommitPluginDestLpFilters(rf.config.offRamp.Address())
 	created, deleted := logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
 	if err := logpollerutil.UnregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
 		return err
@@ -234,7 +247,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 
-	msgRequests, err := r.config.onRampReader.GetSendRequestsGteSeqNum(ctx, nextInflightMin, int(r.offchainConfig.SourceFinalityDepth))
+	msgRequests, err := r.onRampReader.GetSendRequestsGteSeqNum(ctx, nextInflightMin, int(r.offchainConfig.SourceFinalityDepth))
 	if err != nil {
 		return 0, 0, err
 	}
@@ -261,7 +274,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 }
 
 func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context, lggr logger.Logger) (inflightMin, onChainMin uint64, err error) {
-	nextMinOnChain, err := r.config.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
+	nextMinOnChain, err := r.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return 0, 0, err
 	}
@@ -300,10 +313,10 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 
 	// Include wrapped native in our token query as way to identify the source native USD price.
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	queryTokens := append([]common.Address{r.config.sourceNative}, tokensWithDecimal...)
+	queryTokens := append([]common.Address{r.sourceNative}, tokensWithDecimal...)
 	sort.Slice(queryTokens, func(i, j int) bool { return queryTokens[i].String() < queryTokens[j].String() }) // make the query deterministic
 
-	rawTokenPricesUSD, err := r.config.priceGetter.TokenPricesUSD(ctx, queryTokens)
+	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -316,9 +329,9 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		}
 	}
 
-	sourceNativePriceUSD, exists := rawTokenPricesUSD[r.config.sourceNative]
+	sourceNativePriceUSD, exists := rawTokenPricesUSD[r.sourceNative]
 	if !exists {
-		return nil, nil, fmt.Errorf("missing source native (%s) price", r.config.sourceNative)
+		return nil, nil, fmt.Errorf("missing source native (%s) price", r.sourceNative)
 	}
 
 	tokenPricesUSD = make(map[common.Address]*big.Int, len(rawTokenPricesUSD))
@@ -333,7 +346,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	}
 
 	// Observe a source chain price for pricing.
-	sourceGasPriceWei, _, err := r.config.sourceFeeEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
+	sourceGasPriceWei, _, err := r.sourceFeeEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -363,9 +376,8 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 // Gets the latest token price updates based on logs within the heartbeat
 // The updates returned by this function are guaranteed to not contain nil values.
 func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, checkInflight bool) (map[common.Address]update, error) {
-	tokenPriceUpdates, err := r.config.destReader.GetTokenPriceUpdatesCreatedAfter(
+	tokenPriceUpdates, err := r.destPriceRegistryReader.GetTokenPriceUpdatesCreatedAfter(
 		ctx,
-		r.destPriceRegistry.Address(),
 		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
 		0,
 	)
@@ -419,10 +431,9 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 	}
 
 	// If there are no price updates inflight, check latest prices onchain
-	gasPriceUpdates, err := r.config.destReader.GetGasPriceUpdatesCreatedAfter(
+	gasPriceUpdates, err := r.destPriceRegistryReader.GetGasPriceUpdatesCreatedAfter(
 		ctx,
-		r.destPriceRegistry.Address(),
-		r.config.sourceChainSelector,
+		r.sourceChainSelector,
 		now.Add(-r.offchainConfig.FeeUpdateHeartBeat.Duration()),
 		0,
 	)
@@ -621,7 +632,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 
 	if len(sourceGasObservations) > r.F {
 		usdPerUnitGas = ccipcalc.BigIntMedian(sourceGasObservations) // Compute the median price
-		destChainSelector = r.config.sourceChainSelector             // Assuming plugin lane is A->B, we write to B the gas price of A
+		destChainSelector = r.sourceChainSelector                    // Assuming plugin lane is A->B, we write to B the gas price of A
 
 		if latestGasPrice.value != nil {
 			gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.FeeUpdateHeartBeat.Duration()
@@ -653,7 +664,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	sendRequests, err := r.config.onRampReader.GetSendRequestsBetweenSeqNums(
+	sendRequests, err := r.onRampReader.GetSendRequestsBetweenSeqNums(
 		ctx,
 		interval.Min,
 		interval.Max,
@@ -778,7 +789,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 	}
 
 	// If report only has price update, check if its epoch and round lags behind the latest onchain
-	lastPriceEpochAndRound, err := r.config.commitStore.GetLatestPriceEpochAndRound(&bind.CallOpts{Context: ctx})
+	lastPriceEpochAndRound, err := r.commitStore.GetLatestPriceEpochAndRound(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		// Assume it's a transient issue getting the last report and try again on the next round
 		return true
@@ -856,5 +867,6 @@ func (r *CommitReportingPlugin) isStaleTokenPrices(ctx context.Context, lggr log
 }
 
 func (r *CommitReportingPlugin) Close() error {
-	return nil
+	// Close any per instance state
+	return r.destPriceRegistryReader.Close()
 }
