@@ -263,7 +263,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 	mockOffRamp, _ := testhelpers.NewFakeOffRamp(t)
 	plugin := ExecutionReportingPlugin{
-		config: ExecutionPluginConfig{
+		config: ExecutionPluginStaticConfig{
 			offRamp: mockOffRamp,
 		},
 		lggr:            logger.TestLogger(t),
@@ -310,7 +310,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	mockCommitStore := &mock_contracts.CommitStoreInterface{}
 
 	plugin := ExecutionReportingPlugin{
-		config: ExecutionPluginConfig{
+		config: ExecutionPluginStaticConfig{
 			offRamp:     mockOffRamp,
 			commitStore: mockCommitStore,
 		},
@@ -420,7 +420,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	destNative := common.HexToAddress("0xb")
 	srcNative := common.HexToAddress("0xc")
 	plugin := ExecutionReportingPlugin{
-		config: ExecutionPluginConfig{
+		config: ExecutionPluginStaticConfig{
 			offRamp: offRamp,
 			onRamp:  onRamp,
 		},
@@ -1086,7 +1086,7 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 		filtersMu:          &sync.Mutex{},
 		sourceChainFilters: filters[:5],
 		destChainFilters:   filters[5:10],
-		config: ExecutionPluginConfig{
+		config: ExecutionPluginStaticConfig{
 			destLP:              destLP,
 			sourceLP:            sourceLP,
 			onRamp:              onRamp,
@@ -1150,7 +1150,7 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 	mockPriceRegistry.On("GetFeeTokens", mock.Anything).Return([]common.Address{}, nil)
 
 	plugin := ExecutionReportingPlugin{
-		config: ExecutionPluginConfig{
+		config: ExecutionPluginStaticConfig{
 			destLP:  mockDestLP,
 			offRamp: mockOffRamp,
 		},

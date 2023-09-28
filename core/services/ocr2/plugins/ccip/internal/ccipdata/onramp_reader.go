@@ -63,7 +63,7 @@ type OnRampReader interface {
 	ToOffRampMessage(message EVM2EVMMessage) (*evm_2_evm_offramp.InternalEVM2EVMMessage, error)
 
 	// Reader cleanup i.e. unsubscribe from logs
-	Close() error
+	Close(opt ...pg.QOpt) error
 }
 
 // NewOnRampReader determines the appropriate version of the onramp and returns a reader for it
@@ -80,7 +80,7 @@ func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	case "1.2.0":
 		return NewOnRampV1_2_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, finalityTags)
 	default:
-		return nil, errors.Errorf("expected version 1.0.0 got %v", version.String())
+		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}
 }
 

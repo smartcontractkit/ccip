@@ -95,6 +95,8 @@ type CommitReportingPlugin struct {
 }
 
 type CommitReportingPluginFactory struct {
+	// Configuration derived from the job spec which does not change
+	// between plugin instances (ie between SetConfigs onchain)
 	config CommitPluginStaticConfig
 
 	// We keep track of the registered filters

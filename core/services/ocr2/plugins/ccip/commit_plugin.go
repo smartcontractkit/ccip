@@ -186,13 +186,17 @@ func getCommitPluginDestLpFilters(offRamp common.Address) []logpoller.Filter {
 }
 
 // UnregisterCommitPluginLpFilters unregisters all the registered filters for both source and dest chains.
+// NOTE: The transaction MUST be used here for CLO's monster tx to function as expected
+// https://github.com/smartcontractkit/ccip/blob/68e2197472fb017dd4e5630d21e7878d58bc2a44/core/services/feeds/service.go#L716
+// TODO once that transaction is broken up, we should be able to simply rely on oracle.Close() to cleanup the filters.
+// Until then we have to deterministically reload the readers from the spec (and thus their filters) and close them.
 func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
 	commitPluginConfig, _, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet)
 	if err != nil {
 		return errors.New("spec is nil")
 	}
 	// Close static config
-	if err := commitPluginConfig.onRampReader.Close(); err != nil {
+	if err := commitPluginConfig.onRampReader.Close(qopts...); err != nil {
 		return err
 	}
 	// TODO: once offramp/commit are abstracted, we can call Close on the offramp/commit readers to unregister filters.
@@ -201,13 +205,9 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 }
 
 func unregisterCommitPluginFilters(ctx context.Context, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address, qopts ...pg.QOpt) error {
-	dynamicCfg, err := destCommitStore.GetDynamicConfig(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return err
-	}
 	return logpollerutil.UnregisterLpFilters(
 		destLP,
-		getCommitPluginDestLpFilters(dynamicCfg.PriceRegistry, offRamp),
+		getCommitPluginDestLpFilters(offRamp),
 		qopts...,
 	)
 }

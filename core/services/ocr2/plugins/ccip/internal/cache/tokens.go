@@ -12,7 +12,6 @@ import (
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -22,7 +21,7 @@ import (
 // NewCachedFeeTokens cache fee tokens returned from PriceRegistry
 func NewCachedFeeTokens(
 	lp logpoller.LogPoller,
-	priceRegistry price_registry.PriceRegistryInterface,
+	priceRegistry ccipdata.PriceRegistryReader,
 	optimisticConfirmations int64,
 ) *CachedChain[[]common.Address] {
 	return &CachedChain[[]common.Address]{
@@ -50,7 +49,7 @@ type CachedTokens struct {
 func NewCachedSupportedTokens(
 	lp logpoller.LogPoller,
 	offRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
-	priceRegistry price_registry.PriceRegistryInterface,
+	priceRegistry ccipdata.PriceRegistryReader,
 	optimisticConfirmations int64,
 ) *CachedChain[CachedTokens] {
 	return &CachedChain[CachedTokens]{
@@ -141,7 +140,7 @@ func (t *supportedTokensOrigin) CallOrigin(ctx context.Context) (map[common.Addr
 }
 
 type feeTokensOrigin struct {
-	priceRegistry price_registry.PriceRegistryInterface
+	priceRegistry ccipdata.PriceRegistryReader
 }
 
 func (t *feeTokensOrigin) Copy(value []common.Address) []common.Address {
@@ -149,7 +148,7 @@ func (t *feeTokensOrigin) Copy(value []common.Address) []common.Address {
 }
 
 func (t *feeTokensOrigin) CallOrigin(ctx context.Context) ([]common.Address, error) {
-	return t.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
+	return t.priceRegistry.GetFeeTokens(ctx)
 }
 
 func copyArray(source []common.Address) []common.Address {

@@ -43,6 +43,8 @@ type PriceRegistryReader interface {
 
 	GetFeeTokens(ctx context.Context) ([]common.Address, error)
 
+	GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error)
+
 	Close() error
 }
 
@@ -60,6 +62,6 @@ func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Addr
 		// TODO: ABI is same now but will break shortly with multigas price updates
 		return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl)
 	default:
-		return nil, errors.Errorf("expected version 1.0.0 got %v", version.String())
+		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}
 }

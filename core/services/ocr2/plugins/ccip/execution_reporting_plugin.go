@@ -26,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -37,7 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -55,7 +53,7 @@ var (
 	_ types.ReportingPlugin        = &ExecutionReportingPlugin{}
 )
 
-type ExecutionPluginConfig struct {
+type ExecutionPluginStaticConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
 	onRampReader             ccipdata.OnRampReader
@@ -63,7 +61,7 @@ type ExecutionPluginConfig struct {
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStore              commit_store.CommitStoreInterface
-	sourcePriceRegistry      price_registry.PriceRegistryInterface
+	sourcePriceRegistry      ccipdata.PriceRegistryReader
 	sourceWrappedNativeToken common.Address
 	destClient               evmclient.Client
 	sourceClient             evmclient.Client
@@ -73,12 +71,13 @@ type ExecutionPluginConfig struct {
 }
 
 type ExecutionReportingPlugin struct {
-	config                 ExecutionPluginConfig
+	config ExecutionPluginStaticConfig
+
 	F                      int
 	lggr                   logger.Logger
 	inflightReports        *inflightExecReportsContainer
 	snoozedRoots           cache.SnoozedRoots
-	destPriceRegistry      price_registry.PriceRegistryInterface
+	destPriceRegistry      ccipdata.PriceRegistryReader
 	destWrappedNative      common.Address
 	onchainConfig          ccipconfig.ExecOnchainConfig
 	offchainConfig         ccipconfig.ExecOffchainConfig
@@ -88,15 +87,16 @@ type ExecutionReportingPlugin struct {
 }
 
 type ExecutionReportingPluginFactory struct {
-	config ExecutionPluginConfig
+	// Config derived from job specs and does not change between instances.
+	config ExecutionPluginStaticConfig
 
 	// We keep track of the registered filters
-	sourceChainFilters []logpoller.Filter
-	destChainFilters   []logpoller.Filter
-	filtersMu          *sync.Mutex
+	//sourceChainFilters []logpoller.Filter
+	destChainFilters []logpoller.Filter
+	filtersMu        *sync.Mutex
 }
 
-func NewExecutionReportingPluginFactory(config ExecutionPluginConfig) *ExecutionReportingPluginFactory {
+func NewExecutionReportingPluginFactory(config ExecutionPluginStaticConfig) *ExecutionReportingPluginFactory {
 	return &ExecutionReportingPluginFactory{
 		config:    config,
 		filtersMu: &sync.Mutex{},
@@ -112,7 +112,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	priceRegistry, err := observability.NewObservedPriceRegistry(onchainConfig.PriceRegistry, ExecPluginLabel, rf.config.destClient)
+	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, onchainConfig.PriceRegistry, rf.config.destLP, rf.config.destClient)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -125,12 +125,12 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	if err = rf.UpdateLogPollerFilters(onchainConfig.PriceRegistry); err != nil {
+	if err = rf.UpdateLogPollerFilters(); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
 	cachedSourceFeeTokens := cache.NewCachedFeeTokens(rf.config.sourceLP, rf.config.sourcePriceRegistry, int64(offchainConfig.SourceFinalityDepth))
-	cachedDestTokens := cache.NewCachedSupportedTokens(rf.config.destLP, rf.config.offRamp, priceRegistry, int64(offchainConfig.DestOptimisticConfirmations))
+	cachedDestTokens := cache.NewCachedSupportedTokens(rf.config.destLP, rf.config.offRamp, destPriceRegistryReader, int64(offchainConfig.DestOptimisticConfirmations))
 	rf.config.lggr.Infow("Starting exec plugin",
 		"offchainConfig", offchainConfig,
 		"onchainConfig", onchainConfig)
@@ -141,7 +141,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			lggr:                  rf.config.lggr.Named("ExecutionReportingPlugin"),
 			snoozedRoots:          cache.NewSnoozedRoots(onchainConfig.PermissionLessExecutionThresholdDuration(), offchainConfig.RootSnoozeTime.Duration()),
 			inflightReports:       newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			destPriceRegistry:     priceRegistry,
+			destPriceRegistry:     destPriceRegistryReader,
 			destWrappedNative:     destWrappedNative,
 			onchainConfig:         onchainConfig,
 			offchainConfig:        offchainConfig,
@@ -204,26 +204,26 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
 // pass zeroAddress if dstPriceRegistry is unknown, filters with zero address are omitted.
 // TODO: Should be able to Close and re-create readers to abstract filters.
-func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address, qopts ...pg.QOpt) error {
+func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(qopts ...pg.QOpt) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
 
-	// source chain filters
-	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(
-		rf.config.sourcePriceRegistry.Address(),
-	)
-	created, deleted := logpollerutil.FiltersDiff(sourceFiltersBefore, sourceFiltersNow)
-	if err := logpollerutil.UnregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
-		return err
-	}
-	if err := logpollerutil.RegisterLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
-		return err
-	}
-	rf.sourceChainFilters = sourceFiltersNow
+	//// source chain filters
+	//sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(
+	//	rf.config.sourcePriceRegistry.Address(),
+	//)
+	//created, deleted := logpollerutil.FiltersDiff(sourceFiltersBefore, sourceFiltersNow)
+	//if err := logpollerutil.UnregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
+	//	return err
+	//}
+	//if err := logpollerutil.RegisterLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
+	//	return err
+	//}
+	//rf.sourceChainFilters = sourceFiltersNow
 
 	// destination chain filters
-	destFiltersBefore, destFiltersNow := rf.destChainFilters, getExecutionPluginDestLpChainFilters(rf.config.commitStore.Address(), rf.config.offRamp.Address(), destPriceRegistry)
-	created, deleted = logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
+	destFiltersBefore, destFiltersNow := rf.destChainFilters, getExecutionPluginDestLpChainFilters(rf.config.commitStore.Address(), rf.config.offRamp.Address())
+	created, deleted := logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
 	if err := logpollerutil.UnregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
 		return err
 	}
@@ -1091,6 +1091,18 @@ func (r *ExecutionReportingPlugin) isStaleReport(messages []evm_2_evm_offramp.In
 }
 
 func (r *ExecutionReportingPlugin) Close() error {
+	// The db tx is not needed here
+	if err := r.config.onRampReader.Close(); err != nil {
+		return err
+	}
+	for _, tokenReader := range r.config.tokenDataProviders {
+		if err := tokenReader.Close(); err != nil {
+			return err
+		}
+	}
+	if err := r.destPriceRegistry.Close(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1133,12 +1145,12 @@ func inflightAggregates(
 // results include feeTokens and passed-in tokens
 // price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
-func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegistry price_registry.PriceRegistryInterface, tokens []common.Address) (map[common.Address]*big.Int, error) {
+func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegistry ccipdata.PriceRegistryReader, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	priceRegistryAddress := priceRegistry.Address()
 	prices := make(map[common.Address]*big.Int)
 
 	wantedTokens := append(feeTokens, tokens...)
-	fetchedPrices, err := priceRegistry.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
+	fetchedPrices, err := priceRegistry.GetTokenPrices(ctx, wantedTokens)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not get token prices of %v", wantedTokens)
 	}

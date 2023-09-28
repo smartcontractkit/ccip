@@ -307,8 +307,8 @@ func (o *OnRampV1_2_0) ToOffRampMessage(message EVM2EVMMessage) (*evm_2_evm_offr
 	}, nil
 }
 
-func (o *OnRampV1_2_0) Close() error {
-	return o.lp.UnregisterFilter(o.filterName)
+func (o *OnRampV1_2_0) Close(qopts ...pg.QOpt) error {
+	return o.lp.UnregisterFilter(o.filterName, qopts...)
 }
 
 func NewOnRampV1_2_0(
