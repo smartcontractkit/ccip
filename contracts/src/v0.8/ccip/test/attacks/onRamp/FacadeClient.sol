@@ -29,16 +29,12 @@ contract FacadeClient {
   }
 
   /// @dev Calls Router to initiate CCIP send.
-  /// The expectation is that s_msg_sequence will alway match the sequence in emitted CCIP messages.
-  function send(uint256 amount) public {
-    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-    tokenAmounts[0].token = address(i_sourceToken);
-    tokenAmounts[0].amount = amount;
-
+  /// The expectation is that s_msg_sequence will always match the sequence in emitted CCIP messages.
+  function send(uint256) public {
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(address(100)),
       data: abi.encodePacked(s_msg_sequence),
-      tokenAmounts: tokenAmounts,
+      tokenAmounts: new Client.EVMTokenAmount[](0),
       extraArgs: "",
       feeToken: address(i_feeToken)
     });

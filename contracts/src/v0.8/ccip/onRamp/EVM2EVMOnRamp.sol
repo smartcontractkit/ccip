@@ -12,6 +12,7 @@ import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
 import {Client} from "../libraries/Client.sol";
 import {Internal} from "../libraries/Internal.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
+import {CallWithExactGas} from "../libraries/CallWithExactGas.sol";
 import {USDPriceWith18Decimals} from "../libraries/USDPriceWith18Decimals.sol";
 import {EnumerableMapAddresses} from "../../shared/enumerable/EnumerableMapAddresses.sol";
 
@@ -55,6 +56,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error InvalidNopAddress(address nop);
   error NotAFeeToken(address token);
   error CannotSendZeroTokens();
+  error TokenPoolError(bytes reason);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -161,6 +163,16 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @dev the maximum number of nops that can be configured at the same time.
   /// Used to bound gas for loops over nops.
   uint256 private constant MAX_NUMBER_OF_NOPS = 64;
+  /// @dev The minimum amount of gas to perform the call with exact gas.
+  /// We include this in the offramp so that we can redeploy to adjust it
+  /// should a hardfork change the gas costs of relevant opcodes in callWithExactGas.
+  uint16 private constant GAS_FOR_CALL_EXACT_CHECK = 5_000;
+  /// @dev The maximum amount of gas to perform the releaseOrMint call with.
+  uint256 private constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 800_000;
+  // We limit return data to a selector plus 4 words. This is to avoid
+  // malicious contracts from returning large amounts of data and causing
+  // repeated out-of-gas scenarios.
+  uint16 public constant MAX_RET_BYTES = 4 + 4 * 32;
 
   // DYNAMIC CONFIG
   /// @dev The config for the onRamp
@@ -323,13 +335,25 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      newMessage.sourceTokenData[i] = getPoolBySourceToken(IERC20(tokenAndAmount.token)).lockOrBurn(
-        originalSender,
-        message.receiver,
-        tokenAndAmount.amount,
-        i_destChainSelector,
-        bytes("") // any future extraArgs component would be added here
+      IPool pool = getPoolBySourceToken(IERC20(tokenAndAmount.token));
+      // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
+      // _callWithExactGas also protects against return data bombs by capping the return data size
+      // at MAX_RET_BYTES.
+      (bool success, bytes memory returnData) = CallWithExactGas._callWithExactGas(
+        abi.encodeWithSelector(
+          pool.lockOrBurn.selector,
+          originalSender,
+          message.receiver,
+          tokenAndAmount.amount,
+          i_destChainSelector,
+          bytes("") // any future extraArgs component would be added here
+        ),
+        address(pool),
+        MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
+        MAX_RET_BYTES,
+        GAS_FOR_CALL_EXACT_CHECK
       );
+      if (!success) revert TokenPoolError(returnData);
     }
 
     // Hash only after the sourceTokenData has been set

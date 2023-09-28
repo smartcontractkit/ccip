@@ -2,6 +2,10 @@
 pragma solidity ^0.8.0;
 
 library CallWithExactGas {
+  error NoContract();
+  error NoGasForCallExactCheck();
+  error NotEnoughGasForCall();
+
   function _callWithExactGas(
     bytes memory payload,
     address target,
@@ -12,13 +16,18 @@ library CallWithExactGas {
     // allocate retData memory ahead of time
     retData = new bytes(maxReturnBytes);
 
+    bytes4 noContract = NoContract.selector;
+    bytes4 noGasForCallExactCheck = NoGasForCallExactCheck.selector;
+    bytes4 notEnoughGasForCall = NotEnoughGasForCall.selector;
+
     // solhint-disable-next-line no-inline-assembly
     assembly {
       // solidity calls check that a contract actually exists at the destination, so we do the same
       // Note we do this check prior to measuring gas so gasForCallExactCheck (our "cushion")
       // doesn't need to account for it.
       if iszero(extcodesize(target)) {
-        revert(0, 0)
+        mstore(0, noContract)
+        revert(0, 0x4)
       }
 
       let g := gas()
@@ -29,13 +38,15 @@ library CallWithExactGas {
       // gas. gasForCallExactCheck ensures we have at least enough gas to be able
       // to revert if gasAmount >  63//64*gas available.
       if lt(g, gasForCallExactCheck) {
-        revert(0, 0)
+        mstore(0, noGasForCallExactCheck)
+        revert(0, 0x4)
       }
       g := sub(g, gasForCallExactCheck)
       // if g - g//64 <= gasAmount, revert
       // (we subtract g//64 because of EIP-150)
       if iszero(gt(sub(g, div(g, 64)), gasLimit)) {
-        revert(0, 0)
+        mstore(0, notEnoughGasForCall)
+        revert(0, 0x4)
       }
       // call and return whether we succeeded. ignore return data
       // call(gas,addr,value,argsOffset,argsLength,retOffset,retLength)
