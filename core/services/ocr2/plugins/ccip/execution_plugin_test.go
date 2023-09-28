@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -75,7 +74,6 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 
 	mockOnRamp, _ := testhelpers.NewFakeOnRamp(t)
 	mockOnRamp.SetDynamicCfg(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{PriceRegistry: srcPriceRegAddr})
-	mockOnRampVersion, _ := semver.NewVersion(testhelpers.FakeOnRampVersion)
 
 	srcLP := mocklp.NewLogPoller(t)
 	srcFilters := []string{
@@ -106,7 +104,6 @@ func TestGetExecutionPluginFilterNames(t *testing.T) {
 		mockOffRamp,
 		commitStoreAddr,
 		mockOnRamp,
-		*mockOnRampVersion,
 		nil,
 	)
 	assert.NoError(t, err)

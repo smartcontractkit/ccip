@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -305,12 +306,21 @@ func unregisterExecutionPluginLpFilters(
 		return err
 	}
 
-	_, version, err := ccipconfig.TypeAndVersion(sourceOnRamp.Address(), sourceChainClient)
+	// TODO stopgap solution before compatibility phase-2
+	tvStr, err := sourceOnRamp.TypeAndVersion(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return err
+	}
+	_, versionStr, err := ccipconfig.ParseTypeAndVersion(tvStr)
+	if err != nil {
+		return err
+	}
+	version, err := semver.NewVersion(versionStr)
 	if err != nil {
 		return err
 	}
 
-	onRampDynCfg, err := contractutil.LoadOnRampDynamicConfig(sourceOnRamp, version, sourceChainClient)
+	onRampDynCfg, err := contractutil.LoadOnRampDynamicConfig(sourceOnRamp, *version, sourceChainClient)
 	if err != nil {
 		return err
 	}
