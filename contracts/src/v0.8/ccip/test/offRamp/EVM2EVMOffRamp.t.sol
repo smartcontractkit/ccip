@@ -1102,12 +1102,12 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     IERC20 dstToken0 = IERC20(s_destTokens[0]);
     uint256 startingBalance = dstToken0.balanceOf(message.receiver);
 
-    (Internal.MessageExecutionState newState, bytes memory error) = s_offRamp.trialExecute(
+    (Internal.MessageExecutionState newState, bytes memory err) = s_offRamp.trialExecute(
       message,
       new bytes[](message.tokenAmounts.length)
     );
     assertEq(uint256(Internal.MessageExecutionState.SUCCESS), uint256(newState));
-    assertEq("", error);
+    assertEq("", err);
 
     // Check that the tokens were transferred
     assertEq(startingBalance + amounts[0], dstToken0.balanceOf(message.receiver));
@@ -1126,12 +1126,12 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
     MaybeRevertingBurnMintTokenPool(s_destPools[1]).setShouldRevert(errorMessage);
 
-    (Internal.MessageExecutionState newState, bytes memory error) = s_offRamp.trialExecute(
+    (Internal.MessageExecutionState newState, bytes memory err) = s_offRamp.trialExecute(
       message,
       new bytes[](message.tokenAmounts.length)
     );
     assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(newState));
-    assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, errorMessage), error);
+    assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, errorMessage), err);
 
     // Expect the balance to remain the same
     assertEq(startingBalance, dstToken0.balanceOf(OWNER));
@@ -1147,12 +1147,12 @@ contract EVM2EVMOffRamp__trialExecute is EVM2EVMOffRampSetup {
     Internal.EVM2EVMMessage memory message = _generateAny2EVMMessageWithTokens(1, amounts);
     MaybeRevertingBurnMintTokenPool(s_destPools[1]).setShouldRevert(errorMessage);
 
-    (Internal.MessageExecutionState newState, bytes memory error) = s_offRamp.trialExecute(
+    (Internal.MessageExecutionState newState, bytes memory err) = s_offRamp.trialExecute(
       message,
       new bytes[](message.tokenAmounts.length)
     );
     assertEq(uint256(Internal.MessageExecutionState.FAILURE), uint256(newState));
-    assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, errorMessage), error);
+    assertEq(abi.encodeWithSelector(EVM2EVMOffRamp.TokenHandlingError.selector, errorMessage), err);
   }
 }
 
