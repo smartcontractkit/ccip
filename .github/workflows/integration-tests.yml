@@ -39,7 +39,7 @@ jobs:
               - '**/*go.sum'
               - '**/*go.mod'
               - '.github/workflows/integration-tests.yml'
-              - '**/*contracts.json"
+              - '**/*contracts.json'
       - name: Collect Metrics
         if: always()
         id: collect-gha-metrics
