@@ -236,7 +236,7 @@
       }
     },
     "Avalanche Fuji": {
-      "fee_token": "0x5425890298aed601595a70AB815c96711a31Bc65",
+      "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
       "bridge_tokens": [
         "0x5425890298aed601595a70AB815c96711a31Bc65"
       ],
@@ -353,7 +353,7 @@
       }
     },
     "Optimism Goerli": {
-      "fee_token": "0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6",
+      "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
       "bridge_tokens": [
         "0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6"
       ],
