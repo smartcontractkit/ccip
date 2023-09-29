@@ -254,8 +254,8 @@
           "deployed_at": 23753755
         },
         "420": {
-          "on_ramp": "0x097076fbd8573418c77d2600606ad063c0e3cc7c",
-          "deployed_at": 23755228
+          "on_ramp": "0x75a4a11d0839ab3983e0205e2eadfe5197f0c3ee",
+          "deployed_at": 26089413
         },
         "80001": {
           "on_ramp": "0x762aabc808270fadfdd9e4186739920d68106673",
@@ -269,9 +269,9 @@
           "receiver_dapp": "0x19910CB895d3F611c4143B80bC194C52ebFaA60A"
         },
         "420": {
-          "off_ramp": "0x0f287140d86335b37ae2ad0707992ecd4202d5b7",
-          "commit_store": "0x5a7fa03e52628a0a6f0ab637f10ba45b68f9ad33",
-          "receiver_dapp": "0x1C23955C7770E4fF85Cd806520A7Ce6A69745E96"
+          "off_ramp": "0x8cd9e1a0192862746037d751afbf07fb103c9ae6",
+          "commit_store": "0xc016efee15f75ef18c7db523cea63b3f01f8ca37",
+          "receiver_dapp": "0xda9e8e71bB750a996Af33ebB8aBb18cd9EB9DC75"
         },
         "80001": {
           "off_ramp": "0x31cf2040d53f178d168997c658d1a7fc5fa7d215",
