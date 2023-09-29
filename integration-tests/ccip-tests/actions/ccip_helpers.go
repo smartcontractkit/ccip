@@ -1219,12 +1219,16 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 				if err != nil {
 					lggr.Warn().Msg("Failed to get receipt for ExecStateChanged event")
 				}
+				var gas uint64
+				if receipt != nil {
+					gas = receipt.GasUsed
+				}
 				if abihelpers.MessageExecutionState(e.State) == abihelpers.ExecutionStateSuccess {
 					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow),
 						testreporters.Success,
 						testreporters.TransactionStats{
 							TxHash:  vLogs.TxHash.Hex(),
-							GasUsed: receipt.GasUsed,
+							GasUsed: gas,
 						})
 					return nil
 				} else {

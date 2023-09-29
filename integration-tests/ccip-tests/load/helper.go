@@ -51,12 +51,12 @@ func (l *loadArgs) Setup(sameCommitAndExec bool) {
 	lggr := l.lggr
 	var setUpArgs *testsetups.CCIPTestSetUpOutputs
 	if !l.TestCfg.ExistingDeployment {
-		replicas := int64(6)
+		replicas := 17
 		if !sameCommitAndExec {
 			replicas = 12
 		}
 		setUpArgs = testsetups.CCIPDefaultTestSetUp(l.TestCfg.Test, lggr, "load-ccip",
-			replicas, transferAmounts, nil, 5, sameCommitAndExec, true, l.TestCfg)
+			replicas, transferAmounts, nil, 16, sameCommitAndExec, true, l.TestCfg)
 	} else {
 		setUpArgs = testsetups.CCIPExistingDeploymentTestSetUp(l.TestCfg.Test, lggr, transferAmounts, true, l.TestCfg)
 	}
@@ -205,7 +205,7 @@ func (l *loadArgs) Start() {
 					Gun:                   ccipLoad,
 					Logger:                ccipLoad.Lane.Logger,
 					SharedData:            l.TestCfg.MsgType,
-					//LokiConfig:            wasp.NewEnvLokiConfig(),
+					LokiConfig:            wasp.NewEnvLokiConfig(),
 					Labels: map[string]string{
 						"test_group":   "load",
 						"cluster":      "sdlc",
