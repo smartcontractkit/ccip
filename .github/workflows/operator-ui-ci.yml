@@ -1,3 +1,4 @@
+---
 #name: Operator UI CI
 #on:
 #  pull_request:
