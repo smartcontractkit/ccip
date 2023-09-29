@@ -40,9 +40,7 @@ func (g ExecGasPriceEstimator) DenoteInUSD(p GasPrice, wrappedNativePrice *big.I
 func (g ExecGasPriceEstimator) Median(gasPrices []GasPrice) (GasPrice, error) {
 	var prices []*big.Int
 	for _, p := range gasPrices {
-		if p != nil {
-			prices = append(prices, p)
-		}
+		prices = append(prices, p)
 	}
 
 	return ccipcalc.BigIntMedian(prices), nil
@@ -53,9 +51,9 @@ func (g ExecGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice, opts GasPriceD
 }
 
 func (g ExecGasPriceEstimator) EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, _ MsgCostOptions) (*big.Int, error) {
-	execGasAmount := new(big.Int).Add(big.NewInt(FeeBoostingOverheadGas), msg.GasLimit)
-	execGasAmount = new(big.Int).Add(execGasAmount, new(big.Int).Mul(big.NewInt(int64(len(msg.Data))), big.NewInt(ExecGasPerPayloadByte)))
-	execGasAmount = new(big.Int).Add(execGasAmount, new(big.Int).Mul(big.NewInt(int64(len(msg.TokenAmounts))), big.NewInt(ExecGasPerToken)))
+	execGasAmount := new(big.Int).Add(big.NewInt(feeBoostingOverheadGas), msg.GasLimit)
+	execGasAmount = new(big.Int).Add(execGasAmount, new(big.Int).Mul(big.NewInt(int64(len(msg.Data))), big.NewInt(execGasPerPayloadByte)))
+	execGasAmount = new(big.Int).Add(execGasAmount, new(big.Int).Mul(big.NewInt(int64(len(msg.TokenAmounts))), big.NewInt(execGasPerToken)))
 
 	execGasCost := new(big.Int).Mul(execGasAmount, p)
 

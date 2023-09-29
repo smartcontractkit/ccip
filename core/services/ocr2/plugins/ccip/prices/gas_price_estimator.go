@@ -12,19 +12,19 @@ import (
 )
 
 const (
-	FeeBoostingOverheadGas = 200_000
-	// ExecGasPerToken is lower-bound estimation of ERC20 releaseOrMint gas cost (Mint with static minter).
+	feeBoostingOverheadGas = 200_000
+	// execGasPerToken is lower-bound estimation of ERC20 releaseOrMint gas cost (Mint with static minter).
 	// Use this in per-token gas cost calc as heuristic to simplify estimation logic.
-	ExecGasPerToken = 10_000
-	// ExecGasPerPayloadByte is gas charged for passing each byte of `data` payload to CCIP receiver, ignores 4 gas per 0-byte rule.
+	execGasPerToken = 10_000
+	// execGasPerPayloadByte is gas charged for passing each byte of `data` payload to CCIP receiver, ignores 4 gas per 0-byte rule.
 	// This can be a constant as it is part of EVM spec. Changes should be rare.
-	ExecGasPerPayloadByte = 16
-	// EvmMessageFixedBytes is byte size of fixed-size fields in EVM2EVMMessage
+	execGasPerPayloadByte = 16
+	// evmMessageFixedBytes is byte size of fixed-size fields in EVM2EVMMessage
 	// Updating EVM2EVMMessage involves an offchain upgrade, safe to keep this as constant in code.
-	EvmMessageFixedBytes     = 448
-	EvmMessageBytesPerToken  = 128          // Byte size of each token transfer, consisting of 1 EVMTokenAmount and 1 bytes, excl length of bytes
-	DAMultiplierBase         = int64(10000) // DA multiplier is in multiples of 0.0001, i.e. 1/DAMultiplierBase
-	DAGasPriceEncodingLength = 112          // Each gas price takes up at most GasPriceEncodingLength number of bits
+	evmMessageFixedBytes     = 448
+	evmMessageBytesPerToken  = 128          // Byte size of each token transfer, consisting of 1 EVMTokenAmount and 1 bytes, excl length of bytes
+	daMultiplierBase         = int64(10000) // DA multiplier is in multiples of 0.0001, i.e. 1/daMultiplierBase
+	daGasPriceEncodingLength = 112          // Each gas price takes up at most GasPriceEncodingLength number of bits
 )
 
 type GasPriceDeviationOptions struct {
@@ -42,17 +42,17 @@ type MsgCostOptions struct {
 // (multi-component gas prices are encoded into the int)
 type GasPrice *big.Int
 
-// GasPriceEstimator is abstraction over multi-component gas prices
+// GasPriceEstimator is abstraction over multi-component gas prices.
 //
 //go:generate mockery --quiet --name GasPriceEstimator --output . --filename gas_price_estimator_mock.go --inpackage --case=underscore
 type GasPriceEstimator interface {
 	// GetGasPrice fetches the current gas price.
 	GetGasPrice(ctx context.Context) (GasPrice, error)
-	// DenoteInUSD converts the gas price to be in units of USD.
+	// DenoteInUSD converts the gas price to be in units of USD. Input prices should not be nil.
 	DenoteInUSD(p GasPrice, wrappedNativePrice *big.Int) (GasPrice, error)
-	// Median finds the median gas price in slice. If gas price has multiple components, median of each individual component should be taken.
+	// Median finds the median gas price in slice. If gas price has multiple components, median of each individual component should be taken. Input prices should not contain nil.
 	Median(gasPrices []GasPrice) (GasPrice, error)
-	// Deviates checks if p1 diffs from p2 by deviation options.
+	// Deviates checks if p1 gas price diffs from p2 by deviation options. Input prices should not be nil.
 	Deviates(p1 GasPrice, p2 GasPrice, opts GasPriceDeviationOptions) (bool, error)
 	// EstimateMsgCostUSD estimates the costs for msg execution, and converts to USD value scaled by 1e18 (e.g. 5$ = 5e18).
 	EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, opts MsgCostOptions) (*big.Int, error)
@@ -78,7 +78,7 @@ func NewGasPriceEstimator(
 				maxGasPrice: maxExecGasPrice,
 			},
 			l1Oracle:            estimator.L1Oracle(),
-			priceEncodingLength: DAGasPriceEncodingLength,
+			priceEncodingLength: daGasPriceEncodingLength,
 		}, nil
 	default:
 		return nil, errors.Errorf("Invalid commitStore version: %s", commitStoreVersion)

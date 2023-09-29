@@ -15,7 +15,7 @@ import (
 )
 
 func encodeGasPrice(daPrice, execPrice *big.Int) *big.Int {
-	return new(big.Int).Add(new(big.Int).Lsh(daPrice, DAGasPriceEncodingLength), execPrice)
+	return new(big.Int).Add(new(big.Int).Lsh(daPrice, daGasPriceEncodingLength), execPrice)
 }
 
 func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
@@ -58,7 +58,7 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 		},
 		{
 			name:         "price out of bounds",
-			daGasPrice:   new(big.Int).Lsh(big.NewInt(1), DAGasPriceEncodingLength),
+			daGasPrice:   new(big.Int).Lsh(big.NewInt(1), daGasPriceEncodingLength),
 			execGasPrice: big.NewInt(1),
 			expPrice:     nil,
 			expErr:       true,
@@ -76,7 +76,7 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 			g := DAGasPriceEstimator{
 				execEstimator:       execEstimator,
 				l1Oracle:            l1Oracle,
-				priceEncodingLength: DAGasPriceEncodingLength,
+				priceEncodingLength: daGasPriceEncodingLength,
 			}
 
 			gasPrice, err := g.GetGasPrice(ctx)
@@ -98,7 +98,7 @@ func TestDAPriceEstimator_GetGasPrice(t *testing.T) {
 		g := DAGasPriceEstimator{
 			execEstimator:       execEstimator,
 			l1Oracle:            nil,
-			priceEncodingLength: DAGasPriceEncodingLength,
+			priceEncodingLength: daGasPriceEncodingLength,
 		}
 
 		gasPrice, err := g.GetGasPrice(ctx)
@@ -141,7 +141,7 @@ func TestDAPriceEstimator_DenoteInUSD(t *testing.T) {
 			g := DAGasPriceEstimator{
 				execEstimator:       nil,
 				l1Oracle:            nil,
-				priceEncodingLength: DAGasPriceEncodingLength,
+				priceEncodingLength: daGasPriceEncodingLength,
 			}
 
 			gasPrice, err := g.DenoteInUSD(tc.gasPrice, tc.nativePrice)
@@ -228,7 +228,7 @@ func TestDAPriceEstimator_Median(t *testing.T) {
 			g := DAGasPriceEstimator{
 				execEstimator:       nil,
 				l1Oracle:            nil,
-				priceEncodingLength: DAGasPriceEncodingLength,
+				priceEncodingLength: daGasPriceEncodingLength,
 			}
 
 			gasPrice, err := g.Median(tc.gasPrices)
@@ -302,7 +302,7 @@ func TestDAPriceEstimator_Deviates(t *testing.T) {
 			g := DAGasPriceEstimator{
 				execEstimator:       nil,
 				l1Oracle:            nil,
-				priceEncodingLength: DAGasPriceEncodingLength,
+				priceEncodingLength: daGasPriceEncodingLength,
 			}
 
 			deviated, err := g.Deviates(tc.gasPrice1, tc.gasPrice2, tc.opts)
@@ -429,7 +429,7 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 			g := DAGasPriceEstimator{
 				execEstimator:       execEstimator,
 				l1Oracle:            nil,
-				priceEncodingLength: DAGasPriceEncodingLength,
+				priceEncodingLength: daGasPriceEncodingLength,
 			}
 
 			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg, tc.opts)
@@ -443,7 +443,7 @@ func TestDAPriceEstimator_String(t *testing.T) {
 	g := DAGasPriceEstimator{
 		execEstimator:       nil,
 		l1Oracle:            nil,
-		priceEncodingLength: DAGasPriceEncodingLength,
+		priceEncodingLength: daGasPriceEncodingLength,
 	}
 
 	str := g.String(encodeGasPrice(big.NewInt(1), big.NewInt(2)))

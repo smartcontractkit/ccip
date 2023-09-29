@@ -26,20 +26,22 @@ func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (GasPrice, error) 
 		return nil, fmt.Errorf("native gas price exceeded max range %+v", gasPrice)
 	}
 
-	if g.l1Oracle != nil {
-		daGasPriceWei, err := g.l1Oracle.GasPrice(ctx)
-		if err != nil {
-			return nil, err
+	if g.l1Oracle == nil {
+		return gasPrice, nil
+	}
+
+	daGasPriceWei, err := g.l1Oracle.GasPrice(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if daGasPrice := daGasPriceWei.ToInt(); daGasPrice.Cmp(big.NewInt(0)) > 0 {
+		if daGasPrice.BitLen() > int(g.priceEncodingLength) {
+			return nil, fmt.Errorf("data availability gas price exceeded max range %+v", daGasPrice)
 		}
 
-		if daGasPrice := daGasPriceWei.ToInt(); daGasPrice.Cmp(big.NewInt(0)) > 0 {
-			if daGasPrice.BitLen() > int(g.priceEncodingLength) {
-				return nil, fmt.Errorf("data availability gas price exceeded max range %+v", daGasPrice)
-			}
-
-			daGasPrice = new(big.Int).Lsh(daGasPrice, g.priceEncodingLength)
-			gasPrice = new(big.Int).Add(gasPrice, daGasPrice)
-		}
+		daGasPrice = new(big.Int).Lsh(daGasPrice, g.priceEncodingLength)
+		gasPrice = new(big.Int).Add(gasPrice, daGasPrice)
 	}
 
 	return gasPrice, nil
@@ -146,11 +148,11 @@ func (g DAGasPriceEstimator) estimateDACostUSD(daGasPrice GasPrice, wrappedNativ
 		sourceTokenDataLen += len(tokenData)
 	}
 
-	dataLen := EvmMessageFixedBytes + len(msg.Data) + len(msg.TokenAmounts)*EvmMessageBytesPerToken + sourceTokenDataLen
+	dataLen := evmMessageFixedBytes + len(msg.Data) + len(msg.TokenAmounts)*evmMessageBytesPerToken + sourceTokenDataLen
 	dataGas := big.NewInt(int64(dataLen)*opts.GasPerDAByte + opts.DAOverheadGas)
 
 	dataGasEstimate := new(big.Int).Mul(dataGas, daGasPrice)
-	dataGasEstimate = new(big.Int).Div(new(big.Int).Mul(dataGasEstimate, big.NewInt(opts.DAMultiplier)), big.NewInt(DAMultiplierBase))
+	dataGasEstimate = new(big.Int).Div(new(big.Int).Mul(dataGasEstimate, big.NewInt(opts.DAMultiplier)), big.NewInt(daMultiplierBase))
 
 	return ccipcalc.CalculateUsdPerUnitGas(dataGasEstimate, wrappedNativePrice)
 }

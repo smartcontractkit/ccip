@@ -471,8 +471,6 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 	tokenDecimals := make(map[common.Address]uint8)
 	tokenDecimals[token1] = 18
 	tokenDecimals[token2] = 18
-	tokenDecimalsCache := cache.NewMockAutoSync[map[common.Address]uint8](t)
-	tokenDecimalsCache.On("Get", mock.Anything).Return(tokenDecimals, nil)
 
 	ob1 := CommitObservation{
 		Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0},
@@ -488,7 +486,7 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 	_ = json.Unmarshal(ob1Bytes, &ob2)
 	_ = json.Unmarshal(ob1Bytes, &ob3)
 
-	faultyOb1 := CommitObservation{
+	obWithNilGasPrice := CommitObservation{
 		Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0},
 		TokenPricesUSD: map[common.Address]*big.Int{
 			token1: token1Price,
@@ -496,7 +494,7 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 		},
 		SourceGasPriceUSD: nil,
 	}
-	faultyOb2 := CommitObservation{
+	obWithNilTokenPrice := CommitObservation{
 		Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0},
 		TokenPricesUSD: map[common.Address]*big.Int{
 			token1: token1Price,
@@ -504,12 +502,12 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 		},
 		SourceGasPriceUSD: gasPrice,
 	}
-	faultyOb3 := CommitObservation{
+	obMissingTokenPrices := CommitObservation{
 		Interval:          commit_store.CommitStoreInterval{Min: 0, Max: 0},
 		TokenPricesUSD:    map[common.Address]*big.Int{},
 		SourceGasPriceUSD: gasPrice,
 	}
-	faultyOb4 := CommitObservation{
+	obWithUnsupportedToken := CommitObservation{
 		Interval: commit_store.CommitStoreInterval{Min: 0, Max: 0},
 		TokenPricesUSD: map[common.Address]*big.Int{
 			token1:           token1Price,
@@ -518,7 +516,7 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 		},
 		SourceGasPriceUSD: gasPrice,
 	}
-	nilOb := CommitObservation{
+	obEmpty := CommitObservation{
 		Interval:          commit_store.CommitStoreInterval{Min: 0, Max: 0},
 		TokenPricesUSD:    nil,
 		SourceGasPriceUSD: nil,
@@ -546,15 +544,29 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 			expError:           false,
 		},
 		{
-			name:               "tolerate 1 faulty with f=2",
-			commitObservations: []CommitObservation{ob1, ob2, ob3, faultyOb1},
+			name:               "tolerate 1 nil gas price with f=2",
+			commitObservations: []CommitObservation{ob1, ob2, ob3, obWithNilGasPrice},
 			f:                  2,
 			expValidObs:        []CommitObservation{ob1, ob2, ob3},
 			expError:           false,
 		},
 		{
-			name:               "tolerate 1 faulty with f=1",
-			commitObservations: []CommitObservation{ob1, ob2, faultyOb2},
+			name:               "tolerate 1 nil token price with f=1",
+			commitObservations: []CommitObservation{ob1, ob2, obWithNilTokenPrice},
+			f:                  1,
+			expValidObs:        []CommitObservation{ob1, ob2},
+			expError:           false,
+		},
+		{
+			name:               "tolerate 1 missing token prices with f=1",
+			commitObservations: []CommitObservation{ob1, ob2, obMissingTokenPrices},
+			f:                  1,
+			expValidObs:        []CommitObservation{ob1, ob2},
+			expError:           false,
+		},
+		{
+			name:               "tolerate 1 unsupported token with f=1",
+			commitObservations: []CommitObservation{ob1, ob2, obWithUnsupportedToken},
 			f:                  1,
 			expValidObs:        []CommitObservation{ob1, ob2},
 			expError:           false,
@@ -568,21 +580,21 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 		},
 		{
 			name:               "too many faulty observations with f=2",
-			commitObservations: []CommitObservation{ob1, ob2, faultyOb3, faultyOb4},
+			commitObservations: []CommitObservation{ob1, ob2, obMissingTokenPrices, obWithUnsupportedToken},
 			f:                  2,
 			expValidObs:        nil,
 			expError:           true,
 		},
 		{
 			name:               "too many faulty observations with f=1",
-			commitObservations: []CommitObservation{ob1, nilOb},
+			commitObservations: []CommitObservation{ob1, obEmpty},
 			f:                  1,
 			expValidObs:        nil,
 			expError:           true,
 		},
 		{
 			name:               "all faulty observations",
-			commitObservations: []CommitObservation{faultyOb1, faultyOb2, faultyOb3, faultyOb4, nilOb},
+			commitObservations: []CommitObservation{obWithNilGasPrice, obWithNilTokenPrice, obMissingTokenPrices, obWithUnsupportedToken, obEmpty},
 			f:                  1,
 			expValidObs:        nil,
 			expError:           true,
@@ -591,12 +603,7 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := &CommitReportingPlugin{
-				lggr:               logger.TestLogger(t),
-				tokenDecimalsCache: tokenDecimalsCache,
-				F:                  tc.f,
-			}
-			obs, err := r.validateObservations(ctx, r.lggr, tc.commitObservations)
+			obs, err := validateObservations(ctx, logger.TestLogger(t), tokenDecimals, tc.f, tc.commitObservations)
 
 			if tc.expError {
 				assert.Error(t, err)

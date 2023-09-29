@@ -418,7 +418,7 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 	return latestUpdates, nil
 }
 
-// getLatestGasPriceUpdate returns the latest gas price updates based on logs within the heartbeat.
+// getLatestGasPriceUpdate returns the latest gas price update based on logs within the heartbeat.
 // If an update is found, it is not expected to contain a nil value. If no updates found, empty update with nil value is returned.
 func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasUpdate update, error error) {
 	if checkInflight {
@@ -465,8 +465,14 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	lggr := r.lggr.Named("CommitReport")
 	parsableObservations := getParsableObservations[CommitObservation](lggr, observations)
 
+	// tokens in the tokenDecimalsCache represent supported tokens on the dest chain
+	supportedTokensMap, err := r.tokenDecimalsCache.Get(ctx)
+	if err != nil {
+		return false, nil, err
+	}
+
 	// Filters out parsable but faulty observations
-	validObservations, err := r.validateObservations(ctx, lggr, parsableObservations)
+	validObservations, err := validateObservations(ctx, lggr, supportedTokensMap, r.F, parsableObservations)
 	if err != nil {
 		return false, nil, err
 	}
@@ -524,12 +530,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 // validateObservations validates the given observations.
 // An observation is rejected if any of its gas price or token price is nil. With current CommitObservation implementation, prices
 // are checked to ensure no nil values before adding to Observation, hence an observation that contains nil values comes from a faulty node.
-func (r *CommitReportingPlugin) validateObservations(ctx context.Context, lggr logger.Logger, observations []CommitObservation) (validObs []CommitObservation, err error) {
-	tokenDecimals, err := r.tokenDecimalsCache.Get(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+func validateObservations(ctx context.Context, lggr logger.Logger, supportedTokensMap map[common.Address]uint8, f int, observations []CommitObservation) (validObs []CommitObservation, err error) {
 	for _, obs := range observations {
 		// If gas price is reported as nil, the observation is faulty, skip the observation.
 		if obs.SourceGasPriceUSD == nil {
@@ -537,18 +538,19 @@ func (r *CommitReportingPlugin) validateObservations(ctx context.Context, lggr l
 			continue
 		}
 		// If observed number of token prices does not match number of supported tokens on dest chain, skip the observation.
-		if len(tokenDecimals) != len(obs.TokenPricesUSD) {
-			lggr.Warnw("Skipping observation due to token count mismatch", "expecting", len(tokenDecimals), "got", len(obs.TokenPricesUSD))
+		if len(supportedTokensMap) != len(obs.TokenPricesUSD) {
+			lggr.Warnw("Skipping observation due to token count mismatch", "expecting", len(supportedTokensMap), "got", len(obs.TokenPricesUSD))
 			continue
 		}
-		// If any of the observed token prices is reported as nil, or not supported on dest chain, skip the observation.
+		// If any of the observed token prices is reported as nil, or not supported on dest chain, the observation is faulty, skip the observation.
+		// Printing all faulty prices instead of short-circuiting to make log more informative.
 		skipObservation := false
 		for token, price := range obs.TokenPricesUSD {
 			if price == nil {
 				lggr.Warnw("Nil value in observed TokenPricesUSD", "token", token.Hex())
 				skipObservation = true
 			}
-			if _, exists := tokenDecimals[token]; !exists {
+			if _, exists := supportedTokensMap[token]; !exists {
 				lggr.Warnw("Unsupported token in observed TokenPricesUSD", "token", token.Hex())
 				skipObservation = true
 			}
@@ -562,8 +564,8 @@ func (r *CommitReportingPlugin) validateObservations(ctx context.Context, lggr l
 	}
 
 	// We require at least f+1 valid observations. This corresponds to the scenario where f of the 2f+1 are faulty.
-	if len(validObs) <= r.F {
-		return nil, errors.Errorf("Not enough valid observations to form consensus: #obs=%d, f=%d", len(validObs), r.F)
+	if len(validObs) <= f {
+		return nil, errors.Errorf("Not enough valid observations to form consensus: #obs=%d, f=%d", len(validObs), f)
 	}
 
 	return validObs, nil
