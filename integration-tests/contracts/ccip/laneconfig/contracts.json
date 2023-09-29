@@ -237,6 +237,7 @@
     },
     "Avalanche Fuji": {
       "fee_token": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
+      "is_native_fee_token": true,
       "bridge_tokens": [
         "0x5425890298aed601595a70AB815c96711a31Bc65"
       ],
