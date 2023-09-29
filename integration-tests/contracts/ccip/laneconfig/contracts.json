@@ -236,12 +236,12 @@
       }
     },
     "Avalanche Fuji": {
-      "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
+      "fee_token": "0x5425890298aed601595a70AB815c96711a31Bc65",
       "bridge_tokens": [
-        "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"
+        "0x5425890298aed601595a70AB815c96711a31Bc65"
       ],
       "bridge_tokens_pools": [
-        "0x658af0d8ecbb13c5fd5b545ac7316e50cc07cf6e"
+        "0x35e08285cfed1ef159236728f843286c55fc0861"
       ],
       "arm": "0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f",
       "arm_proxy": "0xac8cfc3762a979628334a0e4c1026244498e821b",
@@ -353,12 +353,12 @@
       }
     },
     "Optimism Goerli": {
-      "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
+      "fee_token": "0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6",
       "bridge_tokens": [
-        "0xdc2CC710e42857672E7907CF474a69B63B93089f"
+        "0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6"
       ],
       "bridge_tokens_pools": [
-        "0xdecfaf632175915bdf38c00d9d9746e8a90a56c4"
+        "0x6cb3ed9b441eb674b58495c8b3324b59faff5243"
       ],
       "arm": "0xeaf6968fab9c54ac31c3679f120705b5019d3546",
       "arm_proxy": "0x4eb4dbdb3c3b56e5e209abf9c424a3834f2087d0",
