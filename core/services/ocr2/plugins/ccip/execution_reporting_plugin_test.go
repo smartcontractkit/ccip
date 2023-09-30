@@ -623,7 +623,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			offRamp.SetSenderNonces(tc.offRampNoncesBySender)
 
-			gasPriceEstimator := prices.NewMockGasPriceEstimator(t)
+			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
 			if tc.expectedSeqNrs != nil {
 				gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), nil)
 			}

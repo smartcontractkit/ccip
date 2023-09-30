@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
@@ -137,6 +136,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 			onRampReader:             onRampReader,
 			destReader:               ccipdata.NewLogPollerReader(destChain.LogPoller(), execLggr, destChain.Client()),
 			onRamp:                   onRamp,
+			onRampVersion:            onRampVersion,
 			offRamp:                  offRamp,
 			commitStore:              commitStore,
 			commitStoreVersion:       commitStoreVersion,
@@ -147,11 +147,6 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 			destGasEstimator:         destChain.GasEstimator(),
 			destChainEVMID:           destChain.ID(),
 			tokenDataProviders:       tokenDataProviders,
-			msgCostOpt: prices.MsgCostOptions{
-				DAOverheadGas: int64(dynamicOnRampConfig.DestDataAvailabilityOverheadGas),
-				GasPerDAByte:  int64(dynamicOnRampConfig.DestGasPerDataAvailabilityByte),
-				DAMultiplier:  int64(dynamicOnRampConfig.DestDataAvailabilityMultiplier),
-			},
 		}, &BackfillArgs{
 			sourceLP:         sourceChain.LogPoller(),
 			destLP:           destChain.LogPoller(),

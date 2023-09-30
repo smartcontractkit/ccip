@@ -121,7 +121,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				priceGet.On("TokenPricesUSD", mock.Anything, addrs).Return(tc.tokenPrices, nil)
 			}
 
-			gasPriceEstimator := prices.NewMockGasPriceEstimator(t)
+			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 			if tc.fee != nil {
 				var p prices.GasPrice = tc.fee
 				var pUSD prices.GasPrice = ccipcalc.CalculateUsdPerUnitGas(p, tc.tokenPrices[sourceNativeTokenAddr])
@@ -272,7 +272,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expSeqNumRange.Min, tc.expSeqNumRange.Max, 0).Return(tc.sendRequests, nil)
 			}
 
-			gasPriceEstimator := prices.NewMockGasPriceEstimator(t)
+			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 			gasPriceEstimator.On("Median", mock.Anything).Return(gasPrice, nil)
 			if tc.gasPriceUpdates != nil {
 				gasPriceEstimator.On("Deviates", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
@@ -630,8 +630,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 		latestGasPrice           update
 		latestTokenPrices        map[common.Address]update
 		gasPriceHeartBeat        models.Duration
-		daGasPriceDeviationPPB   uint32
-		execGasPriceDeviationPPB uint32
+		daGasPriceDeviationPPB   int64
+		execGasPriceDeviationPPB int64
 		tokenPriceHeartBeat      models.Duration
 		tokenPriceDeviationPPB   uint32
 		expGas                   *big.Int
@@ -869,12 +869,18 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 
 	evmEstimator := mocks.NewEvmFeeEstimator(t)
 	evmEstimator.On("L1Oracle").Return(nil)
-
 	estimatorCSVer, _ := semver.NewVersion("1.2.0")
-	estimator, _ := prices.NewGasPriceEstimator(*estimatorCSVer, evmEstimator, nil)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			estimator, _ := prices.NewGasPriceEstimatorForCommitPlugin(
+				*estimatorCSVer,
+				evmEstimator,
+				nil,
+				tc.daGasPriceDeviationPPB,
+				tc.execGasPriceDeviationPPB,
+			)
+
 			r := &CommitReportingPlugin{
 				lggr:   logger.TestLogger(t),
 				config: CommitPluginConfig{sourceChainSelector: defaultSourceChainSelector},
@@ -884,11 +890,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 					TokenPriceDeviationPPB: tc.tokenPriceDeviationPPB,
 				},
 				gasPriceEstimator: estimator,
-				gasPriceDeviationOpt: prices.GasPriceDeviationOptions{
-					DADeviationPPB:   int64(tc.daGasPriceDeviationPPB),
-					ExecDeviationPPB: int64(tc.execGasPriceDeviationPPB),
-				},
-				F: tc.f,
+				F:                 tc.f,
 			}
 			got, err := r.calculatePriceUpdates(tc.commitObservations, tc.latestGasPrice, tc.latestTokenPrices)
 
@@ -1053,7 +1055,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			priceGetter := pricegetter.NewMockPriceGetter(t)
 			defer priceGetter.AssertExpectations(t)
 
-			gasPriceEstimator := prices.NewMockGasPriceEstimator(t)
+			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 			defer gasPriceEstimator.AssertExpectations(t)
 
 			tokens := make([]common.Address, 0, len(tc.tokenDecimals))

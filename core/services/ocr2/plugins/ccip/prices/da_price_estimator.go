@@ -14,6 +14,10 @@ type DAGasPriceEstimator struct {
 	execEstimator       GasPriceEstimator
 	l1Oracle            rollups.L1Oracle
 	priceEncodingLength uint
+	daDeviationPPB      int64
+	daOverheadGas       int64
+	gasPerDAByte        int64
+	daMultiplier        int64
 }
 
 func (g DAGasPriceEstimator) GetGasPrice(ctx context.Context) (GasPrice, error) {
@@ -88,7 +92,7 @@ func (g DAGasPriceEstimator) Median(gasPrices []GasPrice) (GasPrice, error) {
 	return new(big.Int).Add(daMedian, execMedian), nil
 }
 
-func (g DAGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice, opts GasPriceDeviationOptions) (bool, error) {
+func (g DAGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice) (bool, error) {
 	p1DAGasPrice, p1ExecGasPrice, err := g.parseEncodedGasPrice(p1)
 	if err != nil {
 		return false, err
@@ -98,24 +102,31 @@ func (g DAGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice, opts GasPriceDev
 		return false, err
 	}
 
-	deviated := ccipcalc.Deviates(p1DAGasPrice, p2DAGasPrice, opts.DADeviationPPB) || ccipcalc.Deviates(p1ExecGasPrice, p2ExecGasPrice, opts.ExecDeviationPPB)
-	return deviated, nil
+	execDeviates, err := g.execEstimator.Deviates(p1ExecGasPrice, p2ExecGasPrice)
+	if err != nil {
+		return false, err
+	}
+	if execDeviates {
+		return execDeviates, nil
+	}
+
+	return ccipcalc.Deviates(p1DAGasPrice, p2DAGasPrice, g.daDeviationPPB), nil
 }
 
-func (g DAGasPriceEstimator) EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, opts MsgCostOptions) (*big.Int, error) {
+func (g DAGasPriceEstimator) EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) (*big.Int, error) {
 	daGasPrice, execGasPrice, err := g.parseEncodedGasPrice(p)
 	if err != nil {
 		return nil, err
 	}
 
-	execCostUSD, err := g.execEstimator.EstimateMsgCostUSD(execGasPrice, wrappedNativePrice, msg, opts)
+	execCostUSD, err := g.execEstimator.EstimateMsgCostUSD(execGasPrice, wrappedNativePrice, msg)
 	if err != nil {
 		return nil, err
 	}
 
 	// If there is data availability price component, then include data availability cost in fee estimation
 	if daGasPrice.Cmp(big.NewInt(0)) > 0 {
-		daGasCostUSD := g.estimateDACostUSD(daGasPrice, wrappedNativePrice, msg, opts)
+		daGasCostUSD := g.estimateDACostUSD(daGasPrice, wrappedNativePrice, msg)
 		execCostUSD = new(big.Int).Add(daGasCostUSD, execCostUSD)
 	}
 	return execCostUSD, nil
@@ -142,17 +153,17 @@ func (g DAGasPriceEstimator) parseEncodedGasPrice(p *big.Int) (*big.Int, *big.In
 	return daGasPrice, execGasPrice, nil
 }
 
-func (g DAGasPriceEstimator) estimateDACostUSD(daGasPrice GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, opts MsgCostOptions) *big.Int {
+func (g DAGasPriceEstimator) estimateDACostUSD(daGasPrice GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) *big.Int {
 	var sourceTokenDataLen int
 	for _, tokenData := range msg.SourceTokenData {
 		sourceTokenDataLen += len(tokenData)
 	}
 
 	dataLen := evmMessageFixedBytes + len(msg.Data) + len(msg.TokenAmounts)*evmMessageBytesPerToken + sourceTokenDataLen
-	dataGas := big.NewInt(int64(dataLen)*opts.GasPerDAByte + opts.DAOverheadGas)
+	dataGas := big.NewInt(int64(dataLen)*g.gasPerDAByte + g.daOverheadGas)
 
 	dataGasEstimate := new(big.Int).Mul(dataGas, daGasPrice)
-	dataGasEstimate = new(big.Int).Div(new(big.Int).Mul(dataGasEstimate, big.NewInt(opts.DAMultiplier)), big.NewInt(daMultiplierBase))
+	dataGasEstimate = new(big.Int).Div(new(big.Int).Mul(dataGasEstimate, big.NewInt(g.daMultiplier)), big.NewInt(daMultiplierBase))
 
 	return ccipcalc.CalculateUsdPerUnitGas(dataGasEstimate, wrappedNativePrice)
 }

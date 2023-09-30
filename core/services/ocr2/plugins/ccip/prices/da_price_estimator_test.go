@@ -139,8 +139,6 @@ func TestDAPriceEstimator_DenoteInUSD(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			g := DAGasPriceEstimator{
-				execEstimator:       nil,
-				l1Oracle:            nil,
 				priceEncodingLength: daGasPriceEncodingLength,
 			}
 
@@ -226,8 +224,6 @@ func TestDAPriceEstimator_Median(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			g := DAGasPriceEstimator{
-				execEstimator:       nil,
-				l1Oracle:            nil,
 				priceEncodingLength: daGasPriceEncodingLength,
 			}
 
@@ -240,72 +236,82 @@ func TestDAPriceEstimator_Median(t *testing.T) {
 
 func TestDAPriceEstimator_Deviates(t *testing.T) {
 	testCases := []struct {
-		name        string
-		gasPrice1   GasPrice
-		gasPrice2   GasPrice
-		opts        GasPriceDeviationOptions
-		expDeviates bool
+		name             string
+		gasPrice1        GasPrice
+		gasPrice2        GasPrice
+		daDeviationPPB   int64
+		execDeviationPPB int64
+		expDeviates      bool
 	}{
 		{
-			name:        "base",
-			gasPrice1:   encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
-			gasPrice2:   encodeGasPrice(big.NewInt(79e8), big.NewInt(79e8)),
-			opts:        GasPriceDeviationOptions{DADeviationPPB: 2e8, ExecDeviationPPB: 2e8},
-			expDeviates: true,
+			name:             "base",
+			gasPrice1:        encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
+			gasPrice2:        encodeGasPrice(big.NewInt(79e8), big.NewInt(79e8)),
+			daDeviationPPB:   2e8,
+			execDeviationPPB: 2e8,
+			expDeviates:      true,
 		},
 		{
-			name:        "negative difference also deviates",
-			gasPrice1:   encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
-			gasPrice2:   encodeGasPrice(big.NewInt(121e8), big.NewInt(121e8)),
-			opts:        GasPriceDeviationOptions{DADeviationPPB: 2e8, ExecDeviationPPB: 2e8},
-			expDeviates: true,
+			name:             "negative difference also deviates",
+			gasPrice1:        encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
+			gasPrice2:        encodeGasPrice(big.NewInt(121e8), big.NewInt(121e8)),
+			daDeviationPPB:   2e8,
+			execDeviationPPB: 2e8,
+			expDeviates:      true,
 		},
 		{
-			name:        "only DA component deviates",
-			gasPrice1:   encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
-			gasPrice2:   encodeGasPrice(big.NewInt(150e8), big.NewInt(110e8)),
-			opts:        GasPriceDeviationOptions{DADeviationPPB: 2e8, ExecDeviationPPB: 2e8},
-			expDeviates: true,
+			name:             "only DA component deviates",
+			gasPrice1:        encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
+			gasPrice2:        encodeGasPrice(big.NewInt(150e8), big.NewInt(110e8)),
+			daDeviationPPB:   2e8,
+			execDeviationPPB: 2e8,
+			expDeviates:      true,
 		},
 		{
-			name:        "only exec component deviates",
-			gasPrice1:   encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
-			gasPrice2:   encodeGasPrice(big.NewInt(110e8), big.NewInt(150e8)),
-			opts:        GasPriceDeviationOptions{DADeviationPPB: 2e8, ExecDeviationPPB: 2e8},
-			expDeviates: true,
+			name:             "only exec component deviates",
+			gasPrice1:        encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
+			gasPrice2:        encodeGasPrice(big.NewInt(110e8), big.NewInt(150e8)),
+			daDeviationPPB:   2e8,
+			execDeviationPPB: 2e8,
+			expDeviates:      true,
 		},
 		{
-			name:        "both do not deviate",
-			gasPrice1:   encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
-			gasPrice2:   encodeGasPrice(big.NewInt(110e8), big.NewInt(110e8)),
-			opts:        GasPriceDeviationOptions{DADeviationPPB: 2e8, ExecDeviationPPB: 2e8},
-			expDeviates: false,
+			name:             "both do not deviate",
+			gasPrice1:        encodeGasPrice(big.NewInt(100e8), big.NewInt(100e8)),
+			gasPrice2:        encodeGasPrice(big.NewInt(110e8), big.NewInt(110e8)),
+			daDeviationPPB:   2e8,
+			execDeviationPPB: 2e8,
+			expDeviates:      false,
 		},
 		{
-			name:        "zero DA price and exec deviates",
-			gasPrice1:   encodeGasPrice(big.NewInt(0), big.NewInt(100e8)),
-			gasPrice2:   encodeGasPrice(big.NewInt(0), big.NewInt(121e8)),
-			opts:        GasPriceDeviationOptions{DADeviationPPB: 2e8, ExecDeviationPPB: 2e8},
-			expDeviates: true,
+			name:             "zero DA price and exec deviates",
+			gasPrice1:        encodeGasPrice(big.NewInt(0), big.NewInt(100e8)),
+			gasPrice2:        encodeGasPrice(big.NewInt(0), big.NewInt(121e8)),
+			daDeviationPPB:   2e8,
+			execDeviationPPB: 2e8,
+			expDeviates:      true,
 		},
 		{
-			name:        "zero DA price and exec does not deviate",
-			gasPrice1:   encodeGasPrice(big.NewInt(0), big.NewInt(100e8)),
-			gasPrice2:   encodeGasPrice(big.NewInt(0), big.NewInt(110e8)),
-			opts:        GasPriceDeviationOptions{DADeviationPPB: 2e8, ExecDeviationPPB: 2e8},
-			expDeviates: false,
+			name:             "zero DA price and exec does not deviate",
+			gasPrice1:        encodeGasPrice(big.NewInt(0), big.NewInt(100e8)),
+			gasPrice2:        encodeGasPrice(big.NewInt(0), big.NewInt(110e8)),
+			daDeviationPPB:   2e8,
+			execDeviationPPB: 2e8,
+			expDeviates:      false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			g := DAGasPriceEstimator{
-				execEstimator:       nil,
-				l1Oracle:            nil,
+				execEstimator: ExecGasPriceEstimator{
+					deviationPPB: tc.execDeviationPPB,
+				},
+				daDeviationPPB:      tc.daDeviationPPB,
 				priceEncodingLength: daGasPriceEncodingLength,
 			}
 
-			deviated, err := g.Deviates(tc.gasPrice1, tc.gasPrice2, tc.opts)
+			deviated, err := g.Deviates(tc.gasPrice1, tc.gasPrice2)
 			assert.NoError(t, err)
 			if tc.expDeviates {
 				assert.True(t, deviated)
@@ -324,7 +330,9 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 		gasPrice           GasPrice
 		wrappedNativePrice *big.Int
 		msg                internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
-		opts               MsgCostOptions
+		daOverheadGas      int64
+		gasPerDAByte       int64
+		daMultiplier       int64
 		expUSD             *big.Int
 	}{
 		{
@@ -338,12 +346,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			opts: MsgCostOptions{
-				DAOverheadGas: 100_000,
-				GasPerDAByte:  0,
-				DAMultiplier:  10_000, // 1x multiplier
-			},
-			expUSD: new(big.Int).Add(execCostUSD, big.NewInt(100_000e9)),
+			daOverheadGas: 100_000,
+			gasPerDAByte:  0,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        new(big.Int).Add(execCostUSD, big.NewInt(100_000e9)),
 		},
 		{
 			name:               "include message data gas",
@@ -358,12 +364,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					},
 				},
 			},
-			opts: MsgCostOptions{
-				DAOverheadGas: 100_000,
-				GasPerDAByte:  16,
-				DAMultiplier:  10_000, // 1x multiplier
-			},
-			expUSD: new(big.Int).Add(execCostUSD, big.NewInt(134_208e9)),
+			daOverheadGas: 100_000,
+			gasPerDAByte:  16,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        new(big.Int).Add(execCostUSD, big.NewInt(134_208e9)),
 		},
 		{
 			name:               "zero DA price",
@@ -376,12 +380,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			opts: MsgCostOptions{
-				DAOverheadGas: 100_000,
-				GasPerDAByte:  16,
-				DAMultiplier:  10_000, // 1x multiplier
-			},
-			expUSD: execCostUSD,
+			daOverheadGas: 100_000,
+			gasPerDAByte:  16,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        execCostUSD,
 		},
 		{
 			name:               "double native price",
@@ -394,12 +396,10 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			opts: MsgCostOptions{
-				DAOverheadGas: 100_000,
-				GasPerDAByte:  0,
-				DAMultiplier:  10_000, // 1x multiplier
-			},
-			expUSD: new(big.Int).Add(execCostUSD, big.NewInt(200_000e9)),
+			daOverheadGas: 100_000,
+			gasPerDAByte:  0,
+			daMultiplier:  10_000, // 1x multiplier
+			expUSD:        new(big.Int).Add(execCostUSD, big.NewInt(200_000e9)),
 		},
 		{
 			name:               "half multiplier",
@@ -412,27 +412,28 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 					SourceTokenData: [][]byte{},
 				},
 			},
-			opts: MsgCostOptions{
-				DAOverheadGas: 100_000,
-				GasPerDAByte:  0,
-				DAMultiplier:  5_000, // 1x multiplier
-			},
-			expUSD: new(big.Int).Add(execCostUSD, big.NewInt(50_000e9)),
+			daOverheadGas: 100_000,
+			gasPerDAByte:  0,
+			daMultiplier:  5_000, // 0.5x multiplier
+			expUSD:        new(big.Int).Add(execCostUSD, big.NewInt(50_000e9)),
 		},
 	}
 
 	for _, tc := range testCases {
 		execEstimator := NewMockGasPriceEstimator(t)
-		execEstimator.On("EstimateMsgCostUSD", mock.Anything, tc.wrappedNativePrice, tc.msg, tc.opts).Return(execCostUSD, nil)
+		execEstimator.On("EstimateMsgCostUSD", mock.Anything, tc.wrappedNativePrice, tc.msg).Return(execCostUSD, nil)
 
 		t.Run(tc.name, func(t *testing.T) {
 			g := DAGasPriceEstimator{
 				execEstimator:       execEstimator,
 				l1Oracle:            nil,
 				priceEncodingLength: daGasPriceEncodingLength,
+				daOverheadGas:       tc.daOverheadGas,
+				gasPerDAByte:        tc.gasPerDAByte,
+				daMultiplier:        tc.daMultiplier,
 			}
 
-			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg, tc.opts)
+			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expUSD, costUSD)
 		})

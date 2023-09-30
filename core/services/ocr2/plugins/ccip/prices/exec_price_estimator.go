@@ -12,8 +12,9 @@ import (
 )
 
 type ExecGasPriceEstimator struct {
-	estimator   gas.EvmFeeEstimator
-	maxGasPrice *big.Int
+	estimator    gas.EvmFeeEstimator
+	maxGasPrice  *big.Int
+	deviationPPB int64
 }
 
 func (g ExecGasPriceEstimator) GetGasPrice(ctx context.Context) (GasPrice, error) {
@@ -46,11 +47,11 @@ func (g ExecGasPriceEstimator) Median(gasPrices []GasPrice) (GasPrice, error) {
 	return ccipcalc.BigIntMedian(prices), nil
 }
 
-func (g ExecGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice, opts GasPriceDeviationOptions) (bool, error) {
-	return ccipcalc.Deviates(p1, p2, opts.ExecDeviationPPB), nil
+func (g ExecGasPriceEstimator) Deviates(p1 GasPrice, p2 GasPrice) (bool, error) {
+	return ccipcalc.Deviates(p1, p2, g.deviationPPB), nil
 }
 
-func (g ExecGasPriceEstimator) EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, _ MsgCostOptions) (*big.Int, error) {
+func (g ExecGasPriceEstimator) EstimateMsgCostUSD(p GasPrice, wrappedNativePrice *big.Int, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) (*big.Int, error) {
 	execGasAmount := new(big.Int).Add(big.NewInt(feeBoostingOverheadGas), msg.GasLimit)
 	execGasAmount = new(big.Int).Add(execGasAmount, new(big.Int).Mul(big.NewInt(int64(len(msg.Data))), big.NewInt(execGasPerPayloadByte)))
 	execGasAmount = new(big.Int).Add(execGasAmount, new(big.Int).Mul(big.NewInt(int64(len(msg.TokenAmounts))), big.NewInt(execGasPerToken)))

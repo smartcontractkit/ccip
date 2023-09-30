@@ -137,10 +137,7 @@ func TestExecPriceEstimator_DenoteInUSD(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			g := ExecGasPriceEstimator{
-				estimator:   nil,
-				maxGasPrice: nil,
-			}
+			g := ExecGasPriceEstimator{}
 
 			gasPrice, err := g.DenoteInUSD(tc.gasPrice, tc.nativePrice)
 			assert.NoError(t, err)
@@ -191,10 +188,7 @@ func TestExecPriceEstimator_Median(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			g := ExecGasPriceEstimator{
-				estimator:   nil,
-				maxGasPrice: nil,
-			}
+			g := ExecGasPriceEstimator{}
 
 			gasPrice, err := g.Median(tc.gasPrices)
 			assert.NoError(t, err)
@@ -205,50 +199,49 @@ func TestExecPriceEstimator_Median(t *testing.T) {
 
 func TestExecPriceEstimator_Deviates(t *testing.T) {
 	testCases := []struct {
-		name        string
-		gasPrice1   GasPrice
-		gasPrice2   GasPrice
-		opts        GasPriceDeviationOptions
-		expDeviates bool
+		name         string
+		gasPrice1    GasPrice
+		gasPrice2    GasPrice
+		deviationPPB int64
+		expDeviates  bool
 	}{
 		{
-			name:        "base",
-			gasPrice1:   big.NewInt(100e8),
-			gasPrice2:   big.NewInt(79e8),
-			opts:        GasPriceDeviationOptions{ExecDeviationPPB: 2e8},
-			expDeviates: true,
+			name:         "base",
+			gasPrice1:    big.NewInt(100e8),
+			gasPrice2:    big.NewInt(79e8),
+			deviationPPB: 2e8,
+			expDeviates:  true,
 		},
 		{
-			name:        "negative difference also deviates",
-			gasPrice1:   big.NewInt(100e8),
-			gasPrice2:   big.NewInt(121e8),
-			opts:        GasPriceDeviationOptions{ExecDeviationPPB: 2e8},
-			expDeviates: true,
+			name:         "negative difference also deviates",
+			gasPrice1:    big.NewInt(100e8),
+			gasPrice2:    big.NewInt(121e8),
+			deviationPPB: 2e8,
+			expDeviates:  true,
 		},
 		{
-			name:        "larger difference deviates",
-			gasPrice1:   big.NewInt(100e8),
-			gasPrice2:   big.NewInt(70e8),
-			opts:        GasPriceDeviationOptions{ExecDeviationPPB: 2e8},
-			expDeviates: true,
+			name:         "larger difference deviates",
+			gasPrice1:    big.NewInt(100e8),
+			gasPrice2:    big.NewInt(70e8),
+			deviationPPB: 2e8,
+			expDeviates:  true,
 		},
 		{
-			name:        "smaller difference does not deviate",
-			gasPrice1:   big.NewInt(100e8),
-			gasPrice2:   big.NewInt(90e8),
-			opts:        GasPriceDeviationOptions{ExecDeviationPPB: 2e8},
-			expDeviates: false,
+			name:         "smaller difference does not deviate",
+			gasPrice1:    big.NewInt(100e8),
+			gasPrice2:    big.NewInt(90e8),
+			deviationPPB: 2e8,
+			expDeviates:  false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			g := ExecGasPriceEstimator{
-				estimator:   nil,
-				maxGasPrice: nil,
+				deviationPPB: tc.deviationPPB,
 			}
 
-			deviated, err := g.Deviates(tc.gasPrice1, tc.gasPrice2, tc.opts)
+			deviated, err := g.Deviates(tc.gasPrice1, tc.gasPrice2)
 			assert.NoError(t, err)
 			if tc.expDeviates {
 				assert.True(t, deviated)
@@ -349,12 +342,9 @@ func TestExecPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			g := ExecGasPriceEstimator{
-				estimator:   nil,
-				maxGasPrice: nil,
-			}
+			g := ExecGasPriceEstimator{}
 
-			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg, MsgCostOptions{})
+			costUSD, err := g.EstimateMsgCostUSD(tc.gasPrice, tc.wrappedNativePrice, tc.msg)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expUSD, costUSD)
 		})
@@ -362,10 +352,7 @@ func TestExecPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 }
 
 func TestExecPriceEstimator_String(t *testing.T) {
-	g := ExecGasPriceEstimator{
-		estimator:   nil,
-		maxGasPrice: nil,
-	}
+	g := ExecGasPriceEstimator{}
 
 	str := g.String(big.NewInt(1))
 	assert.Equal(t, "1", str)

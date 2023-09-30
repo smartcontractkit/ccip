@@ -62,6 +62,7 @@ type ExecutionPluginConfig struct {
 	onRampReader             ccipdata.OnRampReader
 	destReader               ccipdata.Reader
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
+	onRampVersion            semver.Version
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStore              commit_store.CommitStoreInterface
 	commitStoreVersion       semver.Version
@@ -72,7 +73,6 @@ type ExecutionPluginConfig struct {
 	destChainEVMID           *big.Int
 	destGasEstimator         gas.EvmFeeEstimator
 	tokenDataProviders       map[common.Address]tokendata.Reader
-	msgCostOpt               prices.MsgCostOptions
 }
 
 type ExecutionReportingPlugin struct {
@@ -88,7 +88,7 @@ type ExecutionReportingPlugin struct {
 	cachedSourceFeeTokens  cache.AutoSync[[]common.Address]
 	cachedDestTokens       cache.AutoSync[cache.CachedTokens]
 	customTokenPoolFactory func(ctx context.Context, poolAddress common.Address, bind bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error)
-	gasPriceEstimator      prices.GasPriceEstimator
+	gasPriceEstimator      prices.GasPriceEstimatorExec
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -139,10 +139,18 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 		"offchainConfig", offchainConfig,
 		"onchainConfig", onchainConfig)
 
-	gasPriceEstimator, err := prices.NewGasPriceEstimator(
+	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(rf.config.onRamp, rf.config.onRampVersion, rf.config.sourceClient)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+
+	gasPriceEstimator, err := prices.NewGasPriceEstimatorForExecPlugin(
 		rf.config.commitStoreVersion,
 		rf.config.destGasEstimator,
 		big.NewInt(int64(offchainConfig.MaxGasPrice)),
+		int64(dynamicOnRampConfig.DestDataAvailabilityOverheadGas),
+		int64(dynamicOnRampConfig.DestGasPerDataAvailabilityByte),
+		int64(dynamicOnRampConfig.DestDataAvailabilityMultiplier),
 	)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
@@ -566,7 +574,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		execCostUsd, err := r.gasPriceEstimator.EstimateMsgCostUSD(gasPriceValue, dstWrappedNativePrice, msg, r.config.msgCostOpt)
+		execCostUsd, err := r.gasPriceEstimator.EstimateMsgCostUSD(gasPriceValue, dstWrappedNativePrice, msg)
 		if err != nil {
 			msgLggr.Errorw("failed to estimate message cost USD", "err", err)
 			return []ObservedMessage{}

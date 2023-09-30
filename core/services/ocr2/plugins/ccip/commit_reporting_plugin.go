@@ -79,16 +79,15 @@ type CommitPluginConfig struct {
 }
 
 type CommitReportingPlugin struct {
-	config               CommitPluginConfig
-	F                    int
-	lggr                 logger.Logger
-	inflightReports      *inflightCommitReportsContainer
-	destPriceRegistry    price_registry.PriceRegistryInterface
-	offchainConfig       ccipconfig.CommitOffchainConfig
-	onchainConfig        ccipconfig.CommitOnchainConfig
-	tokenDecimalsCache   cache.AutoSync[map[common.Address]uint8]
-	gasPriceEstimator    prices.GasPriceEstimator
-	gasPriceDeviationOpt prices.GasPriceDeviationOptions
+	config             CommitPluginConfig
+	F                  int
+	lggr               logger.Logger
+	inflightReports    *inflightCommitReportsContainer
+	destPriceRegistry  price_registry.PriceRegistryInterface
+	offchainConfig     ccipconfig.CommitOffchainConfig
+	onchainConfig      ccipconfig.CommitOnchainConfig
+	tokenDecimalsCache cache.AutoSync[map[common.Address]uint8]
+	gasPriceEstimator  prices.GasPriceEstimatorCommit
 }
 
 type CommitReportingPluginFactory struct {
@@ -132,10 +131,12 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		"onchainConfig", onchainConfig,
 	)
 
-	gasPriceEstimator, err := prices.NewGasPriceEstimator(
+	gasPriceEstimator, err := prices.NewGasPriceEstimatorForCommitPlugin(
 		rf.config.commitStoreVersion,
 		rf.config.sourceFeeEstimator,
 		big.NewInt(int64(offchainConfig.MaxGasPrice)),
+		int64(offchainConfig.DAGasPriceDeviationPPB),
+		int64(offchainConfig.ExecGasPriceDeviationPPB),
 	)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
@@ -158,10 +159,6 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				int64(offchainConfig.DestFinalityDepth),
 			),
 			gasPriceEstimator: gasPriceEstimator,
-			gasPriceDeviationOpt: prices.GasPriceDeviationOptions{
-				DADeviationPPB:   int64(offchainConfig.DAGasPriceDeviationPPB),
-				ExecDeviationPPB: int64(offchainConfig.ExecGasPriceDeviationPPB),
-			},
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -680,7 +677,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 
 	if latestGasPrice.value != nil {
 		gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
-		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value, r.gasPriceDeviationOpt)
+		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value)
 		if err != nil {
 			return commit_store.InternalPriceUpdates{}, err
 		}
@@ -880,7 +877,7 @@ func (r *CommitReportingPlugin) isStaleGasPrice(ctx context.Context, lggr logger
 	}
 
 	if latestGasPrice.value != nil {
-		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(priceUpdates.UsdPerUnitGas, latestGasPrice.value, r.gasPriceDeviationOpt)
+		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(priceUpdates.UsdPerUnitGas, latestGasPrice.value)
 		if err != nil {
 			lggr.Errorw("Report is stale because deviation check failed", "err", err)
 			return true
