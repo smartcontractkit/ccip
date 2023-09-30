@@ -361,10 +361,10 @@
       "bridge_tokens_pools": [
         "0x6cb3ed9b441eb674b58495c8b3324b59faff5243"
       ],
-      "arm": "0xeaf6968fab9c54ac31c3679f120705b5019d3546",
-      "arm_proxy": "0x4eb4dbdb3c3b56e5e209abf9c424a3834f2087d0",
-      "router": "0xeb52e9ae4a9fb37172978642d4c141ef53876f26",
-      "price_registry": "0x490f3b46fba6af0d7499867a73469a077251c2bb",
+      "arm": "0x7103f9da75f04dd452b257aaca23842895ae1920",
+      "arm_proxy": "0xb140855a247c139710d17ef0eef71e08b7515952",
+      "router": "0x42415975c9cbcc0a73f8fa90018b55ed3b239273",
+      "price_registry": "0x85eeae3b41c36819d4fa89d4d74dc45b41b749cc",
       "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
         "43113": {
