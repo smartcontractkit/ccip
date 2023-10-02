@@ -190,6 +190,7 @@ func (l *loadArgs) Start() {
 					GenName:               fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
 					Schedule:              l.schedules,
 					LoadType:              wasp.RPS,
+					FailOnErr:             true,
 					RateLimitUnitDuration: l.TestCfg.Load.TimeUnit,
 					CallTimeout:           l.TestCfg.Load.LoadTimeOut,
 					Gun:                   ccipLoad,
