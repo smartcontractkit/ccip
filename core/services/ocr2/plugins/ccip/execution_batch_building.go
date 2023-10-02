@@ -15,7 +15,7 @@ func getProofData(
 	ctx context.Context,
 	sourceReader ccipdata.OnRampReader,
 	interval ccipdata.CommitStoreInterval,
-) (sendReqsInRoot []ccipdata.Event[ccipdata.EVM2EVMMessage], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
+) (sendReqsInRoot []ccipdata.Event[internal.EVM2EVMMessage], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
 	sendReqs, err := sourceReader.GetSendRequestsBetweenSeqNums(
 		ctx,
 		interval.Min,
@@ -38,14 +38,14 @@ func getProofData(
 
 func buildExecutionReportForMessages(
 	//msgsInRoot []*evm_2_evm_offramp.InternalEVM2EVMMessage,
-	msgsInRoot []ccipdata.Event[ccipdata.EVM2EVMMessage],
+	msgsInRoot []ccipdata.Event[internal.EVM2EVMMessage],
 	leaves [][32]byte,
 	tree *merklemulti.Tree[[32]byte],
 	commitInterval ccipdata.CommitStoreInterval,
 	observedMessages []ObservedMessage,
 ) (ccipdata.ExecReport, error) {
 	innerIdxs := make([]int, 0, len(observedMessages))
-	var messages []ccipdata.EVM2EVMMessage
+	var messages []internal.EVM2EVMMessage
 	var hashes [][32]byte
 	var offchainTokenData [][][]byte
 	for _, observedMessage := range observedMessages {

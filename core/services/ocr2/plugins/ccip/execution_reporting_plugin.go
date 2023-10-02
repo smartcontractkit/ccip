@@ -25,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -778,7 +777,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	// use errgroup to fetch send request logs and executed sequence numbers in parallel
 	eg := &errgroup.Group{}
 
-	var sendRequests []ccipdata.Event[ccipdata.EVM2EVMMessage]
+	var sendRequests []ccipdata.Event[internal.EVM2EVMMessage]
 	eg.Go(func() error {
 		sendReqs, err := r.config.onRampReader.GetSendRequestsBetweenSeqNums(
 			ctx,
@@ -1054,7 +1053,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	return true, err
 }
 
-func (r *ExecutionReportingPlugin) isStaleReport(messages []ccipdata.EVM2EVMMessage) (bool, error) {
+func (r *ExecutionReportingPlugin) isStaleReport(messages []internal.EVM2EVMMessage) (bool, error) {
 	if len(messages) == 0 {
 		return true, fmt.Errorf("messages are empty")
 	}
@@ -1066,7 +1065,7 @@ func (r *ExecutionReportingPlugin) isStaleReport(messages []ccipdata.EVM2EVMMess
 	if err != nil {
 		return true, err
 	}
-	if state := abihelpers.MessageExecutionState(msgState); state == abihelpers.ExecutionStateFailure || state == abihelpers.ExecutionStateSuccess {
+	if state := ccipdata.MessageExecutionState(msgState); state == ccipdata.ExecutionStateFailure || state == ccipdata.ExecutionStateSuccess {
 		return true, nil
 	}
 
@@ -1074,10 +1073,6 @@ func (r *ExecutionReportingPlugin) isStaleReport(messages []ccipdata.EVM2EVMMess
 }
 
 func (r *ExecutionReportingPlugin) Close() error {
-	// Close per instance readers
-	if err := r.destPriceRegistry.Close(); err != nil {
-		return err
-	}
 	return nil
 }
 

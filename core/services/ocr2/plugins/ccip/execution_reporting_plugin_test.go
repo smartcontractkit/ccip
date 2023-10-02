@@ -50,7 +50,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		commitStorePaused bool
 		inflightReports   []InflightInternalExecutionReport
 		unexpiredReports  []ccipdata.Event[commit_store.CommitStoreReportAccepted]
-		sendRequests      []ccipdata.Event[ccipdata.EVM2EVMMessage]
+		sendRequests      []ccipdata.Event[internal.EVM2EVMMessage]
 		executedSeqNums   []uint64
 		tokenPoolsMapping map[common.Address]common.Address
 		blessedRoots      map[[32]byte]bool
@@ -86,15 +86,15 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			},
 			tokenPoolsMapping: map[common.Address]common.Address{},
 			senderNonce:       9,
-			sendRequests: []ccipdata.Event[ccipdata.EVM2EVMMessage]{
+			sendRequests: []ccipdata.Event[internal.EVM2EVMMessage]{
 				{
-					Data: ccipdata.EVM2EVMMessage{SequenceNumber: 10},
+					Data: internal.EVM2EVMMessage{SequenceNumber: 10},
 				},
 				{
-					Data: ccipdata.EVM2EVMMessage{SequenceNumber: 11},
+					Data: internal.EVM2EVMMessage{SequenceNumber: 11},
 				},
 				{
-					Data: ccipdata.EVM2EVMMessage{SequenceNumber: 12},
+					Data: internal.EVM2EVMMessage{SequenceNumber: 12},
 				},
 			},
 		},
@@ -376,7 +376,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	onRamp, _ := testhelpers.NewFakeOnRamp(t)
 	p.config.onRamp = onRamp
 
-	sendReqs := make([]ccipdata.Event[ccipdata.EVM2EVMMessage], len(observations))
+	sendReqs := make([]ccipdata.Event[internal.EVM2EVMMessage], len(observations))
 	sourceReader := ccipdata.NewMockOnRampReader(t)
 	for i := range observations {
 		msg := evm_2_evm_offramp.InternalEVM2EVMMessage{
@@ -393,8 +393,8 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 			FeeToken:            utils.RandomAddress(),
 			MessageId:           [32]byte{12},
 		}
-		sendReqs[i] = ccipdata.Event[ccipdata.EVM2EVMMessage]{
-			Data: ccipdata.EVM2EVMMessage{
+		sendReqs[i] = ccipdata.Event[internal.EVM2EVMMessage]{
+			Data: internal.EVM2EVMMessage{
 				SequenceNumber: msg.SequenceNumber,
 			},
 		}
@@ -912,7 +912,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 		reports             []commit_store.CommitStoreCommitReport
 		expQueryMin         uint64 // expected min/max used in the query to get ccipevents
 		expQueryMax         uint64
-		onchainEvents       []ccipdata.Event[ccipdata.EVM2EVMMessage]
+		onchainEvents       []ccipdata.Event[internal.EVM2EVMMessage]
 		destLatestBlock     int64
 		destExecutedSeqNums []uint64
 
@@ -939,10 +939,10 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			},
 			expQueryMin: 1,
 			expQueryMax: 3,
-			onchainEvents: []ccipdata.Event[ccipdata.EVM2EVMMessage]{
-				{Data: ccipdata.EVM2EVMMessage{SequenceNumber: 1}},
-				{Data: ccipdata.EVM2EVMMessage{SequenceNumber: 2}},
-				{Data: ccipdata.EVM2EVMMessage{SequenceNumber: 3}},
+			onchainEvents: []ccipdata.Event[internal.EVM2EVMMessage]{
+				{Data: internal.EVM2EVMMessage{SequenceNumber: 1}},
+				{Data: internal.EVM2EVMMessage{SequenceNumber: 2}},
+				{Data: internal.EVM2EVMMessage{SequenceNumber: 3}},
 			},
 			destLatestBlock:     10_000,
 			destExecutedSeqNums: []uint64{1},

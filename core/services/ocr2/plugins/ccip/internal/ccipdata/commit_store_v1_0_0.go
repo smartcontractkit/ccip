@@ -65,8 +65,8 @@ func (c *CommitStoreV1_0_0) EncodeCommitReport(report CommitStoreReport) ([]byte
 	return c.commitReportArgs.PackValues([]interface{}{rep})
 }
 
-func (c *CommitStoreV1_0_0) DecodeCommitReport(report []byte) (CommitStoreReport, error) {
-	unpacked, err := c.commitReportArgs.Unpack(report)
+func decodeCommitReportV1_0_0(commitReportArgs abi.Arguments, report []byte) (CommitStoreReport, error) {
+	unpacked, err := commitReportArgs.Unpack(report)
 	if err != nil {
 		return CommitStoreReport{}, err
 	}
@@ -113,6 +113,10 @@ func (c *CommitStoreV1_0_0) DecodeCommitReport(report []byte) (CommitStoreReport
 		},
 		MerkleRoot: commitReport.MerkleRoot,
 	}, nil
+}
+
+func (c *CommitStoreV1_0_0) DecodeCommitReport(report []byte) (CommitStoreReport, error) {
+	return decodeCommitReportV1_0_0(c.commitReportArgs, report)
 }
 
 func (c *CommitStoreV1_0_0) IsBlessed(ctx context.Context, root [32]byte) (bool, error) {

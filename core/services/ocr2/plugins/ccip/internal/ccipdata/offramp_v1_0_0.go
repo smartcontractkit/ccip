@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -84,21 +85,21 @@ func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ExecReport, error)
 	if !ok {
 		return ExecReport{}, fmt.Errorf("got %T", unpacked[0])
 	}
-	var messages []EVM2EVMMessage
+	var messages []internal.EVM2EVMMessage
 	for _, msg := range erStruct.Messages {
-		var tokensAndAmounts []evm_2_evm_offramp.ClientEVMTokenAmount
+		var tokensAndAmounts []internal.TokenAmount
 		for _, tokenAndAmount := range msg.TokenAmounts {
-			tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_offramp.ClientEVMTokenAmount{
+			tokensAndAmounts = append(tokensAndAmounts, internal.TokenAmount{
 				Token:  tokenAndAmount.Token,
 				Amount: tokenAndAmount.Amount,
 			})
 		}
 		// TODO
-		messages = append(messages, EVM2EVMMessage{
+		messages = append(messages, internal.EVM2EVMMessage{
 			SequenceNumber:      msg.SequenceNumber,
 			GasLimit:            nil,
 			Nonce:               0,
-			MessageId:           Hash{},
+			MessageId:           msg.MessageId,
 			SourceChainSelector: 0,
 			Sender:              common.Address{},
 			Receiver:            common.Address{},
@@ -106,9 +107,9 @@ func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ExecReport, error)
 			FeeToken:            common.Address{},
 			FeeTokenAmount:      nil,
 			Data:                nil,
-			TokenAmounts:        nil,
+			TokenAmounts:        tokensAndAmounts,
 			SourceTokenData:     nil,
-			Hash:                Hash{},
+			Hash:                [32]byte{}, // TODO
 		})
 	}
 

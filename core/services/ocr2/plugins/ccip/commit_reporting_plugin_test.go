@@ -53,7 +53,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 		commitStoreIsPaused bool
 		commitStoreSeqNum   uint64
 		tokenPrices         map[common.Address]*big.Int
-		sendReqs            []ccipdata.Event[ccipdata.EVM2EVMMessage]
+		sendReqs            []ccipdata.Event[internal.EVM2EVMMessage]
 		tokenDecimals       map[common.Address]uint8
 		fee                 *big.Int
 
@@ -67,9 +67,9 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				someTokenAddr:         big.NewInt(2),
 				sourceNativeTokenAddr: big.NewInt(2),
 			},
-			sendReqs: []ccipdata.Event[ccipdata.EVM2EVMMessage]{
-				{Data: ccipdata.EVM2EVMMessage{SequenceNumber: 54}},
-				{Data: ccipdata.EVM2EVMMessage{SequenceNumber: 55}},
+			sendReqs: []ccipdata.Event[internal.EVM2EVMMessage]{
+				{Data: internal.EVM2EVMMessage{SequenceNumber: 54}},
+				{Data: internal.EVM2EVMMessage{SequenceNumber: 55}},
 			},
 			fee: big.NewInt(100),
 			tokenDecimals: map[common.Address]uint8{
@@ -189,7 +189,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		gasPriceUpdates   []ccipdata.Event[price_registry.PriceRegistryUsdPerUnitGasUpdated]
 		tokenDecimals     map[common.Address]uint8
 		tokenPriceUpdates []ccipdata.Event[price_registry.PriceRegistryUsdPerTokenUpdated]
-		sendRequests      []ccipdata.Event[ccipdata.EVM2EVMMessage]
+		sendRequests      []ccipdata.Event[internal.EVM2EVMMessage]
 
 		expCommitReport *commit_store.CommitStoreCommitReport
 		expSeqNumRange  commit_store.CommitStoreInterval
@@ -202,9 +202,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: gasPrice},
 			},
 			f: 1,
-			sendRequests: []ccipdata.Event[ccipdata.EVM2EVMMessage]{
+			sendRequests: []ccipdata.Event[internal.EVM2EVMMessage]{
 				{
-					Data: ccipdata.EVM2EVMMessage{
+					Data: internal.EVM2EVMMessage{
 						SequenceNumber: 1,
 					},
 				},
@@ -253,7 +253,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				{Interval: commit_store.CommitStoreInterval{Min: 2, Max: 2}, SourceGasPriceUSD: big.NewInt(0)},
 			},
 			f:              1,
-			sendRequests:   []ccipdata.Event[ccipdata.EVM2EVMMessage]{{}},
+			sendRequests:   []ccipdata.Event[internal.EVM2EVMMessage]{{}},
 			expSeqNumRange: commit_store.CommitStoreInterval{Min: 2, Max: 2},
 			expErr:         true,
 		},
@@ -1276,10 +1276,10 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 			}
 
 			onRampReader := ccipdata.NewMockOnRampReader(t)
-			var sendReqs []ccipdata.Event[ccipdata.EVM2EVMMessage]
+			var sendReqs []ccipdata.Event[internal.EVM2EVMMessage]
 			for _, seqNum := range tc.msgSeqNums {
-				sendReqs = append(sendReqs, ccipdata.Event[ccipdata.EVM2EVMMessage]{
-					Data: ccipdata.EVM2EVMMessage{
+				sendReqs = append(sendReqs, ccipdata.Event[internal.EVM2EVMMessage]{
+					Data: internal.EVM2EVMMessage{
 						SequenceNumber: seqNum,
 					},
 				})

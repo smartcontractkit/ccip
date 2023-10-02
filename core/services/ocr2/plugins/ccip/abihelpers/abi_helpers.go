@@ -13,50 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-// TODO: Deprecate in favour of version specific types
-var EventSignatures struct {
-	// CommitStore
-	ReportAccepted common.Hash
-	// OffRamp
-	ExecutionStateChanged common.Hash
-	PoolAdded             common.Hash
-	PoolRemoved           common.Hash
-
-	// PriceRegistry
-	UsdPerUnitGasUpdated common.Hash
-	UsdPerTokenUpdated   common.Hash
-	FeeTokenAdded        common.Hash
-	FeeTokenRemoved      common.Hash
-
-	// offset || priceUpdatesOffset || minSeqNum || maxSeqNum || merkleRoot
-	ReportAcceptedMaxSequenceNumberWord int
-	// sig || seqNum || messageId || ...
-	ExecutionStateChangedSequenceNumberIndex int
-}
-
-var (
-	MessageArgs         abi.Arguments
-	TokenAmountsArgs    abi.Arguments
-	CommitReportArgs    abi.Arguments
-	ExecutionReportArgs abi.Arguments
-)
-
 func GetIDOrPanic(name string, abi2 abi.ABI) common.Hash {
 	event, ok := abi2.Events[name]
 	if !ok {
 		panic(fmt.Sprintf("missing event %s", name))
 	}
 	return event.ID
-}
-
-func init() {
-	//commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
-	//if err != nil {
-	//	panic(err)
-	//}
-	//EventSignatures.ReportAccepted = GetIDOrPanic("ReportAccepted", commitStoreABI)
-	//EventSignatures.ReportAcceptedMaxSequenceNumberWord = 3
-
 }
 
 // ProofFlagsToBits transforms a list of boolean proof flags to a *big.Int

@@ -1,8 +1,11 @@
 package ccipdata
 
 import (
+	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -10,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -104,4 +108,41 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}
+}
+
+func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
+	// TODO error on wrong type
+	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
+	if err != nil {
+		panic(err)
+	}
+	commitReportArgs := commitStoreABI.Events["ReportAccepted"].Inputs
+	switch ver.String() {
+	case "1.0.0", "1.1.0":
+		return func(report []byte) (*txmgr.TxMeta, error) {
+			commitReport, err := decodeCommitReportV1_0_0(commitReportArgs, report)
+			if err != nil {
+				return nil, err
+			}
+			return commitReportToEthTxMeta(commitReport)
+		}, nil
+	case "1.2.0":
+		// TODO
+	default:
+		return nil, errors.Errorf("got unexpected version %v", ver.String())
+	}
+	return nil, errors.New("impossible")
+}
+
+// CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
+// sequence numbers of the committed messages will be added to tx metadata
+func commitReportToEthTxMeta(commitReport CommitStoreReport) (*txmgr.TxMeta, error) {
+	n := int(commitReport.Interval.Max-commitReport.Interval.Min) + 1
+	seqRange := make([]uint64, n)
+	for i := 0; i < n; i++ {
+		seqRange[i] = uint64(i) + commitReport.Interval.Min
+	}
+	return &txmgr.TxMeta{
+		SeqNumbers: seqRange,
+	}, nil
 }

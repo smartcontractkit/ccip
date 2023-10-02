@@ -85,12 +85,15 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not get source native token")
 	}
+	execLggr := lggr.Named("CCIPExecution").With(
+		"sourceChain", ChainName(int64(chainId)),
+		"destChain", ChainName(destChainID))
 	// TODO: we don't support onramp source registry changes without a reboot yet?
 	sourcePriceRegistry, err := ccipdata.NewPriceRegistryReader(lggr, dynamicOnRampConfig.PriceRegistry, sourceChain.LogPoller(), sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load source registry")
 	}
-	offRampReader, err := ccipdata.NewOffRampReader(lggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampReader, err := ccipdata.NewOffRampReader(lggr, common.HexToAddress(spec.ContractID), destChain.Client(), sourceChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load offRampReader")
 	}
@@ -98,10 +101,6 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load commitStore readerc")
 	}
-
-	execLggr := lggr.Named("CCIPExecution").With(
-		"sourceChain", ChainName(int64(chainId)),
-		"destChain", ChainName(destChainID))
 	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
 		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
 	if err != nil {

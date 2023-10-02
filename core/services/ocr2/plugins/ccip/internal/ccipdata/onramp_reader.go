@@ -5,16 +5,15 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -27,56 +26,17 @@ const (
 	COMMIT_CCIP_SENDS = "Commit ccip sends"
 )
 
-type Hash [32]byte
-
-func (h Hash) String() string {
-	return hexutil.Encode(h[:])
-}
-
-type TokenAmount struct {
-	Token  common.Address
-	Amount *big.Int
-}
-
-// EVM2EVMMessage is the interface for a message sent from the offramp to the onramp
-// Plugin can operate against any lane version which has a message satisfying this interface.
-type EVM2EVMMessage struct {
-	SequenceNumber      uint64
-	GasLimit            *big.Int
-	Nonce               uint64
-	MessageId           Hash
-	SourceChainSelector uint64
-	Sender              common.Address
-	Receiver            common.Address
-	Strict              bool
-	FeeToken            common.Address
-	FeeTokenAmount      *big.Int
-	Data                []byte
-	TokenAmounts        []TokenAmount
-	SourceTokenData     [][]byte
-
-	// Computed
-	Hash Hash
-	// TODO: add more fields as we abstract exec plugin
-	// also this Log can eventually go away with destchain abstractions
-	Log types.Log // Raw event data
-}
-
 //go:generate mockery --quiet --name OnRampReader --output . --filename onramp_reader_mock.go --inpackage --case=underscore
 type OnRampReader interface {
 	// GetSendRequestsGteSeqNum returns all the message send requests with sequence number greater than or equal to the provided.
 	// If checkFinalityTags is set to true then confs param is ignored, the latest finalized block is used in the query.
-	GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[EVM2EVMMessage], error)
+	GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
 
 	// GetSendRequestsBetweenSeqNums returns all the message send requests in the provided sequence numbers range (inclusive).
-	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[EVM2EVMMessage], error)
+	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
 
 	// Get router configured in the onRamp
 	RouterAddress() common.Address
-
-	// TODO: temporary until we abstract offramp as well
-	// (currently this works since all versions are compatible with the same offramp ABI)
-	ToOffRampMessage(message EVM2EVMMessage) (*evm_2_evm_offramp.InternalEVM2EVMMessage, error)
 
 	// Reader cleanup i.e. unsubscribe from logs
 	Close(opt ...pg.QOpt) error

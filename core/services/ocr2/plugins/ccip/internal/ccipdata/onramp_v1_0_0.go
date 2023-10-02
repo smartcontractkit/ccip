@@ -14,10 +14,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -148,7 +148,7 @@ func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	}, nil
 }
 
-func (o *OnRampV1_0_0) logToMessage(log types.Log) (*EVM2EVMMessage, error) {
+func (o *OnRampV1_0_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, error) {
 	msg, err := o.onRamp.ParseCCIPSendRequested(log)
 	if err != nil {
 		return nil, err
@@ -157,16 +157,30 @@ func (o *OnRampV1_0_0) logToMessage(log types.Log) (*EVM2EVMMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &EVM2EVMMessage{
-		SequenceNumber: msg.Message.SequenceNumber,
-		GasLimit:       msg.Message.GasLimit,
-		Nonce:          msg.Message.Nonce,
-		Hash:           h,
-		Log:            log,
+	tokensAndAmounts := make([]internal.TokenAmount, len(msg.Message.TokenAmounts))
+	for i, tokenAndAmount := range msg.Message.TokenAmounts {
+		tokensAndAmounts[i] = internal.TokenAmount{
+			Token:  tokenAndAmount.Token,
+			Amount: tokenAndAmount.Amount,
+		}
+	}
+	return &internal.EVM2EVMMessage{
+		SourceChainSelector: msg.Message.SourceChainSelector,
+		Sender:              msg.Message.Sender,
+		Receiver:            msg.Message.Receiver,
+		Strict:              msg.Message.Strict,
+		Nonce:               msg.Message.Nonce,
+		FeeToken:            msg.Message.FeeToken,
+		FeeTokenAmount:      msg.Message.FeeTokenAmount,
+		Data:                msg.Message.Data,
+		TokenAmounts:        tokensAndAmounts,
+		SourceTokenData:     make([][]byte, len(msg.Message.TokenAmounts)),
+		MessageId:           msg.Message.MessageId,
+		Hash:                h,
 	}, nil
 }
 
-func (o *OnRampV1_0_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[EVM2EVMMessage], error) {
+func (o *OnRampV1_0_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
 	if !o.finalityTags {
 		logs, err2 := o.lp.LogsDataWordGreaterThan(
 			o.sendRequestedEventSig,
@@ -179,7 +193,7 @@ func (o *OnRampV1_0_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint
 		if err2 != nil {
 			return nil, fmt.Errorf("logs data word greater than: %w", err2)
 		}
-		return parseLogs[EVM2EVMMessage](logs, o.lggr, o.logToMessage)
+		return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 	}
 	latestFinalizedHash, err := latestFinalizedBlockHash(ctx, o.client)
 	if err != nil {
@@ -196,7 +210,7 @@ func (o *OnRampV1_0_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint
 	if err != nil {
 		return nil, fmt.Errorf("logs until block hash data word greater than: %w", err)
 	}
-	return parseLogs[EVM2EVMMessage](logs, o.lggr, o.logToMessage)
+	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
 func (o *OnRampV1_0_0) RouterAddress() common.Address {
@@ -204,7 +218,7 @@ func (o *OnRampV1_0_0) RouterAddress() common.Address {
 	return config.Router
 }
 
-func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[EVM2EVMMessage], error) {
+func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
 	logs, err := o.lp.LogsDataWordRange(
 		o.sendRequestedEventSig,
 		o.address,
@@ -216,37 +230,7 @@ func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNum
 	if err != nil {
 		return nil, err
 	}
-	return parseLogs[EVM2EVMMessage](logs, o.lggr, o.logToMessage)
-}
-
-// TODO: follow up with offramp version abstraction
-func (o *OnRampV1_0_0) ToOffRampMessage(message EVM2EVMMessage) (*evm_2_evm_offramp.InternalEVM2EVMMessage, error) {
-	m, err := o.onRamp.ParseCCIPSendRequested(message.Log)
-	if err != nil {
-		return nil, err
-	}
-	tokensAndAmounts := make([]evm_2_evm_offramp.ClientEVMTokenAmount, len(m.Message.TokenAmounts))
-	for i, tokenAndAmount := range m.Message.TokenAmounts {
-		tokensAndAmounts[i] = evm_2_evm_offramp.ClientEVMTokenAmount{
-			Token:  tokenAndAmount.Token,
-			Amount: tokenAndAmount.Amount,
-		}
-	}
-	return &evm_2_evm_offramp.InternalEVM2EVMMessage{
-		SourceChainSelector: m.Message.SourceChainSelector,
-		Sender:              m.Message.Sender,
-		Receiver:            m.Message.Receiver,
-		SequenceNumber:      m.Message.SequenceNumber,
-		GasLimit:            m.Message.GasLimit,
-		Strict:              m.Message.Strict,
-		Nonce:               m.Message.Nonce,
-		FeeToken:            m.Message.FeeToken,
-		FeeTokenAmount:      m.Message.FeeTokenAmount,
-		Data:                m.Message.Data,
-		TokenAmounts:        tokensAndAmounts,
-		SourceTokenData:     make([][]byte, len(m.Message.TokenAmounts)),
-		MessageId:           m.Message.MessageId,
-	}, nil
+	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
 func (o *OnRampV1_0_0) Close(qopts ...pg.QOpt) error {

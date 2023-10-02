@@ -917,5 +917,5 @@ func (r *CommitReportingPlugin) isStaleTokenPrices(ctx context.Context, lggr log
 }
 
 func (r *CommitReportingPlugin) Close() error {
-	return r.destPriceRegistryReader.Close()
+	return nil
 }

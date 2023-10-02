@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -111,7 +112,7 @@ type ExecutionStateChanged struct {
 }
 
 type ExecReport struct {
-	Messages          []EVM2EVMMessage
+	Messages          []internal.EVM2EVMMessage
 	OffchainTokenData [][][]byte
 	Proofs            [][32]byte
 	ProofFlagBits     *big.Int
@@ -141,6 +142,16 @@ type OffRampReader interface {
 
 	Close(qopts ...pg.QOpt) error
 }
+
+// MessageExecutionState defines the execution states of CCIP messages.
+type MessageExecutionState uint8
+
+const (
+	ExecutionStateUntouched MessageExecutionState = iota
+	ExecutionStateInProgress
+	ExecutionStateSuccess
+	ExecutionStateFailure
+)
 
 func NewOffRampReader(lggr logger.Logger, addr common.Address, srcClient, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (OffRampReader, error) {
 	_, version, err := ccipconfig.TypeAndVersion(addr, destClient)
