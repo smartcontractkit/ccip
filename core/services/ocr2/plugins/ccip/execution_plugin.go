@@ -59,7 +59,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "get chainset")
 	}
-	offRamp, err := contractutil.LoadOffRamp(common.HexToAddress(spec.ContractID), ExecPluginLabel, destChain.Client())
+	offRamp, _, err := contractutil.LoadOffRamp(common.HexToAddress(spec.ContractID), ExecPluginLabel, destChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading offRamp")
 	}
@@ -75,15 +75,15 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to open source chain")
 	}
-	commitStore, err := contractutil.LoadCommitStore(offRampConfig.CommitStore, ExecPluginLabel, destChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading commitStore")
-	}
-	onRamp, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
+	//commitStore, commitStoreVersion, err := contractutil.LoadCommitStore(offRampConfig.CommitStore, ExecPluginLabel, destChain.Client())
+	//if err != nil {
+	//	return nil, nil, errors.Wrap(err, "failed loading commitStore")
+	//}
+	onRamp, onRampVersion, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading onRamp")
 	}
-	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, sourceChain.Client())
+	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, onRampVersion, sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading onRamp config")
 	}
@@ -97,6 +97,14 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	}
 	// TODO: we don't support onramp source registry changes without a reboot yet?
 	sourcePriceRegistry, err := ccipdata.NewPriceRegistryReader(lggr, dynamicOnRampConfig.PriceRegistry, sourceChain.LogPoller(), sourceChain.Client())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not load source registry")
+	}
+	offRampReader, err := ccipdata.NewOffRampReader(lggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not load source registry")
+	}
+	commitStoreReader, err := ccipdata.NewOffRampReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load source registry")
 	}
@@ -127,8 +135,11 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 			onRampReader:             onRampReader,
 			destReader:               ccipdata.NewLogPollerReader(destChain.LogPoller(), execLggr, destChain.Client()),
 			onRamp:                   onRamp,
+			onRampVersion:            onRampVersion,
 			offRamp:                  offRamp,
-			commitStore:              commitStore,
+			commitStoreReader:        commitStoreReader,
+			offRampReader:            offRampReader,
+			commitStoreVersion:       commitStoreVersion,
 			sourcePriceRegistry:      sourcePriceRegistry,
 			sourceWrappedNativeToken: sourceWrappedNative,
 			destClient:               destChain.Client(),
@@ -272,6 +283,40 @@ func unregisterExecutionPluginLpFilters(
 	destOffRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
 	commitStore common.Address,
 	qopts ...pg.QOpt) error {
+	//<<<<<<< HEAD
+	//=======
+	//	destOffRampDynCfg, err := destOffRamp.GetDynamicConfig(&bind.CallOpts{Context: ctx})
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	// TODO stopgap solution before compatibility phase-2
+	//	tvStr, err := sourceOnRamp.TypeAndVersion(&bind.CallOpts{Context: ctx})
+	//	if err != nil {
+	//		return err
+	//	}
+	//	_, versionStr, err := ccipconfig.ParseTypeAndVersion(tvStr)
+	//	if err != nil {
+	//		return err
+	//	}
+	//	version, err := semver.NewVersion(versionStr)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	onRampDynCfg, err := contractutil.LoadOnRampDynamicConfig(sourceOnRamp, *version, sourceChainClient)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	if err = logpollerutil.UnregisterLpFilters(
+	//		sourceLP,
+	//		getExecutionPluginSourceLpChainFilters(onRampDynCfg.PriceRegistry),
+	//		qopts...,
+	//	); err != nil {
+	//		return err
+	//	}
+	//>>>>>>> ccip-develop
 
 	return logpollerutil.UnregisterLpFilters(
 		destLP,

@@ -34,6 +34,7 @@ type OffRampReader interface {
 
 	GetDestinationTokens(ctx context.Context) ([]common.Address, error)
 
+	Address() common.Address
 	Close(qopts ...pg.QOpt) error
 }
 

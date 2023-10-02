@@ -24,9 +24,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
@@ -39,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -57,6 +55,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		unexpiredReports  []ccipdata.Event[commit_store.CommitStoreReportAccepted]
 		sendRequests      []ccipdata.Event[ccipdata.EVM2EVMMessage]
 		executedSeqNums   []uint64
+		tokenPoolsMapping map[common.Address]common.Address
 		blessedRoots      map[[32]byte]bool
 		senderNonce       uint64
 		rateLimiterState  evm_2_evm_offramp.RateLimiterTokenBucket
@@ -88,7 +87,8 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			rateLimiterState: evm_2_evm_offramp.RateLimiterTokenBucket{
 				IsEnabled: false,
 			},
-			senderNonce: 9,
+			tokenPoolsMapping: map[common.Address]common.Address{},
+			senderNonce:       9,
 			sendRequests: []ccipdata.Event[ccipdata.EVM2EVMMessage]{
 				{
 					Data: ccipdata.EVM2EVMMessage{SequenceNumber: 10},
@@ -160,6 +160,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			})
 			p.destPriceRegistry = priceRegistry
 			p.config.sourcePriceRegistry = priceRegistry
+
+			cachedTokenPools := cache.NewMockAutoSync[map[common.Address]common.Address](t)
+			cachedTokenPools.On("Get", ctx).Return(tc.tokenPoolsMapping, nil).Maybe()
+			p.cachedTokenPools = cachedTokenPools
 
 			sourceFeeTokens := cache.NewMockAutoSync[[]common.Address](t)
 			sourceFeeTokens.On("Get", ctx).Return([]common.Address{}, nil).Maybe()
@@ -419,22 +423,6 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	sender1 := common.HexToAddress("0xa")
 	destNative := common.HexToAddress("0xb")
 	srcNative := common.HexToAddress("0xc")
-	plugin := ExecutionReportingPlugin{
-		config: ExecutionPluginStaticConfig{
-			offRamp: offRamp,
-			onRamp:  onRamp,
-		},
-		destWrappedNative: destNative,
-		offchainConfig: ccipconfig.ExecOffchainConfig{
-			SourceFinalityDepth:         5,
-			DestOptimisticConfirmations: 1,
-			DestFinalityDepth:           5,
-			BatchGasLimit:               300_000,
-			RelativeBoostPerWaitHour:    1,
-			MaxGasPrice:                 1,
-		},
-		lggr: logger.TestLogger(t),
-	}
 
 	msg1 := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 		InternalEVM2EVMMessage: evm_2_evm_offramp.InternalEVM2EVMMessage{
@@ -641,6 +629,30 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			offRamp.SetSenderNonces(tc.offRampNoncesBySender)
+
+			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
+			if tc.expectedSeqNrs != nil {
+				gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), nil)
+			}
+
+			plugin := ExecutionReportingPlugin{
+				config: ExecutionPluginConfig{
+					offRamp: offRamp,
+					onRamp:  onRamp,
+				},
+				destWrappedNative: destNative,
+				offchainConfig: ccipconfig.ExecOffchainConfig{
+					SourceFinalityDepth:         5,
+					DestOptimisticConfirmations: 1,
+					DestFinalityDepth:           5,
+					BatchGasLimit:               300_000,
+					RelativeBoostPerWaitHour:    1,
+					MaxGasPrice:                 1,
+				},
+				lggr:              logger.TestLogger(t),
+				gasPriceEstimator: gasPriceEstimator,
+			}
+
 			seqNrs := plugin.buildBatch(
 				context.Background(),
 				lggr,
@@ -649,7 +661,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 				tc.tokenLimit,
 				tc.srcPrices,
 				tc.dstPrices,
-				func() (*big.Int, error) { return tc.destGasPrice, nil },
+				func() (prices.GasPrice, error) { return tc.destGasPrice, nil },
 				tc.srcToDestTokens,
 				tc.destRateLimits,
 			)
@@ -765,6 +777,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 		sourceToDestToken map[common.Address]common.Address
 		destPools         map[common.Address]common.Address
 		poolRateLimits    map[common.Address]custom_token_pool.RateLimiterTokenBucket
+		destPoolsCacheErr error
 
 		expRateLimits map[common.Address]*big.Int
 		expErr        bool
@@ -838,6 +851,20 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			},
 			expErr: false,
 		},
+		{
+			name:              "dest pool cache error",
+			tokenAmounts:      []evm_2_evm_offramp.ClientEVMTokenAmount{{Token: tk1}},
+			sourceToDestToken: map[common.Address]common.Address{tk1: tk1dest},
+			destPoolsCacheErr: errors.New("some random error"),
+			expErr:            true,
+		},
+		{
+			name:              "pool for token not found",
+			tokenAmounts:      []evm_2_evm_offramp.ClientEVMTokenAmount{{Token: tk1}},
+			sourceToDestToken: map[common.Address]common.Address{tk1: tk1dest},
+			destPools:         map[common.Address]common.Address{},
+			expErr:            true,
+		},
 	}
 
 	ctx := testutils.Context(t)
@@ -846,6 +873,10 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &ExecutionReportingPlugin{}
 			p.lggr = lggr
+
+			tokenPoolsCache := cache.NewMockAutoSync[map[common.Address]common.Address](t)
+			tokenPoolsCache.On("Get", ctx).Return(tc.destPools, tc.destPoolsCacheErr).Maybe()
+			p.cachedTokenPools = tokenPoolsCache
 
 			offRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
 			offRamp.SetTokenPools(tc.destPools)
@@ -874,55 +905,6 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expRateLimits, rateLimits)
-		})
-	}
-}
-
-func TestExecutionReportingPlugin_estimateDestinationGasPrice(t *testing.T) {
-	testCases := []struct {
-		name      string
-		evmFee    gas.EvmFee
-		evmFeeErr error
-
-		expRes *big.Int
-		expErr bool
-	}{
-		{
-			name: "dynamic fee cap has precedence over legacy",
-			evmFee: gas.EvmFee{
-				Legacy:        assets.NewWei(big.NewInt(1000)),
-				DynamicFeeCap: assets.NewWei(big.NewInt(2000)),
-			},
-			expRes: big.NewInt(2000),
-		},
-		{
-			name: "legacy is used if dynamic fee cap is not provided",
-			evmFee: gas.EvmFee{
-				Legacy: assets.NewWei(big.NewInt(1000)),
-			},
-			expRes: big.NewInt(1000),
-		},
-		{
-			name:      "stop on error",
-			evmFeeErr: errors.New("some error"),
-			expErr:    true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			p := &ExecutionReportingPlugin{}
-			mockEstimator := mocks.NewEvmFeeEstimator(t)
-			mockEstimator.On("GetFee", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tc.evmFee, uint32(0), tc.evmFeeErr)
-			p.config.destGasEstimator = mockEstimator
-
-			res, err := p.estimateDestinationGasPrice(testutils.Context(t))
-			if tc.expErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
-			assert.Equal(t, tc.expRes, res)
 		})
 	}
 }
