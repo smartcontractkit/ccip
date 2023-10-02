@@ -38,6 +38,8 @@ type CommitStoreReader interface {
 
 	IsDown(ctx context.Context) bool
 
+	DestPriceRegistryFromOnC() common.Address
+
 	Verify(ctx context.Context, report ExecReport) bool
 
 	Close(qopts ...pg.QOpt) error

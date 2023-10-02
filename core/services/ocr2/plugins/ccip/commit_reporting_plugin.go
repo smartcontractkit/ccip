@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
@@ -63,9 +62,7 @@ type CommitPluginStaticConfig struct {
 	sourceNative        common.Address
 	sourceFeeEstimator  gas.EvmFeeEstimator
 	// Dest
-	destLP logpoller.LogPoller
-	//offRamp        evm_2_evm_offramp.EVM2EVMOffRampInterface
-	//commitStore    commit_store.CommitStoreInterface
+	destLP             logpoller.LogPoller
 	offRamp            ccipdata.OffRampReader
 	commitStore        ccipdata.CommitStoreReader
 	commitStoreVersion semver.Version
@@ -86,9 +83,9 @@ type CommitReportingPlugin struct {
 	commitStore             ccipdata.CommitStoreReader
 	destPriceRegistryReader ccipdata.PriceRegistryReader
 	offchainConfig          ccipconfig.CommitOffchainConfig
-	onchainConfig           ccipconfig.CommitOnchainConfig
-	tokenDecimalsCache      cache.AutoSync[map[common.Address]uint8]
-	F                       int
+	//onchainConfig           ccipconfig.CommitOnchainConfig
+	tokenDecimalsCache cache.AutoSync[map[common.Address]uint8]
+	F                  int
 	// Offchain
 	priceGetter pricegetter.PriceGetter
 	// State
@@ -100,18 +97,41 @@ type CommitReportingPluginFactory struct {
 	// between plugin instances (ie between SetConfigs onchain)
 	config CommitPluginStaticConfig
 
-	// We keep track of the registered filters
-	// TODO: Can push this down into the readers
-	destChainFilters []logpoller.Filter
-	filtersMu        *sync.Mutex
+	// Dynamic readers
+	readersMu          *sync.Mutex
+	destPriceRegReader ccipdata.PriceRegistryReader
+	destPriceRegAddr   common.Address
 }
 
 // NewCommitReportingPluginFactory return a new CommitReportingPluginFactory.
 func NewCommitReportingPluginFactory(config CommitPluginStaticConfig) *CommitReportingPluginFactory {
 	return &CommitReportingPluginFactory{
 		config:    config,
-		filtersMu: &sync.Mutex{},
+		readersMu: &sync.Mutex{},
 	}
+}
+
+func (rf *CommitReportingPluginFactory) UpdateDynamicReaders(newPriceRegAddr common.Address) error {
+	rf.readersMu.Lock()
+	defer rf.readersMu.Unlock()
+	// TODO: Investigate use of Close() to cleanup.
+	// TODO: a true price registry upgrade on an existing lane may want some kind of start block in its config? Right now we
+	// essentially assume that plugins don't care about historical price reg logs.
+	if rf.destPriceRegAddr == newPriceRegAddr {
+		// No-op
+		return nil
+	}
+	// Close old reader and open new reader if address changed.
+	if err := rf.destPriceRegReader.Close(); err != nil {
+		return err
+	}
+	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, newPriceRegAddr, rf.config.destLP, rf.config.destClient)
+	if err != nil {
+		return err
+	}
+	rf.destPriceRegReader = destPriceRegistryReader
+	rf.destPriceRegAddr = newPriceRegAddr
+	return nil
 }
 
 // NewReportingPlugin returns the ccip CommitReportingPlugin and satisfies the ReportingPluginFactory interface.
@@ -125,19 +145,9 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	// Note that we assume prior reporting plugin instance has called Close() already which will unregister the filters.
-	// Although there may be downtime between the filters, since we are only constructing a new reader if it's changed
-	// TODO: a true price registry upgrade on an existing lane may want some kind of start block in its config? Right now we
-	// essentially assume that plugins don't care about historical price reg logs.
-	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, onchainConfig.PriceRegistry, rf.config.destLP, rf.config.destClient)
-	if err != nil {
+	if err := rf.UpdateDynamicReaders(onchainConfig.PriceRegistry); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-
-	// TODO can remove once offramp abstracted
-	//if err = rf.UpdateLogPollerFilters(); err != nil {
-	//	return nil, types.ReportingPluginInfo{}, err
-	//}
 
 	rf.config.lggr.Infow("NewReportingPlugin",
 		"offchainConfig", offchainConfig,
@@ -158,21 +168,19 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 	return &CommitReportingPlugin{
 			sourceChainSelector:     rf.config.sourceChainSelector,
 			sourceNative:            rf.config.sourceNative,
-			sourceFeeEstimator:      rf.config.sourceFeeEstimator,
 			onRampReader:            rf.config.onRampReader,
 			commitStore:             rf.config.commitStore,
 			priceGetter:             rf.config.priceGetter,
 			F:                       config.F,
 			lggr:                    rf.config.lggr.Named("CommitReportingPlugin"),
 			inflightReports:         newInflightCommitReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
-			destPriceRegistryReader: destPriceRegistryReader,
-			onchainConfig:           onchainConfig,
+			destPriceRegistryReader: rf.destPriceRegReader,
 			offchainConfig:          offchainConfig,
 			tokenDecimalsCache: cache.NewTokenToDecimals(
 				rf.config.lggr,
 				rf.config.destLP,
 				rf.config.offRamp,
-				destPriceRegistryReader,
+				rf.destPriceRegReader,
 				rf.config.destClient,
 				int64(offchainConfig.DestFinalityDepth),
 			),
@@ -201,7 +209,7 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
 	// If the commit store is down the protocol should halt.
-	if contractutil.IsCommitStoreDownNow(ctx, lggr, r.commitStore) {
+	if r.commitStore.IsDown(ctx) {
 		return nil, ErrCommitStoreIsDown
 	}
 	r.inflightReports.expire(lggr)
@@ -295,7 +303,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 }
 
 func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context, lggr logger.Logger) (inflightMin, onChainMin uint64, err error) {
-	nextMinOnChain, err := r.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
+	nextMinOnChain, err := r.commitStore.GetExpectedNextSequenceNumber(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -689,7 +697,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 	if err != nil {
 		return commit_store.InternalPriceUpdates{}, err
 	}
-	destChainSelector := r.config.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
+	destChainSelector := r.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
 
 	if latestGasPrice.value != nil {
 		gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
@@ -848,7 +856,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 	}
 
 	// If report only has price update, check if its epoch and round lags behind the latest onchain
-	lastPriceEpochAndRound, err := r.commitStore.GetLatestPriceEpochAndRound(&bind.CallOpts{Context: ctx})
+	lastPriceEpochAndRound, err := r.commitStore.GetLatestPriceEpochAndRound(ctx)
 	if err != nil {
 		// Assume it's a transient issue getting the last report and try again on the next round
 		return true

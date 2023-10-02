@@ -75,10 +75,6 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to open source chain")
 	}
-	//commitStore, commitStoreVersion, err := contractutil.LoadCommitStore(offRampConfig.CommitStore, ExecPluginLabel, destChain.Client())
-	//if err != nil {
-	//	return nil, nil, errors.Wrap(err, "failed loading commitStore")
-	//}
 	onRamp, onRampVersion, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading onRamp")
@@ -102,11 +98,11 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	}
 	offRampReader, err := ccipdata.NewOffRampReader(lggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load source registry")
+		return nil, nil, errors.Wrap(err, "could not load offRampReader")
 	}
-	commitStoreReader, err := ccipdata.NewOffRampReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller())
+	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load source registry")
+		return nil, nil, errors.Wrap(err, "could not load commitStore readerc")
 	}
 
 	execLggr := lggr.Named("CCIPExecution").With(
