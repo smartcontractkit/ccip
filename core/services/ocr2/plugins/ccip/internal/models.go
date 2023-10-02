@@ -5,12 +5,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
 // EVM2EVMOnRampCCIPSendRequestedWithMeta helper struct to hold the send request and some metadata
 type EVM2EVMOnRampCCIPSendRequestedWithMeta struct {
-	evm_2_evm_offramp.InternalEVM2EVMMessage
+	ccipdata.EVM2EVMMessage
 	BlockTimestamp time.Time
 	Executed       bool
 	Finalized      bool

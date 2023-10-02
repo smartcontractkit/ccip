@@ -33,14 +33,30 @@ func (h Hash) String() string {
 	return hexutil.Encode(h[:])
 }
 
+type TokenAmount struct {
+	Token  common.Address
+	Amount *big.Int
+}
+
 // EVM2EVMMessage is the interface for a message sent from the offramp to the onramp
 // Plugin can operate against any lane version which has a message satisfying this interface.
 type EVM2EVMMessage struct {
-	SequenceNumber uint64
-	GasLimit       *big.Int
-	Nonce          uint64
-	MessageId      Hash
-	Hash           Hash
+	SequenceNumber      uint64
+	GasLimit            *big.Int
+	Nonce               uint64
+	MessageId           Hash
+	SourceChainSelector uint64
+	Sender              common.Address
+	Receiver            common.Address
+	Strict              bool
+	FeeToken            common.Address
+	FeeTokenAmount      *big.Int
+	Data                []byte
+	TokenAmounts        []TokenAmount
+	SourceTokenData     [][]byte
+
+	// Computed
+	Hash Hash
 	// TODO: add more fields as we abstract exec plugin
 	// also this Log can eventually go away with destchain abstractions
 	Log types.Log // Raw event data

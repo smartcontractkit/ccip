@@ -101,8 +101,8 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 			}
 			return &GasPriceUpdate{
 				GasPrice: GasPrice{
-					DestChain: p.DestChain,
-					Value:     p.Value,
+					DestChainSelector: p.DestChain,
+					Value:             p.Value,
 				},
 				Timestamp: p.Timestamp,
 			}, nil

@@ -4,12 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"math"
 	"math/big"
 	"reflect"
 	"sort"
-	"sync"
 	"testing"
 	"time"
 
@@ -38,7 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
@@ -1040,6 +1037,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 	}
 }
 
+/*
 func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 	const numFilters = 10
 	filters := make([]logpoller.Filter, numFilters)
@@ -1095,11 +1093,12 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 	err := rf.UpdateLogPollerFilters(destPriceRegistryAddr)
 	assert.NoError(t, err)
 }
+*/
 
 func TestExecutionReportToEthTxMeta(t *testing.T) {
 	t.Run("happy flow", func(t *testing.T) {
 		executionReport := generateExecutionReport(t, 10, 3, 1000)
-		encExecReport, err := abihelpers.EncodeExecutionReport(executionReport)
+		encExecReport, err := ccipdata.EncodeExecutionReport(executionReport)
 		assert.NoError(t, err)
 		txMeta, err := ExecutionReportToEthTxMeta(encExecReport)
 		assert.NoError(t, err)

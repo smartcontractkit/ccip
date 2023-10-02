@@ -32,8 +32,8 @@ type TokenPriceUpdate struct {
 }
 
 type GasPrice struct {
-	DestChain uint64
-	Value     *big.Int
+	DestChainSelector uint64
+	Value             *big.Int
 }
 
 type GasPriceUpdate struct {
