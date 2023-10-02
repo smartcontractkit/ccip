@@ -42,7 +42,7 @@ func (p *PriceRegistryV1_0_0) GetFeeTokens(ctx context.Context) ([]common.Addres
 	return p.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
 }
 
-func (p *PriceRegistryV1_0_0) Close() error {
+func (p *PriceRegistryV1_0_0) Close(opts ...pg.QOpt) error {
 	return nil
 }
 
@@ -67,8 +67,10 @@ func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Conte
 				return nil, err
 			}
 			return &TokenPriceUpdate{
-				Token:     tp.Token,
-				Value:     tp.Value,
+				TokenPrice: TokenPrice{
+					Token: tp.Token,
+					Value: tp.Value,
+				},
 				Timestamp: tp.Timestamp,
 			}, nil
 		},
@@ -98,8 +100,10 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 				return nil, err
 			}
 			return &GasPriceUpdate{
-				DestChain: p.DestChain,
-				Value:     p.Value,
+				GasPrice: GasPrice{
+					DestChain: p.DestChain,
+					Value:     p.Value,
+				},
 				Timestamp: p.Timestamp,
 			}, nil
 		},

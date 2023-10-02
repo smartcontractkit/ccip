@@ -21,21 +21,18 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -65,9 +62,11 @@ type CommitPluginStaticConfig struct {
 	sourceNative        common.Address
 	sourceFeeEstimator  gas.EvmFeeEstimator
 	// Dest
-	destLP         logpoller.LogPoller
-	offRamp        evm_2_evm_offramp.EVM2EVMOffRampInterface
-	commitStore    commit_store.CommitStoreInterface
+	destLP logpoller.LogPoller
+	//offRamp        evm_2_evm_offramp.EVM2EVMOffRampInterface
+	//commitStore    commit_store.CommitStoreInterface
+	offRamp        ccipdata.OffRampReader
+	commitStore    ccipdata.CommitStoreReader
 	destClient     evmclient.Client
 	destChainEVMID *big.Int
 	// Offchain
@@ -82,7 +81,7 @@ type CommitReportingPlugin struct {
 	sourceNative        common.Address
 	sourceFeeEstimator  gas.EvmFeeEstimator
 	// Dest
-	commitStore             commit_store.CommitStoreInterface
+	commitStore             ccipdata.CommitStoreReader
 	destPriceRegistryReader ccipdata.PriceRegistryReader
 	offchainConfig          ccipconfig.CommitOffchainConfig
 	onchainConfig           ccipconfig.CommitOnchainConfig
@@ -123,15 +122,20 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
+
+	// Note that we assume prior reporting plugin instance has called Close() already which will unregister the filters.
+	// Although there may be downtime between the filters, since we are only constructing a new reader if it's changed
+	// TODO: a true price registry upgrade on an existing lane may want some kind of start block in its config? Right now we
+	// essentially assume that plugins don't care about historical price reg logs.
 	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, onchainConfig.PriceRegistry, rf.config.destLP, rf.config.destClient)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
 	// TODO can remove once offramp abstracted
-	if err = rf.UpdateLogPollerFilters(); err != nil {
-		return nil, types.ReportingPluginInfo{}, err
-	}
+	//if err = rf.UpdateLogPollerFilters(); err != nil {
+	//	return nil, types.ReportingPluginInfo{}, err
+	//}
 
 	rf.config.lggr.Infow("NewReportingPlugin",
 		"offchainConfig", offchainConfig,
@@ -225,23 +229,23 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
 // pass zeroAddress if destPriceRegistry is unknown, filters with zero address are omitted.
 // TODO: Should be able to Close and re-create readers to abstract filters.
-func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(qopts ...pg.QOpt) error {
-	rf.filtersMu.Lock()
-	defer rf.filtersMu.Unlock()
-
-	// destination chain filters
-	destFiltersBefore, destFiltersNow := rf.destChainFilters, getCommitPluginDestLpFilters(rf.config.offRamp.Address())
-	created, deleted := logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
-	if err := logpollerutil.UnregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
-		return err
-	}
-	if err := logpollerutil.RegisterLpFilters(rf.config.destLP, created, qopts...); err != nil {
-		return err
-	}
-	rf.destChainFilters = destFiltersNow
-
-	return nil
-}
+//func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(qopts ...pg.QOpt) error {
+//	rf.filtersMu.Lock()
+//	defer rf.filtersMu.Unlock()
+//
+//	// destination chain filters
+//	destFiltersBefore, destFiltersNow := rf.destChainFilters, getCommitPluginDestLpFilters(rf.config.offRamp.Address())
+//	created, deleted := logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
+//	if err := logpollerutil.UnregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
+//		return err
+//	}
+//	if err := logpollerutil.RegisterLpFilters(rf.config.destLP, created, qopts...); err != nil {
+//		return err
+//	}
+//	rf.destChainFilters = destFiltersNow
+//
+//	return nil
+//}
 
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {
 	nextInflightMin, _, err := r.nextMinSeqNum(ctx, lggr)
@@ -869,6 +873,5 @@ func (r *CommitReportingPlugin) isStaleTokenPrices(ctx context.Context, lggr log
 }
 
 func (r *CommitReportingPlugin) Close() error {
-	// Close any per instance state
 	return r.destPriceRegistryReader.Close()
 }

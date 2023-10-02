@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -20,15 +21,23 @@ const (
 	FEE_TOKEN_REMOVED    = "Fee token removed"
 )
 
+type TokenPrice struct {
+	Token common.Address
+	Value *big.Int
+}
+
 type TokenPriceUpdate struct {
-	Token     common.Address
-	Value     *big.Int
+	TokenPrice
 	Timestamp *big.Int
 }
 
-type GasPriceUpdate struct {
+type GasPrice struct {
 	DestChain uint64
 	Value     *big.Int
+}
+
+type GasPriceUpdate struct {
+	GasPrice
 	Timestamp *big.Int
 }
 
@@ -45,7 +54,7 @@ type PriceRegistryReader interface {
 
 	GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error)
 
-	Close() error
+	Close(qopts ...pg.QOpt) error
 }
 
 // NewPriceRegistryReader determines the appropriate version of the price registry and returns a reader for it.

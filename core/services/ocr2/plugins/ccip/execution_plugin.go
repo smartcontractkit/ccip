@@ -36,10 +36,7 @@ import (
 )
 
 const (
-	EXEC_REPORT_ACCEPTS          = "Exec report accepts"
-	EXEC_EXECUTION_STATE_CHANGES = "Exec execution state changes"
-	EXEC_TOKEN_POOL_ADDED        = "Token pool added"
-	EXEC_TOKEN_POOL_REMOVED      = "Token pool removed"
+	EXEC_REPORT_ACCEPTS = "Exec report accepts"
 )
 
 // TOOD pass context?

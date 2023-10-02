@@ -22,7 +22,6 @@ import (
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
@@ -59,8 +58,9 @@ type ExecutionPluginStaticConfig struct {
 	onRampReader             ccipdata.OnRampReader
 	destReader               ccipdata.Reader
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
+	offRampReader            ccipdata.OffRampReader
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
-	commitStore              commit_store.CommitStoreInterface
+	commitStoreReader        ccipdata.CommitStoreReader
 	sourcePriceRegistry      ccipdata.PriceRegistryReader
 	sourceWrappedNativeToken common.Address
 	destClient               evmclient.Client
@@ -112,6 +112,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
+	// Open dynamic readers
 	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, onchainConfig.PriceRegistry, rf.config.destLP, rf.config.destClient)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
@@ -168,7 +169,7 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if contractutil.IsCommitStoreDownNow(ctx, lggr, r.config.commitStore) {
+	if r.config.commitStoreReader.IsDown(ctx) {
 		return nil, ErrCommitStoreIsDown
 	}
 	// Expire any inflight reports.
@@ -238,8 +239,7 @@ func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(qopts ...pg.QO
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(
 		ctx,
-		r.config.destReader,
-		r.config.commitStore,
+		r.config.commitStoreReader,
 		r.onchainConfig.PermissionLessExecutionThresholdDuration(),
 	)
 	if err != nil {
@@ -450,9 +450,8 @@ func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) 
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
-	stateChanges, err := r.config.destReader.GetExecutionStateChangesBetweenSeqNums(
+	stateChanges, err := r.config.offRampReader.GetExecutionStateChangesBetweenSeqNums(
 		ctx,
-		r.config.offRamp.Address(),
 		min,
 		max,
 		int(r.offchainConfig.DestOptimisticConfirmations),
@@ -722,7 +721,7 @@ func calculateMessageMaxGas(gasLimit *big.Int, numRequests, dataLen, numTokens i
 
 // helper struct to hold the commitReport and the related send requests
 type commitReportWithSendRequests struct {
-	commitReport         commit_store.CommitStoreCommitReport
+	commitReport         ccipdata.CommitStoreReport
 	sendRequestsWithMeta []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
 }
 
@@ -754,7 +753,7 @@ func (r *commitReportWithSendRequests) sendReqFits(sendReq internal.EVM2EVMOnRam
 // getReportsWithSendRequests returns the target reports with populated send requests.
 func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	ctx context.Context,
-	reports []commit_store.CommitStoreCommitReport,
+	reports []ccipdata.CommitStoreReport,
 ) ([]commitReportWithSendRequests, error) {
 	if len(reports) == 0 {
 		return nil, nil
@@ -863,10 +862,10 @@ func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, sourceT
 // Assumes non-empty report. Messages to execute can span more than one report, but are assumed to be in order of increasing
 // sequence number.
 func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.Logger, observedMessages []ObservedMessage) ([]byte, error) {
-	if err := validateSeqNumbers(ctx, r.config.commitStore, observedMessages); err != nil {
+	if err := validateSeqNumbers(ctx, r.config.commitStoreReader, observedMessages); err != nil {
 		return nil, err
 	}
-	commitReport, err := getCommitReportForSeqNum(ctx, r.config.destReader, r.config.commitStore, observedMessages[0].SeqNr)
+	commitReport, err := getCommitReportForSeqNum(ctx, r.config.commitStoreReader, observedMessages[0].SeqNr)
 	if err != nil {
 		return nil, err
 	}
@@ -877,22 +876,27 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		return nil, err
 	}
 
-	messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(sendReqsInRoot))
-	for i, msg := range sendReqsInRoot {
-		offRampMsg, _ := r.config.onRampReader.ToOffRampMessage(msg.Data)
-		messages[i] = offRampMsg
-	}
+	//messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(sendReqsInRoot))
+	//for i, msg := range sendReqsInRoot {
+	//	offRampMsg, _ := r.config.onRampReader.ToOffRampMessage(msg.Data)
+	//	messages[i] = offRampMsg
+	//}
 
 	// cap messages which fits MaxExecutionReportLength (after serialized)
 	capped := sort.Search(len(observedMessages), func(i int) bool {
-		report, _, err2 := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:i+1])
+		report, err2 := buildExecutionReportForMessages(sendReqsInRoot, leaves, tree, commitReport.Interval, observedMessages[:i+1])
 		if err2 != nil {
 			r.lggr.Errorw("build execution report", "err", err2)
 			return false
 		}
 
-		var encoded []byte
-		encoded, err = abihelpers.EncodeExecutionReport(report)
+		//var encoded []byte
+		//encoded, err = abihelpers.EncodeExecutionReport(report)
+		//if err != nil {
+		//	// false makes Search keep looking to the right, always including any "erroring" ObservedMessage and allowing us to detect in the bottom
+		//	return false
+		//}
+		encoded, err := r.config.offRampReader.EncodeExecutionReport(report)
 		if err != nil {
 			// false makes Search keep looking to the right, always including any "erroring" ObservedMessage and allowing us to detect in the bottom
 			return false
@@ -903,12 +907,12 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		return nil, err
 	}
 
-	execReport, hashes, err := buildExecutionReportForMessages(messages, leaves, tree, commitReport.Interval, observedMessages[:capped])
+	execReport, err := buildExecutionReportForMessages(sendReqsInRoot, leaves, tree, commitReport.Interval, observedMessages[:capped])
 	if err != nil {
 		return nil, err
 	}
 
-	encodedReport, err := abihelpers.EncodeExecutionReport(execReport)
+	encodedReport, err := r.config.offRampReader.EncodeExecutionReport(execReport)
 	if err != nil {
 		return nil, err
 	}
@@ -921,14 +925,8 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	}
 
 	// Double check this verifies before sending.
-	res, err := r.config.commitStore.Verify(&bind.CallOpts{Context: ctx}, hashes, execReport.Proofs, execReport.ProofFlagBits)
-	if err != nil {
-		lggr.Errorw("Unable to call verify", "observations", observedMessages[:capped], "root", commitReport.MerkleRoot[:], "seqRange", commitReport.Interval, "err", err)
-		return nil, err
-	}
-	// No timestamp, means failed to verify root.
-	if res.Cmp(big.NewInt(0)) == 0 {
-		root := tree.Root()
+	valid := r.config.commitStoreReader.Verify(ctx, execReport)
+	if !valid {
 		lggr.Errorf("Root does not verify for messages: %v, our inner root 0x%x", observedMessages[:capped], root)
 		return nil, errors.New("root does not verify")
 	}
@@ -1091,15 +1089,7 @@ func (r *ExecutionReportingPlugin) isStaleReport(messages []evm_2_evm_offramp.In
 }
 
 func (r *ExecutionReportingPlugin) Close() error {
-	// The db tx is not needed here
-	if err := r.config.onRampReader.Close(); err != nil {
-		return err
-	}
-	for _, tokenReader := range r.config.tokenDataProviders {
-		if err := tokenReader.Close(); err != nil {
-			return err
-		}
-	}
+	// Close per instance readers
 	if err := r.destPriceRegistry.Close(); err != nil {
 		return err
 	}
@@ -1181,13 +1171,11 @@ func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegis
 
 func getUnexpiredCommitReports(
 	ctx context.Context,
-	destReader ccipdata.Reader,
-	commitStore commit_store.CommitStoreInterface,
+	commitStoreReader ccipdata.CommitStoreReader,
 	permissionExecutionThreshold time.Duration,
-) ([]commit_store.CommitStoreCommitReport, error) {
-	acceptedReports, err := destReader.GetAcceptedCommitReportsGteTimestamp(
+) ([]ccipdata.CommitStoreReport, error) {
+	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
-		commitStore.Address(),
 		time.Now().Add(-permissionExecutionThreshold),
 		0,
 	)
@@ -1195,9 +1183,9 @@ func getUnexpiredCommitReports(
 		return nil, err
 	}
 
-	var reports []commit_store.CommitStoreCommitReport
+	var reports []ccipdata.CommitStoreReport
 	for _, acceptedReport := range acceptedReports {
-		reports = append(reports, acceptedReport.Data.Report)
+		reports = append(reports, acceptedReport.Data)
 	}
 	return reports, nil
 }

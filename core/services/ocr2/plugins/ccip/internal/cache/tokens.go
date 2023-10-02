@@ -74,7 +74,7 @@ func NewCachedSupportedTokens(
 func NewTokenToDecimals(
 	lggr logger.Logger,
 	lp logpoller.LogPoller,
-	offRamp evm_2_evm_offramp.EVM2EVMOffRampInterface,
+	offRamp ccipdata.OffRampReader,
 	//priceRegistry price_registry.PriceRegistryInterface,
 	priceRegistryReader ccipdata.PriceRegistryReader,
 	client evmclient.Client,
@@ -194,7 +194,7 @@ func copyMap[M ~map[K]V, K comparable, V any](m M) M {
 
 type tokenToDecimals struct {
 	lggr    logger.Logger
-	offRamp evm_2_evm_offramp.EVM2EVMOffRampInterface
+	offRamp ccipdata.OffRampReader
 	//priceRegistry price_registry.PriceRegistryInterface
 	priceRegistryReader ccipdata.PriceRegistryReader
 	tokenFactory        func(address common.Address) (link_token_interface.LinkTokenInterface, error)

@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -25,7 +24,6 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
@@ -73,10 +71,10 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to open source chain")
 	}
-	offRamp, err := contractutil.LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), CommitPluginLabel, destChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading offRamp")
-	}
+	//offRamp, err := contractutil.LoadOffRamp(common.HexToAddress(pluginConfig.OffRamp), CommitPluginLabel, destChain.Client())
+	//if err != nil {
+	//	return nil, nil, errors.Wrap(err, "failed loading offRamp")
+	//}
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(int64(chainId)),
 		"destChain", ChainName(destChainID))
@@ -96,6 +94,14 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, err
 	}
+	offRampReader, err := ccipdata.NewOffRampReader(commitLggr, common.HexToAddress(pluginConfig.OffRamp), destChain.Client(), destChain.LogPoller())
+	if err != nil {
+		return nil, nil, err
+	}
+	commitStoreReader, err := ccipdata.NewCommitStoreReader(commitLggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller())
+	if err != nil {
+		return nil, nil, err
+	}
 	lggr.Infow("NewCommitServices",
 		"pluginConfig", pluginConfig,
 		"staticConfig", staticConfig,
@@ -107,13 +113,13 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			lggr:                commitLggr,
 			destLP:              destChain.LogPoller(),
 			onRampReader:        onRampReader,
-			offRamp:             offRamp,
+			offRamp:             offRampReader,
 			priceGetter:         priceGetterObject,
 			sourceNative:        sourceNative,
 			sourceFeeEstimator:  sourceChain.GasEstimator(),
 			sourceChainSelector: staticConfig.SourceChainSelector,
 			destClient:          destChain.Client(),
-			commitStore:         commitStore,
+			commitStore:         commitStoreReader,
 		}, &BackfillArgs{
 			sourceLP:         sourceChain.LogPoller(),
 			destLP:           destChain.LogPoller(),
@@ -170,21 +176,21 @@ func CommitReportToEthTxMeta(report []byte) (*txmgr.TxMeta, error) {
 	}, nil
 }
 
-func getCommitPluginDestLpFilters(offRamp common.Address) []logpoller.Filter {
-	return []logpoller.Filter{
-		{
-			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, offRamp),
-			EventSigs: []common.Hash{abihelpers.EventSignatures.PoolAdded},
-			Addresses: []common.Address{offRamp},
-		},
-		{
-			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, offRamp),
-			EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved},
-			Addresses: []common.Address{offRamp},
-		},
-	}
-}
-
+//	func getCommitPluginDestLpFilters(offRamp common.Address) []logpoller.Filter {
+//		return []logpoller.Filter{
+//			{
+//				Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, offRamp),
+//				EventSigs: []common.Hash{abihelpers.EventSignatures.PoolAdded},
+//				Addresses: []common.Address{offRamp},
+//			},
+//			{
+//				Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, offRamp),
+//				EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved},
+//				Addresses: []common.Address{offRamp},
+//			},
+//		}
+//	}
+//
 // UnregisterCommitPluginLpFilters unregisters all the registered filters for both source and dest chains.
 // NOTE: The transaction MUST be used here for CLO's monster tx to function as expected
 // https://github.com/smartcontractkit/ccip/blob/68e2197472fb017dd4e5630d21e7878d58bc2a44/core/services/feeds/service.go#L716
@@ -196,18 +202,27 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 		return errors.New("spec is nil")
 	}
 	// Close static config
+	// (dynamic config/per instance config is closed via instance.Close())
+	// This means on job deletion the dynamic filters are closed separately - TODO double check that is correct.
 	if err := commitPluginConfig.onRampReader.Close(qopts...); err != nil {
 		return err
 	}
-	// TODO: once offramp/commit are abstracted, we can call Close on the offramp/commit readers to unregister filters.
-	return unregisterCommitPluginFilters(ctx, commitPluginConfig.destLP, commitPluginConfig.commitStore,
-		commitPluginConfig.offRamp.Address(), qopts...)
+	if err := commitPluginConfig.commitStore.Close(qopts...); err != nil {
+		return err
+	}
+	if err := commitPluginConfig.offRamp.Close(qopts...); err != nil {
+		return err
+	}
+	return nil
+	//// TODO: once offramp/commit are abstracted, we can call Close on the offramp/commit readers to unregister filters.
+	//return unregisterCommitPluginFilters(ctx, commitPluginConfig.destLP, commitPluginConfig.commitStore,
+	//	commitPluginConfig.offRamp.Address(), qopts...)
 }
 
-func unregisterCommitPluginFilters(ctx context.Context, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address, qopts ...pg.QOpt) error {
-	return logpollerutil.UnregisterLpFilters(
-		destLP,
-		getCommitPluginDestLpFilters(offRamp),
-		qopts...,
-	)
-}
+//func unregisterCommitPluginFilters(ctx context.Context, destLP logpoller.LogPoller, destCommitStore commit_store.CommitStoreInterface, offRamp common.Address, qopts ...pg.QOpt) error {
+//	return logpollerutil.UnregisterLpFilters(
+//		destLP,
+//		getCommitPluginDestLpFilters(offRamp),
+//		qopts...,
+//	)
+//}
