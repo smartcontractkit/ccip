@@ -190,8 +190,7 @@ contract StructFactory {
 
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: tokenPriceUpdates,
-      destChainSelector: 0,
-      usdPerUnitGas: 0
+      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
 
     return priceUpdates;
@@ -209,8 +208,7 @@ contract StructFactory {
     }
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: tokenPriceUpdates,
-      destChainSelector: 0,
-      usdPerUnitGas: 0
+      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
     });
 
     return priceUpdates;
@@ -221,8 +219,7 @@ contract StructFactory {
     return
       Internal.PriceUpdates({
         tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
-        destChainSelector: 0,
-        usdPerUnitGas: 0
+        gasPriceUpdates: new Internal.GasPriceUpdate[](0)
       });
   }
 }
