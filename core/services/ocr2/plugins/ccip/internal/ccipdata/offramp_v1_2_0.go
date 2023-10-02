@@ -48,8 +48,8 @@ func (o *OffRampV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig []byt
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
 }
 
-func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_2_0, error) {
-	v100, err := NewOffRampV1_0_0(lggr, addr, ec, lp, estimator)
+func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, srcClient client.Client) (*OffRampV1_2_0, error) {
+	v100, err := NewOffRampV1_0_0(lggr, addr, ec, lp, estimator, srcClient)
 	if err != nil {
 		return nil, err
 	}

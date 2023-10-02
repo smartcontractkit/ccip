@@ -4,27 +4,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/gethwrappers2/ocr2aggregator"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
-)
-
-// MessageExecutionState defines the execution states of CCIP messages.
-type MessageExecutionState uint8
-
-const (
-	ExecutionStateUntouched MessageExecutionState = iota
-	ExecutionStateInProgress
-	ExecutionStateSuccess
-	ExecutionStateFailure
 )
 
 // TODO: Deprecate in favour of version specific types
@@ -64,32 +50,12 @@ func GetIDOrPanic(name string, abi2 abi.ABI) common.Hash {
 }
 
 func init() {
-	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
-	if err != nil {
-		panic(err)
-	}
-	EventSignatures.ReportAccepted = GetIDOrPanic("ReportAccepted", commitStoreABI)
-	EventSignatures.ReportAcceptedMaxSequenceNumberWord = 3
-
-	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_offramp.EVM2EVMOffRampABI))
-	if err != nil {
-		panic(err)
-	}
-	EventSignatures.ExecutionStateChanged = GetIDOrPanic("ExecutionStateChanged", offRampABI)
-	EventSignatures.ExecutionStateChangedSequenceNumberIndex = 1
-	EventSignatures.PoolAdded = GetIDOrPanic("PoolAdded", offRampABI)
-	EventSignatures.PoolRemoved = GetIDOrPanic("PoolRemoved", offRampABI)
-
-	priceRegistryABI, err := abi.JSON(strings.NewReader(price_registry.PriceRegistryABI))
-	if err != nil {
-		panic(err)
-	}
-	EventSignatures.UsdPerUnitGasUpdated = GetIDOrPanic("UsdPerUnitGasUpdated", priceRegistryABI)
-	EventSignatures.UsdPerTokenUpdated = GetIDOrPanic("UsdPerTokenUpdated", priceRegistryABI)
-	EventSignatures.FeeTokenAdded = GetIDOrPanic("FeeTokenAdded", priceRegistryABI)
-	EventSignatures.FeeTokenRemoved = GetIDOrPanic("FeeTokenRemoved", priceRegistryABI)
-
-	CommitReportArgs = commitStoreABI.Events["ReportAccepted"].Inputs
+	//commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
+	//if err != nil {
+	//	panic(err)
+	//}
+	//EventSignatures.ReportAccepted = GetIDOrPanic("ReportAccepted", commitStoreABI)
+	//EventSignatures.ReportAcceptedMaxSequenceNumberWord = 3
 
 }
 

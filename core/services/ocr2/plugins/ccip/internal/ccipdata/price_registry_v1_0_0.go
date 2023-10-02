@@ -27,6 +27,9 @@ type PriceRegistryV1_0_0 struct {
 	address       common.Address
 	lp            logpoller.LogPoller
 	lggr          logger.Logger
+	filters       []logpoller.Filter
+	tokenUpdated  common.Hash
+	gasUpdated    common.Hash
 }
 
 func (p *PriceRegistryV1_0_0) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error) {
@@ -43,12 +46,12 @@ func (p *PriceRegistryV1_0_0) GetFeeTokens(ctx context.Context) ([]common.Addres
 }
 
 func (p *PriceRegistryV1_0_0) Close(opts ...pg.QOpt) error {
-	return nil
+	return logpollerutil.UnregisterLpFilters(p.lp, p.filters, opts...)
 }
 
 func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]Event[TokenPriceUpdate], error) {
 	logs, err := p.lp.LogsCreatedAfter(
-		abihelpers.EventSignatures.UsdPerTokenUpdated,
+		p.tokenUpdated,
 		p.address,
 		ts,
 		confs,
@@ -79,7 +82,7 @@ func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Conte
 
 func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]Event[GasPriceUpdate], error) {
 	logs, err := p.lp.IndexedLogsCreatedAfter(
-		abihelpers.EventSignatures.UsdPerUnitGasUpdated,
+		p.gasUpdated,
 		p.address,
 		1,
 		[]common.Hash{abihelpers.EvmWord(chainSelector)},
@@ -122,9 +125,11 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 	if err != nil {
 		return nil, err
 	}
+	gasUpdated := abihelpers.GetIDOrPanic("UsdPerUnitGasUpdated", priceRegistryABI)
+	tokenUpdated := abihelpers.GetIDOrPanic("UsdPerTokenUpdated", priceRegistryABI)
 	var filters = []logpoller.Filter{{
 		Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistryAddr),
-		EventSigs: []common.Hash{abihelpers.GetIDOrPanic("UsdPerUnitGasUpdated", priceRegistryABI), abihelpers.GetIDOrPanic("UsdPerTokenUpdated", priceRegistryABI)},
+		EventSigs: []common.Hash{gasUpdated, tokenUpdated},
 		Addresses: []common.Address{priceRegistryAddr},
 	},
 		{
@@ -146,5 +151,7 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 		address:       priceRegistryAddr,
 		lp:            lp,
 		lggr:          lggr,
+		gasUpdated:    gasUpdated,
+		tokenUpdated:  tokenUpdated,
 	}, nil
 }

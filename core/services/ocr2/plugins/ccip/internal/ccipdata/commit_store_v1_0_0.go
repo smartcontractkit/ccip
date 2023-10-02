@@ -32,15 +32,17 @@ const (
 var _ CommitStoreReader = &CommitStoreV1_0_0{}
 
 type CommitStoreV1_0_0 struct {
-	commitStore       *commit_store.CommitStore
-	lggr              logger.Logger
-	lp                logpoller.LogPoller
-	address           common.Address
-	estimator         gas.EvmFeeEstimator
-	gasPriceEstimator prices.ExecGasPriceEstimator
-	offchainConfig    OffchainConfig
-	filters           []logpoller.Filter
-	commitReportArgs  abi.Arguments
+	commitStore               *commit_store.CommitStore
+	lggr                      logger.Logger
+	lp                        logpoller.LogPoller
+	address                   common.Address
+	estimator                 gas.EvmFeeEstimator
+	gasPriceEstimator         prices.ExecGasPriceEstimator
+	offchainConfig            OffchainConfig
+	filters                   []logpoller.Filter
+	reportAcceptedSig         common.Hash
+	reportAcceptedMaxSeqIndex int
+	commitReportArgs          abi.Arguments
 }
 
 func (c *CommitStoreV1_0_0) EncodeCommitReport(report CommitStoreReport) ([]byte, error) {
@@ -213,9 +215,9 @@ func (c *CommitStoreV1_0_0) parseReport(log types.Log) (*CommitStoreReport, erro
 
 func (c *CommitStoreV1_0_0) GetAcceptedCommitReportsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[CommitStoreReport], error) {
 	logs, err := c.lp.LogsDataWordGreaterThan(
-		abihelpers.EventSignatures.ReportAccepted,
+		c.reportAcceptedSig,
 		c.address,
-		abihelpers.EventSignatures.ReportAcceptedMaxSequenceNumberWord,
+		c.reportAcceptedMaxSeqIndex,
 		logpoller.EvmWord(seqNum),
 		confs,
 		pg.WithParentCtx(ctx),
@@ -233,7 +235,7 @@ func (c *CommitStoreV1_0_0) GetAcceptedCommitReportsGteSeqNum(ctx context.Contex
 
 func (c *CommitStoreV1_0_0) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]Event[CommitStoreReport], error) {
 	logs, err := c.lp.LogsCreatedAfter(
-		abihelpers.EventSignatures.ReportAccepted,
+		c.reportAcceptedSig,
 		c.address,
 		ts,
 		confs,
@@ -308,5 +310,14 @@ func NewCommitStoreV1_0_0(lggr logger.Logger, addr common.Address, ec client.Cli
 		return nil, err
 	}
 	// TODO: try and read initial config
-	return &CommitStoreV1_0_0{commitStore: commitStore, lggr: lggr, lp: lp, estimator: estimator, filters: filters, commitReportArgs: commitReportArgs}, nil
+	return &CommitStoreV1_0_0{commitStore: commitStore,
+		lggr:              lggr,
+		lp:                lp,
+		estimator:         estimator,
+		filters:           filters,
+		commitReportArgs:  commitReportArgs,
+		reportAcceptedSig: eventSig,
+		// offset || priceUpdatesOffset || minSeqNum || maxSeqNum || merkleRoot
+		reportAcceptedMaxSeqIndex: 3,
+	}, nil
 }

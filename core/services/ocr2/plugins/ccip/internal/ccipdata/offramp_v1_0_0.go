@@ -45,6 +45,8 @@ type OffRampV1_0_0 struct {
 	estimator           gas.EvmFeeEstimator
 	gasPriceEstimator   prices.GasPriceEstimatorExec
 	executionReportArgs abi.Arguments
+	eventIndex          int
+	eventSig            common.Hash
 }
 
 func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ExecReport, error) {
@@ -173,9 +175,9 @@ func (o *OffRampV1_0_0) Close(qopts ...pg.QOpt) error {
 
 func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error) {
 	logs, err := o.lp.IndexedLogsTopicRange(
-		abihelpers.EventSignatures.ExecutionStateChanged,
+		o.eventSig,
 		o.addr,
-		abihelpers.EventSignatures.ExecutionStateChangedSequenceNumberIndex,
+		o.eventIndex,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
 		confs,
@@ -247,21 +249,23 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 	if !ok {
 		panic("missing event 'manuallyExecute'")
 	}
+	stateChanged := abihelpers.GetIDOrPanic("ExecutionStateChanged", offRampABI)
+	executionStateChangedSequenceNumberIndex := 1
 	executionReportArgs := manuallyExecuteMethod.Inputs[:1]
 	var filters = []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, addr.String()),
-			EventSigs: []common.Hash{abihelpers.EventSignatures.ExecutionStateChanged},
+			EventSigs: []common.Hash{stateChanged},
 			Addresses: []common.Address{addr},
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, addr.String()),
-			EventSigs: []common.Hash{abihelpers.EventSignatures.PoolAdded},
+			EventSigs: []common.Hash{abihelpers.GetIDOrPanic("PoolAdded", offRampABI)},
 			Addresses: []common.Address{addr},
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, addr.String()),
-			EventSigs: []common.Hash{abihelpers.EventSignatures.PoolRemoved},
+			EventSigs: []common.Hash{abihelpers.GetIDOrPanic("PoolRemoved", offRampABI)},
 			Addresses: []common.Address{addr},
 		},
 	}
@@ -284,5 +288,6 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 	if err != nil {
 		return nil, err
 	}
-	return &OffRampV1_0_0{offRamp: offRamp, onRamp: onRamp, addr: addr, lggr: lggr, lp: lp, filters: filters, estimator: estimator, executionReportArgs: executionReportArgs}, nil
+	return &OffRampV1_0_0{offRamp: offRamp, onRamp: onRamp, addr: addr, lggr: lggr, lp: lp, filters: filters,
+		estimator: estimator, executionReportArgs: executionReportArgs, eventSig: stateChanged, eventIndex: executionStateChangedSequenceNumberIndex}, nil
 }
