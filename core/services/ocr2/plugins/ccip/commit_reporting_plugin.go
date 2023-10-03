@@ -10,14 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
@@ -56,14 +54,12 @@ type CommitPluginStaticConfig struct {
 	onRampReader        ccipdata.OnRampReader
 	sourceChainSelector uint64
 	sourceNative        common.Address
-	sourceFeeEstimator  gas.EvmFeeEstimator
 	// Dest
-	destLP             logpoller.LogPoller
-	offRamp            ccipdata.OffRampReader
-	commitStore        ccipdata.CommitStoreReader
-	commitStoreVersion semver.Version
-	destClient         evmclient.Client
-	destChainEVMID     *big.Int
+	destLP         logpoller.LogPoller
+	offRamp        ccipdata.OffRampReader
+	commitStore    ccipdata.CommitStoreReader
+	destClient     evmclient.Client
+	destChainEVMID *big.Int
 	// Offchain
 	priceGetter pricegetter.PriceGetter
 }

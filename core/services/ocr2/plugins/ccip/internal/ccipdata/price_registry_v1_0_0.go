@@ -2,10 +2,9 @@ package ccipdata
 
 import (
 	"context"
-	"strings"
+	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -20,7 +19,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-var _ PriceRegistryReader = &PriceRegistryV1_0_0{}
+var (
+	_ PriceRegistryReader = &PriceRegistryV1_0_0{}
+)
+
+const ExecPluginLabel = "exec"
 
 type PriceRegistryV1_0_0 struct {
 	priceRegistry *observability.ObservedPriceRegistryV1_0_0
@@ -33,13 +36,26 @@ type PriceRegistryV1_0_0 struct {
 }
 
 func (p *PriceRegistryV1_0_0) FeeTokenEvents() []common.Hash {
-	//TODO implement me
-	panic("implement me")
+	priceRegABI := abihelpers.MustParseABI(price_registry.PriceRegistryABI)
+	return []common.Hash{abihelpers.MustGetEventID("FeeTokenRemoved", priceRegABI), abihelpers.MustGetEventID("FeeTokenAdded", priceRegABI)}
 }
 
 func (p *PriceRegistryV1_0_0) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error) {
-	//TODO implement me
-	panic("implement me")
+	tps, err := p.priceRegistry.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
+	if err != nil {
+		return nil, err
+	}
+	var tpu []TokenPriceUpdate
+	for i, tp := range tps {
+		tpu = append(tpu, TokenPriceUpdate{
+			TokenPrice: TokenPrice{
+				Token: wantedTokens[i],
+				Value: tp.Value,
+			},
+			Timestamp: big.NewInt(int64(tp.Timestamp)), // TODO: valid conversion
+		})
+	}
+	return tpu, nil
 }
 
 func (p *PriceRegistryV1_0_0) Address() common.Address {
@@ -118,18 +134,14 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 	)
 }
 
-const ExecPluginLabel = "exec"
-
 func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistryV1_0_0, error) {
 	// TODO pass label
 	priceRegistry, err := observability.NewObservedPriceRegistryV1_0_0(priceRegistryAddr, ExecPluginLabel, ec)
 	if err != nil {
 		return nil, err
 	}
-	priceRegistryABI, err := abi.JSON(strings.NewReader(price_registry.PriceRegistryABI))
-	if err != nil {
-		return nil, err
-	}
+	priceRegistryABI := abihelpers.MustParseABI(price_registry.PriceRegistryABI)
+	// TODO: clean up strings
 	tokenUpdated := abihelpers.MustGetEventID("UsdPerTokenUpdated", priceRegistryABI)
 	var filters = []logpoller.Filter{{
 		Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistryAddr),

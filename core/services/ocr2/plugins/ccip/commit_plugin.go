@@ -55,13 +55,13 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "get chainset")
 	}
-	commitStore, commitStoreVersion, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
+	commitStore, _, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading commitStoreReader")
+		return nil, nil, errors.Wrap(err, "failed loading commitStore")
 	}
 	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStoreReader")
+		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
 	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {
@@ -115,11 +115,9 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			offRamp:             offRampReader,
 			priceGetter:         priceGetterObject,
 			sourceNative:        sourceNative,
-			sourceFeeEstimator:  sourceChain.GasEstimator(),
 			sourceChainSelector: staticConfig.SourceChainSelector,
 			destClient:          destChain.Client(),
 			commitStore:         commitStoreReader,
-			commitStoreVersion:  commitStoreVersion,
 		}, &BackfillArgs{
 			sourceLP:         sourceChain.LogPoller(),
 			destLP:           destChain.LogPoller(),
@@ -169,9 +167,6 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 	if err != nil {
 		return errors.New("spec is nil")
 	}
-	// Close static config
-	// (dynamic config/per instance config is closed via instance.Close())
-	// This means on job deletion the dynamic filters are closed separately - TODO double check that is correct.
 	if err := commitPluginConfig.onRampReader.Close(qopts...); err != nil {
 		return err
 	}

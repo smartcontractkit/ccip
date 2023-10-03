@@ -38,7 +38,6 @@ func getProofData(
 }
 
 func buildExecutionReportForMessages(
-	//msgsInRoot []*evm_2_evm_offramp.InternalEVM2EVMMessage,
 	msgsInRoot []ccipdata.Event[internal.EVM2EVMMessage],
 	leaves [][32]byte,
 	tree *merklemulti.Tree[[32]byte],
