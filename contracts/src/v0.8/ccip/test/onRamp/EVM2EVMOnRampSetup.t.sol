@@ -200,6 +200,15 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       messageId: ""
     });
 
+    for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
+      address token = message.tokenAmounts[i].token;
+      if (token == s_sourceFeeToken || token == s_sourceRouter.getWrappedNative() || token == CUSTOM_TOKEN) {
+        messageEvent.sourceTokenData[i] = hex"01";
+      } else {
+        messageEvent.sourceTokenData[i] = hex"00";
+      }
+    }
+
     messageEvent.messageId = Internal._hash(messageEvent, s_metadataHash);
     return messageEvent;
   }

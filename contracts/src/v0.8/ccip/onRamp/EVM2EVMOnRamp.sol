@@ -276,12 +276,23 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     _validateMessage(message.data.length, gasLimit, numberOfTokens);
 
     // Only check token value if there are tokens
+    bytes memory aggrRateLimits = new bytes(numberOfTokens);
+    Client.EVMTokenAmount[] memory tokenTransfersCopy = message.tokenAmounts;
     if (numberOfTokens > 0) {
       for (uint256 i = 0; i < numberOfTokens; ++i) {
-        if (message.tokenAmounts[i].amount == 0) revert CannotSendZeroTokens();
+        Client.EVMTokenAmount calldata tokenAmount = message.tokenAmounts[i];
+        if (tokenAmount.amount == 0) revert CannotSendZeroTokens();
+
+        // For POC, only limit if token bps fee is charged
+        if (s_tokenTransferFeeConfig[tokenAmount.token].ratio > 0) {
+          aggrRateLimits[i] = bytes1(uint8(1));
+        } else {
+          aggrRateLimits[i] = bytes1(uint8(0));
+          tokenTransfersCopy[i].amount = 0;
+        }
       }
       // Rate limit on aggregated token value
-      _rateLimitValue(message.tokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
+      _rateLimitValue(tokenTransfersCopy, IPriceRegistry(s_dynamicConfig.priceRegistry));
     }
 
     // Convert feeToken to link if not already in link
@@ -323,13 +334,15 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      newMessage.sourceTokenData[i] = getPoolBySourceToken(IERC20(tokenAndAmount.token)).lockOrBurn(
+      bytes memory tokenPoolData = getPoolBySourceToken(IERC20(tokenAndAmount.token)).lockOrBurn(
         originalSender,
         message.receiver,
         tokenAndAmount.amount,
         i_destChainSelector,
         bytes("") // any future extraArgs component would be added here
       );
+
+      newMessage.sourceTokenData[i] = bytes.concat(aggrRateLimits[i], tokenPoolData);
     }
 
     // Hash only after the sourceTokenData has been set

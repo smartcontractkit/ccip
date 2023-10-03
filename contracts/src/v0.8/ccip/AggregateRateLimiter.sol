@@ -44,6 +44,10 @@ contract AggregateRateLimiter is OwnerIsCreator {
 
     uint256 value = 0;
     for (uint256 i = 0; i < numberOfTokens; ++i) {
+      if (tokenAmounts[i].amount == 0) {
+        continue;
+      }
+
       // not fetching validated price, as price staleness is not important for value-based rate limiting
       // we only need to verify price is not 0
       uint224 pricePerToken = priceRegistry.getTokenPrice(tokenAmounts[i].token).value;

@@ -117,6 +117,8 @@ contract TokenProxy_ccipSend is TokenProxySetup {
 
     Internal.EVM2EVMMessage memory msgEvent = _messageToEvent(message, 1, 1, expectedFee, OWNER);
     msgEvent.sender = address(s_tokenProxy);
+    msgEvent.sourceTokenData = new bytes[](1);
+    msgEvent.sourceTokenData[0] = hex"00";
     msgEvent.messageId = Internal._hash(msgEvent, s_metadataHash);
 
     vm.expectEmit();

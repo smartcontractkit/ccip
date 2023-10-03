@@ -399,7 +399,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// its execution and enforce atomicity among successful message processing and token transfer.
   /// @dev We use 165 to check for the ccipReceive interface to permit sending tokens to contracts
   /// (for example smart contract wallets) without an associated message.
-  function executeSingleMessage(Internal.EVM2EVMMessage memory message, bytes[] memory offchainTokenData) external {
+  function executeSingleMessage(Internal.EVM2EVMMessage calldata message, bytes[] calldata offchainTokenData) external {
     if (msg.sender != address(this)) revert CanOnlySelfCall();
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
@@ -571,11 +571,11 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
   function _releaseOrMintTokens(
-    Client.EVMTokenAmount[] memory sourceTokenAmounts,
+    Client.EVMTokenAmount[] calldata sourceTokenAmounts,
     bytes memory originalSender,
     address receiver,
-    bytes[] memory sourceTokenData,
-    bytes[] memory offchainTokenData
+    bytes[] calldata sourceTokenData,
+    bytes[] calldata offchainTokenData
   ) internal returns (Client.EVMTokenAmount[] memory) {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
@@ -587,7 +587,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
           receiver,
           sourceTokenAmounts[i].amount,
           i_sourceChainSelector,
-          abi.encode(sourceTokenData[i], offchainTokenData[i])
+          abi.encode(sourceTokenData[i][1:], offchainTokenData[i])
         )
       {} catch (bytes memory err) {
         /// @dev wrap and rethrow the error so we can catch it lower in the stack
@@ -595,9 +595,18 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
       }
 
       destTokenAmounts[i].token = address(pool.getToken());
+      if (uint8(sourceTokenData[i][0]) == 1) {
+        destTokenAmounts[i].amount = 0;
+      } else {
+        destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
+      }
+    }
+    
+    _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
+
+    for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       destTokenAmounts[i].amount = sourceTokenAmounts[i].amount;
     }
-    _rateLimitValue(destTokenAmounts, IPriceRegistry(s_dynamicConfig.priceRegistry));
     return destTokenAmounts;
   }
 

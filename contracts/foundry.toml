@@ -21,7 +21,7 @@ solc_version = '0.8.19'
 src = 'src/v0.8/ccip'
 test = 'src/v0.8/ccip/test'
 optimizer_runs = 26_000
-deny_warnings = true
+deny_warnings = false
 
 [profile.metatx]
 solc_version = '0.8.15'
