@@ -32,7 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-// TOOD pass context?
+// TODO pass context?
 func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer) (*ExecutionPluginStaticConfig, *BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, nil, errors.New("spec is nil")
@@ -217,10 +217,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 	if err := execPluginConfig.offRampReader.Close(qopts...); err != nil {
 		return err
 	}
-	if err := execPluginConfig.commitStoreReader.Close(qopts...); err != nil {
-		return err
-	}
-	return nil
+	return execPluginConfig.commitStoreReader.Close(qopts...)
 }
 
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.

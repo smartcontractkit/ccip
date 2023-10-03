@@ -880,8 +880,8 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 			return false
 		}
 
-		encoded, err := r.config.offRampReader.EncodeExecutionReport(report)
-		if err != nil {
+		encoded, err2 := r.config.offRampReader.EncodeExecutionReport(report)
+		if err2 != nil {
 			// false makes Search keep looking to the right, always including any "erroring" ObservedMessage and allowing us to detect in the bottom
 			return false
 		}

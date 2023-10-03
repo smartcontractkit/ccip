@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -41,7 +40,6 @@ var (
 
 type OffRampV1_0_0 struct {
 	offRamp             *evm_2_evm_offramp.EVM2EVMOffRamp
-	onRamp              *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp
 	addr                common.Address
 	lp                  logpoller.LogPoller
 	lggr                logger.Logger
@@ -253,7 +251,7 @@ func decodeExecReportV1_0_0(args abi.Arguments, report []byte) (ExecReport, erro
 			Data:                msg.Data,
 			TokenAmounts:        tokensAndAmounts,
 			SourceTokenData:     msg.SourceTokenData,
-			// TODO: Not needed for plugins, but should be recomputed for consistentcy.
+			// TODO: Not needed for plugins, but should be recomputed for consistency.
 			// Requires the offramp knowing about onramp version
 			Hash: [32]byte{},
 		})

@@ -1407,7 +1407,7 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 
 	testCases := []struct {
 		name                 string
-		priceRegistryUpdates []price_registry.PriceRegistryUsdPerTokenUpdated
+		priceRegistryUpdates []ccipdata.TokenPriceUpdate
 		checkInflight        bool
 		inflightUpdates      map[common.Address]update
 		expUpdates           map[common.Address]update
@@ -1415,15 +1415,19 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 	}{
 		{
 			name: "ignore inflight updates",
-			priceRegistryUpdates: []price_registry.PriceRegistryUsdPerTokenUpdated{
+			priceRegistryUpdates: []ccipdata.TokenPriceUpdate{
 				{
-					Token:     tk1,
-					Value:     big.NewInt(1000),
+					TokenPrice: ccipdata.TokenPrice{
+						Token: tk1,
+						Value: big.NewInt(1000),
+					},
 					Timestamp: big.NewInt(now.Add(1 * time.Minute).Unix()),
 				},
 				{
-					Token:     tk2,
-					Value:     big.NewInt(2000),
+					TokenPrice: ccipdata.TokenPrice{
+						Token: tk2,
+						Value: big.NewInt(2000),
+					},
 					Timestamp: big.NewInt(now.Add(2 * time.Minute).Unix()),
 				},
 			},
@@ -1436,15 +1440,19 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 		},
 		{
 			name: "consider inflight updates",
-			priceRegistryUpdates: []price_registry.PriceRegistryUsdPerTokenUpdated{
+			priceRegistryUpdates: []ccipdata.TokenPriceUpdate{
 				{
-					Token:     tk1,
-					Value:     big.NewInt(1000),
+					TokenPrice: ccipdata.TokenPrice{
+						Token: tk1,
+						Value: big.NewInt(1000),
+					},
 					Timestamp: big.NewInt(now.Add(1 * time.Minute).Unix()),
 				},
 				{
-					Token:     tk2,
-					Value:     big.NewInt(2000),
+					TokenPrice: ccipdata.TokenPrice{
+						Token: tk2,
+						Value: big.NewInt(2000),
+					},
 					Timestamp: big.NewInt(now.Add(2 * time.Minute).Unix()),
 				},
 			},
@@ -1466,22 +1474,19 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &CommitReportingPlugin{}
 
-			_, priceRegAddr := testhelpers.NewFakePriceRegistry(t)
+			//_, priceRegAddr := testhelpers.NewFakePriceRegistry(t)
 			priceReg := ccipdata.NewMockPriceRegistryReader(t)
 			p.destPriceRegistryReader = priceReg
 
-			destReader := ccipdata.NewMockReader(t)
-			var events []ccipdata.Event[price_registry.PriceRegistryUsdPerTokenUpdated]
+			//destReader := ccipdata.NewMockReader(t)
+			var events []ccipdata.Event[ccipdata.TokenPriceUpdate]
 			for _, up := range tc.priceRegistryUpdates {
-				events = append(events, ccipdata.Event[price_registry.PriceRegistryUsdPerTokenUpdated]{
-					Data: price_registry.PriceRegistryUsdPerTokenUpdated{
-						Token:     up.Token,
-						Value:     up.Value,
-						Timestamp: up.Timestamp,
-					},
+				events = append(events, ccipdata.Event[ccipdata.TokenPriceUpdate]{
+					Data: up,
 				})
 			}
-			destReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, priceRegAddr, mock.Anything, 0).Return(events, nil)
+			//destReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, priceRegAddr, mock.Anything, 0).Return(events, nil)
+			priceReg.On("GetTokenPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(events, nil)
 
 			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 			if len(tc.inflightUpdates) > 0 {

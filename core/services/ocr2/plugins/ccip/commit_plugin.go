@@ -178,8 +178,5 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 	if err := commitPluginConfig.commitStore.Close(qopts...); err != nil {
 		return err
 	}
-	if err := commitPluginConfig.offRamp.Close(qopts...); err != nil {
-		return err
-	}
-	return nil
+	return commitPluginConfig.offRamp.Close(qopts...)
 }

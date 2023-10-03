@@ -168,7 +168,7 @@ func NewOffRampReader(lggr logger.Logger, addr common.Address, srcClient, destCl
 	case "1.2.0":
 		return NewOffRampV1_2_0(lggr, addr, destClient, lp, estimator)
 	default:
-		return nil, errors.Errorf("unsupported offramp verison %v", version.String())
+		return nil, errors.Errorf("unsupported offramp version %v", version.String())
 	}
 	// TODO can validate it points to the correct onramp version using srcClinet
 }
