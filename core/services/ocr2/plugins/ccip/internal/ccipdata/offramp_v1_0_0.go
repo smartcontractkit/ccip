@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -45,6 +46,8 @@ type OffRampV1_0_0 struct {
 	ec                  client.Client
 	filters             []logpoller.Filter
 	estimator           gas.EvmFeeEstimator
+	offchainConfig      ExecOffchainConfig
+	onchainConfig       ExecOnchainConfig
 	gasPriceEstimator   prices.GasPriceEstimatorExec
 	executionReportArgs abi.Arguments
 	eventIndex          int
@@ -52,28 +55,23 @@ type OffRampV1_0_0 struct {
 }
 
 func (o *OffRampV1_0_0) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
-	//TODO implement me
-	panic("implement me")
+	return o.offRamp.GetDestinationToken(&bind.CallOpts{Context: ctx}, address)
 }
 
 func (o *OffRampV1_0_0) GetSupportedTokens(ctx context.Context) ([]common.Address, error) {
-	//TODO implement me
-	panic("implement me")
+	return o.offRamp.GetSupportedTokens(&bind.CallOpts{Context: ctx})
 }
 
 func (o *OffRampV1_0_0) GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error) {
-	//TODO implement me
-	panic("implement me")
+	return o.offRamp.GetPoolByDestToken(&bind.CallOpts{Context: ctx}, address)
 }
 
 func (o *OffRampV1_0_0) OffchainConfig() ExecOffchainConfig {
-	//TODO implement me
-	panic("implement me")
+	return o.offchainConfig
 }
 
 func (o *OffRampV1_0_0) OnchainConfig() ExecOnchainConfig {
-	//TODO implement me
-	panic("implement me")
+	return o.onchainConfig
 }
 
 func (o *OffRampV1_0_0) GasPriceEstimator() prices.GasPriceEstimatorExec {
@@ -102,6 +100,17 @@ func (o *OffRampV1_0_0) ConfigChanged(onchainConfig []byte, offchainConfig []byt
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
+	o.offchainConfig = ExecOffchainConfig{
+		SourceFinalityDepth:         offchainConfigParsed.SourceFinalityDepth,
+		DestFinalityDepth:           offchainConfigParsed.DestFinalityDepth,
+		DestOptimisticConfirmations: offchainConfigParsed.DestOptimisticConfirmations,
+		BatchGasLimit:               offchainConfigParsed.BatchGasLimit,
+		RelativeBoostPerWaitHour:    offchainConfigParsed.RelativeBoostPerWaitHour,
+		MaxGasPrice:                 offchainConfigParsed.MaxGasPrice,
+		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
+		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
+	}
+	o.onchainConfig = ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
 	o.gasPriceEstimator = prices.NewExecGasPriceEstimator(o.estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0)
 	o.lggr.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
@@ -224,22 +233,23 @@ func decodeExecReportV1_0_0(args abi.Arguments, report []byte) (ExecReport, erro
 				Amount: tokenAndAmount.Amount,
 			})
 		}
-		// TODO
 		messages = append(messages, internal.EVM2EVMMessage{
 			SequenceNumber:      msg.SequenceNumber,
-			GasLimit:            nil,
-			Nonce:               0,
+			GasLimit:            msg.GasLimit,
+			Nonce:               msg.Nonce,
 			MessageId:           msg.MessageId,
-			SourceChainSelector: 0,
-			Sender:              common.Address{},
-			Receiver:            common.Address{},
-			Strict:              false,
-			FeeToken:            common.Address{},
-			FeeTokenAmount:      nil,
-			Data:                nil,
+			SourceChainSelector: msg.SourceChainSelector,
+			Sender:              msg.Sender,
+			Receiver:            msg.Receiver,
+			Strict:              msg.Strict,
+			FeeToken:            msg.FeeToken,
+			FeeTokenAmount:      msg.FeeTokenAmount,
+			Data:                msg.Data,
 			TokenAmounts:        tokensAndAmounts,
-			SourceTokenData:     nil,
-			Hash:                [32]byte{}, // TODO
+			SourceTokenData:     msg.SourceTokenData,
+			// TODO: Not needed for plugins, but should be recomputed for consistentcy.
+			// Requires the offramp knowing about onramp version
+			Hash: [32]byte{},
 		})
 	}
 
@@ -263,7 +273,7 @@ func (o *OffRampV1_0_0) TokenEvents() []common.Hash {
 	return []common.Hash{abihelpers.MustGetEventID("PoolAdded", offRampABI), abihelpers.MustGetEventID("PoolRemoved", offRampABI)}
 }
 
-func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, srcClient client.Client) (*OffRampV1_0_0, error) {
+func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_0_0, error) {
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
 		return nil, err
@@ -292,22 +302,6 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 	if err := logpollerutil.RegisterLpFilters(lp, filters); err != nil {
 		return nil, err
 	}
-	s, err := offRamp.GetStaticConfig(nil)
-	if err != nil {
-		return nil, err
-	}
-	// Must point to the correct version onramp
-	contractType, version, err := ccipconfig.TypeAndVersion(s.OnRamp, srcClient)
-	if err != nil {
-		return nil, err
-	}
-	if contractType != ccipconfig.EVM2EVMOnRamp || version.String() != "1.0.0" {
-		return nil, errors.Errorf("offramp points to invalid onramp %v expected 1.0.0", version.String())
-	}
-	onRamp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(s.OnRamp, srcClient)
-	if err != nil {
-		return nil, err
-	}
-	return &OffRampV1_0_0{offRamp: offRamp, onRamp: onRamp, addr: addr, lggr: lggr, lp: lp, filters: filters,
+	return &OffRampV1_0_0{offRamp: offRamp, addr: addr, lggr: lggr, lp: lp, filters: filters,
 		estimator: estimator, executionReportArgs: executionReportArgs, eventSig: stateChanged, eventIndex: executionStateChangedSequenceNumberIndex}, nil
 }

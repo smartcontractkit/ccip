@@ -26,6 +26,7 @@ import (
 
 const (
 	EXEC_REPORT_ACCEPTS = "Exec report accepts"
+	ReportAccepted      = "ReportAccepted"
 )
 
 var _ CommitStoreReader = &CommitStoreV1_0_0{}
@@ -297,8 +298,8 @@ func NewCommitStoreV1_0_0(lggr logger.Logger, addr common.Address, ec client.Cli
 		return nil, err
 	}
 	commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
-	eventSig := abihelpers.MustGetEventID("ReportAccepted", commitStoreABI)
-	commitReportArgs := abihelpers.MustGetEventInputs("ReportAccepted", commitStoreABI)
+	eventSig := abihelpers.MustGetEventID(ReportAccepted, commitStoreABI)
+	commitReportArgs := abihelpers.MustGetEventInputs(ReportAccepted, commitStoreABI)
 	var filters = []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, addr.String()),

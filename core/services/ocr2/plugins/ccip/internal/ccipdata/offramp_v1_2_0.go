@@ -17,7 +17,7 @@ import (
 
 var _ OffRampReader = &OffRampV1_2_0{}
 
-// In 1.2 we have a different estimator
+// In 1.2 we have a different estimator impl
 type OffRampV1_2_0 struct {
 	*OffRampV1_0_0
 	gasPriceEstimator prices.GasPriceEstimatorExec
@@ -48,13 +48,12 @@ func (o *OffRampV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig []byt
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
 }
 
-func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, srcClient client.Client) (*OffRampV1_2_0, error) {
-	v100, err := NewOffRampV1_0_0(lggr, addr, ec, lp, estimator, srcClient)
+func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_2_0, error) {
+	v100, err := NewOffRampV1_0_0(lggr, addr, ec, lp, estimator)
 	if err != nil {
 		return nil, err
 	}
 	return &OffRampV1_2_0{
-		OffRampV1_0_0:     v100,
-		gasPriceEstimator: nil,
+		OffRampV1_0_0: v100,
 	}, nil
 }

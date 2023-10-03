@@ -42,21 +42,15 @@ type GasPriceUpdate struct {
 }
 
 type PriceRegistryReader interface {
+	Close(qopts ...pg.QOpt) error
 	// GetTokenPriceUpdatesCreatedAfter returns all the token price updates that happened after the provided timestamp.
 	GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]Event[TokenPriceUpdate], error)
-
 	// GetGasPriceUpdatesCreatedAfter returns all the gas price updates that happened after the provided timestamp.
 	GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]Event[GasPriceUpdate], error)
-
 	Address() common.Address
-
 	FeeTokenEvents() []common.Hash
-
 	GetFeeTokens(ctx context.Context) ([]common.Address, error)
-
 	GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error)
-
-	Close(qopts ...pg.QOpt) error
 }
 
 // NewPriceRegistryReader determines the appropriate version of the price registry and returns a reader for it.

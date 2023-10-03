@@ -120,7 +120,7 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 
 const ExecPluginLabel = "exec"
 
-func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client, qopts ...pg.QOpt) (*PriceRegistryV1_0_0, error) {
+func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistryV1_0_0, error) {
 	// TODO pass label
 	priceRegistry, err := observability.NewObservedPriceRegistryV1_0_0(priceRegistryAddr, ExecPluginLabel, ec)
 	if err != nil {
@@ -147,7 +147,7 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 			EventSigs: []common.Hash{abihelpers.MustGetEventID("FeeTokenAdded", priceRegistryABI)},
 			Addresses: []common.Address{priceRegistryAddr},
 		}}
-	err = logpollerutil.RegisterLpFilters(lp, filters, qopts...)
+	err = logpollerutil.RegisterLpFilters(lp, filters)
 	if err != nil {
 		return nil, err
 	}

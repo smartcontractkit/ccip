@@ -28,18 +28,14 @@ const (
 
 //go:generate mockery --quiet --name OnRampReader --output . --filename onramp_reader_mock.go --inpackage --case=underscore
 type OnRampReader interface {
+	Closer
 	// GetSendRequestsGteSeqNum returns all the message send requests with sequence number greater than or equal to the provided.
 	// If checkFinalityTags is set to true then confs param is ignored, the latest finalized block is used in the query.
 	GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
-
 	// GetSendRequestsBetweenSeqNums returns all the message send requests in the provided sequence numbers range (inclusive).
 	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
-
 	// Get router configured in the onRamp
 	RouterAddress() common.Address
-
-	// Reader cleanup i.e. unsubscribe from logs
-	Close(opt ...pg.QOpt) error
 }
 
 // NewOnRampReader determines the appropriate version of the onramp and returns a reader for it

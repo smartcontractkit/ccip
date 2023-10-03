@@ -73,7 +73,16 @@ func NewCCIPExecutionProvider(lggr logger.Logger, chainSet evm.Chain, rargs rela
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, configWatcher, ks, ccip.ExecutionReportToEthTxMeta)
+	address := common.HexToAddress(relayOpts.ContractID)
+	typ, ver, err := ccipconfig.TypeAndVersion(address, chainSet.Client())
+	if err != nil {
+		return nil, err
+	}
+	fn, err := ccip.ExecReportToEthTxMeta(typ, ver)
+	if err != nil {
+		return nil, err
+	}
+	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, configWatcher, ks, fn)
 	if err != nil {
 		return nil, err
 	}

@@ -111,6 +111,5 @@ func NewCommitStoreV1_2_0(lggr logger.Logger, addr common.Address, ec client.Cli
 	if err != nil {
 		return nil, err
 	}
-	// TODO: try and read initial config
 	return &CommitStoreV1_2_0{CommitStoreV1_0_0: commitStoreV100}, nil
 }

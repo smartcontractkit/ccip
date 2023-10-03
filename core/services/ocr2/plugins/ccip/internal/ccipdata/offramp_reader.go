@@ -20,7 +20,6 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
@@ -123,37 +122,24 @@ type ExecReport struct {
 }
 
 type OffRampReader interface {
+	Closer
 	// Will error if messages are not a compatible verion
 	EncodeExecutionReport(report ExecReport) ([]byte, error)
-
 	DecodeExecutionReport(report []byte) (ExecReport, error)
-
 	// GetExecutionStateChangesBetweenSeqNums returns all the execution state change events for the provided message sequence numbers (inclusive).
 	GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error)
-
 	GetDestinationTokens(ctx context.Context) ([]common.Address, error)
-
 	GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error)
-
 	GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error)
-
 	GetSupportedTokens(ctx context.Context) ([]common.Address, error)
-
 	Address() common.Address
-
-	// TODO Needed for cachign, maybe caching should move behind the readers?
+	// TODO Needed for caching, maybe caching should move behind the readers?
 	TokenEvents() []common.Hash
-
 	// Notifies the reader that the config has changed onchain
 	ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error)
-
 	OffchainConfig() ExecOffchainConfig
-
 	OnchainConfig() ExecOnchainConfig
-
 	GasPriceEstimator() prices.GasPriceEstimatorExec
-
-	Close(qopts ...pg.QOpt) error
 }
 
 // MessageExecutionState defines the execution states of CCIP messages.
@@ -173,12 +159,13 @@ func NewOffRampReader(lggr logger.Logger, addr common.Address, srcClient, destCl
 	}
 	switch version.String() {
 	case "1.0.0", "1.1.0":
-		return NewOffRampV1_0_0(lggr, addr, destClient, lp, estimator, srcClient)
+		return NewOffRampV1_0_0(lggr, addr, destClient, lp, estimator)
 	case "1.2.0":
-		return NewOffRampV1_2_0(lggr, addr, destClient, lp, estimator, srcClient)
+		return NewOffRampV1_2_0(lggr, addr, destClient, lp, estimator)
 	default:
 		return nil, errors.Errorf("unsupported offramp verison %v", version.String())
 	}
+	// TODO can validate it points to the correct onramp version using srcClinet
 }
 
 func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {

@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 type CommitStoreInterval struct {
@@ -64,34 +63,22 @@ type OffchainConfig struct {
 }
 
 type CommitStoreReader interface {
+	Closer
 	GetExpectedNextSequenceNumber(context context.Context) (uint64, error)
-
 	GetLatestPriceEpochAndRound(context context.Context) (uint64, error)
-
 	// GetAcceptedCommitReportsGteSeqNum returns all the accepted commit reports that have sequence number greater than or equal to the provided.
 	GetAcceptedCommitReportsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[CommitStoreReport], error)
-
 	// GetAcceptedCommitReportsGteTimestamp returns all the commit reports with timestamp greater than or equal to the provided.
 	GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]Event[CommitStoreReport], error)
-
 	IsDown(ctx context.Context) bool
-
 	IsBlessed(ctx context.Context, root [32]byte) (bool, error)
-
 	// Notifies the reader that the config has changed onchain
 	ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, error)
-
 	OffchainConfig() OffchainConfig
-
 	GasPriceEstimator() prices.GasPriceEstimatorCommit
-
 	EncodeCommitReport(report CommitStoreReport) ([]byte, error)
-
 	DecodeCommitReport(report []byte) (CommitStoreReport, error)
-
 	Verify(ctx context.Context, report ExecReport) bool
-
-	Close(qopts ...pg.QOpt) error
 }
 
 func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (CommitStoreReader, error) {
