@@ -23,6 +23,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
+const (
+	ManuallyExecute = "manuallyExecute"
+)
+
 // Do not change the JSON format of this struct without consulting with
 // the RDD people first.
 type ExecOffchainConfig struct {
@@ -178,7 +182,7 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 		// ABI remains the same across all offramp versions.
 		offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
 		return func(report []byte) (*txmgr.TxMeta, error) {
-			execReport, err := decodeExecReportV1_0_0(abihelpers.MustGetMethodInputs("manuallyExecute", offRampABI)[:1], report)
+			execReport, err := decodeExecReportV1_0_0(abihelpers.MustGetMethodInputs(ManuallyExecute, offRampABI)[:1], report)
 			if err != nil {
 				return nil, err
 			}
@@ -187,6 +191,12 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 	default:
 		return nil, errors.Errorf("got unexpected version %v", ver.String())
 	}
+}
+
+func EncodeExecutionReport(report ExecReport) ([]byte, error) {
+	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
+	return encodeExecutionReportV1_0_0(abihelpers.MustGetMethodInputs(ManuallyExecute, offRampABI)[:1], report)
+	// TODO: 1.2 will split
 }
 
 func execReportToEthTxMeta(execReport ExecReport) (*txmgr.TxMeta, error) {

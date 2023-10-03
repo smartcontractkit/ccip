@@ -46,6 +46,10 @@ type CommitStoreV1_0_0 struct {
 }
 
 func (c *CommitStoreV1_0_0) EncodeCommitReport(report CommitStoreReport) ([]byte, error) {
+	return encodeCommitReportV1_0_0(c.commitReportArgs, report)
+}
+
+func encodeCommitReportV1_0_0(commitReportArgs abi.Arguments, report CommitStoreReport) ([]byte, error) {
 	var tokenPriceUpdates []commit_store.InternalTokenPriceUpdate
 	for _, tokenPriceUpdate := range report.TokenPrices {
 		tokenPriceUpdates = append(tokenPriceUpdates, commit_store.InternalTokenPriceUpdate{
@@ -62,7 +66,7 @@ func (c *CommitStoreV1_0_0) EncodeCommitReport(report CommitStoreReport) ([]byte
 		Interval:   commit_store.CommitStoreInterval{},
 		MerkleRoot: [32]byte{},
 	}
-	return c.commitReportArgs.PackValues([]interface{}{rep})
+	return commitReportArgs.PackValues([]interface{}{rep})
 }
 
 func decodeCommitReportV1_0_0(commitReportArgs abi.Arguments, report []byte) (CommitStoreReport, error) {

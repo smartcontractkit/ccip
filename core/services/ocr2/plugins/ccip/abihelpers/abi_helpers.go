@@ -105,3 +105,12 @@ func DecodeOCR2Config(encoded []byte) (*ocr2aggregator.OCR2AggregatorConfigSet, 
 	}
 	return unpacked, nil
 }
+
+// Deprecated:
+func DecodeCommitReport() {
+
+}
+
+func EncodeCommitReport() {
+
+}

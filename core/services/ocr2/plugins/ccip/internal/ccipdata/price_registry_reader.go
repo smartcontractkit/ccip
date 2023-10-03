@@ -10,7 +10,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -19,6 +21,10 @@ const (
 	COMMIT_PRICE_UPDATES = "Commit price updates"
 	FEE_TOKEN_ADDED      = "Fee token added"
 	FEE_TOKEN_REMOVED    = "Fee token removed"
+)
+
+var (
+	UsdPerUnitGasUpdatedV1_0_0 = abihelpers.MustGetEventID("UsdPerUnitGasUpdated", abihelpers.MustParseABI(price_registry.PriceRegistryABI))
 )
 
 type TokenPrice struct {

@@ -34,7 +34,9 @@ const (
 )
 
 var (
-	_ OffRampReader = &OffRampV1_0_0{}
+	_                                OffRampReader = &OffRampV1_0_0{}
+	ExecutionStateChangedEventV1_0_0               = abihelpers.MustGetEventID("ExecutionStateChanged", abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI))
+	ExecutionStateChangedSeqNrV1_0_0               = 1
 )
 
 type OffRampV1_0_0 struct {
@@ -153,7 +155,7 @@ func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Conte
 	)
 }
 
-func (o *OffRampV1_0_0) EncodeExecutionReport(report ExecReport) ([]byte, error) {
+func encodeExecutionReportV1_0_0(args abi.Arguments, report ExecReport) ([]byte, error) {
 	var msgs []evm_2_evm_offramp.InternalEVM2EVMMessage
 	for _, msg := range report.Messages {
 		var ta []evm_2_evm_offramp.ClientEVMTokenAmount
@@ -186,7 +188,11 @@ func (o *OffRampV1_0_0) EncodeExecutionReport(report ExecReport) ([]byte, error)
 		Proofs:            report.Proofs,
 		ProofFlagBits:     report.ProofFlagBits,
 	}
-	return o.executionReportArgs.PackValues([]interface{}{&rep})
+	return args.PackValues([]interface{}{&rep})
+}
+
+func (o *OffRampV1_0_0) EncodeExecutionReport(report ExecReport) ([]byte, error) {
+	return encodeExecutionReportV1_0_0(o.executionReportArgs, report)
 }
 
 func decodeExecReportV1_0_0(args abi.Arguments, report []byte) (ExecReport, error) {
@@ -279,13 +285,12 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		return nil, err
 	}
 	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
-	stateChanged := abihelpers.MustGetEventID("ExecutionStateChanged", offRampABI)
 	executionStateChangedSequenceNumberIndex := 1
 	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", offRampABI)[:1]
 	var filters = []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, addr.String()),
-			EventSigs: []common.Hash{stateChanged},
+			EventSigs: []common.Hash{ExecutionStateChangedEventV1_0_0},
 			Addresses: []common.Address{addr},
 		},
 		{
@@ -303,5 +308,5 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		return nil, err
 	}
 	return &OffRampV1_0_0{offRamp: offRamp, addr: addr, lggr: lggr, lp: lp, filters: filters,
-		estimator: estimator, executionReportArgs: executionReportArgs, eventSig: stateChanged, eventIndex: executionStateChangedSequenceNumberIndex}, nil
+		estimator: estimator, executionReportArgs: executionReportArgs, eventSig: ExecutionStateChangedEventV1_0_0, eventIndex: executionStateChangedSequenceNumberIndex}, nil
 }

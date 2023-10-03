@@ -130,11 +130,10 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 	if err != nil {
 		return nil, err
 	}
-	gasUpdated := abihelpers.MustGetEventID("UsdPerUnitGasUpdated", priceRegistryABI)
 	tokenUpdated := abihelpers.MustGetEventID("UsdPerTokenUpdated", priceRegistryABI)
 	var filters = []logpoller.Filter{{
 		Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistryAddr),
-		EventSigs: []common.Hash{gasUpdated, tokenUpdated},
+		EventSigs: []common.Hash{UsdPerUnitGasUpdatedV1_0_0, tokenUpdated},
 		Addresses: []common.Address{priceRegistryAddr},
 	},
 		{
@@ -156,7 +155,7 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 		address:       priceRegistryAddr,
 		lp:            lp,
 		lggr:          lggr,
-		gasUpdated:    gasUpdated,
+		gasUpdated:    UsdPerUnitGasUpdatedV1_0_0,
 		tokenUpdated:  tokenUpdated,
 	}, nil
 }
