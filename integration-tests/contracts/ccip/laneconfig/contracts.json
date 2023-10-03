@@ -352,10 +352,10 @@
       "bridge_tokens_pools": [
         "0x35e08285cfed1ef159236728f843286c55fc0861"
       ],
-      "arm": "0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f",
-      "arm_proxy": "0xac8cfc3762a979628334a0e4c1026244498e821b",
-      "router": "0x554472a2720e5e7d5d3c817529aba05eed5f82d8",
-      "price_registry": "0xe42ecce39ce5bd2bbf2443660ba6979eeafd48df",
+      "arm": "0x7103f9da75f04dd452b257aaca23842895ae1920",
+      "arm_proxy": "0xb140855a247c139710d17ef0eef71e08b7515952",
+      "router": "0x42415975c9cbcc0a73f8fa90018b55ed3b239273",
+      "price_registry": "0x85eeae3b41c36819d4fa89d4d74dc45b41b749cc",
       "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
       "src_contracts": {
         "11155111": {
@@ -463,16 +463,17 @@
     },
     "Optimism Goerli": {
       "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
+      "is_native_fee_token":true,
       "bridge_tokens": [
         "0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6"
       ],
       "bridge_tokens_pools": [
         "0x6cb3ed9b441eb674b58495c8b3324b59faff5243"
       ],
-      "arm": "0x7103f9da75f04dd452b257aaca23842895ae1920",
-      "arm_proxy": "0xb140855a247c139710d17ef0eef71e08b7515952",
-      "router": "0x42415975c9cbcc0a73f8fa90018b55ed3b239273",
-      "price_registry": "0x85eeae3b41c36819d4fa89d4d74dc45b41b749cc",
+      "arm": "0x270dc4218d51bcaa422af27fa9fef7b1025f4822",
+      "arm_proxy": "0xbf93cf175dad548528829d2558445eea200131c9",
+      "router": "0xdb12517bc81108f332cfcbe6739c7ab9a4621979",
+      "price_registry": "0xe7acd5003f2aefceb8499b7acbc05bf8187837ae",
       "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
         "43113": {
