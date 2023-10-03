@@ -196,6 +196,16 @@ contract StructFactory {
     return priceUpdates;
   }
 
+  function setSingleGasPriceUpdate(
+    Internal.PriceUpdates memory priceUpdates,
+    uint64 destChainSelector,
+    uint224 usdPerUnitGas
+  ) internal pure {
+    priceUpdates.gasPriceUpdates = new Internal.GasPriceUpdate[](1);
+    priceUpdates.gasPriceUpdates[0].destChainSelector = destChainSelector;
+    priceUpdates.gasPriceUpdates[0].usdPerUnitGas = usdPerUnitGas;
+  }
+
   function getPriceUpdatesStruct(
     address[] memory tokens,
     uint224[] memory prices

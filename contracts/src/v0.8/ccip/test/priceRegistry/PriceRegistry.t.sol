@@ -69,9 +69,7 @@ contract PriceRegistrySetup is TokenSetup, RouterSetup {
     }
 
     Internal.PriceUpdates memory priceUpdates = getPriceUpdatesStruct(pricedTokens, tokenPrices);
-    priceUpdates.gasPriceUpdates = new Internal.GasPriceUpdate[](1);
-    priceUpdates.gasPriceUpdates[0].destChainSelector = DEST_CHAIN_ID;
-    priceUpdates.gasPriceUpdates[0].usdPerUnitGas = PACKED_USD_PER_GAS;
+    setSingleGasPriceUpdate(priceUpdates, DEST_CHAIN_ID, PACKED_USD_PER_GAS);
 
     s_encodedInitialPriceUpdates = abi.encode(priceUpdates);
     address[] memory priceUpdaters = new address[](0);
@@ -255,7 +253,10 @@ contract PriceRegistry_updatePrices is PriceRegistrySetup {
 
     assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[0]).value, priceUpdates.tokenPriceUpdates[0].usdPerToken);
     assertEq(s_priceRegistry.getTokenPrice(s_sourceTokens[1]).value, priceUpdates.tokenPriceUpdates[1].usdPerToken);
-    assertEq(s_priceRegistry.getDestinationChainGasPrice(DEST_CHAIN_ID).value, priceUpdates.gasPriceUpdates[0].usdPerUnitGas);
+    assertEq(
+      s_priceRegistry.getDestinationChainGasPrice(DEST_CHAIN_ID).value,
+      priceUpdates.gasPriceUpdates[0].usdPerUnitGas
+    );
   }
 
   // Reverts
@@ -384,10 +385,7 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
   function testZeroGasPriceSuccess() public {
     uint64 zeroGasDestChainSelector = 345678;
     Internal.GasPriceUpdate[] memory gasPriceUpdates = new Internal.GasPriceUpdate[](1);
-    gasPriceUpdates[0] = Internal.GasPriceUpdate({
-      destChainSelector: zeroGasDestChainSelector,
-      usdPerUnitGas: 0
-    });
+    gasPriceUpdates[0] = Internal.GasPriceUpdate({destChainSelector: zeroGasDestChainSelector, usdPerUnitGas: 0});
 
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
@@ -417,10 +415,7 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
     vm.warp(block.timestamp + diff);
 
     Internal.GasPriceUpdate[] memory gasPriceUpdates = new Internal.GasPriceUpdate[](1);
-    gasPriceUpdates[0] = Internal.GasPriceUpdate({
-      destChainSelector: DEST_CHAIN_ID,
-      usdPerUnitGas: PACKED_USD_PER_GAS
-    });
+    gasPriceUpdates[0] = Internal.GasPriceUpdate({destChainSelector: DEST_CHAIN_ID, usdPerUnitGas: PACKED_USD_PER_GAS});
 
     Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
       tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),

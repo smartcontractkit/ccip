@@ -265,9 +265,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
 
     // Update the price of the newly set feeToken
     Internal.PriceUpdates memory priceUpdates = getSinglePriceUpdateStruct(feeTokenWithZeroFeeAndGas, 2_000 ether);
-    priceUpdates.gasPriceUpdates = new Internal.GasPriceUpdate[](1);
-    priceUpdates.gasPriceUpdates[0].destChainSelector = DEST_CHAIN_ID;
-    priceUpdates.gasPriceUpdates[0].usdPerUnitGas = 0;
+    setSingleGasPriceUpdate(priceUpdates, DEST_CHAIN_ID, 0);
 
     s_priceRegistry.updatePrices(priceUpdates);
 

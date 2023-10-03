@@ -210,7 +210,6 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, TypeAndVersionInterfac
         timestamp: uint32(block.timestamp)
       });
       emit UsdPerUnitGasUpdated(update.destChainSelector, update.usdPerUnitGas, block.timestamp);
-
     }
   }
 
