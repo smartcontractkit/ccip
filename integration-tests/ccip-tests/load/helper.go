@@ -204,8 +204,9 @@ func (l *loadArgs) Start() {
 					CallTimeout:           l.TestCfg.Load.LoadTimeOut,
 					Gun:                   ccipLoad,
 					Logger:                ccipLoad.Lane.Logger,
+					CallResultBufLen:      1000,
 					SharedData:            l.TestCfg.MsgType,
-					//LokiConfig:            wasp.NewEnvLokiConfig(),
+					LokiConfig:            wasp.NewEnvLokiConfig(),
 					Labels: map[string]string{
 						"test_group":   "load",
 						"cluster":      "sdlc",
