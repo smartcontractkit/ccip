@@ -109,6 +109,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p := &ExecutionReportingPlugin{}
 			p.inflightReports = newInflightExecReportsContainer(time.Minute)
 			p.inflightReports.reports = tc.inflightReports
+			p.blessedRootsCache = cache.NewBlessedRoots(time.Minute, time.Minute)
 			p.lggr = logger.TestLogger(t)
 
 			commitStore, commitStoreAddr := testhelpers.NewFakeCommitStore(t, 1)
@@ -1110,6 +1111,53 @@ func TestExecutionReportToEthTxMeta(t *testing.T) {
 		_, err := ExecutionReportToEthTxMeta([]byte("whatever"))
 		assert.Error(t, err)
 	})
+}
+
+func TestExecutionReportingPlugin_isBlessed(t *testing.T) {
+	ctx := testutils.Context(t)
+
+	m1 := utils.RandomBytes32()
+	m2 := utils.RandomBytes32()
+
+	t.Run("base", func(t *testing.T) {
+		c := cache.NewBlessedRoots(time.Minute, time.Minute)
+		p := &ExecutionReportingPlugin{blessedRootsCache: c}
+
+		// value fetched from cache
+		c.Set(m1, true)
+		isBlessed, err := p.isBlessed(ctx, m1)
+		assert.NoError(t, err)
+		assert.True(t, isBlessed)
+
+		// value fetched from commit store and then stored in cache
+		cs := mock_contracts.NewCommitStoreInterface(t)
+		cs.On("IsBlessed", mock.Anything, m2).Return(true, nil).Once()
+		p.config.commitStore = cs
+		isBlessed, err = p.isBlessed(ctx, m2)
+		assert.NoError(t, err)
+		assert.True(t, isBlessed)
+		// this time should be fetched from cache
+		isBlessed, err = p.isBlessed(ctx, m2)
+		assert.NoError(t, err)
+		assert.True(t, isBlessed)
+	})
+
+	t.Run("value stored in cache but expired before next call", func(t *testing.T) {
+		c := cache.NewBlessedRoots(time.Nanosecond, time.Minute)
+		p := &ExecutionReportingPlugin{blessedRootsCache: c}
+		cs := mock_contracts.NewCommitStoreInterface(t)
+		cs.On("IsBlessed", mock.Anything, m2).Return(true, nil).Times(2)
+		p.config.commitStore = cs
+		isBlessed, err := p.isBlessed(ctx, m2)
+		assert.NoError(t, err)
+		assert.True(t, isBlessed)
+		// second time should be fetched from commit store again, because the cache entry has expired
+		time.Sleep(10 * time.Nanosecond)
+		isBlessed, err = p.isBlessed(ctx, m2)
+		assert.NoError(t, err)
+		assert.True(t, isBlessed)
+	})
+
 }
 
 func TestUpdateSourceToDestTokenMapping(t *testing.T) {

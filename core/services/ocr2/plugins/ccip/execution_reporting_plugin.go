@@ -90,6 +90,7 @@ type ExecutionReportingPlugin struct {
 	cachedTokenPools       cache.AutoSync[map[common.Address]common.Address]
 	customTokenPoolFactory func(ctx context.Context, poolAddress common.Address, bind bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error)
 	gasPriceEstimator      prices.GasPriceEstimatorExec
+	blessedRootsCache      cache.BlessedRootsCache
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -176,6 +177,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 				return custom_token_pool.NewCustomTokenPool(poolAddress, contractBackend)
 			},
 			gasPriceEstimator: gasPriceEstimator,
+			blessedRootsCache: cache.NewBlessedRoots(500*time.Millisecond, time.Minute),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -354,7 +356,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			continue
 		}
 
-		blessed, err := r.config.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, merkleRoot)
+		blessed, err := r.isBlessed(ctx, merkleRoot)
 		if err != nil {
 			return nil, err
 		}
@@ -402,6 +404,22 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		r.snoozedRoots.Snooze(merkleRoot)
 	}
 	return []ObservedMessage{}, nil
+}
+
+func (r *ExecutionReportingPlugin) isBlessed(ctx context.Context, merkleRoot [32]byte) (bool, error) {
+	isBlessed, exists := r.blessedRootsCache.Get(merkleRoot)
+	if exists {
+		return isBlessed, nil
+	}
+
+	isBlessed, err := r.config.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, merkleRoot)
+	if err != nil {
+		return false, err
+	}
+
+	r.blessedRootsCache.Set(merkleRoot, isBlessed)
+
+	return isBlessed, nil
 }
 
 // destPoolRateLimits returns a map that consists of the rate limits of each destination tokens of the provided reports.
