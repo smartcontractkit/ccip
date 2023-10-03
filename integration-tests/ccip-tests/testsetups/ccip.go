@@ -14,6 +14,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
@@ -314,8 +315,15 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		if simulated {
 			actualNoOfNetworks := len(p.SelectedNetworks)
 			n := p.SelectedNetworks[0]
+			var chainIDs []int64
+			for _, id := range chainselectors.TestChainIds() {
+				if id == 2337 {
+					continue
+				}
+				chainIDs = append(chainIDs, int64(id))
+			}
 			for i := 0; i < p.NoOfNetworks-actualNoOfNetworks; i++ {
-				chainID := networks.AdditionalSimulatedChainIds[i]
+				chainID := chainIDs[i]
 				p.SelectedNetworks = append(p.SelectedNetworks, blockchain.EVMNetwork{
 					Name:                      fmt.Sprintf("simulated-non-dev%d", len(p.SelectedNetworks)+1),
 					ChainID:                   chainID,
@@ -324,8 +332,9 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 					ChainlinkTransactionLimit: n.ChainlinkTransactionLimit,
 					Timeout:                   n.Timeout,
 					MinimumConfirmations:      n.MinimumConfirmations,
-					GasEstimationBuffer:       n.GasEstimationBuffer,
+					GasEstimationBuffer:       n.GasEstimationBuffer + 1000,
 					ClientImplementation:      n.ClientImplementation,
+					DefaultGasLimit:           n.DefaultGasLimit,
 				})
 			}
 		}

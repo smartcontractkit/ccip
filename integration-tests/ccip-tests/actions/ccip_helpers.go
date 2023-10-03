@@ -55,8 +55,8 @@ const (
 	ChaosGroupCCIPGeth            = "CCIPGeth"               // both source and destination simulated geth networks
 	ChaosGroupNetworkACCIPGeth    = "CCIPNetworkAGeth"
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
-	RootSnoozeTimeSimulated       = 1 * time.Minute
-	InflightExpirySimulated       = 1 * time.Minute
+	RootSnoozeTimeSimulated       = 3 * time.Minute
+	InflightExpirySimulated       = 3 * time.Minute
 	// we keep the finality timeout high as it's out of our control
 	FinalityTimeout        = 1 * time.Hour
 	TokenTransfer   string = "WithToken"
@@ -1236,12 +1236,20 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 				if err != nil {
 					lggr.Warn().Msg("Failed to get receipt for ExecStateChanged event")
 				}
+<<<<<<< HEAD
 				if testhelpers.MessageExecutionState(e.State) == testhelpers.ExecutionStateSuccess {
+=======
+				var gasUsed uint64
+				if receipt != nil {
+					gasUsed = receipt.GasUsed
+				}
+				if abihelpers.MessageExecutionState(e.State) == abihelpers.ExecutionStateSuccess {
+>>>>>>> 2b153c8903 (run scale tests in multiple simulated chains)
 					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow),
 						testreporters.Success,
 						testreporters.TransactionStats{
 							TxHash:  vLogs.TxHash.Hex(),
-							GasUsed: receipt.GasUsed,
+							GasUsed: gasUsed,
 						})
 					return nil
 				} else {
@@ -1301,9 +1309,13 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 				if err != nil {
 					lggr.Warn().Msg("Failed to get receipt for ReportAccepted event")
 				}
+				var gasUsed uint64
+				if receipt != nil {
+					gasUsed = receipt.GasUsed
+				}
 				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, totalTime, testreporters.Success,
 					testreporters.TransactionStats{
-						GasUsed:    receipt.GasUsed,
+						GasUsed:    gasUsed,
 						TxHash:     reportAccepted.Raw.TxHash.String(),
 						CommitRoot: fmt.Sprintf("%x", reportAccepted.Report.MerkleRoot),
 					})
@@ -1348,11 +1360,15 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 				}
 				receipt, err := destCCIP.Common.ChainClient.GetTxReceipt(vLogs.TxHash)
 				if err != nil {
-					lggr.Fatal().Err(err).Msg("Failed to get receipt for ReportBlessed event")
+					lggr.Warn().Err(err).Msg("Failed to get receipt for ReportBlessed event")
+				}
+				var gasUsed uint64
+				if receipt != nil {
+					gasUsed = receipt.GasUsed
 				}
 				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ReportBlessed, receivedAt.Sub(prevEventAt), testreporters.Success,
 					testreporters.TransactionStats{
-						GasUsed:    receipt.GasUsed,
+						GasUsed:    gasUsed,
 						TxHash:     vLogs.TxHash.String(),
 						CommitRoot: fmt.Sprintf("%x", CommitReport.MerkleRoot),
 					})
@@ -1581,10 +1597,14 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
 				testreporters.TX, txConfirmationDur, testreporters.Failure)
 			return err
 		}
+		var gasUsed uint64
+		if rcpt != nil {
+			gasUsed = rcpt.GasUsed
+		}
 		lane.Reports.UpdatePhaseStats(int64(lane.NumberOfReq+i), 0,
 			testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.TransactionStats{
 				Fee:                fee.String(),
-				GasUsed:            rcpt.GasUsed,
+				GasUsed:            gasUsed,
 				TxHash:             txHash.Hex(),
 				NoOfTokensSent:     noOfTokens,
 				MessageBytesLength: len([]byte(msg)),
@@ -1944,7 +1964,9 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		rootSnooze = models.MustMakeDuration(RootSnoozeTimeSimulated)
 		inflightExpiry = models.MustMakeDuration(InflightExpirySimulated)
 	}
-	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2Config(commitNodes, testhelpers.NewCommitOffchainConfig(
+
+	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
+		commitNodes, testhelpers.NewCommitOffchainConfig(
 		1,
 		1,
 		models.MustMakeDuration(10*time.Second), // reduce the heartbeat to 10 sec for faster fee updates
@@ -1956,7 +1978,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		inflightExpiry,
 	), testhelpers.NewCommitOnchainConfig(
 		destCCIP.Common.PriceRegistry.EthAddress,
-	))
+	), contracts.OCR2ParamsForCommit, 3*time.Minute)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1972,7 +1994,8 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		nodes = execNodes
 	}
 	if destCCIP.OffRamp != nil {
-		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2Config(nodes, testhelpers.NewExecOffchainConfig(
+		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2ConfigForCCIPPlugin(
+			nodes, testhelpers.NewExecOffchainConfig(
 			1,
 			1,
 			1,
@@ -1987,7 +2010,8 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			destCCIP.Common.PriceRegistry.EthAddress,
 			5,
 			50000,
-		))
+		), contracts.OCR2ParamsForExec, 3*time.Minute)
+
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -2162,8 +2186,12 @@ func (c *CCIPTestEnv) ChaosLabelForGeth(t *testing.T, srcChain, destChain string
 		"app": GethLabel(destChain),
 	}, ChaosGroupNetworkBCCIPGeth)
 	require.NoError(t, err)
-
 	gethNetworksLabels := []string{GethLabel(srcChain), GethLabel(destChain)}
+	c.ChaosLabelForAllGeth(t, gethNetworksLabels)
+
+}
+
+func (c *CCIPTestEnv) ChaosLabelForAllGeth(t *testing.T, gethNetworksLabels []string) {
 	for _, gethNetworkLabel := range gethNetworksLabels {
 		err := c.K8Env.Client.AddLabel(c.K8Env.Cfg.Namespace,
 			fmt.Sprintf("app=%s", gethNetworkLabel),

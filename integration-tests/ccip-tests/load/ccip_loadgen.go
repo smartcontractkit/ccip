@@ -203,10 +203,14 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 			txConfirmationTime = hdr.Timestamp
 		}
 	}
+	var gasUsed uint64
+	if rcpt != nil {
+		gasUsed = rcpt.GasUsed
+	}
 	c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
 		testreporters.TransactionStats{
 			Fee:                fee.String(),
-			GasUsed:            rcpt.GasUsed,
+			GasUsed:            gasUsed,
 			TxHash:             sendTx.Hash().Hex(),
 			NoOfTokensSent:     len(msg.TokenAmounts),
 			MessageBytesLength: len(msg.Data),

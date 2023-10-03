@@ -46,17 +46,17 @@ type loadArgs struct {
 	ChaosExps     []ChaosConfig
 }
 
-func (l *loadArgs) Setup(sameCommitAndExec bool) {
+func (l *loadArgs) Setup(sameCommitAndExec bool, noOfcommit, noOfExec int) {
 	transferAmounts := []*big.Int{big.NewInt(1)}
 	lggr := l.lggr
 	var setUpArgs *testsetups.CCIPTestSetUpOutputs
 	if !l.TestCfg.ExistingDeployment {
-		replicas := 6
+		replicas := noOfcommit + 1
 		if !sameCommitAndExec {
-			replicas = 12
+			replicas = noOfcommit + noOfExec + 2
 		}
 		setUpArgs = testsetups.CCIPDefaultTestSetUp(l.TestCfg.Test, lggr, "load-ccip",
-			replicas, transferAmounts, nil, 5, sameCommitAndExec, true, l.TestCfg)
+			replicas, transferAmounts, nil, noOfcommit, sameCommitAndExec, true, l.TestCfg)
 	} else {
 		setUpArgs = testsetups.CCIPExistingDeploymentTestSetUp(l.TestCfg.Test, lggr, transferAmounts, true, l.TestCfg)
 	}
