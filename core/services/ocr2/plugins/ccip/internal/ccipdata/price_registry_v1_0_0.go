@@ -32,6 +32,11 @@ type PriceRegistryV1_0_0 struct {
 	gasUpdated    common.Hash
 }
 
+func (p *PriceRegistryV1_0_0) FeeTokenEvents() []common.Hash {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (p *PriceRegistryV1_0_0) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error) {
 	//TODO implement me
 	panic("implement me")
@@ -125,8 +130,8 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 	if err != nil {
 		return nil, err
 	}
-	gasUpdated := abihelpers.GetIDOrPanic("UsdPerUnitGasUpdated", priceRegistryABI)
-	tokenUpdated := abihelpers.GetIDOrPanic("UsdPerTokenUpdated", priceRegistryABI)
+	gasUpdated := abihelpers.MustGetEventID("UsdPerUnitGasUpdated", priceRegistryABI)
+	tokenUpdated := abihelpers.MustGetEventID("UsdPerTokenUpdated", priceRegistryABI)
 	var filters = []logpoller.Filter{{
 		Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistryAddr),
 		EventSigs: []common.Hash{gasUpdated, tokenUpdated},
@@ -134,12 +139,12 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 	},
 		{
 			Name:      logpoller.FilterName(FEE_TOKEN_ADDED, priceRegistry),
-			EventSigs: []common.Hash{abihelpers.GetIDOrPanic("FeeTokenAdded", priceRegistryABI)},
+			EventSigs: []common.Hash{abihelpers.MustGetEventID("FeeTokenAdded", priceRegistryABI)},
 			Addresses: []common.Address{priceRegistryAddr},
 		},
 		{
 			Name:      logpoller.FilterName(FEE_TOKEN_REMOVED, priceRegistry),
-			EventSigs: []common.Hash{abihelpers.GetIDOrPanic("FeeTokenAdded", priceRegistryABI)},
+			EventSigs: []common.Hash{abihelpers.MustGetEventID("FeeTokenAdded", priceRegistryABI)},
 			Addresses: []common.Address{priceRegistryAddr},
 		}}
 	err = logpollerutil.RegisterLpFilters(lp, filters, qopts...)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -33,7 +32,9 @@ const (
 	EXEC_TOKEN_POOL_REMOVED      = "Token pool removed"
 )
 
-var _ OffRampReader = &OffRampV1_0_0{}
+var (
+	_ OffRampReader = &OffRampV1_0_0{}
+)
 
 type OffRampV1_0_0 struct {
 	offRamp             *evm_2_evm_offramp.EVM2EVMOffRamp
@@ -50,77 +51,19 @@ type OffRampV1_0_0 struct {
 	eventSig            common.Hash
 }
 
-func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ExecReport, error) {
-	unpacked, err := o.executionReportArgs.Unpack(report)
-	if err != nil {
-		return ExecReport{}, err
-	}
-	if len(unpacked) == 0 {
-		return ExecReport{}, errors.New("assumptionViolation: expected at least one element")
-	}
-	// Must be anonymous struct here
-	erStruct, ok := unpacked[0].(struct {
-		Messages []struct {
-			SourceChainSelector uint64         `json:"sourceChainSelector"`
-			Sender              common.Address `json:"sender"`
-			Receiver            common.Address `json:"receiver"`
-			SequenceNumber      uint64         `json:"sequenceNumber"`
-			GasLimit            *big.Int       `json:"gasLimit"`
-			Strict              bool           `json:"strict"`
-			Nonce               uint64         `json:"nonce"`
-			FeeToken            common.Address `json:"feeToken"`
-			FeeTokenAmount      *big.Int       `json:"feeTokenAmount"`
-			Data                []uint8        `json:"data"`
-			TokenAmounts        []struct {
-				Token  common.Address `json:"token"`
-				Amount *big.Int       `json:"amount"`
-			} `json:"tokenAmounts"`
-			SourceTokenData [][]byte `json:"sourceTokenData"`
-			MessageId       [32]byte `json:"messageId"`
-		} `json:"messages"`
-		OffchainTokenData [][][]byte  `json:"offchainTokenData"`
-		Proofs            [][32]uint8 `json:"proofs"`
-		ProofFlagBits     *big.Int    `json:"proofFlagBits"`
-	})
-	if !ok {
-		return ExecReport{}, fmt.Errorf("got %T", unpacked[0])
-	}
-	var messages []internal.EVM2EVMMessage
-	for _, msg := range erStruct.Messages {
-		var tokensAndAmounts []internal.TokenAmount
-		for _, tokenAndAmount := range msg.TokenAmounts {
-			tokensAndAmounts = append(tokensAndAmounts, internal.TokenAmount{
-				Token:  tokenAndAmount.Token,
-				Amount: tokenAndAmount.Amount,
-			})
-		}
-		// TODO
-		messages = append(messages, internal.EVM2EVMMessage{
-			SequenceNumber:      msg.SequenceNumber,
-			GasLimit:            nil,
-			Nonce:               0,
-			MessageId:           msg.MessageId,
-			SourceChainSelector: 0,
-			Sender:              common.Address{},
-			Receiver:            common.Address{},
-			Strict:              false,
-			FeeToken:            common.Address{},
-			FeeTokenAmount:      nil,
-			Data:                nil,
-			TokenAmounts:        tokensAndAmounts,
-			SourceTokenData:     nil,
-			Hash:                [32]byte{}, // TODO
-		})
-	}
+func (o *OffRampV1_0_0) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
+	//TODO implement me
+	panic("implement me")
+}
 
-	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
-	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
-	return ExecReport{
-		Messages:          messages,
-		OffchainTokenData: erStruct.OffchainTokenData,
-		Proofs:            erStruct.Proofs,
-		ProofFlagBits:     new(big.Int).SetBytes(erStruct.ProofFlagBits.Bytes()),
-	}, nil
+func (o *OffRampV1_0_0) GetSupportedTokens(ctx context.Context) ([]common.Address, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (o *OffRampV1_0_0) GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (o *OffRampV1_0_0) OffchainConfig() ExecOffchainConfig {
@@ -237,22 +180,98 @@ func (o *OffRampV1_0_0) EncodeExecutionReport(report ExecReport) ([]byte, error)
 	return o.executionReportArgs.PackValues([]interface{}{&rep})
 }
 
+func decodeExecReportV1_0_0(args abi.Arguments, report []byte) (ExecReport, error) {
+	unpacked, err := args.Unpack(report)
+	if err != nil {
+		return ExecReport{}, err
+	}
+	if len(unpacked) == 0 {
+		return ExecReport{}, errors.New("assumptionViolation: expected at least one element")
+	}
+	// Must be anonymous struct here
+	erStruct, ok := unpacked[0].(struct {
+		Messages []struct {
+			SourceChainSelector uint64         `json:"sourceChainSelector"`
+			Sender              common.Address `json:"sender"`
+			Receiver            common.Address `json:"receiver"`
+			SequenceNumber      uint64         `json:"sequenceNumber"`
+			GasLimit            *big.Int       `json:"gasLimit"`
+			Strict              bool           `json:"strict"`
+			Nonce               uint64         `json:"nonce"`
+			FeeToken            common.Address `json:"feeToken"`
+			FeeTokenAmount      *big.Int       `json:"feeTokenAmount"`
+			Data                []uint8        `json:"data"`
+			TokenAmounts        []struct {
+				Token  common.Address `json:"token"`
+				Amount *big.Int       `json:"amount"`
+			} `json:"tokenAmounts"`
+			SourceTokenData [][]byte `json:"sourceTokenData"`
+			MessageId       [32]byte `json:"messageId"`
+		} `json:"messages"`
+		OffchainTokenData [][][]byte  `json:"offchainTokenData"`
+		Proofs            [][32]uint8 `json:"proofs"`
+		ProofFlagBits     *big.Int    `json:"proofFlagBits"`
+	})
+	if !ok {
+		return ExecReport{}, fmt.Errorf("got %T", unpacked[0])
+	}
+	var messages []internal.EVM2EVMMessage
+	for _, msg := range erStruct.Messages {
+		var tokensAndAmounts []internal.TokenAmount
+		for _, tokenAndAmount := range msg.TokenAmounts {
+			tokensAndAmounts = append(tokensAndAmounts, internal.TokenAmount{
+				Token:  tokenAndAmount.Token,
+				Amount: tokenAndAmount.Amount,
+			})
+		}
+		// TODO
+		messages = append(messages, internal.EVM2EVMMessage{
+			SequenceNumber:      msg.SequenceNumber,
+			GasLimit:            nil,
+			Nonce:               0,
+			MessageId:           msg.MessageId,
+			SourceChainSelector: 0,
+			Sender:              common.Address{},
+			Receiver:            common.Address{},
+			Strict:              false,
+			FeeToken:            common.Address{},
+			FeeTokenAmount:      nil,
+			Data:                nil,
+			TokenAmounts:        tokensAndAmounts,
+			SourceTokenData:     nil,
+			Hash:                [32]byte{}, // TODO
+		})
+	}
+
+	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
+	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
+	return ExecReport{
+		Messages:          messages,
+		OffchainTokenData: erStruct.OffchainTokenData,
+		Proofs:            erStruct.Proofs,
+		ProofFlagBits:     new(big.Int).SetBytes(erStruct.ProofFlagBits.Bytes()),
+	}, nil
+
+}
+
+func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ExecReport, error) {
+	return decodeExecReportV1_0_0(o.executionReportArgs, report)
+}
+
+func (o *OffRampV1_0_0) TokenEvents() []common.Hash {
+	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
+	return []common.Hash{abihelpers.MustGetEventID("PoolAdded", offRampABI), abihelpers.MustGetEventID("PoolRemoved", offRampABI)}
+}
+
 func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, srcClient client.Client) (*OffRampV1_0_0, error) {
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
 		return nil, err
 	}
-	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_offramp.EVM2EVMOffRampABI))
-	if err != nil {
-		panic(err)
-	}
-	manuallyExecuteMethod, ok := offRampABI.Methods["manuallyExecute"]
-	if !ok {
-		panic("missing event 'manuallyExecute'")
-	}
-	stateChanged := abihelpers.GetIDOrPanic("ExecutionStateChanged", offRampABI)
+	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
+	stateChanged := abihelpers.MustGetEventID("ExecutionStateChanged", offRampABI)
 	executionStateChangedSequenceNumberIndex := 1
-	executionReportArgs := manuallyExecuteMethod.Inputs[:1]
+	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", offRampABI)[:1]
 	var filters = []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, addr.String()),
@@ -261,12 +280,12 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, addr.String()),
-			EventSigs: []common.Hash{abihelpers.GetIDOrPanic("PoolAdded", offRampABI)},
+			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolAdded", offRampABI)},
 			Addresses: []common.Address{addr},
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, addr.String()),
-			EventSigs: []common.Hash{abihelpers.GetIDOrPanic("PoolRemoved", offRampABI)},
+			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolRemoved", offRampABI)},
 			Addresses: []common.Address{addr},
 		},
 	}

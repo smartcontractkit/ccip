@@ -39,7 +39,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	CCIPSendRequestEventSigV1_2_0 = abihelpers.GetIDOrPanic(CCIPSendRequestedEventNameV1_2_0, onRampABI)
+	CCIPSendRequestEventSigV1_2_0 = abihelpers.MustGetEventID(CCIPSendRequestedEventNameV1_2_0, onRampABI)
 }
 
 // Backwards compat for integration tests

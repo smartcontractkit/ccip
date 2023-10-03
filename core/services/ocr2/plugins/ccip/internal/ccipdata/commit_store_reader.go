@@ -1,11 +1,9 @@
 package ccipdata
 
 import (
-	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -16,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -111,27 +110,23 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 }
 
 func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
-	// TODO error on wrong type
-	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
-	if err != nil {
-		panic(err)
+	if typ != ccipconfig.CommitStore {
+		return nil, errors.Errorf("expected %v got %v", ccipconfig.CommitStore, typ)
 	}
-	commitReportArgs := commitStoreABI.Events["ReportAccepted"].Inputs
+	commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
 	switch ver.String() {
-	case "1.0.0", "1.1.0":
+	case "1.0.0", "1.1.0", "1.2.0":
 		return func(report []byte) (*txmgr.TxMeta, error) {
-			commitReport, err := decodeCommitReportV1_0_0(commitReportArgs, report)
+			commitReport, err := decodeCommitReportV1_0_0(abihelpers.MustGetEventInputs("ReportAccepted", commitStoreABI), report)
 			if err != nil {
 				return nil, err
 			}
 			return commitReportToEthTxMeta(commitReport)
 		}, nil
-	case "1.2.0":
-		// TODO
+		// TODO: 1.2 will split
 	default:
 		return nil, errors.Errorf("got unexpected version %v", ver.String())
 	}
-	return nil, errors.New("impossible")
 }
 
 // CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.

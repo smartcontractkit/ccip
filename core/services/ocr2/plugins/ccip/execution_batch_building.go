@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
@@ -76,7 +77,7 @@ func buildExecutionReportForMessages(
 }
 
 // Validates the given message observations do not exceed the committed sequence numbers
-// in the commitStore.
+// in the commitStoreReader.
 func validateSeqNumbers(serviceCtx context.Context, commitStore ccipdata.CommitStoreReader, observedMessages []ObservedMessage) error {
 	nextMin, err := commitStore.GetExpectedNextSequenceNumber(serviceCtx)
 	if err != nil {

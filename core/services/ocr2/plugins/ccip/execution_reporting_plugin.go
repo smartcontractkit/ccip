@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -52,7 +51,6 @@ type ExecutionPluginStaticConfig struct {
 	sourceLP, destLP         logpoller.LogPoller
 	onRampReader             ccipdata.OnRampReader
 	destReader               ccipdata.Reader
-	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
 	offRampReader            ccipdata.OffRampReader
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStoreReader        ccipdata.CommitStoreReader
@@ -135,9 +133,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 
 	offchainConfig := rf.config.offRampReader.OffchainConfig()
 	cachedSourceFeeTokens := cache.NewCachedFeeTokens(rf.config.sourceLP, rf.config.sourcePriceRegistry, int64(offchainConfig.SourceFinalityDepth))
-	cachedDestTokens := cache.NewCachedSupportedTokens(rf.config.destLP, rf.config.offRamp, rf.destPriceRegReader, int64(offchainConfig.DestOptimisticConfirmations))
+	cachedDestTokens := cache.NewCachedSupportedTokens(rf.config.destLP, rf.config.offRampReader, rf.destPriceRegReader, int64(offchainConfig.DestOptimisticConfirmations))
 
-	cachedTokenPools := cache.NewTokenPools(rf.config.lggr, rf.config.destLP, rf.config.offRamp, int64(offchainConfig.DestOptimisticConfirmations), 5)
+	cachedTokenPools := cache.NewTokenPools(rf.config.lggr, rf.config.destLP, rf.config.offRampReader, int64(offchainConfig.DestOptimisticConfirmations), 5)
 
 	return &ExecutionReportingPlugin{
 			config:                rf.config,
@@ -228,7 +226,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 //	//rf.sourceChainFilters = sourceFiltersNow
 //
 //	// destination chain filters
-//	destFiltersBefore, destFiltersNow := rf.destChainFilters, getExecutionPluginDestLpChainFilters(rf.config.commitStore.Address(), rf.config.offRamp.Address())
+//	destFiltersBefore, destFiltersNow := rf.destChainFilters, getExecutionPluginDestLpChainFilters(rf.config.commitStoreReader.Address(), rf.config.offRamp.Address())
 //	created, deleted := logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
 //	if err := logpollerutil.UnregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
 //		return err
@@ -660,7 +658,7 @@ func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMO
 
 func (r *ExecutionReportingPlugin) isRateLimitEnoughForTokenPool(
 	destTokenPoolRateLimits map[common.Address]*big.Int,
-	sourceTokenAmounts []ccipdata.TokenAmount,
+	sourceTokenAmounts []internal.TokenAmount,
 	inflightTokenAmounts map[common.Address]*big.Int,
 	sourceToDestToken map[common.Address]common.Address,
 ) bool {
@@ -845,7 +843,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	return reportsWithSendReqs, nil
 }
 
-func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, sourceToDest map[common.Address]common.Address, tokensAndAmount []ccipdata.TokenAmount) (*big.Int, error) {
+func aggregateTokenValue(destTokenPricesUSD map[common.Address]*big.Int, sourceToDest map[common.Address]common.Address, tokensAndAmount []internal.TokenAmount) (*big.Int, error) {
 	sum := big.NewInt(0)
 	for i := 0; i < len(tokensAndAmount); i++ {
 		price, ok := destTokenPricesUSD[sourceToDest[tokensAndAmount[i].Token]]

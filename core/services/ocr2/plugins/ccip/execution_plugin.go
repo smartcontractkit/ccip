@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
@@ -99,7 +98,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	}
 	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load commitStore readerc")
+		return nil, nil, errors.Wrap(err, "could not load commitStoreReader readerc")
 	}
 	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
 		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
@@ -227,18 +226,6 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
 // Only MessageIDs will be populated in the TxMeta.
-func ExecutionReportToEthTxMeta(report []byte) (*txmgr.TxMeta, error) {
-	execReport, err := abihelpers.DecodeExecutionReport(report)
-	if err != nil {
-		return nil, err
-	}
-
-	msgIDs := make([]string, len(execReport.Messages))
-	for i, msg := range execReport.Messages {
-		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
-	}
-
-	return &txmgr.TxMeta{
-		MessageIDs: msgIDs,
-	}, nil
+func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
+	return ccipdata.ExecReportToEthTxMeta(typ, ver)
 }

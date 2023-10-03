@@ -2,7 +2,6 @@ package ccipdata
 
 import (
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -297,12 +296,9 @@ func NewCommitStoreV1_0_0(lggr logger.Logger, addr common.Address, ec client.Cli
 	if err != nil {
 		return nil, err
 	}
-	commitStoreABI, err := abi.JSON(strings.NewReader(commit_store.CommitStoreABI))
-	if err != nil {
-		panic(err)
-	}
-	eventSig := abihelpers.GetIDOrPanic("ReportAccepted", commitStoreABI)
-	commitReportArgs := commitStoreABI.Events["ReportAccepted"].Inputs
+	commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
+	eventSig := abihelpers.MustGetEventID("ReportAccepted", commitStoreABI)
+	commitReportArgs := abihelpers.MustGetEventInputs("ReportAccepted", commitStoreABI)
 	var filters = []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, addr.String()),
@@ -313,7 +309,6 @@ func NewCommitStoreV1_0_0(lggr logger.Logger, addr common.Address, ec client.Cli
 	if err := logpollerutil.RegisterLpFilters(lp, filters); err != nil {
 		return nil, err
 	}
-	// TODO: try and read initial config
 	return &CommitStoreV1_0_0{commitStore: commitStore,
 		lggr:              lggr,
 		lp:                lp,

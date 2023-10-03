@@ -125,7 +125,7 @@ func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	}
 	// Subscribe to the relevant logs
 	name := logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress)
-	eventSig := abihelpers.GetIDOrPanic(CCIPSendRequestedEventNameV1_0_0, onRampABI)
+	eventSig := abihelpers.MustGetEventID(CCIPSendRequestedEventNameV1_0_0, onRampABI)
 	err = sourceLP.RegisterFilter(logpoller.Filter{
 		Name:      name,
 		EventSigs: []common.Hash{eventSig},

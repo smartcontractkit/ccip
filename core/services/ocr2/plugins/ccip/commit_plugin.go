@@ -57,11 +57,11 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	}
 	commitStore, commitStoreVersion, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading commitStore")
+		return nil, nil, errors.Wrap(err, "failed loading commitStoreReader")
 	}
 	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
+		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStoreReader")
 	}
 	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {

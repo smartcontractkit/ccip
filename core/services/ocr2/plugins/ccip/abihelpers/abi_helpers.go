@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -13,12 +14,36 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-func GetIDOrPanic(name string, abi2 abi.ABI) common.Hash {
+func MustGetEventID(name string, abi2 abi.ABI) common.Hash {
 	event, ok := abi2.Events[name]
 	if !ok {
 		panic(fmt.Sprintf("missing event %s", name))
 	}
 	return event.ID
+}
+
+func MustGetEventInputs(name string, abi2 abi.ABI) abi.Arguments {
+	m, ok := abi2.Events[name]
+	if !ok {
+		panic(fmt.Sprintf("missing event %s", name))
+	}
+	return m.Inputs
+}
+
+func MustGetMethodInputs(name string, abi2 abi.ABI) abi.Arguments {
+	m, ok := abi2.Methods[name]
+	if !ok {
+		panic(fmt.Sprintf("missing method %s", name))
+	}
+	return m.Inputs
+}
+
+func MustParseABI(abiStr string) abi.ABI {
+	abiParsed, err := abi.JSON(strings.NewReader(abiStr))
+	if err != nil {
+		panic(err)
+	}
+	return abiParsed
 }
 
 // ProofFlagsToBits transforms a list of boolean proof flags to a *big.Int

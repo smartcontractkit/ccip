@@ -5,14 +5,18 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -129,7 +133,16 @@ type OffRampReader interface {
 
 	GetDestinationTokens(ctx context.Context) ([]common.Address, error)
 
+	GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error)
+
+	GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error)
+
+	GetSupportedTokens(ctx context.Context) ([]common.Address, error)
+
 	Address() common.Address
+
+	// TODO Needed for cachign, maybe caching should move behind the readers?
+	TokenEvents() []common.Hash
 
 	// Notifies the reader that the config has changed onchain
 	ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error)
@@ -166,4 +179,35 @@ func NewOffRampReader(lggr logger.Logger, addr common.Address, srcClient, destCl
 	default:
 		return nil, errors.Errorf("unsupported offramp verison %v", version.String())
 	}
+}
+
+func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
+	if typ != ccipconfig.EVM2EVMOffRamp {
+		return nil, errors.Errorf("expected %v got %v", ccipconfig.EVM2EVMOffRamp, typ)
+	}
+	switch ver.String() {
+	case "1.0.0", "1.1.0", "1.2.0":
+		// ABI remains the same across all offramp versions.
+		offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
+		return func(report []byte) (*txmgr.TxMeta, error) {
+			execReport, err := decodeExecReportV1_0_0(abihelpers.MustGetMethodInputs("manuallyExecute", offRampABI)[:1], report)
+			if err != nil {
+				return nil, err
+			}
+			return execReportToEthTxMeta(execReport)
+		}, nil
+	default:
+		return nil, errors.Errorf("got unexpected version %v", ver.String())
+	}
+}
+
+func execReportToEthTxMeta(execReport ExecReport) (*txmgr.TxMeta, error) {
+	msgIDs := make([]string, len(execReport.Messages))
+	for i, msg := range execReport.Messages {
+		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
+	}
+
+	return &txmgr.TxMeta{
+		MessageIDs: msgIDs,
+	}, nil
 }

@@ -50,6 +50,8 @@ type PriceRegistryReader interface {
 
 	Address() common.Address
 
+	FeeTokenEvents() []common.Hash
+
 	GetFeeTokens(ctx context.Context) ([]common.Address, error)
 
 	GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error)

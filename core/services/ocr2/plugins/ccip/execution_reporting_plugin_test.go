@@ -1055,7 +1055,7 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 
 	onRamp, _ := testhelpers.NewFakeOnRamp(t)
 	sourcePriceRegistry, _ := testhelpers.NewFakePriceRegistry(t)
-	commitStore, _ := testhelpers.NewFakeCommitStore(t, 1)
+	commitStoreReader, _ := testhelpers.NewFakeCommitStore(t, 1)
 	offRamp, _ := testhelpers.NewFakeOffRamp(t)
 
 	destPriceRegistryAddr := utils.RandomAddress()
@@ -1070,7 +1070,7 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 			destLP:              destLP,
 			sourceLP:            sourceLP,
 			onRamp:              onRamp,
-			commitStore:         commitStore,
+			commitStoreReader:         commitStoreReader,
 			offRamp:             offRamp,
 			sourcePriceRegistry: sourcePriceRegistry,
 			tokenDataProviders:  tokenDataProviders,
@@ -1080,7 +1080,7 @@ func TestExecutionReportingPluginFactory_UpdateLogPollerFilters(t *testing.T) {
 	for _, f := range getExecutionPluginSourceLpChainFilters(sourcePriceRegistry.Address()) {
 		sourceLP.On("RegisterFilter", f).Return(nil)
 	}
-	for _, f := range getExecutionPluginDestLpChainFilters(commitStore.Address(), offRamp.Address(), destPriceRegistryAddr) {
+	for _, f := range getExecutionPluginDestLpChainFilters(commitStoreReader.Address(), offRamp.Address(), destPriceRegistryAddr) {
 		destLP.On("RegisterFilter", f).Return(nil)
 	}
 	for _, f := range rf.sourceChainFilters[1:] { // zero address is skipped

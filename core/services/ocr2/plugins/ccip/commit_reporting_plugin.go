@@ -76,7 +76,7 @@ type CommitReportingPlugin struct {
 	sourceNative        common.Address
 	gasPriceEstimator   prices.GasPriceEstimatorCommit
 	// Dest
-	commitStore             ccipdata.CommitStoreReader
+	commitStoreReader       ccipdata.CommitStoreReader
 	destPriceRegistryReader ccipdata.PriceRegistryReader
 	offchainConfig          ccipdata.OffchainConfig
 	tokenDecimalsCache      cache.AutoSync[map[common.Address]uint8]
@@ -147,7 +147,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			sourceChainSelector:     rf.config.sourceChainSelector,
 			sourceNative:            rf.config.sourceNative,
 			onRampReader:            rf.config.onRampReader,
-			commitStore:             rf.config.commitStore,
+			commitStoreReader:       rf.config.commitStore,
 			priceGetter:             rf.config.priceGetter,
 			F:                       config.F,
 			lggr:                    rf.config.lggr.Named("CommitReportingPlugin"),
@@ -186,7 +186,7 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
 	// If the commit store is down the protocol should halt.
-	if r.commitStore.IsDown(ctx) {
+	if r.commitStoreReader.IsDown(ctx) {
 		return nil, ErrCommitStoreIsDown
 	}
 	r.inflightReports.expire(lggr)
@@ -226,27 +226,6 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 	}.Marshal()
 }
 
-// UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
-// pass zeroAddress if destPriceRegistry is unknown, filters with zero address are omitted.
-// TODO: Should be able to Close and re-create readers to abstract filters.
-//func (rf *CommitReportingPluginFactory) UpdateLogPollerFilters(qopts ...pg.QOpt) error {
-//	rf.filtersMu.Lock()
-//	defer rf.filtersMu.Unlock()
-//
-//	// destination chain filters
-//	destFiltersBefore, destFiltersNow := rf.destChainFilters, getCommitPluginDestLpFilters(rf.config.offRamp.Address())
-//	created, deleted := logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
-//	if err := logpollerutil.UnregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
-//		return err
-//	}
-//	if err := logpollerutil.RegisterLpFilters(rf.config.destLP, created, qopts...); err != nil {
-//		return err
-//	}
-//	rf.destChainFilters = destFiltersNow
-//
-//	return nil
-//}
-
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {
 	nextInflightMin, _, err := r.nextMinSeqNum(ctx, lggr)
 	if err != nil {
@@ -280,7 +259,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 }
 
 func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context, lggr logger.Logger) (inflightMin, onChainMin uint64, err error) {
-	nextMinOnChain, err := r.commitStore.GetExpectedNextSequenceNumber(ctx)
+	nextMinOnChain, err := r.commitStoreReader.GetExpectedNextSequenceNumber(ctx)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -509,7 +488,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	if err != nil {
 		return false, nil, err
 	}
-	encodedReport, err := r.commitStore.EncodeCommitReport(report)
+	encodedReport, err := r.commitStoreReader.EncodeCommitReport(report)
 	if err != nil {
 		return false, nil, err
 	}
@@ -743,7 +722,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 }
 
 func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context, reportTimestamp types.ReportTimestamp, report types.Report) (bool, error) {
-	parsedReport, err := r.commitStore.DecodeCommitReport(report)
+	parsedReport, err := r.commitStoreReader.DecodeCommitReport(report)
 	if err != nil {
 		return false, err
 	}
@@ -778,7 +757,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 // ShouldTransmitAcceptedReport checks if the report is stale, if it is it should not be transmitted.
 func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context, reportTimestamp types.ReportTimestamp, report types.Report) (bool, error) {
 	lggr := r.lggr.Named("CommitShouldTransmitAcceptedReport")
-	parsedReport, err := r.commitStore.DecodeCommitReport(report)
+	parsedReport, err := r.commitStoreReader.DecodeCommitReport(report)
 	if err != nil {
 		return false, err
 	}
@@ -830,7 +809,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 	}
 
 	// If report only has price update, check if its epoch and round lags behind the latest onchain
-	lastPriceEpochAndRound, err := r.commitStore.GetLatestPriceEpochAndRound(ctx)
+	lastPriceEpochAndRound, err := r.commitStoreReader.GetLatestPriceEpochAndRound(ctx)
 	if err != nil {
 		// Assume it's a transient issue getting the last report and try again on the next round
 		return true
@@ -848,7 +827,7 @@ func (r *CommitReportingPlugin) isStaleMerkleRoot(ctx context.Context, lggr logg
 	}
 
 	if checkInflight && nextInflightMin != reportInterval.Min {
-		// There are sequence numbers missing between the commitStore/inflight txs and the proposed report.
+		// There are sequence numbers missing between the commitStoreReader/inflight txs and the proposed report.
 		// The report will fail onchain unless the inflight cache is in an incorrect state. A state like this
 		// could happen for various reasons, e.g. a reboot of the node emptying the caches, and should be self-healing.
 		// We do not submit a tx and wait for the protocol to self-heal by updating the caches or invalidating
