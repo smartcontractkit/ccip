@@ -41,6 +41,7 @@ type GasPriceUpdate struct {
 	Timestamp *big.Int
 }
 
+//go:generate mockery --quiet --name PriceRegistryReader --output . --filename price_registry_reader_mock.go --inpackage --case=underscore
 type PriceRegistryReader interface {
 	Close(qopts ...pg.QOpt) error
 	// GetTokenPriceUpdatesCreatedAfter returns all the token price updates that happened after the provided timestamp.

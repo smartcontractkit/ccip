@@ -65,7 +65,7 @@ func (c CommitOffchainConfigV1_2_0) Validate() error {
 type CommitStoreV1_2_0 struct {
 	*CommitStoreV1_0_0
 	gasPriceEstimator prices.DAGasPriceEstimator
-	offchainConfig    OffchainConfig
+	offchainConfig    CommitOffchainConfig
 }
 
 func (c *CommitStoreV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
@@ -84,7 +84,7 @@ func (c *CommitStoreV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
 		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
 	)
-	c.offchainConfig = OffchainConfig{
+	c.offchainConfig = CommitOffchainConfig{
 		SourceFinalityDepth:    offchainConfigParsed.SourceFinalityDepth,
 		GasPriceDeviationPPB:   offchainConfigParsed.ExecGasPriceDeviationPPB,
 		TokenPriceDeviationPPB: offchainConfigParsed.TokenPriceDeviationPPB,
@@ -98,7 +98,7 @@ func (c *CommitStoreV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 	return onchainConfigParsed.PriceRegistry, nil
 }
 
-func (c *CommitStoreV1_2_0) OffchainConfig() OffchainConfig {
+func (c *CommitStoreV1_2_0) OffchainConfig() CommitOffchainConfig {
 	return c.offchainConfig
 }
 

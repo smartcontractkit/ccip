@@ -52,7 +52,7 @@ func (d CommitOnchainConfig) Validate() error {
 	return nil
 }
 
-type OffchainConfig struct {
+type CommitOffchainConfig struct {
 	SourceFinalityDepth    uint32
 	GasPriceDeviationPPB   uint32
 	GasPriceHeartBeat      time.Duration
@@ -62,6 +62,7 @@ type OffchainConfig struct {
 	DestFinalityDepth      uint32
 }
 
+//go:generate mockery --quiet --name CommitStoreReader --output . --filename commit_store_reader_mock.go --inpackage --case=underscore
 type CommitStoreReader interface {
 	Closer
 	GetExpectedNextSequenceNumber(context context.Context) (uint64, error)
@@ -74,7 +75,7 @@ type CommitStoreReader interface {
 	IsBlessed(ctx context.Context, root [32]byte) (bool, error)
 	// Notifies the reader that the config has changed onchain
 	ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, error)
-	OffchainConfig() OffchainConfig
+	OffchainConfig() CommitOffchainConfig
 	GasPriceEstimator() prices.GasPriceEstimatorCommit
 	EncodeCommitReport(report CommitStoreReport) ([]byte, error)
 	DecodeCommitReport(report []byte) (CommitStoreReport, error)

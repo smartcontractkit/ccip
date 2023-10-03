@@ -18,11 +18,11 @@ type MockOnRampReader struct {
 	mock.Mock
 }
 
-// Close provides a mock function with given fields: opt
-func (_m *MockOnRampReader) Close(opt ...pg.QOpt) error {
-	_va := make([]interface{}, len(opt))
-	for _i := range opt {
-		_va[_i] = opt[_i]
+// Close provides a mock function with given fields: qopts
+func (_m *MockOnRampReader) Close(qopts ...pg.QOpt) error {
+	_va := make([]interface{}, len(qopts))
+	for _i := range qopts {
+		_va[_i] = qopts[_i]
 	}
 	var _ca []interface{}
 	_ca = append(_ca, _va...)
@@ -30,7 +30,7 @@ func (_m *MockOnRampReader) Close(opt ...pg.QOpt) error {
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(...pg.QOpt) error); ok {
-		r0 = rf(opt...)
+		r0 = rf(qopts...)
 	} else {
 		r0 = ret.Error(0)
 	}

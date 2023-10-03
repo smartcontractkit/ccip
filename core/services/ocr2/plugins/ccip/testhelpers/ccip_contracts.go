@@ -1169,7 +1169,7 @@ func (c *CCIPContracts) SendRequest(t *testing.T, msg router.ClientEVM2AnyMessag
 	return tx
 }
 
-func (c *CCIPContracts) AssertExecState(t *testing.T, log logpoller.Log, state abihelpers.MessageExecutionState, offRampOpts ...common.Address) {
+func (c *CCIPContracts) AssertExecState(t *testing.T, log logpoller.Log, state ccipdata.MessageExecutionState, offRampOpts ...common.Address) {
 	var offRamp *evm_2_evm_offramp.EVM2EVMOffRamp
 	var err error
 	if len(offRampOpts) > 0 {
@@ -1181,7 +1181,7 @@ func (c *CCIPContracts) AssertExecState(t *testing.T, log logpoller.Log, state a
 	}
 	executionStateChanged, err := offRamp.ParseExecutionStateChanged(log.ToGethLog())
 	require.NoError(t, err)
-	if abihelpers.MessageExecutionState(executionStateChanged.State) != state {
+	if ccipdata.MessageExecutionState(executionStateChanged.State) != state {
 		t.Log("Execution failed")
 		t.Fail()
 	}

@@ -121,6 +121,7 @@ type ExecReport struct {
 	ProofFlagBits     *big.Int
 }
 
+//go:generate mockery --quiet --name OffRampReader --output . --filename offramp_reader_mock.go --inpackage --case=underscore
 type OffRampReader interface {
 	Closer
 	// Will error if messages are not a compatible verion

@@ -78,7 +78,7 @@ type CommitReportingPlugin struct {
 	// Dest
 	commitStoreReader       ccipdata.CommitStoreReader
 	destPriceRegistryReader ccipdata.PriceRegistryReader
-	offchainConfig          ccipdata.OffchainConfig
+	offchainConfig          ccipdata.CommitOffchainConfig
 	tokenDecimalsCache      cache.AutoSync[map[common.Address]uint8]
 	F                       int
 	// Offchain

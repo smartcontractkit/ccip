@@ -38,7 +38,7 @@ type CommitStoreV1_0_0 struct {
 	address                   common.Address
 	estimator                 gas.EvmFeeEstimator
 	gasPriceEstimator         prices.ExecGasPriceEstimator
-	offchainConfig            OffchainConfig
+	offchainConfig            CommitOffchainConfig
 	filters                   []logpoller.Filter
 	reportAcceptedSig         common.Hash
 	reportAcceptedMaxSeqIndex int
@@ -123,7 +123,7 @@ func (c *CommitStoreV1_0_0) IsBlessed(ctx context.Context, root [32]byte) (bool,
 	return c.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, root)
 }
 
-func (c *CommitStoreV1_0_0) OffchainConfig() OffchainConfig {
+func (c *CommitStoreV1_0_0) OffchainConfig() CommitOffchainConfig {
 	return c.offchainConfig
 }
 
@@ -178,7 +178,7 @@ func (c *CommitStoreV1_0_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 		c.estimator,
 		big.NewInt(int64(offchainConfigV1.MaxGasPrice)),
 		int64(offchainConfigV1.FeeUpdateDeviationPPB))
-	c.offchainConfig = OffchainConfig{
+	c.offchainConfig = CommitOffchainConfig{
 		SourceFinalityDepth:    offchainConfigV1.SourceFinalityDepth,
 		GasPriceDeviationPPB:   offchainConfigV1.FeeUpdateDeviationPPB,
 		TokenPriceDeviationPPB: offchainConfigV1.FeeUpdateDeviationPPB,
