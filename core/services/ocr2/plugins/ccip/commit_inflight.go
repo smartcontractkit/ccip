@@ -67,30 +67,31 @@ func (c *inflightCommitReportsContainer) maxInflightSeqNr() uint64 {
 	return max
 }
 
-// getLatestInflightGasPriceUpdate returns the latest inflight gas price update, and bool flag on if update exists.
-func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() (update, bool) {
+// getLatestInflightGasPriceUpdate returns a map of the latest gas price updates.
+func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() map[uint64]update {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
-	updateFound := false
-	latestGasPriceUpdate := update{}
-	var latestEpochAndRound uint64
+	latestGasPriceUpdates := make(map[uint64]update)
+	latestEpochAndRounds := make(map[uint64]uint64)
 	for _, inflight := range c.inFlightPriceUpdates {
-		if inflight.priceUpdates.DestChainSelector == 0 {
-			// Price updates did not include a gas price
-			continue
-		}
-		if !updateFound || inflight.epochAndRound > latestEpochAndRound {
-			// First price found or found later update, set it
-			updateFound = true
-			latestGasPriceUpdate = update{
-				timestamp: inflight.createdAt,
-				value:     inflight.priceUpdates.UsdPerUnitGas,
+		for _, inflightGasUpdate := range inflight.priceUpdates.GasPriceUpdates {
+			if _, ok := latestGasPriceUpdates[inflightGasUpdate.DestChainSelector]; !ok {
+				latestGasPriceUpdates[inflightGasUpdate.DestChainSelector] = update{
+					value:     inflightGasUpdate.UsdPerUnitGas,
+					timestamp: inflight.createdAt,
+				}
+				latestEpochAndRounds[inflightGasUpdate.DestChainSelector] = inflight.epochAndRound
 			}
-			latestEpochAndRound = inflight.epochAndRound
-			continue
+			if inflight.epochAndRound > latestEpochAndRounds[inflightGasUpdate.DestChainSelector] {
+				latestGasPriceUpdates[inflightGasUpdate.DestChainSelector] = update{
+					value:     inflightGasUpdate.UsdPerUnitGas,
+					timestamp: inflight.createdAt,
+				}
+				latestEpochAndRounds[inflightGasUpdate.DestChainSelector] = inflight.epochAndRound
+			}
 		}
 	}
-	return latestGasPriceUpdate, updateFound
+	return latestGasPriceUpdates
 }
 
 // latestInflightTokenPriceUpdates returns a map of the latest token price updates
@@ -172,7 +173,7 @@ func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report commit_s
 		}
 	}
 
-	if report.PriceUpdates.DestChainSelector != 0 || len(report.PriceUpdates.TokenPriceUpdates) != 0 {
+	if len(report.PriceUpdates.GasPriceUpdates) != 0 || len(report.PriceUpdates.TokenPriceUpdates) != 0 {
 		lggr.Infow("Adding to inflight fee updates", "priceUpdates", report.PriceUpdates)
 		c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
 			priceUpdates:  report.PriceUpdates,

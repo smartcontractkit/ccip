@@ -216,8 +216,10 @@ func DecodeCommitReport(report []byte) (commit_store.CommitStoreCommitReport, er
 				SourceToken common.Address `json:"sourceToken"`
 				UsdPerToken *big.Int       `json:"usdPerToken"`
 			} `json:"tokenPriceUpdates"`
-			DestChainSelector uint64   `json:"destChainSelector"`
-			UsdPerUnitGas     *big.Int `json:"usdPerUnitGas"`
+			GasPriceUpdates []struct {
+				DestChainSelector uint64   `json:"destChainSelector"`
+				UsdPerUnitGas     *big.Int `json:"usdPerUnitGas"`
+			} `json:"gasPriceUpdates"`
 		} `json:"priceUpdates"`
 		Interval struct {
 			Min uint64 `json:"min"`
@@ -237,11 +239,18 @@ func DecodeCommitReport(report []byte) (commit_store.CommitStoreCommitReport, er
 		})
 	}
 
+	var gasPriceUpdates []commit_store.InternalGasPriceUpdate
+	for _, u := range commitReport.PriceUpdates.GasPriceUpdates {
+		gasPriceUpdates = append(gasPriceUpdates, commit_store.InternalGasPriceUpdate{
+			DestChainSelector: u.DestChainSelector,
+			UsdPerUnitGas:     u.UsdPerUnitGas,
+		})
+	}
+
 	return commit_store.CommitStoreCommitReport{
 		PriceUpdates: commit_store.InternalPriceUpdates{
-			DestChainSelector: commitReport.PriceUpdates.DestChainSelector,
-			UsdPerUnitGas:     commitReport.PriceUpdates.UsdPerUnitGas,
 			TokenPriceUpdates: tokenPriceUpdates,
+			GasPriceUpdates:   gasPriceUpdates,
 		},
 		Interval: commit_store.CommitStoreInterval{
 			Min: commitReport.Interval.Min,

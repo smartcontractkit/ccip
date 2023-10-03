@@ -223,8 +223,12 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 1},
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: nil,
-					DestChainSelector: uint64(sourceChainSelector),
-					UsdPerUnitGas:     gasPrice,
+					GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
+						{
+							DestChainSelector: uint64(sourceChainSelector),
+							UsdPerUnitGas:     gasPrice,
+						},
+					},
 				},
 			},
 			expErr: false,
@@ -338,8 +342,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	t.Run("empty report should not be accepted", func(t *testing.T) {
 		p := newPlugin()
 		report := commit_store.CommitStoreCommitReport{
-			// UsdPerUnitGas is mandatory otherwise report cannot be encoded/decoded
-			PriceUpdates: commit_store.InternalPriceUpdates{UsdPerUnitGas: big.NewInt(int64(rand.Int()))},
+			PriceUpdates: commit_store.InternalPriceUpdates{},
 		}
 		encodedReport, err := abihelpers.EncodeCommitReport(report)
 		assert.NoError(t, err)
@@ -357,7 +360,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		p.config.commitStore = commitStore
 
 		report := commit_store.CommitStoreCommitReport{
-			PriceUpdates: commit_store.InternalPriceUpdates{UsdPerUnitGas: big.NewInt(int64(rand.Int()))},
+			PriceUpdates: commit_store.InternalPriceUpdates{},
 			MerkleRoot:   [32]byte{123}, // this report is considered non-empty since it has a merkle root
 		}
 
@@ -387,8 +390,12 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 						UsdPerToken: big.NewInt(int64(rand.Int())),
 					},
 				},
-				DestChainSelector: rand.Uint64(),
-				UsdPerUnitGas:     big.NewInt(int64(rand.Int())),
+				GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
+					{
+						DestChainSelector: rand.Uint64(),
+						UsdPerUnitGas:     big.NewInt(int64(rand.Int())),
+					},
+				},
 			},
 			MerkleRoot: [32]byte{123},
 		}
@@ -415,8 +422,12 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
 				{SourceToken: utils.RandomAddress(), UsdPerToken: big.NewInt(9e18)},
 			},
-			DestChainSelector: rand.Uint64(),
-			UsdPerUnitGas:     big.NewInt(2000e9),
+			GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: rand.Uint64(),
+					UsdPerUnitGas:     big.NewInt(2000e9),
+				},
+			},
 		},
 		MerkleRoot: [32]byte{123},
 	}
@@ -634,9 +645,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 		execGasPriceDeviationPPB int64
 		tokenPriceHeartBeat      models.Duration
 		tokenPriceDeviationPPB   uint32
-		expGas                   *big.Int
 		expTokenUpdates          []commit_store.InternalTokenPriceUpdate
-		expDestChainSel          uint64
+		expGasUpdates            []commit_store.InternalGasPriceUpdate
 	}{
 		{
 			name: "median",
@@ -646,9 +656,13 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{SourceGasPriceUSD: big.NewInt(3)},
 				{SourceGasPriceUSD: big.NewInt(4)},
 			},
-			f:               2,
-			expGas:          big.NewInt(3),
-			expDestChainSel: defaultSourceChainSelector,
+			f: 2,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: defaultSourceChainSelector,
+					UsdPerUnitGas:     big.NewInt(3),
+				},
+			},
 		},
 		{
 			name: "gas price update skipped because the latest is similar and was updated recently",
@@ -665,9 +679,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				timestamp: time.Now().Add(-30 * time.Minute), // recent
 				value:     val1e18(9),                        // latest value close to the update
 			},
-			f:               1,
-			expGas:          zero,
-			expDestChainSel: 0,
+			f:             1,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{},
 		},
 		{
 			name: "gas price update included, the latest is similar but was not updated recently",
@@ -684,9 +697,13 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				timestamp: time.Now().Add(-90 * time.Minute), // recent
 				value:     val1e18(9),                        // latest value close to the update
 			},
-			f:               1,
-			expGas:          val1e18(11),
-			expDestChainSel: defaultSourceChainSelector,
+			f: 1,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: defaultSourceChainSelector,
+					UsdPerUnitGas:     val1e18(11),
+				},
+			},
 		},
 		{
 			name: "gas price update deviates from latest",
@@ -704,9 +721,13 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				timestamp: time.Now().Add(-30 * time.Minute), // recent
 				value:     val1e18(11),                       // latest value close to the update
 			},
-			f:               2,
-			expGas:          val1e18(20),
-			expDestChainSel: defaultSourceChainSelector,
+			f: 2,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: defaultSourceChainSelector,
+					UsdPerUnitGas:     val1e18(20),
+				},
+			},
 		},
 		{
 			name: "median one token",
@@ -718,8 +739,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{
 				{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)},
 			},
-			expGas:          zero,
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: defaultSourceChainSelector,
+					UsdPerUnitGas:     zero,
+				},
+			},
 		},
 		{
 			name: "median two tokens",
@@ -732,8 +757,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{SourceToken: feeToken1, UsdPerToken: big.NewInt(12)},
 				{SourceToken: feeToken2, UsdPerToken: big.NewInt(13)},
 			},
-			expGas:          zero,
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: defaultSourceChainSelector,
+					UsdPerUnitGas:     zero,
+				},
+			},
 		},
 		{
 			name: "token price update skipped because it is close to the latest",
@@ -753,8 +782,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 					value:     val1e18(9),
 				},
 			},
-			expGas:          zero,
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: defaultSourceChainSelector,
+					UsdPerUnitGas:     zero,
+				},
+			},
 		},
 		{
 			name: "gas price and token price both included because they are not close to the latest",
@@ -781,8 +814,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{
 				{SourceToken: feeToken1, UsdPerToken: val1e18(21)},
 			},
-			expGas:          val1e18(11),
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: defaultSourceChainSelector,
+					UsdPerUnitGas:     val1e18(11),
+				},
+			},
 		},
 		{
 			name: "gas price and token price both included because they not been updated recently",
@@ -809,8 +846,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{
 				{SourceToken: feeToken1, UsdPerToken: val1e18(21)},
 			},
-			expGas:          val1e18(11),
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: defaultSourceChainSelector,
+					UsdPerUnitGas:     val1e18(11),
+				},
+			},
 		},
 		{
 			name: "gas price included because it deviates from latest and token price skipped because it does not deviate",
@@ -834,8 +875,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 					value:     val1e18(9),
 				},
 			},
-			expGas:          val1e18(11),
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: defaultSourceChainSelector,
+					UsdPerUnitGas:     val1e18(11),
+				},
+			},
 		},
 		{
 			name: "gas price skipped because it does not deviate and token price included because it has not been updated recently",
@@ -862,8 +907,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expTokenUpdates: []commit_store.InternalTokenPriceUpdate{
 				{SourceToken: feeToken1, UsdPerToken: val1e18(21)},
 			},
-			expGas:          zero,
-			expDestChainSel: 0,
+			expGasUpdates: []commit_store.InternalGasPriceUpdate{},
 		},
 	}
 
@@ -894,9 +938,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			}
 			got, err := r.calculatePriceUpdates(tc.commitObservations, tc.latestGasPrice, tc.latestTokenPrices)
 
-			assert.Equal(t, tc.expGas, got.UsdPerUnitGas)
 			assert.Equal(t, tc.expTokenUpdates, got.TokenPriceUpdates)
-			assert.Equal(t, tc.expDestChainSel, got.DestChainSelector)
+			assert.Equal(t, tc.expGasUpdates, got.GasPriceUpdates)
 			assert.NoError(t, err)
 		})
 	}
@@ -1359,8 +1402,12 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 					InflightPriceUpdate{
 						createdAt: tc.inflightGasPriceUpdate.timestamp,
 						priceUpdates: commit_store.InternalPriceUpdates{
-							DestChainSelector: 1234,
-							UsdPerUnitGas:     tc.inflightGasPriceUpdate.value,
+							GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
+								{
+									DestChainSelector: 1234,
+									UsdPerUnitGas:     tc.inflightGasPriceUpdate.value,
+								},
+							},
 						},
 					},
 				)
@@ -1519,8 +1566,12 @@ func Test_commitReportSize(t *testing.T) {
 			Interval:   commit_store.CommitStoreInterval{Min: min, Max: max},
 			PriceUpdates: commit_store.InternalPriceUpdates{
 				TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-				DestChainSelector: 1337,
-				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+				GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
+					{
+						DestChainSelector: 1337,
+						UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+					},
+				},
 			},
 		})
 		require.NoError(t, err)
@@ -1638,8 +1689,12 @@ func TestCommitReportToEthTxMeta(t *testing.T) {
 			report := commit_store.CommitStoreCommitReport{
 				PriceUpdates: commit_store.InternalPriceUpdates{
 					TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{},
-					DestChainSelector: uint64(1337),
-					UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+					GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
+						{
+							DestChainSelector: uint64(1337),
+							UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+						},
+					},
 				},
 				MerkleRoot: tree.Root(),
 				Interval:   commit_store.CommitStoreInterval{Min: tc.min, Max: tc.max},

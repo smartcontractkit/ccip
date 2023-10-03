@@ -71,8 +71,12 @@ func TestCommitReportEncoding(t *testing.T) {
 					UsdPerToken: big.NewInt(9e18),
 				},
 			},
-			DestChainSelector: rand.Uint64(),
-			UsdPerUnitGas:     big.NewInt(2000e9),
+			GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
+				{
+					DestChainSelector: rand.Uint64(),
+					UsdPerUnitGas:     big.NewInt(2000e9),
+				},
+			},
 		},
 		MerkleRoot: [32]byte{123},
 		Interval:   commit_store.CommitStoreInterval{Min: 1, Max: 10},

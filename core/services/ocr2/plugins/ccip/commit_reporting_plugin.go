@@ -419,9 +419,9 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 // If an update is found, it is not expected to contain a nil value. If no updates found, empty update with nil value is returned.
 func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasUpdate update, error error) {
 	if checkInflight {
-		latestInflightGasPriceUpdate, latestUpdateFound := r.inflightReports.getLatestInflightGasPriceUpdate()
-		if latestUpdateFound {
-			gasUpdate = latestInflightGasPriceUpdate
+		latestInflightGasPriceUpdates := r.inflightReports.getLatestInflightGasPriceUpdate()
+		if inflightUpdate, exists := latestInflightGasPriceUpdates[r.config.sourceChainSelector]; exists {
+			gasUpdate = inflightUpdate
 			r.lggr.Infow("Latest gas price from inflight", "gasPriceUpdateVal", gasUpdate.value, "gasPriceUpdateTs", gasUpdate.timestamp)
 
 			// Gas price can fluctuate frequently, many updates may be in flight.
@@ -499,7 +499,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		return false, nil, err
 	}
 	// If there are no fee updates and the interval is zero there is no report to produce.
-	if len(priceUpdates.TokenPriceUpdates) == 0 && priceUpdates.DestChainSelector == 0 && agreedInterval.Min == 0 {
+	if len(priceUpdates.TokenPriceUpdates) == 0 && len(priceUpdates.GasPriceUpdates) == 0 && agreedInterval.Min == 0 {
 		lggr.Infow("Empty report, skipping")
 		return false, nil, nil
 	}
@@ -517,8 +517,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		"minSeqNr", report.Interval.Min,
 		"maxSeqNr", report.Interval.Max,
 		"tokenPriceUpdates", report.PriceUpdates.TokenPriceUpdates,
-		"destChainSelector", report.PriceUpdates.DestChainSelector,
-		"sourceUsdPerUnitGas", report.PriceUpdates.UsdPerUnitGas,
+		"gasPriceUpdates", report.PriceUpdates.GasPriceUpdates,
 		"epochAndRound", epochAndRound,
 	)
 	return true, encodedReport, nil
@@ -669,11 +668,18 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 		return bytes.Compare(tokenPriceUpdates[i].SourceToken[:], tokenPriceUpdates[j].SourceToken[:]) == -1
 	})
 
+	destChainSelector := r.config.sourceChainSelector                     // Assuming plugin lane is A->B, we write to B the gas price of A
 	newGasPrice, err := r.gasPriceEstimator.Median(sourceGasObservations) // Compute the median price
 	if err != nil {
 		return commit_store.InternalPriceUpdates{}, err
 	}
-	destChainSelector := r.config.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
+	// Although onchain interface accepts multi gas updates, we only do 1 gas price per report for now.
+	gasPriceUpdates := []commit_store.InternalGasPriceUpdate{
+		{
+			DestChainSelector: destChainSelector,
+			UsdPerUnitGas:     newGasPrice,
+		},
+	}
 
 	if latestGasPrice.value != nil {
 		gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat.Duration()
@@ -682,15 +688,13 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 			return commit_store.InternalPriceUpdates{}, err
 		}
 		if gasPriceUpdatedRecently && !gasPriceDeviated {
-			newGasPrice = big.NewInt(0)
-			destChainSelector = uint64(0)
+			gasPriceUpdates = []commit_store.InternalGasPriceUpdate{}
 		}
 	}
 
 	return commit_store.InternalPriceUpdates{
 		TokenPriceUpdates: tokenPriceUpdates,
-		DestChainSelector: destChainSelector,
-		UsdPerUnitGas:     newGasPrice, // we MUST pass zero to skip the update (never nil)
+		GasPriceUpdates:   gasPriceUpdates,
 	}, nil
 }
 
@@ -753,13 +757,12 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		"merkleRoot", parsedReport.MerkleRoot,
 		"minSeqNum", parsedReport.Interval.Min,
 		"maxSeqNum", parsedReport.Interval.Max,
-		"destChainSelector", parsedReport.PriceUpdates.DestChainSelector,
-		"usdPerUnitGas", parsedReport.PriceUpdates.UsdPerUnitGas,
 		"tokenPriceUpdates", parsedReport.PriceUpdates.TokenPriceUpdates,
+		"gasPriceUpdates", parsedReport.PriceUpdates.GasPriceUpdates,
 		"reportTimestamp", reportTimestamp,
 	)
 	// Empty report, should not be put on chain
-	if parsedReport.MerkleRoot == [32]byte{} && parsedReport.PriceUpdates.DestChainSelector == 0 && len(parsedReport.PriceUpdates.TokenPriceUpdates) == 0 {
+	if parsedReport.MerkleRoot == [32]byte{} && len(parsedReport.PriceUpdates.GasPriceUpdates) == 0 && len(parsedReport.PriceUpdates.TokenPriceUpdates) == 0 {
 		lggr.Warn("Empty report, should not be put on chain")
 		return false, nil
 	}
@@ -814,7 +817,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 		return r.isStaleMerkleRoot(ctx, lggr, report.Interval, checkInflight)
 	}
 
-	hasGasPriceUpdate := report.PriceUpdates.DestChainSelector != 0
+	hasGasPriceUpdate := len(report.PriceUpdates.GasPriceUpdates) > 0
 	hasTokenPriceUpdates := len(report.PriceUpdates.TokenPriceUpdates) > 0
 
 	// If there is no merkle root, no gas price update and no token price update
@@ -875,9 +878,14 @@ func (r *CommitReportingPlugin) isStaleGasPrice(ctx context.Context, lggr logger
 		lggr.Errorw("Report is stale because getLatestGasPriceUpdate failed", "err", err)
 		return true
 	}
+	// Commit plugin currently only supports 1 gas price per report. If report contains more than 1, reject the report.
+	if len(priceUpdates.GasPriceUpdates) > 1 {
+		lggr.Errorw("Report is stale because it contains more than 1 gas price update", "GasPriceUpdates", priceUpdates.GasPriceUpdates)
+		return true
+	}
 
 	if latestGasPrice.value != nil {
-		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(priceUpdates.UsdPerUnitGas, latestGasPrice.value)
+		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(priceUpdates.GasPriceUpdates[0].UsdPerUnitGas, latestGasPrice.value)
 		if err != nil {
 			lggr.Errorw("Report is stale because deviation check failed", "err", err)
 			return true
@@ -886,8 +894,8 @@ func (r *CommitReportingPlugin) isStaleGasPrice(ctx context.Context, lggr logger
 		if !gasPriceDeviated {
 			lggr.Infow("Report is stale because of gas price",
 				"latestGasPriceUpdate", latestGasPrice.value,
-				"usdPerUnitGas", priceUpdates.UsdPerUnitGas,
-				"destChainSelector", priceUpdates.DestChainSelector)
+				"usdPerUnitGas", priceUpdates.GasPriceUpdates[0].UsdPerUnitGas,
+				"destChainSelector", priceUpdates.GasPriceUpdates[0].DestChainSelector)
 			return true
 		}
 	}
