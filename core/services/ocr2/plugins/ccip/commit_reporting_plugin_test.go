@@ -1395,6 +1395,7 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 			p.lggr = lggr
 			destPriceRegistry, _ := testhelpers.NewFakePriceRegistry(t)
 			p.destPriceRegistry = destPriceRegistry
+			p.config.sourceChainSelector = uint64(1234)
 
 			if tc.inflightGasPriceUpdate != nil {
 				p.inflightReports.inFlightPriceUpdates = append(
@@ -1404,7 +1405,7 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 						priceUpdates: commit_store.InternalPriceUpdates{
 							GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
 								{
-									DestChainSelector: 1234,
+									DestChainSelector: p.config.sourceChainSelector,
 									UsdPerUnitGas:     tc.inflightGasPriceUpdate.value,
 								},
 							},
@@ -1424,7 +1425,7 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 					})
 				}
 				destReader := ccipdata.NewMockReader(t)
-				destReader.On("GetGasPriceUpdatesCreatedAfter", ctx, mock.Anything, uint64(0), mock.Anything, 0).Return(events, nil)
+				destReader.On("GetGasPriceUpdatesCreatedAfter", ctx, mock.Anything, p.config.sourceChainSelector, mock.Anything, 0).Return(events, nil)
 				p.config.destReader = destReader
 			}
 

@@ -67,8 +67,8 @@ func (c *inflightCommitReportsContainer) maxInflightSeqNr() uint64 {
 	return max
 }
 
-// getLatestInflightGasPriceUpdate returns a map of the latest gas price updates.
-func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() map[uint64]update {
+// latestInflightGasPriceUpdates returns a map of the latest gas price updates.
+func (c *inflightCommitReportsContainer) latestInflightGasPriceUpdates() map[uint64]update {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
 	latestGasPriceUpdates := make(map[uint64]update)

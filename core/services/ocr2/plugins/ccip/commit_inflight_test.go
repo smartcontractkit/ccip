@@ -27,7 +27,7 @@ func TestCommitInflight(t *testing.T) {
 	})
 
 	// Initially should be empty
-	inflightGasUpdates := c.getLatestInflightGasPriceUpdate()
+	inflightGasUpdates := c.latestInflightGasPriceUpdates()
 	assert.Equal(t, 0, len(inflightGasUpdates))
 	assert.Equal(t, uint64(0), c.maxInflightSeqNr())
 
@@ -36,7 +36,7 @@ func TestCommitInflight(t *testing.T) {
 	// Add a single report inflight
 	root1 := utils.Keccak256Fixed(hexutil.MustDecode("0xaa"))
 	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 2}, MerkleRoot: root1}, epochAndRound))
-	inflightGasUpdates = c.getLatestInflightGasPriceUpdate()
+	inflightGasUpdates = c.latestInflightGasPriceUpdates()
 	assert.Equal(t, 0, len(inflightGasUpdates))
 	assert.Equal(t, uint64(2), c.maxInflightSeqNr())
 	epochAndRound++
@@ -44,24 +44,25 @@ func TestCommitInflight(t *testing.T) {
 	// Add another price report
 	root2 := utils.Keccak256Fixed(hexutil.MustDecode("0xab"))
 	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{Interval: commit_store.CommitStoreInterval{Min: 3, Max: 4}, MerkleRoot: root2}, epochAndRound))
-	inflightGasUpdates = c.getLatestInflightGasPriceUpdate()
+	inflightGasUpdates = c.latestInflightGasPriceUpdates()
 	assert.Equal(t, 0, len(inflightGasUpdates))
 	assert.Equal(t, uint64(4), c.maxInflightSeqNr())
 	epochAndRound++
 
 	// Add gas price updates
+	destChainSelector := uint64(1)
 	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{PriceUpdates: commit_store.InternalPriceUpdates{
 		GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
 			{
-				DestChainSelector: uint64(1),
+				DestChainSelector: destChainSelector,
 				UsdPerUnitGas:     big.NewInt(1),
 			},
 		},
 	}}, epochAndRound))
 
-	inflightGasUpdates = c.getLatestInflightGasPriceUpdate()
+	inflightGasUpdates = c.latestInflightGasPriceUpdates()
 	assert.Equal(t, 1, len(inflightGasUpdates))
-	assert.Equal(t, big.NewInt(1), inflightGasUpdates[0].value)
+	assert.Equal(t, big.NewInt(1), inflightGasUpdates[destChainSelector].value)
 	assert.Equal(t, uint64(4), c.maxInflightSeqNr())
 	epochAndRound++
 
@@ -88,7 +89,7 @@ func TestCommitInflight(t *testing.T) {
 			},
 			GasPriceUpdates: []commit_store.InternalGasPriceUpdate{
 				{
-					DestChainSelector: uint64(1),
+					DestChainSelector: destChainSelector,
 					UsdPerUnitGas:     big.NewInt(999),
 				},
 			},
@@ -100,9 +101,9 @@ func TestCommitInflight(t *testing.T) {
 	require.Equal(t, len(latestInflightTokenPriceUpdates), 1)
 	assert.Equal(t, big.NewInt(9999), latestInflightTokenPriceUpdates[token].value)
 
-	latestInflightTokenPriceUpdates = c.latestInflightTokenPriceUpdates()
-	require.Equal(t, len(latestInflightTokenPriceUpdates), 1)
-	assert.Equal(t, big.NewInt(999), latestInflightTokenPriceUpdates[token].value)
+	latestInflightGasPriceUpdates := c.latestInflightGasPriceUpdates()
+	require.Equal(t, len(latestInflightGasPriceUpdates), 1)
+	assert.Equal(t, big.NewInt(999), latestInflightGasPriceUpdates[destChainSelector].value)
 }
 
 func Test_inflightCommitReportsContainer_expire(t *testing.T) {

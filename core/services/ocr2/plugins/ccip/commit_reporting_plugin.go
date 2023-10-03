@@ -419,7 +419,7 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 // If an update is found, it is not expected to contain a nil value. If no updates found, empty update with nil value is returned.
 func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasUpdate update, error error) {
 	if checkInflight {
-		latestInflightGasPriceUpdates := r.inflightReports.getLatestInflightGasPriceUpdate()
+		latestInflightGasPriceUpdates := r.inflightReports.latestInflightGasPriceUpdates()
 		if inflightUpdate, exists := latestInflightGasPriceUpdates[r.config.sourceChainSelector]; exists {
 			gasUpdate = inflightUpdate
 			r.lggr.Infow("Latest gas price from inflight", "gasPriceUpdateVal", gasUpdate.value, "gasPriceUpdateTs", gasUpdate.timestamp)
