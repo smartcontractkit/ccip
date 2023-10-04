@@ -225,19 +225,6 @@ func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 		}
 	}
 
-	//SequenceNumber      uint64
-	//GasLimit            *big.Int
-	//Nonce               uint64
-	//MessageId           Hash
-	//SourceChainSelector uint64
-	//Sender              common.Address
-	//Receiver            common.Address
-	//Strict              bool
-	//FeeToken            common.Address
-	//FeeTokenAmount      *big.Int
-	//Data                []byte
-	//TokenAmounts        []TokenAmount
-	//SourceTokenData     [][]byte
 	return &internal.EVM2EVMMessage{
 		SequenceNumber:      msg.Message.SequenceNumber,
 		GasLimit:            msg.Message.GasLimit,

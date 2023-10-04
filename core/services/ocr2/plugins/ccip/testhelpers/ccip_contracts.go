@@ -69,7 +69,7 @@ var (
 )
 
 // Backwards compat, in principle these statuses are version dependent
-// TODO: Adjust integration tests to be verison agnostic using readers
+// TODO: Adjust integration tests to be version agnostic using readers
 var (
 	ExecutionStateSuccess = MessageExecutionState(ccipdata.ExecutionStateSuccess)
 	ExecutionStateFailure = MessageExecutionState(ccipdata.ExecutionStateFailure)

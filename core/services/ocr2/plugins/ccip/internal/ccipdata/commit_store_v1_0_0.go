@@ -63,8 +63,8 @@ func encodeCommitReportV1_0_0(commitReportArgs abi.Arguments, report CommitStore
 			UsdPerUnitGas:     report.GasPrices[0].Value,
 			DestChainSelector: report.GasPrices[0].DestChainSelector,
 		},
-		Interval:   commit_store.CommitStoreInterval{},
-		MerkleRoot: [32]byte{},
+		Interval:   commit_store.CommitStoreInterval{Min: report.Interval.Min, Max: report.Interval.Max},
+		MerkleRoot: report.MerkleRoot,
 	}
 	return commitReportArgs.PackValues([]interface{}{rep})
 }
