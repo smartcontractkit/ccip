@@ -158,7 +158,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 
 func TestCommitReportingPlugin_Report(t *testing.T) {
 	ctx := testutils.Context(t)
-	sourceChainSelector := rand.Int()
+	sourceChainSelector := uint64(rand.Int())
 	var gasPrice prices.GasPrice = big.NewInt(1)
 	gasPriceHeartBeat := models.MustMakeDuration(time.Hour)
 
@@ -214,7 +214,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				{
 					Data: ccipdata.GasPriceUpdate{
 						GasPrice: ccipdata.GasPrice{
-							DestChainSelector: 123, // todo
+							DestChainSelector: sourceChainSelector,
 							Value:             big.NewInt(1),
 						},
 						Timestamp: big.NewInt(time.Now().Add(-2 * gasPriceHeartBeat.Duration()).Unix()),
@@ -240,7 +240,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				{
 					Data: ccipdata.GasPriceUpdate{
 						GasPrice: ccipdata.GasPrice{
-							DestChainSelector: 123,
+							DestChainSelector: sourceChainSelector,
 							Value:             big.NewInt(1),
 						},
 						Timestamp: big.NewInt(time.Now().Add(-gasPriceHeartBeat.Duration() / 2).Unix()),
@@ -266,7 +266,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			destPriceRegistryReader := ccipdata.NewMockPriceRegistryReader(t)
-			destPriceRegistryReader.On("GetGasPriceUpdatesCreatedAfter", ctx, uint64(sourceChainSelector), mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
+			destPriceRegistryReader.On("GetGasPriceUpdatesCreatedAfter", ctx, sourceChainSelector, mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
 			destPriceRegistryReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
 
 			onRampReader := ccipdata.NewMockOnRampReader(t)
@@ -293,7 +293,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 			p.destPriceRegistryReader = destPriceRegistryReader
 			p.onRampReader = onRampReader
-			p.sourceChainSelector = uint64(sourceChainSelector)
+			p.sourceChainSelector = sourceChainSelector
 			p.tokenDecimalsCache = tokenDecimalsCache
 			p.gasPriceEstimator = gasPriceEstimator
 			p.offchainConfig.GasPriceHeartBeat = gasPriceHeartBeat.Duration()
