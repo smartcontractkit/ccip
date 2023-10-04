@@ -725,21 +725,16 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 		return false, err
 	}
 
-	if len(parsedReport.GasPrices) == 0 {
-		return false, fmt.Errorf("report does not have any gas prices, merkleRoot=%x", parsedReport.MerkleRoot)
-	}
-
 	lggr := r.lggr.Named("CommitShouldAcceptFinalizedReport").With(
 		"merkleRoot", parsedReport.MerkleRoot,
 		"minSeqNum", parsedReport.Interval.Min,
 		"maxSeqNum", parsedReport.Interval.Max,
-		"destChainSelector", parsedReport.GasPrices[0].DestChainSelector,
-		"usdPerUnitGas", parsedReport.GasPrices[0].Value,
+		"gasPriceUpdates", parsedReport.GasPrices,
 		"tokenPriceUpdates", parsedReport.TokenPrices,
 		"reportTimestamp", reportTimestamp,
 	)
 	// Empty report, should not be put on chain
-	if parsedReport.MerkleRoot == [32]byte{} && parsedReport.GasPrices[0].DestChainSelector == 0 && len(parsedReport.TokenPrices) == 0 {
+	if parsedReport.MerkleRoot == [32]byte{} && len(parsedReport.GasPrices) == 0 && len(parsedReport.TokenPrices) == 0 {
 		lggr.Warn("Empty report, should not be put on chain")
 		return false, nil
 	}
@@ -794,12 +789,7 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 		return r.isStaleMerkleRoot(ctx, lggr, report.Interval, checkInflight)
 	}
 
-	if len(report.GasPrices) == 0 {
-		lggr.Errorf("report stale due to not having any gas prices")
-		return true
-	}
-
-	hasGasPriceUpdate := report.GasPrices[0].DestChainSelector != 0
+	hasGasPriceUpdate := len(report.GasPrices) > 0
 	hasTokenPriceUpdates := len(report.TokenPrices) > 0
 
 	// If there is no merkle root, no gas price update and no token price update

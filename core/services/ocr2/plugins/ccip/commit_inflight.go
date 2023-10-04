@@ -1,7 +1,6 @@
 package ccip
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -174,11 +173,7 @@ func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report ccipdata
 		}
 	}
 
-	if len(report.GasPrices) == 0 {
-		return errors.New("report does not contain any gas prices")
-	}
-
-	if report.GasPrices[0].DestChainSelector != 0 || len(report.TokenPrices) != 0 {
+	if len(report.GasPrices) != 0 || len(report.TokenPrices) != 0 {
 		lggr.Infow("Adding to inflight fee updates", "gasPrices", report.GasPrices, "tokenPrices", report.TokenPrices)
 		c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
 			gasPrices:     report.GasPrices,

@@ -62,11 +62,17 @@ func encodeCommitReportV1_0_0(commitReportArgs abi.Arguments, report CommitStore
 			UsdPerToken: tokenPriceUpdate.Value,
 		})
 	}
+	var usdPerUnitGas = big.NewInt(0)
+	var destChainSelector = uint64(0)
+	if len(report.GasPrices) > 0 {
+		usdPerUnitGas = report.GasPrices[0].Value
+		destChainSelector = report.GasPrices[0].DestChainSelector
+	}
 	rep := commit_store.CommitStoreCommitReport{
 		PriceUpdates: commit_store.InternalPriceUpdates{
 			TokenPriceUpdates: tokenPriceUpdates,
-			UsdPerUnitGas:     report.GasPrices[0].Value,
-			DestChainSelector: report.GasPrices[0].DestChainSelector,
+			UsdPerUnitGas:     usdPerUnitGas,
+			DestChainSelector: destChainSelector,
 		},
 		Interval:   commit_store.CommitStoreInterval{Min: report.Interval.Min, Max: report.Interval.Max},
 		MerkleRoot: report.MerkleRoot,
@@ -110,12 +116,18 @@ func decodeCommitReportV1_0_0(commitReportArgs abi.Arguments, report []byte) (Co
 		})
 	}
 
-	return CommitStoreReport{
-		TokenPrices: tokenPriceUpdates,
-		GasPrices: []GasPrice{{
+	var gasPrices []GasPrice
+	if commitReport.PriceUpdates.DestChainSelector != 0 {
+		// No gas price update	{
+		gasPrices = append(gasPrices, GasPrice{
 			DestChainSelector: commitReport.PriceUpdates.DestChainSelector,
 			Value:             commitReport.PriceUpdates.UsdPerUnitGas,
-		}},
+		})
+	}
+
+	return CommitStoreReport{
+		TokenPrices: tokenPriceUpdates,
+		GasPrices:   gasPrices,
 		Interval: CommitStoreInterval{
 			Min: commitReport.Interval.Min,
 			Max: commitReport.Interval.Max,

@@ -352,10 +352,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	t.Run("empty report should not be accepted", func(t *testing.T) {
 		p := newPlugin()
 
-		report := ccipdata.CommitStoreReport{
-			// UsdPerUnitGas is mandatory otherwise report cannot be encoded/decoded
-			GasPrices: []ccipdata.GasPrice{{DestChainSelector: 0, Value: big.NewInt(int64(rand.Int()))}},
-		}
+		report := ccipdata.CommitStoreReport{}
 
 		commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
 		p.commitStoreReader = commitStoreReader
