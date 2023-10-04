@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.0;
 
+/// @dev Handles the edge case where we want to pass a specific amount of gas,
+/// @dev but EIP-150 sends all but 1/64 of the remaining gas instead so the user gets
+/// @dev less gas than they paid for. The other 2 parts of EIP-150 do not apply since
+/// @dev a) we hard code value=0 and b) we ensure code already exists.
+/// @dev If we revert instead, then that will never happen.
+/// @dev Separately we capture the return data up to a maximum size to avoid return bombs,
+/// @dev borrowed from https://github.com/nomad-xyz/ExcessivelySafeCall/blob/main/src/ExcessivelySafeCall.sol.
 library CallWithExactGas {
   error NoContract();
   error NoGasForCallExactCheck();

@@ -92,14 +92,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     address router; // ─────────────────────────────────╯ Router address
     address priceRegistry; // ─────╮ Price registry address
     uint16 maxTokensLength; //     │ Maximum number of ERC20 token transfers that can be included per message
-    uint32 maxDataSize; // ────────╯ Maximum payload data size
+    uint32 maxDataSize; //         │ Maximum payload data size
+    uint32 maxPoolGas; // ─────────╯ Maximum amount of gas passed on to token pool when calling releaseOrMint
   }
 
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "EVM2EVMOffRamp 1.2.0";
-  /// @dev The maximum amount of gas available to perform the releaseOrMint call with.
-  uint256 internal constant MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS = 200_000;
   /// @dev Commit store address on the destination chain
   address internal immutable i_commitStore;
   /// @dev ChainSelector of the source chain
@@ -594,7 +593,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
           abi.encode(sourceTokenData[i], offchainTokenData[i])
         ),
         address(pool),
-        MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS,
+        s_dynamicConfig.maxPoolGas,
         Internal.MAX_RET_BYTES,
         Internal.GAS_FOR_CALL_EXACT_CHECK
       );
