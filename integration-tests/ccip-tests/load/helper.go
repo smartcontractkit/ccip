@@ -204,7 +204,6 @@ func (l *loadArgs) Start() {
 					CallTimeout:           l.TestCfg.Load.LoadTimeOut,
 					Gun:                   ccipLoad,
 					Logger:                ccipLoad.Lane.Logger,
-					CallResultBufLen:      1000,
 					SharedData:            l.TestCfg.MsgType,
 					LokiConfig:            wasp.NewEnvLokiConfig(),
 					Labels: map[string]string{

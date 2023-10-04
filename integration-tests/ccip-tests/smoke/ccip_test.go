@@ -237,6 +237,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			err = tc.lane.SendRequests(1, TestCfg.MsgType)
 			require.NoError(t, err)
 
+			// validate the  successful request was delivered to the destination
+			tc.lane.ValidateRequests()
+
 			// try to send again with amount more than the amount refilled by rate and
 			// this should fail, as the refill rate is not enough to refill the capacity
 			tokensTobeSent = new(big.Int).Mul(AggregatedRateLimitRate, big.NewInt(5))
@@ -258,9 +261,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				Str("FailedTx", failedTx.Hex()).
 				Msg("Msg sent with tokens more than AggregateValueRate")
 			require.Equal(t, "AggregateValueRateLimitReached", errReason)
-
-			// validate the  successful request was delivered to the destination
-			tc.lane.ValidateRequests()
 
 			// now set the token pool rate limit
 			if SetRateLimit {
@@ -319,6 +319,8 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			tc.lane.RecordStateBeforeTransfer()
 			err = tc.lane.SendRequests(1, TestCfg.MsgType)
 			require.NoError(t, err)
+			// validate that the successful transfers are reflected in destination
+			tc.lane.ValidateRequests()
 
 			// try to send again with amount more than the amount refilled by token pool rate and
 			// this should fail, as the refill rate is not enough to refill the capacity
@@ -341,9 +343,6 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				Str("FailedTx", failedTx.Hex()).
 				Msg("Msg sent with tokens more than TokenPool Rate")
 			require.Equal(t, "TokenRateLimitReached", errReason)
-
-			// validate that the successful transfers are reflected in destination
-			tc.lane.ValidateRequests()
 		})
 	}
 }

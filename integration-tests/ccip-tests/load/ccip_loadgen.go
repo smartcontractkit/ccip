@@ -135,7 +135,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	c.CurrentMsgSerialNo.Inc()
 
 	lggr := c.Lane.Logger.With().Int("msg Number", int(msgSerialNo)).Logger()
-
+	stats := testreporters.NewCCIPRequestStats(msgSerialNo)
 	// form the message for transfer
 	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
 
@@ -188,9 +188,9 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	}
 
 	if err != nil {
-		c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
+		c.reports.UpdatePhaseStatsForReq(stats, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
 		res.Error = fmt.Sprintf("ccip-send tx error %+v for msg ID %d", err, msgSerialNo)
-		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
@@ -207,7 +207,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	if rcpt != nil {
 		gasUsed = rcpt.GasUsed
 	}
-	c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
+	c.reports.UpdatePhaseStatsForReq(stats, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
 		testreporters.TransactionStats{
 			Fee:                fee.String(),
 			GasUsed:            gasUsed,
@@ -218,10 +218,10 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
 	msgLog, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(
-		lggr, msgSerialNo, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, c.reports)
+		lggr, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, stats, c.reports)
 	if err != nil || msgLog == nil {
 		res.Error = err.Error()
-		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
@@ -231,7 +231,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 
 	if bytes.Compare(sentMsg.Data, []byte(msgStr)) != 0 {
 		res.Error = fmt.Sprintf("the message byte didnot match expected %s received %s msg ID %d", msgStr, string(sentMsg.Data), msgSerialNo)
-		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
@@ -243,7 +243,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	if c.Lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 &&
 		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLog.Raw.BlockNumber {
 		sourceLogFinalizedAt = c.LastFinalizedTimestamp.Load()
-		c.reports.UpdatePhaseStats(msgSerialNo, seqNum, testreporters.SourceLogFinalized,
+		c.reports.UpdatePhaseStatsForReq(stats, seqNum, testreporters.SourceLogFinalized,
 			sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
 			testreporters.TransactionStats{
 				TxHash:           msgLog.Raw.TxHash.String(),
@@ -253,10 +253,10 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	} else {
 		var finalizingBlock uint64
 		sourceLogFinalizedAt, finalizingBlock, err = c.Lane.Source.AssertSendRequestedLogFinalized(
-			lggr, msgSerialNo, seqNum, msgLog, sourceLogTime, c.reports)
+			lggr, seqNum, msgLog, sourceLogTime, stats, c.reports)
 		if err != nil {
 			res.Error = err.Error()
-			res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+			res.Data = stats.StatusByPhase
 			res.Failed = true
 			return res
 		}
@@ -266,37 +266,37 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 
 	// wait for
 	// - CommitStore to increase the seq number,
-	err = c.Lane.Dest.AssertSeqNumberExecuted(lggr, msgSerialNo, seqNum, c.CallTimeOut, sourceLogFinalizedAt, c.reports)
+	err = c.Lane.Dest.AssertSeqNumberExecuted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stats, c.reports)
 	if err != nil {
 		res.Error = err.Error()
-		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
 	// wait for ReportAccepted event
-	commitReport, reportAcceptedAt, err := c.Lane.Dest.AssertEventReportAccepted(lggr, msgSerialNo, seqNum, c.CallTimeOut, sourceLogFinalizedAt, c.reports)
+	commitReport, reportAcceptedAt, err := c.Lane.Dest.AssertEventReportAccepted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stats, c.reports)
 	if err != nil || commitReport == nil {
 		res.Error = err.Error()
-		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
-	blessedAt, err := c.Lane.Dest.AssertReportBlessed(lggr, msgSerialNo, seqNum, c.CallTimeOut, *commitReport, reportAcceptedAt, c.reports)
+	blessedAt, err := c.Lane.Dest.AssertReportBlessed(lggr, seqNum, c.CallTimeOut, *commitReport, reportAcceptedAt, stats, c.reports)
 	if err != nil {
 		res.Error = err.Error()
-		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
-	err = c.Lane.Dest.AssertEventExecutionStateChanged(lggr, msgSerialNo, seqNum, c.CallTimeOut, blessedAt, c.reports)
+	err = c.Lane.Dest.AssertEventExecutionStateChanged(lggr, seqNum, c.CallTimeOut, blessedAt, stats, c.reports)
 	if err != nil {
 		res.Error = err.Error()
-		res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
 
-	res.Data = c.reports.GetPhaseStatsForRequest(msgSerialNo)
+	res.Data = stats.StatusByPhase
 	return res
 }
 
