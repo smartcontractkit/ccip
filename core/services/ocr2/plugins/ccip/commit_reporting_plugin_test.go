@@ -97,9 +97,12 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sourceFinalityDepth := 10
 
-			commitStore, _ := testhelpers.NewFakeCommitStore(t, tc.commitStoreSeqNum)
-			commitStore.SetPaused(tc.commitStoreIsPaused)
 			commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+			commitStoreReader.On("IsDown", ctx).Return(tc.commitStoreIsPaused)
+			if !tc.commitStoreIsPaused {
+				commitStoreReader.On("GetExpectedNextSequenceNumber", ctx).Return(tc.commitStoreSeqNum, nil)
+			}
+
 			onRampReader := ccipdata.NewMockOnRampReader(t)
 			if len(tc.sendReqs) > 0 {
 				onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.commitStoreSeqNum, sourceFinalityDepth).
