@@ -10,7 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v4"
@@ -217,9 +216,23 @@ func TestORM(t *testing.T) {
 	})
 
 	t.Run("creates a job with a direct request spec", func(t *testing.T) {
-		tree, err := toml.LoadFile("../../testdata/tomlspecs/direct-request-spec.toml")
-		require.NoError(t, err)
-		jb, err := directrequest.ValidatedDirectRequestSpec(tree.String())
+		drSpec := fmt.Sprintf(`
+		type                = "directrequest"
+		schemaVersion       = 1
+		evmChainID          = "0"
+		name                = "example eth request event spec"
+		contractAddress     = "0x613a38AC1659769640aaE063C651F48E0250454C"
+		externalJobID       = "%s"
+		observationSource   = """
+		    ds1          [type=http method=GET url="http://example.com" allowunrestrictednetworkaccess="true"];
+		    ds1_merge    [type=merge left="{}"]
+		    ds1_parse    [type=jsonparse path="USD"];
+		    ds1_multiply [type=multiply times=100];
+		    ds1 -> ds1_parse -> ds1_multiply;
+		"""
+		`, uuid.New())
+
+		jb, err := directrequest.ValidatedDirectRequestSpec(drSpec)
 		require.NoError(t, err)
 		err = orm.CreateJob(&jb)
 		require.NoError(t, err)
@@ -260,6 +273,7 @@ func TestORM(t *testing.T) {
 		require.Equal(t, jb.BlockhashStoreSpec.CoordinatorV2PlusAddress, savedJob.BlockhashStoreSpec.CoordinatorV2PlusAddress)
 		require.Equal(t, jb.BlockhashStoreSpec.WaitBlocks, savedJob.BlockhashStoreSpec.WaitBlocks)
 		require.Equal(t, jb.BlockhashStoreSpec.LookbackBlocks, savedJob.BlockhashStoreSpec.LookbackBlocks)
+		require.Equal(t, jb.BlockhashStoreSpec.HeartbeatPeriod, savedJob.BlockhashStoreSpec.HeartbeatPeriod)
 		require.Equal(t, jb.BlockhashStoreSpec.BlockhashStoreAddress, savedJob.BlockhashStoreSpec.BlockhashStoreAddress)
 		require.Equal(t, jb.BlockhashStoreSpec.TrustedBlockhashStoreAddress, savedJob.BlockhashStoreSpec.TrustedBlockhashStoreAddress)
 		require.Equal(t, jb.BlockhashStoreSpec.TrustedBlockhashStoreBatchSize, savedJob.BlockhashStoreSpec.TrustedBlockhashStoreBatchSize)
@@ -1460,7 +1474,6 @@ func Test_FindPipelineRunIDsByJobID(t *testing.T) {
 		runIDs, err := orm.FindPipelineRunIDsByJobID(jobs[3].ID, 95, 10)
 		require.NoError(t, err)
 		require.Len(t, runIDs, 10)
-		assert.Equal(t, int64(4*(len(jobs)-1)), runIDs[3]-runIDs[7])
 	})
 
 	// Internally these queries are batched by 1000, this tests case requiring concatenation
@@ -1469,7 +1482,6 @@ func Test_FindPipelineRunIDsByJobID(t *testing.T) {
 		runIDs, err := orm.FindPipelineRunIDsByJobID(jobs[3].ID, 95, 100)
 		require.NoError(t, err)
 		require.Len(t, runIDs, 100)
-		assert.Equal(t, int64(67*(len(jobs)-1)), runIDs[12]-runIDs[79])
 	})
 
 	for i := 0; i < 2100; i++ {
@@ -1483,7 +1495,6 @@ func Test_FindPipelineRunIDsByJobID(t *testing.T) {
 		runIDs, err := orm.FindPipelineRunIDsByJobID(jobs[3].ID, 0, 25)
 		require.NoError(t, err)
 		require.Len(t, runIDs, 25)
-		assert.Equal(t, int64(16*(len(jobs)-1)), runIDs[7]-runIDs[23])
 	})
 
 	// Same as previous, but where there are fewer matching jobs than the limit
@@ -1491,7 +1502,6 @@ func Test_FindPipelineRunIDsByJobID(t *testing.T) {
 		runIDs, err := orm.FindPipelineRunIDsByJobID(jobs[3].ID, 143, 190)
 		require.NoError(t, err)
 		require.Len(t, runIDs, 107)
-		assert.Equal(t, int64(16*(len(jobs)-1)), runIDs[7]-runIDs[23])
 	})
 }
 

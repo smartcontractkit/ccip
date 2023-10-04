@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -18,7 +19,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -38,6 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -58,17 +59,19 @@ var (
 type ExecutionPluginConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
-	sourceReader             ccipdata.Reader
+	onRampReader             ccipdata.OnRampReader
 	destReader               ccipdata.Reader
 	onRamp                   evm_2_evm_onramp.EVM2EVMOnRampInterface
+	onRampVersion            semver.Version
 	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStore              commit_store.CommitStoreInterface
+	commitStoreVersion       semver.Version
 	sourcePriceRegistry      price_registry.PriceRegistryInterface
 	sourceWrappedNativeToken common.Address
 	destClient               evmclient.Client
 	sourceClient             evmclient.Client
+	destChainEVMID           *big.Int
 	destGasEstimator         gas.EvmFeeEstimator
-	leafHasher               hashlib.LeafHasherInterface[[32]byte]
 	tokenDataProviders       map[common.Address]tokendata.Reader
 }
 
@@ -84,7 +87,9 @@ type ExecutionReportingPlugin struct {
 	offchainConfig         ccipconfig.ExecOffchainConfig
 	cachedSourceFeeTokens  cache.AutoSync[[]common.Address]
 	cachedDestTokens       cache.AutoSync[cache.CachedTokens]
+	cachedTokenPools       cache.AutoSync[map[common.Address]common.Address]
 	customTokenPoolFactory func(ctx context.Context, poolAddress common.Address, bind bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error)
+	gasPriceEstimator      prices.GasPriceEstimatorExec
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -131,9 +136,28 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 
 	cachedSourceFeeTokens := cache.NewCachedFeeTokens(rf.config.sourceLP, rf.config.sourcePriceRegistry, int64(offchainConfig.SourceFinalityDepth))
 	cachedDestTokens := cache.NewCachedSupportedTokens(rf.config.destLP, rf.config.offRamp, priceRegistry, int64(offchainConfig.DestOptimisticConfirmations))
+
+	cachedTokenPools := cache.NewTokenPools(rf.config.lggr, rf.config.destLP, rf.config.offRamp, int64(offchainConfig.DestOptimisticConfirmations), 5)
 	rf.config.lggr.Infow("Starting exec plugin",
 		"offchainConfig", offchainConfig,
 		"onchainConfig", onchainConfig)
+
+	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(rf.config.onRamp, rf.config.onRampVersion, rf.config.sourceClient)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+
+	gasPriceEstimator, err := prices.NewGasPriceEstimatorForExecPlugin(
+		rf.config.commitStoreVersion,
+		rf.config.destGasEstimator,
+		big.NewInt(int64(offchainConfig.MaxGasPrice)),
+		int64(dynamicOnRampConfig.DestDataAvailabilityOverheadGas),
+		int64(dynamicOnRampConfig.DestGasPerDataAvailabilityByte),
+		int64(dynamicOnRampConfig.DestDataAvailabilityMultiplier),
+	)
+	if err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
 
 	return &ExecutionReportingPlugin{
 			config:                rf.config,
@@ -147,9 +171,11 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offchainConfig:        offchainConfig,
 			cachedDestTokens:      cachedDestTokens,
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
+			cachedTokenPools:      cachedTokenPools,
 			customTokenPoolFactory: func(ctx context.Context, poolAddress common.Address, contractBackend bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
 				return custom_token_pool.NewCustomTokenPool(poolAddress, contractBackend)
 			},
+			gasPriceEstimator: gasPriceEstimator,
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -203,15 +229,14 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 
 // UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
 // pass zeroAddress if dstPriceRegistry is unknown, filters with zero address are omitted.
+// TODO: Should be able to Close and re-create readers to abstract filters.
 func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(destPriceRegistry common.Address, qopts ...pg.QOpt) error {
 	rf.filtersMu.Lock()
 	defer rf.filtersMu.Unlock()
 
 	// source chain filters
 	sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(
-		rf.config.onRamp.Address(),
 		rf.config.sourcePriceRegistry.Address(),
-		rf.config.tokenDataProviders,
 	)
 	created, deleted := logpollerutil.FiltersDiff(sourceFiltersBefore, sourceFiltersNow)
 	if err := logpollerutil.UnregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
@@ -277,8 +302,8 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
 	})
-	getDestGasPrice := cache.LazyFetch(func() (*big.Int, error) {
-		return r.estimateDestinationGasPrice(ctx)
+	getDestGasPrice := cache.LazyFetch(func() (prices.GasPrice, error) {
+		return r.gasPriceEstimator.GetGasPrice(ctx)
 	})
 
 	lggr.Infow("Processing unexpired reports", "n", len(unexpiredReports))
@@ -395,12 +420,17 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 		}
 	}
 
+	tokenPools, err := r.cachedTokenPools.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get cached token pools: %w", err)
+	}
+
 	res := make(map[common.Address]*big.Int, len(dstTokens))
 
 	for dstToken := range dstTokens {
-		poolAddress, err := r.config.offRamp.GetPoolByDestToken(&bind.CallOpts{Context: ctx}, dstToken)
-		if err != nil {
-			return nil, fmt.Errorf("get pool by dest token (%s): %w", dstToken, err)
+		poolAddress, exists := tokenPools[dstToken]
+		if !exists {
+			return nil, fmt.Errorf("pool for token '%s' does not exist", dstToken)
 		}
 
 		tokenPool, err := r.customTokenPoolFactory(ctx, poolAddress, r.config.destClient)
@@ -419,18 +449,6 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 	}
 
 	return res, nil
-}
-
-func (r *ExecutionReportingPlugin) estimateDestinationGasPrice(ctx context.Context) (*big.Int, error) {
-	destGasPriceWei, _, err := r.config.destGasEstimator.GetFee(ctx, nil, 0, assets.NewWei(big.NewInt(int64(r.offchainConfig.MaxGasPrice))))
-	if err != nil {
-		return nil, errors.Wrap(err, "could not estimate destination gas price")
-	}
-	destGasPrice := destGasPriceWei.Legacy.ToInt()
-	if destGasPriceWei.DynamicFeeCap != nil {
-		destGasPrice = destGasPriceWei.DynamicFeeCap.ToInt()
-	}
-	return destGasPrice, nil
 }
 
 func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) (map[common.Address]common.Address, []common.Address, error) {
@@ -480,7 +498,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	aggregateTokenLimit *big.Int,
 	sourceTokenPricesUSD map[common.Address]*big.Int,
 	destTokenPricesUSD map[common.Address]*big.Int,
-	execGasPriceEstimate cache.LazyFunction[*big.Int],
+	gasPriceEstimate cache.LazyFunction[prices.GasPrice],
 	sourceToDestToken map[common.Address]common.Address,
 	destTokenPoolRateLimits map[common.Address]*big.Int,
 ) (executableMessages []ObservedMessage) {
@@ -553,7 +571,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 		}
 
 		// Fee boosting
-		execGasPriceEstimateValue, err := execGasPriceEstimate()
+		gasPriceValue, err := gasPriceEstimate()
 		if err != nil {
 			msgLggr.Errorw("Unexpected error fetching gas price estimate", "err", err)
 			return []ObservedMessage{}
@@ -565,7 +583,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		execCostUsd := computeExecCost(msg.GasLimit, execGasPriceEstimateValue, dstWrappedNativePrice)
+		execCostUsd, err := r.gasPriceEstimator.EstimateMsgCostUSD(gasPriceValue, dstWrappedNativePrice, msg)
+		if err != nil {
+			msgLggr.Errorw("failed to estimate message cost USD", "err", err)
+			return []ObservedMessage{}
+		}
+
 		// calculating the source chain fee, dividing by 1e18 for denomination.
 		// For example:
 		// FeeToken=link; FeeTokenAmount=1e17 i.e. 0.1 link, price is 6e18 USD/link (1 USD = 1e18),
@@ -776,11 +799,10 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	// use errgroup to fetch send request logs and executed sequence numbers in parallel
 	eg := &errgroup.Group{}
 
-	var sendRequests []ccipdata.Event[evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested]
+	var sendRequests []ccipdata.Event[ccipdata.EVM2EVMMessage]
 	eg.Go(func() error {
-		sendReqs, err := r.config.sourceReader.GetSendRequestsBetweenSeqNums(
+		sendReqs, err := r.config.onRampReader.GetSendRequestsBetweenSeqNums(
 			ctx,
-			r.config.onRamp.Address(),
 			intervalMin,
 			intervalMax,
 			int(r.offchainConfig.SourceFinalityDepth),
@@ -821,19 +843,22 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	}
 
 	for _, sendReq := range sendRequests {
-		msg := abihelpers.OnRampMessageToOffRampMessage(sendReq.Data.Message)
+		msg, err := r.config.onRampReader.ToOffRampMessage(sendReq.Data)
+		if err != nil {
+			return nil, err
+		}
 
 		// if value exists in the map then it's executed
 		// if value exists, and it's true then it's considered finalized
 		finalized, executed := executedSeqNums[msg.SequenceNumber]
 
 		reqWithMeta := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-			InternalEVM2EVMMessage: msg,
+			InternalEVM2EVMMessage: *msg,
 			BlockTimestamp:         sendReq.BlockTimestamp,
 			Executed:               executed,
 			Finalized:              finalized,
-			LogIndex:               sendReq.Data.Raw.Index,
-			TxHash:                 sendReq.Data.Raw.TxHash,
+			LogIndex:               sendReq.LogIndex,
+			TxHash:                 sendReq.TxHash,
 		}
 
 		// attach the msg to the appropriate reports
@@ -871,15 +896,15 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	}
 	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
-	sendReqsInRoot, leaves, tree, err := getProofData(ctx, lggr, r.config.leafHasher, r.config.onRamp.Address(), r.config.sourceReader, commitReport.Interval)
+	sendReqsInRoot, leaves, tree, err := getProofData(ctx, r.config.onRampReader, commitReport.Interval)
 	if err != nil {
 		return nil, err
 	}
 
 	messages := make([]*evm_2_evm_offramp.InternalEVM2EVMMessage, len(sendReqsInRoot))
 	for i, msg := range sendReqsInRoot {
-		offRampMsg := abihelpers.OnRampMessageToOffRampMessage(msg.Data.Message)
-		messages[i] = &offRampMsg
+		offRampMsg, _ := r.config.onRampReader.ToOffRampMessage(msg.Data)
+		messages[i] = offRampMsg
 	}
 
 	// cap messages which fits MaxExecutionReportLength (after serialized)
