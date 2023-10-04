@@ -974,13 +974,13 @@ func CCIPDefaultTestSetUp(
 			chainByChainID[n.ChainID] = ec
 		}
 	}
-
-	t.Cleanup(func() {
-		if inputs.KeepEnvAlive {
-			return
+	printStats := func() {
+		for k := range setUpArgs.Reporter.LaneStats {
+			setUpArgs.Reporter.LaneStats[k].Finalize(k)
 		}
+	}
+	t.Cleanup(func() {
 		if configureCLNode {
-			lggr.Info().Msg("Tearing down the environment")
 			if ccipEnv.LocalCluster != nil {
 				err := ccipEnv.LocalCluster.Terminate()
 				require.NoError(t, err, "Local cluster termination shouldn't fail")
@@ -989,14 +989,17 @@ func CCIPDefaultTestSetUp(
 				}
 				return
 			}
+			if inputs.KeepEnvAlive {
+				printStats()
+				return
+			}
+			lggr.Info().Msg("Tearing down the environment")
 			err = integrationactions.TeardownSuite(t, ccipEnv.K8Env, utils.ProjectRoot, ccipEnv.CLNodes, setUpArgs.Reporter,
 				zapcore.ErrorLevel, chains...)
 			require.NoError(t, err, "Environment teardown shouldn't fail")
 		} else {
 			//just print
-			for k := range setUpArgs.Reporter.LaneStats {
-				setUpArgs.Reporter.LaneStats[k].Finalize(k)
-			}
+			printStats()
 		}
 	})
 

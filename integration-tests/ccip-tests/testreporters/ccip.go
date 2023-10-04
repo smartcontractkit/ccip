@@ -152,15 +152,11 @@ func (testStats *CCIPLaneStats) Finalize(lane string) {
 	events := make(map[Phase]*zerolog.Event)
 	testStats.statusByPhaseByRequests.Range(func(key, value interface{}) bool {
 		if reqNo, ok := key.(int64); ok {
-			if stat, ok := value.(*RequestStat); ok {
-				for phase, phaseStat := range stat.StatusByPhase {
+			if stat, ok := value.(map[Phase]PhaseStat); ok {
+				for phase, phaseStat := range stat {
 					if phaseStat.Status == Success {
 						testStats.SuccessCountsByPhase[phase]++
 						testStats.Aggregate(phase, phaseStat.Duration)
-						if phase == ExecStateChanged {
-							testStats.SuccessCountsByPhase[E2E]++
-							testStats.Aggregate(E2E, phaseStat.Duration)
-						}
 					} else {
 						testStats.FailedCountsByPhase[phase]++
 						testStats.FailedCountsByPhase[E2E]++
