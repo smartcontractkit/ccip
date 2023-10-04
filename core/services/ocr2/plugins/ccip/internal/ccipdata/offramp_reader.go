@@ -157,7 +157,7 @@ const (
 	ExecutionStateFailure
 )
 
-func NewOffRampReader(lggr logger.Logger, addr common.Address, srcClient, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (OffRampReader, error) {
+func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (OffRampReader, error) {
 	_, version, err := ccipconfig.TypeAndVersion(addr, destClient)
 	if err != nil {
 		return nil, err

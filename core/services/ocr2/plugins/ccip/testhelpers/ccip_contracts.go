@@ -41,6 +41,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -56,17 +57,109 @@ var (
 	OffRamp  = "offramp"
 	DestPool = "dest pool"
 
-	Receiver              = "receiver"
-	Sender                = "sender"
-	Link                  = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
-	HundredLink           = Link(100)
-	LinkUSDValue          = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
-	SourceChainID         = uint64(1000)
-	SourceChainSelector   = uint64(11787463284727550157)
-	DestChainID           = uint64(1337)
-	DestChainSelector     = uint64(3379446385462418246)
-	ExecutionStateSuccess = ccipdata.ExecutionStateSuccess
+	Receiver            = "receiver"
+	Sender              = "sender"
+	Link                = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	HundredLink         = Link(100)
+	LinkUSDValue        = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	SourceChainID       = uint64(1000)
+	SourceChainSelector = uint64(11787463284727550157)
+	DestChainID         = uint64(1337)
+	DestChainSelector   = uint64(3379446385462418246)
 )
+
+// Backwards compat, in principle these statuses are version dependent
+// TODO: Adjust integration tests to be verison agnostic using readers
+var (
+	ExecutionStateSuccess = MessageExecutionState(ccipdata.ExecutionStateSuccess)
+	ExecutionStateFailure = MessageExecutionState(ccipdata.ExecutionStateFailure)
+)
+
+type MessageExecutionState ccipdata.MessageExecutionState
+type CommitOffchainConfig struct {
+	ccipdata.CommitOffchainConfigV1_2_0
+}
+
+func NewCommitOffchainConfig(SourceFinalityDepth uint32,
+	DestFinalityDepth uint32,
+	GasPriceHeartBeat models.Duration,
+	DAGasPriceDeviationPPB uint32,
+	ExecGasPriceDeviationPPB uint32,
+	TokenPriceHeartBeat models.Duration,
+	TokenPriceDeviationPPB uint32,
+	MaxGasPrice uint64,
+	InflightCacheExpiry models.Duration) CommitOffchainConfig {
+	return CommitOffchainConfig{ccipdata.CommitOffchainConfigV1_2_0{
+		SourceFinalityDepth:      SourceFinalityDepth,
+		DestFinalityDepth:        DestFinalityDepth,
+		GasPriceHeartBeat:        GasPriceHeartBeat,
+		DAGasPriceDeviationPPB:   DAGasPriceDeviationPPB,
+		ExecGasPriceDeviationPPB: ExecGasPriceDeviationPPB,
+		TokenPriceHeartBeat:      TokenPriceHeartBeat,
+		TokenPriceDeviationPPB:   TokenPriceDeviationPPB,
+		MaxGasPrice:              MaxGasPrice,
+		InflightCacheExpiry:      InflightCacheExpiry,
+	}}
+}
+
+type CommitOnchainConfig struct {
+	ccipdata.CommitOnchainConfig
+}
+
+func NewCommitOnchainConfig(
+	PriceRegistry common.Address,
+) CommitOnchainConfig {
+	return CommitOnchainConfig{ccipdata.CommitOnchainConfig{
+		PriceRegistry: PriceRegistry,
+	}}
+}
+
+type ExecOnchainConfig struct {
+	ccipdata.ExecOnchainConfigV1_0_0
+}
+
+func NewExecOnchainConfig(
+	PermissionLessExecutionThresholdSeconds uint32,
+	Router common.Address,
+	PriceRegistry common.Address,
+	MaxTokensLength uint16,
+	MaxDataSize uint32,
+) ExecOnchainConfig {
+	return ExecOnchainConfig{ccipdata.ExecOnchainConfigV1_0_0{
+		PermissionLessExecutionThresholdSeconds: PermissionLessExecutionThresholdSeconds,
+		Router:                                  Router,
+		PriceRegistry:                           PriceRegistry,
+		MaxTokensLength:                         MaxTokensLength,
+		MaxDataSize:                             MaxDataSize,
+	}}
+}
+
+type ExecOffchainConfig struct {
+	ccipdata.ExecOffchainConfig
+}
+
+func NewExecOffchainConfig(
+	SourceFinalityDepth uint32,
+	DestOptimisticConfirmations uint32,
+	DestFinalityDepth uint32,
+	BatchGasLimit uint32,
+	RelativeBoostPerWaitHour float64,
+	MaxGasPrice uint64,
+	InflightCacheExpiry models.Duration,
+	RootSnoozeTime models.Duration,
+) ExecOffchainConfig {
+	return ExecOffchainConfig{ccipdata.ExecOffchainConfig{
+		SourceFinalityDepth:         SourceFinalityDepth,
+		DestOptimisticConfirmations: DestOptimisticConfirmations,
+		DestFinalityDepth:           DestFinalityDepth,
+		BatchGasLimit:               BatchGasLimit,
+		RelativeBoostPerWaitHour:    RelativeBoostPerWaitHour,
+		MaxGasPrice:                 MaxGasPrice,
+		InflightCacheExpiry:         InflightCacheExpiry,
+		RootSnoozeTime:              RootSnoozeTime,
+	}}
+
+}
 
 type MaybeRevertReceiver struct {
 	Receiver *maybe_revert_message_receiver.MaybeRevertMessageReceiver

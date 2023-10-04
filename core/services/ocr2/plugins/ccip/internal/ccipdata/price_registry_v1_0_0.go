@@ -144,17 +144,17 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 	// TODO: clean up strings
 	tokenUpdated := abihelpers.MustGetEventID("UsdPerTokenUpdated", priceRegistryABI)
 	var filters = []logpoller.Filter{{
-		Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistryAddr),
+		Name:      logpoller.FilterName(COMMIT_PRICE_UPDATES, priceRegistryAddr.String()),
 		EventSigs: []common.Hash{UsdPerUnitGasUpdatedV1_0_0, tokenUpdated},
 		Addresses: []common.Address{priceRegistryAddr},
 	},
 		{
-			Name:      logpoller.FilterName(FEE_TOKEN_ADDED, priceRegistry),
+			Name:      logpoller.FilterName(FEE_TOKEN_ADDED, priceRegistryAddr.String()),
 			EventSigs: []common.Hash{abihelpers.MustGetEventID("FeeTokenAdded", priceRegistryABI)},
 			Addresses: []common.Address{priceRegistryAddr},
 		},
 		{
-			Name:      logpoller.FilterName(FEE_TOKEN_REMOVED, priceRegistry),
+			Name:      logpoller.FilterName(FEE_TOKEN_REMOVED, priceRegistryAddr.String()),
 			EventSigs: []common.Hash{abihelpers.MustGetEventID("FeeTokenAdded", priceRegistryABI)},
 			Addresses: []common.Address{priceRegistryAddr},
 		}}

@@ -92,13 +92,13 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load source registry")
 	}
-	offRampReader, err := ccipdata.NewOffRampReader(lggr, common.HexToAddress(spec.ContractID), destChain.Client(), sourceChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampReader, err := ccipdata.NewOffRampReader(lggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load offRampReader")
 	}
 	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load commitStoreReader readerc")
+		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
 	}
 	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
 		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())

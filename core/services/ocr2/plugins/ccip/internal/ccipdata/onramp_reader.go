@@ -35,7 +35,7 @@ type OnRampReader interface {
 	// GetSendRequestsBetweenSeqNums returns all the message send requests in the provided sequence numbers range (inclusive).
 	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
 	// Get router configured in the onRamp
-	RouterAddress() common.Address
+	RouterAddress() (common.Address, error)
 }
 
 // NewOnRampReader determines the appropriate version of the onramp and returns a reader for it

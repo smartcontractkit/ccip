@@ -314,7 +314,9 @@ func NewCommitStoreV1_0_0(lggr logger.Logger, addr common.Address, ec client.Cli
 	if err := logpollerutil.RegisterLpFilters(lp, filters); err != nil {
 		return nil, err
 	}
-	return &CommitStoreV1_0_0{commitStore: commitStore,
+	return &CommitStoreV1_0_0{
+		commitStore:       commitStore,
+		address:           addr,
 		lggr:              lggr,
 		lp:                lp,
 		estimator:         estimator,

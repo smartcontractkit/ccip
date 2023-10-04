@@ -107,9 +107,11 @@ func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(newPriceRegAddr 
 		// No-op
 		return nil
 	}
-	// Close old reader and open new reader if address changed.
-	if err := rf.destPriceRegReader.Close(); err != nil {
-		return err
+	// Close old reader (if present) and open new reader if address changed.
+	if rf.destPriceRegReader != nil {
+		if err := rf.destPriceRegReader.Close(); err != nil {
+			return err
+		}
 	}
 	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, newPriceRegAddr, rf.config.destLP, rf.config.destClient)
 	if err != nil {

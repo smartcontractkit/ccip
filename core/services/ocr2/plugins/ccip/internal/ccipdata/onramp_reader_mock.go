@@ -91,10 +91,14 @@ func (_m *MockOnRampReader) GetSendRequestsGteSeqNum(ctx context.Context, seqNum
 }
 
 // RouterAddress provides a mock function with given fields:
-func (_m *MockOnRampReader) RouterAddress() common.Address {
+func (_m *MockOnRampReader) RouterAddress() (common.Address, error) {
 	ret := _m.Called()
 
 	var r0 common.Address
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (common.Address, error)); ok {
+		return rf()
+	}
 	if rf, ok := ret.Get(0).(func() common.Address); ok {
 		r0 = rf()
 	} else {
@@ -103,7 +107,13 @@ func (_m *MockOnRampReader) RouterAddress() common.Address {
 		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 type mockConstructorTestingTNewMockOnRampReader interface {

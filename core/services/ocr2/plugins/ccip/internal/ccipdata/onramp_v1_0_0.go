@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"strings"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -119,10 +117,7 @@ func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	if err != nil {
 		return nil, err
 	}
-	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp_1_0_0.EVM2EVMOnRampABI))
-	if err != nil {
-		return nil, err
-	}
+	onRampABI := abihelpers.MustParseABI(evm_2_evm_onramp_1_0_0.EVM2EVMOnRampABI)
 	// Subscribe to the relevant logs
 	name := logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress)
 	eventSig := abihelpers.MustGetEventID(CCIPSendRequestedEventNameV1_0_0, onRampABI)
@@ -165,17 +160,19 @@ func (o *OnRampV1_0_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 		}
 	}
 	return &internal.EVM2EVMMessage{
+		SequenceNumber:      msg.Message.SequenceNumber,
+		GasLimit:            msg.Message.GasLimit,
+		Nonce:               msg.Message.Nonce,
+		MessageId:           msg.Message.MessageId,
 		SourceChainSelector: msg.Message.SourceChainSelector,
 		Sender:              msg.Message.Sender,
 		Receiver:            msg.Message.Receiver,
 		Strict:              msg.Message.Strict,
-		Nonce:               msg.Message.Nonce,
 		FeeToken:            msg.Message.FeeToken,
 		FeeTokenAmount:      msg.Message.FeeTokenAmount,
 		Data:                msg.Message.Data,
 		TokenAmounts:        tokensAndAmounts,
-		SourceTokenData:     make([][]byte, len(msg.Message.TokenAmounts)),
-		MessageId:           msg.Message.MessageId,
+		SourceTokenData:     make([][]byte, len(msg.Message.TokenAmounts)), // Always empty in 1.0
 		Hash:                h,
 	}, nil
 }
@@ -213,9 +210,12 @@ func (o *OnRampV1_0_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint
 	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
-func (o *OnRampV1_0_0) RouterAddress() common.Address {
-	config, _ := o.onRamp.GetDynamicConfig(nil)
-	return config.Router
+func (o *OnRampV1_0_0) RouterAddress() (common.Address, error) {
+	config, err := o.onRamp.GetDynamicConfig(nil)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return config.Router, nil
 }
 
 func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {

@@ -82,18 +82,22 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	// Load all the readers relevant for this plugin.
 	onRampReader, err := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled(), qopts...)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "failed onramp reader")
 	}
-	offRampReader, err := ccipdata.NewOffRampReader(commitLggr, common.HexToAddress(pluginConfig.OffRamp), destChain.Client(), sourceChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampReader, err := ccipdata.NewOffRampReader(commitLggr, common.HexToAddress(pluginConfig.OffRamp), destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "failed offramp reader")
 	}
 	commitStoreReader, err := ccipdata.NewCommitStoreReader(commitLggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "failed commit reader")
 	}
 
-	sourceRouter, err := router.NewRouter(onRampReader.RouterAddress(), sourceChain.Client())
+	addr, err := onRampReader.RouterAddress()
+	if err != nil {
+		return nil, nil, err
+	}
+	sourceRouter, err := router.NewRouter(addr, sourceChain.Client())
 	if err != nil {
 		return nil, nil, err
 	}

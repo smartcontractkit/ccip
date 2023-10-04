@@ -224,18 +224,34 @@ func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 			Amount: tokenAndAmount.Amount,
 		}
 	}
+
+	//SequenceNumber      uint64
+	//GasLimit            *big.Int
+	//Nonce               uint64
+	//MessageId           Hash
+	//SourceChainSelector uint64
+	//Sender              common.Address
+	//Receiver            common.Address
+	//Strict              bool
+	//FeeToken            common.Address
+	//FeeTokenAmount      *big.Int
+	//Data                []byte
+	//TokenAmounts        []TokenAmount
+	//SourceTokenData     [][]byte
 	return &internal.EVM2EVMMessage{
+		SequenceNumber:      msg.Message.SequenceNumber,
+		GasLimit:            msg.Message.GasLimit,
+		Nonce:               msg.Message.Nonce,
+		MessageId:           msg.Message.MessageId,
 		SourceChainSelector: msg.Message.SourceChainSelector,
 		Sender:              msg.Message.Sender,
 		Receiver:            msg.Message.Receiver,
 		Strict:              msg.Message.Strict,
-		Nonce:               msg.Message.Nonce,
 		FeeToken:            msg.Message.FeeToken,
 		FeeTokenAmount:      msg.Message.FeeTokenAmount,
 		Data:                msg.Message.Data,
 		TokenAmounts:        tokensAndAmounts,
 		SourceTokenData:     msg.Message.SourceTokenData, // Breaking change 1.2
-		MessageId:           msg.Message.MessageId,
 		Hash:                h,
 	}, nil
 }
@@ -288,9 +304,12 @@ func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNum
 	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
-func (o *OnRampV1_2_0) RouterAddress() common.Address {
-	config, _ := o.onRamp.GetDynamicConfig(nil)
-	return config.Router
+func (o *OnRampV1_2_0) RouterAddress() (common.Address, error) {
+	config, err := o.onRamp.GetDynamicConfig(nil)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return config.Router, nil
 }
 
 func (o *OnRampV1_2_0) Close(qopts ...pg.QOpt) error {
@@ -308,7 +327,7 @@ func NewOnRampV1_2_0(
 ) (*OnRampV1_2_0, error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
-		panic(err) // ABI failure ok to panic
+		return nil, err
 	}
 	// Subscribe to the relevant logs
 	// Note we can keep the same prefix across 1.0/1.1 and 1.2 because the onramp addresses will be different
