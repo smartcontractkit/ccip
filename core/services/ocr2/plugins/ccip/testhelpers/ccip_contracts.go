@@ -56,15 +56,16 @@ var (
 	OffRamp  = "offramp"
 	DestPool = "dest pool"
 
-	Receiver            = "receiver"
-	Sender              = "sender"
-	Link                = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
-	HundredLink         = Link(100)
-	LinkUSDValue        = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
-	SourceChainID       = uint64(1000)
-	SourceChainSelector = uint64(11787463284727550157)
-	DestChainID         = uint64(1337)
-	DestChainSelector   = uint64(3379446385462418246)
+	Receiver              = "receiver"
+	Sender                = "sender"
+	Link                  = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	HundredLink           = Link(100)
+	LinkUSDValue          = func(amount int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(amount)) }
+	SourceChainID         = uint64(1000)
+	SourceChainSelector   = uint64(11787463284727550157)
+	DestChainID           = uint64(1337)
+	DestChainSelector     = uint64(3379446385462418246)
+	ExecutionStateSuccess = ccipdata.ExecutionStateSuccess
 )
 
 type MaybeRevertReceiver struct {

@@ -131,7 +131,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	if err := rf.UpdateDynamicReaders(destPriceReg); err != nil {
+	if err = rf.UpdateDynamicReaders(destPriceReg); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 

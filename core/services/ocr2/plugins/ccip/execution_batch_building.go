@@ -46,7 +46,6 @@ func buildExecutionReportForMessages(
 ) (ccipdata.ExecReport, error) {
 	innerIdxs := make([]int, 0, len(observedMessages))
 	var messages []internal.EVM2EVMMessage
-	var hashes [][32]byte
 	var offchainTokenData [][][]byte
 	for _, observedMessage := range observedMessages {
 		if observedMessage.SeqNr < commitInterval.Min || observedMessage.SeqNr > commitInterval.Max {
@@ -56,9 +55,7 @@ func buildExecutionReportForMessages(
 		innerIdx := int(observedMessage.SeqNr - commitInterval.Min)
 		messages = append(messages, msgsInRoot[innerIdx].Data)
 		offchainTokenData = append(offchainTokenData, observedMessage.TokenData)
-
 		innerIdxs = append(innerIdxs, innerIdx)
-		hashes = append(hashes, leaves[innerIdx])
 	}
 
 	merkleProof, err := tree.Prove(innerIdxs)
