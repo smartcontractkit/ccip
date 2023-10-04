@@ -121,8 +121,7 @@ type CCIPLaneStats struct {
 	statusByPhaseByRequests sync.Map                    `json:"-"`
 }
 
-func (testStats *CCIPLaneStats) UpdatePhaseStatsForReq(stat *RequestStat, seqNum uint64, step Phase, duration time.Duration, state Status, sendTransactionStats ...TransactionStats) {
-	stat.UpdateState(testStats.lggr, seqNum, step, duration, state, sendTransactionStats...)
+func (testStats *CCIPLaneStats) UpdatePhaseStatsForReq(stat *RequestStat) {
 	testStats.statusByPhaseByRequests.Store(stat.reqNo, stat.StatusByPhase)
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -126,6 +127,18 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 
 	sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
+	// close all header subscriptions for dest chains
+	switch val := destCCIP.Common.ChainClient.(type) {
+	case *blockchain.EthereumMultinodeClient:
+		ethClient, ok := val.Clients[0].(*blockchain.EthereumClient)
+		require.True(c.t, ok, "failed to cast to ethereum client")
+		queuedEvents := ethClient.GetHeaderSubscriptions()
+		for subName := range queuedEvents {
+			ethClient.DeleteHeaderEventSubscription(subName)
+		}
+	default:
+		require.Fail(c.t, "unknown chain client type")
+	}
 }
 
 func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
@@ -136,6 +149,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 
 	lggr := c.Lane.Logger.With().Int("msg Number", int(msgSerialNo)).Logger()
 	stats := testreporters.NewCCIPRequestStats(msgSerialNo)
+	defer c.reports.UpdatePhaseStatsForReq(stats)
 	// form the message for transfer
 	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
 
@@ -188,7 +202,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	}
 
 	if err != nil {
-		c.reports.UpdatePhaseStatsForReq(stats, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
+		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
 		res.Error = fmt.Sprintf("ccip-send tx error %+v for msg ID %d", err, msgSerialNo)
 		res.Data = stats.StatusByPhase
 		res.Failed = true
@@ -207,7 +221,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	if rcpt != nil {
 		gasUsed = rcpt.GasUsed
 	}
-	c.reports.UpdatePhaseStatsForReq(stats, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
+	stats.UpdateState(lggr, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
 		testreporters.TransactionStats{
 			Fee:                fee.String(),
 			GasUsed:            gasUsed,
@@ -217,8 +231,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 		})
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
-	msgLog, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(
-		lggr, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, stats, c.reports)
+	msgLog, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(lggr, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, stats)
 	if err != nil || msgLog == nil {
 		res.Error = err.Error()
 		res.Data = stats.StatusByPhase
@@ -243,7 +256,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	if c.Lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 &&
 		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLog.Raw.BlockNumber {
 		sourceLogFinalizedAt = c.LastFinalizedTimestamp.Load()
-		c.reports.UpdatePhaseStatsForReq(stats, seqNum, testreporters.SourceLogFinalized,
+		stats.UpdateState(lggr, seqNum, testreporters.SourceLogFinalized,
 			sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
 			testreporters.TransactionStats{
 				TxHash:           msgLog.Raw.TxHash.String(),
@@ -253,7 +266,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	} else {
 		var finalizingBlock uint64
 		sourceLogFinalizedAt, finalizingBlock, err = c.Lane.Source.AssertSendRequestedLogFinalized(
-			lggr, seqNum, msgLog, sourceLogTime, stats, c.reports)
+			lggr, seqNum, msgLog, sourceLogTime, stats)
 		if err != nil {
 			res.Error = err.Error()
 			res.Data = stats.StatusByPhase
@@ -266,7 +279,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 
 	// wait for
 	// - CommitStore to increase the seq number,
-	err = c.Lane.Dest.AssertSeqNumberExecuted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stats, c.reports)
+	err = c.Lane.Dest.AssertSeqNumberExecuted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stats)
 	if err != nil {
 		res.Error = err.Error()
 		res.Data = stats.StatusByPhase
@@ -274,21 +287,21 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 		return res
 	}
 	// wait for ReportAccepted event
-	commitReport, reportAcceptedAt, err := c.Lane.Dest.AssertEventReportAccepted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stats, c.reports)
+	commitReport, reportAcceptedAt, err := c.Lane.Dest.AssertEventReportAccepted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stats)
 	if err != nil || commitReport == nil {
 		res.Error = err.Error()
 		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
-	blessedAt, err := c.Lane.Dest.AssertReportBlessed(lggr, seqNum, c.CallTimeOut, *commitReport, reportAcceptedAt, stats, c.reports)
+	blessedAt, err := c.Lane.Dest.AssertReportBlessed(lggr, seqNum, c.CallTimeOut, *commitReport, reportAcceptedAt, stats)
 	if err != nil {
 		res.Error = err.Error()
 		res.Data = stats.StatusByPhase
 		res.Failed = true
 		return res
 	}
-	err = c.Lane.Dest.AssertEventExecutionStateChanged(lggr, seqNum, c.CallTimeOut, blessedAt, stats, c.reports)
+	err = c.Lane.Dest.AssertEventExecutionStateChanged(lggr, seqNum, c.CallTimeOut, blessedAt, stats)
 	if err != nil {
 		res.Error = err.Error()
 		res.Data = stats.StatusByPhase
