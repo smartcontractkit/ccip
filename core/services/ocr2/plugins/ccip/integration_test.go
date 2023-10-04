@@ -99,7 +99,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		ccipTH.AssertExecState(t, executionLogs[0], ccipdata.ExecutionStateSuccess)
+		ccipTH.AssertExecState(t, executionLogs[0], testhelpers.ExecutionStateSuccess)
 
 		// Asserts
 		// 1) The total pool input == total pool output
@@ -204,7 +204,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		// Should all be executed
 		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum+n-1)
 		for _, execLog := range executionLogs {
-			ccipTH.AssertExecState(t, execLog, ccipdata.ExecutionStateSuccess)
+			ccipTH.AssertExecState(t, execLog, testhelpers.ExecutionStateSuccess)
 		}
 
 		currentSeqNum += n
@@ -236,7 +236,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum, onRampV1.Address())
 		ccipTH.EventuallyReportCommitted(t, currentSeqNum, commitStoreV1.Address())
 		executionLog := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum, offRampV1.Address())
-		ccipTH.AssertExecState(t, executionLog[0], ccipdata.ExecutionStateSuccess, offRampV1.Address())
+		ccipTH.AssertExecState(t, executionLog[0], testhelpers.ExecutionStateSuccess, offRampV1.Address())
 
 		nonceAtOnRampV1, err := onRampV1.GetSenderNonce(nil, ccipTH.Source.User.From)
 		require.NoError(t, err, "getting nonce from onRamp")
@@ -383,7 +383,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum)
 		assert.Len(t, executionLogs, 1)
-		ccipTH.AssertExecState(t, executionLogs[0], ccipdata.ExecutionStateSuccess)
+		ccipTH.AssertExecState(t, executionLogs[0], testhelpers.ExecutionStateSuccess)
 		currentSeqNum++
 
 		// get the nop fee
@@ -503,7 +503,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 
 			executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, i, i)
 			assert.Len(t, executionLogs, 1)
-			ccipTH.AssertExecState(t, executionLogs[0], ccipdata.ExecutionStateSuccess)
+			ccipTH.AssertExecState(t, executionLogs[0], testhelpers.ExecutionStateSuccess)
 		}
 
 		for i, node := range ccipTH.Nodes {
