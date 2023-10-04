@@ -207,40 +207,6 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	return NewExecutionObservation(executableObservations).Marshal()
 }
 
-//// UpdateLogPollerFilters updates the log poller filters for the source and destination chains.
-//// pass zeroAddress if dstPriceRegistry is unknown, filters with zero address are omitted.
-//// TODO: Should be able to Close and re-create readers to abstract filters.
-//func (rf *ExecutionReportingPluginFactory) UpdateLogPollerFilters(qopts ...pg.QOpt) error {
-//	rf.filtersMu.Lock()
-//	defer rf.filtersMu.Unlock()
-//
-//	//// source chain filters
-//	//sourceFiltersBefore, sourceFiltersNow := rf.sourceChainFilters, getExecutionPluginSourceLpChainFilters(
-//	//	rf.config.sourcePriceRegistry.Address(),
-//	//)
-//	//created, deleted := logpollerutil.FiltersDiff(sourceFiltersBefore, sourceFiltersNow)
-//	//if err := logpollerutil.UnregisterLpFilters(rf.config.sourceLP, deleted, qopts...); err != nil {
-//	//	return err
-//	//}
-//	//if err := logpollerutil.RegisterLpFilters(rf.config.sourceLP, created, qopts...); err != nil {
-//	//	return err
-//	//}
-//	//rf.sourceChainFilters = sourceFiltersNow
-//
-//	// destination chain filters
-//	destFiltersBefore, destFiltersNow := rf.destChainFilters, getExecutionPluginDestLpChainFilters(rf.config.commitStoreReader.Address(), rf.config.offRamp.Address())
-//	created, deleted := logpollerutil.FiltersDiff(destFiltersBefore, destFiltersNow)
-//	if err := logpollerutil.UnregisterLpFilters(rf.config.destLP, deleted, qopts...); err != nil {
-//		return err
-//	}
-//	if err := logpollerutil.RegisterLpFilters(rf.config.destLP, created, qopts...); err != nil {
-//		return err
-//	}
-//	rf.destChainFilters = destFiltersNow
-//
-//	return nil
-//}
-
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
 	unexpiredReports, err := getUnexpiredCommitReports(
 		ctx,

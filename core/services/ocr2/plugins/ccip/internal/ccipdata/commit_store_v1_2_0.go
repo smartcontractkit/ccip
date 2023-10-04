@@ -2,6 +2,7 @@ package ccipdata
 
 import (
 	"math/big"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -64,6 +65,8 @@ func (c CommitOffchainConfigV1_2_0) Validate() error {
 
 type CommitStoreV1_2_0 struct {
 	*CommitStoreV1_0_0
+	// Dynamic config
+	configMu          sync.RWMutex
 	gasPriceEstimator prices.DAGasPriceEstimator
 	offchainConfig    CommitOffchainConfig
 }
@@ -78,6 +81,7 @@ func (c *CommitStoreV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 	if err != nil {
 		return common.Address{}, err
 	}
+	c.configMu.Lock()
 	c.gasPriceEstimator = prices.NewDAGasPriceEstimator(
 		c.estimator,
 		big.NewInt(int64(offchainConfigParsed.MaxGasPrice)),
@@ -91,6 +95,8 @@ func (c *CommitStoreV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 		InflightCacheExpiry:    offchainConfigParsed.InflightCacheExpiry.Duration(),
 		DestFinalityDepth:      offchainConfigParsed.DestFinalityDepth,
 	}
+	c.configMu.Unlock()
+
 	c.lggr.Infow("ConfigChanged",
 		"offchainConfig", offchainConfigParsed,
 		"onchainConfig", onchainConfigParsed,
@@ -99,10 +105,14 @@ func (c *CommitStoreV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 }
 
 func (c *CommitStoreV1_2_0) OffchainConfig() CommitOffchainConfig {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	return c.offchainConfig
 }
 
 func (c *CommitStoreV1_2_0) GasPriceEstimator() prices.GasPriceEstimatorCommit {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	return c.gasPriceEstimator
 }
 

@@ -2,6 +2,7 @@ package ccipdata
 
 import (
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -32,17 +33,21 @@ const (
 var _ CommitStoreReader = &CommitStoreV1_0_0{}
 
 type CommitStoreV1_0_0 struct {
+	// Static config
 	commitStore               *commit_store.CommitStore
 	lggr                      logger.Logger
 	lp                        logpoller.LogPoller
 	address                   common.Address
 	estimator                 gas.EvmFeeEstimator
-	gasPriceEstimator         prices.ExecGasPriceEstimator
-	offchainConfig            CommitOffchainConfig
 	filters                   []logpoller.Filter
 	reportAcceptedSig         common.Hash
 	reportAcceptedMaxSeqIndex int
 	commitReportArgs          abi.Arguments
+
+	// Dynamic config
+	configMu          sync.RWMutex
+	gasPriceEstimator prices.ExecGasPriceEstimator
+	offchainConfig    CommitOffchainConfig
 }
 
 func (c *CommitStoreV1_0_0) EncodeCommitReport(report CommitStoreReport) ([]byte, error) {
@@ -128,10 +133,14 @@ func (c *CommitStoreV1_0_0) IsBlessed(ctx context.Context, root [32]byte) (bool,
 }
 
 func (c *CommitStoreV1_0_0) OffchainConfig() CommitOffchainConfig {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	return c.offchainConfig
 }
 
 func (c *CommitStoreV1_0_0) GasPriceEstimator() prices.GasPriceEstimatorCommit {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	return c.gasPriceEstimator
 }
 
@@ -178,6 +187,7 @@ func (c *CommitStoreV1_0_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 	if err != nil {
 		return common.Address{}, err
 	}
+	c.configMu.Lock()
 	c.gasPriceEstimator = prices.NewExecGasPriceEstimator(
 		c.estimator,
 		big.NewInt(int64(offchainConfigV1.MaxGasPrice)),
@@ -189,6 +199,7 @@ func (c *CommitStoreV1_0_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 		InflightCacheExpiry:    offchainConfigV1.InflightCacheExpiry.Duration(),
 		DestFinalityDepth:      offchainConfigV1.DestFinalityDepth,
 	}
+	c.configMu.Unlock()
 	c.lggr.Infow("ConfigChanged",
 		"offchainConfig", offchainConfigV1,
 		"onchainConfig", onchainConfigParsed,

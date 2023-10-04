@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -46,12 +47,15 @@ type OffRampV1_0_0 struct {
 	ec                  client.Client
 	filters             []logpoller.Filter
 	estimator           gas.EvmFeeEstimator
-	offchainConfig      ExecOffchainConfig
-	onchainConfig       ExecOnchainConfig
-	gasPriceEstimator   prices.GasPriceEstimatorExec
 	executionReportArgs abi.Arguments
 	eventIndex          int
 	eventSig            common.Hash
+
+	// Dynamic config
+	configMu          sync.RWMutex
+	gasPriceEstimator prices.GasPriceEstimatorExec
+	offchainConfig    ExecOffchainConfig
+	onchainConfig     ExecOnchainConfig
 }
 
 func (o *OffRampV1_0_0) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
@@ -67,14 +71,20 @@ func (o *OffRampV1_0_0) GetPoolByDestToken(ctx context.Context, address common.A
 }
 
 func (o *OffRampV1_0_0) OffchainConfig() ExecOffchainConfig {
+	o.configMu.RLock()
+	defer o.configMu.RUnlock()
 	return o.offchainConfig
 }
 
 func (o *OffRampV1_0_0) OnchainConfig() ExecOnchainConfig {
+	o.configMu.RLock()
+	defer o.configMu.RUnlock()
 	return o.onchainConfig
 }
 
 func (o *OffRampV1_0_0) GasPriceEstimator() prices.GasPriceEstimatorExec {
+	o.configMu.RLock()
+	defer o.configMu.RUnlock()
 	return o.gasPriceEstimator
 }
 
@@ -100,6 +110,7 @@ func (o *OffRampV1_0_0) ConfigChanged(onchainConfig []byte, offchainConfig []byt
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
+	o.configMu.Lock()
 	o.offchainConfig = ExecOffchainConfig{
 		SourceFinalityDepth:         offchainConfigParsed.SourceFinalityDepth,
 		DestFinalityDepth:           offchainConfigParsed.DestFinalityDepth,
@@ -112,6 +123,8 @@ func (o *OffRampV1_0_0) ConfigChanged(onchainConfig []byte, offchainConfig []byt
 	}
 	o.onchainConfig = ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
 	o.gasPriceEstimator = prices.NewExecGasPriceEstimator(o.estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0)
+	o.configMu.Unlock()
+
 	o.lggr.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
 		"onchainConfig", offchainConfigParsed)

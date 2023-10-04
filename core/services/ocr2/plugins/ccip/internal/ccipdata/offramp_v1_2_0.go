@@ -2,6 +2,8 @@ package ccipdata
 
 import (
 	"math/big"
+	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -20,7 +22,11 @@ var _ OffRampReader = &OffRampV1_2_0{}
 // In 1.2 we have a different estimator impl
 type OffRampV1_2_0 struct {
 	*OffRampV1_0_0
+	// Dynamic config
+	configMu          sync.RWMutex
 	gasPriceEstimator prices.GasPriceEstimatorExec
+	offchainConfig    ExecOffchainConfig
+	onchainConfig     ExecOnchainConfig
 }
 
 func (o *OffRampV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
@@ -41,11 +47,43 @@ func (o *OffRampV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig []byt
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
+	o.configMu.Lock()
+	o.offchainConfig = ExecOffchainConfig{
+		SourceFinalityDepth:         offchainConfigParsed.SourceFinalityDepth,
+		DestFinalityDepth:           offchainConfigParsed.DestFinalityDepth,
+		DestOptimisticConfirmations: offchainConfigParsed.DestOptimisticConfirmations,
+		BatchGasLimit:               offchainConfigParsed.BatchGasLimit,
+		RelativeBoostPerWaitHour:    offchainConfigParsed.RelativeBoostPerWaitHour,
+		MaxGasPrice:                 offchainConfigParsed.MaxGasPrice,
+		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
+		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
+	}
+	o.onchainConfig = ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
 	o.gasPriceEstimator = prices.NewDAGasPriceEstimator(o.estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0, 0)
+	o.configMu.Unlock()
 	o.lggr.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
 		"onchainConfig", offchainConfigParsed)
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
+}
+
+// TODO probably a way to reuse 1.0.0
+func (o *OffRampV1_2_0) OffchainConfig() ExecOffchainConfig {
+	o.configMu.RLock()
+	defer o.configMu.RUnlock()
+	return o.offchainConfig
+}
+
+func (o *OffRampV1_2_0) OnchainConfig() ExecOnchainConfig {
+	o.configMu.RLock()
+	defer o.configMu.RUnlock()
+	return o.onchainConfig
+}
+
+func (o *OffRampV1_2_0) GasPriceEstimator() prices.GasPriceEstimatorExec {
+	o.configMu.RLock()
+	defer o.configMu.RUnlock()
+	return o.gasPriceEstimator
 }
 
 func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_2_0, error) {
