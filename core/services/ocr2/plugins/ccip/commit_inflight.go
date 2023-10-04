@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -171,6 +172,10 @@ func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report ccipdata
 			report:    report,
 			createdAt: time.Now(),
 		}
+	}
+
+	if len(report.GasPrices) == 0 {
+		return errors.New("report does not contain any gas prices")
 	}
 
 	if report.GasPrices[0].DestChainSelector != 0 || len(report.TokenPrices) != 0 {

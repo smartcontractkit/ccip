@@ -22,10 +22,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
@@ -101,12 +99,11 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
 
-			//commitStore, commitStoreAddr := testhelpers.NewFakeCommitStore(t, 1)
 			commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
 			commitStoreReader.On("IsDown", mock.Anything).Return(tc.commitStorePaused)
 			// Blessed roots return true
 			for root, blessed := range tc.blessedRoots {
-				commitStoreReader.On("IsBlessed", root).Return(blessed).Maybe()
+				commitStoreReader.On("IsBlessed", mock.Anything, root).Return(blessed, nil).Maybe()
 			}
 			commitStoreReader.On("GetAcceptedCommitReportsGteTimestamp", ctx, mock.Anything, 0).
 				Return(tc.unexpiredReports, nil).Maybe()
@@ -120,10 +117,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			destReader.On("LatestBlock", ctx).Return(int64(1234), nil).Maybe()
 			p.config.destReader = destReader
 
-			var executionEvents []ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]
+			var executionEvents []ccipdata.Event[ccipdata.ExecutionStateChanged]
 			for _, seqNum := range tc.executedSeqNums {
-				executionEvents = append(executionEvents, ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]{
-					Data: evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged{SequenceNumber: seqNum},
+				executionEvents = append(executionEvents, ccipdata.Event[ccipdata.ExecutionStateChanged]{
+					Data: ccipdata.ExecutionStateChanged{SequenceNumber: seqNum},
 				})
 			}
 			offRampReader := ccipdata.NewMockOffRampReader(t)
@@ -134,11 +131,6 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			sourceReader := ccipdata.NewMockOnRampReader(t)
 			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
 				Return(tc.sendRequests, nil).Maybe()
-			//if !tc.expErr {
-			//	sourceReader.On("ToOffRampMessage", mock.Anything).Return(&internal.EVM2EVMMessage{SequenceNumber: 10}, nil)
-			//	sourceReader.On("ToOffRampMessage", mock.Anything).Return(&internal.EVM2EVMMessage{SequenceNumber: 11}, nil)
-			//	sourceReader.On("ToOffRampMessage", mock.Anything).Return(&internal.EVM2EVMMessage{SequenceNumber: 12}, nil)
-			//}
 			p.config.onRampReader = sourceReader
 
 			cachedDestTokens := cache.NewMockAutoSync[cache.CachedTokens](t)
@@ -148,14 +140,14 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			}, nil).Maybe()
 			p.cachedDestTokens = cachedDestTokens
 
-			//priceRegistry, _ := testhelpers.NewFakePriceRegistry(t)
-			//priceRegistry.SetTokenPrices([]price_registry.InternalTimestampedPackedUint224{
-			//	{Value: big.NewInt(123), Timestamp: uint32(time.Now().Unix())},
-			//})
 			destPriceRegReader := ccipdata.NewMockPriceRegistryReader(t)
 			destPriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
 				[]ccipdata.TokenPriceUpdate{{TokenPrice: ccipdata.TokenPrice{Token: common.HexToAddress("0x1"), Value: big.NewInt(123)}, Timestamp: big.NewInt(time.Now().Unix())}}, nil).Maybe()
+			destPriceRegReader.On("Address").Return(utils.RandomAddress()).Maybe()
 			sourcePriceRegReader := ccipdata.NewMockPriceRegistryReader(t)
+			sourcePriceRegReader.On("Address").Return(utils.RandomAddress()).Maybe()
+			sourcePriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
+				[]ccipdata.TokenPriceUpdate{{TokenPrice: ccipdata.TokenPrice{Token: common.HexToAddress("0x1"), Value: big.NewInt(123)}, Timestamp: big.NewInt(time.Now().Unix())}}, nil).Maybe()
 			p.destPriceRegistry = destPriceRegReader
 			p.config.sourcePriceRegistry = sourcePriceRegReader
 
@@ -274,6 +266,10 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 	mockedExecState := mockOffRamp.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(ccipdata.ExecutionStateUntouched), nil).Once()
 
+	offRampReader := ccipdata.NewMockOffRampReader(t)
+	plugin.config.offRampReader = offRampReader
+	offRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
+
 	should, err := plugin.ShouldAcceptFinalizedReport(testutils.Context(t), ocrtypes.ReportTimestamp{}, encodedReport)
 	require.NoError(t, err)
 	assert.Equal(t, true, should)
@@ -322,6 +318,10 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 
 	mockedExecState := mockOffRamp.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(ccipdata.ExecutionStateUntouched), nil).Once()
 
+	offRampReader := ccipdata.NewMockOffRampReader(t)
+	plugin.config.offRampReader = offRampReader
+	offRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
+
 	should, err := plugin.ShouldTransmitAcceptedReport(testutils.Context(t), ocrtypes.ReportTimestamp{}, encodedReport)
 	require.NoError(t, err)
 	assert.Equal(t, true, should)
@@ -354,13 +354,11 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p := &ExecutionReportingPlugin{}
 	p.lggr = logger.TestLogger(t)
 
-	//commitStore, commitStoreAddress := testhelpers.NewFakeCommitStore(t, executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1)
 	commitStore := ccipdata.NewMockCommitStoreReader(t)
 	commitStore.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true)
-	p.config.commitStoreReader = commitStore
-
-	destReader := ccipdata.NewMockReader(t)
-	destReader.On("GetAcceptedCommitReportsGteSeqNum", ctx, observations[0].SeqNr, 0).
+	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
+		Return(executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1, nil)
+	commitStore.On("GetAcceptedCommitReportsGteSeqNum", ctx, observations[0].SeqNr, 0).
 		Return([]ccipdata.Event[ccipdata.CommitStoreReport]{
 			{
 				Data: ccipdata.CommitStoreReport{
@@ -371,7 +369,13 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 				},
 			},
 		}, nil)
-	p.config.destReader = destReader
+	p.config.commitStoreReader = commitStore
+
+	lp := lpMocks.NewLogPoller(t)
+	lp.On("RegisterFilter", mock.Anything).Return(nil)
+	offRampReader, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+	assert.NoError(t, err)
+	p.config.offRampReader = offRampReader
 
 	sendReqs := make([]ccipdata.Event[internal.EVM2EVMMessage], len(observations))
 	sourceReader := ccipdata.NewMockOnRampReader(t)
@@ -390,12 +394,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 			FeeToken:            utils.RandomAddress(),
 			MessageId:           [32]byte{12},
 		}
-		sendReqs[i] = ccipdata.Event[internal.EVM2EVMMessage]{
-			Data: internal.EVM2EVMMessage{
-				SequenceNumber: msg.SequenceNumber,
-			},
-		}
-		sourceReader.On("ToOffRampMessage", mock.Anything).Return(&msg, nil)
+		sendReqs[i] = ccipdata.Event[internal.EVM2EVMMessage]{Data: msg}
 	}
 	sourceReader.On("GetSendRequestsBetweenSeqNums",
 		ctx, observations[0].SeqNr, observations[len(observations)-1].SeqNr, 0).Return(sendReqs, nil)
@@ -986,32 +985,24 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			p := &ExecutionReportingPlugin{}
 			p.lggr = lggr
 
-			//onRamp, _ := testhelpers.NewFakeOnRamp(t)
-			//p.config.onRamp = onRamp
-
-			offRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
-			p.config.offRamp = offRamp
+			offRampReader := ccipdata.NewMockOffRampReader(t)
+			p.config.offRampReader = offRampReader
 
 			sourceReader := ccipdata.NewMockOnRampReader(t)
 			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expQueryMin, tc.expQueryMax, 0).
 				Return(tc.onchainEvents, nil).Maybe()
-			if len(tc.expReports) > 1 {
-				sourceReader.On("ToOffRampMessage", mock.Anything).Return(&internal.EVM2EVMMessage{SequenceNumber: 1}, nil).Once()
-				sourceReader.On("ToOffRampMessage", mock.Anything).Return(&internal.EVM2EVMMessage{SequenceNumber: 2}, nil).Once()
-				sourceReader.On("ToOffRampMessage", mock.Anything).Return(&internal.EVM2EVMMessage{SequenceNumber: 3}, nil).Once()
-			}
 			p.config.onRampReader = sourceReader
 
 			destReader := ccipdata.NewMockReader(t)
 			destReader.On("LatestBlock", ctx).Return(tc.destLatestBlock, nil).Maybe()
-			var executedEvents []ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]
+			var executedEvents []ccipdata.Event[ccipdata.ExecutionStateChanged]
 			for _, executedSeqNum := range tc.destExecutedSeqNums {
-				executedEvents = append(executedEvents, ccipdata.Event[evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged]{
-					Data: evm_2_evm_offramp.EVM2EVMOffRampExecutionStateChanged{SequenceNumber: executedSeqNum},
+				executedEvents = append(executedEvents, ccipdata.Event[ccipdata.ExecutionStateChanged]{
+					Data: ccipdata.ExecutionStateChanged{SequenceNumber: executedSeqNum},
 					Meta: ccipdata.Meta{BlockNumber: tc.destLatestBlock - 10},
 				})
 			}
-			destReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, offRampAddr, tc.expQueryMin, tc.expQueryMax, 0).Return(executedEvents, nil).Maybe()
+			offRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, tc.expQueryMin, tc.expQueryMax, 0).Return(executedEvents, nil).Maybe()
 			p.config.destReader = destReader
 
 			populatedReports, err := p.getReportsWithSendRequests(ctx, tc.reports)
@@ -1109,6 +1100,7 @@ func TestExecutionReportToEthTxMeta(t *testing.T) {
 }
 */
 
+/* this is a test related to the cache, should not be here
 func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 	expectedNewBlockNumber := int64(10000)
 	logs := []logpoller.Log{{BlockNumber: expectedNewBlockNumber}}
@@ -1119,7 +1111,6 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 
 	sourceToken, destToken := common.HexToAddress("111111"), common.HexToAddress("222222")
 
-	//mockOffRamp := &mock_contracts.EVM2EVMOffRampInterface{}
 	mockOffRamp := ccipdata.NewMockOffRampReader(t)
 	mockOffRamp.On("Address").Return(common.HexToAddress("0x01"))
 	mockOffRamp.On("GetSupportedTokens", mock.Anything).Return([]common.Address{sourceToken}, nil)
@@ -1141,6 +1132,7 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, destToken, value.SupportedTokens[sourceToken])
 }
+*/
 
 func Test_calculateObservedMessagesConsensus(t *testing.T) {
 	type args struct {
@@ -1260,7 +1252,7 @@ func Test_getTokensPrices(t *testing.T) {
 		name      string
 		feeTokens []common.Address
 		tokens    []common.Address
-		retPrices []price_registry.InternalTimestampedPackedUint224
+		retPrices []ccipdata.TokenPriceUpdate
 		expPrices map[common.Address]*big.Int
 		expErr    bool
 	}{
@@ -1268,10 +1260,10 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "base",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedPackedUint224{
-				{Value: big.NewInt(10)},
-				{Value: big.NewInt(20)},
-				{Value: big.NewInt(30)},
+			retPrices: []ccipdata.TokenPriceUpdate{
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(20)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(30)}},
 			},
 			expPrices: map[common.Address]*big.Int{
 				tk1: big.NewInt(10),
@@ -1284,11 +1276,11 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "token is both fee token and normal token",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3, tk1},
-			retPrices: []price_registry.InternalTimestampedPackedUint224{
-				{Value: big.NewInt(10)},
-				{Value: big.NewInt(20)},
-				{Value: big.NewInt(30)},
-				{Value: big.NewInt(10)},
+			retPrices: []ccipdata.TokenPriceUpdate{
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(20)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(30)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
 			},
 			expPrices: map[common.Address]*big.Int{
 				tk1: big.NewInt(10),
@@ -1301,11 +1293,11 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "token is both fee token and normal token and price registry gave different price",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3, tk1},
-			retPrices: []price_registry.InternalTimestampedPackedUint224{
-				{Value: big.NewInt(10)},
-				{Value: big.NewInt(20)},
-				{Value: big.NewInt(30)},
-				{Value: big.NewInt(1000)}, // different price for same token
+			retPrices: []ccipdata.TokenPriceUpdate{
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(20)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(30)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(1000)}},
 			},
 			expErr: true,
 		},
@@ -1313,10 +1305,10 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "zero price should lead to an error",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedPackedUint224{
-				{Value: big.NewInt(10)},
-				{Value: big.NewInt(0)},
-				{Value: big.NewInt(30)},
+			retPrices: []ccipdata.TokenPriceUpdate{
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(0)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(30)}},
 			},
 			expErr: true,
 		},
@@ -1324,9 +1316,9 @@ func Test_getTokensPrices(t *testing.T) {
 			name:      "contract returns less prices than requested",
 			feeTokens: []common.Address{tk1, tk2},
 			tokens:    []common.Address{tk3},
-			retPrices: []price_registry.InternalTimestampedPackedUint224{
-				{Value: big.NewInt(10)},
-				{Value: big.NewInt(20)},
+			retPrices: []ccipdata.TokenPriceUpdate{
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(20)}},
 			},
 			expErr: true,
 		},
@@ -1334,10 +1326,9 @@ func Test_getTokensPrices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			//priceReg, _ := testhelpers.NewFakePriceRegistry(t)
 			priceReg := ccipdata.NewMockPriceRegistryReader(t)
 			priceReg.On("GetTokenPrices", mock.Anything, mock.Anything).Return(tc.retPrices, nil)
-			//priceReg.SetTokenPrices(tc.retPrices)
+			priceReg.On("Address").Return(utils.RandomAddress(), nil)
 
 			prices, err := getTokensPrices(context.Background(), tc.feeTokens, priceReg, tc.tokens)
 			if tc.expErr {

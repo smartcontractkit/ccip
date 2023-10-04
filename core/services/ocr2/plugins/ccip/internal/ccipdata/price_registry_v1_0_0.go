@@ -169,5 +169,6 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 		lggr:          lggr,
 		gasUpdated:    UsdPerUnitGasUpdatedV1_0_0,
 		tokenUpdated:  tokenUpdated,
+		filters:       filters,
 	}, nil
 }

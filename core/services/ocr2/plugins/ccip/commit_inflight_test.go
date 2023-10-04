@@ -36,19 +36,31 @@ func TestCommitInflight(t *testing.T) {
 
 	// Add a single report inflight
 	root1 := utils.Keccak256Fixed(hexutil.MustDecode("0xaa"))
-	require.NoError(t, c.add(lggr, ccipdata.CommitStoreReport{Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 2}, MerkleRoot: root1}, epochAndRound))
+	require.NoError(t, c.add(lggr, ccipdata.CommitStoreReport{
+		Interval:   ccipdata.CommitStoreInterval{Min: 1, Max: 2},
+		MerkleRoot: root1,
+		GasPrices: []ccipdata.GasPrice{
+			{DestChainSelector: 123, Value: big.NewInt(999)},
+		},
+	}, epochAndRound))
 	inflightUpdate, hasUpdate = c.getLatestInflightGasPriceUpdate()
-	assert.Equal(t, inflightUpdate, update{})
-	assert.False(t, hasUpdate)
+	assert.Equal(t, big.NewInt(999), inflightUpdate.value)
+	assert.True(t, hasUpdate)
 	assert.Equal(t, uint64(2), c.maxInflightSeqNr())
 	epochAndRound++
 
 	// Add another price report
 	root2 := utils.Keccak256Fixed(hexutil.MustDecode("0xab"))
-	require.NoError(t, c.add(lggr, ccipdata.CommitStoreReport{Interval: ccipdata.CommitStoreInterval{Min: 3, Max: 4}, MerkleRoot: root2}, epochAndRound))
+	require.NoError(t, c.add(lggr, ccipdata.CommitStoreReport{
+		Interval:   ccipdata.CommitStoreInterval{Min: 3, Max: 4},
+		MerkleRoot: root2,
+		GasPrices: []ccipdata.GasPrice{
+			{DestChainSelector: 321, Value: big.NewInt(888)},
+		},
+	}, epochAndRound))
 	inflightUpdate, hasUpdate = c.getLatestInflightGasPriceUpdate()
-	assert.Equal(t, inflightUpdate, update{})
-	assert.False(t, hasUpdate)
+	assert.Equal(t, big.NewInt(888), inflightUpdate.value)
+	assert.True(t, hasUpdate)
 	assert.Equal(t, uint64(4), c.maxInflightSeqNr())
 	epochAndRound++
 
@@ -76,6 +88,7 @@ func TestCommitInflight(t *testing.T) {
 				Value: big.NewInt(10),
 			},
 		},
+		GasPrices: []ccipdata.GasPrice{{}},
 	}, epochAndRound))
 	// Apply cache price to existing
 	latestInflightTokenPriceUpdates := c.latestInflightTokenPriceUpdates()

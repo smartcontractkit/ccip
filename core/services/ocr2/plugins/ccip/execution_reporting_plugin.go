@@ -865,7 +865,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
+	//lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
 	sendReqsInRoot, leaves, tree, err := getProofData(ctx, r.config.onRampReader, commitReport.Interval)
 	if err != nil {

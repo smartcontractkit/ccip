@@ -1,6 +1,7 @@
 package ccipdata
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -12,9 +13,12 @@ import (
 )
 
 func TestPriceRegistryFilters(t *testing.T) {
+	cl := mocks.NewClient(t)
+	cl.On("ConfiguredChainID").Return(big.NewInt(1))
+
 	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) Closer {
-		c, err := NewPriceRegistryV1_0_0(logger.TestLogger(t), addr, lp, new(mocks.Client))
+		c, err := NewPriceRegistryV1_0_0(logger.TestLogger(t), addr, lp, cl)
 		require.NoError(t, err)
 		return c
-	}, 2)
+	}, 3)
 }

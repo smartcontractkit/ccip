@@ -722,6 +722,11 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	if err != nil {
 		return false, err
 	}
+
+	if len(parsedReport.GasPrices) == 0 {
+		return false, fmt.Errorf("report does not have any gas prices, merkleRoot=%x", parsedReport.MerkleRoot)
+	}
+
 	lggr := r.lggr.Named("CommitShouldAcceptFinalizedReport").With(
 		"merkleRoot", parsedReport.MerkleRoot,
 		"minSeqNum", parsedReport.Interval.Min,
@@ -785,6 +790,11 @@ func (r *CommitReportingPlugin) isStaleReport(ctx context.Context, lggr logger.L
 	// If there is a merkle root, ignore all other staleness checks and only check for sequence number staleness
 	if report.MerkleRoot != [32]byte{} {
 		return r.isStaleMerkleRoot(ctx, lggr, report.Interval, checkInflight)
+	}
+
+	if len(report.GasPrices) == 0 {
+		lggr.Errorf("report stale due to not having any gas prices")
+		return true
 	}
 
 	hasGasPriceUpdate := report.GasPrices[0].DestChainSelector != 0
