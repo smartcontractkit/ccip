@@ -188,7 +188,7 @@ func encodeExecutionReportV1_0_0(args abi.Arguments, report ExecReport) ([]byte,
 			FeeTokenAmount:      msg.FeeTokenAmount,
 			Data:                msg.Data,
 			TokenAmounts:        ta,
-			SourceTokenData:     [][]byte{}, // Always empty in 1.0
+			SourceTokenData:     msg.SourceTokenData,
 			MessageId:           msg.MessageId,
 		})
 	}
