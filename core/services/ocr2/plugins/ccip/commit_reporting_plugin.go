@@ -129,7 +129,7 @@ func (rf *CommitReportingPluginFactory) UpdateDynamicReaders(newPriceRegAddr com
 
 // NewReportingPlugin returns the ccip CommitReportingPlugin and satisfies the ReportingPluginFactory interface.
 func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	destPriceReg, err := rf.config.commitStore.ConfigChanged(config.OnchainConfig, config.OffchainConfig)
+	destPriceReg, err := rf.config.commitStore.ChangeConfig(config.OnchainConfig, config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -184,7 +184,11 @@ func (r *CommitReportingPlugin) Query(context.Context, types.ReportTimestamp) (t
 func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("CommitObservation")
 	// If the commit store is down the protocol should halt.
-	if r.commitStoreReader.IsDown(ctx) {
+	down, err := r.commitStoreReader.IsDown(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "isDown check errored")
+	}
+	if down {
 		return nil, ErrCommitStoreIsDown
 	}
 	r.inflightReports.expire(lggr)
@@ -477,7 +481,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		return false, nil, err
 	}
 	// If there are no fee updates and the interval is zero there is no report to produce.
-	if len(tokenPrices) == 0 && gasPrices[0].DestChainSelector == 0 && agreedInterval.Min == 0 {
+	if len(tokenPrices) == 0 && len(gasPrices) == 0 && agreedInterval.Min == 0 && agreedInterval.Max == 0 {
 		lggr.Infow("Empty report, skipping")
 		return false, nil, nil
 	}
@@ -652,19 +656,20 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 	}
 	destChainSelector := r.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
 
+	var gasPrices []ccipdata.GasPrice
 	if latestGasPrice.value != nil {
 		gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat
 		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value)
 		if err != nil {
 			return nil, nil, err
 		}
-		if gasPriceUpdatedRecently && !gasPriceDeviated {
-			newGasPrice = big.NewInt(0)
-			destChainSelector = uint64(0)
+		// If there is an update, include it.
+		if !gasPriceUpdatedRecently || gasPriceDeviated {
+			gasPrices = append(gasPrices, ccipdata.GasPrice{DestChainSelector: destChainSelector, Value: newGasPrice})
 		}
 	}
 
-	return tokenPriceUpdates, []ccipdata.GasPrice{{DestChainSelector: destChainSelector, Value: newGasPrice}}, nil
+	return tokenPriceUpdates, gasPrices, nil
 }
 
 // buildReport assumes there is at least one message in reqs.

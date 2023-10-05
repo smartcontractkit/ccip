@@ -659,7 +659,6 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 	const defaultSourceChainSelector = 10 // we reuse this value across all test cases
 	feeToken1 := common.HexToAddress("0xa")
 	feeToken2 := common.HexToAddress("0xb")
-	zero := big.NewInt(0)
 
 	val1e18 := func(val int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(val)) }
 
@@ -674,9 +673,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 		execGasPriceDeviationPPB int64
 		tokenPriceHeartBeat      models.Duration
 		tokenPriceDeviationPPB   uint32
-		expGas                   *big.Int
 		expTokenUpdates          []ccipdata.TokenPrice
-		expDestChainSel          uint64
+		expGasUpdates            []ccipdata.GasPrice
 	}{
 		{
 			name: "median",
@@ -686,9 +684,12 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{SourceGasPriceUSD: big.NewInt(3)},
 				{SourceGasPriceUSD: big.NewInt(4)},
 			},
-			f:               2,
-			expGas:          big.NewInt(3),
-			expDestChainSel: defaultSourceChainSelector,
+			latestGasPrice: update{
+				timestamp: time.Now().Add(-30 * time.Minute), // recent
+				value:     val1e18(9),                        // median deviates
+			},
+			f:             2,
+			expGasUpdates: []ccipdata.GasPrice{{DestChainSelector: defaultSourceChainSelector, Value: big.NewInt(3)}},
 		},
 		{
 			name: "gas price update skipped because the latest is similar and was updated recently",
@@ -705,9 +706,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				timestamp: time.Now().Add(-30 * time.Minute), // recent
 				value:     val1e18(9),                        // latest value close to the update
 			},
-			f:               1,
-			expGas:          zero,
-			expDestChainSel: 0,
+			f:             1,
+			expGasUpdates: nil,
 		},
 		{
 			name: "gas price update included, the latest is similar but was not updated recently",
@@ -724,9 +724,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				timestamp: time.Now().Add(-90 * time.Minute), // recent
 				value:     val1e18(9),                        // latest value close to the update
 			},
-			f:               1,
-			expGas:          val1e18(11),
-			expDestChainSel: defaultSourceChainSelector,
+			f:             1,
+			expGasUpdates: []ccipdata.GasPrice{{DestChainSelector: defaultSourceChainSelector, Value: val1e18(11)}},
 		},
 		{
 			name: "gas price update deviates from latest",
@@ -744,9 +743,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				timestamp: time.Now().Add(-30 * time.Minute), // recent
 				value:     val1e18(11),                       // latest value close to the update
 			},
-			f:               2,
-			expGas:          val1e18(20),
-			expDestChainSel: defaultSourceChainSelector,
+			f:             2,
+			expGasUpdates: []ccipdata.GasPrice{{DestChainSelector: defaultSourceChainSelector, Value: val1e18(20)}},
 		},
 		{
 			name: "median one token",
@@ -758,8 +756,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expTokenUpdates: []ccipdata.TokenPrice{
 				{Token: feeToken1, Value: big.NewInt(12)},
 			},
-			expGas:          zero,
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: nil,
 		},
 		{
 			name: "median two tokens",
@@ -772,8 +769,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{Token: feeToken1, Value: big.NewInt(12)},
 				{Token: feeToken2, Value: big.NewInt(13)},
 			},
-			expGas:          zero,
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: nil,
 		},
 		{
 			name: "token price update skipped because it is close to the latest",
@@ -793,8 +789,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 					value:     val1e18(9),
 				},
 			},
-			expGas:          zero,
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: nil,
 		},
 		{
 			name: "gas price and token price both included because they are not close to the latest",
@@ -821,8 +816,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expTokenUpdates: []ccipdata.TokenPrice{
 				{Token: feeToken1, Value: val1e18(21)},
 			},
-			expGas:          val1e18(11),
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: []ccipdata.GasPrice{{DestChainSelector: defaultSourceChainSelector, Value: val1e18(11)}},
 		},
 		{
 			name: "gas price and token price both included because they not been updated recently",
@@ -849,8 +843,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expTokenUpdates: []ccipdata.TokenPrice{
 				{Token: feeToken1, Value: val1e18(21)},
 			},
-			expGas:          val1e18(11),
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: []ccipdata.GasPrice{{DestChainSelector: defaultSourceChainSelector, Value: val1e18(11)}},
 		},
 		{
 			name: "gas price included because it deviates from latest and token price skipped because it does not deviate",
@@ -874,8 +867,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 					value:     val1e18(9),
 				},
 			},
-			expGas:          val1e18(11),
-			expDestChainSel: defaultSourceChainSelector,
+			expGasUpdates: []ccipdata.GasPrice{{DestChainSelector: defaultSourceChainSelector, Value: val1e18(11)}},
 		},
 		{
 			name: "gas price skipped because it does not deviate and token price included because it has not been updated recently",
@@ -902,8 +894,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expTokenUpdates: []ccipdata.TokenPrice{
 				{Token: feeToken1, Value: val1e18(21)},
 			},
-			expGas:          zero,
-			expDestChainSel: 0,
+			expGasUpdates: nil,
 		},
 	}
 
@@ -934,9 +925,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			}
 			gotTokens, gotGas, err := r.calculatePriceUpdates(tc.commitObservations, tc.latestGasPrice, tc.latestTokenPrices)
 
-			assert.Equal(t, tc.expGas, gotGas[0].Value)
+			assert.Equal(t, tc.expGasUpdates, gotGas)
 			assert.Equal(t, tc.expTokenUpdates, gotTokens)
-			assert.Equal(t, tc.expDestChainSel, gotGas[0].DestChainSelector)
 			assert.NoError(t, err)
 		})
 	}

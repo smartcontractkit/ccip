@@ -92,7 +92,7 @@ func (o *OffRampV1_0_0) Address() common.Address {
 	return o.addr
 }
 
-func (o *OffRampV1_0_0) ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
+func (o *OffRampV1_0_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfigV1_0_0](onchainConfig)
 	if err != nil {
 		return common.Address{}, common.Address{}, err

@@ -70,7 +70,7 @@ func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Addr
 		return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl)
 	}
 	switch version.String() {
-	case "1.2.0":
+	case v1_2_0:
 		// TODO: ABI is same now but will break shortly with multigas price updates
 		return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl)
 	default:

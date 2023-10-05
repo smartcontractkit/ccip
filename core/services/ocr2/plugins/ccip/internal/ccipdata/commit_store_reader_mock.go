@@ -6,6 +6,7 @@ import (
 	context "context"
 
 	common "github.com/ethereum/go-ethereum/common"
+	context2 "golang.org/x/net/context"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -41,8 +42,8 @@ func (_m *MockCommitStoreReader) Close(qopts ...pg.QOpt) error {
 	return r0
 }
 
-// ConfigChanged provides a mock function with given fields: onchainConfig, offchainConfig
-func (_m *MockCommitStoreReader) ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
+// ChangeConfig provides a mock function with given fields: onchainConfig, offchainConfig
+func (_m *MockCommitStoreReader) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
 	ret := _m.Called(onchainConfig, offchainConfig)
 
 	var r0 common.Address
@@ -258,7 +259,7 @@ func (_m *MockCommitStoreReader) IsBlessed(ctx context.Context, root [32]byte) (
 }
 
 // IsDown provides a mock function with given fields: ctx
-func (_m *MockCommitStoreReader) IsDown(ctx context.Context) bool {
+func (_m *MockCommitStoreReader) IsDown(ctx context2.Context) (bool, error) {
 	ret := _m.Called(ctx)
 
 	var r0 bool
@@ -268,7 +269,7 @@ func (_m *MockCommitStoreReader) IsDown(ctx context.Context) bool {
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	return r0, nil
 }
 
 // OffchainConfig provides a mock function with given fields:
@@ -286,7 +287,7 @@ func (_m *MockCommitStoreReader) OffchainConfig() CommitOffchainConfig {
 }
 
 // Verify provides a mock function with given fields: ctx, report
-func (_m *MockCommitStoreReader) Verify(ctx context.Context, report ExecReport) bool {
+func (_m *MockCommitStoreReader) VerifyExecutionReport(ctx context2.Context, report ExecReport) (bool, error) {
 	ret := _m.Called(ctx, report)
 
 	var r0 bool
@@ -296,7 +297,7 @@ func (_m *MockCommitStoreReader) Verify(ctx context.Context, report ExecReport) 
 		r0 = ret.Get(0).(bool)
 	}
 
-	return r0
+	return r0, nil
 }
 
 type mockConstructorTestingTNewMockCommitStoreReader interface {

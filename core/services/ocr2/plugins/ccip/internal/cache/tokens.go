@@ -177,9 +177,8 @@ func copyMap[M ~map[K]V, K comparable, V any](m M) M {
 }
 
 type tokenToDecimals struct {
-	lggr    logger.Logger
-	offRamp ccipdata.OffRampReader
-	//priceRegistry price_registry.PriceRegistryInterface
+	lggr                logger.Logger
+	offRamp             ccipdata.OffRampReader
 	priceRegistryReader ccipdata.PriceRegistryReader
 	tokenFactory        func(address common.Address) (link_token_interface.LinkTokenInterface, error)
 	tokenDecimals       sync.Map

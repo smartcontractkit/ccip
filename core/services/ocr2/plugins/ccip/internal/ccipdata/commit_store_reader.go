@@ -71,15 +71,15 @@ type CommitStoreReader interface {
 	GetAcceptedCommitReportsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[CommitStoreReport], error)
 	// GetAcceptedCommitReportsGteTimestamp returns all the commit reports with timestamp greater than or equal to the provided.
 	GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]Event[CommitStoreReport], error)
-	IsDown(ctx context.Context) bool
+	IsDown(ctx context.Context) (bool, error)
 	IsBlessed(ctx context.Context, root [32]byte) (bool, error)
 	// Notifies the reader that the config has changed onchain
-	ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, error)
+	ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, error)
 	OffchainConfig() CommitOffchainConfig
 	GasPriceEstimator() prices.GasPriceEstimatorCommit
 	EncodeCommitReport(report CommitStoreReport) ([]byte, error)
 	DecodeCommitReport(report []byte) (CommitStoreReport, error)
-	Verify(ctx context.Context, report ExecReport) bool
+	VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error)
 }
 
 func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (CommitStoreReader, error) {
@@ -88,9 +88,9 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 		return nil, errors.Errorf("expected %v got %v", ccipconfig.EVM2EVMOnRamp, contractType)
 	}
 	switch version.String() {
-	case "1.0.0", "1.1.0":
+	case v1_0_0, v1_1_0:
 		return NewCommitStoreV1_0_0(lggr, address, ec, lp, estimator)
-	case "1.2.0":
+	case v1_2_0:
 		return NewCommitStoreV1_2_0(lggr, address, ec, lp, estimator)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
@@ -100,7 +100,7 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 // Backwards compat for tests
 func DecodeCommitReport(verStr string, report []byte) (CommitStoreReport, error) {
 	switch verStr {
-	case "1.0.0", "1.1.0", "1.2.0":
+	case v1_0_0, v1_1_0, v1_2_0:
 		commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
 		return decodeCommitReportV1_0_0(abihelpers.MustGetEventInputs(ReportAccepted, commitStoreABI), report)
 		// TODO: 1.2 will split
@@ -121,7 +121,7 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 	}
 	commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
 	switch ver.String() {
-	case "1.0.0", "1.1.0", "1.2.0":
+	case v1_0_0, v1_1_0, v1_2_0:
 		return func(report []byte) (*txmgr.TxMeta, error) {
 			commitReport, err := decodeCommitReportV1_0_0(abihelpers.MustGetEventInputs(ReportAccepted, commitStoreABI), report)
 			if err != nil {
@@ -138,10 +138,10 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 // CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
 // sequence numbers of the committed messages will be added to tx metadata
 func commitReportToEthTxMeta(commitReport CommitStoreReport) (*txmgr.TxMeta, error) {
-	n := int(commitReport.Interval.Max-commitReport.Interval.Min) + 1
+	n := uint64(commitReport.Interval.Max-commitReport.Interval.Min) + 1
 	seqRange := make([]uint64, n)
-	for i := 0; i < n; i++ {
-		seqRange[i] = uint64(i) + commitReport.Interval.Min
+	for i := uint64(0); i < n; i++ {
+		seqRange[i] = i + commitReport.Interval.Min
 	}
 	return &txmgr.TxMeta{
 		SeqNumbers: seqRange,

@@ -123,7 +123,7 @@ func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(newPriceRegAddr 
 }
 
 func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
-	destPriceRegistry, destWrappedNative, err := rf.config.offRampReader.ConfigChanged(config.OnchainConfig, config.OffchainConfig)
+	destPriceRegistry, destWrappedNative, err := rf.config.offRampReader.ChangeConfig(config.OnchainConfig, config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -174,7 +174,11 @@ func (r *ExecutionReportingPlugin) Query(context.Context, types.ReportTimestamp)
 
 func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp types.ReportTimestamp, query types.Query) (types.Observation, error) {
 	lggr := r.lggr.Named("ExecutionObservation")
-	if r.config.commitStoreReader.IsDown(ctx) {
+	down, err := r.config.commitStoreReader.IsDown(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "isDown check errored")
+	}
+	if down {
 		return nil, ErrCommitStoreIsDown
 	}
 	// Expire any inflight reports.
@@ -833,7 +837,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	if err != nil {
 		return nil, err
 	}
-	//lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
+	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
 	sendReqsInRoot, leaves, tree, err := getProofData(ctx, r.config.onRampReader, commitReport.Interval)
 	if err != nil {
@@ -876,7 +880,10 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		)
 	}
 	// Double check this verifies before sending.
-	valid := r.config.commitStoreReader.Verify(ctx, execReport)
+	valid, err := r.config.commitStoreReader.VerifyExecutionReport(ctx, execReport)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to verify")
+	}
 	if !valid {
 		return nil, errors.New("root does not verify")
 	}

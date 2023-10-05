@@ -21,6 +21,12 @@ type Meta struct {
 	LogIndex       uint
 }
 
+const (
+	v1_0_0 = "1.0.0"
+	v1_1_0 = "1.1.0"
+	v1_2_0 = "1.2.0"
+)
+
 type Closer interface {
 	Close(qopts ...pg.QOpt) error
 }

@@ -69,6 +69,8 @@ func (c *inflightCommitReportsContainer) maxInflightSeqNr() uint64 {
 }
 
 // getLatestInflightGasPriceUpdate returns the latest inflight gas price update, and bool flag on if update exists.
+// Note we assume that reports contain either 1 or 0 gas prices.
+// If this assumption is broken, we will need to update this logic.
 func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() (update, bool) {
 	c.locker.RLock()
 	defer c.locker.RUnlock()
@@ -76,7 +78,7 @@ func (c *inflightCommitReportsContainer) getLatestInflightGasPriceUpdate() (upda
 	latestGasPriceUpdate := update{}
 	var latestEpochAndRound uint64
 	for _, inflight := range c.inFlightPriceUpdates {
-		if inflight.gasPrices[0].DestChainSelector == 0 {
+		if len(inflight.gasPrices) == 0 {
 			// Price updates did not include a gas price
 			continue
 		}
@@ -102,14 +104,8 @@ func (c *inflightCommitReportsContainer) latestInflightTokenPriceUpdates() map[c
 	latestEpochAndRounds := make(map[common.Address]uint64)
 	for _, inflight := range c.inFlightPriceUpdates {
 		for _, inflightTokenUpdate := range inflight.tokenPrices {
-			if _, ok := latestTokenPriceUpdates[inflightTokenUpdate.Token]; !ok {
-				latestTokenPriceUpdates[inflightTokenUpdate.Token] = update{
-					value:     inflightTokenUpdate.Value,
-					timestamp: inflight.createdAt,
-				}
-				latestEpochAndRounds[inflightTokenUpdate.Token] = inflight.epochAndRound
-			}
-			if inflight.epochAndRound > latestEpochAndRounds[inflightTokenUpdate.Token] {
+			_, ok := latestTokenPriceUpdates[inflightTokenUpdate.Token]
+			if !ok || inflight.epochAndRound > latestEpochAndRounds[inflightTokenUpdate.Token] {
 				latestTokenPriceUpdates[inflightTokenUpdate.Token] = update{
 					value:     inflightTokenUpdate.Value,
 					timestamp: inflight.createdAt,

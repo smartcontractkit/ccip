@@ -74,7 +74,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(int64(chainId)),
 		"destChain", ChainName(destChainID))
-	priceGetterObject, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -93,11 +93,11 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, errors.Wrap(err, "failed commit reader")
 	}
 
-	addr, err := onRampReader.RouterAddress()
+	onRampRouterAddr, err := onRampReader.RouterAddress()
 	if err != nil {
 		return nil, nil, err
 	}
-	sourceRouter, err := router.NewRouter(addr, sourceChain.Client())
+	sourceRouter, err := router.NewRouter(onRampRouterAddr, sourceChain.Client())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,7 +117,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			destLP:              destChain.LogPoller(),
 			onRampReader:        onRampReader,
 			offRamp:             offRampReader,
-			priceGetter:         priceGetterObject,
+			priceGetter:         pipelinePriceGetter,
 			sourceNative:        sourceNative,
 			sourceChainSelector: staticConfig.SourceChainSelector,
 			destClient:          destChain.Client(),

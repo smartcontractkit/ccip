@@ -29,7 +29,7 @@ type OffRampV1_2_0 struct {
 	onchainConfig     ExecOnchainConfig
 }
 
-func (o *OffRampV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
+func (o *OffRampV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfigV1_0_0](onchainConfig)
 	if err != nil {
 		return common.Address{}, common.Address{}, err

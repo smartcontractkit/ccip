@@ -71,7 +71,7 @@ type CommitStoreV1_2_0 struct {
 	offchainConfig    CommitOffchainConfig
 }
 
-func (c *CommitStoreV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
+func (c *CommitStoreV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[CommitOnchainConfig](onchainConfig)
 	if err != nil {
 		return common.Address{}, err
@@ -97,7 +97,7 @@ func (c *CommitStoreV1_2_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 	}
 	c.configMu.Unlock()
 
-	c.lggr.Infow("ConfigChanged",
+	c.lggr.Infow("ChangeConfig",
 		"offchainConfig", offchainConfigParsed,
 		"onchainConfig", onchainConfigParsed,
 	)

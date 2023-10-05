@@ -56,7 +56,7 @@ func (_m *MockOffRampReader) Close(qopts ...pg.QOpt) error {
 }
 
 // ConfigChanged provides a mock function with given fields: onchainConfig, offchainConfig
-func (_m *MockOffRampReader) ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
+func (_m *MockOffRampReader) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
 	ret := _m.Called(onchainConfig, offchainConfig)
 
 	var r0 common.Address

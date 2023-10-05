@@ -189,7 +189,7 @@ func (c CommitOffchainConfigV1) Validate() error {
 	return nil
 }
 
-func (c *CommitStoreV1_0_0) ConfigChanged(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
+func (c *CommitStoreV1_0_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[CommitOnchainConfig](onchainConfig)
 	if err != nil {
 		return common.Address{}, err
@@ -212,7 +212,7 @@ func (c *CommitStoreV1_0_0) ConfigChanged(onchainConfig []byte, offchainConfig [
 		DestFinalityDepth:      offchainConfigV1.DestFinalityDepth,
 	}
 	c.configMu.Unlock()
-	c.lggr.Infow("ConfigChanged",
+	c.lggr.Infow("ChangeConfig",
 		"offchainConfig", offchainConfigV1,
 		"onchainConfig", onchainConfigParsed,
 	)
@@ -291,17 +291,17 @@ func (c *CommitStoreV1_0_0) GetLatestPriceEpochAndRound(ctx context.Context) (ui
 	return c.commitStore.GetLatestPriceEpochAndRound(&bind.CallOpts{Context: ctx})
 }
 
-func (c *CommitStoreV1_0_0) IsDown(ctx context.Context) bool {
+func (c *CommitStoreV1_0_0) IsDown(ctx context.Context) (bool, error) {
 	unPausedAndHealthy, err := c.commitStore.IsUnpausedAndARMHealthy(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		// If we cannot read the state, assume the worst
 		c.lggr.Errorw("Unable to read CommitStore IsUnpausedAndARMHealthy", "err", err)
-		return true
+		return true, nil
 	}
-	return !unPausedAndHealthy
+	return !unPausedAndHealthy, nil
 }
 
-func (c *CommitStoreV1_0_0) Verify(ctx context.Context, report ExecReport) bool {
+func (c *CommitStoreV1_0_0) VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error) {
 	var hashes [][32]byte
 	for _, msg := range report.Messages {
 		hashes = append(hashes, msg.Hash)
@@ -309,14 +309,14 @@ func (c *CommitStoreV1_0_0) Verify(ctx context.Context, report ExecReport) bool 
 	res, err := c.commitStore.Verify(&bind.CallOpts{Context: ctx}, hashes, report.Proofs, report.ProofFlagBits)
 	if err != nil {
 		c.lggr.Errorw("Unable to call verify", "messages", report.Messages, "err", err)
-		return false
+		return false, nil
 	}
 	// No timestamp, means failed to verify root.
 	if res.Cmp(big.NewInt(0)) == 0 {
 		c.lggr.Errorw("Root does not verify", "messages", report.Messages)
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }
 
 func NewCommitStoreV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*CommitStoreV1_0_0, error) {
