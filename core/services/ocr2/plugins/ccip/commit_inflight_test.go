@@ -21,7 +21,7 @@ func TestCommitInflight(t *testing.T) {
 	c := newInflightCommitReportsContainer(time.Hour)
 
 	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
-		gasPrices:     []ccipdata.GasPrice{{DestChainSelector: 0, Value: big.NewInt(0)}},
+		gasPrices:     []ccipdata.GasPrice{},
 		createdAt:     time.Now(),
 		epochAndRound: ccipcalc.MergeEpochAndRound(2, 4),
 	})

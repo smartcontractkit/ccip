@@ -35,27 +35,7 @@ func (_m *MockOffRampReader) Address() common.Address {
 	return r0
 }
 
-// Close provides a mock function with given fields: qopts
-func (_m *MockOffRampReader) Close(qopts ...pg.QOpt) error {
-	_va := make([]interface{}, len(qopts))
-	for _i := range qopts {
-		_va[_i] = qopts[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(...pg.QOpt) error); ok {
-		r0 = rf(qopts...)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// ConfigChanged provides a mock function with given fields: onchainConfig, offchainConfig
+// ChangeConfig provides a mock function with given fields: onchainConfig, offchainConfig
 func (_m *MockOffRampReader) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
 	ret := _m.Called(onchainConfig, offchainConfig)
 
@@ -88,6 +68,26 @@ func (_m *MockOffRampReader) ChangeConfig(onchainConfig []byte, offchainConfig [
 	}
 
 	return r0, r1, r2
+}
+
+// Close provides a mock function with given fields: qopts
+func (_m *MockOffRampReader) Close(qopts ...pg.QOpt) error {
+	_va := make([]interface{}, len(qopts))
+	for _i := range qopts {
+		_va[_i] = qopts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(...pg.QOpt) error); ok {
+		r0 = rf(qopts...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // DecodeExecutionReport provides a mock function with given fields: report
