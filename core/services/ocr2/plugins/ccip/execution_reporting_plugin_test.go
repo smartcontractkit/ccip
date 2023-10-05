@@ -100,7 +100,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.lggr = logger.TestLogger(t)
 
 			commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
-			commitStoreReader.On("IsDown", mock.Anything).Return(tc.commitStorePaused)
+			commitStoreReader.On("IsDown", mock.Anything).Return(tc.commitStorePaused, nil)
 			// Blessed roots return true
 			for root, blessed := range tc.blessedRoots {
 				commitStoreReader.On("IsBlessed", mock.Anything, root).Return(blessed, nil).Maybe()
@@ -355,7 +355,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p.lggr = logger.TestLogger(t)
 
 	commitStore := ccipdata.NewMockCommitStoreReader(t)
-	commitStore.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true)
+	commitStore.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
 		Return(executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1, nil)
 	commitStore.On("GetAcceptedCommitReportsGteSeqNum", ctx, observations[0].SeqNr, 0).
