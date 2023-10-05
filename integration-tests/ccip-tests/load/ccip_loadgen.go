@@ -128,16 +128,17 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
 	// close all header subscriptions for dest chains
-	switch val := destCCIP.Common.ChainClient.(type) {
-	case *blockchain.EthereumMultinodeClient:
-		ethClient, ok := val.Clients[0].(*blockchain.EthereumClient)
-		require.True(c.t, ok, "failed to cast to ethereum client")
-		queuedEvents := ethClient.GetHeaderSubscriptions()
-		for subName := range queuedEvents {
-			ethClient.DeleteHeaderEventSubscription(subName)
+	queuedEvents := destCCIP.Common.ChainClient.GetHeaderSubscriptions()
+	for subName := range queuedEvents {
+		destCCIP.Common.ChainClient.DeleteHeaderEventSubscription(subName)
+	}
+	// close all header subscriptions for source chains except for finalized header
+	queuedEvents = sourceCCIP.Common.ChainClient.GetHeaderSubscriptions()
+	for subName := range queuedEvents {
+		if subName == blockchain.FinalizedHeaderKey {
+			continue
 		}
-	default:
-		require.Fail(c.t, "unknown chain client type")
+		sourceCCIP.Common.ChainClient.DeleteHeaderEventSubscription(subName)
 	}
 }
 
@@ -210,7 +211,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	}
 	lggr = lggr.With().Str("Msg Tx", sendTx.Hash().String()).Logger()
 	txConfirmationTime := time.Now().UTC()
-	rcpt, err1 := c.Lane.Source.Common.ChainClient.GetTxReceipt(sendTx.Hash())
+	rcpt, err1 := bind.WaitMined(context.Background(), sourceCCIP.Common.ChainClient.DeployBackend(), sendTx)
 	if err1 == nil {
 		hdr, err1 := c.Lane.Source.Common.ChainClient.HeaderByNumber(context.Background(), rcpt.BlockNumber)
 		if err1 == nil {
