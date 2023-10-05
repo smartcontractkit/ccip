@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CommitStore OffchainConfig fields updated.
   - New fields `GasPriceHeartBeat`, `DAGasPriceDeviationPPB`, `ExecGasPriceDeviationPPB`, `TokenPriceHeartBeat`, `TokenPriceDeviationPPB` added
   - Old Fields `FeeUpdateHeartBeat`, `FeeUpdateDeviationPPB` removed.
+- OffRamp caps gas passed on to TokenPool when calling `releaseOrMint`.
+  - A new `maxPoolGas` field is added to OffRamp **DynamicConfig** to store this gas limit.
+
 
 ### Removed
 
