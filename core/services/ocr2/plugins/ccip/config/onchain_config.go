@@ -43,6 +43,7 @@ func (d ExecOnchainConfig) AbiString() string {
 				{"name": "priceRegistry", "type": "address"},
 				{"name": "maxTokensLength", "type": "uint16"},
 				{"name": "maxDataSize", "type": "uint32"}
+				{"name": "maxPoolGas", "type": "uint32"}
 			],
 			"type": "tuple"
 		}
@@ -64,6 +65,9 @@ func (d ExecOnchainConfig) Validate() error {
 	}
 	if d.MaxDataSize == 0 {
 		return errors.New("must set MaxDataSize")
+	}
+	if d.MaxPoolGas == 0 {
+		return errors.New("must set MaxPoolGas")
 	}
 	return nil
 }

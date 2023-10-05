@@ -64,6 +64,7 @@ func TestExecOnchainConfig(t *testing.T) {
 				PriceRegistry:                           randomAddress(),
 				MaxTokensLength:                         uint16(rand.Uint32()),
 				MaxDataSize:                             rand.Uint32(),
+				MaxPoolGas:                              rand.Uint32(),
 			},
 		},
 		{

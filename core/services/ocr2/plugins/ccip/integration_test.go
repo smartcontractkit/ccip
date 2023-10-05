@@ -518,6 +518,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 				PriceRegistry:                           ccipTH.Dest.PriceRegistry.Address(),
 				MaxDataSize:                             1e5,
 				MaxTokensLength:                         5,
+				MaxPoolGas:                              200_000,
 			})
 			node.EventuallyNodeUsesUpdatedPriceRegistry(t, ccipTH)
 		}

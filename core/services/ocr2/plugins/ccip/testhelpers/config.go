@@ -50,6 +50,7 @@ func (c *CCIPContracts) CreateDefaultExecOnchainConfig(t *testing.T) []byte {
 		PriceRegistry:                           c.Dest.PriceRegistry.Address(),
 		MaxDataSize:                             1e5,
 		MaxTokensLength:                         5,
+		MaxPoolGas:                              200_000,
 	})
 	require.NoError(t, err)
 	return config

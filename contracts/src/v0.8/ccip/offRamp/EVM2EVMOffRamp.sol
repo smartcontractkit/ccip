@@ -367,7 +367,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   }
 
   /// @notice Try executing a message.
-  /// @param message Client.Any2EVMMessage memory message.
+  /// @param message Internal.EVM2EVMMessage memory message.
   /// @param offchainTokenData Data provided by the DON for token transfers.
   /// @return the new state of the message, being either SUCCESS or FAILURE.
   /// @return revert data in bytes if CCIP receiver reverted during execution.
