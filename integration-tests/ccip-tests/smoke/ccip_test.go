@@ -24,7 +24,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	}
 	l := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, l, testsetups.Smoke)
-	transferAmounts := []*big.Int{big.NewInt(1e14), big.NewInt(1e14)}
+	transferAmounts := []*big.Int{big.NewInt(1e5)}
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", 6, transferAmounts, nil, 5, true, true, TestCfg)
 	var tcs []subtestInput
 	if len(setUpOutput.Lanes) == 0 {

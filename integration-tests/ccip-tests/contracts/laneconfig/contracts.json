@@ -401,18 +401,19 @@
     "Avalanche Fuji": {
       "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
       "bridge_tokens": [
-        "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846"
+        "0x5425890298aed601595a70AB815c96711a31Bc65"
       ],
       "bridge_tokens_pools": [
-        "0x658af0d8ecbb13c5fd5b545ac7316e50cc07cf6e"
+        "0x35e08285cfed1ef159236728f843286c55fc0861"
       ],
-      "arm": "0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f",
-      "router": "0x554472a2720e5e7d5d3c817529aba05eed5f82d8",
-      "price_registry": "0xe42ecce39ce5bd2bbf2443660ba6979eeafd48df",
+      "arm": "0x7103f9da75f04dd452b257aaca23842895ae1920",
+      "is_mock_arm" : true,
+      "router": "0x42415975c9cbcc0a73f8fa90018b55ed3b239273",
+      "price_registry": "0x85eeae3b41c36819d4fa89d4d74dc45b41b749cc",
       "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
       "src_contracts": {
         "Optimism Goerli": {
-          "on_ramp": "0x097076fbd8573418c77d2600606ad063c0e3cc7c",
+          "on_ramp": "0x75a4a11d0839ab3983e0205e2eadfe5197f0c3ee",
           "deployed_at": 23755228
         },
         "Polygon Mumbai": {
@@ -426,9 +427,9 @@
       },
       "dest_contracts": {
         "Optimism Goerli": {
-          "off_ramp": "0x0f287140d86335b37ae2ad0707992ecd4202d5b7",
-          "commit_store": "0x5a7fa03e52628a0a6f0ab637f10ba45b68f9ad33",
-          "receiver_dapp": "0x1C23955C7770E4fF85Cd806520A7Ce6A69745E96"
+          "off_ramp": "0x8cd9e1a0192862746037d751afbf07fb103c9ae6",
+          "commit_store": "0xc016efee15f75ef18c7db523cea63b3f01f8ca37",
+          "receiver_dapp": "0xda9e8e71bB750a996Af33ebB8aBb18cd9EB9DC75"
         },
         "Polygon Mumbai": {
           "off_ramp": "0x31cf2040d53f178d168997c658d1a7fc5fa7d215",
@@ -539,14 +540,15 @@
     "Optimism Goerli": {
       "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
       "bridge_tokens": [
-        "0xdc2CC710e42857672E7907CF474a69B63B93089f"
+        "0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6"
       ],
       "bridge_tokens_pools": [
-        "0xdecfaf632175915bdf38c00d9d9746e8a90a56c4"
+        "0x6cb3ed9b441eb674b58495c8b3324b59faff5243"
       ],
-      "arm": "0xeaf6968fab9c54ac31c3679f120705b5019d3546",
-      "router": "0xeb52e9ae4a9fb37172978642d4c141ef53876f26",
-      "price_registry": "0x490f3b46fba6af0d7499867a73469a077251c2bb",
+      "arm": "0x270dc4218d51bcaa422af27fa9fef7b1025f4822",
+      "is_mock_arm" : true,
+      "router": "0xdb12517bc81108f332cfcbe6739c7ab9a4621979",
+      "price_registry": "0xe7acd5003f2aefceb8499b7acbc05bf8187837ae",
       "wrapped_native": "0x4200000000000000000000000000000000000006",
       "src_contracts": {
         "Arbitrum Goerli": {
@@ -554,8 +556,8 @@
           "deployed_at": 11481052
         },
         "Avalanche Fuji": {
-          "on_ramp": "0xf33303166911ff86ad1a5ea94d459b4ba0ba8cc9",
-          "deployed_at": 11482157
+          "on_ramp": "0x9f68d3ce6fafac72723348f284f8961e0d3b80ad",
+          "deployed_at": 14980444
         },
         "Base Goerli": {
           "on_ramp": "0x1a674645f3eb4147543fca7d40c5719cbd997362",
@@ -573,9 +575,9 @@
           "receiver_dapp": "0xF4b300716856e468f584163937E26aEda5741eCB"
         },
         "Avalanche Fuji": {
-          "off_ramp": "0xee8ce182ea0c0edecf06c2a032a17b2058fc5a04",
-          "commit_store": "0x2980de4ce178bc8bb6840abd2ef0e2a7c8e7272f",
-          "receiver_dapp": "0x18992693d445f70dc931e5711b0732c569951397"
+          "off_ramp": "0x688f944c37abee17e0de9df89fb4bd85dacd9dfd",
+          "commit_store": "0x31f243a32291096413899a480ed781b27ad4de75",
+          "receiver_dapp": "0xda9e8e71bB750a996Af33ebB8aBb18cd9EB9DC75"
         },
         "Base Goerli": {
           "off_ramp": "0xd0a9f52562f9111a4cd66d6615b8773bf96e6b74",
