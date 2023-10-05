@@ -201,6 +201,7 @@ func (l *loadArgs) Start() {
 					Schedule:              l.schedules,
 					LoadType:              wasp.RPS,
 					RateLimitUnitDuration: l.TestCfg.Load.TimeUnit,
+					CallResultBufLen:      100,
 					CallTimeout:           l.TestCfg.Load.LoadTimeOut,
 					Gun:                   ccipLoad,
 					Logger:                ccipLoad.Lane.Logger,
