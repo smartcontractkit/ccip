@@ -481,7 +481,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		return false, nil, err
 	}
 	// If there are no fee updates and the interval is zero there is no report to produce.
-	if len(tokenPrices) == 0 && len(gasPrices) == 0 && agreedInterval.Min == 0 && agreedInterval.Max == 0 {
+	if len(tokenPrices) == 0 && len(gasPrices) == 0 && agreedInterval.Max == 0 {
 		lggr.Infow("Empty report, skipping")
 		return false, nil, nil
 	}

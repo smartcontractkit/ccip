@@ -756,7 +756,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 			expTokenUpdates: []ccipdata.TokenPrice{
 				{Token: feeToken1, Value: big.NewInt(12)},
 			},
-			expGasUpdates: nil,
+			// We expect a gas update because no latest
+			expGasUpdates: []ccipdata.GasPrice{{DestChainSelector: defaultSourceChainSelector, Value: big.NewInt(0)}},
 		},
 		{
 			name: "median two tokens",
@@ -769,7 +770,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{Token: feeToken1, Value: big.NewInt(12)},
 				{Token: feeToken2, Value: big.NewInt(13)},
 			},
-			expGasUpdates: nil,
+			// We expect a gas update because no latest
+			expGasUpdates: []ccipdata.GasPrice{{DestChainSelector: defaultSourceChainSelector, Value: big.NewInt(0)}},
 		},
 		{
 			name: "token price update skipped because it is close to the latest",
@@ -789,7 +791,8 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 					value:     val1e18(9),
 				},
 			},
-			expGasUpdates: nil,
+			// We expect a gas update because no latest
+			expGasUpdates: []ccipdata.GasPrice{{DestChainSelector: defaultSourceChainSelector, Value: big.NewInt(0)}},
 		},
 		{
 			name: "gas price and token price both included because they are not close to the latest",
