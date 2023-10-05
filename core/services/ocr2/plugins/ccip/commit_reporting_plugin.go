@@ -657,16 +657,20 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 	destChainSelector := r.sourceChainSelector // Assuming plugin lane is A->B, we write to B the gas price of A
 
 	var gasPrices []ccipdata.GasPrice
+	// Default to updating so that we update if there are no prior updates.
+	shouldUpdate := true
 	if latestGasPrice.value != nil {
 		gasPriceUpdatedRecently := time.Since(latestGasPrice.timestamp) < r.offchainConfig.GasPriceHeartBeat
 		gasPriceDeviated, err := r.gasPriceEstimator.Deviates(newGasPrice, latestGasPrice.value)
 		if err != nil {
 			return nil, nil, err
 		}
-		// If there is an update, include it.
-		if !gasPriceUpdatedRecently || gasPriceDeviated {
-			gasPrices = append(gasPrices, ccipdata.GasPrice{DestChainSelector: destChainSelector, Value: newGasPrice})
+		if gasPriceUpdatedRecently && !gasPriceDeviated {
+			shouldUpdate = false
 		}
+	}
+	if shouldUpdate {
+		gasPrices = append(gasPrices, ccipdata.GasPrice{DestChainSelector: destChainSelector, Value: newGasPrice})
 	}
 
 	return tokenPriceUpdates, gasPrices, nil
