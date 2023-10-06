@@ -1341,10 +1341,10 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 			value, ok := destCCIP.ReportBlessedWatcher.Load(CommitReport.MerkleRoot)
 			receivedAt := time.Now().UTC()
 			if ok && value != nil {
-				// if the value is processed, delete it from the map
-				destCCIP.ReportBlessedWatcher.Delete(CommitReport.MerkleRoot)
 				vLogs, exists := value.(*types.Log)
 				if exists {
+					// if the value is processed, delete it from the map
+					destCCIP.ReportBlessedWatcher.Delete(CommitReport.MerkleRoot)
 					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
 					if err == nil {
 						receivedAt = hdr.Timestamp
