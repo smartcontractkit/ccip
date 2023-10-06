@@ -150,7 +150,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 
 	lggr := c.Lane.Logger.With().Int("msg Number", int(msgSerialNo)).Logger()
 	stats := testreporters.NewCCIPRequestStats(msgSerialNo)
-	defer c.reports.UpdatePhaseStatsForReq(stats)
+	//defer c.reports.UpdatePhaseStatsForReq(stats)
 	// form the message for transfer
 	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
 
