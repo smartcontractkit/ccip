@@ -574,7 +574,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @notice Returns the token transfer fee.
   /// A basis point fee is calculated from the USD value of each token transfer.
   /// For each individual transfer, this fee is between [minFeeUSD, maxFeeUSD].
-  /// Total transfer fee is sum of each individual token transfer fee.
+  /// Total transfer fee is the sum of each individual token transfer fee.
   /// @dev Assumes that tokenAmounts are validated to be listed tokens elsewhere.
   /// @dev Splitting one token transfer into multiple transfers is discouraged,
   /// as it will result in a transferFee equal or greater than the same amount aggregated/de-duped.
