@@ -30,8 +30,4 @@ contract OCR2NoChecksHelper is OCR2BaseNoChecks {
   }
 
   function _report(bytes calldata report) internal override {}
-
-  function typeAndVersion() public pure override returns (string memory) {
-    return "OCR2BaseHelper 1.0.0";
-  }
 }
