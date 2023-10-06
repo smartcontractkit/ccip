@@ -72,6 +72,10 @@ var (
 		},
 	}
 	DONDBResourceProfile = map[string]interface{}{
+		"image": map[string]interface{}{
+			"image":   "postgres",
+			"version": "13.12",
+		},
 		"stateful": true,
 		"capacity": "10Gi",
 		"resources": map[string]interface{}{
