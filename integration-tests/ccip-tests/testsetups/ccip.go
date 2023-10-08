@@ -379,6 +379,24 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	}
 
 	if tType != Smoke {
+		dbMem, _ := utils.GetEnv("CCIP_DB_MEM")
+		dbCPU, _ := utils.GetEnv("CCIP_DB_CPU")
+		if dbCPU == "" {
+			dbCPU = "2"
+		}
+		if dbMem == "" {
+			dbMem = "4Gi"
+		}
+		DONDBResourceProfile["resources"] = map[string]interface{}{
+			"requests": map[string]interface{}{
+				"cpu":    dbCPU,
+				"memory": dbMem,
+			},
+			"limits": map[string]interface{}{
+				"cpu":    dbCPU,
+				"memory": dbMem,
+			},
+		}
 		p.CLNodeDBResourceProfile = DONDBResourceProfile
 	}
 
