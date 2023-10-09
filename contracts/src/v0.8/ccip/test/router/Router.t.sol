@@ -262,9 +262,12 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
 
     // Update the price of the newly set feeToken
-    Internal.PriceUpdates memory priceUpdates = getSinglePriceUpdateStruct(feeTokenWithZeroFeeAndGas, 2_000 ether);
-    setSingleGasPriceUpdate(priceUpdates, DEST_CHAIN_ID, 0);
-
+    Internal.PriceUpdates memory priceUpdates = getSingleTokenAndGasPriceUpdateStruct(
+      feeTokenWithZeroFeeAndGas,
+      2_000 ether,
+      DEST_CHAIN_ID,
+      0
+    );
     s_priceRegistry.updatePrices(priceUpdates);
 
     // Set the feeToken args on the onRamp
