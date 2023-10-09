@@ -21,6 +21,7 @@ const (
 	COMMIT_PRICE_UPDATES = "Commit price updates"
 	FEE_TOKEN_ADDED      = "Fee token added"
 	FEE_TOKEN_REMOVED    = "Fee token removed"
+	ExecPluginLabel      = "exec"
 )
 
 var (
@@ -70,8 +71,7 @@ func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Addr
 	}
 	switch version.String() {
 	case v1_2_0:
-		// TODO: ABI is same now but will break shortly with multigas price updates
-		return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl)
+		return NewPriceRegistryV1_2_0(lggr, priceRegistryAddress, lp, cl)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}

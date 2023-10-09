@@ -23,8 +23,6 @@ var (
 	_ PriceRegistryReader = &PriceRegistryV1_0_0{}
 )
 
-const ExecPluginLabel = "exec"
-
 type PriceRegistryV1_0_0 struct {
 	priceRegistry *observability.ObservedPriceRegistryV1_0_0
 	address       common.Address

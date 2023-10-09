@@ -6,16 +6,16 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_0_0"
 )
 
 type ObservedPriceRegistryV1_0_0 struct {
-	*price_registry.PriceRegistry
+	*price_registry_1_0_0.PriceRegistry
 	metric metricDetails
 }
 
 func NewObservedPriceRegistryV1_0_0(address common.Address, pluginName string, client client.Client) (*ObservedPriceRegistryV1_0_0, error) {
-	priceRegistry, err := price_registry.NewPriceRegistry(address, client)
+	priceRegistry, err := price_registry_1_0_0.NewPriceRegistry(address, client)
 	if err != nil {
 		return nil, err
 	}
@@ -36,20 +36,20 @@ func (o *ObservedPriceRegistryV1_0_0) GetFeeTokens(opts *bind.CallOpts) ([]commo
 	})
 }
 
-func (o *ObservedPriceRegistryV1_0_0) GetTokenPrices(opts *bind.CallOpts, tokens []common.Address) ([]price_registry.InternalTimestampedPackedUint224, error) {
-	return withObservedContract(o.metric, "GetTokenPrices", func() ([]price_registry.InternalTimestampedPackedUint224, error) {
+func (o *ObservedPriceRegistryV1_0_0) GetTokenPrices(opts *bind.CallOpts, tokens []common.Address) ([]price_registry_1_0_0.InternalTimestampedUint192Value, error) {
+	return withObservedContract(o.metric, "GetTokenPrices", func() ([]price_registry_1_0_0.InternalTimestampedUint192Value, error) {
 		return o.PriceRegistry.GetTokenPrices(opts, tokens)
 	})
 }
 
-func (o *ObservedPriceRegistryV1_0_0) ParseUsdPerUnitGasUpdated(log types.Log) (*price_registry.PriceRegistryUsdPerUnitGasUpdated, error) {
-	return withObservedContract(o.metric, "ParseUsdPerUnitGasUpdated", func() (*price_registry.PriceRegistryUsdPerUnitGasUpdated, error) {
+func (o *ObservedPriceRegistryV1_0_0) ParseUsdPerUnitGasUpdated(log types.Log) (*price_registry_1_0_0.PriceRegistryUsdPerUnitGasUpdated, error) {
+	return withObservedContract(o.metric, "ParseUsdPerUnitGasUpdated", func() (*price_registry_1_0_0.PriceRegistryUsdPerUnitGasUpdated, error) {
 		return o.PriceRegistry.ParseUsdPerUnitGasUpdated(log)
 	})
 }
 
-func (o *ObservedPriceRegistryV1_0_0) ParseUsdPerTokenUpdated(log types.Log) (*price_registry.PriceRegistryUsdPerTokenUpdated, error) {
-	return withObservedContract(o.metric, "ParseUsdPerTokenUpdated", func() (*price_registry.PriceRegistryUsdPerTokenUpdated, error) {
+func (o *ObservedPriceRegistryV1_0_0) ParseUsdPerTokenUpdated(log types.Log) (*price_registry_1_0_0.PriceRegistryUsdPerTokenUpdated, error) {
+	return withObservedContract(o.metric, "ParseUsdPerTokenUpdated", func() (*price_registry_1_0_0.PriceRegistryUsdPerTokenUpdated, error) {
 		return o.PriceRegistry.ParseUsdPerTokenUpdated(log)
 	})
 }
