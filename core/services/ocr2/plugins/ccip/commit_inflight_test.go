@@ -90,7 +90,7 @@ func TestCommitInflight(t *testing.T) {
 				Value: big.NewInt(10),
 			},
 		},
-		GasPrices: []ccipdata.GasPrice{{}},
+		GasPrices: []ccipdata.GasPrice{},
 	}, epochAndRound))
 	// Apply cache price to existing
 	latestInflightTokenPriceUpdates := c.latestInflightTokenPriceUpdates()
@@ -118,7 +118,7 @@ func TestCommitInflight(t *testing.T) {
 	assert.Equal(t, 3, len(inflightGasUpdates))
 	assert.Equal(t, big.NewInt(999), inflightGasUpdates[123].value)
 	assert.Equal(t, big.NewInt(888), inflightGasUpdates[321].value)
-	assert.Equal(t, big.NewInt(1), inflightGasUpdates[999].value)
+	assert.Equal(t, big.NewInt(999), inflightGasUpdates[1].value)
 }
 
 func Test_inflightCommitReportsContainer_expire(t *testing.T) {
