@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-func TestCommitReportEncodingV1_0_0(t *testing.T) {
+func TestCommitReportEncodingV_1_2_0(t *testing.T) {
 	report := CommitStoreReport{
 		TokenPrices: []TokenPrice{
 			{
@@ -35,7 +35,7 @@ func TestCommitReportEncodingV1_0_0(t *testing.T) {
 	lp := mocks.NewLogPoller(t)
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
 
-	c, err := NewCommitStoreV1_0_0(logger.TestLogger(t), randomAddress(), nil, lp, nil)
+	c, err := NewCommitStoreV1_2_0(logger.TestLogger(t), randomAddress(), nil, lp, nil)
 	assert.NoError(t, err)
 
 	encodedReport, err := c.EncodeCommitReport(report)
@@ -44,6 +44,5 @@ func TestCommitReportEncodingV1_0_0(t *testing.T) {
 
 	decodedReport, err := c.DecodeCommitReport(encodedReport)
 	require.NoError(t, err)
-	require.Equal(t, report.TokenPrices, decodedReport.TokenPrices)
 	require.Equal(t, report, decodedReport)
 }
