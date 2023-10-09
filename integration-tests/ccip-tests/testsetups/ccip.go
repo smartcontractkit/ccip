@@ -63,12 +63,12 @@ var (
 	}
 	DONResourceProfile = map[string]interface{}{
 		"requests": map[string]interface{}{
-			"cpu":    "4",
-			"memory": "8Gi",
+			"cpu":    "2",
+			"memory": "4Gi",
 		},
 		"limits": map[string]interface{}{
-			"cpu":    "4",
-			"memory": "8Gi",
+			"cpu":    "2",
+			"memory": "4Gi",
 		},
 	}
 	DONDBResourceProfile = map[string]interface{}{
@@ -366,9 +366,36 @@ func (p *CCIPTestConfig) FormNetworkPairCombinations() {
 	}
 }
 
+func SetResourceProfile(defaultcpu, defaultmem, cpu, mem string) map[string]interface{} {
+	if cpu == "" {
+		cpu = defaultcpu
+	}
+	if mem == "" {
+		mem = defaultmem
+	}
+	return map[string]interface{}{
+		"requests": map[string]interface{}{
+			"cpu":    cpu,
+			"memory": mem,
+		},
+		"limits": map[string]interface{}{
+			"cpu":    cpu,
+			"memory": cpu,
+		},
+	}
+}
+
 // NewCCIPTestConfig collects all test related CCIPTestConfig from environment variables
 func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
 	var allError error
+	nodeMem, _ := utils.GetEnv("CCIP_NODE_MEM")
+	nodeCPU, _ := utils.GetEnv("CCIP_NODE_CPU")
+	DONResourceProfile["resources"] = SetResourceProfile("2", "4Gi", nodeCPU, nodeMem)
+
+	dbMem, _ := utils.GetEnv("CCIP_DB_MEM")
+	dbCPU, _ := utils.GetEnv("CCIP_DB_CPU")
+	DONDBResourceProfile["resources"] = SetResourceProfile("2", "4Gi", dbCPU, dbMem)
+
 	p := &CCIPTestConfig{
 		Test:                t,
 		MsgType:             actions.TokenTransfer,
@@ -379,24 +406,6 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	}
 
 	if tType != Smoke {
-		dbMem, _ := utils.GetEnv("CCIP_DB_MEM")
-		dbCPU, _ := utils.GetEnv("CCIP_DB_CPU")
-		if dbCPU == "" {
-			dbCPU = "2"
-		}
-		if dbMem == "" {
-			dbMem = "4Gi"
-		}
-		DONDBResourceProfile["resources"] = map[string]interface{}{
-			"requests": map[string]interface{}{
-				"cpu":    dbCPU,
-				"memory": dbMem,
-			},
-			"limits": map[string]interface{}{
-				"cpu":    dbCPU,
-				"memory": dbMem,
-			},
-		}
 		p.CLNodeDBResourceProfile = DONDBResourceProfile
 	}
 
