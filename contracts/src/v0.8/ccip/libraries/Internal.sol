@@ -17,8 +17,8 @@ library Internal {
   }
 
   struct GasPriceUpdate {
-    uint64 destChainSelector; // ──╮ Destination chain selector
-    uint224 usdPerUnitGas; // ─────╯ 1e18 USD per smallest unit (e.g. wei) of destination chain gas
+    uint64 destChainSelector; // Destination chain selector
+    uint224 usdPerUnitGas; // 1e18 USD per smallest unit (e.g. wei) of destination chain gas
   }
 
   struct TimestampedPackedUint224 {
