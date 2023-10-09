@@ -35,8 +35,8 @@ const (
 
 var (
 	_                                OffRampReader = &OffRampV1_0_0{}
-	ExecutionStateChangedEventV1_0_0               = abihelpers.MustGetEventID("ExecutionStateChanged", abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI))
-	ExecutionStateChangedSeqNrV1_0_0               = 1
+	ExecutionStateChangedEventV1_0_0      = abihelpers.MustGetEventID("ExecutionStateChanged", abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI))
+	ExecutionStateChangedSeqNrIndexV1_0_0 = 1
 )
 
 type OffRampV1_0_0 struct {

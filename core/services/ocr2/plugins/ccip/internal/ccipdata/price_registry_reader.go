@@ -64,7 +64,6 @@ type PriceRegistryReader interface {
 func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Address, lp logpoller.LogPoller, cl client.Client) (PriceRegistryReader, error) {
 	_, version, err := ccipconfig.TypeAndVersion(priceRegistryAddress, cl)
 	if err != nil {
-		// TODO: would this always through a method not found?
 		// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it errors
 		// its v1.
 		return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl)
