@@ -380,7 +380,7 @@ func SetResourceProfile(defaultcpu, defaultmem, cpu, mem string) map[string]inte
 		},
 		"limits": map[string]interface{}{
 			"cpu":    cpu,
-			"memory": cpu,
+			"memory": mem,
 		},
 	}
 }
