@@ -38,8 +38,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	ccipConfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -654,7 +652,9 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			})
 			tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 				Token:             token.ContractAddress,
-				Ratio:             5_0, // 5 bps
+				MinFeeUSD:         50,           // $0.5
+				MaxFeeUSD:         1_000_000_00, // $ 1 million
+				Ratio:             5_0,          // 5 bps
 				DestGasOverhead:   34_000,
 				DestBytesOverhead: 0,
 			})
@@ -675,22 +675,18 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			sourceCCIP.Common.RateLimiterConfig,
 			[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 				{
-					Token:                  common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
-					NetworkFeeUSD:          1_00,
-					MinTokenTransferFeeUSD: 1_00,
-					MaxTokenTransferFeeUSD: 5000_00,
-					GasMultiplier:          GasFeeMultiplier,
-					PremiumMultiplier:      1e18,
-					Enabled:                true,
+					Token:             common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+					NetworkFeeUSD:     1_00,
+					GasMultiplier:     GasFeeMultiplier,
+					PremiumMultiplier: 1e18,
+					Enabled:           true,
 				},
 				{
-					Token:                  sourceCCIP.Common.WrappedNative,
-					NetworkFeeUSD:          1_00,
-					MinTokenTransferFeeUSD: 1_00,
-					MaxTokenTransferFeeUSD: 5000_00,
-					GasMultiplier:          GasFeeMultiplier,
-					PremiumMultiplier:      1e18,
-					Enabled:                true,
+					Token:             sourceCCIP.Common.WrappedNative,
+					NetworkFeeUSD:     1_00,
+					GasMultiplier:     GasFeeMultiplier,
+					PremiumMultiplier: 1e18,
+					Enabled:           true,
 				},
 			},
 			tokenTransferFeeConfig,
@@ -1240,7 +1236,7 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 				if err != nil {
 					lggr.Warn().Msg("Failed to get receipt for ExecStateChanged event")
 				}
-				if abihelpers.MessageExecutionState(e.State) == abihelpers.ExecutionStateSuccess {
+				if testhelpers.MessageExecutionState(e.State) == testhelpers.ExecutionStateSuccess {
 					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow),
 						testreporters.Success,
 						testreporters.TransactionStats{
@@ -1948,19 +1944,19 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		rootSnooze = models.MustMakeDuration(RootSnoozeTimeSimulated)
 		inflightExpiry = models.MustMakeDuration(InflightExpirySimulated)
 	}
-	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2Config(commitNodes, ccipConfig.CommitOffchainConfig{
-		SourceFinalityDepth:      1,
-		DestFinalityDepth:        1,
-		GasPriceHeartBeat:        models.MustMakeDuration(10 * time.Second), // reduce the heartbeat to 10 sec for faster fee updates
-		DAGasPriceDeviationPPB:   1e6,
-		ExecGasPriceDeviationPPB: 1e6,
-		TokenPriceHeartBeat:      models.MustMakeDuration(10 * time.Second),
-		TokenPriceDeviationPPB:   1e6,
-		MaxGasPrice:              200e9,
-		InflightCacheExpiry:      inflightExpiry,
-	}, ccipConfig.CommitOnchainConfig{
-		PriceRegistry: destCCIP.Common.PriceRegistry.EthAddress,
-	})
+	signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err := contracts.NewOffChainAggregatorV2Config(commitNodes, testhelpers.NewCommitOffchainConfig(
+		1,
+		1,
+		models.MustMakeDuration(10*time.Second), // reduce the heartbeat to 10 sec for faster fee updates
+		1e6,
+		1e6,
+		models.MustMakeDuration(10*time.Second),
+		1e6,
+		200e9,
+		inflightExpiry,
+	), testhelpers.NewCommitOnchainConfig(
+		destCCIP.Common.PriceRegistry.EthAddress,
+	))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -1976,23 +1972,22 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 		nodes = execNodes
 	}
 	if destCCIP.OffRamp != nil {
-		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2Config(nodes, ccipConfig.ExecOffchainConfig{
-			SourceFinalityDepth:         1,
-			DestOptimisticConfirmations: 1,
-			DestFinalityDepth:           1,
-			BatchGasLimit:               5_000_000,
-			RelativeBoostPerWaitHour:    0.7,
-			MaxGasPrice:                 200e9,
-			InflightCacheExpiry:         inflightExpiry,
-			RootSnoozeTime:              rootSnooze,
-		}, ccipConfig.ExecOnchainConfig{
-			PermissionLessExecutionThresholdSeconds: 60 * 30,
-			Router:                                  destCCIP.Common.Router.EthAddress,
-			PriceRegistry:                           destCCIP.Common.PriceRegistry.EthAddress,
-			MaxTokensLength:                         5,
-			MaxDataSize:                             50000,
-			MaxPoolGas:                              200_000,
-		})
+		signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig, err = contracts.NewOffChainAggregatorV2Config(nodes, testhelpers.NewExecOffchainConfig(
+			1,
+			1,
+			1,
+			5_000_000,
+			0.7,
+			200e9,
+			inflightExpiry,
+			rootSnooze,
+		), testhelpers.NewExecOnchainConfig(
+			60*30,
+			destCCIP.Common.Router.EthAddress,
+			destCCIP.Common.PriceRegistry.EthAddress,
+			5,
+			50000,
+		))
 		if err != nil {
 			return errors.WithStack(err)
 		}
