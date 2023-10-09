@@ -1,4 +1,4 @@
-package ccip
+package commitplugin
 
 import (
 	"context"
@@ -14,13 +14,12 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
@@ -31,12 +30,59 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-type BackfillArgs struct {
-	sourceLP, destLP                 logpoller.LogPoller
-	sourceStartBlock, destStartBlock int64
+const Label = "commit"
+
+func InitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
+	if err != nil {
+		return nil, err
+	}
+	wrappedPluginFactory := newFactory(*pluginConfig)
+
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, pluginConfig.destChainEVMID)
+	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
+	oracle, err := libocr2.NewOracle(argsNoPlugin)
+	if err != nil {
+		return nil, err
+	}
+	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+	if new {
+		return []job.ServiceCtx{oraclelib.NewBackfilledOracle(
+			pluginConfig.lggr,
+			backfillArgs.SourceLP,
+			backfillArgs.DestLP,
+			backfillArgs.SourceStartBlock,
+			backfillArgs.DestStartBlock,
+			job.NewServiceAdapter(oracle)),
+		}, nil
+	}
+	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *BackfillArgs, error) {
+func ReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
+	return ccipdata.CommitReportToEthTxMeta(typ, ver)
+}
+
+// UnregisterLpFilters unregisters all the registered filters for both source and dest chains.
+// NOTE: The transaction MUST be used here for CLO's monster tx to function as expected
+// https://github.com/smartcontractkit/ccip/blob/68e2197472fb017dd4e5630d21e7878d58bc2a44/core/services/feeds/service.go#L716
+// TODO once that transaction is broken up, we should be able to simply rely on oracle.Close() to cleanup the filters.
+// Until then we have to deterministically reload the readers from the spec (and thus their filters) and close them.
+func UnregisterLpFilters(_ context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
+	commitPluginConfig, _, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet)
+	if err != nil {
+		return errors.New("spec is nil")
+	}
+	if err := commitPluginConfig.onRampReader.Close(qopts...); err != nil {
+		return err
+	}
+	if err := commitPluginConfig.commitStore.Close(qopts...); err != nil {
+		return err
+	}
+	return commitPluginConfig.offRamp.Close(qopts...)
+}
+
+func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) (*StaticConfig, *oraclelib.BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, nil, errors.New("spec is nil")
 	}
@@ -55,7 +101,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "get chainset")
 	}
-	commitStore, _, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), CommitPluginLabel, destChain.Client())
+	commitStore, _, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), Label, destChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading commitStore")
 	}
@@ -72,8 +118,8 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, errors.Wrap(err, "unable to open source chain")
 	}
 	commitLggr := lggr.Named("CCIPCommit").With(
-		"sourceChain", ChainName(int64(chainId)),
-		"destChain", ChainName(destChainID))
+		"sourceChain", ccip.ChainName(int64(chainId)),
+		"destChain", ccip.ChainName(destChainID))
 	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
 		return nil, nil, err
@@ -112,7 +158,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		//"dynamicOnRampConfig", dynamicOnRampConfig,
 		"sourceNative", sourceNative,
 		"sourceRouter", sourceRouter.Address())
-	return &CommitPluginStaticConfig{
+	return &StaticConfig{
 			lggr:                commitLggr,
 			destLP:              destChain.LogPoller(),
 			onRampReader:        onRampReader,
@@ -122,60 +168,10 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			sourceChainSelector: staticConfig.SourceChainSelector,
 			destClient:          destChain.Client(),
 			commitStore:         commitStoreReader,
-		}, &BackfillArgs{
-			sourceLP:         sourceChain.LogPoller(),
-			destLP:           destChain.LogPoller(),
-			sourceStartBlock: pluginConfig.SourceStartBlock,
-			destStartBlock:   pluginConfig.DestStartBlock,
+		}, &oraclelib.BackfillArgs{
+			SourceLP:         sourceChain.LogPoller(),
+			DestLP:           destChain.LogPoller(),
+			SourceStartBlock: pluginConfig.SourceStartBlock,
+			DestStartBlock:   pluginConfig.DestStartBlock,
 		}, nil
-}
-
-func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
-	if err != nil {
-		return nil, err
-	}
-	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
-
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, pluginConfig.destChainEVMID)
-	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
-	oracle, err := libocr2.NewOracle(argsNoPlugin)
-	if err != nil {
-		return nil, err
-	}
-	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
-	if new {
-		return []job.ServiceCtx{oraclelib.NewBackfilledOracle(
-			pluginConfig.lggr,
-			backfillArgs.sourceLP,
-			backfillArgs.destLP,
-			backfillArgs.sourceStartBlock,
-			backfillArgs.destStartBlock,
-			job.NewServiceAdapter(oracle)),
-		}, nil
-	}
-	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
-}
-
-func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
-	return ccipdata.CommitReportToEthTxMeta(typ, ver)
-}
-
-// UnregisterCommitPluginLpFilters unregisters all the registered filters for both source and dest chains.
-// NOTE: The transaction MUST be used here for CLO's monster tx to function as expected
-// https://github.com/smartcontractkit/ccip/blob/68e2197472fb017dd4e5630d21e7878d58bc2a44/core/services/feeds/service.go#L716
-// TODO once that transaction is broken up, we should be able to simply rely on oracle.Close() to cleanup the filters.
-// Until then we have to deterministically reload the readers from the spec (and thus their filters) and close them.
-func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	commitPluginConfig, _, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet)
-	if err != nil {
-		return errors.New("spec is nil")
-	}
-	if err := commitPluginConfig.onRampReader.Close(qopts...); err != nil {
-		return err
-	}
-	if err := commitPluginConfig.commitStore.Close(qopts...); err != nil {
-		return err
-	}
-	return commitPluginConfig.offRamp.Close(qopts...)
 }

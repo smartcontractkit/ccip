@@ -7,8 +7,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/commitplugin"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/executionplugin"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 
@@ -41,7 +42,7 @@ func NewCCIPCommitProvider(lggr logger.Logger, chainSet evm.Chain, rargs relayty
 	if err != nil {
 		return nil, err
 	}
-	fn, err := ccip.CommitReportToEthTxMeta(typ, ver)
+	fn, err := commitplugin.ReportToEthTxMeta(typ, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +79,7 @@ func NewCCIPExecutionProvider(lggr logger.Logger, chainSet evm.Chain, rargs rela
 	if err != nil {
 		return nil, err
 	}
-	fn, err := ccip.ExecReportToEthTxMeta(typ, ver)
+	fn, err := executionplugin.ReportToEthTxMeta(typ, ver)
 	if err != nil {
 		return nil, err
 	}

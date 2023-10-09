@@ -1,4 +1,4 @@
-package ccip
+package executionplugin
 
 import (
 	"context"
@@ -15,13 +15,13 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
@@ -32,120 +32,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-// TODO pass context?
-func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer) (*ExecutionPluginStaticConfig, *BackfillArgs, error) {
-	if jb.OCR2OracleSpec == nil {
-		return nil, nil, errors.New("spec is nil")
-	}
-	spec := jb.OCR2OracleSpec
-	var pluginConfig ccipconfig.ExecutionPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
-	if err != nil {
-		return nil, nil, err
-	}
-	chainIDInterface, ok := spec.RelayConfig["chainID"]
-	if !ok {
-		return nil, nil, errors.New("chainID must be provided in relay config")
-	}
-	destChainID := int64(chainIDInterface.(float64))
-	destChain, err := chainSet.Get(strconv.FormatInt(destChainID, 10))
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "get chainset")
-	}
-	offRamp, _, err := contractutil.LoadOffRamp(common.HexToAddress(spec.ContractID), ExecPluginLabel, destChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading offRamp")
-	}
-	offRampConfig, err := offRamp.GetStaticConfig(&bind.CallOpts{})
-	if err != nil {
-		return nil, nil, err
-	}
-	chainId, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
-	if err != nil {
-		return nil, nil, err
-	}
-	sourceChain, err := chainSet.Get(strconv.FormatUint(chainId, 10))
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to open source chain")
-	}
-	onRamp, onRampVersion, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, ExecPluginLabel, sourceChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading onRamp")
-	}
-	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, onRampVersion, sourceChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading onRamp config")
-	}
-	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading source router")
-	}
-	sourceWrappedNative, err := sourceRouter.GetWrappedNative(&bind.CallOpts{})
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not get source native token")
-	}
-	execLggr := lggr.Named("CCIPExecution").With(
-		"sourceChain", ChainName(int64(chainId)),
-		"destChain", ChainName(destChainID))
-	// TODO: we don't support onramp source registry changes without a reboot yet?
-	sourcePriceRegistry, err := ccipdata.NewPriceRegistryReader(lggr, dynamicOnRampConfig.PriceRegistry, sourceChain.LogPoller(), sourceChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load source registry")
-	}
-	offRampReader, err := ccipdata.NewOffRampReader(lggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load offRampReader")
-	}
-	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
-	}
-	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
-		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
-	if err != nil {
-		return nil, nil, err
-	}
-	tokenDataProviders, err := getTokenDataProviders(lggr, pluginConfig, sourceChain.LogPoller())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not get token data providers")
-	}
-	execLggr.Infow("Initialized exec plugin",
-		"pluginConfig", pluginConfig,
-		"onRampAddress", onRamp.Address(),
-		"sourcePriceRegistry", sourcePriceRegistry.Address(),
-		"dynamicOnRampConfig", dynamicOnRampConfig,
-		"sourceNative", sourceWrappedNative,
-		"sourceRouter", sourceRouter.Address())
-	return &ExecutionPluginStaticConfig{
-			lggr:                     execLggr,
-			sourceLP:                 sourceChain.LogPoller(),
-			destLP:                   destChain.LogPoller(),
-			onRampReader:             onRampReader,
-			destReader:               ccipdata.NewLogPollerReader(destChain.LogPoller(), execLggr, destChain.Client()),
-			offRamp:                  offRamp,
-			commitStoreReader:        commitStoreReader,
-			offRampReader:            offRampReader,
-			sourcePriceRegistry:      sourcePriceRegistry,
-			sourceWrappedNativeToken: sourceWrappedNative,
-			destClient:               destChain.Client(),
-			sourceClient:             sourceChain.Client(),
-			destGasEstimator:         destChain.GasEstimator(),
-			destChainEVMID:           destChain.ID(),
-			tokenDataProviders:       tokenDataProviders,
-		}, &BackfillArgs{
-			sourceLP:         sourceChain.LogPoller(),
-			destLP:           destChain.LogPoller(),
-			sourceStartBlock: pluginConfig.SourceStartBlock,
-			destStartBlock:   pluginConfig.DestStartBlock,
-		}, nil
-}
+const Label = "exec"
 
-func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+func InitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(lggr, jb, chainSet)
 	if err != nil {
 		return nil, err
 	}
-	wrappedPluginFactory := NewExecutionReportingPluginFactory(*execPluginConfig)
+	wrappedPluginFactory := newFactory(*execPluginConfig)
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, execPluginConfig.destChainEVMID)
 	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(execPluginConfig.lggr, true, logError)
@@ -158,14 +52,41 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 		return []job.ServiceCtx{
 			oraclelib.NewBackfilledOracle(
 				execPluginConfig.lggr,
-				backfillArgs.sourceLP,
-				backfillArgs.destLP,
-				backfillArgs.sourceStartBlock,
-				backfillArgs.destStartBlock,
+				backfillArgs.SourceLP,
+				backfillArgs.DestLP,
+				backfillArgs.SourceStartBlock,
+				backfillArgs.DestStartBlock,
 				job.NewServiceAdapter(oracle)),
 		}, nil
 	}
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+}
+
+// UnregisterLpFilters unregisters all the registered filters for both source and dest chains.
+// See comment in UnregisterCommitPluginLpFilters
+func UnregisterLpFilters(_ context.Context, lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
+	execPluginConfig, _, err := jobSpecToExecPluginConfig(lggr, jb, chainSet)
+	if err != nil {
+		return err
+	}
+	if err := execPluginConfig.onRampReader.Close(qopts...); err != nil {
+		return err
+	}
+	for _, tokenReader := range execPluginConfig.tokenDataProviders {
+		if err := tokenReader.Close(qopts...); err != nil {
+			return err
+		}
+	}
+	if err := execPluginConfig.offRampReader.Close(qopts...); err != nil {
+		return err
+	}
+	return execPluginConfig.commitStoreReader.Close(qopts...)
+}
+
+// ReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
+// Only MessageIDs will be populated in the TxMeta.
+func ReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
+	return ccipdata.ExecReportToEthTxMeta(typ, ver)
 }
 
 func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller) (map[common.Address]tokendata.Reader, error) {
@@ -199,29 +120,110 @@ func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Execution
 	return tokenDataProviders, nil
 }
 
-// UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
-// See comment in UnregisterCommitPluginLpFilters
-func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	execPluginConfig, _, err := jobSpecToExecPluginConfig(lggr, jb, chainSet)
+// TODO pass context?
+func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer) (*StaticConfig, *oraclelib.BackfillArgs, error) {
+	if jb.OCR2OracleSpec == nil {
+		return nil, nil, errors.New("spec is nil")
+	}
+	spec := jb.OCR2OracleSpec
+	var pluginConfig ccipconfig.ExecutionPluginJobSpecConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	if err := execPluginConfig.onRampReader.Close(qopts...); err != nil {
-		return err
+	chainIDInterface, ok := spec.RelayConfig["chainID"]
+	if !ok {
+		return nil, nil, errors.New("chainID must be provided in relay config")
 	}
-	for _, tokenReader := range execPluginConfig.tokenDataProviders {
-		if err := tokenReader.Close(qopts...); err != nil {
-			return err
-		}
+	destChainID := int64(chainIDInterface.(float64))
+	destChain, err := chainSet.Get(strconv.FormatInt(destChainID, 10))
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "get chainset")
 	}
-	if err := execPluginConfig.offRampReader.Close(qopts...); err != nil {
-		return err
+	offRamp, _, err := contractutil.LoadOffRamp(common.HexToAddress(spec.ContractID), Label, destChain.Client())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed loading offRamp")
 	}
-	return execPluginConfig.commitStoreReader.Close(qopts...)
-}
-
-// ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
-// Only MessageIDs will be populated in the TxMeta.
-func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
-	return ccipdata.ExecReportToEthTxMeta(typ, ver)
+	offRampConfig, err := offRamp.GetStaticConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, nil, err
+	}
+	chainId, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
+	if err != nil {
+		return nil, nil, err
+	}
+	sourceChain, err := chainSet.Get(strconv.FormatUint(chainId, 10))
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to open source chain")
+	}
+	onRamp, onRampVersion, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, Label, sourceChain.Client())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed loading onRamp")
+	}
+	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, onRampVersion, sourceChain.Client())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed loading onRamp config")
+	}
+	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed loading source router")
+	}
+	sourceWrappedNative, err := sourceRouter.GetWrappedNative(&bind.CallOpts{})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not get source native token")
+	}
+	execLggr := lggr.Named("CCIPExecution").With(
+		"sourceChain", ccip.ChainName(int64(chainId)),
+		"destChain", ccip.ChainName(destChainID))
+	// TODO: we don't support onramp source registry changes without a reboot yet?
+	sourcePriceRegistry, err := ccipdata.NewPriceRegistryReader(lggr, dynamicOnRampConfig.PriceRegistry, sourceChain.LogPoller(), sourceChain.Client())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not load source registry")
+	}
+	offRampReader, err := ccipdata.NewOffRampReader(lggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not load offRampReader")
+	}
+	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
+	}
+	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
+		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
+	if err != nil {
+		return nil, nil, err
+	}
+	tokenDataProviders, err := getTokenDataProviders(lggr, pluginConfig, sourceChain.LogPoller())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not get token data providers")
+	}
+	execLggr.Infow("Initialized exec plugin",
+		"pluginConfig", pluginConfig,
+		"onRampAddress", onRamp.Address(),
+		"sourcePriceRegistry", sourcePriceRegistry.Address(),
+		"dynamicOnRampConfig", dynamicOnRampConfig,
+		"sourceNative", sourceWrappedNative,
+		"sourceRouter", sourceRouter.Address())
+	return &StaticConfig{
+			lggr:                     execLggr,
+			sourceLP:                 sourceChain.LogPoller(),
+			destLP:                   destChain.LogPoller(),
+			onRampReader:             onRampReader,
+			destReader:               ccipdata.NewLogPollerReader(destChain.LogPoller(), execLggr, destChain.Client()),
+			offRamp:                  offRamp,
+			commitStoreReader:        commitStoreReader,
+			offRampReader:            offRampReader,
+			sourcePriceRegistry:      sourcePriceRegistry,
+			sourceWrappedNativeToken: sourceWrappedNative,
+			destClient:               destChain.Client(),
+			sourceClient:             sourceChain.Client(),
+			destGasEstimator:         destChain.GasEstimator(),
+			destChainEVMID:           destChain.ID(),
+			tokenDataProviders:       tokenDataProviders,
+		}, &oraclelib.BackfillArgs{
+			SourceLP:         sourceChain.LogPoller(),
+			DestLP:           destChain.LogPoller(),
+			SourceStartBlock: pluginConfig.SourceStartBlock,
+			DestStartBlock:   pluginConfig.DestStartBlock,
+		}, nil
 }

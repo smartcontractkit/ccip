@@ -13,6 +13,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
+type BackfillArgs struct {
+	SourceLP, DestLP                 logpoller.LogPoller
+	SourceStartBlock, DestStartBlock int64
+}
+
 type BackfilledOracle struct {
 	srcStartBlock, dstStartBlock int64
 	oracleStarted                atomic.Bool

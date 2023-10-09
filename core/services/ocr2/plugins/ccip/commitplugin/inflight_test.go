@@ -1,4 +1,4 @@
-package ccip
+package commitplugin
 
 import (
 	"math/big"
@@ -20,7 +20,7 @@ func TestCommitInflight(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	c := newInflightCommitReportsContainer(time.Hour)
 
-	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
+	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, inflightPriceUpdate{
 		gasPrices:     []ccipdata.GasPrice{},
 		createdAt:     time.Now(),
 		epochAndRound: ccipcalc.MergeEpochAndRound(2, 4),
@@ -96,7 +96,7 @@ func TestCommitInflight(t *testing.T) {
 	assert.Equal(t, big.NewInt(10), latestInflightTokenPriceUpdates[token].value)
 
 	// larger epoch and round overrides existing price update
-	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
+	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, inflightPriceUpdate{
 		tokenPrices: []ccipdata.TokenPrice{
 			{Token: token, Value: big.NewInt(9999)},
 		},
@@ -117,7 +117,7 @@ func TestCommitInflight(t *testing.T) {
 func Test_inflightCommitReportsContainer_expire(t *testing.T) {
 	c := &inflightCommitReportsContainer{
 		cacheExpiry: time.Minute,
-		inFlight: map[[32]byte]InflightCommitReport{
+		inFlight: map[[32]byte]inflightReport{
 			common.HexToHash("1"): {
 				report:    ccipdata.CommitStoreReport{},
 				createdAt: time.Now().Add(-5 * time.Minute),
@@ -127,15 +127,15 @@ func Test_inflightCommitReportsContainer_expire(t *testing.T) {
 				createdAt: time.Now().Add(-10 * time.Second),
 			},
 		},
-		inFlightPriceUpdates: []InflightPriceUpdate{
+		inFlightPriceUpdates: []inflightPriceUpdate{
 			{
 				gasPrices:     []ccipdata.GasPrice{{DestChainSelector: 100, Value: big.NewInt(0)}},
-				createdAt:     time.Now().Add(-PRICE_EXPIRY_MULTIPLIER * time.Minute),
+				createdAt:     time.Now().Add(-priceExpiryMultiplier * time.Minute),
 				epochAndRound: ccipcalc.MergeEpochAndRound(10, 5),
 			},
 			{
 				gasPrices:     []ccipdata.GasPrice{{DestChainSelector: 200, Value: big.NewInt(0)}},
-				createdAt:     time.Now().Add(-PRICE_EXPIRY_MULTIPLIER * time.Second),
+				createdAt:     time.Now().Add(-priceExpiryMultiplier * time.Second),
 				epochAndRound: ccipcalc.MergeEpochAndRound(20, 5),
 			},
 		},

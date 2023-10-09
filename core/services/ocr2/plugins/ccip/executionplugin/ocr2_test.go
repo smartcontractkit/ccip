@@ -1,4 +1,4 @@
-package ccip
+package executionplugin
 
 import (
 	"bytes"
@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -42,7 +43,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 	testCases := []struct {
 		name              string
 		commitStorePaused bool
-		inflightReports   []InflightInternalExecutionReport
+		inflightReports   []inflightInternalReport
 		unexpiredReports  []ccipdata.Event[ccipdata.CommitStoreReport]
 		sendRequests      []ccipdata.Event[internal.EVM2EVMMessage]
 		executedSeqNums   []uint64
@@ -60,7 +61,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		{
 			name:              "happy flow",
 			commitStorePaused: false,
-			inflightReports:   []InflightInternalExecutionReport{},
+			inflightReports:   []inflightInternalReport{},
 			unexpiredReports: []ccipdata.Event[ccipdata.CommitStoreReport]{
 				{
 					Data: ccipdata.CommitStoreReport{
@@ -176,7 +177,7 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 		name            string
 		f               int
 		committedSeqNum uint64
-		observations    []ExecutionObservation
+		observations    []ccip.ExecutionObservation
 
 		expectingSomeReport bool
 		expectedReport      ccipdata.ExecReport
@@ -186,9 +187,9 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 			name:            "not enough observations to form consensus",
 			f:               5,
 			committedSeqNum: 5,
-			observations: []ExecutionObservation{
-				{Messages: map[uint64]MsgData{3: {}, 4: {}}},
-				{Messages: map[uint64]MsgData{3: {}, 4: {}}},
+			observations: []ccip.ExecutionObservation{
+				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
+				{Messages: map[uint64]ccip.MsgData{3: {}, 4: {}}},
 			},
 			expectingSomeErr:    false,
 			expectingSomeReport: false,
@@ -197,7 +198,7 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 			name:                "zero observations",
 			f:                   0,
 			committedSeqNum:     5,
-			observations:        []ExecutionObservation{},
+			observations:        []ccip.ExecutionObservation{},
 			expectingSomeErr:    false,
 			expectingSomeReport: false,
 		},
@@ -257,7 +258,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 	mockOffRamp, _ := testhelpers.NewFakeOffRamp(t)
 	plugin := ExecutionReportingPlugin{
-		config: ExecutionPluginStaticConfig{
+		config: StaticConfig{
 			offRamp: mockOffRamp,
 		},
 		lggr:            logger.TestLogger(t),
@@ -308,7 +309,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	mockCommitStore := ccipdata.NewMockCommitStoreReader(t)
 
 	plugin := ExecutionReportingPlugin{
-		config: ExecutionPluginStaticConfig{
+		config: StaticConfig{
 			offRamp:           mockOffRamp,
 			commitStoreReader: mockCommitStore,
 		},
@@ -345,9 +346,9 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	// ensure "naive" full report would be bigger than limit
 	assert.Greater(t, len(encodedReport), MaxExecutionReportLength, "full execution report length")
 
-	observations := make([]ObservedMessage, len(executionReport.Messages))
+	observations := make([]ccip.ObservedMessage, len(executionReport.Messages))
 	for i, msg := range executionReport.Messages {
-		observations[i] = NewObservedMessage(msg.SequenceNumber, executionReport.OffchainTokenData[i])
+		observations[i] = ccip.NewObservedMessage(msg.SequenceNumber, executionReport.OffchainTokenData[i])
 	}
 
 	// ensure that buildReport should cap the built report to fit in MaxExecutionReportLength
@@ -453,29 +454,29 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	var tt = []struct {
 		name                     string
 		reqs                     []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
-		inflight                 []InflightInternalExecutionReport
+		inflight                 []inflightInternalReport
 		tokenLimit, destGasPrice *big.Int
 		srcPrices, dstPrices     map[common.Address]*big.Int
 		offRampNoncesBySender    map[common.Address]uint64
 		destRateLimits           map[common.Address]*big.Int
 		srcToDestTokens          map[common.Address]common.Address
-		expectedSeqNrs           []ObservedMessage
+		expectedSeqNrs           []ccip.ObservedMessage
 	}{
 		{
 			name:                  "single message no tokens",
 			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
-			inflight:              []InflightInternalExecutionReport{},
+			inflight:              []inflightInternalReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
-			expectedSeqNrs:        []ObservedMessage{{SeqNr: uint64(1)}},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(1)}},
 		},
 		{
 			name:                  "executed non finalized messages should be skipped",
 			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
-			inflight:              []InflightInternalExecutionReport{},
+			inflight:              []inflightInternalReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -486,7 +487,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		{
 			name:                  "finalized executed log",
 			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg3},
-			inflight:              []InflightInternalExecutionReport{},
+			inflight:              []inflightInternalReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -497,7 +498,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		{
 			name:                  "dst token price does not exist",
 			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
-			inflight:              []InflightInternalExecutionReport{},
+			inflight:              []inflightInternalReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
@@ -508,7 +509,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		{
 			name:                  "src token price does not exist",
 			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
-			inflight:              []InflightInternalExecutionReport{},
+			inflight:              []inflightInternalReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[common.Address]*big.Int{},
@@ -535,7 +536,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		{
 			name:         "message with tokens is not executed if limit is reached",
 			reqs:         []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg4},
-			inflight:     []InflightInternalExecutionReport{},
+			inflight:     []inflightInternalReport{},
 			tokenLimit:   big.NewInt(2),
 			destGasPrice: big.NewInt(10),
 			srcPrices:    map[common.Address]*big.Int{srcNative: big.NewInt(1e18)},
@@ -549,7 +550,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		{
 			name: "message with tokens is not executed if limit is reached when inflight is full",
 			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg5},
-			inflight: []InflightInternalExecutionReport{
+			inflight: []inflightInternalReport{
 				{
 					createdAt: time.Now(),
 					messages:  []internal.EVM2EVMMessage{msg4.EVM2EVMMessage},
@@ -608,13 +609,13 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 			},
-			inflight:              []InflightInternalExecutionReport{},
+			inflight:              []inflightInternalReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
 			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
 			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
 			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
-			expectedSeqNrs:        []ObservedMessage{{SeqNr: uint64(10)}, {SeqNr: uint64(12)}},
+			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}, {SeqNr: uint64(12)}},
 		},
 	}
 
@@ -629,7 +630,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			}
 
 			plugin := ExecutionReportingPlugin{
-				config: ExecutionPluginStaticConfig{
+				config: StaticConfig{
 					offRamp: offRamp,
 				},
 				destWrappedNative: destNative,
@@ -1136,13 +1137,13 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 
 func Test_calculateObservedMessagesConsensus(t *testing.T) {
 	type args struct {
-		observations []ExecutionObservation
+		observations []ccip.ExecutionObservation
 		f            int
 	}
 	tests := []struct {
 		name string
 		args args
-		want []ObservedMessage
+		want []ccip.ObservedMessage
 	}{
 		{
 			name: "no observations",
@@ -1150,27 +1151,27 @@ func Test_calculateObservedMessagesConsensus(t *testing.T) {
 				observations: nil,
 				f:            0,
 			},
-			want: []ObservedMessage{},
+			want: []ccip.ObservedMessage{},
 		},
 		{
 			name: "common path",
 			args: args{
-				observations: []ExecutionObservation{
+				observations: []ccip.ExecutionObservation{
 					{
-						Messages: map[uint64]MsgData{
+						Messages: map[uint64]ccip.MsgData{
 							1: {TokenData: [][]byte{{0x1}, {0x1}, {0x1}}},
 							2: {TokenData: [][]byte{{0x2}, {0x2}, {0x2}}},
 						},
 					},
 					{
-						Messages: map[uint64]MsgData{
+						Messages: map[uint64]ccip.MsgData{
 							1: {TokenData: [][]byte{{0x1}, {0x1}, {0xff}}}, // different token data - should not be picked
 							2: {TokenData: [][]byte{{0x2}, {0x2}, {0x2}}},
 							3: {TokenData: [][]byte{{0x3}, {0x3}, {0x3}}},
 						},
 					},
 					{
-						Messages: map[uint64]MsgData{
+						Messages: map[uint64]ccip.MsgData{
 							1: {TokenData: [][]byte{{0x1}, {0x1}, {0x1}}},
 							2: {TokenData: [][]byte{{0x2}, {0x2}, {0x2}}},
 						},
@@ -1178,52 +1179,52 @@ func Test_calculateObservedMessagesConsensus(t *testing.T) {
 				},
 				f: 1,
 			},
-			want: []ObservedMessage{
-				{SeqNr: 1, MsgData: MsgData{TokenData: [][]byte{{0x1}, {0x1}, {0x1}}}},
-				{SeqNr: 2, MsgData: MsgData{TokenData: [][]byte{{0x2}, {0x2}, {0x2}}}},
+			want: []ccip.ObservedMessage{
+				{SeqNr: 1, MsgData: ccip.MsgData{TokenData: [][]byte{{0x1}, {0x1}, {0x1}}}},
+				{SeqNr: 2, MsgData: ccip.MsgData{TokenData: [][]byte{{0x2}, {0x2}, {0x2}}}},
 			},
 		},
 		{
 			name: "similar token data",
 			args: args{
-				observations: []ExecutionObservation{
+				observations: []ccip.ExecutionObservation{
 					{
-						Messages: map[uint64]MsgData{
+						Messages: map[uint64]ccip.MsgData{
 							1: {TokenData: [][]byte{{0x1}, {0x1}, {0x1}}},
 						},
 					},
 					{
-						Messages: map[uint64]MsgData{
+						Messages: map[uint64]ccip.MsgData{
 							1: {TokenData: [][]byte{{0x1}, {0x1, 0x1}}},
 						},
 					},
 					{
-						Messages: map[uint64]MsgData{
+						Messages: map[uint64]ccip.MsgData{
 							1: {TokenData: [][]byte{{0x1}, {0x1, 0x1}}},
 						},
 					},
 				},
 				f: 1,
 			},
-			want: []ObservedMessage{
-				{SeqNr: 1, MsgData: MsgData{TokenData: [][]byte{{0x1}, {0x1, 0x1}}}},
+			want: []ccip.ObservedMessage{
+				{SeqNr: 1, MsgData: ccip.MsgData{TokenData: [][]byte{{0x1}, {0x1, 0x1}}}},
 			},
 		},
 		{
 			name: "results should be deterministic",
 			args: args{
-				observations: []ExecutionObservation{
-					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x2}}}}},
-					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x2}}}}},
-					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x1}}}}},
-					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x3}}}}},
-					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x3}}}}},
-					{Messages: map[uint64]MsgData{1: {TokenData: [][]byte{{0x1}}}}},
+				observations: []ccip.ExecutionObservation{
+					{Messages: map[uint64]ccip.MsgData{1: {TokenData: [][]byte{{0x2}}}}},
+					{Messages: map[uint64]ccip.MsgData{1: {TokenData: [][]byte{{0x2}}}}},
+					{Messages: map[uint64]ccip.MsgData{1: {TokenData: [][]byte{{0x1}}}}},
+					{Messages: map[uint64]ccip.MsgData{1: {TokenData: [][]byte{{0x3}}}}},
+					{Messages: map[uint64]ccip.MsgData{1: {TokenData: [][]byte{{0x3}}}}},
+					{Messages: map[uint64]ccip.MsgData{1: {TokenData: [][]byte{{0x1}}}}},
 				},
 				f: 1,
 			},
-			want: []ObservedMessage{
-				{SeqNr: 1, MsgData: MsgData{TokenData: [][]byte{{0x1}}}},
+			want: []ccip.ObservedMessage{
+				{SeqNr: 1, MsgData: ccip.MsgData{TokenData: [][]byte{{0x1}}}},
 			},
 		},
 	}
@@ -1401,7 +1402,7 @@ func Test_inflightAggregates(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		inflight        []InflightInternalExecutionReport
+		inflight        []inflightInternalReport
 		destTokenPrices map[common.Address]*big.Int
 		sourceToDest    map[common.Address]common.Address
 
@@ -1413,7 +1414,7 @@ func Test_inflightAggregates(t *testing.T) {
 	}{
 		{
 			name: "base",
-			inflight: []InflightInternalExecutionReport{
+			inflight: []inflightInternalReport{
 				{
 					messages: []internal.EVM2EVMMessage{
 						{
@@ -1462,7 +1463,7 @@ func Test_inflightAggregates(t *testing.T) {
 		},
 		{
 			name: "missing price",
-			inflight: []InflightInternalExecutionReport{
+			inflight: []inflightInternalReport{
 				{
 					messages: []internal.EVM2EVMMessage{
 						{
@@ -1486,7 +1487,7 @@ func Test_inflightAggregates(t *testing.T) {
 		},
 		{
 			name:                       "nothing inflight",
-			inflight:                   []InflightInternalExecutionReport{},
+			inflight:                   []inflightInternalReport{},
 			expInflightSeqNrs:          map[uint64]struct{}{},
 			expInflightAggrVal:         big.NewInt(0),
 			expMaxInflightSenderNonces: map[common.Address]uint64{},

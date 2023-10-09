@@ -1,4 +1,4 @@
-package ccip
+package commitplugin
 
 import (
 	"context"
@@ -68,7 +68,7 @@ func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
 				}
 			}
 
-			err := UnregisterCommitPluginLpFilters(context.Background(), lggr, job.Job{OCR2OracleSpec: tc.spec}, prMock, chainSet)
+			err := UnregisterLpFilters(context.Background(), lggr, job.Job{OCR2OracleSpec: tc.spec}, prMock, chainSet)
 			if tc.expectingErr {
 				assert.Error(t, err)
 			} else {

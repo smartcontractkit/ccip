@@ -1,4 +1,4 @@
-package ccip
+package executionplugin
 
 import (
 	"sync"
@@ -12,7 +12,7 @@ import (
 
 // InflightInternalExecutionReport serves the same purpose as InflightCommitReport
 // see the comment on that struct for context.
-type InflightInternalExecutionReport struct {
+type inflightInternalReport struct {
 	createdAt time.Time
 	messages  []internal.EVM2EVMMessage
 }
@@ -20,36 +20,36 @@ type InflightInternalExecutionReport struct {
 // inflightExecReportsContainer holds existing inflight reports.
 // it provides a thread-safe access as it is called from multiple goroutines,
 // e.g. reporting and transmission protocols.
-type inflightExecReportsContainer struct {
+type inflightReportsContainer struct {
 	locker  sync.RWMutex
-	reports []InflightInternalExecutionReport
+	reports []inflightInternalReport
 
 	cacheExpiry time.Duration
 }
 
-func newInflightExecReportsContainer(inflightCacheExpiry time.Duration) *inflightExecReportsContainer {
-	return &inflightExecReportsContainer{
+func newInflightExecReportsContainer(inflightCacheExpiry time.Duration) *inflightReportsContainer {
+	return &inflightReportsContainer{
 		locker:      sync.RWMutex{},
-		reports:     make([]InflightInternalExecutionReport, 0),
+		reports:     make([]inflightInternalReport, 0),
 		cacheExpiry: inflightCacheExpiry,
 	}
 }
 
-func (container *inflightExecReportsContainer) getAll() []InflightInternalExecutionReport {
+func (container *inflightReportsContainer) getAll() []inflightInternalReport {
 	container.locker.RLock()
 	defer container.locker.RUnlock()
 
-	reports := make([]InflightInternalExecutionReport, len(container.reports))
+	reports := make([]inflightInternalReport, len(container.reports))
 	copy(reports[:], container.reports[:])
 
 	return reports
 }
 
-func (container *inflightExecReportsContainer) expire(lggr logger.Logger) {
+func (container *inflightReportsContainer) expire(lggr logger.Logger) {
 	container.locker.Lock()
 	defer container.locker.Unlock()
 	// Reap old inflight txs and check if any messages in the report are inflight.
-	var stillInFlight []InflightInternalExecutionReport
+	var stillInFlight []inflightInternalReport
 	for _, report := range container.reports {
 		if time.Since(report.createdAt) > container.cacheExpiry {
 			// Happy path: inflight report was successfully transmitted onchain, we remove it from inflight and onchain state reflects inflight.
@@ -62,7 +62,7 @@ func (container *inflightExecReportsContainer) expire(lggr logger.Logger) {
 	container.reports = stillInFlight
 }
 
-func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages []internal.EVM2EVMMessage) error {
+func (container *inflightReportsContainer) add(lggr logger.Logger, messages []internal.EVM2EVMMessage) error {
 	container.locker.Lock()
 	defer container.locker.Unlock()
 
@@ -74,7 +74,7 @@ func (container *inflightExecReportsContainer) add(lggr logger.Logger, messages 
 
 	// Otherwise not already in flight, add it.
 	lggr.Info("Inflight report added")
-	container.reports = append(container.reports, InflightInternalExecutionReport{
+	container.reports = append(container.reports, inflightInternalReport{
 		createdAt: time.Now(),
 		messages:  messages,
 	})

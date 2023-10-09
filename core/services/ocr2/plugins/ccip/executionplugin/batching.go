@@ -1,10 +1,11 @@
-package ccip
+package executionplugin
 
 import (
 	"context"
 
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -37,12 +38,11 @@ func getProofData(
 	return sendReqs, leaves, tree, nil
 }
 
-func buildExecutionReportForMessages(
+func buildReportFromMessages(
 	msgsInRoot []ccipdata.Event[internal.EVM2EVMMessage],
-	leaves [][32]byte,
 	tree *merklemulti.Tree[[32]byte],
 	commitInterval ccipdata.CommitStoreInterval,
-	observedMessages []ObservedMessage,
+	observedMessages []ccip.ObservedMessage,
 ) (ccipdata.ExecReport, error) {
 	innerIdxs := make([]int, 0, len(observedMessages))
 	var messages []internal.EVM2EVMMessage
@@ -74,7 +74,7 @@ func buildExecutionReportForMessages(
 
 // Validates the given message observations do not exceed the committed sequence numbers
 // in the commitStoreReader.
-func validateSeqNumbers(serviceCtx context.Context, commitStore ccipdata.CommitStoreReader, observedMessages []ObservedMessage) error {
+func validateSeqNumbers(serviceCtx context.Context, commitStore ccipdata.CommitStoreReader, observedMessages []ccip.ObservedMessage) error {
 	nextMin, err := commitStore.GetExpectedNextSequenceNumber(serviceCtx)
 	if err != nil {
 		return err
