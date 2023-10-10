@@ -7,12 +7,6 @@ test_load_ccip_simulated_k8:
     ENV_JOB_IMAGE=$(testimage)  \
 	go test -timeout 24h -count=1 -v -run ^TestLoadCCIPStableRequestTriggeringWithNetworkChaos$$ ./load
 
-
-#example usage: make set_env envfile=load-test.env
-.PHONY: set_env
-set_env:
-	source $(envfile)
-
 # example usage: make test_smoke_ccip_simulated_local image=chainlink-ccip tag=latest testname=TestSmokeCCIPForBidirectionalLane
 .PHONY: test_smoke_ccip_simulated_local
 test_smoke_ccip_simulated_local:
