@@ -21,11 +21,19 @@ func TestCommitReportEncodingV_1_2_0(t *testing.T) {
 				Token: utils.RandomAddress(),
 				Value: big.NewInt(9e18),
 			},
+			{
+				Token: utils.RandomAddress(),
+				Value: big.NewInt(1e18),
+			},
 		},
 		GasPrices: []GasPrice{
 			{
 				DestChainSelector: rand.Uint64(),
 				Value:             big.NewInt(2000e9),
+			},
+			{
+				DestChainSelector: rand.Uint64(),
+				Value:             big.NewInt(3000e9),
 			},
 		},
 		MerkleRoot: [32]byte{123},
