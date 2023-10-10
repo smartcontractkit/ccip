@@ -406,7 +406,7 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	DONDBResourceProfile["resources"] = SetResourceProfile("2", "4Gi", dbCPU, dbMem)
 
 	ccipTOML, _ := utils.GetEnv("CCIP_TOML_PATH")
-	if ccipTOML == "" {
+	if ccipTOML != "" {
 		tomlFile, err := os.Open(ccipTOML)
 		if err != nil {
 			allError = multierr.Append(allError, err)
