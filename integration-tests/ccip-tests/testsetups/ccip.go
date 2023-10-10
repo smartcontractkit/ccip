@@ -35,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
 	ccipnode "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+	integrationnodes "github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 )
 
 const (
@@ -403,6 +404,20 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	dbMem, _ := utils.GetEnv("CCIP_DB_MEM")
 	dbCPU, _ := utils.GetEnv("CCIP_DB_CPU")
 	DONDBResourceProfile["resources"] = SetResourceProfile("2", "4Gi", dbCPU, dbMem)
+
+	ccipTOML, _ := utils.GetEnv("CCIP_TOML_PATH")
+	if ccipTOML == "" {
+		tomlFile, err := os.Open(ccipTOML)
+		if err != nil {
+			allError = multierr.Append(allError, err)
+		} else {
+			defer tomlFile.Close()
+			_, err := tomlFile.Read(node.CCIPTOML)
+			if err != nil {
+				allError = multierr.Append(allError, err)
+			}
+		}
+	}
 
 	p := &CCIPTestConfig{
 		Test:                t,
@@ -1193,13 +1208,12 @@ func DeployLocalCluster(
 			}
 		}
 	}
-
+	configOpts := []integrationnodes.NodeConfigOpt{
+		node.WithPrivateEVMs(networks),
+	}
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
-		toml, err := node.NewConfigFromToml(ccipnode.CCIPTOML,
-			node.WithPrivateEVMs(networks),
-			node.WithDBConnections(50, 50),
-		)
+		toml, err := node.NewConfigFromToml(ccipnode.CCIPTOML, configOpts...)
 		if err != nil {
 			return err
 		}
@@ -1290,7 +1304,6 @@ func DeployEnvironments(
 	tomlCfg, err := node.NewConfigFromToml(
 		ccipnode.CCIPTOML,
 		ccipnode.WithPrivateEVMs(nets),
-		node.WithDBConnections(50, 50),
 	)
 	tomlStr, err := tomlCfg.TOMLString()
 	require.NoError(t, err)

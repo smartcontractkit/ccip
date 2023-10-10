@@ -34,13 +34,6 @@ func NewConfigFromToml(tomlConfig []byte, opts ...node.NodeConfigOpt) (*chainlin
 	return &cfg, nil
 }
 
-func WithDBConnections(openConn, idleConn int64) node.NodeConfigOpt {
-	return func(c *chainlink.Config) {
-		c.Database.MaxIdleConns = itutils.Ptr(idleConn)
-		c.Database.MaxOpenConns = itutils.Ptr(openConn)
-	}
-}
-
 func WithPrivateEVMs(networks []blockchain.EVMNetwork) node.NodeConfigOpt {
 	var evmConfigs []*evmcfg.EVMConfig
 	for _, network := range networks {
