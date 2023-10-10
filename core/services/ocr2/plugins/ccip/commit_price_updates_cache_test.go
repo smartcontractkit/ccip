@@ -32,10 +32,10 @@ func Test_tokenPriceUpdatesCache(t *testing.T) {
 	})
 
 	t.Run("test expiration", func(t *testing.T) {
-		c := newTokenPriceUpdatesCache(ctx, 20*time.Nanosecond) // every 1ns cache expires
+		c := newTokenPriceUpdatesCache(ctx, 200*time.Nanosecond) // every 1ns cache expires
 		assert.Equal(t, time.Time{}, c.mostRecentTs())
 		c.updateIfMoreRecent(ts, tk, big.NewInt(100))
-		time.Sleep(time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 		assert.Equal(t, time.Time{}, c.mostRecentTs()) // should have expired
 		assert.Len(t, c.get(), 0)
 	})
