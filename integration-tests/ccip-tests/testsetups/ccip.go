@@ -88,6 +88,14 @@ var (
 				"memory": "4Gi",
 			},
 		},
+		"additionalArgs": []string{
+			"-c",
+			"shared_buffers=1536MB",
+			"-c",
+			"effective_cache_size=4096MB",
+			"-c",
+			"work_mem=64MB",
+		},
 	}
 	NodeFundingForLoad = big.NewFloat(20)
 	DefaultNodeFunding = big.NewFloat(1)
@@ -1189,7 +1197,9 @@ func DeployLocalCluster(
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
 		toml, err := node.NewConfigFromToml(ccipnode.CCIPTOML,
-			node.WithPrivateEVMs(networks))
+			node.WithPrivateEVMs(networks),
+			node.WithDBConnections(50, 50),
+		)
 		if err != nil {
 			return err
 		}
@@ -1277,7 +1287,11 @@ func DeployEnvironments(
 		*/
 	}
 
-	tomlCfg, err := node.NewConfigFromToml(ccipnode.CCIPTOML, ccipnode.WithPrivateEVMs(nets))
+	tomlCfg, err := node.NewConfigFromToml(
+		ccipnode.CCIPTOML,
+		ccipnode.WithPrivateEVMs(nets),
+		node.WithDBConnections(50, 50),
+	)
 	tomlStr, err := tomlCfg.TOMLString()
 	require.NoError(t, err)
 	clProps["toml"] = tomlStr
