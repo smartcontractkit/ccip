@@ -51,7 +51,7 @@ func (p *PriceRegistryV1_2_0) GetTokenPrices(ctx context.Context, wantedTokens [
 				Token: wantedTokens[i],
 				Value: tp.Value,
 			},
-			Timestamp: big.NewInt(int64(tp.Timestamp)), // TODO: valid conversion
+			Timestamp: big.NewInt(int64(tp.Timestamp)),
 		})
 	}
 	return tpu, nil
