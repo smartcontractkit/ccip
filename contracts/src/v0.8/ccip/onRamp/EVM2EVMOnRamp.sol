@@ -55,6 +55,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error InvalidNopAddress(address nop);
   error NotAFeeToken(address token);
   error CannotSendZeroTokens();
+  error SourceTokenDataTooLarge(uint256 maxSize, uint256 actualSize);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -330,6 +331,15 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         i_destChainSelector,
         bytes("") // any future extraArgs component would be added here
       );
+
+      // Cap sourceTokenData to no larger than configured destBytesOverhead.
+      // This approach limits a malicious pool to underpay NOPs by no more than offchainData.length number of bytes.
+      // It is acceptable as offchainData.length is 0 for most tokens. The few tokens that require it are likely to be more trusted, e.g. USDC.
+      // Even if such token pool becomes malicious, the potential loss in fees is capped.
+      // With this implementation, we will reject tokens that have non-capped sourceTokenData size and large offchainData size.
+      if (newMessage.sourceTokenData[i].length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead) {
+        revert SourceTokenDataTooLarge(s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead, newMessage.sourceTokenData[i].length);
+      }
     }
 
     // Hash only after the sourceTokenData has been set
