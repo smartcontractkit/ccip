@@ -29,7 +29,7 @@ require (
 	github.com/smartcontractkit/ocr2keepers v0.7.27
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230804151440-2f1eb1e20687
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230906073235-9e478e5e19f1
-	github.com/smartcontractkit/wasp v0.3.2-0.20231006235042-7a05a771b363
+	github.com/smartcontractkit/wasp v0.3.2-0.20231007012020-8f5eb29299d7
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
 	github.com/testcontainers/testcontainers-go v0.23.0
