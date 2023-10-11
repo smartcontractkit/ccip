@@ -4,22 +4,31 @@ option go_package = "github.com/smartcontractkit/chainlink/v2/core/services/sync
 
 package telem;
 
-message CCIPBlockNumber {
-    uint64 timestamp = 1;
-    uint64 block_number = 2;
-    string block_hash = 3;
-    bytes config_digest = 4;
+message CCIPExecutionReportSummary {
+    // string csa_public_key = 0;
+    
+    uint32 len_messages = 1;
+    uint32 len_offchain_token_data = 2;
 }
 
-message CCIPNodeVersion {
-    uint64 timestamp = 1;
-    string node_version = 2;
-    bytes config_digest = 3;
+// The CCIPCommitReport message is used to report the latest commit
+// as it's seend by the node.
+message CCIPCommitReportSummary {
+    // string csa_public_key = 0; // don't send -- as telemetry client is initialized with it, OTI should be ijecting it; it's redundant
+    // bytes merkle_root = 0; // don't send -- it will blow up the cardinality
+    // uint64 interval_min = 0; // don't send -- low debugging value
+    // uint64 interval_max = 0; // don't send -- low debugging value
+    
+    uint32 len_token_price_updates = 1;
+    uint64 price_updates_dest_chain_selector = 2;
+    bytes price_updates_usd_per_unit_gas = 3; // big.Int
+    uint32 epoch = 4;
+    uint32 round = 5;
 }
 
 message CCIPTelemWrapper{
     oneof msg {
-        CCIPBlockNumber block_number = 1;
-        CCIPNodeVersion node_version = 2;
+        CCIPCommitReportSummary commit_report = 1;
+        CCIPExecutionReportSummary execution_report  = 2;
     }
 }

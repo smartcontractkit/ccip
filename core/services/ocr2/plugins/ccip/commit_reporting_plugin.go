@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -30,7 +31,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -72,6 +75,7 @@ type CommitPluginConfig struct {
 	sourceClient, destClient evmclient.Client
 	leafHasher               hashlib.LeafHasherInterface[[32]byte]
 	checkFinalityTags        bool
+	monitoringEndpoint       commontypes.MonitoringEndpoint
 }
 
 type CommitReportingPlugin struct {
@@ -504,7 +508,45 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		"sourceUsdPerUnitGas", report.PriceUpdates.UsdPerUnitGas,
 		"epochAndRound", epochAndRound,
 	)
+
+	telem := r.collectTelemetry(&report, &epochAndRound)
+	bytes, err := proto.Marshal(telem)
+	if err != nil {
+		// Telemetry related errors are not critical and must not affect
+		// execution, so we log them and continue.
+		lggr.Errorw("failed to marshal telemetry to protobuf", "err", err)
+	}
+	r.config.monitoringEndpoint.SendLog(bytes)
+
 	return true, encodedReport, nil
+}
+
+func (r *CommitReportingPlugin) collectTelemetry(
+	report *commit_store.CommitStoreCommitReport,
+	epochAndRound *types.ReportTimestamp,
+) (t *telemPb.CCIPTelemWrapper) {
+	usdPerUnitGasToBytes, err := report.PriceUpdates.UsdPerUnitGas.MarshalText()
+	if err != nil {
+		// Telemetry related errors are not critical and must not affect
+		// execution, so we log them and continue.
+		r.lggr.Errorw("failed to marshal usdPerUnitGas to bytes", "err", err)
+	}
+
+	summary := telemPb.CCIPCommitReportSummary{
+		LenTokenPriceUpdates:          uint32(len(report.PriceUpdates.TokenPriceUpdates)),
+		PriceUpdatesDestChainSelector: report.PriceUpdates.DestChainSelector,
+		PriceUpdatesUsdPerUnitGas:     usdPerUnitGasToBytes,
+		Epoch:                         epochAndRound.Epoch,
+		Round:                         uint32(epochAndRound.Round),
+	}
+
+	telem := telemPb.CCIPTelemWrapper{
+		Msg: &telemPb.CCIPTelemWrapper_CommitReport{
+			CommitReport: &summary,
+		},
+	}
+
+	return &telem
 }
 
 // calculateIntervalConsensus compresses a set of intervals into one interval
@@ -740,6 +782,11 @@ func (r *CommitReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Context
 	// When the commitTransmitter enqueues the tx for tx manager,
 	// we mark it as fulfilled, effectively removing it from the set of inflight messages.
 	shouldTransmit := !r.isStaleReport(ctx, lggr, parsedReport, false, reportTimestamp)
+
+	if shouldTransmit {
+		// TODO(vlad): inject protobuf telemetry
+		r.config.monitoringEndpoint.SendLog([]byte{})
+	}
 
 	lggr.Infow("ShouldTransmitAcceptedReport",
 		"shouldTransmit", shouldTransmit,

@@ -40,6 +40,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
+	"github.com/smartcontractkit/libocr/commontypes"
 )
 
 const (
@@ -70,6 +71,7 @@ type ExecutionPluginConfig struct {
 	destGasEstimator         gas.EvmFeeEstimator
 	leafHasher               hashlib.LeafHasherInterface[[32]byte]
 	tokenDataProviders       map[common.Address]tokendata.Reader
+	monitoringEndpoint       commontypes.MonitoringEndpoint
 }
 
 type ExecutionReportingPlugin struct {
@@ -1065,6 +1067,9 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 		lggr.Info("Execution report is stale")
 		return false, nil
 	}
+
+	// TODO(vlad): inject protobuf telemetry
+	r.config.monitoringEndpoint.SendLog([]byte{})
 
 	lggr.Info("Transmitting finalized report")
 	return true, err
