@@ -73,7 +73,8 @@ func (d ExecOnchainConfigV1_2_0) PermissionLessExecutionThresholdDuration() time
 type OffRampV1_2_0 struct {
 	*OffRampV1_0_0
 
-	offRamp *evm_2_evm_offramp.EVM2EVMOffRamp
+	offRamp             *evm_2_evm_offramp.EVM2EVMOffRamp
+	executionReportArgs abi.Arguments
 
 	// Dynamic config
 	configMu          sync.RWMutex
@@ -204,10 +205,10 @@ func decodeExecReportV1_2_0(args abi.Arguments, report []byte) (ExecReport, erro
 				Token  common.Address `json:"token"`
 				Amount *big.Int       `json:"amount"`
 			} `json:"tokenAmounts"`
-			SourceTokenData [][]byte `json:"sourceTokenData"`
-			MessageId       [32]byte `json:"messageId"`
+			SourceTokenData [][]uint8 `json:"sourceTokenData"`
+			MessageId       [32]uint8 `json:"messageId"`
 		} `json:"messages"`
-		OffchainTokenData [][][]byte  `json:"offchainTokenData"`
+		OffchainTokenData [][][]uint8 `json:"offchainTokenData"`
 		Proofs            [][32]uint8 `json:"proofs"`
 		ProofFlagBits     *big.Int    `json:"proofFlagBits"`
 	})
@@ -268,8 +269,13 @@ func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client,
 	if err != nil {
 		return nil, err
 	}
+
+	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
+	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", offRampABI)[:1]
+
 	return &OffRampV1_2_0{
-		OffRampV1_0_0: v100,
-		offRamp:       offRamp,
+		OffRampV1_0_0:       v100,
+		offRamp:             offRamp,
+		executionReportArgs: executionReportArgs,
 	}, nil
 }

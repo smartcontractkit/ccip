@@ -254,29 +254,30 @@ func decodeExecReportV1_0_0(args abi.Arguments, report []byte) (ExecReport, erro
 	if len(unpacked) == 0 {
 		return ExecReport{}, errors.New("assumptionViolation: expected at least one element")
 	}
-	// Must be anonymous struct here
+
 	erStruct, ok := unpacked[0].(struct {
 		Messages []struct {
 			SourceChainSelector uint64         `json:"sourceChainSelector"`
-			Sender              common.Address `json:"sender"`
-			Receiver            common.Address `json:"receiver"`
 			SequenceNumber      uint64         `json:"sequenceNumber"`
+			FeeTokenAmount      *big.Int       `json:"feeTokenAmount"`
+			Sender              common.Address `json:"sender"`
+			Nonce               uint64         `json:"nonce"`
 			GasLimit            *big.Int       `json:"gasLimit"`
 			Strict              bool           `json:"strict"`
-			Nonce               uint64         `json:"nonce"`
-			FeeToken            common.Address `json:"feeToken"`
-			FeeTokenAmount      *big.Int       `json:"feeTokenAmount"`
+			Receiver            common.Address `json:"receiver"`
 			Data                []uint8        `json:"data"`
 			TokenAmounts        []struct {
 				Token  common.Address `json:"token"`
 				Amount *big.Int       `json:"amount"`
 			} `json:"tokenAmounts"`
-			MessageId [32]byte `json:"messageId"`
+			FeeToken  common.Address `json:"feeToken"`
+			MessageId [32]uint8      `json:"messageId"`
 		} `json:"messages"`
-		OffchainTokenData [][][]byte  `json:"offchainTokenData"`
+		OffchainTokenData [][][]uint8 `json:"offchainTokenData"`
 		Proofs            [][32]uint8 `json:"proofs"`
 		ProofFlagBits     *big.Int    `json:"proofFlagBits"`
 	})
+
 	if !ok {
 		return ExecReport{}, fmt.Errorf("got %T", unpacked[0])
 	}
