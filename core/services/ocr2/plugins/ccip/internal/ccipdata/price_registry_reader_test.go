@@ -154,68 +154,73 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	}
 }
 
+func testPriceRegistryReader(t *testing.T, th priceRegReaderTH, pr ccipdata.PriceRegistryReader) {
+	// Assert have expected fee tokens.
+	gotFeeTokens, err := pr.GetFeeTokens(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, th.expectedFeeTokens, gotFeeTokens)
+
+	// Note unsupported chain selector simply returns an empty set not an error
+	gasUpdates, err := pr.GetGasPriceUpdatesCreatedAfter(context.Background(), 1e6, time.Unix(0, 0), 0)
+	require.NoError(t, err)
+	assert.Len(t, gasUpdates, 0)
+
+	for i, ts := range th.blockTs {
+		// Should see all updates >= ts.
+		var expectedGas []ccipdata.GasPrice
+		var expectedToken []ccipdata.TokenPrice
+		for j := i; j < len(th.blockTs); j++ {
+			expectedGas = append(expectedGas, th.expectedGasUpdates[th.blockTs[j]]...)
+			expectedToken = append(expectedToken, th.expectedTokenUpdates[th.blockTs[j]]...)
+		}
+		gasUpdates, err = pr.GetGasPriceUpdatesCreatedAfter(context.Background(), th.dest, time.Unix(int64(ts-1), 0), 0)
+		require.NoError(t, err)
+		assert.Len(t, gasUpdates, len(expectedGas))
+
+		tokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(int64(ts-1), 0), 0)
+		require.NoError(t, err)
+		assert.Len(t, tokenUpdates, len(expectedToken))
+	}
+
+	// Empty token set should return empty set no error.
+	gotEmpty, err := pr.GetTokenPrices(context.Background(), []common.Address{})
+	require.NoError(t, err)
+	assert.Len(t, gotEmpty, 0)
+
+	// We expect latest token prices to apply
+	allTokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(0, 0), 0)
+	require.NoError(t, err)
+	// Build latest map
+	latest := make(map[common.Address]*big.Int)
+	// Comes back in ascending order (oldest first)
+	var allTokens []common.Address
+	for i := len(allTokenUpdates) - 1; i >= 0; i-- {
+		_, have := latest[allTokenUpdates[i].Data.Token]
+		if have {
+			continue
+		}
+		latest[allTokenUpdates[i].Data.Token] = allTokenUpdates[i].Data.Value
+		allTokens = append(allTokens, allTokenUpdates[i].Data.Token)
+	}
+	tokenPrices, err := pr.GetTokenPrices(context.Background(), allTokens)
+	require.NoError(t, err)
+	require.Len(t, tokenPrices, len(allTokens))
+	for _, p := range tokenPrices {
+		assert.Equal(t, p.Value, latest[p.Token])
+	}
+
+	// We expect 2 fee token events (added/removed). Exact event sigs may differ.
+	assert.Len(t, pr.FeeTokenEvents(), 2)
+
+}
+
 func TestPriceRegistryReader(t *testing.T) {
 	th := setupPriceRegistryReaderTH(t)
 	// Assert all readers produce the same expected results.
 	for version, pr := range th.readers {
 		pr := pr
 		t.Run("PriceRegistryReader"+version, func(t *testing.T) {
-			// Assert have expected fee tokens.
-			gotFeeTokens, err := pr.GetFeeTokens(context.Background())
-			require.NoError(t, err)
-			assert.Equal(t, th.expectedFeeTokens, gotFeeTokens)
-
-			// Note unsupported chain selector simply returns an empty set not an error
-			gasUpdates, err := pr.GetGasPriceUpdatesCreatedAfter(context.Background(), 1e6, time.Unix(0, 0), 0)
-			require.NoError(t, err)
-			assert.Len(t, gasUpdates, 0)
-
-			for i, ts := range th.blockTs {
-				// Should see all updates >= ts.
-				var expectedGas []ccipdata.GasPrice
-				var expectedToken []ccipdata.TokenPrice
-				for j := i; j < len(th.blockTs); j++ {
-					expectedGas = append(expectedGas, th.expectedGasUpdates[th.blockTs[j]]...)
-					expectedToken = append(expectedToken, th.expectedTokenUpdates[th.blockTs[j]]...)
-				}
-				gasUpdates, err = pr.GetGasPriceUpdatesCreatedAfter(context.Background(), th.dest, time.Unix(int64(ts-1), 0), 0)
-				require.NoError(t, err)
-				assert.Len(t, gasUpdates, len(expectedGas))
-
-				tokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(int64(ts-1), 0), 0)
-				require.NoError(t, err)
-				assert.Len(t, tokenUpdates, len(expectedToken))
-			}
-
-			// Empty token set should return empty set no error.
-			gotEmpty, err := pr.GetTokenPrices(context.Background(), []common.Address{})
-			require.NoError(t, err)
-			assert.Len(t, gotEmpty, 0)
-
-			// We expect latest token prices to apply
-			allTokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(0, 0), 0)
-			require.NoError(t, err)
-			// Build latest map
-			latest := make(map[common.Address]*big.Int)
-			// Comes back in ascending order (oldest first)
-			var allTokens []common.Address
-			for i := len(allTokenUpdates) - 1; i >= 0; i-- {
-				_, have := latest[allTokenUpdates[i].Data.Token]
-				if have {
-					continue
-				}
-				latest[allTokenUpdates[i].Data.Token] = allTokenUpdates[i].Data.Value
-				allTokens = append(allTokens, allTokenUpdates[i].Data.Token)
-			}
-			tokenPrices, err := pr.GetTokenPrices(context.Background(), allTokens)
-			require.NoError(t, err)
-			require.Len(t, tokenPrices, len(allTokens))
-			for _, p := range tokenPrices {
-				assert.Equal(t, p.Value, latest[p.Token])
-			}
-
-			// We expect 2 fee token events (added/removed). Exact event sigs may differ.
-			assert.Len(t, pr.FeeTokenEvents(), 2)
+			testPriceRegistryReader(t, th, pr)
 		})
 	}
 }
