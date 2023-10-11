@@ -138,7 +138,7 @@ func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client
 	default:
 		return nil, errors.Errorf("unsupported offramp version %v", version.String())
 	}
-	// TODO can validate it points to the correct onramp version using srcClinet
+	// TODO can validate it pointing to the correct version
 }
 
 func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
@@ -169,6 +169,8 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 	}
 }
 
+// EncodeExecutionReport is only used in tests
+// TODO should remove it and update tests to use Reader interface.
 func EncodeExecutionReport(report ExecReport) ([]byte, error) {
 	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
 	return encodeExecutionReportV1_2_0(abihelpers.MustGetMethodInputs(ManuallyExecute, offRampABI)[:1], report)
