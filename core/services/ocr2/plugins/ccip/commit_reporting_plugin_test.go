@@ -298,7 +298,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.gasPriceEstimator = gasPriceEstimator
 			p.offchainConfig.GasPriceHeartBeat = gasPriceHeartBeat.Duration()
 			p.commitStoreReader = commitStoreReader
-			p.tokenPriceUpdatesCache = newTokenPriceUpdatesCache(context.Background(), time.Hour)
+			p.tokenPriceUpdatesCache = newTokenPriceUpdatesCache()
 			p.F = tc.f
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
@@ -1507,7 +1507,7 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 			//_, priceRegAddr := testhelpers.NewFakePriceRegistry(t)
 			priceReg := ccipdata.NewMockPriceRegistryReader(t)
 			p.destPriceRegistryReader = priceReg
-			p.tokenPriceUpdatesCache = newTokenPriceUpdatesCache(context.Background(), time.Hour)
+			p.tokenPriceUpdatesCache = newTokenPriceUpdatesCache()
 
 			//destReader := ccipdata.NewMockReader(t)
 			var events []ccipdata.Event[ccipdata.TokenPriceUpdate]
@@ -1548,9 +1548,10 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 }
 
 func TestCommitReportingPlugin_getLatestTokenPriceUpdates_cache(t *testing.T) {
+	ctx := testutils.Context(t)
 	priceReg := ccipdata.NewMockPriceRegistryReader(t)
 	p := &CommitReportingPlugin{
-		tokenPriceUpdatesCache:  newTokenPriceUpdatesCache(context.Background(), time.Hour),
+		tokenPriceUpdatesCache:  newTokenPriceUpdatesCache(),
 		destPriceRegistryReader: priceReg,
 		offchainConfig: ccipdata.CommitOffchainConfig{
 			TokenPriceHeartBeat: 12 * time.Hour,
@@ -1592,7 +1593,7 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates_cache(t *testing.T) {
 		0,
 	).Return(onChainUpdates, nil).Once()
 
-	priceUpdates, err := p.getLatestTokenPriceUpdates(context.Background(), now, false)
+	priceUpdates, err := p.getLatestTokenPriceUpdates(ctx, now, false)
 	assert.NoError(t, err)
 	// we expect to get only one update, since all three updates above are for the same token
 	assert.Len(t, priceUpdates, 1)
@@ -1606,7 +1607,7 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates_cache(t *testing.T) {
 		twoHoursAgo.Truncate(time.Second), // now we expect to ask for price updates after the most recent price update
 		0,
 	).Return([]ccipdata.Event[ccipdata.TokenPriceUpdate]{}, nil).Once()
-	priceUpdates, err = p.getLatestTokenPriceUpdates(context.Background(), now, false)
+	priceUpdates, err = p.getLatestTokenPriceUpdates(ctx, now, false)
 	assert.NoError(t, err)
 	// and we expect to get the exact same price update since there wasn't anything new recorded onchain
 	assert.Equal(t, big.NewInt(102), priceUpdates[tk1].value)

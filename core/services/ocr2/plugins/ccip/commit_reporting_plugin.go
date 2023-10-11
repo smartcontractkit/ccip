@@ -161,7 +161,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				int64(rf.config.commitStore.OffchainConfig().DestFinalityDepth),
 			),
 			gasPriceEstimator:      rf.config.commitStore.GasPriceEstimator(),
-			tokenPriceUpdatesCache: newTokenPriceUpdatesCache(context.Background(), time.Hour),
+			tokenPriceUpdatesCache: newTokenPriceUpdatesCache(),
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -384,7 +384,7 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 		)
 	}
 
-	latestUpdates := r.tokenPriceUpdatesCache.get()
+	latestUpdates := r.tokenPriceUpdatesCache.get(now.Add(-r.offchainConfig.TokenPriceHeartBeat))
 	if !checkInflight {
 		return latestUpdates, nil
 	}

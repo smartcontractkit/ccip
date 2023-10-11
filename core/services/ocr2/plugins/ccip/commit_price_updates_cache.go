@@ -1,7 +1,6 @@
 package ccip
 
 import (
-	"context"
 	"math/big"
 	"sync"
 	"time"
@@ -10,34 +9,16 @@ import (
 )
 
 type tokenPriceUpdatesCache struct {
-	mem    map[common.Address]update
-	mu     *sync.RWMutex
-	expiry time.Duration
+	mem map[common.Address]update
+	mu  *sync.RWMutex
 }
 
-func newTokenPriceUpdatesCache(ctx context.Context, expiry time.Duration) *tokenPriceUpdatesCache {
+func newTokenPriceUpdatesCache() *tokenPriceUpdatesCache {
 	c := &tokenPriceUpdatesCache{
-		mem:    make(map[common.Address]update),
-		mu:     &sync.RWMutex{},
-		expiry: expiry,
+		mem: make(map[common.Address]update),
+		mu:  &sync.RWMutex{},
 	}
-	go c.expirationWorker(ctx)
 	return c
-}
-
-func (c *tokenPriceUpdatesCache) expirationWorker(ctx context.Context) {
-	tick := time.NewTicker(c.expiry)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-tick.C:
-			c.mu.Lock()
-			c.mem = make(map[common.Address]update)
-			c.mu.Unlock()
-		}
-	}
 }
 
 func (c *tokenPriceUpdatesCache) mostRecentTs() time.Time {
@@ -68,11 +49,15 @@ func (c *tokenPriceUpdatesCache) updateIfMoreRecent(ts time.Time, tk common.Addr
 	return false
 }
 
-func (c *tokenPriceUpdatesCache) get() map[common.Address]update {
+// get returns all the price updates with timestamp greater than or equal to the provided
+func (c *tokenPriceUpdatesCache) get(minTs time.Time) map[common.Address]update {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	cp := make(map[common.Address]update, len(c.mem))
 	for k, v := range c.mem {
+		if v.timestamp.Before(minTs) {
+			continue
+		}
 		cp[k] = v
 	}
 	return cp
