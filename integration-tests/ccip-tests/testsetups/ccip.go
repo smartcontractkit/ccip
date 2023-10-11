@@ -405,6 +405,17 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	dbCPU, _ := utils.GetEnv("CCIP_DB_CPU")
 	DONDBResourceProfile["resources"] = SetResourceProfile("2", "4Gi", dbCPU, dbMem)
 
+	dbArgs, _ := utils.GetEnv("CCIP_DB_ARGS")
+	if dbArgs != "" {
+		args := strings.Split(dbArgs, ",")
+		var formattedArgs []string
+		for _, arg := range args {
+			formattedArgs = append(formattedArgs, "-c")
+			formattedArgs = append(formattedArgs, arg)
+		}
+		DONDBResourceProfile["additionalArgs"] = formattedArgs
+	}
+
 	ccipTOML, _ := utils.GetEnv("CCIP_TOML_PATH")
 	if ccipTOML != "" {
 		tomlFile, err := os.Open(ccipTOML)
