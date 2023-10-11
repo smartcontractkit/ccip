@@ -1389,6 +1389,7 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 			p.lggr = lggr
 			destPriceRegistry := ccipdata.NewMockPriceRegistryReader(t)
 			p.destPriceRegistryReader = destPriceRegistry
+			p.priceUpdatesCache = newPriceUpdatesCache()
 
 			if tc.inflightGasPriceUpdate != nil {
 				p.inflightReports.inFlightPriceUpdates = append(
