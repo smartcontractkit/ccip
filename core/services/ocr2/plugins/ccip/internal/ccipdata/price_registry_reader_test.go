@@ -51,11 +51,12 @@ type priceRegReaderTH struct {
 	readers []ccipdata.PriceRegistryReader
 
 	// Expected state
-	expectedFeeTokens  []common.Address
-	expectedGasUpdates []ccipdata.GasPrice
+	expectedFeeTokens    []common.Address
+	expectedGasUpdates   []ccipdata.GasPrice
+	expectedTokenUpdates []ccipdata.TokenPrice
 }
 
-// setupPriceRegistryReaderTH instatiates all versions of the price registry reader
+// setupPriceRegistryReaderTH instantiates all versions of the price registry reader
 // with a snapshot of data so reader tests can do multi-version assertions.
 func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	user := testutils.MustNewSimTransactor(t)
@@ -77,10 +78,19 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 			Value:             big.NewInt(11),
 		},
 	}
+	tokenPriceUpdates := []ccipdata.TokenPrice{
+		{
+			Token: randomAddress(),
+			Value: big.NewInt(12),
+		},
+	}
 	addr, _, pr, err := price_registry_1_0_0.DeployPriceRegistry(user, sim, nil, feeTokens, 1000)
 	require.NoError(t, err)
 	_, err = pr.UpdatePrices(user, price_registry_1_0_0.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry_1_0_0.InternalTokenPriceUpdate{},
+		TokenPriceUpdates: []price_registry_1_0_0.InternalTokenPriceUpdate{{
+			SourceToken: tokenPriceUpdates[0].Token,
+			UsdPerToken: tokenPriceUpdates[0].Value,
+		}},
 		DestChainSelector: gasPriceUpdates[0].DestChainSelector,
 		UsdPerUnitGas:     gasPriceUpdates[0].Value,
 	})
@@ -92,7 +102,12 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	addr, _, pr2, err := price_registry.DeployPriceRegistry(user, sim, nil, feeTokens, 1000)
 	require.NoError(t, err)
 	_, err = pr2.UpdatePrices(user, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{},
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: tokenPriceUpdates[0].Token,
+				UsdPerToken: tokenPriceUpdates[0].Value,
+			},
+		},
 		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
 			{
 				DestChainSelector: gasPriceUpdates[0].DestChainSelector,
@@ -109,31 +124,56 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	lp.PollAndSaveLogs(context.Background(), 1)
 
 	return priceRegReaderTH{
-		lp:                 lp,
-		ec:                 ec,
-		lggr:               lggr,
-		user:               user,
-		sim:                sim,
-		readers:            []ccipdata.PriceRegistryReader{pr10, pr12r},
-		expectedFeeTokens:  feeTokens,
-		expectedGasUpdates: gasPriceUpdates,
+		lp:                   lp,
+		ec:                   ec,
+		lggr:                 lggr,
+		user:                 user,
+		sim:                  sim,
+		readers:              []ccipdata.PriceRegistryReader{pr10, pr12r},
+		expectedFeeTokens:    feeTokens,
+		expectedGasUpdates:   gasPriceUpdates,
+		expectedTokenUpdates: tokenPriceUpdates,
 	}
 }
 
 func TestPriceRegistryReader(t *testing.T) {
 	th := setupPriceRegistryReaderTH(t)
+	// Assert all readers produce the same expected results.
 	for _, pr := range th.readers {
-		// Assert fee token read.
+		// Assert have expected fee tokens.
 		gotFeeTokens, err := pr.GetFeeTokens(context.Background())
 		require.NoError(t, err)
 		assert.Equal(t, th.expectedFeeTokens, gotFeeTokens)
 
-		// Assert latest gas price read.
-		updates, err := pr.GetGasPriceUpdatesCreatedAfter(context.Background(), th.expectedGasUpdates[0].DestChainSelector, time.Unix(0, 0), 0)
+		// Note unsupported chain selector simply returns an empty set not an error
+		gasUpdates, err := pr.GetGasPriceUpdatesCreatedAfter(context.Background(), th.expectedGasUpdates[0].DestChainSelector+1, time.Unix(0, 0), 0)
 		require.NoError(t, err)
-		require.Equal(t, len(updates), 1)
-		assert.Equal(t, updates[0].Data.GasPrice, th.expectedGasUpdates[0])
+		assert.Len(t, gasUpdates, 0)
 
-		// TODO test other price reader methods.
+		// Assert expected gas updates.
+		gasUpdates, err = pr.GetGasPriceUpdatesCreatedAfter(context.Background(), th.expectedGasUpdates[0].DestChainSelector, time.Unix(0, 0), 0)
+		require.NoError(t, err)
+		require.Len(t, gasUpdates, 1)
+		assert.Equal(t, gasUpdates[0].Data.GasPrice, th.expectedGasUpdates[0])
+
+		// Assert expected token updates.
+		tokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(0, 0), 0)
+		require.NoError(t, err)
+		require.Len(t, tokenUpdates, 1)
+		assert.Equal(t, tokenUpdates[0].Data.TokenPrice, th.expectedTokenUpdates[0])
+
+		// Empty token set should return empty set no error.
+		gotEmpty, err := pr.GetTokenPrices(context.Background(), []common.Address{})
+		require.NoError(t, err)
+		assert.Len(t, gotEmpty, 0)
+
+		// Assert expected token prices
+		tokenPrices, err := pr.GetTokenPrices(context.Background(), []common.Address{th.expectedTokenUpdates[0].Token})
+		require.NoError(t, err)
+		require.Len(t, tokenPrices, 1)
+		assert.Equal(t, tokenPrices[0].TokenPrice, th.expectedTokenUpdates[0])
+
+		// We expect 2 fee token events (added/removed). Exact event sigs may differ.
+		assert.Len(t, pr.FeeTokenEvents(), 2)
 	}
 }
