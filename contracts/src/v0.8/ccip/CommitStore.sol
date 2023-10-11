@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
+import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {ICommitStore} from "./interfaces/ICommitStore.sol";
 import {IARM} from "./interfaces/IARM.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
@@ -10,7 +10,7 @@ import {OCR2Base} from "./ocr/OCR2Base.sol";
 import {Internal} from "./libraries/Internal.sol";
 import {MerkleMultiProof} from "./libraries/MerkleMultiProof.sol";
 
-contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
+contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   error StaleReport();
   error PausedError();
   error InvalidInterval(Interval interval);
@@ -184,7 +184,7 @@ contract CommitStore is ICommitStore, TypeAndVersionInterface, OCR2Base {
     CommitReport memory report = abi.decode(encodedReport, (CommitReport));
 
     // Check if the report contains price updates
-    if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.destChainSelector != 0) {
+    if (report.priceUpdates.tokenPriceUpdates.length > 0 || report.priceUpdates.gasPriceUpdates.length > 0) {
       // Check for price staleness based on the epoch and round
       if (s_latestPriceEpochAndRound < epochAndRound) {
         // If prices are not stale, update the latest epoch and round

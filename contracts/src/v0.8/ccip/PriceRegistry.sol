@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {ITypeAndVersion} from "../shared/interfaces/ITypeAndVersion.sol";
 import {IPriceRegistry} from "./interfaces/IPriceRegistry.sol";
-import {TypeAndVersionInterface} from "../interfaces/TypeAndVersionInterface.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 import {Internal} from "./libraries/Internal.sol";
@@ -12,7 +12,7 @@ import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.0/contracts/ut
 
 /// @notice The PriceRegistry contract responsibility is to store the current gas price in USD for a given destination chain,
 /// and the price of a token in USD allowing the owner or priceUpdater to update this value.
-contract PriceRegistry is IPriceRegistry, OwnerIsCreator, TypeAndVersionInterface {
+contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   using EnumerableSet for EnumerableSet.AddressSet;
   using USDPriceWith18Decimals for uint224;
 
@@ -190,9 +190,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, TypeAndVersionInterfac
 
   // @inheritdoc IPriceRegistry
   function updatePrices(Internal.PriceUpdates calldata priceUpdates) external override requireUpdaterOrOwner {
-    uint256 priceUpdatesLength = priceUpdates.tokenPriceUpdates.length;
+    uint256 tokenUpdatesLength = priceUpdates.tokenPriceUpdates.length;
 
-    for (uint256 i = 0; i < priceUpdatesLength; ++i) {
+    for (uint256 i = 0; i < tokenUpdatesLength; ++i) {
       Internal.TokenPriceUpdate memory update = priceUpdates.tokenPriceUpdates[i];
       s_usdPerToken[update.sourceToken] = Internal.TimestampedPackedUint224({
         value: update.usdPerToken,
@@ -201,12 +201,15 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, TypeAndVersionInterfac
       emit UsdPerTokenUpdated(update.sourceToken, update.usdPerToken, block.timestamp);
     }
 
-    if (priceUpdates.destChainSelector != 0) {
-      s_usdPerUnitGasByDestChainSelector[priceUpdates.destChainSelector] = Internal.TimestampedPackedUint224({
-        value: priceUpdates.usdPerUnitGas,
+    uint256 gasUpdatesLength = priceUpdates.gasPriceUpdates.length;
+
+    for (uint256 i = 0; i < gasUpdatesLength; ++i) {
+      Internal.GasPriceUpdate memory update = priceUpdates.gasPriceUpdates[i];
+      s_usdPerUnitGasByDestChainSelector[update.destChainSelector] = Internal.TimestampedPackedUint224({
+        value: update.usdPerUnitGas,
         timestamp: uint32(block.timestamp)
       });
-      emit UsdPerUnitGasUpdated(priceUpdates.destChainSelector, priceUpdates.usdPerUnitGas, block.timestamp);
+      emit UsdPerUnitGasUpdated(update.destChainSelector, update.usdPerUnitGas, block.timestamp);
     }
   }
 
