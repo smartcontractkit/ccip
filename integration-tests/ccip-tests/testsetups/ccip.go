@@ -89,14 +89,6 @@ var (
 				"memory": "4Gi",
 			},
 		},
-		"additionalArgs": []string{
-			"-c",
-			"shared_buffers=1536MB",
-			"-c",
-			"effective_cache_size=4096MB",
-			"-c",
-			"work_mem=64MB",
-		},
 	}
 	NodeFundingForLoad = big.NewFloat(20)
 	DefaultNodeFunding = big.NewFloat(1)
