@@ -50,7 +50,7 @@ contract LockReleaseTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override onlyOnRamp checkAllowList(originalSender) whenHealthy returns (bytes memory) {
+  ) external virtual override onlyOnRamp checkAllowList(originalSender) whenHealthy returns (bytes memory) {
     _consumeOnRampRateLimit(amount);
     emit Locked(msg.sender, amount);
     return "";
@@ -67,7 +67,7 @@ contract LockReleaseTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes memory
-  ) external override onlyOffRamp whenHealthy {
+  ) external virtual override onlyOffRamp whenHealthy {
     _consumeOffRampRateLimit(amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, amount);
@@ -79,7 +79,7 @@ contract LockReleaseTokenPool is TokenPool {
   }
 
   // @inheritdoc IERC165
-  function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
+  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
     return interfaceId == LOCK_RELEASE_INTERFACE_ID || super.supportsInterface(interfaceId);
   }
 

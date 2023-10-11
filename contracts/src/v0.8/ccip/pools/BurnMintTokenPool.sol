@@ -27,7 +27,7 @@ contract BurnMintTokenPool is TokenPool {
     uint256 amount,
     uint64,
     bytes calldata
-  ) external override onlyOnRamp checkAllowList(originalSender) whenHealthy returns (bytes memory) {
+  ) external virtual override onlyOnRamp checkAllowList(originalSender) whenHealthy returns (bytes memory) {
     _consumeOnRampRateLimit(amount);
     IBurnMintERC20(address(i_token)).burn(amount);
     emit Burned(msg.sender, amount);
