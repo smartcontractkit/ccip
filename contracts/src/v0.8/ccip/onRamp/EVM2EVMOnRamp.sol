@@ -324,7 +324,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      newMessage.sourceTokenData[i] = getPoolBySourceToken(IERC20(tokenAndAmount.token)).lockOrBurn(
+      bytes memory tokenData = getPoolBySourceToken(IERC20(tokenAndAmount.token)).lockOrBurn(
         originalSender,
         message.receiver,
         tokenAndAmount.amount,
@@ -332,13 +332,15 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         bytes("") // any future extraArgs component would be added here
       );
 
-      // Cap sourceTokenData to no larger than configured destBytesOverhead.
+      // Cap tokenData to no larger than configured destBytesOverhead.
       // This approach limits a malicious pool to underpay NOPs by no more than offchainData.length number of bytes.
       // It is acceptable as offchainData.length is 0 for most tokens. The few tokens that require it are likely to be more trusted, e.g. USDC.
       // Even if such token pool becomes malicious, the potential loss in fees is capped.
       // With this implementation, we will reject tokens that have non-capped sourceTokenData size and large offchainData size.
-      if (newMessage.sourceTokenData[i].length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead)
+      if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead)
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
+
+      newMessage.sourceTokenData[i] = tokenData;
     }
 
     // Hash only after the sourceTokenData has been set

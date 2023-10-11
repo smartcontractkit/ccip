@@ -52,7 +52,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   error CanOnlySelfCall();
   error ReceiverError(bytes error);
   error TokenHandlingError(bytes error);
-  error TokenRateLimitError(bytes error);
   error EmptyReport();
   error BadARMSignal();
   error InvalidMessageId();
@@ -330,7 +329,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
       // Although we expect only valid messages will be committed, we check again
       // when executing as a defense in depth measure.
       bytes[] memory offchainTokenData = report.offchainTokenData[i];
-      _isWellFormed(message, offchainTokenData.length);
+      _isWellFormed(
+        message.sequenceNumber,
+        message.sourceChainSelector,
+        message.tokenAmounts.length,
+        message.data.length,
+        offchainTokenData.length
+      );
 
       _setExecutionState(message.sequenceNumber, Internal.MessageExecutionState.IN_PROGRESS);
       (Internal.MessageExecutionState newState, bytes memory returnData) = _trialExecute(message, offchainTokenData);
@@ -355,15 +360,24 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   }
 
   /// @notice Does basic message validation. Should never fail.
-  /// @param message The message to be validated.
+  /// @param sequenceNumber Sequence number of the message.
+  /// @param sourceChainSelector SourceChainSelector of the message.
+  /// @param numberOfTokens Length of tokenAmounts array in the message.
+  /// @param dataLength Length of data field in the message.
+  /// @param offchainTokenDataLength Length of offchainTokenData array.
   /// @dev reverts on validation failures.
-  function _isWellFormed(Internal.EVM2EVMMessage memory message, uint256 offchainTokenDataLength) private view {
-    if (message.sourceChainSelector != i_sourceChainSelector) revert InvalidSourceChain(message.sourceChainSelector);
-    if (message.tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength))
-      revert UnsupportedNumberOfTokens(message.sequenceNumber);
-    if (message.tokenAmounts.length != offchainTokenDataLength) revert TokenDataMismatch(message.sequenceNumber);
-    if (message.data.length > uint256(s_dynamicConfig.maxDataSize))
-      revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), message.data.length);
+  function _isWellFormed(
+    uint64 sequenceNumber,
+    uint64 sourceChainSelector,
+    uint256 numberOfTokens,
+    uint256 dataLength,
+    uint256 offchainTokenDataLength
+  ) private view {
+    if (sourceChainSelector != i_sourceChainSelector) revert InvalidSourceChain(sourceChainSelector);
+    if (numberOfTokens > uint256(s_dynamicConfig.maxTokensLength)) revert UnsupportedNumberOfTokens(sequenceNumber);
+    if (numberOfTokens != offchainTokenDataLength) revert TokenDataMismatch(sequenceNumber);
+    if (dataLength > uint256(s_dynamicConfig.maxDataSize))
+      revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), dataLength);
   }
 
   /// @notice Try executing a message.
@@ -500,9 +514,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
   /// @param sourceToken The source token
   /// @return the destination token
   function getDestinationToken(IERC20 sourceToken) external view returns (IERC20) {
-    (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
-    if (!success) revert UnsupportedToken(sourceToken);
-    return IPool(pool).getToken();
+    return getPoolBySourceToken(sourceToken).getToken();
   }
 
   /// @notice Get a token pool by its dest token
@@ -564,7 +576,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
 
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
   /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
+  /// @param originalSender The message sender.
   /// @param receiver The address that will receive the tokens.
+  /// @param sourceTokenData Array of token data returned by token pools on the source chain.
+  /// @param offchainTokenData Array of token data fetched offchain by the DON.
   /// @dev This function wrappes the token pool call in a try catch block to gracefully handle
   /// any non-rate limiting errors that may occur. If we encounter a rate limiting related error
   /// we bubble it up. If we encounter a non-rate limiting error we wrap it in a TokenHandlingError.
