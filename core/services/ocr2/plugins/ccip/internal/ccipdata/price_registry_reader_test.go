@@ -2,7 +2,6 @@ package ccipdata_test
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -62,7 +61,6 @@ type priceRegReaderTH struct {
 func commitAndGetBlockTs(ec *client.SimulatedBackendClient) uint64 {
 	h := ec.Commit()
 	b, _ := ec.BlockByHash(context.Background(), h)
-	fmt.Println("bh", b.Number(), b.Hash())
 	return b.Time()
 }
 
@@ -75,7 +73,6 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),
 		},
 	}, 10e6)
-	sim.Commit()
 	ec := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
 	lggr := logger.TestLogger(t)
 	// TODO: We should be able to use an in memory log poller ORM here to speed up the tests.
@@ -117,7 +114,11 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	require.NoError(t, err)
 	addr2, _, _, err := price_registry.DeployPriceRegistry(user, sim, nil, feeTokens, 1000)
 	require.NoError(t, err)
-	ec.Commit() // Deploy these
+	pr10r, err := ccipdata.NewPriceRegistryReader(lggr, addr, lp, ec)
+	require.NoError(t, err)
+	pr12r, err := ccipdata.NewPriceRegistryReader(lggr, addr2, lp, ec)
+	require.NoError(t, err)
+	commitAndGetBlockTs(ec) // Deploy these
 	// Apply block1.
 	ccipdata.ApplyPriceRegistryUpdateV1_0_0(t, user, addr, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
 	ccipdata.ApplyPriceRegistryUpdateV1_2_0(t, user, addr2, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
@@ -126,11 +127,6 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	ccipdata.ApplyPriceRegistryUpdateV1_0_0(t, user, addr, ec, gasPriceUpdatesBlock2, tokenPriceUpdatesBlock2)
 	ccipdata.ApplyPriceRegistryUpdateV1_2_0(t, user, addr2, ec, gasPriceUpdatesBlock2, tokenPriceUpdatesBlock2)
 	b2 := commitAndGetBlockTs(ec)
-
-	pr10r, err := ccipdata.NewPriceRegistryReader(lggr, addr, lp, ec)
-	require.NoError(t, err)
-	pr12r, err := ccipdata.NewPriceRegistryReader(lggr, addr2, lp, ec)
-	require.NoError(t, err)
 
 	// Capture all lp data.
 	lp.PollAndSaveLogs(context.Background(), 1)
