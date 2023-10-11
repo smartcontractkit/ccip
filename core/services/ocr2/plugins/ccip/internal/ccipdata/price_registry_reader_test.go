@@ -2,6 +2,7 @@ package ccipdata_test
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -48,12 +49,21 @@ type priceRegReaderTH struct {
 	lggr    logger.Logger
 	user    *bind.TransactOpts
 	sim     *backends.SimulatedBackend
-	readers []ccipdata.PriceRegistryReader
+	readers map[string]ccipdata.PriceRegistryReader
 
 	// Expected state
+	blockTs              []uint64
 	expectedFeeTokens    []common.Address
-	expectedGasUpdates   []ccipdata.GasPrice
-	expectedTokenUpdates []ccipdata.TokenPrice
+	expectedGasUpdates   map[uint64][]ccipdata.GasPrice
+	expectedTokenUpdates map[uint64][]ccipdata.TokenPrice
+	dest                 uint64
+}
+
+func commitAndGetBlockTs(ec *client.SimulatedBackendClient) uint64 {
+	h := ec.Commit()
+	b, _ := ec.BlockByHash(context.Background(), h)
+	fmt.Println("bh", b.Number(), b.Hash())
+	return b.Time()
 }
 
 // setupPriceRegistryReaderTH instantiates all versions of the price registry reader
@@ -72,108 +82,144 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, 2, 3, 2, 1000)
 
 	feeTokens := []common.Address{randomAddress(), randomAddress()}
-	gasPriceUpdates := []ccipdata.GasPrice{
+	dest := uint64(10)
+	gasPriceUpdatesBlock1 := []ccipdata.GasPrice{
 		{
-			DestChainSelector: uint64(10),
+			DestChainSelector: dest,
 			Value:             big.NewInt(11),
 		},
 	}
-	tokenPriceUpdates := []ccipdata.TokenPrice{
+	gasPriceUpdatesBlock2 := []ccipdata.GasPrice{
 		{
-			Token: randomAddress(),
+			DestChainSelector: dest, // Reset same gas price
+			Value:             big.NewInt(12),
+		},
+	}
+	token1 := randomAddress()
+	token2 := randomAddress()
+	tokenPriceUpdatesBlock1 := []ccipdata.TokenPrice{
+		{
+			Token: token1,
 			Value: big.NewInt(12),
 		},
 	}
-	addr, _, pr, err := price_registry_1_0_0.DeployPriceRegistry(user, sim, nil, feeTokens, 1000)
+	tokenPriceUpdatesBlock2 := []ccipdata.TokenPrice{
+		{
+			Token: token1,
+			Value: big.NewInt(13),
+		},
+		{
+			Token: token2,
+			Value: big.NewInt(12),
+		},
+	}
+	addr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, sim, nil, feeTokens, 1000)
 	require.NoError(t, err)
-	_, err = pr.UpdatePrices(user, price_registry_1_0_0.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry_1_0_0.InternalTokenPriceUpdate{{
-			SourceToken: tokenPriceUpdates[0].Token,
-			UsdPerToken: tokenPriceUpdates[0].Value,
-		}},
-		DestChainSelector: gasPriceUpdates[0].DestChainSelector,
-		UsdPerUnitGas:     gasPriceUpdates[0].Value,
-	})
+	addr2, _, _, err := price_registry.DeployPriceRegistry(user, sim, nil, feeTokens, 1000)
 	require.NoError(t, err)
-	sim.Commit()
-	pr10, err := ccipdata.NewPriceRegistryReader(lggr, addr, lp, ec)
-	require.NoError(t, err)
+	ec.Commit() // Deploy these
+	// Apply block1.
+	ccipdata.ApplyPriceRegistryUpdateV1_0_0(t, user, addr, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
+	ccipdata.ApplyPriceRegistryUpdateV1_2_0(t, user, addr2, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
+	b1 := commitAndGetBlockTs(ec)
+	// Apply block2
+	ccipdata.ApplyPriceRegistryUpdateV1_0_0(t, user, addr, ec, gasPriceUpdatesBlock2, tokenPriceUpdatesBlock2)
+	ccipdata.ApplyPriceRegistryUpdateV1_2_0(t, user, addr2, ec, gasPriceUpdatesBlock2, tokenPriceUpdatesBlock2)
+	b2 := commitAndGetBlockTs(ec)
 
-	addr, _, pr2, err := price_registry.DeployPriceRegistry(user, sim, nil, feeTokens, 1000)
+	pr10r, err := ccipdata.NewPriceRegistryReader(lggr, addr, lp, ec)
 	require.NoError(t, err)
-	_, err = pr2.UpdatePrices(user, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: tokenPriceUpdates[0].Token,
-				UsdPerToken: tokenPriceUpdates[0].Value,
-			},
-		},
-		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
-			{
-				DestChainSelector: gasPriceUpdates[0].DestChainSelector,
-				UsdPerUnitGas:     gasPriceUpdates[0].Value,
-			},
-		},
-	})
-	require.NoError(t, err)
-	sim.Commit()
-	pr12r, err := ccipdata.NewPriceRegistryReader(lggr, addr, lp, ec)
+	pr12r, err := ccipdata.NewPriceRegistryReader(lggr, addr2, lp, ec)
 	require.NoError(t, err)
 
 	// Capture all lp data.
 	lp.PollAndSaveLogs(context.Background(), 1)
 
 	return priceRegReaderTH{
-		lp:                   lp,
-		ec:                   ec,
-		lggr:                 lggr,
-		user:                 user,
-		sim:                  sim,
-		readers:              []ccipdata.PriceRegistryReader{pr10, pr12r},
-		expectedFeeTokens:    feeTokens,
-		expectedGasUpdates:   gasPriceUpdates,
-		expectedTokenUpdates: tokenPriceUpdates,
+		lp:   lp,
+		ec:   ec,
+		lggr: lggr,
+		user: user,
+		sim:  sim,
+		readers: map[string]ccipdata.PriceRegistryReader{
+			ccipdata.V1_0_0: pr10r, ccipdata.V1_2_0: pr12r,
+		},
+		expectedFeeTokens: feeTokens,
+		expectedGasUpdates: map[uint64][]ccipdata.GasPrice{
+			b1: gasPriceUpdatesBlock1,
+			b2: gasPriceUpdatesBlock2,
+		},
+		expectedTokenUpdates: map[uint64][]ccipdata.TokenPrice{
+			b1: tokenPriceUpdatesBlock1,
+			b2: tokenPriceUpdatesBlock2,
+		},
+		blockTs: []uint64{b1, b2},
+		dest:    dest,
 	}
 }
 
 func TestPriceRegistryReader(t *testing.T) {
 	th := setupPriceRegistryReaderTH(t)
 	// Assert all readers produce the same expected results.
-	for _, pr := range th.readers {
-		// Assert have expected fee tokens.
-		gotFeeTokens, err := pr.GetFeeTokens(context.Background())
-		require.NoError(t, err)
-		assert.Equal(t, th.expectedFeeTokens, gotFeeTokens)
+	for version, pr := range th.readers {
+		pr := pr
+		t.Run("PriceRegistryReader"+version, func(t *testing.T) {
+			// Assert have expected fee tokens.
+			gotFeeTokens, err := pr.GetFeeTokens(context.Background())
+			require.NoError(t, err)
+			assert.Equal(t, th.expectedFeeTokens, gotFeeTokens)
 
-		// Note unsupported chain selector simply returns an empty set not an error
-		gasUpdates, err := pr.GetGasPriceUpdatesCreatedAfter(context.Background(), th.expectedGasUpdates[0].DestChainSelector+1, time.Unix(0, 0), 0)
-		require.NoError(t, err)
-		assert.Len(t, gasUpdates, 0)
+			// Note unsupported chain selector simply returns an empty set not an error
+			gasUpdates, err := pr.GetGasPriceUpdatesCreatedAfter(context.Background(), 1e6, time.Unix(0, 0), 0)
+			require.NoError(t, err)
+			assert.Len(t, gasUpdates, 0)
 
-		// Assert expected gas updates.
-		gasUpdates, err = pr.GetGasPriceUpdatesCreatedAfter(context.Background(), th.expectedGasUpdates[0].DestChainSelector, time.Unix(0, 0), 0)
-		require.NoError(t, err)
-		require.Len(t, gasUpdates, 1)
-		assert.Equal(t, gasUpdates[0].Data.GasPrice, th.expectedGasUpdates[0])
+			for i, ts := range th.blockTs {
+				// Should see all updates >= ts.
+				var expectedGas []ccipdata.GasPrice
+				var expectedToken []ccipdata.TokenPrice
+				for j := i; j < len(th.blockTs); j++ {
+					expectedGas = append(expectedGas, th.expectedGasUpdates[th.blockTs[j]]...)
+					expectedToken = append(expectedToken, th.expectedTokenUpdates[th.blockTs[j]]...)
+				}
+				gasUpdates, err = pr.GetGasPriceUpdatesCreatedAfter(context.Background(), th.dest, time.Unix(int64(ts-1), 0), 0)
+				require.NoError(t, err)
+				assert.Len(t, gasUpdates, len(expectedGas))
 
-		// Assert expected token updates.
-		tokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(0, 0), 0)
-		require.NoError(t, err)
-		require.Len(t, tokenUpdates, 1)
-		assert.Equal(t, tokenUpdates[0].Data.TokenPrice, th.expectedTokenUpdates[0])
+				tokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(int64(ts-1), 0), 0)
+				require.NoError(t, err)
+				assert.Len(t, tokenUpdates, len(expectedToken))
+			}
 
-		// Empty token set should return empty set no error.
-		gotEmpty, err := pr.GetTokenPrices(context.Background(), []common.Address{})
-		require.NoError(t, err)
-		assert.Len(t, gotEmpty, 0)
+			// Empty token set should return empty set no error.
+			gotEmpty, err := pr.GetTokenPrices(context.Background(), []common.Address{})
+			require.NoError(t, err)
+			assert.Len(t, gotEmpty, 0)
 
-		// Assert expected token prices
-		tokenPrices, err := pr.GetTokenPrices(context.Background(), []common.Address{th.expectedTokenUpdates[0].Token})
-		require.NoError(t, err)
-		require.Len(t, tokenPrices, 1)
-		assert.Equal(t, tokenPrices[0].TokenPrice, th.expectedTokenUpdates[0])
+			// We expect latest token prices to apply
+			allTokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(0, 0), 0)
+			require.NoError(t, err)
+			// Build latest map
+			latest := make(map[common.Address]*big.Int)
+			// Comes back in ascending order (oldest first)
+			var allTokens []common.Address
+			for i := len(allTokenUpdates) - 1; i >= 0; i-- {
+				_, have := latest[allTokenUpdates[i].Data.Token]
+				if have {
+					continue
+				}
+				latest[allTokenUpdates[i].Data.Token] = allTokenUpdates[i].Data.Value
+				allTokens = append(allTokens, allTokenUpdates[i].Data.Token)
+			}
+			tokenPrices, err := pr.GetTokenPrices(context.Background(), allTokens)
+			require.NoError(t, err)
+			require.Len(t, tokenPrices, len(allTokens))
+			for _, p := range tokenPrices {
+				assert.Equal(t, p.Value, latest[p.Token])
+			}
 
-		// We expect 2 fee token events (added/removed). Exact event sigs may differ.
-		assert.Len(t, pr.FeeTokenEvents(), 2)
+			// We expect 2 fee token events (added/removed). Exact event sigs may differ.
+			assert.Len(t, pr.FeeTokenEvents(), 2)
+		})
 	}
 }

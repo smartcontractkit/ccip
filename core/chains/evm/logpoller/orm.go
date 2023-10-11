@@ -276,21 +276,20 @@ func (o *DbORM) SelectLogs(start, end int64, address common.Address, eventSig co
 
 // SelectLogsCreatedAfter finds logs created after some timestamp.
 func (o *DbORM) SelectLogsCreatedAfter(address common.Address, eventSig common.Hash, after time.Time, confs int, qopts ...pg.QOpt) ([]Log, error) {
-	minBlock, maxBlock, err := o.blocksRangeAfterTimestamp(after, confs, qopts...)
-	if err != nil {
-		return nil, err
-	}
+	//minBlock, maxBlock, err := o.blocksRangeAfterTimestamp(after, confs, qopts...)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	var logs []Log
 	q := o.q.WithOpts(qopts...)
-	err = q.Select(&logs, `
+	err := q.Select(&logs, `
 		SELECT * FROM evm.logs 
 			WHERE evm_chain_id = $1 
 			AND address = $2 
 			AND event_sig = $3 	
-			AND block_number > $4
-			AND block_number <= $5
-			ORDER BY (block_number, log_index)`, utils.NewBig(o.chainID), address, eventSig, minBlock, maxBlock)
+			AND block_timestamp > $4
+			ORDER BY (block_number, log_index)`, utils.NewBig(o.chainID), address, eventSig, after)
 	if err != nil {
 		return nil, err
 	}
@@ -547,23 +546,22 @@ func validateTopicIndex(index int) error {
 }
 
 func (o *DbORM) SelectIndexedLogsCreatedAfter(address common.Address, eventSig common.Hash, topicIndex int, topicValues []common.Hash, after time.Time, confs int, qopts ...pg.QOpt) ([]Log, error) {
-	minBlock, maxBlock, err := o.blocksRangeAfterTimestamp(after, confs, qopts...)
-	if err != nil {
-		return nil, err
-	}
+	//minBlock, maxBlock, err := o.blocksRangeAfterTimestamp(after, confs, qopts...)
+	//if err != nil {
+	//	return nil, err
+	//}
 	var logs []Log
 	q := o.q.WithOpts(qopts...)
 	topicValuesBytes := concatBytes(topicValues)
 	// Add 1 since postgresql arrays are 1-indexed.
-	err = q.Select(&logs, `
+	err := q.Select(&logs, `
 		SELECT * FROM evm.logs 
 			WHERE evm.logs.evm_chain_id = $1
 			AND address = $2 
 			AND event_sig = $3
 			AND topics[$4] = ANY($5)
-			AND block_number > $6
-			AND block_number <= $7
-			ORDER BY (block_number, log_index)`, utils.NewBig(o.chainID), address, eventSig.Bytes(), topicIndex+1, topicValuesBytes, minBlock, maxBlock)
+			AND block_timestamp > $6
+			ORDER BY (block_number, log_index)`, utils.NewBig(o.chainID), address, eventSig.Bytes(), topicIndex+1, topicValuesBytes, after)
 	if err != nil {
 		return nil, err
 	}

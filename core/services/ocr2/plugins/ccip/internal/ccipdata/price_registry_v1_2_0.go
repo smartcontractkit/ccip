@@ -3,19 +3,29 @@ package ccipdata
 import (
 	"context"
 	"math/big"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 )
 
 var (
 	_ PriceRegistryReader = &PriceRegistryV1_2_0{}
 )
+
+func init() {
+	if abihelpers.MustGetEventID("UsdPerUnitGasUpdated", abihelpers.MustParseABI(price_registry.PriceRegistryABI)) != UsdPerUnitGasUpdatedV1_0_0 {
+		panic("UsdPerUnitGasUpdatedV1_0_0 must be the same as UsdPerUnitGasUpdated")
+	}
+}
 
 type PriceRegistryV1_2_0 struct {
 	*PriceRegistryV1_0_0
@@ -55,4 +65,33 @@ func (p *PriceRegistryV1_2_0) GetTokenPrices(ctx context.Context, wantedTokens [
 		})
 	}
 	return tpu, nil
+}
+
+func ApplyPriceRegistryUpdateV1_2_0(t *testing.T, user *bind.TransactOpts, addr common.Address, ec client.Client, gasPrices []GasPrice, tokenPrices []TokenPrice) common.Hash {
+	require.True(t, len(gasPrices) <= 1)
+	pr, err := price_registry.NewPriceRegistry(addr, ec)
+	require.NoError(t, err)
+	o, err := pr.Owner(nil)
+	require.NoError(t, err)
+	require.Equal(t, user.From, o)
+	var tps []price_registry.InternalTokenPriceUpdate
+	for _, tp := range tokenPrices {
+		tps = append(tps, price_registry.InternalTokenPriceUpdate{
+			SourceToken: tp.Token,
+			UsdPerToken: tp.Value,
+		})
+	}
+	var gps []price_registry.InternalGasPriceUpdate
+	for _, gp := range gasPrices {
+		gps = append(gps, price_registry.InternalGasPriceUpdate{
+			DestChainSelector: gp.DestChainSelector,
+			UsdPerUnitGas:     gp.Value,
+		})
+	}
+	tx, err := pr.UpdatePrices(user, price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: tps,
+		GasPriceUpdates:   gps,
+	})
+	require.NoError(t, err)
+	return tx.Hash()
 }

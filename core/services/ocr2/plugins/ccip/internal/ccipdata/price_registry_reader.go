@@ -48,8 +48,10 @@ type GasPriceUpdate struct {
 type PriceRegistryReader interface {
 	Close(qopts ...pg.QOpt) error
 	// GetTokenPriceUpdatesCreatedAfter returns all the token price updates that happened after the provided timestamp.
+	// The returned updates are sorted by timestamp in ascending order.
 	GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]Event[TokenPriceUpdate], error)
 	// GetGasPriceUpdatesCreatedAfter returns all the gas price updates that happened after the provided timestamp.
+	// The returned updates are sorted by timestamp in ascending order.
 	GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]Event[GasPriceUpdate], error)
 	Address() common.Address
 	FeeTokenEvents() []common.Hash
@@ -61,12 +63,14 @@ type PriceRegistryReader interface {
 func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Address, lp logpoller.LogPoller, cl client.Client) (PriceRegistryReader, error) {
 	_, version, err := ccipconfig.TypeAndVersion(priceRegistryAddress, cl)
 	if err != nil {
+		lggr.Infof("Assuming %v is 1.0.0 price registry", priceRegistryAddress.String())
 		// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it errors
 		// its v1.
+		// TODO: if there's an RPC error we may actually create a 100 reader for 120 contract?
 		return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl)
 	}
 	switch version.String() {
-	case v1_2_0:
+	case V1_2_0:
 		return NewPriceRegistryV1_2_0(lggr, priceRegistryAddress, lp, cl)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())

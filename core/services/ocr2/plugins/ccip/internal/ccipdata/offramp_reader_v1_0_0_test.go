@@ -34,5 +34,5 @@ func TestExecutionReportEncoding(t *testing.T) {
 	decodeCommitReport, err := offRamp.DecodeExecutionReport(encodeExecutionReport)
 	require.NoError(t, err)
 	require.Equal(t, report.Proofs, decodeCommitReport.Proofs)
-	// require.Equal(t, report, decodeCommitReport) // TODO: fails because some fields are not supported on v1_0_0
+	// require.Equal(t, report, decodeCommitReport) // TODO: fails because some fields are not supported on V1_0_0
 }
