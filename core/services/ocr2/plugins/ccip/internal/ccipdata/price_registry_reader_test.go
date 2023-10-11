@@ -177,8 +177,8 @@ func testPriceRegistryReader(t *testing.T, th priceRegReaderTH, pr ccipdata.Pric
 		require.NoError(t, err)
 		assert.Len(t, gasUpdates, len(expectedGas))
 
-		tokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(int64(ts-1), 0), 0)
-		require.NoError(t, err)
+		tokenUpdates, err2 := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(int64(ts-1), 0), 0)
+		require.NoError(t, err2)
 		assert.Len(t, tokenUpdates, len(expectedToken))
 	}
 
