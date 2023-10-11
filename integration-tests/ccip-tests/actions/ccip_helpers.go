@@ -1987,6 +1987,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			destCCIP.Common.PriceRegistry.EthAddress,
 			5,
 			50000,
+			200_000,
 		))
 		if err != nil {
 			return errors.WithStack(err)
