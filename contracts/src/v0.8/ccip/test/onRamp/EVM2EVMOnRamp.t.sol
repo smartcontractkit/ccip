@@ -730,10 +730,10 @@ contract EVM2EVMOnRamp_getFeeSetup is EVM2EVMOnRampSetup {
   }
 }
 
-/// @notice #getDataAvailabilityCostUSD
-contract EVM2EVMOnRamp_getDataAvailabilityCostUSD is EVM2EVMOnRamp_getFeeSetup {
+/// @notice #getDataAvailabilityCost
+contract EVM2EVMOnRamp_getDataAvailabilityCost is EVM2EVMOnRamp_getFeeSetup {
   function testEmptyMessageCalculatesDataAvailabilityCostSuccess() public {
-    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
+    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCost(USD_PER_DATA_AVAILABILITY_GAS, 0, 0, 0);
 
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
 
@@ -749,7 +749,7 @@ contract EVM2EVMOnRamp_getDataAvailabilityCostUSD is EVM2EVMOnRamp_getFeeSetup {
   }
 
   function testSimpleMessageCalculatesDataAvailabilityCostSuccess() public {
-    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(USD_PER_DATA_AVAILABILITY_GAS, 100, 5, 50);
+    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCost(USD_PER_DATA_AVAILABILITY_GAS, 100, 5, 50);
 
     EVM2EVMOnRamp.DynamicConfig memory dynamicConfig = s_onRamp.getDynamicConfig();
 
@@ -773,7 +773,7 @@ contract EVM2EVMOnRamp_getDataAvailabilityCostUSD is EVM2EVMOnRamp_getFeeSetup {
     uint32 numberOfTokens,
     uint32 tokenTransferBytesOverhead
   ) public {
-    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(
+    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCost(
       0,
       messageDataLength,
       numberOfTokens,
@@ -798,7 +798,7 @@ contract EVM2EVMOnRamp_getDataAvailabilityCostUSD is EVM2EVMOnRamp_getFeeSetup {
     dynamicConfig.destDataAvailabilityMultiplier = destDataAvailabilityMultiplier;
     s_onRamp.setDynamicConfig(dynamicConfig);
 
-    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCostUSD(
+    uint256 dataAvailabilityCostUSD = s_onRamp.getDataAvailabilityCost(
       dataAvailabilityGasPrice,
       messageDataLength,
       numberOfTokens,
@@ -1161,7 +1161,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSDCents) * feeTokenConfig.premiumMultiplierWeiPerEth);
-      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCostUSD(
+      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
         message.tokenAmounts.length,
@@ -1212,7 +1212,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
       uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + customDataSize * DEST_GAS_PER_PAYLOAD_BYTE;
       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
       uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSDCents) * feeTokenConfig.premiumMultiplierWeiPerEth);
-      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCostUSD(
+      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
         message.tokenAmounts.length,
@@ -1246,7 +1246,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
         message.tokenAmounts
       );
       uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplierWeiPerEth);
-      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCostUSD(
+      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
         message.tokenAmounts.length,
@@ -1300,7 +1300,7 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
         message.tokenAmounts
       );
       uint256 messageFeeUSD = (transferFeeUSD * feeTokenConfig.premiumMultiplierWeiPerEth);
-      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCostUSD(
+      uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
         message.tokenAmounts.length,
