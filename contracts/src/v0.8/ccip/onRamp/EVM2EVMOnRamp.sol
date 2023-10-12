@@ -105,7 +105,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     address token; // ──────────────────╮ Token address
     uint32 networkFeeUSDCents; //       │ Flat network fee to charge for messages,  multiples of 0.01 USD
     uint64 gasMultiplier; // ───────────╯ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost
-    uint64 premiumMultiplier; // ───────╮ Multiplier for fee-token-specific premiums
+    uint64 premiumMultiplier; // ───────╮ Multiplier for fee-token-specific premiums, 1e18 based
     bool enabled; // ───────────────────╯ Whether this fee token is enabled
   }
 
