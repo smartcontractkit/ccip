@@ -1343,18 +1343,21 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 	chainSelector := uint64(1234)
 
 	testCases := []struct {
-		name                   string
-		checkInflight          bool
-		inflightGasPriceUpdate *update
-		destGasPriceUpdates    []update
-		expUpdate              update
-		expErr                 bool
+		name                    string
+		checkInflight           bool
+		inflightGasPriceUpdate  *update
+		destGasPriceUpdates     []update
+		cacheValue              update
+		expUpdate               update
+		expErr                  bool
+		expStartQuery           time.Time
+		mockPriceRegistryReader *ccipdata.MockPriceRegistryReader
 	}{
 		{
 			name:                   "only inflight gas price",
 			checkInflight:          true,
-			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(1000)},
-			expUpdate:              update{timestamp: now, value: big.NewInt(1000)},
+			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(4000)},
+			expUpdate:              update{timestamp: now, value: big.NewInt(4000)},
 			expErr:                 false,
 		},
 		{
@@ -1362,22 +1365,53 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 			checkInflight:          true,
 			inflightGasPriceUpdate: nil,
 			destGasPriceUpdates: []update{
-				{timestamp: now.Add(time.Minute), value: big.NewInt(2000)},
-				{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
+				{timestamp: now.Add(-3 * time.Minute), value: big.NewInt(1000)},
+				{timestamp: now.Add(-2 * time.Minute), value: big.NewInt(2000)},
+				{timestamp: now.Add(-1 * time.Minute), value: big.NewInt(3000)},
 			},
-			expUpdate: update{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
+			expUpdate: update{timestamp: now.Add(-1 * time.Minute), value: big.NewInt(3000)},
 			expErr:    false,
 		},
 		{
-			name:                   "inflight updates are skipped",
+			name:                   "inflight updates skipped and cache empty",
 			checkInflight:          false,
-			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(1000)},
+			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(4000)},
 			destGasPriceUpdates: []update{
-				{timestamp: now.Add(time.Minute), value: big.NewInt(2000)},
-				{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
+				{timestamp: now.Add(-3 * time.Minute), value: big.NewInt(1000)},
+				{timestamp: now.Add(-2 * time.Minute), value: big.NewInt(2000)},
+				{timestamp: now.Add(-1 * time.Minute), value: big.NewInt(3000)},
 			},
-			expUpdate: update{timestamp: now.Add(2 * time.Minute), value: big.NewInt(3000)},
-			expErr:    false,
+			expUpdate:     update{timestamp: now.Add(-1 * time.Minute), value: big.NewInt(3000)},
+			expErr:        false,
+			expStartQuery: time.Time{},
+		},
+		{
+			name:                   "inflight updates skipped and cache not up to date",
+			checkInflight:          false,
+			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(4000)},
+			destGasPriceUpdates: []update{
+				{timestamp: now.Add(-3 * time.Minute), value: big.NewInt(1000)},
+				{timestamp: now.Add(-2 * time.Minute), value: big.NewInt(2000)},
+				{timestamp: now.Add(-1 * time.Minute), value: big.NewInt(3000)},
+			},
+			cacheValue:    update{timestamp: now.Add(-2 * time.Minute), value: big.NewInt(2000)},
+			expUpdate:     update{timestamp: now.Add(-1 * time.Minute), value: big.NewInt(3000)},
+			expErr:        false,
+			expStartQuery: now.Add(-2 * time.Minute),
+		},
+		{
+			name:                   "inflight updates skipped and cache up to date",
+			checkInflight:          false,
+			inflightGasPriceUpdate: &update{timestamp: now, value: big.NewInt(4000)},
+			destGasPriceUpdates: []update{
+				{timestamp: now.Add(-3 * time.Minute), value: big.NewInt(1000)},
+				{timestamp: now.Add(-2 * time.Minute), value: big.NewInt(2000)},
+				{timestamp: now.Add(-1 * time.Minute), value: big.NewInt(3000)},
+			},
+			cacheValue:    update{timestamp: now.Add(-1 * time.Minute), value: big.NewInt(3000)},
+			expUpdate:     update{timestamp: now.Add(-1 * time.Minute), value: big.NewInt(3000)},
+			expErr:        false,
+			expStartQuery: now.Add(-1 * time.Minute),
 		},
 	}
 
@@ -1392,6 +1426,8 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 			destPriceRegistry := ccipdata.NewMockPriceRegistryReader(t)
 			p.destPriceRegistryReader = destPriceRegistry
 			p.priceUpdatesCache = newPriceUpdatesCache()
+			p.priceUpdatesCache.updateCache(tc.cacheValue)
+			p.offchainConfig.GasPriceHeartBeat = 5 * time.Minute
 
 			if tc.inflightGasPriceUpdate != nil {
 				p.inflightReports.inFlightPriceUpdates = append(
@@ -1406,20 +1442,26 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 				)
 			}
 
+			// Build mocked result of GetGasPriceUpdatesCreatedAfter.
+			destReader := ccipdata.NewMockPriceRegistryReader(t)
 			if len(tc.destGasPriceUpdates) > 0 {
 				var events []ccipdata.Event[ccipdata.GasPriceUpdate]
 				for _, u := range tc.destGasPriceUpdates {
-					events = append(events, ccipdata.Event[ccipdata.GasPriceUpdate]{
-						Data: ccipdata.GasPriceUpdate{
-							GasPrice:  ccipdata.GasPrice{Value: u.value},
-							Timestamp: big.NewInt(u.timestamp.Unix()),
-						},
-					})
+					if tc.cacheValue.timestamp.IsZero() || !u.timestamp.Before(tc.cacheValue.timestamp) {
+						events = append(events, ccipdata.Event[ccipdata.GasPriceUpdate]{
+							Data: ccipdata.GasPriceUpdate{
+								GasPrice: ccipdata.GasPrice{
+									DestChainSelector: chainSelector,
+									Value:             u.value},
+								Timestamp: big.NewInt(u.timestamp.Unix()),
+							},
+						})
+					}
 				}
-				destReader := ccipdata.NewMockPriceRegistryReader(t)
-				destReader.On("GetGasPriceUpdatesCreatedAfter", ctx, chainSelector, mock.Anything, 0).Return(events, nil)
-				p.destPriceRegistryReader = destReader
+				destReader.On("GetGasPriceUpdatesCreatedAfter", ctx, chainSelector, mock.Anything, mock.Anything).Return(events, nil)
 			}
+			p.destPriceRegistryReader = destReader
+			tc.mockPriceRegistryReader = destReader
 
 			priceUpdate, err := p.getLatestGasPriceUpdate(ctx, time.Now(), tc.checkInflight)
 			if tc.expErr {
@@ -1430,6 +1472,16 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expUpdate.timestamp.Truncate(time.Second), priceUpdate.timestamp.Truncate(time.Second))
 			assert.Equal(t, tc.expUpdate.value.Uint64(), priceUpdate.value.Uint64())
+
+			// Verify proper cache usage: if the cache is used, we shouldn't query the full range.
+			reader := tc.mockPriceRegistryReader
+			if tc.checkInflight && tc.inflightGasPriceUpdate != nil {
+				reader.AssertNotCalled(t, "GetGasPriceUpdatesCreatedAfter", ctx, chainSelector, mock.Anything, 0)
+			} else if tc.expStartQuery.IsZero() {
+				reader.AssertCalled(t, "GetGasPriceUpdatesCreatedAfter", ctx, chainSelector, mock.Anything, 0)
+			} else {
+				reader.AssertCalled(t, "GetGasPriceUpdatesCreatedAfter", ctx, chainSelector, tc.expStartQuery, 0)
+			}
 		})
 	}
 }
