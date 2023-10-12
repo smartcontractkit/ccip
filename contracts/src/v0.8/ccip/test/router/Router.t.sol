@@ -262,12 +262,8 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
 
     // Update the price of the newly set feeToken
-    Internal.PriceUpdates memory priceUpdates = getSingleTokenAndGasPriceUpdateStruct(
-      feeTokenWithZeroFeeAndGas,
-      2_000 ether,
-      DEST_CHAIN_ID,
-      0
-    );
+    Internal.PriceUpdates memory priceUpdates =
+      getSingleTokenAndGasPriceUpdateStruct(feeTokenWithZeroFeeAndGas, 2_000 ether, DEST_CHAIN_ID, 0);
     s_priceRegistry.updatePrices(priceUpdates);
 
     // Set the feeToken args on the onRamp
@@ -408,10 +404,7 @@ contract Router_applyRampUpdates is RouterSetup {
     vm.expectRevert(IRouter.OnlyOffRamp.selector);
     changePrank(offRamp);
     s_sourceRouter.routeMessage(
-      generateReceiverMessage(SOURCE_CHAIN_ID),
-      GAS_FOR_CALL_EXACT_CHECK,
-      100_000,
-      address(s_receiver)
+      generateReceiverMessage(SOURCE_CHAIN_ID), GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver)
     );
     changePrank(OWNER);
 
@@ -423,10 +416,7 @@ contract Router_applyRampUpdates is RouterSetup {
     assertEq(offRampUpdates[0].offRamp, gotOffRamps[0].offRamp);
     changePrank(offRamp);
     s_sourceRouter.routeMessage(
-      generateReceiverMessage(SOURCE_CHAIN_ID),
-      GAS_FOR_CALL_EXACT_CHECK,
-      100_000,
-      address(s_receiver)
+      generateReceiverMessage(SOURCE_CHAIN_ID), GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver)
     );
   }
 
@@ -654,20 +644,14 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
   }
 
   function testAutoExecSuccess() public {
-    (bool success, ) = s_destRouter.routeMessage(
-      generateReceiverMessage(SOURCE_CHAIN_ID),
-      GAS_FOR_CALL_EXACT_CHECK,
-      100_000,
-      address(s_receiver)
+    (bool success,) = s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID), GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver)
     );
 
     assertTrue(success);
 
-    (success, ) = s_destRouter.routeMessage(
-      generateReceiverMessage(SOURCE_CHAIN_ID),
-      GAS_FOR_CALL_EXACT_CHECK,
-      1,
-      address(s_receiver)
+    (success,) = s_destRouter.routeMessage(
+      generateReceiverMessage(SOURCE_CHAIN_ID), GAS_FOR_CALL_EXACT_CHECK, 1, address(s_receiver)
     );
 
     // Can run out of gas, should return false
@@ -680,10 +664,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
 
     vm.expectRevert(IRouter.OnlyOffRamp.selector);
     s_destRouter.routeMessage(
-      generateReceiverMessage(SOURCE_CHAIN_ID),
-      GAS_FOR_CALL_EXACT_CHECK,
-      100_000,
-      address(s_receiver)
+      generateReceiverMessage(SOURCE_CHAIN_ID), GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver)
     );
   }
 
@@ -691,10 +672,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     s_mockARM.voteToCurse(bytes32(0));
     vm.expectRevert(Router.BadARMSignal.selector);
     s_destRouter.routeMessage(
-      generateReceiverMessage(SOURCE_CHAIN_ID),
-      GAS_FOR_CALL_EXACT_CHECK,
-      100_000,
-      address(s_receiver)
+      generateReceiverMessage(SOURCE_CHAIN_ID), GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver)
     );
   }
 }

@@ -7,6 +7,7 @@ import {OwnerIsCreator} from "./../../../shared/access/OwnerIsCreator.sol";
 
 contract MockARM is IARM, OwnerIsCreator {
   error CustomError(bytes err);
+
   bool private s_curse;
   bytes private s_err;
   ARM.VersionedConfig private s_versionedConfig;

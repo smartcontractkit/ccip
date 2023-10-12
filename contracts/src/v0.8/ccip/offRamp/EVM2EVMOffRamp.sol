@@ -68,10 +68,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
   event SkippedSenderWithPreviousRampMessageInflight(uint64 indexed nonce, address indexed sender);
   event ExecutionStateChanged(
-    uint64 indexed sequenceNumber,
-    bytes32 indexed messageId,
-    Internal.MessageExecutionState state,
-    bytes returnData
+    uint64 indexed sequenceNumber, bytes32 indexed messageId, Internal.MessageExecutionState state, bytes returnData
   );
 
   /// @notice Static offRamp config
@@ -145,10 +142,14 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
     if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
-    if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
+    if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) {
+      revert ZeroAddressNotAllowed();
+    }
     // Ensures we can never deploy a new offRamp that points to a commitStore that
     // already has roots committed.
-    if (ICommitStore(staticConfig.commitStore).getExpectedNextSequenceNumber() != 1) revert CommitStoreAlreadyInUse();
+    if (ICommitStore(staticConfig.commitStore).getExpectedNextSequenceNumber() != 1) {
+      revert CommitStoreAlreadyInUse();
+    }
 
     i_commitStore = staticConfig.commitStore;
     i_sourceChainSelector = staticConfig.sourceChainSelector;
@@ -181,11 +182,10 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @return The current execution state of the message.
   /// @dev we use the literal number 128 because using a constant increased gas usage.
   function getExecutionState(uint64 sequenceNumber) public view returns (Internal.MessageExecutionState) {
-    return
-      Internal.MessageExecutionState(
-        (s_executionStates[sequenceNumber / 128] >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH)) &
-          MESSAGE_EXECUTION_STATE_MASK
-      );
+    return Internal.MessageExecutionState(
+      (s_executionStates[sequenceNumber / 128] >> ((sequenceNumber % 128) * MESSAGE_EXECUTION_STATE_BIT_WIDTH))
+        & MESSAGE_EXECUTION_STATE_MASK
+    );
   }
 
   /// @notice Sets a new execution state for a given sequence number. It will overwrite any existing state.
@@ -222,14 +222,18 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// insufficient gas provided.
   function manuallyExecute(Internal.ExecutionReport memory report, uint256[] memory gasLimitOverrides) external {
     // We do this here because the other _execute path is already covered OCR2BaseXXX.
-    if (i_chainID != block.chainid) revert OCR2BaseNoChecks.ForkedChain(i_chainID, uint64(block.chainid));
+    if (i_chainID != block.chainid) {
+      revert OCR2BaseNoChecks.ForkedChain(i_chainID, uint64(block.chainid));
+    }
 
     uint256 numMsgs = report.messages.length;
     if (numMsgs != gasLimitOverrides.length) revert ManualExecutionGasLimitMismatch();
     for (uint256 i = 0; i < numMsgs; ++i) {
       uint256 newLimit = gasLimitOverrides[i];
       // Checks to ensure message cannot be executed with less gas than specified.
-      if (newLimit != 0 && newLimit < report.messages[i].gasLimit) revert InvalidManualExecutionGasLimit(i, newLimit);
+      if (newLimit != 0 && newLimit < report.messages[i].gasLimit) {
+        revert InvalidManualExecutionGasLimit(i, newLimit);
+      }
     }
 
     _execute(report, gasLimitOverrides);
@@ -277,17 +281,20 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // and failed. This check protects against reentry and re-execution because the other states are
       // IN_PROGRESS and SUCCESS, both should not be allowed to execute.
       if (
-        !(originalState == Internal.MessageExecutionState.UNTOUCHED ||
-          originalState == Internal.MessageExecutionState.FAILURE)
+        !(
+          originalState == Internal.MessageExecutionState.UNTOUCHED
+            || originalState == Internal.MessageExecutionState.FAILURE
+        )
       ) revert AlreadyExecuted(message.sequenceNumber);
 
       if (manualExecution) {
-        bool isOldCommitReport = (block.timestamp - timestampCommitted) >
-          s_dynamicConfig.permissionLessExecutionThresholdSeconds;
+        bool isOldCommitReport =
+          (block.timestamp - timestampCommitted) > s_dynamicConfig.permissionLessExecutionThresholdSeconds;
         // Manually execution is fine if we previously failed or if the commit report is just too old
         // Acceptable state transitions: FAILURE->SUCCESS, UNTOUCHED->SUCCESS, FAILURE->FAILURE
-        if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE))
+        if (!(isOldCommitReport || originalState == Internal.MessageExecutionState.FAILURE)) {
           revert ManualExecutionNotYetEnabled();
+        }
 
         // Manual execution gas limit can override gas limit specified in the message. Value of 0 indicates no override.
         if (manualExecGasLimits[i] != 0) {
@@ -296,7 +303,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       } else {
         // DON can only execute a message once
         // Acceptable state transitions: UNTOUCHED->SUCCESS, UNTOUCHED->FAILURE
-        if (originalState != Internal.MessageExecutionState.UNTOUCHED) revert AlreadyAttempted(message.sequenceNumber);
+        if (originalState != Internal.MessageExecutionState.UNTOUCHED) {
+          revert AlreadyAttempted(message.sequenceNumber);
+        }
       }
 
       // In the scenario where we upgrade offRamps, we still want to have sequential nonces.
@@ -340,8 +349,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
       // The only valid prior states are UNTOUCHED and FAILURE (checked above)
       // The only valid post states are FAILURE and SUCCESS (checked below)
-      if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS)
+      if (newState != Internal.MessageExecutionState.FAILURE && newState != Internal.MessageExecutionState.SUCCESS) {
         revert InvalidNewState(message.sequenceNumber, newState);
+      }
 
       // Nonce changes per state transition
       // UNTOUCHED -> FAILURE  nonce bump
@@ -360,12 +370,18 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @param message The message to be validated.
   /// @dev reverts on validation failures.
   function _isWellFormed(Internal.EVM2EVMMessage memory message, uint256 offchainTokenDataLength) private view {
-    if (message.sourceChainSelector != i_sourceChainSelector) revert InvalidSourceChain(message.sourceChainSelector);
-    if (message.tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength))
+    if (message.sourceChainSelector != i_sourceChainSelector) {
+      revert InvalidSourceChain(message.sourceChainSelector);
+    }
+    if (message.tokenAmounts.length > uint256(s_dynamicConfig.maxTokensLength)) {
       revert UnsupportedNumberOfTokens(message.sequenceNumber);
-    if (message.tokenAmounts.length != offchainTokenDataLength) revert TokenDataMismatch(message.sequenceNumber);
-    if (message.data.length > uint256(s_dynamicConfig.maxDataSize))
+    }
+    if (message.tokenAmounts.length != offchainTokenDataLength) {
+      revert TokenDataMismatch(message.sequenceNumber);
+    }
+    if (message.data.length > uint256(s_dynamicConfig.maxDataSize)) {
       revert MessageTooLarge(uint256(s_dynamicConfig.maxDataSize), message.data.length);
+    }
   }
 
   /// @notice Try executing a message.
@@ -377,7 +393,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     Internal.EVM2EVMMessage memory message,
     bytes[] memory offchainTokenData
   ) internal returns (Internal.MessageExecutionState, bytes memory) {
-    try this.executeSingleMessage(message, offchainTokenData) {} catch (bytes memory err) {
+    try this.executeSingleMessage(message, offchainTokenData) {}
+    catch (bytes memory err) {
       if (ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
         // prepended by the 4 bytes of ReceiverError.selector or TokenHandlingError.selector
@@ -404,11 +421,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
     if (message.tokenAmounts.length > 0) {
       destTokenAmounts = _releaseOrMintTokens(
-        message.tokenAmounts,
-        abi.encode(message.sender),
-        message.receiver,
-        message.sourceTokenData,
-        offchainTokenData
+        message.tokenAmounts, abi.encode(message.sender), message.receiver, message.sourceTokenData, offchainTokenData
       );
     }
     if (
@@ -437,15 +450,14 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   /// @notice Returns the static config.
   /// @dev This function will always return the same struct as the contents is static and can never change.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return
-      StaticConfig({
-        commitStore: i_commitStore,
-        chainSelector: i_chainSelector,
-        sourceChainSelector: i_sourceChainSelector,
-        onRamp: i_onRamp,
-        prevOffRamp: i_prevOffRamp,
-        armProxy: i_armProxy
-      });
+    return StaticConfig({
+      commitStore: i_commitStore,
+      chainSelector: i_chainSelector,
+      sourceChainSelector: i_sourceChainSelector,
+      onRamp: i_onRamp,
+      prevOffRamp: i_prevOffRamp,
+      armProxy: i_armProxy
+    });
   }
 
   /// @notice Returns the current dynamic config.
@@ -484,7 +496,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   function getSupportedTokens() external view returns (IERC20[] memory sourceTokens) {
     sourceTokens = new IERC20[](s_poolsBySourceToken.length());
     for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      (address token, ) = s_poolsBySourceToken.at(i);
+      (address token,) = s_poolsBySourceToken.at(i);
       sourceTokens[i] = IERC20(token);
     }
   }
@@ -521,7 +533,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   function getDestinationTokens() external view returns (IERC20[] memory destTokens) {
     destTokens = new IERC20[](s_poolsByDestToken.length());
     for (uint256 i = 0; i < destTokens.length; ++i) {
-      (address token, ) = s_poolsByDestToken.at(i);
+      (address token,) = s_poolsByDestToken.at(i);
       destTokens[i] = IERC20(token);
     }
   }
@@ -581,15 +593,13 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
       IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
 
-      try
-        pool.releaseOrMint(
-          originalSender,
-          receiver,
-          sourceTokenAmounts[i].amount,
-          i_sourceChainSelector,
-          abi.encode(sourceTokenData[i], offchainTokenData[i])
-        )
-      {} catch (bytes memory err) {
+      try pool.releaseOrMint(
+        originalSender,
+        receiver,
+        sourceTokenAmounts[i].amount,
+        i_sourceChainSelector,
+        abi.encode(sourceTokenData[i], offchainTokenData[i])
+      ) {} catch (bytes memory err) {
         /// @dev wrap and rethrow the error so we can catch it lower in the stack
         revert TokenHandlingError(err);
       }

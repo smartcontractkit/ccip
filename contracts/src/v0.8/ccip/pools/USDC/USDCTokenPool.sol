@@ -114,11 +114,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // is able to call replaceDepositForBurn. Since this contract does not implement
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
     uint64 nonce = ITokenMessenger(s_config.tokenMessenger).depositForBurnWithCaller(
-      amount,
-      domain.domainIdentifier,
-      receiver,
-      address(i_token),
-      domain.allowedCaller
+      amount, domain.domainIdentifier, receiver, address(i_token), domain.allowedCaller
     );
     emit Burned(msg.sender, amount);
     return abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}));
@@ -154,8 +150,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     if (
       !IMessageReceiver(s_config.messageTransmitter).receiveMessage(
-        msgAndAttestation.message,
-        msgAndAttestation.attestation
+        msgAndAttestation.message, msgAndAttestation.attestation
       )
     ) revert UnlockingUSDCFailed();
     emit Minted(msg.sender, receiver, amount);
@@ -199,10 +194,12 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       nonce := mload(add(usdcMessage, 20)) // 12 + 8 = 20
     }
 
-    if (sourceDomain != sourceTokenData.sourceDomain)
+    if (sourceDomain != sourceTokenData.sourceDomain) {
       revert InvalidSourceDomain(sourceTokenData.sourceDomain, sourceDomain);
-    if (destinationDomain != i_localDomainIdentifier)
+    }
+    if (destinationDomain != i_localDomainIdentifier) {
       revert InvalidDestinationDomain(i_localDomainIdentifier, destinationDomain);
+    }
     if (nonce != sourceTokenData.nonce) revert InvalidNonce(sourceTokenData.nonce, nonce);
   }
 
@@ -223,9 +220,13 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// @notice Sets the config
   function _setConfig(USDCConfig memory config) internal {
     if (config.version != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(config.version);
-    if (config.messageTransmitter == address(0) || config.tokenMessenger == address(0)) revert InvalidConfig();
+    if (config.messageTransmitter == address(0) || config.tokenMessenger == address(0)) {
+      revert InvalidConfig();
+    }
     uint32 tokenMessengerVersion = ITokenMessenger(config.tokenMessenger).messageBodyVersion();
-    if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+    if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) {
+      revert InvalidTokenMessengerVersion(tokenMessengerVersion);
+    }
 
     // Revoke approval for previous token messenger
     if (s_config.tokenMessenger != address(0)) i_token.approve(s_config.tokenMessenger, 0);
@@ -244,7 +245,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   function setDomains(DomainUpdate[] calldata domains) external onlyOwner {
     for (uint256 i = 0; i < domains.length; ++i) {
       DomainUpdate memory domain = domains[i];
-      if (domain.allowedCaller == bytes32(0) || domain.destChainSelector == 0) revert InvalidDomain(domain);
+      if (domain.allowedCaller == bytes32(0) || domain.destChainSelector == 0) {
+        revert InvalidDomain(domain);
+      }
 
       s_chainToDomain[domain.destChainSelector] = Domain({
         domainIdentifier: domain.domainIdentifier,

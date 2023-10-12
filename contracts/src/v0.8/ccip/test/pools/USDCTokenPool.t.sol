@@ -74,18 +74,12 @@ contract USDCTokenPoolSetup is BaseTest {
     );
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({
-      ramp: s_routerAllowedOnRamp,
-      allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
-    });
+    onRamps[0] =
+      TokenPool.RampUpdate({ramp: s_routerAllowedOnRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
 
     TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({
-      ramp: s_routerAllowedOffRamp,
-      allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
-    });
+    offRamps[0] =
+      TokenPool.RampUpdate({ramp: s_routerAllowedOffRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
 
     s_usdcTokenPool.applyRampUpdates(onRamps, offRamps);
     s_usdcTokenPoolWithAllowList.applyRampUpdates(onRamps, offRamps);
@@ -116,17 +110,16 @@ contract USDCTokenPoolSetup is BaseTest {
   }
 
   function _generateUSDCMessage(USDCMessage memory usdcMessage) internal pure returns (bytes memory) {
-    return
-      abi.encodePacked(
-        usdcMessage.version,
-        usdcMessage.sourceDomain,
-        usdcMessage.destinationDomain,
-        usdcMessage.nonce,
-        usdcMessage.sender,
-        usdcMessage.recipient,
-        usdcMessage.destinationCaller,
-        usdcMessage.messageBody
-      );
+    return abi.encodePacked(
+      usdcMessage.version,
+      usdcMessage.sourceDomain,
+      usdcMessage.destinationDomain,
+      usdcMessage.nonce,
+      usdcMessage.sender,
+      usdcMessage.recipient,
+      usdcMessage.destinationCaller,
+      usdcMessage.messageBody
+    );
   }
 }
 
@@ -172,13 +165,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Burned(s_routerAllowedOnRamp, amount);
 
-    bytes memory encodedNonce = s_usdcTokenPool.lockOrBurn(
-      OWNER,
-      abi.encodePacked(destinationReceiver),
-      amount,
-      DEST_CHAIN_ID,
-      bytes("")
-    );
+    bytes memory encodedNonce =
+      s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_ID, bytes(""));
     uint64 nonce = abi.decode(encodedNonce, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
   }
@@ -208,11 +196,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     emit Burned(s_routerAllowedOnRamp, amount);
 
     bytes memory encodedNonce = s_usdcTokenPoolWithAllowList.lockOrBurn(
-      s_allowedList[0],
-      abi.encodePacked(destinationReceiver),
-      amount,
-      DEST_CHAIN_ID,
-      bytes("")
+      s_allowedList[0], abi.encodePacked(destinationReceiver), amount, DEST_CHAIN_ID, bytes("")
     );
     uint64 nonce = abi.decode(encodedNonce, (uint64));
     assertEq(s_mockUSDC.s_nonce() - 1, nonce);
@@ -285,8 +269,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
 
   // https://etherscan.io/tx/0xac9f501fe0b76df1f07a22e1db30929fd12524bc7068d74012dff948632f0883
   function testReleaseOrMintRealTxSuccess() public {
-    bytes
-      memory encodedUsdcMessage = hex"000000000000000300000000000000000000127a00000000000000000000000019330d10d9cc8751218eaf51e8885d058642e08a000000000000000000000000bd3fa81b58ba92a82136038b25adec7066af3155000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e58310000000000000000000000004af08f56978be7dce2d1be3c65c005b41e79401c000000000000000000000000000000000000000000000000000000002057ff7a0000000000000000000000003a23f943181408eac424116af7b7790c94cb97a50000000000000000000000000000000000000000000000000000000000000000000000000000008274119237535fd659626b090f87e365ff89ebc7096bb32e8b0e85f155626b73ae7c4bb2485c184b7cc3cf7909045487890b104efb62ae74a73e32901bdcec91df1bb9ee08ccb014fcbcfe77b74d1263fd4e0b0e8de05d6c9a5913554364abfd5ea768b222f50c715908183905d74044bb2b97527c7e70ae7983c443a603557cac3b1c000000000000000000000000000000000000000000000000000000000000";
+    bytes memory encodedUsdcMessage =
+      hex"000000000000000300000000000000000000127a00000000000000000000000019330d10d9cc8751218eaf51e8885d058642e08a000000000000000000000000bd3fa81b58ba92a82136038b25adec7066af3155000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e58310000000000000000000000004af08f56978be7dce2d1be3c65c005b41e79401c000000000000000000000000000000000000000000000000000000002057ff7a0000000000000000000000003a23f943181408eac424116af7b7790c94cb97a50000000000000000000000000000000000000000000000000000000000000000000000000000008274119237535fd659626b090f87e365ff89ebc7096bb32e8b0e85f155626b73ae7c4bb2485c184b7cc3cf7909045487890b104efb62ae74a73e32901bdcec91df1bb9ee08ccb014fcbcfe77b74d1263fd4e0b0e8de05d6c9a5913554364abfd5ea768b222f50c715908183905d74044bb2b97527c7e70ae7983c443a603557cac3b1c000000000000000000000000000000000000000000000000000000000000";
     bytes memory attestation = bytes("attestation bytes");
 
     uint32 nonce = 4730;
@@ -298,8 +282,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     );
 
     vm.expectCall(
-      address(s_mockUSDC),
-      abi.encodeWithSelector(MockUSDC.receiveMessage.selector, encodedUsdcMessage, attestation)
+      address(s_mockUSDC), abi.encodeWithSelector(MockUSDC.receiveMessage.selector, encodedUsdcMessage, attestation)
     );
 
     changePrank(s_routerAllowedOffRamp);
@@ -344,9 +327,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     address recipient = address(1);
     changePrank(s_routerAllowedOffRamp);
 
-    bytes memory extraData = abi.encode(
-      USDCTokenPool.MessageAndAttestation({message: bytes(""), attestation: bytes("")})
-    );
+    bytes memory extraData =
+      abi.encode(USDCTokenPool.MessageAndAttestation({message: bytes(""), attestation: bytes("")}));
 
     vm.expectRevert(
       abi.encodeWithSelector(RateLimiter.TokenMaxCapacityExceeded.selector, capacity, amount, address(s_token))
@@ -389,11 +371,8 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
         enabled: true
       });
 
-      s_chainToDomain[destChainSelectors[i]] = USDCTokenPool.Domain({
-        domainIdentifier: domainIdentifiers[i],
-        allowedCaller: allowedCallers[i],
-        enabled: true
-      });
+      s_chainToDomain[destChainSelectors[i]] =
+        USDCTokenPool.Domain({domainIdentifier: domainIdentifiers[i], allowedCaller: allowedCallers[i], enabled: true});
     }
 
     vm.expectEmit();
@@ -478,8 +457,7 @@ contract USDCTokenPool_setConfig is USDCTokenPoolSetup {
 
     assertEq(0, s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), oldConfig.tokenMessenger));
     assertEq(
-      type(uint256).max,
-      s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), gotConfig.tokenMessenger)
+      type(uint256).max, s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), gotConfig.tokenMessenger)
     );
     // Assert old approval is removed
     assertEq(0, s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), address(s_mockUSDC)));
@@ -488,11 +466,8 @@ contract USDCTokenPool_setConfig is USDCTokenPoolSetup {
   // Reverts
 
   function testInvalidMessageVersionReverts() public {
-    USDCTokenPool.USDCConfig memory newConfig = USDCTokenPool.USDCConfig({
-      version: 1,
-      tokenMessenger: address(100),
-      messageTransmitter: address(1)
-    });
+    USDCTokenPool.USDCConfig memory newConfig =
+      USDCTokenPool.USDCConfig({version: 1, tokenMessenger: address(100), messageTransmitter: address(1)});
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, newConfig.version));
     s_usdcTokenPool.setConfig(newConfig);
@@ -502,22 +477,16 @@ contract USDCTokenPool_setConfig is USDCTokenPoolSetup {
     uint32 wrongVersion = 5;
     MockUSDC newMockUSDC = new MockUSDC(wrongVersion);
 
-    USDCTokenPool.USDCConfig memory newConfig = USDCTokenPool.USDCConfig({
-      version: 0,
-      tokenMessenger: address(newMockUSDC),
-      messageTransmitter: address(1)
-    });
+    USDCTokenPool.USDCConfig memory newConfig =
+      USDCTokenPool.USDCConfig({version: 0, tokenMessenger: address(newMockUSDC), messageTransmitter: address(1)});
 
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, wrongVersion));
     s_usdcTokenPool.setConfig(newConfig);
   }
 
   function testInvalidConfigReverts() public {
-    USDCTokenPool.USDCConfig memory newConfig = USDCTokenPool.USDCConfig({
-      version: 0,
-      tokenMessenger: address(0),
-      messageTransmitter: address(123456789)
-    });
+    USDCTokenPool.USDCConfig memory newConfig =
+      USDCTokenPool.USDCConfig({version: 0, tokenMessenger: address(0), messageTransmitter: address(123456789)});
 
     vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
     s_usdcTokenPool.setConfig(newConfig);
@@ -557,8 +526,7 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
 
     vm.resumeGasMetering();
     s_usdcTokenPool.validateMessage(
-      encodedUsdcMessage,
-      USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})
+      encodedUsdcMessage, USDCTokenPool.SourceTokenDataPayload({nonce: nonce, sourceDomain: sourceDomain})
     );
   }
 
@@ -576,10 +544,8 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
       messageBody: bytes("")
     });
 
-    USDCTokenPool.SourceTokenDataPayload memory sourceTokenData = USDCTokenPool.SourceTokenDataPayload({
-      nonce: usdcMessage.nonce,
-      sourceDomain: usdcMessage.sourceDomain
-    });
+    USDCTokenPool.SourceTokenDataPayload memory sourceTokenData =
+      USDCTokenPool.SourceTokenDataPayload({nonce: usdcMessage.nonce, sourceDomain: usdcMessage.sourceDomain});
 
     bytes memory encodedUsdcMessage = _generateUSDCMessage(usdcMessage);
 
@@ -606,9 +572,7 @@ contract USDCTokenPool__validateMessage is USDCTokenPoolSetup {
     usdcMessage.destinationDomain = DEST_DOMAIN_IDENTIFIER + 1;
     vm.expectRevert(
       abi.encodeWithSelector(
-        USDCTokenPool.InvalidDestinationDomain.selector,
-        DEST_DOMAIN_IDENTIFIER,
-        usdcMessage.destinationDomain
+        USDCTokenPool.InvalidDestinationDomain.selector, DEST_DOMAIN_IDENTIFIER, usdcMessage.destinationDomain
       )
     );
 

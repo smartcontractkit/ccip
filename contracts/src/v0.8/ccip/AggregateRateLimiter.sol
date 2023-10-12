@@ -88,7 +88,9 @@ contract AggregateRateLimiter is OwnerIsCreator {
   /// @notice a modifier that allows the owner or the s_tokenLimitAdmin call the functions
   /// it is applied to.
   modifier onlyAdminOrOwner() {
-    if (msg.sender != owner() && msg.sender != s_admin) revert RateLimiter.OnlyCallableByAdminOrOwner();
+    if (msg.sender != owner() && msg.sender != s_admin) {
+      revert RateLimiter.OnlyCallableByAdminOrOwner();
+    }
     _;
   }
 }

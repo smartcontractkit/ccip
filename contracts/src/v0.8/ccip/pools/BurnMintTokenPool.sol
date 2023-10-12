@@ -16,11 +16,7 @@ contract BurnMintTokenPool is TokenPool, ITypeAndVersion {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "BurnMintTokenPool 1.2.0";
 
-  constructor(
-    IBurnMintERC20 token,
-    address[] memory allowlist,
-    address armProxy
-  ) TokenPool(token, allowlist, armProxy) {}
+  constructor(IBurnMintERC20 token, address[] memory allowlist, address armProxy) TokenPool(token, allowlist, armProxy) {}
 
   /// @notice Burn the token in the pool
   /// @param amount Amount to burn

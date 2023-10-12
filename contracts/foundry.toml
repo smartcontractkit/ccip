@@ -61,4 +61,10 @@ test = 'src/v0.8/shared/test'
 solc_version = '0.8.19'
 
 
+[fmt]
+line_length = 120
+tab_width = 2
+multiline_func_header = "params_first"
+
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config

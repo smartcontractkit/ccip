@@ -54,11 +54,8 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
     BurnMintERC677(address(s_token)).grantMintAndBurnRoles(address(s_thirdPartyPoolWithAllowList));
 
     TokenPool.RampUpdate[] memory poolOnRampsUpdates = new TokenPool.RampUpdate[](1);
-    poolOnRampsUpdates[0] = TokenPool.RampUpdate({
-      ramp: s_allowedOnRamp,
-      allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
-    });
+    poolOnRampsUpdates[0] =
+      TokenPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
     TokenPool.RampUpdate[] memory poolOffRampUpdates = new TokenPool.RampUpdate[](0);
 
     s_thirdPartyPool.applyRampUpdates(poolOnRampsUpdates, poolOffRampUpdates);
@@ -68,6 +65,7 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
 
 contract ThirdPartyBurnMintTokenPool_lockOrBurn is ThirdPartyBurnMintTokenPoolSetup {
   error SenderNotAllowed(address sender);
+
   event Burned(address indexed sender, uint256 amount);
   event TokensConsumed(uint256 amount);
 

@@ -65,13 +65,18 @@ contract TokenProxy is OwnerIsCreator {
   /// @notice Validates the message content.
   /// @dev Only allows a single token to be sent, and no data.
   function _validateMessage(Client.EVM2AnyMessage calldata message) internal view {
-    if (message.tokenAmounts.length != 1 || message.tokenAmounts[0].token != i_token) revert InvalidToken();
+    if (message.tokenAmounts.length != 1 || message.tokenAmounts[0].token != i_token) {
+      revert InvalidToken();
+    }
     if (message.data.length > 0) revert NoDataAllowed();
 
-    if (message.extraArgs.length == 0 || bytes4(message.extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG)
+    if (message.extraArgs.length == 0 || bytes4(message.extraArgs) != Client.EVM_EXTRA_ARGS_V1_TAG) {
       revert GasShouldBeZero();
+    }
 
-    if (abi.decode(message.extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit != 0) revert GasShouldBeZero();
+    if (abi.decode(message.extraArgs[4:], (Client.EVMExtraArgsV1)).gasLimit != 0) {
+      revert GasShouldBeZero();
+    }
   }
 
   /// @notice Returns the CCIP router contract.

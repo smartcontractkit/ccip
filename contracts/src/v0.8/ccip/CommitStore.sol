@@ -85,10 +85,8 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// will either be ignored (reverted as an invalid interval) or will be accepted as an additional valid price update.
   constructor(StaticConfig memory staticConfig) OCR2Base(false) {
     if (
-      staticConfig.onRamp == address(0) ||
-      staticConfig.chainSelector == 0 ||
-      staticConfig.sourceChainSelector == 0 ||
-      staticConfig.armProxy == address(0)
+      staticConfig.onRamp == address(0) || staticConfig.chainSelector == 0 || staticConfig.sourceChainSelector == 0
+        || staticConfig.armProxy == address(0)
     ) revert InvalidCommitStoreConfig();
 
     i_chainSelector = staticConfig.chainSelector;
@@ -204,8 +202,9 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
     }
 
     // If we reached this section, the report should contain a valid root
-    if (s_minSeqNr != report.interval.min || report.interval.min > report.interval.max)
+    if (s_minSeqNr != report.interval.min || report.interval.min > report.interval.max) {
       revert InvalidInterval(report.interval);
+    }
 
     if (report.merkleRoot == bytes32(0)) revert InvalidRoot();
     // Disallow duplicate roots as that would reset the timestamp and
@@ -224,13 +223,12 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   /// @notice Returns the static commit store config.
   /// @return the configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
-    return
-      StaticConfig({
-        chainSelector: i_chainSelector,
-        sourceChainSelector: i_sourceChainSelector,
-        onRamp: i_onRamp,
-        armProxy: i_armProxy
-      });
+    return StaticConfig({
+      chainSelector: i_chainSelector,
+      sourceChainSelector: i_sourceChainSelector,
+      onRamp: i_onRamp,
+      armProxy: i_armProxy
+    });
   }
 
   /// @notice Returns the dynamic commit store config.

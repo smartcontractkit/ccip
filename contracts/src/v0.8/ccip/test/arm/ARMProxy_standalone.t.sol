@@ -43,7 +43,7 @@ contract ARMProxyStandaloneTest is Test {
   }
 
   /*
-  function testARMCall_fuzz(bool expectedSuccess, bytes memory call, bytes memory ret) public {
+    function testARMCall_fuzz(bool expectedSuccess, bytes memory call, bytes memory ret) public {
     // filter out calls to functions that will be handled on the ARMProxy instead
     // of the underlying ARM contract
     vm.assume(
@@ -66,15 +66,15 @@ contract ARMProxyStandaloneTest is Test {
 
     assertEq(result, ret);
     assertEq(expectedSuccess, actualSuccess);
-  }
-  */
+    }
+    */
 
   function testARMCallEmptyContractRevert() public {
     vm.prank(OWNER_ADDRESS);
     s_armProxy.setARM(EMPTY_ADDRESS); // No code at address 1, should revert.
     vm.expectRevert();
     bytes memory b = new bytes(0);
-    (bool success, ) = address(s_armProxy).call(b);
+    (bool success,) = address(s_armProxy).call(b);
     success;
   }
 }

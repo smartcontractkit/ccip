@@ -21,11 +21,7 @@ contract BurnMintERC677Setup is BaseTest {
     s_burnMintERC677.grantMintAndBurnRoles(address(s_pool));
     s_burnMintOffRamp = address(238323465456);
     TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({
-      ramp: s_burnMintOffRamp,
-      allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
-    });
+    offRamps[0] = TokenPool.RampUpdate({ramp: s_burnMintOffRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
     s_pool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
 
     s_burnMintOnRamp = address(238323465457);

@@ -56,7 +56,9 @@ library MerkleMultiProof {
       uint256 leavesLen = leaves.length;
       uint256 proofsLen = proofs.length;
       if (leavesLen == 0) revert LeavesCannotBeEmpty();
-      if (!(leavesLen <= MAX_NUM_HASHES + 1 && proofsLen <= MAX_NUM_HASHES + 1)) revert InvalidProof();
+      if (!(leavesLen <= MAX_NUM_HASHES + 1 && proofsLen <= MAX_NUM_HASHES + 1)) {
+        revert InvalidProof();
+      }
       uint256 totalHashes = leavesLen + proofsLen - 1;
       if (!(totalHashes <= MAX_NUM_HASHES)) revert InvalidProof();
       if (totalHashes == 0) {
@@ -93,7 +95,9 @@ library MerkleMultiProof {
 
         hashes[i] = _hashPair(a, b);
       }
-      if (!(hashPos == totalHashes - 1 && leafPos == leavesLen && proofPos == proofsLen)) revert InvalidProof();
+      if (!(hashPos == totalHashes - 1 && leafPos == leavesLen && proofPos == proofsLen)) {
+        revert InvalidProof();
+      }
       // Return the last hash.
       return hashes[totalHashes - 1];
     }

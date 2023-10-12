@@ -135,9 +135,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       IERC20 token = IERC20(message.tokenAmounts[i].token);
       // We rely on getPoolBySourceToken to validate that the token is whitelisted.
       token.safeTransferFrom(
-        msg.sender,
-        address(IEVM2AnyOnRamp(onRamp).getPoolBySourceToken(token)),
-        message.tokenAmounts[i].amount
+        msg.sender, address(IEVM2AnyOnRamp(onRamp).getPoolBySourceToken(token)), message.tokenAmounts[i].amount
       );
     }
 
@@ -161,13 +159,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     uint16 gasForCallExactCheck,
     uint256 gasLimit,
     address receiver
-  )
-    external
-    override
-    onlyOffRamp(message.sourceChainSelector)
-    whenHealthy
-    returns (bool success, bytes memory retData)
-  {
+  ) external override onlyOffRamp(message.sourceChainSelector) whenHealthy returns (bool success, bytes memory retData) {
     // We encode here instead of the offRamps to constrain specifically what functions
     // can be called from the router.
     bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
@@ -179,9 +171,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       // solidity calls check that a contract actually exists at the destination, so we do the same
       // Note we do this check prior to measuring gas so gasForCallExactCheck (our "cushion")
       // doesn't need to account for it.
-      if iszero(extcodesize(receiver)) {
-        revert(0, 0)
-      }
+      if iszero(extcodesize(receiver)) { revert(0, 0) }
 
       let g := gas()
       // Compute g -= gasForCallExactCheck and check for underflow
@@ -190,24 +180,18 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       // as we do not want to provide them with less, however that check itself costs
       // gas. gasForCallExactCheck ensures we have at least enough gas to be able
       // to revert if gasAmount >  63//64*gas available.
-      if lt(g, gasForCallExactCheck) {
-        revert(0, 0)
-      }
+      if lt(g, gasForCallExactCheck) { revert(0, 0) }
       g := sub(g, gasForCallExactCheck)
       // if g - g//64 <= gasAmount, revert
       // (we subtract g//64 because of EIP-150)
-      if iszero(gt(sub(g, div(g, 64)), gasLimit)) {
-        revert(0, 0)
-      }
+      if iszero(gt(sub(g, div(g, 64)), gasLimit)) { revert(0, 0) }
       // call and return whether we succeeded. ignore return data
       // call(gas,addr,value,argsOffset,argsLength,retOffset,retLength)
       success := call(gasLimit, receiver, 0, add(data, 0x20), mload(data), 0, 0)
 
       // limit our copy to MAX_RET_BYTES bytes
       let toCopy := returndatasize()
-      if gt(toCopy, MAX_RET_BYTES) {
-        toCopy := MAX_RET_BYTES
-      }
+      if gt(toCopy, MAX_RET_BYTES) { toCopy := MAX_RET_BYTES }
       // Store the length of the copied bytes
       mstore(retData, toCopy)
       // copy the bytes from retData[0:_toCopy]
@@ -308,7 +292,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     if (to == address(0)) revert InvalidRecipientAddress(to);
 
     if (tokenAddress == address(0)) {
-      (bool success, ) = to.call{value: amount}("");
+      (bool success,) = to.call{value: amount}("");
       if (!success) revert FailedToSendValue();
       return;
     }

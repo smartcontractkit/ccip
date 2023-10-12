@@ -41,8 +41,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   ///     Very Expensive:   1 unit of gas costs 1 USD                  -> 1e18
   ///     Expensive:        1 unit of gas costs 0.1 USD                -> 1e17
   ///     Cheap:            1 unit of gas costs 0.000001 USD           -> 1e12
-  mapping(uint64 destChainSelector => Internal.TimestampedPackedUint224 price)
-    private s_usdPerUnitGasByDestChainSelector;
+  mapping(uint64 destChainSelector => Internal.TimestampedPackedUint224 price) private
+    s_usdPerUnitGasByDestChainSelector;
 
   /// @dev The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
   /// @dev Price of 1e18 represents 1 USD per 1e18 token amount.
@@ -80,9 +80,12 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   }
 
   // @inheritdoc IPriceRegistry
-  function getTokenPrices(
-    address[] calldata tokens
-  ) external view override returns (Internal.TimestampedPackedUint224[] memory) {
+  function getTokenPrices(address[] calldata tokens)
+    external
+    view
+    override
+    returns (Internal.TimestampedPackedUint224[] memory)
+  {
     uint256 length = tokens.length;
     Internal.TimestampedPackedUint224[] memory tokenPrices = new Internal.TimestampedPackedUint224[](length);
     for (uint256 i = 0; i < length; ++i) {
@@ -98,9 +101,12 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   }
 
   // @inheritdoc IPriceRegistry
-  function getDestinationChainGasPrice(
-    uint64 destChainSelector
-  ) external view override returns (Internal.TimestampedPackedUint224 memory) {
+  function getDestinationChainGasPrice(uint64 destChainSelector)
+    external
+    view
+    override
+    returns (Internal.TimestampedPackedUint224 memory)
+  {
     return s_usdPerUnitGasByDestChainSelector[destChainSelector];
   }
 
@@ -112,7 +118,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     // We do allow a gas price of 0, but no stale or unset gas prices
     if (gasPrice.timestamp == 0) revert ChainNotSupported(destChainSelector);
     uint256 timePassed = block.timestamp - gasPrice.timestamp;
-    if (timePassed > i_stalenessThreshold) revert StaleGasPrice(destChainSelector, i_stalenessThreshold, timePassed);
+    if (timePassed > i_stalenessThreshold) {
+      revert StaleGasPrice(destChainSelector, i_stalenessThreshold, timePassed);
+    }
 
     return (_getValidatedTokenPrice(token), gasPrice.value);
   }
@@ -142,7 +150,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     Internal.TimestampedPackedUint224 memory tokenPrice = s_usdPerToken[token];
     if (tokenPrice.timestamp == 0 || tokenPrice.value == 0) revert TokenNotSupported(token);
     uint256 timePassed = block.timestamp - tokenPrice.timestamp;
-    if (timePassed > i_stalenessThreshold) revert StaleTokenPrice(token, i_stalenessThreshold, timePassed);
+    if (timePassed > i_stalenessThreshold) {
+      revert StaleTokenPrice(token, i_stalenessThreshold, timePassed);
+    }
     return tokenPrice.value;
   }
 
@@ -194,10 +204,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
     for (uint256 i = 0; i < tokenUpdatesLength; ++i) {
       Internal.TokenPriceUpdate memory update = priceUpdates.tokenPriceUpdates[i];
-      s_usdPerToken[update.sourceToken] = Internal.TimestampedPackedUint224({
-        value: update.usdPerToken,
-        timestamp: uint32(block.timestamp)
-      });
+      s_usdPerToken[update.sourceToken] =
+        Internal.TimestampedPackedUint224({value: update.usdPerToken, timestamp: uint32(block.timestamp)});
       emit UsdPerTokenUpdated(update.sourceToken, update.usdPerToken, block.timestamp);
     }
 
@@ -205,10 +213,8 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
     for (uint256 i = 0; i < gasUpdatesLength; ++i) {
       Internal.GasPriceUpdate memory update = priceUpdates.gasPriceUpdates[i];
-      s_usdPerUnitGasByDestChainSelector[update.destChainSelector] = Internal.TimestampedPackedUint224({
-        value: update.usdPerUnitGas,
-        timestamp: uint32(block.timestamp)
-      });
+      s_usdPerUnitGasByDestChainSelector[update.destChainSelector] =
+        Internal.TimestampedPackedUint224({value: update.usdPerUnitGas, timestamp: uint32(block.timestamp)});
       emit UsdPerUnitGasUpdated(update.destChainSelector, update.usdPerUnitGas, block.timestamp);
     }
   }
@@ -258,7 +264,9 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
 
   /// @notice Require that the caller is the owner or a fee updater.
   modifier requireUpdaterOrOwner() {
-    if (msg.sender != owner() && !s_priceUpdaters.contains(msg.sender)) revert OnlyCallableByUpdaterOrOwner();
+    if (msg.sender != owner() && !s_priceUpdaters.contains(msg.sender)) {
+      revert OnlyCallableByUpdaterOrOwner();
+    }
     _;
   }
 }

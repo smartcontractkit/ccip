@@ -140,6 +140,7 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
 contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
   event ConfigChanged(RateLimiter.Config);
   event OnRampConfigured(address onRamp, RateLimiter.Config);
+
   address internal s_onRamp;
 
   function setUp() public virtual override {
@@ -193,6 +194,7 @@ contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
 contract TokenPool_setOffRampRateLimiterConfig is TokenPoolSetup {
   event ConfigChanged(RateLimiter.Config);
   event OffRampConfigured(address onRamp, RateLimiter.Config);
+
   address internal s_offRamp;
 
   function setUp() public virtual override {

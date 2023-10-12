@@ -22,7 +22,7 @@ contract ConfigCompare is Test {
 contract ARM_constructor is ConfigCompare, ARMSetup {
   function testConstructorSuccess() public {
     ARM.Config memory expectedConfig = armConstructorArgs();
-    (uint32 actualVersion, , ARM.Config memory actualConfig) = s_arm.getConfigDetails();
+    (uint32 actualVersion,, ARM.Config memory actualConfig) = s_arm.getConfigDetails();
     assertEq(actualVersion, 1);
     assertConfigEq(actualConfig, expectedConfig);
   }
@@ -116,7 +116,7 @@ contract ARM_voteToBlessRoots is ARMSetup {
   }
 
   function testSenderAlreadyVotedIgnoredSuccess() public {
-    (address voter, ) = _getFirstBlessVoterAndWeight();
+    (address voter,) = _getFirstBlessVoterAndWeight();
 
     changePrank(voter);
     s_arm.voteToBless(makeTaggedRootSingleton(1));
@@ -178,13 +178,8 @@ contract ARM_unvoteToCurse is ARMSetup {
     s_arm.voteToCurse(makeCurseId(1));
     bytes32 expectedCursesHash = keccak256(abi.encode(bytes32(0), makeCurseId(1)));
     assertFalse(s_arm.isCursed());
-    (
-      address[] memory cursers,
-      uint32[] memory voteCounts,
-      bytes32[] memory cursesHashes,
-      uint16 weight,
-      bool cursed
-    ) = s_arm.getCurseProgress();
+    (address[] memory cursers, uint32[] memory voteCounts, bytes32[] memory cursesHashes, uint16 weight, bool cursed) =
+      s_arm.getCurseProgress();
     assertEq(1, cursers.length);
     assertEq(1, voteCounts.length);
     assertEq(cfg.voters[s_curser].curseVoteAddr, cursers[0]);
@@ -215,8 +210,7 @@ contract ARM_unvoteToCurse is ARMSetup {
       // should fail when using garbage curses hash
       vm.expectRevert(expectedRevert);
       s_arm.unvoteToCurse(
-        cfg.voters[s_curser].curseVoteAddr,
-        0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+        cfg.voters[s_curser].curseVoteAddr, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
       );
     }
   }
@@ -226,14 +220,11 @@ contract ARM_unvoteToCurse is ARMSetup {
     changePrank(cfg.voters[s_curser].curseUnvoteAddr);
     vm.expectRevert(
       abi.encodeWithSelector(
-        ARM.InvalidCursesHash.selector,
-        s_cursesHash,
-        0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+        ARM.InvalidCursesHash.selector, s_cursesHash, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
       )
     );
     s_arm.unvoteToCurse(
-      cfg.voters[s_curser].curseVoteAddr,
-      0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+      cfg.voters[s_curser].curseVoteAddr, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
     );
   }
 
@@ -312,20 +303,14 @@ contract ARM_voteToCurse is ARMSetup {
     changePrank(voter);
     vm.expectEmit();
     emit VotedToCurse(
-      1,
-      voter,
-      weight,
-      1,
-      makeCurseId(123),
-      keccak256(abi.encode(bytes32(0), makeCurseId(123))),
-      weight
+      1, voter, weight, 1, makeCurseId(123), keccak256(abi.encode(bytes32(0), makeCurseId(123))), weight
     );
 
     vm.resumeGasMetering();
     s_arm.voteToCurse(makeCurseId(123));
     vm.pauseGasMetering();
 
-    (address[] memory voters, , , uint16 votes, bool cursed) = s_arm.getCurseProgress();
+    (address[] memory voters,,, uint16 votes, bool cursed) = s_arm.getCurseProgress();
     assertEq(1, voters.length);
     assertEq(voter, voters[0]);
     assertEq(weight, votes);
@@ -371,8 +356,7 @@ contract ARM_voteToCurse is ARMSetup {
       makeCurseId(cfg.voters.length + 1), // this curse id
       keccak256(
         abi.encode(
-          keccak256(abi.encode(bytes32(0), makeCurseId(cfg.voters.length - 1))),
-          makeCurseId(cfg.voters.length + 1)
+          keccak256(abi.encode(bytes32(0), makeCurseId(cfg.voters.length - 1))), makeCurseId(cfg.voters.length + 1)
         )
       ), // cursesHash
       weightSum // accumulatedWeight
@@ -391,7 +375,7 @@ contract ARM_voteToCurse is ARMSetup {
     s_arm.ownerCurse();
 
     {
-      (address[] memory voters, , , uint24 accWeight, bool cursed) = s_arm.getCurseProgress();
+      (address[] memory voters,,, uint24 accWeight, bool cursed) = s_arm.getCurseProgress();
       assertEq(voters.length, 0);
       assertEq(accWeight, 0);
       assertTrue(cursed);
@@ -403,7 +387,7 @@ contract ARM_voteToCurse is ARMSetup {
     s_arm.ownerCurse();
 
     {
-      (address[] memory voters, , , uint24 accWeight, bool cursed) = s_arm.getCurseProgress();
+      (address[] memory voters,,, uint24 accWeight, bool cursed) = s_arm.getCurseProgress();
       assertEq(voters.length, 0);
       assertEq(accWeight, 0);
       assertTrue(cursed);
@@ -414,7 +398,7 @@ contract ARM_voteToCurse is ARMSetup {
     emit RecoveredFromCurse();
     s_arm.ownerUnvoteToCurse(unvoteRecords);
     {
-      (address[] memory voters, , , uint24 accWeight, bool cursed) = s_arm.getCurseProgress();
+      (address[] memory voters,,, uint24 accWeight, bool cursed) = s_arm.getCurseProgress();
       assertEq(voters.length, 0);
       assertEq(accWeight, 0);
       assertFalse(cursed);
@@ -431,7 +415,7 @@ contract ARM_voteToCurse is ARMSetup {
   }
 
   function testAlreadyVotedReverts() public {
-    (address voter, ) = _getFirstCurseVoterAndWeight();
+    (address voter,) = _getFirstCurseVoterAndWeight();
     changePrank(voter);
     s_arm.voteToCurse(makeCurseId(1));
 
@@ -475,14 +459,11 @@ contract ARM_ownerUnvoteToCurse is ARMSetup {
   }
 
   function makeUnvoteToCurseRecords() internal pure returns (ARM.UnvoteToCurseRecord[] memory) {
-    (address[] memory cursers, ) = getCursersAndCurseCounts();
+    (address[] memory cursers,) = getCursersAndCurseCounts();
     ARM.UnvoteToCurseRecord[] memory records = new ARM.UnvoteToCurseRecord[](cursers.length);
     for (uint256 i = 0; i < cursers.length; ++i) {
-      records[i] = ARM.UnvoteToCurseRecord({
-        curseVoteAddr: cursers[i],
-        cursesHash: bytes32(uint256(0)),
-        forceUnvote: true
-      });
+      records[i] =
+        ARM.UnvoteToCurseRecord({curseVoteAddr: cursers[i], cursesHash: bytes32(uint256(0)), forceUnvote: true});
     }
     return records;
   }
@@ -501,7 +482,7 @@ contract ARM_ownerUnvoteToCurse is ARMSetup {
     vm.pauseGasMetering();
 
     assertFalse(s_arm.isCursed());
-    (address[] memory voters, , bytes32[] memory cursesHashes, uint256 weight, bool cursed) = s_arm.getCurseProgress();
+    (address[] memory voters,, bytes32[] memory cursesHashes, uint256 weight, bool cursed) = s_arm.getCurseProgress();
     assertEq(voters.length, 0);
     assertEq(cursesHashes.length, 0);
     assertEq(weight, 0);
@@ -515,13 +496,8 @@ contract ARM_ownerUnvoteToCurse is ARMSetup {
     ownerUnvoteToCurse();
 
     assertFalse(s_arm.isCursed());
-    (
-      address[] memory voters,
-      uint32[] memory voteCounts,
-      bytes32[] memory cursesHashes,
-      uint256 weight,
-      bool cursed
-    ) = s_arm.getCurseProgress();
+    (address[] memory voters, uint32[] memory voteCounts, bytes32[] memory cursesHashes, uint256 weight, bool cursed) =
+      s_arm.getCurseProgress();
     assertEq(voters.length, 0);
     assertEq(cursesHashes.length, 0);
     assertEq(voteCounts.length, 0);
@@ -577,12 +553,11 @@ contract ARM_setConfig is ConfigCompare, ARMSetup {
       blessWeight: WEIGHT_10,
       curseWeight: WEIGHT_10
     });
-    return
-      ARM.Config({
-        voters: voters,
-        blessWeightThreshold: WEIGHT_1 + WEIGHT_10,
-        curseWeightThreshold: WEIGHT_1 + WEIGHT_10
-      });
+    return ARM.Config({
+      voters: voters,
+      blessWeightThreshold: WEIGHT_1 + WEIGHT_10,
+      curseWeightThreshold: WEIGHT_1 + WEIGHT_10
+    });
   }
 
   function setUp() public virtual override {
@@ -622,19 +597,19 @@ contract ARM_setConfig is ConfigCompare, ARMSetup {
     vm.expectEmit();
     emit ConfigSet(2, cfg);
 
-    (uint32 configVersionBefore, , ) = s_arm.getConfigDetails();
+    (uint32 configVersionBefore,,) = s_arm.getConfigDetails();
     vm.resumeGasMetering();
     s_arm.setConfig(cfg);
     vm.pauseGasMetering();
     // Assert VersionedConfig has changed correctly
-    (uint32 configVersionAfter, , ARM.Config memory configAfter) = s_arm.getConfigDetails();
+    (uint32 configVersionAfter,, ARM.Config memory configAfter) = s_arm.getConfigDetails();
     assertEq(configVersionBefore + 1, configVersionAfter);
     assertConfigEq(configAfter, cfg);
 
     // Assert that curse votes have been cleared, except for CURSE_VOTER_2 who
     // has already voted and is also part of the new config
-    (address[] memory curseVoters, , bytes32[] memory cursesHashes, uint256 curseWeight, bool cursed) = s_arm
-      .getCurseProgress();
+    (address[] memory curseVoters,, bytes32[] memory cursesHashes, uint256 curseWeight, bool cursed) =
+      s_arm.getCurseProgress();
     assertEq(1, curseVoters.length);
     assertEq(WEIGHT_10, curseWeight);
     assertEq(1, cursesHashes.length);

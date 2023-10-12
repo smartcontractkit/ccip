@@ -60,7 +60,9 @@ library RateLimiter {
 
     if (capacity < requestTokens) {
       // Token address 0 indicates consuming aggregate value rate limit capacity.
-      if (tokenAddress == address(0)) revert AggregateValueMaxCapacityExceeded(capacity, requestTokens);
+      if (tokenAddress == address(0)) {
+        revert AggregateValueMaxCapacityExceeded(capacity, requestTokens);
+      }
       revert TokenMaxCapacityExceeded(capacity, requestTokens, tokenAddress);
     }
     if (tokens < requestTokens) {
@@ -70,7 +72,9 @@ library RateLimiter {
       // This acts as a lower bound of wait time.
       uint256 minWaitInSeconds = ((requestTokens - tokens) + (rate - 1)) / rate;
 
-      if (tokenAddress == address(0)) revert AggregateValueRateLimitReached(minWaitInSeconds, tokens);
+      if (tokenAddress == address(0)) {
+        revert AggregateValueRateLimitReached(minWaitInSeconds, tokens);
+      }
       revert TokenRateLimitReached(minWaitInSeconds, tokens, tokenAddress);
     }
     tokens -= requestTokens;
@@ -86,9 +90,8 @@ library RateLimiter {
     // We update the bucket to reflect the status at the exact time of the
     // call. This means we might need to refill a part of the bucket based
     // on the time that has passed since the last update.
-    bucket.tokens = uint128(
-      _calculateRefill(bucket.capacity, bucket.tokens, block.timestamp - bucket.lastUpdated, bucket.rate)
-    );
+    bucket.tokens =
+      uint128(_calculateRefill(bucket.capacity, bucket.tokens, block.timestamp - bucket.lastUpdated, bucket.rate));
     bucket.lastUpdated = uint32(block.timestamp);
     return bucket;
   }

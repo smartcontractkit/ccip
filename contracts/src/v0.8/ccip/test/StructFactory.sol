@@ -63,12 +63,11 @@ contract StructFactory {
       blessWeight: WEIGHT_40,
       curseWeight: WEIGHT_40
     });
-    return
-      ARM.Config({
-        voters: voters,
-        blessWeightThreshold: WEIGHT_10 + WEIGHT_20 + WEIGHT_40,
-        curseWeightThreshold: WEIGHT_1 + WEIGHT_10 + WEIGHT_20 + WEIGHT_40
-      });
+    return ARM.Config({
+      voters: voters,
+      blessWeightThreshold: WEIGHT_10 + WEIGHT_20 + WEIGHT_40,
+      curseWeightThreshold: WEIGHT_1 + WEIGHT_10 + WEIGHT_20 + WEIGHT_40
+    });
   }
 
   uint8 internal constant ZERO = 0;
@@ -99,12 +98,9 @@ contract StructFactory {
 
   // Total L1 data availability overhead estimate is 33_596 gas.
   // This value includes complete CommitStore and OffRamp call data.
-  uint32 internal constant DEST_DATA_AVAILABILITY_OVERHEAD_GAS =
-    188 + // Fixed data availability overhead in OP stack.
-      (32 * 31 + 4) *
-      DEST_GAS_PER_DATA_AVAILABILITY_BYTE + // CommitStore single-root transmission takes up about 31 slots, plus selector.
-      (32 * 34 + 4) *
-      DEST_GAS_PER_DATA_AVAILABILITY_BYTE; // OffRamp transmission excluding EVM2EVMMessage takes up about 34 slots, plus selector.
+  uint32 internal constant DEST_DATA_AVAILABILITY_OVERHEAD_GAS = 188 // Fixed data availability overhead in OP stack.
+    + (32 * 31 + 4) * DEST_GAS_PER_DATA_AVAILABILITY_BYTE // CommitStore single-root transmission takes up about 31 slots, plus selector.
+    + (32 * 34 + 4) * DEST_GAS_PER_DATA_AVAILABILITY_BYTE; // OffRamp transmission excluding EVM2EVMMessage takes up about 34 slots, plus selector.
 
   // Multiples of 0.0001, use 6840 for OP, same as OP mainnet 0.684.
   uint16 internal constant DEST_GAS_DATA_AVAILABILITY_MULTIPLIER = 6840;
@@ -126,33 +122,31 @@ contract StructFactory {
     address router,
     address priceRegistry
   ) internal pure returns (EVM2EVMOffRamp.DynamicConfig memory) {
-    return
-      EVM2EVMOffRamp.DynamicConfig({
-        router: router,
-        maxDataSize: MAX_DATA_SIZE,
-        priceRegistry: priceRegistry,
-        maxTokensLength: MAX_TOKENS_LENGTH,
-        permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS
-      });
+    return EVM2EVMOffRamp.DynamicConfig({
+      router: router,
+      maxDataSize: MAX_DATA_SIZE,
+      priceRegistry: priceRegistry,
+      maxTokensLength: MAX_TOKENS_LENGTH,
+      permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS
+    });
   }
 
   function generateDynamicOnRampConfig(
     address router,
     address priceRegistry
   ) internal pure returns (EVM2EVMOnRamp.DynamicConfig memory) {
-    return
-      EVM2EVMOnRamp.DynamicConfig({
-        router: router,
-        maxTokensLength: MAX_TOKENS_LENGTH,
-        destGasOverhead: DEST_GAS_OVERHEAD,
-        destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
-        destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
-        destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
-        destDataAvailabilityMultiplier: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER,
-        priceRegistry: priceRegistry,
-        maxDataSize: MAX_DATA_SIZE,
-        maxGasLimit: MAX_GAS_LIMIT
-      });
+    return EVM2EVMOnRamp.DynamicConfig({
+      router: router,
+      maxTokensLength: MAX_TOKENS_LENGTH,
+      destGasOverhead: DEST_GAS_OVERHEAD,
+      destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
+      destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
+      destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
+      destDataAvailabilityMultiplier: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER,
+      priceRegistry: priceRegistry,
+      maxDataSize: MAX_DATA_SIZE,
+      maxGasLimit: MAX_GAS_LIMIT
+    });
   }
 
   function getTokensAndPools(
@@ -188,10 +182,8 @@ contract StructFactory {
     Internal.TokenPriceUpdate[] memory tokenPriceUpdates = new Internal.TokenPriceUpdate[](1);
     tokenPriceUpdates[0] = Internal.TokenPriceUpdate({sourceToken: token, usdPerToken: price});
 
-    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: tokenPriceUpdates,
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
-    });
+    Internal.PriceUpdates memory priceUpdates =
+      Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: new Internal.GasPriceUpdate[](0)});
 
     return priceUpdates;
   }
@@ -203,10 +195,8 @@ contract StructFactory {
     Internal.GasPriceUpdate[] memory gasPriceUpdates = new Internal.GasPriceUpdate[](1);
     gasPriceUpdates[0] = Internal.GasPriceUpdate({destChainSelector: chainSelector, usdPerUnitGas: usdPerUnitGas});
 
-    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
-      gasPriceUpdates: gasPriceUpdates
-    });
+    Internal.PriceUpdates memory priceUpdates =
+      Internal.PriceUpdates({tokenPriceUpdates: new Internal.TokenPriceUpdate[](0), gasPriceUpdates: gasPriceUpdates});
 
     return priceUpdates;
   }
@@ -232,20 +222,17 @@ contract StructFactory {
     for (uint256 i = 0; i < length; ++i) {
       tokenPriceUpdates[i] = Internal.TokenPriceUpdate({sourceToken: tokens[i], usdPerToken: prices[i]});
     }
-    Internal.PriceUpdates memory priceUpdates = Internal.PriceUpdates({
-      tokenPriceUpdates: tokenPriceUpdates,
-      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
-    });
+    Internal.PriceUpdates memory priceUpdates =
+      Internal.PriceUpdates({tokenPriceUpdates: tokenPriceUpdates, gasPriceUpdates: new Internal.GasPriceUpdate[](0)});
 
     return priceUpdates;
   }
 
   // OffRamp
   function getEmptyPriceUpdates() internal pure returns (Internal.PriceUpdates memory priceUpdates) {
-    return
-      Internal.PriceUpdates({
-        tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
-        gasPriceUpdates: new Internal.GasPriceUpdate[](0)
-      });
+    return Internal.PriceUpdates({
+      tokenPriceUpdates: new Internal.TokenPriceUpdate[](0),
+      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+    });
   }
 }
