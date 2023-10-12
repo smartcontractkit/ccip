@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Removed
-- All allowlist functionality is removed:
+- All onramp allowlist functionality is removed:
   - events AllowListAdd(address sender), AllowListRemove(address sender), AllowListEnabledSet(bool enabled)
   - applyAllowListUpdates / getAllowList
   - setAllowListEnabled / getAllowListEnabled
