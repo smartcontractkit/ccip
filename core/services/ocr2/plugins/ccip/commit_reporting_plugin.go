@@ -440,7 +440,6 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 				timestamp: timestamp,
 				value:     priceUpdate.Data.Value,
 			}
-			// Update the cache.
 			r.priceUpdatesCache.updateCache(gasUpdate)
 		}
 	}
