@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	gasmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
+	rollupMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper"
@@ -224,10 +225,39 @@ func TestCommitStoreReaders(t *testing.T) {
 	onchainConfig, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
 		PriceRegistry: pr,
 	})
+
+	commonOffchain := ccipdata.CommitOffchainConfig{
+		SourceFinalityDepth:    1,
+		GasPriceDeviationPPB:   1e6,
+		GasPriceHeartBeat:      1 * time.Hour,
+		TokenPriceDeviationPPB: 1e6,
+		TokenPriceHeartBeat:    1 * time.Hour,
+		InflightCacheExpiry:    3 * time.Hour,
+		DestFinalityDepth:      2,
+	}
+	offchainConfig, err := ccipconfig.EncodeOffchainConfig[ccipdata.CommitOffchainConfigV1_0_0](ccipdata.CommitOffchainConfigV1_0_0{
+		SourceFinalityDepth:   commonOffchain.SourceFinalityDepth,
+		DestFinalityDepth:     commonOffchain.DestFinalityDepth,
+		FeeUpdateHeartBeat:    models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
+		FeeUpdateDeviationPPB: commonOffchain.GasPriceDeviationPPB,
+		MaxGasPrice:           1e9,
+		InflightCacheExpiry:   models.MustMakeDuration(commonOffchain.InflightCacheExpiry),
+	})
 	_, err = ch.SetOCR2Config(user, signers, transmitters, 1, onchainConfig, 1, []byte{})
 	require.NoError(t, err)
 	onchainConfig2, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
 		PriceRegistry: pr2,
+	})
+	offchainConfig2, err := ccipconfig.EncodeOffchainConfig[ccipdata.CommitOffchainConfigV1_2_0](ccipdata.CommitOffchainConfigV1_2_0{
+		SourceFinalityDepth:      commonOffchain.SourceFinalityDepth,
+		DestFinalityDepth:        commonOffchain.DestFinalityDepth,
+		MaxGasPrice:              1e9,
+		GasPriceHeartBeat:        models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
+		DAGasPriceDeviationPPB:   1e7,
+		ExecGasPriceDeviationPPB: commonOffchain.GasPriceDeviationPPB,
+		TokenPriceDeviationPPB:   commonOffchain.TokenPriceDeviationPPB,
+		TokenPriceHeartBeat:      models.MustMakeDuration(commonOffchain.TokenPriceHeartBeat),
+		InflightCacheExpiry:      models.MustMakeDuration(commonOffchain.InflightCacheExpiry),
 	})
 	_, err = ch2.SetOCR2Config(user, signers, transmitters, 1, onchainConfig2, 1, []byte{})
 	require.NoError(t, err)
@@ -247,35 +277,73 @@ func TestCommitStoreReaders(t *testing.T) {
 	// Capture all logs.
 	lp.PollAndSaveLogs(context.Background(), 1)
 
-	for _, cr := range []ccipdata.CommitStoreReader{c10r, c12r} {
-		// Assert encoding
-		b, err := cr.EncodeCommitReport(rep)
-		require.NoError(t, err)
-		d, err := cr.DecodeCommitReport(b)
-		require.NoError(t, err)
-		assert.Equal(t, d.Interval.Max, rep.Interval.Max)
+	configs := map[string][][]byte{
+		ccipdata.V1_0_0: {onchainConfig, offchainConfig},
+		ccipdata.V1_2_0: {onchainConfig2, offchainConfig2},
+	}
+	crs := map[string]ccipdata.CommitStoreReader{
+		ccipdata.V1_0_0: c10r,
+		ccipdata.V1_2_0: c12r,
+	}
+	prs := map[string]common.Address{
+		ccipdata.V1_0_0: pr,
+		ccipdata.V1_2_0: pr2,
+	}
+	lm := new(rollupMocks.L1Oracle)
+	ge.On("L1Oracle").Return(lm)
+	for v, cr := range crs {
+		cr := cr
+		t.Run("CommitStoreReader "+v, func(t *testing.T) {
+			// Assert encoding
+			b, err := cr.EncodeCommitReport(rep)
+			require.NoError(t, err)
+			d, err := cr.DecodeCommitReport(b)
+			require.NoError(t, err)
+			assert.Equal(t, d, rep)
 
-		// Assert reading
-		latest, err := cr.GetLatestPriceEpochAndRound(context.Background())
-		require.NoError(t, err)
-		assert.Equal(t, er.Uint64(), latest)
+			// Assert reading
+			latest, err := cr.GetLatestPriceEpochAndRound(context.Background())
+			require.NoError(t, err)
+			assert.Equal(t, er.Uint64(), latest)
 
-		// Assert cursing
-		down, err := cr.IsDown(context.Background())
-		require.NoError(t, err)
-		assert.False(t, down)
-		_, err = arm.VoteToCurse(user, [32]byte{})
-		require.NoError(t, err)
-		ec.Commit()
-		down, err = cr.IsDown(context.Background())
-		require.NoError(t, err)
-		assert.True(t, down)
-		_, err = arm.OwnerUnvoteToCurse(user, nil)
-		require.NoError(t, err)
-		ec.Commit()
+			// Assert cursing
+			down, err := cr.IsDown(context.Background())
+			require.NoError(t, err)
+			assert.False(t, down)
+			_, err = arm.VoteToCurse(user, [32]byte{})
+			require.NoError(t, err)
+			ec.Commit()
+			down, err = cr.IsDown(context.Background())
+			require.NoError(t, err)
+			assert.True(t, down)
+			_, err = arm.OwnerUnvoteToCurse(user, nil)
+			require.NoError(t, err)
+			ec.Commit()
 
-		seqNr, err := cr.GetExpectedNextSequenceNumber(context.Background())
-		require.NoError(t, err)
-		assert.Equal(t, rep.Interval.Max+1, seqNr)
+			seqNr, err := cr.GetExpectedNextSequenceNumber(context.Background())
+			require.NoError(t, err)
+			assert.Equal(t, rep.Interval.Max+1, seqNr)
+
+			reps, err := cr.GetAcceptedCommitReportsGteSeqNum(context.Background(), rep.Interval.Max+1, 0)
+			require.NoError(t, err)
+			assert.Len(t, reps, 0)
+
+			reps, err = cr.GetAcceptedCommitReportsGteSeqNum(context.Background(), rep.Interval.Max, 0)
+			require.NoError(t, err)
+			require.Len(t, reps, 1)
+			assert.Equal(t, reps[0].Data, rep)
+
+			reps, err = cr.GetAcceptedCommitReportsGteSeqNum(context.Background(), rep.Interval.Min-1, 0)
+			require.NoError(t, err)
+			require.Len(t, reps, 1)
+			assert.Equal(t, reps[0].Data, rep)
+
+			// Until we detect the config, we'll have empty offchain config
+			assert.Equal(t, cr.OffchainConfig(), ccipdata.CommitOffchainConfig{})
+			newPr, err := cr.ChangeConfig(configs[v][0], configs[v][1])
+			require.NoError(t, err)
+			assert.Equal(t, newPr, prs[v])
+			assert.Equal(t, commonOffchain, cr.OffchainConfig())
+		})
 	}
 }

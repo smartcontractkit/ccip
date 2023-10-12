@@ -220,7 +220,9 @@ func (c *CommitStoreV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []
 	c.offchainConfig = CommitOffchainConfig{
 		SourceFinalityDepth:    offchainConfigParsed.SourceFinalityDepth,
 		GasPriceDeviationPPB:   offchainConfigParsed.ExecGasPriceDeviationPPB,
+		GasPriceHeartBeat:      offchainConfigParsed.GasPriceHeartBeat.Duration(),
 		TokenPriceDeviationPPB: offchainConfigParsed.TokenPriceDeviationPPB,
+		TokenPriceHeartBeat:    offchainConfigParsed.TokenPriceHeartBeat.Duration(),
 		InflightCacheExpiry:    offchainConfigParsed.InflightCacheExpiry.Duration(),
 		DestFinalityDepth:      offchainConfigParsed.DestFinalityDepth,
 	}
