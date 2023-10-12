@@ -1160,7 +1160,8 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
 
       uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-      uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSDCents) * feeTokenConfig.premiumMultiplierWeiPerEth);
+      uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSDCents) *
+        feeTokenConfig.premiumMultiplierWeiPerEth);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,
@@ -1185,7 +1186,8 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
 
     uint256 gasUsed = GAS_LIMIT + DEST_GAS_OVERHEAD;
     uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-    uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSDCents) * feeTokenConfig.premiumMultiplierWeiPerEth);
+    uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSDCents) *
+      feeTokenConfig.premiumMultiplierWeiPerEth);
 
     uint256 totalPriceInFeeToken = (gasFeeUSD + messageFeeUSD) / s_feeTokenPrice;
     assertEq(totalPriceInFeeToken, feeAmount);
@@ -1211,7 +1213,8 @@ contract EVM2EVMOnRamp_getFee is EVM2EVMOnRamp_getFeeSetup {
 
       uint256 gasUsed = customGasLimit + DEST_GAS_OVERHEAD + customDataSize * DEST_GAS_PER_PAYLOAD_BYTE;
       uint256 gasFeeUSD = (gasUsed * feeTokenConfig.gasMultiplierWeiPerEth * USD_PER_GAS);
-      uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSDCents) * feeTokenConfig.premiumMultiplierWeiPerEth);
+      uint256 messageFeeUSD = (configUSDToValue(feeTokenConfig.networkFeeUSDCents) *
+        feeTokenConfig.premiumMultiplierWeiPerEth);
       uint256 dataAvailabilityFeeUSD = s_onRamp.getDataAvailabilityCost(
         USD_PER_DATA_AVAILABILITY_GAS,
         message.data.length,

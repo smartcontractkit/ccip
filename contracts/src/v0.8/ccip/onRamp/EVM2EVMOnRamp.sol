@@ -93,20 +93,20 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @dev Struct to hold the execution fee configuration for a fee token
   struct FeeTokenConfig {
-    uint32 networkFeeUSDCents; // ──────╮ Flat network fee to charge for messages,  multiples of 0.01 USD
-    uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
-    uint64 premiumMultiplierWeiPerEth; //        │ Multiplier for fee-token-specific premiums
-    bool enabled; // ───────────────────╯ Whether this fee token is enabled
+    uint32 networkFeeUSDCents; // ──────────────╮ Flat network fee to charge for messages,  multiples of 0.01 USD
+    uint64 gasMultiplierWeiPerEth; //           │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
+    uint64 premiumMultiplierWeiPerEth; //       │ Multiplier for fee-token-specific premiums
+    bool enabled; // ───────────────────────────╯ Whether this fee token is enabled
   }
 
   /// @dev Struct to hold the fee configuration for a fee token, same as the FeeTokenConfig but with
   /// token included so that an array of these can be passed in to setFeeTokenConfig to set the mapping
   struct FeeTokenConfigArgs {
-    address token; // ──────────────────╮ Token address
-    uint32 networkFeeUSDCents; //       │ Flat network fee to charge for messages,  multiples of 0.01 USD
-    uint64 gasMultiplierWeiPerEth; // ───────────╯ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost
-    uint64 premiumMultiplierWeiPerEth; // ───────╮ Multiplier for fee-token-specific premiums, 1e18 based
-    bool enabled; // ───────────────────╯ Whether this fee token is enabled
+    address token; // ──────────────────────────╮ Token address
+    uint32 networkFeeUSDCents; //               │ Flat network fee to charge for messages,  multiples of 0.01 USD
+    uint64 gasMultiplierWeiPerEth; // ──────────╯ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost
+    uint64 premiumMultiplierWeiPerEth; // ──────╮ Multiplier for fee-token-specific premiums, 1e18 based
+    bool enabled; // ───────────────────────────╯ Whether this fee token is enabled
   }
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
