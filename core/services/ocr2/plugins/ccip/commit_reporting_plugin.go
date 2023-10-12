@@ -80,7 +80,9 @@ type CommitReportingPlugin struct {
 	// Offchain
 	priceGetter pricegetter.PriceGetter
 	// State
-	inflightReports        *inflightCommitReportsContainer
+	inflightReports *inflightCommitReportsContainer
+	// Cache
+	priceUpdatesCache      *priceUpdatesCache
 	tokenPriceUpdatesCache *tokenPriceUpdatesCache
 }
 
@@ -161,6 +163,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				int64(rf.config.commitStore.OffchainConfig().DestFinalityDepth),
 			),
 			gasPriceEstimator:      rf.config.commitStore.GasPriceEstimator(),
+			priceUpdatesCache:      newPriceUpdatesCache(),
 			tokenPriceUpdatesCache: newTokenPriceUpdatesCache(),
 		},
 		types.ReportingPluginInfo{
@@ -417,17 +420,22 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 		}
 	}
 
-	// If there are no price updates inflight, check latest prices onchain
+	// If there are no price updates inflight, check the latest prices onchain.
+
+	// Query from the last cached update timestamp, if any.
+	queryFrom := now.Add(-r.offchainConfig.GasPriceHeartBeat)
+	if last := r.priceUpdatesCache.get(); last.timestamp.After(queryFrom) {
+		queryFrom = last.timestamp
+	}
 	gasPriceUpdates, err := r.destPriceRegistryReader.GetGasPriceUpdatesCreatedAfter(
 		ctx,
 		r.sourceChainSelector,
-		now.Add(-r.offchainConfig.GasPriceHeartBeat),
+		queryFrom,
 		0,
 	)
 	if err != nil {
 		return update{}, err
 	}
-
 	for _, priceUpdate := range gasPriceUpdates {
 		// Ordered by ascending timestamps
 		timestamp := time.Unix(priceUpdate.Data.Timestamp.Int64(), 0)
@@ -436,6 +444,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 				timestamp: timestamp,
 				value:     priceUpdate.Data.Value,
 			}
+			r.priceUpdatesCache.updateCache(gasUpdate)
 		}
 	}
 
