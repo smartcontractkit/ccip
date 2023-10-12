@@ -82,7 +82,7 @@ type CommitReportingPlugin struct {
 	// State
 	inflightReports *inflightCommitReportsContainer
 	// Cache
-	priceUpdatesCache *priceUpdatesCache
+	priceUpdatesCache      *priceUpdatesCache
 	tokenPriceUpdatesCache *tokenPriceUpdatesCache
 }
 
@@ -162,8 +162,8 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				rf.config.destClient,
 				int64(rf.config.commitStore.OffchainConfig().DestFinalityDepth),
 			),
-			gasPriceEstimator: rf.config.commitStore.GasPriceEstimator(),
-			priceUpdatesCache: newPriceUpdatesCache(),
+			gasPriceEstimator:      rf.config.commitStore.GasPriceEstimator(),
+			priceUpdatesCache:      newPriceUpdatesCache(),
 			tokenPriceUpdatesCache: newTokenPriceUpdatesCache(),
 		},
 		types.ReportingPluginInfo{
