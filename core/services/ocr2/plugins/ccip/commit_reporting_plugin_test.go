@@ -1696,7 +1696,7 @@ func TestCommitReportToEthTxMeta(t *testing.T) {
 			txMeta, err := fn(out)
 			require.NoError(t, err)
 			require.NotNil(t, txMeta)
-			//require.EqualValues(t, tc.expectedRange, txMeta.SeqNumbers) // TODO: the commit store intervals are not decoded
+			require.EqualValues(t, tc.expectedRange, txMeta.SeqNumbers)
 		})
 	}
 }

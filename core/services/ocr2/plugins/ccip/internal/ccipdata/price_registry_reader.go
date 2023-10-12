@@ -3,6 +3,7 @@ package ccipdata
 import (
 	"context"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -63,11 +64,13 @@ type PriceRegistryReader interface {
 func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Address, lp logpoller.LogPoller, cl client.Client) (PriceRegistryReader, error) {
 	_, version, err := ccipconfig.TypeAndVersion(priceRegistryAddress, cl)
 	if err != nil {
-		lggr.Infof("Assuming %v is 1.0.0 price registry", priceRegistryAddress.String())
-		// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it errors
-		// its v1.
-		// TODO: if there's an RPC error we may actually create a 100 reader for 120 contract?
-		return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl)
+		if strings.Contains(err.Error(), "execution reverted") {
+			lggr.Infof("Assuming %v is 1.0.0 price registry, got %v", priceRegistryAddress.String(), err)
+			// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it reverts
+			// its v1.
+			return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl)
+		}
+		return nil, err
 	}
 	switch version.String() {
 	case V1_2_0:

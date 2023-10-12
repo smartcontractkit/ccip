@@ -3,6 +3,7 @@ package ccipdata_test
 import (
 	"context"
 	"math/big"
+	"reflect"
 	"testing"
 	"time"
 
@@ -47,7 +48,6 @@ type priceRegReaderTH struct {
 	ec      client.Client
 	lggr    logger.Logger
 	user    *bind.TransactOpts
-	sim     *backends.SimulatedBackend
 	readers map[string]ccipdata.PriceRegistryReader
 
 	// Expected state
@@ -64,9 +64,7 @@ func commitAndGetBlockTs(ec *client.SimulatedBackendClient) uint64 {
 	return b.Time()
 }
 
-// setupPriceRegistryReaderTH instantiates all versions of the price registry reader
-// with a snapshot of data so reader tests can do multi-version assertions.
-func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
+func newSim(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
 	user := testutils.MustNewSimTransactor(t)
 	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
 		user.From: {
@@ -74,6 +72,13 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 		},
 	}, 10e6)
 	ec := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
+	return user, ec
+}
+
+// setupPriceRegistryReaderTH instantiates all versions of the price registry reader
+// with a snapshot of data so reader tests can do multi-version assertions.
+func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
+	user, ec := newSim(t)
 	lggr := logger.TestLogger(t)
 	// TODO: We should be able to use an in memory log poller ORM here to speed up the tests.
 	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, 2, 3, 2, 1000)
@@ -110,15 +115,17 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 			Value: big.NewInt(12),
 		},
 	}
-	addr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, sim, nil, feeTokens, 1000)
+	addr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, ec, nil, feeTokens, 1000)
 	require.NoError(t, err)
-	addr2, _, _, err := price_registry.DeployPriceRegistry(user, sim, nil, feeTokens, 1000)
-	require.NoError(t, err)
-	pr10r, err := ccipdata.NewPriceRegistryReader(lggr, addr, lp, ec)
-	require.NoError(t, err)
-	pr12r, err := ccipdata.NewPriceRegistryReader(lggr, addr2, lp, ec)
+	addr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, nil, feeTokens, 1000)
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
+	pr10r, err := ccipdata.NewPriceRegistryReader(lggr, addr, lp, ec)
+	require.NoError(t, err)
+	assert.Equal(t, reflect.TypeOf(pr10r).String(), reflect.TypeOf(&ccipdata.PriceRegistryV1_0_0{}).String())
+	pr12r, err := ccipdata.NewPriceRegistryReader(lggr, addr2, lp, ec)
+	require.NoError(t, err)
+	assert.Equal(t, reflect.TypeOf(pr10r).String(), reflect.TypeOf(&ccipdata.PriceRegistryV1_0_0{}).String())
 	// Apply block1.
 	ccipdata.ApplyPriceRegistryUpdateV1_0_0(t, user, addr, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
 	ccipdata.ApplyPriceRegistryUpdateV1_2_0(t, user, addr2, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
@@ -136,7 +143,6 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 		ec:   ec,
 		lggr: lggr,
 		user: user,
-		sim:  sim,
 		readers: map[string]ccipdata.PriceRegistryReader{
 			ccipdata.V1_0_0: pr10r, ccipdata.V1_2_0: pr12r,
 		},

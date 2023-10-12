@@ -121,7 +121,6 @@ func (o *OffRampV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
 }
 
-// TODO probably a way to reuse 1.0.0
 func (o *OffRampV1_2_0) OffchainConfig() ExecOffchainConfig {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
