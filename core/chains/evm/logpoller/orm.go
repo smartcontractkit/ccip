@@ -283,7 +283,7 @@ func (o *DbORM) SelectLogsCreatedAfter(address common.Address, eventSig common.H
 			WHERE evm_chain_id = $1 
 			AND address = $2 
 			AND event_sig = $3 	
-			AND (block_number + $4) <= (SELECT COALESCE(block_number, 0) FROM evm.log_poller_blocks WHERE evm_chain_id = $1 ORDER BY block_number DESC LIMIT 1)
+			AND block_number <= (SELECT COALESCE(block_number, 0) FROM evm.log_poller_blocks WHERE evm_chain_id = $1 ORDER BY block_number DESC LIMIT 1) - $4
 			AND block_timestamp > $5
 			ORDER BY (block_number, log_index)`, utils.NewBig(o.chainID), address, eventSig, confs, after)
 	if err != nil {
@@ -552,7 +552,7 @@ func (o *DbORM) SelectIndexedLogsCreatedAfter(address common.Address, eventSig c
 			AND address = $2 
 			AND event_sig = $3
 			AND topics[$4] = ANY($5)
-			AND (block_number + $6) <= (SELECT COALESCE(block_number, 0) FROM evm.log_poller_blocks WHERE evm_chain_id = $1 ORDER BY block_number DESC LIMIT 1)
+			AND block_number <= (SELECT COALESCE(block_number, 0) FROM evm.log_poller_blocks WHERE evm_chain_id = $1 ORDER BY block_number DESC LIMIT 1) - $6
 			AND block_timestamp > $7
 			ORDER BY (block_number, log_index)`, utils.NewBig(o.chainID), address, eventSig.Bytes(), topicIndex+1, topicValuesBytes, confs, after)
 	if err != nil {

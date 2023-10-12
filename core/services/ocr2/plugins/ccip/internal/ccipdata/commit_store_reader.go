@@ -90,6 +90,7 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 	}
 	switch version.String() {
 	case V1_0_0, V1_1_0:
+		// Versions are identical
 		return NewCommitStoreV1_0_0(lggr, address, ec, lp, estimator)
 	case V1_2_0:
 		return NewCommitStoreV1_2_0(lggr, address, ec, lp, estimator)

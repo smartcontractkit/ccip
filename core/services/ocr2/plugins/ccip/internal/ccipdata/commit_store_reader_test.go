@@ -1,18 +1,29 @@
 package ccipdata_test
 
 import (
+	"context"
 	"math/big"
 	"math/rand"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
+	gasmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper_1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -158,5 +169,113 @@ func TestCommitOnchainConfig(t *testing.T) {
 				require.Equal(t, tt.want, decoded)
 			}
 		})
+	}
+}
+
+func TestCommitStoreReaders(t *testing.T) {
+	user, ec := newSim(t)
+	lggr := logger.TestLogger(t)
+	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, 2, 3, 2, 1000)
+
+	// Deploy 2 commit store versions
+	onramp1 := randomAddress()
+	onramp2 := randomAddress()
+	// Report
+	rep := ccipdata.CommitStoreReport{
+		TokenPrices: []ccipdata.TokenPrice{{Token: randomAddress(), Value: big.NewInt(1)}},
+		GasPrices:   []ccipdata.GasPrice{{DestChainSelector: 1, Value: big.NewInt(1)}},
+		Interval:    ccipdata.CommitStoreInterval{Min: 1, Max: 10},
+		MerkleRoot:  common.HexToHash("0x1"),
+	}
+	er := big.NewInt(1)
+	armAddr, _, arm, err := mock_arm_contract.DeployMockARMContract(user, ec)
+	require.NoError(t, err)
+	addr, _, ch, err := commit_store_helper_1_0_0.DeployCommitStoreHelper(user, ec, commit_store_helper_1_0_0.CommitStoreStaticConfig{
+		ChainSelector:       testutils.SimulatedChainID.Uint64(),
+		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
+		OnRamp:              onramp1,
+		ArmProxy:            armAddr,
+	})
+	require.NoError(t, err)
+	addr2, _, ch2, err := commit_store_helper.DeployCommitStoreHelper(user, ec, commit_store_helper.CommitStoreStaticConfig{
+		ChainSelector:       testutils.SimulatedChainID.Uint64(),
+		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
+		OnRamp:              onramp2,
+		ArmProxy:            armAddr,
+	})
+	require.NoError(t, err)
+	commitAndGetBlockTs(ec) // Deploy these
+	pr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, ec, []common.Address{addr}, nil, 1e6)
+	require.NoError(t, err)
+	pr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, []common.Address{addr2}, nil, 1e6)
+	require.NoError(t, err)
+	commitAndGetBlockTs(ec) // Deploy these
+	ge := new(gasmocks.EvmFeeEstimator)
+	c10r, err := ccipdata.NewCommitStoreReader(lggr, addr, ec, lp, ge)
+	require.NoError(t, err)
+	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&ccipdata.CommitStoreV1_0_0{}).String())
+	c12r, err := ccipdata.NewCommitStoreReader(lggr, addr2, ec, lp, ge)
+	require.NoError(t, err)
+	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&ccipdata.CommitStoreV1_2_0{}).String())
+
+	// Apply config
+	signers := []common.Address{randomAddress(), randomAddress(), randomAddress(), randomAddress()}
+	transmitters := []common.Address{randomAddress(), randomAddress(), randomAddress(), randomAddress()}
+	onchainConfig, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
+		PriceRegistry: pr,
+	})
+	_, err = ch.SetOCR2Config(user, signers, transmitters, 1, onchainConfig, 1, []byte{})
+	require.NoError(t, err)
+	onchainConfig2, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
+		PriceRegistry: pr2,
+	})
+	_, err = ch2.SetOCR2Config(user, signers, transmitters, 1, onchainConfig2, 1, []byte{})
+	require.NoError(t, err)
+	commitAndGetBlockTs(ec)
+
+	// Apply report
+	b, err := c10r.EncodeCommitReport(rep)
+	require.NoError(t, err)
+	_, err = ch.Report(user, b, er)
+	require.NoError(t, err)
+	b, err = c12r.EncodeCommitReport(rep)
+	require.NoError(t, err)
+	_, err = ch2.Report(user, b, er)
+	require.NoError(t, err)
+	commitAndGetBlockTs(ec)
+
+	// Capture all logs.
+	lp.PollAndSaveLogs(context.Background(), 1)
+
+	for _, cr := range []ccipdata.CommitStoreReader{c10r, c12r} {
+		// Assert encoding
+		b, err := cr.EncodeCommitReport(rep)
+		require.NoError(t, err)
+		d, err := cr.DecodeCommitReport(b)
+		require.NoError(t, err)
+		assert.Equal(t, d.Interval.Max, rep.Interval.Max)
+
+		// Assert reading
+		latest, err := cr.GetLatestPriceEpochAndRound(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, er.Uint64(), latest)
+
+		// Assert cursing
+		down, err := cr.IsDown(context.Background())
+		require.NoError(t, err)
+		assert.False(t, down)
+		_, err = arm.VoteToCurse(user, [32]byte{})
+		require.NoError(t, err)
+		ec.Commit()
+		down, err = cr.IsDown(context.Background())
+		require.NoError(t, err)
+		assert.True(t, down)
+		_, err = arm.OwnerUnvoteToCurse(user, nil)
+		require.NoError(t, err)
+		ec.Commit()
+
+		seqNr, err := cr.GetExpectedNextSequenceNumber(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, rep.Interval.Max+1, seqNr)
 	}
 }
