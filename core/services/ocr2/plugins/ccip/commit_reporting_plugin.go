@@ -515,8 +515,9 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		// Telemetry related errors are not critical and must not affect
 		// execution, so we log them and continue.
 		lggr.Errorw("failed to marshal telemetry to protobuf", "err", err)
+	} else {
+		r.config.monitoringEndpoint.SendLog(bytes)
 	}
-	r.config.monitoringEndpoint.SendLog(bytes)
 
 	return true, encodedReport, nil
 }
@@ -540,13 +541,11 @@ func (r *CommitReportingPlugin) collectTelemetry(
 		Round:                         uint32(epochAndRound.Round),
 	}
 
-	telem := telemPb.CCIPTelemWrapper{
+	return &telemPb.CCIPTelemWrapper{
 		Msg: &telemPb.CCIPTelemWrapper_CommitReport{
 			CommitReport: &summary,
 		},
 	}
-
-	return &telem
 }
 
 // calculateIntervalConsensus compresses a set of intervals into one interval

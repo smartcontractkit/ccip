@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/pkg/errors"
 
@@ -40,6 +41,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
+	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
 	"github.com/smartcontractkit/libocr/commontypes"
 )
 
@@ -953,12 +955,39 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
+	telem := collectTelemetry(observedMessages)
+	bytes, err := proto.Marshal(telem)
+	if err != nil {
+		// Telemetry related errors are not critical and must not affect
+		// execution, so we log them and continue.
+		lggr.Errorw("failed to marshal telemetry to protobuf", "err", err)
+	} else {
+		r.config.monitoringEndpoint.SendLog(bytes)
+	}
+
 	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {
 		return false, nil, err
 	}
 	lggr.Infow("Report", "executableObservations", observedMessages)
+
 	return true, report, nil
+}
+
+func collectTelemetry(observedMessages []ObservedMessage) (t *telemPb.CCIPTelemWrapper) {
+	lenMsg := len(observedMessages) *
+		len(observedMessages[0].MsgData.TokenData) *
+		len(observedMessages[0].MsgData.TokenData[0])
+	summary := telemPb.CCIPExecutionReportSummary{
+		LenMessages:          uint32(lenMsg), // len of all messages in bytes
+		LenOffchainTokenData: uint32(len(observedMessages[0].TokenData)),
+	}
+
+	return &telemPb.CCIPTelemWrapper{
+		Msg: &telemPb.CCIPTelemWrapper_ExecutionReport{
+			ExecutionReport: &summary,
+		},
+	}
 }
 
 type tallyKey struct {
