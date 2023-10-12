@@ -41,15 +41,15 @@ func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, ver
 		}
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:                          legacyDynamicConfig.Router,
-			MaxTokensLength:                 legacyDynamicConfig.MaxTokensLength,
+			MaxNumberOfTokensPerMsg:         legacyDynamicConfig.MaxTokensLength,
 			DestGasOverhead:                 0,
 			DestGasPerPayloadByte:           0,
 			DestDataAvailabilityOverheadGas: 0,
 			DestGasPerDataAvailabilityByte:  0,
 			DestDataAvailabilityMultiplier:  0,
 			PriceRegistry:                   legacyDynamicConfig.PriceRegistry,
-			MaxDataSize:                     legacyDynamicConfig.MaxDataSize,
-			MaxGasLimit:                     uint32(legacyDynamicConfig.MaxGasLimit),
+			MaxDataBytes:                    legacyDynamicConfig.MaxDataSize,
+			MaxPerMsgGasLimit:               uint32(legacyDynamicConfig.MaxGasLimit),
 		}, nil
 	case "1.1.0":
 		legacyOnramp, err := evm_2_evm_onramp_1_1_0.NewEVM2EVMOnRamp(onRamp.Address(), client)
@@ -62,15 +62,15 @@ func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, ver
 		}
 		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 			Router:                          legacyDynamicConfig.Router,
-			MaxTokensLength:                 legacyDynamicConfig.MaxTokensLength,
+			MaxNumberOfTokensPerMsg:         legacyDynamicConfig.MaxTokensLength,
 			DestGasOverhead:                 legacyDynamicConfig.DestGasOverhead,
 			DestGasPerPayloadByte:           legacyDynamicConfig.DestGasPerPayloadByte,
 			DestDataAvailabilityOverheadGas: 0,
 			DestGasPerDataAvailabilityByte:  0,
 			DestDataAvailabilityMultiplier:  0,
 			PriceRegistry:                   legacyDynamicConfig.PriceRegistry,
-			MaxDataSize:                     legacyDynamicConfig.MaxDataSize,
-			MaxGasLimit:                     uint32(legacyDynamicConfig.MaxGasLimit),
+			MaxDataBytes:                    legacyDynamicConfig.MaxDataSize,
+			MaxPerMsgGasLimit:               uint32(legacyDynamicConfig.MaxGasLimit),
 		}, nil
 	case "1.2.0":
 		return onRamp.GetDynamicConfig(opts)

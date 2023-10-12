@@ -409,14 +409,14 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 			},
 			evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 				Router:                          router,
-				MaxTokensLength:                 5,
+				MaxNumberOfTokensPerMsg:         5,
 				DestGasOverhead:                 350_000,
 				DestGasPerPayloadByte:           16,
 				DestDataAvailabilityOverheadGas: 33_596,
 				DestGasPerDataAvailabilityByte:  16,
 				DestDataAvailabilityMultiplier:  6840, // 0.684
 				PriceRegistry:                   priceRegistry,
-				MaxDataSize:                     50000,
+				MaxDataBytes:                    50000,
 				MaxGasLimit:                     4_000_000,
 			},
 			tokensAndPools,
