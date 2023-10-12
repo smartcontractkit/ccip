@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Changed
+- PriceUpdate now accepts an array of gas price update
+  - Removed `destChainSelector` and `usdPerUnitGas` from PriceUpdates
+  - Added `GasPriceUpdate[] gasPriceUpdates` to PriceUpdates. Each `GasPriceUpdate` struct contains `destChainSelector` and `usdPerUnitGas`.
 - OnRamp fee calculation logic now includes L1 security fee if sending to L2.
   - New field `destBytesOverhead` added to **TokenTransferFeeConfig**.
     - `destBytesOverhead` is the size of additional bytes being passed to destination for token transfers. For example, USDC transfers require additional attestation data.
@@ -20,6 +23,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `destDataAvailabilityOverheadGas` is the extra data availability gas charged on top of message data.
     - `destGasPerDataAvailabilityByte` is the amount of gas to charge per byte of data that needs data availability.
     - `destDataAvailabilityMultiplier` is the multiplier for data availability gas. It is in multiples of 1e-4, or 0.0001. It can represent calldata compression factor on Optimistic Rollups.
+- OnRamp token transfer fee calculation updated.
+  - `minTokenTransferFeeUSD` and `maxTokenTransferFeeUSD` are removed from FeeTokenConfig.
+  - `minFeeUSD` and `maxFeeUSD` are added to TokenTransferFeeConfig, they will be applied at a per-token level.
+  - token transfer premium is calculated as the sum of each individual token transfer fee.
+- MessageId hashing logic updated.
+  - the new `sourceTokenData` field is added to the hash.
+  - fixed-size fields are hashed in nested hash function.
+- CommitStore OffchainConfig fields updated.
+  - New fields `GasPriceHeartBeat`, `DAGasPriceDeviationPPB`, `ExecGasPriceDeviationPPB`, `TokenPriceHeartBeat`, `TokenPriceDeviationPPB` added
+    - `GasPriceHeartBeat` specifies an update heartbeat threshold for gas prices
+    - `DAGasPriceDeviationPPB` specifies deviation PPB threshold for dava availability (DA) gas price. On chains without DA component, this should be 0.
+    - `ExecGasPriceDeviationPPB` specifies deviation PPB threshold for native EVM execution gas price.
+    - `TokenPriceHeartBeat` specifies an update heartbeat threshold for token prices
+    - `TokenPriceDeviationPPB` specifies deviation PPB threshold for token price.
+  - Old Fields `FeeUpdateHeartBeat`, `FeeUpdateDeviationPPB` removed. They are replaced by the fields above.
 
 ### Removed
 

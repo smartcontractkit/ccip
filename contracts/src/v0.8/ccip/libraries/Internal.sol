@@ -8,13 +8,17 @@ import {MerkleMultiProof} from "../libraries/MerkleMultiProof.sol";
 library Internal {
   struct PriceUpdates {
     TokenPriceUpdate[] tokenPriceUpdates;
-    uint64 destChainSelector; // ──╮ Destination chain selector
-    uint224 usdPerUnitGas; // ─────╯ 1e18 USD per smallest unit (e.g. wei) of destination chain gas
+    GasPriceUpdate[] gasPriceUpdates;
   }
 
   struct TokenPriceUpdate {
     address sourceToken; // Source token
     uint224 usdPerToken; // 1e18 USD per smallest unit of token
+  }
+
+  struct GasPriceUpdate {
+    uint64 destChainSelector; // Destination chain selector
+    uint224 usdPerUnitGas; // 1e18 USD per smallest unit (e.g. wei) of destination chain gas
   }
 
   struct TimestampedPackedUint224 {
@@ -65,8 +69,8 @@ library Internal {
   uint256 public constant MESSAGE_FIXED_BYTES = 32 * 17;
 
   /// @dev Each token transfer adds 1 EVMTokenAmount and 1 bytes.
-  /// When abiEncoded, each EVMTokenAmount takes 2 slots, each bytes takes 2 slots.
-  uint256 public constant MESSAGE_BYTES_PER_TOKEN = 32 * 4;
+  /// When abiEncoded, each EVMTokenAmount takes 2 slots, each bytes takes 2 slots, excl bytes contents
+  uint256 public constant MESSAGE_FIXED_BYTES_PER_TOKEN = 32 * 4;
 
   function _toAny2EVMMessage(
     EVM2EVMMessage memory original,

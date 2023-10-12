@@ -1,69 +1,16 @@
-package config
+package ccipdata
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
-
-func TestCommitOffchainConfig_Encoding(t *testing.T) {
-	tests := map[string]struct {
-		want      CommitOffchainConfig
-		expectErr bool
-	}{
-		"encodes and decodes config with all fields set": {
-			want: CommitOffchainConfig{
-				SourceFinalityDepth:   3,
-				DestFinalityDepth:     3,
-				FeeUpdateHeartBeat:    models.MustMakeDuration(1 * time.Hour),
-				FeeUpdateDeviationPPB: 5e7,
-				MaxGasPrice:           200e9,
-				InflightCacheExpiry:   models.MustMakeDuration(23456 * time.Second),
-			},
-		},
-		"fails decoding when all fields present but with 0 values": {
-			want: CommitOffchainConfig{
-				SourceFinalityDepth:   0,
-				DestFinalityDepth:     0,
-				FeeUpdateHeartBeat:    models.MustMakeDuration(0),
-				FeeUpdateDeviationPPB: 0,
-				MaxGasPrice:           0,
-				InflightCacheExpiry:   models.MustMakeDuration(0),
-			},
-			expectErr: true,
-		},
-		"fails decoding when all fields are missing": {
-			want:      CommitOffchainConfig{},
-			expectErr: true,
-		},
-		"fails decoding when some fields are missing": {
-			want: CommitOffchainConfig{
-				SourceFinalityDepth:   3,
-				FeeUpdateHeartBeat:    models.MustMakeDuration(1 * time.Hour),
-				FeeUpdateDeviationPPB: 5e7,
-				MaxGasPrice:           200e9,
-			},
-			expectErr: true,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			encode, err := EncodeOffchainConfig(tc.want)
-			require.NoError(t, err)
-			got, err := DecodeOffchainConfig[CommitOffchainConfig](encode)
-
-			if tc.expectErr {
-				require.ErrorContains(t, err, "must set")
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tc.want, got)
-			}
-		})
-	}
-}
 
 func TestExecOffchainConfig_Encoding(t *testing.T) {
 	tests := map[string]struct {
@@ -110,15 +57,56 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			exp := tc.want
-			encode, err := EncodeOffchainConfig(&exp)
+			encode, err := ccipconfig.EncodeOffchainConfig(&exp)
 			require.NoError(t, err)
-			got, err := DecodeOffchainConfig[ExecOffchainConfig](encode)
+			got, err := ccipconfig.DecodeOffchainConfig[ExecOffchainConfig](encode)
 
 			if tc.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tc.want, got)
+			}
+		})
+	}
+}
+
+func TestExecOnchainConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		want      ExecOnchainConfigV1_0_0
+		expectErr bool
+	}{
+		{
+			name: "encodes and decodes config with all fields set",
+			want: ExecOnchainConfigV1_0_0{
+				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
+				Router:                                  randomAddress(),
+				PriceRegistry:                           randomAddress(),
+				MaxTokensLength:                         uint16(rand.Uint32()),
+				MaxDataSize:                             rand.Uint32(),
+			},
+		},
+		{
+			name: "encodes and fails decoding config with missing fields",
+			want: ExecOnchainConfigV1_0_0{
+				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
+				MaxDataSize:                             rand.Uint32(),
+			},
+			expectErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
+			require.NoError(t, err)
+
+			decoded, err := abihelpers.DecodeAbiStruct[ExecOnchainConfigV1_0_0](encoded)
+			if tt.expectErr {
+				require.ErrorContains(t, err, "must set")
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, decoded)
 			}
 		})
 	}

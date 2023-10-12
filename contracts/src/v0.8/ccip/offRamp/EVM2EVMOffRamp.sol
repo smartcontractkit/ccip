@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {TypeAndVersionInterface} from "../../interfaces/TypeAndVersionInterface.sol";
+import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
 import {ICommitStore} from "../interfaces/ICommitStore.sol";
 import {IARM} from "../interfaces/IARM.sol";
 import {IPool} from "../interfaces/pools/IPool.sol";
@@ -28,7 +28,7 @@ import {ERC165Checker} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts
 /// @dev OCR2BaseNoChecks is used to save gas, signatures are not required as the offramp can only execute
 /// messages which are committed in the commitStore. We still make use of OCR2 as an executor whitelist
 /// and turn-taking mechanism.
-contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersionInterface, OCR2BaseNoChecks {
+contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersion, OCR2BaseNoChecks {
   using Address for address;
   using ERC165Checker for address;
   using EnumerableMapAddresses for EnumerableMapAddresses.AddressToAddressMap;
@@ -380,7 +380,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
     try this.executeSingleMessage(message, offchainTokenData) {} catch (bytes memory err) {
       if (ReceiverError.selector == bytes4(err) || TokenHandlingError.selector == bytes4(err)) {
         // If CCIP receiver execution is not successful, bubble up receiver revert data,
-        // prepended by the 4 bytes of ReceiverError.selector
+        // prepended by the 4 bytes of ReceiverError.selector or TokenHandlingError.selector
         // Max length of revert data is Router.MAX_RET_BYTES, max length of err is 4 + Router.MAX_RET_BYTES
         return (Internal.MessageExecutionState.FAILURE, err);
       } else {
@@ -589,23 +589,9 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, TypeAndVersion
           i_sourceChainSelector,
           abi.encode(sourceTokenData[i], offchainTokenData[i])
         )
-      {} catch (
-        /// @dev we only want to revert on rate limiting errors, any other errors are
-        /// wrapped in a TokenHandlingError, which is caught above and handled gracefully.
-        bytes memory err
-      ) {
-        bytes4 errSig = bytes4(err);
-        if (
-          RateLimiter.BucketOverfilled.selector == errSig ||
-          RateLimiter.AggregateValueMaxCapacityExceeded.selector == errSig ||
-          RateLimiter.AggregateValueRateLimitReached.selector == errSig ||
-          RateLimiter.TokenMaxCapacityExceeded.selector == errSig ||
-          RateLimiter.TokenRateLimitReached.selector == errSig
-        ) {
-          revert TokenRateLimitError(err);
-        } else {
-          revert TokenHandlingError(err);
-        }
+      {} catch (bytes memory err) {
+        /// @dev wrap and rethrow the error so we can catch it lower in the stack
+        revert TokenHandlingError(err);
       }
 
       destTokenAmounts[i].token = address(pool.getToken());

@@ -199,8 +199,6 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     feeTokenConfigArgs[0] = EVM2EVMOnRamp.FeeTokenConfigArgs({
       token: s_sourceTokens[1],
       networkFeeUSD: 1,
-      minTokenTransferFeeUSD: 1,
-      maxTokenTransferFeeUSD: 5,
       gasMultiplier: 108e16,
       premiumMultiplier: 1e18,
       enabled: true
@@ -264,10 +262,12 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     s_priceRegistry.applyFeeTokensUpdates(feeTokens, new address[](0));
 
     // Update the price of the newly set feeToken
-    Internal.PriceUpdates memory priceUpdates = getSinglePriceUpdateStruct(feeTokenWithZeroFeeAndGas, 2_000 ether);
-    priceUpdates.destChainSelector = DEST_CHAIN_ID;
-    priceUpdates.usdPerUnitGas = 0;
-
+    Internal.PriceUpdates memory priceUpdates = getSingleTokenAndGasPriceUpdateStruct(
+      feeTokenWithZeroFeeAndGas,
+      2_000 ether,
+      DEST_CHAIN_ID,
+      0
+    );
     s_priceRegistry.updatePrices(priceUpdates);
 
     // Set the feeToken args on the onRamp
@@ -275,8 +275,6 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     feeTokenConfigArgs[0] = EVM2EVMOnRamp.FeeTokenConfigArgs({
       token: s_sourceTokens[1],
       networkFeeUSD: 0,
-      minTokenTransferFeeUSD: 0,
-      maxTokenTransferFeeUSD: 5,
       gasMultiplier: 108e16,
       premiumMultiplier: 1e18,
       enabled: true

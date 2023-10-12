@@ -14,6 +14,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
@@ -34,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
 	ccipnode "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
+	integrationnodes "github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 )
 
 const (
@@ -62,15 +64,19 @@ var (
 	}
 	DONResourceProfile = map[string]interface{}{
 		"requests": map[string]interface{}{
-			"cpu":    "4",
-			"memory": "8Gi",
+			"cpu":    "2",
+			"memory": "4Gi",
 		},
 		"limits": map[string]interface{}{
-			"cpu":    "4",
-			"memory": "8Gi",
+			"cpu":    "2",
+			"memory": "4Gi",
 		},
 	}
 	DONDBResourceProfile = map[string]interface{}{
+		"image": map[string]interface{}{
+			"image":   "postgres",
+			"version": "13.12",
+		},
 		"stateful": true,
 		"capacity": "10Gi",
 		"resources": map[string]interface{}{
@@ -314,8 +320,15 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		if simulated {
 			actualNoOfNetworks := len(p.SelectedNetworks)
 			n := p.SelectedNetworks[0]
+			var chainIDs []int64
+			for _, id := range chainselectors.TestChainIds() {
+				if id == 2337 {
+					continue
+				}
+				chainIDs = append(chainIDs, int64(id))
+			}
 			for i := 0; i < p.NoOfNetworks-actualNoOfNetworks; i++ {
-				chainID := networks.AdditionalSimulatedChainIds[i]
+				chainID := chainIDs[i]
 				p.SelectedNetworks = append(p.SelectedNetworks, blockchain.EVMNetwork{
 					Name:                      fmt.Sprintf("simulated-non-dev%d", len(p.SelectedNetworks)+1),
 					ChainID:                   chainID,
@@ -324,8 +337,9 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 					ChainlinkTransactionLimit: n.ChainlinkTransactionLimit,
 					Timeout:                   n.Timeout,
 					MinimumConfirmations:      n.MinimumConfirmations,
-					GasEstimationBuffer:       n.GasEstimationBuffer,
+					GasEstimationBuffer:       n.GasEstimationBuffer + 1000,
 					ClientImplementation:      n.ClientImplementation,
+					DefaultGasLimit:           n.DefaultGasLimit,
 				})
 			}
 		}
@@ -353,9 +367,61 @@ func (p *CCIPTestConfig) FormNetworkPairCombinations() {
 	}
 }
 
+func SetResourceProfile(defaultcpu, defaultmem, cpu, mem string) map[string]interface{} {
+	if cpu == "" {
+		cpu = defaultcpu
+	}
+	if mem == "" {
+		mem = defaultmem
+	}
+	return map[string]interface{}{
+		"requests": map[string]interface{}{
+			"cpu":    cpu,
+			"memory": mem,
+		},
+		"limits": map[string]interface{}{
+			"cpu":    cpu,
+			"memory": mem,
+		},
+	}
+}
+
 // NewCCIPTestConfig collects all test related CCIPTestConfig from environment variables
 func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
 	var allError error
+	nodeMem, _ := utils.GetEnv("CCIP_NODE_MEM")
+	nodeCPU, _ := utils.GetEnv("CCIP_NODE_CPU")
+	DONResourceProfile["resources"] = SetResourceProfile("2", "4Gi", nodeCPU, nodeMem)
+
+	dbMem, _ := utils.GetEnv("CCIP_DB_MEM")
+	dbCPU, _ := utils.GetEnv("CCIP_DB_CPU")
+	DONDBResourceProfile["resources"] = SetResourceProfile("2", "4Gi", dbCPU, dbMem)
+
+	dbArgs, _ := utils.GetEnv("CCIP_DB_ARGS")
+	if dbArgs != "" {
+		args := strings.Split(dbArgs, ",")
+		var formattedArgs []string
+		for _, arg := range args {
+			formattedArgs = append(formattedArgs, "-c")
+			formattedArgs = append(formattedArgs, arg)
+		}
+		DONDBResourceProfile["additionalArgs"] = formattedArgs
+	}
+
+	ccipTOML, _ := utils.GetEnv("CCIP_TOML_PATH")
+	if ccipTOML != "" {
+		tomlFile, err := os.Open(ccipTOML)
+		if err != nil {
+			allError = multierr.Append(allError, err)
+		} else {
+			defer tomlFile.Close()
+			_, err := tomlFile.Read(node.CCIPTOML)
+			if err != nil {
+				allError = multierr.Append(allError, err)
+			}
+		}
+	}
+
 	p := &CCIPTestConfig{
 		Test:                t,
 		MsgType:             actions.TokenTransfer,
@@ -852,7 +918,7 @@ func CCIPDefaultTestSetUp(
 	t *testing.T,
 	lggr zerolog.Logger,
 	envName string,
-	numOfCLNodes int64,
+	numOfCLNodes int,
 	transferAmounts []*big.Int,
 	tokenDeployerFns []blockchain.ContractDeployer,
 	numOfCommitNodes int, commitAndExecOnSameDON, bidirectional bool,
@@ -907,7 +973,7 @@ func CCIPDefaultTestSetUp(
 			}
 		} else {
 			clProps := make(map[string]interface{})
-			clProps["replicas"] = strconv.FormatInt(numOfCLNodes, 10)
+			clProps["replicas"] = numOfCLNodes
 			clProps["db"] = inputs.CLNodeDBResourceProfile
 			clProps["chainlink"] = map[string]interface{}{
 				"resources": inputs.CLNodeResourceProfile,
@@ -965,13 +1031,13 @@ func CCIPDefaultTestSetUp(
 			chainByChainID[n.ChainID] = ec
 		}
 	}
-
-	t.Cleanup(func() {
-		if inputs.KeepEnvAlive {
-			return
+	printStats := func() {
+		for k := range setUpArgs.Reporter.LaneStats {
+			setUpArgs.Reporter.LaneStats[k].Finalize(k)
 		}
+	}
+	t.Cleanup(func() {
 		if configureCLNode {
-			lggr.Info().Msg("Tearing down the environment")
 			if ccipEnv.LocalCluster != nil {
 				err := ccipEnv.LocalCluster.Terminate()
 				require.NoError(t, err, "Local cluster termination shouldn't fail")
@@ -980,14 +1046,17 @@ func CCIPDefaultTestSetUp(
 				}
 				return
 			}
+			if inputs.KeepEnvAlive {
+				printStats()
+				return
+			}
+			lggr.Info().Msg("Tearing down the environment")
 			err = integrationactions.TeardownSuite(t, ccipEnv.K8Env, utils.ProjectRoot, ccipEnv.CLNodes, setUpArgs.Reporter,
 				zapcore.ErrorLevel, chains...)
 			require.NoError(t, err, "Environment teardown shouldn't fail")
 		} else {
 			//just print
-			for k := range setUpArgs.Reporter.LaneStats {
-				setUpArgs.Reporter.LaneStats[k].Finalize(k)
-			}
+			printStats()
 		}
 	})
 
@@ -1125,7 +1194,7 @@ func CCIPExistingDeploymentTestSetUp(
 
 func DeployLocalCluster(
 	t *testing.T,
-	noOfCLNodes int64,
+	noOfCLNodes int,
 	networks []blockchain.EVMNetwork,
 ) (*test_env.CLClusterTestEnv, func() error) {
 	env, err := test_env.NewCLTestEnvBuilder().
@@ -1142,15 +1211,16 @@ func DeployLocalCluster(
 			}
 		}
 	}
-
+	configOpts := []integrationnodes.NodeConfigOpt{
+		node.WithPrivateEVMs(networks),
+	}
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
-		toml, err := node.NewConfigFromToml(ccipnode.CCIPTOML,
-			node.WithPrivateEVMs(networks))
+		toml, err := node.NewConfigFromToml(ccipnode.CCIPTOML, configOpts...)
 		if err != nil {
 			return err
 		}
-		return env.StartClNodes(toml, int(noOfCLNodes))
+		return env.StartClNodes(toml, noOfCLNodes, "")
 	}
 	return env, deployCL
 }
@@ -1234,7 +1304,10 @@ func DeployEnvironments(
 		*/
 	}
 
-	tomlCfg, err := node.NewConfigFromToml(ccipnode.CCIPTOML, ccipnode.WithPrivateEVMs(nets))
+	tomlCfg, err := node.NewConfigFromToml(
+		ccipnode.CCIPTOML,
+		ccipnode.WithPrivateEVMs(nets),
+	)
 	tomlStr, err := tomlCfg.TOMLString()
 	require.NoError(t, err)
 	clProps["toml"] = tomlStr

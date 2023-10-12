@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -21,51 +21,77 @@ func TestCommitInflight(t *testing.T) {
 	c := newInflightCommitReportsContainer(time.Hour)
 
 	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
-		priceUpdates:  commit_store.InternalPriceUpdates{DestChainSelector: 0}, // skipped when destChainSelector is 0
+		gasPrices:     []ccipdata.GasPrice{},
 		createdAt:     time.Now(),
 		epochAndRound: ccipcalc.MergeEpochAndRound(2, 4),
 	})
 
 	// Initially should be empty
-	assert.Nil(t, c.getLatestInflightGasPriceUpdate())
+	inflightGasUpdates := c.latestInflightGasPriceUpdates()
+	assert.Equal(t, 0, len(inflightGasUpdates))
 	assert.Equal(t, uint64(0), c.maxInflightSeqNr())
 
 	epochAndRound := uint64(1)
 
 	// Add a single report inflight
 	root1 := utils.Keccak256Fixed(hexutil.MustDecode("0xaa"))
-	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 2}, MerkleRoot: root1}, epochAndRound))
-	assert.Nil(t, c.getLatestInflightGasPriceUpdate())
+	require.NoError(t, c.add(lggr, ccipdata.CommitStoreReport{
+		Interval:   ccipdata.CommitStoreInterval{Min: 1, Max: 2},
+		MerkleRoot: root1,
+		GasPrices: []ccipdata.GasPrice{
+			{DestChainSelector: 123, Value: big.NewInt(999)},
+		},
+	}, epochAndRound))
+	inflightGasUpdates = c.latestInflightGasPriceUpdates()
+	assert.Equal(t, 1, len(inflightGasUpdates))
+	assert.Equal(t, big.NewInt(999), inflightGasUpdates[123].value)
 	assert.Equal(t, uint64(2), c.maxInflightSeqNr())
 	epochAndRound++
 
 	// Add another price report
 	root2 := utils.Keccak256Fixed(hexutil.MustDecode("0xab"))
-	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{Interval: commit_store.CommitStoreInterval{Min: 3, Max: 4}, MerkleRoot: root2}, epochAndRound))
-	assert.Nil(t, c.getLatestInflightGasPriceUpdate())
+	require.NoError(t, c.add(lggr, ccipdata.CommitStoreReport{
+		Interval:   ccipdata.CommitStoreInterval{Min: 3, Max: 4},
+		MerkleRoot: root2,
+		GasPrices: []ccipdata.GasPrice{
+			{DestChainSelector: 321, Value: big.NewInt(888)},
+		},
+	}, epochAndRound))
+	inflightGasUpdates = c.latestInflightGasPriceUpdates()
+	assert.Equal(t, 2, len(inflightGasUpdates))
+	assert.Equal(t, big.NewInt(999), inflightGasUpdates[123].value)
+	assert.Equal(t, big.NewInt(888), inflightGasUpdates[321].value)
 	assert.Equal(t, uint64(4), c.maxInflightSeqNr())
 	epochAndRound++
 
 	// Add gas price updates
-	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{PriceUpdates: commit_store.InternalPriceUpdates{
-		DestChainSelector: uint64(1),
-		UsdPerUnitGas:     big.NewInt(1),
-	}}, epochAndRound))
-	latest := c.getLatestInflightGasPriceUpdate()
-	assert.Equal(t, big.NewInt(1), latest.value)
+	require.NoError(t, c.add(lggr, ccipdata.CommitStoreReport{
+		GasPrices: []ccipdata.GasPrice{
+			{
+				DestChainSelector: uint64(1),
+				Value:             big.NewInt(1),
+			},
+		}}, epochAndRound))
+
+	inflightGasUpdates = c.latestInflightGasPriceUpdates()
+	assert.Equal(t, 3, len(inflightGasUpdates))
+	assert.Equal(t, big.NewInt(999), inflightGasUpdates[123].value)
+	assert.Equal(t, big.NewInt(888), inflightGasUpdates[321].value)
+	assert.Equal(t, big.NewInt(1), inflightGasUpdates[1].value)
 	assert.Equal(t, uint64(4), c.maxInflightSeqNr())
 	epochAndRound++
 
 	// Add a token price update
 	token := common.HexToAddress("0xa")
-	require.NoError(t, c.add(lggr, commit_store.CommitStoreCommitReport{PriceUpdates: commit_store.InternalPriceUpdates{
-		TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
+	require.NoError(t, c.add(lggr, ccipdata.CommitStoreReport{
+		TokenPrices: []ccipdata.TokenPrice{
 			{
-				SourceToken: token,
-				UsdPerToken: big.NewInt(10),
+				Token: token,
+				Value: big.NewInt(10),
 			},
 		},
-	}}, epochAndRound))
+		GasPrices: []ccipdata.GasPrice{},
+	}, epochAndRound))
 	// Apply cache price to existing
 	latestInflightTokenPriceUpdates := c.latestInflightTokenPriceUpdates()
 	require.Equal(t, len(latestInflightTokenPriceUpdates), 1)
@@ -73,12 +99,14 @@ func TestCommitInflight(t *testing.T) {
 
 	// larger epoch and round overrides existing price update
 	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
-		priceUpdates: commit_store.InternalPriceUpdates{
-			TokenPriceUpdates: []commit_store.InternalTokenPriceUpdate{
-				{SourceToken: token, UsdPerToken: big.NewInt(9999)},
+		tokenPrices: []ccipdata.TokenPrice{
+			{Token: token, Value: big.NewInt(9999)},
+		},
+		gasPrices: []ccipdata.GasPrice{
+			{
+				DestChainSelector: uint64(1),
+				Value:             big.NewInt(999),
 			},
-			DestChainSelector: uint64(1),
-			UsdPerUnitGas:     big.NewInt(999),
 		},
 		createdAt:     time.Now(),
 		epochAndRound: ccipcalc.MergeEpochAndRound(999, 99),
@@ -86,6 +114,11 @@ func TestCommitInflight(t *testing.T) {
 	latestInflightTokenPriceUpdates = c.latestInflightTokenPriceUpdates()
 	require.Equal(t, len(latestInflightTokenPriceUpdates), 1)
 	assert.Equal(t, big.NewInt(9999), latestInflightTokenPriceUpdates[token].value)
+	inflightGasUpdates = c.latestInflightGasPriceUpdates()
+	assert.Equal(t, 3, len(inflightGasUpdates))
+	assert.Equal(t, big.NewInt(999), inflightGasUpdates[123].value)
+	assert.Equal(t, big.NewInt(888), inflightGasUpdates[321].value)
+	assert.Equal(t, big.NewInt(999), inflightGasUpdates[1].value)
 }
 
 func Test_inflightCommitReportsContainer_expire(t *testing.T) {
@@ -93,22 +126,22 @@ func Test_inflightCommitReportsContainer_expire(t *testing.T) {
 		cacheExpiry: time.Minute,
 		inFlight: map[[32]byte]InflightCommitReport{
 			common.HexToHash("1"): {
-				report:    commit_store.CommitStoreCommitReport{},
+				report:    ccipdata.CommitStoreReport{},
 				createdAt: time.Now().Add(-5 * time.Minute),
 			},
 			common.HexToHash("2"): {
-				report:    commit_store.CommitStoreCommitReport{},
+				report:    ccipdata.CommitStoreReport{},
 				createdAt: time.Now().Add(-10 * time.Second),
 			},
 		},
 		inFlightPriceUpdates: []InflightPriceUpdate{
 			{
-				priceUpdates:  commit_store.InternalPriceUpdates{DestChainSelector: 100},
+				gasPrices:     []ccipdata.GasPrice{{DestChainSelector: 100, Value: big.NewInt(0)}},
 				createdAt:     time.Now().Add(-PRICE_EXPIRY_MULTIPLIER * time.Minute),
 				epochAndRound: ccipcalc.MergeEpochAndRound(10, 5),
 			},
 			{
-				priceUpdates:  commit_store.InternalPriceUpdates{DestChainSelector: 200},
+				gasPrices:     []ccipdata.GasPrice{{DestChainSelector: 200, Value: big.NewInt(0)}},
 				createdAt:     time.Now().Add(-PRICE_EXPIRY_MULTIPLIER * time.Second),
 				epochAndRound: ccipcalc.MergeEpochAndRound(20, 5),
 			},
