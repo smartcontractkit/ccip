@@ -1,12 +1,7 @@
 name: Integration Tests Publish
 # Publish the compiled integration tests
-
-
 on:
   push:
-    branches:
-      - ccip-develop
-    tags: [ v* ]
   workflow_dispatch:
 
 env:
@@ -21,9 +16,6 @@ jobs:
     name: Publish Integration Test Image
     runs-on: ubuntu-latest
     steps:
-      - name: Extract tag name
-        id: extract_tag
-        run: echo "::set-output name=tag::$(git describe --tags --match 'v*' --exact-match 2>/dev/null)"
       - name: Collect Metrics
         id: collect-gha-metrics
         uses: smartcontractkit/push-gha-metrics-action@d2c2b7bdc9012651230b2608a1bcb0c48538b6ec
@@ -37,14 +29,14 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Collect other tags
+        if: startsWith(github.ref, 'refs/tags/v')
         id: collect_other_tags
         run: |
-          RELEASE_TAG="${{ steps.extract_tag.outputs.tag != '' && format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink-ccip-tests:{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, steps.extract_tag.outputs.tag) || '' }}"
-          echo "::set-output name=tags::${ECR_TAG},${RELEASE_TAG}"
+          RELEASE_TAG="${{ github.ref_name != '' && format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink-ccip-tests:{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.ref_name) || '' }}"
       - name: Build Image
         uses: ./.github/actions/build-test-image
         with:
-          other_tags: ${{ steps.collect_other_tags.outputs.tags }}
+          other_tags: ${{ env.ECR_TAG }}, ${RELEASE_TAG}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
