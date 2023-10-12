@@ -198,7 +198,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     EVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new EVM2EVMOnRamp.FeeTokenConfigArgs[](1);
     feeTokenConfigArgs[0] = EVM2EVMOnRamp.FeeTokenConfigArgs({
       token: s_sourceTokens[1],
-      networkFeeUSD: 1,
+      networkFeeUSDCents: 1,
       gasMultiplier: 108e16,
       premiumMultiplier: 1e18,
       enabled: true
@@ -274,7 +274,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
     EVM2EVMOnRamp.FeeTokenConfigArgs[] memory feeTokenConfigArgs = new EVM2EVMOnRamp.FeeTokenConfigArgs[](1);
     feeTokenConfigArgs[0] = EVM2EVMOnRamp.FeeTokenConfigArgs({
       token: s_sourceTokens[1],
-      networkFeeUSD: 0,
+      networkFeeUSDCents: 0,
       gasMultiplier: 108e16,
       premiumMultiplier: 1e18,
       enabled: true

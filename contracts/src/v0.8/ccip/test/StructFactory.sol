@@ -132,9 +132,9 @@ contract StructFactory {
         permissionLessExecutionThresholdSeconds: PERMISSION_LESS_EXECUTION_THRESHOLD_SECONDS,
         router: router,
         priceRegistry: priceRegistry,
-        maxTokensLength: MAX_TOKENS_LENGTH,
-        maxDataSize: MAX_DATA_SIZE,
-        maxPoolGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS
+        maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
+        maxDataBytes: MAX_DATA_SIZE,
+        maxPoolReleaseOrMintGas: MAX_TOKEN_POOL_RELEASE_OR_MINT_GAS
       });
   }
 
@@ -145,15 +145,15 @@ contract StructFactory {
     return
       EVM2EVMOnRamp.DynamicConfig({
         router: router,
-        maxTokensLength: MAX_TOKENS_LENGTH,
+        maxNumberOfTokensPerMsg: MAX_TOKENS_LENGTH,
         destGasOverhead: DEST_GAS_OVERHEAD,
         destGasPerPayloadByte: DEST_GAS_PER_PAYLOAD_BYTE,
         destDataAvailabilityOverheadGas: DEST_DATA_AVAILABILITY_OVERHEAD_GAS,
         destGasPerDataAvailabilityByte: DEST_GAS_PER_DATA_AVAILABILITY_BYTE,
         destDataAvailabilityMultiplier: DEST_GAS_DATA_AVAILABILITY_MULTIPLIER,
         priceRegistry: priceRegistry,
-        maxDataSize: MAX_DATA_SIZE,
-        maxGasLimit: MAX_GAS_LIMIT
+        maxDataBytes: MAX_DATA_SIZE,
+        maxPerMsgGasLimit: MAX_GAS_LIMIT
       });
   }
 
