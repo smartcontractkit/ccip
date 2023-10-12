@@ -21,7 +21,7 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 	// but I think that would essentially be testing geth's abi library
 	// as our encode/decode is a thin wrapper around that.
 	report := ccipdata.ExecReport{
-		Messages:          []internal.EVM2EVMMessage{},
+		Messages:          []internal.EVM2EVMMessage(nil),
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{testutils.Random32Byte()},
 		ProofFlagBits:     big.NewInt(133),
@@ -37,7 +37,7 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 	decodeCommitReport, err := offRamp.DecodeExecutionReport(encodeExecutionReport)
 	require.NoError(t, err)
 	require.Equal(t, report.Proofs, decodeCommitReport.Proofs)
-	// require.Equal(t, report, decodeCommitReport) // TODO: fails because some fields are not supported on V1_0_0
+	require.Equal(t, report, decodeCommitReport)
 }
 
 func TestOffRampFiltersV100(t *testing.T) {

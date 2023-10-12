@@ -248,6 +248,7 @@ func TestCommitStoreReaders(t *testing.T) {
 		MaxGasPrice:           maxGas,
 		InflightCacheExpiry:   models.MustMakeDuration(commonOffchain.InflightCacheExpiry),
 	})
+	require.NoError(t, err)
 	_, err = ch.SetOCR2Config(user, signers, transmitters, 1, onchainConfig, 1, []byte{})
 	require.NoError(t, err)
 	onchainConfig2, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
@@ -350,6 +351,12 @@ func TestCommitStoreReaders(t *testing.T) {
 			assert.Equal(t, reps[0].Data, rep)
 
 			reps, err = cr.GetAcceptedCommitReportsGteSeqNum(context.Background(), rep.Interval.Min-1, 0)
+			require.NoError(t, err)
+			require.Len(t, reps, 1)
+			assert.Equal(t, reps[0].Data, rep)
+
+			// Sanity
+			reps, err = cr.GetAcceptedCommitReportsGteTimestamp(context.Background(), time.Unix(0, 0), 0)
 			require.NoError(t, err)
 			require.Len(t, reps, 1)
 			assert.Equal(t, reps[0].Data, rep)
