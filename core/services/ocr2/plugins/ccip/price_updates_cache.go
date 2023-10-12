@@ -27,5 +27,7 @@ func (c *priceUpdatesCache) get() update {
 }
 
 func (c *priceUpdatesCache) updateCache(update update) {
-	c.lastUpdate = update
+	if update.timestamp.After(c.lastUpdate.timestamp) {
+		c.lastUpdate = update
+	}
 }
