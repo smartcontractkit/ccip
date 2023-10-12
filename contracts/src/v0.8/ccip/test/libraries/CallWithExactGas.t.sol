@@ -22,7 +22,6 @@ contract CallWithExactGas_callWithExactGas is BaseTest {
 
     s_receiver = new MaybeRevertMessageReceiver(false);
     s_reverting_receiver = new MaybeRevertMessageReceiver(true);
-    s_reverting_receiver.setErr("test");
 
     s_caller = new CallWithExactGasHelper();
   }
@@ -53,7 +52,10 @@ contract CallWithExactGas_callWithExactGas is BaseTest {
     assertTrue(success);
   }
 
-  function test_CallWithExactGasReceiverErrorSuccess() public {
+  function testFuzz_CallWithExactGasReceiverErrorSuccess(uint16 testRetBytes) public {
+    // Bound with upper limit, otherwise the test runs out of gas.
+    testRetBytes = uint16(bound(testRetBytes, 0, Internal.MAX_RET_BYTES * 10));
+
     Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
       messageId: "1",
       sourceChainSelector: 1,
@@ -62,6 +64,12 @@ contract CallWithExactGas_callWithExactGas is BaseTest {
       destTokenAmounts: new Client.EVMTokenAmount[](0)
     });
     bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
+
+    bytes memory errorData = new bytes(testRetBytes);
+    for (uint256 i = 0; i < errorData.length; ++i) {
+      errorData[i] = 0x01;
+    }
+    s_reverting_receiver.setErr(errorData);
 
     vm.expectCall(address(s_reverting_receiver), data);
 
@@ -74,7 +82,18 @@ contract CallWithExactGas_callWithExactGas is BaseTest {
     );
 
     assertFalse(success);
-    assertEq(abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, "test"), retData);
+
+    bytes memory totalReturnData = abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, errorData);
+    bytes memory expectedReturnData = totalReturnData;
+
+    // If expected return data is longer than MAX_RET_BYTES, truncate it to MAX_RET_BYTES
+    if (expectedReturnData.length > Internal.MAX_RET_BYTES) {
+      expectedReturnData = new bytes(Internal.MAX_RET_BYTES);
+      for (uint256 i = 0; i < Internal.MAX_RET_BYTES; ++i) {
+        expectedReturnData[i] = totalReturnData[i];
+      }
+    }
+    assertEq(expectedReturnData, retData);
   }
 
   function test_NoContractReverts() public {

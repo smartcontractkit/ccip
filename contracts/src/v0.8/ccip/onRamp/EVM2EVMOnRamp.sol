@@ -332,11 +332,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         bytes("") // any future extraArgs component would be added here
       );
 
-      // Cap tokenData to no larger than configured destBytesOverhead.
-      // This approach limits a malicious pool to underpay NOPs by no more than offchainData.length number of bytes.
-      // It is acceptable as offchainData.length is 0 for most tokens. The few tokens that require it are likely to be more trusted, e.g. USDC.
-      // Even if such token pool becomes malicious, the potential loss in fees is capped.
-      // With this implementation, we will reject tokens that have non-capped sourceTokenData size and large offchainData size.
+      // Cap tokenData to no larger than destBytesOverhead. Since destBytesOverhead is sum(tokenData.length, offchainData.length),
+      // a malicious pool can underpay NOPs by no more than offchainData.length number of bytes.
+      // This risk is acceptable. For most tokens, offchainData.length is 0. If a token needs it, we will review the source and
+      // destination token pools for malicious potential before whitelisting.
       if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead)
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
 
