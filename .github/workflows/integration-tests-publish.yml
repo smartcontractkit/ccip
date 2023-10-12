@@ -33,10 +33,11 @@ jobs:
         id: collect_other_tags
         run: |
           RELEASE_TAG="${{ github.ref_name != '' && format('{0}.dkr.ecr.{1}.amazonaws.com/chainlink-ccip-tests:{2}', secrets.QA_AWS_ACCOUNT_NUMBER, secrets.QA_AWS_REGION, github.ref_name) || '' }}"
+          echo ${RELEASE_TAG}
       - name: Build Image
         uses: ./.github/actions/build-test-image
         with:
-          other_tags: ${{ env.ECR_TAG }}, ${RELEASE_TAG}
+          other_tags: ${{ env.ECR_TAG }},${RELEASE_TAG}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
