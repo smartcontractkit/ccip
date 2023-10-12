@@ -2,6 +2,7 @@ package ccipdata_test
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"reflect"
@@ -13,7 +14,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	gasmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	rollupMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/rollups/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -225,6 +228,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	onchainConfig, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
 		PriceRegistry: pr,
 	})
+	require.NoError(t, err)
 
 	commonOffchain := ccipdata.CommitOffchainConfig{
 		SourceFinalityDepth:    1,
@@ -235,12 +239,13 @@ func TestCommitStoreReaders(t *testing.T) {
 		InflightCacheExpiry:    3 * time.Hour,
 		DestFinalityDepth:      2,
 	}
+	maxGas := uint64(1e9)
 	offchainConfig, err := ccipconfig.EncodeOffchainConfig[ccipdata.CommitOffchainConfigV1_0_0](ccipdata.CommitOffchainConfigV1_0_0{
 		SourceFinalityDepth:   commonOffchain.SourceFinalityDepth,
 		DestFinalityDepth:     commonOffchain.DestFinalityDepth,
 		FeeUpdateHeartBeat:    models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
 		FeeUpdateDeviationPPB: commonOffchain.GasPriceDeviationPPB,
-		MaxGasPrice:           1e9,
+		MaxGasPrice:           maxGas,
 		InflightCacheExpiry:   models.MustMakeDuration(commonOffchain.InflightCacheExpiry),
 	})
 	_, err = ch.SetOCR2Config(user, signers, transmitters, 1, onchainConfig, 1, []byte{})
@@ -248,10 +253,11 @@ func TestCommitStoreReaders(t *testing.T) {
 	onchainConfig2, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
 		PriceRegistry: pr2,
 	})
+	require.NoError(t, err)
 	offchainConfig2, err := ccipconfig.EncodeOffchainConfig[ccipdata.CommitOffchainConfigV1_2_0](ccipdata.CommitOffchainConfigV1_2_0{
 		SourceFinalityDepth:      commonOffchain.SourceFinalityDepth,
 		DestFinalityDepth:        commonOffchain.DestFinalityDepth,
-		MaxGasPrice:              1e9,
+		MaxGasPrice:              maxGas,
 		GasPriceHeartBeat:        models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
 		DAGasPriceDeviationPPB:   1e7,
 		ExecGasPriceDeviationPPB: commonOffchain.GasPriceDeviationPPB,
@@ -259,6 +265,7 @@ func TestCommitStoreReaders(t *testing.T) {
 		TokenPriceHeartBeat:      models.MustMakeDuration(commonOffchain.TokenPriceHeartBeat),
 		InflightCacheExpiry:      models.MustMakeDuration(commonOffchain.InflightCacheExpiry),
 	})
+	require.NoError(t, err)
 	_, err = ch2.SetOCR2Config(user, signers, transmitters, 1, onchainConfig2, 1, []byte{})
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec)
@@ -289,8 +296,17 @@ func TestCommitStoreReaders(t *testing.T) {
 		ccipdata.V1_0_0: pr,
 		ccipdata.V1_2_0: pr2,
 	}
+	gasPrice := big.NewInt(10)
+	daPrice := big.NewInt(20)
+	expectedGas := map[string]string{
+		ccipdata.V1_0_0: gasPrice.String(),
+		ccipdata.V1_2_0: fmt.Sprintf("DA Price: %s, Exec Price: %s", daPrice, gasPrice),
+	}
+	ge.On("GetFee", mock.Anything, mock.Anything, mock.Anything, assets.NewWei(big.NewInt(int64(maxGas)))).Return(gas.EvmFee{Legacy: assets.NewWei(gasPrice)}, uint32(0), nil)
 	lm := new(rollupMocks.L1Oracle)
+	lm.On("GasPrice", mock.Anything).Return(assets.NewWei(daPrice), nil)
 	ge.On("L1Oracle").Return(lm)
+
 	for v, cr := range crs {
 		cr := cr
 		t.Run("CommitStoreReader "+v, func(t *testing.T) {
@@ -344,6 +360,10 @@ func TestCommitStoreReaders(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, newPr, prs[v])
 			assert.Equal(t, commonOffchain, cr.OffchainConfig())
+			// We should be able to query for gas prices now.
+			gp, err := cr.GasPriceEstimator().GetGasPrice(context.Background())
+			require.NoError(t, err)
+			assert.Equal(t, expectedGas[v], cr.GasPriceEstimator().String(gp))
 		})
 	}
 }
