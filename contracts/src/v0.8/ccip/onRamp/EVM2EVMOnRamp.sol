@@ -115,7 +115,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint32 maxFeeUSD; //                │ Maximum fee to charge per token transfer, multiples of 0.01 USD
     uint16 ratio; //                    │ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; //          │ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // ───────╯ Extra data availability bytes on top of fixed transfer data, e.g. USDC source token data and offchain data
+    uint32 destBytesOverhead; // ───────╯ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
   }
 
   /// @dev Same as TokenTransferFeeConfig
@@ -126,7 +126,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     uint32 maxFeeUSD; //                │ Maximum fee to charge per token transfer, multiples of 0.01 USD
     uint16 ratio; // ───────────────────╯ Ratio of token transfer value to charge as fee, multiples of 0.1bps, or 1e-5
     uint32 destGasOverhead; // ─────────╮ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // ───────╯ Extra data availability bytes on top of fixed transfer data, e.g. USDC source token data and offchain data
+    uint32 destBytesOverhead; // ───────╯ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
@@ -332,10 +332,10 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
         bytes("") // any future extraArgs component would be added here
       );
 
-      // Cap tokenData to no larger than destBytesOverhead. Since destBytesOverhead is sum(tokenData.length, offchainData.length),
-      // a malicious pool can underpay NOPs by no more than offchainData.length number of bytes.
-      // This risk is acceptable. For most tokens, offchainData.length is 0. If a token needs it, we will review the source and
-      // destination token pools for malicious potential before whitelisting.
+      // Since the DON has to pay for the tokenData to be included on the destination chain, we cap the length of the tokenData.
+      // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
+      // As destBytesOverhead accounts for tokenData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
+      // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
       if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead)
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
 
