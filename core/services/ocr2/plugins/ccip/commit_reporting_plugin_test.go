@@ -299,6 +299,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.gasPriceEstimator = gasPriceEstimator
 			p.offchainConfig.GasPriceHeartBeat = gasPriceHeartBeat.Duration()
 			p.commitStoreReader = commitStoreReader
+			p.tokenPriceUpdatesCache = newTokenPriceUpdatesCache()
 			p.F = tc.f
 			p.priceUpdatesCache = newPriceUpdatesCache()
 
@@ -1563,6 +1564,7 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 			//_, priceRegAddr := testhelpers.NewFakePriceRegistry(t)
 			priceReg := ccipdata.NewMockPriceRegistryReader(t)
 			p.destPriceRegistryReader = priceReg
+			p.tokenPriceUpdatesCache = newTokenPriceUpdatesCache()
 
 			//destReader := ccipdata.NewMockReader(t)
 			var events []ccipdata.Event[ccipdata.TokenPriceUpdate]
@@ -1600,6 +1602,73 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 		})
 	}
 
+}
+
+func TestCommitReportingPlugin_getLatestTokenPriceUpdates_cache(t *testing.T) {
+	ctx := testutils.Context(t)
+	priceReg := ccipdata.NewMockPriceRegistryReader(t)
+	p := &CommitReportingPlugin{
+		tokenPriceUpdatesCache:  newTokenPriceUpdatesCache(),
+		destPriceRegistryReader: priceReg,
+		offchainConfig: ccipdata.CommitOffchainConfig{
+			TokenPriceHeartBeat: 12 * time.Hour,
+		},
+	}
+
+	twoHoursAgo := time.Now().Add(-2 * time.Hour)
+	threeHoursAgo := time.Now().Add(-3 * time.Hour)
+	fourHoursAgo := time.Now().Add(-4 * time.Hour)
+
+	tk1 := utils.RandomAddress()
+	now := time.Now()
+
+	onChainUpdates := []ccipdata.Event[ccipdata.TokenPriceUpdate]{
+		{
+			Data: ccipdata.TokenPriceUpdate{
+				TokenPrice: ccipdata.TokenPrice{Token: tk1, Value: big.NewInt(100)},
+				Timestamp:  big.NewInt(0).SetInt64(fourHoursAgo.Unix()),
+			},
+		},
+		{
+			Data: ccipdata.TokenPriceUpdate{
+				TokenPrice: ccipdata.TokenPrice{Token: tk1, Value: big.NewInt(102)},
+				Timestamp:  big.NewInt(0).SetInt64(twoHoursAgo.Unix()),
+			},
+		},
+		{
+			Data: ccipdata.TokenPriceUpdate{
+				TokenPrice: ccipdata.TokenPrice{Token: tk1, Value: big.NewInt(101)},
+				Timestamp:  big.NewInt(0).SetInt64(threeHoursAgo.Unix()),
+			},
+		},
+	}
+	rand.Shuffle(len(onChainUpdates), func(i, j int) { onChainUpdates[i], onChainUpdates[j] = onChainUpdates[j], onChainUpdates[i] })
+	priceReg.On(
+		"GetTokenPriceUpdatesCreatedAfter",
+		mock.Anything,
+		now.Add(-p.offchainConfig.TokenPriceHeartBeat), // first call should pass the token price heart beat duration
+		0,
+	).Return(onChainUpdates, nil).Once()
+
+	priceUpdates, err := p.getLatestTokenPriceUpdates(ctx, now, false)
+	assert.NoError(t, err)
+	// we expect to get only one update, since all three updates above are for the same token
+	assert.Len(t, priceUpdates, 1)
+	// and we expect to get the latest price update
+	assert.Equal(t, big.NewInt(102), priceUpdates[tk1].value)
+	assert.Equal(t, twoHoursAgo.Unix(), priceUpdates[tk1].timestamp.Unix())
+
+	priceReg.On(
+		"GetTokenPriceUpdatesCreatedAfter",
+		mock.Anything,
+		twoHoursAgo.Truncate(time.Second), // now we expect to ask for price updates after the most recent price update
+		0,
+	).Return([]ccipdata.Event[ccipdata.TokenPriceUpdate]{}, nil).Once()
+	priceUpdates, err = p.getLatestTokenPriceUpdates(ctx, now, false)
+	assert.NoError(t, err)
+	// and we expect to get the exact same price update since there wasn't anything new recorded onchain
+	assert.Equal(t, big.NewInt(102), priceUpdates[tk1].value)
+	assert.Equal(t, twoHoursAgo.Unix(), priceUpdates[tk1].timestamp.Unix())
 }
 
 func Test_commitReportSize(t *testing.T) {

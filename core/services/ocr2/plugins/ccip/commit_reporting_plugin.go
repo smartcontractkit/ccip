@@ -83,6 +83,7 @@ type CommitReportingPlugin struct {
 	inflightReports *inflightCommitReportsContainer
 	// Cache
 	priceUpdatesCache *priceUpdatesCache
+	tokenPriceUpdatesCache *tokenPriceUpdatesCache
 }
 
 type CommitReportingPluginFactory struct {
@@ -163,6 +164,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			),
 			gasPriceEstimator: rf.config.commitStore.GasPriceEstimator(),
 			priceUpdatesCache: newPriceUpdatesCache(),
+			tokenPriceUpdatesCache: newTokenPriceUpdatesCache(),
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -363,27 +365,29 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 // Gets the latest token price updates based on logs within the heartbeat
 // The updates returned by this function are guaranteed to not contain nil values.
 func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, checkInflight bool) (map[common.Address]update, error) {
-	tokenPriceUpdates, err := r.destPriceRegistryReader.GetTokenPriceUpdatesCreatedAfter(
-		ctx,
-		now.Add(-r.offchainConfig.TokenPriceHeartBeat),
-		0,
-	)
+	ts := now.Add(-r.offchainConfig.TokenPriceHeartBeat)
+	if mostRecentCachedTs := r.tokenPriceUpdatesCache.mostRecentTs(); mostRecentCachedTs.After(ts) {
+		ts = mostRecentCachedTs
+	}
+
+	newTokenPriceUpdates, err := r.destPriceRegistryReader.GetTokenPriceUpdatesCreatedAfter(ctx, ts, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	latestUpdates := make(map[common.Address]update)
-	for _, tokenUpdate := range tokenPriceUpdates {
-		priceUpdate := tokenUpdate.Data
-		// Ordered by ascending timestamps
-		timestamp := time.Unix(priceUpdate.Timestamp.Int64(), 0)
-		if priceUpdate.Value != nil && !timestamp.Before(latestUpdates[priceUpdate.Token].timestamp) {
-			latestUpdates[priceUpdate.Token] = update{
-				timestamp: timestamp,
-				value:     priceUpdate.Value,
-			}
+	for _, upd := range newTokenPriceUpdates {
+		if upd.Data.Value == nil {
+			continue
 		}
+
+		r.tokenPriceUpdatesCache.updateIfMoreRecent(
+			time.Unix(upd.Data.Timestamp.Int64(), 0),
+			upd.Data.Token,
+			upd.Data.Value,
+		)
 	}
+
+	latestUpdates := r.tokenPriceUpdatesCache.get(now.Add(-r.offchainConfig.TokenPriceHeartBeat))
 	if !checkInflight {
 		return latestUpdates, nil
 	}
