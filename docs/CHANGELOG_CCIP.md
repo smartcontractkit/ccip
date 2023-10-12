@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- USDC Support
+  - Added `USDC` token pool
+  - Jobspec changes to support USDC information
+- Added TypeAndVersion to all token pools & price registry
+
 ### Changed
 - PriceUpdate now accepts an array of gas price update
   - Removed `destChainSelector` and `usdPerUnitGas` from PriceUpdates
@@ -55,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `maxGasLimit` -> `maxPerMsgGasLimit`
   - All fees that ended with USD denominated in cents are now suffixed with `Cents`
   - `ratio` -> `deciBps`
+
 
 ### Removed
 
