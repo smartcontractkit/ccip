@@ -27,7 +27,7 @@ MaxOpenConns = 50
 
 [OCR2]
 Enabled = true
-DefaultTransactionQueueDepth = 0
+DefaultTransactionQueueDepth = 150
 
 [OCR]
 Enabled = false
