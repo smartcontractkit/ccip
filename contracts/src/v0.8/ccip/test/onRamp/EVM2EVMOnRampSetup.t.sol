@@ -40,8 +40,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMOnRamp.FeeTokenConfigArgs({
         token: s_sourceFeeToken,
         networkFeeUSDCents: 1_00, // 1 USD
-        gasMultiplier: 1e18, // 1x
-        premiumMultiplier: 5e17, // 0.5x
+        gasMultiplierWeiPerEth: 1e18, // 1x
+        premiumMultiplierWeiPerEth: 5e17, // 0.5x
         enabled: true
       })
     );
@@ -49,8 +49,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       EVM2EVMOnRamp.FeeTokenConfigArgs({
         token: WETH,
         networkFeeUSDCents: 5_00, // 5 USD
-        gasMultiplier: 2e18, // 2x
-        premiumMultiplier: 2e18, // 2x
+        gasMultiplierWeiPerEth: 2e18, // 2x
+        premiumMultiplierWeiPerEth: 2e18, // 2x
         enabled: true
       })
     );
