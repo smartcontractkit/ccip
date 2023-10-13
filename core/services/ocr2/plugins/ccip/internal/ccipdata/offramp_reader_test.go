@@ -143,9 +143,9 @@ func TestExecOnchainConfig120(t *testing.T) {
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  utils.RandomAddress(),
 				PriceRegistry:                           utils.RandomAddress(),
-				MaxNumberOfTokensPerMsg:                         uint16(rand.Uint32()),
-				MaxDataBytes:                             rand.Uint32(),
-				MaxPoolReleaseOrMintGas:                              rand.Uint32(),
+				MaxNumberOfTokensPerMsg:                 uint16(rand.Uint32()),
+				MaxDataBytes:                            rand.Uint32(),
+				MaxPoolReleaseOrMintGas:                 rand.Uint32(),
 			},
 		},
 		{
