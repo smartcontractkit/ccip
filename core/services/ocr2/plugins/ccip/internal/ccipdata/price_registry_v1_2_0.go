@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 )
 
 var (
@@ -22,7 +21,7 @@ var (
 
 type PriceRegistryV1_2_0 struct {
 	*PriceRegistryV1_0_0
-	obs *observability.ObservedPriceRegistryV1_2_0
+	pr *price_registry.PriceRegistry
 }
 
 func NewPriceRegistryV1_2_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistryV1_2_0, error) {
@@ -30,13 +29,13 @@ func NewPriceRegistryV1_2_0(lggr logger.Logger, priceRegistryAddr common.Address
 	if err != nil {
 		return nil, err
 	}
-	obs, err := observability.NewObservedPriceRegistryV1_2_0(priceRegistryAddr, ExecPluginLabel, ec)
+	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddr, ec)
 	if err != nil {
 		return nil, err
 	}
 	return &PriceRegistryV1_2_0{
 		PriceRegistryV1_0_0: v100,
-		obs:                 obs,
+		pr:                  priceRegistry,
 	}, nil
 }
 
@@ -44,7 +43,7 @@ func NewPriceRegistryV1_2_0(lggr logger.Logger, priceRegistryAddr common.Address
 // See https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/PriceRegistry.sol#L141
 func (p *PriceRegistryV1_2_0) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error) {
 	// Make call using 224 ABI.
-	tps, err := p.obs.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
+	tps, err := p.pr.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
 	if err != nil {
 		return nil, err
 	}
