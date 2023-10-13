@@ -29,7 +29,6 @@ import (
 
 func TestPriceRegistryFilters(t *testing.T) {
 	cl := mocks.NewClient(t)
-	cl.On("ConfiguredChainID").Return(big.NewInt(1))
 
 	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
 		c, err := ccipdata.NewPriceRegistryV1_0_0(logger.TestLogger(t), addr, lp, cl)

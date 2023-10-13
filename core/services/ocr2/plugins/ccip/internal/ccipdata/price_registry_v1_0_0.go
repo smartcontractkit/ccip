@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
@@ -29,7 +28,7 @@ var (
 )
 
 type PriceRegistryV1_0_0 struct {
-	priceRegistry   *observability.ObservedPriceRegistryV1_0_0
+	priceRegistry   price_registry.PriceRegistryInterface
 	address         common.Address
 	lp              logpoller.LogPoller
 	lggr            logger.Logger
@@ -139,7 +138,7 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 }
 
 func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistryV1_0_0, error) {
-	priceRegistry, err := observability.NewObservedPriceRegistryV1_0_0(priceRegistryAddr, ExecPluginLabel, ec)
+	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddr, ec)
 	if err != nil {
 		return nil, err
 	}
