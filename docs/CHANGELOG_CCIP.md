@@ -24,10 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OnRamp fee calculation logic now includes L1 security fee if sending to L2.
   - New field `destBytesOverhead` added to **TokenTransferFeeConfig**.
     - `destBytesOverhead` is the size of additional bytes being passed to destination for token transfers. For example, USDC transfers require additional attestation data.
-  - new fields `destDataAvailabilityOverheadGas`, `destGasPerDataAvailabilityByte`, `destDataAvailabilityMultiplier` added to **DynamicConfig**.
+  - new fields `destDataAvailabilityOverheadGas`, `destGasPerDataAvailabilityByte`, `destDataAvailabilityMultiplierBps` added to **DynamicConfig**.
     - `destDataAvailabilityOverheadGas` is the extra data availability gas charged on top of message data.
     - `destGasPerDataAvailabilityByte` is the amount of gas to charge per byte of data that needs data availability.
-    - `destDataAvailabilityMultiplier` is the multiplier for data availability gas. It is in multiples of 1e-4, or 0.0001. It can represent calldata compression factor on Optimistic Rollups.
+    - `destDataAvailabilityMultiplierBps` is the multiplier for data availability gas. It is in multiples of bps, or 0.0001. It can represent calldata compression factor on Rollups.
 - OnRamp token transfer fee calculation updated.
   - `minTokenTransferFeeUSD` and `maxTokenTransferFeeUSD` are removed from FeeTokenConfig.
   - `minFeeUSDCents` and `maxFeeUSDCents` are added to TokenTransferFeeConfig, they will be applied at a per-token level.
@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `maxTokensLength` -> `maxNumberOfTokensPerMsg`
   - `maxDataSize` -> `maxDataBytes`
   - `maxGasLimit` -> `maxPerMsgGasLimit`
+  - `gasMultiplier` -> `gasMultiplierWeiPerEth`
+  - `premiumMultiplier` -> `premiumMultiplierWeiPerEth`
   - All fees that ended with USD denominated in cents are now suffixed with `Cents`
   - `ratio` -> `deciBps`
 

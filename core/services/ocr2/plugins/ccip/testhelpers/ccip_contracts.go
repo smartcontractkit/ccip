@@ -321,16 +321,16 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 			ArmProxy:          c.Source.ARM.Address(), // ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
-			Router:                          c.Source.Router.Address(),
-			MaxNumberOfTokensPerMsg:         5,
-			DestGasOverhead:                 350_000,
-			DestGasPerPayloadByte:           16,
-			DestDataAvailabilityOverheadGas: 33_596,
-			DestGasPerDataAvailabilityByte:  16,
-			DestDataAvailabilityMultiplier:  6840, // 0.684
-			PriceRegistry:                   c.Source.PriceRegistry.Address(),
-			MaxDataBytes:                    1e5,
-			MaxPerMsgGasLimit:               4_000_000,
+			Router:                            c.Source.Router.Address(),
+			MaxNumberOfTokensPerMsg:           5,
+			DestGasOverhead:                   350_000,
+			DestGasPerPayloadByte:             16,
+			DestDataAvailabilityOverheadGas:   33_596,
+			DestGasPerDataAvailabilityByte:    16,
+			DestDataAvailabilityMultiplierBps: 6840, // 0.684
+			PriceRegistry:                     c.Source.PriceRegistry.Address(),
+			MaxDataBytes:                      1e5,
+			MaxPerMsgGasLimit:                 4_000_000,
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
@@ -345,18 +345,18 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
-				Token:              c.Source.LinkToken.Address(),
-				NetworkFeeUSDCents: 1_00,
-				GasMultiplier:      1e18,
-				PremiumMultiplier:  9e17,
-				Enabled:            true,
+				Token:                      c.Source.LinkToken.Address(),
+				NetworkFeeUSDCents:         1_00,
+				GasMultiplierWeiPerEth:     1e18,
+				PremiumMultiplierWeiPerEth: 9e17,
+				Enabled:                    true,
 			},
 			{
-				Token:              c.Source.WrappedNative.Address(),
-				NetworkFeeUSDCents: 1_00,
-				GasMultiplier:      1e18,
-				PremiumMultiplier:  1e18,
-				Enabled:            true,
+				Token:                      c.Source.WrappedNative.Address(),
+				NetworkFeeUSDCents:         1_00,
+				GasMultiplierWeiPerEth:     1e18,
+				PremiumMultiplierWeiPerEth: 1e18,
+				Enabled:                    true,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
@@ -1019,16 +1019,16 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			ArmProxy:          armProxySourceAddress, // ARM
 		},
 		evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
-			Router:                          sourceRouterAddress,
-			MaxNumberOfTokensPerMsg:         5,
-			DestGasOverhead:                 350_000,
-			DestGasPerPayloadByte:           16,
-			DestDataAvailabilityOverheadGas: 33_596,
-			DestGasPerDataAvailabilityByte:  16,
-			DestDataAvailabilityMultiplier:  6840, // 0.684
-			PriceRegistry:                   sourcePricesAddress,
-			MaxDataBytes:                    1e5,
-			MaxPerMsgGasLimit:               4_000_000,
+			Router:                            sourceRouterAddress,
+			MaxNumberOfTokensPerMsg:           5,
+			DestGasOverhead:                   350_000,
+			DestGasPerPayloadByte:             16,
+			DestDataAvailabilityOverheadGas:   33_596,
+			DestGasPerDataAvailabilityByte:    16,
+			DestDataAvailabilityMultiplierBps: 6840, // 0.684
+			PriceRegistry:                     sourcePricesAddress,
+			MaxDataBytes:                      1e5,
+			MaxPerMsgGasLimit:                 4_000_000,
 		},
 		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
@@ -1047,18 +1047,18 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampFeeTokenConfigArgs{
 			{
-				Token:              sourceLinkTokenAddress,
-				NetworkFeeUSDCents: 1_00,
-				GasMultiplier:      1e18,
-				PremiumMultiplier:  9e17,
-				Enabled:            true,
+				Token:                      sourceLinkTokenAddress,
+				NetworkFeeUSDCents:         1_00,
+				GasMultiplierWeiPerEth:     1e18,
+				PremiumMultiplierWeiPerEth: 9e17,
+				Enabled:                    true,
 			},
 			{
-				Token:              sourceWeth9addr,
-				NetworkFeeUSDCents: 1_00,
-				GasMultiplier:      1e18,
-				PremiumMultiplier:  1e18,
-				Enabled:            true,
+				Token:                      sourceWeth9addr,
+				NetworkFeeUSDCents:         1_00,
+				GasMultiplierWeiPerEth:     1e18,
+				PremiumMultiplierWeiPerEth: 1e18,
+				Enabled:                    true,
 			},
 		},
 		[]evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
