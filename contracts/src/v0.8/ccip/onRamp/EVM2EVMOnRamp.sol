@@ -93,40 +93,40 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
   /// @dev Struct to hold the execution fee configuration for a fee token
   struct FeeTokenConfig {
-    uint32 networkFeeUSDCents; // ───────────────╮ Flat network fee to charge for messages,  multiples of 0.01 USD
-    uint64 gasMultiplierWeiPerEth; //            │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
-    uint64 premiumMultiplierWeiPerEth; //        │ Multiplier for fee-token-specific premiums
-    bool enabled; // ────────────────────────────╯ Whether this fee token is enabled
+    uint32 networkFeeUSDCents; // ─────────╮ Flat network fee to charge for messages,  multiples of 0.01 USD
+    uint64 gasMultiplierWeiPerEth; //      │ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost.
+    uint64 premiumMultiplierWeiPerEth; //  │ Multiplier for fee-token-specific premiums
+    bool enabled; // ──────────────────────╯ Whether this fee token is enabled
   }
 
   /// @dev Struct to hold the fee configuration for a fee token, same as the FeeTokenConfig but with
   /// token included so that an array of these can be passed in to setFeeTokenConfig to set the mapping
   struct FeeTokenConfigArgs {
-    address token; // ───────────────────────────╮ Token address
-    uint32 networkFeeUSDCents; //                │ Flat network fee to charge for messages,  multiples of 0.01 USD
-    uint64 gasMultiplierWeiPerEth; // ───────────╯ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost
-    uint64 premiumMultiplierWeiPerEth; // ───────╮ Multiplier for fee-token-specific premiums, 1e18 based
-    bool enabled; // ────────────────────────────╯ Whether this fee token is enabled
+    address token; // ─────────────────────╮ Token address
+    uint32 networkFeeUSDCents; //          │ Flat network fee to charge for messages,  multiples of 0.01 USD
+    uint64 gasMultiplierWeiPerEth; // ─────╯ Multiplier for gas costs, 1e18 based so 11e17 = 10% extra cost
+    uint64 premiumMultiplierWeiPerEth; // ─╮ Multiplier for fee-token-specific premiums, 1e18 based
+    bool enabled; // ──────────────────────╯ Whether this fee token is enabled
   }
 
   /// @dev Struct to hold the transfer fee configuration for token transfers
   struct TokenTransferFeeConfig {
-    uint32 minFeeUSDCents; // ──────────╮ Minimum fee to charge per token transfer, multiples of 0.01 USD
-    uint32 maxFeeUSDCents; //           │ Maximum fee to charge per token transfer, multiples of 0.01 USD
-    uint16 deciBps; //                  │ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
-    uint32 destGasOverhead; //          │ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // ───────╯ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    uint32 minFeeUSDCents; // ────╮ Minimum fee to charge per token transfer, multiples of 0.01 USD
+    uint32 maxFeeUSDCents; //     │ Maximum fee to charge per token transfer, multiples of 0.01 USD
+    uint16 deciBps; //            │ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
+    uint32 destGasOverhead; //    │ Gas charged to execute the token transfer on the destination chain
+    uint32 destBytesOverhead; // ─╯ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
   }
 
   /// @dev Same as TokenTransferFeeConfig
   /// token included so that an array of these can be passed in to setTokenTransferFeeConfig
   struct TokenTransferFeeConfigArgs {
-    address token; // ──────────────────╮ Token address
-    uint32 minFeeUSDCents; //           │ Minimum fee to charge per token transfer, multiples of 0.01 USD
-    uint32 maxFeeUSDCents; //           │ Maximum fee to charge per token transfer, multiples of 0.01 USD
-    uint16 deciBps; // ─────────────────╯ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
-    uint32 destGasOverhead; // ─────────╮ Gas charged to execute the token transfer on the destination chain
-    uint32 destBytesOverhead; // ───────╯ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
+    address token; // ────────────╮ Token address
+    uint32 minFeeUSDCents; //     │ Minimum fee to charge per token transfer, multiples of 0.01 USD
+    uint32 maxFeeUSDCents; //     │ Maximum fee to charge per token transfer, multiples of 0.01 USD
+    uint16 deciBps; // ───────────╯ Basis points charged on token transfers, multiples of 0.1bps, or 1e-5
+    uint32 destGasOverhead; // ───╮ Gas charged to execute the token transfer on the destination chain
+    uint32 destBytesOverhead; // ─╯ Extra data availability bytes on top of fixed transfer data, including sourceTokenData and offchainData
   }
 
   /// @dev Nop address and weight, used to set the nops and their weights
@@ -523,7 +523,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       premiumFee = uint256(feeTokenConfig.networkFeeUSDCents) * 1e16;
     }
 
-    // Apply a feeToken-specific multiplier with 18 decimals, raising the premiumFeeUSD to 36 decimals
+    // Apply a feeToken-specific multiplier with 18 decimals, raising the premiumFee to 36 decimals
     premiumFee = premiumFee * feeTokenConfig.premiumMultiplierWeiPerEth;
 
     // Calculate execution gas fee on destination chain in USD with 36 decimals.
