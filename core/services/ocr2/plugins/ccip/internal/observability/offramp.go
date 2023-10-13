@@ -13,7 +13,7 @@ type ObservedOffRampReader struct {
 	metric metricDetails
 }
 
-func NewObservedOffRampReader(origin ccipdata.OffRampReader, chainID uint64, pluginName string) *ObservedOffRampReader {
+func NewObservedOffRampReader(origin ccipdata.OffRampReader, chainID int64, pluginName string) *ObservedOffRampReader {
 	return &ObservedOffRampReader{
 		OffRampReader: origin,
 		metric: metricDetails{

@@ -14,7 +14,7 @@ type ObservedOnRampReader struct {
 	metric metricDetails
 }
 
-func NewObservedOnRampReader(origin ccipdata.OnRampReader, chainID uint64, pluginName string) *ObservedOnRampReader {
+func NewObservedOnRampReader(origin ccipdata.OnRampReader, chainID int64, pluginName string) *ObservedOnRampReader {
 	return &ObservedOnRampReader{
 		OnRampReader: origin,
 		metric: metricDetails{

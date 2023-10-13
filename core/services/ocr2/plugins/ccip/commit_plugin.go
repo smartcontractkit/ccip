@@ -107,9 +107,9 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	}
 
 	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, chainId, CommitPluginLabel)
-	offRampReader = observability.NewObservedOffRampReader(offRampReader, chainId, CommitPluginLabel)
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, chainId, CommitPluginLabel)
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, int64(chainId), CommitPluginLabel)
+	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, CommitPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, CommitPluginLabel)
 
 	lggr.Infow("NewCommitServices",
 		"pluginConfig", pluginConfig,

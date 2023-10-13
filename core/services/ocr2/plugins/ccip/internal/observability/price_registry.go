@@ -14,7 +14,7 @@ type ObservedPriceRegistryReader struct {
 	metric metricDetails
 }
 
-func NewPriceRegistryReader(origin ccipdata.PriceRegistryReader, chainID uint64, pluginName string) *ObservedPriceRegistryReader {
+func NewPriceRegistryReader(origin ccipdata.PriceRegistryReader, chainID int64, pluginName string) *ObservedPriceRegistryReader {
 	return &ObservedPriceRegistryReader{
 		PriceRegistryReader: origin,
 		metric: metricDetails{

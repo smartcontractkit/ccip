@@ -13,7 +13,7 @@ type ObservedCommitStoreReader struct {
 	metric metricDetails
 }
 
-func NewObservedCommitStoreReader(origin ccipdata.CommitStoreReader, chainID uint64, pluginName string) *ObservedCommitStoreReader {
+func NewObservedCommitStoreReader(origin ccipdata.CommitStoreReader, chainID int64, pluginName string) *ObservedCommitStoreReader {
 	return &ObservedCommitStoreReader{
 		CommitStoreReader: origin,
 		metric: metricDetails{

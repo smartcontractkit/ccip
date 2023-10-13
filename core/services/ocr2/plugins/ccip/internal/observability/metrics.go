@@ -47,7 +47,7 @@ var (
 type metricDetails struct {
 	histogram  *prometheus.HistogramVec
 	pluginName string
-	chainId    uint64
+	chainId    int64
 }
 
 func withObservedContract[T any](metric metricDetails, function string, contract func() (T, error)) (T, error) {
@@ -55,7 +55,7 @@ func withObservedContract[T any](metric metricDetails, function string, contract
 	value, err := contract()
 	metric.histogram.
 		WithLabelValues(
-			strconv.FormatUint(metric.chainId, 10),
+			strconv.FormatInt(metric.chainId, 10),
 			metric.pluginName,
 			function,
 			strconv.FormatBool(err == nil),

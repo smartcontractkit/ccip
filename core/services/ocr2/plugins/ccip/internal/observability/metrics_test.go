@@ -45,7 +45,7 @@ func TestProperLabelsArePassed(t *testing.T) {
 func TestMetricsSendFromContractDirectly(t *testing.T) {
 	expectedCounter := 4
 	ctx := testutils.Context(t)
-	chainId := uint64(420)
+	chainId := int64(420)
 
 	mockedOfframp := ccipdata.NewMockOffRampReader(t)
 	mockedOfframp.On("GetSupportedTokens", ctx).Return([]common.Address{}, nil)

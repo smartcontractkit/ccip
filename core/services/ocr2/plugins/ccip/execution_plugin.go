@@ -112,10 +112,10 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	}
 
 	// Prom wrappers
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, chainId, ExecPluginLabel)
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, chainId, ExecPluginLabel)
-	offRampReader = observability.NewObservedOffRampReader(offRampReader, chainId, ExecPluginLabel)
-	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, chainId, ExecPluginLabel)
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, int64(chainId), ExecPluginLabel)
+	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, int64(chainId), ExecPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ExecPluginLabel)
+	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, ExecPluginLabel)
 
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", pluginConfig,
