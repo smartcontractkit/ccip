@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestPriceRegistryFilters(t *testing.T) {
@@ -83,7 +84,7 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	// TODO: We should be able to use an in memory log poller ORM here to speed up the tests.
 	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, 2, 3, 2, 1000)
 
-	feeTokens := []common.Address{randomAddress(), randomAddress()}
+	feeTokens := []common.Address{utils.RandomAddress(), utils.RandomAddress()}
 	dest := uint64(10)
 	gasPriceUpdatesBlock1 := []ccipdata.GasPrice{
 		{
@@ -93,12 +94,12 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	}
 	gasPriceUpdatesBlock2 := []ccipdata.GasPrice{
 		{
-			DestChainSelector: dest, // Reset same gas price
-			Value:             big.NewInt(12),
+			DestChainSelector: dest,           // Reset same gas price
+			Value:             big.NewInt(12), // Intentionally different from block1
 		},
 	}
-	token1 := randomAddress()
-	token2 := randomAddress()
+	token1 := utils.RandomAddress()
+	token2 := utils.RandomAddress()
 	tokenPriceUpdatesBlock1 := []ccipdata.TokenPrice{
 		{
 			Token: token1,
@@ -108,11 +109,11 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	tokenPriceUpdatesBlock2 := []ccipdata.TokenPrice{
 		{
 			Token: token1,
-			Value: big.NewInt(13),
+			Value: big.NewInt(13), // Intentionally change token1 value
 		},
 		{
 			Token: token2,
-			Value: big.NewInt(12),
+			Value: big.NewInt(12), // Intentionally set a same value different token
 		},
 	}
 	addr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, ec, nil, feeTokens, 1000)

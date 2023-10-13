@@ -217,15 +217,15 @@ func (c *CommitStoreV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []
 		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
 		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
 	)
-	c.offchainConfig = CommitOffchainConfig{
-		SourceFinalityDepth:    offchainConfigParsed.SourceFinalityDepth,
-		GasPriceDeviationPPB:   offchainConfigParsed.ExecGasPriceDeviationPPB,
-		GasPriceHeartBeat:      offchainConfigParsed.GasPriceHeartBeat.Duration(),
-		TokenPriceDeviationPPB: offchainConfigParsed.TokenPriceDeviationPPB,
-		TokenPriceHeartBeat:    offchainConfigParsed.TokenPriceHeartBeat.Duration(),
-		InflightCacheExpiry:    offchainConfigParsed.InflightCacheExpiry.Duration(),
-		DestFinalityDepth:      offchainConfigParsed.DestFinalityDepth,
-	}
+	c.offchainConfig = NewCommitOffchainConfig(
+		offchainConfigParsed.SourceFinalityDepth,
+		offchainConfigParsed.ExecGasPriceDeviationPPB,
+		offchainConfigParsed.GasPriceHeartBeat.Duration(),
+		offchainConfigParsed.TokenPriceDeviationPPB,
+		offchainConfigParsed.TokenPriceHeartBeat.Duration(),
+		offchainConfigParsed.InflightCacheExpiry.Duration(),
+		offchainConfigParsed.DestFinalityDepth,
+	)
 	c.configMu.Unlock()
 
 	c.lggr.Infow("ChangeConfig",

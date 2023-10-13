@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -14,10 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
-
-func randomAddress() common.Address {
-	return common.BigToAddress(big.NewInt(rand.Int63()))
-}
 
 func TestCommitReportEncodingV1_0_0(t *testing.T) {
 	report := CommitStoreReport{
@@ -40,7 +35,7 @@ func TestCommitReportEncodingV1_0_0(t *testing.T) {
 	lp := mocks.NewLogPoller(t)
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
 
-	c, err := NewCommitStoreV1_0_0(logger.TestLogger(t), randomAddress(), nil, lp, nil)
+	c, err := NewCommitStoreV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 	assert.NoError(t, err)
 
 	encodedReport, err := c.EncodeCommitReport(report)

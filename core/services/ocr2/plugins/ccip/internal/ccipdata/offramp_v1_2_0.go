@@ -214,7 +214,7 @@ func decodeExecReportV1_2_0(args abi.Arguments, report []byte) (ExecReport, erro
 	if !ok {
 		return ExecReport{}, fmt.Errorf("got %T", unpacked[0])
 	}
-	var messages []internal.EVM2EVMMessage
+	messages := []internal.EVM2EVMMessage{}
 	for _, msg := range erStruct.Messages {
 		var tokensAndAmounts []internal.TokenAmount
 		for _, tokenAndAmount := range msg.TokenAmounts {

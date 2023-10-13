@@ -63,6 +63,26 @@ type CommitOffchainConfig struct {
 	DestFinalityDepth      uint32
 }
 
+func NewCommitOffchainConfig(
+	sourceFinalityDepth uint32,
+	gasPriceDeviationPPB uint32,
+	gasPriceHeartBeat time.Duration,
+	tokenPriceDeviationPPB uint32,
+	tokenPriceHeartBeat time.Duration,
+	inflightCacheExpiry time.Duration,
+	destFinalityDepth uint32,
+) CommitOffchainConfig {
+	return CommitOffchainConfig{
+		SourceFinalityDepth:    sourceFinalityDepth,
+		GasPriceDeviationPPB:   gasPriceDeviationPPB,
+		GasPriceHeartBeat:      gasPriceHeartBeat,
+		TokenPriceDeviationPPB: tokenPriceDeviationPPB,
+		TokenPriceHeartBeat:    tokenPriceHeartBeat,
+		InflightCacheExpiry:    inflightCacheExpiry,
+		DestFinalityDepth:      destFinalityDepth,
+	}
+}
+
 //go:generate mockery --quiet --name CommitStoreReader --output . --filename commit_store_reader_mock.go --inpackage --case=underscore
 type CommitStoreReader interface {
 	Closer

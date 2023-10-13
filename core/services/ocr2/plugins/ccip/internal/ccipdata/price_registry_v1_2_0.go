@@ -13,19 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/observability"
 )
 
 var (
 	_ PriceRegistryReader = &PriceRegistryV1_2_0{}
 )
-
-func init() {
-	if abihelpers.MustGetEventID("UsdPerUnitGasUpdated", abihelpers.MustParseABI(price_registry.PriceRegistryABI)) != UsdPerUnitGasUpdatedV1_0_0 {
-		panic("UsdPerUnitGasUpdatedV1_0_0 must be the same as UsdPerUnitGasUpdated")
-	}
-}
 
 type PriceRegistryV1_2_0 struct {
 	*PriceRegistryV1_0_0
@@ -47,7 +40,8 @@ func NewPriceRegistryV1_2_0(lggr logger.Logger, priceRegistryAddr common.Address
 	}, nil
 }
 
-// GetTokenPrices must be overridden to use the 1.2 ABI (return parameter changed from uint192 to uint224.
+// GetTokenPrices must be overridden to use the 1.2 ABI (return parameter changed from uint192 to uint224)
+// See https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/PriceRegistry.sol#L141
 func (p *PriceRegistryV1_2_0) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error) {
 	// Make call using 224 ABI.
 	tps, err := p.obs.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
@@ -61,7 +55,7 @@ func (p *PriceRegistryV1_2_0) GetTokenPrices(ctx context.Context, wantedTokens [
 				Token: wantedTokens[i],
 				Value: tp.Value,
 			},
-			Timestamp: big.NewInt(int64(tp.Timestamp)),
+			TimestampUnixSec: big.NewInt(int64(tp.Timestamp)),
 		})
 	}
 	return tpu, nil

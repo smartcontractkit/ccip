@@ -56,7 +56,7 @@ func (p *PriceRegistryV1_0_0) GetTokenPrices(ctx context.Context, wantedTokens [
 				Token: wantedTokens[i],
 				Value: tp.Value,
 			},
-			Timestamp: big.NewInt(int64(tp.Timestamp)),
+			TimestampUnixSec: big.NewInt(int64(tp.Timestamp)),
 		})
 	}
 	return tpu, nil
@@ -99,7 +99,7 @@ func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Conte
 					Token: tp.Token,
 					Value: tp.Value,
 				},
-				Timestamp: tp.Timestamp,
+				TimestampUnixSec: tp.Timestamp,
 			}, nil
 		},
 	)
@@ -132,7 +132,7 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 					DestChainSelector: p.DestChain,
 					Value:             p.Value,
 				},
-				Timestamp: p.Timestamp,
+				TimestampUnixSec: p.Timestamp,
 			}, nil
 		},
 	)

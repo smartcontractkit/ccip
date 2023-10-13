@@ -616,27 +616,6 @@ func (o *DbORM) SelectIndexedLogsWithSigsExcluding(sigA, sigB common.Hash, topic
 	return logs, nil
 }
 
-func (o *DbORM) blocksRangeAfterTimestamp(after time.Time, confs int, qopts ...pg.QOpt) (int64, int64, error) {
-	type blockRange struct {
-		MinBlockNumber int64 `db:"min_block"`
-		MaxBlockNumber int64 `db:"max_block"`
-	}
-
-	var br blockRange
-	q := o.q.WithOpts(qopts...)
-	err := q.Get(&br, `
-		SELECT 
-		    coalesce(min(block_number), 0) as min_block, 
-		    coalesce(max(block_number), 0) as max_block
-		FROM evm.log_poller_blocks 
-		WHERE evm_chain_id = $1
-		AND block_timestamp > $2`, utils.NewBig(o.chainID), after)
-	if err != nil {
-		return 0, 0, err
-	}
-	return br.MinBlockNumber, br.MaxBlockNumber - int64(confs), nil
-}
-
 type bytesProducer interface {
 	Bytes() []byte
 }

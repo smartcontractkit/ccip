@@ -15,6 +15,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestOffRampFilters(t *testing.T) {
@@ -99,8 +100,8 @@ func TestExecOnchainConfig100(t *testing.T) {
 			name: "encodes and decodes config with all fields set",
 			want: ccipdata.ExecOnchainConfigV1_0_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
-				Router:                                  randomAddress(),
-				PriceRegistry:                           randomAddress(),
+				Router:                                  utils.RandomAddress(),
+				PriceRegistry:                           utils.RandomAddress(),
 				MaxTokensLength:                         uint16(rand.Uint32()),
 				MaxDataSize:                             rand.Uint32(),
 			},
@@ -140,8 +141,8 @@ func TestExecOnchainConfig120(t *testing.T) {
 			name: "encodes and decodes config with all fields set",
 			want: ccipdata.ExecOnchainConfigV1_2_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
-				Router:                                  randomAddress(),
-				PriceRegistry:                           randomAddress(),
+				Router:                                  utils.RandomAddress(),
+				PriceRegistry:                           utils.RandomAddress(),
 				MaxTokensLength:                         uint16(rand.Uint32()),
 				MaxDataSize:                             rand.Uint32(),
 				MaxPoolGas:                              rand.Uint32(),

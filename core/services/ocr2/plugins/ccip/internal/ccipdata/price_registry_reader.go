@@ -30,8 +30,7 @@ type TokenPrice struct {
 
 type TokenPriceUpdate struct {
 	TokenPrice
-	// Unix time stamp in seconds.
-	Timestamp *big.Int
+	TimestampUnixSec *big.Int
 }
 
 type GasPrice struct {
@@ -41,8 +40,7 @@ type GasPrice struct {
 
 type GasPriceUpdate struct {
 	GasPrice
-	// Unix time stamp in seconds
-	Timestamp *big.Int
+	TimestampUnixSec *big.Int
 }
 
 //go:generate mockery --quiet --name PriceRegistryReader --output . --filename price_registry_reader_mock.go --inpackage --case=underscore

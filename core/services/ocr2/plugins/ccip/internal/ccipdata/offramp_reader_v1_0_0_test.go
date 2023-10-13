@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestExecutionReportEncodingV100(t *testing.T) {
@@ -21,7 +22,7 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 	// but I think that would essentially be testing geth's abi library
 	// as our encode/decode is a thin wrapper around that.
 	report := ccipdata.ExecReport{
-		Messages:          []internal.EVM2EVMMessage(nil),
+		Messages:          []internal.EVM2EVMMessage{},
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{testutils.Random32Byte()},
 		ProofFlagBits:     big.NewInt(133),
@@ -29,7 +30,7 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 
 	lp := lpmocks.NewLogPoller(t)
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
-	offRamp, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), randomAddress(), nil, lp, nil)
+	offRamp, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 	require.NoError(t, err)
 
 	encodeExecutionReport, err := offRamp.EncodeExecutionReport(report)

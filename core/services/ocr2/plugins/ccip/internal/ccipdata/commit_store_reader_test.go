@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"reflect"
 	"testing"
 	"time"
@@ -33,6 +32,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func assertFilterRegistration(t *testing.T, lp *lpmocks.LogPoller, buildCloser func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer, numFilter int) {
@@ -137,10 +137,6 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 	}
 }
 
-func randomAddress() common.Address {
-	return common.BigToAddress(big.NewInt(rand.Int63()))
-}
-
 func TestCommitOnchainConfig(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -150,7 +146,7 @@ func TestCommitOnchainConfig(t *testing.T) {
 		{
 			name: "encodes and decodes config with all fields set",
 			want: ccipdata.CommitOnchainConfig{
-				PriceRegistry: randomAddress(),
+				PriceRegistry: utils.RandomAddress(),
 			},
 			expectErr: false,
 		},
@@ -182,11 +178,11 @@ func TestCommitStoreReaders(t *testing.T) {
 	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, 2, 3, 2, 1000)
 
 	// Deploy 2 commit store versions
-	onramp1 := randomAddress()
-	onramp2 := randomAddress()
+	onramp1 := utils.RandomAddress()
+	onramp2 := utils.RandomAddress()
 	// Report
 	rep := ccipdata.CommitStoreReport{
-		TokenPrices: []ccipdata.TokenPrice{{Token: randomAddress(), Value: big.NewInt(1)}},
+		TokenPrices: []ccipdata.TokenPrice{{Token: utils.RandomAddress(), Value: big.NewInt(1)}},
 		GasPrices:   []ccipdata.GasPrice{{DestChainSelector: 1, Value: big.NewInt(1)}},
 		Interval:    ccipdata.CommitStoreInterval{Min: 1, Max: 10},
 		MerkleRoot:  common.HexToHash("0x1"),
@@ -223,8 +219,8 @@ func TestCommitStoreReaders(t *testing.T) {
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&ccipdata.CommitStoreV1_2_0{}).String())
 
 	// Apply config
-	signers := []common.Address{randomAddress(), randomAddress(), randomAddress(), randomAddress()}
-	transmitters := []common.Address{randomAddress(), randomAddress(), randomAddress(), randomAddress()}
+	signers := []common.Address{utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress()}
+	transmitters := []common.Address{utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress()}
 	onchainConfig, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
 		PriceRegistry: pr,
 	})
