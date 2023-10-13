@@ -406,6 +406,8 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 // getLatestGasPriceUpdate returns the latest gas price update based on logs within the heartbeat.
 // If an update is found, it is not expected to contain a nil value. If no updates found, empty update with nil value is returned.
 func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now time.Time, checkInflight bool) (gasUpdate update, error error) {
+	gasUpdate = r.priceUpdatesCache.getGasPriceUpdate()
+
 	if checkInflight {
 		latestInflightGasPriceUpdates := r.inflightReports.latestInflightGasPriceUpdates()
 		if inflightUpdate, exists := latestInflightGasPriceUpdates[r.sourceChainSelector]; exists {
