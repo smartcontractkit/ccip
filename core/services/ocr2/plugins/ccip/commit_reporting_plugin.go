@@ -448,6 +448,10 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 		}
 	}
 
+	// if it's too old return an empty update
+	if gasUpdate.timestamp.Before(now.Add(-r.offchainConfig.GasPriceHeartBeat)) {
+		return update{}, nil
+	}
 	r.lggr.Infow("Latest gas price from log poller", "gasPriceUpdateVal", gasUpdate.value, "gasPriceUpdateTs", gasUpdate.timestamp)
 	return gasUpdate, nil
 }
