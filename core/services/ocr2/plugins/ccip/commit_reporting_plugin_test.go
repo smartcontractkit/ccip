@@ -299,9 +299,8 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.gasPriceEstimator = gasPriceEstimator
 			p.offchainConfig.GasPriceHeartBeat = gasPriceHeartBeat.Duration()
 			p.commitStoreReader = commitStoreReader
-			p.tokenPriceUpdatesCache = newTokenPriceUpdatesCache()
-			p.F = tc.f
 			p.priceUpdatesCache = newPriceUpdatesCache()
+			p.F = tc.f
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
@@ -1427,7 +1426,7 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 			destPriceRegistry := ccipdata.NewMockPriceRegistryReader(t)
 			p.destPriceRegistryReader = destPriceRegistry
 			p.priceUpdatesCache = newPriceUpdatesCache()
-			p.priceUpdatesCache.updateCache(tc.cacheValue)
+			p.priceUpdatesCache.updateGasPriceIfMoreRecent(tc.cacheValue)
 			p.offchainConfig.GasPriceHeartBeat = 5 * time.Minute
 
 			if tc.inflightGasPriceUpdate != nil {
@@ -1564,7 +1563,7 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 			//_, priceRegAddr := testhelpers.NewFakePriceRegistry(t)
 			priceReg := ccipdata.NewMockPriceRegistryReader(t)
 			p.destPriceRegistryReader = priceReg
-			p.tokenPriceUpdatesCache = newTokenPriceUpdatesCache()
+			p.priceUpdatesCache = newPriceUpdatesCache()
 
 			//destReader := ccipdata.NewMockReader(t)
 			var events []ccipdata.Event[ccipdata.TokenPriceUpdate]
@@ -1608,7 +1607,7 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates_cache(t *testing.T) {
 	ctx := testutils.Context(t)
 	priceReg := ccipdata.NewMockPriceRegistryReader(t)
 	p := &CommitReportingPlugin{
-		tokenPriceUpdatesCache:  newTokenPriceUpdatesCache(),
+		priceUpdatesCache:       newPriceUpdatesCache(),
 		destPriceRegistryReader: priceReg,
 		offchainConfig: ccipdata.CommitOffchainConfig{
 			TokenPriceHeartBeat: 12 * time.Hour,

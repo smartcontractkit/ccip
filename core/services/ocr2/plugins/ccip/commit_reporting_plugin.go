@@ -82,8 +82,7 @@ type CommitReportingPlugin struct {
 	// State
 	inflightReports *inflightCommitReportsContainer
 	// Cache
-	priceUpdatesCache      *priceUpdatesCache
-	tokenPriceUpdatesCache *tokenPriceUpdatesCache
+	priceUpdatesCache *priceUpdatesCache
 }
 
 type CommitReportingPluginFactory struct {
@@ -162,9 +161,8 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				rf.config.destClient,
 				int64(rf.config.commitStore.OffchainConfig().DestFinalityDepth),
 			),
-			gasPriceEstimator:      rf.config.commitStore.GasPriceEstimator(),
-			priceUpdatesCache:      newPriceUpdatesCache(),
-			tokenPriceUpdatesCache: newTokenPriceUpdatesCache(),
+			gasPriceEstimator: rf.config.commitStore.GasPriceEstimator(),
+			priceUpdatesCache: newPriceUpdatesCache(),
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -366,7 +364,7 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 // The updates returned by this function are guaranteed to not contain nil values.
 func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, now time.Time, checkInflight bool) (map[common.Address]update, error) {
 	ts := now.Add(-r.offchainConfig.TokenPriceHeartBeat)
-	if mostRecentCachedTs := r.tokenPriceUpdatesCache.mostRecentTs(); mostRecentCachedTs.After(ts) {
+	if mostRecentCachedTs := r.priceUpdatesCache.mostRecentTokenPriceUpdate(); mostRecentCachedTs.After(ts) {
 		ts = mostRecentCachedTs
 	}
 
@@ -380,14 +378,14 @@ func (r *CommitReportingPlugin) getLatestTokenPriceUpdates(ctx context.Context, 
 			continue
 		}
 
-		r.tokenPriceUpdatesCache.updateIfMoreRecent(
+		r.priceUpdatesCache.updateTokenPriceIfMoreRecent(
 			time.Unix(upd.Data.Timestamp.Int64(), 0),
 			upd.Data.Token,
 			upd.Data.Value,
 		)
 	}
 
-	latestUpdates := r.tokenPriceUpdatesCache.get(now.Add(-r.offchainConfig.TokenPriceHeartBeat))
+	latestUpdates := r.priceUpdatesCache.getTokenPriceUpdates(now.Add(-r.offchainConfig.TokenPriceHeartBeat))
 	if !checkInflight {
 		return latestUpdates, nil
 	}
@@ -424,7 +422,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 
 	// Query from the last cached update timestamp, if any.
 	queryFrom := now.Add(-r.offchainConfig.GasPriceHeartBeat)
-	if last := r.priceUpdatesCache.get(); last.timestamp.After(queryFrom) {
+	if last := r.priceUpdatesCache.getGasPriceUpdate(); last.timestamp.After(queryFrom) {
 		queryFrom = last.timestamp
 	}
 	gasPriceUpdates, err := r.destPriceRegistryReader.GetGasPriceUpdatesCreatedAfter(
@@ -444,7 +442,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 				timestamp: timestamp,
 				value:     priceUpdate.Data.Value,
 			}
-			r.priceUpdatesCache.updateCache(gasUpdate)
+			r.priceUpdatesCache.updateGasPriceIfMoreRecent(gasUpdate)
 		}
 	}
 
