@@ -15,11 +15,10 @@ type priceUpdatesCache struct {
 }
 
 func newPriceUpdatesCache() *priceUpdatesCache {
-	c := &priceUpdatesCache{
+	return &priceUpdatesCache{
 		tokenPriceUpdates: make(map[common.Address]update),
 		mu:                &sync.RWMutex{},
 	}
-	return c
 }
 
 func (c *priceUpdatesCache) mostRecentTokenPriceUpdate() time.Time {
