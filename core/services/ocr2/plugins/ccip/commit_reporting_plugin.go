@@ -123,7 +123,7 @@ func (rf *CommitReportingPluginFactory) UpdateDynamicReaders(newPriceRegAddr com
 	if err != nil {
 		return err
 	}
-	destPriceRegistryReader = observability.NewPriceRegistryReader(destPriceRegistryReader, rf.config.destChainEVMID.Uint64(), CommitPluginLabel)
+	destPriceRegistryReader = observability.NewPriceRegistryReader(destPriceRegistryReader, rf.config.destClient.ConfiguredChainID().Uint64(), CommitPluginLabel)
 	rf.destPriceRegReader = destPriceRegistryReader
 	rf.destPriceRegAddr = newPriceRegAddr
 	return nil

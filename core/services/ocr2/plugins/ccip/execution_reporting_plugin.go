@@ -118,7 +118,7 @@ func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(newPriceRegAddr 
 	if err != nil {
 		return err
 	}
-	destPriceRegistryReader = observability.NewPriceRegistryReader(destPriceRegistryReader, rf.config.destChainEVMID.Uint64(), ExecPluginLabel)
+	destPriceRegistryReader = observability.NewPriceRegistryReader(destPriceRegistryReader, rf.config.destClient.ConfiguredChainID().Uint64(), ExecPluginLabel)
 	rf.destPriceRegReader = destPriceRegistryReader
 	rf.destPriceRegAddr = newPriceRegAddr
 	return nil
