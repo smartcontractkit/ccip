@@ -1,0 +1,44 @@
+Networks = ['SIMULATED', 'ROPSTEN']
+
+[Chainlink]
+[Chainlink.CommonConfig]
+Image = 'smartcontract/chainlink:latest'
+Tag = 'latest'
+NodeConfig = """
+RootDir = '/home/chainlink'
+
+[Feature]
+FeedsManager = true
+LogPoller = true
+UICSAKeys = true
+
+[Database]
+MaxIdleConns = 20
+MaxOpenConns = 40
+MigrateOnStartup = true
+
+[Log]
+Level = 'debug'
+JSONConsole = true
+
+[Log.File]
+MaxSize = '0b'
+
+[WebServer]
+AllowOrigins = '*'
+HTTPPort = 6688
+SecureCookies = false
+SessionTimeout = '999h0m0s'
+
+[WebServer.RateLimit]
+Authenticated = 2000
+Unauthenticated = 100
+
+[WebServer.TLS]
+HTTPSPort = 0
+"""
+
+[Products]
+[Products.CCIP]
+[Products.CCIP.load]
+MsgType = 'WithToken'
