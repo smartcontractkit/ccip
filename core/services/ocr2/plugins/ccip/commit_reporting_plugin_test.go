@@ -278,7 +278,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 			gasPriceEstimator.On("Median", mock.Anything).Return(gasPrice, nil)
 			if tc.gasPriceUpdates != nil {
-				gasPriceEstimator.On("Deviates", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
+				gasPriceEstimator.On("Deviates", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 			}
 
 			tokenDecimalsCache := cache.NewMockAutoSync[map[common.Address]uint8](t)
