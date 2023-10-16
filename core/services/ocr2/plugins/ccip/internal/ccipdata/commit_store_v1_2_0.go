@@ -178,9 +178,6 @@ func (c CommitOffchainConfigV1_2_0) Validate() error {
 	if c.GasPriceHeartBeat.Duration() == 0 {
 		return errors.New("must set GasPriceHeartBeat")
 	}
-	if c.DAGasPriceDeviationPPB == 0 {
-		return errors.New("must set DAGasPriceDeviationPPB")
-	}
 	if c.ExecGasPriceDeviationPPB == 0 {
 		return errors.New("must set ExecGasPriceDeviationPPB")
 	}
