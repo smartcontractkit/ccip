@@ -45,6 +45,8 @@ library Internal {
     address pool; // The token pool address
   }
 
+  /// @notice Report that is submitted by the execution DON at the execution phase.
+  /// @dev RMN depends on this struct, if changing, please notify RMN.
   struct ExecutionReport {
     EVM2EVMMessage[] messages;
     // Contains a bytes array for each message, each inner bytes array contains bytes per transferred token
@@ -53,7 +55,8 @@ library Internal {
     uint256 proofFlagBits;
   }
 
-  // @notice The cross chain message that gets committed to EVM chains
+  /// @notice The cross chain message that gets committed to EVM chains.
+  /// @dev RMN depends on this struct, if changing, please notify RMN.
   struct EVM2EVMMessage {
     uint64 sourceChainSelector; // ─────────╮ the chain selector of the source chain, note: not chainId
     address sender; // ─────────────────────╯ sender address on the source chain
@@ -129,6 +132,7 @@ library Internal {
   /// IN_PROGRESS currently being executed, used a replay protection
   /// SUCCESS successfully executed. End state
   /// FAILURE unsuccessfully executed, manual execution is now enabled.
+  /// @dev RMN depends on this enum, if changing, please notify RMN.
   enum MessageExecutionState {
     UNTOUCHED,
     IN_PROGRESS,

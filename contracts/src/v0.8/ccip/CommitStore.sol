@@ -21,11 +21,13 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
 
   event Paused(address account);
   event Unpaused(address account);
+  /// @dev RMN depends on this event, if changing, please notify RMN.
   event ReportAccepted(CommitReport report);
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event RootRemoved(bytes32 root);
 
   /// @notice Static commit store config
+  /// @dev RMN depends on this struct, if changing, please notify RMN.
   struct StaticConfig {
     uint64 chainSelector; // ───────╮  Destination chainSelector
     uint64 sourceChainSelector; // ─╯  Source chainSelector
@@ -45,6 +47,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   }
 
   /// @notice Report that is committed by the observing DON at the committing phase
+  /// @dev RMN depends on this struct, if changing, please notify RMN.
   struct CommitReport {
     Internal.PriceUpdates priceUpdates;
     Interval interval;
@@ -222,6 +225,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   // ================================================================
 
   /// @notice Returns the static commit store config.
+  /// @dev RMN depends on this function, if changing, please notify RMN.
   /// @return the configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
     return

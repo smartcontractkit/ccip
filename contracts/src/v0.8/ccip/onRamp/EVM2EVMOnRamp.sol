@@ -61,12 +61,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   event NopPaid(address indexed nop, uint256 amount);
   event FeeConfigSet(FeeTokenConfigArgs[] feeConfig);
   event TokenTransferFeeConfigSet(TokenTransferFeeConfigArgs[] transferFeeConfig);
+  /// RMN depends on this event, if changing, please notify RMN.
   event CCIPSendRequested(Internal.EVM2EVMMessage message);
   event NopsSet(uint256 nopWeightsTotal, NopAndWeight[] nopsAndWeights);
   event PoolAdded(address token, address pool);
   event PoolRemoved(address token, address pool);
 
   /// @dev Struct that contains the static configuration
+  /// RMN depends on this struct, if changing, please notify RMN.
   struct StaticConfig {
     address linkToken; // ────────╮ Link token address
     uint64 chainSelector; // ─────╯ Source chainSelector
@@ -382,6 +384,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // ================================================================
 
   /// @notice Returns the static onRamp config.
+  /// @dev RMN depends on this function, if changing, please notify RMN.
   /// @return the configuration.
   function getStaticConfig() external view returns (StaticConfig memory) {
     return

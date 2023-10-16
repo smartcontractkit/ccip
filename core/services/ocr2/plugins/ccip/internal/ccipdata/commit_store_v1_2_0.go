@@ -193,6 +193,7 @@ func (c CommitOffchainConfigV1_2_0) Validate() error {
 	if c.InflightCacheExpiry.Duration() == 0 {
 		return errors.New("must set InflightCacheExpiry")
 	}
+	// DAGasPriceDeviationPPB is not validated because it can be 0 on non-rollups
 
 	return nil
 }

@@ -6,6 +6,7 @@ import {IARM} from "./interfaces/IARM.sol";
 
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 
+/// @dev This contract is owned by RMN, if changes required, please notify RMN.
 contract ARM is IARM, OwnerIsCreator, ITypeAndVersion {
   // STATIC CONFIG
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
