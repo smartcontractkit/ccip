@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/vrf_coordinator_v2_5"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/vrf_v2plus_load_test_with_metrics"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/vrf_v2plus_upgraded_version"
@@ -848,7 +849,7 @@ func (v *EthereumVRFV2PlusWrapperLoadTestConsumer) GetLastRequestId(ctx context.
 }
 
 func (v *EthereumVRFV2PlusWrapperLoadTestConsumer) GetWrapper(ctx context.Context) (common.Address, error) {
-	return v.consumer.IVrfV2PlusWrapper(&bind.CallOpts{
+	return v.consumer.GetWrapper(&bind.CallOpts{
 		From:    common.HexToAddress(v.client.GetDefaultWallet().Address()),
 		Context: ctx,
 	})
