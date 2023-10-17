@@ -56,6 +56,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   error NotAFeeToken(address token);
   error CannotSendZeroTokens();
   error SourceTokenDataTooLarge(address token);
+  error InvalidChainSelector(uint64 chainSelector);
 
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event NopPaid(address indexed nop, uint256 amount);
@@ -256,12 +257,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   function forwardFromRouter(
     Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
-    address originalSender
+    address originalSender,
+    uint64 destChainSelector
   ) external whenHealthy returns (bytes32) {
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
     // Router address may be zero intentionally to pause.
     if (msg.sender != s_dynamicConfig.router) revert MustBeCalledByRouter();
+    if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
     // EVM destination addresses should be abi encoded and therefore always 32 bytes long
     // Not duplicately validated in `getFee`. Invalid address is uncommon, gas cost outweighs UX gain.

@@ -143,7 +143,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       );
     }
 
-    return IEVM2AnyOnRamp(onRamp).forwardFromRouter(message, feeTokenAmount, msg.sender);
+    return IEVM2AnyOnRamp(onRamp).forwardFromRouter(message, feeTokenAmount, msg.sender, destinationChainSelector);
   }
 
   // ================================================================

@@ -402,25 +402,25 @@ func (_m *EVM2EVMOnRampInterface) FilterTokenTransferFeeConfigSet(opts *bind.Fil
 	return r0, r1
 }
 
-// ForwardFromRouter provides a mock function with given fields: opts, message, feeTokenAmount, originalSender
-func (_m *EVM2EVMOnRampInterface) ForwardFromRouter(opts *bind.TransactOpts, message evm_2_evm_onramp.ClientEVM2AnyMessage, feeTokenAmount *big.Int, originalSender common.Address) (*types.Transaction, error) {
-	ret := _m.Called(opts, message, feeTokenAmount, originalSender)
+// ForwardFromRouter provides a mock function with given fields: opts, message, feeTokenAmount, originalSender, destChainSelector
+func (_m *EVM2EVMOnRampInterface) ForwardFromRouter(opts *bind.TransactOpts, message evm_2_evm_onramp.ClientEVM2AnyMessage, feeTokenAmount *big.Int, originalSender common.Address, destChainSelector uint64) (*types.Transaction, error) {
+	ret := _m.Called(opts, message, feeTokenAmount, originalSender, destChainSelector)
 
 	var r0 *types.Transaction
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_onramp.ClientEVM2AnyMessage, *big.Int, common.Address) (*types.Transaction, error)); ok {
-		return rf(opts, message, feeTokenAmount, originalSender)
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_onramp.ClientEVM2AnyMessage, *big.Int, common.Address, uint64) (*types.Transaction, error)); ok {
+		return rf(opts, message, feeTokenAmount, originalSender, destChainSelector)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_onramp.ClientEVM2AnyMessage, *big.Int, common.Address) *types.Transaction); ok {
-		r0 = rf(opts, message, feeTokenAmount, originalSender)
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, evm_2_evm_onramp.ClientEVM2AnyMessage, *big.Int, common.Address, uint64) *types.Transaction); ok {
+		r0 = rf(opts, message, feeTokenAmount, originalSender, destChainSelector)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*types.Transaction)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, evm_2_evm_onramp.ClientEVM2AnyMessage, *big.Int, common.Address) error); ok {
-		r1 = rf(opts, message, feeTokenAmount, originalSender)
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, evm_2_evm_onramp.ClientEVM2AnyMessage, *big.Int, common.Address, uint64) error); ok {
+		r1 = rf(opts, message, feeTokenAmount, originalSender, destChainSelector)
 	} else {
 		r1 = ret.Error(1)
 	}

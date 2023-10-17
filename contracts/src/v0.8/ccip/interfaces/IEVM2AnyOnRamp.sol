@@ -43,9 +43,11 @@ interface IEVM2AnyOnRamp {
   /// @dev if the contract is paused, this function will revert.
   /// @param message Message struct to send
   /// @param originalSender The original initiator of the CCIP request
+  /// @param destChainSelector The destination chain selector
   function forwardFromRouter(
     Client.EVM2AnyMessage memory message,
     uint256 feeTokenAmount,
-    address originalSender
+    address originalSender,
+    uint64 destChainSelector
   ) external returns (bytes32);
 }
