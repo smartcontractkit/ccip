@@ -249,7 +249,7 @@ func (n *ClNode) StartContainer() error {
 	nodeSecretsToml, err := templates.NodeSecretsTemplate{
 		PgDbName:      n.PostgresDb.DbName,
 		PgHost:        n.PostgresDb.ContainerName,
-		PgPort:        n.PostgresDb.Port,
+		PgPort:        n.PostgresDb.InternalPort,
 		PgPassword:    n.PostgresDb.Password,
 		CustomSecrets: n.NodeSecretsConfigTOML,
 	}.String()
