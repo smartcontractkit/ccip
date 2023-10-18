@@ -41,6 +41,7 @@ contract CommitStore is ICommitStore, ITypeAndVersion, OCR2Base {
   }
 
   /// @notice a sequenceNumber interval
+  /// @dev RMN depends on this struct, if changing, please notify RMN.
   struct Interval {
     uint64 min; // ───╮ Minimum sequence number, inclusive
     uint64 max; // ───╯ Maximum sequence number, inclusive

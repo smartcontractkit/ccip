@@ -15,21 +15,28 @@ library Internal {
   // repeated out-of-gas scenarios.
   uint16 internal constant MAX_RET_BYTES = 4 + 4 * 32;
 
+  /// @notice A collection of token price and gas price updates.
+  /// @dev RMN depends on this struct, if changing, please notify RMN.
   struct PriceUpdates {
     TokenPriceUpdate[] tokenPriceUpdates;
     GasPriceUpdate[] gasPriceUpdates;
   }
 
+  /// @notice Token price in USD.
+  /// @dev RMN depends on this struct, if changing, please notify RMN.
   struct TokenPriceUpdate {
     address sourceToken; // Source token
     uint224 usdPerToken; // 1e18 USD per smallest unit of token
   }
 
+  /// @notice Gas price for a given chain in USD, its value may contain tightly packed fields.
+  /// @dev RMN depends on this struct, if changing, please notify RMN.
   struct GasPriceUpdate {
     uint64 destChainSelector; // Destination chain selector
     uint224 usdPerUnitGas; // 1e18 USD per smallest unit (e.g. wei) of destination chain gas
   }
 
+  /// @notice A timestamped uint224 value that can contain several tightly packed fields.
   struct TimestampedPackedUint224 {
     uint224 value; // ───────╮ Value in uint224, packed.
     uint32 timestamp; // ────╯ Timestamp of the most recent price update.
@@ -37,7 +44,7 @@ library Internal {
 
   /// @dev Gas price is stored in 112-bit unsigned int. uint224 can pack 2 prices.
   /// When packing L1 and L2 gas prices, L1 gas price is left-shifted to the higher-order bits.
-  /// Using uint8, which is strictly lower than 1st shift operand, to avoid shift operand type warning.
+  /// Using uint8 type, which cannot be higher than other bit shift operands, to avoid shift operand type warning.
   uint8 public constant GAS_PRICE_BITS = 112;
 
   struct PoolUpdate {
