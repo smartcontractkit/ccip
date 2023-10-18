@@ -29,15 +29,15 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   error InvalidRecipientAddress(address to);
   error BadARMSignal();
 
-  struct OnRamp {
-    uint64 destChainSelector;
-    address onRamp;
-  }
-
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
   event OffRampAdded(address offRamp);
   event OffRampRemoved(address offRamp);
   event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
+
+  struct OnRamp {
+    uint64 destChainSelector;
+    address onRamp;
+  }
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "Router 1.0.0";
