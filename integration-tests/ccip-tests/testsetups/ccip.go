@@ -1198,6 +1198,7 @@ func DeployLocalCluster(
 	networks []blockchain.EVMNetwork,
 ) (*test_env.CLClusterTestEnv, func() error) {
 	env, err := test_env.NewCLTestEnvBuilder().
+		WithTestLogger(t).
 		WithPrivateGethChains(networks).
 		Build()
 	require.NoError(t, err)
