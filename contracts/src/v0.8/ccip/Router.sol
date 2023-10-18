@@ -14,7 +14,7 @@ import {Internal} from "./libraries/Internal.sol";
 import {CallWithExactGas} from "./libraries/CallWithExactGas.sol";
 import {OwnerIsCreator} from "./../shared/access/OwnerIsCreator.sol";
 
-import {EnumerableMap} from "../vendor/openzeppelin-solidity/v4.8.0/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableSet} from "../vendor/openzeppelin-solidity/v4.8.0/contracts/utils/structs/EnumerableSet.sol";
 import {SafeERC20} from "../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
 
@@ -23,27 +23,21 @@ import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC
 /// @dev This contract is used as a router for both on-ramps and off-ramps
 contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   using SafeERC20 for IERC20;
-  using EnumerableMap for EnumerableMap.AddressToUintMap;
+  using EnumerableSet for EnumerableSet.AddressSet;
 
   error FailedToSendValue();
   error InvalidRecipientAddress(address to);
-  error OffRampMismatch();
   error BadARMSignal();
-
-  event OnRampSet(uint64 indexed destChainSelector, address onRamp);
-  event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
-  event OffRampRemoved(uint64 indexed sourceChainSelector, address offRamp);
-  event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
 
   struct OnRamp {
     uint64 destChainSelector;
     address onRamp;
   }
 
-  struct OffRamp {
-    uint64 sourceChainSelector;
-    address offRamp;
-  }
+  event OnRampSet(uint64 indexed destChainSelector, address onRamp);
+  event OffRampAdded(address offRamp);
+  event OffRampRemoved(address offRamp);
+  event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "Router 1.0.0";
@@ -63,7 +57,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // Mapping of offRamps to source chain ids
   // Can be multiple offRamps enabled at a time for a given sourceChainSelector,
   // for example during an no downtime upgrade while v1 messages are being flushed.
-  EnumerableMap.AddressToUintMap private s_offRamps;
+  EnumerableSet.AddressSet private s_offRamps;
 
   constructor(address wrappedNative, address armProxy) {
     // Zero address indicates unsupported auto-wrapping, therefore, unsupported
@@ -87,7 +81,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     }
     address onRamp = s_onRamps[destinationChainSelector];
     if (onRamp == address(0)) revert UnsupportedDestinationChain(destinationChainSelector);
-    return IEVM2AnyOnRamp(onRamp).getFee(message);
+    return IEVM2AnyOnRamp(onRamp).getFee(destinationChainSelector, message);
   }
 
   /// @inheritdoc IRouterClient
@@ -95,7 +89,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     if (!isChainSupported(chainSelector)) {
       return new address[](0);
     }
-    return IEVM2AnyOnRamp(s_onRamps[uint256(chainSelector)]).getSupportedTokens();
+    return IEVM2AnyOnRamp(s_onRamps[uint256(chainSelector)]).getSupportedTokens(chainSelector);
   }
 
   /// @inheritdoc IRouterClient
@@ -117,7 +111,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       // as part of the native fee coin payment.
       message.feeToken = s_wrappedNative;
       // We rely on getFee to validate that the feeToken is whitelisted.
-      feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(message);
+      feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(destinationChainSelector, message);
       // Ensure sufficient native.
       if (msg.value < feeTokenAmount) revert InsufficientFeeTokenAmount();
       // Wrap and send native payment.
@@ -128,7 +122,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     } else {
       if (msg.value > 0) revert InvalidMsgValue();
       // We rely on getFee to validate that the feeToken is whitelisted.
-      feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(message);
+      feeTokenAmount = IEVM2AnyOnRamp(onRamp).getFee(destinationChainSelector, message);
       IERC20(message.feeToken).safeTransferFrom(msg.sender, onRamp, feeTokenAmount);
     }
 
@@ -143,7 +137,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       );
     }
 
-    return IEVM2AnyOnRamp(onRamp).forwardFromRouter(message, feeTokenAmount, msg.sender, destinationChainSelector);
+    return IEVM2AnyOnRamp(onRamp).forwardFromRouter(destinationChainSelector, message, feeTokenAmount, msg.sender);
   }
 
   // ================================================================
@@ -160,7 +154,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   )
     external
     override
-    onlyOffRamp(message.sourceChainSelector)
+    onlyOffRamp()
     whenHealthy
     returns (bool success, bytes memory retData)
   {
@@ -210,28 +204,22 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   }
 
   /// @notice Return a full list of configured offRamps.
-  function getOffRamps() external view returns (OffRamp[] memory) {
-    OffRamp[] memory offRamps = new OffRamp[](s_offRamps.length());
-    for (uint256 i = 0; i < offRamps.length; ++i) {
-      (address offRamp, uint256 sourceChainSelector) = s_offRamps.at(i);
-      offRamps[i] = OffRamp({sourceChainSelector: uint64(sourceChainSelector), offRamp: offRamp});
-    }
-    return offRamps;
+  function getOffRamps() external view returns (address[] memory) {
+    return s_offRamps.values();
   }
 
   /// @notice Returns true if the given address is a permissioned offRamp
   /// and sourceChainSelector if so.
-  function isOffRamp(address offRamp) external view returns (bool, uint64) {
-    (bool exists, uint256 sourceChainSelector) = s_offRamps.tryGet(offRamp);
-    return (exists, uint64(sourceChainSelector));
+  function isOffRamp(address offRamp) external view returns (bool) {
+    return s_offRamps.contains(offRamp);
   }
 
   /// @notice applyRampUpdates applies a set of ramp changes which provides
   /// the ability to add new chains and upgrade ramps.
   function applyRampUpdates(
     OnRamp[] calldata onRampUpdates,
-    OffRamp[] calldata offRampRemoves,
-    OffRamp[] calldata offRampAdds
+    address[] calldata offRampRemoves,
+    address[] calldata offRampAdds
   ) external onlyOwner {
     // Apply egress updates.
     // We permit zero address as way to disable egress.
@@ -243,21 +231,13 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     // Apply ingress updates.
     // We permit an empty list as a way to disable ingress.
     for (uint256 i = 0; i < offRampRemoves.length; ++i) {
-      uint64 rampSelector = offRampRemoves[i].sourceChainSelector;
-      address rampAddress = offRampRemoves[i].offRamp;
-
-      if (s_offRamps.get(rampAddress) != uint256(rampSelector)) revert OffRampMismatch();
-
-      if (s_offRamps.remove(rampAddress)) {
-        emit OffRampRemoved(rampSelector, rampAddress);
+      if (s_offRamps.remove(offRampRemoves[i])) {
+        emit OffRampRemoved(offRampRemoves[i]);
       }
     }
     for (uint256 i = 0; i < offRampAdds.length; ++i) {
-      uint64 rampSelector = offRampAdds[i].sourceChainSelector;
-      address rampAddress = offRampAdds[i].offRamp;
-
-      if (s_offRamps.set(rampAddress, rampSelector)) {
-        emit OffRampAdded(rampSelector, rampAddress);
+      if (s_offRamps.add(offRampAdds[i])) {
+        emit OffRampAdded(offRampAdds[i]);
       }
     }
   }
@@ -283,10 +263,8 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // ================================================================
 
   /// @notice only lets permissioned offRamps execute
-  /// @dev We additionally restrict offRamps to specific source chains for defense in depth.
-  modifier onlyOffRamp(uint64 expectedSourceChainSelector) {
-    (bool exists, uint256 sourceChainSelector) = s_offRamps.tryGet(msg.sender);
-    if (!exists || expectedSourceChainSelector != uint64(sourceChainSelector)) revert OnlyOffRamp();
+  modifier onlyOffRamp() {
+    if (!s_offRamps.contains(msg.sender)) revert OnlyOffRamp();
     _;
   }
 

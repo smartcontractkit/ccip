@@ -8,21 +8,9 @@ import {Internal} from "../libraries/Internal.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
 
-interface IEVM2AnyOnRamp {
-  /// @notice Get the fee for a given ccip message
-  /// @param message The message to calculate the cost for
-  /// @return fee The calculated fee
-  function getFee(Client.EVM2AnyMessage calldata message) external view returns (uint256 fee);
+import {IEVM2AnyOnRampRouter} from "./IEVM2AnyOnRampRouter.sol";
 
-  /// @notice Get the pool for a specific token
-  /// @param sourceToken The source chain token to get the pool for
-  /// @return pool Token pool
-  function getPoolBySourceToken(IERC20 sourceToken) external view returns (IPool);
-
-  /// @notice Gets a list of all supported source chain tokens.
-  /// @return tokens The addresses of all tokens that this onRamp supports for sending.
-  function getSupportedTokens() external view returns (address[] memory tokens);
-
+interface IEVM2AnyOnRamp is IEVM2AnyOnRampRouter {
   /// @notice Gets the next sequence number to be used in the onRamp
   /// @return the next sequence number to be used
   function getExpectedNextSequenceNumber() external view returns (uint64);
@@ -36,18 +24,4 @@ interface IEVM2AnyOnRamp {
   /// @param removes The tokens and pools to be removed
   /// @param adds The tokens and pools to be added.
   function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) external;
-
-  /// @notice Send a message to the remote chain
-  /// @dev only callable by the Router
-  /// @dev approve() must have already been called on the token using the this ramp address as the spender.
-  /// @dev if the contract is paused, this function will revert.
-  /// @param message Message struct to send
-  /// @param originalSender The original initiator of the CCIP request
-  /// @param destChainSelector The destination chain selector
-  function forwardFromRouter(
-    Client.EVM2AnyMessage memory message,
-    uint256 feeTokenAmount,
-    address originalSender,
-    uint64 destChainSelector
-  ) external returns (bytes32);
 }

@@ -6,6 +6,7 @@ import {IPool} from "../interfaces/pools/IPool.sol";
 import {IARM} from "../interfaces/IARM.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
+import {IEVM2AnyOnRampRouter} from "../interfaces/IEVM2AnyOnRampRouter.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
@@ -253,12 +254,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     return uint64(senderNonce);
   }
 
-  /// @inheritdoc IEVM2AnyOnRamp
+  /// @inheritdoc IEVM2AnyOnRampRouter
   function forwardFromRouter(
+    uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
     uint256 feeTokenAmount,
-    address originalSender,
-    uint64 destChainSelector
+    address originalSender
   ) external whenHealthy returns (bytes32) {
     // Validate message sender is set and allowed. Not validated in `getFee` since it is not user-driven.
     if (originalSender == address(0)) revert RouterMustSetOriginalSender();
@@ -436,8 +437,8 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // │                      Tokens and pools                        │
   // ================================================================
 
-  /// @inheritdoc IEVM2AnyOnRamp
-  function getSupportedTokens() external view returns (address[] memory) {
+  /// @inheritdoc IEVM2AnyOnRampRouter
+  function getSupportedTokens(uint64 /*destChainSelector*/) external view returns (address[] memory) {
     address[] memory sourceTokens = new address[](s_poolsBySourceToken.length());
     for (uint256 i = 0; i < sourceTokens.length; ++i) {
       (sourceTokens[i], ) = s_poolsBySourceToken.at(i);
@@ -445,7 +446,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     return sourceTokens;
   }
 
-  /// @inheritdoc IEVM2AnyOnRamp
+  /// @inheritdoc IEVM2AnyOnRampRouter
   function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
     if (!s_poolsBySourceToken.contains(address(sourceToken))) revert UnsupportedToken(sourceToken);
     return IPool(s_poolsBySourceToken.get(address(sourceToken)));
@@ -492,11 +493,14 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // │                             Fees                             │
   // ================================================================
 
-  /// @inheritdoc IEVM2AnyOnRamp
+  /// @inheritdoc IEVM2AnyOnRampRouter
   /// @dev getFee MUST revert if the feeToken is not listed in the fee token config, as the router assumes it does.
+  /// @param destChainSelector The destination chain selector.
   /// @param message The message to get quote for.
   /// @return feeTokenAmount The amount of fee token needed for the fee, in smallest denomination of the fee token.
-  function getFee(Client.EVM2AnyMessage calldata message) external view returns (uint256 feeTokenAmount) {
+  function getFee(uint64 destChainSelector, Client.EVM2AnyMessage calldata message) external view returns (uint256 feeTokenAmount) {
+    if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
+  
     Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
     _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts.length);
