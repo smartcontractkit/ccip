@@ -509,13 +509,6 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 				p.NoOfTokens = n
 			}
 		}
-		// if the number of tokens is more than 5, increase the gas limit
-		if p.NoOfTokens > 5 {
-			for _, pair := range p.NetworkPairs {
-				pair.NetworkA.DefaultGasLimit = 10000000
-				pair.NetworkB.DefaultGasLimit = 10000000
-			}
-		}
 
 		tokenAmountStr, _ := utils.GetEnv("CCIP_TRANSFER_AMOUNT_PER_TOKEN")
 		if tokenAmountStr != "" {
@@ -1061,6 +1054,10 @@ func CCIPDefaultTestSetUp(
 		for _, n := range inputs.SelectedNetworks {
 			if _, ok := chainByChainID[n.ChainID]; ok {
 				continue
+			}
+			// if the no of tokens is greater than 2, increase the gas limit
+			if inputs.NoOfTokens > 2 {
+				n.DefaultGasLimit = 10000000
 			}
 			ec, err := blockchain.NewEVMClient(n, k8Env, lggr)
 			require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
