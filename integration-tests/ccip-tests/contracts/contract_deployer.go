@@ -391,14 +391,6 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 	*OnRamp,
 	error,
 ) {
-	if len(tokensAndPools) > 2 {
-		net := e.evmClient.GetNetworkConfig()
-		net.DefaultGasLimit = 8_000_000
-		log.Info().
-			Str("Network Name", net.Name).
-			Uint64("Gaslimit", e.evmClient.GetNetworkConfig().DefaultGasLimit).
-			Msg("Setting gas limit to 10_000_000")
-	}
 	address, _, instance, err := e.evmClient.DeployContract("OnRamp", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,

@@ -619,6 +619,34 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
+func (sourceCCIP *SourceCCIPModule) SyncPoolsAndTokens() error {
+	var tokensAndPools []evm_2_evm_onramp.InternalPoolUpdate
+	var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
+	for i, token := range sourceCCIP.Common.BridgeTokens {
+		tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.InternalPoolUpdate{
+			Token: token.ContractAddress,
+			Pool:  sourceCCIP.Common.BridgeTokenPools[i].EthAddress,
+		})
+		tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
+			Token:             token.ContractAddress,
+			MinFeeUSDCents:    50,           // $0.5
+			MaxFeeUSDCents:    1_000_000_00, // $ 1 million
+			DeciBps:           5_0,          // 5 bps
+			DestGasOverhead:   34_000,
+			DestBytesOverhead: 0,
+		})
+	}
+	err := sourceCCIP.OnRamp.SetTokenTransferFeeConfig(tokenTransferFeeConfig)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	err = sourceCCIP.OnRamp.ApplyPoolUpdates(tokensAndPools)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
+}
+
 // DeployContracts deploys all CCIP contracts specific to the source chain
 func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig) error {
 	var err error
@@ -643,20 +671,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 	if sourceCCIP.OnRamp == nil {
 		var tokensAndPools []evm_2_evm_onramp.InternalPoolUpdate
 		var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
-		for i, token := range sourceCCIP.Common.BridgeTokens {
-			tokensAndPools = append(tokensAndPools, evm_2_evm_onramp.InternalPoolUpdate{
-				Token: token.ContractAddress,
-				Pool:  sourceCCIP.Common.BridgeTokenPools[i].EthAddress,
-			})
-			tokenTransferFeeConfig = append(tokenTransferFeeConfig, evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs{
-				Token:             token.ContractAddress,
-				MinFeeUSDCents:    50,           // $0.5
-				MaxFeeUSDCents:    1_000_000_00, // $ 1 million
-				DeciBps:           5_0,          // 5 bps
-				DestGasOverhead:   34_000,
-				DestBytesOverhead: 0,
-			})
-		}
 
 		sourceCCIP.SrcStartBlock, err = sourceCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
 		if err != nil {
@@ -703,6 +717,12 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		err = sourceCCIP.Common.Router.SetOnRamp(destChainSelector, sourceCCIP.OnRamp.EthAddress)
 		if err != nil {
 			return fmt.Errorf("setting onramp on the router shouldn't fail %+v", err)
+		}
+
+		// now sync the pools and tokens
+		err := sourceCCIP.SyncPoolsAndTokens()
+		if err != nil {
+			return err
 		}
 
 		err = sourceCCIP.Common.ChainClient.WaitForEvents()

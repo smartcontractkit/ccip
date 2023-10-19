@@ -601,6 +601,30 @@ func (onRamp *OnRamp) SetNops() error {
 	return onRamp.client.ProcessTransaction(tx)
 }
 
+func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs) error {
+	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	tx, err := onRamp.Instance.SetTokenTransferFeeConfig(opts, tokenTransferFeeConfig)
+	if err != nil {
+		return err
+	}
+	return onRamp.client.ProcessTransaction(tx)
+}
+
+func (onRamp *OnRamp) ApplyPoolUpdates(poolUpdates []evm_2_evm_onramp.InternalPoolUpdate) error {
+	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	tx, err := onRamp.Instance.ApplyPoolUpdates(opts, []evm_2_evm_onramp.InternalPoolUpdate{}, poolUpdates)
+	if err != nil {
+		return err
+	}
+	return onRamp.client.ProcessTransaction(tx)
+}
+
 func (onRamp *OnRamp) PayNops() error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
