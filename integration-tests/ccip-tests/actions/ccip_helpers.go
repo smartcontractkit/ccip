@@ -61,7 +61,7 @@ const (
 	// 1 day should be enough for most of the cases
 	PermissionlessExecThreshold = 60 * 60 * 24 // 1 day
 
-	MaxNoOfTokensInMsg = 100
+	MaxNoOfTokensInMsg = 1000
 	// we keep the finality timeout high as it's out of our control
 	FinalityTimeout        = 1 * time.Hour
 	TokenTransfer   string = "WithToken"
