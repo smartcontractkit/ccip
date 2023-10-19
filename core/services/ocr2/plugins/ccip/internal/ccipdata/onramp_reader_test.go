@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -37,8 +38,7 @@ func getVersions() []string {
 	return []string{V1_0_0, V1_1_0, V1_2_0}
 }
 
-func Test_OnRampReader(t *testing.T) {
-	// Assert all readers produce the same expected results.
+func TestOnRampReaderInit(t *testing.T) {
 	for _, version := range getVersions() {
 		t.Run("OnRampReader_"+version, func(t *testing.T) {
 			setupAndTestOnRampReader(t, version)
@@ -444,9 +444,13 @@ func testOnRampReader(t *testing.T, th readerTH, expectedRouterAddress common.Ad
 	require.NoError(t, err)
 	require.Equal(t, expectedRouterAddress, res)
 
-	_, err = th.reader.GetSendRequestsGteSeqNum(th.user.Context, 0, 0)
-	require.Error(t, errors.New("latest finalized header is nil")) // requires logs to be polled.
+	//th.lp.PollAndSaveLogs(th.user.Context, 3)
 
-	_, err = th.reader.GetSendRequestsBetweenSeqNums(th.user.Context, 0, 10, 0)
-	require.Error(t, errors.New("latest finalized header is nil")) // requires logs to be polled.
+	_, err = th.reader.GetSendRequestsGteSeqNum(th.user.Context, 0, 0)
+	require.Error(t, err, errors.New("latest finalized header is nil")) // requires logs to be polled.
+
+	msg, err := th.reader.GetSendRequestsBetweenSeqNums(th.user.Context, 0, 10, 0)
+	require.NoError(t, err)
+	require.NotNil(t, msg)
+	require.Equal(t, []Event[internal.EVM2EVMMessage]{}, msg)
 }
