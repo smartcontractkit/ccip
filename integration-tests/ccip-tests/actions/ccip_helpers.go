@@ -923,7 +923,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		return common.Hash{}, d, nil, fmt.Errorf("failed encoding the receiver address: %+v", err)
 	}
 
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(600_000), false)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed encoding the options field: %+v", err)
 	}

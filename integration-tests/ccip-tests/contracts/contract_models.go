@@ -610,6 +610,11 @@ func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_e
 	if err != nil {
 		return err
 	}
+	log.Info().
+		Interface("tokenTransferFeeConfig", tokenTransferFeeConfig).
+		Str("onRamp", onRamp.Address()).
+		Str("Network Name", onRamp.client.GetNetworkConfig().Name).
+		Msg("TokenTransferFeeConfig set in OnRamp")
 	return onRamp.client.ProcessTransaction(tx)
 }
 
@@ -622,6 +627,11 @@ func (onRamp *OnRamp) ApplyPoolUpdates(poolUpdates []evm_2_evm_onramp.InternalPo
 	if err != nil {
 		return err
 	}
+	log.Info().
+		Interface("poolUpdates", poolUpdates).
+		Str("onRamp", onRamp.Address()).
+		Str("Network Name", onRamp.client.GetNetworkConfig().Name).
+		Msg("poolUpdates set in OnRamp")
 	return onRamp.client.ProcessTransaction(tx)
 }
 

@@ -513,6 +513,7 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 		}
 
 		tokenAmountStr, _ := utils.GetEnv("CCIP_TRANSFER_AMOUNT_PER_TOKEN")
+		p.TokenAmount = big.NewInt(1)
 		if tokenAmountStr != "" {
 			amount, _ := big.NewInt(0).SetString(tokenAmountStr, 10)
 			if amount == nil {
