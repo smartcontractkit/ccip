@@ -17,6 +17,7 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
+	"github.com/smartcontractkit/chainlink-env/pkg/cdk8s/blockscout"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -114,6 +115,7 @@ type CCIPTestConfig struct {
 	ExistingDeployment      bool
 	ExistingEnv             string
 	ReuseContracts          bool
+	Blockscout              bool
 	SequentialLaneAddition  bool
 	NodeFunding             *big.Float
 	Load                    *CCIPLoadInput
@@ -538,6 +540,16 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			allError = multierr.Append(allError, err)
 		} else {
 			p.LocalCluster = e
+		}
+	}
+
+	blckscout, _ := utils.GetEnv("CCIP_DEPLOY_BLOCKSCOUT")
+	if blckscout != "" {
+		e, err := strconv.ParseBool(blckscout)
+		if err != nil {
+			allError = multierr.Append(allError, err)
+		} else {
+			p.Blockscout = e
 		}
 	}
 
@@ -1016,7 +1028,7 @@ func CCIPDefaultTestSetUp(
 					TTL:             inputs.EnvTTL,
 					NamespacePrefix: envName,
 					Test:            t,
-				}, clProps, inputs.GethResourceProfile, inputs.SelectedNetworks)
+				}, clProps, inputs.GethResourceProfile, inputs.SelectedNetworks, inputs.Blockscout)
 			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
 		}
 
@@ -1266,6 +1278,7 @@ func DeployEnvironments(
 	clProps map[string]interface{},
 	gethResource map[string]interface{},
 	networks []blockchain.EVMNetwork,
+	useBlockscout bool,
 ) *environment.Environment {
 	testEnvironment := environment.New(envconfig)
 	numOfTxNodes := 1
@@ -1324,15 +1337,13 @@ func DeployEnvironments(
 	for i := range networks {
 		nets = append(nets, networks[i])
 		nets[i].URLs, nets[i].HTTPURLs = urlFinder(networks[i])
-		// skip adding blockscout for simplified deployments
-		// uncomment the following to debug on-chain transactions
-		/*
+		if useBlockscout {
 			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-					Name:    fmt.Sprintf("%s-blockscout", networks[i].Name),
-					WsURL:   networks[i].URLs[0],
-					HttpURL: networks[i].HTTPURLs[0],
-				}))
-		*/
+				Name:    fmt.Sprintf("%s-blockscout", networks[i].Name),
+				WsURL:   networks[i].URLs[0],
+				HttpURL: networks[i].HTTPURLs[0],
+			}))
+		}
 	}
 
 	tomlCfg, err := node.NewConfigFromToml(

@@ -393,7 +393,7 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 ) {
 	if len(tokensAndPools) > 2 {
 		net := e.evmClient.GetNetworkConfig()
-		net.DefaultGasLimit = 10_000_000
+		net.DefaultGasLimit = 8_000_000
 		log.Info().
 			Str("Network Name", net.Name).
 			Uint64("Gaslimit", e.evmClient.GetNetworkConfig().DefaultGasLimit).
