@@ -429,7 +429,8 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		ccipModule.FeeToken = token
 	}
 
-	if len(ccipModule.BridgeTokens) == 0 {
+	// number of deployed bridge tokens does not match noOfTokens; deploy rest of the tokens
+	if len(ccipModule.BridgeTokens) < noOfTokens {
 		// deploy bridge token.
 		for i := len(ccipModule.BridgeTokens); i < noOfTokens; i++ {
 			var token *contracts.ERC20Token
@@ -455,20 +456,20 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		if err != nil {
 			return fmt.Errorf("error in waiting for bridge token deployment %+v", err)
 		}
-	} else {
-		var tokens []*contracts.ERC20Token
-		for _, token := range ccipModule.BridgeTokens {
-			newToken, err := cd.NewERC20TokenContract(common.HexToAddress(token.Address()))
-			if err != nil {
-				return fmt.Errorf("getting new bridge token contract shouldn't fail %+v", err)
-			}
-			tokens = append(tokens, newToken)
-		}
-		ccipModule.BridgeTokens = tokens
 	}
-	if len(ccipModule.BridgeTokenPools) == 0 {
+
+	var tokens []*contracts.ERC20Token
+	for _, token := range ccipModule.BridgeTokens {
+		newToken, err := cd.NewERC20TokenContract(common.HexToAddress(token.Address()))
+		if err != nil {
+			return fmt.Errorf("getting new bridge token contract shouldn't fail %+v", err)
+		}
+		tokens = append(tokens, newToken)
+	}
+	ccipModule.BridgeTokens = tokens
+	if len(ccipModule.BridgeTokenPools) != len(ccipModule.BridgeTokens) {
 		// deploy native token pool
-		for i := len(ccipModule.BridgeTokenPools); i < noOfTokens; i++ {
+		for i := len(ccipModule.BridgeTokenPools); i < len(ccipModule.BridgeTokens); i++ {
 			token := ccipModule.BridgeTokens[i]
 			btp, err := cd.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.ARMContract)
 			if err != nil {
@@ -563,7 +564,7 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 			Capacity: contracts.HundredCoins,
 		},
 		ExistingDeployment: existingDeployment,
-		poolFunds:          testhelpers.Link(1000),
+		poolFunds:          testhelpers.Link(1),
 		gasUpdateWatcherMu: &sync.Mutex{},
 		gasUpdateWatcher:   make(map[uint64]*big.Int),
 	}, nil
@@ -630,11 +631,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 	}
 
 	sourceCCIP.LoadContracts(lane)
-	// update transfer amount array length to be equal to the number of tokens
-	// each index in TransferAmount array corresponds to the amount to be transferred for the token at the same index in BridgeTokens array
-	if len(sourceCCIP.TransferAmount) != len(sourceCCIP.Common.BridgeTokens) && len(sourceCCIP.TransferAmount) > 0 {
-		sourceCCIP.TransferAmount = sourceCCIP.TransferAmount[:len(sourceCCIP.Common.BridgeTokens)]
-	}
 	sourceChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
 		return errors.WithStack(err)
@@ -666,7 +662,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		if err != nil {
 			return fmt.Errorf("getting latest block number shouldn't fail %+v", err)
 		}
-
 		sourceCCIP.OnRamp, err = contractDeployer.DeployOnRamp(
 			sourceChainSelector,
 			destChainSelector,

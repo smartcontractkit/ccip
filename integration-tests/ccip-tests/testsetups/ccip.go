@@ -106,6 +106,8 @@ type CCIPTestConfig struct {
 	EnvTTL                  time.Duration
 	KeepEnvAlive            bool
 	MsgType                 string
+	NoOfTokens              int
+	TokenAmount             *big.Int
 	PhaseTimeout            time.Duration
 	TestDuration            time.Duration
 	LocalCluster            bool
@@ -496,6 +498,29 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 		}
 	}
 
+	if p.MsgType == actions.TokenTransfer {
+		p.NoOfTokens = 1
+		inputNo, _ := utils.GetEnv("CCIP_NO_OF_TOKENS")
+		if inputNo != "" {
+			n, err := strconv.Atoi(inputNo)
+			if err != nil {
+				allError = multierr.Append(allError, err)
+			} else {
+				p.NoOfTokens = n
+			}
+		}
+
+		tokenAmountStr, _ := utils.GetEnv("CCIP_TRANSFER_AMOUNT_PER_TOKEN")
+		if tokenAmountStr != "" {
+			amount, _ := big.NewInt(0).SetString(tokenAmountStr, 10)
+			if amount == nil {
+				allError = multierr.Append(allError, fmt.Errorf("invalid CCIP_TRANSFER_AMOUNT_PER_TOKEN env variable value: %s", tokenAmountStr))
+			} else {
+				p.TokenAmount = amount
+			}
+		}
+	}
+
 	fundingAmountStr, _ := utils.GetEnv("CCIP_CHAINLINK_NODE_FUNDING")
 	if fundingAmountStr != "" {
 		fundingAmount, _ := big.NewFloat(0).SetString(fundingAmountStr)
@@ -650,7 +675,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	numOfCommitNodes int,
 	commitAndExecOnSameDON, bidirectional bool,
 ) error {
-	var allErrors error
+	var allErrors atomic.Error
 	t := o.Cfg.Test
 	var k8Env *environment.Environment
 	ccipEnv := o.Env
@@ -780,19 +805,21 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		srcConfig, destConfig, err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkACmn, networkBCmn,
 			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp)
 		if err != nil {
-			allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err - %+v", networkA.Name, networkB.Name, err))
+			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err - %+v", networkA.Name, networkB.Name, err)))
 			return err
 		}
 		err = o.LaneConfig.WriteLaneConfig(networkA.Name, srcConfig)
 		if err != nil {
-			allErrors = multierr.Append(allErrors, fmt.Errorf("writing lane config for %s; err - %+v", networkA.Name, err))
+			lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkA.Name, networkB.Name)
+			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %+v", networkA.Name, err)))
 			return err
 		}
 		err = o.LaneConfig.WriteLaneConfig(networkB.Name, destConfig)
 		if err != nil {
-			allErrors = multierr.Append(allErrors, fmt.Errorf("writing lane config for %s; err - %+v", networkB.Name, err))
+			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %+v", networkB.Name, err)))
 			return err
 		}
+		lggr.Info().Msgf("done setting up lane %s to %s", networkA.Name, networkB.Name)
 		return nil
 	})
 
@@ -802,20 +829,22 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			srcConfig, destConfig, err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkBCmn, networkACmn,
 				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp)
 			if err != nil {
-				allErrors = multierr.Append(allErrors, fmt.Errorf("deploying lane %s to %s; err -  %+v", networkB.Name, networkA.Name, err))
+				lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkB.Name, networkA.Name)
+				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err -  %+v", networkB.Name, networkA.Name, err)))
 				return err
 			}
 
 			err = o.LaneConfig.WriteLaneConfig(networkB.Name, srcConfig)
 			if err != nil {
-				allErrors = multierr.Append(allErrors, fmt.Errorf("writing lane config for %s; err - %+v", networkA.Name, err))
+				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %+v", networkA.Name, err)))
 				return err
 			}
 			err = o.LaneConfig.WriteLaneConfig(networkA.Name, destConfig)
 			if err != nil {
-				allErrors = multierr.Append(allErrors, fmt.Errorf("writing lane config for %s; err - %+v", networkB.Name, err))
+				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %+v", networkB.Name, err)))
 				return err
 			}
+			lggr.Info().Msgf("done setting up lane %s to %s", networkB.Name, networkA.Name)
 			return nil
 		}
 		return nil
@@ -835,7 +864,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			return err
 		case <-ctx.Done():
 			lggr.Print(ctx.Err())
-			return allErrors
+			return allErrors.Load()
 		}
 	}
 }
@@ -919,7 +948,6 @@ func CCIPDefaultTestSetUp(
 	lggr zerolog.Logger,
 	envName string,
 	numOfCLNodes int,
-	transferAmounts []*big.Int,
 	tokenDeployerFns []blockchain.ContractDeployer,
 	numOfCommitNodes int, commitAndExecOnSameDON, bidirectional bool,
 	inputs *CCIPTestConfig,
@@ -933,9 +961,11 @@ func CCIPDefaultTestSetUp(
 	)
 	filename := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
 	inputs.Test = t
-	if inputs.MsgType == actions.DataOnlyTransfer {
-		transferAmounts = []*big.Int{}
+	var transferAmounts []*big.Int
+	for i := 0; i < inputs.NoOfTokens; i++ {
+		transferAmounts = append(transferAmounts, inputs.TokenAmount)
 	}
+
 	setUpArgs := &CCIPTestSetUpOutputs{
 		Cfg:            inputs,
 		Reporter:       testreporters.NewCCIPTestReporter(t, lggr),
@@ -1083,8 +1113,9 @@ func CCIPDefaultTestSetUp(
 		if setUpArgs.Cfg.NoOfLanesPerPair > 1 {
 			regex := regexp.MustCompile(`-(\d+)$`)
 			networkNameToReadCfg := regex.ReplaceAllString(n, "")
+			reuse := inputs.ReuseContracts
 			// if reuse contracts is true, copy common contracts from the same network except the router contract
-			setUpArgs.LaneConfig.CopyCommonContracts(networkNameToReadCfg, n, inputs.ReuseContracts, inputs.MsgType == actions.TokenTransfer)
+			setUpArgs.LaneConfig.CopyCommonContracts(networkNameToReadCfg, n, reuse, inputs.MsgType == actions.TokenTransfer)
 		}
 	}
 
@@ -1184,11 +1215,10 @@ func CCIPDefaultTestSetUp(
 func CCIPExistingDeploymentTestSetUp(
 	t *testing.T,
 	lggr zerolog.Logger,
-	transferAmounts []*big.Int,
 	bidirectional bool,
 	input *CCIPTestConfig,
 ) *CCIPTestSetUpOutputs {
-	return CCIPDefaultTestSetUp(t, lggr, "ccip-runner", 0, transferAmounts,
+	return CCIPDefaultTestSetUp(t, lggr, "ccip-runner", 0,
 		nil, 0, false, bidirectional, input)
 }
 

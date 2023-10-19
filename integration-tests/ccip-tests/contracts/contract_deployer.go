@@ -112,7 +112,7 @@ func (e *CCIPContractsDeployer) NewERC20TokenContract(addr common.Address) (*ERC
 	}
 	log.Info().
 		Str("Contract Address", addr.Hex()).
-		Str("Contract Name", "Link Token").
+		Str("Contract Name", "ERC20 Token").
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
