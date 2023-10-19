@@ -512,7 +512,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
 
     (uint224 feeTokenPrice, uint224 packedGasPrice) = IPriceRegistry(s_dynamicConfig.priceRegistry)
-      .getTokenAndGasPrices(message.feeToken, i_destChainSelector);
+      .getTokenAndGasPrices(message.feeToken, destChainSelector);
     uint112 executionGasPrice = uint112(packedGasPrice);
 
     // Calculate premiumFee in USD with 18 decimals precision first.
