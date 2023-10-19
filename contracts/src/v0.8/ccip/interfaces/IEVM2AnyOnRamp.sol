@@ -1,14 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IPool} from "./pools/IPool.sol";
-
-import {Client} from "../libraries/Client.sol";
-import {Internal} from "../libraries/Internal.sol";
-
-import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
-
 import {IEVM2AnyOnRampRouter} from "./IEVM2AnyOnRampRouter.sol";
+
+import {Internal} from "../libraries/Internal.sol";
 
 interface IEVM2AnyOnRamp is IEVM2AnyOnRampRouter {
   /// @notice Gets the next sequence number to be used in the onRamp
