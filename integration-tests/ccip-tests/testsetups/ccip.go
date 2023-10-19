@@ -1055,10 +1055,6 @@ func CCIPDefaultTestSetUp(
 			if _, ok := chainByChainID[n.ChainID]; ok {
 				continue
 			}
-			// if the no of tokens is greater than 2, increase the gas limit
-			if inputs.NoOfTokens > 2 {
-				n.DefaultGasLimit = 30000000
-			}
 			ec, err := blockchain.NewEVMClient(n, k8Env, lggr)
 			require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 			chains = append(chains, ec)
