@@ -724,3 +724,27 @@ func (offRamp *OffRamp) SetOCR2Config(
 	}
 	return offRamp.client.ProcessTransaction(tx)
 }
+
+func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address) error {
+	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	var tokenUpdates []evm_2_evm_offramp.InternalPoolUpdate
+	for i, srcToken := range sourceTokens {
+		tokenUpdates = append(tokenUpdates, evm_2_evm_offramp.InternalPoolUpdate{
+			Token: srcToken,
+			Pool:  pools[i],
+		})
+	}
+	tx, err := offRamp.Instance.ApplyPoolUpdates(opts, []evm_2_evm_offramp.InternalPoolUpdate{}, tokenUpdates)
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Interface("tokenUpdates", tokenUpdates).
+		Str("offRamp", offRamp.Address()).
+		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
+		Msg("tokenUpdates set in OffRamp")
+	return offRamp.client.ProcessTransaction(tx)
+}

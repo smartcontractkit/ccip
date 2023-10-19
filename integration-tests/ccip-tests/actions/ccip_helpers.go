@@ -60,6 +60,8 @@ const (
 	// The higher the load/throughput, the higher value we might need here to guarantee that nonces are not blocked
 	// 1 day should be enough for most of the cases
 	PermissionlessExecThreshold = 60 * 60 * 24 // 1 day
+
+	MaxNoOfTokensInMsg = 100
 	// we keep the finality timeout high as it's out of our control
 	FinalityTimeout        = 1 * time.Hour
 	TokenTransfer   string = "WithToken"
@@ -1026,6 +1028,20 @@ func (destCCIP *DestCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 	}
 }
 
+func (destCCIP *DestCCIPModule) SyncTokensAndPools(srcTokens []*contracts.ERC20Token) error {
+	var sourceTokens, pools []common.Address
+
+	for _, token := range srcTokens {
+		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
+	}
+
+	for i := range destCCIP.Common.BridgeTokenPools {
+		pools = append(pools, destCCIP.Common.BridgeTokenPools[i].EthAddress)
+	}
+
+	return destCCIP.OffRamp.SyncTokensAndPools(sourceTokens, pools)
+}
+
 // DeployContracts deploys all CCIP contracts specific to the destination chain
 func (destCCIP *DestCCIPModule) DeployContracts(
 	sourceCCIP SourceCCIPModule,
@@ -1074,23 +1090,11 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		}
 	}
 
-	var sourceTokens, destTokens, pools []common.Address
-
-	for _, token := range sourceCCIP.Common.BridgeTokens {
-		sourceTokens = append(sourceTokens, common.HexToAddress(token.Address()))
-	}
-
-	for i, token := range destCCIP.Common.BridgeTokens {
-		destTokens = append(destTokens, common.HexToAddress(token.Address()))
-		pool := destCCIP.Common.BridgeTokenPools[i]
-		pools = append(pools, pool.EthAddress)
-	}
-
 	if destCCIP.OffRamp == nil {
 		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(
 			sourceChainSelector, destChainSelector,
 			destCCIP.CommitStore.EthAddress, sourceCCIP.OnRamp.EthAddress,
-			sourceTokens, pools, destCCIP.Common.RateLimiterConfig, *destCCIP.Common.ARMContract)
+			[]common.Address{}, []common.Address{}, destCCIP.Common.RateLimiterConfig, *destCCIP.Common.ARMContract)
 		if err != nil {
 			return fmt.Errorf("deploying offramp shouldn't fail %+v", err)
 		}
@@ -1103,6 +1107,11 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, sourceChainSelector)
 		if err != nil {
 			return fmt.Errorf("setting offramp as fee updater shouldn't fail %+v", err)
+		}
+
+		err = destCCIP.SyncTokensAndPools(sourceCCIP.Common.BridgeTokens)
+		if err != nil {
+			return fmt.Errorf("syncing tokens and pools shouldn't fail %+v", err)
 		}
 		err = destCCIP.Common.ChainClient.WaitForEvents()
 		if err != nil {
@@ -2009,7 +2018,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				PermissionlessExecThreshold,
 				destCCIP.Common.Router.EthAddress,
 				destCCIP.Common.PriceRegistry.EthAddress,
-				5,
+				MaxNoOfTokensInMsg,
 				50000,
 				200_000,
 			), contracts.OCR2ParamsForExec, 3*time.Minute)
