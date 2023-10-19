@@ -58,11 +58,9 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   address private s_wrappedNative;
   // destChainSelector => onRamp address
   mapping(uint256 destChainSelector => address onRamp) private s_onRamps;
-
   // A collection of offramp addresses.
   EnumerableSet.AddressSet private s_offRamps;
-
-  // Mapping from a sourceChainSelector and offramp combo to a flag indicating wether it is valid.
+  // Mapping of [sourceChainSelector, offRamp] to a flag indicating whether it is valid.
   // The mapping key is sourceChainSelector << 160 + offramp address.
   mapping(uint256 sourceSelectorAndOffRamp => bool isOffRamp) private s_offRampIndexes;
 
@@ -158,13 +156,11 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     uint16 gasForCallExactCheck,
     uint256 gasLimit,
     address receiver
-  )
-    external
-    override
-    onlyOffRamp(message.sourceChainSelector)
-    whenHealthy
-    returns (bool success, bytes memory retData)
-  {
+  ) external override whenHealthy returns (bool success, bytes memory retData) {
+    // We only permit offRamps to call this function.
+    uint256 rampIndex = (uint256(message.sourceChainSelector) << 160) + uint160(msg.sender);
+    if (!s_offRampIndexes[rampIndex]) revert OnlyOffRamp();
+
     // We encode here instead of the offRamps to constrain specifically what functions
     // can be called from the router.
     bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
@@ -241,9 +237,8 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       uint64 rampSelector = offRampRemoves[i].sourceChainSelector;
       address rampAddress = offRampRemoves[i].offRamp;
 
-      uint256 rampIndex = uint256(rampSelector) << 160 + uint160(rampAddress);
-      s_offRampIndexes[rampIndex] = false;
-      
+      s_offRampIndexes[(uint256(rampSelector) << 160) + uint160(rampAddress)] = false;
+
       if (s_offRamps.remove(rampAddress)) {
         emit OffRampRemoved(rampSelector, rampAddress);
       }
@@ -252,8 +247,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       uint64 rampSelector = offRampAdds[i].sourceChainSelector;
       address rampAddress = offRampAdds[i].offRamp;
 
-      uint256 rampIndex = uint256(rampSelector) << 160 + uint160(rampAddress);
-      s_offRampIndexes[rampIndex] = true;
+      s_offRampIndexes[(uint256(rampSelector) << 160) + uint160(rampAddress)] = true;
 
       if (s_offRamps.add(rampAddress)) {
         emit OffRampAdded(rampSelector, rampAddress);
@@ -280,13 +274,6 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // ================================================================
   // │                           Access                             │
   // ================================================================
-
-  /// @notice only lets permissioned offRamps execute
-  /// @dev We additionally restrict offRamps to specific source chains for defense in depth.
-  modifier onlyOffRamp(uint64 expectedSourceChainSelector) {
-    if (!s_offRampIndexes[uint256(expectedSourceChainSelector) << 160 + uint160(msg.sender)]) revert OnlyOffRamp();
-    _;
-  }
 
   /// @notice Ensure that the ARM has not emitted a bad signal, and that the latest heartbeat is not stale.
   modifier whenHealthy() {

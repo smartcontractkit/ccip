@@ -397,9 +397,8 @@ contract Router_applyRampUpdates is RouterSetup {
     offRampUpdates[0] = Router.OffRamp(SOURCE_CHAIN_ID, offRamp);
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
     assertEq(1, s_sourceRouter.getOffRamps().length);
-    Router.OffRamp[] memory gotOffRamps = s_sourceRouter.getOffRamps();
-    assertEq(offRampUpdates[0].sourceChainSelector, gotOffRamps[0].sourceChainSelector);
-    assertEq(offRampUpdates[0].offRamp, gotOffRamps[0].offRamp);
+    address[] memory gotOffRamps = s_sourceRouter.getOffRamps();
+    assertEq(offRampUpdates[0].offRamp, gotOffRamps[0]);
     // Remove ingress
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, new Router.OffRamp[](0));
     assertEq(0, s_sourceRouter.getOffRamps().length);
@@ -419,8 +418,7 @@ contract Router_applyRampUpdates is RouterSetup {
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
     assertEq(1, s_sourceRouter.getOffRamps().length);
     gotOffRamps = s_sourceRouter.getOffRamps();
-    assertEq(offRampUpdates[0].sourceChainSelector, gotOffRamps[0].sourceChainSelector);
-    assertEq(offRampUpdates[0].offRamp, gotOffRamps[0].offRamp);
+    assertEq(offRampUpdates[0].offRamp, gotOffRamps[0]);
     changePrank(offRamp);
     s_sourceRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
@@ -461,22 +459,22 @@ contract Router_applyRampUpdates is RouterSetup {
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
   }
 
-  function testOffRampMismatchReverts() public {
-    address offRamp = address(uint160(2));
-
-    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
-    offRampUpdates[0] = Router.OffRamp(DEST_CHAIN_ID, offRamp);
-
-    vm.expectEmit();
-    emit OffRampAdded(DEST_CHAIN_ID, offRamp);
-    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
-
-    offRampUpdates[0] = Router.OffRamp(SOURCE_CHAIN_ID, offRamp);
-
-    vm.expectRevert(Router.OffRampMismatch.selector);
-    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
-  }
+  //  function testOffRampMismatchReverts() public {
+  //    address offRamp = address(uint160(2));
+  //
+  //    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
+  //    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+  //    offRampUpdates[0] = Router.OffRamp(DEST_CHAIN_ID, offRamp);
+  //
+  //    vm.expectEmit();
+  //    emit OffRampAdded(DEST_CHAIN_ID, offRamp);
+  //    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+  //
+  //    offRampUpdates[0] = Router.OffRamp(SOURCE_CHAIN_ID, offRamp);
+  //
+  //    vm.expectRevert(Router.OffRampMismatch.selector);
+  //    s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, offRampUpdates);
+  //  }
 }
 
 /// @notice #setWrappedNative

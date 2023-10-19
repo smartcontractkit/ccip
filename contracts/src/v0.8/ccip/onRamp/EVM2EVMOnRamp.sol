@@ -498,9 +498,12 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   /// @param destChainSelector The destination chain selector.
   /// @param message The message to get quote for.
   /// @return feeTokenAmount The amount of fee token needed for the fee, in smallest denomination of the fee token.
-  function getFee(uint64 destChainSelector, Client.EVM2AnyMessage calldata message) external view returns (uint256 feeTokenAmount) {
+  function getFee(
+    uint64 destChainSelector,
+    Client.EVM2AnyMessage calldata message
+  ) external view returns (uint256 feeTokenAmount) {
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
-  
+
     Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
     // Validate the message with various checks
     _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts.length);
