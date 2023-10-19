@@ -24,9 +24,11 @@ import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC
 contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.UintSet;
 
   error FailedToSendValue();
   error InvalidRecipientAddress(address to);
+  error OffRampMismatch(uint64 chainSelector, address offRamp);
   error BadARMSignal();
 
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
@@ -58,11 +60,9 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   address private s_wrappedNative;
   // destChainSelector => onRamp address
   mapping(uint256 destChainSelector => address onRamp) private s_onRamps;
-  // A collection of offramp addresses.
-  EnumerableSet.AddressSet private s_offRamps;
-  // Mapping of [sourceChainSelector, offRamp] to a flag indicating whether it is valid.
-  // The mapping key is sourceChainSelector << 160 + offramp address.
-  mapping(uint256 sourceSelectorAndOffRamp => bool isOffRamp) private s_offRampIndexes;
+  // Stores [sourceChainSelector << 160 + offramp] as a pair to allow for
+  // lookups for specific chain/offramp pairs.
+  EnumerableSet.UintSet private s_chainSelectorAndOffRamps;
 
   constructor(address wrappedNative, address armProxy) {
     // Zero address indicates unsupported auto-wrapping, therefore, unsupported
@@ -157,9 +157,10 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     uint256 gasLimit,
     address receiver
   ) external override whenHealthy returns (bool success, bytes memory retData) {
-    // We only permit offRamps to call this function.
-    uint256 rampIndex = (uint256(message.sourceChainSelector) << 160) + uint160(msg.sender);
-    if (!s_offRampIndexes[rampIndex]) revert OnlyOffRamp();
+    // We only permit offRamps to call this function. We have to encode the sourceChainSelector
+    // and msg.sender into a uint256 to use as a key in the set.
+    if (!s_chainSelectorAndOffRamps.contains((uint256(message.sourceChainSelector) << 160) + uint160(msg.sender)))
+      revert OnlyOffRamp();
 
     // We encode here instead of the offRamps to constrain specifically what functions
     // can be called from the router.
@@ -206,15 +207,21 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     return s_onRamps[destChainSelector];
   }
 
-  /// @notice Return a full list of configured offRamps.
-  function getOffRamps() external view returns (address[] memory) {
-    return s_offRamps.values();
+  function getOffRamps() external view returns (OffRamp[] memory) {
+    uint256[] memory encodedOffRamps = s_chainSelectorAndOffRamps.values();
+    OffRamp[] memory offRamps = new OffRamp[](encodedOffRamps.length);
+    for (uint256 i = 0; i < encodedOffRamps.length; ++i) {
+      uint256 encodedOffRamp = encodedOffRamps[i];
+      offRamps[i] = OffRamp({
+        sourceChainSelector: uint64(encodedOffRamp >> 160),
+        offRamp: address(uint160(encodedOffRamp))
+      });
+    }
+    return offRamps;
   }
 
-  /// @notice Returns true if the given address is a permissioned offRamp
-  /// and sourceChainSelector if so.
-  function isOffRamp(address offRamp) external view returns (bool) {
-    return s_offRamps.contains(offRamp);
+  function isOffRamp(address offRamp, uint64 sourceChainSelector) external view returns (bool) {
+    return s_chainSelectorAndOffRamps.contains((uint256(sourceChainSelector) << 160) + uint160(offRamp));
   }
 
   /// @notice applyRampUpdates applies a set of ramp changes which provides
@@ -231,26 +238,25 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       s_onRamps[onRampUpdate.destChainSelector] = onRampUpdate.onRamp;
       emit OnRampSet(onRampUpdate.destChainSelector, onRampUpdate.onRamp);
     }
+
     // Apply ingress updates.
-    // We permit an empty list as a way to disable ingress.
     for (uint256 i = 0; i < offRampRemoves.length; ++i) {
-      uint64 rampSelector = offRampRemoves[i].sourceChainSelector;
-      address rampAddress = offRampRemoves[i].offRamp;
+      uint64 sourceChainSelector = offRampRemoves[i].sourceChainSelector;
+      address offRampAddress = offRampRemoves[i].offRamp;
 
-      s_offRampIndexes[(uint256(rampSelector) << 160) + uint160(rampAddress)] = false;
+      // If the selector-offRamp pair does not exist, revert.
+      if (!s_chainSelectorAndOffRamps.remove((uint256(sourceChainSelector) << 160) + uint160(offRampAddress)))
+        revert OffRampMismatch(sourceChainSelector, offRampAddress);
 
-      if (s_offRamps.remove(rampAddress)) {
-        emit OffRampRemoved(rampSelector, rampAddress);
-      }
+      emit OffRampRemoved(sourceChainSelector, offRampAddress);
     }
+
     for (uint256 i = 0; i < offRampAdds.length; ++i) {
-      uint64 rampSelector = offRampAdds[i].sourceChainSelector;
-      address rampAddress = offRampAdds[i].offRamp;
+      uint64 sourceChainSelector = offRampAdds[i].sourceChainSelector;
+      address offRampAddress = offRampAdds[i].offRamp;
 
-      s_offRampIndexes[(uint256(rampSelector) << 160) + uint160(rampAddress)] = true;
-
-      if (s_offRamps.add(rampAddress)) {
-        emit OffRampAdded(rampSelector, rampAddress);
+      if (s_chainSelectorAndOffRamps.add((uint256(sourceChainSelector) << 160) + uint160(offRampAddress))) {
+        emit OffRampAdded(sourceChainSelector, offRampAddress);
       }
     }
   }

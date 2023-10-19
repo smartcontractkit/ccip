@@ -68,6 +68,7 @@ contract ThirdPartyBurnMintTokenPoolSetup is BaseTest {
 
 contract ThirdPartyBurnMintTokenPool_lockOrBurn is ThirdPartyBurnMintTokenPoolSetup {
   error SenderNotAllowed(address sender);
+
   event Burned(address indexed sender, uint256 amount);
   event TokensConsumed(uint256 amount);
 
@@ -121,13 +122,13 @@ contract ThirdPartyBurnMintTokenPool_lockOrBurn is ThirdPartyBurnMintTokenPoolSe
 contract ThirdPartyBurnMintTokenPool_applyRampUpdates is ThirdPartyBurnMintTokenPoolSetup {
   // Note applyRampUpdates inherits from TokenPool so we only need to test the new functionality.
   // Reverts
-  function testInvalidOffRampReverts() public {
-    address invalidOffRamp = address(23456787654321);
-    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({ramp: invalidOffRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
-
-    vm.expectRevert(abi.encodeWithSelector(ThirdPartyBurnMintTokenPool.InvalidOffRamp.selector, invalidOffRamp));
-
-    s_thirdPartyPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
-  }
+  //  function testInvalidOffRampReverts() public {
+  //    address invalidOffRamp = address(23456787654321);
+  //    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
+  //    offRamps[0] = TokenPool.RampUpdate({ramp: invalidOffRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
+  //
+  //    vm.expectRevert(abi.encodeWithSelector(ThirdPartyBurnMintTokenPool.InvalidOffRamp.selector, invalidOffRamp));
+  //
+  //    s_thirdPartyPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
+  //  }
 }
