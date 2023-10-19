@@ -725,6 +725,30 @@
         }
       }
     },
+    "Arbitrum Goerli-3": {
+      "is_mock_arm": true,
+      "fee_token": "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
+      "arm": "0x8DBe3f909D4dD20dC38a53c71785F13F582Df36F",
+      "router": "",
+      "price_registry": "0x22bC3FDf88f14a2bc19ea5e94Ebb7Fb5ca87d86C",
+      "wrapped_native": "0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
+    "Arbitrum Goerli-4": {
+      "is_mock_arm": true,
+      "fee_token": "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
+      "arm": "0x8DBe3f909D4dD20dC38a53c71785F13F582Df36F",
+      "router": "",
+      "price_registry": "0x22bC3FDf88f14a2bc19ea5e94Ebb7Fb5ca87d86C",
+      "wrapped_native": "0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
     "Avalanche Fuji-1": {
       "is_mock_arm": true,
       "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
@@ -861,6 +885,30 @@
         }
       }
     },
+    "Avalanche Fuji-3": {
+      "is_mock_arm": true,
+      "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
+      "arm": "0xFee98E43a2ED492Bb7f0EBE29ccBcdBd4b99E906",
+      "router": "",
+      "price_registry": "0xb014099621f4d7996BDaAa381545aE6A3F146526",
+      "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
+    "Avalanche Fuji-4": {
+      "is_mock_arm": true,
+      "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
+      "arm": "0xFee98E43a2ED492Bb7f0EBE29ccBcdBd4b99E906",
+      "router": "",
+      "price_registry": "0xb014099621f4d7996BDaAa381545aE6A3F146526",
+      "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
     "BSC Testnet-1": {
       "is_mock_arm": true,
       "fee_token": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
@@ -996,6 +1044,30 @@
           "receiver_dapp": "0xd604e61Cec366dE54C1C1F14b5F1c5D60094dE07"
         }
       }
+    },
+    "BSC Testnet-3": {
+      "is_mock_arm": true,
+      "fee_token": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
+      "bridge_tokens": [],
+      "bridge_tokens_pools": [],
+      "arm": "0x092047b6f7db7C0Ea8AE58075f7869DC5c1C0f3f",
+      "router": "",
+      "price_registry": "0x1b424319E6DA0FFaAD1Df89A3FD49E90014c3e66",
+      "wrapped_native": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
+    "BSC Testnet-4": {
+      "is_mock_arm": true,
+      "fee_token": "0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06",
+      "bridge_tokens": [],
+      "bridge_tokens_pools": [],
+      "arm": "0x092047b6f7db7C0Ea8AE58075f7869DC5c1C0f3f",
+      "router": "",
+      "price_registry": "0x1b424319E6DA0FFaAD1Df89A3FD49E90014c3e66",
+      "wrapped_native": "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd",
+      "src_contracts": {},
+      "dest_contracts": {}
     },
     "Base Goerli-1": {
       "is_mock_arm": true,
@@ -1135,6 +1207,32 @@
         }
       }
     },
+    "Base Goerli-3": {
+      "is_mock_arm": true,
+      "fee_token": "0xD886E2286Fd1073df82462ea1822119600Af80b6",
+      "is_native_fee_token": true,
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
+      "arm": "0xC110044180409bdF033B25e5962C415c5C5C2A99",
+      "router": "",
+      "price_registry": "0x3011Df7E7d34Ae72070Bb9C5A9DEfCc8489269C5",
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
+    "Base Goerli-4": {
+      "is_mock_arm": true,
+      "fee_token": "0xD886E2286Fd1073df82462ea1822119600Af80b6",
+      "is_native_fee_token": true,
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
+      "arm": "0xC110044180409bdF033B25e5962C415c5C5C2A99",
+      "router": "",
+      "price_registry": "0x3011Df7E7d34Ae72070Bb9C5A9DEfCc8489269C5",
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
     "Optimism Goerli-1": {
       "is_mock_arm": true,
       "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
@@ -1270,6 +1368,30 @@
           "receiver_dapp": "0x39B57064FAD9Dd07cBAc8002Ec5547942Eba1720"
         }
       }
+    },
+    "Optimism Goerli-3": {
+      "is_mock_arm": true,
+      "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
+      "bridge_tokens": [],
+      "bridge_tokens_pools": [],
+      "arm": "0xb2BDC15AF974EdD65813C5d508F60E625fDDC7F6",
+      "router": "",
+      "price_registry": "0x121F2CBDa72d73502d7a896CA10b2650e45dd83D",
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
+    "Optimism Goerli-4": {
+      "is_mock_arm": true,
+      "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
+      "bridge_tokens": [],
+      "bridge_tokens_pools": [],
+      "arm": "0xb2BDC15AF974EdD65813C5d508F60E625fDDC7F6",
+      "router": "",
+      "price_registry": "0x121F2CBDa72d73502d7a896CA10b2650e45dd83D",
+      "wrapped_native": "0x4200000000000000000000000000000000000006",
+      "src_contracts": {},
+      "dest_contracts": {}
     },
     "Polygon Mumbai-1": {
       "is_mock_arm": true,
@@ -1407,6 +1529,30 @@
         }
       }
     },
+    "Polygon Mumbai-3": {
+      "is_mock_arm": true,
+      "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
+      "arm": "0xDC88BcE99f0C1A997010953e83BC9380ec9aDa8F",
+      "router": "",
+      "price_registry": "0x569CaE44B4C2B94dB796032119440e85e229DDbF",
+      "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
+    "Polygon Mumbai-4": {
+      "is_mock_arm": true,
+      "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
+      "bridge_tokens": null,
+      "bridge_tokens_pools": null,
+      "arm": "0xDC88BcE99f0C1A997010953e83BC9380ec9aDa8F",
+      "router": "",
+      "price_registry": "0x569CaE44B4C2B94dB796032119440e85e229DDbF",
+      "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
     "Sepolia Testnet-1": {
       "is_mock_arm": true,
       "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
@@ -1542,6 +1688,30 @@
           "receiver_dapp": "0x2078C5fc33ccC02dafFf18e9C6Cbf09fcc43D66c"
         }
       }
+    },
+    "Sepolia Testnet-3": {
+      "is_mock_arm": true,
+      "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+      "bridge_tokens": [],
+      "bridge_tokens_pools": [],
+      "arm": "0x996C84211D7D2E80a0c27857dD38BFBb87700075",
+      "router": "",
+      "price_registry": "0x27D25dE4E6d2C876bE139908acA8a3783a53dACf",
+      "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+      "src_contracts": {},
+      "dest_contracts": {}
+    },
+    "Sepolia Testnet-4": {
+      "is_mock_arm": true,
+      "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+      "bridge_tokens": [],
+      "bridge_tokens_pools": [],
+      "arm": "0x996C84211D7D2E80a0c27857dD38BFBb87700075",
+      "router": "",
+      "price_registry": "0x27D25dE4E6d2C876bE139908acA8a3783a53dACf",
+      "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+      "src_contracts": {},
+      "dest_contracts": {}
     }
   }
 }

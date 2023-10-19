@@ -509,6 +509,13 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 				p.NoOfTokens = n
 			}
 		}
+		// if the number of tokens is more than 5, increase the gas limit
+		if p.NoOfTokens > 5 {
+			for _, pair := range p.NetworkPairs {
+				pair.NetworkA.DefaultGasLimit = 10000000
+				pair.NetworkB.DefaultGasLimit = 10000000
+			}
+		}
 
 		tokenAmountStr, _ := utils.GetEnv("CCIP_TRANSFER_AMOUNT_PER_TOKEN")
 		if tokenAmountStr != "" {
