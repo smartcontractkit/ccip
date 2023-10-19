@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import "../../applications/PingPongDemo.sol";
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import "../../libraries/Client.sol";
+import "../../onRamp/EVM2EVMOnRamp.sol";
 
 // setup
 contract PingPongDappSetup is EVM2EVMOnRampSetup {
@@ -21,6 +22,11 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
     s_feeToken = IERC20(s_sourceTokens[0]);
     s_pingPong = new PingPongDemo(address(s_sourceRouter), s_feeToken);
     s_pingPong.setCounterpart(DEST_CHAIN_ID, i_pongContract);
+
+    // set ping pong as an onRamp nop to make sure that funding runs
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](1);
+    nopsAndWeights[0] = EVM2EVMOnRamp.NopAndWeight({nop: address(s_pingPong), weight: 1});
+    s_onRamp.setNops(nopsAndWeights);
 
     uint256 fundingAmount = 1e18;
 
@@ -95,6 +101,34 @@ contract PingPong_ccipReceive is PingPongDappSetup {
     emit Pong(pingPongNumber + 1);
 
     s_pingPong.ccipReceive(message);
+  }
+
+  function testFunding() public {
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+    changePrank(address(s_sourceRouter));
+
+    // the number of funding rounds that is set in the contract
+    uint256 fundingRounds = 5;
+
+    uint256 initialPingPongBalance = IERC20(s_feeToken).balanceOf(address(s_pingPong));
+
+    for (uint256 pingPongNumber = 0; pingPongNumber <= fundingRounds; pingPongNumber++) {
+      Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+        messageId: bytes32("a"),
+        sourceChainSelector: DEST_CHAIN_ID,
+        sender: abi.encode(i_pongContract),
+        data: abi.encode(pingPongNumber),
+        destTokenAmounts: tokenAmounts
+      });
+      s_pingPong.ccipReceive(message);
+
+      uint256 currentPingPongBalance = IERC20(s_feeToken).balanceOf(address(s_pingPong));
+      if (pingPongNumber == fundingRounds - 1) {
+        require(initialPingPongBalance == currentPingPongBalance, "ping pong should have been funded");
+      } else {
+        require(initialPingPongBalance > currentPingPongBalance, "funding is not made yet");
+      }
+    }
   }
 }
 
