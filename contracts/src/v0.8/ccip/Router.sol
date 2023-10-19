@@ -30,13 +30,18 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   error BadARMSignal();
 
   event OnRampSet(uint64 indexed destChainSelector, address onRamp);
-  event OffRampAdded(address offRamp);
-  event OffRampRemoved(address offRamp);
+  event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
+  event OffRampRemoved(uint64 indexed sourceChainSelector, address offRamp);
   event MessageExecuted(bytes32 messageId, uint64 sourceChainSelector, address offRamp, bytes32 calldataHash);
 
   struct OnRamp {
     uint64 destChainSelector;
     address onRamp;
+  }
+
+  struct OffRamp {
+    uint64 sourceChainSelector;
+    address offRamp;
   }
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -52,12 +57,14 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // DYNAMIC CONFIG
   address private s_wrappedNative;
   // destChainSelector => onRamp address
-  // Only ever one onRamp enabled at a time for a given destChainSelector.
   mapping(uint256 destChainSelector => address onRamp) private s_onRamps;
-  // Mapping of offRamps to source chain ids
-  // Can be multiple offRamps enabled at a time for a given sourceChainSelector,
-  // for example during an no downtime upgrade while v1 messages are being flushed.
+
+  // A collection of offramp addresses.
   EnumerableSet.AddressSet private s_offRamps;
+
+  // Mapping from a sourceChainSelector and offramp combo to a flag indicating wether it is valid.
+  // The mapping key is sourceChainSelector << 160 + offramp address.
+  mapping(uint256 sourceSelectorAndOffRamp => bool isOffRamp) private s_offRampIndexes;
 
   constructor(address wrappedNative, address armProxy) {
     // Zero address indicates unsupported auto-wrapping, therefore, unsupported
@@ -154,7 +161,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   )
     external
     override
-    onlyOffRamp()
+    onlyOffRamp(message.sourceChainSelector)
     whenHealthy
     returns (bool success, bytes memory retData)
   {
@@ -218,8 +225,8 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   /// the ability to add new chains and upgrade ramps.
   function applyRampUpdates(
     OnRamp[] calldata onRampUpdates,
-    address[] calldata offRampRemoves,
-    address[] calldata offRampAdds
+    OffRamp[] calldata offRampRemoves,
+    OffRamp[] calldata offRampAdds
   ) external onlyOwner {
     // Apply egress updates.
     // We permit zero address as way to disable egress.
@@ -231,13 +238,25 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     // Apply ingress updates.
     // We permit an empty list as a way to disable ingress.
     for (uint256 i = 0; i < offRampRemoves.length; ++i) {
-      if (s_offRamps.remove(offRampRemoves[i])) {
-        emit OffRampRemoved(offRampRemoves[i]);
+      uint64 rampSelector = offRampRemoves[i].sourceChainSelector;
+      address rampAddress = offRampRemoves[i].offRamp;
+
+      uint256 rampIndex = uint256(rampSelector) << 160 + uint160(rampAddress);
+      s_offRampIndexes[rampIndex] = false;
+      
+      if (s_offRamps.remove(rampAddress)) {
+        emit OffRampRemoved(rampSelector, rampAddress);
       }
     }
     for (uint256 i = 0; i < offRampAdds.length; ++i) {
-      if (s_offRamps.add(offRampAdds[i])) {
-        emit OffRampAdded(offRampAdds[i]);
+      uint64 rampSelector = offRampAdds[i].sourceChainSelector;
+      address rampAddress = offRampAdds[i].offRamp;
+
+      uint256 rampIndex = uint256(rampSelector) << 160 + uint160(rampAddress);
+      s_offRampIndexes[rampIndex] = true;
+
+      if (s_offRamps.add(rampAddress)) {
+        emit OffRampAdded(rampSelector, rampAddress);
       }
     }
   }
@@ -263,8 +282,9 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // ================================================================
 
   /// @notice only lets permissioned offRamps execute
-  modifier onlyOffRamp() {
-    if (!s_offRamps.contains(msg.sender)) revert OnlyOffRamp();
+  /// @dev We additionally restrict offRamps to specific source chains for defense in depth.
+  modifier onlyOffRamp(uint64 expectedSourceChainSelector) {
+    if (!s_offRampIndexes[uint256(expectedSourceChainSelector) << 160 + uint160(msg.sender)]) revert OnlyOffRamp();
     _;
   }
 
