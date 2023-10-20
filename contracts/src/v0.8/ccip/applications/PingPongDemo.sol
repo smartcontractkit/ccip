@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IRouterClientExtended} from "./interfaces/IRouterClientExtended.sol";
-import {IEVM2AnyOnRampExtended} from "./interfaces/IEVM2AnyOnRampExtended.sol";
+import {Router} from "../Router.sol";
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
@@ -26,7 +25,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
 
   // number of ping-pongs till a call to the funding method 'fundPingPong' is made
   // note that 0 disables the funding.
-  uint256 private s_fundingRounds = 5;
+  uint8 private s_fundingRounds = 5;
 
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
@@ -59,7 +58,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
       extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000})),
       feeToken: address(s_feeToken)
     });
-    IRouterClientExtended(getRouter()).ccipSend(s_counterpartChainSelector, message);
+    Router(getRouter()).ccipSend(s_counterpartChainSelector, message);
 
     if (s_fundingRounds > 0 && pingPongCount % s_fundingRounds == 0) {
       fundPingPong();
@@ -77,31 +76,19 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   /// The contract can only be funded if it is set as a nop in the target onRamp.
   /// In case your contract is not a nop you can prevent this function from being called by setting s_fundingRounds=0.
   function fundPingPong() public {
-    address onRampAddress = IRouterClientExtended(getRouter()).getOnRamp(s_counterpartChainSelector);
+    address onRampAddress = Router(getRouter()).getOnRamp(s_counterpartChainSelector);
 
     // onRamp does not have anything to pay
-    if (IEVM2AnyOnRampExtended(onRampAddress).getNopFeesJuels() == 0) {
+    if (EVM2EVMOnRamp(onRampAddress).getNopFeesJuels() == 0) {
       return;
     }
 
     // not enough link to fund the ping pong
-    if (IEVM2AnyOnRampExtended(onRampAddress).linkAvailableForPayment() < 0) {
+    if (EVM2EVMOnRamp(onRampAddress).linkAvailableForPayment() < 0) {
       return;
     }
 
-    bool isNop = false;
-    (EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights, ) = IEVM2AnyOnRampExtended(onRampAddress).getNops();
-    for (uint256 i = nopsAndWeights.length; i > 0; --i) {
-      EVM2EVMOnRamp.NopAndWeight memory nopAndWeight = nopsAndWeights[i - 1];
-      if (nopAndWeight.nop == address(this)) {
-        isNop = true;
-        break;
-      }
-    }
-
-    if (isNop) {
-      IEVM2AnyOnRampExtended(onRampAddress).payNops();
-    }
+    EVM2EVMOnRamp(onRampAddress).payNops();
   }
 
   /////////////////////////////////////////////////////////////////////
