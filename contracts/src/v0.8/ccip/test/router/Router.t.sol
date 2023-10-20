@@ -442,7 +442,7 @@ contract Router_applyRampUpdates is RouterSetup {
     }
 
     changePrank(offRamp2);
-    
+
     s_sourceRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
