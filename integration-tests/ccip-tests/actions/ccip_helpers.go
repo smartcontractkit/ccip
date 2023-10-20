@@ -802,7 +802,8 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 	balances *BalanceSheet,
 ) {
 	if len(sourceCCIP.TransferAmount) > 0 {
-		for i, token := range sourceCCIP.Common.BridgeTokens {
+		for i := range sourceCCIP.TransferAmount {
+			token := sourceCCIP.Common.BridgeTokens[i]
 			name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), sourceCCIP.Sender.Hex())
 			balances.Update(name, BalanceItem{
 				Address:  sourceCCIP.Sender,
@@ -810,7 +811,8 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 				AmtToSub: bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i]),
 			})
 		}
-		for i, pool := range sourceCCIP.Common.BridgeTokenPools {
+		for i := range sourceCCIP.TransferAmount {
+			pool := sourceCCIP.Common.BridgeTokenPools[i]
 			name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", sourceCCIP.Common.BridgeTokens[i].Address(), pool.Address())
 			balances.Update(name, BalanceItem{
 				Address:  pool.EthAddress,
@@ -913,7 +915,8 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 ) (common.Hash, time.Duration, *big.Int, error) {
 	var tokenAndAmounts []router.ClientEVMTokenAmount
 	if msgType == TokenTransfer {
-		for i, token := range sourceCCIP.Common.BridgeTokens {
+		for i := range sourceCCIP.TransferAmount {
+			token := sourceCCIP.Common.BridgeTokens[i]
 			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
 				Token: common.HexToAddress(token.Address()), Amount: sourceCCIP.TransferAmount[i],
 			})
@@ -1192,7 +1195,8 @@ func (destCCIP *DestCCIPModule) UpdateBalance(
 	balance *BalanceSheet,
 ) {
 	if len(transferAmount) > 0 {
-		for i, token := range destCCIP.Common.BridgeTokens {
+		for i := range transferAmount {
+			token := destCCIP.Common.BridgeTokens[i]
 			name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), destCCIP.ReceiverDapp.Address())
 			balance.Update(name, BalanceItem{
 				Address:  destCCIP.ReceiverDapp.EthAddress,
@@ -1200,7 +1204,8 @@ func (destCCIP *DestCCIPModule) UpdateBalance(
 				AmtToAdd: bigmath.Mul(big.NewInt(noOfReq), transferAmount[i]),
 			})
 		}
-		for i, pool := range destCCIP.Common.BridgeTokenPools {
+		for i := range transferAmount {
+			pool := destCCIP.Common.BridgeTokenPools[i]
 			name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", destCCIP.Common.BridgeTokens[i].Address(), pool.Address())
 			balance.Update(name, BalanceItem{
 				Address:  pool.EthAddress,

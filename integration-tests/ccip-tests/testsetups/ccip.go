@@ -107,7 +107,8 @@ type CCIPTestConfig struct {
 	EnvTTL                  time.Duration
 	KeepEnvAlive            bool
 	MsgType                 string
-	NoOfTokens              int
+	NoOfTokensPerChain      int
+	NoOfTokensInMsg         int
 	TokenAmount             *big.Int
 	PhaseTimeout            time.Duration
 	TestDuration            time.Duration
@@ -501,14 +502,25 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	}
 
 	if p.MsgType == actions.TokenTransfer {
-		p.NoOfTokens = 1
+		p.NoOfTokensPerChain = 1
+
 		inputNo, _ := utils.GetEnv("CCIP_NO_OF_TOKENS")
 		if inputNo != "" {
 			n, err := strconv.Atoi(inputNo)
 			if err != nil {
 				allError = multierr.Append(allError, err)
 			} else {
-				p.NoOfTokens = n
+				p.NoOfTokensPerChain = n
+			}
+		}
+		p.NoOfTokensInMsg = p.NoOfTokensPerChain
+		inputNoPerMsg, _ := utils.GetEnv("CCIP_NO_OF_TOKENS_PER_REQUEST")
+		if inputNoPerMsg != "" {
+			n, err := strconv.Atoi(inputNoPerMsg)
+			if err != nil {
+				allError = multierr.Append(allError, err)
+			} else {
+				p.NoOfTokensInMsg = n
 			}
 		}
 
@@ -975,7 +987,7 @@ func CCIPDefaultTestSetUp(
 	filename := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
 	inputs.Test = t
 	var transferAmounts []*big.Int
-	for i := 0; i < inputs.NoOfTokens; i++ {
+	for i := 0; i < inputs.NoOfTokensInMsg; i++ {
 		transferAmounts = append(transferAmounts, inputs.TokenAmount)
 	}
 
@@ -1141,7 +1153,7 @@ func CCIPDefaultTestSetUp(
 		net.HTTPURLs = chain.GetNetworkConfig().HTTPURLs
 		net.URLs = chain.GetNetworkConfig().URLs
 		chainAddGrp.Go(func() error {
-			return setUpArgs.DeployChainContracts(chain, net, len(transferAmounts), tokenDeployerFns, lggr)
+			return setUpArgs.DeployChainContracts(chain, net, inputs.NoOfTokensPerChain, tokenDeployerFns, lggr)
 		})
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
