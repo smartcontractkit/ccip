@@ -58,6 +58,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   // DYNAMIC CONFIG
   address private s_wrappedNative;
   // destChainSelector => onRamp address
+  // Only ever one onRamp enabled at a time for a given destChainSelector.
   mapping(uint256 destChainSelector => address onRamp) private s_onRamps;
   // Stores [sourceChainSelector << 160 + offramp] as a pair to allow for
   // lookups for specific chain/offramp pairs.
