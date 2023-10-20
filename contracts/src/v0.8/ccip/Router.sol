@@ -229,7 +229,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     return offRamps;
   }
 
-  function isOffRamp(address offRamp, uint64 sourceChainSelector) external view returns (bool) {
+  function isOffRamp(uint64 sourceChainSelector, address offRamp) external view returns (bool) {
     return s_chainSelectorAndOffRamps.contains(_mergeChainSelectorAndOffRamp(sourceChainSelector, offRamp));
   }
 

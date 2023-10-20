@@ -379,6 +379,7 @@ contract Router_ccipSend is EVM2EVMOnRampSetup {
   }
 }
 
+// @notice applyRampUpdates
 contract Router_applyRampUpdates is RouterSetup {
   event OffRampAdded(uint64 indexed sourceChainSelector, address offRamp);
 
@@ -392,20 +393,35 @@ contract Router_applyRampUpdates is RouterSetup {
   function testOffRampDisable() public {
     // Add ingress
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
-    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](3);
     address offRamp = address(uint160(2));
+    address offRamp2 = address(uint160(3));
     offRampUpdates[0] = Router.OffRamp(SOURCE_CHAIN_ID, offRamp);
+    offRampUpdates[1] = Router.OffRamp(SOURCE_CHAIN_ID, offRamp2);
+    offRampUpdates[2] = Router.OffRamp(SOURCE_CHAIN_ID, address(uint160(78125187589324)));
+
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+
     Router.OffRamp[] memory gotOffRamps = s_sourceRouter.getOffRamps();
-    assertEq(1, gotOffRamps.length);
-    assertEq(offRampUpdates[0].offRamp, gotOffRamps[0].offRamp);
+    assertEq(offRampUpdates.length, gotOffRamps.length);
+
+    for (uint256 i = 0; i < offRampUpdates.length; ++i) {
+      assertEq(offRampUpdates[i].offRamp, gotOffRamps[i].offRamp);
+      assertTrue(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
+    }
+
     // Remove ingress
     s_sourceRouter.applyRampUpdates(onRampUpdates, offRampUpdates, new Router.OffRamp[](0));
     assertEq(0, s_sourceRouter.getOffRamps().length);
 
+    for (uint256 i = 0; i < offRampUpdates.length; ++i) {
+      assertFalse(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
+    }
+
     // Disabled offramp should not be able to route.
-    vm.expectRevert(IRouter.OnlyOffRamp.selector);
     changePrank(offRamp);
+
+    vm.expectRevert(IRouter.OnlyOffRamp.selector);
     s_sourceRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
@@ -416,10 +432,17 @@ contract Router_applyRampUpdates is RouterSetup {
 
     // Re-enabling should succeed
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
+
     gotOffRamps = s_sourceRouter.getOffRamps();
-    assertEq(1, gotOffRamps.length);
-    assertEq(offRampUpdates[0].offRamp, gotOffRamps[0].offRamp);
-    changePrank(offRamp);
+    assertEq(offRampUpdates.length, gotOffRamps.length);
+
+    for (uint256 i = 0; i < offRampUpdates.length; ++i) {
+      assertEq(offRampUpdates[i].offRamp, gotOffRamps[i].offRamp);
+      assertTrue(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
+    }
+
+    changePrank(offRamp2);
+    
     s_sourceRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
