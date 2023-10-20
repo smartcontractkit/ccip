@@ -700,6 +700,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
+	start := time.Now()
 	sendRequests, err := r.onRampReader.GetSendRequestsBetweenSeqNums(
 		ctx,
 		interval.Min,
@@ -715,6 +716,15 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 			"maxSeqNr", interval.Max)
 		return ccipdata.CommitStoreReport{}, fmt.Errorf("tried building a tree without leaves")
 	}
+
+	lggr.Infow(
+		"SelectLogsDataWordRange",
+		"type", "commit_build_report",
+		"sendRequests", len(sendRequests),
+		"minSeqNr", interval.Min,
+		"maxSeqNr", interval.Max,
+		"duration", time.Since(start).Milliseconds(),
+	)
 
 	leaves := make([][32]byte, 0, len(sendRequests))
 	var seqNrs []uint64

@@ -2,9 +2,11 @@ package ccip
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -12,11 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 )
 
-func getProofData(
-	ctx context.Context,
-	sourceReader ccipdata.OnRampReader,
-	interval ccipdata.CommitStoreInterval,
-) (sendReqsInRoot []ccipdata.Event[internal.EVM2EVMMessage], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
+func getProofData(ctx context.Context, sourceReader ccipdata.OnRampReader, interval ccipdata.CommitStoreInterval, lggr logger.Logger) (sendReqsInRoot []ccipdata.Event[internal.EVM2EVMMessage], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
+	start := time.Now()
 	sendReqs, err := sourceReader.GetSendRequestsBetweenSeqNums(
 		ctx,
 		interval.Min,
@@ -26,6 +25,16 @@ func getProofData(
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	lggr.Infow(
+		"SelectLogsDataWordRange",
+		"type", "exec_proof_data",
+		"sendRequests", len(sendReqs),
+		"minSeqNr", interval.Min,
+		"maxSeqNr", interval.Max,
+		"duration", time.Since(start).Milliseconds(),
+	)
+
 	leaves = make([][32]byte, 0, len(sendReqs))
 	for _, req := range sendReqs {
 		leaves = append(leaves, req.Data.Hash)

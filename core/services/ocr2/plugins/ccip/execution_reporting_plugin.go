@@ -424,6 +424,7 @@ func (r *ExecutionReportingPlugin) sourceDestinationTokens(ctx context.Context) 
 // before. It doesn't matter if the executed succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
 func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
+	start := time.Now()
 	stateChanges, err := r.config.offRampReader.GetExecutionStateChangesBetweenSeqNums(
 		ctx,
 		min,
@@ -433,6 +434,16 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+
+	r.lggr.Infow(
+		"SelectIndexedLogsTopicRange",
+		"type", "exec",
+		"sendRequests", len(stateChanges),
+		"minSeqNr", min,
+		"maxSeqNr", max,
+		"duration", time.Since(start).Milliseconds(),
+	)
+
 	executedMp := make(map[uint64]bool, len(stateChanges))
 	for _, stateChange := range stateChanges {
 		finalized := (latestBlock - stateChange.BlockNumber) >= int64(r.offchainConfig.DestFinalityDepth)
@@ -755,6 +766,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 	var sendRequests []ccipdata.Event[internal.EVM2EVMMessage]
 	eg.Go(func() error {
+		start := time.Now()
 		sendReqs, err := r.config.onRampReader.GetSendRequestsBetweenSeqNums(
 			ctx,
 			intervalMin,
@@ -764,6 +776,16 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 		if err != nil {
 			return err
 		}
+
+		r.lggr.Infow(
+			"SelectLogsDataWordRange",
+			"type", "exec_get_report",
+			"sendRequests", len(sendReqs),
+			"minSeqNr", intervalMin,
+			"maxSeqNr", intervalMax,
+			"duration", time.Since(start).Milliseconds(),
+		)
+
 		sendRequests = sendReqs
 		return nil
 	})
@@ -845,7 +867,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	}
 	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
-	sendReqsInRoot, leaves, tree, err := getProofData(ctx, r.config.onRampReader, commitReport.Interval)
+	sendReqsInRoot, leaves, tree, err := getProofData(ctx, r.config.onRampReader, commitReport.Interval, r.lggr)
 	if err != nil {
 		return nil, err
 	}
