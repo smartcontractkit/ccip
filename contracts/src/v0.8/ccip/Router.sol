@@ -137,7 +137,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       // We rely on getPoolBySourceToken to validate that the token is whitelisted.
       token.safeTransferFrom(
         msg.sender,
-        address(IEVM2AnyOnRamp(onRamp).getPoolBySourceToken(token)),
+        address(IEVM2AnyOnRamp(onRamp).getPoolBySourceToken(destinationChainSelector, token)),
         message.tokenAmounts[i].amount
       );
     }

@@ -1666,11 +1666,11 @@ contract EVM2EVMOnRamp_setTokenTransferFeeConfig is EVM2EVMOnRampSetup {
 // #getTokenPool
 contract EVM2EVMOnRamp_getTokenPool is EVM2EVMOnRampSetup {
   function testGetTokenPoolSuccess() public {
-    assertEq(s_sourcePools[0], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[0]))));
-    assertEq(s_sourcePools[1], address(s_onRamp.getPoolBySourceToken(IERC20(s_sourceTokens[1]))));
+    assertEq(s_sourcePools[0], address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_ID, IERC20(s_sourceTokens[0]))));
+    assertEq(s_sourcePools[1], address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_ID, IERC20(s_sourceTokens[1]))));
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, IERC20(s_destTokens[0])));
-    s_onRamp.getPoolBySourceToken(IERC20(s_destTokens[0]));
+    s_onRamp.getPoolBySourceToken(DEST_CHAIN_ID, IERC20(s_destTokens[0]));
   }
 }
 
@@ -1690,7 +1690,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
     s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
-    assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(IERC20(adds[0].token))));
+    assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_ID, IERC20(adds[0].token))));
 
     vm.expectEmit();
     emit PoolRemoved(adds[0].token, adds[0].pool);
@@ -1698,7 +1698,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
     s_onRamp.applyPoolUpdates(adds, new Internal.PoolUpdate[](0));
 
     vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.UnsupportedToken.selector, adds[0].token));
-    s_onRamp.getPoolBySourceToken(IERC20(adds[0].token));
+    s_onRamp.getPoolBySourceToken(DEST_CHAIN_ID, IERC20(adds[0].token));
   }
 
   function testAtomicPoolReplacementSuccess() public {
@@ -1713,7 +1713,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
     s_onRamp.applyPoolUpdates(new Internal.PoolUpdate[](0), adds);
 
-    assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(IERC20(token))));
+    assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_ID, IERC20(token))));
 
     MockTokenPool newMockPool = new MockTokenPool(token);
 
@@ -1727,7 +1727,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
     s_onRamp.applyPoolUpdates(adds, updates);
 
-    assertEq(updates[0].pool, address(s_onRamp.getPoolBySourceToken(IERC20(token))));
+    assertEq(updates[0].pool, address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_ID, IERC20(token))));
   }
 
   // Reverts

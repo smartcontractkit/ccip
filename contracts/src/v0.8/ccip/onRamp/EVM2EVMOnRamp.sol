@@ -327,7 +327,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // There should be no state changes after external call to TokenPools.
     for (uint256 i = 0; i < numberOfTokens; ++i) {
       Client.EVMTokenAmount memory tokenAndAmount = message.tokenAmounts[i];
-      bytes memory tokenData = getPoolBySourceToken(IERC20(tokenAndAmount.token)).lockOrBurn(
+      bytes memory tokenData = getPoolBySourceToken(destChainSelector, IERC20(tokenAndAmount.token)).lockOrBurn(
         originalSender,
         message.receiver,
         tokenAndAmount.amount,
@@ -446,7 +446,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   }
 
   /// @inheritdoc IEVM2AnyOnRampRouter
-  function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
+  function getPoolBySourceToken(uint64 /*destChainSelector*/, IERC20 sourceToken) public view returns (IPool) {
     if (!s_poolsBySourceToken.contains(address(sourceToken))) revert UnsupportedToken(sourceToken);
     return IPool(s_poolsBySourceToken.get(address(sourceToken)));
   }
