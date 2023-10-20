@@ -50,6 +50,8 @@ const (
 	DefaultPhaseTimeoutForLongTests        = 50 * time.Minute
 	DefaultPhaseTimeout                    = 10 * time.Minute
 	DefaultTestDuration                    = 10 * time.Minute
+	DefaultDBMaxOpenConns                  = 40
+	DefaultDBMaxIdleConns                  = 20
 )
 
 var (
@@ -119,6 +121,8 @@ type CCIPTestConfig struct {
 	Blockscout              bool
 	SequentialLaneAddition  bool
 	NodeFunding             *big.Float
+	DBMaxOpenConns          int64
+	DBMaxIdleConns          int64
 	Load                    *CCIPLoadInput
 	AllNetworks             map[string]blockchain.EVMNetwork
 	SelectedNetworks        []blockchain.EVMNetwork
@@ -498,6 +502,28 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			allError = multierr.Append(allError, fmt.Errorf("invalid msg type %s", inputMsgType))
 		} else {
 			p.MsgType = inputMsgType
+		}
+	}
+
+	maxConnInput, _ := utils.GetEnv("CCIP_MAX_OPEN_CONNECTIONS")
+	p.DBMaxOpenConns = DefaultDBMaxOpenConns
+	if maxConnInput != "" {
+		n, err := strconv.ParseInt(maxConnInput, 10, 64)
+		if err != nil {
+			allError = multierr.Append(allError, err)
+		} else {
+			p.DBMaxOpenConns = n
+		}
+	}
+
+	idleConnInput, _ := utils.GetEnv("CCIP_MAX_IDLE_CONNECTIONS")
+	p.DBMaxIdleConns = DefaultDBMaxIdleConns
+	if maxConnInput != "" {
+		n, err := strconv.ParseInt(idleConnInput, 10, 64)
+		if err != nil {
+			allError = multierr.Append(allError, err)
+		} else {
+			p.DBMaxIdleConns = n
 		}
 	}
 
@@ -1022,7 +1048,7 @@ func CCIPDefaultTestSetUp(
 	var local *test_env.CLClusterTestEnv
 	if configureCLNode {
 		if inputs.LocalCluster {
-			local, deployCL = DeployLocalCluster(t, numOfCLNodes, inputs.SelectedNetworks)
+			local, deployCL = DeployLocalCluster(t, numOfCLNodes, inputs)
 			ccipEnv = &actions.CCIPTestEnv{
 				LocalCluster: local,
 			}
@@ -1041,7 +1067,7 @@ func CCIPDefaultTestSetUp(
 					TTL:             inputs.EnvTTL,
 					NamespacePrefix: envName,
 					Test:            t,
-				}, clProps, inputs.GethResourceProfile, inputs.SelectedNetworks, inputs.Blockscout)
+				}, clProps, inputs.GethResourceProfile, inputs)
 			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
 		}
 
@@ -1250,26 +1276,29 @@ func CCIPExistingDeploymentTestSetUp(
 func DeployLocalCluster(
 	t *testing.T,
 	noOfCLNodes int,
-	networks []blockchain.EVMNetwork,
+	testInputs *CCIPTestConfig,
 ) (*test_env.CLClusterTestEnv, func() error) {
+	selectedNetworks := testInputs.SelectedNetworks
 	env, err := test_env.NewCLTestEnvBuilder().
 		WithTestLogger(t).
-		WithPrivateGethChains(networks).
+		WithPrivateGethChains(selectedNetworks).
 		Build()
 	require.NoError(t, err)
 	for _, n := range env.PrivateChain {
 		primaryNode := n.GetPrimaryNode()
 		require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
-		for i, networkCfg := range networks {
+		for i, networkCfg := range selectedNetworks {
 			if networkCfg.ChainID == n.GetNetworkConfig().ChainID {
-				networks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
-				networks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
+				selectedNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
+				selectedNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
 			}
 		}
 	}
 	configOpts := []integrationnodes.NodeConfigOpt{
-		node.WithPrivateEVMs(networks),
+		node.WithPrivateEVMs(selectedNetworks),
+		node.WithDBConnectionPool(testInputs.DBMaxIdleConns, testInputs.DBMaxOpenConns),
 	}
+
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
 		toml, err := node.NewConfigFromToml(ccipnode.CCIPTOML, configOpts...)
@@ -1290,12 +1319,13 @@ func DeployEnvironments(
 	envconfig *environment.Config,
 	clProps map[string]interface{},
 	gethResource map[string]interface{},
-	networks []blockchain.EVMNetwork,
-	useBlockscout bool,
+	testInputs *CCIPTestConfig,
 ) *environment.Environment {
+	useBlockscout := testInputs.Blockscout
+	selectedNetworks := testInputs.SelectedNetworks
 	testEnvironment := environment.New(envconfig)
 	numOfTxNodes := 1
-	for _, network := range networks {
+	for _, network := range selectedNetworks {
 		if !network.Simulated {
 			continue
 		}
@@ -1347,14 +1377,14 @@ func DeployEnvironments(
 		return internalWsURLs, internalHttpURLs
 	}
 	var nets []blockchain.EVMNetwork
-	for i := range networks {
-		nets = append(nets, networks[i])
-		nets[i].URLs, nets[i].HTTPURLs = urlFinder(networks[i])
+	for i := range selectedNetworks {
+		nets = append(nets, selectedNetworks[i])
+		nets[i].URLs, nets[i].HTTPURLs = urlFinder(selectedNetworks[i])
 		if useBlockscout {
 			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-				Name:    fmt.Sprintf("%s-blockscout", networks[i].Name),
-				WsURL:   networks[i].URLs[0],
-				HttpURL: networks[i].HTTPURLs[0],
+				Name:    fmt.Sprintf("%s-blockscout", selectedNetworks[i].Name),
+				WsURL:   selectedNetworks[i].URLs[0],
+				HttpURL: selectedNetworks[i].HTTPURLs[0],
 			}))
 		}
 	}
@@ -1362,6 +1392,7 @@ func DeployEnvironments(
 	tomlCfg, err := node.NewConfigFromToml(
 		ccipnode.CCIPTOML,
 		ccipnode.WithPrivateEVMs(nets),
+		ccipnode.WithDBConnectionPool(testInputs.DBMaxIdleConns, testInputs.DBMaxOpenConns),
 	)
 	tomlStr, err := tomlCfg.TOMLString()
 	require.NoError(t, err)

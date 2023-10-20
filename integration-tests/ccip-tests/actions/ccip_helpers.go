@@ -107,21 +107,6 @@ type CCIPCommon struct {
 	gasUpdateWatcherMu *sync.Mutex
 	gasUpdateWatcher   map[uint64]*big.Int // key - destchain id; value - timestamp of update
 	priceUpdateSubs    []event.Subscription
-	connectionIssues   *atomic.Bool
-	connectionRestored *atomic.Bool
-}
-
-func (ccipModule *CCIPCommon) ConnectionRestored() {
-	for {
-		select {
-		case <-ccipModule.ChainClient.ConnectionRestored():
-			ccipModule.connectionRestored.Store(true)
-			ccipModule.connectionIssues.Store(false)
-		case <-ccipModule.ChainClient.ConnectionIssue():
-			ccipModule.connectionIssues.Store(true)
-			ccipModule.connectionRestored.Store(false)
-		}
-	}
 }
 
 func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
@@ -566,7 +551,7 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 			Capacity: contracts.HundredCoins,
 		},
 		ExistingDeployment: existingDeployment,
-		poolFunds:          testhelpers.Link(1),
+		poolFunds:          testhelpers.Link(5),
 		gasUpdateWatcherMu: &sync.Mutex{},
 		gasUpdateWatcher:   make(map[uint64]*big.Int),
 	}, nil
