@@ -276,7 +276,6 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
 
     uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     // Validate the message with various checks
-
     uint256 numberOfTokens = message.tokenAmounts.length;
     _validateMessage(message.data.length, gasLimit, numberOfTokens);
 
@@ -504,9 +503,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   ) external view returns (uint256 feeTokenAmount) {
     if (destChainSelector != i_destChainSelector) revert InvalidChainSelector(destChainSelector);
 
-    Client.EVMExtraArgsV1 memory extraArgs = _fromBytes(message.extraArgs);
+    uint256 gasLimit = _fromBytes(message.extraArgs).gasLimit;
     // Validate the message with various checks
-    _validateMessage(message.data.length, extraArgs.gasLimit, message.tokenAmounts.length);
+    _validateMessage(message.data.length, gasLimit, message.tokenAmounts.length);
 
     FeeTokenConfig memory feeTokenConfig = s_feeTokenConfig[message.feeToken];
     if (!feeTokenConfig.enabled) revert NotAFeeToken(message.feeToken);
@@ -540,7 +539,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     // We add the message gas limit, the overhead gas, and the data availability gas together.
     // We then multiply this destination gas total with the gas multiplier and convert it into USD.
     uint256 executionCost = executionGasPrice *
-      ((extraArgs.gasLimit +
+      ((gasLimit +
         s_dynamicConfig.destGasOverhead +
         (message.data.length * s_dynamicConfig.destGasPerPayloadByte) +
         tokenTransferGas) * feeTokenConfig.gasMultiplierWeiPerEth);
