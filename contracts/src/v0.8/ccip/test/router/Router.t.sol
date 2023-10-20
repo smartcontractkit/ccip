@@ -13,7 +13,7 @@ import "../offRamp/EVM2EVMOffRampSetup.t.sol";
 /// @notice #constructor
 contract Router_constructor is EVM2EVMOnRampSetup {
   function testConstructorSuccess() public {
-    assertEq("Router 1.0.0", s_sourceRouter.typeAndVersion());
+    assertEq("Router 1.2.0", s_sourceRouter.typeAndVersion());
     // owner
     assertEq(OWNER, s_sourceRouter.owner());
   }

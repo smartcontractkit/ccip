@@ -576,25 +576,25 @@ func (_m *EVM2EVMOnRampInterface) GetNops(opts *bind.CallOpts) (evm_2_evm_onramp
 	return r0, r1
 }
 
-// GetPoolBySourceToken provides a mock function with given fields: opts, sourceToken
-func (_m *EVM2EVMOnRampInterface) GetPoolBySourceToken(opts *bind.CallOpts, sourceToken common.Address) (common.Address, error) {
-	ret := _m.Called(opts, sourceToken)
+// GetPoolBySourceToken provides a mock function with given fields: opts, arg0, sourceToken
+func (_m *EVM2EVMOnRampInterface) GetPoolBySourceToken(opts *bind.CallOpts, arg0 uint64, sourceToken common.Address) (common.Address, error) {
+	ret := _m.Called(opts, arg0, sourceToken)
 
 	var r0 common.Address
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) (common.Address, error)); ok {
-		return rf(opts, sourceToken)
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64, common.Address) (common.Address, error)); ok {
+		return rf(opts, arg0, sourceToken)
 	}
-	if rf, ok := ret.Get(0).(func(*bind.CallOpts, common.Address) common.Address); ok {
-		r0 = rf(opts, sourceToken)
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, uint64, common.Address) common.Address); ok {
+		r0 = rf(opts, arg0, sourceToken)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(common.Address)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*bind.CallOpts, common.Address) error); ok {
-		r1 = rf(opts, sourceToken)
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts, uint64, common.Address) error); ok {
+		r1 = rf(opts, arg0, sourceToken)
 	} else {
 		r1 = ret.Error(1)
 	}
