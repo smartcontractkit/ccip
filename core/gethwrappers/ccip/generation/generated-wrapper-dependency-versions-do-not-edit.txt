@@ -13,6 +13,6 @@ maybe_revert_message_receiver: ../../../contracts/solc/v0.8.19/MaybeRevertMessag
 mock_arm_contract: ../../../contracts/solc/v0.8.19/MockARM.abi ../../../contracts/solc/v0.8.19/MockARM.bin efcf4cb260a2b6a6e189639f62bb50ab650a135715c1fcd42c92dfa9d04aa0e3
 ping_pong_demo: ../../../contracts/solc/v0.8.19/PingPongDemo.abi ../../../contracts/solc/v0.8.19/PingPongDemo.bin f2972aa082cee8b461122f79773ce247d23b551ddc2ca9926ae90624134cfb23
 price_registry: ../../../contracts/solc/v0.8.19/PriceRegistry.abi ../../../contracts/solc/v0.8.19/PriceRegistry.bin 36e8d2c44a16fefb5258557cb1eae25eca1cc12efcd3c3270f91a90a5f81e7ea
-router: ../../../contracts/solc/v0.8.19/Router.abi ../../../contracts/solc/v0.8.19/Router.bin e237a409f59462856840efd5682b6cf8c1c5e95dff88a73a3b31c6e8079e70d7
+router: ../../../contracts/solc/v0.8.19/Router.abi ../../../contracts/solc/v0.8.19/Router.bin ceef3c8da1b3bf4bf11352de034fa8c19d7e7ab981b67a644afeabe7bf1c3c0b
 usdc_token_pool: ../../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool.bin dd7e1adb7e9bcfafe86721206ebf84dbfedf236adf0040b853d30575c207f3e4
 weth9: ../../../contracts/solc/v0.8.19/WETH9.abi ../../../contracts/solc/v0.8.19/WETH9.bin 5a7d64fb19b62ec523c7667ce4c2983295c05f74935b5f994c06a6f70d440f8b

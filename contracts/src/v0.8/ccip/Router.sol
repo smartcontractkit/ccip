@@ -159,7 +159,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   ) external override whenHealthy returns (bool success, bytes memory retData) {
     // We only permit offRamps to call this function. We have to encode the sourceChainSelector
     // and msg.sender into a uint256 to use as a key in the set.
-    if (!s_chainSelectorAndOffRamps.contains((uint256(message.sourceChainSelector) << 160) + uint160(msg.sender)))
+    if (!s_chainSelectorAndOffRamps.contains(_mergeChainSelectorAndOffRamp(message.sourceChainSelector, msg.sender)))
       revert OnlyOffRamp();
 
     // We encode here instead of the offRamps to constrain specifically what functions
@@ -176,6 +176,15 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
 
     emit MessageExecuted(message.messageId, message.sourceChainSelector, msg.sender, keccak256(data));
     return (success, retData);
+  }
+
+  // @notice Merges a chain selector and offRamp address into a single uint256 by shifting the
+  // chain selector 160 bits to the left.
+  function _mergeChainSelectorAndOffRamp(
+    uint64 sourceChainSelector,
+    address offRampAddress
+  ) internal pure returns (uint256) {
+    return (uint256(sourceChainSelector) << 160) + uint160(offRampAddress);
   }
 
   // ================================================================
@@ -221,7 +230,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   }
 
   function isOffRamp(address offRamp, uint64 sourceChainSelector) external view returns (bool) {
-    return s_chainSelectorAndOffRamps.contains((uint256(sourceChainSelector) << 160) + uint160(offRamp));
+    return s_chainSelectorAndOffRamps.contains(_mergeChainSelectorAndOffRamp(sourceChainSelector, offRamp));
   }
 
   /// @notice applyRampUpdates applies a set of ramp changes which provides
@@ -245,7 +254,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       address offRampAddress = offRampRemoves[i].offRamp;
 
       // If the selector-offRamp pair does not exist, revert.
-      if (!s_chainSelectorAndOffRamps.remove((uint256(sourceChainSelector) << 160) + uint160(offRampAddress)))
+      if (!s_chainSelectorAndOffRamps.remove(_mergeChainSelectorAndOffRamp(sourceChainSelector, offRampAddress)))
         revert OffRampMismatch(sourceChainSelector, offRampAddress);
 
       emit OffRampRemoved(sourceChainSelector, offRampAddress);
@@ -255,7 +264,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
       uint64 sourceChainSelector = offRampAdds[i].sourceChainSelector;
       address offRampAddress = offRampAdds[i].offRamp;
 
-      if (s_chainSelectorAndOffRamps.add((uint256(sourceChainSelector) << 160) + uint160(offRampAddress))) {
+      if (s_chainSelectorAndOffRamps.add(_mergeChainSelectorAndOffRamp(sourceChainSelector, offRampAddress))) {
         emit OffRampAdded(sourceChainSelector, offRampAddress);
       }
     }
