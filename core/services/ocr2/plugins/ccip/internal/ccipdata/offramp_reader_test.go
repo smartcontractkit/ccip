@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -199,77 +200,42 @@ func TestOffRampReaderInit(t *testing.T) {
 	}
 }
 
-func newSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
-	user := testutils.MustNewSimTransactor(t)
-	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
-		user.From: {
-			Balance: big.NewInt(0).Mul(big.NewInt(50), big.NewInt(1e18)),
-		},
-	}, 10e8)
-	balance, err := sim.BalanceAt(user.Context, user.From, nil)
-	require.NoError(t, err)
-	logger.TestLogger(t).Debug("User balance: ", balance)
-	ec := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
-	return user, ec
-}
-
-// Should be moved to a common test utils package.
-func assertNonRevert(t *testing.T, tx *types.Transaction, bc *client.SimulatedBackendClient, user *bind.TransactOpts) {
-	receipt, err := bc.TransactionReceipt(user.Context, tx.Hash())
-	require.NoError(t, err)
-	require.NotEqual(t, uint64(0), receipt.Status, "Transaction should not have reverted")
-	logger.TestLogger(t).Debug("Transaction status: ", receipt.Status)
-}
-
 func setupAndTestOffRampReader(t *testing.T, version string) {
 
 	user, bc := newSimulation(t)
 	log := logger.TestLogger(t)
-	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
-	lp := logpoller.NewLogPoller(
-		orm,
-		bc,
-		log,
-		100*time.Millisecond, 2, 3, 2, 1000)
 	//log.Debug("Created user ", user.From)
 
 	// Set gas limit to avoid issue with gas estimator.
 	user.GasPrice = big.NewInt(1000000000)
-	//user.GasLimit = 0
 	user.GasLimit = 10_000_000
-	//user.GasLimit = 1_000_000
 
 	// Create the version-specific offRamp:
 	// For version 1.0 and 1.1:
 	// evm_2_evm_offramp_1_0_0.DeployEVM2EVMOffRamp(..)
 	// For version 1.2 only:
 	// evm_2_evm_offramp.DeployEVM2EVMOffRamp(..)
+	switch version {
+	case ccipdata.V1_0_0:
+	case ccipdata.V1_1_0:
+		setupAndTestOffRampReaderV1_0_0(t, user, bc, log)
+	case ccipdata.V1_2_0:
+		setupAndTestOffRampReaderV1_2_0(t, user, bc, log)
+	}
+}
 
-	// Deploy a mock ARM.
-	armAddr, tx, _, err := mock_arm_contract.DeployMockARMContract(user, bc)
-	bc.Commit()
-	assertNonRevert(t, tx, bc, user)
-	log.Debug("ARM deployed at ", armAddr)
+func setupAndTestOffRampReaderV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient, log logger.SugaredLogger) {
 
-	// Deploy a CommitStore.
+	armAddr := deployMockArm(t, user, bc)
 	onRampAddr := utils.RandomAddress()
-	csAddr, tx, cs, err := commit_store_helper.DeployCommitStoreHelper(user, bc, commit_store_helper.CommitStoreStaticConfig{
-		ChainSelector:       testutils.SimulatedChainID.Uint64(),
-		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
-		OnRamp:              onRampAddr,
-		ArmProxy:            armAddr,
-	})
-	bc.Commit()
-	assertNonRevert(t, tx, bc, user)
-	log.Debug("Transaction: ", tx)
-	log.Debug("CommitStore deployed at ", csAddr)
-	log.Debug("CommitStore deployed at ", cs.Address())
+
+	cs := deployCommitStoreV1_2_0(t, user, bc, onRampAddr, armAddr)
+
+	// Test the deployed CommitStore.
 	callOpts := &bind.CallOpts{
 		From:    user.From,
 		Context: context.Background(),
 	}
-
-	// Test the deployed CommitStore.
 	number, err := cs.GetExpectedNextSequenceNumber(callOpts)
 	require.NoError(t, err)
 	log.Debug("Expected next sequence number: ", number)
@@ -279,7 +245,7 @@ func setupAndTestOffRampReader(t *testing.T, version string) {
 
 	// Deploy the OffRamp.
 	staticConfig := evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-		CommitStore:         csAddr,
+		CommitStore:         cs.Address(),
 		ChainSelector:       testutils.SimulatedChainID.Uint64(),
 		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
 		OnRamp:              onRampAddr,
@@ -287,10 +253,10 @@ func setupAndTestOffRampReader(t *testing.T, version string) {
 		ArmProxy:            armAddr,
 	}
 	sourceTokens := []common.Address{
-		//utils.RandomAddress(), // Need to be IERC20.
+		//utils.RandomAddress(), // Need to be IERC20 (?)
 	}
 	pools := []common.Address{
-		//utils.RandomAddress(), // Need to be IPool.
+		//utils.RandomAddress(), // Need to be IPool (?)
 	}
 	rateLimiterConfig := evm_2_evm_offramp.RateLimiterConfig{
 		IsEnabled: false,
@@ -304,6 +270,7 @@ func setupAndTestOffRampReader(t *testing.T, version string) {
 	bc.Commit()
 	require.NoError(t, err)
 	assertNonRevert(t, tx, bc, user)
+	require.Equal(t, offRampAddr, offRamp.Address())
 
 	log.Debug("\tTransaction: ", tx)
 	log.Debug("\tTx hash: ", tx.Hash())
@@ -334,11 +301,6 @@ func setupAndTestOffRampReader(t *testing.T, version string) {
 	code, err := bc.Backend().CodeAt(user.Context, offRampAddr, receipt.BlockNumber)
 	require.NoError(t, err)
 	log.Debug("Code: ", code)
-	//
-
-	//or, err = evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddr, bc)
-	//require.NoError(t, err)
-	//log.Debug("OffRamp: ", or)
 
 	// tmp: exploring blocks for contract presence.
 	for block := 0; block < 4; block++ {
@@ -363,6 +325,12 @@ func setupAndTestOffRampReader(t *testing.T, version string) {
 	log.Debug("Tav: ", tav)
 
 	// Deploy the version-specific reader.
+	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
+	lp := logpoller.NewLogPoller(
+		orm,
+		bc,
+		log,
+		100*time.Millisecond, 2, 3, 2, 1000)
 	reader, err := ccipdata.NewOffRampReader(log, offRampAddr, bc, lp, nil)
 	require.NoError(t, err)
 	assertNonRevert(t, tx, bc, user)
@@ -371,4 +339,106 @@ func setupAndTestOffRampReader(t *testing.T, version string) {
 	res, err := reader.GetDestinationTokens(user.Context)
 	require.NoError(t, err)
 	require.Equal(t, []common.Address{}, res)
+}
+
+func deployMockArm(
+	t *testing.T,
+	user *bind.TransactOpts,
+	bc *client.SimulatedBackendClient,
+) common.Address {
+	armAddr, tx, _, err := mock_arm_contract.DeployMockARMContract(user, bc)
+	require.NoError(t, err)
+	bc.Commit()
+	assertNonRevert(t, tx, bc, user)
+	require.NotEqual(t, common.Address{}, armAddr)
+	return armAddr
+}
+
+func deployCommitStoreV1_0_0(
+	t *testing.T,
+	user *bind.TransactOpts,
+	bc *client.SimulatedBackendClient,
+	onRampAddress common.Address,
+	armAddress common.Address,
+) *commit_store_helper_1_0_0.CommitStoreHelper {
+	// Deploy the CommitStore using the helper.
+	csAddr, tx, cs, err := commit_store_helper_1_0_0.DeployCommitStoreHelper(user, bc, commit_store_helper_1_0_0.CommitStoreStaticConfig{
+		ChainSelector:       testutils.SimulatedChainID.Uint64(),
+		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
+		OnRamp:              onRampAddress,
+		ArmProxy:            armAddress,
+	})
+	require.NoError(t, err)
+	bc.Commit()
+	assertNonRevert(t, tx, bc, user)
+	require.Equal(t, csAddr, cs.Address()) // Fails without the CommitStoreHelper fix.
+
+	// Test the deployed CommitStore.
+	callOpts := &bind.CallOpts{
+		From:    user.From,
+		Context: context.Background(),
+	}
+	number, err := cs.GetExpectedNextSequenceNumber(callOpts)
+	require.NoError(t, err)
+	require.Equal(t, 1, int(number))
+	tav, err := cs.TypeAndVersion(callOpts)
+	require.NoError(t, err)
+	require.Equal(t, "CommitStore 1.0.0", tav)
+	return cs
+}
+
+func deployCommitStoreV1_2_0(
+	t *testing.T,
+	user *bind.TransactOpts,
+	bc *client.SimulatedBackendClient,
+	onRampAddress common.Address,
+	armAddress common.Address,
+) *commit_store_helper.CommitStoreHelper {
+	// Deploy the CommitStore using the helper.
+	csAddr, tx, cs, err := commit_store_helper.DeployCommitStoreHelper(user, bc, commit_store_helper.CommitStoreStaticConfig{
+		ChainSelector:       testutils.SimulatedChainID.Uint64(),
+		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
+		OnRamp:              onRampAddress,
+		ArmProxy:            armAddress,
+	})
+	require.NoError(t, err)
+	bc.Commit()
+	assertNonRevert(t, tx, bc, user)
+	require.Equal(t, csAddr, cs.Address()) // Fails without the CommitStoreHelper fix.
+
+	// Test the deployed CommitStore.
+	callOpts := &bind.CallOpts{
+		From:    user.From,
+		Context: context.Background(),
+	}
+	number, err := cs.GetExpectedNextSequenceNumber(callOpts)
+	require.NoError(t, err)
+	require.Equal(t, 1, int(number))
+	tav, err := cs.TypeAndVersion(callOpts)
+	require.NoError(t, err)
+	require.Equal(t, "CommitStore 1.2.0", tav)
+	return cs
+}
+
+// TODO Should be moved to a common test utils package.
+func newSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
+	user := testutils.MustNewSimTransactor(t)
+	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
+		user.From: {
+			Balance: big.NewInt(0).Mul(big.NewInt(50), big.NewInt(1e18)),
+		},
+	}, 10e6)
+	balance, err := sim.BalanceAt(user.Context, user.From, nil)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(0).Mul(big.NewInt(50), big.NewInt(1e18)), balance)
+	ec := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
+	return user, ec
+}
+
+// TODO Should be moved to a common test utils package.
+func assertNonRevert(t *testing.T, tx *types.Transaction, bc *client.SimulatedBackendClient, user *bind.TransactOpts) {
+	receipt, err := bc.TransactionReceipt(user.Context, tx.Hash())
+	require.NoError(t, err)
+	require.NotEqual(t, uint64(0), receipt.Status, "Transaction should not have reverted")
+	logger.TestLogger(t).Debug("Transaction status: ", receipt.Status)
 }
