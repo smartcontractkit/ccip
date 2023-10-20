@@ -4,7 +4,8 @@ pragma solidity 0.8.19;
 import {IBurnMintERC20} from "../../shared/token/ERC20/IBurnMintERC20.sol";
 
 import {BurnMintTokenPool} from "./BurnMintTokenPool.sol";
-import {Router} from "../Router.sol";
+
+//import {Router} from "../Router.sol";
 
 /// @notice This pool mints and burns a 3rd-party token. This pool is not owned by the DON
 // and therefor has an additional check on adding offRamps.
