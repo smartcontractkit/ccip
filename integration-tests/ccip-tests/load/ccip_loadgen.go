@@ -177,9 +177,9 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 		rand.Shuffle(len(msg.TokenAmounts), func(i, j int) {
 			msg.TokenAmounts[i], msg.TokenAmounts[j] = msg.TokenAmounts[j], msg.TokenAmounts[i]
 		})
+		// select first 2 tokens
+		msg.TokenAmounts = msg.TokenAmounts[:2]
 	}
-	// select first 2 tokens
-	msg.TokenAmounts = msg.TokenAmounts[:2]
 	msg.Data = []byte(msgStr)
 
 	feeToken := sourceCCIP.Common.FeeToken.EthAddress
