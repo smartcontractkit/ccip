@@ -100,6 +100,10 @@ func NewCommitReportingPluginFactory(config CommitPluginStaticConfig) *CommitRep
 	return &CommitReportingPluginFactory{
 		config:    config,
 		readersMu: &sync.Mutex{},
+
+		// the fields below are initially empty and populated on demand
+		destPriceRegReader: nil,
+		destPriceRegAddr:   common.Address{},
 	}
 }
 
@@ -143,6 +147,8 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
+	pluginOffChainConfig := rf.config.commitStore.OffchainConfig()
+
 	return &CommitReportingPlugin{
 			sourceChainSelector:     rf.config.sourceChainSelector,
 			sourceNative:            rf.config.sourceNative,
@@ -162,6 +168,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				int64(rf.config.commitStore.OffchainConfig().DestFinalityDepth),
 			),
 			gasPriceEstimator: rf.config.commitStore.GasPriceEstimator(),
+			offchainConfig:    pluginOffChainConfig,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
