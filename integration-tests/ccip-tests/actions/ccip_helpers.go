@@ -57,6 +57,9 @@ const (
 	ChaosGroupNetworkBCCIPGeth    = "CCIPNetworkBGeth"
 	RootSnoozeTimeSimulated       = 3 * time.Minute
 	InflightExpirySimulated       = 3 * time.Minute
+	// The higher the load/throughput, the higher value we might need here to guarantee that nonces are not blocked
+	// 1 day should be enough for most of the cases
+	PermissionlessExecThreshold = 60 * 60 * 24 // 1 day
 	// we keep the finality timeout high as it's out of our control
 	FinalityTimeout        = 1 * time.Hour
 	TokenTransfer   string = "WithToken"
@@ -1988,7 +1991,7 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				inflightExpiry,
 				rootSnooze,
 			), testhelpers.NewExecOnchainConfig(
-				60*30,
+				PermissionlessExecThreshold,
 				destCCIP.Common.Router.EthAddress,
 				destCCIP.Common.PriceRegistry.EthAddress,
 				5,
@@ -2228,7 +2231,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	//var err error
 	if c.LocalCluster != nil {
 		// for local cluster, fetch the values from the local cluster
-		for _, chainlinkNode := range c.LocalCluster.CLNodes {
+		for _, chainlinkNode := range c.LocalCluster.ClCluster.Nodes {
 			chainlinkNodes = append(chainlinkNodes, chainlinkNode.API)
 			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}
@@ -2244,8 +2247,6 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		}
 
 		for _, chainlinkNode := range chainlinkK8sNodes {
-			chainlinkNode.ChainlinkClient.SetLogger(logger)
-			chainlinkNode.ChainlinkClient.AddRetryAttempt(3)
 			chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient)
 			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}

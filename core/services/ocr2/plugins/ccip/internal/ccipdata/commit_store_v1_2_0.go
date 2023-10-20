@@ -211,6 +211,8 @@ func (c *CommitStoreV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []
 		return common.Address{}, err
 	}
 	c.configMu.Lock()
+
+	c.lggr.Infow("Initializing NewDAGasPriceEstimator", "estimator", c.estimator, "l1Oracle", c.estimator.L1Oracle())
 	c.gasPriceEstimator = prices.NewDAGasPriceEstimator(
 		c.estimator,
 		big.NewInt(int64(offchainConfigParsed.MaxGasPrice)),
@@ -361,6 +363,9 @@ func NewCommitStoreV1_2_0(lggr logger.Logger, addr common.Address, ec client.Cli
 	if err := logpollerutil.RegisterLpFilters(lp, filters); err != nil {
 		return nil, err
 	}
+
+	lggr.Infow("Initializing CommitStoreV1_2_0 with estimator", "estimator", estimator)
+
 	return &CommitStoreV1_2_0{
 		commitStore:       commitStore,
 		address:           addr,
@@ -372,5 +377,10 @@ func NewCommitStoreV1_2_0(lggr logger.Logger, addr common.Address, ec client.Cli
 		reportAcceptedSig: eventSig,
 		// offset || priceUpdatesOffset || minSeqNum || maxSeqNum || merkleRoot
 		reportAcceptedMaxSeqIndex: 3,
+		configMu:                  sync.RWMutex{},
+
+		// The fields below are initially empty and set on ChangeConfig method
+		offchainConfig:    CommitOffchainConfig{},
+		gasPriceEstimator: prices.DAGasPriceEstimator{},
 	}, nil
 }
