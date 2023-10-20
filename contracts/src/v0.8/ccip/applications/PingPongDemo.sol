@@ -76,7 +76,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   /// @notice A function that is responsible for funding this contract.
   /// The contract can only be funded if it is set as a nop in the target onRamp.
   /// In case your contract is not a nop you can prevent this function from being called by setting s_fundingRounds=0.
-  function fundPingPong() public  {
+  function fundPingPong() public {
     address onRampAddress = IRouterClientExtended(getRouter()).getOnRamp(s_counterpartChainSelector);
 
     // onRamp does not have anything to pay
