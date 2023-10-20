@@ -128,7 +128,8 @@ type CCIPTestConfig struct {
 	SelectedNetworks        []blockchain.EVMNetwork
 	NetworkPairs            []NetworkPair
 	NoOfNetworks            int
-	NoOfLanesPerPair        int
+	NoOfRoutersPerPair      int
+	MaxNoOfLanes            int
 	GethResourceProfile     map[string]interface{}
 	CLNodeResourceProfile   map[string]interface{}
 	CLNodeDBResourceProfile map[string]interface{}
@@ -220,10 +221,10 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 	//	the network will be added as "testnetA-1", testnetA-2","testnetB-1", testnetB-2"
 	// to deploy 4 lanes between same network pair "testnetA", "testnetB".
 	// lanes - testnetA-1<->testnetB-1, testnetA-1<-->testnetB-2 , testnetA-2<--> testnetB-1, testnetA-2<--> testnetB-2
-	if p.NoOfLanesPerPair > 1 {
+	if p.NoOfRoutersPerPair > 1 {
 		firstOfPairs[0].Name = fmt.Sprintf("%s-%d", firstOfPairs[0].Name, 1)
 		secondOfPairs[0].Name = fmt.Sprintf("%s-%d", secondOfPairs[0].Name, 1)
-		for i := 1; i < p.NoOfLanesPerPair; i++ {
+		for i := 1; i < p.NoOfRoutersPerPair; i++ {
 			netsA := networkA
 			netsA.Name = fmt.Sprintf("%s-%d", netsA.Name, i+1)
 			netsB := networkB
@@ -245,13 +246,14 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 
 func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	var allError error
-	noRouter, _ := utils.GetEnv("CCIP_NO_OF_LANES_PER_PAIR")
+	noRouter, _ := utils.GetEnv("CCIP_NO_OF_ROUTERS_PER_PAIR")
+	p.NoOfRoutersPerPair = 1
 	if noRouter != "" {
 		n, err := strconv.Atoi(noRouter)
 		if err != nil {
 			allError = multierr.Append(allError, err)
 		} else {
-			p.NoOfLanesPerPair = n
+			p.NoOfRoutersPerPair = n
 		}
 	}
 	// if network pairs are provided, then use them
@@ -360,12 +362,30 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		p.AddPairToNetworkList(p.SelectedNetworks[0], p.SelectedNetworks[1])
 	}
 
+	noLanes, _ := utils.GetEnv("CCIP_TOTAL_NO_OF_LANES")
+	if noLanes != "" {
+		n, err := strconv.Atoi(noLanes)
+		if err != nil {
+			allError = multierr.Append(allError, err)
+		} else if n > len(p.NetworkPairs) {
+			allError = multierr.Append(allError, fmt.Errorf("total number of lanes cannot be greater than total number of network pairs"))
+		} else {
+			p.MaxNoOfLanes = n
+		}
+	}
+	if allError != nil {
+		return allError
+	}
+
+	if p.MaxNoOfLanes > 0 {
+		p.NetworkPairs = p.NetworkPairs[:p.MaxNoOfLanes]
+	}
 	for _, n := range p.NetworkPairs {
 		lggr.Info().Str("NetworkA", n.NetworkA.Name).Str("NetworkB", n.NetworkB.Name).Msg("Network Pairs")
 	}
 	lggr.Info().Int("Pairs", len(p.NetworkPairs)).Msg("No Of Lanes")
 
-	return allError
+	return nil
 }
 
 func (p *CCIPTestConfig) FormNetworkPairCombinations() {
@@ -1161,7 +1181,7 @@ func CCIPDefaultTestSetUp(
 	// In the following the common contracts will be copied from "testnetA" to "testnetA-1" and "testnetA-2" and
 	// from "testnetB" to "testnetB-1" and "testnetB-2"
 	for n := range inputs.AllNetworks {
-		if setUpArgs.Cfg.NoOfLanesPerPair > 1 {
+		if setUpArgs.Cfg.NoOfRoutersPerPair > 1 {
 			regex := regexp.MustCompile(`-(\d+)$`)
 			networkNameToReadCfg := regex.ReplaceAllString(n, "")
 			reuse := inputs.ReuseContracts

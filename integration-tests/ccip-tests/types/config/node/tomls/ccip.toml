@@ -23,7 +23,7 @@ HTTPSPort = 0
 
 [Database]
 MaxIdleConns = 20
-MaxOpenConns = 40
+MaxOpenConns = 20
 MigrateOnStartup = true
 
 [OCR2]
