@@ -23,7 +23,6 @@ import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC
 /// @dev This contract is used as a router for both on-ramps and off-ramps
 contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
   using SafeERC20 for IERC20;
-  using EnumerableSet for EnumerableSet.AddressSet;
   using EnumerableSet for EnumerableSet.UintSet;
 
   error FailedToSendValue();
