@@ -1322,7 +1322,7 @@ func DeployLocalCluster(
 	}
 	configOpts := []integrationnodes.NodeConfigOpt{
 		node.WithPrivateEVMs(selectedNetworks),
-		node.WithDBConnectionPool(testInputs.DBMaxIdleConns, testInputs.DBMaxOpenConns),
+		node.WithDBConnectionPool(testInputs.DBMaxOpenConns, testInputs.DBMaxIdleConns),
 	}
 
 	// a func to start the CL nodes asynchronously
