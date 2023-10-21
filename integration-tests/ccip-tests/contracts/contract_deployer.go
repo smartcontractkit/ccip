@@ -395,7 +395,6 @@ func (e *CCIPContractsDeployer) DeployOnRamp(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		auth.GasLimit = 10000000
 		return evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 			auth,
 			backend,
