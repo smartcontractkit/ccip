@@ -123,7 +123,7 @@ func TestLoadCCIPStableWithPodChaosAndNetworkChaos(t *testing.T) {
 			},
 		},
 	}
-	t.Parallel()
+
 	var allChaosDur time.Duration
 	// to override the default duration of chaos with test input
 	for _, ch := range inputs {
