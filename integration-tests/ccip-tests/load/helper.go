@@ -276,8 +276,8 @@ func (l *loadArgs) ApplyChaos() {
 	}
 	testEnv.ChaosLabelForCLNodes(l.TestCfg.Test)
 
-	for i, exp := range l.ChaosExps {
-		if i > 0 && exp.WaitBetweenChaos > 0 {
+	for _, exp := range l.ChaosExps {
+		if exp.WaitBetweenChaos > 0 {
 			l.lggr.Info().Msgf("sleeping for %s after chaos %s", exp.WaitBetweenChaos, exp.ChaosName)
 			time.Sleep(exp.WaitBetweenChaos)
 		}

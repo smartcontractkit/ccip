@@ -153,7 +153,6 @@ func TestLoadCCIPStableWithPodChaosAndNetworkChaos(t *testing.T) {
 	testEnv := testArgs.TestSetupArgs.Env
 	require.NotNil(t, testEnv)
 	require.NotNil(t, testEnv.K8Env)
-	testArgs.SanityCheck()
 
 	// apply network chaos so that chainlink's RPC calls are affected by some network delay for the duration of the test
 	var gethNetworksLabels []string
