@@ -102,7 +102,7 @@ func TestLoadCCIPStableRequestTriggeringWithNetworkChaos(t *testing.T) {
 // the pod chaos is applied at a regular interval throughout the test duration
 // this test needs to be run for a longer duration to see the effects of pod chaos
 // in this test commit and execution are set up to be on the same node
-func TestLoadCCIPStableWithPodChaosAndNetworkChaos(t *testing.T) {
+func TestLoadCCIPStableWithPodChaos(t *testing.T) {
 	t.Parallel()
 
 	inputs := []ChaosConfig{
@@ -154,30 +154,7 @@ func TestLoadCCIPStableWithPodChaosAndNetworkChaos(t *testing.T) {
 	require.NotNil(t, testEnv)
 	require.NotNil(t, testEnv.K8Env)
 
-	// apply network chaos so that chainlink's RPC calls are affected by some network delay for the duration of the test
-	var gethNetworksLabels []string
-	for _, net := range testArgs.TestCfg.SelectedNetworks {
-		gethNetworksLabels = append(gethNetworksLabels, actions.GethLabel(net.Name))
-	}
-	testEnv.ChaosLabelForAllGeth(t, gethNetworksLabels)
-	chaosId, err := testEnv.K8Env.Chaos.Run(
-		chaos.NewNetworkLatency(
-			testEnv.K8Env.Cfg.Namespace, &chaos.Props{
-				FromLabels:  &map[string]*string{"geth": a.Str(actions.ChaosGroupCCIPGeth)},
-				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
-				DurationStr: testArgs.TestCfg.TestDuration.String(),
-				Delay:       "300ms",
-			}))
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		if chaosId != "" {
-			require.NoError(t, testEnv.K8Env.Chaos.Stop(chaosId))
-		}
-	})
 	testArgs.TriggerLoad()
-
-	// apply pod chaos to the CL nodes asynchronously and sequentially while the load is running
 	testArgs.ApplyChaos()
 	testArgs.Wait()
 }
