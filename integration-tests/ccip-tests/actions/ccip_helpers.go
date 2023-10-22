@@ -1873,8 +1873,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	} else {
 		execNodes = commitNodes
 	}
-	env.numOfAllowedFaultyExec = len(execNodes)/3 - 1
-	env.numOfAllowedFaultyCommit = len(commitNodes)/3 - 1
+	env.numOfAllowedFaultyExec = (len(execNodes) - 1) / 3
+	env.numOfAllowedFaultyCommit = (len(commitNodes) - 1) / 3
 
 	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
 	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
