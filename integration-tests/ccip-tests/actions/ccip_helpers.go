@@ -1855,8 +1855,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	var bootstrapExec *client.CLNodesWithKeys
 	var execNodes []*client.CLNodesWithKeys
 	commitNodes := clNodes[1:]
-	env.commitNodeStartIndex = 1
-	env.execNodeStartIndex = 1
+	env.commitNodeStartIndex = 2
+	env.execNodeStartIndex = 2
 	env.numOfCommitNodes = numOfCommitNodes
 	env.numOfExecNodes = numOfCommitNodes
 	if !commitAndExecOnSameDON {
@@ -1866,8 +1866,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		bootstrapExec = clNodes[1] // for a set-up of different commit and execution nodes second node is the bootstrapper for execution nodes
 		commitNodes = clNodes[2 : 2+numOfCommitNodes]
 		execNodes = clNodes[2+numOfCommitNodes:]
-		env.commitNodeStartIndex = 2
-		env.execNodeStartIndex = 7
+		env.commitNodeStartIndex = 3
+		env.execNodeStartIndex = 3 + numOfCommitNodes
 		env.numOfCommitNodes = len(commitNodes)
 		env.numOfExecNodes = len(execNodes)
 	} else {
