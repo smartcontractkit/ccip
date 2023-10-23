@@ -7,7 +7,7 @@ import {Client} from "../libraries/Client.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
 
-interface IEVM2AnyOnRampRouter {
+interface IEVM2AnyOnRampClient {
   /// @notice Get the fee for a given ccip message
   /// @param destChainSelector The destination chain selector
   /// @param message The message to calculate the cost for

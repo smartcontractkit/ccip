@@ -6,7 +6,7 @@ import {IPool} from "../interfaces/pools/IPool.sol";
 import {IARM} from "../interfaces/IARM.sol";
 import {IPriceRegistry} from "../interfaces/IPriceRegistry.sol";
 import {IEVM2AnyOnRamp} from "../interfaces/IEVM2AnyOnRamp.sol";
-import {IEVM2AnyOnRampRouter} from "../interfaces/IEVM2AnyOnRampRouter.sol";
+import {IEVM2AnyOnRampClient} from "../interfaces/IEVM2AnyOnRampClient.sol";
 import {ILinkAvailable} from "../interfaces/automation/ILinkAvailable.sol";
 
 import {AggregateRateLimiter} from "../AggregateRateLimiter.sol";
@@ -254,7 +254,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     return uint64(senderNonce);
   }
 
-  /// @inheritdoc IEVM2AnyOnRampRouter
+  /// @inheritdoc IEVM2AnyOnRampClient
   function forwardFromRouter(
     uint64 destChainSelector,
     Client.EVM2AnyMessage calldata message,
@@ -436,7 +436,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // │                      Tokens and pools                        │
   // ================================================================
 
-  /// @inheritdoc IEVM2AnyOnRampRouter
+  /// @inheritdoc IEVM2AnyOnRampClient
   function getSupportedTokens(uint64 /*destChainSelector*/) external view returns (address[] memory) {
     address[] memory sourceTokens = new address[](s_poolsBySourceToken.length());
     for (uint256 i = 0; i < sourceTokens.length; ++i) {
@@ -445,7 +445,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
     return sourceTokens;
   }
 
-  /// @inheritdoc IEVM2AnyOnRampRouter
+  /// @inheritdoc IEVM2AnyOnRampClient
   function getPoolBySourceToken(uint64 /*destChainSelector*/, IERC20 sourceToken) public view returns (IPool) {
     if (!s_poolsBySourceToken.contains(address(sourceToken))) revert UnsupportedToken(sourceToken);
     return IPool(s_poolsBySourceToken.get(address(sourceToken)));
@@ -492,7 +492,7 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
   // │                             Fees                             │
   // ================================================================
 
-  /// @inheritdoc IEVM2AnyOnRampRouter
+  /// @inheritdoc IEVM2AnyOnRampClient
   /// @dev getFee MUST revert if the feeToken is not listed in the fee token config, as the router assumes it does.
   /// @param destChainSelector The destination chain selector.
   /// @param message The message to get quote for.
