@@ -16,21 +16,21 @@ library Internal {
   uint16 internal constant MAX_RET_BYTES = 4 + 4 * 32;
 
   /// @notice A collection of token price and gas price updates.
-  /// @dev RMN depends on this struct, if changing, please notify RMN.
+  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct PriceUpdates {
     TokenPriceUpdate[] tokenPriceUpdates;
     GasPriceUpdate[] gasPriceUpdates;
   }
 
   /// @notice Token price in USD.
-  /// @dev RMN depends on this struct, if changing, please notify RMN.
+  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct TokenPriceUpdate {
     address sourceToken; // Source token
     uint224 usdPerToken; // 1e18 USD per smallest unit of token
   }
 
   /// @notice Gas price for a given chain in USD, its value may contain tightly packed fields.
-  /// @dev RMN depends on this struct, if changing, please notify RMN.
+  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct GasPriceUpdate {
     uint64 destChainSelector; // Destination chain selector
     uint224 usdPerUnitGas; // 1e18 USD per smallest unit (e.g. wei) of destination chain gas
@@ -53,7 +53,7 @@ library Internal {
   }
 
   /// @notice Report that is submitted by the execution DON at the execution phase.
-  /// @dev RMN depends on this struct, if changing, please notify RMN.
+  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct ExecutionReport {
     EVM2EVMMessage[] messages;
     // Contains a bytes array for each message, each inner bytes array contains bytes per transferred token
@@ -63,7 +63,7 @@ library Internal {
   }
 
   /// @notice The cross chain message that gets committed to EVM chains.
-  /// @dev RMN depends on this struct, if changing, please notify RMN.
+  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct EVM2EVMMessage {
     uint64 sourceChainSelector; // ─────────╮ the chain selector of the source chain, note: not chainId
     address sender; // ─────────────────────╯ sender address on the source chain
@@ -108,7 +108,7 @@ library Internal {
 
   function _hash(EVM2EVMMessage memory original, bytes32 metadataHash) internal pure returns (bytes32) {
     // Fixed-size message fields are included in nested hash to reduce stack pressure.
-    // This hashing scheme is also used by RMN. If changing it, please notify RMN.
+    // This hashing scheme is also used by RMN. If changing it, please notify the RMN maintainers.
     return
       keccak256(
         abi.encode(
@@ -139,7 +139,7 @@ library Internal {
   /// IN_PROGRESS currently being executed, used a replay protection
   /// SUCCESS successfully executed. End state
   /// FAILURE unsuccessfully executed, manual execution is now enabled.
-  /// @dev RMN depends on this enum, if changing, please notify RMN.
+  /// @dev RMN depends on this enum, if changing, please notify the RMN maintainers.
   enum MessageExecutionState {
     UNTOUCHED,
     IN_PROGRESS,

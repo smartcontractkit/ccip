@@ -67,7 +67,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   event ConfigSet(StaticConfig staticConfig, DynamicConfig dynamicConfig);
   event SkippedIncorrectNonce(uint64 indexed nonce, address indexed sender);
   event SkippedSenderWithPreviousRampMessageInflight(uint64 indexed nonce, address indexed sender);
-  /// @dev RMN depends on this event, if changing, please notify RMN.
+  /// @dev RMN depends on this event, if changing, please notify the RMN maintainers.
   event ExecutionStateChanged(
     uint64 indexed sequenceNumber,
     bytes32 indexed messageId,
@@ -76,7 +76,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   );
 
   /// @notice Static offRamp config
-  /// @dev RMN depends on this struct, if changing, please notify RMN.
+  /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct StaticConfig {
     address commitStore; // ────────╮  CommitStore address on the destination chain
     uint64 chainSelector; // ───────╯  Destination chainSelector
@@ -451,7 +451,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   /// @notice Returns the static config.
   /// @dev This function will always return the same struct as the contents is static and can never change.
-  /// RMN depends on this function, if changing, please notify RMN.
+  /// RMN depends on this function, if changing, please notify the RMN maintainers.
   function getStaticConfig() external view returns (StaticConfig memory) {
     return
       StaticConfig({
