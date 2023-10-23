@@ -208,7 +208,13 @@ func addContractStructFields(contractName string, fileNode *ast.File) *ast.File 
 			if !is {
 				continue
 			}
+			if len(returnStmt.Results) < 3 {
+				continue
+			}
 			lit, is := returnStmt.Results[2].(*ast.UnaryExpr).X.(*ast.CompositeLit)
+			if !is {
+				continue
+			}
 			addressExpr := &ast.KeyValueExpr{
 				Key:   ast.NewIdent("address"),
 				Value: ast.NewIdent("address"),
