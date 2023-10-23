@@ -25,7 +25,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
 
   // number of ping-pongs till a call to the funding method 'fundPingPong' is made
   // note that 0 disables the funding.
-  uint8 private s_fundingRounds = 5;
+  uint8 private constant FUNDING_ROUNDS = 5;
 
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
@@ -60,7 +60,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     });
     Router(getRouter()).ccipSend(s_counterpartChainSelector, message);
 
-    if (s_fundingRounds > 0 && pingPongCount % s_fundingRounds == 0) {
+    if (FUNDING_ROUNDS > 0 && pingPongCount % FUNDING_ROUNDS == 0) {
       fundPingPong();
     }
   }
@@ -76,19 +76,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   /// The contract can only be funded if it is set as a nop in the target onRamp.
   /// In case your contract is not a nop you can prevent this function from being called by setting s_fundingRounds=0.
   function fundPingPong() public {
-    address onRampAddress = Router(getRouter()).getOnRamp(s_counterpartChainSelector);
-
-    // onRamp does not have anything to pay
-    if (EVM2EVMOnRamp(onRampAddress).getNopFeesJuels() == 0) {
-      return;
-    }
-
-    // not enough link to fund the ping pong
-    if (EVM2EVMOnRamp(onRampAddress).linkAvailableForPayment() < 0) {
-      return;
-    }
-
-    EVM2EVMOnRamp(onRampAddress).payNops();
+    EVM2EVMOnRamp(Router(getRouter()).getOnRamp(s_counterpartChainSelector)).payNops();
   }
 
   /////////////////////////////////////////////////////////////////////
