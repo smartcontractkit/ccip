@@ -1,21 +1,14 @@
-Networks = ['SIMULATED', 'ROPSTEN']
+[Products]
+[Products.CCIP]
+Networks = ['SIMULATED_1', 'SIMULATED_2']
 
-[Chainlink]
-[Chainlink.CommonConfig]
-Image = 'smartcontract/chainlink:latest'
-Tag = 'latest'
+[Products.CCIP.Chainlink]
+[Products.CCIP.Chainlink.Common]
+Name = 'node1'
 NodeConfig = """
-RootDir = '/home/chainlink'
-
 [Feature]
-FeedsManager = true
 LogPoller = true
-UICSAKeys = true
-
-[Database]
-MaxIdleConns = 20
-MaxOpenConns = 40
-MigrateOnStartup = true
+CCIP = true
 
 [Log]
 Level = 'debug'
@@ -28,17 +21,71 @@ MaxSize = '0b'
 AllowOrigins = '*'
 HTTPPort = 6688
 SecureCookies = false
-SessionTimeout = '999h0m0s'
+HTTPWriteTimeout = '1m'
 
 [WebServer.RateLimit]
 Authenticated = 2000
-Unauthenticated = 100
+Unauthenticated = 1000
 
 [WebServer.TLS]
 HTTPSPort = 0
+
+[Database]
+MaxIdleConns = 50
+MaxOpenConns = 50
+MigrateOnStartup = true
+
+[OCR2]
+Enabled = true
+DefaultTransactionQueueDepth = 0
+
+[OCR]
+Enabled = false
+DefaultTransactionQueueDepth = 0
+
+[P2P.V1]
+Enabled = false
+ListenPort = 0
+
+[P2P]
+[P2P.V2]
+Enabled = true
+ListenAddresses = ['0.0.0.0:6690']
+AnnounceAddresses = ['0.0.0.0:6690']
+DeltaDial = '500ms'
+DeltaReconcile = '5s'
 """
 
-[Products]
-[Products.CCIP]
-[Products.CCIP.load]
+[Products.CCIP.Groups]
+[Products.CCIP.Groups.smoke]
+KeepEnvAlive = false
 MsgType = 'WithToken'
+PhaseTimeout = '10m0s'
+LocalCluster = true
+ExistingDeployment = false
+ReuseContracts = true
+SequentialLaneAddition = false
+NodeFunding = 10.0
+NoOfNetworks = 2
+NoOfRoutersPerPair = 1
+NoOfTokensPerChain = 2
+NoOfTokensInMsg = 2
+AmountPerToken = 1
+
+[Products.CCIP.Groups.load]
+KeepEnvAlive = false
+MsgType = 'WithToken'
+PhaseTimeout = '50m0s'
+TestDuration = '10m0s'
+LocalCluster = false
+ExistingDeployment = false
+ReuseContracts = true
+SequentialLaneAddition = false
+NodeFunding = 10.0
+RequestPerUnitTime = [2]
+TimeUnit = '1s'
+NoOfNetworks = 2
+NoOfRoutersPerPair = 1
+NoOfTokensPerChain = 2
+NoOfTokensInMsg = 2
+AmountPerToken = 1

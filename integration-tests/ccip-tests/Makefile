@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # example usage: make test_load_ccip_simulated_k8 image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestLoadCCIPStableRequestTriggeringWithNetworkChaos
+=======
+# example usage: make test_load_ccip_simulated_k8 image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestLoadCCIPStableRPS
+>>>>>>> 38cd917d0a (merge with ccip-develop)
 .PHONY: test_load_ccip_simulated_k8
 test_load_ccip_simulated_k8:
 	source ./load-test.env && \

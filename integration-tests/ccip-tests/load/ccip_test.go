@@ -11,7 +11,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/ccip/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
+	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 func TestLoadCCIPStableRPS(t *testing.T) {
@@ -36,7 +38,7 @@ func TestLoadCCIPSequentialLaneAdd(t *testing.T) {
 	t.Skipf("test needs maintenance")
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background())
-	testArgs.TestCfg.SequentialLaneAddition = true
+	testArgs.TestCfg.GroupInput.SequentialLaneAddition = utils.Ptr(true)
 	if len(testArgs.TestCfg.NetworkPairs) <= 1 {
 		t.Skip("Skipping the test as there are not enough network pairs to run the test")
 	}
@@ -82,7 +84,7 @@ func TestLoadCCIPStableRequestTriggeringWithNetworkChaos(t *testing.T) {
 			testEnv.K8Env.Cfg.Namespace, &chaos.Props{
 				FromLabels:  &map[string]*string{"geth": a.Str(actions.ChaosGroupCCIPGeth)},
 				ToLabels:    &map[string]*string{"app": a.Str("chainlink-0")},
-				DurationStr: testArgs.TestCfg.TestDuration.String(),
+				DurationStr: testArgs.TestCfg.GroupInput.TestDuration.String(),
 				Delay:       "300ms",
 			}))
 	require.NoError(t, err)
@@ -249,9 +251,9 @@ func TestLoadCCIPStableWithPodChaosDiffCommitAndExec(t *testing.T) {
 			t.Parallel()
 			lggr := logging.GetTestLogger(t)
 			testArgs := NewLoadArgs(t, lggr, context.Background(), in)
-			testArgs.TestCfg.TestDuration = 5 * time.Minute
-			testArgs.TestCfg.Load.TimeUnit = 1 * time.Second
-			testArgs.TestCfg.Load.RequestPerUnitTime = []int64{2}
+			testArgs.TestCfg.GroupInput.TestDuration = models.MustNewDuration(5 * time.Minute)
+			testArgs.TestCfg.GroupInput.TimeUnit = models.MustNewDuration(1 * time.Second)
+			testArgs.TestCfg.GroupInput.RequestPerUnitTime = []int64{2}
 
 			testArgs.Setup(false, 5, 5)
 			// if the test runs on remote runner
