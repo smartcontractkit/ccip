@@ -31,11 +31,7 @@ type CCIPTestConfig struct {
 	MaxNoOfLanes               int                `toml:",omitempty"`
 }
 
-func (c CCIPTestConfig) ApplyOverrides(from Group) error {
-	fromCfg, ok := from.(CCIPTestConfig)
-	if !ok {
-		return errors.Errorf("invalid CCIP test config type %T", from)
-	}
+func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
 	if fromCfg.KeepEnvAlive != nil {
 		c.KeepEnvAlive = fromCfg.KeepEnvAlive
 	}
@@ -105,16 +101,16 @@ func (c CCIPTestConfig) ApplyOverrides(from Group) error {
 	return nil
 }
 
-func (c CCIPTestConfig) ReadSecrets() error {
+func (c *CCIPTestConfig) ReadSecrets() error {
 	// no secrets to read
 	return nil
 }
 
-func (c CCIPTestConfig) Validate() error {
-	if c.PhaseTimeout.Duration().Minutes() < 1 || c.PhaseTimeout.Duration().Minutes() > 50 {
+func (c *CCIPTestConfig) Validate() error {
+	if c.PhaseTimeout != nil && (c.PhaseTimeout.Duration().Minutes() < 1 || c.PhaseTimeout.Duration().Minutes() > 50) {
 		return errors.Errorf("phase timeout should be between 1 and 50 minutes")
 	}
-	if c.TestDuration.Duration().Minutes() < 1 {
+	if c.TestDuration != nil && c.TestDuration.Duration().Minutes() < 1 {
 		return errors.Errorf("test duration should be greater than 1 minute")
 	}
 	if c.MsgType != "WithoutToken" && c.MsgType != "WithToken" {
@@ -133,5 +129,78 @@ func (c CCIPTestConfig) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+type CCIPContractConfig struct {
+	Data string `toml:",omitempty"`
+}
+
+func (c *CCIPContractConfig) ApplyOverrides(from *CCIPContractConfig) error {
+	if from.Data != "" {
+		c.Data = from.Data
+	}
+	return nil
+}
+
+func (c *CCIPContractConfig) ContractsData() []byte {
+	if c == nil || c.Data == "" {
+		return nil
+	}
+	return []byte(c.Data)
+}
+
+type CCIP struct {
+	*Common
+	Deployments *CCIPContractConfig        `toml:",omitempty"`
+	Groups      map[string]*CCIPTestConfig `toml:",omitempty"`
+}
+
+func (c *CCIP) ReadSecrets() error {
+	err := c.Common.ReadSecrets()
+	if err != nil {
+		return err
+	}
+	for _, grp := range c.Groups {
+		if err := grp.ReadSecrets(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *CCIP) Validate() error {
+	err := c.Common.Validate()
+	if err != nil {
+		return err
+	}
+	for _, grp := range c.Groups {
+		if err := grp.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *CCIP) ApplyOverrides(fromCfg *CCIP) error {
+	if err := c.Common.ApplyOverrides(fromCfg.Common); err != nil {
+		return err
+	}
+	if err := c.Deployments.ApplyOverrides(fromCfg.Deployments); err != nil {
+		return err
+	}
+	if len(fromCfg.Groups) != 0 {
+		for name, grp := range fromCfg.Groups {
+			if c.Groups == nil {
+				c.Groups = map[string]*CCIPTestConfig{}
+			}
+			if _, ok := c.Groups[name]; !ok {
+				c.Groups[name] = &CCIPTestConfig{}
+			}
+			if err := c.Groups[name].ApplyOverrides(grp); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }

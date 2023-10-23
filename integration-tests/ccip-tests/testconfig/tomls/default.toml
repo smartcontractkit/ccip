@@ -1,10 +1,14 @@
-[Products]
-[Products.CCIP]
+[CCIP]
 Networks = ['SIMULATED_1', 'SIMULATED_2']
 
-[Products.CCIP.Chainlink]
-[Products.CCIP.Chainlink.Common]
+[CCIP.Chainlink]
+[CCIP.Chainlink.Common]
 Name = 'node1'
+NodeMemory = '2Gi'
+NodeCPU = '2'
+DBMemory = '2Gi'
+DBCPU = '2'
+DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB']
 NodeConfig = """
 [Feature]
 LogPoller = true
@@ -56,8 +60,8 @@ DeltaDial = '500ms'
 DeltaReconcile = '5s'
 """
 
-[Products.CCIP.Groups]
-[Products.CCIP.Groups.smoke]
+[CCIP.Groups]
+[CCIP.Groups.smoke]
 KeepEnvAlive = false
 MsgType = 'WithToken'
 PhaseTimeout = '10m0s'
@@ -65,14 +69,14 @@ LocalCluster = true
 ExistingDeployment = false
 ReuseContracts = true
 SequentialLaneAddition = false
-NodeFunding = 10.0
+NodeFunding = 1.0
 NoOfNetworks = 2
 NoOfRoutersPerPair = 1
 NoOfTokensPerChain = 2
 NoOfTokensInMsg = 2
 AmountPerToken = 1
 
-[Products.CCIP.Groups.load]
+[CCIP.Groups.load]
 KeepEnvAlive = false
 MsgType = 'WithToken'
 PhaseTimeout = '50m0s'
@@ -81,7 +85,7 @@ LocalCluster = false
 ExistingDeployment = false
 ReuseContracts = true
 SequentialLaneAddition = false
-NodeFunding = 10.0
+NodeFunding = 20.0
 RequestPerUnitTime = [2]
 TimeUnit = '1s'
 NoOfNetworks = 2

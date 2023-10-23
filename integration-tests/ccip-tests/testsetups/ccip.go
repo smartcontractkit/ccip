@@ -18,7 +18,6 @@ import (
 	"github.com/rs/zerolog"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-env/client"
-	"github.com/smartcontractkit/chainlink-env/config"
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-env/pkg/cdk8s/blockscout"
 	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
@@ -54,6 +53,34 @@ var (
 			"memory": "6Gi",
 		},
 	}
+	DONResourceProfile = map[string]interface{}{
+		"requests": map[string]interface{}{
+			"cpu":    "2",
+			"memory": "4Gi",
+		},
+		"limits": map[string]interface{}{
+			"cpu":    "2",
+			"memory": "4Gi",
+		},
+	}
+	DONDBResourceProfile = map[string]interface{}{
+		"image": map[string]interface{}{
+			"image":   "postgres",
+			"version": "13.12",
+		},
+		"stateful": true,
+		"capacity": "10Gi",
+		"resources": map[string]interface{}{
+			"requests": map[string]interface{}{
+				"cpu":    "2",
+				"memory": "4Gi",
+			},
+			"limits": map[string]interface{}{
+				"cpu":    "2",
+				"memory": "4Gi",
+			},
+		},
+	}
 )
 
 type NetworkPair struct {
@@ -65,8 +92,9 @@ type NetworkPair struct {
 
 type CCIPTestConfig struct {
 	Test                    *testing.T
-	ConfigInput             testconfig.ProductTest
-	GroupInput              testconfig.CCIPTestConfig
+	ConfigInput             *testconfig.Common
+	GroupInput              *testconfig.CCIPTestConfig
+	ContractsInput          *testconfig.CCIPContractConfig
 	AllNetworks             map[string]blockchain.EVMNetwork
 	SelectedNetworks        []blockchain.EVMNetwork
 	NetworkPairs            []NetworkPair
@@ -112,6 +140,7 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 
 func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	var allError error
+
 	// if network pairs are provided, then use them
 	if p.GroupInput.NetworkPairs != nil {
 		networkPairs := p.GroupInput.NetworkPairs
@@ -210,7 +239,7 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	}
 	lggr.Info().Int("Pairs", len(p.NetworkPairs)).Msg("No Of Lanes")
 
-	return nil
+	return allError
 }
 
 func (p *CCIPTestConfig) FormNetworkPairCombinations() {
@@ -245,16 +274,30 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	if allError != nil {
 		t.Fatal(allError)
 	}
-	ccipCfg, groupCfg, err := testconfig.GlobalTestConfig.CCIP(tType)
-	if err != nil {
-		t.Fatal(err)
+	ccipCfg := testconfig.GlobalTestConfig.CCIP.Common
+	contractCfg := testconfig.GlobalTestConfig.CCIP.Deployments
+	groupCfg, exists := testconfig.GlobalTestConfig.CCIP.Groups[tType]
+	if !exists {
+		t.Fatalf("group config for %s does not exist", tType)
 	}
-
+	DONResourceProfile = SetResourceProfile("2", "4Gi", ccipCfg.Chainlink.NodeCPU, ccipCfg.Chainlink.NodeMemory)
+	DONDBResourceProfile["resources"] = SetResourceProfile("2", "4Gi", ccipCfg.Chainlink.DBCPU, ccipCfg.Chainlink.DBMemory)
+	if len(ccipCfg.Chainlink.DBArgs) > 0 {
+		var formattedArgs []string
+		for _, arg := range ccipCfg.Chainlink.DBArgs {
+			formattedArgs = append(formattedArgs, "-c")
+			formattedArgs = append(formattedArgs, arg)
+		}
+		DONDBResourceProfile["additionalArgs"] = formattedArgs
+	}
 	p := &CCIPTestConfig{
-		Test:                t,
-		ConfigInput:         ccipCfg,
-		GroupInput:          groupCfg,
-		GethResourceProfile: GethResourceProfile,
+		Test:                    t,
+		ConfigInput:             ccipCfg,
+		ContractsInput:          contractCfg,
+		GroupInput:              groupCfg,
+		GethResourceProfile:     GethResourceProfile,
+		CLNodeResourceProfile:   DONResourceProfile,
+		CLNodeDBResourceProfile: DONDBResourceProfile,
 	}
 
 	allError = multierr.Append(allError, p.SetNetworkPairs(lggr))
@@ -658,7 +701,7 @@ func CCIPDefaultTestSetUp(
 		require.NoError(t, err, "error while removing existing lane config file - %s", setUpArgs.LaneConfigFile)
 	}
 
-	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment()
+	setUpArgs.LaneConfig, err = laneconfig.ReadLanesFromExistingDeployment(setUpArgs.Cfg.ContractsInput.ContractsData())
 	require.NoError(t, err)
 
 	if setUpArgs.LaneConfig == nil {
@@ -684,7 +727,6 @@ func CCIPDefaultTestSetUp(
 			clProps["chainlink"] = map[string]interface{}{
 				"resources": inputs.CLNodeResourceProfile,
 			}
-
 			// deploy the env if configureCLNode is true
 			k8Env = DeployEnvironments(
 				t,
@@ -692,7 +734,7 @@ func CCIPDefaultTestSetUp(
 					TTL:             inputs.ConfigInput.TTL.Duration(),
 					NamespacePrefix: envName,
 					Test:            t,
-				}, clProps, inputs.GethResourceProfile, inputs)
+				}, clProps, inputs)
 			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
 		}
 
@@ -703,19 +745,17 @@ func CCIPDefaultTestSetUp(
 		}
 	} else {
 		// if configureCLNode is false, use a placeholder env to create remote runner
-		if _, set := os.LookupEnv(config.EnvVarJobImage); set {
-			k8Env = environment.New(
-				&environment.Config{
-					TTL:             inputs.ConfigInput.TTL.Duration(),
-					NamespacePrefix: envName,
-					Test:            t,
-				})
-			err = k8Env.Run()
-			require.NoErrorf(t, err, "error creating environment remote runner")
-			setUpArgs.Env = &actions.CCIPTestEnv{K8Env: k8Env}
-			if k8Env.WillUseRemoteRunner() {
-				return setUpArgs
-			}
+		k8Env = environment.New(
+			&environment.Config{
+				TTL:             inputs.ConfigInput.TTL.Duration(),
+				NamespacePrefix: envName,
+				Test:            t,
+			})
+		err = k8Env.Run()
+		require.NoErrorf(t, err, "error creating environment remote runner")
+		setUpArgs.Env = &actions.CCIPTestEnv{K8Env: k8Env}
+		if k8Env.WillUseRemoteRunner() {
+			return setUpArgs
 		}
 	}
 
@@ -733,12 +773,7 @@ func CCIPDefaultTestSetUp(
 			if _, ok := chainByChainID[n.ChainID]; ok {
 				continue
 			}
-			var ec blockchain.EVMClient
-			if k8Env == nil {
-				ec, err = blockchain.ConnectEVMClient(n, lggr)
-			} else {
-				ec, err = blockchain.NewEVMClient(n, k8Env, lggr)
-			}
+			ec, err := blockchain.NewEVMClient(n, k8Env, lggr)
 			require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
 			chains = append(chains, ec)
 			chainByChainID[n.ChainID] = ec
@@ -934,7 +969,7 @@ func DeployLocalCluster(
 
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
-		toml, err := node.NewConfigFromToml(ccipnode.CCIPTOML, configOpts...)
+		toml, err := node.NewConfigFromToml([]byte(testInputs.ConfigInput.Chainlink.Common.NodeConfig), configOpts...)
 		if err != nil {
 			return err
 		}
@@ -951,7 +986,6 @@ func DeployEnvironments(
 	t *testing.T,
 	envconfig *environment.Config,
 	clProps map[string]interface{},
-	gethResource map[string]interface{},
 	testInputs *CCIPTestConfig,
 ) *environment.Environment {
 	useBlockscout := testInputs.GroupInput.Blockscout
@@ -973,11 +1007,11 @@ func DeployEnvironments(
 						},
 						"tx": map[string]interface{}{
 							"replicas":  strconv.Itoa(numOfTxNodes),
-							"resources": gethResource,
+							"resources": testInputs.GethResourceProfile,
 						},
 						"miner": map[string]interface{}{
 							"replicas":  "0",
-							"resources": gethResource,
+							"resources": testInputs.GethResourceProfile,
 						},
 					},
 					"bootnode": map[string]interface{}{
@@ -1022,10 +1056,7 @@ func DeployEnvironments(
 		}
 	}
 
-	tomlCfg, err := node.NewConfigFromToml(
-		ccipnode.CCIPTOML,
-		ccipnode.WithPrivateEVMs(nets),
-	)
+	tomlCfg, err := node.NewConfigFromToml([]byte(testInputs.ConfigInput.Chainlink.Common.NodeConfig), ccipnode.WithPrivateEVMs(nets))
 	tomlStr, err := tomlCfg.TOMLString()
 	require.NoError(t, err)
 	clProps["toml"] = tomlStr

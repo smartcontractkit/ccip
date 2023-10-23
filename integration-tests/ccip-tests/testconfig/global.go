@@ -18,14 +18,12 @@ import (
 )
 
 const (
-	ErrReadConfig      = "failed to read TOML config"
-	ErrUnmarshalConfig = "failed to unmarshal TOML config"
-
-	Load  string = "Load"
-	Chaos string = "Chaos"
-	Smoke string = "Smoke"
-
-	CCIP = "CCIP"
+	ErrReadConfig             = "failed to read TOML config"
+	ErrUnmarshalConfig        = "failed to unmarshal TOML config"
+	Load               string = "load"
+	Chaos              string = "chaos"
+	Smoke              string = "smoke"
+	ProductCCIP               = "CCIP"
 )
 
 var (
@@ -34,7 +32,7 @@ var (
 	GlobalTestConfig *Config
 )
 
-func initv1() {
+func init() {
 	var err error
 	GlobalTestConfig, err = NewConfig()
 	if err != nil {
@@ -46,38 +44,17 @@ func initv1() {
 type GenericConfig interface {
 	ReadSecrets() error
 	Validate() error
-}
-
-type Group interface {
-	ApplyOverrides(from Group) error
-	GenericConfig
+	ApplyOverrides(from interface{}) error
 }
 
 // Config is the top level config struct. It contains config for all product based tests.
 type Config struct {
-	Products map[string]ProductTest `toml:",omitempty"`
-}
-
-// CCIP is the config for CCIP tests for a particular test group
-func (c Config) CCIP(group string) (ProductTest, CCIPTestConfig, error) {
-	ccip, ok := c.Products[CCIP]
-	if !ok {
-		return ProductTest{}, CCIPTestConfig{}, errors.New("no CCIP config found")
-	}
-	testCfg, exists := ccip.Groups[group]
-	if !exists {
-		return ccip, CCIPTestConfig{}, errors.Errorf("no CCIP test config found for test type %s", group)
-	}
-	testGroupCfg, ok := testCfg.(CCIPTestConfig)
-	if !ok {
-		return ccip, CCIPTestConfig{}, errors.Errorf("invalid CCIP test config type %T", testCfg)
-	}
-	return ccip, testGroupCfg, nil
+	CCIP *CCIP `toml:",omitempty"`
 }
 
 func NewConfig() (*Config, error) {
-	var cfg *Config
-	var override *Config
+	cfg := &Config{}
+	override := &Config{}
 	// load config from default file
 	err := config.DecodeTOML(bytes.NewReader(DefaultConfig), cfg)
 	if err != nil {
@@ -95,28 +72,21 @@ func NewConfig() (*Config, error) {
 	}
 	if override != nil {
 		// apply overrides for all products
-		for name, product := range override.Products {
-			if existing, ok := cfg.Products[name]; ok {
-				err := existing.ApplyOverrides(product)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				cfg.Products[name] = product
+		if override.CCIP != nil {
+			err = cfg.CCIP.ApplyOverrides(override.CCIP)
+			if err != nil {
+				return nil, err
 			}
 		}
 	}
 	// read secrets for all products
-	for _, product := range cfg.Products {
-		err := product.ReadSecrets()
+	if cfg.CCIP != nil {
+		err = cfg.CCIP.ReadSecrets()
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	// validate all products
-	for _, product := range cfg.Products {
-		err := product.Validate()
+		// validate all products
+		err = cfg.CCIP.Validate()
 		if err != nil {
 			return nil, err
 		}
@@ -125,33 +95,22 @@ func NewConfig() (*Config, error) {
 	return cfg, nil
 }
 
-// ProductTest is the generic config struct which can be used with product specific configs.
+// Common is the generic config struct which can be used with product specific configs.
 // It contains generic DON and networks config which can be applied to all product based tests.
-type ProductTest struct {
+type Common struct {
 	EnvUser   string           `toml:",omitempty"`
 	TTL       *models.Duration `toml:",omitempty"`
 	Chainlink *Chainlink       `toml:",omitempty"`
 	Networks  []string         `toml:",omitempty"`
-	Groups    map[string]Group `toml:",omitempty"`
 }
 
-func (p ProductTest) ReadSecrets() error {
+func (p Common) ReadSecrets() error {
 	// read secrets for all products and test types
 	// TODO: as of now we read network secrets through networks.SetNetworks, change this to generic secret reading mechanism
-	err := p.Chainlink.ReadSecrets()
-	if err != nil {
-		return err
-	}
-	for _, group := range p.Groups {
-		err := group.ReadSecrets()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return p.Chainlink.ReadSecrets()
 }
 
-func (p ProductTest) ApplyOverrides(from ProductTest) error {
+func (p Common) ApplyOverrides(from *Common) error {
 	if from.EnvUser != "" {
 		p.EnvUser = from.EnvUser
 	}
@@ -167,54 +126,29 @@ func (p ProductTest) ApplyOverrides(from ProductTest) error {
 		}
 		p.Chainlink.ApplyOverrides(from.Chainlink)
 	}
-	if from.Groups != nil {
-		if p.Groups == nil {
-			p.Groups = make(map[string]Group)
-		}
-		for name, group := range from.Groups {
-			if existing, ok := p.Groups[name]; ok {
-				err := existing.ApplyOverrides(group)
-				if err != nil {
-					return err
-				}
-			} else {
-				p.Groups[name] = group
-			}
-		}
-	}
 	return nil
 }
 
-func (p ProductTest) Validate() error {
+func (p Common) Validate() error {
 	if p.Networks == nil {
 		return errors.New("no networks specified")
 	}
-	err := p.Chainlink.Validate()
-	if err != nil {
-		return err
-	}
-	for _, group := range p.Groups {
-		err := group.Validate()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return p.Chainlink.Validate()
 }
 
-func (p ProductTest) EVMNetworks() []blockchain.EVMNetwork {
+func (p Common) EVMNetworks() []blockchain.EVMNetwork {
 	return networks.SetNetworks(p.Networks)
 }
 
 type Chainlink struct {
-	Common     *Node   `toml:",omitempty"`
-	NodeMemory string  `toml:",omitempty"`
-	NodeCPU    string  `toml:",omitempty"`
-	DBMemory   string  `toml:",omitempty"`
-	DBCPU      string  `toml:",omitempty"`
-	DBArgs     string  `toml:",omitempty"`
-	NoOfNodes  *int    `toml:",omitempty"`
-	Nodes      []*Node `toml:",omitempty"` // to be mentioned only if diff nodes follow diff configs; not required if all nodes follow CommonConfig
+	Common     *Node    `toml:",omitempty"`
+	NodeMemory string   `toml:",omitempty"`
+	NodeCPU    string   `toml:",omitempty"`
+	DBMemory   string   `toml:",omitempty"`
+	DBCPU      string   `toml:",omitempty"`
+	DBArgs     []string `toml:",omitempty"`
+	NoOfNodes  *int     `toml:",omitempty"`
+	Nodes      []*Node  `toml:",omitempty"` // to be mentioned only if diff nodes follow diff configs; not required if all nodes follow CommonConfig
 }
 
 func (c *Chainlink) ApplyOverrides(from *Chainlink) {
@@ -245,7 +179,7 @@ func (c *Chainlink) ApplyOverrides(from *Chainlink) {
 	if from.DBCPU != "" {
 		c.DBCPU = from.DBCPU
 	}
-	if from.DBArgs != "" {
+	if from.DBArgs != nil {
 		c.DBArgs = from.DBArgs
 	}
 }
@@ -292,6 +226,13 @@ type Node struct {
 }
 
 func (n *Node) ApplyOverrides(from *Node) {
+	if from == nil {
+		return
+	}
+	if n == nil {
+		n = from
+		return
+	}
 	if from.Name != "" {
 		n.Name = from.Name
 	}
