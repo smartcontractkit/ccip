@@ -2266,7 +2266,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	} else {
 		// in case of k8s, we need to connect to the chainlink nodes
 		log.Info().Msg("Connecting to launched resources")
-		chainlinkK8sNodes, err := client.ConnectChainlinkNodes(c.K8Env)client/chainlink.go
+		chainlinkK8sNodes, err := client.ConnectChainlinkNodes(c.K8Env)
 		if err != nil {
 			return errors.WithStack(err)
 		}
