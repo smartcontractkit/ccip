@@ -125,7 +125,7 @@ func DeployEVM2EVMOffRampHelper(auth *bind.TransactOpts, backend bind.ContractBa
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	return address, tx, &EVM2EVMOffRampHelper{EVM2EVMOffRampHelperCaller: EVM2EVMOffRampHelperCaller{contract: contract}, EVM2EVMOffRampHelperTransactor: EVM2EVMOffRampHelperTransactor{contract: contract}, EVM2EVMOffRampHelperFilterer: EVM2EVMOffRampHelperFilterer{contract: contract}}, nil
+	return address, tx, &EVM2EVMOffRampHelper{address: address, abi: *parsed, EVM2EVMOffRampHelperCaller: EVM2EVMOffRampHelperCaller{contract: contract}, EVM2EVMOffRampHelperTransactor: EVM2EVMOffRampHelperTransactor{contract: contract}, EVM2EVMOffRampHelperFilterer: EVM2EVMOffRampHelperFilterer{contract: contract}}, nil
 }
 
 type EVM2EVMOffRampHelper struct {
