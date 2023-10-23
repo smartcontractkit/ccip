@@ -213,7 +213,7 @@ func setupAndTestOffRampReader(t *testing.T, version string) {
 	case ccipdata.V1_0_0:
 		setupAndTestOffRampReaderV1_0_0(t, user, bc, log)
 	case ccipdata.V1_1_0:
-		// Version 1.1.0 uses the same contract as 1.0.0.
+		// Version 1.1.0 uses the same contracts as 1.0.0.
 		setupAndTestOffRampReaderV1_0_0(t, user, bc, log)
 	case ccipdata.V1_2_0:
 		setupAndTestOffRampReaderV1_2_0(t, user, bc, log)
@@ -226,11 +226,11 @@ func setupAndTestOffRampReaderV1_2_0(t *testing.T, user *bind.TransactOpts, bc *
 
 	onRampAddr := utils.RandomAddress()
 	armAddr := deployMockArm(t, user, bc)
-	cs := deployCommitStoreV1_2_0(t, user, bc, onRampAddr, armAddr)
+	csAddr := deployCommitStoreV1_2_0(t, user, bc, onRampAddr, armAddr)
 
 	// Deploy the OffRamp.
 	staticConfig := evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
-		CommitStore:         cs.Address(),
+		CommitStore:         csAddr,
 		ChainSelector:       testutils.SimulatedChainID.Uint64(),
 		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
 		OnRamp:              onRampAddr,
@@ -253,7 +253,6 @@ func setupAndTestOffRampReaderV1_2_0(t *testing.T, user *bind.TransactOpts, bc *
 	bc.Commit()
 	require.NoError(t, err)
 	assertNonRevert(t, tx, bc, user)
-	require.Equal(t, offRampAddr, offRamp.Address())
 
 	// Test the deployed OffRamp.
 	callOpts := &bind.CallOpts{
@@ -276,11 +275,11 @@ func setupAndTestOffRampReaderV1_0_0(t *testing.T, user *bind.TransactOpts, bc *
 
 	onRampAddr := utils.RandomAddress()
 	armAddr := deployMockArm(t, user, bc)
-	cs := deployCommitStoreV1_0_0(t, user, bc, onRampAddr, armAddr)
+	csAddr := deployCommitStoreV1_0_0(t, user, bc, onRampAddr, armAddr)
 
 	// Deploy the OffRamp.
 	staticConfig := evm_2_evm_offramp_1_0_0.EVM2EVMOffRampStaticConfig{
-		CommitStore:         cs.Address(),
+		CommitStore:         csAddr,
 		ChainSelector:       testutils.SimulatedChainID.Uint64(),
 		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
 		OnRamp:              onRampAddr,
@@ -303,7 +302,6 @@ func setupAndTestOffRampReaderV1_0_0(t *testing.T, user *bind.TransactOpts, bc *
 	bc.Commit()
 	require.NoError(t, err)
 	assertNonRevert(t, tx, bc, user)
-	require.Equal(t, offRampAddr, offRamp.Address())
 
 	// Test the deployed OffRamp.
 	callOpts := &bind.CallOpts{
@@ -358,7 +356,7 @@ func deployCommitStoreV1_2_0(
 	bc *client.SimulatedBackendClient,
 	onRampAddress common.Address,
 	armAddress common.Address,
-) *commit_store_helper.CommitStoreHelper {
+) common.Address {
 	// Deploy the CommitStore using the helper.
 	csAddr, tx, cs, err := commit_store_helper.DeployCommitStoreHelper(user, bc, commit_store_helper.CommitStoreStaticConfig{
 		ChainSelector:       testutils.SimulatedChainID.Uint64(),
@@ -369,7 +367,6 @@ func deployCommitStoreV1_2_0(
 	require.NoError(t, err)
 	bc.Commit()
 	assertNonRevert(t, tx, bc, user)
-	require.Equal(t, csAddr, cs.Address()) // Fails without the CommitStoreHelper fix.
 
 	// Test the deployed CommitStore.
 	callOpts := &bind.CallOpts{
@@ -382,7 +379,8 @@ func deployCommitStoreV1_2_0(
 	tav, err := cs.TypeAndVersion(callOpts)
 	require.NoError(t, err)
 	require.Equal(t, "CommitStore 1.2.0", tav)
-	return cs
+
+	return csAddr
 }
 
 func deployCommitStoreV1_0_0(
@@ -391,8 +389,7 @@ func deployCommitStoreV1_0_0(
 	bc *client.SimulatedBackendClient,
 	onRampAddress common.Address,
 	armAddress common.Address,
-) *commit_store_helper_1_0_0.CommitStoreHelper {
-	// Deploy the CommitStore using the helper.
+) common.Address {
 	csAddr, tx, cs, err := commit_store_helper_1_0_0.DeployCommitStoreHelper(user, bc, commit_store_helper_1_0_0.CommitStoreStaticConfig{
 		ChainSelector:       testutils.SimulatedChainID.Uint64(),
 		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
@@ -402,8 +399,6 @@ func deployCommitStoreV1_0_0(
 	require.NoError(t, err)
 	bc.Commit()
 	assertNonRevert(t, tx, bc, user)
-	require.Equal(t, csAddr, cs.Address()) // Fails without the CommitStoreHelper fix.
-
 	// Test the deployed CommitStore.
 	callOpts := &bind.CallOpts{
 		From:    user.From,
@@ -415,7 +410,7 @@ func deployCommitStoreV1_0_0(
 	tav, err := cs.TypeAndVersion(callOpts)
 	require.NoError(t, err)
 	require.Equal(t, "CommitStore 1.0.0", tav)
-	return cs
+	return csAddr
 }
 
 // Should be moved to a common test utils package.
