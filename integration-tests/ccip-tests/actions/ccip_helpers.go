@@ -2260,13 +2260,13 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 	if c.LocalCluster != nil {
 		// for local cluster, fetch the values from the local cluster
 		for _, chainlinkNode := range c.LocalCluster.ClCluster.Nodes {
-			chainlinkNodes = append(chainlinkNodes, chainlinkNode.API)
+			chainlinkNodes = append(chainlinkNodes, chainlinkNode.API.WithRetryCount(3))
 			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}
 	} else {
 		// in case of k8s, we need to connect to the chainlink nodes
 		log.Info().Msg("Connecting to launched resources")
-		chainlinkK8sNodes, err := client.ConnectChainlinkNodes(c.K8Env)
+		chainlinkK8sNodes, err := client.ConnectChainlinkNodes(c.K8Env)client/chainlink.go
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -2275,7 +2275,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		}
 
 		for _, chainlinkNode := range chainlinkK8sNodes {
-			chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient)
+			chainlinkNodes = append(chainlinkNodes, chainlinkNode.ChainlinkClient.WithRetryCount(3))
 			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}
 		c.CLNodes = chainlinkK8sNodes
