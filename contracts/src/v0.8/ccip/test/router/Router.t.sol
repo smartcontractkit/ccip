@@ -392,17 +392,37 @@ contract Router_applyRampUpdates is RouterSetup {
     s_receiver = new MaybeRevertMessageReceiver(false);
   }
 
+  function assertOffRampRouteSucceeds(Router.OffRamp memory offRamp) internal {
+    changePrank(offRamp.offRamp);
+
+    Client.Any2EVMMessage memory message = generateReceiverMessage(offRamp.sourceChainSelector);
+    vm.expectCall(address(s_receiver), abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message));
+    s_sourceRouter.routeMessage(message, GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver));
+  }
+
+  function assertOffRampRouteReverts(Router.OffRamp memory offRamp) internal {
+    changePrank(offRamp.offRamp);
+
+    vm.expectRevert(IRouter.OnlyOffRamp.selector);
+    s_sourceRouter.routeMessage(
+      generateReceiverMessage(offRamp.sourceChainSelector),
+      GAS_FOR_CALL_EXACT_CHECK,
+      100_000,
+      address(s_receiver)
+    );
+  }
+
   function testFuzz_OffRampUpdates(Router.OffRamp[] memory offRamps) public {
-    // Test adding offramps
+    // Test adding offRamps
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRamps);
 
-    // There is no uniqueness guarantee on fuzz input, offramp will not emit in case of a duplicate,
-    // hence cannot assert on number of offramp event emissions, we need to use isOffRamp
+    // There is no uniqueness guarantee on fuzz input, offRamps will not emit in case of a duplicate,
+    // hence cannot assert on number of offRamps event emissions, we need to use isOffRamp
     for (uint256 i = 0; i < offRamps.length; ++i) {
       assertTrue(s_sourceRouter.isOffRamp(offRamps[i].sourceChainSelector, offRamps[i].offRamp));
     }
 
-    // Test removing offramps
+    // Test removing offRamps
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), s_sourceRouter.getOffRamps(), new Router.OffRamp[](0));
 
     assertEq(0, s_sourceRouter.getOffRamps().length);
@@ -418,8 +438,8 @@ contract Router_applyRampUpdates is RouterSetup {
     }
   }
 
-  function test_OffRampUpdatesWithRouting() public {
-    // Explicitly construct chain selectors and ramp addresses so we have control over uniqueness for the various test scenarios.
+  function testOffRampUpdatesWithRouting() public {
+    // Explicitly construct chain selectors and ramp addresses so we have ramp uniqueness for the various test scenarios.
     uint256 numberOfSelectors = 10;
     uint64[] memory sourceChainSelectors = new uint64[](numberOfSelectors);
     for (uint256 i = 0; i < numberOfSelectors; ++i) {
@@ -431,39 +451,40 @@ contract Router_applyRampUpdates is RouterSetup {
     for (uint256 i = 0; i < numberOfOffRamps; ++i) {
       offRamps[i] = address(uint160(i * 10));
     }
-    
-    // Add ingress
+
+    // 1st test scenario: add offramps.
+    // Check all the offramps are added correctly, and can route messages.
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](0);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](numberOfSelectors * numberOfOffRamps);
 
-    // Ensure there are multi-ramp source and multi-source ramp
+    // Ensure there are multi-offramp source and multi-source offramps
     for (uint256 i = 0; i < numberOfSelectors; ++i) {
       for (uint256 j = 0; j < numberOfOffRamps; ++j) {
         offRampUpdates[(i * numberOfOffRamps) + j] = Router.OffRamp(sourceChainSelectors[i], offRamps[j]);
       }
     }
 
+    for (uint256 i = 0; i < offRampUpdates.length; ++i) {
+      vm.expectEmit();
+      emit OffRampAdded(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp);
+    }
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
-    // Check all offRamps are added and can route to receiver
     Router.OffRamp[] memory gotOffRamps = s_sourceRouter.getOffRamps();
     assertEq(offRampUpdates.length, gotOffRamps.length);
 
     for (uint256 i = 0; i < offRampUpdates.length; ++i) {
       assertEq(offRampUpdates[i].offRamp, gotOffRamps[i].offRamp);
       assertTrue(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
-
-      changePrank(offRampUpdates[i].offRamp);
-
-      Client.Any2EVMMessage memory message = generateReceiverMessage(offRampUpdates[i].sourceChainSelector);
-      vm.expectCall(address(s_receiver), abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message));
-      s_sourceRouter.routeMessage(message, GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver));
+      assertOffRampRouteSucceeds(offRampUpdates[i]);
     }
-    
 
     changePrank(OWNER);
 
-    // Remove and add partial ingress
+    // 2nd test scenario: partially remove existing offramps, add new offramps.
+    // Check offramps are removed correctly. Removed offramps cannot route messages.
+    // Check new offramps are added correctly. New offramps can route messages.
+    // Check unmodified offramps remain correct, and can still route messages.
     uint256 numberOfPartialUpdates = offRampUpdates.length / 2;
     Router.OffRamp[] memory partialOffRampRemoves = new Router.OffRamp[](numberOfPartialUpdates);
     Router.OffRamp[] memory partialOffRampAdds = new Router.OffRamp[](numberOfPartialUpdates);
@@ -471,49 +492,45 @@ contract Router_applyRampUpdates is RouterSetup {
       partialOffRampRemoves[i] = offRampUpdates[i];
       partialOffRampAdds[i] = Router.OffRamp({
         sourceChainSelector: offRampUpdates[i].sourceChainSelector,
-        offRamp: address(uint160(offRampUpdates[i].offRamp) + 1e18) // new offramp addresses
+        offRamp: address(uint160(offRampUpdates[i].offRamp) + 1e18) // Ensure unique new offRamps addresses
       });
     }
 
+    for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
+      vm.expectEmit();
+      emit OffRampRemoved(partialOffRampRemoves[i].sourceChainSelector, partialOffRampRemoves[i].offRamp);
+    }
+    for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
+      vm.expectEmit();
+      emit OffRampAdded(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp);
+    }
     s_sourceRouter.applyRampUpdates(onRampUpdates, partialOffRampRemoves, partialOffRampAdds);
 
-    // Check removes and addes succeeded
     gotOffRamps = s_sourceRouter.getOffRamps();
     assertEq(offRampUpdates.length, gotOffRamps.length);
 
     for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
-      assertFalse(s_sourceRouter.isOffRamp(partialOffRampRemoves[i].sourceChainSelector, partialOffRampRemoves[i].offRamp));
-      assertTrue(s_sourceRouter.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
-
-      changePrank(partialOffRampRemoves[i].offRamp);
-
-      vm.expectRevert(IRouter.OnlyOffRamp.selector);
-      s_sourceRouter.routeMessage(
-        generateReceiverMessage(partialOffRampRemoves[i].sourceChainSelector),
-        GAS_FOR_CALL_EXACT_CHECK,
-        100_000,
-        address(s_receiver)
+      assertFalse(
+        s_sourceRouter.isOffRamp(partialOffRampRemoves[i].sourceChainSelector, partialOffRampRemoves[i].offRamp)
       );
+      assertOffRampRouteReverts(partialOffRampRemoves[i]);
 
-      changePrank(partialOffRampAdds[i].offRamp);
-      Client.Any2EVMMessage memory message = generateReceiverMessage(partialOffRampAdds[i].sourceChainSelector);
-      vm.expectCall(address(s_receiver), abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message));
-      s_sourceRouter.routeMessage(message, GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver));
+      assertTrue(s_sourceRouter.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
+      assertOffRampRouteSucceeds(partialOffRampAdds[i]);
     }
     for (uint256 i = numberOfPartialUpdates; i < offRampUpdates.length; ++i) {
       assertTrue(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
-
-      changePrank(offRampUpdates[i].offRamp);
-
-      Client.Any2EVMMessage memory message = generateReceiverMessage(offRampUpdates[i].sourceChainSelector);
-      vm.expectCall(address(s_receiver), abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message));
-      s_sourceRouter.routeMessage(message, GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver));
+      assertOffRampRouteSucceeds(offRampUpdates[i]);
     }
 
-
     changePrank(OWNER);
-    
-    // Remove all offRamps
+
+    // 3rd test scenario: remove all offramps.
+    // Check all offramps have been removed, no offramp is able to route messages.
+    for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
+      vm.expectEmit();
+      emit OffRampRemoved(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp);
+    }
     s_sourceRouter.applyRampUpdates(onRampUpdates, partialOffRampAdds, new Router.OffRamp[](0));
 
     uint256 numberOfRemainingOfframps = offRampUpdates.length - numberOfPartialUpdates;
@@ -521,62 +538,55 @@ contract Router_applyRampUpdates is RouterSetup {
     for (uint256 i = 0; i < numberOfRemainingOfframps; ++i) {
       remainingOffRampRemoves[i] = offRampUpdates[i + numberOfPartialUpdates];
     }
+
+    for (uint256 i = 0; i < numberOfRemainingOfframps; ++i) {
+      vm.expectEmit();
+      emit OffRampRemoved(remainingOffRampRemoves[i].sourceChainSelector, remainingOffRampRemoves[i].offRamp);
+    }
     s_sourceRouter.applyRampUpdates(onRampUpdates, remainingOffRampRemoves, new Router.OffRamp[](0));
 
-    // Check there are no offRamps
+    // Check there are no offRamps.
     assertEq(0, s_sourceRouter.getOffRamps().length);
 
     for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
       assertFalse(s_sourceRouter.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
-
-      changePrank(partialOffRampAdds[i].offRamp);
-
-      vm.expectRevert(IRouter.OnlyOffRamp.selector);
-      s_sourceRouter.routeMessage(
-        generateReceiverMessage(partialOffRampAdds[i].sourceChainSelector),
-        GAS_FOR_CALL_EXACT_CHECK,
-        100_000,
-        address(s_receiver)
-      );
+      assertOffRampRouteReverts(partialOffRampAdds[i]);
     }
     for (uint256 i = 0; i < offRampUpdates.length; ++i) {
       assertFalse(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
-
-      changePrank(offRampUpdates[i].offRamp);
-
-      vm.expectRevert(IRouter.OnlyOffRamp.selector);
-      s_sourceRouter.routeMessage(
-        generateReceiverMessage(offRampUpdates[i].sourceChainSelector),
-        GAS_FOR_CALL_EXACT_CHECK,
-        100_000,
-        address(s_receiver)
-      );
+      assertOffRampRouteReverts(offRampUpdates[i]);
     }
 
-
     changePrank(OWNER);
-    
-    // Add all offRamps back
+
+    // 4th test scenario: add initial onramps back.
+    // Check the offramps are added correctly, and can route messages.
+    // Check offramps that were not added back remain unset, and cannot route messages.
+    for (uint256 i = 0; i < offRampUpdates.length; ++i) {
+      vm.expectEmit();
+      emit OffRampAdded(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp);
+    }
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
-    // Check all offRamps are added back and can route to receiver
+    // Check initial offRamps are added back and can route to receiver.
     gotOffRamps = s_sourceRouter.getOffRamps();
     assertEq(offRampUpdates.length, gotOffRamps.length);
 
     for (uint256 i = 0; i < offRampUpdates.length; ++i) {
       assertEq(offRampUpdates[i].offRamp, gotOffRamps[i].offRamp);
       assertTrue(s_sourceRouter.isOffRamp(offRampUpdates[i].sourceChainSelector, offRampUpdates[i].offRamp));
+      assertOffRampRouteSucceeds(offRampUpdates[i]);
+    }
 
-      changePrank(offRampUpdates[i].offRamp);
-
-      Client.Any2EVMMessage memory message = generateReceiverMessage(offRampUpdates[i].sourceChainSelector);
-      vm.expectCall(address(s_receiver), abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message));
-      s_sourceRouter.routeMessage(message, GAS_FOR_CALL_EXACT_CHECK, 100_000, address(s_receiver));
+    // Check offramps that were not added back remain unset.
+    for (uint256 i = 0; i < numberOfPartialUpdates; ++i) {
+      assertFalse(s_sourceRouter.isOffRamp(partialOffRampAdds[i].sourceChainSelector, partialOffRampAdds[i].offRamp));
+      assertOffRampRouteReverts(partialOffRampAdds[i]);
     }
   }
 
   function testFuzz_OnRampUpdates(Router.OnRamp[] memory onRamps) public {
-    // Test adding onramps
+    // Test adding onRamps
     for (uint256 i = 0; i < onRamps.length; ++i) {
       vm.expectEmit();
       emit OnRampSet(onRamps[i].destChainSelector, onRamps[i].onRamp);
@@ -584,7 +594,7 @@ contract Router_applyRampUpdates is RouterSetup {
 
     s_sourceRouter.applyRampUpdates(onRamps, new Router.OffRamp[](0), new Router.OffRamp[](0));
 
-    // Test setting onramp to unsupported
+    // Test setting onRamps to unsupported
     for (uint256 i = 0; i < onRamps.length; ++i) {
       onRamps[i].onRamp = address(0);
 
