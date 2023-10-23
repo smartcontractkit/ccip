@@ -47,7 +47,7 @@ package ccip
 // correct version of abigen installed , the above commands spin up docker
 // containers. In my hands, total running time including compilation is about
 // 13s. If you're modifying solidity code and testing against go code a lot, it
-// might be worthwhile to generate the the wrappers using a static container
+// might be worthwhile to generate the wrappers using a static container
 // with abigen and solc, which will complete much faster. E.g.
 //
 //   abigen -sol ../../contracts/src/v0.6/VRFAll.sol -pkg vrf -out solidity_interfaces.go
