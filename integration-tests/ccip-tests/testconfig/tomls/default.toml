@@ -1,14 +1,17 @@
 [CCIP]
+[CCIP.Env]
 Networks = ['SIMULATED_1', 'SIMULATED_2']
 
-[CCIP.Chainlink]
-[CCIP.Chainlink.Common]
-Name = 'node1'
+[CCIP.Env.Chainlink]
 NodeMemory = '2Gi'
 NodeCPU = '2'
 DBMemory = '2Gi'
 DBCPU = '2'
 DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB']
+
+
+[CCIP.Env.Chainlink.Common]
+Name = 'node1'
 NodeConfig = """
 [Feature]
 LogPoller = true
@@ -59,6 +62,7 @@ AnnounceAddresses = ['0.0.0.0:6690']
 DeltaDial = '500ms'
 DeltaReconcile = '5s'
 """
+
 
 [CCIP.Groups]
 [CCIP.Groups.smoke]

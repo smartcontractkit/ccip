@@ -78,7 +78,7 @@ type loadArgs struct {
 func (l *loadArgs) Setup(sameCommitAndExec bool, noOfcommit, noOfExec int) {
 	lggr := l.lggr
 	var setUpArgs *testsetups.CCIPTestSetUpOutputs
-	existing := pointer.GetBool(l.TestCfg.GroupInput.ExistingDeployment)
+	existing := pointer.GetBool(l.TestCfg.TestGroupInput.ExistingDeployment)
 	if !existing {
 		replicas := noOfcommit + 1
 		if !sameCommitAndExec {
@@ -95,29 +95,29 @@ func (l *loadArgs) Setup(sameCommitAndExec bool, noOfcommit, noOfExec int) {
 func (l *loadArgs) setSchedule() {
 	var segments []*wasp.Segment
 	var segmentDuration time.Duration
-	require.Greater(l.t, len(l.TestCfg.GroupInput.RequestPerUnitTime), 0, "RequestPerUnitTime must be set")
-	if len(l.TestCfg.GroupInput.RequestPerUnitTime) > 1 {
-		for i, req := range l.TestCfg.GroupInput.RequestPerUnitTime {
-			duration := l.TestCfg.GroupInput.StepDuration[i].Duration()
+	require.Greater(l.t, len(l.TestCfg.TestGroupInput.RequestPerUnitTime), 0, "RequestPerUnitTime must be set")
+	if len(l.TestCfg.TestGroupInput.RequestPerUnitTime) > 1 {
+		for i, req := range l.TestCfg.TestGroupInput.RequestPerUnitTime {
+			duration := l.TestCfg.TestGroupInput.StepDuration[i].Duration()
 			segmentDuration += duration
 			segments = append(segments, wasp.Plain(req, duration)...)
 		}
-		totalDuration := l.TestCfg.GroupInput.TestDuration.Duration()
+		totalDuration := l.TestCfg.TestGroupInput.TestDuration.Duration()
 		repeatTimes := totalDuration.Seconds() / segmentDuration.Seconds()
 		l.schedules = wasp.CombineAndRepeat(int(math.Round(repeatTimes)), segments)
 	} else {
-		l.schedules = wasp.Plain(l.TestCfg.GroupInput.RequestPerUnitTime[0], l.TestCfg.GroupInput.TestDuration.Duration())
+		l.schedules = wasp.Plain(l.TestCfg.TestGroupInput.RequestPerUnitTime[0], l.TestCfg.TestGroupInput.TestDuration.Duration())
 	}
 }
 
 func (l *loadArgs) SanityCheck() {
 	for _, lane := range l.TestSetupArgs.Lanes {
 		lane.ForwardLane.RecordStateBeforeTransfer()
-		err := lane.ForwardLane.SendRequests(1, l.TestCfg.GroupInput.MsgType)
+		err := lane.ForwardLane.SendRequests(1, l.TestCfg.TestGroupInput.MsgType)
 		require.NoError(l.t, err)
 		lane.ForwardLane.ValidateRequests()
 		lane.ReverseLane.RecordStateBeforeTransfer()
-		err = lane.ReverseLane.SendRequests(1, l.TestCfg.GroupInput.MsgType)
+		err = lane.ReverseLane.SendRequests(1, l.TestCfg.TestGroupInput.MsgType)
 		require.NoError(l.t, err)
 		lane.ReverseLane.ValidateRequests()
 	}
@@ -142,7 +142,7 @@ func (l *loadArgs) TriggerLoad(schedule ...*wasp.Segment) {
 			}
 		}
 	}
-	l.TestSetupArgs.Reporter.SetDuration(l.TestCfg.GroupInput.TestDuration.Duration())
+	l.TestSetupArgs.Reporter.SetDuration(l.TestCfg.TestGroupInput.TestDuration.Duration())
 }
 
 func (l *loadArgs) AddMoreLanesToRun() {
@@ -154,7 +154,7 @@ func (l *loadArgs) AddMoreLanesToRun() {
 	transferAmounts := []*big.Int{big.NewInt(1)}
 	// set the ticker duration based on number of network pairs and the total test duration
 	noOfPair := int64(len(l.TestCfg.NetworkPairs))
-	step := l.TestCfg.GroupInput.TestDuration.Duration().Nanoseconds() / noOfPair
+	step := l.TestCfg.TestGroupInput.TestDuration.Duration().Nanoseconds() / noOfPair
 	ticker := time.NewTicker(time.Duration(step))
 	l.setSchedule()
 	// Lane for the first network pair is already deployed
@@ -207,7 +207,7 @@ func (l *loadArgs) Start() {
 	go func() {
 		defer l.LoadStarterWg.Done()
 		loadCount := 0
-		namespace := l.TestCfg.GroupInput.ExistingEnv
+		namespace := l.TestCfg.TestGroupInput.ExistingEnv
 		for {
 			select {
 			case cfg := <-l.LaneLoadCfg:
@@ -218,8 +218,8 @@ func (l *loadArgs) Start() {
 					Str("Destination Network", lane.DestNetworkName).
 					Msg("Starting load for lane")
 
-				ccipLoad := NewCCIPLoad(l.TestCfg.Test, lane, l.TestCfg.GroupInput.PhaseTimeout.Duration(), 100000, lane.Reports)
-				ccipLoad.BeforeAllCall(l.TestCfg.GroupInput.MsgType)
+				ccipLoad := NewCCIPLoad(l.TestCfg.Test, lane, l.TestCfg.TestGroupInput.PhaseTimeout.Duration(), 100000, lane.Reports)
+				ccipLoad.BeforeAllCall(l.TestCfg.TestGroupInput.MsgType)
 				if lane.TestEnv != nil && lane.TestEnv.K8Env != nil && lane.TestEnv.K8Env.Cfg != nil {
 					namespace = lane.TestEnv.K8Env.Cfg.Namespace
 				}
@@ -229,12 +229,12 @@ func (l *loadArgs) Start() {
 					GenName:               fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
 					Schedule:              l.schedules,
 					LoadType:              wasp.RPS,
-					RateLimitUnitDuration: l.TestCfg.GroupInput.TimeUnit.Duration(),
+					RateLimitUnitDuration: l.TestCfg.TestGroupInput.TimeUnit.Duration(),
 					CallResultBufLen:      10, // we keep the last 10 call results for each generator, as the detailed report is generated at the end of the test
-					CallTimeout:           (l.TestCfg.GroupInput.PhaseTimeout.Duration()) * 5,
+					CallTimeout:           (l.TestCfg.TestGroupInput.PhaseTimeout.Duration()) * 5,
 					Gun:                   ccipLoad,
 					Logger:                ccipLoad.Lane.Logger,
-					SharedData:            l.TestCfg.GroupInput.MsgType,
+					SharedData:            l.TestCfg.TestGroupInput.MsgType,
 					LokiConfig:            wasp.NewEnvLokiConfig(),
 					Labels: map[string]string{
 						"test_group":   "load",

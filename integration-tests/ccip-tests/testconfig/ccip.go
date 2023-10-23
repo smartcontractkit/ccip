@@ -32,6 +32,9 @@ type CCIPTestConfig struct {
 }
 
 func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
+	if fromCfg == nil {
+		return nil
+	}
 	if fromCfg.KeepEnvAlive != nil {
 		c.KeepEnvAlive = fromCfg.KeepEnvAlive
 	}
@@ -137,6 +140,9 @@ type CCIPContractConfig struct {
 }
 
 func (c *CCIPContractConfig) ApplyOverrides(from *CCIPContractConfig) error {
+	if from == nil {
+		return nil
+	}
 	if from.Data != "" {
 		c.Data = from.Data
 	}
@@ -151,13 +157,13 @@ func (c *CCIPContractConfig) ContractsData() []byte {
 }
 
 type CCIP struct {
-	*Common
+	Env         *Common                    `toml:",omitempty"`
 	Deployments *CCIPContractConfig        `toml:",omitempty"`
 	Groups      map[string]*CCIPTestConfig `toml:",omitempty"`
 }
 
 func (c *CCIP) ReadSecrets() error {
-	err := c.Common.ReadSecrets()
+	err := c.Env.ReadSecrets()
 	if err != nil {
 		return err
 	}
@@ -170,10 +176,13 @@ func (c *CCIP) ReadSecrets() error {
 }
 
 func (c *CCIP) Validate() error {
-	err := c.Common.Validate()
-	if err != nil {
-		return err
+	if c.Env != nil {
+		err := c.Env.Validate()
+		if err != nil {
+			return err
+		}
 	}
+
 	for _, grp := range c.Groups {
 		if err := grp.Validate(); err != nil {
 			return err
@@ -183,11 +192,23 @@ func (c *CCIP) Validate() error {
 }
 
 func (c *CCIP) ApplyOverrides(fromCfg *CCIP) error {
-	if err := c.Common.ApplyOverrides(fromCfg.Common); err != nil {
-		return err
+	if c.Env == nil {
+		if fromCfg.Env != nil {
+			c.Env = fromCfg.Env
+		}
+	} else {
+		if err := c.Env.ApplyOverrides(fromCfg.Env); err != nil {
+			return err
+		}
 	}
-	if err := c.Deployments.ApplyOverrides(fromCfg.Deployments); err != nil {
-		return err
+	if c.Deployments == nil {
+		if fromCfg.Deployments != nil {
+			c.Deployments = fromCfg.Deployments
+		}
+	} else {
+		if err := c.Deployments.ApplyOverrides(fromCfg.Deployments); err != nil {
+			return err
+		}
 	}
 	if len(fromCfg.Groups) != 0 {
 		for name, grp := range fromCfg.Groups {

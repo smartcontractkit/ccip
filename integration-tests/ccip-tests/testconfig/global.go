@@ -52,6 +52,10 @@ type Config struct {
 	CCIP *CCIP `toml:",omitempty"`
 }
 
+func (c *Config) Validate() error {
+	return c.CCIP.Validate()
+}
+
 func NewConfig() (*Config, error) {
 	cfg := &Config{}
 	override := &Config{}
@@ -62,7 +66,7 @@ func NewConfig() (*Config, error) {
 	}
 
 	// load config from env var if specified
-	rawConfig, _ := utils.GetEnv("TEST_CONFIG_OVERRIDE")
+	rawConfig, _ := utils.GetEnv("BASE64_TEST_CONFIG_OVERRIDE")
 	if rawConfig != "" {
 		d, err := base64.StdEncoding.DecodeString(rawConfig)
 		err = toml.Unmarshal(d, &override)
@@ -73,9 +77,13 @@ func NewConfig() (*Config, error) {
 	if override != nil {
 		// apply overrides for all products
 		if override.CCIP != nil {
-			err = cfg.CCIP.ApplyOverrides(override.CCIP)
-			if err != nil {
-				return nil, err
+			if cfg.CCIP == nil {
+				cfg.CCIP = override.CCIP
+			} else {
+				err = cfg.CCIP.ApplyOverrides(override.CCIP)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -111,6 +119,9 @@ func (p Common) ReadSecrets() error {
 }
 
 func (p Common) ApplyOverrides(from *Common) error {
+	if from == nil {
+		return nil
+	}
 	if from.EnvUser != "" {
 		p.EnvUser = from.EnvUser
 	}
@@ -152,6 +163,9 @@ type Chainlink struct {
 }
 
 func (c *Chainlink) ApplyOverrides(from *Chainlink) {
+	if from == nil {
+		return
+	}
 	if from.NoOfNodes != nil {
 		c.NoOfNodes = from.NoOfNodes
 	}
