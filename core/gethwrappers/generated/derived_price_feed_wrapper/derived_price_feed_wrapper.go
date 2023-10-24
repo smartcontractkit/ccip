@@ -50,7 +50,7 @@ func DeployDerivedPriceFeed(auth *bind.TransactOpts, backend bind.ContractBacken
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	return address, tx, &DerivedPriceFeed{DerivedPriceFeedCaller: DerivedPriceFeedCaller{contract: contract}, DerivedPriceFeedTransactor: DerivedPriceFeedTransactor{contract: contract}, DerivedPriceFeedFilterer: DerivedPriceFeedFilterer{contract: contract}}, nil
+	return address, tx, &DerivedPriceFeed{address: address, abi: *parsed, DerivedPriceFeedCaller: DerivedPriceFeedCaller{contract: contract}, DerivedPriceFeedTransactor: DerivedPriceFeedTransactor{contract: contract}, DerivedPriceFeedFilterer: DerivedPriceFeedFilterer{contract: contract}}, nil
 }
 
 type DerivedPriceFeed struct {
