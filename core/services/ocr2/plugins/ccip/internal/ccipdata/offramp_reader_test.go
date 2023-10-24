@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
@@ -245,7 +244,7 @@ func setupAndTestOffRampReaderV1_2_0(t *testing.T, user *bind.TransactOpts, bc *
 
 	onRampAddr := utils.RandomAddress()
 	armAddr := deployMockArm(t, user, bc)
-	csAddr := deployCommitStoreV1_2_0(t, user, bc, onRampAddr, armAddr)
+	csAddr := deployCommitStore(t, user, bc, onRampAddr, armAddr)
 
 	// Deploy the OffRamp.
 	staticConfig := evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
@@ -290,7 +289,7 @@ func setupAndTestOffRampReaderV1_0_0(t *testing.T, user *bind.TransactOpts, bc *
 
 	onRampAddr := utils.RandomAddress()
 	armAddr := deployMockArm(t, user, bc)
-	csAddr := deployCommitStoreV1_0_0(t, user, bc, onRampAddr, armAddr)
+	csAddr := deployCommitStore(t, user, bc, onRampAddr, armAddr)
 
 	// Deploy the OffRamp.
 	staticConfig := evm_2_evm_offramp_1_0_0.EVM2EVMOffRampStaticConfig{
@@ -361,7 +360,8 @@ func deployMockArm(
 	return armAddr
 }
 
-func deployCommitStoreV1_2_0(
+// Deploy the CommitStore. We use the same CommitStore version for all versions of OffRamp tested.
+func deployCommitStore(
 	t *testing.T,
 	user *bind.TransactOpts,
 	bc *client.SimulatedBackendClient,
@@ -391,36 +391,6 @@ func deployCommitStoreV1_2_0(
 	require.NoError(t, err)
 	require.Equal(t, "CommitStore 1.2.0", tav)
 
-	return csAddr
-}
-
-func deployCommitStoreV1_0_0(
-	t *testing.T,
-	user *bind.TransactOpts,
-	bc *client.SimulatedBackendClient,
-	onRampAddress common.Address,
-	armAddress common.Address,
-) common.Address {
-	csAddr, tx, cs, err := commit_store_helper_1_0_0.DeployCommitStoreHelper(user, bc, commit_store_helper_1_0_0.CommitStoreStaticConfig{
-		ChainSelector:       testutils.SimulatedChainID.Uint64(),
-		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
-		OnRamp:              onRampAddress,
-		ArmProxy:            armAddress,
-	})
-	require.NoError(t, err)
-	bc.Commit()
-	assertNonRevert(t, tx, bc, user)
-	// Test the deployed CommitStore.
-	callOpts := &bind.CallOpts{
-		From:    user.From,
-		Context: context.Background(),
-	}
-	number, err := cs.GetExpectedNextSequenceNumber(callOpts)
-	require.NoError(t, err)
-	require.Equal(t, 1, int(number))
-	tav, err := cs.TypeAndVersion(callOpts)
-	require.NoError(t, err)
-	require.Equal(t, "CommitStore 1.0.0", tav)
 	return csAddr
 }
 
