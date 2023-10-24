@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IRouterClient} from "../interfaces/IRouterClient.sol";
-
+import {Router} from "../Router.sol";
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
+import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
 
@@ -23,10 +23,19 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   bool private s_isPaused;
   IERC20 private s_feeToken;
 
+  // Defines the number of ping-pongs till a call to the funding method 'fundPingPong' is made
+  // Set to 0 to disable auto-funding, auto-funding only works for ping-pongs that are set as NOPs in the onRamp.
+  uint8 private s_fundingRounds = 21;
+
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), 2 ** 256 - 1);
+
+    if (s_fundingRounds % 2 == 0) {
+      // making fundingRounds even ensures that both sides (odd/even count) of the ping pong get funded.
+      s_fundingRounds += 1;
+    }
   }
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
@@ -51,10 +60,14 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
       receiver: abi.encode(s_counterpartAddress),
       data: data,
       tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000})),
+      extraArgs: "",
       feeToken: address(s_feeToken)
     });
-    IRouterClient(getRouter()).ccipSend(s_counterpartChainSelector, message);
+    Router(getRouter()).ccipSend(s_counterpartChainSelector, message);
+
+    if (s_fundingRounds > 0 && pingPongCount % s_fundingRounds == 0) {
+      fundPingPong();
+    }
   }
 
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
@@ -62,6 +75,13 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     if (!s_isPaused) {
       _respond(pingPongCount + 1);
     }
+  }
+
+  /// @notice A function that is responsible for funding this contract.
+  /// The contract can only be funded if it is set as a nop in the target onRamp.
+  /// In case your contract is not a nop you can prevent this function from being called by setting s_fundingRounds=0.
+  function fundPingPong() public {
+    EVM2EVMOnRamp(Router(getRouter()).getOnRamp(s_counterpartChainSelector)).payNops();
   }
 
   /////////////////////////////////////////////////////////////////////
