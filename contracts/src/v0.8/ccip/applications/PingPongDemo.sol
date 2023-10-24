@@ -23,20 +23,18 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   // Pause ping-ponging
   bool private s_isPaused;
   IERC20 private s_feeToken;
-
-  // Defines the number of ping-pongs till a call to the funding method 'fundPingPong' is made
+  
+  // Defines the increase in ping pong count before self-funding is attempted.
   // Set to 0 to disable auto-funding, auto-funding only works for ping-pongs that are set as NOPs in the onRamp.
-  uint8 private s_fundingRounds = 21;
+  uint8 public s_countIncrBeforeFunding;
 
-  constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
+  constructor(address router, IERC20 feeToken, uint8 roundTripsBeforeFundng) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), 2 ** 256 - 1);
 
-    if (s_fundingRounds % 2 == 0) {
-      // making fundingRounds even ensures that both sides (odd/even count) of the ping pong get funded.
-      s_fundingRounds += 1;
-    }
+    // PingPong count increases by 2 for each round trip.
+    s_countIncrBeforeFunding = roundTripsBeforeFundng * 2;
   }
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
@@ -56,6 +54,8 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
       emit Pong(pingPongCount);
     }
 
+    fundPingPong(pingPongCount);
+
     bytes memory data = abi.encode(pingPongCount);
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(s_counterpartAddress),
@@ -65,10 +65,6 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
       feeToken: address(s_feeToken)
     });
     IRouterWithOnRamps(getRouter()).ccipSend(s_counterpartChainSelector, message);
-
-    if (s_fundingRounds > 0 && pingPongCount % s_fundingRounds == 0) {
-      fundPingPong();
-    }
   }
 
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
@@ -80,9 +76,16 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
 
   /// @notice A function that is responsible for funding this contract.
   /// The contract can only be funded if it is set as a nop in the target onRamp.
-  /// In case your contract is not a nop you can prevent this function from being called by setting s_fundingRounds=0.
-  function fundPingPong() public {
-    EVM2EVMOnRamp(IRouterWithOnRamps(getRouter()).getOnRamp(s_counterpartChainSelector)).payNops();
+  /// In case your contract is not a nop you can prevent this function from being called by setting s_countIncrBeforeFunding=0.
+  function fundPingPong(uint256 pingPongCount) public {
+    // If selfFunding is disabled, or ping pong count has not reached s_countIncrPerFunding, do not attempt funding.
+    if (s_countIncrBeforeFunding == 0 || pingPongCount < s_countIncrBeforeFunding) return;
+
+    // Ping pong on one side will always be even, one side will always to odd.
+    // Funding threshold is met if pingPongCount = (s_countIncrBeforeFunding * I) + (0 || 1)
+    if (pingPongCount % s_countIncrBeforeFunding <= 1) {
+      EVM2EVMOnRamp(IRouterWithOnRamps(getRouter()).getOnRamp(s_counterpartChainSelector)).payNops();
+    }
   }
 
   /////////////////////////////////////////////////////////////////////

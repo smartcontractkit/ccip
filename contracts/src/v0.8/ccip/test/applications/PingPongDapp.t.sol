@@ -110,7 +110,7 @@ contract PingPong_ccipReceive is PingPongDappSetup {
 
     uint256 initialPingPongBalance = IERC20(s_feeToken).balanceOf(address(s_pingPong));
 
-    for (uint256 pingPongNumber = 0; pingPongNumber <= s_fundingRounds; pingPongNumber++) {
+    for (uint256 pingPongNumber = 0; pingPongNumber <= s_fundingRounds; ++pingPongNumber) {
       Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
         messageId: bytes32("a"),
         sourceChainSelector: DEST_CHAIN_ID,
