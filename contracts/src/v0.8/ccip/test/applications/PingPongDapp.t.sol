@@ -13,6 +13,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 
   PingPongDemo internal s_pingPong;
   IERC20 internal s_feeToken;
+  uint8 internal s_fundingRounds = 5;
 
   address internal immutable i_pongContract = address(10);
 
@@ -20,7 +21,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
 
     s_feeToken = IERC20(s_sourceTokens[0]);
-    s_pingPong = new PingPongDemo(address(s_sourceRouter), s_feeToken);
+    s_pingPong = new PingPongDemo(address(s_sourceRouter), s_feeToken, s_fundingRounds);
     s_pingPong.setCounterpart(DEST_CHAIN_ID, i_pongContract);
 
     // set ping pong as an onRamp nop to make sure that funding runs
@@ -107,12 +108,9 @@ contract PingPong_ccipReceive is PingPongDappSetup {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
     changePrank(address(s_sourceRouter));
 
-    // the number of funding rounds that is set in the contract
-    uint256 fundingRounds = 5;
-
     uint256 initialPingPongBalance = IERC20(s_feeToken).balanceOf(address(s_pingPong));
 
-    for (uint256 pingPongNumber = 0; pingPongNumber <= fundingRounds; pingPongNumber++) {
+    for (uint256 pingPongNumber = 0; pingPongNumber <= s_fundingRounds; pingPongNumber++) {
       Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
         messageId: bytes32("a"),
         sourceChainSelector: DEST_CHAIN_ID,
@@ -123,7 +121,7 @@ contract PingPong_ccipReceive is PingPongDappSetup {
       s_pingPong.ccipReceive(message);
 
       uint256 currentPingPongBalance = IERC20(s_feeToken).balanceOf(address(s_pingPong));
-      if (pingPongNumber == fundingRounds - 1) {
+      if (pingPongNumber == s_fundingRounds - 1) {
         require(initialPingPongBalance == currentPingPongBalance, "ping pong should have been funded");
       } else {
         require(initialPingPongBalance > currentPingPongBalance, "funding is not made yet");
