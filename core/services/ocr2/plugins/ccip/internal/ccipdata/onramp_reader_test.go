@@ -35,7 +35,7 @@ type readerTH struct {
 }
 
 func TestNewOnRampReader__noContractAtAddress(t *testing.T) {
-	_, bc := newSim(t)
+	_, bc := newSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -54,26 +54,36 @@ func TestNewOnRampReader__noContractAtAddress(t *testing.T) {
 	assert.EqualError(t, err, "expected 'EVM2EVMOnRamp' got '' (no contract code at given address)")
 }
 
-// The versions to test.
-func getVersions() []string {
-	return []string{V1_0_0, V1_1_0, V1_2_0}
-}
-
 func TestOnRampReaderInit(t *testing.T) {
-	for _, version := range getVersions() {
-		t.Run("OnRampReader_"+version, func(t *testing.T) {
-			setupAndTestOnRampReader(t, version)
+
+	tests := []struct {
+		name    string
+		version string
+	}{
+		{
+			name:    "OnRampReader_V1_0_0",
+			version: V1_0_0,
+		},
+		{
+			name:    "OnRampReader_V1_1_0",
+			version: V1_1_0,
+		},
+		{
+			name:    "OnRampReader_V1_2_0",
+			version: V1_2_0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			th := setupOnRampReaderTH(t, test.version)
+			testVersionSpecificOnRampReader(t, th, test.version)
 		})
 	}
 }
 
-func setupAndTestOnRampReader(t *testing.T, version string) {
-	th := setupOnRampReaderTH(t, version)
-	testVersionSpecificOnRampReader(t, th, version)
-}
-
 func setupOnRampReaderTH(t *testing.T, version string) readerTH {
-	user, bc := newSim(t)
+	user, bc := newSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -95,47 +105,6 @@ func setupOnRampReaderTH(t *testing.T, version string) readerTH {
 		require.Fail(t, "Unknown version: ", version)
 	}
 
-	// Insert log messages.
-	topic := []byte("Commit ccip sends - " + onRampAddress.String())
-	topics := [][]byte{topic}
-	err := orm.InsertLogs([]logpoller.Log{
-		{
-			EvmChainId:  utils.NewBigI(testutils.SimulatedChainID.Int64()),
-			LogIndex:    0,
-			BlockHash:   common.HexToHash("0x3333"),
-			BlockNumber: 1,
-			EventSig:    common.BytesToHash([]byte(onRampAddress.String())),
-			Topics:      topics,
-			Address:     onRampAddress,
-			TxHash:      common.HexToHash("0x000011"),
-			Data:        append([]byte("hello 0"), byte(0)),
-		},
-		{
-			EvmChainId:  utils.NewBigI(testutils.SimulatedChainID.Int64()),
-			LogIndex:    0,
-			BlockHash:   common.HexToHash("0x3333"),
-			BlockNumber: 2,
-			EventSig:    common.BytesToHash([]byte(onRampAddress.String())),
-			Topics:      topics,
-			Address:     onRampAddress,
-			TxHash:      common.HexToHash("0x11111"),
-			Data:        append([]byte("hello 1"), byte(1)),
-		},
-		{
-			EvmChainId:  utils.NewBigI(testutils.SimulatedChainID.Int64()),
-			LogIndex:    0,
-			BlockHash:   common.HexToHash("0x3333"),
-			BlockNumber: 3,
-			EventSig:    common.BytesToHash([]byte(onRampAddress.String())),
-			Topics:      topics,
-			Address:     onRampAddress,
-			TxHash:      common.HexToHash("0x22222"),
-			Data:        append([]byte("hello 2"), byte(2)),
-		},
-	})
-	require.NoError(t, err)
-	bc.Commit()
-
 	// Create the version-specific reader.
 	reader, err := NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc, true)
 	require.NoError(t, err)
@@ -152,31 +121,27 @@ func setupOnRampReaderTH(t *testing.T, version string) readerTH {
 func setupOnRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient, log logger.SugaredLogger) common.Address {
 
 	linkTokenAddress := common.HexToAddress("0x000011")
-
 	staticConfig := evm_2_evm_onramp_1_0_0.EVM2EVMOnRampStaticConfig{
 		LinkToken:         linkTokenAddress,
 		ChainSelector:     testutils.SimulatedChainID.Uint64(),
 		DestChainSelector: testutils.SimulatedChainID.Uint64(),
 		DefaultTxGasLimit: 30000,
 		MaxNopFeesJuels:   big.NewInt(1000000),
-		PrevOnRamp:        common.HexToAddress("0x000009"),
-		ArmProxy:          common.HexToAddress("0x000008"),
+		PrevOnRamp:        common.Address{},
+		ArmProxy:          utils.RandomAddress(),
 	}
-
 	dynamicConfig := evm_2_evm_onramp_1_0_0.EVM2EVMOnRampDynamicConfig{
 		Router:          common.HexToAddress("0x000100"),
 		MaxTokensLength: 4,
-		PriceRegistry:   common.HexToAddress("0x000066"),
+		PriceRegistry:   utils.RandomAddress(),
 		MaxDataSize:     100000,
 		MaxGasLimit:     100000,
 	}
-
 	rateLimiterConfig := evm_2_evm_onramp_1_0_0.RateLimiterConfig{
 		IsEnabled: false,
 		Capacity:  big.NewInt(5),
 		Rate:      big.NewInt(5),
 	}
-
 	allowList := []common.Address{user.From}
 	feeTokenConfigs := []evm_2_evm_onramp_1_0_0.EVM2EVMOnRampFeeTokenConfigArgs{
 		{
@@ -190,7 +155,7 @@ func setupOnRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	}
 	tokenTransferConfigArgs := []evm_2_evm_onramp_1_0_0.EVM2EVMOnRampTokenTransferFeeConfigArgs{
 		{
-			Token:  common.HexToAddress("0x111111"),
+			Token:  utils.RandomAddress(),
 			MinFee: 10,
 			MaxFee: 1000,
 			Ratio:  1,
@@ -198,7 +163,7 @@ func setupOnRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	}
 	nopsAndWeights := []evm_2_evm_onramp_1_0_0.EVM2EVMOnRampNopAndWeight{
 		{
-			Nop:    common.HexToAddress("0x222222222"),
+			Nop:    utils.RandomAddress(),
 			Weight: 1,
 		},
 	}
@@ -236,19 +201,16 @@ func setupOnRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	res, err := onRamp.GetDynamicConfig(&callOpts)
 	require.NoError(t, err)
 	require.NotNil(t, res)
-	log.Debug("DynamicConfig: ", res)
 
 	tav, err := onRamp.TypeAndVersion(&callOpts)
 	require.NoError(t, err)
 	require.NotNil(t, tav)
-	log.Debug("TypeAndVersion: ", tav)
 	return onRampAddress
 }
 
 func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient, log logger.SugaredLogger) common.Address {
 
 	linkTokenAddress := common.HexToAddress("0x000011")
-
 	staticConfig := evm_2_evm_onramp_1_1_0.EVM2EVMOnRampStaticConfig{
 		LinkToken:         linkTokenAddress,
 		ChainSelector:     testutils.SimulatedChainID.Uint64(),
@@ -258,7 +220,6 @@ func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		PrevOnRamp:        common.HexToAddress("0x000009"),
 		ArmProxy:          common.HexToAddress("0x000008"),
 	}
-
 	dynamicConfig := evm_2_evm_onramp_1_1_0.EVM2EVMOnRampDynamicConfig{
 		Router:          common.HexToAddress("0x000110"),
 		MaxTokensLength: 4,
@@ -266,13 +227,11 @@ func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		MaxDataSize:     100000,
 		MaxGasLimit:     100000,
 	}
-
 	rateLimiterConfig := evm_2_evm_onramp_1_1_0.RateLimiterConfig{
 		IsEnabled: false,
 		Capacity:  big.NewInt(5),
 		Rate:      big.NewInt(5),
 	}
-
 	allowList := []common.Address{user.From}
 	feeTokenConfigs := []evm_2_evm_onramp_1_1_0.EVM2EVMOnRampFeeTokenConfigArgs{
 		{
@@ -332,12 +291,10 @@ func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	res, err := onRamp.GetDynamicConfig(&callOpts)
 	require.NoError(t, err)
 	require.NotNil(t, res)
-	log.Debug("DynamicConfig: ", res)
 
 	tav, err := onRamp.TypeAndVersion(&callOpts)
 	require.NoError(t, err)
 	require.NotNil(t, tav)
-	log.Debug("TypeAndVersion: ", tav)
 	return onRampAddress
 }
 
@@ -426,16 +383,14 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	res, err := onRamp.GetDynamicConfig(&callOpts)
 	require.NoError(t, err)
 	require.NotNil(t, res)
-	log.Debug("DynamicConfig: ", res)
 
 	tav, err := onRamp.TypeAndVersion(&callOpts)
 	require.NoError(t, err)
 	require.NotNil(t, tav)
-	log.Debug("TypeAndVersion: ", tav)
 	return onRampAddress
 }
 
-func newSim(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
+func newSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
 	user := testutils.MustNewSimTransactor(t)
 	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
 		user.From: {
@@ -464,8 +419,6 @@ func testOnRampReader(t *testing.T, th readerTH, expectedRouterAddress common.Ad
 	res, err := th.reader.RouterAddress()
 	require.NoError(t, err)
 	require.Equal(t, expectedRouterAddress, res)
-
-	//th.lp.PollAndSaveLogs(th.user.Context, 3)
 
 	_, err = th.reader.GetSendRequestsGteSeqNum(th.user.Context, 0, 0)
 	require.Error(t, err, errors.New("latest finalized header is nil")) // requires logs to be polled.

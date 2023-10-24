@@ -32,6 +32,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
+type readerTH struct {
+	lp     logpoller.LogPollerTest
+	ec     client.Client
+	log    logger.Logger
+	user   *bind.TransactOpts
+	reader ccipdata.OffRampReader
+}
+
 func TestOffRampFilters(t *testing.T) {
 	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
 		c, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
@@ -187,11 +195,6 @@ func TestExecOnchainConfig120(t *testing.T) {
 	}
 }
 
-// The versions to test.
-func getVersions() []string {
-	return []string{ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0}
-}
-
 func TestOffRampReaderInit(t *testing.T) {
 
 	tests := []struct {
@@ -214,33 +217,94 @@ func TestOffRampReaderInit(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			setupAndTestOffRampReader(t, test.version)
+			th := setupOffRampReaderTH(t, test.version)
+			testOffRampReader(t, th)
 		})
 	}
 }
 
-func setupAndTestOffRampReader(t *testing.T, version string) {
-
+func setupOffRampReaderTH(t *testing.T, version string) readerTH {
 	user, bc := newSimulation(t)
 	log := logger.TestLogger(t)
-	// Set gas limit to avoid issue with gas estimator.
-	user.GasPrice = big.NewInt(1000000000)
-	user.GasLimit = 10_000_000
+	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
+	lp := logpoller.NewLogPoller(
+		orm,
+		bc,
+		log,
+		100*time.Millisecond, 2, 3, 2, 1000)
 
+	// Setup offRamp.
+	var offRampAddress common.Address
 	switch version {
 	case ccipdata.V1_0_0:
-		setupAndTestOffRampReaderV1_0_0(t, user, bc, log)
+		offRampAddress = setupOffRampV1_0_0(t, user, bc)
 	case ccipdata.V1_1_0:
 		// Version 1.1.0 uses the same contracts as 1.0.0.
-		setupAndTestOffRampReaderV1_0_0(t, user, bc, log)
+		offRampAddress = setupOffRampV1_0_0(t, user, bc)
 	case ccipdata.V1_2_0:
-		setupAndTestOffRampReaderV1_2_0(t, user, bc, log)
+		offRampAddress = setupOffRampV1_2_0(t, user, bc)
 	default:
 		require.Fail(t, "Unknown version: ", version)
 	}
+
+	// Create the version-specific reader.
+	reader, err := ccipdata.NewOffRampReader(log, offRampAddress, bc, lp, nil)
+	require.NoError(t, err)
+	require.Equal(t, offRampAddress, reader.Address())
+
+	return readerTH{
+		lp:     lp,
+		ec:     bc,
+		log:    log,
+		user:   user,
+		reader: reader,
+	}
 }
 
-func setupAndTestOffRampReaderV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient, log logger.SugaredLogger) {
+func setupOffRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
+	onRampAddr := utils.RandomAddress()
+	armAddr := deployMockArm(t, user, bc)
+	csAddr := deployCommitStore(t, user, bc, onRampAddr, armAddr)
+
+	// Deploy the OffRamp.
+	staticConfig := evm_2_evm_offramp_1_0_0.EVM2EVMOffRampStaticConfig{
+		CommitStore:         csAddr,
+		ChainSelector:       testutils.SimulatedChainID.Uint64(),
+		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
+		OnRamp:              onRampAddr,
+		PrevOffRamp:         common.Address{},
+		ArmProxy:            armAddr,
+	}
+	sourceTokens := []common.Address{}
+	pools := []common.Address{}
+	rateLimiterConfig := evm_2_evm_offramp_1_0_0.RateLimiterConfig{
+		IsEnabled: false,
+		Capacity:  big.NewInt(0),
+		Rate:      big.NewInt(0),
+	}
+
+	offRampAddr, tx, offRamp, err := evm_2_evm_offramp_1_0_0.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
+	bc.Commit()
+	require.NoError(t, err)
+	assertNonRevert(t, tx, bc, user)
+
+	// Test the deployed OffRamp.
+	callOpts := &bind.CallOpts{
+		From:    user.From,
+		Context: context.Background(),
+	}
+
+	owner, err := offRamp.Owner(callOpts)
+	require.NoError(t, err)
+	require.Equal(t, user.From, owner)
+
+	tav, err := offRamp.TypeAndVersion(callOpts)
+	require.NoError(t, err)
+	require.Equal(t, "EVM2EVMOffRamp 1.1.0", tav)
+	return offRampAddr
+}
+
+func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
 
 	onRampAddr := utils.RandomAddress()
 	armAddr := deployMockArm(t, user, bc)
@@ -281,70 +345,7 @@ func setupAndTestOffRampReaderV1_2_0(t *testing.T, user *bind.TransactOpts, bc *
 	tav, err := offRamp.TypeAndVersion(callOpts)
 	require.NoError(t, err)
 	require.Equal(t, "EVM2EVMOffRamp 1.2.0", tav)
-
-	setupAndTestReader(t, log, bc, user, offRampAddr)
-}
-
-func setupAndTestOffRampReaderV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient, log logger.SugaredLogger) {
-
-	onRampAddr := utils.RandomAddress()
-	armAddr := deployMockArm(t, user, bc)
-	csAddr := deployCommitStore(t, user, bc, onRampAddr, armAddr)
-
-	// Deploy the OffRamp.
-	staticConfig := evm_2_evm_offramp_1_0_0.EVM2EVMOffRampStaticConfig{
-		CommitStore:         csAddr,
-		ChainSelector:       testutils.SimulatedChainID.Uint64(),
-		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
-		OnRamp:              onRampAddr,
-		PrevOffRamp:         common.Address{},
-		ArmProxy:            armAddr,
-	}
-	sourceTokens := []common.Address{}
-	pools := []common.Address{}
-	rateLimiterConfig := evm_2_evm_offramp_1_0_0.RateLimiterConfig{
-		IsEnabled: false,
-		Capacity:  big.NewInt(0),
-		Rate:      big.NewInt(0),
-	}
-
-	offRampAddr, tx, offRamp, err := evm_2_evm_offramp_1_0_0.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
-	bc.Commit()
-	require.NoError(t, err)
-	assertNonRevert(t, tx, bc, user)
-
-	// Test the deployed OffRamp.
-	callOpts := &bind.CallOpts{
-		From:    user.From,
-		Context: context.Background(),
-	}
-
-	owner, err := offRamp.Owner(callOpts)
-	require.NoError(t, err)
-	require.Equal(t, user.From, owner)
-
-	tav, err := offRamp.TypeAndVersion(callOpts)
-	require.NoError(t, err)
-	require.Equal(t, "EVM2EVMOffRamp 1.1.0", tav)
-
-	setupAndTestReader(t, log, bc, user, offRampAddr)
-}
-
-// Deploy and test the version-specific reader.
-func setupAndTestReader(t *testing.T, log logger.SugaredLogger, bc *client.SimulatedBackendClient, user *bind.TransactOpts, offRampAddr common.Address) {
-	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
-	lp := logpoller.NewLogPoller(
-		orm,
-		bc,
-		log,
-		100*time.Millisecond, 2, 3, 2, 1000)
-	reader, err := ccipdata.NewOffRampReader(log, offRampAddr, bc, lp, nil)
-	require.NoError(t, err)
-	require.Equal(t, offRampAddr, reader.Address())
-
-	res, err := reader.GetDestinationTokens(user.Context)
-	require.NoError(t, err)
-	require.Equal(t, []common.Address{}, res)
+	return offRampAddr
 }
 
 func deployMockArm(
@@ -394,6 +395,12 @@ func deployCommitStore(
 	return csAddr
 }
 
+func testOffRampReader(t *testing.T, th readerTH) {
+	res, err := th.reader.GetDestinationTokens(th.user.Context)
+	require.NoError(t, err)
+	require.Equal(t, []common.Address{}, res)
+}
+
 // Should be moved to a common test utils package.
 func newSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
 	user := testutils.MustNewSimTransactor(t)
@@ -402,9 +409,6 @@ func newSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendCl
 			Balance: big.NewInt(0).Mul(big.NewInt(50), big.NewInt(1e18)),
 		},
 	}, 10e6)
-	balance, err := sim.BalanceAt(user.Context, user.From, nil)
-	require.NoError(t, err)
-	require.Equal(t, big.NewInt(0).Mul(big.NewInt(50), big.NewInt(1e18)), balance)
 	ec := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
 	return user, ec
 }
