@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Router} from "../Router.sol";
+import {IRouterWithOnRamps} from "./interfaces/IRouterWithOnRamps.sol";
+
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
@@ -63,7 +64,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
       extraArgs: "",
       feeToken: address(s_feeToken)
     });
-    Router(getRouter()).ccipSend(s_counterpartChainSelector, message);
+    IRouterWithOnRamps(getRouter()).ccipSend(s_counterpartChainSelector, message);
 
     if (s_fundingRounds > 0 && pingPongCount % s_fundingRounds == 0) {
       fundPingPong();
@@ -81,7 +82,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   /// The contract can only be funded if it is set as a nop in the target onRamp.
   /// In case your contract is not a nop you can prevent this function from being called by setting s_fundingRounds=0.
   function fundPingPong() public {
-    EVM2EVMOnRamp(Router(getRouter()).getOnRamp(s_counterpartChainSelector)).payNops();
+    EVM2EVMOnRamp(IRouterWithOnRamps(getRouter()).getOnRamp(s_counterpartChainSelector)).payNops();
   }
 
   /////////////////////////////////////////////////////////////////////
