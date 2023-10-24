@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -31,6 +32,26 @@ type readerTH struct {
 	log    logger.Logger
 	user   *bind.TransactOpts
 	reader OnRampReader
+}
+
+func TestNewOnRampReader__noContractAtAddress(t *testing.T) {
+	_, bc := newSim(t)
+	log := logger.TestLogger(t)
+	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
+	lp := logpoller.NewLogPoller(
+		orm,
+		bc,
+		log,
+		100*time.Millisecond, 2, 3, 2, 1000)
+
+	_, err := NewOnRampReader(
+		logger.TestLogger(t),
+		testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(),
+		common.Address{},
+		lp,
+		bc,
+		true)
+	assert.EqualError(t, err, "expected 'EVM2EVMOnRamp' got '' (no contract code at given address)")
 }
 
 // The versions to test.
