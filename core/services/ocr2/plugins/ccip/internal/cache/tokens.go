@@ -99,26 +99,32 @@ func (t *supportedTokensOrigin) Copy(value map[common.Address]common.Address) ma
 // CallOrigin Generates the source to dest token mapping based on the offRamp.
 // NOTE: this queries the offRamp n+1 times, where n is the number of enabled tokens.
 func (t *supportedTokensOrigin) CallOrigin(ctx context.Context) (map[common.Address]common.Address, error) {
-	srcToDstTokenMapping := make(map[common.Address]common.Address)
 	sourceTokens, err := t.offRamp.GetSupportedTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
+	if len(sourceTokens) == 0 {
+		return nil, nil
+	}
 
-	seenDestinationTokens := make(map[common.Address]struct{})
+	destTokens, err := t.offRamp.GetDestinationTokensFromSourceTokens(ctx, sourceTokens)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, sourceToken := range sourceTokens {
-		dst, err1 := t.offRamp.GetDestinationToken(ctx, sourceToken)
-		if err1 != nil {
-			return nil, err1
+	if len(destTokens) != len(sourceTokens) {
+		return nil, fmt.Errorf("GetDestinationTokensFromSourceTokens returned %d tokens while %d were expected",
+			len(destTokens), len(sourceTokens))
+	}
+
+	seenDestTokens := make(map[common.Address]struct{})
+	srcToDstTokenMapping := make(map[common.Address]common.Address, len(sourceTokens))
+	for i, sourceToken := range sourceTokens {
+		if _, exists := seenDestTokens[destTokens[i]]; exists {
+			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destTokens[i])
 		}
-
-		if _, exists := seenDestinationTokens[dst]; exists {
-			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", dst)
-		}
-
-		seenDestinationTokens[dst] = struct{}{}
-		srcToDstTokenMapping[sourceToken] = dst
+		srcToDstTokenMapping[sourceToken] = destTokens[i]
+		seenDestTokens[destTokens[i]] = struct{}{}
 	}
 	return srcToDstTokenMapping, nil
 }

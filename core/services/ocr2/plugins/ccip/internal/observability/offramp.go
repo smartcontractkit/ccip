@@ -60,6 +60,12 @@ func (o *ObservedOffRampReader) GetDestinationToken(ctx context.Context, address
 	})
 }
 
+func (o *ObservedOffRampReader) GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error) {
+	return withObservedContract(o.metric, "GetDestinationTokensFromSourceTokens", func() ([]common.Address, error) {
+		return o.OffRampReader.GetDestinationTokensFromSourceTokens(ctx, tokenAddresses)
+	})
+}
+
 func (o *ObservedOffRampReader) GetSupportedTokens(ctx context.Context) ([]common.Address, error) {
 	return withObservedContract(o.metric, "GetSupportedTokens", func() ([]common.Address, error) {
 		return o.OffRampReader.GetSupportedTokens(ctx)

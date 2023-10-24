@@ -208,6 +208,32 @@ func (_m *MockOffRampReader) GetDestinationTokens(ctx context.Context) ([]common
 	return r0, r1
 }
 
+// GetDestinationTokensFromSourceTokens provides a mock function with given fields: ctx, tokenAddresses
+func (_m *MockOffRampReader) GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error) {
+	ret := _m.Called(ctx, tokenAddresses)
+
+	var r0 []common.Address
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) ([]common.Address, error)); ok {
+		return rf(ctx, tokenAddresses)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) []common.Address); ok {
+		r0 = rf(ctx, tokenAddresses)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]common.Address)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []common.Address) error); ok {
+		r1 = rf(ctx, tokenAddresses)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetExecutionStateChangesBetweenSeqNums provides a mock function with given fields: ctx, seqNumMin, seqNumMax, confs
 func (_m *MockOffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin uint64, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error) {
 	ret := _m.Called(ctx, seqNumMin, seqNumMax, confs)

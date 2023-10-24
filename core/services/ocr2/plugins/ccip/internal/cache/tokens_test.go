@@ -144,10 +144,13 @@ func TestCallOrigin(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			offRampReader := ccipdata.NewMockOffRampReader(t)
 			srcTks := make([]common.Address, 0, len(tc.srcToDst))
+			destTks := make([]common.Address, 0, len(tc.srcToDst))
+
 			for sourceTk, destTk := range tc.srcToDst {
-				offRampReader.On("GetDestinationToken", mock.Anything, sourceTk).Return(destTk, nil)
 				srcTks = append(srcTks, sourceTk)
+				destTks = append(destTks, destTk)
 			}
+			offRampReader.On("GetDestinationTokensFromSourceTokens", mock.Anything, srcTks).Return(destTks, nil)
 			offRampReader.On("GetSupportedTokens", mock.Anything).Return(srcTks, nil)
 			o := supportedTokensOrigin{offRamp: offRampReader}
 			srcToDst, err := o.CallOrigin(context.Background())

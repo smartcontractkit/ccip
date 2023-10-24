@@ -23,6 +23,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -31,6 +32,7 @@ const (
 	EXEC_EXECUTION_STATE_CHANGES = "Exec execution state changes"
 	EXEC_TOKEN_POOL_ADDED        = "Token pool added"
 	EXEC_TOKEN_POOL_REMOVED      = "Token pool removed"
+	RPC_BATCH_LIMIT              = 10
 )
 
 var (
@@ -101,6 +103,30 @@ type OffRampV1_0_0 struct {
 
 func (o *OffRampV1_0_0) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
 	return o.offRamp.GetDestinationToken(&bind.CallOpts{Context: ctx}, address)
+}
+
+func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error) {
+	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
+
+	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddresses))
+	for _, sourceTk := range tokenAddresses {
+		evmCalls = append(evmCalls, rpclib.NewEvmCall(offRampABI, "getDestinationToken", o.addr, sourceTk))
+	}
+
+	results, err := rpclib.EvmBatchCallWithLimit[common.Address](ctx, RPC_BATCH_LIMIT, o.ec, evmCalls...)
+	if err != nil {
+		return nil, err
+	}
+
+	destTokens := make([]common.Address, 0, len(tokenAddresses))
+	for _, res := range results {
+		if res.Err != nil {
+			return nil, err
+		}
+		destTokens = append(destTokens, res.Data)
+	}
+
+	return destTokens, nil
 }
 
 func (o *OffRampV1_0_0) GetSupportedTokens(ctx context.Context) ([]common.Address, error) {
