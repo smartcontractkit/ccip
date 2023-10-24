@@ -194,9 +194,28 @@ func getVersions() []string {
 }
 
 func TestOffRampReaderInit(t *testing.T) {
-	for _, version := range getVersions() {
-		t.Run("OffRampReader_"+version, func(t *testing.T) {
-			setupAndTestOffRampReader(t, version)
+
+	tests := []struct {
+		name    string
+		version string
+	}{
+		{
+			name:    "OffRampReader_V1_0_0",
+			version: ccipdata.V1_0_0,
+		},
+		{
+			name:    "OffRampReader_V1_1_0",
+			version: ccipdata.V1_1_0,
+		},
+		{
+			name:    "OffRampReader_V1_2_0",
+			version: ccipdata.V1_2_0,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			setupAndTestOffRampReader(t, test.version)
 		})
 	}
 }
@@ -237,12 +256,8 @@ func setupAndTestOffRampReaderV1_2_0(t *testing.T, user *bind.TransactOpts, bc *
 		PrevOffRamp:         common.Address{},
 		ArmProxy:            armAddr,
 	}
-	sourceTokens := []common.Address{
-		//utils.RandomAddress(), // Need to be IERC20 (?)
-	}
-	pools := []common.Address{
-		//utils.RandomAddress(), // Need to be IPool (?)
-	}
+	sourceTokens := []common.Address{}
+	pools := []common.Address{}
 	rateLimiterConfig := evm_2_evm_offramp.RateLimiterConfig{
 		IsEnabled: false,
 		Capacity:  big.NewInt(0),
@@ -286,12 +301,8 @@ func setupAndTestOffRampReaderV1_0_0(t *testing.T, user *bind.TransactOpts, bc *
 		PrevOffRamp:         common.Address{},
 		ArmProxy:            armAddr,
 	}
-	sourceTokens := []common.Address{
-		//utils.RandomAddress(), // Need to be IERC20 (?)
-	}
-	pools := []common.Address{
-		//utils.RandomAddress(), // Need to be IPool (?)
-	}
+	sourceTokens := []common.Address{}
+	pools := []common.Address{}
 	rateLimiterConfig := evm_2_evm_offramp_1_0_0.RateLimiterConfig{
 		IsEnabled: false,
 		Capacity:  big.NewInt(0),
