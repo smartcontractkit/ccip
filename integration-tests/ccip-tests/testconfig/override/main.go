@@ -27,5 +27,6 @@ func main() {
 	if os.Setenv("BASE64_TEST_CONFIG_OVERRIDE", encoded) != nil {
 		os.Exit(1)
 	}
+	fmt.Println(os.Getenv("BASE64_TEST_CONFIG_OVERRIDE"))
 	fmt.Println("Successfully set the env var BASE64_TEST_CONFIG_OVERRIDE with the contents of ", *overrideconfigPath, "as Base64 encoded string")
 }

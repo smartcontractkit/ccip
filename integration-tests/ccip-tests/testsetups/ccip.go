@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -17,11 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-env/client"
 	"github.com/smartcontractkit/chainlink-env/environment"
-	"github.com/smartcontractkit/chainlink-env/pkg/cdk8s/blockscout"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/chainlink"
-	"github.com/smartcontractkit/chainlink-env/pkg/helm/reorg"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils"
@@ -36,10 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
-	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
-	ccipnode "github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
-	integrationnodes "github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 )
 
 var (
@@ -53,34 +45,6 @@ var (
 			"memory": "6Gi",
 		},
 	}
-	DONResourceProfile = map[string]interface{}{
-		"requests": map[string]interface{}{
-			"cpu":    "2",
-			"memory": "4Gi",
-		},
-		"limits": map[string]interface{}{
-			"cpu":    "2",
-			"memory": "4Gi",
-		},
-	}
-	DONDBResourceProfile = map[string]interface{}{
-		"image": map[string]interface{}{
-			"image":   "postgres",
-			"version": "13.12",
-		},
-		"stateful": true,
-		"capacity": "10Gi",
-		"resources": map[string]interface{}{
-			"requests": map[string]interface{}{
-				"cpu":    "2",
-				"memory": "4Gi",
-			},
-			"limits": map[string]interface{}{
-				"cpu":    "2",
-				"memory": "4Gi",
-			},
-		},
-	}
 )
 
 type NetworkPair struct {
@@ -91,16 +55,14 @@ type NetworkPair struct {
 }
 
 type CCIPTestConfig struct {
-	Test                    *testing.T
-	EnvInput                *testconfig.Common
-	TestGroupInput          *testconfig.CCIPTestConfig
-	ContractsInput          *testconfig.CCIPContractConfig
-	AllNetworks             map[string]blockchain.EVMNetwork
-	SelectedNetworks        []blockchain.EVMNetwork
-	NetworkPairs            []NetworkPair
-	GethResourceProfile     map[string]interface{}
-	CLNodeResourceProfile   map[string]interface{}
-	CLNodeDBResourceProfile map[string]interface{}
+	Test                *testing.T
+	EnvInput            *testconfig.Common
+	TestGroupInput      *testconfig.CCIPTestConfig
+	ContractsInput      *testconfig.CCIPContractConfig
+	AllNetworks         map[string]blockchain.EVMNetwork
+	SelectedNetworks    []blockchain.EVMNetwork
+	NetworkPairs        []NetworkPair
+	GethResourceProfile map[string]interface{}
 }
 
 func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMNetwork) {
@@ -250,25 +212,6 @@ func (p *CCIPTestConfig) FormNetworkPairCombinations() {
 	}
 }
 
-func SetResourceProfile(defaultcpu, defaultmem, cpu, mem string) map[string]interface{} {
-	if cpu == "" {
-		cpu = defaultcpu
-	}
-	if mem == "" {
-		mem = defaultmem
-	}
-	return map[string]interface{}{
-		"requests": map[string]interface{}{
-			"cpu":    cpu,
-			"memory": mem,
-		},
-		"limits": map[string]interface{}{
-			"cpu":    cpu,
-			"memory": mem,
-		},
-	}
-}
-
 func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
 	var allError error
 	if allError != nil {
@@ -280,24 +223,13 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 	if !exists {
 		t.Fatalf("group config for %s does not exist", tType)
 	}
-	DONResourceProfile = SetResourceProfile("2", "4Gi", ccipCfg.Chainlink.NodeCPU, ccipCfg.Chainlink.NodeMemory)
-	DONDBResourceProfile["resources"] = SetResourceProfile("2", "4Gi", ccipCfg.Chainlink.DBCPU, ccipCfg.Chainlink.DBMemory)
-	if len(ccipCfg.Chainlink.DBArgs) > 0 {
-		var formattedArgs []string
-		for _, arg := range ccipCfg.Chainlink.DBArgs {
-			formattedArgs = append(formattedArgs, "-c")
-			formattedArgs = append(formattedArgs, arg)
-		}
-		DONDBResourceProfile["additionalArgs"] = formattedArgs
-	}
+
 	p := &CCIPTestConfig{
-		Test:                    t,
-		EnvInput:                ccipCfg,
-		ContractsInput:          contractCfg,
-		TestGroupInput:          groupCfg,
-		GethResourceProfile:     GethResourceProfile,
-		CLNodeResourceProfile:   DONResourceProfile,
-		CLNodeDBResourceProfile: DONDBResourceProfile,
+		Test:                t,
+		EnvInput:            ccipCfg,
+		ContractsInput:      contractCfg,
+		TestGroupInput:      groupCfg,
+		GethResourceProfile: GethResourceProfile,
 	}
 
 	allError = multierr.Append(allError, p.SetNetworkPairs(lggr))
@@ -664,9 +596,10 @@ func CCIPDefaultTestSetUp(
 	t *testing.T,
 	lggr zerolog.Logger,
 	envName string,
-	numOfCLNodes int,
 	tokenDeployerFns []blockchain.ContractDeployer,
-	numOfCommitNodes int, commitAndExecOnSameDON, bidirectional bool,
+	numOfCommitNodes int,
+	commitAndExecOnSameDON,
+	bidirectional bool,
 	inputs *CCIPTestConfig,
 ) *CCIPTestSetUpOutputs {
 	var (
@@ -684,7 +617,6 @@ func CCIPDefaultTestSetUp(
 			transferAmounts = append(transferAmounts, big.NewInt(inputs.TestGroupInput.AmountPerToken))
 		}
 	}
-
 	setUpArgs := &CCIPTestSetUpOutputs{
 		Cfg:            inputs,
 		Reporter:       testreporters.NewCCIPTestReporter(t, lggr),
@@ -716,17 +648,11 @@ func CCIPDefaultTestSetUp(
 	var local *test_env.CLClusterTestEnv
 	if configureCLNode {
 		if pointer.GetBool(inputs.TestGroupInput.LocalCluster) {
-			local, deployCL = DeployLocalCluster(t, numOfCLNodes, inputs)
+			local, deployCL = DeployLocalCluster(t, inputs)
 			ccipEnv = &actions.CCIPTestEnv{
 				LocalCluster: local,
 			}
 		} else {
-			clProps := make(map[string]interface{})
-			clProps["replicas"] = numOfCLNodes
-			clProps["db"] = inputs.CLNodeDBResourceProfile
-			clProps["chainlink"] = map[string]interface{}{
-				"resources": inputs.CLNodeResourceProfile,
-			}
 			// deploy the env if configureCLNode is true
 			k8Env = DeployEnvironments(
 				t,
@@ -734,7 +660,7 @@ func CCIPDefaultTestSetUp(
 					TTL:             inputs.EnvInput.TTL.Duration(),
 					NamespacePrefix: envName,
 					Test:            t,
-				}, clProps, inputs)
+				}, inputs)
 			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
 		}
 
@@ -938,132 +864,5 @@ func CCIPExistingDeploymentTestSetUp(
 	bidirectional bool,
 	input *CCIPTestConfig,
 ) *CCIPTestSetUpOutputs {
-	return CCIPDefaultTestSetUp(t, lggr, "ccip-runner", 0,
-		nil, 0, false, bidirectional, input)
-}
-
-func DeployLocalCluster(
-	t *testing.T,
-	noOfCLNodes int,
-	testInputs *CCIPTestConfig,
-) (*test_env.CLClusterTestEnv, func() error) {
-	selectedNetworks := testInputs.SelectedNetworks
-	env, err := test_env.NewCLTestEnvBuilder().
-		WithTestLogger(t).
-		WithPrivateGethChains(selectedNetworks).
-		Build()
-	require.NoError(t, err)
-	for _, n := range env.PrivateChain {
-		primaryNode := n.GetPrimaryNode()
-		require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
-		for i, networkCfg := range selectedNetworks {
-			if networkCfg.ChainID == n.GetNetworkConfig().ChainID {
-				selectedNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
-				selectedNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
-			}
-		}
-	}
-	configOpts := []integrationnodes.NodeConfigOpt{
-		node.WithPrivateEVMs(selectedNetworks),
-	}
-
-	// a func to start the CL nodes asynchronously
-	deployCL := func() error {
-		toml, err := node.NewConfigFromToml([]byte(testInputs.EnvInput.Chainlink.Common.NodeConfig), configOpts...)
-		if err != nil {
-			return err
-		}
-		return env.StartClCluster(toml, noOfCLNodes, "")
-	}
-	return env, deployCL
-}
-
-// DeployEnvironments deploys K8 env for CCIP tests. For tests running on simulated geth it deploys -
-// 1. two simulated geth network in non-dev mode
-// 2. mockserver ( to set mock price feed details)
-// 3. chainlink nodes
-func DeployEnvironments(
-	t *testing.T,
-	envconfig *environment.Config,
-	clProps map[string]interface{},
-	testInputs *CCIPTestConfig,
-) *environment.Environment {
-	useBlockscout := testInputs.TestGroupInput.Blockscout
-	selectedNetworks := testInputs.SelectedNetworks
-	testEnvironment := environment.New(envconfig)
-	numOfTxNodes := 1
-	for _, network := range selectedNetworks {
-		if !network.Simulated {
-			continue
-		}
-		testEnvironment.
-			AddHelm(reorg.New(&reorg.Props{
-				NetworkName: network.Name,
-				NetworkType: "simulated-geth-non-dev",
-				Values: map[string]interface{}{
-					"geth": map[string]interface{}{
-						"genesis": map[string]interface{}{
-							"networkId": fmt.Sprint(network.ChainID),
-						},
-						"tx": map[string]interface{}{
-							"replicas":  strconv.Itoa(numOfTxNodes),
-							"resources": testInputs.GethResourceProfile,
-						},
-						"miner": map[string]interface{}{
-							"replicas":  "0",
-							"resources": testInputs.GethResourceProfile,
-						},
-					},
-					"bootnode": map[string]interface{}{
-						"replicas": "1",
-					},
-				},
-			}))
-	}
-	err := testEnvironment.Run()
-	require.NoError(t, err)
-
-	if testEnvironment.WillUseRemoteRunner() {
-		return testEnvironment
-	}
-	urlFinder := func(network blockchain.EVMNetwork) ([]string, []string) {
-		if !network.Simulated {
-			return network.URLs, network.HTTPURLs
-		}
-		networkName := network.Name
-		var internalWsURLs, internalHttpURLs []string
-		for i := 0; i < numOfTxNodes; i++ {
-			podName := fmt.Sprintf("%s-ethereum-geth:%d", networkName, i)
-			txNodeInternalWs, err := testEnvironment.Fwd.FindPort(podName, "geth", "ws-rpc").As(client.RemoteConnection, client.WS)
-			require.NoError(t, err, "Error finding WS ports")
-			internalWsURLs = append(internalWsURLs, txNodeInternalWs)
-			txNodeInternalHttp, err := testEnvironment.Fwd.FindPort(podName, "geth", "http-rpc").As(client.RemoteConnection, client.HTTP)
-			require.NoError(t, err, "Error finding HTTP ports")
-			internalHttpURLs = append(internalHttpURLs, txNodeInternalHttp)
-		}
-		return internalWsURLs, internalHttpURLs
-	}
-	var nets []blockchain.EVMNetwork
-	for i := range selectedNetworks {
-		nets = append(nets, selectedNetworks[i])
-		nets[i].URLs, nets[i].HTTPURLs = urlFinder(selectedNetworks[i])
-		if useBlockscout {
-			testEnvironment.AddChart(blockscout.New(&blockscout.Props{
-				Name:    fmt.Sprintf("%s-blockscout", selectedNetworks[i].Name),
-				WsURL:   selectedNetworks[i].URLs[0],
-				HttpURL: selectedNetworks[i].HTTPURLs[0],
-			}))
-		}
-	}
-
-	tomlCfg, err := node.NewConfigFromToml([]byte(testInputs.EnvInput.Chainlink.Common.NodeConfig), ccipnode.WithPrivateEVMs(nets))
-	tomlStr, err := tomlCfg.TOMLString()
-	require.NoError(t, err)
-	clProps["toml"] = tomlStr
-	clProps["prometheus"] = true
-	err = testEnvironment.
-		AddHelm(chainlink.New(0, clProps)).
-		Run()
-	require.NoError(t, err)
-	return testEnvironment
+	return CCIPDefaultTestSetUp(t, lggr, "ccip-runner", nil, 0, false, bidirectional, input)
 }

@@ -80,12 +80,8 @@ func (l *loadArgs) Setup(sameCommitAndExec bool, noOfcommit, noOfExec int) {
 	var setUpArgs *testsetups.CCIPTestSetUpOutputs
 	existing := pointer.GetBool(l.TestCfg.TestGroupInput.ExistingDeployment)
 	if !existing {
-		replicas := noOfcommit + 1
-		if !sameCommitAndExec {
-			replicas = noOfcommit + noOfExec + 2
-		}
 		setUpArgs = testsetups.CCIPDefaultTestSetUp(l.TestCfg.Test, lggr, "load-ccip",
-			replicas, nil, noOfcommit, sameCommitAndExec, true, l.TestCfg)
+			nil, noOfcommit, sameCommitAndExec, true, l.TestCfg)
 	} else {
 		setUpArgs = testsetups.CCIPExistingDeploymentTestSetUp(l.TestCfg.Test, lggr, true, l.TestCfg)
 	}

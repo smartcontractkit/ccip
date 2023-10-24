@@ -3,10 +3,13 @@
 Networks = ['SIMULATED_1', 'SIMULATED_2']
 
 [CCIP.Env.Chainlink]
-NodeMemory = '2Gi'
+NoOfNodes = 6
+NodeMemory = '4Gi'
 NodeCPU = '2'
-DBMemory = '2Gi'
+DBMemory = '4Gi'
 DBCPU = '2'
+DBCapacity = '10Gi'
+IsStateful = true
 DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB']
 
 

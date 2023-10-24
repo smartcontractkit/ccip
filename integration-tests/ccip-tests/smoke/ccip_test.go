@@ -26,7 +26,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	}
 	l := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)
-	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", 6, nil, 5, true, true, TestCfg)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", nil, 5, true, true, TestCfg)
 	var tcs []subtestInput
 	if len(setUpOutput.Lanes) == 0 {
 		return
@@ -81,7 +81,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)
 	require.Equal(t, actions.TokenTransfer, TestCfg.TestGroupInput.MsgType, "Test config should have token transfer message type")
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(
-		t, l, "smoke-ccip", 6, nil,
+		t, l, "smoke-ccip", nil,
 		5, true, true, TestCfg)
 	var tcs []subtestInput
 	if len(setUpOutput.Lanes) == 0 {

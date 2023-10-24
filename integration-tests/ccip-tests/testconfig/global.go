@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/AlekSi/pointer"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -157,6 +158,8 @@ type Chainlink struct {
 	NodeCPU    string   `toml:",omitempty"`
 	DBMemory   string   `toml:",omitempty"`
 	DBCPU      string   `toml:",omitempty"`
+	DBCapacity string   `toml:",omitempty"`
+	IsStateful *bool    `toml:",omitempty"`
 	DBArgs     []string `toml:",omitempty"`
 	NoOfNodes  *int     `toml:",omitempty"`
 	Nodes      []*Node  `toml:",omitempty"` // to be mentioned only if diff nodes follow diff configs; not required if all nodes follow CommonConfig
@@ -196,6 +199,12 @@ func (c *Chainlink) ApplyOverrides(from *Chainlink) {
 	if from.DBArgs != nil {
 		c.DBArgs = from.DBArgs
 	}
+	if from.DBCapacity != "" {
+		c.DBCapacity = from.DBCapacity
+	}
+	if from.IsStateful != nil {
+		c.IsStateful = from.IsStateful
+	}
 }
 
 func (c *Chainlink) ReadSecrets() error {
@@ -211,21 +220,43 @@ func (c *Chainlink) ReadSecrets() error {
 		image, _ := utils.GetEnv(fmt.Sprintf("CHAINLINK_IMAGE-%d", i+1))
 		if image != "" {
 			node.Image = image
+		} else {
+			node.Image = c.Common.Image
 		}
 		tag, _ := utils.GetEnv(fmt.Sprintf("CHAINLINK_VERSION-%d", i+1))
 		if tag != "" {
 			node.Tag = tag
+		} else {
+			node.Tag = c.Common.Tag
 		}
 	}
 	return nil
 }
 
 func (c *Chainlink) Validate() error {
+	if c.Common == nil {
+		return errors.New("common config can't be empty")
+	}
+	if c.Common.Image == "" || c.Common.Tag == "" {
+		return errors.New("must provide chainlink image and tag")
+	}
+	if c.Common.DBImage == "" || c.Common.DBTag == "" {
+		return errors.New("must provide db image and tag")
+	}
+	if c.NoOfNodes != nil {
+		return errors.New("chainlink config is invalid, NoOfNodes should be specified")
+	}
 	if c.Common == nil && c.Nodes == nil {
 		return errors.New("chainlink config is empty, either Common or Nodes should be specified")
 	}
 	if c.Common != nil && c.Nodes != nil {
 		return errors.New("chainlink config is invalid, either Common or Nodes should be specified")
+	}
+	if c.Nodes != nil {
+		noOfNodes := pointer.GetInt(c.NoOfNodes)
+		if noOfNodes != len(c.Nodes) {
+			return errors.New("chainlink config is invalid, NoOfNodes and Nodes length mismatch")
+		}
 	}
 	return nil
 }
