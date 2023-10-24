@@ -26,7 +26,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   
   // Defines the increase in ping pong count before self-funding is attempted.
   // Set to 0 to disable auto-funding, auto-funding only works for ping-pongs that are set as NOPs in the onRamp.
-  uint8 public s_countIncrBeforeFunding;
+  uint8 private s_countIncrBeforeFunding;
 
   constructor(address router, IERC20 feeToken, uint8 roundTripsBeforeFundng) CCIPReceiver(router) {
     s_isPaused = false;
@@ -114,5 +114,9 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
 
   function setPaused(bool pause) external onlyOwner {
     s_isPaused = pause;
+  }
+
+  function getCountIncrBeforeFunding() external view returns (uint8) {
+    return s_countIncrBeforeFunding;
   }
 }
