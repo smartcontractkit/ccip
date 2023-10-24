@@ -6,8 +6,6 @@ Networks = ['SIMULATED_1', 'SIMULATED_2']
 NoOfNodes = 6
 NodeMemory = '4Gi'
 NodeCPU = '2'
-DBImage = 'postgres'
-DBTag = '13.12'
 DBMemory = '4Gi'
 DBCPU = '2'
 DBCapacity = '10Gi'
@@ -17,6 +15,8 @@ DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB
 
 [CCIP.Env.Chainlink.Common]
 Name = 'node1'
+DBImage = 'postgres'
+DBTag = '13.12'
 NodeConfig = """
 [Feature]
 LogPoller = true
