@@ -55,7 +55,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
       receiver: abi.encode(s_counterpartAddress),
       data: data,
       tokenAmounts: new Client.EVMTokenAmount[](0),
-      extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 200_000})),
+      extraArgs: "",
       feeToken: address(s_feeToken)
     });
     Router(getRouter()).ccipSend(s_counterpartChainSelector, message);
