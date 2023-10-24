@@ -118,19 +118,20 @@ func TestLoadCCIPStableWithMajorityNodeFailure(t *testing.T) {
 		},
 	}
 
-	var allChaosDur time.Duration
-	// to override the default duration of chaos with test input
-	for _, ch := range inputs {
-		dur, err := ch.SetInput()
-		require.NoError(t, err)
-		allChaosDur += dur
-	}
-
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background(), inputs...)
 
+	var allChaosDur time.Duration
+	// to override the default duration of chaos with test input
+	for i := range inputs {
+		inputs[i].ChaosProps.DurationStr = testArgs.TestCfg.TestGroupInput.ChaosDuration.String()
+		allChaosDur += testArgs.TestCfg.TestGroupInput.ChaosDuration.Duration()
+		inputs[i].WaitBetweenChaos = testArgs.TestCfg.TestGroupInput.WaitBetweenChaosDuringLoad.Duration()
+		allChaosDur += inputs[i].WaitBetweenChaos
+	}
+
 	// the duration of load test should be greater than the duration of chaos
-	if testArgs.TestCfg.TestDuration < allChaosDur+2*time.Minute {
+	if testArgs.TestCfg.TestGroupInput.TestDuration.Duration() < allChaosDur+2*time.Minute {
 		t.Fatalf("Skipping the test as the test duration is less than the chaos duration")
 	}
 
@@ -171,19 +172,20 @@ func TestLoadCCIPStableWithMinorityNodeFailure(t *testing.T) {
 		},
 	}
 
-	var allChaosDur time.Duration
-	// to override the default duration of chaos with test input
-	for _, ch := range inputs {
-		dur, err := ch.SetInput()
-		require.NoError(t, err)
-		allChaosDur += dur
-	}
-
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background(), inputs...)
 
+	var allChaosDur time.Duration
+	// to override the default duration of chaos with test input
+	for i := range inputs {
+		inputs[i].ChaosProps.DurationStr = testArgs.TestCfg.TestGroupInput.ChaosDuration.String()
+		allChaosDur += testArgs.TestCfg.TestGroupInput.ChaosDuration.Duration()
+		inputs[i].WaitBetweenChaos = testArgs.TestCfg.TestGroupInput.WaitBetweenChaosDuringLoad.Duration()
+		allChaosDur += inputs[i].WaitBetweenChaos
+	}
+
 	// the duration of load test should be greater than the duration of chaos
-	if testArgs.TestCfg.TestDuration < allChaosDur+2*time.Minute {
+	if testArgs.TestCfg.TestGroupInput.TestDuration.Duration() < allChaosDur+2*time.Minute {
 		t.Fatalf("Skipping the test as the test duration is less than the chaos duration")
 	}
 

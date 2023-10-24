@@ -29,6 +29,7 @@ type CCIPTestConfig struct {
 	NoOfTokensInMsg            int                `toml:",omitempty"`
 	AmountPerToken             int64              `toml:",omitempty"`
 	MaxNoOfLanes               int                `toml:",omitempty"`
+	ChaosDuration              *models.Duration   `toml:",omitempty"`
 }
 
 func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
@@ -77,6 +78,9 @@ func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
 	if fromCfg.WaitBetweenChaosDuringLoad != nil {
 		c.WaitBetweenChaosDuringLoad = fromCfg.WaitBetweenChaosDuringLoad
 	}
+	if fromCfg.ChaosDuration != nil {
+		c.ChaosDuration = fromCfg.ChaosDuration
+	}
 	if len(fromCfg.NetworkPairs) != 0 {
 		c.NetworkPairs = fromCfg.NetworkPairs
 	}
@@ -101,6 +105,7 @@ func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
 	if fromCfg.AmountPerToken != 0 {
 		c.AmountPerToken = fromCfg.AmountPerToken
 	}
+
 	return nil
 }
 

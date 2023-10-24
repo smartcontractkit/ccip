@@ -100,3 +100,23 @@ NoOfRoutersPerPair = 1
 NoOfTokensPerChain = 2
 NoOfTokensInMsg = 2
 AmountPerToken = 1
+
+[CCIP.Groups.chaos]
+KeepEnvAlive = false
+MsgType = 'WithToken'
+PhaseTimeout = '50m0s'
+TestDuration = '10m0s'
+LocalCluster = false
+ExistingDeployment = false
+ReuseContracts = true
+SequentialLaneAddition = false
+NodeFunding = 20.0
+RequestPerUnitTime = [2]
+TimeUnit = '1s'
+NoOfNetworks = 2
+NoOfRoutersPerPair = 1
+NoOfTokensPerChain = 2
+NoOfTokensInMsg = 2
+AmountPerToken = 1
+WaitBetweenChaosDuringLoad = '2m'
+ChaosDuration = '10m'
