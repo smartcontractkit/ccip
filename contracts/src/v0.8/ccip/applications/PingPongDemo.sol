@@ -25,13 +25,12 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
 
   // Defines the number of ping-pongs till a call to the funding method 'fundPingPong' is made
   // Set to 0 to disable auto-funding, auto-funding only works for ping-pongs that are set as NOPs in the onRamp.
-  uint8 private s_fundingRounds;
+  uint8 private constant FUNDING_ROUNDS = 20;
 
-  constructor(address router, IERC20 feeToken, uint8 fundingRounds) CCIPReceiver(router) {
+  constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), 2 ** 256 - 1);
-    s_fundingRounds = fundingRounds;
   }
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
@@ -61,7 +60,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     });
     Router(getRouter()).ccipSend(s_counterpartChainSelector, message);
 
-    if (s_fundingRounds > 0 && pingPongCount % s_fundingRounds == 0) {
+    if (FUNDING_ROUNDS > 0 && pingPongCount % FUNDING_ROUNDS == 0) {
       fundPingPong();
     }
   }

@@ -13,7 +13,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
 
   PingPongDemo internal s_pingPong;
   IERC20 internal s_feeToken;
-  uint8 internal s_fundingRounds = 5;
+  uint8 internal s_fundingRounds = 20;
 
   address internal immutable i_pongContract = address(10);
 
@@ -21,7 +21,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
     EVM2EVMOnRampSetup.setUp();
 
     s_feeToken = IERC20(s_sourceTokens[0]);
-    s_pingPong = new PingPongDemo(address(s_sourceRouter), s_feeToken, s_fundingRounds);
+    s_pingPong = new PingPongDemo(address(s_sourceRouter), s_feeToken);
     s_pingPong.setCounterpart(DEST_CHAIN_ID, i_pongContract);
 
     // set ping pong as an onRamp nop to make sure that funding runs
@@ -29,7 +29,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
     nopsAndWeights[0] = EVM2EVMOnRamp.NopAndWeight({nop: address(s_pingPong), weight: 1});
     s_onRamp.setNops(nopsAndWeights);
 
-    uint256 fundingAmount = 1e18;
+    uint256 fundingAmount = 5e18;
 
     // Fund the contract with LINK tokens
     s_feeToken.transfer(address(s_pingPong), fundingAmount);
