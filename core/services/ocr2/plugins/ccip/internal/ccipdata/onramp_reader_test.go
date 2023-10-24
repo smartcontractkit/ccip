@@ -1,16 +1,13 @@
 package ccipdata
 
 import (
-	"context"
 	"errors"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -35,7 +32,7 @@ type readerTH struct {
 }
 
 func TestNewOnRampReader__noContractAtAddress(t *testing.T) {
-	_, bc := newSimulation(t)
+	_, bc := NewSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -83,7 +80,7 @@ func TestOnRampReaderInit(t *testing.T) {
 }
 
 func setupOnRampReaderTH(t *testing.T, version string) readerTH {
-	user, bc := newSimulation(t)
+	user, bc := NewSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -185,26 +182,11 @@ func setupOnRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		nopsAndWeights,
 	)
 	bc.Commit()
-
 	require.NoError(t, err)
+	AssertNonRevert(t, transaction, bc, user)
 	require.NotNil(t, onRampAddress)
 	require.NotNil(t, transaction)
 	require.NotNil(t, onRamp)
-
-	// Test calls to onRamp (sanity check).
-	callOpts := bind.CallOpts{
-		From:    user.From,
-		Context: context.Background(),
-	}
-	bc.Commit()
-
-	res, err := onRamp.GetDynamicConfig(&callOpts)
-	require.NoError(t, err)
-	require.NotNil(t, res)
-
-	tav, err := onRamp.TypeAndVersion(&callOpts)
-	require.NoError(t, err)
-	require.NotNil(t, tav)
 	return onRampAddress
 }
 
@@ -275,26 +257,11 @@ func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		nopsAndWeights,
 	)
 	bc.Commit()
-
 	require.NoError(t, err)
+	AssertNonRevert(t, transaction, bc, user)
 	require.NotNil(t, onRampAddress)
 	require.NotNil(t, transaction)
 	require.NotNil(t, onRamp)
-
-	// Test calls to onRamp (sanity check).
-	callOpts := bind.CallOpts{
-		From:    user.From,
-		Context: context.Background(),
-	}
-	bc.Commit()
-
-	res, err := onRamp.GetDynamicConfig(&callOpts)
-	require.NoError(t, err)
-	require.NotNil(t, res)
-
-	tav, err := onRamp.TypeAndVersion(&callOpts)
-	require.NoError(t, err)
-	require.NotNil(t, tav)
 	return onRampAddress
 }
 
@@ -367,38 +334,13 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		nopsAndWeights,
 	)
 	bc.Commit()
-
 	require.NoError(t, err)
+	AssertNonRevert(t, transaction, bc, user)
 	require.NotNil(t, onRampAddress)
 	require.NotNil(t, transaction)
 	require.NotNil(t, onRamp)
 
-	// Test calls to onRamp (sanity check).
-	callOpts := bind.CallOpts{
-		From:    user.From,
-		Context: context.Background(),
-	}
-	bc.Commit()
-
-	res, err := onRamp.GetDynamicConfig(&callOpts)
-	require.NoError(t, err)
-	require.NotNil(t, res)
-
-	tav, err := onRamp.TypeAndVersion(&callOpts)
-	require.NoError(t, err)
-	require.NotNil(t, tav)
 	return onRampAddress
-}
-
-func newSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
-	user := testutils.MustNewSimTransactor(t)
-	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
-		user.From: {
-			Balance: big.NewInt(3).Mul(big.NewInt(10), big.NewInt(1e18)),
-		},
-	}, 10e6)
-	backendClient := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
-	return user, backendClient
 }
 
 func testVersionSpecificOnRampReader(t *testing.T, th readerTH, version string) {
