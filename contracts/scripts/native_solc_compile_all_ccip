@@ -30,7 +30,6 @@ compileContractLowOpts () {
 }
 
 compileContract ccip/Router.sol
-compileContractLowOpts ccip/onRamp/EVM2EVMOnRamp.sol
 compileContract ccip/CommitStore.sol
 compileContract ccip/offRamp/EVM2EVMOffRamp.sol
 compileContract ccip/ARM.sol
@@ -40,6 +39,7 @@ compileContract ccip/pools/LockReleaseTokenPool.sol
 compileContract ccip/pools/BurnMintTokenPool.sol
 compileContract shared/token/ERC677/BurnMintERC677.sol
 compileContract ccip/applications/PingPongDemo.sol
+compileContractLowOpts ccip/onRamp/EVM2EVMOnRamp.sol
 
 # Test helpers
 compileContract ccip/test/helpers/BurnMintERC677Helper.sol
