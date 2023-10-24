@@ -243,7 +243,7 @@ func (c *Chainlink) Validate() error {
 	if c.Common.DBImage == "" || c.Common.DBTag == "" {
 		return errors.New("must provide db image and tag")
 	}
-	if c.NoOfNodes != nil {
+	if c.NoOfNodes == nil {
 		return errors.New("chainlink config is invalid, NoOfNodes should be specified")
 	}
 	if c.Common == nil && c.Nodes == nil {
