@@ -102,14 +102,10 @@ func TestChaosCCIP(t *testing.T) {
 			t.Parallel()
 			l := logging.GetTestLogger(t)
 			testCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Chaos)
-			var (
-				numOfCommitNodes = 5
-				numOfRequests    = 3
-			)
+			var numOfRequests = 3
 
 			setUpArgs := testsetups.CCIPDefaultTestSetUp(
-				t, l, "chaos-ccip",
-				nil, numOfCommitNodes, false, false, testCfg)
+				t, l, "chaos-ccip", nil, testCfg)
 
 			if len(setUpArgs.Lanes) == 0 {
 				return

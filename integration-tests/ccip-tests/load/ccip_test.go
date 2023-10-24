@@ -20,7 +20,7 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background())
-	testArgs.Setup(true, 5, 5)
+	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
@@ -42,7 +42,7 @@ func TestLoadCCIPSequentialLaneAdd(t *testing.T) {
 	if len(testArgs.TestCfg.NetworkPairs) <= 1 {
 		t.Skip("Skipping the test as there are not enough network pairs to run the test")
 	}
-	testArgs.Setup(true, 5, 5)
+	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
@@ -60,7 +60,7 @@ func TestLoadCCIPStableRequestTriggeringWithNetworkChaos(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background())
-	testArgs.Setup(true, 16, 16)
+	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
@@ -135,7 +135,7 @@ func TestLoadCCIPStableWithMajorityNodeFailure(t *testing.T) {
 		t.Fatalf("Skipping the test as the test duration is less than the chaos duration")
 	}
 
-	testArgs.Setup(true, 16, 16)
+	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
@@ -189,7 +189,7 @@ func TestLoadCCIPStableWithMinorityNodeFailure(t *testing.T) {
 		t.Fatalf("Skipping the test as the test duration is less than the chaos duration")
 	}
 
-	testArgs.Setup(true, 16, 16)
+	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
@@ -257,7 +257,7 @@ func TestLoadCCIPStableWithPodChaosDiffCommitAndExec(t *testing.T) {
 			testArgs.TestCfg.TestGroupInput.TimeUnit = models.MustNewDuration(1 * time.Second)
 			testArgs.TestCfg.TestGroupInput.RequestPerUnitTime = []int64{2}
 
-			testArgs.Setup(false, 5, 5)
+			testArgs.Setup()
 			// if the test runs on remote runner
 			if len(testArgs.TestSetupArgs.Lanes) == 0 {
 				return

@@ -597,9 +597,6 @@ func CCIPDefaultTestSetUp(
 	lggr zerolog.Logger,
 	envName string,
 	tokenDeployerFns []blockchain.ContractDeployer,
-	numOfCommitNodes int,
-	commitAndExecOnSameDON,
-	bidirectional bool,
 	inputs *CCIPTestConfig,
 ) *CCIPTestSetUpOutputs {
 	var (
@@ -805,9 +802,11 @@ func CCIPDefaultTestSetUp(
 		laneAddGrp.Go(func() error {
 			return setUpArgs.AddLanesForNetworkPair(
 				lggr, n.NetworkA, n.NetworkB,
-				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID],
-				transferAmounts, numOfCommitNodes, commitAndExecOnSameDON,
-				bidirectional)
+				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID], transferAmounts,
+				inputs.TestGroupInput.NumberOfCommitNodes,
+				pointer.GetBool(inputs.TestGroupInput.CommitAndExecuteOnSameDON),
+				pointer.GetBool(inputs.TestGroupInput.BiDirectionalLane),
+			)
 		})
 	}
 	require.NoError(t, laneAddGrp.Wait())
@@ -847,22 +846,4 @@ func CCIPDefaultTestSetUp(
 	}
 	lggr.Info().Msg("Test setup completed")
 	return setUpArgs
-}
-
-// CCIPExistingDeploymentTestSetUp is same as CCIPDefaultTestSetUp
-// except it's called when
-// 1. contracts are already deployed on live networks
-// 2. CL nodes are set up and configured with existing contracts
-// 3. No k8 env deployment is needed
-// It reuses already deployed contracts from the addresses provided in ../contracts/ccip/laneconfig/contracts.json
-// Returns -
-// CCIPLane for NetworkA --> NetworkB
-// CCIPLane for NetworkB --> NetworkA
-func CCIPExistingDeploymentTestSetUp(
-	t *testing.T,
-	lggr zerolog.Logger,
-	bidirectional bool,
-	input *CCIPTestConfig,
-) *CCIPTestSetUpOutputs {
-	return CCIPDefaultTestSetUp(t, lggr, "ccip-runner", nil, 0, false, bidirectional, input)
 }

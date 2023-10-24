@@ -8,6 +8,9 @@ import (
 
 type CCIPTestConfig struct {
 	KeepEnvAlive               *bool              `toml:",omitempty"`
+	BiDirectionalLane          *bool              `toml:",omitempty"`
+	CommitAndExecuteOnSameDON  *bool              `toml:",omitempty"`
+	NumberOfCommitNodes        int                `toml:",omitempty"`
 	MsgType                    string             `toml:",omitempty"`
 	PhaseTimeout               *models.Duration   `toml:",omitempty"`
 	TestDuration               *models.Duration   `toml:",omitempty"`
@@ -35,6 +38,9 @@ type CCIPTestConfig struct {
 func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
 	if fromCfg == nil {
 		return nil
+	}
+	if fromCfg.BiDirectionalLane != nil {
+		c.BiDirectionalLane = fromCfg.BiDirectionalLane
 	}
 	if fromCfg.KeepEnvAlive != nil {
 		c.KeepEnvAlive = fromCfg.KeepEnvAlive

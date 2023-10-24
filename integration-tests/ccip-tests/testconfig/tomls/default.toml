@@ -70,8 +70,11 @@ DeltaReconcile = '5s'
 [CCIP.Groups]
 [CCIP.Groups.smoke]
 KeepEnvAlive = false
+BiDirectionalLane = true
+CommitAndExecuteOnSameDON = true
+NumberOfCommitNodes = 5
 MsgType = 'WithToken'
-PhaseTimeout = '10m0s'
+PhaseTimeout = '10m'
 LocalCluster = true
 ExistingDeployment = false
 ReuseContracts = true
@@ -85,9 +88,12 @@ AmountPerToken = 1
 
 [CCIP.Groups.load]
 KeepEnvAlive = false
+BiDirectionalLane = true
+CommitAndExecuteOnSameDON = true
+NumberOfCommitNodes = 5
 MsgType = 'WithToken'
-PhaseTimeout = '50m0s'
-TestDuration = '10m0s'
+PhaseTimeout = '50m'
+TestDuration = '10m'
 LocalCluster = false
 ExistingDeployment = false
 ReuseContracts = true
@@ -103,9 +109,12 @@ AmountPerToken = 1
 
 [CCIP.Groups.chaos]
 KeepEnvAlive = false
+BiDirectionalLane = true
+CommitAndExecuteOnSameDON = false
+NumberOfCommitNodes = 5
 MsgType = 'WithToken'
-PhaseTimeout = '50m0s'
-TestDuration = '10m0s'
+PhaseTimeout = '50m'
+TestDuration = '10m'
 LocalCluster = false
 ExistingDeployment = false
 ReuseContracts = true

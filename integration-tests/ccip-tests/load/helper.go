@@ -48,17 +48,14 @@ type loadArgs struct {
 	ChaosExps     []ChaosConfig
 }
 
-func (l *loadArgs) Setup(sameCommitAndExec bool, noOfcommit, noOfExec int) {
+func (l *loadArgs) Setup() {
 	lggr := l.lggr
-	var setUpArgs *testsetups.CCIPTestSetUpOutputs
 	existing := pointer.GetBool(l.TestCfg.TestGroupInput.ExistingDeployment)
-	if !existing {
-		setUpArgs = testsetups.CCIPDefaultTestSetUp(l.TestCfg.Test, lggr, "load-ccip",
-			nil, noOfcommit, sameCommitAndExec, true, l.TestCfg)
-	} else {
-		setUpArgs = testsetups.CCIPExistingDeploymentTestSetUp(l.TestCfg.Test, lggr, true, l.TestCfg)
+	envName := "load-ccip"
+	if existing {
+		envName = "ccip-runner"
 	}
-	l.TestSetupArgs = setUpArgs
+	l.TestSetupArgs = testsetups.CCIPDefaultTestSetUp(l.TestCfg.Test, lggr, envName, nil, l.TestCfg)
 }
 
 func (l *loadArgs) setSchedule() {
