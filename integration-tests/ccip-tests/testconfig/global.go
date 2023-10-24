@@ -252,7 +252,7 @@ func (c *Chainlink) Validate() error {
 	if c.Common != nil && c.Nodes != nil {
 		return errors.New("chainlink config is invalid, either Common or Nodes should be specified")
 	}
-	if c.Nodes != nil {
+	if c.Nodes != nil && len(c.Nodes) > 0 {
 		noOfNodes := pointer.GetInt(c.NoOfNodes)
 		if noOfNodes != len(c.Nodes) {
 			return errors.New("chainlink config is invalid, NoOfNodes and Nodes length mismatch")
