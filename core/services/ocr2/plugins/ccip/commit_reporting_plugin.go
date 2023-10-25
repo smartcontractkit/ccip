@@ -13,7 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"google.golang.org/protobuf/proto"
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -28,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
+	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
 )
 
 const (
@@ -63,6 +66,8 @@ type CommitPluginStaticConfig struct {
 	destChainEVMID *big.Int
 	// Offchain
 	priceGetter pricegetter.PriceGetter
+	// Telemetry
+	monitoringEndpoint commontypes.MonitoringEndpoint
 }
 
 type CommitReportingPlugin struct {
@@ -82,6 +87,8 @@ type CommitReportingPlugin struct {
 	priceGetter pricegetter.PriceGetter
 	// State
 	inflightReports *inflightCommitReportsContainer
+	// Telemetry
+	monitoringEndpoint commontypes.MonitoringEndpoint
 }
 
 type CommitReportingPluginFactory struct {
@@ -167,8 +174,9 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				rf.config.destClient,
 				int64(rf.config.commitStore.OffchainConfig().DestFinalityDepth),
 			),
-			gasPriceEstimator: rf.config.commitStore.GasPriceEstimator(),
-			offchainConfig:    pluginOffChainConfig,
+			gasPriceEstimator:  rf.config.commitStore.GasPriceEstimator(),
+			offchainConfig:     pluginOffChainConfig,
+			monitoringEndpoint: rf.config.monitoringEndpoint,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -511,7 +519,35 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		"gasPriceUpdates", report.GasPrices,
 		"epochAndRound", epochAndRound,
 	)
+
+	// Commit telemetry collection and sending to the monitoring endpoint
+	telem := r.collectCommitTelemetry(&report, &epochAndRound)
+	bytes, err := proto.Marshal(telem)
+	if err != nil {
+		// Telemetry related errors are not critical and must not affect
+		// execution, so we log them and continue.
+		lggr.Errorw("failed to marshal telemetry to protobuf", "err", err)
+	} else {
+		r.monitoringEndpoint.SendLog(bytes)
+	}
+
 	return true, encodedReport, nil
+}
+
+func (r *CommitReportingPlugin) collectCommitTelemetry(
+	report *ccipdata.CommitStoreReport,
+	epochAndRound *types.ReportTimestamp,
+) (t *telemPb.CCIPTelemWrapper) {
+	return &telemPb.CCIPTelemWrapper{
+		Msg: &telemPb.CCIPTelemWrapper_CommitReport{
+			CommitReport: &telemPb.CCIPCommitReportSummary{
+				LenTokenPrices: uint32(len(report.TokenPrices)),
+				LenGasPrices:   uint32(len(report.GasPrices)), // XXX: if the len is short, would it be better to send the actual gas prices?
+				Epoch:          epochAndRound.Epoch,
+				Round:          uint32(epochAndRound.Round),
+			},
+		},
+	}
 }
 
 // validateObservations validates the given observations.

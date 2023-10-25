@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+option go_package = "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem";
+
+package telem;
+
+message CCIPExecutionReportSummary {
+    uint32 len_token_price_updates = 1;
+    uint32 len_gas_price_updates = 2;
+}
+
+// The CCIPCommitReport message is used to report the latest commit
+// as it's seend by the node.
+message CCIPCommitReportSummary {
+    uint32 len_token_prices = 1;
+    uint32 len_gas_prices = 2;
+    uint32 epoch = 3;
+    uint32 round = 4;
+}
+
+message CCIPTelemWrapper{
+    oneof msg {
+        CCIPCommitReportSummary commit_report = 1;
+        CCIPExecutionReportSummary execution_report  = 2;
+    }
+}

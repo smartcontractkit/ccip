@@ -141,6 +141,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if err != nil {
 		return nil, err
 	}
+	pluginConfig.monitoringEndpoint = argsNoPlugin.MonitoringEndpoint
 	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, pluginConfig.destChainEVMID)
