@@ -8,10 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -224,7 +221,7 @@ func TestOffRampReaderInit(t *testing.T) {
 }
 
 func setupOffRampReaderTH(t *testing.T, version string) readerTH {
-	user, bc := newSimulation(t)
+	user, bc := ccipdata.NewSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -286,7 +283,7 @@ func setupOffRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	offRampAddr, tx, offRamp, err := evm_2_evm_offramp_1_0_0.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.AssertNonRevert(t, tx, bc, user)
 
 	// Test the deployed OffRamp.
 	callOpts := &bind.CallOpts{
@@ -330,7 +327,7 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.AssertNonRevert(t, tx, bc, user)
 
 	// Test the deployed OffRamp.
 	callOpts := &bind.CallOpts{
@@ -356,7 +353,7 @@ func deployMockArm(
 	armAddr, tx, _, err := mock_arm_contract.DeployMockARMContract(user, bc)
 	require.NoError(t, err)
 	bc.Commit()
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.AssertNonRevert(t, tx, bc, user)
 	require.NotEqual(t, common.Address{}, armAddr)
 	return armAddr
 }
@@ -378,7 +375,7 @@ func deployCommitStore(
 	})
 	require.NoError(t, err)
 	bc.Commit()
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.AssertNonRevert(t, tx, bc, user)
 
 	// Test the deployed CommitStore.
 	callOpts := &bind.CallOpts{
@@ -399,23 +396,4 @@ func testOffRampReader(t *testing.T, th readerTH) {
 	res, err := th.reader.GetDestinationTokens(th.user.Context)
 	require.NoError(t, err)
 	require.Equal(t, []common.Address{}, res)
-}
-
-// Should be moved to a common test utils package.
-func newSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
-	user := testutils.MustNewSimTransactor(t)
-	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
-		user.From: {
-			Balance: big.NewInt(0).Mul(big.NewInt(50), big.NewInt(1e18)),
-		},
-	}, 10e6)
-	ec := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
-	return user, ec
-}
-
-// Should be moved to a common test utils package.
-func assertNonRevert(t *testing.T, tx *types.Transaction, bc *client.SimulatedBackendClient, user *bind.TransactOpts) {
-	receipt, err := bc.TransactionReceipt(user.Context, tx.Hash())
-	require.NoError(t, err)
-	require.NotEqual(t, uint64(0), receipt.Status, "Transaction should not have reverted")
 }
