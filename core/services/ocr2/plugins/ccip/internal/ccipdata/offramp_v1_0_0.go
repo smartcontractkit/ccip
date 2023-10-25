@@ -90,6 +90,7 @@ type OffRampV1_0_0 struct {
 	lp                  logpoller.LogPoller
 	lggr                logger.Logger
 	ec                  client.Client
+	evmBatchCaller      rpclib.EvmBatchCaller
 	filters             []logpoller.Filter
 	estimator           gas.EvmFeeEstimator
 	executionReportArgs abi.Arguments
@@ -115,7 +116,7 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		evmCalls = append(evmCalls, rpclib.NewEvmCall(offRampABI, "getDestinationToken", o.addr, sourceTk))
 	}
 
-	results, err := rpclib.EvmBatchCallWithLimit(ctx, RPC_BATCH_LIMIT, o.ec, evmCalls...)
+	results, err := o.evmBatchCaller.BatchCallLimit(ctx, RPC_BATCH_LIMIT, o.ec, evmCalls)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +124,7 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 	destTokens := make([]common.Address, 0, len(tokenAddresses))
 	for _, res := range results {
 		if res.Err != nil {
-			return nil, err
+			return nil, res.Err
 		}
 
 		if len(res.Outputs) != 1 {
@@ -407,6 +408,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		eventSig:            ExecutionStateChangedEventV1_0_0,
 		eventIndex:          executionStateChangedSequenceNumberIndex,
 		configMu:            sync.RWMutex{},
+		evmBatchCaller:      rpclib.NewDefaultEvmBatchCaller(),
 
 		// values set on the fly after ChangeConfig is called
 		gasPriceEstimator: prices.ExecGasPriceEstimator{},
