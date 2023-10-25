@@ -7,8 +7,8 @@ Here lives the integration tests for ccip, utilizing our [chainlink-testing-fram
 ### Setting up test inputs :
 
 In order to run the tests the first step is to set up the test inputs. There are two kinds of inputs -
-1. Generic test input set via TOML - If no specific input is set the tests will run with default inputs mentioned in [default.toml](./testconfig/tomls/default.toml)
-2. Secrets set via env variables. Please refer to [secrets.toml](./testconfig/secrets.env) for the list of env variables that need to be set.
+1. Generic test input - set via TOML - If no specific input is set; the tests will run with default inputs mentioned in [default.toml](./testconfig/tomls/default.toml)
+2. Secrets - set via env variables. Please refer to [secrets.toml](./testconfig/secrets.env) for the list of env variables that need to be set.
 
 If you want to override the default inputs, you need to set an env var `BASE64_TEST_CONFIG_OVERRIDE` containing the base64 encoded TOML file content.
 For example, if you want to override the `Networks` input in test and want to run your test on `avalanche testnet` and `arbitrum goerli` network, you can create a TOML file with the following content:
@@ -53,6 +53,9 @@ You can use a specific chainlink image and tag (if you already have one) for the
 make build_ccip_image image=chainlink-ccip tag=latest-dev # please choose the image and tag name as per your choice
 ```
 
+Currently, for local run the tests creates two new private geth networks and runs the tests on them. Running tests on testnet and mainnet is not supported yet for local run.
+Please refer to [Using remote kubernetes cluster](#using-remote-kubernetes-cluster) section for running the tests on live networks like testnet and mainnet.
+
 You can use the following command to run the tests locally with your specific chainlink image.
 
 #### Smoke Tests
@@ -62,3 +65,7 @@ You can use the following command to run the tests locally with your specific ch
 make test_smoke_ccip image=chainlink-ccip tag=latest-dev testimage="" testname=TestSmokeCCIPForBidirectionalLane overridestring="<overridden config string>" override_toml="<the toml file with overridden config string>" env="<.env file with BASE64_TEST_CONFIG_OVERRIDE value>"
 ```
 Currently other types of tests like load and chaos can only be run using remote kubernetes cluster.
+
+### Using remote kubernetes cluster
+
+These tests remain bound to a Kubernetes run environment, and require more complex setup and running instructions. We endeavor to make these easier to run and configure, but for the time being please seek a member of the QA/Test Tooling team if you want to run these.
