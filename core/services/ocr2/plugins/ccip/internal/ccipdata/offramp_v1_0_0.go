@@ -34,7 +34,7 @@ const (
 	EXEC_TOKEN_POOL_REMOVED      = "Token pool removed"
 
 	// RPC_BATCH_LIMIT defines the maximum number of rpc requests to be included in a batch.
-	RPC_BATCH_LIMIT = 20
+	RPC_BATCH_LIMIT = 16
 )
 
 var (
@@ -116,7 +116,12 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		evmCalls = append(evmCalls, rpclib.NewEvmCall(offRampABI, "getDestinationToken", o.addr, sourceTk))
 	}
 
-	results, err := o.evmBatchCaller.BatchCallLimit(ctx, RPC_BATCH_LIMIT, o.ec, evmCalls)
+	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("get latest block: %w", err)
+	}
+
+	results, err := o.evmBatchCaller.BatchCallLimit(ctx, RPC_BATCH_LIMIT, o.ec, uint64(latestBlock), evmCalls)
 	if err != nil {
 		return nil, err
 	}

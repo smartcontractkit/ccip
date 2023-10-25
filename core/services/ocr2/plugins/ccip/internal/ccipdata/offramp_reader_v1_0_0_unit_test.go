@@ -2,12 +2,14 @@ package ccipdata
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -15,7 +17,7 @@ import (
 
 func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 	ctx := testutils.Context(t)
-	const numSrcTokens = 10
+	const numSrcTokens = 20
 
 	generateTokensAndOutputs := func() ([]common.Address, []common.Address, []rpclib.DataAndErr) {
 		srcTks := make([]common.Address, numSrcTokens)
@@ -31,48 +33,62 @@ func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 		return srcTks, dstTks, outputs
 	}
 
-	t.Run("happy path", func(t *testing.T) {
-		batchCaller := rpclib.NewMockEvmBatchCaller(t)
-		o := &OffRampV1_0_0{evmBatchCaller: batchCaller}
-		srcTks, dstTks, outputs := generateTokensAndOutputs()
-		batchCaller.On("BatchCallLimit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(outputs, nil)
-		actualDstTokens, err := o.GetDestinationTokensFromSourceTokens(ctx, srcTks)
-		assert.NoError(t, err)
-		assert.Equal(t, dstTks, actualDstTokens)
-	})
+	testCases := []struct {
+		name           string
+		outputChangeFn func(outputs []rpclib.DataAndErr) []rpclib.DataAndErr
+		expErr         bool
+	}{
+		{
+			name:           "happy path",
+			outputChangeFn: func(outputs []rpclib.DataAndErr) []rpclib.DataAndErr { return outputs },
+			expErr:         false,
+		},
+		{
+			name: "rpc error",
+			outputChangeFn: func(outputs []rpclib.DataAndErr) []rpclib.DataAndErr {
+				outputs[2].Err = fmt.Errorf("some error")
+				return outputs
+			},
+			expErr: true,
+		},
+		{
+			name: "unexpected outputs",
+			outputChangeFn: func(outputs []rpclib.DataAndErr) []rpclib.DataAndErr {
+				outputs[0].Outputs = append(outputs[0].Outputs, "unexpected", 123)
+				return outputs
+			},
+			expErr: true,
+		},
+		{
+			name: "unexpected output type",
+			outputChangeFn: func(outputs []rpclib.DataAndErr) []rpclib.DataAndErr {
+				outputs[0].Outputs = []any{utils.RandomAddress().String()}
+				return outputs
+			},
+			expErr: true,
+		},
+	}
 
-	t.Run("rpc error", func(t *testing.T) {
-		batchCaller := rpclib.NewMockEvmBatchCaller(t)
-		o := &OffRampV1_0_0{evmBatchCaller: batchCaller}
-		srcTks, _, outputs := generateTokensAndOutputs()
-		outputs[0].Err = fmt.Errorf("some error")
-		batchCaller.On("BatchCallLimit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(outputs, nil)
-		_, err := o.GetDestinationTokensFromSourceTokens(ctx, srcTks)
-		assert.Error(t, err)
-	})
+	lp := mocks.NewLogPoller(t)
+	lp.On("LatestBlock", mock.Anything).Return(int64(rand.Uint64()), nil)
 
-	t.Run("unexpected outputs count", func(t *testing.T) {
-		batchCaller := rpclib.NewMockEvmBatchCaller(t)
-		o := &OffRampV1_0_0{evmBatchCaller: batchCaller}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			batchCaller := rpclib.NewMockEvmBatchCaller(t)
+			o := &OffRampV1_0_0{evmBatchCaller: batchCaller, lp: lp}
+			srcTks, dstTks, outputs := generateTokensAndOutputs()
+			outputs = tc.outputChangeFn(outputs)
+			batchCaller.On("BatchCallLimit", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Return(outputs, nil)
+			actualDstTokens, err := o.GetDestinationTokensFromSourceTokens(ctx, srcTks)
 
-		srcTks, _, outputs := generateTokensAndOutputs()
-		outputs[0].Outputs = append(outputs[0].Outputs, "unexpected", 123)
-		batchCaller.On("BatchCallLimit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(outputs, nil)
-		_, err := o.GetDestinationTokensFromSourceTokens(ctx, srcTks)
-		assert.Error(t, err)
-	})
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
 
-	t.Run("unexpected output type", func(t *testing.T) {
-		batchCaller := rpclib.NewMockEvmBatchCaller(t)
-		o := &OffRampV1_0_0{evmBatchCaller: batchCaller}
-		srcTks, _, outputs := generateTokensAndOutputs()
-		outputs[0].Outputs[0] = "0x123"
-		batchCaller.On("BatchCallLimit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(outputs, nil)
-		_, err := o.GetDestinationTokensFromSourceTokens(ctx, srcTks)
-		assert.Error(t, err)
-	})
+			assert.NoError(t, err)
+			assert.Equal(t, dstTks, actualDstTokens)
+		})
+	}
 }

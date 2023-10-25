@@ -104,7 +104,7 @@ func (t *supportedTokensOrigin) CallOrigin(ctx context.Context) (map[common.Addr
 		return nil, err
 	}
 	if len(sourceTokens) == 0 {
-		return nil, nil
+		return map[common.Address]common.Address{}, nil
 	}
 
 	destTokens, err := t.offRamp.GetDestinationTokensFromSourceTokens(ctx, sourceTokens)

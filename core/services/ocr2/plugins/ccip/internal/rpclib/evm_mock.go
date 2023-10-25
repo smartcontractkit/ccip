@@ -15,25 +15,25 @@ type MockEvmBatchCaller struct {
 	mock.Mock
 }
 
-// BatchCall provides a mock function with given fields: ctx, batchSender, calls
-func (_m *MockEvmBatchCaller) BatchCall(ctx context.Context, batchSender client.BatchSender, calls []EvmCall) ([]DataAndErr, error) {
-	ret := _m.Called(ctx, batchSender, calls)
+// BatchCall provides a mock function with given fields: ctx, batchSender, blockNumber, calls
+func (_m *MockEvmBatchCaller) BatchCall(ctx context.Context, batchSender client.BatchSender, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
+	ret := _m.Called(ctx, batchSender, blockNumber, calls)
 
 	var r0 []DataAndErr
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, client.BatchSender, []EvmCall) ([]DataAndErr, error)); ok {
-		return rf(ctx, batchSender, calls)
+	if rf, ok := ret.Get(0).(func(context.Context, client.BatchSender, uint64, []EvmCall) ([]DataAndErr, error)); ok {
+		return rf(ctx, batchSender, blockNumber, calls)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, client.BatchSender, []EvmCall) []DataAndErr); ok {
-		r0 = rf(ctx, batchSender, calls)
+	if rf, ok := ret.Get(0).(func(context.Context, client.BatchSender, uint64, []EvmCall) []DataAndErr); ok {
+		r0 = rf(ctx, batchSender, blockNumber, calls)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]DataAndErr)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, client.BatchSender, []EvmCall) error); ok {
-		r1 = rf(ctx, batchSender, calls)
+	if rf, ok := ret.Get(1).(func(context.Context, client.BatchSender, uint64, []EvmCall) error); ok {
+		r1 = rf(ctx, batchSender, blockNumber, calls)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -41,25 +41,25 @@ func (_m *MockEvmBatchCaller) BatchCall(ctx context.Context, batchSender client.
 	return r0, r1
 }
 
-// BatchCallLimit provides a mock function with given fields: ctx, limit, batchSender, calls
-func (_m *MockEvmBatchCaller) BatchCallLimit(ctx context.Context, limit int, batchSender client.BatchSender, calls []EvmCall) ([]DataAndErr, error) {
-	ret := _m.Called(ctx, limit, batchSender, calls)
+// BatchCallLimit provides a mock function with given fields: ctx, limit, batchSender, blockNumber, calls
+func (_m *MockEvmBatchCaller) BatchCallLimit(ctx context.Context, limit int, batchSender client.BatchSender, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
+	ret := _m.Called(ctx, limit, batchSender, blockNumber, calls)
 
 	var r0 []DataAndErr
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, client.BatchSender, []EvmCall) ([]DataAndErr, error)); ok {
-		return rf(ctx, limit, batchSender, calls)
+	if rf, ok := ret.Get(0).(func(context.Context, int, client.BatchSender, uint64, []EvmCall) ([]DataAndErr, error)); ok {
+		return rf(ctx, limit, batchSender, blockNumber, calls)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, client.BatchSender, []EvmCall) []DataAndErr); ok {
-		r0 = rf(ctx, limit, batchSender, calls)
+	if rf, ok := ret.Get(0).(func(context.Context, int, client.BatchSender, uint64, []EvmCall) []DataAndErr); ok {
+		r0 = rf(ctx, limit, batchSender, blockNumber, calls)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]DataAndErr)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, client.BatchSender, []EvmCall) error); ok {
-		r1 = rf(ctx, limit, batchSender, calls)
+	if rf, ok := ret.Get(1).(func(context.Context, int, client.BatchSender, uint64, []EvmCall) error); ok {
+		r1 = rf(ctx, limit, batchSender, blockNumber, calls)
 	} else {
 		r1 = ret.Error(1)
 	}
