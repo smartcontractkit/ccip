@@ -1,7 +1,6 @@
 package ccipdata
 
 import (
-	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_1_0"
@@ -31,16 +31,9 @@ type readerTH struct {
 	reader OnRampReader
 }
 
-func TestNewOnRampReader__noContractAtAddress(t *testing.T) {
+func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 	_, bc := NewSimulation(t)
-	log := logger.TestLogger(t)
-	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
-	lp := logpoller.NewLogPoller(
-		orm,
-		bc,
-		log,
-		100*time.Millisecond, 2, 3, 2, 1000)
-
+	lp := lpmocks.NewLogPoller(t)
 	_, err := NewOnRampReader(
 		logger.TestLogger(t),
 		testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(),
@@ -103,7 +96,7 @@ func setupOnRampReaderTH(t *testing.T, version string) readerTH {
 	}
 
 	// Create the version-specific reader.
-	reader, err := NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc, true)
+	reader, err := NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc, false)
 	require.NoError(t, err)
 
 	return readerTH{
@@ -199,8 +192,8 @@ func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		DestChainSelector: testutils.SimulatedChainID.Uint64(),
 		DefaultTxGasLimit: 30000,
 		MaxNopFeesJuels:   big.NewInt(1000000),
-		PrevOnRamp:        common.HexToAddress("0x000009"),
-		ArmProxy:          common.HexToAddress("0x000008"),
+		PrevOnRamp:        common.Address{},
+		ArmProxy:          utils.RandomAddress(),
 	}
 	dynamicConfig := evm_2_evm_onramp_1_1_0.EVM2EVMOnRampDynamicConfig{
 		Router:          common.HexToAddress("0x000110"),
@@ -274,8 +267,8 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		DestChainSelector: testutils.SimulatedChainID.Uint64(),
 		DefaultTxGasLimit: 30000,
 		MaxNopFeesJuels:   big.NewInt(1000000),
-		PrevOnRamp:        common.HexToAddress("0x000009"),
-		ArmProxy:          common.HexToAddress("0x000008"),
+		PrevOnRamp:        common.Address{},
+		ArmProxy:          utils.RandomAddress(),
 	}
 	dynamicConfig := evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
 		Router:                            common.HexToAddress("0x000120"),
@@ -285,7 +278,7 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		DestDataAvailabilityOverheadGas:   0,
 		DestGasPerDataAvailabilityByte:    0,
 		DestDataAvailabilityMultiplierBps: 0,
-		PriceRegistry:                     common.HexToAddress("0x000777"),
+		PriceRegistry:                     utils.RandomAddress(),
 		MaxDataBytes:                      0,
 		MaxPerMsgGasLimit:                 0,
 	}
@@ -315,13 +308,11 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	}
 	nopsAndWeights := []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight{
 		{
-			Nop:    common.HexToAddress("0x222222222"),
+			Nop:    utils.RandomAddress(),
 			Weight: 1,
 		},
 	}
 	tokenAndPool := []evm_2_evm_onramp.InternalPoolUpdate{}
-	user.GasPrice = big.NewInt(10000000000)
-	user.GasLimit = 0
 	onRampAddress, transaction, onRamp, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		user,
 		bc,
@@ -362,10 +353,12 @@ func testOnRampReader(t *testing.T, th readerTH, expectedRouterAddress common.Ad
 	require.NoError(t, err)
 	require.Equal(t, expectedRouterAddress, res)
 
-	_, err = th.reader.GetSendRequestsGteSeqNum(th.user.Context, 0, 0)
-	require.Error(t, err, errors.New("latest finalized header is nil")) // requires logs to be polled.
+	msg, err := th.reader.GetSendRequestsGteSeqNum(th.user.Context, 0, 0)
+	require.NoError(t, err)
+	require.NotNil(t, msg)
+	require.Equal(t, []Event[internal.EVM2EVMMessage]{}, msg)
 
-	msg, err := th.reader.GetSendRequestsBetweenSeqNums(th.user.Context, 0, 10, 0)
+	msg, err = th.reader.GetSendRequestsBetweenSeqNums(th.user.Context, 0, 10, 0)
 	require.NoError(t, err)
 	require.NotNil(t, msg)
 	require.Equal(t, []Event[internal.EVM2EVMMessage]{}, msg)

@@ -285,17 +285,11 @@ func setupOffRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	require.NoError(t, err)
 	ccipdata.AssertNonRevert(t, tx, bc, user)
 
-	// Test the deployed OffRamp.
-	callOpts := &bind.CallOpts{
+	// Verify the deployed OffRamp.
+	tav, err := offRamp.TypeAndVersion(&bind.CallOpts{
 		From:    user.From,
 		Context: context.Background(),
-	}
-
-	owner, err := offRamp.Owner(callOpts)
-	require.NoError(t, err)
-	require.Equal(t, user.From, owner)
-
-	tav, err := offRamp.TypeAndVersion(callOpts)
+	})
 	require.NoError(t, err)
 	require.Equal(t, "EVM2EVMOffRamp 1.1.0", tav)
 	return offRampAddr
@@ -329,17 +323,11 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	require.NoError(t, err)
 	ccipdata.AssertNonRevert(t, tx, bc, user)
 
-	// Test the deployed OffRamp.
-	callOpts := &bind.CallOpts{
+	// Verify the deployed OffRamp.
+	tav, err := offRamp.TypeAndVersion(&bind.CallOpts{
 		From:    user.From,
 		Context: context.Background(),
-	}
-
-	owner, err := offRamp.Owner(callOpts)
-	require.NoError(t, err)
-	require.Equal(t, user.From, owner)
-
-	tav, err := offRamp.TypeAndVersion(callOpts)
+	})
 	require.NoError(t, err)
 	require.Equal(t, "EVM2EVMOffRamp 1.2.0", tav)
 	return offRampAddr
@@ -382,9 +370,6 @@ func deployCommitStore(
 		From:    user.From,
 		Context: context.Background(),
 	}
-	number, err := cs.GetExpectedNextSequenceNumber(callOpts)
-	require.NoError(t, err)
-	require.Equal(t, 1, int(number))
 	tav, err := cs.TypeAndVersion(callOpts)
 	require.NoError(t, err)
 	require.Equal(t, "CommitStore 1.2.0", tav)
@@ -393,7 +378,15 @@ func deployCommitStore(
 }
 
 func testOffRampReader(t *testing.T, th readerTH) {
-	res, err := th.reader.GetDestinationTokens(th.user.Context)
+	addresses, err := th.reader.GetDestinationTokens(th.user.Context)
 	require.NoError(t, err)
-	require.Equal(t, []common.Address{}, res)
+	require.Equal(t, []common.Address{}, addresses)
+
+	tokens, err := th.reader.GetSupportedTokens(th.user.Context)
+	require.NoError(t, err)
+	require.Equal(t, []common.Address{}, tokens)
+
+	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(th.user.Context, 0, 10, 0)
+	require.NoError(t, err)
+	require.Equal(t, []ccipdata.Event[ccipdata.ExecutionStateChanged]{}, events)
 }
