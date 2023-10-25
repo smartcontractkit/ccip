@@ -129,6 +129,9 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	}
 
 	p.SelectedNetworks = p.EnvInput.EVMNetworks()
+	if p.TestGroupInput.NoOfNetworks == 0 {
+		p.TestGroupInput.NoOfNetworks = len(p.SelectedNetworks)
+	}
 	// TODO remove this when CTF network timeout is fixed
 	for i := range p.SelectedNetworks {
 		p.SelectedNetworks[i].Timeout = blockchain.JSONStrDuration{

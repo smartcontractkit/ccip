@@ -57,6 +57,15 @@ func (c *Config) Validate() error {
 	return c.CCIP.Validate()
 }
 
+func (c *Config) TOMLString() string {
+	buf := new(bytes.Buffer)
+	err := toml.NewEncoder(buf).Encode(c)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to encode config to TOML")
+	}
+	return buf.String()
+}
+
 func NewConfig() (*Config, error) {
 	cfg := &Config{}
 	override := &Config{}
@@ -69,6 +78,7 @@ func NewConfig() (*Config, error) {
 	// load config from env var if specified
 	rawConfig, _ := utils.GetEnv("BASE64_TEST_CONFIG_OVERRIDE")
 	if rawConfig != "" {
+		log.Info().Msg("Found BASE64_TEST_CONFIG_OVERRIDE env var, overriding default config")
 		d, err := base64.StdEncoding.DecodeString(rawConfig)
 		err = toml.Unmarshal(d, &override)
 		if err != nil {
@@ -78,6 +88,7 @@ func NewConfig() (*Config, error) {
 	if override != nil {
 		// apply overrides for all products
 		if override.CCIP != nil {
+			log.Debug().Interface("override", override).Msg("Applying overrides for CCIP")
 			if cfg.CCIP == nil {
 				cfg.CCIP = override.CCIP
 			} else {
@@ -100,7 +111,7 @@ func NewConfig() (*Config, error) {
 			return nil, err
 		}
 	}
-	log.Debug().Interface("Config", cfg).Msg("Parsed config")
+	fmt.Println("running test with config", cfg.TOMLString())
 	return cfg, nil
 }
 
@@ -113,13 +124,13 @@ type Common struct {
 	Networks  []string         `toml:",omitempty"`
 }
 
-func (p Common) ReadSecrets() error {
+func (p *Common) ReadSecrets() error {
 	// read secrets for all products and test types
 	// TODO: as of now we read network secrets through networks.SetNetworks, change this to generic secret reading mechanism
 	return p.Chainlink.ReadSecrets()
 }
 
-func (p Common) ApplyOverrides(from *Common) error {
+func (p *Common) ApplyOverrides(from *Common) error {
 	if from == nil {
 		return nil
 	}
@@ -141,14 +152,14 @@ func (p Common) ApplyOverrides(from *Common) error {
 	return nil
 }
 
-func (p Common) Validate() error {
+func (p *Common) Validate() error {
 	if p.Networks == nil {
 		return errors.New("no networks specified")
 	}
 	return p.Chainlink.Validate()
 }
 
-func (p Common) EVMNetworks() []blockchain.EVMNetwork {
+func (p *Common) EVMNetworks() []blockchain.EVMNetwork {
 	return networks.SetNetworks(p.Networks)
 }
 
