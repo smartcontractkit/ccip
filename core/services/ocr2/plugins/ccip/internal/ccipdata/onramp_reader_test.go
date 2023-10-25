@@ -1,4 +1,4 @@
-package ccipdata
+package ccipdata_test
 
 import (
 	"math/big"
@@ -20,21 +20,22 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-type readerTH struct {
+type onRampReaderTH struct {
 	lp     logpoller.LogPollerTest
 	ec     client.Client
 	log    logger.Logger
 	user   *bind.TransactOpts
-	reader OnRampReader
+	reader ccipdata.OnRampReader
 }
 
 func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
-	_, bc := NewSimulation(t)
+	_, bc := newSimulation(t)
 	lp := lpmocks.NewLogPoller(t)
-	_, err := NewOnRampReader(
+	_, err := ccipdata.NewOnRampReader(
 		logger.TestLogger(t),
 		testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(),
 		common.Address{},
@@ -52,15 +53,15 @@ func TestOnRampReaderInit(t *testing.T) {
 	}{
 		{
 			name:    "OnRampReader_V1_0_0",
-			version: V1_0_0,
+			version: ccipdata.V1_0_0,
 		},
 		{
 			name:    "OnRampReader_V1_1_0",
-			version: V1_1_0,
+			version: ccipdata.V1_1_0,
 		},
 		{
 			name:    "OnRampReader_V1_2_0",
-			version: V1_2_0,
+			version: ccipdata.V1_2_0,
 		},
 	}
 
@@ -72,8 +73,8 @@ func TestOnRampReaderInit(t *testing.T) {
 	}
 }
 
-func setupOnRampReaderTH(t *testing.T, version string) readerTH {
-	user, bc := NewSimulation(t)
+func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
+	user, bc := newSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -85,21 +86,21 @@ func setupOnRampReaderTH(t *testing.T, version string) readerTH {
 	// Setup onRamp.
 	var onRampAddress common.Address
 	switch version {
-	case V1_0_0:
+	case ccipdata.V1_0_0:
 		onRampAddress = setupOnRampV1_0_0(t, user, bc)
-	case V1_1_0:
+	case ccipdata.V1_1_0:
 		onRampAddress = setupOnRampV1_1_0(t, user, bc)
-	case V1_2_0:
+	case ccipdata.V1_2_0:
 		onRampAddress = setupOnRampV1_2_0(t, user, bc)
 	default:
 		require.Fail(t, "Unknown version: ", version)
 	}
 
 	// Create the version-specific reader.
-	reader, err := NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc, false)
+	reader, err := ccipdata.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc, false)
 	require.NoError(t, err)
 
-	return readerTH{
+	return onRampReaderTH{
 		lp:     lp,
 		ec:     bc,
 		log:    log,
@@ -172,7 +173,7 @@ func setupOnRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	)
 	bc.Commit()
 	require.NoError(t, err)
-	AssertNonRevert(t, transaction, bc, user)
+	assertNonRevert(t, transaction, bc, user)
 	return onRampAddress
 }
 
@@ -240,7 +241,7 @@ func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	)
 	bc.Commit()
 	require.NoError(t, err)
-	AssertNonRevert(t, transaction, bc, user)
+	assertNonRevert(t, transaction, bc, user)
 	return onRampAddress
 }
 
@@ -312,24 +313,24 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	)
 	bc.Commit()
 	require.NoError(t, err)
-	AssertNonRevert(t, transaction, bc, user)
+	assertNonRevert(t, transaction, bc, user)
 	return onRampAddress
 }
 
-func testVersionSpecificOnRampReader(t *testing.T, th readerTH, version string) {
+func testVersionSpecificOnRampReader(t *testing.T, th onRampReaderTH, version string) {
 	switch version {
-	case V1_0_0:
+	case ccipdata.V1_0_0:
 		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000100"))
-	case V1_1_0:
+	case ccipdata.V1_1_0:
 		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000110"))
-	case V1_2_0:
+	case ccipdata.V1_2_0:
 		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000120"))
 	default:
 		require.Fail(t, "Unknown version: ", version)
 	}
 }
 
-func testOnRampReader(t *testing.T, th readerTH, expectedRouterAddress common.Address) {
+func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress common.Address) {
 
 	res, err := th.reader.RouterAddress()
 	require.NoError(t, err)
@@ -338,10 +339,10 @@ func testOnRampReader(t *testing.T, th readerTH, expectedRouterAddress common.Ad
 	msg, err := th.reader.GetSendRequestsGteSeqNum(th.user.Context, 0, 0)
 	require.NoError(t, err)
 	require.NotNil(t, msg)
-	require.Equal(t, []Event[internal.EVM2EVMMessage]{}, msg)
+	require.Equal(t, []ccipdata.Event[internal.EVM2EVMMessage]{}, msg)
 
 	msg, err = th.reader.GetSendRequestsBetweenSeqNums(th.user.Context, 0, 10, 0)
 	require.NoError(t, err)
 	require.NotNil(t, msg)
-	require.Equal(t, []Event[internal.EVM2EVMMessage]{}, msg)
+	require.Equal(t, []ccipdata.Event[internal.EVM2EVMMessage]{}, msg)
 }

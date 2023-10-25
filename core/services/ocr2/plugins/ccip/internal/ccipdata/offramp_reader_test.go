@@ -29,7 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-type readerTH struct {
+type offRampReaderTH struct {
 	lp     logpoller.LogPollerTest
 	ec     client.Client
 	log    logger.Logger
@@ -220,8 +220,8 @@ func TestOffRampReaderInit(t *testing.T) {
 	}
 }
 
-func setupOffRampReaderTH(t *testing.T, version string) readerTH {
-	user, bc := ccipdata.NewSimulation(t)
+func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
+	user, bc := newSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -249,7 +249,7 @@ func setupOffRampReaderTH(t *testing.T, version string) readerTH {
 	require.NoError(t, err)
 	require.Equal(t, offRampAddress, reader.Address())
 
-	return readerTH{
+	return offRampReaderTH{
 		lp:     lp,
 		ec:     bc,
 		log:    log,
@@ -283,7 +283,7 @@ func setupOffRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	offRampAddr, tx, offRamp, err := evm_2_evm_offramp_1_0_0.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
-	ccipdata.AssertNonRevert(t, tx, bc, user)
+	assertNonRevert(t, tx, bc, user)
 
 	// Verify the deployed OffRamp.
 	tav, err := offRamp.TypeAndVersion(&bind.CallOpts{
@@ -321,7 +321,7 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
-	ccipdata.AssertNonRevert(t, tx, bc, user)
+	assertNonRevert(t, tx, bc, user)
 
 	// Verify the deployed OffRamp.
 	tav, err := offRamp.TypeAndVersion(&bind.CallOpts{
@@ -341,7 +341,7 @@ func deployMockArm(
 	armAddr, tx, _, err := mock_arm_contract.DeployMockARMContract(user, bc)
 	require.NoError(t, err)
 	bc.Commit()
-	ccipdata.AssertNonRevert(t, tx, bc, user)
+	assertNonRevert(t, tx, bc, user)
 	require.NotEqual(t, common.Address{}, armAddr)
 	return armAddr
 }
@@ -363,7 +363,7 @@ func deployCommitStore(
 	})
 	require.NoError(t, err)
 	bc.Commit()
-	ccipdata.AssertNonRevert(t, tx, bc, user)
+	assertNonRevert(t, tx, bc, user)
 
 	// Test the deployed CommitStore.
 	callOpts := &bind.CallOpts{
@@ -377,7 +377,7 @@ func deployCommitStore(
 	return csAddr
 }
 
-func testOffRampReader(t *testing.T, th readerTH) {
+func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	addresses, err := th.reader.GetDestinationTokens(th.user.Context)
 	require.NoError(t, err)
 	require.Equal(t, []common.Address{}, addresses)

@@ -1,4 +1,4 @@
-package ccipdata
+package ccipdata_test
 
 import (
 	"math/big"
@@ -16,7 +16,7 @@ import (
 )
 
 // NewSimulation returns a client and a simulated backend.
-func NewSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
+func newSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
 	user := testutils.MustNewSimTransactor(t)
 	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
 		user.From: {
@@ -31,7 +31,7 @@ func NewSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendCl
 }
 
 // AssertNonRevert Verify that a transaction was not reverted.
-func AssertNonRevert(t *testing.T, tx *types.Transaction, bc *client.SimulatedBackendClient, user *bind.TransactOpts) {
+func assertNonRevert(t *testing.T, tx *types.Transaction, bc *client.SimulatedBackendClient, user *bind.TransactOpts) {
 	require.NotNil(t, tx, "Transaction should not be nil")
 	receipt, err := bc.TransactionReceipt(user.Context, tx.Hash())
 	require.NoError(t, err)
