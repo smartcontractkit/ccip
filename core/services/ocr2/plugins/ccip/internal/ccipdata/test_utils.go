@@ -32,6 +32,7 @@ func NewSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendCl
 
 // AssertNonRevert Verify that a transaction was not reverted.
 func AssertNonRevert(t *testing.T, tx *types.Transaction, bc *client.SimulatedBackendClient, user *bind.TransactOpts) {
+	require.NotNil(t, tx, "Transaction should not be nil")
 	receipt, err := bc.TransactionReceipt(user.Context, tx.Hash())
 	require.NoError(t, err)
 	require.NotEqual(t, uint64(0), receipt.Status, "Transaction should not have reverted")
