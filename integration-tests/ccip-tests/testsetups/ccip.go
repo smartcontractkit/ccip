@@ -653,14 +653,15 @@ func CCIPDefaultTestSetUp(
 				LocalCluster: local,
 			}
 		} else {
+			envConfig := &environment.Config{
+				NamespacePrefix: envName,
+				Test:            t,
+			}
+			if inputs.EnvInput.TTL != nil {
+				envConfig.TTL = inputs.EnvInput.TTL.Duration()
+			}
 			// deploy the env if configureCLNode is true
-			k8Env = DeployEnvironments(
-				t,
-				&environment.Config{
-					TTL:             inputs.EnvInput.TTL.Duration(),
-					NamespacePrefix: envName,
-					Test:            t,
-				}, inputs)
+			k8Env = DeployEnvironments(t, envConfig, inputs)
 			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
 		}
 
