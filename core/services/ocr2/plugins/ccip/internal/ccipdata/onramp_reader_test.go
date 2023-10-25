@@ -158,7 +158,7 @@ func setupOnRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		},
 	}
 	tokenAndPool := []evm_2_evm_onramp_1_0_0.InternalPoolUpdate{}
-	onRampAddress, transaction, onRamp, err := evm_2_evm_onramp_1_0_0.DeployEVM2EVMOnRamp(
+	onRampAddress, transaction, _, err := evm_2_evm_onramp_1_0_0.DeployEVM2EVMOnRamp(
 		user,
 		bc,
 		staticConfig,
@@ -173,8 +173,6 @@ func setupOnRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	bc.Commit()
 	require.NoError(t, err)
 	AssertNonRevert(t, transaction, bc, user)
-	require.NotNil(t, onRampAddress)
-	require.NotNil(t, onRamp)
 	return onRampAddress
 }
 
@@ -228,11 +226,7 @@ func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		},
 	}
 	tokenAndPool := []evm_2_evm_onramp_1_1_0.InternalPoolUpdate{}
-
-	user.GasPrice = big.NewInt(10000000000)
-	user.GasLimit = 0
-
-	onRampAddress, transaction, onRamp, err := evm_2_evm_onramp_1_1_0.DeployEVM2EVMOnRamp(
+	onRampAddress, transaction, _, err := evm_2_evm_onramp_1_1_0.DeployEVM2EVMOnRamp(
 		user,
 		bc,
 		staticConfig,
@@ -247,8 +241,6 @@ func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	bc.Commit()
 	require.NoError(t, err)
 	AssertNonRevert(t, transaction, bc, user)
-	require.NotNil(t, onRampAddress)
-	require.NotNil(t, onRamp)
 	return onRampAddress
 }
 
@@ -307,7 +299,7 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 		},
 	}
 	tokenAndPool := []evm_2_evm_onramp.InternalPoolUpdate{}
-	onRampAddress, transaction, onRamp, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
+	onRampAddress, transaction, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
 		user,
 		bc,
 		staticConfig,
@@ -321,9 +313,6 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	bc.Commit()
 	require.NoError(t, err)
 	AssertNonRevert(t, transaction, bc, user)
-	require.NotNil(t, onRampAddress)
-	require.NotNil(t, onRamp)
-
 	return onRampAddress
 }
 
