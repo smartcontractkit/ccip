@@ -32,7 +32,9 @@ const (
 	EXEC_EXECUTION_STATE_CHANGES = "Exec execution state changes"
 	EXEC_TOKEN_POOL_ADDED        = "Token pool added"
 	EXEC_TOKEN_POOL_REMOVED      = "Token pool removed"
-	RPC_BATCH_LIMIT              = 10
+
+	// RPC_BATCH_LIMIT defines the maximum number of rpc requests to be included in a batch.
+	RPC_BATCH_LIMIT = 20
 )
 
 var (
@@ -113,7 +115,7 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		evmCalls = append(evmCalls, rpclib.NewEvmCall(offRampABI, "getDestinationToken", o.addr, sourceTk))
 	}
 
-	results, err := rpclib.EvmBatchCallWithLimit[common.Address](ctx, RPC_BATCH_LIMIT, o.ec, evmCalls...)
+	results, err := rpclib.EvmBatchCallWithLimit(ctx, RPC_BATCH_LIMIT, o.ec, evmCalls...)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +125,17 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		if res.Err != nil {
 			return nil, err
 		}
-		destTokens = append(destTokens, res.Data)
+
+		if len(res.Outputs) != 1 {
+			return nil, fmt.Errorf("got %d outputs but one was expected", len(res.Outputs))
+		}
+
+		destTokenAddress, is := res.Outputs[0].(common.Address)
+		if !is {
+			return nil, fmt.Errorf("the result (%T) is not an address", res.Outputs[0])
+		}
+
+		destTokens = append(destTokens, destTokenAddress)
 	}
 
 	return destTokens, nil
