@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/pkg/errors"
 
@@ -33,6 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
 )
 
 const (
@@ -82,6 +84,8 @@ type ExecutionReportingPlugin struct {
 	cachedTokenPools       cache.AutoSync[map[common.Address]common.Address]
 	customTokenPoolFactory func(ctx context.Context, poolAddress common.Address, bind bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error)
 	gasPriceEstimator      prices.GasPriceEstimatorExec
+	// Telemetry
+	monitoringEndpoint commontypes.MonitoringEndpoint
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -163,7 +167,8 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			customTokenPoolFactory: func(ctx context.Context, poolAddress common.Address, contractBackend bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
 				return custom_token_pool.NewCustomTokenPool(poolAddress, contractBackend)
 			},
-			gasPriceEstimator: rf.config.offRampReader.GasPriceEstimator(),
+			gasPriceEstimator:  rf.config.offRampReader.GasPriceEstimator(),
+			monitoringEndpoint: rf.config.monitoringEndpoint,
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -916,12 +921,35 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
+	telem := collectTelemetry(observedMessages)
+	bytes, err := proto.Marshal(telem)
+	if err != nil {
+		// Telemetry related errors are not critical and must not affect
+		// execution, so we log them and continue.
+		lggr.Errorw("failed to marshal telemetry to protobuf", "err", err)
+	} else {
+		r.monitoringEndpoint.SendLog(bytes)
+	}
+
 	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {
 		return false, nil, err
 	}
 	lggr.Infow("Report", "executableObservations", observedMessages)
 	return true, report, nil
+}
+
+func collectTelemetry(observedMessages []ObservedMessage) (t *telemPb.CCIPTelemWrapper) {
+	if len(observedMessages) > 0 {
+		return &telemPb.CCIPTelemWrapper{
+			Msg: &telemPb.CCIPTelemWrapper_ExecutionReport{
+				ExecutionReport: &telemPb.CCIPExecutionReportSummary{
+					LenTokenData: uint32(len(observedMessages[0].MsgData.TokenData)),
+				},
+			},
+		}
+	}
+	return nil
 }
 
 type tallyKey struct {

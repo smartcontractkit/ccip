@@ -5,8 +5,7 @@ option go_package = "github.com/smartcontractkit/chainlink/v2/core/services/sync
 package telem;
 
 message CCIPExecutionReportSummary {
-    uint32 len_token_price_updates = 1;
-    uint32 len_gas_price_updates = 2;
+    uint32 len_token_data = 1;
 }
 
 // The CCIPCommitReport message is used to report the latest commit
