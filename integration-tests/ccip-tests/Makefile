@@ -44,3 +44,10 @@ test_smoke_ccip_simulated_local_besu: override_config
   	CHAINLINK_VERSION=$(tag)  \
     ENV_JOB_IMAGE=""  \
 	go test -timeout 24h -count=1 -v -run ^TestSmokeCCIPForBidirectionalLane$$ ./smoke
+
+# image: the name for the chainlink image being built, example: image=chainlink
+# tag: the tag for the chainlink image being built, example: tag=latest
+# example usage: make build_ccip_image image=chainlink-ccip tag=latest
+.PHONY: build_ccip_image
+build_ccip_image:
+	docker build -f ../../core/chainlink.Dockerfile --build-arg COMMIT_SHA=$(git rev-parse HEAD) --build-arg CHAINLINK_USER=chainlink -t $(image):$(tag) ../../

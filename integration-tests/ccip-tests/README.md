@@ -40,9 +40,7 @@ You can run the command to ignore the changes to the file.
 git update-index --skip-worktree ./testconfig/secrets.env
 ```
 
-
-
-To run the tests with
+### Triggering the tests
 There are two ways to run the tests:
 1. Using local docker containers
 2. Using remote kubernetes cluster
@@ -50,3 +48,17 @@ There are two ways to run the tests:
 ### Using local docker containers
 
 In order to run the tests locally, you need to have docker installed and running on your machine.
+You can use a specific chainlink image and tag (if you already have one) for the tests. Otherwise, you can build the image using the following command:
+```bash
+make build_ccip_image image=chainlink-ccip tag=latest-dev # please choose the image and tag name as per your choice
+```
+
+You can use the following command to run the tests locally with your specific chainlink image.
+
+#### Smoke Tests
+```bash
+# if overridestring is set, override_toml is ignored
+# mark the testimage as empty for running the tests in local docker containers
+make test_smoke_ccip image=chainlink-ccip tag=latest-dev testimage="" testname=TestSmokeCCIPForBidirectionalLane overridestring="<overridden config string>" override_toml="<the toml file with overridden config string>" env="<.env file with BASE64_TEST_CONFIG_OVERRIDE value>"
+```
+Currently other types of tests like load and chaos can only be run using remote kubernetes cluster.
