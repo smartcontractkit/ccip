@@ -1,7 +1,7 @@
 [CCIP]
 
 [CCIP.Env]
-Networks = ['AVALANCHE_FUJI', 'ARBITRUM_GOERLI']
+Networks = ['AVALANCHE_FUJI', 'OPTIMISM_GOERLI']
 
 [CCIP.Deployments]
 Data = """
