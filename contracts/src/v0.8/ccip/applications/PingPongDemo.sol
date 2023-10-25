@@ -23,18 +23,18 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   // Pause ping-ponging
   bool private s_isPaused;
   IERC20 private s_feeToken;
-  
+
   // Defines the increase in ping pong count before self-funding is attempted.
   // Set to 0 to disable auto-funding, auto-funding only works for ping-pongs that are set as NOPs in the onRamp.
   uint8 private s_countIncrBeforeFunding;
 
-  constructor(address router, IERC20 feeToken, uint8 roundTripsBeforeFundng) CCIPReceiver(router) {
+  constructor(address router, IERC20 feeToken, uint8 roundTripsBeforeFunding) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), 2 ** 256 - 1);
 
     // PingPong count increases by 2 for each round trip.
-    s_countIncrBeforeFunding = roundTripsBeforeFundng * 2;
+    s_countIncrBeforeFunding = roundTripsBeforeFunding * 2;
   }
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
