@@ -25,8 +25,7 @@ export BASE64_TEST_CONFIG_OVERRIDE=$(base64 -i <path-to-toml-file>)
 
 Alternatively, you can also use the make command to invoke a go script to do the same.
 ```bash
-## if overridestring is set, override_toml is ignored
-make override_config overridestring="<overridden config string>" override_toml="<the toml file with overridden config string>" env="<.env file with BASE64_TEST_CONFIG_OVERRIDE value>"
+make override_config override_toml="<the toml file with overridden config>" env="<.env file with BASE64_TEST_CONFIG_OVERRIDE value>"
 ```
 
 In order to set the secrets, you need to set the env vars mentioned in [secrets.toml](./testconfig/secrets.env) file and source the file.  
@@ -62,7 +61,7 @@ You can use the following command to run the tests locally with your specific ch
 ```bash
 # if overridestring is set, override_toml is ignored
 # mark the testimage as empty for running the tests in local docker containers
-make test_smoke_ccip image=chainlink-ccip tag=latest-dev testimage="" testname=TestSmokeCCIPForBidirectionalLane overridestring="<overridden config string>" override_toml="<the toml file with overridden config string>" env="<.env file with BASE64_TEST_CONFIG_OVERRIDE value>"
+make test_smoke_ccip image=chainlink-ccip tag=latest-dev testimage="" testname=TestSmokeCCIPForBidirectionalLane override_toml="<the toml file with overridden config string>" env="<.env file with BASE64_TEST_CONFIG_OVERRIDE value>"
 ```
 Currently other types of tests like load and chaos can only be run using remote kubernetes cluster.
 
