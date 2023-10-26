@@ -1,51 +1,53 @@
+## To Override the default config,
+# example usage: make override_config overridestring="" override_toml=../config/config.toml env=../.env
+.PHONY: override_config
+override_config:
+	cd ./testconfig/override && \
+	go run . --overridewith=$(overridestring) --path=$(override_toml) --output=$(env) && \
+	cd ../..
+
+
 # example usage: make test_load_ccip_simulated_k8 image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestLoadCCIPStableRequestTriggeringWithNetworkChaos
-.PHONY: test_load_ccip_simulated_k8
-test_load_ccip_simulated_k8:
-	source ./load-test.env && \
+.PHONY: test_load_ccip
+include test-config.env
+test_load_ccip:
+	source ./testconfig/override/$(env) && \
     CHAINLINK_IMAGE=$(image)  \
     CHAINLINK_VERSION=$(tag)  \
     ENV_JOB_IMAGE=$(testimage)  \
+    TEST_SUITE=load \
+    TEST_ARGS="-test.timeout 900h" \
+    DETACH_RUNNER=true \
 	go test -timeout 24h -count=1 -v -run ^$(testname)$$ ./load
 
 
-# example usage: make test_load_ccip_simulated_k8 image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest
-.PHONY: test_load_ccip_testnet_k8
-test_load_ccip_testnet_k8:
-	source ./load-test.env && \
-	SELECTED_NETWORKS="SIMULATED,SEPOLIA,OPTIMISM_GOERLI,ARBITRUM_GOERLI,AVALANCHE_FUJI,BSC_TESTNET,MUMBAI,BASE_GOERLI"  \
-	CCIP_NO_OF_NETWORKS=7  \
-	CCIP_CHAINLINK_NODE_FUNDING=10  \
+# example usage: make test_smoke_ccip image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestSmokeCCIPForBidirectionalLane overridestring="" override_toml=../config/config.toml env=test-config.env
+.PHONY: test_smoke_ccip
+include test-config.env
+test_smoke_ccip: override_config
+	source ./testconfig/override/$(env) && \
     CHAINLINK_IMAGE=$(image)  \
     CHAINLINK_VERSION=$(tag)  \
     ENV_JOB_IMAGE=$(testimage)  \
-	go test -timeout 24h -count=1 -v -run ^TestLoadCCIPStableRPS$$ ./load
-
-# example usage: make test_smoke_ccip_simulated_local image=chainlink-ccip tag=latest testname=TestSmokeCCIPForBidirectionalLane
-.PHONY: test_smoke_ccip_simulated_local
-test_smoke_ccip_simulated_local:
-	DATABASE_URL="postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable" \
-    SELECTED_NETWORKS="SIMULATED,SIMULATED_1,SIMULATED_2"  \
-    CCIP_DEPLOY_ON_LOCAL=True  \
-    CCIP_NETWORK_PAIRS="" \
-    CCIP_NO_OF_NETWORKS=2  \
-    CCIP_NO_OF_ROUTERS_PER_PAIR=1  \
-    CCIP_MSG_TYPE=WithToken \
-    CHAINLINK_IMAGE=$(image)  \
-    CHAINLINK_VERSION=$(tag)  \
-    CCIP_TESTS_ON_EXISTING_DEPLOYMENT=False  \
-    ENV_JOB_IMAGE=""  \
+    TEST_SUITE=smoke \
+    TEST_ARGS="-test.timeout 900h" \
+    DETACH_RUNNER=true \
 	go test -timeout 24h -count=1 -v -run ^$(testname)$$ ./smoke
 
-# example usage: make test_smoke_ccip_simulated_local_besu image=chainlink tag=latest
+# example usage: make test_smoke_ccip_simulated_local_besu image=chainlink-ccip tag=latest override_toml=../config/config.toml env=test-config.env
 .PHONY: test_smoke_ccip_simulated_local_besu
-test_smoke_ccip_simulated_local_besu:
-	DATABASE_URL="postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable" \
-    SELECTED_NETWORKS="SIMULATED,SIMULATED_BESU_NONDEV_1,SIMULATED_BESU_NONDEV_2"  \
-    CCIP_DEPLOY_ON_LOCAL=True  \
-    CCIP_NO_OF_NETWORKS=2  \
-    CCIP_MSG_TYPE=WithToken \
-    CHAINLINK_IMAGE=$(image)  \
-    CHAINLINK_VERSION=$(tag)  \
-    CCIP_TESTS_ON_EXISTING_DEPLOYMENT=False  \
+include test-config.env
+overridestring := "CCIP.Env.Networks = ['SIMULATED_BESU_NONDEV_1', 'SIMULATED_BESU_NONDEV_2']"
+test_smoke_ccip_simulated_local_besu: override_config
+	source ./testconfig/override/$(env) && \
+  	CHAINLINK_IMAGE=$(image)  \
+  	CHAINLINK_VERSION=$(tag)  \
     ENV_JOB_IMAGE=""  \
 	go test -timeout 24h -count=1 -v -run ^TestSmokeCCIPForBidirectionalLane$$ ./smoke
+
+# image: the name for the chainlink image being built, example: image=chainlink
+# tag: the tag for the chainlink image being built, example: tag=latest
+# example usage: make build_ccip_image image=chainlink-ccip tag=latest
+.PHONY: build_ccip_image
+build_ccip_image:
+	docker build -f ../../core/chainlink.Dockerfile --build-arg COMMIT_SHA=$(git rev-parse HEAD) --build-arg CHAINLINK_USER=chainlink -t $(image):$(tag) ../../
