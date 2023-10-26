@@ -18,16 +18,13 @@ import (
 // NewSimulation returns a client and a simulated backend.
 func newSimulation(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
 	user := testutils.MustNewSimTransactor(t)
-	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
+	simulatedBackend := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
 		user.From: {
 			Balance: big.NewInt(0).Mul(big.NewInt(3), big.NewInt(1e18)),
 		},
 	}, 10e6)
-	balance, err := sim.BalanceAt(user.Context, user.From, nil)
-	require.NoError(t, err)
-	require.Equal(t, big.NewInt(0).Mul(big.NewInt(3), big.NewInt(1e18)), balance)
-	ec := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
-	return user, ec
+	simulatedBackendClient := client.NewSimulatedBackendClient(t, simulatedBackend, testutils.SimulatedChainID)
+	return user, simulatedBackendClient
 }
 
 // AssertNonRevert Verify that a transaction was not reverted.

@@ -25,9 +25,6 @@ import (
 )
 
 type onRampReaderTH struct {
-	lp     logpoller.LogPollerTest
-	ec     client.Client
-	log    logger.Logger
 	user   *bind.TransactOpts
 	reader ccipdata.OnRampReader
 }
@@ -101,9 +98,6 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 	require.NoError(t, err)
 
 	return onRampReaderTH{
-		lp:     lp,
-		ec:     bc,
-		log:    log,
 		user:   user,
 		reader: reader,
 	}
@@ -331,17 +325,17 @@ func testVersionSpecificOnRampReader(t *testing.T, th onRampReaderTH, version st
 }
 
 func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress common.Address) {
-
+	ctx := th.user.Context
 	res, err := th.reader.RouterAddress()
 	require.NoError(t, err)
 	require.Equal(t, expectedRouterAddress, res)
 
-	msg, err := th.reader.GetSendRequestsGteSeqNum(th.user.Context, 0, 0)
+	msg, err := th.reader.GetSendRequestsGteSeqNum(ctx, 0, 0)
 	require.NoError(t, err)
 	require.NotNil(t, msg)
 	require.Equal(t, []ccipdata.Event[internal.EVM2EVMMessage]{}, msg)
 
-	msg, err = th.reader.GetSendRequestsBetweenSeqNums(th.user.Context, 0, 10, 0)
+	msg, err = th.reader.GetSendRequestsBetweenSeqNums(ctx, 0, 10, 0)
 	require.NoError(t, err)
 	require.NotNil(t, msg)
 	require.Equal(t, []ccipdata.Event[internal.EVM2EVMMessage]{}, msg)
