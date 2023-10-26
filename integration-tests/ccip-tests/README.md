@@ -20,7 +20,7 @@ Networks = ['AVALANCHE_FUJI', 'ARBITRUM_GOERLI']
 ```
 and then encode it using `base64` command and set the env var `BASE64_TEST_CONFIG_OVERRIDE` with the encoded content.
 ```bash
-export BASE64_TEST_CONFIG_OVERRIDE=$(base64 -w 0 < path-to-toml-file)
+export BASE64_TEST_CONFIG_OVERRIDE=$(base64 -i <path-to-toml-file>)
 ```
 
 Alternatively, you can also use the make command to invoke a go script to do the same.
