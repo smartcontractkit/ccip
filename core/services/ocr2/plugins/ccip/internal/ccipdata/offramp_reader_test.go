@@ -283,7 +283,7 @@ func setupOffRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		Context: testutils.Context(t),
 	})
 	require.NoError(t, err)
-	require.Equal(t, "EVM2EVMOffRamp 1.1.0", tav)
+	require.Equal(t, "EVM2EVMOffRamp 1.0.0", tav)
 	return offRampAddr
 }
 
