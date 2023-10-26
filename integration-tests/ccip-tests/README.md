@@ -59,7 +59,6 @@ You can use the following command to run the tests locally with your specific ch
 
 #### Smoke Tests
 ```bash
-# if overridestring is set, override_toml is ignored
 # mark the testimage as empty for running the tests in local docker containers
 make test_smoke_ccip image=chainlink-ccip tag=latest-dev testimage="" testname=TestSmokeCCIPForBidirectionalLane override_toml="<the toml file with overridden config string>" env="<.env file with BASE64_TEST_CONFIG_OVERRIDE value>"
 ```
