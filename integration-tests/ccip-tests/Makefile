@@ -1,10 +1,10 @@
 include test-config.env
 ## To Override the default config,
-# example usage: make override_config overridestring="" override_toml=../config/config.toml env=../.env
+# example usage: make override_config override_toml=../config/config.toml env=../.env
 .PHONY: override_config
 override_config:
 	cd ./testconfig/override && \
-	go run . --overridewith=$(overridestring) --path=$(override_toml) --output=$(env) && \
+	go run . --path=$(override_toml) --output=$(env) && \
 	cd ../..
 
 
@@ -21,9 +21,9 @@ test_load_ccip:
 	go test -timeout 24h -count=1 -v -run ^$(testname)$$ ./load
 
 
-# example usage: make test_smoke_ccip image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestSmokeCCIPForBidirectionalLane overridestring="" override_toml=../config/config.toml env=test-config.env
+# example usage: make test_smoke_ccip image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestSmokeCCIPForBidirectionalLane override_toml=../config/config.toml env=test-config.env
 # To run the test in besu simulated network, use the following command:
-# example usage: make test_smoke_ccip image=chainlink-ccip tag=latest testimage="" testname=TestSmokeCCIPForBidirectionalLane overridestring="CCIP.Env.Networks = ['SIMULATED_BESU_NONDEV_1', 'SIMULATED_BESU_NONDEV_2']" override_toml="" env=test-config.env
+# example usage: make test_smoke_ccip image=chainlink-ccip tag=latest testimage="" testname=TestSmokeCCIPForBidirectionalLane override_toml="" env=test-config.env
 .PHONY: test_smoke_ccip
 test_smoke_ccip: override_config
 	source ./testconfig/override/$(env) && \
