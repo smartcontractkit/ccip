@@ -30,9 +30,6 @@ import (
 )
 
 type offRampReaderTH struct {
-	lp     logpoller.LogPollerTest
-	ec     client.Client
-	log    logger.Logger
 	user   *bind.TransactOpts
 	reader ccipdata.OffRampReader
 }
@@ -250,9 +247,6 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 	require.Equal(t, offRampAddress, reader.Address())
 
 	return offRampReaderTH{
-		lp:     lp,
-		ec:     bc,
-		log:    log,
 		user:   user,
 		reader: reader,
 	}
@@ -378,15 +372,16 @@ func deployCommitStore(
 }
 
 func testOffRampReader(t *testing.T, th offRampReaderTH) {
-	addresses, err := th.reader.GetDestinationTokens(th.user.Context)
+	ctx := th.user.Context
+	addresses, err := th.reader.GetDestinationTokens(ctx)
 	require.NoError(t, err)
 	require.Equal(t, []common.Address{}, addresses)
 
-	tokens, err := th.reader.GetSupportedTokens(th.user.Context)
+	tokens, err := th.reader.GetSupportedTokens(ctx)
 	require.NoError(t, err)
 	require.Equal(t, []common.Address{}, tokens)
 
-	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(th.user.Context, 0, 10, 0)
+	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(ctx, 0, 10, 0)
 	require.NoError(t, err)
 	require.Equal(t, []ccipdata.Event[ccipdata.ExecutionStateChanged]{}, events)
 }
