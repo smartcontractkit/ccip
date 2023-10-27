@@ -483,12 +483,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			} else {
 				// Nothing inflight take from chain.
 				// Chain holds existing nonce.
-				//nonce, err := r.config.offRamp.GetSenderNonce(nil, msg.Sender)
-				// TODO
-				//offRampAddr := r.config.offRampReader.GetOffRampAddress()
-				//reader, err := ccipdata.NewOffRampReader(lggr, offRampAddr, r.config.destClient, r.config.destLP, r.config.destGasEstimator)
 				nonce, err := r.config.offRampReader.GetSenderNonce(nil, msg.Sender)
-
 				if err != nil {
 					lggr.Errorw("unable to get sender nonce", "err", err, "seqNr", msg.SequenceNumber)
 					continue
