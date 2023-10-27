@@ -234,7 +234,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     // Revoke approval for previous token messenger
     if (s_config.tokenMessenger != address(0)) i_token.safeApprove(s_config.tokenMessenger, 0);
-    // Approve new token messenger. The new messenger must start with 0 allowance.
+    // Approve new token messenger. New tokenMessenger must have an allowance of 0, otherwise safeApprove reverts.
+    // Since we set allowance to 0 for existing tokenMessenger before approving a new one, this condition is always met.
     i_token.safeApprove(config.tokenMessenger, type(uint256).max);
     s_config = config;
     emit ConfigSet(config);
