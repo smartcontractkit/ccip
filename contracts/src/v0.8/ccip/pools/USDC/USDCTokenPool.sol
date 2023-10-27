@@ -188,7 +188,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
       // we will only be left with the first 4 bytes of the message.
       version := mload(add(usdcMessage, 4)) // 0 + 4 = 4
     }
-    // This token pool only supports version 1 of the CCTP message format
+    // This token pool only supports version 0 of the CCTP message format
     // We check the version prior to loading the rest of the message
     // to avoid unexpected reverts due to out-of-bounds reads.
     if (version != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(version);
