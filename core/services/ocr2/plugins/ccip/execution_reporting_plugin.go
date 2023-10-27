@@ -164,7 +164,8 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
 			cachedTokenPools:      cachedTokenPools,
 			gasPriceEstimator:     rf.config.offRampReader.GasPriceEstimator(),
-			monitoringEndpoint:    rf.config.monitoringEndpoint,
+			// Telemetry
+			monitoringEndpoint: rf.config.monitoringEndpoint,
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -935,10 +936,10 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 
 	telem := collectTelemetry(observedMessages)
 	bytes, err := proto.Marshal(telem)
-	if err != nil {
+	if err != nil || r.monitoringEndpoint == nil {
 		// Telemetry related errors are not critical and must not affect
 		// execution, so we log them and continue.
-		lggr.Errorw("failed to marshal telemetry to protobuf", "err", err)
+		lggr.Errorw("cannot marshal or send telemetry", "err", err)
 	} else {
 		r.monitoringEndpoint.SendLog(bytes)
 	}
