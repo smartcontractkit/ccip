@@ -523,10 +523,10 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	// Commit telemetry collection and sending to the monitoring endpoint
 	telem := r.collectCommitTelemetry(&report, &epochAndRound)
 	bytes, err := proto.Marshal(telem)
-	if err != nil {
+	if err != nil || r.monitoringEndpoint == nil {
 		// Telemetry related errors are not critical and must not affect
 		// execution, so we log them and continue.
-		lggr.Errorw("failed to marshal telemetry to protobuf", "err", err)
+		lggr.Errorw("cannot marshal or send telemetry", "err", err)
 	} else {
 		r.monitoringEndpoint.SendLog(bytes)
 	}

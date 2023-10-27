@@ -25,16 +25,16 @@ import (
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
-
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestExecutionReportingPlugin_Observation(t *testing.T) {
@@ -68,9 +68,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 					},
 				},
 			},
-			blessedRoots: map[[32]byte]bool{
-				[32]byte{123}: true,
-			},
+			blessedRoots: map[[32]byte]bool{{123}: true},
 			rateLimiterState: evm_2_evm_offramp.RateLimiterTokenBucket{
 				IsEnabled: false,
 			},
@@ -90,6 +88,9 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		},
 	}
 
+	// Telemetry
+	me := genMonitoringEndpoint(t)
+
 	ctx := testutils.Context(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -97,6 +98,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports = newInflightExecReportsContainer(time.Minute)
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
+			p.monitoringEndpoint = me
 
 			commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
 			commitStoreReader.On("IsDown", mock.Anything).Return(tc.commitStorePaused, nil)
@@ -162,6 +164,9 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.cachedSourceFeeTokens = sourceFeeTokens
 
 			p.snoozedRoots = cache.NewSnoozedRoots(time.Minute, time.Minute)
+			if p.monitoringEndpoint == nil {
+				t.Error("monitoring endpoint is nil")
+			}
 
 			_, err := p.Observation(ctx, types.ReportTimestamp{}, types.Query{})
 			if tc.expErr {

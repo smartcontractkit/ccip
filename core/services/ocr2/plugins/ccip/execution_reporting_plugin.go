@@ -167,7 +167,8 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			customTokenPoolFactory: func(ctx context.Context, poolAddress common.Address, contractBackend bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
 				return custom_token_pool.NewCustomTokenPool(poolAddress, contractBackend)
 			},
-			gasPriceEstimator:  rf.config.offRampReader.GasPriceEstimator(),
+			gasPriceEstimator: rf.config.offRampReader.GasPriceEstimator(),
+			// Telemetry
 			monitoringEndpoint: rf.config.monitoringEndpoint,
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
@@ -923,10 +924,10 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 
 	telem := collectTelemetry(observedMessages)
 	bytes, err := proto.Marshal(telem)
-	if err != nil {
+	if err != nil || r.monitoringEndpoint == nil {
 		// Telemetry related errors are not critical and must not affect
 		// execution, so we log them and continue.
-		lggr.Errorw("failed to marshal telemetry to protobuf", "err", err)
+		lggr.Errorw("cannot marshal or send telemetry", "err", err)
 	} else {
 		r.monitoringEndpoint.SendLog(bytes)
 	}
