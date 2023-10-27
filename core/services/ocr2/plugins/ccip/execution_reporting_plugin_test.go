@@ -126,7 +126,6 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			offRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
 				Return(executionEvents, nil).Maybe()
 			offRampReader.On("CurrentRateLimiterState", mock.Anything).Return(tc.rateLimiterState, nil).Maybe()
-			//offRampReader.On("GetOffRampAddress").Return(utils.RandomAddress()).Maybe()
 			offRampReader.On("GetOffRampAddress").Return(offRamp.Address()).Maybe()
 			offRampReader.On("GetSenderNonce", mock.Anything, mock.Anything).Return(offRamp.GetSenderNonce(nil, utils.RandomAddress())).Maybe()
 			p.config.offRampReader = offRampReader
@@ -258,7 +257,6 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	encodedReport, err := ccipdata.EncodeExecutionReport(report)
 	require.NoError(t, err)
 
-	//mockOffRamp, _ := testhelpers.NewFakeOffRamp(t)
 	offRampReader := ccipdata.NewMockOffRampReader(t)
 	offRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
 

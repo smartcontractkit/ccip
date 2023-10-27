@@ -48,12 +48,11 @@ var (
 )
 
 type ExecutionPluginStaticConfig struct {
-	lggr             logger.Logger
-	sourceLP, destLP logpoller.LogPoller
-	onRampReader     ccipdata.OnRampReader
-	destReader       ccipdata.Reader
-	offRampReader    ccipdata.OffRampReader
-	//offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
+	lggr                     logger.Logger
+	sourceLP, destLP         logpoller.LogPoller
+	onRampReader             ccipdata.OnRampReader
+	destReader               ccipdata.Reader
+	offRampReader            ccipdata.OffRampReader
 	commitStoreReader        ccipdata.CommitStoreReader
 	sourcePriceRegistry      ccipdata.PriceRegistryReader
 	sourceWrappedNativeToken common.Address
