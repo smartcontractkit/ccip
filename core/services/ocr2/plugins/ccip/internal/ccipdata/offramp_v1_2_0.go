@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
@@ -81,6 +82,22 @@ type OffRampV1_2_0 struct {
 	gasPriceEstimator prices.GasPriceEstimatorExec
 	offchainConfig    ExecOffchainConfig
 	onchainConfig     ExecOnchainConfig
+}
+
+func (o *OffRampV1_2_0) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
+	nonce, err := o.offRamp.GetSenderNonce(opts, sender)
+	if err != nil {
+		return *new(uint64), err
+	}
+	return nonce, nil
+}
+
+func (o *OffRampV1_2_0) CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+	state, err := o.offRamp.CurrentRateLimiterState(opts)
+	if err != nil {
+		return *new(evm_2_evm_offramp.RateLimiterTokenBucket), err
+	}
+	return state, nil
 }
 
 func (o *OffRampV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {

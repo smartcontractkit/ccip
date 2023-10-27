@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -97,6 +98,40 @@ type OffRampV1_0_0 struct {
 	gasPriceEstimator prices.GasPriceEstimatorExec
 	offchainConfig    ExecOffchainConfig
 	onchainConfig     ExecOnchainConfig
+}
+
+func (o *OffRampV1_0_0) GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error) {
+	state, err := o.offRamp.GetExecutionState(opts, sequenceNumber)
+	if err != nil {
+		return *new(uint8), err
+	}
+	return state, nil
+}
+
+func (o *OffRampV1_0_0) GetOffRampAddress() common.Address {
+	return o.offRamp.Address()
+}
+
+func (o *OffRampV1_0_0) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
+	nonce, err := o.offRamp.GetSenderNonce(opts, sender)
+	if err != nil {
+		return *new(uint64), err
+	}
+	return nonce, nil
+}
+
+func (o *OffRampV1_0_0) CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+	state, err := o.offRamp.CurrentRateLimiterState(opts)
+	if err != nil {
+		return *new(evm_2_evm_offramp.RateLimiterTokenBucket), err
+	}
+	return evm_2_evm_offramp.RateLimiterTokenBucket{
+		Tokens:      state.Tokens,
+		LastUpdated: state.LastUpdated,
+		IsEnabled:   state.IsEnabled,
+		Capacity:    state.Capacity,
+		Rate:        state.Rate,
+	}, nil
 }
 
 func (o *OffRampV1_0_0) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {

@@ -48,12 +48,12 @@ var (
 )
 
 type ExecutionPluginStaticConfig struct {
-	lggr                     logger.Logger
-	sourceLP, destLP         logpoller.LogPoller
-	onRampReader             ccipdata.OnRampReader
-	destReader               ccipdata.Reader
-	offRampReader            ccipdata.OffRampReader
-	offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
+	lggr             logger.Logger
+	sourceLP, destLP logpoller.LogPoller
+	onRampReader     ccipdata.OnRampReader
+	destReader       ccipdata.Reader
+	offRampReader    ccipdata.OffRampReader
+	//offRamp                  evm_2_evm_offramp.EVM2EVMOffRampInterface
 	commitStoreReader        ccipdata.CommitStoreReader
 	sourcePriceRegistry      ccipdata.PriceRegistryReader
 	sourceWrappedNativeToken common.Address
@@ -237,7 +237,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	// always be the lower bound of what would be available on chain
 	// since we already account for inflight txs.
 	getAllowedTokenAmount := cache.LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
-		return r.config.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
+		return r.config.offRampReader.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 	})
 	sourceToDestTokens, supportedDestTokens, err := r.sourceDestinationTokens(ctx)
 	if err != nil {
@@ -393,7 +393,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 			return nil, fmt.Errorf("new custom dest token pool %s: %w", poolAddress, err)
 		}
 
-		rateLimiterState, err := tokenPool.CurrentOffRampRateLimiterState(&bind.CallOpts{Context: ctx}, r.config.offRamp.Address())
+		rateLimiterState, err := tokenPool.CurrentOffRampRateLimiterState(&bind.CallOpts{Context: ctx}, r.config.offRampReader.GetOffRampAddress())
 		if err != nil {
 			return nil, fmt.Errorf("get rate off ramp rate limiter state: %w", err)
 		}
@@ -483,7 +483,12 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			} else {
 				// Nothing inflight take from chain.
 				// Chain holds existing nonce.
-				nonce, err := r.config.offRamp.GetSenderNonce(nil, msg.Sender)
+				//nonce, err := r.config.offRamp.GetSenderNonce(nil, msg.Sender)
+				// TODO
+				//offRampAddr := r.config.offRampReader.GetOffRampAddress()
+				//reader, err := ccipdata.NewOffRampReader(lggr, offRampAddr, r.config.destClient, r.config.destLP, r.config.destGasEstimator)
+				nonce, err := r.config.offRampReader.GetSenderNonce(nil, msg.Sender)
+
 				if err != nil {
 					lggr.Errorw("unable to get sender nonce", "err", err, "seqNr", msg.SequenceNumber)
 					continue
@@ -1040,7 +1045,7 @@ func (r *ExecutionReportingPlugin) isStaleReport(messages []internal.EVM2EVMMess
 	// If the first message is executed already, this execution report is stale.
 	// Note the default execution state, including for arbitrary seq number not yet committed
 	// is ExecutionStateUntouched.
-	msgState, err := r.config.offRamp.GetExecutionState(nil, messages[0].SequenceNumber)
+	msgState, err := r.config.offRampReader.GetExecutionState(nil, messages[0].SequenceNumber)
 	if err != nil {
 		return true, err
 	}
