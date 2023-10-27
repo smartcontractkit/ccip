@@ -875,9 +875,9 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 
 			offRamp, offRampAddr := testhelpers.NewFakeOffRamp(t)
 			offRamp.SetTokenPools(tc.destPools)
-			//p.config.offRamp = offRamp
-			offRampReader, err := ccipdata.NewOffRampReader(lggr, offRampAddr, nil, nil, nil)
-			require.NoError(t, err)
+
+			offRampReader := ccipdata.NewMockOffRampReader(t)
+			offRampReader.On("GetOffRampAddress").Return(offRampAddr).Maybe()
 			p.config.offRampReader = offRampReader
 
 			p.customTokenPoolFactory = func(ctx context.Context, poolAddress common.Address, _ bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
