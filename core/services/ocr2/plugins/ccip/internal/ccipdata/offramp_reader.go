@@ -118,7 +118,7 @@ type OffRampReader interface {
 	// Required for the execution plugin.
 	GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error)
 	CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error)
-	GetOffRampAddress() common.Address
+	GetOffRampAddress() (common.Address, error)
 	GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error)
 }
 
