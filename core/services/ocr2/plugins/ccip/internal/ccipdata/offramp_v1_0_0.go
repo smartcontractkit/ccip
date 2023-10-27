@@ -32,12 +32,10 @@ const (
 	EXEC_EXECUTION_STATE_CHANGES = "Exec execution state changes"
 	EXEC_TOKEN_POOL_ADDED        = "Token pool added"
 	EXEC_TOKEN_POOL_REMOVED      = "Token pool removed"
-
-	// RPC_BATCH_LIMIT defines the maximum number of rpc requests to be included in a batch.
-	RPC_BATCH_LIMIT = 16
 )
 
 var (
+	abiOffRampV1_0_0                                    = abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
 	_                                     OffRampReader = &OffRampV1_0_0{}
 	ExecutionStateChangedEventV1_0_0                    = abihelpers.MustGetEventID("ExecutionStateChanged", abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI))
 	ExecutionStateChangedSeqNrIndexV1_0_0               = 1
@@ -104,16 +102,10 @@ type OffRampV1_0_0 struct {
 	onchainConfig     ExecOnchainConfig
 }
 
-func (o *OffRampV1_0_0) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
-	return o.offRamp.GetDestinationToken(&bind.CallOpts{Context: ctx}, address)
-}
-
 func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error) {
-	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
-
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddresses))
 	for _, sourceTk := range tokenAddresses {
-		evmCalls = append(evmCalls, rpclib.NewEvmCall(offRampABI, "getDestinationToken", o.addr, sourceTk))
+		evmCalls = append(evmCalls, rpclib.NewEvmCall(abiOffRampV1_0_0, "getDestinationToken", o.addr, sourceTk))
 	}
 
 	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
@@ -121,9 +113,9 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		return nil, fmt.Errorf("get latest block: %w", err)
 	}
 
-	results, err := o.evmBatchCaller.BatchCallLimit(ctx, RPC_BATCH_LIMIT, o.ec, uint64(latestBlock), evmCalls)
+	results, err := o.evmBatchCaller.BatchCallDynamicLimitRetries(ctx, uint64(latestBlock), evmCalls)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
 
 	destTokens := make([]common.Address, 0, len(tokenAddresses))
@@ -144,6 +136,9 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		destTokens = append(destTokens, destTokenAddress)
 	}
 
+	if len(destTokens) != len(tokenAddresses) {
+		return nil, fmt.Errorf("go %d tokens while %d were expected", len(destTokens), len(tokenAddresses))
+	}
 	return destTokens, nil
 }
 
@@ -369,8 +364,7 @@ func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ExecReport, error)
 }
 
 func (o *OffRampV1_0_0) TokenEvents() []common.Hash {
-	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
-	return []common.Hash{abihelpers.MustGetEventID("PoolAdded", offRampABI), abihelpers.MustGetEventID("PoolRemoved", offRampABI)}
+	return []common.Hash{abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0), abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)}
 }
 
 func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_0_0, error) {
@@ -413,7 +407,11 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		eventSig:            ExecutionStateChangedEventV1_0_0,
 		eventIndex:          executionStateChangedSequenceNumberIndex,
 		configMu:            sync.RWMutex{},
-		evmBatchCaller:      rpclib.NewDefaultEvmBatchCaller(),
+		evmBatchCaller: rpclib.NewDefaultEvmBatchCaller(
+			ec,
+			rpclib.DefaultRpcBatchSizeLimit,
+			rpclib.DefaultRpcBatchBackOffMultiplier,
+		),
 
 		// values set on the fly after ChangeConfig is called
 		gasPriceEstimator: prices.ExecGasPriceEstimator{},

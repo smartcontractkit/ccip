@@ -103,7 +103,6 @@ type OffRampReader interface {
 	GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error)
 	GetDestinationTokens(ctx context.Context) ([]common.Address, error)
 	GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error)
-	GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error)
 	// GetDestinationTokensFromSourceTokens will return an 1:1 mapping of the provided source tokens to dest tokens
 	GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error)
 	GetSupportedTokens(ctx context.Context) ([]common.Address, error)

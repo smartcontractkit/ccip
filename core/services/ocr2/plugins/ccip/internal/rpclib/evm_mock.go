@@ -5,8 +5,6 @@ package rpclib
 import (
 	context "context"
 
-	client "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -15,25 +13,25 @@ type MockEvmBatchCaller struct {
 	mock.Mock
 }
 
-// BatchCall provides a mock function with given fields: ctx, batchSender, blockNumber, calls
-func (_m *MockEvmBatchCaller) BatchCall(ctx context.Context, batchSender client.BatchSender, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
-	ret := _m.Called(ctx, batchSender, blockNumber, calls)
+// BatchCall provides a mock function with given fields: ctx, blockNumber, calls
+func (_m *MockEvmBatchCaller) BatchCall(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
+	ret := _m.Called(ctx, blockNumber, calls)
 
 	var r0 []DataAndErr
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, client.BatchSender, uint64, []EvmCall) ([]DataAndErr, error)); ok {
-		return rf(ctx, batchSender, blockNumber, calls)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, []EvmCall) ([]DataAndErr, error)); ok {
+		return rf(ctx, blockNumber, calls)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, client.BatchSender, uint64, []EvmCall) []DataAndErr); ok {
-		r0 = rf(ctx, batchSender, blockNumber, calls)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, []EvmCall) []DataAndErr); ok {
+		r0 = rf(ctx, blockNumber, calls)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]DataAndErr)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, client.BatchSender, uint64, []EvmCall) error); ok {
-		r1 = rf(ctx, batchSender, blockNumber, calls)
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, []EvmCall) error); ok {
+		r1 = rf(ctx, blockNumber, calls)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -41,25 +39,51 @@ func (_m *MockEvmBatchCaller) BatchCall(ctx context.Context, batchSender client.
 	return r0, r1
 }
 
-// BatchCallLimit provides a mock function with given fields: ctx, limit, batchSender, blockNumber, calls
-func (_m *MockEvmBatchCaller) BatchCallLimit(ctx context.Context, limit int, batchSender client.BatchSender, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
-	ret := _m.Called(ctx, limit, batchSender, blockNumber, calls)
+// BatchCallDynamicLimitRetries provides a mock function with given fields: ctx, blockNumber, calls
+func (_m *MockEvmBatchCaller) BatchCallDynamicLimitRetries(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
+	ret := _m.Called(ctx, blockNumber, calls)
 
 	var r0 []DataAndErr
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int, client.BatchSender, uint64, []EvmCall) ([]DataAndErr, error)); ok {
-		return rf(ctx, limit, batchSender, blockNumber, calls)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, []EvmCall) ([]DataAndErr, error)); ok {
+		return rf(ctx, blockNumber, calls)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int, client.BatchSender, uint64, []EvmCall) []DataAndErr); ok {
-		r0 = rf(ctx, limit, batchSender, blockNumber, calls)
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, []EvmCall) []DataAndErr); ok {
+		r0 = rf(ctx, blockNumber, calls)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]DataAndErr)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int, client.BatchSender, uint64, []EvmCall) error); ok {
-		r1 = rf(ctx, limit, batchSender, blockNumber, calls)
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, []EvmCall) error); ok {
+		r1 = rf(ctx, blockNumber, calls)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// BatchCallLimit provides a mock function with given fields: ctx, blockNumber, calls
+func (_m *MockEvmBatchCaller) BatchCallLimit(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
+	ret := _m.Called(ctx, blockNumber, calls)
+
+	var r0 []DataAndErr
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, []EvmCall) ([]DataAndErr, error)); ok {
+		return rf(ctx, blockNumber, calls)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, []EvmCall) []DataAndErr); ok {
+		r0 = rf(ctx, blockNumber, calls)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]DataAndErr)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, []EvmCall) error); ok {
+		r1 = rf(ctx, blockNumber, calls)
 	} else {
 		r1 = ret.Error(1)
 	}

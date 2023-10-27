@@ -109,12 +109,7 @@ func (t *supportedTokensOrigin) CallOrigin(ctx context.Context) (map[common.Addr
 
 	destTokens, err := t.offRamp.GetDestinationTokensFromSourceTokens(ctx, sourceTokens)
 	if err != nil {
-		return nil, err
-	}
-
-	if len(destTokens) != len(sourceTokens) {
-		return nil, fmt.Errorf("GetDestinationTokensFromSourceTokens returned %d tokens while %d were expected",
-			len(destTokens), len(sourceTokens))
+		return nil, fmt.Errorf("get destination tokens from source tokens: %w", err)
 	}
 
 	seenDestTokens := make(map[common.Address]struct{})
