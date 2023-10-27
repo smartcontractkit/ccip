@@ -8,9 +8,14 @@ import {IMessageReceiver} from "./IMessageReceiver.sol";
 
 import {TokenPool} from "../TokenPool.sol";
 
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/utils/SafeERC20.sol";
+
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
 contract USDCTokenPool is TokenPool, ITypeAndVersion {
+  using SafeERC20 for IERC20;
+
   event DomainsSet(DomainUpdate[]);
   event ConfigSet(USDCConfig);
 
@@ -228,9 +233,9 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
 
     // Revoke approval for previous token messenger
-    if (s_config.tokenMessenger != address(0)) i_token.approve(s_config.tokenMessenger, 0);
-    // Approve new token messenger
-    i_token.approve(config.tokenMessenger, type(uint256).max);
+    if (s_config.tokenMessenger != address(0)) i_token.safeApprove(s_config.tokenMessenger, 0);
+    // Approve new token messenger. The new messenger must start with 0 allowance.
+    i_token.safeApprove(config.tokenMessenger, type(uint256).max);
     s_config = config;
     emit ConfigSet(config);
   }
