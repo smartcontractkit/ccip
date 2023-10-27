@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
@@ -77,7 +78,7 @@ func TestDefaultEvmBatchCaller_BatchCallDynamicLimit(t *testing.T) {
 			batchSizes := make([]int, 0)
 
 			ec := mocks.NewClient(t)
-			bc := NewDefaultEvmBatchCaller(ec, tc.maxBatchSize, tc.backOffMultiplier)
+			bc := NewDefaultEvmBatchCaller(logger.TestLogger(t), ec, tc.maxBatchSize, tc.backOffMultiplier)
 			ctx := testutils.Context(t)
 			calls := make([]EvmCall, tc.numCalls)
 			for i := range calls {

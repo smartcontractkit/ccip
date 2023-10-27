@@ -408,6 +408,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		eventIndex:          executionStateChangedSequenceNumberIndex,
 		configMu:            sync.RWMutex{},
 		evmBatchCaller: rpclib.NewDefaultEvmBatchCaller(
+			lggr,
 			ec,
 			rpclib.DefaultRpcBatchSizeLimit,
 			rpclib.DefaultRpcBatchBackOffMultiplier,

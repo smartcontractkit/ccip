@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 //go:generate mockery --quiet --name EvmBatchCaller --output . --filename evm_mock.go --inpackage --case=underscore
@@ -39,6 +40,7 @@ const (
 )
 
 type DefaultEvmBatchCaller struct {
+	lggr              logger.Logger
 	batchSender       client.BatchSender
 	batchSizeLimit    int
 	backOffMultiplier int
@@ -47,7 +49,7 @@ type DefaultEvmBatchCaller struct {
 // NewDefaultEvmBatchCaller returns a new batch caller instance.
 // batchCallLimit defines the maximum number of calls for BatchCallLimit method, pass 0 to keep the default.
 // backOffMultiplier defines the back-off strategy for retries on BatchCallDynamicLimitRetries method, pass 0 to keep the default.
-func NewDefaultEvmBatchCaller(batchSender client.BatchSender, batchSizeLimit, backOffMultiplier int) *DefaultEvmBatchCaller {
+func NewDefaultEvmBatchCaller(lggr logger.Logger, batchSender client.BatchSender, batchSizeLimit, backOffMultiplier int) *DefaultEvmBatchCaller {
 	batchSize := DefaultRpcBatchSizeLimit
 	if batchSizeLimit > 0 {
 		batchSize = batchSizeLimit
@@ -59,6 +61,7 @@ func NewDefaultEvmBatchCaller(batchSender client.BatchSender, batchSizeLimit, ba
 	}
 
 	return &DefaultEvmBatchCaller{
+		lggr:              lggr,
 		batchSender:       batchSender,
 		batchSizeLimit:    batchSize,
 		backOffMultiplier: multiplier,
@@ -139,6 +142,8 @@ func (c *DefaultEvmBatchCaller) BatchCallDynamicLimitRetries(ctx context.Context
 			newLim = 1
 		}
 		lim = newLim
+		c.lggr.Errorf("retrying batch call with %d calls and %d limit that failed with error=%s",
+			len(calls), lim, err)
 	}
 }
 
