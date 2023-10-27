@@ -26,8 +26,8 @@ func TestDefaultEvmBatchCaller_BatchCallDynamicLimit(t *testing.T) {
 			name:                          "defaults",
 			maxBatchSize:                  DefaultRpcBatchSizeLimit,
 			backOffMultiplier:             DefaultRpcBatchBackOffMultiplier,
-			numCalls:                      100,
-			expectedBatchSizesOnEachRetry: []int{20, 5, 1},
+			numCalls:                      200,
+			expectedBatchSizesOnEachRetry: []int{100, 20, 4, 1},
 		},
 		{
 			name:                          "base simple scenario",

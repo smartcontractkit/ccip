@@ -29,14 +29,14 @@ type EvmBatchCaller interface {
 
 const (
 	// DefaultRpcBatchSizeLimit defines the maximum number of rpc requests to be included in a batch.
-	DefaultRpcBatchSizeLimit = 20
+	DefaultRpcBatchSizeLimit = 100
 
 	// DefaultRpcBatchBackOffMultiplier defines the rate of reducing the batch size limit for retried calls.
 	// For example if limit is 20 and multiplier is 4:
 	// 1.        20
 	// 2. 20/4 = 5
 	// 3. 5/4  = 1
-	DefaultRpcBatchBackOffMultiplier = 4
+	DefaultRpcBatchBackOffMultiplier = 5
 )
 
 type DefaultEvmBatchCaller struct {
