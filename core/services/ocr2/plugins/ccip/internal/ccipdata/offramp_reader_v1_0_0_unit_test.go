@@ -52,12 +52,12 @@ func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 			expErr: true,
 		},
 		{
-			name: "unexpected outputs",
+			name: "unexpected outputs length should be fine if the type is correct",
 			outputChangeFn: func(outputs []rpclib.DataAndErr) []rpclib.DataAndErr {
 				outputs[0].Outputs = append(outputs[0].Outputs, "unexpected", 123)
 				return outputs
 			},
-			expErr: true,
+			expErr: false,
 		},
 		{
 			name: "unexpected output type",

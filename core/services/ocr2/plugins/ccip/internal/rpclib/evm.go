@@ -200,3 +200,22 @@ type DataAndErr struct {
 	Outputs []any
 	Err     error
 }
+
+func ParseOutput[T any](dataAndErr DataAndErr, idx int) (T, error) {
+	var empty T
+
+	if dataAndErr.Err != nil {
+		return empty, dataAndErr.Err
+	}
+
+	if idx < 0 || idx >= len(dataAndErr.Outputs) {
+		return empty, fmt.Errorf("idx %d is out of bounds for %d outputs", idx, len(dataAndErr.Outputs))
+	}
+
+	res, is := dataAndErr.Outputs[idx].(T)
+	if !is {
+		return empty, fmt.Errorf("the result (%T) is not an address", dataAndErr.Outputs[idx])
+	}
+
+	return res, nil
+}

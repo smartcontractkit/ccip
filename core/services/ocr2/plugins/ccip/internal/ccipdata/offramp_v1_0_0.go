@@ -120,19 +120,10 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 
 	destTokens := make([]common.Address, 0, len(tokenAddresses))
 	for _, res := range results {
-		if res.Err != nil {
-			return nil, res.Err
+		destTokenAddress, err := rpclib.ParseOutput[common.Address](res, 0)
+		if err != nil {
+			return nil, err
 		}
-
-		if len(res.Outputs) != 1 {
-			return nil, fmt.Errorf("got %d outputs but one was expected", len(res.Outputs))
-		}
-
-		destTokenAddress, is := res.Outputs[0].(common.Address)
-		if !is {
-			return nil, fmt.Errorf("the result (%T) is not an address", res.Outputs[0])
-		}
-
 		destTokens = append(destTokens, destTokenAddress)
 	}
 
