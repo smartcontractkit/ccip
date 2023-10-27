@@ -78,7 +78,7 @@ func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 			o := &OffRampV1_0_0{evmBatchCaller: batchCaller, lp: lp}
 			srcTks, dstTks, outputs := generateTokensAndOutputs()
 			outputs = tc.outputChangeFn(outputs)
-			batchCaller.On("BatchCallLimit", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			batchCaller.On("BatchCallDynamicLimitRetries", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(outputs, nil)
 			actualDstTokens, err := o.GetDestinationTokensFromSourceTokens(ctx, srcTks)
 
