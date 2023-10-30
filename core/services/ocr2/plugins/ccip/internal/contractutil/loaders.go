@@ -15,6 +15,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
+// deprecated
 func LoadOnRamp(onRampAddress common.Address, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampInterface, semver.Version, error) {
 	version, err := ccipconfig.VerifyTypeAndVersion(onRampAddress, client, ccipconfig.EVM2EVMOnRamp)
 	if err != nil {
@@ -25,6 +26,7 @@ func LoadOnRamp(onRampAddress common.Address, client client.Client) (evm_2_evm_o
 	return onRamp, version, err
 }
 
+// deprecated
 func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, version semver.Version, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
 	opts := &bind.CallOpts{}
 
@@ -78,6 +80,7 @@ func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, ver
 	}
 }
 
+// deprecated
 func LoadOffRamp(offRampAddress common.Address, client client.Client) (evm_2_evm_offramp.EVM2EVMOffRampInterface, semver.Version, error) {
 	version, err := ccipconfig.VerifyTypeAndVersion(offRampAddress, client, ccipconfig.EVM2EVMOffRamp)
 	if err != nil {
@@ -88,6 +91,7 @@ func LoadOffRamp(offRampAddress common.Address, client client.Client) (evm_2_evm
 	return offRamp, version, err
 }
 
+// deprecated
 func LoadCommitStore(commitStoreAddress common.Address, client client.Client) (commit_store.CommitStoreInterface, semver.Version, error) {
 	version, err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
 	if err != nil {
