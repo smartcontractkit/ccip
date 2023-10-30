@@ -53,24 +53,20 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 		return nil, nil, errors.Wrap(err, "get chainset")
 	}
 
-	// Create the offRamp reader.
 	onRampAddress := common.HexToAddress(spec.ContractID)
 	offRampReader, err := ccipdata.NewOffRampReader(lggr, onRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load offRampReader")
 	}
 	offRampConfig, err := offRampReader.GetOffRampStaticConfig(&bind.CallOpts{})
-
 	chainId, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
 	if err != nil {
 		return nil, nil, err
 	}
-
 	sourceChain, err := chainSet.Get(strconv.FormatUint(chainId, 10))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to open source chain")
 	}
-
 	execLggr := lggr.Named("CCIPExecution").With(
 		"sourceChain", ChainName(int64(chainId)),
 		"destChain", ChainName(destChainID))
@@ -100,7 +96,6 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
 	}
-
 	tokenDataProviders, err := getTokenDataProviders(lggr, pluginConfig, sourceChain.LogPoller())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not get token data providers")
