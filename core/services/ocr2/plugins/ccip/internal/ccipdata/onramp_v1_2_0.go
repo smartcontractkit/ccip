@@ -208,6 +208,20 @@ type OnRampV1_2_0 struct {
 	sendRequestedSeqNumberWord int
 }
 
+func (o *OnRampV1_2_0) GetOnRampAddress() (common.Address, error) {
+	if o.onRamp == nil {
+		return common.Address{}, fmt.Errorf("onramp not initialized")
+	}
+	return o.onRamp.Address(), nil
+}
+
+func (o *OnRampV1_2_0) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+	if o.onRamp == nil {
+		return *new(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig), fmt.Errorf("onramp not initialized")
+	}
+	return o.onRamp.GetDynamicConfig(nil)
+}
+
 func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, error) {
 	msg, err := o.onRamp.ParseCCIPSendRequested(log)
 	if err != nil {

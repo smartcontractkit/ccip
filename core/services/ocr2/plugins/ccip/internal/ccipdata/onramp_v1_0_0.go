@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -106,6 +107,36 @@ type OnRampV1_0_0 struct {
 	filterName                 string
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
+}
+
+func (o *OnRampV1_0_0) GetOnRampAddress() (common.Address, error) {
+	if o.onRamp == nil {
+		return common.Address{}, fmt.Errorf("onramp not initialized")
+	}
+	return o.onRamp.Address(), nil
+}
+
+func (o *OnRampV1_0_0) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+	if o.onRamp == nil {
+		return *new(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig), fmt.Errorf("onramp not initialized")
+	}
+	legacyDynamicConfig, err := o.onRamp.GetDynamicConfig(nil)
+	if err != nil {
+		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+	}
+	return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
+		Router:                            legacyDynamicConfig.Router,
+		MaxNumberOfTokensPerMsg:           legacyDynamicConfig.MaxTokensLength,
+		DestGasOverhead:                   0,
+		DestGasPerPayloadByte:             0,
+		DestDataAvailabilityOverheadGas:   0,
+		DestGasPerDataAvailabilityByte:    0,
+		DestDataAvailabilityMultiplierBps: 0,
+		PriceRegistry:                     legacyDynamicConfig.PriceRegistry,
+		MaxDataBytes:                      legacyDynamicConfig.MaxDataSize,
+		MaxPerMsgGasLimit:                 uint32(legacyDynamicConfig.MaxGasLimit),
+	}, nil
+
 }
 
 func (o *OnRampV1_0_0) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
