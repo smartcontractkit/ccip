@@ -136,7 +136,6 @@ func (o *OnRampV1_0_0) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampD
 		MaxDataBytes:                      legacyDynamicConfig.MaxDataSize,
 		MaxPerMsgGasLimit:                 uint32(legacyDynamicConfig.MaxGasLimit),
 	}, nil
-
 }
 
 func (o *OnRampV1_0_0) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
