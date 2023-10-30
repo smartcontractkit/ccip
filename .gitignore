@@ -60,6 +60,7 @@ core/web/assets
 # Integration Tests
 integration-tests/**/logs/
 integration-tests/**/tmp_*
+integration-tests/**/testconfig/override/**.env
 tests-*.xml
 *.test
 tmp-manifest-*.yaml
