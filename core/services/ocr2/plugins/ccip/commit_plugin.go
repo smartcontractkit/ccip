@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -61,7 +60,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed offramp reader")
 	}
-	offRampConfig, err := offRampReader.GetOffRampStaticConfig(&bind.CallOpts{})
+	offRampConfig, err := offRampReader.GetOffRampStaticConfig(nil)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to retrieve offramp static config")
 	}
@@ -69,7 +68,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed commitstore reader")
 	}
-	staticConfig, err := commitStoreReader.GetStaticConfig(&bind.CallOpts{})
+	staticConfig, err := commitStoreReader.GetStaticConfig(nil)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to retrieve commitstore static config")
 	}

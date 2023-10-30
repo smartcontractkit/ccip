@@ -58,7 +58,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load offRampReader")
 	}
-	offRampConfig, err := offRampReader.GetOffRampStaticConfig(&bind.CallOpts{})
+	offRampConfig, err := offRampReader.GetOffRampStaticConfig(nil)
 	chainId, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
 	if err != nil {
 		return nil, nil, err

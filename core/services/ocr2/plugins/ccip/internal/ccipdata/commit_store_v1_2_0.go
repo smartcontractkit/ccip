@@ -45,8 +45,8 @@ type CommitStoreV1_2_0 struct {
 	offchainConfig    CommitOffchainConfig
 }
 
-func (c *CommitStoreV1_2_0) GetStaticConfig(opts *bind.CallOpts) (commit_store.CommitStoreStaticConfig, error) {
-	return c.commitStore.GetStaticConfig(opts)
+func (c *CommitStoreV1_2_0) GetStaticConfig(ctx context.Context) (commit_store.CommitStoreStaticConfig, error) {
+	return c.commitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
 }
 
 func (c *CommitStoreV1_2_0) EncodeCommitReport(report CommitStoreReport) ([]byte, error) {

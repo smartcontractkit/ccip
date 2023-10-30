@@ -51,8 +51,8 @@ type CommitStoreV1_0_0 struct {
 	offchainConfig    CommitOffchainConfig
 }
 
-func (c *CommitStoreV1_0_0) GetStaticConfig(opts *bind.CallOpts) (commit_store.CommitStoreStaticConfig, error) {
-	legacyConfig, err := c.commitStore.GetStaticConfig(opts)
+func (c *CommitStoreV1_0_0) GetStaticConfig(ctx context.Context) (commit_store.CommitStoreStaticConfig, error) {
+	legacyConfig, err := c.commitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return *new(commit_store.CommitStoreStaticConfig), err
 	}

@@ -100,11 +100,11 @@ type OffRampV1_0_0 struct {
 	onchainConfig     ExecOnchainConfig
 }
 
-func (o *OffRampV1_0_0) GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
+func (o *OffRampV1_0_0) GetOffRampStaticConfig(context context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
 	if o.offRamp == nil {
 		return *new(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig), fmt.Errorf("offramp not initialized")
 	}
-	c, err := o.offRamp.GetStaticConfig(opts)
+	c, err := o.offRamp.GetStaticConfig(&bind.CallOpts{Context: context})
 	if err != nil {
 		return *new(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig), fmt.Errorf("error while retrieving offramp config: %v", err)
 	}
