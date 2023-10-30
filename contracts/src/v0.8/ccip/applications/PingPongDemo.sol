@@ -6,7 +6,6 @@ import {IRouterWithOnRamps} from "./interfaces/IRouterWithOnRamps.sol";
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
-import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
 
@@ -16,25 +15,18 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   event Pong(uint256 pingPongCount);
 
   // The chain ID of the counterpart ping pong contract
-  uint64 private s_counterpartChainSelector;
+  uint64 internal s_counterpartChainSelector;
   // The contract address of the counterpart ping pong contract
-  address private s_counterpartAddress;
+  address internal s_counterpartAddress;
 
   // Pause ping-ponging
   bool private s_isPaused;
-  IERC20 private s_feeToken;
+  IERC20 internal s_feeToken;
 
-  // Defines the increase in ping pong count before self-funding is attempted.
-  // Set to 0 to disable auto-funding, auto-funding only works for ping-pongs that are set as NOPs in the onRamp.
-  uint8 private s_countIncrBeforeFunding;
-
-  constructor(address router, IERC20 feeToken, uint8 roundTripsBeforeFunding) CCIPReceiver(router) {
+  constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), 2 ** 256 - 1);
-
-    // PingPong count increases by 2 for each round trip.
-    s_countIncrBeforeFunding = roundTripsBeforeFunding * 2;
   }
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {
@@ -47,15 +39,12 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     _respond(1);
   }
 
-  function _respond(uint256 pingPongCount) private {
+  function _respond(uint256 pingPongCount) internal virtual {
     if (pingPongCount & 1 == 1) {
       emit Ping(pingPongCount);
     } else {
       emit Pong(pingPongCount);
     }
-
-    fundPingPong(pingPongCount);
-
     bytes memory data = abi.encode(pingPongCount);
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(s_counterpartAddress),
@@ -74,34 +63,24 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     }
   }
 
-  /// @notice A function that is responsible for funding this contract.
-  /// The contract can only be funded if it is set as a nop in the target onRamp.
-  /// In case your contract is not a nop you can prevent this function from being called by setting s_countIncrBeforeFunding=0.
-  function fundPingPong(uint256 pingPongCount) public {
-    // If selfFunding is disabled, or ping pong count has not reached s_countIncrPerFunding, do not attempt funding.
-    if (s_countIncrBeforeFunding == 0 || pingPongCount < s_countIncrBeforeFunding) return;
-
-    // Ping pong on one side will always be even, one side will always to odd.
-    // Funding threshold is met if pingPongCount = (s_countIncrBeforeFunding * I) + (0 || 1)
-    if (pingPongCount % s_countIncrBeforeFunding <= 1) {
-      EVM2EVMOnRamp(IRouterWithOnRamps(getRouter()).getOnRamp(s_counterpartChainSelector)).payNops();
-    }
-  }
-
   /////////////////////////////////////////////////////////////////////
   // Plumbing
   /////////////////////////////////////////////////////////////////////
 
-  function getCounterpartChainSelector() external view returns (uint64) {
+  function getCounterpartChainSelector() public view returns (uint64) {
     return s_counterpartChainSelector;
   }
 
-  function setCounterpartChainSelector(uint64 chainSelector) external onlyOwner {
+  function setCounterpartChainSelector(uint64 chainSelector) public onlyOwner {
     s_counterpartChainSelector = chainSelector;
   }
 
-  function getCounterpartAddress() external view returns (address) {
+  function getCounterpartAddress() public view returns (address) {
     return s_counterpartAddress;
+  }
+
+  function getFeeToken() public view returns (IERC20) {
+    return s_feeToken;
   }
 
   function setCounterpartAddress(address addr) external onlyOwner {
@@ -114,9 +93,5 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
 
   function setPaused(bool pause) external onlyOwner {
     s_isPaused = pause;
-  }
-
-  function getCountIncrBeforeFunding() external view returns (uint8) {
-    return s_countIncrBeforeFunding;
   }
 }
