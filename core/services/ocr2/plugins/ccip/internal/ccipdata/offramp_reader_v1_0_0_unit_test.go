@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -74,7 +75,7 @@ func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			batchCaller := rpclib.NewMockEvmBatchCaller(t)
+			batchCaller := rpclibmocks.NewEvmBatchCaller(t)
 			o := &OffRampV1_0_0{evmBatchCaller: batchCaller, lp: lp}
 			srcTks, dstTks, outputs := generateTokensAndOutputs()
 			outputs = tc.outputChangeFn(outputs)

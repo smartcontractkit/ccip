@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
-//go:generate mockery --quiet --name EvmBatchCaller --output . --filename evm_mock.go --inpackage --case=underscore
+//go:generate mockery --quiet --name EvmBatchCaller --output ./rpclibmocks --outpkg rpclibmocks --filename evm_mock.go --case=underscore
 type EvmBatchCaller interface {
 	// BatchCall will make a single batched rpc call for all the provided contract calls.
 	BatchCall(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error)
