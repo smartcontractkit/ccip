@@ -311,6 +311,30 @@ func (_m *MockOffRampReader) GetOffRampAddress() (common.Address, error) {
 	return r0, r1
 }
 
+// GetOffRampStaticConfig provides a mock function with given fields: opts
+func (_m *MockOffRampReader) GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
+	ret := _m.Called(opts)
+
+	var r0 evm_2_evm_offramp.EVM2EVMOffRampStaticConfig
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error)); ok {
+		return rf(opts)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) evm_2_evm_offramp.EVM2EVMOffRampStaticConfig); ok {
+		r0 = rf(opts)
+	} else {
+		r0 = ret.Get(0).(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig)
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
+		r1 = rf(opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetPoolByDestToken provides a mock function with given fields: ctx, address
 func (_m *MockOffRampReader) GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error) {
 	ret := _m.Called(ctx, address)

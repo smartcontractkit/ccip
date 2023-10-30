@@ -120,6 +120,8 @@ type OffRampReader interface {
 	CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error)
 	GetOffRampAddress() (common.Address, error)
 	GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error)
+
+	GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error)
 }
 
 // MessageExecutionState defines the execution states of CCIP messages.

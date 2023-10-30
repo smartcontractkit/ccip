@@ -100,6 +100,24 @@ type OffRampV1_0_0 struct {
 	onchainConfig     ExecOnchainConfig
 }
 
+func (o *OffRampV1_0_0) GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
+	if o.offRamp == nil {
+		return *new(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig), fmt.Errorf("offramp not initialized")
+	}
+	c, err := o.offRamp.GetStaticConfig(opts)
+	if err != nil {
+		return *new(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig), fmt.Errorf("error while retrieving offramp config: %v", err)
+	}
+	return evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
+		CommitStore:         c.CommitStore,
+		ChainSelector:       c.ChainSelector,
+		SourceChainSelector: c.SourceChainSelector,
+		OnRamp:              c.OnRamp,
+		PrevOffRamp:         c.PrevOffRamp,
+		ArmProxy:            c.ArmProxy,
+	}, nil
+}
+
 func (o *OffRampV1_0_0) GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error) {
 	state, err := o.offRamp.GetExecutionState(opts, sequenceNumber)
 	if err != nil {
