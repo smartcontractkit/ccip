@@ -40,58 +40,6 @@ func (_m *EvmBatchCaller) BatchCall(ctx context.Context, blockNumber uint64, cal
 	return r0, r1
 }
 
-// BatchCallDynamicLimitRetries provides a mock function with given fields: ctx, blockNumber, calls
-func (_m *EvmBatchCaller) BatchCallDynamicLimitRetries(ctx context.Context, blockNumber uint64, calls []rpclib.EvmCall) ([]rpclib.DataAndErr, error) {
-	ret := _m.Called(ctx, blockNumber, calls)
-
-	var r0 []rpclib.DataAndErr
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, []rpclib.EvmCall) ([]rpclib.DataAndErr, error)); ok {
-		return rf(ctx, blockNumber, calls)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, []rpclib.EvmCall) []rpclib.DataAndErr); ok {
-		r0 = rf(ctx, blockNumber, calls)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]rpclib.DataAndErr)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, uint64, []rpclib.EvmCall) error); ok {
-		r1 = rf(ctx, blockNumber, calls)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// BatchCallLimit provides a mock function with given fields: ctx, blockNumber, calls
-func (_m *EvmBatchCaller) BatchCallLimit(ctx context.Context, blockNumber uint64, calls []rpclib.EvmCall) ([]rpclib.DataAndErr, error) {
-	ret := _m.Called(ctx, blockNumber, calls)
-
-	var r0 []rpclib.DataAndErr
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, []rpclib.EvmCall) ([]rpclib.DataAndErr, error)); ok {
-		return rf(ctx, blockNumber, calls)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, []rpclib.EvmCall) []rpclib.DataAndErr); ok {
-		r0 = rf(ctx, blockNumber, calls)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]rpclib.DataAndErr)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, uint64, []rpclib.EvmCall) error); ok {
-		r1 = rf(ctx, blockNumber, calls)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 type mockConstructorTestingTNewEvmBatchCaller interface {
 	mock.TestingT
 	Cleanup(func())

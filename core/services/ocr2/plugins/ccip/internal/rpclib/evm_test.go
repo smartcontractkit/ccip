@@ -81,7 +81,7 @@ func TestDefaultEvmBatchCaller_BatchCallDynamicLimit(t *testing.T) {
 			batchSizes := make([]int, 0)
 
 			ec := mocks.NewClient(t)
-			bc := rpclib.NewDefaultEvmBatchCaller(logger.TestLogger(t), ec, tc.maxBatchSize, tc.backOffMultiplier)
+			bc := rpclib.NewDynamicLimitedBatchCaller(logger.TestLogger(t), ec, tc.maxBatchSize, tc.backOffMultiplier)
 			ctx := testutils.Context(t)
 			calls := make([]rpclib.EvmCall, tc.numCalls)
 			emptyAbi := abihelpers.MustParseABI("[]")
@@ -92,7 +92,7 @@ func TestDefaultEvmBatchCaller_BatchCallDynamicLimit(t *testing.T) {
 				evmCalls := args.Get(1).([]rpc.BatchElem)
 				batchSizes = append(batchSizes, len(evmCalls))
 			}).Return(errors.New("some error"))
-			_, _ = bc.BatchCallDynamicLimitRetries(ctx, 123, calls)
+			_, _ = bc.BatchCall(ctx, 123, calls)
 
 			assert.Equal(t, tc.expectedBatchSizesOnEachRetry, batchSizes)
 		})

@@ -15,16 +15,7 @@ import (
 
 //go:generate mockery --quiet --name EvmBatchCaller --output ./rpclibmocks --outpkg rpclibmocks --filename evm_mock.go --case=underscore
 type EvmBatchCaller interface {
-	// BatchCall will make a single batched rpc call for all the provided contract calls.
 	BatchCall(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error)
-
-	// BatchCallLimit is similar to EvmBatchCall but splits the batches into sub-calls based on the defined batch size limit.
-	// This method should be preferred over BatchCall for large payloads.
-	BatchCallLimit(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error)
-
-	// BatchCallDynamicLimitRetries is similar to BatchCallLimit but will perform retries by reducing the batch size on each retry.
-	// It is preferred when the RPC behavior/limits are unknown or when retrying is required.
-	BatchCallDynamicLimitRetries(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error)
 }
 
 const (
@@ -39,7 +30,22 @@ const (
 	DefaultRpcBatchBackOffMultiplier = 5
 )
 
-type DefaultEvmBatchCaller struct {
+// DynamicLimitedBatchCaller makes batched rpc calls and perform retries by reducing the batch size on each retry.
+type DynamicLimitedBatchCaller struct {
+	bc *defaultEvmBatchCaller
+}
+
+func NewDynamicLimitedBatchCaller(lggr logger.Logger, batchSender client.BatchSender, batchSizeLimit, backOffMultiplier int) *DynamicLimitedBatchCaller {
+	return &DynamicLimitedBatchCaller{
+		bc: newDefaultEvmBatchCaller(lggr, batchSender, batchSizeLimit, backOffMultiplier),
+	}
+}
+
+func (c *DynamicLimitedBatchCaller) BatchCall(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
+	return c.bc.batchCallDynamicLimitRetries(ctx, blockNumber, calls)
+}
+
+type defaultEvmBatchCaller struct {
 	lggr              logger.Logger
 	batchSender       client.BatchSender
 	batchSizeLimit    int
@@ -49,7 +55,7 @@ type DefaultEvmBatchCaller struct {
 // NewDefaultEvmBatchCaller returns a new batch caller instance.
 // batchCallLimit defines the maximum number of calls for BatchCallLimit method, pass 0 to keep the default.
 // backOffMultiplier defines the back-off strategy for retries on BatchCallDynamicLimitRetries method, pass 0 to keep the default.
-func NewDefaultEvmBatchCaller(lggr logger.Logger, batchSender client.BatchSender, batchSizeLimit, backOffMultiplier int) *DefaultEvmBatchCaller {
+func newDefaultEvmBatchCaller(lggr logger.Logger, batchSender client.BatchSender, batchSizeLimit, backOffMultiplier int) *defaultEvmBatchCaller {
 	batchSize := DefaultRpcBatchSizeLimit
 	if batchSizeLimit > 0 {
 		batchSize = batchSizeLimit
@@ -60,7 +66,7 @@ func NewDefaultEvmBatchCaller(lggr logger.Logger, batchSender client.BatchSender
 		multiplier = backOffMultiplier
 	}
 
-	return &DefaultEvmBatchCaller{
+	return &defaultEvmBatchCaller{
 		lggr:              lggr,
 		batchSender:       batchSender,
 		batchSizeLimit:    batchSize,
@@ -68,7 +74,7 @@ func NewDefaultEvmBatchCaller(lggr logger.Logger, batchSender client.BatchSender
 	}
 }
 
-func (c *DefaultEvmBatchCaller) BatchCall(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
+func (c *defaultEvmBatchCaller) batchCall(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
 	if len(calls) == 0 {
 		return nil, nil
 	}
@@ -125,7 +131,7 @@ func (c *DefaultEvmBatchCaller) BatchCall(ctx context.Context, blockNumber uint6
 	return results, nil
 }
 
-func (c *DefaultEvmBatchCaller) BatchCallDynamicLimitRetries(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
+func (c *defaultEvmBatchCaller) batchCallDynamicLimitRetries(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
 	lim := c.batchSizeLimit
 	for {
 		results, err := c.batchCallLimit(ctx, blockNumber, calls, lim)
@@ -147,13 +153,9 @@ func (c *DefaultEvmBatchCaller) BatchCallDynamicLimitRetries(ctx context.Context
 	}
 }
 
-func (c *DefaultEvmBatchCaller) BatchCallLimit(ctx context.Context, blockNumber uint64, calls []EvmCall) ([]DataAndErr, error) {
-	return c.batchCallLimit(ctx, blockNumber, calls, c.batchSizeLimit)
-}
-
-func (c *DefaultEvmBatchCaller) batchCallLimit(ctx context.Context, blockNumber uint64, calls []EvmCall, batchSizeLimit int) ([]DataAndErr, error) {
+func (c *defaultEvmBatchCaller) batchCallLimit(ctx context.Context, blockNumber uint64, calls []EvmCall, batchSizeLimit int) ([]DataAndErr, error) {
 	if batchSizeLimit <= 0 {
-		return c.BatchCall(ctx, blockNumber, calls)
+		return c.batchCall(ctx, blockNumber, calls)
 	}
 
 	results := make([]DataAndErr, 0, len(calls))
@@ -165,7 +167,7 @@ func (c *DefaultEvmBatchCaller) batchCallLimit(ctx context.Context, blockNumber 
 			idxTo = len(calls)
 		}
 
-		subResults, err := c.BatchCall(ctx, blockNumber, calls[idxFrom:idxTo])
+		subResults, err := c.batchCall(ctx, blockNumber, calls[idxFrom:idxTo])
 		if err != nil {
 			return nil, err
 		}

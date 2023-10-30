@@ -113,7 +113,7 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		return nil, fmt.Errorf("get latest block: %w", err)
 	}
 
-	results, err := o.evmBatchCaller.BatchCallDynamicLimitRetries(ctx, uint64(latestBlock), evmCalls)
+	results, err := o.evmBatchCaller.BatchCall(ctx, uint64(latestBlock), evmCalls)
 	if err != nil {
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
@@ -398,7 +398,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		eventSig:            ExecutionStateChangedEventV1_0_0,
 		eventIndex:          executionStateChangedSequenceNumberIndex,
 		configMu:            sync.RWMutex{},
-		evmBatchCaller: rpclib.NewDefaultEvmBatchCaller(
+		evmBatchCaller: rpclib.NewDynamicLimitedBatchCaller(
 			lggr,
 			ec,
 			rpclib.DefaultRpcBatchSizeLimit,
