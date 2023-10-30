@@ -22,7 +22,7 @@ contract PingPongDappSetup is EVM2EVMOnRampSetup {
     s_pingPong = new PingPongDemo(address(s_sourceRouter), s_feeToken);
     s_pingPong.setCounterpart(DEST_CHAIN_ID, i_pongContract);
 
-    uint256 fundingAmount = 5e18;
+    uint256 fundingAmount = 1e18;
 
     // Fund the contract with LINK tokens
     s_feeToken.transfer(address(s_pingPong), fundingAmount);
