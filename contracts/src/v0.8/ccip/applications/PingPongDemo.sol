@@ -2,15 +2,15 @@
 pragma solidity ^0.8.0;
 
 import {IRouterClient} from "../interfaces/IRouterClient.sol";
+import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
 import {CCIPReceiver} from "./CCIPReceiver.sol";
 
-import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
-
 /// @title PingPongDemo - A simple ping-pong contract for demonstrating cross-chain communication
-contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
+contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
   event Ping(uint256 pingPongCount);
   event Pong(uint256 pingPongCount);
 
@@ -27,6 +27,10 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     s_isPaused = false;
     s_feeToken = feeToken;
     s_feeToken.approve(address(router), 2 ** 256 - 1);
+  }
+
+  function typeAndVersion() external pure virtual returns (string memory) {
+    return "PingPongDemo 1.2.0";
   }
 
   function setCounterpart(uint64 counterpartChainSelector, address counterpartAddress) external onlyOwner {

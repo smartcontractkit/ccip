@@ -9,11 +9,15 @@ import {Router} from "../Router.sol";
 import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
 
 contract SelfFundedPingPong is PingPongDemo {
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
+  string public constant override typeAndVersion = "SelfFundedPingPong 1.2.0";
+
+  event Funded();
+  event CountIncrBeforeFundingSet(uint8 countIncrBeforeFunding);
+
   // Defines the increase in ping pong count before self-funding is attempted.
   // Set to 0 to disable auto-funding, auto-funding only works for ping-pongs that are set as NOPs in the onRamp.
   uint8 private s_countIncrBeforeFunding;
-
-  event Funded();
 
   constructor(address router, IERC20 feeToken, uint8 roundTripsBeforeFunding) PingPongDemo(router, feeToken) {
     // PingPong count increases by 2 for each round trip.
@@ -59,5 +63,6 @@ contract SelfFundedPingPong is PingPongDemo {
 
   function setCountIncrBeforeFunding(uint8 countIncrBeforeFunding) public onlyOwner {
     s_countIncrBeforeFunding = countIncrBeforeFunding;
+    emit CountIncrBeforeFundingSet(countIncrBeforeFunding);
   }
 }

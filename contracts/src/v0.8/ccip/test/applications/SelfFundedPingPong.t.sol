@@ -11,6 +11,7 @@ import {Client} from "../../libraries/Client.sol";
 contract SelfFundedPingPongDappSetup is EVM2EVMOnRampSetup {
   event Ping(uint256 pingPongs);
   event Pong(uint256 pingPongs);
+  event CountIncrBeforeFundingSet(uint8 countIncrBeforeFunding);
 
   SelfFundedPingPong internal s_pingPong;
   IERC20 internal s_feeToken;
@@ -38,7 +39,7 @@ contract SelfFundedPingPongDappSetup is EVM2EVMOnRampSetup {
 }
 
 /// @notice #ccipReceive
-contract SelfFundedPingPong_funding is SelfFundedPingPongDappSetup {
+contract SelfFundedPingPong_ccipReceive is SelfFundedPingPongDappSetup {
   event Funded();
 
   function test_FundingSuccess() public {
@@ -51,6 +52,10 @@ contract SelfFundedPingPong_funding is SelfFundedPingPongDappSetup {
     });
 
     uint8 countIncrBeforeFunding = 5;
+
+    vm.expectEmit();
+    emit CountIncrBeforeFundingSet(countIncrBeforeFunding);
+
     s_pingPong.setCountIncrBeforeFunding(countIncrBeforeFunding);
 
     vm.startPrank(address(s_sourceRouter));
@@ -84,5 +89,19 @@ contract SelfFundedPingPong_funding is SelfFundedPingPongDappSetup {
     // because pingPong is not set as a nop
     vm.expectRevert(EVM2EVMOnRamp.OnlyCallableByOwnerOrAdminOrNop.selector);
     s_pingPong.ccipReceive(message);
+  }
+}
+
+/// @notice #setCountIncrBeforeFunding
+contract SelfFundedPingPong_setCountIncrBeforeFunding is SelfFundedPingPongDappSetup {
+  function test_setCountIncrBeforeFunding() public {
+    uint8 c = s_pingPong.getCountIncrBeforeFunding();
+
+    vm.expectEmit();
+    emit CountIncrBeforeFundingSet(c + 1);
+
+    s_pingPong.setCountIncrBeforeFunding(c + 1);
+    uint8 c2 = s_pingPong.getCountIncrBeforeFunding();
+    assertEq(c2, c + 1);
   }
 }
