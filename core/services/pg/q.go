@@ -357,3 +357,11 @@ func (q *queryLogger) postSqlLog(ctx context.Context, begin time.Time) {
 
 	promSQLQueryTime.Observe(pct)
 }
+
+func (q Q) SelectNamed(dest interface{}, query string, arg interface{}) error {
+	query, args, err := q.BindNamed(query, arg)
+	if err != nil {
+		return errors.Wrap(err, "error binding arg")
+	}
+	return q.Select(dest, query, args...)
+}

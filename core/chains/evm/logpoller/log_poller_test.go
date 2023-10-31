@@ -1212,3 +1212,18 @@ func Test_CreatedAfterQueriesWithBackfill(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, logs, emittedLogs)
 }
+
+func Test_Sth(t *testing.T) {
+	th := SetupTH(t, 10, 3, 2)
+
+	logs, err := th.ORM.FetchNotExecutedReports(
+		utils.RandomAddress(),
+		utils.RandomBytes32(),
+		utils.RandomAddress(),
+		utils.RandomBytes32(),
+		time.Now(),
+	)
+
+	fmt.Println(logs)
+	fmt.Println(err)
+}

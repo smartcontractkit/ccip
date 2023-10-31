@@ -59,6 +59,7 @@ type LogPoller interface {
 	LogsDataWordRange(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin, wordValueMax common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error)
 	LogsDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error)
 	LogsUntilBlockHashDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, untilBlockHash common.Hash, qopts ...pg.QOpt) ([]Log, error)
+	FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error)
 }
 
 type LogPollerTest interface {
@@ -1152,6 +1153,10 @@ func (lp *logPoller) fillRemainingBlocksFromRPC(
 // The order of events is not significant. Both logs must be inside the block range and have the minimum number of confirmations
 func (lp *logPoller) IndexedLogsWithSigsExcluding(address common.Address, eventSigA, eventSigB common.Hash, topicIndex int, fromBlock, toBlock int64, confs int, qopts ...pg.QOpt) ([]Log, error) {
 	return lp.orm.SelectIndexedLogsWithSigsExcluding(eventSigA, eventSigB, topicIndex, address, fromBlock, toBlock, confs, qopts...)
+}
+
+func (lp *logPoller) FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error) {
+	return lp.orm.FetchNotExecutedReports(commitStoreAddr, commitStoreEvent, offrampAddress, offrampEventSig, after, qopts...)
 }
 
 func EvmWord(i uint64) common.Hash {

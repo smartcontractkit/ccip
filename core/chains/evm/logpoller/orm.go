@@ -54,6 +54,7 @@ type ORM interface {
 	SelectLogsDataWordRange(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin, wordValueMax common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error)
 	SelectLogsDataWordGreaterThan(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error)
 	SelectLogsUntilBlockHashDataWordGreaterThan(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, untilBlockHash common.Hash, qopts ...pg.QOpt) ([]Log, error)
+	FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error)
 }
 
 type DbORM struct {
@@ -290,6 +291,52 @@ func (o *DbORM) SelectLogsCreatedAfter(address common.Address, eventSig common.H
 		return nil, err
 	}
 	return logs, nil
+}
+
+func (o *DbORM) FetchNotExecutedReports(
+	commitStoreAddr common.Address,
+	commitStoreEvent common.Hash,
+	offrampAddress common.Address,
+	offrampEventSig common.Hash,
+	after time.Time,
+	qopts ...pg.QOpt,
+) ([]Log, error) {
+	var logs []Log
+	queryArgs := map[string]interface{}{
+		"chain_id":              utils.NewBig(o.chainID),
+		"commit_store_addr":     commitStoreAddr,
+		"commit_store_event":    commitStoreEvent,
+		"offramp_addr":          offrampAddress,
+		"offramp_event":         offrampEventSig,
+		"block_timestamp_after": after,
+		"topic_index":           1 + 1,
+		"min_seq_word_index":    2,
+		"max_seq_word_index":    3,
+	}
+	q := o.q.WithOpts(qopts...)
+	err := q.SelectNamed(&logs, `
+		SELECT * FROM evm.logs reports
+			WHERE reports.evm_chain_id = :chain_id 
+			AND reports.address = :commit_store_addr
+			AND reports.event_sig = :commit_store_event
+			AND reports.block_timestamp > :block_timestamp_after
+			AND EXISTS (
+				SELECT 1 
+				FROM generate_series(
+				    ('x' || encode(substring(data from 32*:min_seq_word_index+25 for 8), 'hex'))::::bit(64)::::bigint,
+				    ('x' || encode(substring(data from 32*:max_seq_word_index+25 for 8), 'hex'))::::bit(64)::::bigint
+				) s(seqNr)
+				WHERE s.seqNr NOT IN (
+					SELECT 
+				        ('x' || substring(executed.topics[:topic_index]::::text from 51 for 16))::::bit(64)::::bigint
+				    FROM evm.logs executed
+					WHERE executed.evm_chain_id = :chain_id
+					AND executed.address = :offramp_addr
+					AND executed.event_sig = :offramp_event
+				)
+			)
+			ORDER BY (reports.block_number, reports.log_index)`, queryArgs)
+	return logs, err
 }
 
 // SelectLogsWithSigsByBlockRangeFilter finds the logs in the given block range with the given event signatures
