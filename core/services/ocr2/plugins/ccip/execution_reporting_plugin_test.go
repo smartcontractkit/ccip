@@ -626,12 +626,12 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			}
 
 			// Mock calls to reader.
-			offRampReader := ccipdata.NewMockOffRampReader(t)
-			offRampReader.On("GetSenderNonce", mock.Anything, sender1).Return(uint64(0), nil).Maybe()
+			mockOffRampReader := ccipdata.NewMockOffRampReader(t)
+			mockOffRampReader.On("GetSenderNonce", mock.Anything, sender1).Return(uint64(0), nil).Maybe()
 
 			plugin := ExecutionReportingPlugin{
 				config: ExecutionPluginStaticConfig{
-					offRampReader: offRampReader,
+					offRampReader: mockOffRampReader,
 				},
 				destWrappedNative: destNative,
 				offchainConfig: ccipdata.ExecOffchainConfig{
