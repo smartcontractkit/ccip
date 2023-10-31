@@ -45,6 +45,13 @@ type CommitStoreV1_2_0 struct {
 	offchainConfig    CommitOffchainConfig
 }
 
+func (c *CommitStoreV1_2_0) GetCommitStoreStaticConfig(ctx context.Context) (commit_store.CommitStoreStaticConfig, error) {
+	if c.commitStore == nil {
+		return *new(commit_store.CommitStoreStaticConfig), errors.New("commitStore not initialized")
+	}
+	return c.commitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
+}
+
 func (c *CommitStoreV1_2_0) EncodeCommitReport(report CommitStoreReport) ([]byte, error) {
 	return encodeCommitReportV1_2_0(c.commitReportArgs, report)
 }

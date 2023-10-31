@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -48,6 +49,22 @@ type CommitStoreV1_0_0 struct {
 	configMu          sync.RWMutex
 	gasPriceEstimator prices.ExecGasPriceEstimator
 	offchainConfig    CommitOffchainConfig
+}
+
+func (c *CommitStoreV1_0_0) GetCommitStoreStaticConfig(ctx context.Context) (commit_store.CommitStoreStaticConfig, error) {
+	if c.commitStore == nil {
+		return *new(commit_store.CommitStoreStaticConfig), errors.New("commitStore not initialized")
+	}
+	legacyConfig, err := c.commitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return *new(commit_store.CommitStoreStaticConfig), errors.New("Could not get commitStore static config")
+	}
+	return commit_store.CommitStoreStaticConfig{
+		ChainSelector:       legacyConfig.ChainSelector,
+		SourceChainSelector: legacyConfig.SourceChainSelector,
+		OnRamp:              legacyConfig.OnRamp,
+		ArmProxy:            legacyConfig.ArmProxy,
+	}, nil
 }
 
 func (c *CommitStoreV1_0_0) EncodeCommitReport(report CommitStoreReport) ([]byte, error) {

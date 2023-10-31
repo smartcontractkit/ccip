@@ -101,6 +101,8 @@ type CommitStoreReader interface {
 	EncodeCommitReport(report CommitStoreReport) ([]byte, error)
 	DecodeCommitReport(report []byte) (CommitStoreReport, error)
 	VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error)
+
+	GetCommitStoreStaticConfig(ctx context.Context) (commit_store.CommitStoreStaticConfig, error)
 }
 
 func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (CommitStoreReader, error) {
