@@ -89,11 +89,7 @@ func (o *OffRampV1_2_0) GetSenderNonce(opts *bind.CallOpts, sender common.Addres
 }
 
 func (o *OffRampV1_2_0) CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
-	state, err := o.offRamp.CurrentRateLimiterState(opts)
-	if err != nil {
-		return *new(evm_2_evm_offramp.RateLimiterTokenBucket), err
-	}
-	return state, nil
+	return o.offRamp.CurrentRateLimiterState(opts)
 }
 
 func (o *OffRampV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
