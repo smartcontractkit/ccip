@@ -60,6 +60,9 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 		return nil, nil, errors.Wrap(err, "could not load offRampReader")
 	}
 	offRampConfig, err := offRampReader.GetOffRampStaticConfig(&bind.CallOpts{})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not get offramp static config")
+	}
 
 	chainId, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
 	if err != nil {
@@ -77,9 +80,12 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
 		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "could not create onramp reader")
 	}
 	dynamicOnRampConfig, err := onRampReader.GetOnRampDynamicConfig()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not get onramp dynamic config")
+	}
 
 	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
 	if err != nil {
