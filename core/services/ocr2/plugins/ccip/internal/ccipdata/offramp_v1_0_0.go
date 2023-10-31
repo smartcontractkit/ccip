@@ -101,19 +101,11 @@ type OffRampV1_0_0 struct {
 }
 
 func (o *OffRampV1_0_0) GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error) {
-	state, err := o.offRamp.GetExecutionState(opts, sequenceNumber)
-	if err != nil {
-		return *new(uint8), err
-	}
-	return state, nil
+	return o.offRamp.GetExecutionState(opts, sequenceNumber)
 }
 
 func (o *OffRampV1_0_0) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
-	nonce, err := o.offRamp.GetSenderNonce(opts, sender)
-	if err != nil {
-		return *new(uint64), err
-	}
-	return nonce, nil
+	return o.offRamp.GetSenderNonce(opts, sender)
 }
 
 func (o *OffRampV1_0_0) CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {

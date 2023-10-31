@@ -85,11 +85,7 @@ type OffRampV1_2_0 struct {
 }
 
 func (o *OffRampV1_2_0) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
-	nonce, err := o.offRamp.GetSenderNonce(opts, sender)
-	if err != nil {
-		return *new(uint64), err
-	}
-	return nonce, nil
+	return o.offRamp.GetSenderNonce(opts, sender)
 }
 
 func (o *OffRampV1_2_0) CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
