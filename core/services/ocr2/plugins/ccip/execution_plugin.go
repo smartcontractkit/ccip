@@ -32,20 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-// getDestChain returns the destination chain for the given job spec.
-func getDestChain(spec *job.OCR2OracleSpec, chainSet evm.LegacyChainContainer) (evm.Chain, error) {
-	chainIDInterface, ok := spec.RelayConfig["chainID"]
-	if !ok {
-		return *new(evm.Chain), errors.New("chainID must be provided in relay config")
-	}
-	destChainID := int64(chainIDInterface.(float64))
-	destChain, err := chainSet.Get(strconv.FormatInt(destChainID, 10))
-	if err != nil {
-		return *new(evm.Chain), errors.Wrap(err, "Chain not found in chainset")
-	}
-	return destChain, nil
-}
-
 // TODO pass context?
 func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer) (*ExecutionPluginStaticConfig, *BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
@@ -58,7 +44,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 		return nil, nil, err
 	}
 
-	destChain, err := getDestChain(spec, chainSet)
+	destChain, destChainId, err := ccipconfig.GetDestChain(spec, chainSet)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -86,7 +72,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 
 	execLggr := lggr.Named("CCIPExecution").With(
 		"sourceChain", ChainName(int64(chainId)),
-		"destChain", ChainName(destChain.ID().Int64()))
+		"destChain", ChainName(destChainId))
 	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
 		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
 	if err != nil {
@@ -125,8 +111,8 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	// Prom wrappers
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, int64(chainId), ExecPluginLabel)
 	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, int64(chainId), ExecPluginLabel)
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChain.ID().Int64(), ExecPluginLabel)
-	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChain.ID().Int64(), ExecPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainId, ExecPluginLabel)
+	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainId, ExecPluginLabel)
 
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", pluginConfig,

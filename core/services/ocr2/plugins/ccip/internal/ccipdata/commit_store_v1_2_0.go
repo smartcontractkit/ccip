@@ -46,9 +46,6 @@ type CommitStoreV1_2_0 struct {
 }
 
 func (c *CommitStoreV1_2_0) GetCommitStoreStaticConfig() (commit_store.CommitStoreStaticConfig, error) {
-	if c.commitStore == nil {
-		return *new(commit_store.CommitStoreStaticConfig), errors.New("commitStore not initialized")
-	}
 	return c.commitStore.GetStaticConfig(&bind.CallOpts{})
 }
 

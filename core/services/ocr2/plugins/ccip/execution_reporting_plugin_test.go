@@ -306,14 +306,14 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 
 	mockCommitStoreReader := ccipdata.NewMockCommitStoreReader(t)
 
-	offRampReader := ccipdata.NewMockOffRampReader(t)
-	offRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
-	mockedExecState := offRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(ccipdata.ExecutionStateUntouched), nil).Once()
+	mockOffRampReader := ccipdata.NewMockOffRampReader(t)
+	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
+	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(ccipdata.ExecutionStateUntouched), nil).Once()
 
 	plugin := ExecutionReportingPlugin{
 		config: ExecutionPluginStaticConfig{
 			commitStoreReader: mockCommitStoreReader,
-			offRampReader:     offRampReader,
+			offRampReader:     mockOffRampReader,
 		},
 		lggr:            logger.TestLogger(t),
 		inflightReports: newInflightExecReportsContainer(models.MustMakeDuration(1 * time.Hour).Duration()),
@@ -625,13 +625,12 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 				gasPriceEstimator.On("EstimateMsgCostUSD", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(big.NewInt(0), nil)
 			}
 
-			// Mock calls to reader.
-			offRampReader := ccipdata.NewMockOffRampReader(t)
-			offRampReader.On("GetSenderNonce", mock.Anything, sender1).Return(uint64(0), nil).Maybe()
+			mockOffRampReader := ccipdata.NewMockOffRampReader(t)
+			mockOffRampReader.On("GetSenderNonce", mock.Anything, sender1).Return(uint64(0), nil).Maybe()
 
 			plugin := ExecutionReportingPlugin{
 				config: ExecutionPluginStaticConfig{
-					offRampReader: offRampReader,
+					offRampReader: mockOffRampReader,
 				},
 				destWrappedNative: destNative,
 				offchainConfig: ccipdata.ExecOffchainConfig{

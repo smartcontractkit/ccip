@@ -121,7 +121,7 @@ func (o *OffRampV1_0_0) GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_o
 func (o *OffRampV1_0_0) GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error) {
 	state, err := o.offRamp.GetExecutionState(opts, sequenceNumber)
 	if err != nil {
-		return *new(uint8), err
+		return 0, err
 	}
 	return state, nil
 }
