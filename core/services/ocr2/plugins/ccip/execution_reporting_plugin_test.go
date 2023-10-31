@@ -107,6 +107,8 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			}
 			commitStoreReader.On("GetAcceptedCommitReportsGteTimestamp", ctx, mock.Anything, 0).
 				Return(tc.unexpiredReports, nil).Maybe()
+			commitStoreReader.On("GetAcceptedCommitReportsGteTimestampV2", ctx, mock.Anything, mock.Anything, 0).
+				Return(tc.unexpiredReports, nil).Maybe()
 			p.config.commitStoreReader = commitStoreReader
 
 			offRamp, _ := testhelpers.NewFakeOffRamp(t)
@@ -124,6 +126,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				})
 			}
 			offRampReader := ccipdata.NewMockOffRampReader(t)
+			offRampReader.On("Address").Return(offRamp.Address()).Maybe()
 			offRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
 				Return(executionEvents, nil).Maybe()
 			p.config.offRampReader = offRampReader

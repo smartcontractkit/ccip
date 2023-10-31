@@ -21,6 +21,22 @@ type MockCommitStoreReader struct {
 	mock.Mock
 }
 
+// Address provides a mock function with given fields:
+func (_m *MockCommitStoreReader) Address() common.Address {
+	ret := _m.Called()
+
+	var r0 common.Address
+	if rf, ok := ret.Get(0).(func() common.Address); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(common.Address)
+		}
+	}
+
+	return r0
+}
+
 // ChangeConfig provides a mock function with given fields: onchainConfig, offchainConfig
 func (_m *MockCommitStoreReader) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
 	ret := _m.Called(onchainConfig, offchainConfig)
@@ -178,6 +194,32 @@ func (_m *MockCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx contex
 
 	if rf, ok := ret.Get(1).(func(context.Context, time.Time, int) error); ok {
 		r1 = rf(ctx, ts, confs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAcceptedCommitReportsGteTimestampV2 provides a mock function with given fields: ctx, offrampAddress, ts, confs
+func (_m *MockCommitStoreReader) GetAcceptedCommitReportsGteTimestampV2(ctx context.Context, offrampAddress common.Address, ts time.Time, confs int) ([]Event[CommitStoreReport], error) {
+	ret := _m.Called(ctx, offrampAddress, ts, confs)
+
+	var r0 []Event[CommitStoreReport]
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, time.Time, int) ([]Event[CommitStoreReport], error)); ok {
+		return rf(ctx, offrampAddress, ts, confs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, common.Address, time.Time, int) []Event[CommitStoreReport]); ok {
+		r0 = rf(ctx, offrampAddress, ts, confs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]Event[CommitStoreReport])
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, common.Address, time.Time, int) error); ok {
+		r1 = rf(ctx, offrampAddress, ts, confs)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -92,6 +92,7 @@ type CommitStoreReader interface {
 	GetAcceptedCommitReportsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[CommitStoreReport], error)
 	// GetAcceptedCommitReportsGteTimestamp returns all the commit reports with timestamp greater than or equal to the provided.
 	GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]Event[CommitStoreReport], error)
+	GetAcceptedCommitReportsGteTimestampV2(ctx context.Context, offrampAddress common.Address, ts time.Time, confs int) ([]Event[CommitStoreReport], error)
 	IsDown(ctx context.Context) (bool, error)
 	IsBlessed(ctx context.Context, root [32]byte) (bool, error)
 	// Notifies the reader that the config has changed onchain
@@ -101,6 +102,7 @@ type CommitStoreReader interface {
 	EncodeCommitReport(report CommitStoreReport) ([]byte, error)
 	DecodeCommitReport(report []byte) (CommitStoreReport, error)
 	VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error)
+	Address() common.Address
 }
 
 func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (CommitStoreReader, error) {

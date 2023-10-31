@@ -35,6 +35,39 @@ func (_m *LogPoller) Close() error {
 	return r0
 }
 
+// FetchNotExecutedReports provides a mock function with given fields: commitStoreAddr, commitStoreEvent, offrampAddress, offrampEventSig, after, qopts
+func (_m *LogPoller) FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]logpoller.Log, error) {
+	_va := make([]interface{}, len(qopts))
+	for _i := range qopts {
+		_va[_i] = qopts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, commitStoreAddr, commitStoreEvent, offrampAddress, offrampEventSig, after)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 []logpoller.Log
+	var r1 error
+	if rf, ok := ret.Get(0).(func(common.Address, common.Hash, common.Address, common.Hash, time.Time, ...pg.QOpt) ([]logpoller.Log, error)); ok {
+		return rf(commitStoreAddr, commitStoreEvent, offrampAddress, offrampEventSig, after, qopts...)
+	}
+	if rf, ok := ret.Get(0).(func(common.Address, common.Hash, common.Address, common.Hash, time.Time, ...pg.QOpt) []logpoller.Log); ok {
+		r0 = rf(commitStoreAddr, commitStoreEvent, offrampAddress, offrampEventSig, after, qopts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]logpoller.Log)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(common.Address, common.Hash, common.Address, common.Hash, time.Time, ...pg.QOpt) error); ok {
+		r1 = rf(commitStoreAddr, commitStoreEvent, offrampAddress, offrampEventSig, after, qopts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetBlocksRange provides a mock function with given fields: ctx, numbers, qopts
 func (_m *LogPoller) GetBlocksRange(ctx context.Context, numbers []uint64, qopts ...pg.QOpt) ([]logpoller.LogPollerBlock, error) {
 	_va := make([]interface{}, len(qopts))

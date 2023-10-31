@@ -108,3 +108,7 @@ func (d disabled) LatestBlockByEventSigsAddrsWithConfs(fromBlock int64, eventSig
 func (d disabled) LogsUntilBlockHashDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, untilBlockHash common.Hash, qopts ...pg.QOpt) ([]Log, error) {
 	return nil, ErrDisabled
 }
+
+func (d disabled) FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error) {
+	return nil, ErrDisabled
+}

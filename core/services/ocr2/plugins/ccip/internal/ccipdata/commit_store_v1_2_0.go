@@ -307,6 +307,26 @@ func (c *CommitStoreV1_2_0) GetAcceptedCommitReportsGteTimestamp(ctx context.Con
 	)
 }
 
+func (c *CommitStoreV1_2_0) GetAcceptedCommitReportsGteTimestampV2(ctx context.Context, offrampAddress common.Address, ts time.Time, confs int) ([]Event[CommitStoreReport], error) {
+	logs, err := c.lp.FetchNotExecutedReports(
+		c.address,
+		c.reportAcceptedSig,
+		offrampAddress,
+		common.HexToHash("0xd4f851956a5d67c3997d1c9205045fef79bae2947fdee7e9e2641abc7391ef65"),
+		ts,
+		pg.WithParentCtx(ctx),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseLogs[CommitStoreReport](
+		logs,
+		c.lggr,
+		c.parseReport,
+	)
+}
+
 func (c *CommitStoreV1_2_0) GetExpectedNextSequenceNumber(ctx context.Context) (uint64, error) {
 	return c.commitStore.GetExpectedNextSequenceNumber(&bind.CallOpts{Context: ctx})
 }
@@ -341,6 +361,10 @@ func (c *CommitStoreV1_2_0) VerifyExecutionReport(ctx context.Context, report Ex
 		return false, nil
 	}
 	return true, nil
+}
+
+func (c *CommitStoreV1_2_0) Address() common.Address {
+	return c.address
 }
 
 func NewCommitStoreV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*CommitStoreV1_2_0, error) {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -44,6 +46,12 @@ func (o *ObservedCommitStoreReader) GetAcceptedCommitReportsGteSeqNum(ctx contex
 func (o *ObservedCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]ccipdata.Event[ccipdata.CommitStoreReport], error) {
 	return withObservedContract(o.metric, "GetAcceptedCommitReportsGteTimestamp", func() ([]ccipdata.Event[ccipdata.CommitStoreReport], error) {
 		return o.CommitStoreReader.GetAcceptedCommitReportsGteTimestamp(ctx, ts, confs)
+	})
+}
+
+func (o *ObservedCommitStoreReader) GetAcceptedCommitReportsGteTimestampV2(ctx context.Context, offrampAddress common.Address, ts time.Time, confs int) ([]ccipdata.Event[ccipdata.CommitStoreReport], error) {
+	return withObservedContract(o.metric, "GetAcceptedCommitReportsGteTimestampV2", func() ([]ccipdata.Event[ccipdata.CommitStoreReport], error) {
+		return o.CommitStoreReader.GetAcceptedCommitReportsGteTimestampV2(ctx, offrampAddress, ts, confs)
 	})
 }
 

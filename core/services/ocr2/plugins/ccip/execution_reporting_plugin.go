@@ -218,14 +218,16 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
-	unexpiredReports, err := getUnexpiredCommitReports(
+	unexpiredReports, err := getUnexpiredCommitReportsWithSingleQuery(
 		ctx,
 		r.config.commitStoreReader,
+		r.config.offRampReader,
 		r.onchainConfig.PermissionLessExecutionThresholdSeconds,
 	)
 	if err != nil {
 		return nil, err
 	}
+
 	lggr.Infow("Unexpired roots", "n", len(unexpiredReports))
 	if len(unexpiredReports) == 0 {
 		return []ObservedMessage{}, nil
@@ -1135,6 +1137,29 @@ func getUnexpiredCommitReports(
 ) ([]ccipdata.CommitStoreReport, error) {
 	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
+		time.Now().Add(-permissionExecutionThreshold),
+		0,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var reports []ccipdata.CommitStoreReport
+	for _, acceptedReport := range acceptedReports {
+		reports = append(reports, acceptedReport.Data)
+	}
+	return reports, nil
+}
+
+func getUnexpiredCommitReportsWithSingleQuery(
+	ctx context.Context,
+	commitStoreReader ccipdata.CommitStoreReader,
+	offRampReader ccipdata.OffRampReader,
+	permissionExecutionThreshold time.Duration,
+) ([]ccipdata.CommitStoreReport, error) {
+	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestampV2(
+		ctx,
+		offRampReader.Address(),
 		time.Now().Add(-permissionExecutionThreshold),
 		0,
 	)
