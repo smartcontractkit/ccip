@@ -56,7 +56,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Could not create commitStore reader")
 	}
-	staticConfig, err := commitStoreReader.GetCommitStoreStaticConfig(nil)
+	staticConfig, err := commitStoreReader.GetCommitStoreStaticConfig()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Could not get commitStore static config")
 	}

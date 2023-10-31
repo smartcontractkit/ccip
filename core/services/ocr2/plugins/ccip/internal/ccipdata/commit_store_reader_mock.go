@@ -186,23 +186,23 @@ func (_m *MockCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx contex
 	return r0, r1
 }
 
-// GetCommitStoreStaticConfig provides a mock function with given fields: ctx
-func (_m *MockCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (commit_store.CommitStoreStaticConfig, error) {
-	ret := _m.Called(ctx)
+// GetCommitStoreStaticConfig provides a mock function with given fields:
+func (_m *MockCommitStoreReader) GetCommitStoreStaticConfig() (commit_store.CommitStoreStaticConfig, error) {
+	ret := _m.Called()
 
 	var r0 commit_store.CommitStoreStaticConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (commit_store.CommitStoreStaticConfig, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func() (commit_store.CommitStoreStaticConfig, error)); ok {
+		return rf()
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) commit_store.CommitStoreStaticConfig); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func() commit_store.CommitStoreStaticConfig); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(commit_store.CommitStoreStaticConfig)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
