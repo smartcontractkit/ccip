@@ -285,32 +285,6 @@ func (_m *MockOffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.
 	return r0, r1
 }
 
-// GetOffRampAddress provides a mock function with given fields:
-func (_m *MockOffRampReader) GetOffRampAddress() (common.Address, error) {
-	ret := _m.Called()
-
-	var r0 common.Address
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (common.Address, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() common.Address); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(common.Address)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetPoolByDestToken provides a mock function with given fields: ctx, address
 func (_m *MockOffRampReader) GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error) {
 	ret := _m.Called(ctx, address)

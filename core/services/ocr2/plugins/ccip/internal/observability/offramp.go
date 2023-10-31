@@ -68,12 +68,6 @@ func (o *ObservedOffRampReader) GetSupportedTokens(ctx context.Context) ([]commo
 	})
 }
 
-func (o *ObservedOffRampReader) GetOffRampAddress() (common.Address, error) {
-	return withObservedContract(o.metric, "GetOffRampAddress", func() (common.Address, error) {
-		return o.OffRampReader.GetOffRampAddress()
-	})
-}
-
 func (o *ObservedOffRampReader) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
 	return withObservedContract(o.metric, "GetSenderNonce", func() (uint64, error) {
 		return o.OffRampReader.GetSenderNonce(opts, sender)

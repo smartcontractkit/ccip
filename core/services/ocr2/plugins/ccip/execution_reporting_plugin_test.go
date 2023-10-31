@@ -126,7 +126,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			offRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
 				Return(executionEvents, nil).Maybe()
 			offRampReader.On("CurrentRateLimiterState", mock.Anything).Return(tc.rateLimiterState, nil).Maybe()
-			offRampReader.On("GetOffRampAddress").Return(offRamp.Address()).Maybe()
+			offRampReader.On("Address").Return(offRamp.Address()).Maybe()
 			offRampReader.On("GetSenderNonce", mock.Anything, mock.Anything).Return(offRamp.GetSenderNonce(nil, utils.RandomAddress())).Maybe()
 			p.config.offRampReader = offRampReader
 
@@ -875,7 +875,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			offRamp.SetTokenPools(tc.destPools)
 
 			offRampReader := ccipdata.NewMockOffRampReader(t)
-			offRampReader.On("GetOffRampAddress").Return(offRampAddr, nil).Maybe()
+			offRampReader.On("Address").Return(offRampAddr, nil).Maybe()
 			p.config.offRampReader = offRampReader
 
 			p.customTokenPoolFactory = func(ctx context.Context, poolAddress common.Address, _ bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error) {
