@@ -36,13 +36,13 @@ contract SelfFundedPingPongDappSetup is EVM2EVMOnRampSetup {
 
 /// @notice #ccipReceive
 contract SelfFundedPingPong_funding is SelfFundedPingPongDappSetup {
-  function testFunding() public {
+  event Funded();
+
+  function test_FundingSuccess() public {
     Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
     changePrank(address(s_sourceRouter));
 
-    uint256 pingPongBalance = IERC20(s_feeToken).balanceOf(address(s_pingPong));
-
-    for (uint256 pingPongNumber = 0; pingPongNumber < 2 * s_roundTripsBeforeFunding; ++pingPongNumber) {
+    for (uint256 pingPongNumber = 0; pingPongNumber <= 2 * s_roundTripsBeforeFunding; ++pingPongNumber) {
       Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
         messageId: bytes32("a"),
         sourceChainSelector: DEST_CHAIN_ID,
@@ -50,15 +50,32 @@ contract SelfFundedPingPong_funding is SelfFundedPingPongDappSetup {
         data: abi.encode(pingPongNumber),
         destTokenAmounts: tokenAmounts
       });
-      s_pingPong.ccipReceive(message);
 
-      uint256 currentPingPongBalance = IERC20(s_feeToken).balanceOf(address(s_pingPong));
       if (pingPongNumber == 2 * s_roundTripsBeforeFunding - 1) {
-        require(currentPingPongBalance > pingPongBalance, "ping pong was funded");
-      } else {
-        require(currentPingPongBalance < pingPongBalance, "funding is not made yet");
+        vm.expectEmit();
+        emit Funded();
       }
-      pingPongBalance = currentPingPongBalance;
+
+      s_pingPong.ccipReceive(message);
     }
+  }
+
+  function test_FundingFailure() public {
+    EVM2EVMOnRamp.NopAndWeight[] memory nopsAndWeights = new EVM2EVMOnRamp.NopAndWeight[](0);
+    s_onRamp.setNops(nopsAndWeights);
+
+    Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+    changePrank(address(s_sourceRouter));
+
+    Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+      messageId: bytes32("a"),
+      sourceChainSelector: DEST_CHAIN_ID,
+      sender: abi.encode(i_pongContract),
+      data: abi.encode(2 * s_roundTripsBeforeFunding - 1),
+      destTokenAmounts: tokenAmounts
+    });
+
+    vm.expectRevert(); // because pingPong is not set as a nop
+    s_pingPong.ccipReceive(message);
   }
 }

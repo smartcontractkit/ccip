@@ -13,6 +13,8 @@ contract SelfFundedPingPong is PingPongDemo {
   // Set to 0 to disable auto-funding, auto-funding only works for ping-pongs that are set as NOPs in the onRamp.
   uint8 private s_countIncrBeforeFunding;
 
+  event Funded();
+
   constructor(address router, IERC20 feeToken, uint8 roundTripsBeforeFunding) PingPongDemo(router, feeToken) {
     // PingPong count increases by 2 for each round trip.
     s_countIncrBeforeFunding = roundTripsBeforeFunding * 2;
@@ -49,6 +51,7 @@ contract SelfFundedPingPong is PingPongDemo {
     // Funding threshold is met if pingPongCount = (s_countIncrBeforeFunding * I) + (0 || 1)
     if (pingPongCount % s_countIncrBeforeFunding <= 1) {
       EVM2EVMOnRamp(IRouterWithOnRamps(getRouter()).getOnRamp(getCounterpartChainSelector())).payNops();
+      emit Funded();
     }
   }
 

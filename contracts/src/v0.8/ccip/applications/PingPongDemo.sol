@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IRouterWithOnRamps} from "./interfaces/IRouterWithOnRamps.sol";
+import {IRouterClient} from "../interfaces/IRouterClient.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {Client} from "../libraries/Client.sol";
@@ -15,7 +15,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
   event Pong(uint256 pingPongCount);
 
   // The chain ID of the counterpart ping pong contract
-  uint64 internal s_counterpartChainSelector;
+  uint64 private s_counterpartChainSelector;
   // The contract address of the counterpart ping pong contract
   address internal s_counterpartAddress;
 
@@ -53,7 +53,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
       extraArgs: "",
       feeToken: address(s_feeToken)
     });
-    IRouterWithOnRamps(getRouter()).ccipSend(s_counterpartChainSelector, message);
+    IRouterClient(getRouter()).ccipSend(s_counterpartChainSelector, message);
   }
 
   function _ccipReceive(Client.Any2EVMMessage memory message) internal override {
@@ -71,7 +71,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator {
     return s_counterpartChainSelector;
   }
 
-  function setCounterpartChainSelector(uint64 chainSelector) public onlyOwner {
+  function setCounterpartChainSelector(uint64 chainSelector) external onlyOwner {
     s_counterpartChainSelector = chainSelector;
   }
 
