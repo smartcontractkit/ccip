@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -55,25 +56,14 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "get chainset")
 	}
-
-	onRampAddress := common.HexToAddress(spec.ContractID)
-	offRampReader, err := ccipdata.NewOffRampReader(lggr, onRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	commitStore, _, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), destChain.Client())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed offramp reader")
+		return nil, nil, errors.Wrap(err, "failed loading commitStore")
 	}
-	offRampConfig, err := offRampReader.GetOffRampStaticConfig(&bind.CallOpts{})
+	staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to retrieve offramp static config")
+		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
-	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed commitstore reader")
-	}
-	staticConfig, err := commitStoreReader.GetStaticConfig(&bind.CallOpts{})
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to retrieve commitstore static config")
-	}
-
 	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
 	if err != nil {
 		return nil, nil, err
@@ -94,6 +84,14 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	onRampReader, err := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled(), qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed onramp reader")
+	}
+	offRampReader, err := ccipdata.NewOffRampReader(commitLggr, common.HexToAddress(pluginConfig.OffRamp), destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed offramp reader")
+	}
+	commitStoreReader, err := ccipdata.NewCommitStoreReader(commitLggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed commit reader")
 	}
 	onRampRouterAddr, err := onRampReader.RouterAddress()
 	if err != nil {
