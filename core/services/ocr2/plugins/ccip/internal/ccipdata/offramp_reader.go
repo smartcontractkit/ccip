@@ -121,7 +121,7 @@ type OffRampReader interface {
 	GetOffRampAddress() (common.Address, error)
 	GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error)
 
-	GetOffRampStaticConfig(ctx context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error)
+	GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error)
 }
 
 // MessageExecutionState defines the execution states of CCIP messages.

@@ -1,7 +1,6 @@
 package ccipdata
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"sync"
@@ -85,11 +84,11 @@ type OffRampV1_2_0 struct {
 	onchainConfig     ExecOnchainConfig
 }
 
-func (o *OffRampV1_2_0) GetOffRampStaticConfig(context context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
+func (o *OffRampV1_2_0) GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
 	if o.offRamp == nil {
 		return *new(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig), fmt.Errorf("offramp not initialized")
 	}
-	return o.offRamp.GetStaticConfig(&bind.CallOpts{Context: context})
+	return o.offRamp.GetStaticConfig(opts)
 }
 
 func (o *OffRampV1_2_0) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {

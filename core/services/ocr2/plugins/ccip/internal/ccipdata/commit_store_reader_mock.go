@@ -3,6 +3,7 @@
 package ccipdata
 
 import (
+	bind "github.com/ethereum/go-ethereum/accounts/abi/bind"
 	common "github.com/ethereum/go-ethereum/common"
 	commit_store "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 
@@ -234,23 +235,23 @@ func (_m *MockCommitStoreReader) GetLatestPriceEpochAndRound(_a0 context.Context
 	return r0, r1
 }
 
-// GetStaticConfig provides a mock function with given fields: _a0
-func (_m *MockCommitStoreReader) GetStaticConfig(_a0 context.Context) (commit_store.CommitStoreStaticConfig, error) {
-	ret := _m.Called(_a0)
+// GetStaticConfig provides a mock function with given fields: opts
+func (_m *MockCommitStoreReader) GetStaticConfig(opts *bind.CallOpts) (commit_store.CommitStoreStaticConfig, error) {
+	ret := _m.Called(opts)
 
 	var r0 commit_store.CommitStoreStaticConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (commit_store.CommitStoreStaticConfig, error)); ok {
-		return rf(_a0)
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) (commit_store.CommitStoreStaticConfig, error)); ok {
+		return rf(opts)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) commit_store.CommitStoreStaticConfig); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts) commit_store.CommitStoreStaticConfig); ok {
+		r0 = rf(opts)
 	} else {
 		r0 = ret.Get(0).(commit_store.CommitStoreStaticConfig)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
+		r1 = rf(opts)
 	} else {
 		r1 = ret.Error(1)
 	}
