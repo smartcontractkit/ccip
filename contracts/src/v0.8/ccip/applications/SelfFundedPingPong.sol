@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {PingPongDemo} from "./PingPongDemo.sol";
-import {IRouterWithOnRamps} from "./interfaces/IRouterWithOnRamps.sol";
-import {Client} from "../libraries/Client.sol";
-import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
-
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
+
+import {PingPongDemo} from "./PingPongDemo.sol";
+import {Client} from "../libraries/Client.sol";
+import {Router} from "../Router.sol";
+import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
 
 contract SelfFundedPingPong is PingPongDemo {
   // Defines the increase in ping pong count before self-funding is attempted.
@@ -29,15 +29,14 @@ contract SelfFundedPingPong is PingPongDemo {
 
     fundPingPong(pingPongCount);
 
-    bytes memory data = abi.encode(pingPongCount);
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
       receiver: abi.encode(getCounterpartAddress()),
-      data: data,
+      data: abi.encode(pingPongCount),
       tokenAmounts: new Client.EVMTokenAmount[](0),
       extraArgs: "",
       feeToken: address(getFeeToken())
     });
-    IRouterWithOnRamps(getRouter()).ccipSend(getCounterpartChainSelector(), message);
+    Router(getRouter()).ccipSend(getCounterpartChainSelector(), message);
   }
 
   /// @notice A function that is responsible for funding this contract.
@@ -48,14 +47,17 @@ contract SelfFundedPingPong is PingPongDemo {
     if (s_countIncrBeforeFunding == 0 || pingPongCount < s_countIncrBeforeFunding) return;
 
     // Ping pong on one side will always be even, one side will always to odd.
-    // Funding threshold is met if pingPongCount = (s_countIncrBeforeFunding * I) + (0 || 1)
     if (pingPongCount % s_countIncrBeforeFunding <= 1) {
-      EVM2EVMOnRamp(IRouterWithOnRamps(getRouter()).getOnRamp(getCounterpartChainSelector())).payNops();
+      EVM2EVMOnRamp(Router(getRouter()).getOnRamp(getCounterpartChainSelector())).payNops();
       emit Funded();
     }
   }
 
   function getCountIncrBeforeFunding() external view returns (uint8) {
     return s_countIncrBeforeFunding;
+  }
+
+  function setCountIncrBeforeFunding(uint8 countIncrBeforeFunding) public onlyOwner {
+    s_countIncrBeforeFunding = countIncrBeforeFunding;
   }
 }
