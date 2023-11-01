@@ -38,7 +38,7 @@ test_smoke_ccip: override_config
 .PHONY: test_smoke_ccip_default
 include test-config.env
 test_smoke_ccip_default:
-    CHAINLINK_IMAGE=$(image)  \
+	CHAINLINK_IMAGE=$(image)  \
     CHAINLINK_VERSION=$(tag)  \
     ENV_JOB_IMAGE=$(testimage)  \
     TEST_SUITE=smoke \
