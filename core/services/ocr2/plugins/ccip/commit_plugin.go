@@ -35,6 +35,15 @@ type BackfillArgs struct {
 	sourceStartBlock, destStartBlock int64
 }
 
+//// FIXME temporary solution for getting the gas estimator from the source chain in the commit store's static config.
+//func getCommitStoreStaticConfig(commitStoreAddress common.Address, destChain evm.Chain) (commit_store.CommitStoreStaticConfig, error) {
+//	commitStore, _, err := contractutil.LoadCommitStore(commitStoreAddress, destChain.Client())
+//	if err != nil {
+//		return commit_store.CommitStoreStaticConfig{}, err
+//	}
+//	return commitStore.GetStaticConfig(&bind.CallOpts{})
+//}
+
 func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, nil, errors.New("spec is nil")
