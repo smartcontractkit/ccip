@@ -69,14 +69,26 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to open source chain")
 	}
-	onRamp, onRampVersion, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, sourceChain.Client())
+
+	execLggr := lggr.Named("CCIPExecution").With(
+		"sourceChain", ChainName(int64(chainId)),
+		"destChain", ChainName(destChainID))
+	onRampAddress := offRampConfig.OnRamp
+	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRampAddress, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
+
+	//onRamp, onRampVersion, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, sourceChain.Client())
+	//if err != nil {
+	//	return nil, nil, errors.Wrap(err, "failed loading onRamp")
+	//}
+	//dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, onRampVersion, sourceChain.Client())
+	//if err != nil {
+	//	return nil, nil, errors.Wrap(err, "failed loading onRamp config")
+	//}
+	dynamicOnRampConfig, err := onRampReader.GetOnRampDynamicConfig()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading onRamp")
+		return nil, nil, errors.Wrap(err, "could not get onramp dynamic config")
 	}
-	dynamicOnRampConfig, err := contractutil.LoadOnRampDynamicConfig(onRamp, onRampVersion, sourceChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading onRamp config")
-	}
+
 	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading source router")
@@ -85,15 +97,14 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not get source native token")
 	}
-	execLggr := lggr.Named("CCIPExecution").With(
-		"sourceChain", ChainName(int64(chainId)),
-		"destChain", ChainName(destChainID))
+
 	// TODO: we don't support onramp source registry changes without a reboot yet?
 	sourcePriceRegistry, err := ccipdata.NewPriceRegistryReader(lggr, dynamicOnRampConfig.PriceRegistry, sourceChain.LogPoller(), sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load source registry")
 	}
-	offRampReader, err := ccipdata.NewOffRampReader(lggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampAddress := common.HexToAddress(spec.ContractID)
+	offRampReader, err := ccipdata.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load offRampReader")
 	}
@@ -101,11 +112,11 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
 	}
-	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
-		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
-	if err != nil {
-		return nil, nil, err
-	}
+	//onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
+	//	offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
+	//if err != nil {
+	//	return nil, nil, err
+	//}
 	tokenDataProviders, err := getTokenDataProviders(lggr, pluginConfig, sourceChain.LogPoller())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not get token data providers")
@@ -119,7 +130,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", pluginConfig,
-		"onRampAddress", onRamp.Address(),
+		"onRampAddress", onRampAddress,
 		"sourcePriceRegistry", sourcePriceRegistry.Address(),
 		"dynamicOnRampConfig", dynamicOnRampConfig,
 		"sourceNative", sourceWrappedNative,

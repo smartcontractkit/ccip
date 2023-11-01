@@ -65,14 +65,13 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 
-	commitStoreAddress := common.HexToAddress(spec.ContractID)
-
 	destChain, destChainId, err := ccipconfig.GetDestChain(spec, chainSet)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// FIXME: gas estimator must be the one from sourceChain (not destChain).
+	commitStoreAddress := common.HexToAddress(spec.ContractID)
 	staticConfig, err := getCommitStoreStaticConfig(commitStoreAddress, destChain)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
@@ -85,21 +84,6 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed creating commitStore reader")
 	}
-
-	//staticConfig, err := commitStore.GetStaticConfig(&bind.CallOpts{})
-	//staticConfig, err := commitStoreReader.GetCommitStoreStaticConfig()
-	//if err != nil {
-	//	return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
-	//}
-
-	//sourceChainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
-	//if err != nil {
-	//	return nil, nil, err
-	//}
-	//sourceChain, err := chainSet.Get(strconv.FormatUint(sourceChainId, 10))
-	//if err != nil {
-	//	return nil, nil, errors.Wrap(err, "unable to open source chain")
-	//}
 
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(sourceChainId),
@@ -118,10 +102,6 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed offramp reader")
 	}
-	//commitStoreReader, err := ccipdata.NewCommitStoreReader(commitLggr, common.HexToAddress(spec.ContractID), destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
-	//if err != nil {
-	//	return nil, nil, errors.Wrap(err, "failed commit reader")
-	//}
 	onRampRouterAddr, err := onRampReader.RouterAddress()
 	if err != nil {
 		return nil, nil, err

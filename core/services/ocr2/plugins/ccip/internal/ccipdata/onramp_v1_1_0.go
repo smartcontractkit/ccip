@@ -1,10 +1,13 @@
 package ccipdata
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -38,4 +41,26 @@ func (o *OnRampV1_1_0) RouterAddress() (common.Address, error) {
 		return common.Address{}, err
 	}
 	return config.Router, nil
+}
+
+func (o *OnRampV1_1_0) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+	if o.onRamp == nil {
+		return *new(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig), fmt.Errorf("onramp not initialized")
+	}
+	legacyDynamicConfig, err := o.onRamp.GetDynamicConfig(nil)
+	if err != nil {
+		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+	}
+	return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
+		Router:                            legacyDynamicConfig.Router,
+		MaxNumberOfTokensPerMsg:           legacyDynamicConfig.MaxTokensLength,
+		DestGasOverhead:                   legacyDynamicConfig.DestGasOverhead,
+		DestGasPerPayloadByte:             legacyDynamicConfig.DestGasPerPayloadByte,
+		DestDataAvailabilityOverheadGas:   0,
+		DestGasPerDataAvailabilityByte:    0,
+		DestDataAvailabilityMultiplierBps: 0,
+		PriceRegistry:                     legacyDynamicConfig.PriceRegistry,
+		MaxDataBytes:                      legacyDynamicConfig.MaxDataSize,
+		MaxPerMsgGasLimit:                 uint32(legacyDynamicConfig.MaxGasLimit),
+	}, nil
 }
