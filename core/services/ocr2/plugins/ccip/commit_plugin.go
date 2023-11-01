@@ -14,6 +14,7 @@ import (
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
@@ -22,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -36,9 +36,18 @@ type BackfillArgs struct {
 	sourceStartBlock, destStartBlock int64
 }
 
+func loadCommitStore(commitStoreAddress common.Address, client client.Client) (commit_store.CommitStoreInterface, semver.Version, error) {
+	version, err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
+	if err != nil {
+		return nil, semver.Version{}, errors.Wrap(err, "Invalid commitStore contract")
+	}
+	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, client)
+	return commitStore, version, err
+}
+
 // FIXME temporary solution for getting the gas estimator from the source chain in the commit store's static config.
 func getCommitStoreStaticConfig(commitStoreAddress common.Address, destChain evm.Chain) (commit_store.CommitStoreStaticConfig, error) {
-	commitStore, _, err := contractutil.LoadCommitStore(commitStoreAddress, destChain.Client())
+	commitStore, _, err := loadCommitStore(commitStoreAddress, destChain.Client())
 	if err != nil {
 		return commit_store.CommitStoreStaticConfig{}, err
 	}
@@ -93,7 +102,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	//}
 
 	commitLggr := lggr.Named("CCIPCommit").With(
-		"sourceChain", ChainName(int64(sourceChainId)),
+		"sourceChain", ChainName(sourceChainId),
 		"destChain", ChainName(destChainId))
 	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {

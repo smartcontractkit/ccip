@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
@@ -15,6 +14,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
+// deprecated
 func LoadOnRamp(onRampAddress common.Address, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampInterface, semver.Version, error) {
 	version, err := ccipconfig.VerifyTypeAndVersion(onRampAddress, client, ccipconfig.EVM2EVMOnRamp)
 	if err != nil {
@@ -25,6 +25,7 @@ func LoadOnRamp(onRampAddress common.Address, client client.Client) (evm_2_evm_o
 	return onRamp, version, err
 }
 
+// deprecated
 func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, version semver.Version, client client.Client) (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
 	opts := &bind.CallOpts{}
 
@@ -78,6 +79,7 @@ func LoadOnRampDynamicConfig(onRamp evm_2_evm_onramp.EVM2EVMOnRampInterface, ver
 	}
 }
 
+// deprecated
 func LoadOffRamp(offRampAddress common.Address, client client.Client) (evm_2_evm_offramp.EVM2EVMOffRampInterface, semver.Version, error) {
 	version, err := ccipconfig.VerifyTypeAndVersion(offRampAddress, client, ccipconfig.EVM2EVMOffRamp)
 	if err != nil {
@@ -86,14 +88,4 @@ func LoadOffRamp(offRampAddress common.Address, client client.Client) (evm_2_evm
 
 	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(offRampAddress, client)
 	return offRamp, version, err
-}
-
-func LoadCommitStore(commitStoreAddress common.Address, client client.Client) (commit_store.CommitStoreInterface, semver.Version, error) {
-	version, err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
-	if err != nil {
-		return nil, semver.Version{}, errors.Wrap(err, "Invalid commitStore contract")
-	}
-
-	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, client)
-	return commitStore, version, err
 }
