@@ -642,7 +642,7 @@ func CCIPDefaultTestSetUp(
 		envConfig.TTL = inputs.EnvInput.TTL.Duration()
 	}
 	if inputs.TestGroupInput.TestDuration != nil {
-		approxDur := inputs.TestGroupInput.TestDuration.Duration() + 5*time.Hour
+		approxDur := inputs.TestGroupInput.TestDuration.Duration() + 3*time.Hour
 		if envConfig.TTL < approxDur {
 			envConfig.TTL = approxDur
 		}
@@ -655,6 +655,7 @@ func CCIPDefaultTestSetUp(
 				LocalCluster: local,
 			}
 		} else {
+			lggr.Info().Msg("Deploying test environment")
 			// deploy the env if configureCLNode is true
 			k8Env = DeployEnvironments(t, envConfig, inputs)
 			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}

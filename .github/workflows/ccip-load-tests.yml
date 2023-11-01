@@ -135,7 +135,7 @@ jobs:
       - name: Sets env vars
         shell: bash
         run: |
-          if [[ "${{ github.event_name }}" != "workflow_dispatch" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "BASE64_TEST_CONFIG_OVERRIDE= ${{ inputs.base64_test_input }}" >> $GITHUB_ENV
             echo "TEST_BASE64_TEST_CONFIG_OVERRIDE= ${{ inputs.base64_test_input }}" >> $GITHUB_ENV
           fi
