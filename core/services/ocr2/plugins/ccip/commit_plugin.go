@@ -59,6 +59,9 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	commitStoreAddress := common.HexToAddress(spec.ContractID)
 
 	destChain, destChainId, err := ccipconfig.GetDestChain(spec, chainSet)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// FIXME: gas estimator must be the one from sourceChain (not destChain).
 	staticConfig, err := getCommitStoreStaticConfig(commitStoreAddress, destChain)
@@ -66,6 +69,9 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
 	sourceChain, sourceChainId, err := ccipconfig.GetChain(staticConfig.SourceChainSelector, chainSet)
+	if err != nil {
+		return nil, nil, err
+	}
 	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed creating commitStore reader")
