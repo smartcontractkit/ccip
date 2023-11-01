@@ -75,6 +75,9 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 		"destChain", ChainName(destChainID))
 	onRampAddress := offRampConfig.OnRamp
 	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, onRampAddress, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to create the onRamp reader")
+	}
 
 	//onRamp, onRampVersion, err := contractutil.LoadOnRamp(offRampConfig.OnRamp, sourceChain.Client())
 	//if err != nil {
