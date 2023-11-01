@@ -47,15 +47,9 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, err
 	}
-	chainIDInterface, ok := spec.RelayConfig["chainID"]
-	if !ok {
-		return nil, nil, errors.New("chainID must be provided in relay config")
-	}
-	destChainID := int64(chainIDInterface.(float64))
-	destChain, err := chainSet.Get(strconv.FormatInt(destChainID, 10))
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "get chainset")
-	}
+
+	destChain, destChainId, err := ccipconfig.GetDestChain(spec, chainSet)
+
 	commitStore, _, err := contractutil.LoadCommitStore(common.HexToAddress(spec.ContractID), destChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading commitStore")
@@ -74,7 +68,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	}
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(int64(chainId)),
-		"destChain", ChainName(destChainID))
+		"destChain", ChainName(destChainId))
 	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
 		return nil, nil, err
@@ -108,8 +102,8 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 
 	// Prom wrappers
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, int64(chainId), CommitPluginLabel)
-	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, CommitPluginLabel)
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, CommitPluginLabel)
+	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainId, CommitPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainId, CommitPluginLabel)
 
 	lggr.Infow("NewCommitServices",
 		"pluginConfig", pluginConfig,
