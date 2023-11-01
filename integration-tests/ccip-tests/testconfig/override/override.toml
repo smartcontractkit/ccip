@@ -1,6 +1,5 @@
 [CCIP]
-
+[CCIP.Groups]
 [CCIP.Groups.load]
-KeepEnvAlive = false
 TestDuration = '1m'
 
