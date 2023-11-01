@@ -34,13 +34,13 @@ contract SelfFundedPingPong is PingPongDemo {
     fundPingPong(pingPongCount);
 
     Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-      receiver: abi.encode(getCounterpartAddress()),
+      receiver: abi.encode(s_counterpartAddress),
       data: abi.encode(pingPongCount),
       tokenAmounts: new Client.EVMTokenAmount[](0),
       extraArgs: "",
-      feeToken: address(getFeeToken())
+      feeToken: address(s_feeToken)
     });
-    Router(getRouter()).ccipSend(getCounterpartChainSelector(), message);
+    Router(getRouter()).ccipSend(s_counterpartChainSelector, message);
   }
 
   /// @notice A function that is responsible for funding this contract.
@@ -52,7 +52,7 @@ contract SelfFundedPingPong is PingPongDemo {
 
     // Ping pong on one side will always be even, one side will always to odd.
     if (pingPongCount % s_countIncrBeforeFunding <= 1) {
-      EVM2EVMOnRamp(Router(getRouter()).getOnRamp(getCounterpartChainSelector())).payNops();
+      EVM2EVMOnRamp(Router(getRouter()).getOnRamp(s_counterpartChainSelector)).payNops();
       emit Funded();
     }
   }

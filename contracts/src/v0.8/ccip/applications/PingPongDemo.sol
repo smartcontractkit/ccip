@@ -16,18 +16,18 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
   event Pong(uint256 pingPongCount);
 
   // The chain ID of the counterpart ping pong contract
-  uint64 private s_counterpartChainSelector;
+  uint64 internal s_counterpartChainSelector;
   // The contract address of the counterpart ping pong contract
   address internal s_counterpartAddress;
-
   // Pause ping-ponging
   bool private s_isPaused;
+  // The fee token used to pay for CCIP transactions
   IERC20 internal s_feeToken;
 
   constructor(address router, IERC20 feeToken) CCIPReceiver(router) {
     s_isPaused = false;
     s_feeToken = feeToken;
-    s_feeToken.approve(address(router), 2 ** 256 - 1);
+    s_feeToken.approve(address(router), type(uint256).max);
   }
 
   function typeAndVersion() external pure virtual returns (string memory) {
@@ -72,7 +72,7 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
   // Plumbing
   /////////////////////////////////////////////////////////////////////
 
-  function getCounterpartChainSelector() public view returns (uint64) {
+  function getCounterpartChainSelector() external view returns (uint64) {
     return s_counterpartChainSelector;
   }
 
@@ -80,11 +80,11 @@ contract PingPongDemo is CCIPReceiver, OwnerIsCreator, ITypeAndVersion {
     s_counterpartChainSelector = chainSelector;
   }
 
-  function getCounterpartAddress() public view returns (address) {
+  function getCounterpartAddress() external view returns (address) {
     return s_counterpartAddress;
   }
 
-  function getFeeToken() public view returns (IERC20) {
+  function getFeeToken() external view returns (IERC20) {
     return s_feeToken;
   }
 
