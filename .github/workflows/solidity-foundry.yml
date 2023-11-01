@@ -51,7 +51,7 @@ jobs:
       - name: Run Solhint
         if: ${{ needs.changes.outputs.changes == 'true' }}
         working-directory: contracts
-        run: pnpm lint:ccip
+        run: pnpm solhint
 
   coverage:
     needs: [changes]
