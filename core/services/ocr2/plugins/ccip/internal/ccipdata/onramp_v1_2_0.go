@@ -209,9 +209,6 @@ type OnRampV1_2_0 struct {
 }
 
 func (o *OnRampV1_2_0) GetOnRampAddress() (common.Address, error) {
-	if o.onRamp == nil {
-		return common.Address{}, fmt.Errorf("onramp not initialized")
-	}
 	return o.onRamp.Address(), nil
 }
 
