@@ -3,7 +3,21 @@ pragma solidity 0.8.19;
 
 import "../BaseTest.t.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {BurnMintTokenPoolSetup} from "./BurnMintTokenPoolSetup.t.sol";
+import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
+import {BurnMintSetup} from "./BurnMintSetup.t.sol";
+
+contract BurnMintTokenPoolSetup is BurnMintSetup {
+  BurnMintTokenPool internal s_pool;
+
+  function setUp() public virtual override {
+    BurnMintSetup.setUp();
+
+    s_pool = new BurnMintTokenPool(s_burnMintERC677, new address[](0), address(s_mockARM));
+    s_burnMintERC677.grantMintAndBurnRoles(address(s_pool));
+
+    applyRampUpdates(address(s_pool));
+  }
+}
 
 contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
   function testPoolBurnSuccess() public {

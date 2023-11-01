@@ -3,20 +3,19 @@ pragma solidity 0.8.19;
 
 import "../BaseTest.t.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
-import {BurnMintTokenPoolSetup} from "./BurnMintTokenPoolSetup.t.sol";
-import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
+import {BurnMintSetup} from "./BurnMintSetup.t.sol";
 import {BurnFromMintTokenPool} from "../../pools/BurnFromMintTokenPool.sol";
 
-contract BurnFromMintTokenPoolSetup is BurnMintTokenPoolSetup {
-  function setUp() public virtual override {
-    BurnMintTokenPoolSetup.setUp();
+contract BurnFromMintTokenPoolSetup is BurnMintSetup {
+  BurnFromMintTokenPool internal s_pool;
 
-    address newPool = address(new BurnFromMintTokenPool(s_burnMintERC677, new address[](0), address(s_mockARM)));
-    // Since all versions share the exact same interface, this reduces code duplication
-    s_pool = BurnMintTokenPool(newPool);
+  function setUp() public virtual override {
+    BurnMintSetup.setUp();
+
+    s_pool = new BurnFromMintTokenPool(s_burnMintERC677, new address[](0), address(s_mockARM));
     s_burnMintERC677.grantMintAndBurnRoles(address(s_pool));
 
-    applyRampUpdates();
+    applyRampUpdates(address(s_pool));
   }
 }
 
