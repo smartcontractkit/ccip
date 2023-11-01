@@ -392,11 +392,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 			return nil, fmt.Errorf("new custom dest token pool %s: %w", poolAddress, err)
 		}
 
-		offRampAddr, err := r.config.offRampReader.GetOffRampAddress()
-		if err != nil {
-			return nil, fmt.Errorf("error while retrieving offRamp address: %w", err)
-		}
-
+		offRampAddr := r.config.offRampReader.Address()
 		rateLimiterState, err := tokenPool.CurrentOffRampRateLimiterState(&bind.CallOpts{Context: ctx}, offRampAddr)
 		if err != nil {
 			return nil, fmt.Errorf("get rate off ramp rate limiter state: %w", err)
