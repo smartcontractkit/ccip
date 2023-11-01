@@ -126,7 +126,7 @@ jobs:
         with:
           basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
-          this-job-name: ${{ inputs.networks }} CCIP Load Test
+          this-job-name: CCIP Load Test
         continue-on-error: true
       - name: Checkout the repo
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
@@ -166,6 +166,8 @@ jobs:
           TEST_LOKI_URL: ${{ secrets.TEST_LOKI_URL }}
           RR_MEM: 8Gi
           RR_CPU: 4
+          TEST_TRIGGERED_BY: ccip-load-test-ci
+          GH_TOKEN: ${{ github.token }}
         with:
           test_command_to_run: make test_need_operator_assets && cd ./integration-tests/ccip-tests && go test -v -timeout 900h -count=1 -json -run ^TestLoadCCIPStableRPS$ ./load  2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
@@ -180,3 +182,4 @@ jobs:
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
+          should_cleanup: "true"
