@@ -39,11 +39,11 @@ test_smoke_ccip: override_config
 include test-config.env
 test_smoke_ccip_default:
 	CHAINLINK_IMAGE=$(image)  \
-    CHAINLINK_VERSION=$(tag)  \
-    ENV_JOB_IMAGE=$(testimage)  \
-    TEST_SUITE=smoke \
-    TEST_ARGS="-test.timeout 900h" \
-    DETACH_RUNNER=true \
+	CHAINLINK_VERSION=$(tag)  \
+	ENV_JOB_IMAGE=$(testimage)  \
+	TEST_SUITE=smoke \
+	TEST_ARGS="-test.timeout 900h" \
+	DETACH_RUNNER=true \
 	go test -timeout 24h -count=1 -v -run ^$(testname)$$ ./smoke
 
 
