@@ -35,7 +35,7 @@ test_smoke_ccip: override_config
 	go test -timeout 24h -count=1 -v -run ^$(testname)$$ ./smoke
 
 # example usage: make test_smoke_ccip image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestSmokeCCIPForBidirectionalLane
-.PHONY: test_smoke_ccip
+.PHONY: test_smoke_ccip_default
 include test-config.env
 test_smoke_ccip_default:
     CHAINLINK_IMAGE=$(image)  \
