@@ -126,13 +126,6 @@ func (o *OffRampV1_0_0) GetExecutionState(opts *bind.CallOpts, sequenceNumber ui
 	return state, nil
 }
 
-func (o *OffRampV1_0_0) GetOffRampAddress() (common.Address, error) {
-	if o.offRamp == nil {
-		return common.Address{}, fmt.Errorf("offramp not initialized")
-	}
-	return o.offRamp.Address(), nil
-}
-
 func (o *OffRampV1_0_0) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
 	nonce, err := o.offRamp.GetSenderNonce(opts, sender)
 	if err != nil {
