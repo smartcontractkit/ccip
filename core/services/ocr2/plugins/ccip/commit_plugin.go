@@ -3,20 +3,20 @@ package ccip
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
-	chainselectors "github.com/smartcontractkit/chain-selectors"
-
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -35,14 +35,24 @@ type BackfillArgs struct {
 	sourceStartBlock, destStartBlock int64
 }
 
-//// FIXME temporary solution for getting the gas estimator from the source chain in the commit store's static config.
-//func getCommitStoreStaticConfig(commitStoreAddress common.Address, destChain evm.Chain) (commit_store.CommitStoreStaticConfig, error) {
-//	commitStore, _, err := contractutil.LoadCommitStore(commitStoreAddress, destChain.Client())
-//	if err != nil {
-//		return commit_store.CommitStoreStaticConfig{}, err
-//	}
-//	return commitStore.GetStaticConfig(&bind.CallOpts{})
-//}
+func loadCommitStore(commitStoreAddress common.Address, client client.Client) (commit_store.CommitStoreInterface, semver.Version, error) {
+	version, err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
+	if err != nil {
+		return nil, semver.Version{}, errors.Wrap(err, "Invalid commitStore contract")
+	}
+
+	commitStore, err := commit_store.NewCommitStore(commitStoreAddress, client)
+	return commitStore, version, err
+}
+
+// FIXME temporary solution for getting the gas estimator from the source chain in the commit store's static config.
+func getCommitStoreStaticConfig(commitStoreAddress common.Address, destChain evm.Chain) (commit_store.CommitStoreStaticConfig, error) {
+	commitStore, _, err := loadCommitStore(commitStoreAddress, destChain.Client())
+	if err != nil {
+		return commit_store.CommitStoreStaticConfig{}, err
+	}
+	return commitStore.GetStaticConfig(&bind.CallOpts{})
+}
 
 func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
@@ -61,24 +71,33 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	}
 
 	commitStoreAddress := common.HexToAddress(spec.ContractID)
-	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not create commitStore reader")
-	}
-	staticConfig, err := commitStoreReader.GetCommitStoreStaticConfig()
+	// FIXME: gas estimator must be the one from sourceChain (not destChain).
+	staticConfig, err := getCommitStoreStaticConfig(commitStoreAddress, destChain)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
-	chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
+	sourceChain, sourceChainId, err := ccipconfig.GetChain(staticConfig.SourceChainSelector, chainSet)
 	if err != nil {
 		return nil, nil, err
 	}
-	sourceChain, err := chainSet.Get(strconv.FormatUint(chainId, 10))
+	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to open source chain")
+		return nil, nil, errors.Wrap(err, "could not create commitStore reader")
 	}
+	//staticConfig, err := commitStoreReader.GetCommitStoreStaticConfig()
+	//if err != nil {
+	//	return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
+	//}
+	//chainId, err := chainselectors.ChainIdFromSelector(staticConfig.SourceChainSelector)
+	//if err != nil {
+	//	return nil, nil, err
+	//}
+	//sourceChain, err := chainSet.Get(strconv.FormatUint(chainId, 10))
+	//if err != nil {
+	//	return nil, nil, errors.Wrap(err, "unable to open source chain")
+	//}
 	commitLggr := lggr.Named("CCIPCommit").With(
-		"sourceChain", ChainName(int64(chainId)),
+		"sourceChain", ChainName(sourceChainId),
 		"destChain", ChainName(destChainId))
 	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
@@ -108,7 +127,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	}
 
 	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, int64(chainId), CommitPluginLabel)
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainId, CommitPluginLabel)
 	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainId, CommitPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainId, CommitPluginLabel)
 
