@@ -34,13 +34,16 @@ test_smoke_ccip: override_config
     DETACH_RUNNER=true \
 	go test -timeout 24h -count=1 -v -run ^$(testname)$$ ./smoke
 
-# example usage: make test_smoke_ccip image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestSmokeCCIPForBidirectionalLane
+# run ccip smoke tests with default config; explicitly sets the override config to empty
+# example usage: make test_smoke_ccip_default image=chainlink-ccip tag=latest testname=TestSmokeCCIPForBidirectionalLane
 .PHONY: test_smoke_ccip_default
 include test-config.env
 test_smoke_ccip_default:
+	BASE64_TEST_CONFIG_OVERRIDE=""	\
+	TEST_BASE64_TEST_CONFIG_OVERRIDE=""	\
 	CHAINLINK_IMAGE=$(image)  \
 	CHAINLINK_VERSION=$(tag)  \
-	ENV_JOB_IMAGE=$(testimage)  \
+	ENV_JOB_IMAGE=""  \
 	TEST_SUITE=smoke \
 	TEST_ARGS="-test.timeout 900h" \
 	DETACH_RUNNER=true \
