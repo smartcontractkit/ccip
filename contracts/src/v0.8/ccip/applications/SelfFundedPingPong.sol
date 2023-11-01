@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
-
 import {PingPongDemo} from "./PingPongDemo.sol";
 import {Client} from "../libraries/Client.sol";
 import {Router} from "../Router.sol";
 import {EVM2EVMOnRamp} from "../onRamp/EVM2EVMOnRamp.sol";
+
+import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
 
 contract SelfFundedPingPong is PingPongDemo {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
