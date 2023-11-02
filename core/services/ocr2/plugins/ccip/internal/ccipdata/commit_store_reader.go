@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
@@ -118,6 +119,23 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}
+}
+
+// FetchCommitStoreStaticConfig provides access to a commitStore's static config, which is required to access the source chain ID.
+func FetchCommitStoreStaticConfig(address common.Address, ec client.Client) (commit_store.CommitStoreStaticConfig, error) {
+	commitStore, err := loadCommitStore(address, ec)
+	if err != nil {
+		return commit_store.CommitStoreStaticConfig{}, err
+	}
+	return commitStore.GetStaticConfig(&bind.CallOpts{})
+}
+
+func loadCommitStore(commitStoreAddress common.Address, client client.Client) (commit_store.CommitStoreInterface, error) {
+	_, err := ccipconfig.VerifyTypeAndVersion(commitStoreAddress, client, ccipconfig.CommitStore)
+	if err != nil {
+		return nil, errors.Wrap(err, "Invalid commitStore contract")
+	}
+	return commit_store.NewCommitStore(commitStoreAddress, client)
 }
 
 // EncodeCommitReport is only used in tests
