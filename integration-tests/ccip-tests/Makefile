@@ -7,7 +7,7 @@ override_config:
 	cd ../..
 
 
-# example usage: make test_load_ccip_simulated_k8 image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestLoadCCIPStableRequestTriggeringWithNetworkChaos
+# example usage: make test_load_ccip image=chainlink-ccip tag=latest testimage=chainlink-ccip-tests:latest testname=TestLoadCCIPStableRequestTriggeringWithNetworkChaos
 .PHONY: test_load_ccip
 include test-config.env
 test_load_ccip: override_config
