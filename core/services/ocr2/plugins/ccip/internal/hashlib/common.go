@@ -12,15 +12,16 @@ func BytesOfBytesKeccak(b [][]byte) ([32]byte, error) {
 		return [32]byte{}, nil
 	}
 
-	hashes := make([]byte, 0, len(b)*(32+2))
+	joinedBytes := make([]byte, 0)
+	joinedBytes = append(joinedBytes, intToBytes(int64(len(b)))...)
 	for i := range b {
-		h := utils.Keccak256Fixed(b[i])
-
-		// prepending the array length to prevent collision
-		hashes = append(hashes, []byte(strconv.FormatInt(int64(len(b[i])), 10))...)
-
-		hashes = append(hashes, h[:]...)
+		joinedBytes = append(joinedBytes, intToBytes(int64(len(b[i])))...)
+		joinedBytes = append(joinedBytes, b[i]...)
 	}
 
-	return utils.Keccak256Fixed(hashes), nil
+	return utils.Keccak256Fixed(joinedBytes), nil
+}
+
+func intToBytes(v int64) []byte {
+	return []byte(strconv.FormatInt(v, 10))
 }
