@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -37,7 +38,7 @@ const (
 var (
 	abiOffRampV1_0_0                                    = abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
 	_                                     OffRampReader = &OffRampV1_0_0{}
-	ExecutionStateChangedEventV1_0_0                    = abihelpers.MustGetEventID("ExecutionStateChanged", abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI))
+	ExecutionStateChangedEventV1_0_0                    = abihelpers.MustGetEventID("ExecutionStateChanged", abiOffRampV1_0_0)
 	ExecutionStateChangedSeqNrIndexV1_0_0               = 1
 )
 
@@ -100,6 +101,32 @@ type OffRampV1_0_0 struct {
 	gasPriceEstimator prices.GasPriceEstimatorExec
 	offchainConfig    ExecOffchainConfig
 	onchainConfig     ExecOnchainConfig
+}
+
+func (o *OffRampV1_0_0) GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error) {
+	return o.offRamp.GetExecutionState(opts, sequenceNumber)
+}
+
+func (o *OffRampV1_0_0) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
+	return o.offRamp.GetSenderNonce(opts, sender)
+}
+
+func (o *OffRampV1_0_0) CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+	state, err := o.offRamp.CurrentRateLimiterState(opts)
+	if err != nil {
+		return *new(evm_2_evm_offramp.RateLimiterTokenBucket), err
+	}
+	return evm_2_evm_offramp.RateLimiterTokenBucket{
+		Tokens:      state.Tokens,
+		LastUpdated: state.LastUpdated,
+		IsEnabled:   state.IsEnabled,
+		Capacity:    state.Capacity,
+		Rate:        state.Rate,
+	}, nil
+}
+
+func (o *OffRampV1_0_0) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
+	return o.offRamp.GetDestinationToken(&bind.CallOpts{Context: ctx}, address)
 }
 
 func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error) {
@@ -373,9 +400,9 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 	if err != nil {
 		return nil, err
 	}
-	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
+
 	executionStateChangedSequenceNumberIndex := 1
-	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", offRampABI)[:1]
+	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRampV1_0_0)[:1]
 	var filters = []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, addr.String()),
@@ -384,12 +411,12 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, addr.String()),
-			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolAdded", offRampABI)},
+			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0)},
 			Addresses: []common.Address{addr},
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, addr.String()),
-			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolRemoved", offRampABI)},
+			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)},
 			Addresses: []common.Address{addr},
 		},
 	}
