@@ -103,6 +103,10 @@ type OffRampV1_0_0 struct {
 }
 
 func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error) {
+	if len(tokenAddresses) == 0 {
+		return []common.Address{}, nil
+	}
+
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddresses))
 	for _, sourceTk := range tokenAddresses {
 		evmCalls = append(evmCalls, rpclib.NewEvmCall(abiOffRampV1_0_0, "getDestinationToken", o.addr, sourceTk))
@@ -118,6 +122,7 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
 
+	seenDestTokens := make(map[common.Address]struct{})
 	destTokens := make([]common.Address, 0, len(tokenAddresses))
 	for _, res := range results {
 		destTokenAddress, err := rpclib.ParseOutput[common.Address](res, 0)
@@ -125,6 +130,11 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 			return nil, err
 		}
 		destTokens = append(destTokens, destTokenAddress)
+
+		if _, exists := seenDestTokens[destTokenAddress]; exists {
+			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destTokenAddress)
+		}
+		seenDestTokens[destTokenAddress] = struct{}{}
 	}
 
 	if len(destTokens) != len(tokenAddresses) {

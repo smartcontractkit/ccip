@@ -118,9 +118,10 @@ func TestCallOrigin(t *testing.T) {
 	dst2 := common.HexToAddress("21")
 
 	testCases := []struct {
-		name     string
-		srcToDst map[common.Address]common.Address
-		expErr   bool
+		name       string
+		srcToDst   map[common.Address]common.Address
+		offRampErr error
+		expErr     bool
 	}{
 		{
 			name: "base",
@@ -131,12 +132,13 @@ func TestCallOrigin(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "dup dst token",
+			name: "off ramp returned an error",
 			srcToDst: map[common.Address]common.Address{
 				src1: dst1,
-				src2: dst1,
+				src2: dst2,
 			},
-			expErr: true,
+			offRampErr: errors.New("some err"),
+			expErr:     true,
 		},
 	}
 
@@ -150,7 +152,7 @@ func TestCallOrigin(t *testing.T) {
 				srcTks = append(srcTks, sourceTk)
 				destTks = append(destTks, destTk)
 			}
-			offRampReader.On("GetDestinationTokensFromSourceTokens", mock.Anything, srcTks).Return(destTks, nil)
+			offRampReader.On("GetDestinationTokensFromSourceTokens", mock.Anything, srcTks).Return(destTks, tc.offRampErr)
 			offRampReader.On("GetSupportedTokens", mock.Anything).Return(srcTks, nil)
 			o := supportedTokensOrigin{offRamp: offRampReader}
 			srcToDst, err := o.CallOrigin(context.Background())

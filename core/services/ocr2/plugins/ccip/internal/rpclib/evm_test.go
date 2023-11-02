@@ -20,8 +20,8 @@ import (
 func TestDefaultEvmBatchCaller_BatchCallDynamicLimit(t *testing.T) {
 	testCases := []struct {
 		name                          string
-		maxBatchSize                  int
-		backOffMultiplier             int
+		maxBatchSize                  uint
+		backOffMultiplier             uint
 		numCalls                      int
 		expectedBatchSizesOnEachRetry []int
 	}{

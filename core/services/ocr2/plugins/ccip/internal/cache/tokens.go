@@ -103,23 +103,15 @@ func (t *supportedTokensOrigin) CallOrigin(ctx context.Context) (map[common.Addr
 	if err != nil {
 		return nil, err
 	}
-	if len(sourceTokens) == 0 {
-		return map[common.Address]common.Address{}, nil
-	}
 
 	destTokens, err := t.offRamp.GetDestinationTokensFromSourceTokens(ctx, sourceTokens)
 	if err != nil {
 		return nil, fmt.Errorf("get destination tokens from source tokens: %w", err)
 	}
 
-	seenDestTokens := make(map[common.Address]struct{})
 	srcToDstTokenMapping := make(map[common.Address]common.Address, len(sourceTokens))
 	for i, sourceToken := range sourceTokens {
-		if _, exists := seenDestTokens[destTokens[i]]; exists {
-			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destTokens[i])
-		}
 		srcToDstTokenMapping[sourceToken] = destTokens[i]
-		seenDestTokens[destTokens[i]] = struct{}{}
 	}
 	return srcToDstTokenMapping, nil
 }
