@@ -84,10 +84,6 @@ type OffRampV1_2_0 struct {
 	onchainConfig     ExecOnchainConfig
 }
 
-func (o *OffRampV1_2_0) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
-	return o.offRamp.GetSenderNonce(opts, sender)
-}
-
 func (o *OffRampV1_2_0) CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
 	return o.offRamp.CurrentRateLimiterState(opts)
 }
