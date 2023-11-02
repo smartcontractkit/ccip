@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestBytesOfBytesKeccak(t *testing.T) {
@@ -20,15 +22,16 @@ func TestBytesOfBytesKeccak(t *testing.T) {
 	})
 
 	t.Run("should not have collision", func(t *testing.T) {
-		s1 := []byte("abc")
-		s2 := []byte("efg")
-		hs1, err := BytesOfBytesKeccak([][]byte{s1}) // xyz
+		s1 := utils.RandomBytes32()
+		s2 := utils.RandomBytes32()
+
+		hs1, err := BytesOfBytesKeccak([][]byte{s1[:]})
 		assert.NoError(t, err)
 
-		h1, err := BytesOfBytesKeccak([][]byte{s1, s2})
+		h1, err := BytesOfBytesKeccak([][]byte{s1[:], s2[:]})
 		assert.NoError(t, err)
 
-		h2, err := BytesOfBytesKeccak([][]byte{append(hs1[:], s2...)})
+		h2, err := BytesOfBytesKeccak([][]byte{append(hs1[:], s2[:]...)})
 		assert.NoError(t, err)
 
 		assert.NotEqual(t, h1, h2)
