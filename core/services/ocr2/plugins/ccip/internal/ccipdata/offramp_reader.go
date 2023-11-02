@@ -114,8 +114,6 @@ type OffRampReader interface {
 	OffchainConfig() ExecOffchainConfig
 	OnchainConfig() ExecOnchainConfig
 	GasPriceEstimator() prices.GasPriceEstimatorExec
-
-	// Required for the execution plugin.
 	GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error)
 	CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error)
 	GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error)

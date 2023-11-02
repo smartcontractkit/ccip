@@ -101,7 +101,6 @@ type CommitStoreReader interface {
 	EncodeCommitReport(report CommitStoreReport) ([]byte, error)
 	DecodeCommitReport(report []byte) (CommitStoreReport, error)
 	VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error)
-
 	GetCommitStoreStaticConfig() (commit_store.CommitStoreStaticConfig, error)
 }
 

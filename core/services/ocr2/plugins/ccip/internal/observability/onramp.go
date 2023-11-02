@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
@@ -40,5 +41,17 @@ func (o ObservedOnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context,
 func (o ObservedOnRampReader) RouterAddress() (common.Address, error) {
 	return withObservedContract(o.metric, "RouterAddress", func() (common.Address, error) {
 		return o.OnRampReader.RouterAddress()
+	})
+}
+
+func (o ObservedOnRampReader) GetOnRampAddress() (common.Address, error) {
+	return withObservedContract(o.metric, "GetOnRampAddress", func() (common.Address, error) {
+		return o.OnRampReader.GetOnRampAddress()
+	})
+}
+
+func (o ObservedOnRampReader) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+	return withObservedContract(o.metric, "GetOnRampDynamicConfig", func() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+		return o.OnRampReader.GetOnRampDynamicConfig()
 	})
 }

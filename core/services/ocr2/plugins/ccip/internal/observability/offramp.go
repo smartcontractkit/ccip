@@ -85,3 +85,9 @@ func (o *ObservedOffRampReader) GetExecutionState(opts *bind.CallOpts, sequenceN
 		return o.OffRampReader.GetExecutionState(opts, sequenceNumber)
 	})
 }
+
+func (o *ObservedOffRampReader) GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
+	return withObservedContract(o.metric, "GetOffRampStaticConfig", func() (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
+		return o.OffRampReader.GetOffRampStaticConfig(opts)
+	})
+}
