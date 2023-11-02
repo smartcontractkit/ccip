@@ -165,7 +165,7 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 	}
 
 	if len(destTokens) != len(tokenAddresses) {
-		return nil, fmt.Errorf("go %d tokens while %d were expected", len(destTokens), len(tokenAddresses))
+		return nil, fmt.Errorf("got %d tokens while %d were expected", len(destTokens), len(tokenAddresses))
 	}
 	return destTokens, nil
 }
