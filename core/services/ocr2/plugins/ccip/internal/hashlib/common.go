@@ -1,6 +1,8 @@
 package hashlib
 
 import (
+	"strconv"
+
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -10,9 +12,15 @@ func BytesOfBytesKeccak(b [][]byte) ([32]byte, error) {
 		return [32]byte{}, nil
 	}
 
-	h := utils.Keccak256Fixed(b[0])
-	for _, v := range b[1:] {
-		h = utils.Keccak256Fixed(append(h[:], v...))
+	hashes := make([]byte, 0, len(b)*(32+2))
+	for i := range b {
+		h := utils.Keccak256Fixed(b[i])
+
+		// prepending the array length to prevent collision
+		hashes = append(hashes, []byte(strconv.FormatInt(int64(len(b[i])), 10))...)
+
+		hashes = append(hashes, h[:]...)
 	}
-	return h, nil
+
+	return utils.Keccak256Fixed(hashes), nil
 }
