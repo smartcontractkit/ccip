@@ -1574,6 +1574,71 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStat *testreporters.R
 	return rcpt, nil
 }
 
+func (lane *CCIPLane) MultiSend(noOfRequests int, msgType string, multiSendAddr common.Address) error {
+	var ccipMultSend []contracts.CCIPMsgData
+	var tokenAndAmounts []router.ClientEVMTokenAmount
+	if msgType == TokenTransfer {
+		for i := range lane.Source.TransferAmount {
+			token := lane.Source.Common.BridgeTokens[i]
+			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
+				Token: common.HexToAddress(token.Address()), Amount: lane.Source.TransferAmount[i],
+			})
+		}
+	}
+	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, lane.Dest.ReceiverDapp.EthAddress)
+	if err != nil {
+		return fmt.Errorf("failed encoding the receiver address: %+v", err)
+	}
+
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(600_000), false)
+	if err != nil {
+		return fmt.Errorf("failed encoding the options field: %+v", err)
+	}
+	destChainSelector, err := chainselectors.SelectorFromChainId(lane.Source.DestinationChainId)
+	if err != nil {
+		return fmt.Errorf("failed getting the chain selector: %+v", err)
+	}
+
+	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
+	for i := 1; i <= noOfRequests; i++ {
+		// form the message for transfer
+		msg := router.ClientEVM2AnyMessage{
+			Receiver:     receiverAddr,
+			Data:         []byte(fmt.Sprintf("msg %d", i)),
+			TokenAmounts: tokenAndAmounts,
+			FeeToken:     feeToken,
+			ExtraArgs:    extraArgsV1,
+		}
+		sendData := contracts.CCIPMsgData{
+			Msg:           msg,
+			RouterAddr:    lane.Source.Common.Router.EthAddress,
+			ChainSelector: destChainSelector,
+		}
+
+		fee, err := lane.Source.Common.Router.GetFee(destChainSelector, msg)
+		if err != nil {
+			reason, _ := blockchain.RPCErrorFromError(err)
+			if reason != "" {
+				return fmt.Errorf("failed getting the fee: %s", reason)
+			}
+			return fmt.Errorf("failed getting the fee: %+v", err)
+		}
+		log.Info().Str("fee", fee.String()).Msg("calculated fee")
+
+		if feeToken == common.HexToAddress("0x0") {
+			sendData.Fee = fee
+		}
+		ccipMultSend = append(ccipMultSend, sendData)
+	}
+
+	tx, err := contracts.MultiCallCCIP(lane.Source.Common.ChainClient, multiSendAddr.Hex(), ccipMultSend)
+	if err != nil {
+		return fmt.Errorf("failed sending the multisend request: %+v", err)
+	}
+	lane.Logger.Info().Str("txHash", tx.Hash().Hex()).Msg("sent multisend request")
+	return nil
+}
+
 func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
 	for i := 1; i <= noOfRequests; i++ {
 		msg := fmt.Sprintf("msg %d", i)

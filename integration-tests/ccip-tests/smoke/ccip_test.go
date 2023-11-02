@@ -358,3 +358,56 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestSmokeCCIPMultiSend(t *testing.T) {
+	t.Parallel()
+	type subtestInput struct {
+		testName string
+		lane     *actions.CCIPLane
+	}
+	l := logging.GetTestLogger(t)
+	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)
+	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", nil, TestCfg)
+	var tcs []subtestInput
+	if len(setUpOutput.Lanes) == 0 {
+		return
+	}
+
+	t.Cleanup(func() {
+		if TestCfg.TestGroupInput.MsgType == actions.TokenTransfer {
+			setUpOutput.Balance.Verify(t)
+		}
+		require.NoError(t, setUpOutput.TearDown())
+	})
+	for i := range setUpOutput.Lanes {
+		tcs = append(tcs, subtestInput{
+			testName: fmt.Sprintf("CCIP message transfer from network %s to network %s",
+				setUpOutput.Lanes[i].ForwardLane.SourceNetworkName, setUpOutput.Lanes[i].ForwardLane.DestNetworkName),
+			lane: setUpOutput.Lanes[i].ForwardLane,
+		})
+		if setUpOutput.Lanes[i].ReverseLane != nil {
+			tcs = append(tcs, subtestInput{
+				testName: fmt.Sprintf("CCIP message transfer from network %s to network %s",
+					setUpOutput.Lanes[i].ReverseLane.SourceNetworkName, setUpOutput.Lanes[i].ReverseLane.DestNetworkName),
+				lane: setUpOutput.Lanes[i].ReverseLane,
+			})
+		}
+	}
+	l.Info().Int("Total Lanes", len(tcs)).Msg("Starting CCIP test")
+	for _, testcase := range tcs {
+		tc := testcase
+		t.Run(tc.testName, func(t *testing.T) {
+			t.Parallel()
+			tc.lane.Test = t
+			l.Info().
+				Str("Source", tc.lane.SourceNetworkName).
+				Str("Destination", tc.lane.DestNetworkName).
+				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
+
+			tc.lane.RecordStateBeforeTransfer()
+			err := tc.lane.MultiSend(2, TestCfg.TestGroupInput.MsgType, common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"))
+			require.NoError(t, err)
+			tc.lane.ValidateRequests()
+		})
+	}
+}
