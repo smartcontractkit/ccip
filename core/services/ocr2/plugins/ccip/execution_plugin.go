@@ -50,8 +50,8 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	}
 
 	// Create the offRamp reader.
-	onRampAddress := common.HexToAddress(spec.ContractID)
-	offRampReader, err := ccipdata.NewOffRampReader(lggr, onRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampAddress := common.HexToAddress(spec.ContractID)
+	offRampReader, err := ccipdata.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "Could not create offRampReader")
 	}
@@ -116,7 +116,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", pluginConfig,
-		"onRampAddress", onRampAddress,
+		"onRampAddress", offRampConfig.OnRamp,
 		"sourcePriceRegistry", sourcePriceRegistry.Address(),
 		"dynamicOnRampConfig", dynamicOnRampConfig,
 		"sourceNative", sourceWrappedNative,
