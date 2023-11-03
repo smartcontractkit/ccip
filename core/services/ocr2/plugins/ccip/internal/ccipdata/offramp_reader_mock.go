@@ -283,30 +283,6 @@ func (_m *MockOffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.
 	return r0, r1
 }
 
-// GetOffRampStaticConfig provides a mock function with given fields: ctx
-func (_m *MockOffRampReader) GetOffRampStaticConfig(ctx context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
-	ret := _m.Called(ctx)
-
-	var r0 evm_2_evm_offramp.EVM2EVMOffRampStaticConfig
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) evm_2_evm_offramp.EVM2EVMOffRampStaticConfig); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Get(0).(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetPoolByDestToken provides a mock function with given fields: ctx, address
 func (_m *MockOffRampReader) GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error) {
 	ret := _m.Called(ctx, address)
@@ -350,6 +326,30 @@ func (_m *MockOffRampReader) GetSenderNonce(ctx context.Context, sender common.A
 
 	if rf, ok := ret.Get(1).(func(context.Context, common.Address) error); ok {
 		r1 = rf(ctx, sender)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStaticConfig provides a mock function with given fields: ctx
+func (_m *MockOffRampReader) GetStaticConfig(ctx context.Context) (OffRampStaticConfig, error) {
+	ret := _m.Called(ctx)
+
+	var r0 OffRampStaticConfig
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (OffRampStaticConfig, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) OffRampStaticConfig); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(OffRampStaticConfig)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}

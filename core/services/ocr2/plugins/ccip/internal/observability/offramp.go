@@ -85,8 +85,8 @@ func (o *ObservedOffRampReader) GetExecutionState(ctx context.Context, sequenceN
 	})
 }
 
-func (o *ObservedOffRampReader) GetOffRampStaticConfig(ctx context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
-	return withObservedContract(o.metric, "GetOffRampStaticConfig", func() (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
-		return o.OffRampReader.GetOffRampStaticConfig(ctx)
+func (o *ObservedOffRampReader) GetStaticConfig(ctx context.Context) (ccipdata.OffRampStaticConfig, error) {
+	return withObservedContract(o.metric, "GetStaticConfig", func() (ccipdata.OffRampStaticConfig, error) {
+		return o.OffRampReader.GetStaticConfig(ctx)
 	})
 }

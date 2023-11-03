@@ -93,6 +93,15 @@ type ExecReport struct {
 	ProofFlagBits     *big.Int
 }
 
+type OffRampStaticConfig struct {
+	CommitStore         common.Address
+	ChainSelector       uint64
+	SourceChainSelector uint64
+	OnRamp              common.Address
+	PrevOffRamp         common.Address
+	ArmProxy            common.Address
+}
+
 //go:generate mockery --quiet --name OffRampReader --output . --filename offramp_reader_mock.go --inpackage --case=underscore
 type OffRampReader interface {
 	Closer
@@ -118,7 +127,7 @@ type OffRampReader interface {
 	GetSenderNonce(ctx context.Context, sender common.Address) (uint64, error)
 	CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error)
 	GetExecutionState(ctx context.Context, sequenceNumber uint64) (uint8, error)
-	GetOffRampStaticConfig(ctx context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error)
+	GetStaticConfig(ctx context.Context) (OffRampStaticConfig, error)
 }
 
 // MessageExecutionState defines the execution states of CCIP messages.
