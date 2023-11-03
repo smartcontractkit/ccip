@@ -301,6 +301,17 @@ func (o *DbORM) FetchNotExecutedReports(
 	after time.Time,
 	qopts ...pg.QOpt,
 ) ([]Log, error) {
+	return o.FetchNotExecutedReportsV4(commitStoreAddr, commitStoreEvent, offrampAddress, offrampEventSig, after, qopts...)
+}
+
+func (o *DbORM) FetchNotExecutedReportsV1(
+	commitStoreAddr common.Address,
+	commitStoreEvent common.Hash,
+	offrampAddress common.Address,
+	offrampEventSig common.Hash,
+	after time.Time,
+	qopts ...pg.QOpt,
+) ([]Log, error) {
 	var logs []Log
 	queryArgs := map[string]interface{}{
 		"chain_id":              utils.NewBig(o.chainID),
@@ -309,7 +320,7 @@ func (o *DbORM) FetchNotExecutedReports(
 		"offramp_addr":          offrampAddress,
 		"offramp_event":         offrampEventSig,
 		"block_timestamp_after": after,
-		"topic_index":           1,
+		"topic_index":           2,
 		"min_seq_word_index":    2,
 		"max_seq_word_index":    3,
 	}
@@ -336,6 +347,84 @@ func (o *DbORM) FetchNotExecutedReports(
 				)
 			)
 			ORDER BY (reports.block_number, reports.log_index)`, queryArgs)
+	return logs, err
+}
+
+func (o *DbORM) FetchNotExecutedReportsV3(
+	commitStoreAddr common.Address,
+	commitStoreEvent common.Hash,
+	offrampAddress common.Address,
+	offrampEventSig common.Hash,
+	after time.Time,
+	qopts ...pg.QOpt,
+) ([]Log, error) {
+	var logs []Log
+	queryArgs := map[string]interface{}{
+		"chain_id":              utils.NewBig(o.chainID),
+		"commit_store_addr":     commitStoreAddr,
+		"commit_store_event":    commitStoreEvent,
+		"offramp_addr":          offrampAddress,
+		"offramp_event":         offrampEventSig,
+		"block_timestamp_after": after,
+		"topic_index":           2,
+		"min_seq_word_index":    2,
+		"max_seq_word_index":    3,
+	}
+	q := o.q.WithOpts(qopts...)
+	err := q.SelectNamed(&logs, `
+		SELECT reports.* FROM evm.logs reports
+		    WHERE reports.evm_chain_id = :chain_id 
+			AND reports.address = :commit_store_addr
+			AND reports.event_sig = :commit_store_event
+			AND reports.block_timestamp > :block_timestamp_after
+			AND NOT EXISTS(
+			    SELECT 1 FROM evm.logs executed
+			        WHERE executed.evm_chain_id = :chain_id 
+			        AND executed.address = :offramp_addr
+					AND executed.event_sig = :offramp_event
+			        AND executed.topics[:topic_index] 
+			            BETWEEN substring(reports.data from 32*2+1 for 32)
+			        	AND substring(reports.data from 32*3+1 for 32)
+			)
+		    ORDER BY (reports.block_number, reports.log_index)`, queryArgs)
+	return logs, err
+}
+
+func (o *DbORM) FetchNotExecutedReportsV4(
+	commitStoreAddr common.Address,
+	commitStoreEvent common.Hash,
+	offrampAddress common.Address,
+	offrampEventSig common.Hash,
+	after time.Time,
+	qopts ...pg.QOpt,
+) ([]Log, error) {
+	var logs []Log
+	queryArgs := map[string]interface{}{
+		"chain_id":              utils.NewBig(o.chainID),
+		"commit_store_addr":     commitStoreAddr,
+		"commit_store_event":    commitStoreEvent,
+		"offramp_addr":          offrampAddress,
+		"offramp_event":         offrampEventSig,
+		"block_timestamp_after": after,
+		"topic_index":           2,
+		"min_seq_word_index":    2,
+		"max_seq_word_index":    3,
+	}
+	q := o.q.WithOpts(qopts...)
+	err := q.SelectNamed(&logs, `
+		SELECT reports.* FROM evm.logs reports
+		    WHERE reports.evm_chain_id = :chain_id 
+			AND reports.address = :commit_store_addr
+			AND reports.event_sig = :commit_store_event
+			AND reports.block_timestamp > :block_timestamp_after
+			AND (SELECT count(*)
+          		FROM evm.logs executed
+          		WHERE executed.topics[:topic_index] BETWEEN substring(reports.data from 32 * :min_seq_word_index + 1 for 32) AND substring(reports.data from 32 * :max_seq_word_index + 1 for 32)
+            		AND executed.evm_chain_id = :chain_id 
+            		AND executed.address = :offramp_addr
+            		AND executed.event_sig = :offramp_event
+         ) < ('x' || encode(substring(reports.data from 32*:max_seq_word_index+25 for 8), 'hex'))::::bit(64)::::bigint - ('x' || encode(substring(reports.data from 32*:min_seq_word_index+25 for 8), 'hex'))::::bit(64)::::bigint + 1
+		    ORDER BY (reports.block_number, reports.log_index)`, queryArgs)
 	return logs, err
 }
 

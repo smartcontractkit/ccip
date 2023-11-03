@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -18,7 +19,7 @@ import (
 
 const (
 	numberOfReports           = 10000
-	numberOfMessagesPerReport = 10
+	numberOfMessagesPerReport = 100
 	numberOfMessages          = numberOfReports * numberOfMessagesPerReport
 )
 
@@ -53,6 +54,33 @@ func populateDbWithCommitReports(b *testing.B, o *logpoller.DbORM, chainID *big.
 func populateDbWithExecutionStateChanges(b *testing.B, o *logpoller.DbORM, chainID *big.Int, offrampAddress common.Address, offrampExecuted common.Hash) {
 	var logs []logpoller.Log
 	for i := 1; i <= numberOfMessages; i++ {
+		var topics [][]byte
+		for j := 0; j < 5; j++ {
+			topics = append(topics, logpoller.EvmWord(uint64(i)).Bytes())
+		}
+
+		logs = append(logs, logpoller.Log{
+			EvmChainId:     utils.NewBig(chainID),
+			LogIndex:       int64(i),
+			BlockHash:      utils.RandomBytes32(),
+			BlockNumber:    int64(i),
+			BlockTimestamp: time.Now(),
+			EventSig:       offrampExecuted,
+			Topics:         topics,
+			Address:        offrampAddress,
+			TxHash:         utils.RandomAddress().Hash(),
+			Data:           []byte{},
+			CreatedAt:      time.Now(),
+		})
+
+	}
+	require.NoError(b, o.InsertBlock(utils.RandomAddress().Hash(), int64(100_000), time.Now()))
+	require.NoError(b, o.InsertLogs(logs))
+}
+
+func populateDbWithSomeExecuted(b *testing.B, o *logpoller.DbORM, chainID *big.Int, offrampAddress common.Address, offrampExecuted common.Hash) {
+	var logs []logpoller.Log
+	for i := 1; i <= numberOfMessages; i += 2 {
 		var topics [][]byte
 		for j := 0; j < 5; j++ {
 			topics = append(topics, logpoller.EvmWord(uint64(i)).Bytes())
@@ -164,7 +192,7 @@ func Benchmark_GetExecutionStatesAndMessages(b *testing.B) {
 			0,
 		)
 		require.NoError(b, err)
-		require.Len(b, commitReports, numberOfReports)
+		assert.Len(b, commitReports, numberOfReports)
 		fmt.Printf("Commit Reports: %d millis\n", time.Since(start).Milliseconds())
 
 		start = time.Now()
@@ -177,7 +205,7 @@ func Benchmark_GetExecutionStatesAndMessages(b *testing.B) {
 			0,
 		)
 		require.NoError(b, err)
-		require.Len(b, messages, numberOfMessages)
+		assert.Len(b, messages, numberOfMessages)
 		fmt.Printf("OnRamp messages: %d millis\n", time.Since(start).Milliseconds())
 
 		start = time.Now()
@@ -190,7 +218,7 @@ func Benchmark_GetExecutionStatesAndMessages(b *testing.B) {
 			0,
 		)
 		require.NoError(b, err)
-		require.Len(b, executionStateChanges, numberOfMessages)
+		assert.Len(b, executionStateChanges, numberOfMessages)
 		fmt.Printf("Offramp exec state changes: %d millis\n", time.Since(start).Milliseconds())
 	}
 }
@@ -240,6 +268,38 @@ func Benchmark_SingleQueryNoneExecuted(b *testing.B) {
 	offrampExecuted := common.HexToHash("0xd4f851956a5d67c3997d1c9205045fef79bae2947fdee7e9e2641abc7391ef65")
 
 	populateDbWithCommitReports(b, o, chainId, commitStoreAddress, commitReportAccepted)
+
+	b.Log("Db load, running query")
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		start := time.Now()
+		logs, err := o.FetchNotExecutedReports(
+			commitStoreAddress,
+			commitReportAccepted,
+			offrampAddress,
+			offrampExecuted,
+			time.Now().Add(-1*time.Hour),
+		)
+		fmt.Printf("%d millis\n", time.Since(start).Milliseconds())
+		require.NoError(b, err)
+		require.Len(b, logs, numberOfReports)
+	}
+}
+
+func Benchmark_SingleQuerySomeExecuted(b *testing.B) {
+	chainId := big.NewInt(137)
+	_, db := heavyweight.FullTestDBV2(b, "log_match_all", nil)
+	o := logpoller.NewORM(chainId, db, logger.TestLogger(b), pgtest.NewQConfig(false))
+
+	commitStoreAddress := common.HexToAddress("0x2ab9a2Dc53736b361b72d900CdF9F78F9406fbbb")
+	commitReportAccepted := common.HexToHash("0xe81b49e583122eb290c46fc255c962b9a2dec468816c00fb7a2e6ebc42dc92d4")
+
+	offrampAddress := common.HexToAddress("0x6E225058950f237371261C985Db6bDe26df2200E")
+	offrampExecuted := common.HexToHash("0xd4f851956a5d67c3997d1c9205045fef79bae2947fdee7e9e2641abc7391ef65")
+
+	populateDbWithCommitReports(b, o, chainId, commitStoreAddress, commitReportAccepted)
+	populateDbWithSomeExecuted(b, o, chainId, offrampAddress, offrampExecuted)
 
 	b.Log("Db load, running query")
 	b.ResetTimer()
