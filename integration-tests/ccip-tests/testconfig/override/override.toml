@@ -16,10 +16,10 @@ KeepEnvAlive = true
 NumberOfCommitNodes = 16
 MsgType = 'WithoutToken'
 PhaseTimeout = '50m'
-TestDuration = '1h'
+TestDuration = '2h'
 NodeFunding = 1000.0
 RequestPerUnitTime = [1]
-TimeUnit = '10s'
+TimeUnit = '1s'
 NoOfRoutersPerPair = 2
 NoOfNetworks = 10
 

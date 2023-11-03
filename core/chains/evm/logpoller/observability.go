@@ -240,6 +240,12 @@ func (o *ObservedORM) SelectIndexedLogsTopicRange(address common.Address, eventS
 	})
 }
 
+func (o *ObservedORM) FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error) {
+	return withObservedQueryAndResults(o, "FetchNotExecutedReports", func() ([]Log, error) {
+		return o.ORM.FetchNotExecutedReports(commitStoreAddr, commitStoreEvent, offrampAddress, offrampEventSig, after, qopts...)
+	})
+}
+
 func withObservedQueryAndResults[T any](o *ObservedORM, queryName string, query func() ([]T, error)) ([]T, error) {
 	results, err := withObservedQuery(o, queryName, query)
 	if err == nil {
