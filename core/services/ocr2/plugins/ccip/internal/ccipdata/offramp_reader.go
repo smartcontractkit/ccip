@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
@@ -103,7 +104,9 @@ type OffRampReader interface {
 	GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error)
 	GetDestinationTokens(ctx context.Context) ([]common.Address, error)
 	GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error)
-	GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error)
+	// GetDestinationTokensFromSourceTokens will return an 1:1 mapping of the provided source tokens to dest tokens.
+	// Note that if you provide the same token twice you will get an error, each token should be provided once.
+	GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error)
 	GetSupportedTokens(ctx context.Context) ([]common.Address, error)
 	Address() common.Address
 	// TODO Needed for caching, maybe caching should move behind the readers?
@@ -113,6 +116,11 @@ type OffRampReader interface {
 	OffchainConfig() ExecOffchainConfig
 	OnchainConfig() ExecOnchainConfig
 	GasPriceEstimator() prices.GasPriceEstimatorExec
+
+	// Required for the execution plugin.
+	GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error)
+	CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error)
+	GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error)
 }
 
 // MessageExecutionState defines the execution states of CCIP messages.

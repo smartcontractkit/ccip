@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
@@ -22,7 +23,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 )
 
-var _ OffRampReader = &OffRampV1_2_0{}
+var (
+	abiOffRampV1_2_0               = abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
+	_                OffRampReader = &OffRampV1_2_0{}
+)
 
 type ExecOnchainConfigV1_2_0 evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig
 
@@ -81,6 +85,10 @@ type OffRampV1_2_0 struct {
 	gasPriceEstimator prices.GasPriceEstimatorExec
 	offchainConfig    ExecOffchainConfig
 	onchainConfig     ExecOnchainConfig
+}
+
+func (o *OffRampV1_2_0) CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+	return o.offRamp.CurrentRateLimiterState(opts)
 }
 
 func (o *OffRampV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
@@ -269,8 +277,7 @@ func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		return nil, err
 	}
 
-	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
-	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", offRampABI)[:1]
+	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRampV1_2_0)[:1]
 
 	return &OffRampV1_2_0{
 		OffRampV1_0_0:       v100,
