@@ -44,7 +44,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 		return nil, nil, err
 	}
 
-	destChain, destChainId, err := ccipconfig.GetChainFromSpec(spec, chainSet)
+	destChain, destChainID, err := ccipconfig.GetChainFromSpec(spec, chainSet)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -53,34 +53,34 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	offRampAddress := common.HexToAddress(spec.ContractID)
 	offRampReader, err := ccipdata.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "Could not create offRampReader")
+		return nil, nil, errors.Wrap(err, "create offRampReader")
 	}
-	offRampConfig, err := offRampReader.GetOffRampStaticConfig(&bind.CallOpts{})
+	offRampConfig, err := offRampReader.GetOffRampStaticConfig(context.Background())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "Could not get offRamp static config")
+		return nil, nil, errors.Wrap(err, "get offRamp static config")
 	}
 
-	chainId, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
+	chainID, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sourceChain, err := chainSet.Get(strconv.FormatUint(chainId, 10))
+	sourceChain, err := chainSet.Get(strconv.FormatUint(chainID, 10))
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to open source chain")
+		return nil, nil, errors.Wrap(err, "open source chain")
 	}
 
 	execLggr := lggr.Named("CCIPExecution").With(
-		"sourceChain", ChainName(int64(chainId)),
-		"destChain", ChainName(destChainId))
+		"sourceChain", ChainName(int64(chainID)),
+		"destChain", ChainName(destChainID))
 	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
 		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not create onramp reader")
+		return nil, nil, errors.Wrap(err, "create onramp reader")
 	}
 	dynamicOnRampConfig, err := onRampReader.GetOnRampDynamicConfig()
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not get onramp dynamic config")
+		return nil, nil, errors.Wrap(err, "get onramp dynamic config")
 	}
 
 	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
@@ -109,10 +109,10 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	}
 
 	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, int64(chainId), ExecPluginLabel)
-	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, int64(chainId), ExecPluginLabel)
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainId, ExecPluginLabel)
-	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainId, ExecPluginLabel)
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, int64(chainID), ExecPluginLabel)
+	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, int64(chainID), ExecPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ExecPluginLabel)
+	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, ExecPluginLabel)
 
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", pluginConfig,

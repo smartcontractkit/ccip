@@ -103,11 +103,11 @@ type OffRampV1_0_0 struct {
 	onchainConfig     ExecOnchainConfig
 }
 
-func (o *OffRampV1_0_0) GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
+func (o *OffRampV1_0_0) GetOffRampStaticConfig(ctx context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
 	if o.offRamp == nil {
 		return *new(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig), fmt.Errorf("offramp not initialized")
 	}
-	c, err := o.offRamp.GetStaticConfig(opts)
+	c, err := o.offRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return *new(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig), fmt.Errorf("error while retrieving offramp config: %v", err)
 	}
@@ -121,16 +121,16 @@ func (o *OffRampV1_0_0) GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_o
 	}, nil
 }
 
-func (o *OffRampV1_0_0) GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error) {
-	return o.offRamp.GetExecutionState(opts, sequenceNumber)
+func (o *OffRampV1_0_0) GetExecutionState(ctx context.Context, sequenceNumber uint64) (uint8, error) {
+	return o.offRamp.GetExecutionState(&bind.CallOpts{Context: ctx}, sequenceNumber)
 }
 
-func (o *OffRampV1_0_0) GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error) {
-	return o.offRamp.GetSenderNonce(opts, sender)
+func (o *OffRampV1_0_0) GetSenderNonce(ctx context.Context, sender common.Address) (uint64, error) {
+	return o.offRamp.GetSenderNonce(&bind.CallOpts{Context: ctx}, sender)
 }
 
-func (o *OffRampV1_0_0) CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
-	state, err := o.offRamp.CurrentRateLimiterState(opts)
+func (o *OffRampV1_0_0) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+	state, err := o.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return *new(evm_2_evm_offramp.RateLimiterTokenBucket), err
 	}

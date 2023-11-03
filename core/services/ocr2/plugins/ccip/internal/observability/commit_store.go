@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -78,8 +77,8 @@ func (o *ObservedCommitStoreReader) VerifyExecutionReport(ctx context.Context, r
 	})
 }
 
-func (o *ObservedCommitStoreReader) GetCommitStoreStaticConfig() (commit_store.CommitStoreStaticConfig, error) {
-	return withObservedContract(o.metric, "GetCommitStoreStaticConfig", func() (commit_store.CommitStoreStaticConfig, error) {
-		return o.CommitStoreReader.GetCommitStoreStaticConfig()
+func (o *ObservedCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (ccipdata.CommitStoreStaticConfig, error) {
+	return withObservedContract(o.metric, "GetCommitStoreStaticConfig", func() (ccipdata.CommitStoreStaticConfig, error) {
+		return o.CommitStoreReader.GetCommitStoreStaticConfig(ctx)
 	})
 }

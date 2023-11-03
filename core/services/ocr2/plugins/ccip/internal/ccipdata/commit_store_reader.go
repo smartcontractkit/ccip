@@ -64,6 +64,13 @@ type CommitOffchainConfig struct {
 	DestFinalityDepth      uint32
 }
 
+type CommitStoreStaticConfig struct {
+	ChainSelector       uint64
+	SourceChainSelector uint64
+	OnRamp              common.Address
+	ArmProxy            common.Address
+}
+
 func NewCommitOffchainConfig(
 	sourceFinalityDepth uint32,
 	gasPriceDeviationPPB uint32,
@@ -102,7 +109,7 @@ type CommitStoreReader interface {
 	EncodeCommitReport(report CommitStoreReport) ([]byte, error)
 	DecodeCommitReport(report []byte) (CommitStoreReport, error)
 	VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error)
-	GetCommitStoreStaticConfig() (commit_store.CommitStoreStaticConfig, error)
+	GetCommitStoreStaticConfig(ctx context.Context) (CommitStoreStaticConfig, error)
 }
 
 func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (CommitStoreReader, error) {

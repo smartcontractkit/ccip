@@ -3,10 +3,9 @@
 package ccipdata
 
 import (
-	common "github.com/ethereum/go-ethereum/common"
-	commit_store "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
-
 	context "context"
+
+	common "github.com/ethereum/go-ethereum/common"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -186,23 +185,23 @@ func (_m *MockCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx contex
 	return r0, r1
 }
 
-// GetCommitStoreStaticConfig provides a mock function with given fields:
-func (_m *MockCommitStoreReader) GetCommitStoreStaticConfig() (commit_store.CommitStoreStaticConfig, error) {
-	ret := _m.Called()
+// GetCommitStoreStaticConfig provides a mock function with given fields: ctx
+func (_m *MockCommitStoreReader) GetCommitStoreStaticConfig(ctx context.Context) (CommitStoreStaticConfig, error) {
+	ret := _m.Called(ctx)
 
-	var r0 commit_store.CommitStoreStaticConfig
+	var r0 CommitStoreStaticConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (commit_store.CommitStoreStaticConfig, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (CommitStoreStaticConfig, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() commit_store.CommitStoreStaticConfig); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) CommitStoreStaticConfig); ok {
+		r0 = rf(ctx)
 	} else {
-		r0 = ret.Get(0).(commit_store.CommitStoreStaticConfig)
+		r0 = ret.Get(0).(CommitStoreStaticConfig)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}

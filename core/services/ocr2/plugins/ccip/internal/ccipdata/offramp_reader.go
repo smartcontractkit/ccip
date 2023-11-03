@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
@@ -116,10 +115,10 @@ type OffRampReader interface {
 	OffchainConfig() ExecOffchainConfig
 	OnchainConfig() ExecOnchainConfig
 	GasPriceEstimator() prices.GasPriceEstimatorExec
-	GetSenderNonce(opts *bind.CallOpts, sender common.Address) (uint64, error)
-	CurrentRateLimiterState(opts *bind.CallOpts) (evm_2_evm_offramp.RateLimiterTokenBucket, error)
-	GetExecutionState(opts *bind.CallOpts, sequenceNumber uint64) (uint8, error)
-	GetOffRampStaticConfig(opts *bind.CallOpts) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error)
+	GetSenderNonce(ctx context.Context, sender common.Address) (uint64, error)
+	CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error)
+	GetExecutionState(ctx context.Context, sequenceNumber uint64) (uint8, error)
+	GetOffRampStaticConfig(ctx context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error)
 }
 
 // MessageExecutionState defines the execution states of CCIP messages.

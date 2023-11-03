@@ -45,8 +45,17 @@ type CommitStoreV1_2_0 struct {
 	offchainConfig    CommitOffchainConfig
 }
 
-func (c *CommitStoreV1_2_0) GetCommitStoreStaticConfig() (commit_store.CommitStoreStaticConfig, error) {
-	return c.commitStore.GetStaticConfig(&bind.CallOpts{})
+func (c *CommitStoreV1_2_0) GetCommitStoreStaticConfig(ctx context.Context) (CommitStoreStaticConfig, error) {
+	config, err := c.commitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return CommitStoreStaticConfig{}, err
+	}
+	return CommitStoreStaticConfig{
+		ChainSelector:       config.ChainSelector,
+		SourceChainSelector: config.SourceChainSelector,
+		OnRamp:              config.OnRamp,
+		ArmProxy:            config.ArmProxy,
+	}, nil
 }
 
 func (c *CommitStoreV1_2_0) EncodeCommitReport(report CommitStoreReport) ([]byte, error) {
