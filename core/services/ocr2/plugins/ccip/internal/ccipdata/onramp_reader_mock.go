@@ -7,9 +7,7 @@ import (
 
 	common "github.com/ethereum/go-ethereum/common"
 
-	evm_2_evm_onramp "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	internal "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
-
 	mock "github.com/stretchr/testify/mock"
 
 	pg "github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -20,28 +18,8 @@ type MockOnRampReader struct {
 	mock.Mock
 }
 
-// Close provides a mock function with given fields: qopts
-func (_m *MockOnRampReader) Close(qopts ...pg.QOpt) error {
-	_va := make([]interface{}, len(qopts))
-	for _i := range qopts {
-		_va[_i] = qopts[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(...pg.QOpt) error); ok {
-		r0 = rf(qopts...)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// GetOnRampAddress provides a mock function with given fields:
-func (_m *MockOnRampReader) GetOnRampAddress() (common.Address, error) {
+// Address provides a mock function with given fields:
+func (_m *MockOnRampReader) Address() (common.Address, error) {
 	ret := _m.Called()
 
 	var r0 common.Address
@@ -66,19 +44,39 @@ func (_m *MockOnRampReader) GetOnRampAddress() (common.Address, error) {
 	return r0, r1
 }
 
-// GetOnRampDynamicConfig provides a mock function with given fields:
-func (_m *MockOnRampReader) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+// Close provides a mock function with given fields: qopts
+func (_m *MockOnRampReader) Close(qopts ...pg.QOpt) error {
+	_va := make([]interface{}, len(qopts))
+	for _i := range qopts {
+		_va[_i] = qopts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(...pg.QOpt) error); ok {
+		r0 = rf(qopts...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// GetDynamicConfig provides a mock function with given fields:
+func (_m *MockOnRampReader) GetDynamicConfig() (OnRampDynamicConfig, error) {
 	ret := _m.Called()
 
-	var r0 evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig
+	var r0 OnRampDynamicConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error)); ok {
+	if rf, ok := ret.Get(0).(func() (OnRampDynamicConfig, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig); ok {
+	if rf, ok := ret.Get(0).(func() OnRampDynamicConfig); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig)
+		r0 = ret.Get(0).(OnRampDynamicConfig)
 	}
 
 	if rf, ok := ret.Get(1).(func() error); ok {

@@ -11,7 +11,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
@@ -27,6 +26,19 @@ const (
 	COMMIT_CCIP_SENDS = "Commit ccip sends"
 )
 
+type OnRampDynamicConfig struct {
+	Router                            common.Address
+	MaxNumberOfTokensPerMsg           uint16
+	DestGasOverhead                   uint32
+	DestGasPerPayloadByte             uint16
+	DestDataAvailabilityOverheadGas   uint32
+	DestGasPerDataAvailabilityByte    uint16
+	DestDataAvailabilityMultiplierBps uint16
+	PriceRegistry                     common.Address
+	MaxDataBytes                      uint32
+	MaxPerMsgGasLimit                 uint32
+}
+
 //go:generate mockery --quiet --name OnRampReader --output . --filename onramp_reader_mock.go --inpackage --case=underscore
 type OnRampReader interface {
 	Closer
@@ -37,8 +49,8 @@ type OnRampReader interface {
 	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
 	// Get router configured in the onRamp
 	RouterAddress() (common.Address, error)
-	GetOnRampAddress() (common.Address, error)
-	GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error)
+	Address() (common.Address, error)
+	GetDynamicConfig() (OnRampDynamicConfig, error)
 }
 
 // NewOnRampReader determines the appropriate version of the onramp and returns a reader for it

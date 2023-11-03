@@ -12,7 +12,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -109,19 +108,19 @@ type OnRampV1_0_0 struct {
 	sendRequestedSeqNumberWord int
 }
 
-func (o *OnRampV1_0_0) GetOnRampAddress() (common.Address, error) {
+func (o *OnRampV1_0_0) Address() (common.Address, error) {
 	return o.onRamp.Address(), nil
 }
 
-func (o *OnRampV1_0_0) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+func (o *OnRampV1_0_0) GetDynamicConfig() (OnRampDynamicConfig, error) {
 	if o.onRamp == nil {
-		return *new(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig), fmt.Errorf("onramp not initialized")
+		return OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 	}
 	legacyDynamicConfig, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
-		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+		return OnRampDynamicConfig{}, err
 	}
-	return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
+	return OnRampDynamicConfig{
 		Router:                            legacyDynamicConfig.Router,
 		MaxNumberOfTokensPerMsg:           legacyDynamicConfig.MaxTokensLength,
 		DestGasOverhead:                   0,

@@ -43,7 +43,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 
-	destChain, destChainId, err := ccipconfig.GetChainFromSpec(spec, chainSet)
+	destChain, destChainID, err := ccipconfig.GetChainFromSpec(spec, chainSet)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -53,7 +53,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
-	sourceChain, sourceChainId, err := ccipconfig.GetChainByChainSelector(chainSet, staticConfig.SourceChainSelector)
+	sourceChain, sourceChainID, err := ccipconfig.GetChainByChainSelector(chainSet, staticConfig.SourceChainSelector)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -62,8 +62,8 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, errors.Wrap(err, "could not create commitStore reader")
 	}
 	commitLggr := lggr.Named("CCIPCommit").With(
-		"sourceChain", ChainName(sourceChainId),
-		"destChain", ChainName(destChainId))
+		"sourceChain", ChainName(sourceChainID),
+		"destChain", ChainName(destChainID))
 	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	if err != nil {
 		return nil, nil, err
@@ -92,9 +92,9 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	}
 
 	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainId, CommitPluginLabel)
-	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainId, CommitPluginLabel)
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainId, CommitPluginLabel)
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, CommitPluginLabel)
+	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, CommitPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, CommitPluginLabel)
 
 	lggr.Infow("NewCommitServices",
 		"pluginConfig", pluginConfig,

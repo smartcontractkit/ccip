@@ -105,11 +105,11 @@ type OffRampV1_0_0 struct {
 
 func (o *OffRampV1_0_0) GetOffRampStaticConfig(ctx context.Context) (evm_2_evm_offramp.EVM2EVMOffRampStaticConfig, error) {
 	if o.offRamp == nil {
-		return *new(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig), fmt.Errorf("offramp not initialized")
+		return evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{}, fmt.Errorf("offramp not initialized")
 	}
 	c, err := o.offRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return *new(evm_2_evm_offramp.EVM2EVMOffRampStaticConfig), fmt.Errorf("error while retrieving offramp config: %v", err)
+		return evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{}, fmt.Errorf("error while retrieving offramp config: %w", err)
 	}
 	return evm_2_evm_offramp.EVM2EVMOffRampStaticConfig{
 		CommitStore:         c.CommitStore,

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
@@ -208,15 +209,30 @@ type OnRampV1_2_0 struct {
 	sendRequestedSeqNumberWord int
 }
 
-func (o *OnRampV1_2_0) GetOnRampAddress() (common.Address, error) {
+func (o *OnRampV1_2_0) Address() (common.Address, error) {
 	return o.onRamp.Address(), nil
 }
 
-func (o *OnRampV1_2_0) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+func (o *OnRampV1_2_0) GetDynamicConfig() (OnRampDynamicConfig, error) {
 	if o.onRamp == nil {
-		return *new(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig), fmt.Errorf("onramp not initialized")
+		return OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 	}
-	return o.onRamp.GetDynamicConfig(nil)
+	config, err := o.onRamp.GetDynamicConfig(&bind.CallOpts{})
+	if err != nil {
+		return OnRampDynamicConfig{}, fmt.Errorf("get dynamic config: %w", err)
+	}
+	return OnRampDynamicConfig{
+		Router:                            config.Router,
+		MaxNumberOfTokensPerMsg:           config.MaxNumberOfTokensPerMsg,
+		DestGasOverhead:                   config.DestGasOverhead,
+		DestGasPerPayloadByte:             config.DestGasPerPayloadByte,
+		DestDataAvailabilityOverheadGas:   config.DestDataAvailabilityOverheadGas,
+		DestGasPerDataAvailabilityByte:    config.DestGasPerDataAvailabilityByte,
+		DestDataAvailabilityMultiplierBps: config.DestDataAvailabilityMultiplierBps,
+		PriceRegistry:                     config.PriceRegistry,
+		MaxDataBytes:                      config.MaxDataBytes,
+		MaxPerMsgGasLimit:                 config.MaxPerMsgGasLimit,
+	}, nil
 }
 
 func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, error) {

@@ -78,7 +78,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create onramp reader")
 	}
-	dynamicOnRampConfig, err := onRampReader.GetOnRampDynamicConfig()
+	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "get onramp dynamic config")
 	}

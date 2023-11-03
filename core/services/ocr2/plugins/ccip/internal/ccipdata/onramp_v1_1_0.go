@@ -7,7 +7,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -43,15 +42,15 @@ func (o *OnRampV1_1_0) RouterAddress() (common.Address, error) {
 	return config.Router, nil
 }
 
-func (o *OnRampV1_1_0) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
+func (o *OnRampV1_1_0) GetDynamicConfig() (OnRampDynamicConfig, error) {
 	if o.onRamp == nil {
-		return *new(evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig), fmt.Errorf("onramp not initialized")
+		return OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 	}
 	legacyDynamicConfig, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
-		return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{}, err
+		return OnRampDynamicConfig{}, err
 	}
-	return evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig{
+	return OnRampDynamicConfig{
 		Router:                            legacyDynamicConfig.Router,
 		MaxNumberOfTokensPerMsg:           legacyDynamicConfig.MaxTokensLength,
 		DestGasOverhead:                   legacyDynamicConfig.DestGasOverhead,

@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
@@ -44,14 +43,14 @@ func (o ObservedOnRampReader) RouterAddress() (common.Address, error) {
 	})
 }
 
-func (o ObservedOnRampReader) GetOnRampAddress() (common.Address, error) {
-	return withObservedContract(o.metric, "GetOnRampAddress", func() (common.Address, error) {
-		return o.OnRampReader.GetOnRampAddress()
+func (o ObservedOnRampReader) Address() (common.Address, error) {
+	return withObservedContract(o.metric, "Address", func() (common.Address, error) {
+		return o.OnRampReader.Address()
 	})
 }
 
-func (o ObservedOnRampReader) GetOnRampDynamicConfig() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
-	return withObservedContract(o.metric, "GetOnRampDynamicConfig", func() (evm_2_evm_onramp.EVM2EVMOnRampDynamicConfig, error) {
-		return o.OnRampReader.GetOnRampDynamicConfig()
+func (o ObservedOnRampReader) GetDynamicConfig() (ccipdata.OnRampDynamicConfig, error) {
+	return withObservedContract(o.metric, "GetDynamicConfig", func() (ccipdata.OnRampDynamicConfig, error) {
+		return o.OnRampReader.GetDynamicConfig()
 	})
 }
