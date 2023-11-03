@@ -309,7 +309,7 @@ func (o *DbORM) FetchNotExecutedReports(
 		"offramp_addr":          offrampAddress,
 		"offramp_event":         offrampEventSig,
 		"block_timestamp_after": after,
-		"topic_index":           1 + 1,
+		"topic_index":           1,
 		"min_seq_word_index":    2,
 		"max_seq_word_index":    3,
 	}
