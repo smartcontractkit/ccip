@@ -44,7 +44,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 		return nil, nil, err
 	}
 
-	destChain, destChainId, err := ccipconfig.GetDestChain(spec, chainSet)
+	destChain, destChainId, err := ccipconfig.GetChainFromSpec(spec, chainSet)
 	if err != nil {
 		return nil, nil, err
 	}

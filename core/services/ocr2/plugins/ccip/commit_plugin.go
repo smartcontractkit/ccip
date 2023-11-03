@@ -43,7 +43,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 
-	destChain, destChainId, err := ccipconfig.GetDestChain(spec, chainSet)
+	destChain, destChainId, err := ccipconfig.GetChainFromSpec(spec, chainSet)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -53,7 +53,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed getting the static config from the commitStore")
 	}
-	sourceChain, sourceChainId, err := ccipconfig.GetChain(staticConfig.SourceChainSelector, chainSet)
+	sourceChain, sourceChainId, err := ccipconfig.GetChainByChainSelector(chainSet, staticConfig.SourceChainSelector)
 	if err != nil {
 		return nil, nil, err
 	}
