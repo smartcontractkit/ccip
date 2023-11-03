@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
@@ -1628,12 +1629,23 @@ func (lane *CCIPLane) MultiSend(noOfRequests int, msgType string, multiSendAddr 
 		if feeToken == common.HexToAddress("0x0") {
 			sendData.Fee = fee
 		}
+		lane.TotalFee.Add(lane.TotalFee, fee)
 		ccipMultSend = append(ccipMultSend, sendData)
 	}
-
+	// approve the fee amount for multisend
+	if feeToken != common.HexToAddress("0x0") {
+		err := lane.Source.Common.FeeToken.Approve(multiSendAddr.Hex(), lane.TotalFee)
+		if err != nil {
+			return err
+		}
+	}
 	tx, err := contracts.MultiCallCCIP(lane.Source.Common.ChainClient, multiSendAddr.Hex(), ccipMultSend)
 	if err != nil {
 		return fmt.Errorf("failed sending the multisend request: %+v", err)
+	}
+	_, err = bind.WaitMined(context.Background(), lane.Source.Common.ChainClient.DeployBackend(), tx)
+	if err != nil {
+		return err
 	}
 	lane.Logger.Info().Str("txHash", tx.Hash().Hex()).Msg("sent multisend request")
 	return nil

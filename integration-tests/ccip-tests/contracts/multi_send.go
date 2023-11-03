@@ -53,6 +53,7 @@ func MultiCallCCIP(
 	ccipSend := routerABI.Methods["ccipSend"]
 	sendID := ccipSend.ID
 	var callData []Call
+	allValue := big.NewInt(0)
 	for _, msg := range msgData {
 		inputs, err := ccipSend.Inputs.Pack(
 			msg.ChainSelector,
@@ -62,12 +63,14 @@ func MultiCallCCIP(
 			return nil, err
 		}
 		inputs = append(sendID[:], inputs[:]...)
-		data := Call{Target: msg.RouterAddr, AllowFailure: false, Value: msg.Fee, CallData: inputs}
+		data := Call{Target: msg.RouterAddr, AllowFailure: true, Value: msg.Fee, CallData: inputs}
 		callData = append(callData, data)
+		allValue.Add(allValue, msg.Fee)
 	}
 	opts, err := evmClient.TransactionOpts(evmClient.GetDefaultWallet())
 	if err != nil {
 		return nil, err
 	}
+	opts.Value = allValue
 	return boundContract.Transact(opts, "aggregate3Value", callData)
 }

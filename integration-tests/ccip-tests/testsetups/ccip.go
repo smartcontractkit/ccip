@@ -526,8 +526,10 @@ func (o *CCIPTestSetUpOutputs) StartEventWatchers() {
 	for _, lane := range o.ReadLanes() {
 		err := lane.ForwardLane.StartEventWatchers()
 		require.NoError(o.Cfg.Test, err)
-		err = lane.ReverseLane.StartEventWatchers()
-		require.NoError(o.Cfg.Test, err)
+		if lane.ReverseLane != nil {
+			err = lane.ReverseLane.StartEventWatchers()
+			require.NoError(o.Cfg.Test, err)
+		}
 	}
 }
 

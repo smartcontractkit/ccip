@@ -285,6 +285,7 @@
     },
     "Sepolia Testnet": {
       "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+      "is_native_fee_token" : true,
       "bridge_tokens": [
         "0x779877A7B0D9E8603169DdbD7836e478b4624789"
       ],
