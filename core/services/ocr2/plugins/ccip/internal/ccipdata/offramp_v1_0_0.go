@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
@@ -37,6 +38,7 @@ const (
 
 var (
 	abiOffRampV1_0_0                                    = abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
+	abiCustomTokenPool                                  = abihelpers.MustParseABI(custom_token_pool.CustomTokenPoolABI)
 	_                                     OffRampReader = &OffRampV1_0_0{}
 	ExecutionStateChangedEventV1_0_0                    = abihelpers.MustGetEventID("ExecutionStateChanged", abiOffRampV1_0_0)
 	ExecutionStateChangedSeqNrIndexV1_0_0               = 1
@@ -152,6 +154,10 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 	seenDestTokens := make(map[common.Address]struct{})
 	destTokens := make([]common.Address, 0, len(tokenAddresses))
 	for _, res := range results {
+		if res.Err != nil {
+			return nil, fmt.Errorf("rpc call error: %w", res.Err)
+		}
+
 		destTokenAddress, err := rpclib.ParseOutput[common.Address](res, 0)
 		if err != nil {
 			return nil, err
@@ -168,6 +174,51 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		return nil, fmt.Errorf("got %d tokens while %d were expected", len(destTokens), len(tokenAddresses))
 	}
 	return destTokens, nil
+}
+
+func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []common.Address) ([]TokenBucketRateLimit, error) {
+	if len(poolAddresses) == 0 {
+		return nil, nil
+	}
+
+	evmCalls := make([]rpclib.EvmCall, 0, len(poolAddresses))
+	for _, poolAddress := range poolAddresses {
+		evmCalls = append(evmCalls, rpclib.NewEvmCall(
+			abiCustomTokenPool,
+			"CurrentOffRampRateLimiterState",
+			poolAddress,
+			o.addr,
+		))
+	}
+
+	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("get latest block: %w", err)
+	}
+
+	results, err := o.evmBatchCaller.BatchCall(ctx, uint64(latestBlock), evmCalls)
+	if err != nil {
+		return nil, fmt.Errorf("batch call limit: %w", err)
+	}
+
+	if len(results) != len(evmCalls) {
+		return nil, fmt.Errorf("")
+	}
+
+	rateLimits := make([]TokenBucketRateLimit, 0, len(results))
+	for _, res := range results {
+		if res.Err != nil {
+			return nil, fmt.Errorf("rpc call error: %w", res.Err)
+		}
+
+		poolRateLimit, err := rpclib.ParseOutput[TokenBucketRateLimit](res, 0)
+		if err != nil {
+			return nil, fmt.Errorf("parse contract output")
+		}
+		rateLimits = append(rateLimits, poolRateLimit)
+	}
+
+	return rateLimits, nil
 }
 
 func (o *OffRampV1_0_0) GetSupportedTokens(ctx context.Context) ([]common.Address, error) {
