@@ -16,8 +16,20 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/
 contract ThirdPartyLockReleaseTokenPool is ThirdPartyTokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  event Locked(address indexed caller, address indexed sender, bytes receiver, uint256 amount, uint64 destChainSelector);
-  event Released(address indexed caller, address indexed receiver, bytes sender, uint256 amount, uint64 sourceChainSelector);
+  event Locked(
+    address indexed caller,
+    address indexed sender,
+    bytes receiver,
+    uint256 amount,
+    uint64 destChainSelector
+  );
+  event Released(
+    address indexed caller,
+    address indexed receiver,
+    bytes sender,
+    uint256 amount,
+    uint64 sourceChainSelector
+  );
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "ThirdPartyLockReleaseTokenPool 1.2.0";

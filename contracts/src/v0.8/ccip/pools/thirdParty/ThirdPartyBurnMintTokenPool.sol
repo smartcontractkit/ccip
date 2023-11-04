@@ -11,15 +11,26 @@ import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/ut
 /// @notice This pool mints and burns a token.
 /// @dev One token per pool. The token must grant this pool permission to call burn and mint.
 contract ThirdPartyBurnMintTokenPool is ThirdPartyTokenPool, ITypeAndVersion {
-  event Burned(address indexed caller, address indexed sender, bytes receiver, uint256 amount, uint64 destChainSelector);
-  event Minted(address indexed caller, address indexed receiver, bytes sender, uint256 amount, uint64 sourceChainSelector);
+  event Burned(
+    address indexed caller,
+    address indexed sender,
+    bytes receiver,
+    uint256 amount,
+    uint64 destChainSelector
+  );
+  event Minted(
+    address indexed caller,
+    address indexed receiver,
+    bytes sender,
+    uint256 amount,
+    uint64 sourceChainSelector
+  );
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "ThirdPartyBurnMintTokenPool 1.2.0";
 
   /// @dev The unique burn mint pool flag to signal through EIP 165.
   bytes4 private constant BURN_MINT_INTERFACE_ID = bytes4(keccak256("ThirdPartyBurnMintTokenPool"));
-
 
   constructor(IBurnMintERC20 token) ThirdPartyTokenPool(token) {}
 

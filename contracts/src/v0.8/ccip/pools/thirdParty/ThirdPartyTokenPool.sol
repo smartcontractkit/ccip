@@ -20,7 +20,7 @@ abstract contract ThirdPartyTokenPool is IPool, OwnerIsCreator, ConfirmedBridgeR
   error ZeroAddressNotAllowed();
   error NonExistentCaller(address caller);
   error CallerAlreadyExists(address caller);
-  
+
   event LockOrBurnCallerAdded(address caller, uint64 destChainSelector);
   event LockOrBurnCallerRemoved(address caller);
   event ReleaseOrMintCallerAdded(address caller, uint64 sourceChainSelector);
@@ -36,7 +36,7 @@ abstract contract ThirdPartyTokenPool is IPool, OwnerIsCreator, ConfirmedBridgeR
 
   /// @dev The bridgeable token that is managed by this pool.
   IERC20 internal immutable i_token;
-  
+
   /// @dev A set of allowed lockOrBurn callers. We want the whitelist to be enumerable to
   /// be able to quickly determine (without parsing logs) who can lockOrBurn.
   EnumerableSet.AddressSet internal s_lockOrBurnCallers;
@@ -97,11 +97,17 @@ abstract contract ThirdPartyTokenPool is IPool, OwnerIsCreator, ConfirmedBridgeR
   /// @dev Only callable by the owner
   /// @param lockOrBurnCallers A list of permissioned lockOrBurn callers.
   /// @param releaseOrMintCallers A list of permissioned releaseOrMint callers.
-  function applyCallerUpdates(CallerUpdate[] calldata lockOrBurnCallers, CallerUpdate[] calldata releaseOrMintCallers) external virtual onlyOwnerOrBridge {
+  function applyCallerUpdates(
+    CallerUpdate[] calldata lockOrBurnCallers,
+    CallerUpdate[] calldata releaseOrMintCallers
+  ) external virtual onlyOwnerOrBridge {
     _applyCallerUpdates(lockOrBurnCallers, releaseOrMintCallers);
   }
 
-  function _applyCallerUpdates(CallerUpdate[] calldata lockOrBurnCallers, CallerUpdate[] calldata releaseOrMintCallers) internal onlyOwnerOrBridge {
+  function _applyCallerUpdates(
+    CallerUpdate[] calldata lockOrBurnCallers,
+    CallerUpdate[] calldata releaseOrMintCallers
+  ) internal onlyOwnerOrBridge {
     for (uint256 i = 0; i < lockOrBurnCallers.length; ++i) {
       CallerUpdate memory update = lockOrBurnCallers[i];
 
@@ -146,7 +152,7 @@ abstract contract ThirdPartyTokenPool is IPool, OwnerIsCreator, ConfirmedBridgeR
   // ================================================================
 
   /// @notice Consumes lockOrBurn rate limiting capacity in this pool
-  function _consumeLockOrBurnRateLimit(uint64 destChainSelector, uint256 amount ) internal {
+  function _consumeLockOrBurnRateLimit(uint64 destChainSelector, uint256 amount) internal {
     s_lockOrBurnLimits[destChainSelector]._consume(amount, address(i_token));
   }
 
@@ -157,26 +163,36 @@ abstract contract ThirdPartyTokenPool is IPool, OwnerIsCreator, ConfirmedBridgeR
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentLockOrBurnRateLimiterState(uint64 destChainSelector) external view returns (RateLimiter.TokenBucket memory) {
+  function currentLockOrBurnRateLimiterState(
+    uint64 destChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory) {
     return s_lockOrBurnLimits[destChainSelector]._currentTokenBucketState();
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentReleaseOrMintRateLimiterState(uint64 sourceChainSelector) external view returns (RateLimiter.TokenBucket memory) {
+  function currentReleaseOrMintRateLimiterState(
+    uint64 sourceChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory) {
     return s_releaseOrMintLimits[sourceChainSelector]._currentTokenBucketState();
   }
 
   /// @notice Sets the lockOrBurn rate limited config for a lane.
   /// @param config The new rate limiter config.
-  function setLockOrBurnRateLimiterConfig(uint64 destChainSelector, RateLimiter.Config memory config) external onlyOwner {
+  function setLockOrBurnRateLimiterConfig(
+    uint64 destChainSelector,
+    RateLimiter.Config memory config
+  ) external onlyOwner {
     s_lockOrBurnLimits[destChainSelector]._setTokenBucketConfig(config);
     emit LockOrBurnRateLimitConfigured(destChainSelector, config);
   }
 
   /// @notice Sets the releaseOrMint rate limited config.
   /// @param config The new rate limiter config.
-  function setReleaseOrMintRateLimiterConfig(uint64 sourceChainSelector, RateLimiter.Config memory config) external onlyOwner {
+  function setReleaseOrMintRateLimiterConfig(
+    uint64 sourceChainSelector,
+    RateLimiter.Config memory config
+  ) external onlyOwner {
     s_releaseOrMintLimits[sourceChainSelector]._setTokenBucketConfig(config);
     emit ReleaseOrMintRateLimitConfigured(sourceChainSelector, config);
   }
