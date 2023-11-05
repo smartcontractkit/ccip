@@ -117,6 +117,10 @@ abstract contract ThirdPartyTokenPool is IPool, OwnerIsCreator, ConfirmedBridgeR
         } else {
           revert CallerAlreadyExists(update.caller);
         }
+
+        // Always turn on rate limits for all lanes. If the lane is new,
+        // rate limits will block token transfers until owner sets it.
+        s_lockOrBurnLimits[update.chainSelector].isEnabled = true;
       } else {
         if (s_lockOrBurnCallers.remove(update.caller)) {
           emit LockOrBurnCallerRemoved(update.caller);
@@ -136,6 +140,10 @@ abstract contract ThirdPartyTokenPool is IPool, OwnerIsCreator, ConfirmedBridgeR
         } else {
           revert CallerAlreadyExists(update.caller);
         }
+
+        // Always turn on rate limits for all lanes. If the lane is new,
+        // rate limits will block token transfers until owner sets it.
+        s_releaseOrMintLimits[update.chainSelector].isEnabled = true;
       } else {
         if (s_releaseOrMintCallers.remove(update.caller)) {
           emit ReleaseOrMintCallerRemoved(update.caller);
