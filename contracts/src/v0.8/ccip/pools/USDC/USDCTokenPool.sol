@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../../../shared/interfaces/ITypeAndVersion.sol";
-import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {ITokenMessenger} from "./ITokenMessenger.sol";
 import {IMessageTransmitter} from "./IMessageTransmitter.sol";
 
