@@ -91,7 +91,7 @@ func NewCommitOffchainConfig(
 	}
 }
 
-//go:generate mockery --quiet --name CommitStoreReader --filename commit_store_reader_mock_test.go --case=underscore
+//go:generate mockery --quiet --name CommitStoreReader --filename commit_store_reader_mock.go --case=underscore
 type CommitStoreReader interface {
 	Closer
 	GetExpectedNextSequenceNumber(context context.Context) (uint64, error)

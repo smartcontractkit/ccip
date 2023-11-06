@@ -39,7 +39,7 @@ type OnRampDynamicConfig struct {
 	MaxPerMsgGasLimit                 uint32
 }
 
-//go:generate mockery --quiet --name OnRampReader --filename onramp_reader_mock_test.go --case=underscore
+//go:generate mockery --quiet --name OnRampReader --filename onramp_reader_mock.go --case=underscore
 type OnRampReader interface {
 	Closer
 	// GetSendRequestsGteSeqNum returns all the message send requests with sequence number greater than or equal to the provided.
