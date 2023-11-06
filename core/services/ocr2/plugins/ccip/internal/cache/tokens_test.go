@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/slices"
 
-	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -238,17 +236,4 @@ func Test_cachedDecimals(t *testing.T) {
 	decimals, exists = tokenDecimalsCache.getCachedDecimals(addr)
 	assert.Equal(t, uint8(123), decimals)
 	assert.True(t, exists)
-}
-
-func createTokenFactory(decimalMapping map[common.Address]uint8) func(address common.Address) (link_token_interface.LinkTokenInterface, error) {
-	return func(address common.Address) (link_token_interface.LinkTokenInterface, error) {
-		linkToken := &mock_contracts.LinkTokenInterface{}
-		if decimals, found := decimalMapping[address]; found {
-			// Make sure each token is fetched only once
-			linkToken.On("Decimals", mock.Anything).Return(decimals, nil)
-		} else {
-			linkToken.On("Decimals", mock.Anything).Return(uint8(0), errors.New("Error"))
-		}
-		return linkToken, nil
-	}
 }
