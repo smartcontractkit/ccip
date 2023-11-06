@@ -108,6 +108,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   /// Benefits of rate limiting here does not justify the extra gas cost.
   /// @param amount Amount to burn
   /// @dev emits ITokenMessenger.DepositForBurn
+  /// @dev Assumes caller has validated destinationReceiver
   function lockOrBurn(
     address originalSender,
     bytes calldata destinationReceiver,
@@ -122,6 +123,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
+    i_token.safeApprove(i_tokenMessenger, amount);
     uint64 nonce = i_tokenMessenger.depositForBurnWithCaller(
       amount,
       domain.domainIdentifier,
