@@ -12,10 +12,12 @@ import {MockUSDC} from "../mocks/MockUSDC.sol";
 import {USDCTokenPoolHelper} from "../helpers/USDCTokenPoolHelper.sol";
 
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/utils/introspection/IERC165.sol";
+import "../mocks/MockUSDCTransmitter.sol";
 
 contract USDCTokenPoolSetup is BaseTest {
   IBurnMintERC20 internal s_token;
   MockUSDC internal s_mockUSDC;
+  MockUSDCTransmitter internal s_mockUSDCTransmitter;
 
   struct USDCMessage {
     uint32 version;
@@ -48,29 +50,22 @@ contract USDCTokenPoolSetup is BaseTest {
     deal(address(s_token), OWNER, type(uint256).max);
     setUpRamps();
 
-    s_mockUSDC = new MockUSDC(0);
-
-    USDCTokenPool.USDCConfig memory config = USDCTokenPool.USDCConfig({
-      version: s_mockUSDC.messageBodyVersion(),
-      tokenMessenger: address(s_mockUSDC),
-      messageTransmitter: address(s_mockUSDC)
-    });
+    s_mockUSDCTransmitter = new MockUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER);
+    s_mockUSDC = new MockUSDC(0, address(s_mockUSDCTransmitter));
 
     s_usdcTokenPool = new USDCTokenPoolHelper(
-      config,
+      s_mockUSDC,
       s_token,
       new address[](0),
-      address(s_mockARM),
-      DEST_DOMAIN_IDENTIFIER
+      address(s_mockARM)
     );
 
     s_allowedList.push(USER_1);
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
-      config,
+      s_mockUSDC,
       s_token,
       s_allowedList,
-      address(s_mockARM),
-      DEST_DOMAIN_IDENTIFIER
+      address(s_mockARM)
     );
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
@@ -277,7 +272,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Minted(s_routerAllowedOffRamp, recipient, amount);
 
-    vm.expectCall(address(s_mockUSDC), abi.encodeWithSelector(MockUSDC.receiveMessage.selector, message, attestation));
+    vm.expectCall(address(s_mockUSDCTransmitter), abi.encodeWithSelector(MockUSDCTransmitter.receiveMessage.selector, message, attestation));
 
     changePrank(s_routerAllowedOffRamp);
     s_usdcTokenPool.releaseOrMint(abi.encode(OWNER), recipient, amount, SOURCE_CHAIN_ID, extraData);
@@ -298,8 +293,8 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     );
 
     vm.expectCall(
-      address(s_mockUSDC),
-      abi.encodeWithSelector(MockUSDC.receiveMessage.selector, encodedUsdcMessage, attestation)
+      address(s_mockUSDCTransmitter),
+      abi.encodeWithSelector(MockUSDCTransmitter.receiveMessage.selector, encodedUsdcMessage, attestation)
     );
 
     changePrank(s_routerAllowedOffRamp);
@@ -309,7 +304,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
   // Reverts
   function testUnlockingUSDCFailedReverts() public {
     changePrank(s_routerAllowedOffRamp);
-    s_mockUSDC.setShouldSucceed(false);
+    s_mockUSDCTransmitter.setShouldSucceed(false);
 
     uint256 amount = 13255235235;
 
@@ -447,104 +442,6 @@ contract USDCTokenPool_setDomains is USDCTokenPoolSetup {
     vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidDomain.selector, domainUpdates[0]));
 
     s_usdcTokenPool.setDomains(domainUpdates);
-  }
-}
-
-contract USDCTokenPool_setConfig is USDCTokenPoolSetup {
-  event ConfigSet(USDCTokenPool.USDCConfig);
-
-  function testSetConfigSuccess() public {
-    // Assert existing approval
-    assertEq(type(uint256).max, s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), address(s_mockUSDC)));
-
-    MockUSDC newMockUSDC = new MockUSDC(0);
-
-    USDCTokenPool.USDCConfig memory newConfig = USDCTokenPool.USDCConfig({
-      version: 0,
-      tokenMessenger: address(newMockUSDC),
-      messageTransmitter: address(123456789)
-    });
-
-    USDCTokenPool.USDCConfig memory oldConfig = s_usdcTokenPool.getConfig();
-
-    vm.expectCall(
-      address(s_usdcTokenPool.getToken()),
-      abi.encodeWithSelector(IERC20.approve.selector, oldConfig.tokenMessenger, 0)
-    );
-    vm.expectCall(
-      address(s_usdcTokenPool.getToken()),
-      abi.encodeWithSelector(IERC20.approve.selector, newMockUSDC, type(uint256).max)
-    );
-
-    vm.expectEmit();
-    emit ConfigSet(newConfig);
-    s_usdcTokenPool.setConfig(newConfig);
-
-    USDCTokenPool.USDCConfig memory gotConfig = s_usdcTokenPool.getConfig();
-    assertEq(gotConfig.tokenMessenger, newConfig.tokenMessenger);
-    assertEq(gotConfig.messageTransmitter, newConfig.messageTransmitter);
-    assertEq(gotConfig.version, newConfig.version);
-
-    assertEq(0, s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), oldConfig.tokenMessenger));
-    assertEq(
-      type(uint256).max,
-      s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), gotConfig.tokenMessenger)
-    );
-    // Assert old approval is removed
-    assertEq(0, s_usdcTokenPool.getToken().allowance(address(s_usdcTokenPool), address(s_mockUSDC)));
-  }
-
-  // Reverts
-
-  function testInvalidMessageVersionReverts() public {
-    USDCTokenPool.USDCConfig memory newConfig = USDCTokenPool.USDCConfig({
-      version: 1,
-      tokenMessenger: address(100),
-      messageTransmitter: address(1)
-    });
-
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidMessageVersion.selector, newConfig.version));
-    s_usdcTokenPool.setConfig(newConfig);
-  }
-
-  function testInvalidTokenMessengerVersionReverts() public {
-    uint32 wrongVersion = 5;
-    MockUSDC newMockUSDC = new MockUSDC(wrongVersion);
-
-    USDCTokenPool.USDCConfig memory newConfig = USDCTokenPool.USDCConfig({
-      version: 0,
-      tokenMessenger: address(newMockUSDC),
-      messageTransmitter: address(1)
-    });
-
-    vm.expectRevert(abi.encodeWithSelector(USDCTokenPool.InvalidTokenMessengerVersion.selector, wrongVersion));
-    s_usdcTokenPool.setConfig(newConfig);
-  }
-
-  function testInvalidConfigReverts() public {
-    USDCTokenPool.USDCConfig memory newConfig = USDCTokenPool.USDCConfig({
-      version: 0,
-      tokenMessenger: address(0),
-      messageTransmitter: address(123456789)
-    });
-
-    vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
-    s_usdcTokenPool.setConfig(newConfig);
-
-    newConfig.tokenMessenger = address(235);
-    newConfig.messageTransmitter = address(0);
-
-    vm.expectRevert(USDCTokenPool.InvalidConfig.selector);
-    s_usdcTokenPool.setConfig(newConfig);
-  }
-
-  function testOnlyOwnerReverts() public {
-    changePrank(STRANGER);
-    vm.expectRevert("Only callable by owner");
-
-    s_usdcTokenPool.setConfig(
-      USDCTokenPool.USDCConfig({version: 0, tokenMessenger: address(100), messageTransmitter: address(1)})
-    );
   }
 }
 
