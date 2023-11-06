@@ -16,6 +16,8 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/
 contract ThirdPartyLockReleaseTokenPool is ThirdPartyTokenPool, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
+  event TokensMigrated(address newPool, uint256 amount);
+
   event Locked(
     address indexed caller,
     address indexed sender,
@@ -71,6 +73,17 @@ contract ThirdPartyLockReleaseTokenPool is ThirdPartyTokenPool, ITypeAndVersion 
     _consumeReleaseOrMintRateLimit(sourceChainSelector, amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, originalSender, amount, sourceChainSelector);
+  }
+
+  /// @notice Migrate all tokens locked in this pool to a new pool, used for upgrading pools.
+  /// @param newPool Address of the pool to migrate to.
+  function migrateTokensTo(address newPool) external onlyOwner {
+    if (newPool == address(0)) revert ZeroAddressNotAllowed();
+
+    uint256 balance = getToken().balanceOf(address(this));
+    getToken().transfer(newPool, balance);
+
+    emit TokensMigrated(newPool, balance);
   }
 
   /// @notice returns the lock release interface flag used for EIP165 identification.
