@@ -9,19 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/pkg/errors"
-
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
@@ -32,7 +27,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
-	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -64,13 +61,11 @@ type ExecutionPluginStaticConfig struct {
 	destChainEVMID           *big.Int
 	destGasEstimator         gas.EvmFeeEstimator
 	tokenDataProviders       map[common.Address]tokendata.Reader
-	// Telemetry
-	monitoringEndpoint commontypes.MonitoringEndpoint
+	monitoringEndpoint       commontypes.MonitoringEndpoint // Telemetry
 }
 
 type ExecutionReportingPlugin struct {
-	config ExecutionPluginStaticConfig
-
+	config                ExecutionPluginStaticConfig
 	F                     int
 	lggr                  logger.Logger
 	inflightReports       *inflightExecReportsContainer
@@ -83,8 +78,7 @@ type ExecutionReportingPlugin struct {
 	cachedDestTokens      cache.AutoSync[cache.CachedTokens]
 	cachedTokenPools      cache.AutoSync[map[common.Address]common.Address]
 	gasPriceEstimator     prices.GasPriceEstimatorExec
-	// Telemetry
-	monitoringEndpoint commontypes.MonitoringEndpoint
+	telemetryCollector    TelemetryCollector
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -164,8 +158,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
 			cachedTokenPools:      cachedTokenPools,
 			gasPriceEstimator:     rf.config.offRampReader.GasPriceEstimator(),
-			// Telemetry
-			monitoringEndpoint: rf.config.monitoringEndpoint,
+			telemetryCollector: NewTelemetryCollector(
+				rf.config.monitoringEndpoint,
+				rf.config.lggr.Named("ExecutionReportingPlugin")),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -934,15 +929,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	telem := collectTelemetry(observedMessages)
-	bytes, err := proto.Marshal(telem)
-	if err != nil || r.monitoringEndpoint == nil {
-		// Telemetry related errors are not critical and must not affect
-		// execution, so we log them and continue.
-		lggr.Errorw("cannot marshal or send telemetry", "err", err)
-	} else {
-		r.monitoringEndpoint.SendLog(bytes)
-	}
+	r.telemetryCollector.ReportExec(observedMessages, timestamp) // asynchronously send execution telemetry
 
 	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {
@@ -950,19 +937,6 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	}
 	lggr.Infow("Report", "executableObservations", observedMessages)
 	return true, report, nil
-}
-
-func collectTelemetry(observedMessages []ObservedMessage) (t *telemPb.CCIPTelemWrapper) {
-	if len(observedMessages) > 0 {
-		return &telemPb.CCIPTelemWrapper{
-			Msg: &telemPb.CCIPTelemWrapper_ExecutionReport{
-				ExecutionReport: &telemPb.CCIPExecutionReportSummary{
-					LenTokenData: uint32(len(observedMessages[0].MsgData.TokenData)),
-				},
-			},
-		}
-	}
-	return nil
 }
 
 type tallyKey struct {

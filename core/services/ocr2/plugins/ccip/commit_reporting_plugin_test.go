@@ -24,16 +24,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/chainlink/v2/core/config"
+	mocksTelem "github.com/smartcontractkit/chainlink/v2/core/config/mocks"
+	mocksKeystore "github.com/smartcontractkit/chainlink/v2/core/services/keystore/mocks"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	mocks2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/config"
-	mocksTelem "github.com/smartcontractkit/chainlink/v2/core/config/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	mocksKeystore "github.com/smartcontractkit/chainlink/v2/core/services/keystore/mocks"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
@@ -47,6 +45,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/telemetry"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 func TestCommitReportingPlugin_Observation(t *testing.T) {
@@ -203,9 +203,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 	sourceChainSelector := uint64(rand.Int())
 	var gasPrice prices.GasPrice = big.NewInt(1)
 	gasPriceHeartBeat := models.MustMakeDuration(time.Hour)
-
 	// Telemetry
 	me := genMonitoringEndpoint(t)
+	telemCol := NewTelemetryCollector(me, logger.TestLogger(t))
 
 	t.Run("not enough observations", func(t *testing.T) {
 		tokenDecimalsCache := cache.NewMockAutoSync[map[common.Address]uint8](t)
@@ -215,7 +215,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		p.lggr = logger.TestLogger(t)
 		p.tokenDecimalsCache = tokenDecimalsCache
 		p.F = 1
-		p.monitoringEndpoint = me // Telemetry
+		p.telemetryCollector = telemCol
 
 		o := CommitObservation{Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: big.NewInt(0)}
 		obs, err := o.Marshal()
@@ -345,7 +345,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.offchainConfig.GasPriceHeartBeat = gasPriceHeartBeat.Duration()
 			p.commitStoreReader = commitStoreReader
 			p.F = tc.f
-			p.monitoringEndpoint = me
+			p.telemetryCollector = telemCol
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
