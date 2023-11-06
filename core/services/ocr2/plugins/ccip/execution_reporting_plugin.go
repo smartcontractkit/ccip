@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/pkg/errors"
@@ -363,7 +364,6 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 
 	dstTokenToPool := make(map[common.Address]common.Address)
 	dstPoolToToken := make(map[common.Address]common.Address)
-	dstPools := make([]common.Address, 0)
 
 	for _, msg := range commitReports {
 		for _, req := range msg.sendRequestsWithMeta {
@@ -391,11 +391,11 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 
 				dstTokenToPool[dstToken] = poolAddress
 				dstPoolToToken[poolAddress] = dstToken
-				dstPools = append(dstPools, poolAddress)
 			}
 		}
 	}
 
+	dstPools := maps.Values(dstTokenToPool)
 	rateLimits, err := r.config.offRampReader.GetTokenPoolsRateLimits(ctx, dstPools)
 	if err != nil {
 		return nil, fmt.Errorf("fetch pool rate limits: %w", err)
