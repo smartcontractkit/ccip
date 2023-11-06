@@ -55,6 +55,7 @@ type ORM interface {
 	SelectLogsDataWordGreaterThan(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error)
 	SelectLogsUntilBlockHashDataWordGreaterThan(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, untilBlockHash common.Hash, qopts ...pg.QOpt) ([]Log, error)
 	FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error)
+	FetchNotExecutedMessages(onrampAddr common.Address, onrampEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, wordValueMin, wordValueMax common.Hash, qopts ...pg.QOpt) ([]Log, error)
 }
 
 type DbORM struct {
@@ -426,6 +427,99 @@ func (o *DbORM) FetchNotExecutedReportsV4(
          ) < ('x' || encode(substring(reports.data from 32*:max_seq_word_index+25 for 8), 'hex'))::::bit(64)::::bigint - ('x' || encode(substring(reports.data from 32*:min_seq_word_index+25 for 8), 'hex'))::::bit(64)::::bigint + 1
 		    ORDER BY (reports.block_number, reports.log_index)`, queryArgs)
 	return logs, err
+}
+
+func (o *DbORM) FetchNotExecutedMessages(
+	onrampAddr common.Address,
+	onrampEvent common.Hash,
+	offrampAddress common.Address,
+	offrampEventSig common.Hash,
+	wordValueMin, wordValueMax common.Hash,
+	qopts ...pg.QOpt,
+) ([]Log, error) {
+	return o.FetchNotExecutedMessagesV2(onrampAddr, onrampEvent, offrampAddress, offrampEventSig, wordValueMin, wordValueMax, qopts...)
+}
+
+func (o *DbORM) FetchNotExecutedMessagesV1(
+	onrampAddr common.Address,
+	onrampEvent common.Hash,
+	offrampAddress common.Address,
+	offrampEventSig common.Hash,
+	wordValueMin, wordValueMax common.Hash,
+	qopts ...pg.QOpt,
+) ([]Log, error) {
+	queryArgs := map[string]interface{}{
+		"chain_id":       utils.NewBig(o.chainID),
+		"onramp_addr":    onrampAddr,
+		"onramp_event":   onrampEvent,
+		"offramp_addr":   offrampAddress,
+		"offramp_event":  offrampEventSig,
+		"topic_index":    2,
+		"seq_word_index": 4,
+		"min_seq_nr":     wordValueMin,
+		"max_seq_nr":     wordValueMax,
+	}
+
+	var logs []Log
+	q := o.q.WithOpts(qopts...)
+	err := q.SelectNamed(&logs, `SELECT messages.* FROM evm.logs messages
+			LEFT JOIN evm.logs executed 
+				ON executed.topics[:topic_index] = substring(messages.data from 32 * :seq_word_index + 1 for 32)
+				AND executed.evm_chain_id = :chain_id
+				AND executed.address = :offramp_addr
+         		AND executed.event_sig = :offramp_event
+			WHERE messages.evm_chain_id = :chain_id
+			AND messages.address = :onramp_addr 
+			AND messages.event_sig = :onramp_event
+			AND substring(messages.data from 32*:seq_word_index+1 for 32) >= :min_seq_nr
+			AND substring(messages.data from 32*:seq_word_index+1 for 32) <= :max_seq_nr
+			AND executed.address IS NULL
+			ORDER BY (messages.block_number, messages.log_index)`, queryArgs)
+	if err != nil {
+		return nil, err
+	}
+	return logs, nil
+}
+
+func (o *DbORM) FetchNotExecutedMessagesV2(
+	onrampAddr common.Address,
+	onrampEvent common.Hash,
+	offrampAddress common.Address,
+	offrampEventSig common.Hash,
+	wordValueMin, wordValueMax common.Hash,
+	qopts ...pg.QOpt,
+) ([]Log, error) {
+	queryArgs := map[string]interface{}{
+		"chain_id":       utils.NewBig(o.chainID),
+		"onramp_addr":    onrampAddr,
+		"onramp_event":   onrampEvent,
+		"offramp_addr":   offrampAddress,
+		"offramp_event":  offrampEventSig,
+		"topic_index":    2,
+		"seq_word_index": 4,
+		"min_seq_nr":     wordValueMin,
+		"max_seq_nr":     wordValueMax,
+	}
+
+	var logs []Log
+	q := o.q.WithOpts(qopts...)
+	err := q.SelectNamed(&logs, `SELECT messages.* FROM evm.logs messages
+			WHERE messages.evm_chain_id = :chain_id
+			AND messages.address = :onramp_addr 
+			AND messages.event_sig = :onramp_event
+			AND substring(messages.data from 32*:seq_word_index+1 for 32) BETWEEN :min_seq_nr AND :max_seq_nr
+			AND substring(messages.data from 32*:seq_word_index+1 for 32) NOT IN (
+			    SELECT executed.topics[:topic_index] from evm.logs executed 
+				WHERE executed.evm_chain_id = :chain_id
+				AND executed.address = :offramp_addr
+         		AND executed.event_sig = :offramp_event
+         		AND executed.topics[:topic_index] BETWEEN :min_seq_nr AND :max_seq_nr
+			)
+			ORDER BY (messages.block_number, messages.log_index)`, queryArgs)
+	if err != nil {
+		return nil, err
+	}
+	return logs, nil
 }
 
 // SelectLogsWithSigsByBlockRangeFilter finds the logs in the given block range with the given event signatures

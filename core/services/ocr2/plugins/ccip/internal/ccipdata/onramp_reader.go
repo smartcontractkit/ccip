@@ -34,12 +34,13 @@ type OnRampReader interface {
 	GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
 	// GetSendRequestsBetweenSeqNums returns all the message send requests in the provided sequence numbers range (inclusive).
 	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
+	GetSendRequestsBetweenSeqNumsV2(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
 	// Get router configured in the onRamp
 	RouterAddress() (common.Address, error)
 }
 
 // NewOnRampReader determines the appropriate version of the onramp and returns a reader for it
-func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, finalityTags bool, qopts ...pg.QOpt) (OnRampReader, error) {
+func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, offRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, finalityTags bool, qopts ...pg.QOpt) (OnRampReader, error) {
 	contractType, version, err := ccipconfig.TypeAndVersion(onRampAddress, source)
 	if err != nil {
 		return nil, errors.Errorf("expected '%v' got '%v' (%v)", ccipconfig.EVM2EVMOnRamp, contractType, err)
@@ -50,7 +51,7 @@ func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	case V1_1_0:
 		return NewOnRampV1_1_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, finalityTags)
 	case V1_2_0:
-		return NewOnRampV1_2_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, finalityTags)
+		return NewOnRampV1_2_0(lggr, sourceSelector, destSelector, onRampAddress, offRampAddress, sourceLP, source, finalityTags)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}

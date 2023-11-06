@@ -60,6 +60,7 @@ type LogPoller interface {
 	LogsDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, confs int, qopts ...pg.QOpt) ([]Log, error)
 	LogsUntilBlockHashDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, untilBlockHash common.Hash, qopts ...pg.QOpt) ([]Log, error)
 	FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error)
+	FetchNotExecutedMessages(onrampAddr common.Address, onrampEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, wordValueMin, wordValueMax common.Hash, qopts ...pg.QOpt) ([]Log, error)
 }
 
 type LogPollerTest interface {
@@ -1157,6 +1158,10 @@ func (lp *logPoller) IndexedLogsWithSigsExcluding(address common.Address, eventS
 
 func (lp *logPoller) FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error) {
 	return lp.orm.FetchNotExecutedReports(commitStoreAddr, commitStoreEvent, offrampAddress, offrampEventSig, after, qopts...)
+}
+
+func (lp *logPoller) FetchNotExecutedMessages(onrampAddr common.Address, onrampEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, wordValueMin, wordValueMax common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	return lp.orm.FetchNotExecutedMessages(onrampAddr, onrampEvent, offrampAddress, offrampEventSig, wordValueMin, wordValueMax, qopts...)
 }
 
 func EvmWord(i uint64) common.Hash {

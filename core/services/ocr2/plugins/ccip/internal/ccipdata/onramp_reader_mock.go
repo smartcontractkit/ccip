@@ -64,6 +64,32 @@ func (_m *MockOnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context, s
 	return r0, r1
 }
 
+// GetSendRequestsBetweenSeqNumsV2 provides a mock function with given fields: ctx, seqNumMin, seqNumMax, confs
+func (_m *MockOnRampReader) GetSendRequestsBetweenSeqNumsV2(ctx context.Context, seqNumMin uint64, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
+	ret := _m.Called(ctx, seqNumMin, seqNumMax, confs)
+
+	var r0 []Event[internal.EVM2EVMMessage]
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, int) ([]Event[internal.EVM2EVMMessage], error)); ok {
+		return rf(ctx, seqNumMin, seqNumMax, confs)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, int) []Event[internal.EVM2EVMMessage]); ok {
+		r0 = rf(ctx, seqNumMin, seqNumMax, confs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]Event[internal.EVM2EVMMessage])
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64, uint64, int) error); ok {
+		r1 = rf(ctx, seqNumMin, seqNumMax, confs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetSendRequestsGteSeqNum provides a mock function with given fields: ctx, seqNum, confs
 func (_m *MockOnRampReader) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
 	ret := _m.Called(ctx, seqNum, confs)

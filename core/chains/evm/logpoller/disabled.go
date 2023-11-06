@@ -112,3 +112,7 @@ func (d disabled) LogsUntilBlockHashDataWordGreaterThan(eventSig common.Hash, ad
 func (d disabled) FetchNotExecutedReports(commitStoreAddr common.Address, commitStoreEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, after time.Time, qopts ...pg.QOpt) ([]Log, error) {
 	return nil, ErrDisabled
 }
+
+func (d disabled) FetchNotExecutedMessages(onrampAddr common.Address, onrampEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, wordValueMin, wordValueMax common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	return nil, ErrDisabled
+}

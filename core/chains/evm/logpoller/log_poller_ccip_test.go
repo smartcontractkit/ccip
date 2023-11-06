@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	numberOfReports           = 10000
+	numberOfReports           = 1000
 	numberOfMessagesPerReport = 100
 	numberOfMessages          = numberOfReports * numberOfMessagesPerReport
 )
@@ -108,11 +108,9 @@ func populateDbWithSomeExecuted(b *testing.B, o *logpoller.DbORM, chainID *big.I
 func populateDbWithMessages(b *testing.B, o *logpoller.DbORM, chainID *big.Int, onrampAddress common.Address, onrampEvent common.Hash) {
 	var logs []logpoller.Log
 	for i := 1; i <= numberOfMessages; i++ {
-		data := make([]byte, 64)
-		// MinSeqNr
-		data = append(data, logpoller.EvmWord(uint64(numberOfMessagesPerReport*i+1)).Bytes()...)
-		// MaxSeqNr
-		data = append(data, logpoller.EvmWord(uint64(numberOfMessagesPerReport*(i+1))).Bytes()...)
+		data := make([]byte, 128)
+		// SeqNr
+		data = append(data, logpoller.EvmWord(uint64(i)).Bytes()...)
 
 		logs = append(logs, logpoller.Log{
 			EvmChainId:     utils.NewBig(chainID),
@@ -131,7 +129,6 @@ func populateDbWithMessages(b *testing.B, o *logpoller.DbORM, chainID *big.Int, 
 	}
 	require.NoError(b, o.InsertBlock(utils.RandomAddress().Hash(), int64(100_000), time.Now()))
 	require.NoError(b, o.InsertLogs(logs))
-
 }
 
 func Benchmark_CreatedAfter(b *testing.B) {
@@ -316,5 +313,86 @@ func Benchmark_SingleQuerySomeExecuted(b *testing.B) {
 		fmt.Printf("%d millis\n", time.Since(start).Milliseconds())
 		require.NoError(b, err)
 		require.Len(b, logs, numberOfReports)
+	}
+}
+
+// V1
+// 168 millis
+// Benchmark_AllMessagesExecuted-12    	       1	10373778417 ns/op
+
+// V2
+// 93 millis
+//
+// Benchmark_AllMessagesExecuted
+// Benchmark_AllMessagesExecuted-12    	      14	  83441804 ns/op
+// Benchmark_AllMessagesExecuted-12    	      14	  80466869 ns/op
+// Benchmark_AllMessagesExecuted-12    	      12	  83875597 ns/op
+// Benchmark_AllMessagesExecuted-12    	      13	  79230596 ns/op
+// Benchmark_AllMessagesExecuted-12    	      13	  83327372 ns/op
+func Benchmark_AllMessagesExecuted(b *testing.B) {
+	chainId := big.NewInt(137)
+	_, db := heavyweight.FullTestDBV2(b, "msgs", nil)
+	o := logpoller.NewORM(chainId, db, logger.TestLogger(b), pgtest.NewQConfig(false))
+
+	offrampAddress := utils.RandomAddress()
+	offrampExecuted := common.HexToHash("0xd4f851956a5d67c3997d1c9205045fef79bae2947fdee7e9e2641abc7391ef65")
+
+	onrampAddress := utils.RandomAddress()
+	onrampEvent := common.HexToHash("0xaffc45517195d6499808c643bd4a7b0ffeedf95bea5852840d7bfcf63f59e821")
+
+	populateDbWithMessages(b, o, chainId, onrampAddress, onrampEvent)
+	populateDbWithExecutionStateChanges(b, o, chainId, offrampAddress, offrampExecuted)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		//start := time.Now()
+		logs, err := o.FetchNotExecutedMessages(
+			onrampAddress,
+			onrampEvent,
+			offrampAddress,
+			offrampExecuted,
+			logpoller.EvmWord(0),
+			logpoller.EvmWord(numberOfMessages),
+		)
+		//fmt.Printf("%d millis\n", time.Since(start).Milliseconds())
+		require.NoError(b, err)
+		require.Len(b, logs, 0)
+	}
+}
+
+// V1
+// 189 millis
+// Benchmark_NoneMessagesExecuted-12    	       1	3135554125 ns/op
+// V2
+// 230 millis
+// Benchmark_NoneMessagesExecuted-12    	       1	3809230583 ns/op
+
+func Benchmark_NoneMessagesExecuted(b *testing.B) {
+	chainId := big.NewInt(137)
+	_, db := heavyweight.FullTestDBV2(b, "msgs", nil)
+	o := logpoller.NewORM(chainId, db, logger.TestLogger(b), pgtest.NewQConfig(false))
+
+	offrampAddress := utils.RandomAddress()
+	offrampExecuted := common.HexToHash("0xd4f851956a5d67c3997d1c9205045fef79bae2947fdee7e9e2641abc7391ef65")
+
+	onrampAddress := utils.RandomAddress()
+	onrampEvent := common.HexToHash("0xaffc45517195d6499808c643bd4a7b0ffeedf95bea5852840d7bfcf63f59e821")
+
+	populateDbWithMessages(b, o, chainId, onrampAddress, onrampEvent)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		start := time.Now()
+		logs, err := o.FetchNotExecutedMessages(
+			onrampAddress,
+			onrampEvent,
+			offrampAddress,
+			offrampExecuted,
+			logpoller.EvmWord(0),
+			logpoller.EvmWord(numberOfMessages),
+		)
+		fmt.Printf("%d millis\n", time.Since(start).Milliseconds())
+		require.NoError(b, err)
+		require.Len(b, logs, numberOfMessages)
 	}
 }

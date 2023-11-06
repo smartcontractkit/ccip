@@ -36,6 +36,7 @@ func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 		logger.TestLogger(t),
 		testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(),
 		common.Address{},
+		common.Address{},
 		lp,
 		bc,
 		true)
@@ -94,7 +95,7 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 	}
 
 	// Create the version-specific reader.
-	reader, err := ccipdata.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc, false)
+	reader, err := ccipdata.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, common.Address{}, lp, bc, false)
 	require.NoError(t, err)
 
 	return onRampReaderTH{

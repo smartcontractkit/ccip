@@ -234,6 +234,22 @@ func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNum
 	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
+func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNumsV2(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
+	logs, err := o.lp.FetchNotExecutedMessages(
+		o.address,
+		o.sendRequestedEventSig,
+		common.Address{},
+		common.Hash{},
+		abihelpers.EvmWord(seqNumMin),
+		abihelpers.EvmWord(seqNumMax),
+		pg.WithParentCtx(ctx),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
+}
+
 func (o *OnRampV1_0_0) Close(qopts ...pg.QOpt) error {
 	return o.lp.UnregisterFilter(o.filterName, qopts...)
 }

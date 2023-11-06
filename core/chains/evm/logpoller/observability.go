@@ -246,6 +246,12 @@ func (o *ObservedORM) FetchNotExecutedReports(commitStoreAddr common.Address, co
 	})
 }
 
+func (o *ObservedORM) FetchNotExecutedMessages(onrampAddr common.Address, onrampEvent common.Hash, offrampAddress common.Address, offrampEventSig common.Hash, wordValueMin, wordValueMax common.Hash, qopts ...pg.QOpt) ([]Log, error) {
+	return withObservedQueryAndResults(o, "FetchNotExecutedMessages", func() ([]Log, error) {
+		return o.ORM.FetchNotExecutedMessages(onrampAddr, onrampEvent, offrampAddress, offrampEventSig, wordValueMin, wordValueMax, qopts...)
+	})
+}
+
 func withObservedQueryAndResults[T any](o *ObservedORM, queryName string, query func() ([]T, error)) ([]T, error) {
 	results, err := withObservedQuery(o, queryName, query)
 	if err == nil {

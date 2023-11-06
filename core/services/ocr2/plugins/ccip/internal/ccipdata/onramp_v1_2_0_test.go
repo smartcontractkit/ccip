@@ -92,7 +92,8 @@ func TestLogPollerClient_GetSendRequestsGteSeqNum(t *testing.T) {
 	t.Run("using confs", func(t *testing.T) {
 		lp := mocks.NewLogPoller(t)
 		lp.On("RegisterFilter", mock.Anything).Return(nil)
-		onRampV2, err := NewOnRampV1_2_0(lggr, 1, 1, onRampAddr, lp, nil, false)
+		_, err := NewOnRampV1_0_0(lggr, 1, 1, onRampAddr, lp, nil, false)
+		onRampV2, err := NewOnRampV1_2_0(lggr, 1, 1, onRampAddr, common.Address{}, lp, nil, false)
 		require.NoError(t, err)
 		lp.On("LogsDataWordGreaterThan",
 			onRampV2.sendRequestedEventSig,
@@ -120,7 +121,7 @@ func TestLogPollerClient_GetSendRequestsGteSeqNum(t *testing.T) {
 		cl.On("HeaderByNumber", mock.Anything, mock.Anything).Return(h, nil)
 		lp := mocks.NewLogPoller(t)
 		lp.On("RegisterFilter", mock.Anything).Return(nil)
-		onRampV2, err := NewOnRampV1_2_0(lggr, 1, 1, onRampAddr, lp, cl, true)
+		onRampV2, err := NewOnRampV1_2_0(lggr, 1, 1, onRampAddr, common.Address{}, lp, cl, true)
 		require.NoError(t, err)
 		lp.On("LogsUntilBlockHashDataWordGreaterThan",
 			onRampV2.sendRequestedEventSig,

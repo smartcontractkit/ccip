@@ -206,6 +206,8 @@ type OnRampV1_2_0 struct {
 	filterName                 string
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
+	offrampAddress             common.Address
+	offrampEventSig            common.Hash
 }
 
 func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, error) {
@@ -291,6 +293,22 @@ func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNum
 	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
+func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNumsV2(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
+	logs, err := o.lp.FetchNotExecutedMessages(
+		o.address,
+		o.sendRequestedEventSig,
+		o.offrampAddress,
+		o.offrampEventSig,
+		abihelpers.EvmWord(seqNumMin),
+		abihelpers.EvmWord(seqNumMax),
+		pg.WithParentCtx(ctx),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
+}
+
 func (o *OnRampV1_2_0) RouterAddress() (common.Address, error) {
 	config, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
@@ -303,15 +321,7 @@ func (o *OnRampV1_2_0) Close(qopts ...pg.QOpt) error {
 	return o.lp.UnregisterFilter(o.filterName, qopts...)
 }
 
-func NewOnRampV1_2_0(
-	lggr logger.Logger,
-	sourceSelector,
-	destSelector uint64,
-	onRampAddress common.Address,
-	sourceLP logpoller.LogPoller,
-	source client.Client,
-	finalityTags bool,
-) (*OnRampV1_2_0, error) {
+func NewOnRampV1_2_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress, offrampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, finalityTags bool) (*OnRampV1_2_0, error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -326,6 +336,7 @@ func NewOnRampV1_2_0(
 	}); err != nil {
 		return nil, err
 	}
+
 	return &OnRampV1_2_0{
 		finalityTags:               finalityTags,
 		lggr:                       lggr,
@@ -337,5 +348,7 @@ func NewOnRampV1_2_0(
 		address:                    onRampAddress,
 		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndexV1_2_0,
 		sendRequestedEventSig:      CCIPSendRequestEventSigV1_2_0,
+		offrampAddress:             offrampAddress,
+		offrampEventSig:            abihelpers.MustGetEventID("ExecutionStateChanged", abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)),
 	}, nil
 }
