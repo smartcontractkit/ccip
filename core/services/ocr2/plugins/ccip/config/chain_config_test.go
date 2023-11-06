@@ -2,6 +2,7 @@ package config
 
 import (
 	"math/big"
+	"strconv"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -11,37 +12,53 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
-func TestGetChainFromSpec_success(t *testing.T) {
-	spec := &job.OCR2OracleSpec{
-		RelayConfig: job.JSONConfig{
-			"chainID": float64(1337),
+func TestGetChainFromSpec(t *testing.T) {
+
+	testChainID := int64(1337)
+
+	tests := []struct {
+		name           string
+		spec           *job.OCR2OracleSpec
+		expectedErr    bool
+		expectedErrMsg string
+	}{
+		{
+			name: "success",
+			spec: &job.OCR2OracleSpec{
+				RelayConfig: job.JSONConfig{
+					"chainID": float64(testChainID),
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name:           "missing_chain_ID",
+			spec:           &job.OCR2OracleSpec{},
+			expectedErr:    true,
+			expectedErrMsg: "chainID must be provided in relay config",
 		},
 	}
 
 	mockChain := evmORMMocks.NewChain(t)
-	mockChain.On("ID").Return(big.NewInt(1337))
+	mockChain.On("ID").Return(big.NewInt(testChainID)).Maybe()
 
 	mockChainSet := evmORMMocks.NewLegacyChainContainer(t)
-	mockChainSet.On("Get", "1337").Return(mockChain, nil)
+	mockChainSet.On("Get", strconv.FormatInt(testChainID, 10)).Return(mockChain, nil).Maybe()
 
-	chain, chainID, err := GetChainFromSpec(spec, mockChainSet)
-	require.NoError(t, err)
-	require.Equal(t, mockChain, chain)
-	require.Equal(t, int64(1337), chainID)
-}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			chain, chainID, err := GetChainFromSpec(test.spec, mockChainSet)
+			if test.expectedErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), test.expectedErrMsg)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, mockChain, chain)
+				require.Equal(t, testChainID, chainID)
+			}
+		})
+	}
 
-func TestGetChainFromSpec_missingChainID(t *testing.T) {
-	spec := &job.OCR2OracleSpec{}
-
-	mockChain := evmORMMocks.NewChain(t)
-	mockChain.On("ID").Return(big.NewInt(1337)).Maybe()
-
-	mockChainSet := evmORMMocks.NewLegacyChainContainer(t)
-	mockChainSet.On("Get", "1337").Return(mockChain, nil).Maybe()
-
-	_, _, err := GetChainFromSpec(spec, mockChainSet)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "chainID must be provided in relay config")
 }
 
 func TestGetChainByChainSelector_success(t *testing.T) {
