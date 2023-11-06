@@ -53,20 +53,10 @@ contract USDCTokenPoolSetup is BaseTest {
     s_mockUSDCTransmitter = new MockUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER);
     s_mockUSDC = new MockUSDC(0, address(s_mockUSDCTransmitter));
 
-    s_usdcTokenPool = new USDCTokenPoolHelper(
-      s_mockUSDC,
-      s_token,
-      new address[](0),
-      address(s_mockARM)
-    );
+    s_usdcTokenPool = new USDCTokenPoolHelper(s_mockUSDC, s_token, new address[](0), address(s_mockARM));
 
     s_allowedList.push(USER_1);
-    s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(
-      s_mockUSDC,
-      s_token,
-      s_allowedList,
-      address(s_mockARM)
-    );
+    s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(s_mockUSDC, s_token, s_allowedList, address(s_mockARM));
 
     TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
     onRamps[0] = TokenPool.RampUpdate({
@@ -272,7 +262,10 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
     vm.expectEmit();
     emit Minted(s_routerAllowedOffRamp, recipient, amount);
 
-    vm.expectCall(address(s_mockUSDCTransmitter), abi.encodeWithSelector(MockUSDCTransmitter.receiveMessage.selector, message, attestation));
+    vm.expectCall(
+      address(s_mockUSDCTransmitter),
+      abi.encodeWithSelector(MockUSDCTransmitter.receiveMessage.selector, message, attestation)
+    );
 
     changePrank(s_routerAllowedOffRamp);
     s_usdcTokenPool.releaseOrMint(abi.encode(OWNER), recipient, amount, SOURCE_CHAIN_ID, extraData);
