@@ -367,6 +367,11 @@ func TestCommitStoreReaders(t *testing.T) {
 			gp, err := cr.GasPriceEstimator().GetGasPrice(context.Background())
 			require.NoError(t, err)
 			assert.Equal(t, expectedGas[v], cr.GasPriceEstimator().String(gp))
+
+			// Static config.
+			cfg, err := cr.GetCommitStoreStaticConfig(context.Background())
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
 		})
 	}
 }
