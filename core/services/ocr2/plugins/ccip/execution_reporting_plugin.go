@@ -233,6 +233,21 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return []ObservedMessage{}, nil
 	}
 
+	unexpiredReports = func() []ccipdata.CommitStoreReport {
+		index := 0
+		for _, rep := range unexpiredReports {
+			if r.snoozedRoots.IsSnoozed(rep.MerkleRoot) {
+				lggr.Debug("Skipping snoozed root", "minSeqNr", rep.Interval.Min, "maxSeqNr", rep.Interval.Max)
+			} else {
+				unexpiredReports[index] = rep
+				index++
+			}
+		}
+		return unexpiredReports[:index]
+	}()
+
+	lggr.Infow("Unexpired roots, not snoozed", "n", len(unexpiredReports))
+
 	// This could result in slightly different values on each call as
 	// the function returns the allowed amount at the time of the last block.
 	// Since this will only increase over time, the highest observed value will
@@ -292,10 +307,10 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			"maxSeqNr", rep.commitReport.Interval.Max,
 		)
 
-		if r.snoozedRoots.IsSnoozed(merkleRoot) {
-			rootLggr.Debug("Skipping snoozed root")
-			continue
-		}
+		//if r.snoozedRoots.IsSnoozed(merkleRoot) {
+		//	rootLggr.Debug("Skipping snoozed root")
+		//	continue
+		//}
 
 		if err := rep.validate(); err != nil {
 			rootLggr.Errorw("Skipping invalid report", "err", err)
