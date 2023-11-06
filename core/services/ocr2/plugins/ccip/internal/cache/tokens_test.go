@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
@@ -21,7 +22,7 @@ import (
 )
 
 func Test_tokenToDecimals(t *testing.T) {
-	tokenPriceMappings := map[common.Address]uint8{
+	tokenDecimalsMapping := map[common.Address]uint8{
 		common.HexToAddress("0xA"): 10,
 		common.HexToAddress("0xB"): 5,
 		common.HexToAddress("0xC"): 2,
@@ -67,7 +68,7 @@ func Test_tokenToDecimals(t *testing.T) {
 			},
 		},
 		{
-			name:       "missing tokens are skipped",
+			name:       "error on invalid token",
 			destTokens: []common.Address{},
 			feeTokens:  []common.Address{common.HexToAddress("0xD")},
 			want:       map[common.Address]uint8{},
@@ -80,14 +81,39 @@ func Test_tokenToDecimals(t *testing.T) {
 			offRampReader := ccipdata.NewMockOffRampReader(t)
 			offRampReader.On("GetDestinationTokens", mock.Anything).Return(tt.destTokens, nil)
 
+			decimalsQueryTokens := make([]common.Address, 0)
+			tokenDecimals := make([]uint8, 0)
+			var queryErr error
+			for i := range tt.destTokens {
+				decimals, exists := tokenDecimalsMapping[tt.destTokens[i]]
+				if !exists {
+					queryErr = fmt.Errorf("decimals not found")
+				}
+				tokenDecimals = append(tokenDecimals, decimals)
+				decimalsQueryTokens = append(decimalsQueryTokens, tt.destTokens[i])
+			}
+			for i := range tt.feeTokens {
+				if slices.Contains(decimalsQueryTokens, tt.feeTokens[i]) {
+					continue
+				}
+				decimals, exists := tokenDecimalsMapping[tt.feeTokens[i]]
+				if !exists {
+					queryErr = fmt.Errorf("decimals not found")
+				}
+				tokenDecimals = append(tokenDecimals, decimals)
+				decimalsQueryTokens = append(decimalsQueryTokens, tt.feeTokens[i])
+			}
+
 			priceRegistryReader := ccipdata.NewMockPriceRegistryReader(t)
 			priceRegistryReader.On("GetFeeTokens", mock.Anything).Return(tt.feeTokens, nil)
+			if len(decimalsQueryTokens) > 0 {
+				priceRegistryReader.On("GetTokensDecimals", mock.Anything, decimalsQueryTokens).Return(tokenDecimals, queryErr).Once()
+			}
 
 			tokenToDecimal := &tokenToDecimals{
 				lggr:                logger.TestLogger(t),
 				offRamp:             offRampReader,
 				priceRegistryReader: priceRegistryReader,
-				tokenFactory:        createTokenFactory(tokenPriceMappings),
 			}
 
 			got, err := tokenToDecimal.CallOrigin(testutils.Context(t))
@@ -99,11 +125,7 @@ func Test_tokenToDecimals(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 
-			// we set token factory to always return an error
-			// we don't expect it to be used again, decimals should be in cache.
-			tokenToDecimal.tokenFactory = func(address common.Address) (link_token_interface.LinkTokenInterface, error) {
-				return nil, fmt.Errorf("some error")
-			}
+			// we don't expect rpc call to be made, decimals should be in cache.
 			got, err = tokenToDecimal.CallOrigin(testutils.Context(t))
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
