@@ -202,7 +202,8 @@ func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddress
 	}
 
 	if len(results) != len(evmCalls) {
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("results unexpected length, expected %d but got %d",
+			len(evmCalls), len(results))
 	}
 
 	rateLimits := make([]TokenBucketRateLimit, 0, len(results))
