@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {ITokenMessenger} from "../../pools/USDC/ITokenMessenger.sol";
-import {IMessageReceiver} from "../../pools/USDC/IMessageReceiver.sol";
+import {IMessageReceiver} from "../../pools/USDC/IMessageTransmitter.sol";
 
 // This contract mocks both the ITokenMessenger and IMessageReceiver
 // contracts involved with the Cross Chain Token Protocol.
