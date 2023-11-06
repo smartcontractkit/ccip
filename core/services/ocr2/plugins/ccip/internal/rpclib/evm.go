@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"reflect"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -204,11 +205,25 @@ type DataAndErr struct {
 	Err     error
 }
 
+func ParseOutputs[T any](results []DataAndErr, parseFunc func(d DataAndErr) (T, error)) ([]T, error) {
+	parsed := make([]T, 0, len(results))
+
+	for _, res := range results {
+		v, err := parseFunc(res)
+		if err != nil {
+			return nil, fmt.Errorf("parse contract output: %w", err)
+		}
+		parsed = append(parsed, v)
+	}
+
+	return parsed, nil
+}
+
 func ParseOutput[T any](dataAndErr DataAndErr, idx int) (T, error) {
 	var parsed T
 
 	if dataAndErr.Err != nil {
-		return parsed, dataAndErr.Err
+		return parsed, fmt.Errorf("rpc call error: %w", dataAndErr.Err)
 	}
 
 	if idx < 0 || idx >= len(dataAndErr.Outputs) {
@@ -217,9 +232,12 @@ func ParseOutput[T any](dataAndErr DataAndErr, idx int) (T, error) {
 
 	res, is := dataAndErr.Outputs[idx].(T)
 	if !is {
+		// some rpc types are not strictly defined
+		// for that reason we try to manually map the fields using json encoding
 		b, err := json.Marshal(dataAndErr.Outputs[idx])
 		if err == nil {
-			if err := json.Unmarshal(b, &parsed); err == nil {
+			var empty T
+			if err := json.Unmarshal(b, &parsed); err == nil && !reflect.DeepEqual(parsed, empty) {
 				return parsed, nil
 			}
 		}

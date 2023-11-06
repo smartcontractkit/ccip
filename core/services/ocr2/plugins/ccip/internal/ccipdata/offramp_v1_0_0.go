@@ -151,28 +151,21 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
 
+	destTokens, err := rpclib.ParseOutputs[common.Address](results, func(d rpclib.DataAndErr) (common.Address, error) {
+		return rpclib.ParseOutput[common.Address](d, 0)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("parse outputs: %w", err)
+	}
+
 	seenDestTokens := make(map[common.Address]struct{})
-	destTokens := make([]common.Address, 0, len(tokenAddresses))
-	for _, res := range results {
-		if res.Err != nil {
-			return nil, fmt.Errorf("rpc call error: %w", res.Err)
+	for _, destToken := range destTokens {
+		if _, exists := seenDestTokens[destToken]; exists {
+			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destToken)
 		}
-
-		destTokenAddress, err := rpclib.ParseOutput[common.Address](res, 0)
-		if err != nil {
-			return nil, err
-		}
-		destTokens = append(destTokens, destTokenAddress)
-
-		if _, exists := seenDestTokens[destTokenAddress]; exists {
-			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destTokenAddress)
-		}
-		seenDestTokens[destTokenAddress] = struct{}{}
+		seenDestTokens[destToken] = struct{}{}
 	}
 
-	if len(destTokens) != len(tokenAddresses) {
-		return nil, fmt.Errorf("got %d tokens while %d were expected", len(destTokens), len(tokenAddresses))
-	}
 	return destTokens, nil
 }
 
@@ -201,22 +194,11 @@ func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddress
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
 
-	if len(results) != len(evmCalls) {
-		return nil, fmt.Errorf("results unexpected length, expected %d but got %d",
-			len(evmCalls), len(results))
-	}
-
-	rateLimits := make([]TokenBucketRateLimit, 0, len(results))
-	for _, res := range results {
-		if res.Err != nil {
-			return nil, fmt.Errorf("rpc call error: %w", res.Err)
-		}
-
-		poolRateLimit, err := rpclib.ParseOutput[TokenBucketRateLimit](res, 0)
-		if err != nil {
-			return nil, fmt.Errorf("parse contract output: %w", err)
-		}
-		rateLimits = append(rateLimits, poolRateLimit)
+	rateLimits, err := rpclib.ParseOutputs[TokenBucketRateLimit](results, func(d rpclib.DataAndErr) (TokenBucketRateLimit, error) {
+		return rpclib.ParseOutput[TokenBucketRateLimit](d, 0)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("parse outputs: %w", err)
 	}
 
 	return rateLimits, nil
