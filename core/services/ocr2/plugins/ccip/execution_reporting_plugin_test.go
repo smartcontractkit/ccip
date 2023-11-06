@@ -164,9 +164,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.cachedSourceFeeTokens = sourceFeeTokens
 
 			p.snoozedRoots = cache.NewSnoozedRoots(time.Minute, time.Minute)
-			if p.monitoringEndpoint == nil {
-				t.Error("monitoring endpoint is nil")
-			}
+			require.NotNil(t, p.monitoringEndpoint, "monitoring endpoint is nil")
 
 			_, err := p.Observation(ctx, types.ReportTimestamp{}, types.Query{})
 			if tc.expErr {
