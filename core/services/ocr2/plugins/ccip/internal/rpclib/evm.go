@@ -2,6 +2,7 @@ package rpclib
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -204,19 +205,26 @@ type DataAndErr struct {
 }
 
 func ParseOutput[T any](dataAndErr DataAndErr, idx int) (T, error) {
-	var empty T
+	var parsed T
 
 	if dataAndErr.Err != nil {
-		return empty, dataAndErr.Err
+		return parsed, dataAndErr.Err
 	}
 
 	if idx < 0 || idx >= len(dataAndErr.Outputs) {
-		return empty, fmt.Errorf("idx %d is out of bounds for %d outputs", idx, len(dataAndErr.Outputs))
+		return parsed, fmt.Errorf("idx %d is out of bounds for %d outputs", idx, len(dataAndErr.Outputs))
 	}
 
 	res, is := dataAndErr.Outputs[idx].(T)
 	if !is {
-		return empty, fmt.Errorf("the result (%T) is not an address", dataAndErr.Outputs[idx])
+		b, err := json.Marshal(dataAndErr.Outputs[idx])
+		if err == nil {
+			if err := json.Unmarshal(b, &parsed); err == nil {
+				return parsed, nil
+			}
+		}
+
+		return parsed, fmt.Errorf("the result type is: %T, expected: %T", dataAndErr.Outputs[idx], parsed)
 	}
 
 	return res, nil

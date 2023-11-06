@@ -185,7 +185,7 @@ func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddress
 	for _, poolAddress := range poolAddresses {
 		evmCalls = append(evmCalls, rpclib.NewEvmCall(
 			abiCustomTokenPool,
-			"CurrentOffRampRateLimiterState",
+			"currentOffRampRateLimiterState",
 			poolAddress,
 			o.addr,
 		))
@@ -213,7 +213,7 @@ func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddress
 
 		poolRateLimit, err := rpclib.ParseOutput[TokenBucketRateLimit](res, 0)
 		if err != nil {
-			return nil, fmt.Errorf("parse contract output")
+			return nil, fmt.Errorf("parse contract output: %w", err)
 		}
 		rateLimits = append(rateLimits, poolRateLimit)
 	}
