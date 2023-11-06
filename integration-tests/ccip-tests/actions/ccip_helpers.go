@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
@@ -896,44 +895,54 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 	}
 }
 
-func (sourceCCIP *SourceCCIPModule) SendRequest(
+func (sourceCCIP *SourceCCIPModule) CCIPMsg(
 	receiver common.Address,
 	msgType,
 	data string,
-	feeToken common.Address,
-) (common.Hash, time.Duration, *big.Int, error) {
-	var tokenAndAmounts []router.ClientEVMTokenAmount
+) (router.ClientEVM2AnyMessage, error) {
+	tokenAndAmounts := []router.ClientEVMTokenAmount{}
 	if msgType == TokenTransfer {
-		for i := range sourceCCIP.TransferAmount {
+		for i, amount := range sourceCCIP.TransferAmount {
 			token := sourceCCIP.Common.BridgeTokens[i]
 			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
-				Token: common.HexToAddress(token.Address()), Amount: sourceCCIP.TransferAmount[i],
+				Token: common.HexToAddress(token.Address()), Amount: amount,
 			})
 		}
 	}
 	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, receiver)
-	var d time.Duration
 	if err != nil {
-		return common.Hash{}, d, nil, fmt.Errorf("failed encoding the receiver address: %+v", err)
+		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed encoding the receiver address: %+v", err)
 	}
 
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(600_000), false)
 	if err != nil {
-		return common.Hash{}, d, nil, fmt.Errorf("failed encoding the options field: %+v", err)
+		return router.ClientEVM2AnyMessage{}, fmt.Errorf("failed encoding the options field: %+v", err)
 	}
+	// form the message for transfer
+	return router.ClientEVM2AnyMessage{
+		Receiver:     receiverAddr,
+		Data:         []byte(data),
+		TokenAmounts: tokenAndAmounts,
+		FeeToken:     common.HexToAddress(sourceCCIP.Common.FeeToken.Address()),
+		ExtraArgs:    extraArgsV1,
+	}, nil
+}
+
+func (sourceCCIP *SourceCCIPModule) SendRequest(
+	receiver common.Address,
+	msgType,
+	data string,
+) (common.Hash, time.Duration, *big.Int, error) {
+	var d time.Duration
 	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
 		return common.Hash{}, d, nil, fmt.Errorf("failed getting the chain selector: %+v", err)
 	}
 	// form the message for transfer
-	msg := router.ClientEVM2AnyMessage{
-		Receiver:     receiverAddr,
-		Data:         []byte(data),
-		TokenAmounts: tokenAndAmounts,
-		FeeToken:     feeToken,
-		ExtraArgs:    extraArgsV1,
+	msg, err := sourceCCIP.CCIPMsg(receiver, msgType, data)
+	if err != nil {
+		return common.Hash{}, d, nil, fmt.Errorf("failed forming the ccip msg: %+v", err)
 	}
-
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
 		reason, _ := blockchain.RPCErrorFromError(err)
@@ -946,10 +955,10 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 
 	var sendTx *types.Transaction
 	timeNow := time.Now()
-
+	feeToken := common.HexToAddress(sourceCCIP.Common.FeeToken.Address())
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
-	if feeToken != common.HexToAddress("0x0") {
+	if feeToken != (common.Address{}) {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSendAndProcessTx(destChainSelector, msg, nil)
 		if err != nil {
 			return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %+v", err)
@@ -1577,39 +1586,20 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStat *testreporters.R
 
 func (lane *CCIPLane) MultiSend(noOfRequests int, msgType string, multiSendAddr common.Address) error {
 	var ccipMultSend []contracts.CCIPMsgData
-	var tokenAndAmounts []router.ClientEVMTokenAmount
-	if msgType == TokenTransfer {
-		for i := range lane.Source.TransferAmount {
-			token := lane.Source.Common.BridgeTokens[i]
-			tokenAndAmounts = append(tokenAndAmounts, router.ClientEVMTokenAmount{
-				Token: common.HexToAddress(token.Address()), Amount: lane.Source.TransferAmount[i],
-			})
-		}
-	}
-	receiverAddr, err := utils.ABIEncode(`[{"type":"address"}]`, lane.Dest.ReceiverDapp.EthAddress)
+	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
+	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, msgType, "testMsg")
 	if err != nil {
-		return fmt.Errorf("failed encoding the receiver address: %+v", err)
-	}
-
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(600_000), false)
-	if err != nil {
-		return fmt.Errorf("failed encoding the options field: %+v", err)
+		return fmt.Errorf("failed to form the ccip message: %+v", err)
 	}
 	destChainSelector, err := chainselectors.SelectorFromChainId(lane.Source.DestinationChainId)
 	if err != nil {
 		return fmt.Errorf("failed getting the chain selector: %+v", err)
 	}
 
-	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
 	for i := 1; i <= noOfRequests; i++ {
 		// form the message for transfer
-		msg := router.ClientEVM2AnyMessage{
-			Receiver:     receiverAddr,
-			Data:         []byte(fmt.Sprintf("msg %d", i)),
-			TokenAmounts: tokenAndAmounts,
-			FeeToken:     feeToken,
-			ExtraArgs:    extraArgsV1,
-		}
+		msg := genericMsg
+		msg.Data = []byte(fmt.Sprintf("msg %d", i))
 		sendData := contracts.CCIPMsgData{
 			Msg:           msg,
 			RouterAddr:    lane.Source.Common.Router.EthAddress,
@@ -1625,30 +1615,30 @@ func (lane *CCIPLane) MultiSend(noOfRequests int, msgType string, multiSendAddr 
 			return fmt.Errorf("failed getting the fee: %+v", err)
 		}
 		log.Info().Str("fee", fee.String()).Msg("calculated fee")
-
-		if feeToken == common.HexToAddress("0x0") {
-			sendData.Fee = fee
-		}
+		sendData.Fee = fee
 		lane.TotalFee.Add(lane.TotalFee, fee)
 		ccipMultSend = append(ccipMultSend, sendData)
 	}
-	// approve the fee amount for multisend
-	if feeToken != common.HexToAddress("0x0") {
-		err := lane.Source.Common.FeeToken.Approve(multiSendAddr.Hex(), lane.TotalFee)
+	isNative := true
+	// transfer the fee amount to multisend
+	if feeToken != (common.Address{}) {
+		isNative = false
+		err := lane.Source.Common.FeeToken.Transfer(multiSendAddr.Hex(), lane.TotalFee)
 		if err != nil {
 			return err
 		}
 	}
-	tx, err := contracts.MultiCallCCIP(lane.Source.Common.ChainClient, multiSendAddr.Hex(), ccipMultSend)
-	if err != nil {
-		return fmt.Errorf("failed sending the multisend request: %+v", err)
+	// if token transfer is required, transfer the token amount to multisend
+	if msgType == TokenTransfer {
+		for i, amount := range lane.Source.TransferAmount {
+			token := lane.Source.Common.BridgeTokens[i]
+			err := token.Transfer(multiSendAddr.Hex(), amount)
+			if err != nil {
+				return err
+			}
+		}
 	}
-	_, err = bind.WaitMined(context.Background(), lane.Source.Common.ChainClient.DeployBackend(), tx)
-	if err != nil {
-		return err
-	}
-	lane.Logger.Info().Str("txHash", tx.Hash().Hex()).Msg("sent multisend request")
-	return nil
+	return contracts.MultiCallCCIP(lane.Source.Common.ChainClient, multiSendAddr.Hex(), ccipMultSend, isNative)
 }
 
 func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
@@ -1658,7 +1648,6 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
 		txHash, txConfirmationDur, fee, err := lane.Source.SendRequest(
 			lane.Dest.ReceiverDapp.EthAddress,
 			msgType, msg,
-			common.HexToAddress(lane.Source.Common.FeeToken.Address()),
 		)
 		if err != nil {
 			stat.UpdateState(lane.Logger, 0,

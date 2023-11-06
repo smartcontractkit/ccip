@@ -226,7 +226,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
 				actions.TokenTransfer, "msg with token more than aggregated capacity",
-				common.HexToAddress(tc.lane.Source.Common.FeeToken.Address()))
+			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			errReason, v, err := tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
@@ -256,7 +256,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
 				actions.TokenTransfer, "msg with token more than aggregated rate",
-				common.HexToAddress(tc.lane.Source.Common.FeeToken.Address()))
+			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, evm_2_evm_onramp.EVM2EVMOnRampABI)
@@ -309,7 +309,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
 				actions.TokenTransfer, "msg with token more than token pool capacity",
-				common.HexToAddress(tc.lane.Source.Common.FeeToken.Address()))
+			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool.LockReleaseTokenPoolABI)
@@ -339,7 +339,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
 				actions.TokenTransfer, "msg with token more than token pool rate",
-				common.HexToAddress(tc.lane.Source.Common.FeeToken.Address()))
+			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool.LockReleaseTokenPoolABI)
@@ -405,7 +405,9 @@ func TestSmokeCCIPMultiSend(t *testing.T) {
 				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
 
 			tc.lane.RecordStateBeforeTransfer()
-			err := tc.lane.MultiSend(2, TestCfg.TestGroupInput.MsgType, common.HexToAddress("0xcA11bde05977b3631167028862bE2a173976CA11"))
+			//	multiCallAddr, err := contracts.DeployMultiCallContract(tc.lane.Source.Common.ChainClient)
+			//	require.NoError(t, err)
+			err := tc.lane.MultiSend(2, TestCfg.TestGroupInput.MsgType, common.HexToAddress("0xE432fB746806C008AD2D989764fF460990238Bc0"))
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 		})
