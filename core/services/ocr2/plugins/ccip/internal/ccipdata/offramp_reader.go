@@ -102,10 +102,10 @@ type OffRampStaticConfig struct {
 	ArmProxy            common.Address
 }
 
-//go:generate mockery --quiet --name OffRampReader --output . --filename offramp_reader_mock.go --inpackage --case=underscore
+//go:generate mockery --quiet --name OffRampReader --filename offramp_reader_mock.go --case=underscore
 type OffRampReader interface {
 	Closer
-	// Will error if messages are not a compatible verion
+	// Will error if messages are not a compatible version.
 	EncodeExecutionReport(report ExecReport) ([]byte, error)
 	DecodeExecutionReport(report []byte) (ExecReport, error)
 	// GetExecutionStateChangesBetweenSeqNums returns all the execution state change events for the provided message sequence numbers (inclusive).
