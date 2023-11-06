@@ -153,7 +153,7 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 	destTokens := make([]common.Address, 0, len(tokenAddresses))
 	for _, res := range results {
 		if res.Err != nil {
-			return nil, fmt.Errorf("rpc sub-call: %w", err)
+			return nil, fmt.Errorf("rpc sub-call: %w", res.Err)
 		}
 
 		destTokenAddress, err := rpclib.ParseOutput[common.Address](res, 0)
