@@ -98,7 +98,6 @@ var _ OnRampReader = &OnRampV1_0_0{}
 type OnRampV1_0_0 struct {
 	address                    common.Address
 	onRamp                     *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp
-	finalityTags               bool
 	lp                         logpoller.LogPoller
 	lggr                       logger.Logger
 	client                     client.Client
@@ -112,7 +111,7 @@ func (o *OnRampV1_0_0) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context
 	return nil, errors.New("USDC not supported in < 1.2.0")
 }
 
-func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, finalityTags bool) (*OnRampV1_0_0, error) {
+func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_0_0, error) {
 	onRamp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -130,14 +129,13 @@ func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 		return nil, err
 	}
 	return &OnRampV1_0_0{
-		lggr:         lggr,
-		address:      onRampAddress,
-		onRamp:       onRamp,
-		client:       source,
-		lp:           sourceLP,
-		finalityTags: finalityTags,
-		leafHasher:   NewLeafHasherV1_0_0(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
-		filterName:   name,
+		lggr:       lggr,
+		address:    onRampAddress,
+		onRamp:     onRamp,
+		client:     source,
+		lp:         sourceLP,
+		leafHasher: NewLeafHasherV1_0_0(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
+		filterName: name,
 		// offset || sourceChainID || seqNum || ...
 		sendRequestedSeqNumberWord: 2,
 		sendRequestedEventSig:      eventSig,
