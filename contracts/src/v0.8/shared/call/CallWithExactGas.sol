@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-/// @notice This library contains various callWithExactGas functions. All of them are
-/// safe from gas bomb attacks.
-/// @dev There is code duplication in this library. This is done to not leave the assembly
-/// the blocks.
 library CallWithExactGas {
   error NoContract();
   error NoGasForCallExactCheck();
