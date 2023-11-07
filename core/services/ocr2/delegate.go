@@ -1328,11 +1328,11 @@ func (d *Delegate) newServicesCCIPCommit(lggr logger.SugaredLogger, jb job.Job, 
 	if err != nil {
 		return nil, fmt.Errorf("ccip services: %w: %w", ErrJobSpecNoRelayer, err)
 	}
-
 	chain, err := d.legacyChains.Get(rid.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("ccip services; failed to get chain %s: %w", rid.ChainID, err)
 	}
+
 	ccipProvider, err2 := evmrelay.NewCCIPCommitProvider(
 		lggr.Named("CCIPCommit"),
 		chain,
@@ -1345,7 +1345,7 @@ func (d *Delegate) newServicesCCIPCommit(lggr logger.SugaredLogger, jb job.Job, 
 		},
 		transmitterID,
 		d.ethKs,
-		d.eventBroadcaster,
+		pg.EventBroadcaster(),
 	)
 	if err2 != nil {
 		return nil, err2
@@ -1357,7 +1357,7 @@ func (d *Delegate) newServicesCCIPCommit(lggr logger.SugaredLogger, jb job.Job, 
 		ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
 		Database:                     ocrDB,
 		LocalConfig:                  lc,
-		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID, synchronization.OCR2CCIP),
+		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID, synchronization.OCR2CCIP, rid.Network, rid.ChainID),
 		OffchainConfigDigester:       ccipProvider.OffchainConfigDigester(),
 		OffchainKeyring:              kb,
 		OnchainKeyring:               kb,
@@ -1393,7 +1393,7 @@ func (d *Delegate) newServicesCCIPExecution(lggr logger.SugaredLogger, jb job.Jo
 		},
 		transmitterID,
 		d.ethKs,
-		d.eventBroadcaster,
+		eventBroadcaster,
 	)
 	if err2 != nil {
 		return nil, err2
@@ -1405,7 +1405,7 @@ func (d *Delegate) newServicesCCIPExecution(lggr logger.SugaredLogger, jb job.Jo
 		ContractConfigTracker:        ccipProvider.ContractConfigTracker(),
 		Database:                     ocrDB,
 		LocalConfig:                  lc,
-		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID, synchronization.OCR2CCIP),
+		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(spec.ContractID, synchronization.OCR2CCIP, rid.Network, rid.ChainID),
 		OffchainConfigDigester:       ccipProvider.OffchainConfigDigester(),
 		OffchainKeyring:              kb,
 		OnchainKeyring:               kb,

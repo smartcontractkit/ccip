@@ -244,34 +244,16 @@ func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 }
 
 func (o *OnRampV1_2_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
-	if !o.finalityTags {
-		logs, err2 := o.lp.LogsDataWordGreaterThan(
-			o.sendRequestedEventSig,
-			o.address,
-			o.sendRequestedSeqNumberWord,
-			abihelpers.EvmWord(seqNum),
-			confs,
-			pg.WithParentCtx(ctx),
-		)
-		if err2 != nil {
-			return nil, fmt.Errorf("logs data word greater than: %w", err2)
-		}
-		return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
-	}
-	latestFinalizedHash, err := latestFinalizedBlockHash(ctx, o.client)
-	if err != nil {
-		return nil, err
-	}
-	logs, err := o.lp.LogsUntilBlockHashDataWordGreaterThan(
+	logs, err2 := o.lp.LogsDataWordGreaterThan(
 		o.sendRequestedEventSig,
 		o.address,
 		o.sendRequestedSeqNumberWord,
 		abihelpers.EvmWord(seqNum),
-		latestFinalizedHash,
+		logpoller.Confirmations(confs),
 		pg.WithParentCtx(ctx),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("logs until block hash data word greater than: %w", err)
+	if err2 != nil {
+		return nil, fmt.Errorf("logs data word greater than: %w", err2)
 	}
 	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
@@ -283,7 +265,7 @@ func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNum
 		o.sendRequestedSeqNumberWord,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
-		confs,
+		logpoller.Confirmations(confs),
 		pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err

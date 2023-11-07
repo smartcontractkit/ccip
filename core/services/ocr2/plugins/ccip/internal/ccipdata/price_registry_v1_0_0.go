@@ -77,7 +77,7 @@ func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Conte
 		p.tokenUpdated,
 		p.address,
 		ts,
-		confs,
+		logpoller.Confirmations(confs),
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
@@ -110,7 +110,7 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 		1,
 		[]common.Hash{abihelpers.EvmWord(chainSelector)},
 		ts,
-		confs,
+		logpoller.Confirmations(confs),
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
