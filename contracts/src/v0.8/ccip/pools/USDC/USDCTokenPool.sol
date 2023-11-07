@@ -83,7 +83,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     if (address(tokenMessenger) == address(0)) revert InvalidConfig();
     IMessageTransmitter transmitter = IMessageTransmitter(tokenMessenger.localMessageTransmitter());
     uint32 transmitterVersion = transmitter.version();
-    if (transmitterVersion != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(transmitter.version());
+    if (transmitterVersion != SUPPORTED_USDC_VERSION) revert InvalidMessageVersion(transmitterVersion);
     uint32 tokenMessengerVersion = tokenMessenger.messageBodyVersion();
     if (tokenMessengerVersion != SUPPORTED_USDC_VERSION) revert InvalidTokenMessengerVersion(tokenMessengerVersion);
 
@@ -164,7 +164,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     _validateMessage(msgAndAttestation.message, sourceTokenData);
 
     if (
-      !IMessageTransmitter(i_messageTransmitter).receiveMessage(
+      !i_messageTransmitter.receiveMessage(
         msgAndAttestation.message,
         msgAndAttestation.attestation
       )
