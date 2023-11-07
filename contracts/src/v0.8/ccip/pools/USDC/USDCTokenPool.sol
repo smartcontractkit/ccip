@@ -90,6 +90,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     i_tokenMessenger = tokenMessenger;
     i_messageTransmitter = transmitter;
     i_localDomainIdentifier = transmitter.localDomain();
+    i_token.safeApprove(address(i_tokenMessenger), type(uint256).max);
     emit ConfigSet(address(tokenMessenger));
   }
 
@@ -123,7 +124,6 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
     // replaceDepositForBurn, the tokens cannot be maliciously re-routed to another address.
-    i_token.safeApprove(address(i_tokenMessenger), amount);
     uint64 nonce = i_tokenMessenger.depositForBurnWithCaller(
       amount,
       domain.domainIdentifier,
