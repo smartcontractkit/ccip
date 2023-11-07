@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
@@ -46,105 +47,49 @@ type CCIPMsgData struct {
 	Fee           *big.Int
 }
 
-func TransferToken(
-	evmClient blockchain.EVMClient,
-	tokenAddr, from, to common.Address,
-	amount *big.Int,
-) error {
-	token, err := erc20.NewERC20(tokenAddr, evmClient.Backend())
+func ApproveTokenCallData(to common.Address, amount *big.Int) ([]byte, error) {
+	erc20ABI, err := abi.JSON(strings.NewReader(erc20.ERC20ABI))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	opts, err := evmClient.TransactionOpts(evmClient.GetDefaultWallet())
+	approveToken := erc20ABI.Methods["approve"]
+	inputs, err := approveToken.Inputs.Pack(to, amount)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	// approve multisend to transfer tokens
-	tx, err := token.Approve(opts, from, amount)
-	if err != nil {
-		return fmt.Errorf("approve multisend to transfer tokens failed for token %s from %s to %s tx %s %+v",
-			tokenAddr.Hex(), from.Hex(), tx.Hash().Hex(), err)
-	}
-	mined, err := bind.WaitMined(context.Background(), evmClient.DeployBackend(), tx)
-	if err != nil {
-		return err
-	}
-	if mined.Status != types.ReceiptStatusSuccessful {
-		return fmt.Errorf("approve multisend to transfer tokens failed for token %s from %s to %s tx %s",
-			tokenAddr.Hex(), from.Hex(), tx.Hash().Hex())
-	}
-	tx, err = token.TransferFrom(opts, from, to, amount)
-	if err != nil {
-		return fmt.Errorf("transferFrom multisend to router failed for token %s from %s to %s tx %s %+v",
-			tokenAddr.Hex(), from.Hex(), to.Hex(), tx.Hash().Hex(), err)
-	}
-	mined, err = bind.WaitMined(context.Background(), evmClient.DeployBackend(), tx)
-	if err != nil {
-		return err
-	}
-	if mined.Status != types.ReceiptStatusSuccessful {
-		return fmt.Errorf("transferFrom multisend to router failed for token %s from %s to %s tx %s", tokenAddr.Hex(), from.Hex(), to.Hex(), tx.Hash().Hex())
-	}
-	log.Info().
-		Str("From", from.Hex()).
-		Str("To", to.Hex()).
-		Str("Token", tokenAddr.Hex()).
-		Str("Amount", amount.String()).
-		Str("Network Name", evmClient.GetNetworkConfig().Name).
-		Msg("Transferred ERC20")
-	return nil
+	inputs = append(approveToken.ID[:], inputs...)
+	return inputs, nil
 }
 
-func TransferTokensFromMultiCallToRouter(
-	evmClient blockchain.EVMClient,
-	contractAddress common.Address,
-	ccipMsg CCIPMsgData,
-) error {
-	// transfer fee from multisend to router
-	if ccipMsg.Fee != nil && ccipMsg.Fee.Cmp(big.NewInt(0)) > 0 {
-		err := TransferToken(evmClient, ccipMsg.Msg.FeeToken, contractAddress, ccipMsg.RouterAddr, ccipMsg.Fee)
-		if err != nil {
-			return fmt.Errorf("transferFrom multisend to router failed %+v", err)
-		}
+func CCIPSendCallData(msg CCIPMsgData) ([]byte, error) {
+	routerABI, err := abi.JSON(strings.NewReader(router.RouterABI))
+	if err != nil {
+		return nil, err
 	}
-
-	// transfer bridge tokens from multisend to router
-	for _, tokenAmount := range ccipMsg.Msg.TokenAmounts {
-		err := TransferToken(evmClient, tokenAmount.Token, contractAddress, ccipMsg.RouterAddr, tokenAmount.Amount)
-		if err != nil {
-			return fmt.Errorf("transferFrom multisend to router failed %+v", err)
-		}
+	ccipSend := routerABI.Methods["ccipSend"]
+	sendID := ccipSend.ID
+	inputs, err := ccipSend.Inputs.Pack(
+		msg.ChainSelector,
+		msg.Msg,
+	)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	inputs = append(sendID[:], inputs...)
+	return inputs, nil
 }
 
-func DeployMultiCallContract(evmClient blockchain.EVMClient) (common.Address, error) {
-	multiCallABI, err := abi.JSON(strings.NewReader(MultiCallABI))
+func WaitForSuccessfulTxMined(evmClient blockchain.EVMClient, tx *types.Transaction) error {
+	log.Info().Str("tx", tx.Hash().Hex()).Msg("waiting for tx to be mined")
+	receipt, err := bind.WaitMined(context.Background(), evmClient.DeployBackend(), tx)
 	if err != nil {
-		return common.Address{}, err
+		return err
 	}
-	address, tx, _, err := evmClient.DeployContract("MultiCall Contract", func(
-		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
-	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err := bind.DeployContract(auth, multiCallABI, common.FromHex(MultiCallBIN), backend)
-		if err != nil {
-			return common.Address{}, nil, nil, err
-		}
-		return address, tx, contract, err
-	})
-	if err != nil {
-		return common.Address{}, err
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		return fmt.Errorf("tx failed %s", tx.Hash().Hex())
 	}
-	r, err := bind.WaitMined(context.Background(), evmClient.DeployBackend(), tx)
-	if err != nil {
-		return common.Address{}, err
-	}
-	if r.Status != types.ReceiptStatusSuccessful {
-		return common.Address{}, fmt.Errorf("deploy multisend failed")
-	}
-	return *address, nil
+	log.Info().Str("tx", tx.Hash().Hex()).Msg("tx mined successfully")
+	return nil
 }
 
 func MultiCallCCIP(
@@ -159,32 +104,29 @@ func MultiCallCCIP(
 		return err
 	}
 	boundContract := bind.NewBoundContract(contractAddress, multiCallABI, evmClient.Backend(), evmClient.Backend(), evmClient.Backend())
-	routerABI, err := abi.JSON(strings.NewReader(router.RouterABI))
-	if err != nil {
-		return err
-	}
-	ccipSend := routerABI.Methods["ccipSend"]
-	sendID := ccipSend.ID
+
 	// if native, use aggregate3Value to send msg with value
 	if native {
 		var callData []CallWithValue
 		allValue := big.NewInt(0)
+
 		for _, msg := range msgData {
-			inputs, err := ccipSend.Inputs.Pack(
-				msg.ChainSelector,
-				msg.Msg,
-			)
+			// approve bridge token
+			for _, tokenAndAmount := range msg.Msg.TokenAmounts {
+				inputs, err := ApproveTokenCallData(msg.RouterAddr, tokenAndAmount.Amount)
+				if err != nil {
+					return err
+				}
+				data := CallWithValue{Target: tokenAndAmount.Token, AllowFailure: false, CallData: inputs}
+				callData = append(callData, data)
+			}
+			inputs, err := CCIPSendCallData(msg)
 			if err != nil {
 				return err
 			}
-			inputs = append(sendID[:], inputs...)
 			data := CallWithValue{Target: msg.RouterAddr, AllowFailure: false, Value: msg.Fee, CallData: inputs}
 			callData = append(callData, data)
 			allValue.Add(allValue, msg.Fee)
-			err = TransferTokensFromMultiCallToRouter(evmClient, contractAddress, msg)
-			if err != nil {
-				return err
-			}
 		}
 		opts, err := evmClient.TransactionOpts(evmClient.GetDefaultWallet())
 		if err != nil {
@@ -195,31 +137,38 @@ func MultiCallCCIP(
 		if err != nil {
 			return err
 		}
-		receipt, err := bind.WaitMined(context.Background(), evmClient.DeployBackend(), tx)
+		err = WaitForSuccessfulTxMined(evmClient, tx)
 		if err != nil {
-			return err
-		}
-		if receipt.Status != types.ReceiptStatusSuccessful {
-			return fmt.Errorf("multicall failed for ccip-send; router %s", contractAddress.Hex())
+			return errors.Wrapf(err, "multicall failed for ccip-send; router %s", contractAddress.Hex())
 		}
 	}
 	// if with feetoken, use aggregate3 to send msg without value
 	var callData []Call
 	for _, msg := range msgData {
-		inputs, err := ccipSend.Inputs.Pack(
-			msg.ChainSelector,
-			msg.Msg,
-		)
+		// approve fee token
+		if msg.Fee != nil && msg.Fee.Cmp(big.NewInt(0)) > 0 {
+			inputs, err := ApproveTokenCallData(msg.RouterAddr, msg.Fee)
+			if err != nil {
+				return err
+			}
+			data := Call{Target: msg.Msg.FeeToken, AllowFailure: false, CallData: inputs}
+			callData = append(callData, data)
+		}
+		// approve bridge token
+		for _, tokenAndAmount := range msg.Msg.TokenAmounts {
+			inputs, err := ApproveTokenCallData(msg.RouterAddr, tokenAndAmount.Amount)
+			if err != nil {
+				return err
+			}
+			data := Call{Target: tokenAndAmount.Token, AllowFailure: false, CallData: inputs}
+			callData = append(callData, data)
+		}
+		inputs, err := CCIPSendCallData(msg)
 		if err != nil {
 			return err
 		}
-		inputs = append(sendID[:], inputs...)
 		data := Call{Target: msg.RouterAddr, AllowFailure: false, CallData: inputs}
 		callData = append(callData, data)
-		err = TransferTokensFromMultiCallToRouter(evmClient, contractAddress, msg)
-		if err != nil {
-			return err
-		}
 	}
 	opts, err := evmClient.TransactionOpts(evmClient.GetDefaultWallet())
 	if err != nil {
@@ -230,14 +179,9 @@ func MultiCallCCIP(
 	if err != nil {
 		return err
 	}
-	log.Info().Str("Tx", tx.Hash().Hex()).Msg("multicall sent")
-	receipt, err := bind.WaitMined(context.Background(), evmClient.DeployBackend(), tx)
+	err = WaitForSuccessfulTxMined(evmClient, tx)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "multicall failed for ccip-send; router %s", contractAddress.Hex())
 	}
-	if receipt.Status != types.ReceiptStatusSuccessful {
-		return fmt.Errorf("multicall failed for ccip-send; router %s", contractAddress.Hex())
-	}
-	log.Info().Str("Tx", tx.Hash().Hex()).Msg("multicall tx mined")
 	return nil
 }

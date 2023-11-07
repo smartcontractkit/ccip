@@ -562,6 +562,8 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 
 type SourceCCIPModule struct {
 	Common                     *CCIPCommon
+	MulticallEnabled           bool
+	MulticallContract          common.Address
 	Sender                     common.Address
 	TransferAmount             []*big.Int
 	DestinationChainId         uint64
@@ -601,6 +603,9 @@ func (sourceCCIP *SourceCCIPModule) LoadContracts(conf *laneconfig.LaneConfig) {
 				sourceCCIP.OnRamp = &contracts.OnRamp{
 					EthAddress: common.HexToAddress(cfg.OnRamp),
 				}
+			}
+			if common.IsHexAddress(cfg.Multicall) {
+				sourceCCIP.MulticallContract = common.HexToAddress(cfg.Multicall)
 			}
 			if cfg.DepolyedAt > 0 {
 				sourceCCIP.SrcStartBlock = cfg.DepolyedAt
@@ -658,6 +663,12 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		return errors.WithStack(err)
 	}
 
+	if sourceCCIP.MulticallContract == (common.Address{}) && sourceCCIP.MulticallEnabled {
+		sourceCCIP.MulticallContract, err = contractDeployer.DeployMultiCallContract()
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
 	if sourceCCIP.OnRamp == nil {
 		var tokensAndPools []evm_2_evm_onramp.InternalPoolUpdate
 		var tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs
@@ -978,7 +989,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 	return sendTx.Hash(), time.Since(timeNow), fee, nil
 }
 
-func DefaultSourceCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, destChainId uint64, destChain string, transferAmount []*big.Int, ccipCommon *CCIPCommon) (*SourceCCIPModule, error) {
+func DefaultSourceCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, destChainId uint64, destChain string, transferAmount []*big.Int, multicallEnabled bool, ccipCommon *CCIPCommon) (*SourceCCIPModule, error) {
 	cmn, err := ccipCommon.Copy(logger, chainClient)
 	if err != nil {
 		return nil, err
@@ -986,6 +997,7 @@ func DefaultSourceCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMCl
 	return &SourceCCIPModule{
 		Common:             cmn,
 		TransferAmount:     transferAmount,
+		MulticallEnabled:   multicallEnabled,
 		DestinationChainId: destChainId,
 		DestNetworkName:    destChain,
 		Sender:             common.HexToAddress(chainClient.GetDefaultWallet().Address()),
@@ -1523,6 +1535,7 @@ func (lane *CCIPLane) UpdateLaneConfig() {
 	lane.SrcNetworkLaneCfg.SrcContractsMu.Lock()
 	lane.SrcNetworkLaneCfg.SrcContracts[lane.Source.DestNetworkName] = laneconfig.SourceContracts{
 		OnRamp:     lane.Source.OnRamp.Address(),
+		Multicall:  lane.Source.MulticallContract.Hex(),
 		DepolyedAt: lane.Source.SrcStartBlock,
 	}
 	lane.SrcNetworkLaneCfg.SrcContractsMu.Unlock()
@@ -1584,7 +1597,7 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStat *testreporters.R
 	return rcpt, nil
 }
 
-func (lane *CCIPLane) MultiSend(noOfRequests int, msgType string, multiSendAddr common.Address) error {
+func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr common.Address) error {
 	var ccipMultSend []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
 	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, msgType, "testMsg")
@@ -1847,6 +1860,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	sourceCommon *CCIPCommon,
 	destCommon *CCIPCommon,
 	transferAmounts []*big.Int,
+	isMulticall bool,
 	bootstrapAdded *atomic.Bool,
 	configureCLNodes bool,
 	jobErrGroup *errgroup.Group,
@@ -1867,7 +1881,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	lane.Source, err = DefaultSourceCCIPModule(
 		lane.Logger,
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
-		destChainClient.GetNetworkName(), transferAmounts, sourceCommon)
+		destChainClient.GetNetworkName(), transferAmounts, isMulticall, sourceCommon)
 	if err != nil {
 		return nil, nil, errors.WithStack(err)
 	}

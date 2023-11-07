@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/testconfig"
+	"github.com/smartcontractkit/ccip/integration-tests/utils"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
@@ -359,7 +359,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 	}
 }
 
-func TestSmokeCCIPMultiSend(t *testing.T) {
+func TestSmokeCCIPMulticall(t *testing.T) {
 	t.Parallel()
 	type subtestInput struct {
 		testName string
@@ -367,6 +367,8 @@ func TestSmokeCCIPMultiSend(t *testing.T) {
 	}
 	l := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)
+	// enable multicall in one tx for this test
+	TestCfg.TestGroupInput.MulticallInOneTx = utils.Ptr(true)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", nil, TestCfg)
 	var tcs []subtestInput
 	if len(setUpOutput.Lanes) == 0 {
@@ -405,9 +407,7 @@ func TestSmokeCCIPMultiSend(t *testing.T) {
 				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
 
 			tc.lane.RecordStateBeforeTransfer()
-			//	multiCallAddr, err := contracts.DeployMultiCallContract(tc.lane.Source.Common.ChainClient)
-			//	require.NoError(t, err)
-			err := tc.lane.MultiSend(2, TestCfg.TestGroupInput.MsgType, common.HexToAddress("0xE432fB746806C008AD2D989764fF460990238Bc0"))
+			err := tc.lane.Multicall(TestCfg.TestGroupInput.NoOfSendsInMulticall, TestCfg.TestGroupInput.MsgType, tc.lane.Source.MulticallContract)
 			require.NoError(t, err)
 			tc.lane.ValidateRequests()
 		})
