@@ -102,6 +102,14 @@ type OffRampStaticConfig struct {
 	ArmProxy            common.Address
 }
 
+type TokenBucketRateLimit struct {
+	Tokens      *big.Int
+	LastUpdated uint32
+	IsEnabled   bool
+	Capacity    *big.Int
+	Rate        *big.Int
+}
+
 //go:generate mockery --quiet --name OffRampReader --filename offramp_reader_mock.go --case=underscore
 type OffRampReader interface {
 	Closer
@@ -115,6 +123,7 @@ type OffRampReader interface {
 	// GetDestinationTokensFromSourceTokens will return an 1:1 mapping of the provided source tokens to dest tokens.
 	// Note that if you provide the same token twice you will get an error, each token should be provided once.
 	GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error)
+	GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []common.Address) ([]TokenBucketRateLimit, error)
 	GetSupportedTokens(ctx context.Context) ([]common.Address, error)
 	Address() common.Address
 	// TODO Needed for caching, maybe caching should move behind the readers?
