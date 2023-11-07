@@ -46,7 +46,8 @@ contract USDCTokenPoolSetup is BaseTest {
 
   function setUp() public virtual override {
     BaseTest.setUp();
-    s_token = new BurnMintERC677("LINK", "LNK", 18, 0);
+    BurnMintERC677 linkToken = new BurnMintERC677("LINK", "LNK", 18, 0);
+    s_token = linkToken;
     deal(address(s_token), OWNER, type(uint256).max);
     setUpRamps();
 
@@ -54,6 +55,7 @@ contract USDCTokenPoolSetup is BaseTest {
     s_mockUSDC = new MockUSDC(0, address(s_mockUSDCTransmitter));
 
     s_usdcTokenPool = new USDCTokenPoolHelper(s_mockUSDC, s_token, new address[](0), address(s_mockARM));
+    linkToken.grantMintAndBurnRoles(address(s_mockUSDC));
 
     s_allowedList.push(USER_1);
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(s_mockUSDC, s_token, s_allowedList, address(s_mockARM));
@@ -133,9 +135,10 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
   function testFuzz_LockOrBurnSuccess(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(amount < rateLimiterConfig().capacity);
-    vm.assume(amount > 0);
+    vm.assume(destinationReceiver != bytes32(0));
+    amount = bound(amount, 1, 1e18);
+    s_token.transfer(address(s_usdcTokenPool), amount);
     changePrank(s_routerAllowedOnRamp);
-    s_token.approve(address(s_usdcTokenPool), amount);
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_ID);
 
@@ -170,9 +173,10 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
   function testFuzz_LockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(amount < rateLimiterConfig().capacity);
-    vm.assume(amount > 0);
+    vm.assume(destinationReceiver != bytes32(0));
+    amount = bound(amount, 1, 1e18);
+    s_token.transfer(address(s_usdcTokenPoolWithAllowList), amount);
     changePrank(s_routerAllowedOnRamp);
-    s_token.approve(address(s_usdcTokenPoolWithAllowList), amount);
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPoolWithAllowList.getDomain(DEST_CHAIN_ID);
 

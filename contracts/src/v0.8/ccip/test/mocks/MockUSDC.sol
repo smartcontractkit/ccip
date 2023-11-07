@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {ITokenMessenger} from "../../pools/USDC/ITokenMessenger.sol";
 import {IMessageTransmitter} from "../../pools/USDC/IMessageTransmitter.sol";
+import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
 // This contract mocks both the ITokenMessenger and IMessageTransmitter
 // contracts involved with the Cross Chain Token Protocol.
@@ -25,6 +26,8 @@ contract MockUSDC is ITokenMessenger {
     address burnToken,
     bytes32 destinationCaller
   ) external returns (uint64) {
+    IBurnMintERC20(burnToken).transferFrom(msg.sender, address(this), amount);
+    IBurnMintERC20(burnToken).burn(amount);
     emit DepositForBurn(
       s_nonce,
       burnToken,
