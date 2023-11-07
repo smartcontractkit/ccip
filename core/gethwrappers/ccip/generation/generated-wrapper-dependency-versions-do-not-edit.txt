@@ -15,5 +15,5 @@ ping_pong_demo: ../../../contracts/solc/v0.8.19/PingPongDemo.abi ../../../contra
 price_registry: ../../../contracts/solc/v0.8.19/PriceRegistry.abi ../../../contracts/solc/v0.8.19/PriceRegistry.bin 36e8d2c44a16fefb5258557cb1eae25eca1cc12efcd3c3270f91a90a5f81e7ea
 router: ../../../contracts/solc/v0.8.19/Router.abi ../../../contracts/solc/v0.8.19/Router.bin d990e74b6032d4f75ef6e733e31ac5d34a3ac3f453b14f8c3a71367bb011c6db
 self_funded_ping_pong: ../../../contracts/solc/v0.8.19/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.19/SelfFundedPingPong.bin fc2f9ac93f49f4a2a0a0008c2a660444cc5c127688f64beeb63e5f96a10c995e
-usdc_token_pool: ../../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool.bin 6f866c088b581137372bae0b4c3af3c27be30fbbfc15a22e819058c636333a63
+usdc_token_pool: ../../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool.bin 1c832fce16555ec89d63681fd6edc298f24954c542147c85fb1da8ef1fd2ff27
 weth9: ../../../contracts/solc/v0.8.19/WETH9.abi ../../../contracts/solc/v0.8.19/WETH9.bin 5a7d64fb19b62ec523c7667ce4c2983295c05f74935b5f994c06a6f70d440f8b
