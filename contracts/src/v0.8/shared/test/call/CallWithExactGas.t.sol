@@ -25,7 +25,11 @@ contract CallWithExactGas__callWithExactGasSafeReturnData is CallWithExactGasSet
   function testFuzz_CallWithExactGasSafeReturnDataSuccess(bytes memory payload, bytes4 funcSelector) public {
     vm.pauseGasMetering();
     bytes memory data = abi.encodeWithSelector(funcSelector, payload);
-    vm.assume(funcSelector != GenericReceiver.setRevert.selector && funcSelector != GenericReceiver.setErr.selector);
+    vm.assume(
+      funcSelector != GenericReceiver.setRevert.selector &&
+        funcSelector != GenericReceiver.setErr.selector &&
+        funcSelector != 0x5100fc21 // s_toRevert(), which is public and therefore has a function selector
+    );
 
     uint16 maxRetBytes = 0;
 
