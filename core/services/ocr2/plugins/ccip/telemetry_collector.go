@@ -1,6 +1,8 @@
 package ccip
 
 import (
+	"sync"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
@@ -20,12 +22,20 @@ type telemetryCollector struct {
 	lggr               logger.Logger
 }
 
-// NewTelemetryCollector creates a new telemetry collector.
+var (
+	telemCollector telemetryCollector
+	telemOnce      sync.Once
+)
+
+// NewTelemetryCollector creates a single telemetry collector. It's thread-safe.
 func NewTelemetryCollector(monitoringEndpoint commontypes.MonitoringEndpoint, lggr logger.Logger) *telemetryCollector {
-	return &telemetryCollector{
-		monitoringEndpoint: monitoringEndpoint,
-		lggr:               lggr,
-	}
+	telemOnce.Do(func() { // For Java/GOF fans -- it's a singleton.
+		telemCollector = telemetryCollector{
+			monitoringEndpoint: monitoringEndpoint,
+			lggr:               lggr,
+		}
+	})
+	return &telemCollector
 }
 
 // CollectCommit collects commit report data and sends it to the OTI monitoring endpoint.

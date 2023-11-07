@@ -12,13 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/pkg/errors"
-
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -34,7 +29,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
-	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 const (
@@ -64,8 +60,7 @@ type ExecutionPluginStaticConfig struct {
 	destChainEVMID           *big.Int
 	destGasEstimator         gas.EvmFeeEstimator
 	tokenDataProviders       map[common.Address]tokendata.Reader
-	// Telemetry
-	monitoringEndpoint commontypes.MonitoringEndpoint
+	monitoringEndpoint       commontypes.MonitoringEndpoint // Telemetry
 }
 
 type ExecutionReportingPlugin struct {
@@ -84,8 +79,7 @@ type ExecutionReportingPlugin struct {
 	cachedTokenPools       cache.AutoSync[map[common.Address]common.Address]
 	customTokenPoolFactory func(ctx context.Context, poolAddress common.Address, bind bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error)
 	gasPriceEstimator      prices.GasPriceEstimatorExec
-	// Telemetry
-	monitoringEndpoint commontypes.MonitoringEndpoint
+	telemetryCollector     *telemetryCollector
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -168,8 +162,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 				return custom_token_pool.NewCustomTokenPool(poolAddress, contractBackend)
 			},
 			gasPriceEstimator: rf.config.offRampReader.GasPriceEstimator(),
-			// Telemetry
-			monitoringEndpoint: rf.config.monitoringEndpoint,
+			telemetryCollector: NewTelemetryCollector(
+				rf.config.monitoringEndpoint,
+				rf.config.lggr.Named("ExecutionReportingPlugin")),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -922,15 +917,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	telem := collectTelemetry(observedMessages)
-	bytes, err := proto.Marshal(telem)
-	if err != nil || r.monitoringEndpoint == nil {
-		// Telemetry related errors are not critical and must not affect
-		// execution, so we log them and continue.
-		lggr.Errorw("cannot marshal or send telemetry", "err", err)
-	} else {
-		r.monitoringEndpoint.SendLog(bytes)
-	}
+	r.telemetryCollector.ReportExec(observedMessages)
 
 	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {
@@ -938,19 +925,6 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	}
 	lggr.Infow("Report", "executableObservations", observedMessages)
 	return true, report, nil
-}
-
-func collectTelemetry(observedMessages []ObservedMessage) (t *telemPb.CCIPTelemWrapper) {
-	if len(observedMessages) > 0 {
-		return &telemPb.CCIPTelemWrapper{
-			Msg: &telemPb.CCIPTelemWrapper_ExecutionReport{
-				ExecutionReport: &telemPb.CCIPExecutionReportSummary{
-					LenTokenData: uint32(len(observedMessages[0].MsgData.TokenData)),
-				},
-			},
-		}
-	}
-	return nil
 }
 
 type tallyKey struct {

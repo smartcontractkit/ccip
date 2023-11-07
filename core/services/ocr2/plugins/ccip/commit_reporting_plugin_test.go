@@ -203,8 +203,8 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 	var gasPrice prices.GasPrice = big.NewInt(1)
 	gasPriceHeartBeat := models.MustMakeDuration(time.Hour)
 
-	// Telemetry
-	me := genMonitoringEndpoint(t)
+	// // Telemetry
+	// me := genMonitoringEndpoint(t)
 
 	t.Run("not enough observations", func(t *testing.T) {
 		tokenDecimalsCache := cache.NewMockAutoSync[map[common.Address]uint8](t)
@@ -214,7 +214,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		p.lggr = logger.TestLogger(t)
 		p.tokenDecimalsCache = tokenDecimalsCache
 		p.F = 1
-		p.monitoringEndpoint = me // Telemetry
+		// p.monitoringEndpoint = me // Telemetry
 
 		o := CommitObservation{Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: big.NewInt(0)}
 		obs, err := o.Marshal()
@@ -344,7 +344,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.offchainConfig.GasPriceHeartBeat = gasPriceHeartBeat.Duration()
 			p.commitStoreReader = commitStoreReader
 			p.F = tc.f
-			p.monitoringEndpoint = me
+			// p.monitoringEndpoint = me
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {

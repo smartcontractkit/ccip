@@ -13,24 +13,22 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"google.golang.org/protobuf/proto"
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
-
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
+	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 const (
@@ -88,7 +86,7 @@ type CommitReportingPlugin struct {
 	// State
 	inflightReports *inflightCommitReportsContainer
 	// Telemetry
-	monitoringEndpoint commontypes.MonitoringEndpoint
+	telemetryCollector *telemetryCollector
 }
 
 type CommitReportingPluginFactory struct {
@@ -174,9 +172,11 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				rf.config.destClient,
 				int64(rf.config.commitStore.OffchainConfig().DestFinalityDepth),
 			),
-			gasPriceEstimator:  rf.config.commitStore.GasPriceEstimator(),
-			offchainConfig:     pluginOffChainConfig,
-			monitoringEndpoint: rf.config.monitoringEndpoint,
+			gasPriceEstimator: rf.config.commitStore.GasPriceEstimator(),
+			offchainConfig:    pluginOffChainConfig,
+			telemetryCollector: NewTelemetryCollector(
+				rf.config.monitoringEndpoint,
+				rf.config.lggr),
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -507,6 +507,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	if err != nil {
 		return false, nil, err
 	}
+	r.telemetryCollector.ReportCommit(&report, &epochAndRound)
 	encodedReport, err := r.commitStoreReader.EncodeCommitReport(report)
 	if err != nil {
 		return false, nil, err
@@ -519,17 +520,6 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		"gasPriceUpdates", report.GasPrices,
 		"epochAndRound", epochAndRound,
 	)
-
-	// Commit telemetry collection and sending to the monitoring endpoint
-	telem := r.collectCommitTelemetry(&report, &epochAndRound)
-	bytes, err := proto.Marshal(telem)
-	if err != nil || r.monitoringEndpoint == nil {
-		// Telemetry related errors are not critical and must not affect
-		// execution, so we log them and continue.
-		lggr.Errorw("cannot marshal or send telemetry", "err", err)
-	} else {
-		r.monitoringEndpoint.SendLog(bytes)
-	}
 
 	return true, encodedReport, nil
 }

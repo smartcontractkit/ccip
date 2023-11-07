@@ -88,8 +88,8 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		},
 	}
 
-	// Telemetry
-	me := genMonitoringEndpoint(t)
+	// // Telemetry
+	// me := genMonitoringEndpoint(t)
 
 	ctx := testutils.Context(t)
 	for _, tc := range testCases {
@@ -98,7 +98,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports = newInflightExecReportsContainer(time.Minute)
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
-			p.monitoringEndpoint = me
+			// p.monitoringEndpoint = me
 
 			commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
 			commitStoreReader.On("IsDown", mock.Anything).Return(tc.commitStorePaused, nil)
