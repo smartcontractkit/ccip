@@ -38,6 +38,8 @@ compileContract ccip/ARMProxy.sol
 compileContract ccip/PriceRegistry.sol
 compileContract ccip/pools/LockReleaseTokenPool.sol
 compileContract ccip/pools/BurnMintTokenPool.sol
+compileContract ccip/pools/BurnFromMintTokenPool.sol
+compileContract ccip/pools/BurnWithFromMintTokenPool.sol
 compileContract shared/token/ERC677/BurnMintERC677.sol
 compileContract ccip/applications/PingPongDemo.sol
 
