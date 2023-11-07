@@ -40,6 +40,7 @@ const (
 
 	// MaxDataLenPerBatch limits the total length of msg data that can be in a batch.
 	MaxDataLenPerBatch = 60_000
+	ReportFetchStep    = 5
 )
 
 var (
@@ -218,7 +219,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
-	unexpiredReports, err := getUnexpiredCommitReportsWithSingleQuery(
+	allUnexpiredReports, err := getUnexpiredCommitReportsWithSingleQuery(
 		ctx,
 		r.config.commitStoreReader,
 		r.config.offRampReader,
@@ -228,150 +229,150 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return nil, err
 	}
 
-	lggr.Infow("Unexpired roots", "n", len(unexpiredReports))
-	if len(unexpiredReports) == 0 {
+	lggr.Infow("Unexpired roots", "n", len(allUnexpiredReports))
+	if len(allUnexpiredReports) == 0 {
 		return []ObservedMessage{}, nil
 	}
 
-	unexpiredReports = func() []ccipdata.CommitStoreReport {
+	allUnexpiredReports = func() []ccipdata.CommitStoreReport {
 		index := 0
-		for _, rep := range unexpiredReports {
+		for _, rep := range allUnexpiredReports {
 			if r.snoozedRoots.IsSnoozed(rep.MerkleRoot) {
 				lggr.Debug("Skipping snoozed root", "minSeqNr", rep.Interval.Min, "maxSeqNr", rep.Interval.Max)
 			} else {
-				unexpiredReports[index] = rep
+				allUnexpiredReports[index] = rep
 				index++
 			}
 		}
-		return unexpiredReports[:index]
+		return allUnexpiredReports[:index]
 	}()
 
-	lggr.Infow("Unexpired roots, not snoozed", "n", len(unexpiredReports))
+	lggr.Infow("Unexpired roots, not snoozed", "n", len(allUnexpiredReports))
 
-	// This could result in slightly different values on each call as
-	// the function returns the allowed amount at the time of the last block.
-	// Since this will only increase over time, the highest observed value will
-	// always be the lower bound of what would be available on chain
-	// since we already account for inflight txs.
-	getAllowedTokenAmount := cache.LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
-		return r.config.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
-	})
-	sourceToDestTokens, supportedDestTokens, err := r.sourceDestinationTokens(ctx)
-	if err != nil {
-		return nil, err
-	}
-	getSourceTokensPrices := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
-		sourceFeeTokens, err1 := r.cachedSourceFeeTokens.Get(ctx)
-		if err1 != nil {
-			return nil, err1
-		}
-		return getTokensPrices(ctx, sourceFeeTokens, r.config.sourcePriceRegistry, []common.Address{r.config.sourceWrappedNativeToken})
-	})
-	getDestTokensPrices := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
-		dstTokens, err1 := r.cachedDestTokens.Get(ctx)
-		if err1 != nil {
-			return nil, err1
-		}
-		return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
-	})
-	getDestGasPrice := cache.LazyFetch(func() (prices.GasPrice, error) {
-		return r.gasPriceEstimator.GetGasPrice(ctx)
-	})
+	for j := 0; j < len(allUnexpiredReports); j += ReportFetchStep {
+		unexpiredReports := allUnexpiredReports[j:min(j+ReportFetchStep, len(allUnexpiredReports))]
 
-	lggr.Infow("Processing unexpired reports", "n", len(unexpiredReports))
-	measureNumberOfReportsProcessed(timestamp, len(unexpiredReports))
-	reportIterationStart := time.Now()
-	defer func() {
-		measureReportsIterationDuration(timestamp, time.Since(reportIterationStart))
-	}()
-
-	unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReports)
-	if err != nil {
-		return nil, err
-	}
-
-	getDestPoolRateLimits := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
-		return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, sourceToDestTokens)
-	})
-
-	for _, rep := range unexpiredReportsWithSendReqs {
-		if ctx.Err() != nil {
-			lggr.Warn("Processing of roots killed by context")
-			break
-		}
-
-		merkleRoot := rep.commitReport.MerkleRoot
-
-		rootLggr := lggr.With("root", hexutil.Encode(merkleRoot[:]),
-			"minSeqNr", rep.commitReport.Interval.Min,
-			"maxSeqNr", rep.commitReport.Interval.Max,
-		)
-
-		//if r.snoozedRoots.IsSnoozed(merkleRoot) {
-		//	rootLggr.Debug("Skipping snoozed root")
-		//	continue
-		//}
-
-		if err := rep.validate(); err != nil {
-			rootLggr.Errorw("Skipping invalid report", "err", err)
-			continue
-		}
-
-		// If all messages are already executed and finalized, snooze the root for
-		// config.PermissionLessExecutionThresholdSeconds so it will never be considered again.
-		if allMsgsExecutedAndFinalized := rep.allRequestsAreExecutedAndFinalized(); allMsgsExecutedAndFinalized {
-			rootLggr.Infof("Snoozing root %s forever since there are no executable txs anymore", hex.EncodeToString(merkleRoot[:]))
-			r.snoozedRoots.MarkAsExecuted(merkleRoot)
-			incSkippedRequests(reasonAllExecuted)
-			continue
-		}
-
-		blessed, err := r.config.commitStoreReader.IsBlessed(ctx, merkleRoot)
+		// This could result in slightly different values on each call as
+		// the function returns the allowed amount at the time of the last block.
+		// Since this will only increase over time, the highest observed value will
+		// always be the lower bound of what would be available on chain
+		// since we already account for inflight txs.
+		getAllowedTokenAmount := cache.LazyFetch(func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+			return r.config.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
+		})
+		sourceToDestTokens, supportedDestTokens, err := r.sourceDestinationTokens(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if !blessed {
-			rootLggr.Infow("Report is accepted but not blessed")
-			incSkippedRequests(reasonNotBlessed)
-			continue
-		}
+		getSourceTokensPrices := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
+			sourceFeeTokens, err1 := r.cachedSourceFeeTokens.Get(ctx)
+			if err1 != nil {
+				return nil, err1
+			}
+			return getTokensPrices(ctx, sourceFeeTokens, r.config.sourcePriceRegistry, []common.Address{r.config.sourceWrappedNativeToken})
+		})
+		getDestTokensPrices := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
+			dstTokens, err1 := r.cachedDestTokens.Get(ctx)
+			if err1 != nil {
+				return nil, err1
+			}
+			return getTokensPrices(ctx, dstTokens.FeeTokens, r.destPriceRegistry, append(supportedDestTokens, r.destWrappedNative))
+		})
+		getDestGasPrice := cache.LazyFetch(func() (prices.GasPrice, error) {
+			return r.gasPriceEstimator.GetGasPrice(ctx)
+		})
 
-		allowedTokenAmountValue, err := getAllowedTokenAmount()
+		lggr.Infow("Processing unexpired reports", "n", len(unexpiredReports))
+		measureNumberOfReportsProcessed(timestamp, len(unexpiredReports))
+
+		unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReports)
 		if err != nil {
 			return nil, err
 		}
-		sourceTokensPricesValue, err := getSourceTokensPrices()
-		if err != nil {
-			return nil, fmt.Errorf("get source token prices: %w", err)
-		}
 
-		destTokensPricesValue, err := getDestTokensPrices()
-		if err != nil {
-			return nil, fmt.Errorf("get dest token prices: %w", err)
-		}
+		getDestPoolRateLimits := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
+			return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, sourceToDestTokens)
+		})
 
-		destPoolRateLimits, err := getDestPoolRateLimits()
-		if err != nil {
-			return nil, fmt.Errorf("get dest pool rate limits: %w", err)
-		}
+		for _, rep := range unexpiredReportsWithSendReqs {
+			if ctx.Err() != nil {
+				lggr.Warn("Processing of roots killed by context")
+				break
+			}
 
-		buildBatchDuration := time.Now()
-		batch := r.buildBatch(
-			ctx,
-			rootLggr,
-			rep,
-			inflight,
-			allowedTokenAmountValue.Tokens,
-			sourceTokensPricesValue,
-			destTokensPricesValue,
-			getDestGasPrice,
-			sourceToDestTokens,
-			destPoolRateLimits)
-		measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
-		if len(batch) != 0 {
-			return batch, nil
+			merkleRoot := rep.commitReport.MerkleRoot
+
+			rootLggr := lggr.With("root", hexutil.Encode(merkleRoot[:]),
+				"minSeqNr", rep.commitReport.Interval.Min,
+				"maxSeqNr", rep.commitReport.Interval.Max,
+			)
+
+			//if r.snoozedRoots.IsSnoozed(merkleRoot) {
+			//	rootLggr.Debug("Skipping snoozed root")
+			//	continue
+			//}
+
+			if err := rep.validate(); err != nil {
+				rootLggr.Errorw("Skipping invalid report", "err", err)
+				continue
+			}
+
+			// If all messages are already executed and finalized, snooze the root for
+			// config.PermissionLessExecutionThresholdSeconds so it will never be considered again.
+			if allMsgsExecutedAndFinalized := rep.allRequestsAreExecutedAndFinalized(); allMsgsExecutedAndFinalized {
+				rootLggr.Infof("Snoozing root %s forever since there are no executable txs anymore", hex.EncodeToString(merkleRoot[:]))
+				r.snoozedRoots.MarkAsExecuted(merkleRoot)
+				incSkippedRequests(reasonAllExecuted)
+				continue
+			}
+
+			blessed, err := r.config.commitStoreReader.IsBlessed(ctx, merkleRoot)
+			if err != nil {
+				return nil, err
+			}
+			if !blessed {
+				rootLggr.Infow("Report is accepted but not blessed")
+				incSkippedRequests(reasonNotBlessed)
+				continue
+			}
+
+			allowedTokenAmountValue, err := getAllowedTokenAmount()
+			if err != nil {
+				return nil, err
+			}
+			sourceTokensPricesValue, err := getSourceTokensPrices()
+			if err != nil {
+				return nil, fmt.Errorf("get source token prices: %w", err)
+			}
+
+			destTokensPricesValue, err := getDestTokensPrices()
+			if err != nil {
+				return nil, fmt.Errorf("get dest token prices: %w", err)
+			}
+
+			destPoolRateLimits, err := getDestPoolRateLimits()
+			if err != nil {
+				return nil, fmt.Errorf("get dest pool rate limits: %w", err)
+			}
+
+			buildBatchDuration := time.Now()
+			batch := r.buildBatch(
+				ctx,
+				rootLggr,
+				rep,
+				inflight,
+				allowedTokenAmountValue.Tokens,
+				sourceTokensPricesValue,
+				destTokensPricesValue,
+				getDestGasPrice,
+				sourceToDestTokens,
+				destPoolRateLimits)
+			measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
+			if len(batch) != 0 {
+				return batch, nil
+			}
+			r.snoozedRoots.Snooze(merkleRoot)
 		}
-		r.snoozedRoots.Snooze(merkleRoot)
 	}
 	return []ObservedMessage{}, nil
 }
