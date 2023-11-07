@@ -73,7 +73,7 @@ require (
 	github.com/smartcontractkit/chainlink-relay v0.1.7-0.20231020230319-2ede955d1dc9
 	github.com/smartcontractkit/chainlink-solana v1.0.3-0.20231023133638-72f4e799ab05
 	github.com/smartcontractkit/chainlink-starknet/relayer v0.0.1-beta-test.0.20231024133459-1ef3a11319eb
-	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20231027141933-9dba1e479909
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-20230828183543-6d0939746966
 	github.com/smartcontractkit/libocr v0.0.0-20231020123319-d255366a6545
 	github.com/smartcontractkit/ocr2keepers v0.7.28
 	github.com/smartcontractkit/ocr2vrf v0.0.0-20230804151440-2f1eb1e20687
@@ -358,7 +358,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/chainlink-env v0.38.3 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework v1.18.4-0.20231106173929-20fe04d6ad66 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework v1.16.0 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
