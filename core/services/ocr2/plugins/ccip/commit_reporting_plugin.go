@@ -164,7 +164,6 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 				rf.config.destLP,
 				rf.config.offRamp,
 				rf.destPriceRegReader,
-				rf.config.destClient,
 				int64(rf.config.commitStore.OffchainConfig().DestFinalityDepth),
 			),
 			gasPriceEstimator: rf.config.commitStore.GasPriceEstimator(),
@@ -635,7 +634,7 @@ func (r *CommitReportingPlugin) calculatePriceUpdates(observations []CommitObser
 
 	var tokenPriceUpdates []ccipdata.TokenPrice
 	for token, tokenPriceObservations := range priceObservations {
-		medianPrice := ccipcalc.BigIntMedian(tokenPriceObservations)
+		medianPrice := ccipcalc.BigIntSortedMiddle(tokenPriceObservations)
 
 		latestTokenPrice, exists := latestTokenPrices[token]
 		if exists {

@@ -5,13 +5,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"golang.org/x/exp/slices"
 
-	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
@@ -66,7 +63,6 @@ func NewTokenToDecimals(
 	lp logpoller.LogPoller,
 	offRamp ccipdata.OffRampReader,
 	priceRegistryReader ccipdata.PriceRegistryReader,
-	client evmclient.Client,
 	optimisticConfirmations int64,
 ) *CachedChain[map[common.Address]uint8] {
 	return &CachedChain[map[common.Address]uint8]{
@@ -81,9 +77,6 @@ func NewTokenToDecimals(
 			lggr:                lggr,
 			priceRegistryReader: priceRegistryReader,
 			offRamp:             offRamp,
-			tokenFactory: func(token common.Address) (link_token_interface.LinkTokenInterface, error) {
-				return link_token_interface.NewLinkToken(token, client)
-			},
 		},
 	}
 }
@@ -99,26 +92,19 @@ func (t *supportedTokensOrigin) Copy(value map[common.Address]common.Address) ma
 // CallOrigin Generates the source to dest token mapping based on the offRamp.
 // NOTE: this queries the offRamp n+1 times, where n is the number of enabled tokens.
 func (t *supportedTokensOrigin) CallOrigin(ctx context.Context) (map[common.Address]common.Address, error) {
-	srcToDstTokenMapping := make(map[common.Address]common.Address)
 	sourceTokens, err := t.offRamp.GetSupportedTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	seenDestinationTokens := make(map[common.Address]struct{})
+	destTokens, err := t.offRamp.GetDestinationTokensFromSourceTokens(ctx, sourceTokens)
+	if err != nil {
+		return nil, fmt.Errorf("get destination tokens from source tokens: %w", err)
+	}
 
-	for _, sourceToken := range sourceTokens {
-		dst, err1 := t.offRamp.GetDestinationToken(ctx, sourceToken)
-		if err1 != nil {
-			return nil, err1
-		}
-
-		if _, exists := seenDestinationTokens[dst]; exists {
-			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", dst)
-		}
-
-		seenDestinationTokens[dst] = struct{}{}
-		srcToDstTokenMapping[sourceToken] = dst
+	srcToDstTokenMapping := make(map[common.Address]common.Address, len(sourceTokens))
+	for i, sourceToken := range sourceTokens {
+		srcToDstTokenMapping[sourceToken] = destTokens[i]
 	}
 	return srcToDstTokenMapping, nil
 }
@@ -180,7 +166,6 @@ type tokenToDecimals struct {
 	lggr                logger.Logger
 	offRamp             ccipdata.OffRampReader
 	priceRegistryReader ccipdata.PriceRegistryReader
-	tokenFactory        func(address common.Address) (link_token_interface.LinkTokenInterface, error)
 	tokenDecimals       sync.Map
 }
 
@@ -197,25 +182,29 @@ func (t *tokenToDecimals) CallOrigin(ctx context.Context) (map[common.Address]ui
 	}
 
 	mapping := make(map[common.Address]uint8, len(destTokens))
+	unknownDecimalsTokens := make([]common.Address, 0, len(destTokens))
+
 	for _, token := range destTokens {
 		if decimals, exists := t.getCachedDecimals(token); exists {
 			mapping[token] = decimals
 			continue
 		}
-
-		tokenContract, err := t.tokenFactory(token)
-		if err != nil {
-			return nil, err
-		}
-
-		decimals, err := tokenContract.Decimals(&bind.CallOpts{Context: ctx})
-		if err != nil {
-			return nil, fmt.Errorf("get token %s decimals: %w", token, err)
-		}
-
-		t.setCachedDecimals(token, decimals)
-		mapping[token] = decimals
+		unknownDecimalsTokens = append(unknownDecimalsTokens, token)
 	}
+
+	if len(unknownDecimalsTokens) == 0 {
+		return mapping, nil
+	}
+
+	decimals, err := t.priceRegistryReader.GetTokensDecimals(ctx, unknownDecimalsTokens)
+	if err != nil {
+		return nil, fmt.Errorf("get tokens decimals: %w", err)
+	}
+	for i := range decimals {
+		t.setCachedDecimals(unknownDecimalsTokens[i], decimals[i])
+		mapping[unknownDecimalsTokens[i]] = decimals[i]
+	}
+
 	return mapping, nil
 }
 

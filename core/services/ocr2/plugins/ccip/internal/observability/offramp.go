@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -54,14 +55,38 @@ func (o *ObservedOffRampReader) GetPoolByDestToken(ctx context.Context, address 
 	})
 }
 
-func (o *ObservedOffRampReader) GetDestinationToken(ctx context.Context, address common.Address) (common.Address, error) {
-	return withObservedContract(o.metric, "GetDestinationToken", func() (common.Address, error) {
-		return o.OffRampReader.GetDestinationToken(ctx, address)
+func (o *ObservedOffRampReader) GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error) {
+	return withObservedContract(o.metric, "GetDestinationTokensFromSourceTokens", func() ([]common.Address, error) {
+		return o.OffRampReader.GetDestinationTokensFromSourceTokens(ctx, tokenAddresses)
 	})
 }
 
 func (o *ObservedOffRampReader) GetSupportedTokens(ctx context.Context) ([]common.Address, error) {
 	return withObservedContract(o.metric, "GetSupportedTokens", func() ([]common.Address, error) {
 		return o.OffRampReader.GetSupportedTokens(ctx)
+	})
+}
+
+func (o *ObservedOffRampReader) GetSenderNonce(ctx context.Context, sender common.Address) (uint64, error) {
+	return withObservedContract(o.metric, "GetSenderNonce", func() (uint64, error) {
+		return o.OffRampReader.GetSenderNonce(ctx, sender)
+	})
+}
+
+func (o *ObservedOffRampReader) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+	return withObservedContract(o.metric, "CurrentRateLimiterState", func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+		return o.OffRampReader.CurrentRateLimiterState(ctx)
+	})
+}
+
+func (o *ObservedOffRampReader) GetExecutionState(ctx context.Context, sequenceNumber uint64) (uint8, error) {
+	return withObservedContract(o.metric, "GetExecutionState", func() (uint8, error) {
+		return o.OffRampReader.GetExecutionState(ctx, sequenceNumber)
+	})
+}
+
+func (o *ObservedOffRampReader) GetStaticConfig(ctx context.Context) (ccipdata.OffRampStaticConfig, error) {
+	return withObservedContract(o.metric, "GetStaticConfig", func() (ccipdata.OffRampStaticConfig, error) {
+		return o.OffRampReader.GetStaticConfig(ctx)
 	})
 }
