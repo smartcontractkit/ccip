@@ -9,6 +9,7 @@ import {TokenPool} from "../TokenPool.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/utils/introspection/IERC165.sol";
 
 /// @notice This pool mints and burns USDC tokens through the Cross Chain Transfer
 /// Protocol (CCTP).
@@ -99,7 +100,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     return USDC_INTERFACE_ID;
   }
 
-  // See IERC165
+  /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
     return interfaceId == USDC_INTERFACE_ID || super.supportsInterface(interfaceId);
   }
@@ -163,12 +164,8 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
 
     _validateMessage(msgAndAttestation.message, sourceTokenData);
 
-    if (
-      !i_messageTransmitter.receiveMessage(
-        msgAndAttestation.message,
-        msgAndAttestation.attestation
-      )
-    ) revert UnlockingUSDCFailed();
+    if (!i_messageTransmitter.receiveMessage(msgAndAttestation.message, msgAndAttestation.attestation))
+      revert UnlockingUSDCFailed();
     emit Minted(msg.sender, receiver, amount);
   }
 
