@@ -94,8 +94,8 @@ type Delegate struct {
 	RelayGetter
 	isNewlyCreatedJob bool // Set to true if this is a new job freshly added, false if job was present already on node boot.
 	mailMon           *utils.MailboxMonitor
-
-	legacyChains evm.LegacyChainContainer // legacy: use relayers instead
+	eventBroadcaster  pg.EventBroadcaster
+	legacyChains      evm.LegacyChainContainer // legacy: use relayers instead
 }
 
 type DelegateConfig interface {
@@ -222,6 +222,7 @@ func NewDelegate(
 		RelayGetter:           relayers,
 		isNewlyCreatedJob:     false,
 		mailMon:               mailMon,
+		eventBroadcaster:      eventBroadcaster,
 	}
 }
 
@@ -1345,7 +1346,7 @@ func (d *Delegate) newServicesCCIPCommit(lggr logger.SugaredLogger, jb job.Job, 
 		},
 		transmitterID,
 		d.ethKs,
-		pg.EventBroadcaster(),
+		d.eventBroadcaster,
 	)
 	if err2 != nil {
 		return nil, err2
@@ -1393,7 +1394,7 @@ func (d *Delegate) newServicesCCIPExecution(lggr logger.SugaredLogger, jb job.Jo
 		},
 		transmitterID,
 		d.ethKs,
-		eventBroadcaster,
+		d.eventBroadcaster,
 	)
 	if err2 != nil {
 		return nil, err2
