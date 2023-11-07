@@ -41,7 +41,7 @@ contract CallWithExactGas_callWithExactGas is BaseTest {
 
     vm.expectCall(address(s_receiver), data);
 
-    (bool success, ) = s_caller.callWithExactGas(
+    (bool success, , ) = s_caller.callWithExactGas(
       data,
       address(s_receiver),
       100_000,
@@ -73,7 +73,7 @@ contract CallWithExactGas_callWithExactGas is BaseTest {
 
     vm.expectCall(address(s_reverting_receiver), data);
 
-    (bool success, bytes memory retData) = s_caller.callWithExactGas(
+    (bool success, bytes memory retData, ) = s_caller.callWithExactGas(
       data,
       address(s_reverting_receiver),
       100_000,

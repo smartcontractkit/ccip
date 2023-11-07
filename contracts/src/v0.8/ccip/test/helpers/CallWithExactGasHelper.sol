@@ -10,13 +10,7 @@ contract CallWithExactGasHelper {
     uint256 gasLimit,
     uint16 maxReturnBytes,
     uint16 gasForCallExactCheck
-  ) public returns (bool success, bytes memory retData) {
-    (success, retData) = CallWithExactGas._callWithExactGas(
-      payload,
-      target,
-      gasLimit,
-      maxReturnBytes,
-      gasForCallExactCheck
-    );
+  ) public returns (bool success, bytes memory retData, uint256 gasUsed) {
+    return CallWithExactGas._callWithExactGas(payload, target, gasLimit, maxReturnBytes, gasForCallExactCheck);
   }
 }

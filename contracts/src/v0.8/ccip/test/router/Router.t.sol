@@ -696,7 +696,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     Client.Any2EVMMessage memory message = generateReceiverMessage(SOURCE_CHAIN_ID);
     // Manuel execution cannot run out of gas
 
-    (bool success, bytes memory retData) = s_destRouter.routeMessage(
+    (bool success, bytes memory retData, uint256 gasUsed) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       generateManualGasLimit(message.data.length),
@@ -704,6 +704,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     );
     assertTrue(success);
     assertEq("", retData);
+    assertGt(gasUsed, 0);
   }
 
   function testExecutionEventSuccess() public {
@@ -722,7 +723,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
     );
 
-    (bool success, bytes memory retData) = s_destRouter.routeMessage(
+    (bool success, bytes memory retData, ) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       generateManualGasLimit(message.data.length),
@@ -747,7 +748,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
     );
 
-    (success, retData) = s_destRouter.routeMessage(
+    (success, retData, ) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       generateManualGasLimit(message.data.length),
@@ -775,7 +776,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
     );
 
-    (success, retData) = s_destRouter.routeMessage(
+    (success, retData, ) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       generateManualGasLimit(message.data.length),
@@ -819,7 +820,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       expectedRetData = abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, error);
     }
 
-    (bool success, bytes memory retData) = s_destRouter.routeMessage(
+    (bool success, bytes memory retData, ) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       generateManualGasLimit(message.data.length),
@@ -831,7 +832,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
   }
 
   function testAutoExecSuccess() public {
-    (bool success, ) = s_destRouter.routeMessage(
+    (bool success, , ) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       100_000,
@@ -840,7 +841,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
 
     assertTrue(success);
 
-    (success, ) = s_destRouter.routeMessage(
+    (success, , ) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       1,

@@ -430,7 +430,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       !message.receiver.isContract() || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
-    (bool success, bytes memory returnData) = IRouter(s_dynamicConfig.router).routeMessage(
+    (bool success, bytes memory returnData, ) = IRouter(s_dynamicConfig.router).routeMessage(
       Internal._toAny2EVMMessage(message, destTokenAmounts),
       Internal.GAS_FOR_CALL_EXACT_CHECK,
       message.gasLimit,
@@ -602,7 +602,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
       // _callWithExactGas also protects against return data bombs by capping the return data size
       // at MAX_RET_BYTES.
-      (bool success, bytes memory returnData) = CallWithExactGas._callWithExactGas(
+      (bool success, bytes memory returnData, ) = CallWithExactGas._callWithExactGas(
         abi.encodeWithSelector(
           pool.releaseOrMint.selector,
           originalSender,

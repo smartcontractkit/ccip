@@ -156,7 +156,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     uint16 gasForCallExactCheck,
     uint256 gasLimit,
     address receiver
-  ) external override whenHealthy returns (bool success, bytes memory retData) {
+  ) external override whenHealthy returns (bool success, bytes memory retData, uint256 gasUsed) {
     // We only permit offRamps to call this function.
     if (!isOffRamp(message.sourceChainSelector, msg.sender)) revert OnlyOffRamp();
 
@@ -164,7 +164,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     // can be called from the router.
     bytes memory data = abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message);
 
-    (success, retData) = CallWithExactGas._callWithExactGas(
+    (success, retData, gasUsed) = CallWithExactGas._callWithExactGas(
       data,
       receiver,
       gasLimit,
@@ -173,7 +173,7 @@ contract Router is IRouter, IRouterClient, ITypeAndVersion, OwnerIsCreator {
     );
 
     emit MessageExecuted(message.messageId, message.sourceChainSelector, msg.sender, keccak256(data));
-    return (success, retData);
+    return (success, retData, gasUsed);
   }
 
   // @notice Merges a chain selector and offRamp address into a single uint256 by shifting the
