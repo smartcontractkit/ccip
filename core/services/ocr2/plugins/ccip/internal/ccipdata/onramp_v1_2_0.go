@@ -202,7 +202,6 @@ type OnRampV1_2_0 struct {
 	lp                         logpoller.LogPoller
 	leafHasher                 LeafHasherInterface[[32]byte]
 	client                     client.Client
-	finalityTags               bool
 	filterName                 string
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
@@ -292,7 +291,6 @@ func NewOnRampV1_2_0(
 	onRampAddress common.Address,
 	sourceLP logpoller.LogPoller,
 	source client.Client,
-	finalityTags bool,
 ) (*OnRampV1_2_0, error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
@@ -309,7 +307,6 @@ func NewOnRampV1_2_0(
 		return nil, err
 	}
 	return &OnRampV1_2_0{
-		finalityTags:               finalityTags,
 		lggr:                       lggr,
 		client:                     source,
 		lp:                         sourceLP,
