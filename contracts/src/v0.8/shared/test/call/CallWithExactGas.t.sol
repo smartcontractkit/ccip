@@ -55,7 +55,7 @@ contract CallWithExactGas__callWithExactGasSafeReturnData is CallWithExactGasSet
     // The calculated overhead for retData initialization
     uint256 overheadForRetDataInit = 114;
     // The calculated overhead for otherwise unaccounted for gas usage
-    uint256 overheadForCallWithExactGas = 486;
+    uint256 overheadForCallWithExactGas = 416;
 
     bytes memory payload = abi.encodeWithSelector(
       s_caller.callWithExactGasSafeReturnData.selector,
