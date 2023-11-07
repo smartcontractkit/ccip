@@ -344,13 +344,12 @@ func (_m *CommitStoreReader) VerifyExecutionReport(ctx context.Context, report c
 	return r0, r1
 }
 
-type mockConstructorTestingTNewCommitStoreReader interface {
+// NewCommitStoreReader creates a new instance of CommitStoreReader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewCommitStoreReader(t interface {
 	mock.TestingT
 	Cleanup(func())
-}
-
-// NewCommitStoreReader creates a new instance of CommitStoreReader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
-func NewCommitStoreReader(t mockConstructorTestingTNewCommitStoreReader) *CommitStoreReader {
+}) *CommitStoreReader {
 	mock := &CommitStoreReader{}
 	mock.Mock.Test(t)
 

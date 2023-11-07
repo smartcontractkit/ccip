@@ -455,13 +455,12 @@ func (_m *OffRampReader) TokenEvents() []common.Hash {
 	return r0
 }
 
-type mockConstructorTestingTNewOffRampReader interface {
+// NewOffRampReader creates a new instance of OffRampReader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewOffRampReader(t interface {
 	mock.TestingT
 	Cleanup(func())
-}
-
-// NewOffRampReader creates a new instance of OffRampReader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
-func NewOffRampReader(t mockConstructorTestingTNewOffRampReader) *OffRampReader {
+}) *OffRampReader {
 	mock := &OffRampReader{}
 	mock.Mock.Test(t)
 
