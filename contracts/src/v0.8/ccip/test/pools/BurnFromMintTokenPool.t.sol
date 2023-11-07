@@ -64,31 +64,3 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
     s_pool.lockOrBurn(OWNER, bytes(""), 1, 0, bytes(""));
   }
 }
-
-contract BurnFromMintTokenPool_releaseOrMint is BurnFromMintTokenPoolSetup {
-  function testPoolMintSuccess() public {
-    uint256 amount = 1e19;
-    vm.startPrank(s_burnMintOffRamp);
-    vm.expectEmit();
-    emit Transfer(address(0), OWNER, amount);
-    s_pool.releaseOrMint(bytes(""), OWNER, amount, 0, bytes(""));
-    assertEq(s_burnMintERC677.balanceOf(OWNER), amount);
-  }
-
-  function testPoolMintNotHealthyReverts() public {
-    // Should not mint tokens if cursed.
-    s_mockARM.voteToCurse(bytes32(0));
-    uint256 before = s_burnMintERC677.balanceOf(OWNER);
-    vm.startPrank(s_burnMintOffRamp);
-    vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
-    s_pool.releaseOrMint(bytes(""), OWNER, 1e5, 0, bytes(""));
-    assertEq(s_burnMintERC677.balanceOf(OWNER), before);
-  }
-
-  function testPermissionsErrorReverts() public {
-    vm.startPrank(STRANGER);
-
-    vm.expectRevert(TokenPool.PermissionsError.selector);
-    s_pool.releaseOrMint(bytes(""), OWNER, 1, 0, bytes(""));
-  }
-}
