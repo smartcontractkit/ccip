@@ -36,7 +36,11 @@ interface IMessageTransmitter {
   /// signature verification will fail.
   function receiveMessage(bytes calldata message, bytes calldata attestation) external returns (bool success);
 
+  /// Returns domain of chain on which the contract is deployed.
+  /// @dev immutable
   function localDomain() external view returns (uint32);
 
+  /// Returns message format version.
+  /// @dev immutable
   function version() external view returns (uint32);
 }

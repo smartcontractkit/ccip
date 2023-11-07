@@ -4,19 +4,19 @@ pragma solidity 0.8.19;
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
 import "../BaseTest.t.sol";
+import "../mocks/MockUSDCTransmitter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {Router} from "../../Router.sol";
 import {USDCTokenPool} from "../../pools/USDC/USDCTokenPool.sol";
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
-import {MockUSDC} from "../mocks/MockUSDC.sol";
+import {MockUSDCTokenMessenger} from "../mocks/MockUSDCTokenMessenger.sol";
 import {USDCTokenPoolHelper} from "../helpers/USDCTokenPoolHelper.sol";
 
 import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/utils/introspection/IERC165.sol";
-import "../mocks/MockUSDCTransmitter.sol";
 
 contract USDCTokenPoolSetup is BaseTest {
   IBurnMintERC20 internal s_token;
-  MockUSDC internal s_mockUSDC;
+  MockUSDCTokenMessenger internal s_mockUSDC;
   MockUSDCTransmitter internal s_mockUSDCTransmitter;
 
   struct USDCMessage {
@@ -52,7 +52,7 @@ contract USDCTokenPoolSetup is BaseTest {
     setUpRamps();
 
     s_mockUSDCTransmitter = new MockUSDCTransmitter(0, DEST_DOMAIN_IDENTIFIER);
-    s_mockUSDC = new MockUSDC(0, address(s_mockUSDCTransmitter));
+    s_mockUSDC = new MockUSDCTokenMessenger(0, address(s_mockUSDCTransmitter));
 
     s_usdcTokenPool = new USDCTokenPoolHelper(s_mockUSDC, s_token, new address[](0), address(s_mockARM));
     linkToken.grantMintAndBurnRoles(address(s_mockUSDC));
@@ -137,8 +137,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   function testLockOrBurnSuccess() public {
     bytes32 receiver = bytes32(uint256(uint160(STRANGER)));
     uint256 amount = 1;
+    s_token.transfer(address(s_usdcTokenPool), amount);
     changePrank(s_routerAllowedOnRamp);
-    s_token.approve(address(s_usdcTokenPool), amount);
 
     USDCTokenPool.Domain memory expectedDomain = s_usdcTokenPool.getDomain(DEST_CHAIN_ID);
 
@@ -172,9 +172,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   }
 
   function testFuzz_LockOrBurnSuccess(bytes32 destinationReceiver, uint256 amount) public {
-    vm.assume(amount < rateLimiterConfig().capacity);
     vm.assume(destinationReceiver != bytes32(0));
-    amount = bound(amount, 1, 1e18);
+    amount = bound(amount, 1, rateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPool), amount);
     changePrank(s_routerAllowedOnRamp);
 
@@ -210,9 +209,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
   }
 
   function testFuzz_LockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
-    vm.assume(amount < rateLimiterConfig().capacity);
     vm.assume(destinationReceiver != bytes32(0));
-    amount = bound(amount, 1, 1e18);
+    amount = bound(amount, 1, rateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPoolWithAllowList), amount);
     changePrank(s_routerAllowedOnRamp);
 

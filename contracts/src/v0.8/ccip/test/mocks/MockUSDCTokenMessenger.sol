@@ -7,7 +7,7 @@ import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
 // This contract mocks both the ITokenMessenger and IMessageTransmitter
 // contracts involved with the Cross Chain Token Protocol.
-contract MockUSDC is ITokenMessenger {
+contract MockUSDCTokenMessenger is ITokenMessenger {
   uint32 private immutable i_messageBodyVersion;
   bytes32 public constant i_destinationTokenMessenger = keccak256("i_destinationTokenMessenger");
   uint64 public s_nonce;
