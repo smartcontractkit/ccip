@@ -704,7 +704,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
     );
     assertTrue(success);
     assertEq("", retData);
-    assertGt(gasUsed, 0);
+    assertGt(gasUsed, 3_000);
   }
 
   function testExecutionEventSuccess() public {
@@ -723,7 +723,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
     );
 
-    (bool success, bytes memory retData, ) = s_destRouter.routeMessage(
+    (bool success, bytes memory retData, uint256 gasUsed) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       generateManualGasLimit(message.data.length),
@@ -732,6 +732,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
 
     assertFalse(success);
     assertEq(abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, realError1), retData);
+    assertGt(gasUsed, 3_000);
 
     // Reason is truncated
     // Over the MAX_RET_BYTES limit (including offset and length word since we have a dynamic values), should be ignored
@@ -748,7 +749,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
     );
 
-    (success, retData, ) = s_destRouter.routeMessage(
+    (success, retData, gasUsed) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       generateManualGasLimit(message.data.length),
@@ -766,6 +767,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       ),
       retData
     );
+    assertGt(gasUsed, 3_000);
 
     // Should emit success
     vm.expectEmit();
@@ -776,7 +778,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
       keccak256(abi.encodeWithSelector(IAny2EVMMessageReceiver.ccipReceive.selector, message))
     );
 
-    (success, retData, ) = s_destRouter.routeMessage(
+    (success, retData, gasUsed) = s_destRouter.routeMessage(
       generateReceiverMessage(SOURCE_CHAIN_ID),
       GAS_FOR_CALL_EXACT_CHECK,
       generateManualGasLimit(message.data.length),
@@ -785,6 +787,7 @@ contract Router_routeMessage is EVM2EVMOffRampSetup {
 
     assertTrue(success);
     assertEq("", retData);
+    assertGt(gasUsed, 3_000);
   }
 
   function testFuzz_ExecutionEventSuccess(bytes calldata error) public {
