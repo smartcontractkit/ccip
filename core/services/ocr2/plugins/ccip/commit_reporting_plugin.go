@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -25,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -85,7 +83,7 @@ type CommitReportingPlugin struct {
 	priceGetter pricegetter.PriceGetter
 	// State
 	inflightReports    *inflightCommitReportsContainer
-	telemetryCollector *telemetryCollector
+	telemetryCollector TelemetryCollector
 }
 
 type CommitReportingPluginFactory struct {
@@ -505,7 +503,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	if err != nil {
 		return false, nil, err
 	}
-	r.telemetryCollector.ReportCommit(&report, &epochAndRound)
+	r.telemetryCollector.ReportCommit(report, epochAndRound) // asynchronously send commit telemetry
 	encodedReport, err := r.commitStoreReader.EncodeCommitReport(report)
 	if err != nil {
 		return false, nil, err
@@ -520,22 +518,6 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	)
 
 	return true, encodedReport, nil
-}
-
-func (r *CommitReportingPlugin) collectCommitTelemetry(
-	report *ccipdata.CommitStoreReport,
-	epochAndRound *types.ReportTimestamp,
-) (t *telemPb.CCIPTelemWrapper) {
-	return &telemPb.CCIPTelemWrapper{
-		Msg: &telemPb.CCIPTelemWrapper_CommitReport{
-			CommitReport: &telemPb.CCIPCommitReportSummary{
-				LenTokenPrices: uint32(len(report.TokenPrices)),
-				LenGasPrices:   uint32(len(report.GasPrices)), // XXX: if the len is short, would it be better to send the actual gas prices?
-				Epoch:          epochAndRound.Epoch,
-				Round:          uint32(epochAndRound.Round),
-			},
-		},
-	}
 }
 
 // validateObservations validates the given observations.

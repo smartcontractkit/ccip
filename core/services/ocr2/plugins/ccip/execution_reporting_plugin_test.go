@@ -87,9 +87,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		},
 	}
 
-	// // Telemetry
-	// me := genMonitoringEndpoint(t)
-
+	me := genMonitoringEndpoint(t) // Telemetry
 	ctx := testutils.Context(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -97,7 +95,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports = newInflightExecReportsContainer(time.Minute)
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
-			// p.monitoringEndpoint = me
+			p.telemetryCollector = NewTelemetryCollector(me, p.lggr)
 
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 			commitStoreReader.On("IsDown", mock.Anything).Return(tc.commitStorePaused, nil)
@@ -165,7 +163,6 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.cachedSourceFeeTokens = sourceFeeTokens
 
 			p.snoozedRoots = cache.NewSnoozedRoots(time.Minute, time.Minute)
-			require.NotNil(t, p.monitoringEndpoint, "monitoring endpoint is nil")
 
 			_, err := p.Observation(ctx, types.ReportTimestamp{}, types.Query{})
 			if tc.expErr {

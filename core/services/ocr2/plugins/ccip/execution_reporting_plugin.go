@@ -9,14 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
-
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -76,7 +77,7 @@ type ExecutionReportingPlugin struct {
 	cachedTokenPools       cache.AutoSync[map[common.Address]common.Address]
 	customTokenPoolFactory func(ctx context.Context, poolAddress common.Address, bind bind.ContractBackend) (custom_token_pool.CustomTokenPoolInterface, error)
 	gasPriceEstimator      prices.GasPriceEstimatorExec
-	telemetryCollector     *telemetryCollector
+	telemetryCollector     TelemetryCollector
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -931,7 +932,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	r.telemetryCollector.ReportExec(observedMessages, timestamp)
+	r.telemetryCollector.ReportExec(observedMessages, timestamp) // asynchronously send execution telemetry
 
 	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {

@@ -13,8 +13,8 @@ import (
 
 // TelemetryCollector is an interface for collecting telemetry data.
 type TelemetryCollector interface {
-	CollectCommit(report *ccipdata.CommitStoreReport, epochAndRound *types.ReportTimestamp)
-	CollectExec(observedMessages []ObservedMessage)
+	ReportCommit(report ccipdata.CommitStoreReport, epochAndRound types.ReportTimestamp)
+	ReportExec(observedMessages []ObservedMessage, epochAndRound types.ReportTimestamp)
 }
 
 type telemetryCollector struct {
@@ -39,7 +39,7 @@ func NewTelemetryCollector(monitoringEndpoint commontypes.MonitoringEndpoint, lg
 }
 
 // CollectCommit collects commit report data and sends it to the OTI monitoring endpoint.
-func (tc *telemetryCollector) ReportCommit(report *ccipdata.CommitStoreReport, epochAndRound *types.ReportTimestamp) {
+func (tc *telemetryCollector) ReportCommit(report ccipdata.CommitStoreReport, epochAndRound types.ReportTimestamp) {
 	telem := &telemPb.CCIPTelemWrapper{
 		Msg: &telemPb.CCIPTelemWrapper_CommitReport{
 			CommitReport: &telemPb.CCIPCommitReportSummary{
