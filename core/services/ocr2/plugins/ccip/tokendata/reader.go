@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	ErrNotReady = errors.New("token data not ready")
+	ErrNotReady  = errors.New("token data not ready")
+	ErrRateLimit = errors.New("token data API is being rate limited")
 )
 
 // Reader is an interface for fetching offchain token data

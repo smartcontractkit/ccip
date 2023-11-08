@@ -152,6 +152,12 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 		return attestationResponse{}, err
 	}
 	defer res.Body.Close()
+
+	// Explicitly signal if the API is being rate limited
+	if res.StatusCode == http.StatusTooManyRequests {
+		return attestationResponse{}, tokendata.ErrRateLimit
+	}
+
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return attestationResponse{}, err

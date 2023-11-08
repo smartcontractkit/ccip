@@ -67,40 +67,65 @@ func TestUSDCReader_callAttestationApiMock(t *testing.T) {
 }
 
 func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer ts.Close()
-	attestationURI, err := url.ParseRequestURI(ts.URL)
-	require.NoError(t, err)
+	t.Parallel()
 
-	lggr := logger.TestLogger(t)
-	lp := mocks.NewLogPoller(t)
-	lp.On("RegisterFilter", mock.Anything).Return(nil)
-	usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
-	require.NoError(t, err)
-	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI)
-	_, err = usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
-	require.Error(t, err)
-}
+	tests := []struct {
+		name  string
+		getTs func() *httptest.Server
+	}{
+		{
+			name: "server error",
+			getTs: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusInternalServerError)
+				}))
+			},
+		},
+		{
+			name: "timeout",
+			getTs: func() *httptest.Server {
+				response := attestationResponse{
+					Status:      attestationStatusSuccess,
+					Attestation: "720502893578a89a8a87982982ef781c18b193",
+				}
+				responseBytes, _ := json.Marshal(response)
 
-func TestUSDCReader_callAttestationApiMockTimeout(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(attestationTimeout + time.Second)
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer ts.Close()
-	attestationURI, err := url.ParseRequestURI(ts.URL)
-	require.NoError(t, err)
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					time.Sleep(attestationTimeout + time.Second)
+					_, err := w.Write(responseBytes)
+					require.NoError(t, err)
+				}))
 
-	lggr := logger.TestLogger(t)
-	lp := mocks.NewLogPoller(t)
-	lp.On("RegisterFilter", mock.Anything).Return(nil)
-	usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
-	require.NoError(t, err)
-	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI)
-	_, err = usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
-	require.Error(t, err)
+			},
+		},
+		{
+			name: "rate limit",
+			getTs: func() *httptest.Server {
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusTooManyRequests)
+				}))
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ts := test.getTs()
+			defer ts.Close()
+
+			attestationURI, err := url.ParseRequestURI(ts.URL)
+			require.NoError(t, err)
+
+			lggr := logger.TestLogger(t)
+			lp := mocks.NewLogPoller(t)
+			lp.On("RegisterFilter", mock.Anything).Return(nil)
+			usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
+			require.NoError(t, err)
+			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI)
+			_, err = usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
+			require.Error(t, err)
+		})
+	}
 }
 
 func getMockUSDCEndpoint(t *testing.T, response attestationResponse) *httptest.Server {

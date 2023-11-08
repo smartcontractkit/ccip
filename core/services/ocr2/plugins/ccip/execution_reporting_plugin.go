@@ -475,6 +475,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
 	expectedNonces := make(map[common.Address]uint64)
 	availableDataLen := MaxDataLenPerBatch
+	tokenDataRateLimited := false
 
 	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
@@ -525,9 +526,16 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		tokenData, ready, err2 := getTokenData(ctx, msgLggr, msg, r.config.tokenDataProviders)
+		tokenData, rateLimited, ready, err2 := getTokenData(ctx, msgLggr, msg, r.config.tokenDataProviders, tokenDataRateLimited)
 		if err2 != nil {
 			msgLggr.Errorw("Skipping message unable to check token data", "err", err2)
+			continue
+		}
+		if rateLimited {
+			// If a msg contains token being rate limited, the rate limit flag is turned on for the rest of the batch
+			// Let messages that do not require token data be batched, do not the rate limited API again.
+			tokenDataRateLimited = true
+			msgLggr.Warnw("Skipping message attestation being rate limited")
 			continue
 		}
 		if !ready {
@@ -621,7 +629,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	return executableMessages
 }
 
-func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader) (tokenData [][]byte, allReady bool, err error) {
+func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader, tokenDataRateLimited bool) (tokenData [][]byte, rateLimited bool, allReady bool, err error) {
 	for _, token := range msg.TokenAmounts {
 		offchainTokenDataProvider, ok := tokenDataProviders[token.Token]
 		if !ok {
@@ -629,20 +637,28 @@ func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMO
 			tokenData = append(tokenData, []byte{})
 			continue
 		}
+		if tokenDataRateLimited {
+			// If token data required but rate limited, exit without calling the API again
+			return [][]byte{}, true, false, nil
+		}
 		lggr.Infow("Fetching token data", "token", token.Token.Hex())
 		tknData, err2 := offchainTokenDataProvider.ReadTokenData(ctx, msg)
 		if err2 != nil {
+			if errors.Is(err2, tokendata.ErrRateLimit) {
+				lggr.Infow("Token is being rate limited", "token", token.Token.Hex())
+				return [][]byte{}, true, false, nil
+			}
 			if errors.Is(err2, tokendata.ErrNotReady) {
 				lggr.Infow("Token data not ready yet", "token", token.Token.Hex())
-				return [][]byte{}, false, nil
+				return [][]byte{}, false, false, nil
 			}
-			return [][]byte{}, false, err2
+			return [][]byte{}, false, false, err2
 		}
 
 		lggr.Infow("Token data retrieved", "token", token.Token.Hex())
 		tokenData = append(tokenData, tknData)
 	}
-	return tokenData, true, nil
+	return tokenData, false, true, nil
 }
 
 func (r *ExecutionReportingPlugin) isRateLimitEnoughForTokenPool(
