@@ -162,7 +162,6 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			telemetryCollector: NewTelemetryCollector(
 				rf.config.monitoringEndpoint,
 				rf.config.lggr.Named("ExecutionReportingPlugin")),
-			gasPriceEstimator:     rf.config.offRampReader.GasPriceEstimator(),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
