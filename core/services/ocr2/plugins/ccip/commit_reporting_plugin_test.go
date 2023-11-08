@@ -39,6 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -103,13 +104,13 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sourceFinalityDepth := 10
 
-			commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 			commitStoreReader.On("IsDown", ctx).Return(tc.commitStoreIsPaused, nil)
 			if !tc.commitStoreIsPaused {
 				commitStoreReader.On("GetExpectedNextSequenceNumber", ctx).Return(tc.commitStoreSeqNum, nil)
 			}
 
-			onRampReader := ccipdata.NewMockOnRampReader(t)
+			onRampReader := ccipdatamocks.NewOnRampReader(t)
 			if len(tc.sendReqs) > 0 {
 				onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.commitStoreSeqNum, sourceFinalityDepth).
 					Return(tc.sendReqs, nil)
@@ -310,11 +311,11 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			destPriceRegistryReader := ccipdata.NewMockPriceRegistryReader(t)
+			destPriceRegistryReader := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegistryReader.On("GetGasPriceUpdatesCreatedAfter", ctx, sourceChainSelector, mock.Anything, 0).Return(tc.gasPriceUpdates, nil)
 			destPriceRegistryReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, mock.Anything, 0).Return(tc.tokenPriceUpdates, nil)
 
-			onRampReader := ccipdata.NewMockOnRampReader(t)
+			onRampReader := ccipdatamocks.NewOnRampReader(t)
 			if len(tc.sendRequests) > 0 {
 				onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expSeqNumRange.Min, tc.expSeqNumRange.Max, 0).Return(tc.sendRequests, nil)
 			}
@@ -348,8 +349,8 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
-				obs, err := o.Marshal()
-				assert.NoError(t, err)
+				obs, err2 := o.Marshal()
+				assert.NoError(t, err2)
 				aos = append(aos, types.AttributedObservation{Observation: obs})
 			}
 
@@ -386,7 +387,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 		encodedReport := []byte("whatever")
 
-		commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		p.commitStoreReader = commitStoreReader
 		commitStoreReader.On("DecodeCommitReport", encodedReport).
 			Return(ccipdata.CommitStoreReport{}, errors.New("unable to decode report"))
@@ -400,7 +401,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 		report := ccipdata.CommitStoreReport{}
 
-		commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		p.commitStoreReader = commitStoreReader
 		commitStoreReader.On("DecodeCommitReport", mock.Anything).Return(report, nil)
 
@@ -416,7 +417,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 		//_, _ := testhelpers.NewFakeCommitStore(t, onChainSeqNum)
 
-		commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		p := newPlugin()
 
 		p.commitStoreReader = commitStoreReader
@@ -444,11 +445,11 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 		p := newPlugin()
 
-		priceRegistryReader := ccipdata.NewMockPriceRegistryReader(t)
+		priceRegistryReader := ccipdatamocks.NewPriceRegistryReader(t)
 		p.destPriceRegistryReader = priceRegistryReader
 
 		p.lggr = logger.TestLogger(t)
-		commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		p.commitStoreReader = commitStoreReader
 
 		report := ccipdata.CommitStoreReport{
@@ -506,7 +507,7 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 
 	ctx := testutils.Context(t)
 	p := &CommitReportingPlugin{}
-	commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+	commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 	onChainSeqNum := uint64(100)
 	commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(onChainSeqNum, nil)
 	p.commitStoreReader = commitStoreReader
@@ -1214,7 +1215,7 @@ func TestCommitReportingPlugin_nextMinSeqNum(t *testing.T) {
 		},
 	}
 	for _, tc := range tt {
-		commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.onChainMin, nil).Maybe()
 		cp := CommitReportingPlugin{commitStoreReader: commitStoreReader, inflightReports: newInflightCommitReportsContainer(time.Hour)}
 		epochAndRound := uint64(1)
@@ -1240,7 +1241,7 @@ func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 	merkleRoot2 := utils.Keccak256Fixed([]byte("some merkle root 2"))
 
 	t.Run("empty report", func(t *testing.T) {
-		commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		r := &CommitReportingPlugin{commitStoreReader: commitStoreReader}
 		isStale := r.isStaleReport(ctx, lggr, ccipdata.CommitStoreReport{}, false, types.ReportTimestamp{})
 		assert.True(t, isStale)
@@ -1248,7 +1249,7 @@ func TestCommitReportingPlugin_isStaleReport(t *testing.T) {
 
 	t.Run("merkle root", func(t *testing.T) {
 		const expNextSeqNum = uint64(9)
-		commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+		commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 		commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(expNextSeqNum, nil)
 
 		r := &CommitReportingPlugin{
@@ -1342,7 +1343,7 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &CommitReportingPlugin{}
-			commitStoreReader := ccipdata.NewMockCommitStoreReader(t)
+			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 			commitStoreReader.On("GetExpectedNextSequenceNumber", mock.Anything).Return(tc.commitStoreSeqNum, nil)
 			p.commitStoreReader = commitStoreReader
 
@@ -1358,7 +1359,7 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 				}
 			}
 
-			onRampReader := ccipdata.NewMockOnRampReader(t)
+			onRampReader := ccipdatamocks.NewOnRampReader(t)
 			var sendReqs []ccipdata.Event[internal.EVM2EVMMessage]
 			for _, seqNum := range tc.msgSeqNums {
 				sendReqs = append(sendReqs, ccipdata.Event[internal.EVM2EVMMessage]{
@@ -1433,7 +1434,7 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 			p.sourceChainSelector = chainSelector
 			p.inflightReports = newInflightCommitReportsContainer(time.Minute)
 			p.lggr = lggr
-			destPriceRegistry := ccipdata.NewMockPriceRegistryReader(t)
+			destPriceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			p.destPriceRegistryReader = destPriceRegistry
 
 			if tc.inflightGasPriceUpdate != nil {
@@ -1459,7 +1460,7 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 						},
 					})
 				}
-				destReader := ccipdata.NewMockPriceRegistryReader(t)
+				destReader := ccipdatamocks.NewPriceRegistryReader(t)
 				destReader.On("GetGasPriceUpdatesCreatedAfter", ctx, chainSelector, mock.Anything, 0).Return(events, nil)
 				p.destPriceRegistryReader = destReader
 			}
@@ -1552,7 +1553,7 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 			p := &CommitReportingPlugin{}
 
 			//_, priceRegAddr := testhelpers.NewFakePriceRegistry(t)
-			priceReg := ccipdata.NewMockPriceRegistryReader(t)
+			priceReg := ccipdatamocks.NewPriceRegistryReader(t)
 			p.destPriceRegistryReader = priceReg
 
 			//destReader := ccipdata.NewMockReader(t)
