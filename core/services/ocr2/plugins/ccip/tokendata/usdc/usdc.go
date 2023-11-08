@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
@@ -23,8 +24,9 @@ import (
 )
 
 const (
-	apiVersion      = "v1"
-	attestationPath = "attestations"
+	apiVersion         = "v1"
+	attestationPath    = "attestations"
+	attestationTimeout = 5 * time.Second
 )
 
 type attestationStatus string
@@ -135,7 +137,12 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.E
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
 	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%x", s.attestationApi, apiVersion, attestationPath, usdcMessageHash)
-	req, err := http.NewRequestWithContext(ctx, "GET", fullAttestationUrl, nil)
+
+	// Use a timeout to guard against attestation API hanging, causing observation timeout and failing to make any progress.
+	timeoutCtx, cancel := context.WithTimeout(ctx, attestationTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(timeoutCtx, "GET", fullAttestationUrl, nil)
+
 	if err != nil {
 		return attestationResponse{}, err
 	}

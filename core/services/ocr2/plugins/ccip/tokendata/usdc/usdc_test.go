@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/mock"
@@ -67,6 +68,25 @@ func TestUSDCReader_callAttestationApiMock(t *testing.T) {
 
 func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+	attestationURI, err := url.ParseRequestURI(ts.URL)
+	require.NoError(t, err)
+
+	lggr := logger.TestLogger(t)
+	lp := mocks.NewLogPoller(t)
+	lp.On("RegisterFilter", mock.Anything).Return(nil)
+	usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
+	require.NoError(t, err)
+	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI)
+	_, err = usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
+	require.Error(t, err)
+}
+
+func TestUSDCReader_callAttestationApiMockTimeout(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(attestationTimeout + time.Second)
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer ts.Close()
