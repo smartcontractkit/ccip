@@ -84,8 +84,7 @@ type CommitReportingPlugin struct {
 	// Offchain
 	priceGetter pricegetter.PriceGetter
 	// State
-	inflightReports *inflightCommitReportsContainer
-	// Telemetry
+	inflightReports    *inflightCommitReportsContainer
 	telemetryCollector *telemetryCollector
 }
 

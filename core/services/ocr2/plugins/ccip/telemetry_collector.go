@@ -45,6 +45,8 @@ func (tc *telemetryCollector) ReportCommit(report *ccipdata.CommitStoreReport, e
 			CommitReport: &telemPb.CCIPCommitReportSummary{
 				LenTokenPrices: uint32(len(report.TokenPrices)),
 				LenGasPrices:   uint32(len(report.GasPrices)), // XXX: if the len is short, would it be better to send the actual gas prices?
+				IntervalMin:    report.Interval.Min,
+				IntervalMax:    report.Interval.Max,
 				Epoch:          epochAndRound.Epoch,
 				Round:          uint32(epochAndRound.Round),
 			},
@@ -54,13 +56,20 @@ func (tc *telemetryCollector) ReportCommit(report *ccipdata.CommitStoreReport, e
 }
 
 // CollectExec collects execution report data and sends it to the OTI monitoring endpoint.
-func (tc *telemetryCollector) ReportExec(observedMessages []ObservedMessage) {
+func (tc *telemetryCollector) ReportExec(observedMessages []ObservedMessage, epochAndRound types.ReportTimestamp) {
 	var telem *telemPb.CCIPTelemWrapper
 	if len(observedMessages) > 0 {
+		var lenTokenData uint32
+		for _, msg := range observedMessages {
+			lenTokenData += uint32(len(msg.MsgData.TokenData))
+		}
 		telem = &telemPb.CCIPTelemWrapper{
 			Msg: &telemPb.CCIPTelemWrapper_ExecutionReport{
 				ExecutionReport: &telemPb.CCIPExecutionReportSummary{
-					LenTokenData: uint32(len(observedMessages[0].MsgData.TokenData)),
+					LenObservedMessages: uint32(len(observedMessages)),
+					LenTokenData:        lenTokenData,
+					Epoch:               epochAndRound.Epoch,
+					Round:               uint32(epochAndRound.Round),
 				},
 			},
 		}

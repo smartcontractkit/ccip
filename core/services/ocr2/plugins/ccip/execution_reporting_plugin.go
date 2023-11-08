@@ -917,7 +917,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	r.telemetryCollector.ReportExec(observedMessages)
+	r.telemetryCollector.ReportExec(observedMessages, timestamp)
 
 	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {
