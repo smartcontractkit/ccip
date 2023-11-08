@@ -97,11 +97,11 @@ func MultiCallCCIP(
 	address string,
 	msgData []CCIPMsgData,
 	native bool,
-) error {
+) (*types.Transaction, error) {
 	contractAddress := common.HexToAddress(address)
 	multiCallABI, err := abi.JSON(strings.NewReader(MultiCallABI))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	boundContract := bind.NewBoundContract(contractAddress, multiCallABI, evmClient.Backend(), evmClient.Backend(), evmClient.Backend())
 
@@ -115,14 +115,14 @@ func MultiCallCCIP(
 			for _, tokenAndAmount := range msg.Msg.TokenAmounts {
 				inputs, err := ApproveTokenCallData(msg.RouterAddr, tokenAndAmount.Amount)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				data := CallWithValue{Target: tokenAndAmount.Token, AllowFailure: false, CallData: inputs}
 				callData = append(callData, data)
 			}
 			inputs, err := CCIPSendCallData(msg)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			data := CallWithValue{Target: msg.RouterAddr, AllowFailure: false, Value: msg.Fee, CallData: inputs}
 			callData = append(callData, data)
@@ -130,58 +130,70 @@ func MultiCallCCIP(
 		}
 		opts, err := evmClient.TransactionOpts(evmClient.GetDefaultWallet())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		opts.Value = allValue
 		tx, err := boundContract.Transact(opts, "aggregate3Value", callData)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		err = WaitForSuccessfulTxMined(evmClient, tx)
 		if err != nil {
-			return errors.Wrapf(err, "multicall failed for ccip-send; router %s", contractAddress.Hex())
+			return nil, errors.Wrapf(err, "multicall failed for ccip-send; router %s", contractAddress.Hex())
 		}
 	}
 	// if with feetoken, use aggregate3 to send msg without value
 	var callData []Call
 	for _, msg := range msgData {
+		isFeeTokenAndBridgeTokenSame := false
+		// approve bridge token
+		for _, tokenAndAmount := range msg.Msg.TokenAmounts {
+			var inputs []byte
+			if tokenAndAmount.Token == msg.Msg.FeeToken {
+				isFeeTokenAndBridgeTokenSame = true
+				inputs, err = ApproveTokenCallData(msg.RouterAddr, new(big.Int).Add(msg.Fee, tokenAndAmount.Amount))
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				inputs, err = ApproveTokenCallData(msg.RouterAddr, tokenAndAmount.Amount)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			data := Call{Target: tokenAndAmount.Token, AllowFailure: false, CallData: inputs}
+			callData = append(callData, data)
+		}
 		// approve fee token
-		if msg.Fee != nil && msg.Fee.Cmp(big.NewInt(0)) > 0 {
+		if msg.Fee != nil && msg.Fee.Cmp(big.NewInt(0)) > 0 && !isFeeTokenAndBridgeTokenSame {
 			inputs, err := ApproveTokenCallData(msg.RouterAddr, msg.Fee)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			data := Call{Target: msg.Msg.FeeToken, AllowFailure: false, CallData: inputs}
 			callData = append(callData, data)
 		}
-		// approve bridge token
-		for _, tokenAndAmount := range msg.Msg.TokenAmounts {
-			inputs, err := ApproveTokenCallData(msg.RouterAddr, tokenAndAmount.Amount)
-			if err != nil {
-				return err
-			}
-			data := Call{Target: tokenAndAmount.Token, AllowFailure: false, CallData: inputs}
-			callData = append(callData, data)
-		}
+
 		inputs, err := CCIPSendCallData(msg)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		data := Call{Target: msg.RouterAddr, AllowFailure: false, CallData: inputs}
 		callData = append(callData, data)
 	}
 	opts, err := evmClient.TransactionOpts(evmClient.GetDefaultWallet())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tx, err := boundContract.Transact(opts, "aggregate3", callData)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = WaitForSuccessfulTxMined(evmClient, tx)
 	if err != nil {
-		return errors.Wrapf(err, "multicall failed for ccip-send; router %s", contractAddress.Hex())
+		return tx, errors.Wrapf(err, "multicall failed for ccip-send; router %s", contractAddress.Hex())
 	}
-	return nil
+	return tx, nil
 }

@@ -1,15 +1,9 @@
 [CCIP]
 
-[CCIP.Env]
-Networks = ['SEPOLIA', 'OPTIMISM_GOERLI']
-
 [CCIP.Groups]
 [CCIP.Groups.smoke]
 KeepEnvAlive = false
-BiDirectionalLane = false
 CommitAndExecuteOnSameDON = true
-MsgType = 'WithoutToken'
+MsgType = 'WithToken'
 PhaseTimeout = '10m'
-LocalCluster = false
-ExistingDeployment = true
 ReuseContracts = true

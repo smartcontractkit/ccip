@@ -848,26 +848,29 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 
 func (sourceCCIP *SourceCCIPModule) AssertSendRequestedLogFinalized(
 	lggr zerolog.Logger,
-	seqNum uint64,
-	SendRequested *evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested,
+	txHash common.Hash,
 	prevEventAt time.Time,
-	reqStat *testreporters.RequestStat,
+	reqStats []*testreporters.RequestStat,
 ) (time.Time, uint64, error) {
 	if sourceCCIP.Common.ChainClient.NetworkSimulated() {
 		return prevEventAt, 0, nil
 	}
 	lggr.Info().Msg("Waiting for CCIPSendRequested event log to be finalized")
-	finalizedBlockNum, finalizedAt, err := sourceCCIP.Common.ChainClient.WaitForFinalizedTx(SendRequested.Raw.TxHash)
+	finalizedBlockNum, finalizedAt, err := sourceCCIP.Common.ChainClient.WaitForFinalizedTx(txHash)
 	if err != nil {
-		reqStat.UpdateState(lggr, seqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
+		for _, stat := range reqStats {
+			stat.UpdateState(lggr, stat.SeqNum, testreporters.SourceLogFinalized, time.Since(prevEventAt), testreporters.Failure)
+		}
 		return time.Time{}, 0, fmt.Errorf("error waiting for CCIPSendRequested event log to be finalized - %+v", err)
 	}
-	reqStat.UpdateState(lggr, seqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(prevEventAt), testreporters.Success,
-		testreporters.TransactionStats{
-			TxHash:           SendRequested.Raw.TxHash.Hex(),
-			FinalizedByBlock: finalizedBlockNum.String(),
-			FinalizedAt:      finalizedAt.String(),
-		})
+	for _, stat := range reqStats {
+		stat.UpdateState(lggr, stat.SeqNum, testreporters.SourceLogFinalized, finalizedAt.Sub(prevEventAt), testreporters.Success,
+			testreporters.TransactionStats{
+				TxHash:           txHash.Hex(),
+				FinalizedByBlock: finalizedBlockNum.String(),
+				FinalizedAt:      finalizedAt.String(),
+			})
+	}
 	return finalizedAt, finalizedBlockNum.Uint64(), nil
 }
 
@@ -876,8 +879,8 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 	txHash string,
 	timeout time.Duration,
 	prevEventAt time.Time,
-	reqStat *testreporters.RequestStat,
-) (*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, time.Time, error) {
+	reqStat []*testreporters.RequestStat,
+) ([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested, time.Time, error) {
 	lggr.Info().Msg("Waiting for CCIPSendRequested event")
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -889,18 +892,23 @@ func (sourceCCIP *SourceCCIPModule) AssertEventCCIPSendRequested(
 		case <-ticker.C:
 			value, ok := sourceCCIP.CCIPSendRequestedWatcher.Load(txHash)
 			if ok {
-				if sendRequestedEvent, exists := value.(*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested); exists {
+				// if sendrequested events are found, check if the number of events are same as the number of requests
+				if sendRequestedEvents, exists := value.([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested); exists && len(sendRequestedEvents) == len(reqStat) {
 					// if the value is processed, delete it from the map
 					sourceCCIP.CCIPSendRequestedWatcher.Delete(txHash)
-					sentMsg := sendRequestedEvent.Message
-					seqNum := sentMsg.SequenceNumber
-					// prevEventAt is the time when the message was successful, this should be same as the time when the event was emitted
-					reqStat.UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success)
-					return sendRequestedEvent, prevEventAt, nil
+					for i, sendRequestedEvent := range sendRequestedEvents {
+						sentMsg := sendRequestedEvent.Message
+						seqNum := sentMsg.SequenceNumber
+						// prevEventAt is the time when the message was successful, this should be same as the time when the event was emitted
+						reqStat[i].UpdateState(lggr, seqNum, testreporters.CCIPSendRe, 0, testreporters.Success)
+					}
+					return sendRequestedEvents, prevEventAt, nil
 				}
 			}
 		case <-ctx.Done():
-			reqStat.UpdateState(lggr, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure)
+			for _, stat := range reqStat {
+				stat.UpdateState(lggr, 0, testreporters.CCIPSendRe, time.Since(prevEventAt), testreporters.Failure)
+			}
 			return nil, time.Now(), fmt.Errorf("CCIPSendRequested event is not found for tx %s", txHash)
 		}
 	}
@@ -1465,6 +1473,7 @@ func DefaultDestinationCCIPModule(logger zerolog.Logger, chainClient blockchain.
 }
 
 type CCIPRequest struct {
+	ReqNo                   int64
 	txHash                  string
 	txConfirmationTimestamp time.Time
 	RequestStat             *testreporters.RequestStat
@@ -1504,7 +1513,7 @@ type CCIPLane struct {
 	Balance                 *BalanceSheet
 	StartBlockOnSource      uint64
 	StartBlockOnDestination uint64
-	SentReqs                map[int64]CCIPRequest
+	SentReqs                map[common.Hash][]CCIPRequest
 	TotalFee                *big.Int // total fee for all the requests. Used for balance validation.
 	ValidationTimeout       time.Duration
 	Context                 context.Context
@@ -1583,22 +1592,33 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 	require.NoError(lane.Test, err, "Getting current block should be successful in dest chain")
 	lane.TotalFee = big.NewInt(0)
 	lane.NumberOfReq = 0
-	lane.SentReqs = make(map[int64]CCIPRequest)
+	lane.SentReqs = make(map[common.Hash][]CCIPRequest)
 }
 
-func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStat *testreporters.RequestStat) (*types.Receipt, error) {
+func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporters.RequestStat) (*types.Receipt, error) {
 	request, rcpt, err := CCIPRequestFromTxHash(txHash, lane.Source.Common.ChainClient)
 	if err != nil {
+		for _, stat := range reqStats {
+			stat.UpdateState(lane.Logger, 0, testreporters.TX, 0, testreporters.Failure)
+		}
 		return rcpt, fmt.Errorf("could not get request from tx hash %s: %+v", txHash.Hex(), err)
 	}
-	request.RequestStat = reqStat
-	lane.SentReqs[int64(lane.NumberOfReq+1)] = request
-	lane.NumberOfReq++
+	var allRequests []CCIPRequest
+	for _, stat := range reqStats {
+		allRequests = append(allRequests, CCIPRequest{
+			ReqNo:                   stat.ReqNo,
+			txHash:                  request.txHash,
+			txConfirmationTimestamp: request.txConfirmationTimestamp,
+			RequestStat:             stat,
+		})
+		lane.NumberOfReq++
+	}
+	lane.SentReqs[txHash] = allRequests
 	return rcpt, nil
 }
 
 func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr common.Address) error {
-	var ccipMultSend []contracts.CCIPMsgData
+	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
 	genericMsg, err := lane.Source.CCIPMsg(lane.Dest.ReceiverDapp.EthAddress, msgType, "testMsg")
 	if err != nil {
@@ -1608,7 +1628,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 	if err != nil {
 		return fmt.Errorf("failed getting the chain selector: %+v", err)
 	}
-
+	var reqStats []*testreporters.RequestStat
 	for i := 1; i <= noOfRequests; i++ {
 		// form the message for transfer
 		msg := genericMsg
@@ -1629,8 +1649,20 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 		}
 		log.Info().Str("fee", fee.String()).Msg("calculated fee")
 		sendData.Fee = fee
-		lane.TotalFee.Add(lane.TotalFee, fee)
-		ccipMultSend = append(ccipMultSend, sendData)
+		lane.TotalFee = new(big.Int).Add(lane.TotalFee, fee)
+		ccipMultipleMsg = append(ccipMultipleMsg, sendData)
+		// if token transfer is required, transfer the token amount to multisend
+		if msgType == TokenTransfer {
+			for i, amount := range lane.Source.TransferAmount {
+				token := lane.Source.Common.BridgeTokens[i]
+				err := token.Transfer(multiSendAddr.Hex(), amount)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq + i))
+		reqStats = append(reqStats, stat)
 	}
 	isNative := true
 	// transfer the fee amount to multisend
@@ -1641,17 +1673,40 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 			return err
 		}
 	}
-	// if token transfer is required, transfer the token amount to multisend
-	if msgType == TokenTransfer {
-		for i, amount := range lane.Source.TransferAmount {
-			token := lane.Source.Common.BridgeTokens[i]
-			err := token.Transfer(multiSendAddr.Hex(), amount)
-			if err != nil {
-				return err
-			}
-		}
+
+	tx, err := contracts.MultiCallCCIP(lane.Source.Common.ChainClient, multiSendAddr.Hex(), ccipMultipleMsg, isNative)
+	if err != nil {
+		return fmt.Errorf("failed to send the multicall: %+v", err)
 	}
-	return contracts.MultiCallCCIP(lane.Source.Common.ChainClient, multiSendAddr.Hex(), ccipMultSend, isNative)
+	if err != nil {
+		for _, stat := range reqStats {
+			stat.UpdateState(lane.Logger, 0,
+				testreporters.TX, txConfirmationDur, testreporters.Failure)
+		}
+		return fmt.Errorf("failed to send the multicall: %+v", err)
+	}
+	rcpt, err := lane.AddToSentReqs(tx.Hash(), reqStats)
+	if err != nil {
+		stat.UpdateState(lane.Logger, 0,
+			testreporters.TX, 0, testreporters.Failure)
+		return err
+	}
+	var gasUsed uint64
+	if rcpt != nil {
+		gasUsed = rcpt.GasUsed
+	}
+	noOfTokens := len(lane.Source.TransferAmount)
+	if msgType == DataOnlyTransfer {
+		noOfTokens = 0
+	}
+	stat.UpdateState(lane.Logger, 0,
+		testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.TransactionStats{
+			Fee:                lane.TotalFee.String(),
+			GasUsed:            gasUsed,
+			TxHash:             tx.Hash().Hex(),
+			NoOfTokensSent:     noOfTokens,
+			MessageBytesLength: len(genericMsg.Data),
+		})
 }
 
 func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
@@ -1678,10 +1733,8 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
 		if msgType == DataOnlyTransfer {
 			noOfTokens = 0
 		}
-		rcpt, err := lane.AddToSentReqs(txHash, stat)
+		rcpt, err := lane.AddToSentReqs(txHash, []*testreporters.RequestStat{stat})
 		if err != nil {
-			stat.UpdateState(lane.Logger, 0,
-				testreporters.TX, txConfirmationDur, testreporters.Failure)
 			return err
 		}
 		var gasUsed uint64
@@ -1703,8 +1756,9 @@ func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
 }
 
 func (lane *CCIPLane) ValidateRequests() {
-	for i, tx := range lane.SentReqs {
-		require.NoError(lane.Test, lane.ValidateRequestByTxHash(tx.txHash, tx.txConfirmationTimestamp, i),
+	for txHash, ccipReqs := range lane.SentReqs {
+		require.Greater(lane.Test, len(ccipReqs), 0, "no ccip requests found for tx hash")
+		require.NoError(lane.Test, lane.ValidateRequestByTxHash(txHash),
 			"validating request events by tx hash")
 	}
 	// Asserting balances reliably work only for simulated private chains. The testnet contract balances might get updated by other transactions
@@ -1715,40 +1769,59 @@ func (lane *CCIPLane) ValidateRequests() {
 	}
 }
 
-func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmation time.Time, reqNo int64) error {
-	reqStat := lane.SentReqs[reqNo].RequestStat
-	defer lane.Reports.UpdatePhaseStatsForReq(reqStat)
-	msgLog, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
-		lane.Logger, txHash, lane.ValidationTimeout, txConfirmation, reqStat)
-	if err != nil || msgLog == nil {
+func (lane *CCIPLane) ValidateRequestByTxHash(txHash common.Hash) error {
+	var reqStats []*testreporters.RequestStat
+	ccipRequests := lane.SentReqs[txHash]
+	require.Greater(lane.Test, len(ccipRequests), 0, "no ccip requests found for tx hash")
+	txConfirmation := ccipRequests[0].txConfirmationTimestamp
+	for _, req := range ccipRequests {
+		reqStats = append(reqStats, req.RequestStat)
+		defer lane.Reports.UpdatePhaseStatsForReq(req.RequestStat)
+	}
+
+	msgLogs, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
+		lane.Logger, txHash.Hex(), lane.ValidationTimeout, txConfirmation, reqStats)
+	if err != nil || msgLogs == nil {
 		return fmt.Errorf("could not validate CCIPSendRequested event: %+v", err)
 	}
-	seqNumber := msgLog.Message.SequenceNumber
-
-	sourceLogFinalizedAt, _, err := lane.Source.AssertSendRequestedLogFinalized(lane.Logger, seqNumber, msgLog, ccipSendReqGenAt, reqStat)
+	sourceLogFinalizedAt, _, err := lane.Source.AssertSendRequestedLogFinalized(lane.Logger, txHash, ccipSendReqGenAt, reqStats)
 	if err != nil {
 		return fmt.Errorf("could not finalize CCIPSendRequested event: %+v", err)
 	}
-	err = lane.Dest.AssertSeqNumberExecuted(lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat)
-	if err != nil {
-		return fmt.Errorf("could not validate seq number increase at commit store: %+v", err)
-	}
+	for _, msgLog := range msgLogs {
+		seqNumber := msgLog.Message.SequenceNumber
+		var reqStat *testreporters.RequestStat
+		for _, stat := range reqStats {
+			if stat.SeqNum == seqNumber {
+				reqStat = stat
+				break
+			}
+		}
+		if reqStat == nil {
+			return fmt.Errorf("could not find request stat for seq number %d", seqNumber)
+		}
 
-	// Verify whether commitStore has accepted the report
-	commitReport, reportAcceptedAt, err := lane.Dest.AssertEventReportAccepted(
-		lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat)
-	if err != nil || commitReport == nil {
-		return fmt.Errorf("could not validate ReportAccepted event: %+v", err)
-	}
+		err = lane.Dest.AssertSeqNumberExecuted(lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat)
+		if err != nil {
+			return fmt.Errorf("could not validate seq number increase at commit store: %+v", err)
+		}
 
-	reportBlessedAt, err := lane.Dest.AssertReportBlessed(lane.Logger, seqNumber, lane.ValidationTimeout, *commitReport, reportAcceptedAt, reqStat)
-	if err != nil {
-		return fmt.Errorf("could not validate ReportBlessed event: %+v", err)
-	}
-	// Verify whether the execution state is changed and the transfer is successful
-	err = lane.Dest.AssertEventExecutionStateChanged(lane.Logger, seqNumber, lane.ValidationTimeout, reportBlessedAt, reqStat)
-	if err != nil {
-		return fmt.Errorf("could not validate ExecutionStateChanged event: %+v", err)
+		// Verify whether commitStore has accepted the report
+		commitReport, reportAcceptedAt, err := lane.Dest.AssertEventReportAccepted(
+			lane.Logger, seqNumber, lane.ValidationTimeout, sourceLogFinalizedAt, reqStat)
+		if err != nil || commitReport == nil {
+			return fmt.Errorf("could not validate ReportAccepted event: %+v", err)
+		}
+
+		reportBlessedAt, err := lane.Dest.AssertReportBlessed(lane.Logger, seqNumber, lane.ValidationTimeout, *commitReport, reportAcceptedAt, reqStat)
+		if err != nil {
+			return fmt.Errorf("could not validate ReportBlessed event: %+v", err)
+		}
+		// Verify whether the execution state is changed and the transfer is successful
+		err = lane.Dest.AssertEventExecutionStateChanged(lane.Logger, seqNumber, lane.ValidationTimeout, reportBlessedAt, reqStat)
+		if err != nil {
+			return fmt.Errorf("could not validate ExecutionStateChanged event: %+v", err)
+		}
 	}
 	return nil
 }
@@ -1772,7 +1845,12 @@ func (lane *CCIPLane) StartEventWatchers() error {
 		for {
 			e := <-sendReqEvent
 			lane.Logger.Info().Msgf("CCIPSendRequested event received for seq number %d", e.Message.SequenceNumber)
-			lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), e)
+			eventsForTx, ok := lane.Source.CCIPSendRequestedWatcher.Load(e.Raw.TxHash.Hex())
+			if ok {
+				lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), append(eventsForTx.([]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested), e))
+			} else {
+				lane.Source.CCIPSendRequestedWatcher.Store(e.Raw.TxHash.Hex(), []*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested{e})
+			}
 		}
 	}()
 	reportAcceptedEvent := make(chan *commit_store.CommitStoreReportAccepted)

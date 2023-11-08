@@ -576,9 +576,11 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 		priceUpdateGrp.Go(func() error {
 			return waitForUpdate(*lanes.ForwardLane)
 		})
-		priceUpdateGrp.Go(func() error {
-			return waitForUpdate(*lanes.ReverseLane)
-		})
+		if lanes.ReverseLane != nil {
+			priceUpdateGrp.Go(func() error {
+				return waitForUpdate(*lanes.ReverseLane)
+			})
+		}
 	}
 
 	require.NoError(t, priceUpdateGrp.Wait())
