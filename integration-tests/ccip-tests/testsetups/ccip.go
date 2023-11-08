@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -368,7 +369,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		SourceNetworkName: actions.NetworkName(networkA.Name),
 		DestNetworkName:   actions.NetworkName(networkB.Name),
 		ValidationTimeout: o.Cfg.TestGroupInput.PhaseTimeout.Duration(),
-		SentReqs:          make(map[int64]actions.CCIPRequest),
+		SentReqs:          make(map[common.Hash][]actions.CCIPRequest),
 		TotalFee:          big.NewInt(0),
 		Balance:           o.Balance,
 		Context:           ctx,
@@ -422,7 +423,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 			DestChain:         destChainClientB2A,
 			ValidationTimeout: o.Cfg.TestGroupInput.PhaseTimeout.Duration(),
 			Balance:           o.Balance,
-			SentReqs:          make(map[int64]actions.CCIPRequest),
+			SentReqs:          make(map[common.Hash][]actions.CCIPRequest),
 			TotalFee:          big.NewInt(0),
 			Context:           ctx,
 			SrcNetworkLaneCfg: ccipLaneA2B.DstNetworkLaneCfg,

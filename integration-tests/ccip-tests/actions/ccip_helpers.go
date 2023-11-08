@@ -1629,6 +1629,7 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 		return fmt.Errorf("failed getting the chain selector: %+v", err)
 	}
 	var reqStats []*testreporters.RequestStat
+	var txstats []testreporters.TransactionStats
 	for i := 1; i <= noOfRequests; i++ {
 		// form the message for transfer
 		msg := genericMsg
@@ -1662,6 +1663,11 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 			}
 		}
 		stat := testreporters.NewCCIPRequestStats(int64(lane.NumberOfReq + i))
+		txstats = append(txstats, testreporters.TransactionStats{
+			Fee:                fee.String(),
+			NoOfTokensSent:     len(msg.TokenAmounts),
+			MessageBytesLength: len(msg.Data),
+		})
 		reqStats = append(reqStats, stat)
 	}
 	isNative := true
@@ -1679,34 +1685,28 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 		return fmt.Errorf("failed to send the multicall: %+v", err)
 	}
 	if err != nil {
+		// update the stats as failure for all the requests in the multicall tx
 		for _, stat := range reqStats {
 			stat.UpdateState(lane.Logger, 0,
-				testreporters.TX, txConfirmationDur, testreporters.Failure)
+				testreporters.TX, 0, testreporters.Failure)
 		}
 		return fmt.Errorf("failed to send the multicall: %+v", err)
 	}
 	rcpt, err := lane.AddToSentReqs(tx.Hash(), reqStats)
 	if err != nil {
-		stat.UpdateState(lane.Logger, 0,
-			testreporters.TX, 0, testreporters.Failure)
 		return err
 	}
 	var gasUsed uint64
 	if rcpt != nil {
 		gasUsed = rcpt.GasUsed
 	}
-	noOfTokens := len(lane.Source.TransferAmount)
-	if msgType == DataOnlyTransfer {
-		noOfTokens = 0
+	// update the stats for all the requests in the multicall tx
+	for i, stat := range reqStats {
+		txstats[i].GasUsed = gasUsed
+		txstats[i].TxHash = tx.Hash().Hex()
+		stat.UpdateState(lane.Logger, 0, testreporters.TX, 0, testreporters.Success, txstats[i])
 	}
-	stat.UpdateState(lane.Logger, 0,
-		testreporters.TX, txConfirmationDur, testreporters.Success, testreporters.TransactionStats{
-			Fee:                lane.TotalFee.String(),
-			GasUsed:            gasUsed,
-			TxHash:             tx.Hash().Hex(),
-			NoOfTokensSent:     noOfTokens,
-			MessageBytesLength: len(genericMsg.Data),
-		})
+	return nil
 }
 
 func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
