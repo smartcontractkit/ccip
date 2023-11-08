@@ -200,6 +200,7 @@ func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Execution
 				lggr,
 				usdcReader,
 				attestationURI,
+				pluginConfig.USDCConfig.AttestationAPITimeoutSeconds,
 			),
 		)
 	}
