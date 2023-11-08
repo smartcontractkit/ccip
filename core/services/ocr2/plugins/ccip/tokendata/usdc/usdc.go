@@ -149,6 +149,9 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 	req.Header.Add("accept", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return attestationResponse{}, tokendata.ErrTimeout
+		}
 		return attestationResponse{}, err
 	}
 	defer res.Body.Close()

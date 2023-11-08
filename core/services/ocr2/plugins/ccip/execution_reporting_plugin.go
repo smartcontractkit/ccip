@@ -475,7 +475,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
 	expectedNonces := make(map[common.Address]uint64)
 	availableDataLen := MaxDataLenPerBatch
-	tokenDataRateLimited := false
+	skipTokenWithData := false
 
 	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
@@ -526,16 +526,17 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		tokenData, rateLimited, ready, err2 := getTokenData(ctx, msgLggr, msg, r.config.tokenDataProviders, tokenDataRateLimited)
+		tokenData, skipData, ready, err2 := getTokenData(ctx, msgLggr, msg, r.config.tokenDataProviders, skipTokenWithData)
 		if err2 != nil {
 			msgLggr.Errorw("Skipping message unable to check token data", "err", err2)
 			continue
 		}
-		if rateLimited {
-			// If a msg contains token being rate limited, the rate limit flag is turned on for the rest of the batch
-			// Let messages that do not require token data be batched, do not the rate limited API again.
-			tokenDataRateLimited = true
-			msgLggr.Warnw("Skipping message attestation being rate limited")
+		if skipData {
+			// When fetching token data, 3rd party API could hang or rate limit.
+			// If this happens, we should skip all remaining messages that require token data to avoid calling the API again in this batch.
+			// If API issues does not resolve, eventually the root will only contain messages that should be skipped, and be snoozed.
+			skipTokenWithData = true
+			msgLggr.Warnw("Skipping message due to failing to fetch data from token API")
 			continue
 		}
 		if !ready {
@@ -629,7 +630,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	return executableMessages
 }
 
-func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader, tokenDataRateLimited bool) (tokenData [][]byte, rateLimited bool, allReady bool, err error) {
+func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader, skipTokenWithData bool) (tokenData [][]byte, skipData bool, allReady bool, err error) {
 	for _, token := range msg.TokenAmounts {
 		offchainTokenDataProvider, ok := tokenDataProviders[token.Token]
 		if !ok {
@@ -637,15 +638,15 @@ func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMO
 			tokenData = append(tokenData, []byte{})
 			continue
 		}
-		if tokenDataRateLimited {
-			// If token data required but rate limited, exit without calling the API again
+		if skipTokenWithData {
+			// If token data is required but should be skipped, exit without calling the API
 			return [][]byte{}, true, false, nil
 		}
 		lggr.Infow("Fetching token data", "token", token.Token.Hex())
 		tknData, err2 := offchainTokenDataProvider.ReadTokenData(ctx, msg)
 		if err2 != nil {
-			if errors.Is(err2, tokendata.ErrRateLimit) {
-				lggr.Infow("Token is being rate limited", "token", token.Token.Hex())
+			if errors.Is(err2, tokendata.ErrRateLimit) || errors.Is(err2, tokendata.ErrTimeout) {
+				lggr.Infow(err2.Error(), "token", token.Token.Hex())
 				return [][]byte{}, true, false, nil
 			}
 			if errors.Is(err2, tokendata.ErrNotReady) {

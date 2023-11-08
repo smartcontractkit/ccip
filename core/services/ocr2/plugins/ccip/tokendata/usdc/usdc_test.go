@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -70,8 +72,9 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name  string
-		getTs func() *httptest.Server
+		name          string
+		getTs         func() *httptest.Server
+		expectedError error
 	}{
 		{
 			name: "server error",
@@ -80,6 +83,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 					w.WriteHeader(http.StatusInternalServerError)
 				}))
 			},
+			expectedError: nil,
 		},
 		{
 			name: "timeout",
@@ -97,6 +101,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 				}))
 
 			},
+			expectedError: tokendata.ErrTimeout,
 		},
 		{
 			name: "rate limit",
@@ -105,6 +110,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 					w.WriteHeader(http.StatusTooManyRequests)
 				}))
 			},
+			expectedError: tokendata.ErrRateLimit,
 		},
 	}
 
@@ -124,6 +130,10 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI)
 			_, err = usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 			require.Error(t, err)
+
+			if test.expectedError != nil {
+				require.True(t, errors.Is(err, test.expectedError))
+			}
 		})
 	}
 }
