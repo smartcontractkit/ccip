@@ -35,7 +35,7 @@ func TestUSDCReader_callAttestationApi(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, nil)
 	require.NoError(t, err)
-	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI)
+	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0)
 
 	attestation, err := usdcService.callAttestationApi(context.Background(), [32]byte(common.FromHex(usdcMessageHash)))
 	require.NoError(t, err)
@@ -60,7 +60,7 @@ func TestUSDCReader_callAttestationApiMock(t *testing.T) {
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
 	usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
 	require.NoError(t, err)
-	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI)
+	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0)
 	attestation, err := usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 	require.NoError(t, err)
 
@@ -72,9 +72,10 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		getTs         func() *httptest.Server
-		expectedError error
+		name                 string
+		getTs                func() *httptest.Server
+		customTimeoutSeconds int
+		expectedError        error
 	}{
 		{
 			name: "server error",
@@ -86,7 +87,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name: "timeout",
+			name: "default timeout",
 			getTs: func() *httptest.Server {
 				response := attestationResponse{
 					Status:      attestationStatusSuccess,
@@ -95,13 +96,32 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 				responseBytes, _ := json.Marshal(response)
 
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					time.Sleep(attestationTimeout + time.Second)
+					time.Sleep(defaultAttestationTimeout + time.Second)
 					_, err := w.Write(responseBytes)
 					require.NoError(t, err)
 				}))
 
 			},
 			expectedError: tokendata.ErrTimeout,
+		},
+		{
+			name: "custom timeout",
+			getTs: func() *httptest.Server {
+				response := attestationResponse{
+					Status:      attestationStatusSuccess,
+					Attestation: "720502893578a89a8a87982982ef781c18b193",
+				}
+				responseBytes, _ := json.Marshal(response)
+
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					time.Sleep(2*time.Second + time.Second)
+					_, err := w.Write(responseBytes)
+					require.NoError(t, err)
+				}))
+
+			},
+			customTimeoutSeconds: 2,
+			expectedError:        tokendata.ErrTimeout,
 		},
 		{
 			name: "rate limit",
@@ -127,7 +147,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 			lp.On("RegisterFilter", mock.Anything).Return(nil)
 			usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
 			require.NoError(t, err)
-			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI)
+			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, test.customTimeoutSeconds)
 			_, err = usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 			require.Error(t, err)
 
@@ -154,7 +174,7 @@ func TestGetUSDCMessageBody(t *testing.T) {
 	usdcReader.On("GetLastUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything).Return(expectedBody, nil)
 
 	lggr := logger.TestLogger(t)
-	usdcService := NewUSDCTokenDataReader(lggr, &usdcReader, nil)
+	usdcService := NewUSDCTokenDataReader(lggr, &usdcReader, nil, 0)
 
 	// Make the first call and assert the underlying function is called
 	body, err := usdcService.getUSDCMessageBody(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{})
