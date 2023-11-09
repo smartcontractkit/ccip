@@ -100,6 +100,9 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EV
 
 	s.lggr.Infow("Calling attestation API", "messageBodyHash", hexutil.Encode(messageBody[:]), "messageID", hexutil.Encode(msg.MessageId[:]))
 
+	// sleep for 10 seconds for each API call
+	time.Sleep(10 * time.Second)
+
 	// The attestation API expects the hash of the message body
 	attestationResp, err := s.callAttestationApi(ctx, utils.Keccak256Fixed(messageBody))
 	if err != nil {
