@@ -13,6 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -25,8 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 const (
@@ -231,14 +232,16 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		"epochAndRound", epochAndRound)
 	// Even if all values are empty we still want to communicate our observation
 	// with the other nodes, therefore, we always return the observed values.
-	return CommitObservation{
+	observation := CommitObservation{
 		Interval: ccipdata.CommitStoreInterval{
 			Min: min,
 			Max: max,
 		},
 		TokenPricesUSD:    tokenPricesUSD,
 		SourceGasPriceUSD: sourceGasPriceUSD,
-	}.Marshal()
+	}
+	r.telemetryCollector.TrackCommitObservation(observation, epochAndRound)
+	return observation.Marshal()
 }
 
 func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Context, lggr logger.Logger) (uint64, uint64, error) {
@@ -503,7 +506,6 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	if err != nil {
 		return false, nil, err
 	}
-	r.telemetryCollector.ReportCommit(validObservations, report, epochAndRound) // asynchronously send commit telemetry
 	encodedReport, err := r.commitStoreReader.EncodeCommitReport(report)
 	if err != nil {
 		return false, nil, err
