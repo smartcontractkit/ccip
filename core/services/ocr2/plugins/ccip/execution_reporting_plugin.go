@@ -13,6 +13,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
+
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -27,9 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -917,7 +918,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("ExecutionReport")
-	parsableObservations := getParsableObservations[ExecutionObservation](lggr, observations)
+	parsableObservations, _ := getParsableObservations[ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
 	if len(parsableObservations) <= r.F {
 		lggr.Warn("Non-empty observations <= F, need at least F+1 to continue")
@@ -932,7 +933,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	r.telemetryCollector.ReportExec(observedMessages, timestamp) // asynchronously send execution telemetry
+	// FIXME r.telemetryCollector.ReportExec(mappedObservations, timestamp) // asynchronously send execution telemetry
 
 	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {

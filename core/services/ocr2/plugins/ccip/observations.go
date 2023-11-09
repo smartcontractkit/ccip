@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -63,8 +64,9 @@ func (o ExecutionObservation) Marshal() ([]byte, error) {
 // getParsableObservations checks the given observations for formatting and value errors.
 // It returns all valid observations, potentially being an empty list. It will log
 // malformed observations but never error.
-func getParsableObservations[O CommitObservation | ExecutionObservation](l logger.Logger, observations []types.AttributedObservation) []O {
+func getParsableObservations[O CommitObservation | ExecutionObservation](l logger.Logger, observations []types.AttributedObservation) ([]O, map[commontypes.OracleID]O) {
 	var parseableObservations []O
+	mappedObservations := map[commontypes.OracleID]O{}
 	for _, ao := range observations {
 		if len(ao.Observation) == 0 {
 			// Empty observation
@@ -78,6 +80,7 @@ func getParsableObservations[O CommitObservation | ExecutionObservation](l logge
 			continue
 		}
 		parseableObservations = append(parseableObservations, ob)
+		mappedObservations[ao.Observer] = ob
 	}
-	return parseableObservations
+	return parseableObservations, mappedObservations
 }

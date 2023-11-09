@@ -34,6 +34,7 @@ message CommitObservation {
     uint64 interval_max = 2;
     repeated TokenPrice token_prices = 3; // flattened list of observed token prices in USD
     bytes source_gas_price_usd = 4; // observed source gas price in USD
+    uint32 oracleID = 5;
 }
 
 // TokenPrices is a flattened out into a list CommitObservation.TokenPricesUSD map.

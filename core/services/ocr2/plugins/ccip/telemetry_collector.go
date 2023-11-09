@@ -3,17 +3,18 @@ package ccip
 import (
 	"sync"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	telemPb "github.com/smartcontractkit/chainlink/v2/core/services/synchronization/telem"
 )
 
 // TelemetryCollector is an interface for collecting telemetry data.
 type TelemetryCollector interface {
-	ReportCommit(validObs []CommitObservation, report ccipdata.CommitStoreReport, epochAndRound types.ReportTimestamp)
+	ReportCommit(observations map[commontypes.OracleID]CommitObservation, report ccipdata.CommitStoreReport, epochAndRound types.ReportTimestamp)
 	ReportExec(observedMessages []ObservedMessage, epochAndRound types.ReportTimestamp)
 }
 
@@ -40,13 +41,13 @@ func NewTelemetryCollector(monitoringEndpoint commontypes.MonitoringEndpoint, lg
 
 // CollectCommit collects commit report data and sends it to the OTI monitoring endpoint.
 func (tc *telemetryCollector) ReportCommit(
-	validObs []CommitObservation,
+	observations map[commontypes.OracleID]CommitObservation,
 	report ccipdata.CommitStoreReport,
 	epochAndRound types.ReportTimestamp) {
 
 	// collect telemetry data from valid observations
-	obs := make([]*telemPb.CommitObservation, len(validObs))
-	for i, o := range validObs {
+	obs := make([]*telemPb.CommitObservation, 0, len(observations))
+	for oracleId, o := range observations {
 		tps := make([]*telemPb.TokenPrice, 0, len(o.TokenPricesUSD))
 		for addr, price := range o.TokenPricesUSD {
 			tps = append(tps, &telemPb.TokenPrice{
@@ -54,12 +55,13 @@ func (tc *telemetryCollector) ReportCommit(
 				PriceUsd: price.Bytes(),
 			})
 		}
-		obs[i] = &telemPb.CommitObservation{
+		obs = append(obs, &telemPb.CommitObservation{
 			IntervalMin:       o.Interval.Min,
 			IntervalMax:       o.Interval.Max,
 			TokenPrices:       tps,
 			SourceGasPriceUsd: o.SourceGasPriceUSD.Bytes(),
-		}
+			OracleID:          uint32(oracleId),
+		})
 	}
 
 	// collect telemetry data from report

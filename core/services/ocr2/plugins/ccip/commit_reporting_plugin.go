@@ -13,6 +13,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -25,8 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 const (
@@ -455,7 +456,7 @@ func (r *CommitReportingPlugin) getLatestGasPriceUpdate(ctx context.Context, now
 func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.ReportTimestamp, _ types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	now := time.Now()
 	lggr := r.lggr.Named("CommitReport")
-	parsableObservations := getParsableObservations[CommitObservation](lggr, observations)
+	parsableObservations, mappedObservations := getParsableObservations[CommitObservation](lggr, observations)
 
 	// tokens in the tokenDecimalsCache represent supported tokens on the dest chain
 	supportedTokensMap, err := r.tokenDecimalsCache.Get(ctx)
@@ -503,7 +504,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	if err != nil {
 		return false, nil, err
 	}
-	r.telemetryCollector.ReportCommit(validObservations, report, epochAndRound) // asynchronously send commit telemetry
+	r.telemetryCollector.ReportCommit(mappedObservations, report, epochAndRound)
 	encodedReport, err := r.commitStoreReader.EncodeCommitReport(report)
 	if err != nil {
 		return false, nil, err
