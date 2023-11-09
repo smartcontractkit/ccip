@@ -13,7 +13,7 @@ import (
 
 // TelemetryCollector is an interface for collecting telemetry data.
 type TelemetryCollector interface {
-	ReportCommit(report ccipdata.CommitStoreReport, epochAndRound types.ReportTimestamp)
+	ReportCommit(validObs []CommitObservation, report ccipdata.CommitStoreReport, epochAndRound types.ReportTimestamp)
 	ReportExec(observedMessages []ObservedMessage, epochAndRound types.ReportTimestamp)
 }
 
@@ -39,7 +39,30 @@ func NewTelemetryCollector(monitoringEndpoint commontypes.MonitoringEndpoint, lg
 }
 
 // CollectCommit collects commit report data and sends it to the OTI monitoring endpoint.
-func (tc *telemetryCollector) ReportCommit(report ccipdata.CommitStoreReport, epochAndRound types.ReportTimestamp) {
+func (tc *telemetryCollector) ReportCommit(
+	validObs []CommitObservation,
+	report ccipdata.CommitStoreReport,
+	epochAndRound types.ReportTimestamp) {
+
+	// collect telemetry data from valid observations
+	obs := make([]*telemPb.CommitObservation, len(validObs))
+	for i, o := range validObs {
+		tps := make([]*telemPb.TokenPrice, 0, len(o.TokenPricesUSD))
+		for addr, price := range o.TokenPricesUSD {
+			tps = append(tps, &telemPb.TokenPrice{
+				Address:  addr.Bytes(),
+				PriceUsd: price.Bytes(),
+			})
+		}
+		obs[i] = &telemPb.CommitObservation{
+			IntervalMin:       o.Interval.Min,
+			IntervalMax:       o.Interval.Max,
+			TokenPrices:       tps,
+			SourceGasPriceUsd: o.SourceGasPriceUSD.Bytes(),
+		}
+	}
+
+	// collect telemetry data from report
 	telem := &telemPb.CCIPTelemWrapper{
 		Msg: &telemPb.CCIPTelemWrapper_CommitReport{
 			CommitReport: &telemPb.CCIPCommitReportSummary{
@@ -49,9 +72,11 @@ func (tc *telemetryCollector) ReportCommit(report ccipdata.CommitStoreReport, ep
 				IntervalMax:    report.Interval.Max,
 				Epoch:          epochAndRound.Epoch,
 				Round:          uint32(epochAndRound.Round),
+				Observations:   obs,
 			},
 		},
 	}
+
 	tc.maybeSend(telem)
 }
 
@@ -60,14 +85,17 @@ func (tc *telemetryCollector) ReportExec(observedMessages []ObservedMessage, epo
 	var telem *telemPb.CCIPTelemWrapper
 	if len(observedMessages) > 0 {
 		var lenTokenData uint32
+		tokenData := make([][]byte, 0, len(observedMessages))
 		for _, msg := range observedMessages {
 			lenTokenData += uint32(len(msg.MsgData.TokenData))
+			tokenData = append(tokenData, msg.TokenData...)
 		}
 		telem = &telemPb.CCIPTelemWrapper{
 			Msg: &telemPb.CCIPTelemWrapper_ExecutionReport{
 				ExecutionReport: &telemPb.CCIPExecutionReportSummary{
 					LenObservedMessages: uint32(len(observedMessages)),
 					LenTokenData:        lenTokenData,
+					TokenData:           tokenData,
 					Epoch:               epochAndRound.Epoch,
 					Round:               uint32(epochAndRound.Round),
 				},
