@@ -47,6 +47,7 @@ type CCIPMsgData struct {
 	Fee           *big.Int
 }
 
+// ApproveTokenCallData returns the call data for approving a token with approve function of erc20 contract
 func ApproveTokenCallData(to common.Address, amount *big.Int) ([]byte, error) {
 	erc20ABI, err := abi.JSON(strings.NewReader(erc20.ERC20ABI))
 	if err != nil {
@@ -61,6 +62,7 @@ func ApproveTokenCallData(to common.Address, amount *big.Int) ([]byte, error) {
 	return inputs, nil
 }
 
+// CCIPSendCallData returns the call data for sending a CCIP message with ccipSend function of router contract
 func CCIPSendCallData(msg CCIPMsgData) ([]byte, error) {
 	routerABI, err := abi.JSON(strings.NewReader(router.RouterABI))
 	if err != nil {
@@ -92,6 +94,15 @@ func WaitForSuccessfulTxMined(evmClient blockchain.EVMClient, tx *types.Transact
 	return nil
 }
 
+// MultiCallCCIP sends multiple CCIP messages in a single transaction
+// if native is true, it will send msg with native as fee. In this case the msg should be sent with a
+// msg.value equivalent to the total fee with the help of aggregate3Value
+//
+// if native is false, it will send msg with fee in specific feetoken. In this case the msg should be sent without value with the help of aggregate3.
+// In both cases, if there are any bridge tokens included in ccip transfer, the amount for corresponding token should be approved to the router contract as spender.
+// The approval should be done by calling approval function as part of the call data of aggregate3 or aggregate3Value
+// If feetoken is used as fee, the amount for feetoken should be approved to the router contract as spender and should be done as part of the call data of aggregate3
+// In case of native as fee, there is no need for fee amount approval
 func MultiCallCCIP(
 	evmClient blockchain.EVMClient,
 	address string,
@@ -109,7 +120,7 @@ func MultiCallCCIP(
 	if native {
 		var callData []CallWithValue
 		allValue := big.NewInt(0)
-
+		// create call data for each msg
 		for _, msg := range msgData {
 			// approve bridge token
 			for _, tokenAndAmount := range msg.Msg.TokenAmounts {
@@ -132,7 +143,9 @@ func MultiCallCCIP(
 		if err != nil {
 			return nil, err
 		}
+		// the value of transactionOpts is the sum of the value of all msg, which is the total fee of all ccip-sends
 		opts.Value = allValue
+		// call aggregate3Value to group all msg call data and send them in a single transaction
 		tx, err := boundContract.Transact(opts, "aggregate3Value", callData)
 		if err != nil {
 			return nil, err
@@ -144,11 +157,13 @@ func MultiCallCCIP(
 	}
 	// if with feetoken, use aggregate3 to send msg without value
 	var callData []Call
+	// create call data for each msg
 	for _, msg := range msgData {
 		isFeeTokenAndBridgeTokenSame := false
 		// approve bridge token
 		for _, tokenAndAmount := range msg.Msg.TokenAmounts {
 			var inputs []byte
+			// if feetoken is same as bridge token, approve total amount including transfer amount + fee amount
 			if tokenAndAmount.Token == msg.Msg.FeeToken {
 				isFeeTokenAndBridgeTokenSame = true
 				inputs, err = ApproveTokenCallData(msg.RouterAddr, new(big.Int).Add(msg.Fee, tokenAndAmount.Amount))
@@ -165,7 +180,7 @@ func MultiCallCCIP(
 			data := Call{Target: tokenAndAmount.Token, AllowFailure: false, CallData: inputs}
 			callData = append(callData, data)
 		}
-		// approve fee token
+		// approve fee token if not already approved
 		if msg.Fee != nil && msg.Fee.Cmp(big.NewInt(0)) > 0 && !isFeeTokenAndBridgeTokenSame {
 			inputs, err := ApproveTokenCallData(msg.RouterAddr, msg.Fee)
 			if err != nil {
@@ -187,6 +202,7 @@ func MultiCallCCIP(
 		return nil, err
 	}
 
+	// call aggregate3 to group all msg call data and send them in a single transaction
 	tx, err := boundContract.Transact(opts, "aggregate3", callData)
 	if err != nil {
 		return nil, err

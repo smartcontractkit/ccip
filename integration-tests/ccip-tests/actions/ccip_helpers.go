@@ -1617,6 +1617,8 @@ func (lane *CCIPLane) AddToSentReqs(txHash common.Hash, reqStats []*testreporter
 	return rcpt, nil
 }
 
+// Multicall sends multiple ccip-send requests in a single transaction
+// It will create one transaction for all the requests and will wait for the confirmation
 func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr common.Address) error {
 	var ccipMultipleMsg []contracts.CCIPMsgData
 	feeToken := common.HexToAddress(lane.Source.Common.FeeToken.Address())
@@ -1709,6 +1711,8 @@ func (lane *CCIPLane) Multicall(noOfRequests int, msgType string, multiSendAddr 
 	return nil
 }
 
+// SendRequests sends individual ccip-send requests in different transactions
+// It will create noOfRequests transactions
 func (lane *CCIPLane) SendRequests(noOfRequests int, msgType string) error {
 	for i := 1; i <= noOfRequests; i++ {
 		msg := fmt.Sprintf("msg %d", i)
