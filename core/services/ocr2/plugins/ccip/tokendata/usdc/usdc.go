@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
 
@@ -65,6 +63,7 @@ func (m messageAndAttestation) Validate() error {
 type TokenDataReader struct {
 	lggr           logger.Logger
 	usdcReader     ccipdata.USDCReader
+	httpClient     IHttpClient
 	attestationApi *url.URL
 }
 
@@ -79,7 +78,17 @@ func NewUSDCTokenDataReader(lggr logger.Logger, usdcReader ccipdata.USDCReader, 
 	return &TokenDataReader{
 		lggr:           lggr,
 		usdcReader:     usdcReader,
+		httpClient:     &HttpClient{},
 		attestationApi: usdcAttestationApi,
+	}
+}
+
+func NewUSDCTokenDataReaderWithHttpClient(origin TokenDataReader, httpClient IHttpClient) *TokenDataReader {
+	return &TokenDataReader{
+		lggr:           origin.lggr,
+		usdcReader:     origin.usdcReader,
+		httpClient:     httpClient,
+		attestationApi: origin.attestationApi,
 	}
 }
 
@@ -135,21 +144,10 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.E
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
 	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%x", s.attestationApi, apiVersion, attestationPath, usdcMessageHash)
-	req, err := http.NewRequestWithContext(ctx, "GET", fullAttestationUrl, nil)
+	body, err := s.httpClient.Get(ctx, fullAttestationUrl)
 	if err != nil {
 		return attestationResponse{}, err
 	}
-	req.Header.Add("accept", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return attestationResponse{}, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return attestationResponse{}, err
-	}
-
 	var response attestationResponse
 	err = json.Unmarshal(body, &response)
 	if err != nil {
