@@ -10,7 +10,7 @@ type CCIPTestConfig struct {
 	KeepEnvAlive               *bool              `toml:",omitempty"`
 	BiDirectionalLane          *bool              `toml:",omitempty"`
 	CommitAndExecuteOnSameDON  *bool              `toml:",omitempty"`
-	NumberOfCommitNodes        int                `toml:",omitempty"`
+	NoOfCommitNodes            int                `toml:",omitempty"`
 	MsgType                    string             `toml:",omitempty"`
 	PhaseTimeout               *models.Duration   `toml:",omitempty"`
 	TestDuration               *models.Duration   `toml:",omitempty"`
@@ -44,6 +44,9 @@ func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
 	}
 	if fromCfg.KeepEnvAlive != nil {
 		c.KeepEnvAlive = fromCfg.KeepEnvAlive
+	}
+	if fromCfg.NoOfCommitNodes > 0 && fromCfg.NoOfCommitNodes != c.NoOfCommitNodes {
+		c.NoOfCommitNodes = fromCfg.NoOfCommitNodes
 	}
 	if fromCfg.MsgType != "" {
 		c.MsgType = fromCfg.MsgType
