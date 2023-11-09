@@ -503,7 +503,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	if err != nil {
 		return false, nil, err
 	}
-	r.telemetryCollector.ReportCommit(report, epochAndRound) // asynchronously send commit telemetry
+	r.telemetryCollector.ReportCommit(validObservations, report, epochAndRound) // asynchronously send commit telemetry
 	encodedReport, err := r.commitStoreReader.EncodeCommitReport(report)
 	if err != nil {
 		return false, nil, err
