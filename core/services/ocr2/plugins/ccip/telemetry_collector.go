@@ -42,12 +42,14 @@ func NewTelemetryCollector(monitoringEndpoint commontypes.MonitoringEndpoint, lg
 
 func (tc *telemetryCollector) TrackCommitObservation(observation CommitObservation, epochAndRound types.ReportTimestamp) {
 	telem := &telemPb.CCIPTelemWrapper{
-		Msg: &telemPb.CCIPTelemWrapper_CommitReport{
-			CommitReport: &telemPb.CCIPCommitReportSummary{
-				IntervalMin: observation.Interval.Min,
-				IntervalMax: observation.Interval.Max,
-				Epoch:       epochAndRound.Epoch,
-				Round:       uint32(epochAndRound.Round),
+		Msg: &telemPb.CCIPTelemWrapper_CommitObservation{
+			CommitObservation: &telemPb.CCIPCommitObservation{
+				// Mising fields
+				LenTokenPrices: uint32(len(observation.TokenPricesUSD)),
+				IntervalMin:    observation.Interval.Min,
+				IntervalMax:    observation.Interval.Max,
+				Epoch:          epochAndRound.Epoch,
+				Round:          uint32(epochAndRound.Round),
 			},
 		},
 	}
@@ -59,10 +61,20 @@ func (tc *telemetryCollector) TrackExecObservation(observation ExecutionObservat
 	observedSeqNrs := maps.Keys(observation.Messages)
 	slices.Sort(observedSeqNrs)
 
+	var lenTokenData uint32
+	tokenData := make([][]byte, 0, len(observation.Messages))
+	for _, msg := range observation.Messages {
+		lenTokenData += uint32(len(msg.TokenData))
+		tokenData = append(tokenData, msg.TokenData...)
+	}
+
 	telem := &telemPb.CCIPTelemWrapper{
-		Msg: &telemPb.CCIPTelemWrapper_ExecutionReport{
-			ExecutionReport: &telemPb.CCIPExecutionReportSummary{
+		Msg: &telemPb.CCIPTelemWrapper_ExecutionObservation{
+			ExecutionObservation: &telemPb.CCIPExecutionObservation{
 				LenObservedMessages: uint32(len(observation.Messages)),
+				LenTokenData:        lenTokenData,
+				TokenData:           tokenData,
+				SeqNrs:              observedSeqNrs,
 				Epoch:               epochAndRound.Epoch,
 				Round:               uint32(epochAndRound.Round),
 			},
