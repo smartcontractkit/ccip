@@ -42,6 +42,7 @@ func TestUSDCMonitoring(t *testing.T) {
 			Attestation: "720502893578a89a8a87982982ef781c18b193",
 		}
 		responseBytes, err := json.Marshal(response)
+		require.NoError(t, err)
 		_, err = w.Write(responseBytes)
 		require.NoError(t, err)
 	}))
