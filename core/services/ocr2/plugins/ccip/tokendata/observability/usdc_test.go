@@ -50,7 +50,7 @@ func TestUSDCMonitoring(t *testing.T) {
 	require.NoError(t, err)
 
 	// Service with mock http client.
-	usdcService := usdc.NewUSDCTokenDataReader(lggr, usdcReader, attestationURI)
+	usdcService := usdc.NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 10)
 	observedService := NewObservedUSDCTokenDataReader(*usdcService, "plugin")
 	require.NotNil(t, observedService)
 	msgAndAttestation, err := observedService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{})
@@ -63,7 +63,8 @@ func TestUSDCMonitoring(t *testing.T) {
 	histogram := usdcHistogram
 	assert.Equal(t, 0, counterFromHistogramByLabels(t, histogram, "plugin", "XYZMethod"))
 	assert.Equal(t, 1, counterFromHistogramByLabels(t, histogram, "plugin", "ReadTokenData"))
-	assert.Equal(t, 1, counterFromHistogramByLabels(t, histogram, "plugin", "Get"))
+	assert.Equal(t, 0, counterFromHistogramByLabels(t, histogram, "plugin", "Get"))
+	assert.Equal(t, 1, counterFromHistogramByLabels(t, histogram, "plugin", "GetWithTimeout"))
 
 }
 
