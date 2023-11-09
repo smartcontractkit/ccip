@@ -918,7 +918,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 
 func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.ReportTimestamp, query types.Query, observations []types.AttributedObservation) (bool, types.Report, error) {
 	lggr := r.lggr.Named("ExecutionReport")
-	parsableObservations, _ := getParsableObservations[ExecutionObservation](lggr, observations)
+	parsableObservations, mappedObservations := getParsableObservations[ExecutionObservation](lggr, observations)
 	// Need at least F+1 observations
 	if len(parsableObservations) <= r.F {
 		lggr.Warn("Non-empty observations <= F, need at least F+1 to continue")
@@ -933,7 +933,7 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 		return false, nil, nil
 	}
 
-	// FIXME r.telemetryCollector.ReportExec(mappedObservations, timestamp) // asynchronously send execution telemetry
+	r.telemetryCollector.ReportExec(mappedObservations, observedMessages, timestamp) // asynchronously send execution telemetry
 
 	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {

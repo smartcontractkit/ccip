@@ -5,6 +5,8 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -15,7 +17,7 @@ import (
 // TelemetryCollector is an interface for collecting telemetry data.
 type TelemetryCollector interface {
 	ReportCommit(observations map[commontypes.OracleID]CommitObservation, report ccipdata.CommitStoreReport, epochAndRound types.ReportTimestamp)
-	ReportExec(observedMessages []ObservedMessage, epochAndRound types.ReportTimestamp)
+	ReportExec(observations map[commontypes.OracleID]ExecutionObservation, messages []ObservedMessage, epochAndRound types.ReportTimestamp)
 }
 
 type telemetryCollector struct {
@@ -83,26 +85,23 @@ func (tc *telemetryCollector) ReportCommit(
 }
 
 // CollectExec collects execution report data and sends it to the OTI monitoring endpoint.
-func (tc *telemetryCollector) ReportExec(observedMessages []ObservedMessage, epochAndRound types.ReportTimestamp) {
-	var telem *telemPb.CCIPTelemWrapper
-	if len(observedMessages) > 0 {
-		var lenTokenData uint32
-		tokenData := make([][]byte, 0, len(observedMessages))
-		for _, msg := range observedMessages {
-			lenTokenData += uint32(len(msg.MsgData.TokenData))
-			tokenData = append(tokenData, msg.TokenData...)
-		}
-		telem = &telemPb.CCIPTelemWrapper{
-			Msg: &telemPb.CCIPTelemWrapper_ExecutionReport{
-				ExecutionReport: &telemPb.CCIPExecutionReportSummary{
-					LenObservedMessages: uint32(len(observedMessages)),
-					LenTokenData:        lenTokenData,
-					TokenData:           tokenData,
-					Epoch:               epochAndRound.Epoch,
-					Round:               uint32(epochAndRound.Round),
-				},
+func (tc *telemetryCollector) ReportExec(observations map[commontypes.OracleID]ExecutionObservation, messages []ObservedMessage, epochAndRound types.ReportTimestamp) {
+	obs := make([]*telemPb.ExecutionObservation, len(observations))
+	for oracleId, observation := range observations {
+		seqNrs := maps.Keys(observation.Messages)
+		slices.Sort(seqNrs)
+		obs = append(obs, &telemPb.ExecutionObservation{OracleID: uint32(oracleId), SeqNrs: seqNrs})
+	}
+
+	telem := &telemPb.CCIPTelemWrapper{
+		Msg: &telemPb.CCIPTelemWrapper_ExecutionReport{
+			ExecutionReport: &telemPb.CCIPExecutionReportSummary{
+				LenObservedMessages: uint32(len(messages)),
+				Epoch:               epochAndRound.Epoch,
+				Round:               uint32(epochAndRound.Round),
+				Observations:        obs,
 			},
-		}
+		},
 	}
 	tc.maybeSend(telem)
 }

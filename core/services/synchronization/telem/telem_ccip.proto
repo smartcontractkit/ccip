@@ -12,6 +12,12 @@ message CCIPExecutionReportSummary {
     repeated bytes token_data = 3; // flattened out execution observations
     uint32 epoch = 4;
     uint32 round = 5;
+    repeated ExecutionObservation observations = 6; // execution observations
+}
+
+message ExecutionObservation {
+    repeated uint64 seqNrs = 1;
+    uint32 oracleID = 2;
 }
 
 // Commit Report //////////////////////////////////////////////////////////////
@@ -25,7 +31,7 @@ message CCIPCommitReportSummary {
     uint64 interval_max = 4; // maximum interval
     uint32 epoch = 5;
     uint32 round = 6;
-	repeated CommitObservation observations = 7; // commit observations
+	  repeated CommitObservation observations = 7; // commit observations
 }
 
 // CommitObservation is ccip.CommitObservation
