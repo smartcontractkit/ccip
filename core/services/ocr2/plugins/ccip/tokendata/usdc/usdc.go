@@ -154,34 +154,7 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.E
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
 	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%x", s.attestationApi, apiVersion, attestationPath, usdcMessageHash)
-
-	//// Use a timeout to guard against attestation API hanging, causing observation timeout and failing to make any progress.
-	//timeoutCtx, cancel := context.WithTimeout(ctx, s.attestationApiTimeout)
-	//defer cancel()
-	//req, err := http.NewRequestWithContext(timeoutCtx, "GET", fullAttestationUrl, nil)
-	//
-	//if err != nil {
-	//	return attestationResponse{}, err
-	//}
-	//req.Header.Add("accept", "application/json")
-	//res, err := http.DefaultClient.Do(req)
-	//if err != nil {
-	//	if errors.Is(err, context.DeadlineExceeded) {
-	//		return attestationResponse{}, tokendata.ErrTimeout
-	//	}
-	//	return attestationResponse{}, err
-	//}
-	//defer res.Body.Close()
-	//
-	//// Explicitly signal if the API is being rate limited
-	//if res.StatusCode == http.StatusTooManyRequests {
-	//	return attestationResponse{}, tokendata.ErrRateLimit
-	//}
-	//
-	//body, err := io.ReadAll(res.Body)
-
 	body, err := s.httpClient.GetWithTimeout(ctx, fullAttestationUrl, s.attestationApiTimeout)
-
 	if err != nil {
 		return attestationResponse{}, err
 	}
@@ -190,11 +163,9 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 	if err != nil {
 		return attestationResponse{}, err
 	}
-
 	if response.Status == "" {
 		return attestationResponse{}, fmt.Errorf("invalid attestation response: %s", string(body))
 	}
-
 	return response, nil
 }
 
