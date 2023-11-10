@@ -39,7 +39,6 @@ func (s *HttpClient) GetWithTimeout(ctx context.Context, url string, timeout tim
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(timeoutCtx, "GET", url, nil)
-
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,7 +25,7 @@ var (
 		float64(1 * time.Second),
 		float64(2 * time.Second),
 	}
-	labels        = []string{"function", "success"}
+	labels        = []string{"plugin", "function", "success"}
 	usdcHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "ccip_usdc_reader_request_total",
 		Help:    "Latency of calls to the USDC reader",
@@ -65,6 +66,7 @@ func withObservedContract[T any](metric metricDetails, function string, contract
 		WithLabelValues(
 			metric.pluginName,
 			function,
+			strconv.FormatBool(err == nil),
 		).
 		Observe(float64(time.Since(contractExecutionStarted)))
 	return value, err
