@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,65 +25,83 @@ var (
 	pluginName = "testplugin"
 )
 
-type expected struct {
+type expectedClient struct {
 	pluginName string
 	function   string
-	success    bool
+	status     string
+	result     string
+	count      int
+}
+
+type expectedReader struct {
+	pluginName string
+	function   string
+	result     string
 	count      int
 }
 
 func TestUSDCMonitoring(t *testing.T) {
 
 	tests := []struct {
-		name     string
-		server   *httptest.Server
-		requests int
-		expected []expected
+		name                    string
+		server                  *httptest.Server
+		requests                int
+		expectedClientHistogram []expectedClient
+		expectedReaderHistogram []expectedReader
 	}{
 		{
 			name:     "success",
 			server:   newSuccessServer(t),
 			requests: 5,
-			expected: []expected{
-				{pluginName, "ReadTokenData", true, 5},
-				{pluginName, "ReadTokenData", false, 0},
-				{pluginName, "GetWithTimeout", true, 5},
-				{pluginName, "GetWithTimeout", false, 0},
+			expectedClientHistogram: []expectedClient{
+				{pluginName, "GetWithTimeout", "200", "true", 5},
+				{pluginName, "GetWithTimeout", "429", "false", 0},
+			},
+			expectedReaderHistogram: []expectedReader{
+				{pluginName, "ReadTokenData", "true", 5},
+				{pluginName, "ReadTokenData", "false", 0},
 			},
 		},
 		{
 			name:     "rate_limited",
 			server:   newRateLimitedServer(),
 			requests: 26,
-			expected: []expected{
-				{pluginName, "ReadTokenData", true, 0},
-				{pluginName, "ReadTokenData", false, 26},
-				{pluginName, "GetWithTimeout", true, 0},
-				{pluginName, "GetWithTimeout", false, 26},
+			expectedClientHistogram: []expectedClient{
+				{pluginName, "GetWithTimeout", "200", "true", 0},
+				{pluginName, "GetWithTimeout", "429", "false", 26},
+			},
+			expectedReaderHistogram: []expectedReader{
+				{pluginName, "ReadTokenData", "true", 0},
+				{pluginName, "ReadTokenData", "false", 26},
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testMonitoring(t, test.name, test.server, test.requests, test.expected, logger.TestLogger(t))
+			testMonitoring(t, test.name, test.server, test.requests, test.expectedClientHistogram, test.expectedReaderHistogram, logger.TestLogger(t))
 		})
 	}
 
 }
 
-func testMonitoring(t *testing.T, name string, server *httptest.Server, requests int, expected []expected, log logger.Logger) {
+func testMonitoring(t *testing.T, name string, server *httptest.Server, requests int, expectedClient []expectedClient, expectedReader []expectedReader, log logger.Logger) {
 	server.Start()
 	defer server.Close()
 	attestationURI, err := url.ParseRequestURI(server.URL)
 	require.NoError(t, err)
 
 	// Define test histogram (avoid side effects from other tests if using the real usdcHistogram).
-	histogram := promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "test_histogram_" + name,
+	readerHistogram := promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "test_reader_histogram_" + name,
 		Help:    "Latency of calls to the USDC reader",
 		Buckets: latencyBuckets,
 	}, []string{"plugin", "function", "success"})
+	clientHistogram := promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "test_client_histogram_" + name,
+		Help:    "Latency of calls to the USDC client",
+		Buckets: latencyBuckets,
+	}, []string{"plugin", "function", "status", "success"})
 
 	// Mock USDC reader.
 	usdcReader := mocks.NewUSDCReader(t)
@@ -95,17 +112,17 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	usdcService := usdc.NewUSDCTokenDataReader(log, usdcReader, attestationURI, 0)
 	observedHttpClient := &ObservedIHttpClient{
 		IHttpClient: &usdc.HttpClient{},
-		metric:      metricDetails{histogram, pluginName},
+		metric:      metricDetails{clientHistogram, pluginName},
 	}
 	observedService := &ObservedUSDCTokenDataReader{
 		TokenDataReader: *usdc.NewUSDCTokenDataReaderWithHttpClient(*usdcService, observedHttpClient),
-		metric:          metricDetails{histogram, pluginName},
+		metric:          metricDetails{readerHistogram, pluginName},
 	}
 	require.NotNil(t, observedService)
 
 	for i := 0; i < requests; i++ {
-		//msgAndAttestation, err := observedService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{})
 		_, _ = observedService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{})
+		//msgAndAttestation, err := observedService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{})
 		//require.NoError(t, err)
 		//require.NotNil(t, msgAndAttestation)
 		//expectedMessageAndAttestation := "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000002b0d10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000013720502893578a89a8a87982982ef781c18b19300000000000000000000000000"
@@ -113,12 +130,14 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	}
 
 	// Check that the metrics are updated.
-	//histogram := usdcHistogram
-	assert.Equal(t, 0, counterFromHistogramByLabels(t, histogram, pluginName, "XYZMethod", "true"))
-	assert.Equal(t, 0, counterFromHistogramByLabels(t, histogram, pluginName, "Get", "true"))
-	assert.Equal(t, 0, counterFromHistogramByLabels(t, histogram, pluginName, "Get", "false"))
-	for _, e := range expected {
-		assert.Equal(t, e.count, counterFromHistogramByLabels(t, histogram, e.pluginName, e.function, strconv.FormatBool(e.success)))
+	assert.Equal(t, 0, counterFromHistogramByLabels(t, readerHistogram, pluginName, "XYZMethod", "true"))
+	assert.Equal(t, 0, counterFromHistogramByLabels(t, clientHistogram, pluginName, "Get", "200", "true"))
+	assert.Equal(t, 0, counterFromHistogramByLabels(t, clientHistogram, pluginName, "Get", "429", "false"))
+	for _, e := range expectedClient {
+		assert.Equal(t, e.count, counterFromHistogramByLabels(t, clientHistogram, e.pluginName, e.function, e.status, e.result))
+	}
+	for _, e := range expectedReader {
+		assert.Equal(t, e.count, counterFromHistogramByLabels(t, readerHistogram, e.pluginName, e.function, e.result))
 	}
 }
 

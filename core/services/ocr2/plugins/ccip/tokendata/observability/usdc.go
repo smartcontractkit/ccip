@@ -25,12 +25,16 @@ var (
 		float64(1 * time.Second),
 		float64(2 * time.Second),
 	}
-	labels        = []string{"plugin", "function", "success"}
-	usdcHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+	usdcReaderHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "ccip_usdc_reader_request_total",
 		Help:    "Latency of calls to the USDC reader",
 		Buckets: latencyBuckets,
-	}, labels)
+	}, []string{"plugin", "function", "success"})
+	usdcClientHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "ccip_usdc_client_request_total",
+		Help:    "Latency of calls to the USDC client",
+		Buckets: latencyBuckets,
+	}, []string{"plugin", "function", "status", "success"})
 )
 
 type metricDetails struct {
@@ -47,19 +51,19 @@ func NewObservedUSDCTokenDataReader(origin usdc.TokenDataReader, pluginName stri
 	return &ObservedUSDCTokenDataReader{
 		TokenDataReader: *usdc.NewUSDCTokenDataReaderWithHttpClient(origin, NewObservedIHttpClient(&usdc.HttpClient{}, pluginName)),
 		metric: metricDetails{
-			histogram:  usdcHistogram,
+			histogram:  usdcReaderHistogram,
 			pluginName: pluginName,
 		},
 	}
 }
 
 func (o *ObservedUSDCTokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([]byte, error) {
-	return withObservedContract(o.metric, "ReadTokenData", func() ([]byte, error) {
+	return withObservedReader(o.metric, "ReadTokenData", func() ([]byte, error) {
 		return o.TokenDataReader.ReadTokenData(ctx, msg)
 	})
 }
 
-func withObservedContract[T any](metric metricDetails, function string, contract func() (T, error)) (T, error) {
+func withObservedReader[T any](metric metricDetails, function string, contract func() (T, error)) (T, error) {
 	contractExecutionStarted := time.Now()
 	value, err := contract()
 	metric.histogram.

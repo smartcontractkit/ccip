@@ -13,49 +13,51 @@ import (
 
 type IHttpClient interface {
 	// Get issue a GET request to the given url and return the response body.
-	Get(ctx context.Context, url string) ([]byte, error)
-	GetWithTimeout(ctx context.Context, url string, timeout time.Duration) ([]byte, error)
+	Get(ctx context.Context, url string) ([]byte, int, error)
+	GetWithTimeout(ctx context.Context, url string, timeout time.Duration) ([]byte, int, error)
 }
 
 type HttpClient struct {
 }
 
-func (s *HttpClient) Get(ctx context.Context, url string) ([]byte, error) {
+func (s *HttpClient) Get(ctx context.Context, url string) ([]byte, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusBadRequest, err
 	}
 	req.Header.Add("accept", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, res.StatusCode, err
 	}
 	defer res.Body.Close()
-	return io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	return body, res.StatusCode, err
 }
 
-func (s *HttpClient) GetWithTimeout(ctx context.Context, url string, timeout time.Duration) ([]byte, error) {
+func (s *HttpClient) GetWithTimeout(ctx context.Context, url string, timeout time.Duration) ([]byte, int, error) {
 	// Use a timeout to guard against attestation API hanging, causing observation timeout and failing to make any progress.
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(timeoutCtx, "GET", url, nil)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusBadRequest, err
 	}
 	req.Header.Add("accept", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, tokendata.ErrTimeout
+			return nil, res.StatusCode, tokendata.ErrTimeout
 		}
-		return nil, err
+		return nil, res.StatusCode, err
 	}
 	defer res.Body.Close()
 
 	// Explicitly signal if the API is being rate limited
 	if res.StatusCode == http.StatusTooManyRequests {
-		return nil, tokendata.ErrRateLimit
+		return nil, res.StatusCode, tokendata.ErrRateLimit
 	}
 
-	return io.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
+	return body, res.StatusCode, err
 }

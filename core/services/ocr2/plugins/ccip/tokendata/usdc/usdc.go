@@ -154,7 +154,7 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.E
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
 	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%x", s.attestationApi, apiVersion, attestationPath, usdcMessageHash)
-	body, err := s.httpClient.GetWithTimeout(ctx, fullAttestationUrl, s.attestationApiTimeout)
+	body, _, err := s.httpClient.GetWithTimeout(ctx, fullAttestationUrl, s.attestationApiTimeout)
 	if err != nil {
 		return attestationResponse{}, err
 	}
