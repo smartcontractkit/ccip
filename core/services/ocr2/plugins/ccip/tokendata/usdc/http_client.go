@@ -12,8 +12,9 @@ import (
 )
 
 type IHttpClient interface {
-	// Get issue a GET request to the given url and return the response body.
+	// Get issue a GET request to the given url and return the response body and status code.
 	Get(ctx context.Context, url string) ([]byte, int, error)
+	// GetWithTimeout issue a GET request to the given url and return the response body and status code.
 	GetWithTimeout(ctx context.Context, url string, timeout time.Duration) ([]byte, int, error)
 }
 
