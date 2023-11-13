@@ -13,30 +13,13 @@ import (
 
 type IHttpClient interface {
 	// Get issue a GET request to the given url and return the response body and status code.
-	Get(ctx context.Context, url string) ([]byte, int, error)
-	// GetWithTimeout issue a GET request to the given url and return the response body and status code.
-	GetWithTimeout(ctx context.Context, url string, timeout time.Duration) ([]byte, int, error)
+	Get(ctx context.Context, url string, timeout time.Duration) ([]byte, int, error)
 }
 
 type HttpClient struct {
 }
 
-func (s *HttpClient) Get(ctx context.Context, url string) ([]byte, int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, http.StatusBadRequest, err
-	}
-	req.Header.Add("accept", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, res.StatusCode, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	return body, res.StatusCode, err
-}
-
-func (s *HttpClient) GetWithTimeout(ctx context.Context, url string, timeout time.Duration) ([]byte, int, error) {
+func (s *HttpClient) Get(ctx context.Context, url string, timeout time.Duration) ([]byte, int, error) {
 	// Use a timeout to guard against attestation API hanging, causing observation timeout and failing to make any progress.
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
