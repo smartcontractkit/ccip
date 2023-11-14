@@ -37,7 +37,8 @@ const (
 	MaxExecutionReportLength = 250_000
 
 	// MaxDataLenPerBatch limits the total length of msg data that can be in a batch.
-	MaxDataLenPerBatch    = 60_000
+	MaxDataLenPerBatch = 60_000
+	// MessagesIterationStep limits number of messages fetched to memory at once when iterating through unexpired CommitRoots
 	MessagesIterationStep = 800
 )
 
@@ -275,10 +276,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		})
 
 		measureNumberOfReportsProcessed(timestamp, len(unexpiredReports))
-		reportIterationStart := time.Now()
-		defer func() {
-			measureReportsIterationDuration(timestamp, time.Since(reportIterationStart))
-		}()
 
 		unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReports)
 		if err != nil {
@@ -1188,7 +1185,6 @@ func selectReportsToFillBatch(unexpiredReports []ccipdata.CommitStoreReport, mes
 			break
 		}
 	}
-
-	index = min(index, len(unexpiredReports)-1)
+	index = min(index+1, len(unexpiredReports))
 	return unexpiredReports[:index], index
 }
