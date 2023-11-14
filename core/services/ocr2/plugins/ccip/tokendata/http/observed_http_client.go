@@ -32,43 +32,33 @@ var (
 	}, []string{"status", "success"})
 )
 
-type MetricDetails struct {
-	histogram *prometheus.HistogramVec
-}
-
 type ObservedIHttpClient struct {
 	IHttpClient
-	metric MetricDetails
-}
-
-func NewMetricDetails(histogram *prometheus.HistogramVec) MetricDetails {
-	return MetricDetails{
-		histogram: histogram,
-	}
+	histogram *prometheus.HistogramVec
 }
 
 // NewObservedIHttpClient Create a new ObservedIHttpClient with the USDC client metric.
 func NewObservedIHttpClient(origin IHttpClient) *ObservedIHttpClient {
-	return NewObservedIHttpClientWithMetric(origin, NewMetricDetails(usdcClientHistogram))
+	return NewObservedIHttpClientWithMetric(origin, usdcClientHistogram)
 }
 
-func NewObservedIHttpClientWithMetric(origin IHttpClient, metric MetricDetails) *ObservedIHttpClient {
+func NewObservedIHttpClientWithMetric(origin IHttpClient, histogram *prometheus.HistogramVec) *ObservedIHttpClient {
 	return &ObservedIHttpClient{
 		IHttpClient: origin,
-		metric:      metric,
+		histogram:   histogram,
 	}
 }
 
 func (o *ObservedIHttpClient) Get(ctx context.Context, url string, timeout time.Duration) ([]byte, int, error) {
-	return withObservedHttpClient(o.metric, func() ([]byte, int, error) {
+	return withObservedHttpClient(o.histogram, func() ([]byte, int, error) {
 		return o.IHttpClient.Get(ctx, url, timeout)
 	})
 }
 
-func withObservedHttpClient[T any](metric MetricDetails, contract func() (T, int, error)) (T, int, error) {
+func withObservedHttpClient[T any](histogram *prometheus.HistogramVec, contract func() (T, int, error)) (T, int, error) {
 	contractExecutionStarted := time.Now()
 	value, status, err := contract()
-	metric.histogram.
+	histogram.
 		WithLabelValues(
 			strconv.FormatInt(int64(status), 10),
 			strconv.FormatBool(err == nil),

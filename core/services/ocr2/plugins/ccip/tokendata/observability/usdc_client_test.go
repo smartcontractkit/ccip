@@ -84,7 +84,7 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	usdcReader.On("GetLastUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything).Return(msgBody, nil)
 
 	// Service with monitored http client.
-	observedHttpClient := http2.NewObservedIHttpClientWithMetric(&http2.HttpClient{}, http2.NewMetricDetails(histogram))
+	observedHttpClient := http2.NewObservedIHttpClientWithMetric(&http2.HttpClient{}, histogram)
 	tokenDataReaderDefault := usdc.NewUSDCTokenDataReader(log, usdcReader, attestationURI, 0)
 	tokenDataReader := usdc.NewUSDCTokenDataReaderWithHttpClient(*tokenDataReaderDefault, observedHttpClient)
 	require.NotNil(t, tokenDataReader)
