@@ -1,4 +1,4 @@
-package http
+package observability
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -18,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	http2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
 )
 
@@ -72,8 +74,8 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	// Define test histogram (avoid side effects from other tests if using the real usdcHistogram).
 	histogram := promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "test_client_histogram_" + name,
-		Help:    "Latency of calls to the USDC client",
-		Buckets: usdcLatencyBuckets,
+		Help:    "Latency of calls to the USDC mock client",
+		Buckets: []float64{float64(250 * time.Millisecond), float64(1 * time.Second), float64(5 * time.Second)},
 	}, []string{"status", "success"})
 
 	// Mock USDC reader.
@@ -82,7 +84,7 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	usdcReader.On("GetLastUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything).Return(msgBody, nil)
 
 	// Service with monitored http client.
-	observedHttpClient := NewObservedIHttpClientWithMetric(&HttpClient{}, NewMetricDetails(histogram))
+	observedHttpClient := http2.NewObservedIHttpClientWithMetric(&http2.HttpClient{}, http2.NewMetricDetails(histogram))
 	tokenDataReaderDefault := usdc.NewUSDCTokenDataReader(log, usdcReader, attestationURI, 0)
 	tokenDataReader := usdc.NewUSDCTokenDataReaderWithHttpClient(*tokenDataReaderDefault, observedHttpClient)
 	require.NotNil(t, tokenDataReader)
