@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	UsdcLatencyBuckets = []float64{
+	usdcLatencyBuckets = []float64{
 		float64(10 * time.Millisecond),
 		float64(25 * time.Millisecond),
 		float64(50 * time.Millisecond),
@@ -28,7 +28,7 @@ var (
 	usdcClientHistogram = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "ccip_usdc_client_request_total",
 		Help:    "Latency of calls to the USDC client",
-		Buckets: UsdcLatencyBuckets,
+		Buckets: usdcLatencyBuckets,
 	}, []string{"status", "success"})
 )
 

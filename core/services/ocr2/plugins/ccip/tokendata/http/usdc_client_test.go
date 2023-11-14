@@ -1,4 +1,4 @@
-package observability
+package http
 
 import (
 	"context"
@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
-	http2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
 )
 
@@ -74,7 +73,7 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	histogram := promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "test_client_histogram_" + name,
 		Help:    "Latency of calls to the USDC client",
-		Buckets: http2.UsdcLatencyBuckets,
+		Buckets: usdcLatencyBuckets,
 	}, []string{"status", "success"})
 
 	// Mock USDC reader.
@@ -83,7 +82,7 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	usdcReader.On("GetLastUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything).Return(msgBody, nil)
 
 	// Service with monitored http client.
-	observedHttpClient := http2.NewObservedIHttpClientWithMetric(&http2.HttpClient{}, http2.NewMetricDetails(histogram))
+	observedHttpClient := NewObservedIHttpClientWithMetric(&HttpClient{}, NewMetricDetails(histogram))
 	tokenDataReaderDefault := usdc.NewUSDCTokenDataReader(log, usdcReader, attestationURI, 0)
 	tokenDataReader := usdc.NewUSDCTokenDataReaderWithHttpClient(*tokenDataReaderDefault, observedHttpClient)
 	require.NotNil(t, tokenDataReader)
