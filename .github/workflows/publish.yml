@@ -53,7 +53,7 @@ jobs:
           tags: |
             type=sha,enable={{is_default_branch}}
             type=sha,format=long,enable={{is_default_branch}}
-            type=ref,event=push
+            type=ref,event=branch
       - name: Fetch operator-ui
         shell: bash
         env:
