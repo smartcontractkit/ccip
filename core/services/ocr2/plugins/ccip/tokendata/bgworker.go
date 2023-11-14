@@ -17,6 +17,17 @@ type MsgResult struct {
 	Data             []byte
 }
 
+type Worker interface {
+	// AddJobsFromMsgs will include the provided msgs for background processing.
+	AddJobsFromMsgs(ctx context.Context, msgs []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta)
+
+	// GetMsgTokenData returns the token data for the provided msg. If data are not ready it keeps waiting
+	// until they get ready. Important: Make sure to pass a proper context with timeout.
+	GetMsgTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([][]byte, error)
+
+	GetReaders() map[common.Address]Reader
+}
+
 type BackgroundWorker struct {
 	tokenDataReaders map[common.Address]Reader
 	numWorkers       int
@@ -75,6 +86,8 @@ func (w *BackgroundWorker) spawnWorkers(ctx context.Context) {
 					return
 				case msg := <-w.jobsChan:
 					res := w.work(ctx, msg)
+					// todo: consider keeping a set with the pending msgs to prevent storing empty results
+					// that way if a message is not pending it means that token data are empty
 					w.resultsCache.add(msg.SequenceNumber, res)
 				}
 			}
@@ -124,10 +137,16 @@ func (w *BackgroundWorker) AddJobsFromMsgs(ctx context.Context, msgs []internal.
 			case <-ctx.Done():
 				return
 			default:
-				w.jobsChan <- msg
+				if len(msg.TokenAmounts) > 0 {
+					w.jobsChan <- msg
+				}
 			}
 		}
 	}()
+}
+
+func (w *BackgroundWorker) GetReaders() map[common.Address]Reader {
+	return w.tokenDataReaders
 }
 
 // todo: return error if the same token appears twice in the message
@@ -157,13 +176,16 @@ func (w *BackgroundWorker) getMsgTokenData(ctx context.Context, seqNum uint64) (
 		return msgTokenData, nil
 	}
 
+	// todo: don't wait if a message is not in a pending state
+
 	// wait until the results are ready or until context timeout is reached
-	tick := time.NewTicker(100 * time.Millisecond)
+	tick := time.NewTicker(500 * time.Millisecond)
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, context.DeadlineExceeded
 		case <-tick.C:
+			fmt.Println("waiting for token data")
 			if msgTokenData, exists := w.resultsCache.get(seqNum); exists {
 				return msgTokenData, nil
 			}

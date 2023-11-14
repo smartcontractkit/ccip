@@ -1,6 +1,7 @@
 package tokendata_test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -67,27 +68,112 @@ func TestBackgroundWorker(t *testing.T) {
 
 	tStart := time.Now()
 	for _, msg := range msgs {
-		b, err := w.GetMsgTokenData(ctx, msg)
+		b, err := w.GetMsgTokenData(ctx, msg) // fetched from provider
 		assert.NoError(t, err)
 		assert.Equal(t, tokenData[msg.TokenAmounts[0].Token], b[0])
 	}
-	t.Logf("initial get: %v", time.Since(tStart))
+	assert.True(t, time.Since(tStart) < 600*time.Millisecond)
+	assert.True(t, time.Since(tStart) > 200*time.Millisecond)
 
+	tStart = time.Now()
+	for _, msg := range msgs {
+		b, err := w.GetMsgTokenData(ctx, msg) // fetched from cache
+		assert.NoError(t, err)
+		assert.Equal(t, tokenData[msg.TokenAmounts[0].Token], b[0])
+	}
+	assert.True(t, time.Since(tStart) < 200*time.Millisecond)
+
+	w.AddJobsFromMsgs(ctx, msgs) // same messages are added but they should already be in cache
 	tStart = time.Now()
 	for _, msg := range msgs {
 		b, err := w.GetMsgTokenData(ctx, msg)
 		assert.NoError(t, err)
 		assert.Equal(t, tokenData[msg.TokenAmounts[0].Token], b[0])
 	}
-	t.Logf("get second time: %v", time.Since(tStart))
+	assert.True(t, time.Since(tStart) < 200*time.Millisecond)
+}
+
+func TestBackgroundWorker_RetryOnErrors(t *testing.T) {
+	ctx := testutils.Context(t)
+
+	tk1 := utils.RandomAddress()
+	tk2 := utils.RandomAddress()
+
+	rdr1 := tokendata.NewMockReader(t)
+	rdr2 := tokendata.NewMockReader(t)
+
+	w := tokendata.NewBackgroundWorker(ctx, map[common.Address]tokendata.Reader{
+		tk1: rdr1,
+		tk2: rdr2,
+	}, 10)
+
+	msgs := []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+		{EVM2EVMMessage: internal.EVM2EVMMessage{
+			SequenceNumber: uint64(1),
+			TokenAmounts:   []internal.TokenAmount{{Token: tk1}},
+		}},
+		{EVM2EVMMessage: internal.EVM2EVMMessage{
+			SequenceNumber: uint64(2),
+			TokenAmounts:   []internal.TokenAmount{{Token: tk2}},
+		}},
+	}
+
+	rdr1.On("ReadTokenData", mock.Anything, msgs[0]).
+		Return([]byte("some data"), nil).Once()
+
+	// reader2 returns an error
+	rdr2.On("ReadTokenData", mock.Anything, msgs[1]).
+		Return(nil, fmt.Errorf("some err")).Once()
 
 	w.AddJobsFromMsgs(ctx, msgs)
-	// add same msgs again
-	tStart = time.Now()
-	for _, msg := range msgs {
-		b, err := w.GetMsgTokenData(ctx, msg)
-		assert.NoError(t, err)
-		assert.Equal(t, tokenData[msg.TokenAmounts[0].Token], b[0])
-	}
-	t.Logf("get after adding same msgs: %v", time.Since(tStart))
+	// processing of the messages should have started at this point
+
+	tokenData, err := w.GetMsgTokenData(ctx, msgs[0])
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("some data"), tokenData[0])
+
+	_, err = w.GetMsgTokenData(ctx, msgs[1])
+	assert.Error(t, err)
+	assert.Errorf(t, err, "some error")
+
+	// we make the second reader to return data
+	rdr2.On("ReadTokenData", mock.Anything, msgs[1]).
+		Return([]byte("some other data"), nil).Once()
+
+	// add the jobs again, at this point jobs that previously returned
+	// an error are removed from the cache
+	w.AddJobsFromMsgs(ctx, msgs)
+
+	// since reader1 returned some data before, we expect to get the cached result
+	tokenData, err = w.GetMsgTokenData(ctx, msgs[0])
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("some data"), tokenData[0])
+
+	// wait some time for msg2 to be re-processed and error overwritten
+	time.Sleep(20 * time.Millisecond) // todo: improve the test
+
+	// for reader2 that returned an error before we expect to get data now
+	tokenData, err = w.GetMsgTokenData(ctx, msgs[1])
+	assert.NoError(t, err)
+	assert.Equal(t, []byte("some other data"), tokenData[0])
+}
+
+func TestBackgroundWorker_Timeout(t *testing.T) {
+	ctx := testutils.Context(t)
+
+	tk1 := utils.RandomAddress()
+	tk2 := utils.RandomAddress()
+
+	rdr1 := tokendata.NewMockReader(t)
+	rdr2 := tokendata.NewMockReader(t)
+
+	w := tokendata.NewBackgroundWorker(ctx, map[common.Address]tokendata.Reader{tk1: rdr1, tk2: rdr2}, 10)
+
+	ctx, cf := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cf()
+
+	_, err := w.GetMsgTokenData(ctx, internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+		EVM2EVMMessage: internal.EVM2EVMMessage{SequenceNumber: 1}},
+	)
+	assert.Error(t, err)
 }

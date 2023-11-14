@@ -38,6 +38,10 @@ const (
 
 	// MaxDataLenPerBatch limits the total length of msg data that can be in a batch.
 	MaxDataLenPerBatch = 60_000
+
+	// MaximumAllowedTokenDataWaitTimePerBatchSec defines the maximum time that is allowed
+	// for the plugin to wait for token data to be fetched from external providers per batch.
+	MaximumAllowedTokenDataWaitTimePerBatchSec = 5
 )
 
 var (
@@ -58,7 +62,7 @@ type ExecutionPluginStaticConfig struct {
 	sourceClient             evmclient.Client
 	destChainEVMID           *big.Int
 	destGasEstimator         gas.EvmFeeEstimator
-	tokenDataProviders       map[common.Address]tokendata.Reader
+	tokenDataWorker          tokendata.Worker
 }
 
 type ExecutionReportingPlugin struct {
@@ -264,6 +268,10 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 	unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReports)
 	if err != nil {
 		return nil, err
+	}
+
+	for _, unexpiredReport := range unexpiredReportsWithSendReqs {
+		r.config.tokenDataWorker.AddJobsFromMsgs(ctx, unexpiredReport.sendRequestsWithMeta)
 	}
 
 	getDestPoolRateLimits := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
@@ -476,10 +484,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	expectedNonces := make(map[common.Address]uint64)
 	availableDataLen := MaxDataLenPerBatch
 
-	var tokenDataBgWorker *tokendata.BackgroundWorker // todo: init
-	tokenDataBgWorker.AddJobsFromMsgs(ctx, report.sendRequestsWithMeta)
-	tokenDataRemainingDuration := 5 * time.Second
-
+	tokenDataRemainingDuration := MaximumAllowedTokenDataWaitTimePerBatchSec * time.Second
 	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
 		if msg.Executed {
@@ -529,13 +534,10 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		tStart := time.Now()
-		ctxTimeout, cf := context.WithTimeout(ctx, tokenDataRemainingDuration)
-		tokenData, err2 := tokenDataBgWorker.GetMsgTokenData(ctxTimeout, msg)
-		cf()
-		tokenDataRemainingDuration -= time.Since(tStart)
-		if err2 != nil {
-			msgLggr.Errorw("skipping message error while getting token data", "err", err2)
+		tokenData, dur, err := r.getTokenDataWithCappedLatency(ctx, msg, tokenDataRemainingDuration)
+		tokenDataRemainingDuration -= dur
+		if err != nil {
+			msgLggr.Errorw("skipping message error while getting token data", "err", err)
 			continue
 		}
 
@@ -624,6 +626,26 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	}
 
 	return executableMessages
+}
+
+// getTokenDataWithCappedLatency gets the token data for the provided message.
+// Stops and returns an error if more than allowedWaitingTime is passed.
+// todo: test
+func (r *ExecutionReportingPlugin) getTokenDataWithCappedLatency(
+	ctx context.Context,
+	msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta,
+	allowedWaitingTime time.Duration,
+) ([][]byte, time.Duration, error) {
+	if len(msg.TokenAmounts) == 0 {
+		return nil, 0, nil
+	}
+
+	ctxTimeout, cf := context.WithTimeout(ctx, allowedWaitingTime)
+	defer cf()
+	tStart := time.Now()
+	tokenData, err := r.config.tokenDataWorker.GetMsgTokenData(ctxTimeout, msg)
+	tDur := time.Since(tStart)
+	return tokenData, tDur, err
 }
 
 func (r *ExecutionReportingPlugin) isRateLimitEnoughForTokenPool(

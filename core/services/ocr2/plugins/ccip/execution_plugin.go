@@ -114,6 +114,9 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ExecPluginLabel)
 	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, ExecPluginLabel)
 
+	ctx := context.TODO() // ???
+	const numTokenDataWorkers = 5
+
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", pluginConfig,
 		"onRampAddress", offRampConfig.OnRamp,
@@ -135,7 +138,11 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 			sourceClient:             sourceChain.Client(),
 			destGasEstimator:         destChain.GasEstimator(),
 			destChainEVMID:           destChain.ID(),
-			tokenDataProviders:       tokenDataProviders,
+			tokenDataWorker: tokendata.NewBackgroundWorker(
+				ctx,
+				tokenDataProviders,
+				numTokenDataWorkers,
+			),
 		}, &BackfillArgs{
 			sourceLP:         sourceChain.LogPoller(),
 			destLP:           destChain.LogPoller(),
@@ -214,7 +221,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 	if err := execPluginConfig.onRampReader.Close(qopts...); err != nil {
 		return err
 	}
-	for _, tokenReader := range execPluginConfig.tokenDataProviders {
+	for _, tokenReader := range execPluginConfig.tokenDataWorker.GetReaders() {
 		if err := tokenReader.Close(qopts...); err != nil {
 			return err
 		}

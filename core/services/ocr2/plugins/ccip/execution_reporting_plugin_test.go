@@ -29,6 +29,7 @@ import (
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
@@ -96,6 +97,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports = newInflightExecReportsContainer(time.Minute)
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
+			p.config.tokenDataWorker = tokendata.NewBackgroundWorker(ctx, make(map[common.Address]tokendata.Reader), 10)
 
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 			commitStoreReader.On("IsDown", mock.Anything).Return(tc.commitStorePaused, nil)
@@ -616,6 +618,8 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 		},
 	}
 
+	ctx := testutils.Context(t)
+
 	for _, tc := range tt {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -633,6 +637,8 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			plugin := ExecutionReportingPlugin{
 				config: ExecutionPluginStaticConfig{
 					offRampReader: mockOffRampReader,
+					tokenDataWorker: tokendata.NewBackgroundWorker(
+						ctx, map[common.Address]tokendata.Reader{}, 10),
 				},
 				destWrappedNative: destNative,
 				offchainConfig: ccipdata.ExecOffchainConfig{
