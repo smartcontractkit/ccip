@@ -1,9 +1,9 @@
 GETH_VERSION: 1.12.0
 arm_contract: ../../../contracts/solc/v0.8.19/ARM.abi ../../../contracts/solc/v0.8.19/ARM.bin 893a2d007f5ffad2a118beccee72cf28913a2d6207f22b2028543139a5fdece0
 arm_proxy_contract: ../../../contracts/solc/v0.8.19/ARMProxy.abi ../../../contracts/solc/v0.8.19/ARMProxy.bin f7b818c2ba31d8b12ea2dbaebc72c74e69640b7349b76c7415226cc4946075f2
-burn_from_mint_token_pool: ../../../contracts/solc/v0.8.19/BurnFromMintTokenPool.abi ../../../contracts/solc/v0.8.19/BurnFromMintTokenPool.bin 571c3e811c5df37c648e52783b8b53481f27f3149690d4158def67521204cae4
-burn_mint_token_pool: ../../../contracts/solc/v0.8.19/BurnMintTokenPool.abi ../../../contracts/solc/v0.8.19/BurnMintTokenPool.bin a55d69473db9b5a6f40c49b7e78c125a858460adda4334fcfdceb56143fb7f38
-burn_with_from_mint_token_pool: ../../../contracts/solc/v0.8.19/BurnWithFromMintTokenPool.abi ../../../contracts/solc/v0.8.19/BurnWithFromMintTokenPool.bin c86082f90041c5d517904c2f4547cffa841d5042a82ae576106c57d15eba60f8
+burn_from_mint_token_pool: ../../../contracts/solc/v0.8.19/BurnFromMintTokenPool.abi ../../../contracts/solc/v0.8.19/BurnFromMintTokenPool.bin 7cf07ae6650c4d0917773f5eb01966c4dd714292751a4bf63e343bd336885a28
+burn_mint_token_pool: ../../../contracts/solc/v0.8.19/BurnMintTokenPool.abi ../../../contracts/solc/v0.8.19/BurnMintTokenPool.bin 1cd4c93df4611c6ac0f621cd0a23c08efef37a5c6173cc2b6fa50eb0e67c91b3
+burn_with_from_mint_token_pool: ../../../contracts/solc/v0.8.19/BurnWithFromMintTokenPool.abi ../../../contracts/solc/v0.8.19/BurnWithFromMintTokenPool.bin 94b47ac2a1ebd45e2cb38a7f5db583d8d7380663387f6370efa4103093688e55
 commit_store: ../../../contracts/solc/v0.8.19/CommitStore.abi ../../../contracts/solc/v0.8.19/CommitStore.bin b971b915b36bdc5e4ce8aee6bb5ae7a5cdedc562874f87ca863c96c2529fcc5b
 commit_store_helper: ../../../contracts/solc/v0.8.19/CommitStoreHelper.abi ../../../contracts/solc/v0.8.19/CommitStoreHelper.bin dd078eef6a55928e0cad79f40828a36cfa5c2789a664f37b56a7c215fb7c8932
 custom_token_pool: ../../../contracts/solc/v0.8.19/CustomTokenPool.abi ../../../contracts/solc/v0.8.19/CustomTokenPool.bin 79ab937aa4493bf31fb0e57affd00555aad75205c90268e89674c28ea9e5e48f

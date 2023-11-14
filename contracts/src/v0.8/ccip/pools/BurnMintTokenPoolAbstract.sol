@@ -6,10 +6,18 @@ import {IBurnMintERC20} from "../../shared/token/ERC20/IBurnMintERC20.sol";
 import {TokenPool} from "./TokenPool.sol";
 
 abstract contract BurnMintTokenPoolAbstract is TokenPool {
+  /// @dev The unique burn mint pool flag to signal through EIP 165.
+  bytes4 private constant BURN_MINT_INTERFACE_ID = bytes4(keccak256("BurnMintTokenPool"));
+
   /// @notice Contains the specific burn call for a pool.
   /// @dev overriding this method allows us to create pools with different burn signatures
   /// without duplicating the underlying logic.
   function _burn(uint256 amount) internal virtual;
+
+  // @inheritdoc IERC165
+  function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+    return interfaceId == BURN_MINT_INTERFACE_ID || super.supportsInterface(interfaceId);
+  }
 
   /// @notice Burn the token in the pool
   /// @param amount Amount to burn
@@ -43,5 +51,10 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     _consumeOffRampRateLimit(amount);
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
     emit Minted(msg.sender, receiver, amount);
+  }
+
+  /// @notice returns the lock release interface flag used for EIP165 identification.
+  function getBurnMintInterfaceId() public pure returns (bytes4) {
+    return BURN_MINT_INTERFACE_ID;
   }
 }
