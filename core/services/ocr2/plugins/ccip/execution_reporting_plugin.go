@@ -475,7 +475,10 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	availableGas := uint64(r.offchainConfig.BatchGasLimit)
 	expectedNonces := make(map[common.Address]uint64)
 	availableDataLen := MaxDataLenPerBatch
-	skipTokenWithData := false
+
+	var tokenDataBgWorker *tokendata.BackgroundWorker // todo: init
+	tokenDataBgWorker.AddJobsFromMsgs(ctx, report.sendRequestsWithMeta)
+	tokenDataRemainingDuration := 5 * time.Second
 
 	for _, msg := range report.sendRequestsWithMeta {
 		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
@@ -526,15 +529,13 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			continue
 		}
 
-		tokenData, err2 := getTokenData(ctx, msgLggr, msg, r.config.tokenDataProviders, skipTokenWithData)
+		tStart := time.Now()
+		ctxTimeout, cf := context.WithTimeout(ctx, tokenDataRemainingDuration)
+		tokenData, err2 := tokenDataBgWorker.GetMsgTokenData(ctxTimeout, msg)
+		cf()
+		tokenDataRemainingDuration -= time.Since(tStart)
 		if err2 != nil {
-			// When fetching token data, 3rd party API could hang or rate limit or fail due to any reason.
-			// If this happens, we skip all remaining msgs that require token data in this batch.
-			// If the issue is transient, then it is likely for other nodes in the DON to succeed and execute the msg anyway.
-			// If the issue is API outage or rate limit, then we should indeed avoid calling the API.
-			// If API issues do not resolve, eventually the root will only contain msg that should be skipped, and be snoozed.
-			skipTokenWithData = true
-			msgLggr.Errorw("Skipping message unable to get token data", "err", err2)
+			msgLggr.Errorw("skipping message error while getting token data", "err", err2)
 			continue
 		}
 
@@ -621,31 +622,8 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 		expectedNonces[msg.Sender] = msg.Nonce + 1
 	}
+
 	return executableMessages
-}
-
-func getTokenData(ctx context.Context, lggr logger.Logger, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenDataProviders map[common.Address]tokendata.Reader, skipTokenWithData bool) (tokenData [][]byte, err error) {
-	for _, token := range msg.TokenAmounts {
-		offchainTokenDataProvider, ok := tokenDataProviders[token.Token]
-		if !ok {
-			// No token data required
-			tokenData = append(tokenData, []byte{})
-			continue
-		}
-		if skipTokenWithData {
-			// If token data is required but should be skipped, exit without calling the API
-			return [][]byte{}, errors.New("token requiring data is flagged to be skipped")
-		}
-		lggr.Infow("Fetching token data", "token", token.Token.Hex())
-		tknData, err2 := offchainTokenDataProvider.ReadTokenData(ctx, msg)
-		if err2 != nil {
-			return [][]byte{}, err2
-		}
-
-		lggr.Infow("Token data retrieved", "token", token.Token.Hex())
-		tokenData = append(tokenData, tknData)
-	}
-	return tokenData, nil
 }
 
 func (r *ExecutionReportingPlugin) isRateLimitEnoughForTokenPool(

@@ -69,6 +69,8 @@ type TokenDataReader struct {
 	usdcReader            ccipdata.USDCReader
 	attestationApi        *url.URL
 	attestationApiTimeout time.Duration
+	// todo: monitor the 429s and add a field which stops requests from being sent.
+	// i.e. 'coolDown time.Duration' if it's positive then return error immediately
 }
 
 type attestationResponse struct {
