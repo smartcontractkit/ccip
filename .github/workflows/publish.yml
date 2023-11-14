@@ -7,7 +7,7 @@ on:
     branches:
       - ccip-develop
       - deployment-test
-      - feature/laggy-usdc
+      - feature/laggy-usdc-2
 
 jobs:
   build-and-publish:
