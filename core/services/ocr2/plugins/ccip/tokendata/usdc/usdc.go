@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -65,7 +66,7 @@ func (m messageAndAttestation) Validate() error {
 type TokenDataReader struct {
 	lggr                  logger.Logger
 	usdcReader            ccipdata.USDCReader
-	httpClient            IHttpClient
+	httpClient            http.IHttpClient
 	attestationApi        *url.URL
 	attestationApiTimeout time.Duration
 }
@@ -82,17 +83,16 @@ func NewUSDCTokenDataReader(lggr logger.Logger, usdcReader ccipdata.USDCReader, 
 	if usdcAttestationApiTimeoutSeconds == 0 {
 		timeout = defaultAttestationTimeout
 	}
-
 	return &TokenDataReader{
 		lggr:                  lggr,
 		usdcReader:            usdcReader,
-		httpClient:            &HttpClient{},
+		httpClient:            http.NewObservedIHttpClient(&http.HttpClient{}),
 		attestationApi:        usdcAttestationApi,
 		attestationApiTimeout: timeout,
 	}
 }
 
-func NewUSDCTokenDataReaderWithHttpClient(origin TokenDataReader, httpClient IHttpClient) *TokenDataReader {
+func NewUSDCTokenDataReaderWithHttpClient(origin TokenDataReader, httpClient http.IHttpClient) *TokenDataReader {
 	return &TokenDataReader{
 		lggr:                  origin.lggr,
 		usdcReader:            origin.usdcReader,

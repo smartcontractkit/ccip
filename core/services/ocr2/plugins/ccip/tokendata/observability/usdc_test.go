@@ -18,18 +18,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	http2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
 )
 
-var (
-	pluginName = "testplugin"
-)
-
 type expected struct {
-	pluginName string
-	status     string
-	result     string
-	count      int
+	status string
+	result string
+	count  int
 }
 
 func TestUSDCClientMonitoring(t *testing.T) {
@@ -45,8 +41,8 @@ func TestUSDCClientMonitoring(t *testing.T) {
 			server:   newSuccessServer(t),
 			requests: 5,
 			expected: []expected{
-				{pluginName, "200", "true", 5},
-				{pluginName, "429", "false", 0},
+				{"200", "true", 5},
+				{"429", "false", 0},
 			},
 		},
 		{
@@ -54,8 +50,8 @@ func TestUSDCClientMonitoring(t *testing.T) {
 			server:   newRateLimitedServer(),
 			requests: 26,
 			expected: []expected{
-				{pluginName, "200", "true", 0},
-				{pluginName, "429", "false", 26},
+				{"200", "true", 0},
+				{"429", "false", 26},
 			},
 		},
 	}
@@ -78,8 +74,8 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	histogram := promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "test_client_histogram_" + name,
 		Help:    "Latency of calls to the USDC client",
-		Buckets: latencyBuckets,
-	}, []string{"plugin", "status", "success"})
+		Buckets: http2.UsdcLatencyBuckets,
+	}, []string{"status", "success"})
 
 	// Mock USDC reader.
 	usdcReader := mocks.NewUSDCReader(t)
@@ -87,12 +83,9 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 	usdcReader.On("GetLastUSDCMessagePriorToLogIndexInTx", mock.Anything, mock.Anything, mock.Anything).Return(msgBody, nil)
 
 	// Service with monitored http client.
-	usdcService := usdc.NewUSDCTokenDataReader(log, usdcReader, attestationURI, 0)
-	observedHttpClient := &ObservedIHttpClient{
-		IHttpClient: &usdc.HttpClient{},
-		metric:      metricDetails{histogram, pluginName},
-	}
-	tokenDataReader := *usdc.NewUSDCTokenDataReaderWithHttpClient(*usdcService, observedHttpClient)
+	observedHttpClient := http2.NewObservedIHttpClientWithMetric(&http2.HttpClient{}, http2.NewMetricDetails(histogram))
+	tokenDataReaderDefault := usdc.NewUSDCTokenDataReader(log, usdcReader, attestationURI, 0)
+	tokenDataReader := usdc.NewUSDCTokenDataReaderWithHttpClient(*tokenDataReaderDefault, observedHttpClient)
 	require.NotNil(t, tokenDataReader)
 
 	for i := 0; i < requests; i++ {
@@ -101,7 +94,7 @@ func testMonitoring(t *testing.T, name string, server *httptest.Server, requests
 
 	// Check that the metrics are updated as expected.
 	for _, e := range expected {
-		assert.Equal(t, e.count, counterFromHistogramByLabels(t, histogram, e.pluginName, e.status, e.result))
+		assert.Equal(t, e.count, counterFromHistogramByLabels(t, histogram, e.status, e.result))
 	}
 }
 
