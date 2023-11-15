@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -21,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/http"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -73,6 +72,7 @@ func (m messageAndAttestation) Validate() error {
 type TokenDataReader struct {
 	lggr                  logger.Logger
 	usdcReader            ccipdata.USDCReader
+	httpClient            http.IHttpClient
 	attestationApi        *url.URL
 	attestationApiTimeout time.Duration
 
@@ -93,12 +93,22 @@ func NewUSDCTokenDataReader(lggr logger.Logger, usdcReader ccipdata.USDCReader, 
 	if usdcAttestationApiTimeoutSeconds == 0 {
 		timeout = defaultAttestationTimeout
 	}
-
 	return &TokenDataReader{
 		lggr:                  lggr,
 		usdcReader:            usdcReader,
+		httpClient:            http.NewObservedIHttpClient(&http.HttpClient{}),
 		attestationApi:        usdcAttestationApi,
 		attestationApiTimeout: timeout,
+	}
+}
+
+func NewUSDCTokenDataReaderWithHttpClient(origin TokenDataReader, httpClient http.IHttpClient) *TokenDataReader {
+	return &TokenDataReader{
+		lggr:                  origin.lggr,
+		usdcReader:            origin.usdcReader,
+		httpClient:            httpClient,
+		attestationApi:        origin.attestationApi,
+		attestationApiTimeout: origin.attestationApiTimeout,
 	}
 }
 
@@ -158,30 +168,19 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.E
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
-	// Use a timeout to guard against attestation API hanging, causing observation timeout and failing to make any progress.
-	timeoutCtx, cancel := context.WithTimeout(ctx, s.attestationApiTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(
-		timeoutCtx,
-		http.MethodGet,
+	res, _, headers, err := s.httpClient.Get(
+		ctx,
 		fmt.Sprintf("%s/%s/%s/0x%x", s.attestationApi, apiVersion, attestationPath, usdcMessageHash),
-		nil,
+		s.attestationApiTimeout,
 	)
 	if err != nil {
 		return attestationResponse{}, fmt.Errorf("build request: %w", err)
 	}
-	req.Header.Add("accept", "application/json")
 
-	res, err := http.DefaultClient.Do(req)
 	switch {
-	case errors.Is(err, context.DeadlineExceeded):
-		return attestationResponse{}, tokendata.ErrTimeout
-	case err != nil:
-		return attestationResponse{}, fmt.Errorf("request error: %w", err)
-	case res.StatusCode == http.StatusTooManyRequests:
+	case errors.Is(err, tokendata.ErrRateLimit):
 		coolDownDuration := defaultCoolDownDuration
-		if retryAfterHeader, exists := res.Header["Retry-After"]; exists && len(retryAfterHeader) > 0 {
+		if retryAfterHeader, exists := headers["Retry-After"]; exists && len(retryAfterHeader) > 0 {
 			if retryAfterSec, err := strconv.ParseInt(retryAfterHeader[0], 10, 64); err == nil {
 				coolDownDuration = time.Duration(retryAfterSec) * time.Second
 			}
@@ -190,25 +189,18 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 
 		// Explicitly signal if the API is being rate limited
 		return attestationResponse{}, tokendata.ErrRateLimit
-	}
-
-	defer func() { _ = res.Body.Close() }()
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return attestationResponse{}, err
+	case err != nil:
+		return attestationResponse{}, fmt.Errorf("request error: %w", err)
 	}
 
 	var response attestationResponse
-	err = json.Unmarshal(body, &response)
+	err = json.Unmarshal(res, &response)
 	if err != nil {
 		return attestationResponse{}, err
 	}
-
 	if response.Status == "" {
-		return attestationResponse{}, fmt.Errorf("invalid attestation response: %s", string(body))
+		return attestationResponse{}, fmt.Errorf("invalid attestation response: %s", string(res))
 	}
-
 	return response, nil
 }
 
