@@ -1160,6 +1160,58 @@ func TestUpdateSourceToDestTokenMapping(t *testing.T) {
 }
 */
 
+type delayedTokenDataWorker struct {
+	delay time.Duration
+	tokendata.Worker
+}
+
+func (m delayedTokenDataWorker) GetMsgTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([][]byte, error) {
+	time.Sleep(m.delay)
+	return nil, ctx.Err()
+}
+
+func TestExecutionReportingPlugin_getTokenDataWithCappedLatency(t *testing.T) {
+	testCases := []struct {
+		name               string
+		allowedWaitingTime time.Duration
+		workerLatency      time.Duration
+		expErr             bool
+	}{
+		{
+			name:               "happy flow",
+			allowedWaitingTime: 10 * time.Millisecond,
+			workerLatency:      time.Nanosecond,
+			expErr:             false,
+		},
+		{
+			name:               "worker takes long to reply",
+			allowedWaitingTime: 10 * time.Millisecond,
+			workerLatency:      20 * time.Millisecond,
+			expErr:             true,
+		},
+	}
+
+	ctx := testutils.Context(t)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &ExecutionReportingPlugin{}
+			p.config.tokenDataWorker = delayedTokenDataWorker{delay: tc.workerLatency}
+
+			msg := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				EVM2EVMMessage: internal.EVM2EVMMessage{TokenAmounts: make([]internal.TokenAmount, 1)},
+			}
+
+			_, _, err := p.getTokenDataWithCappedLatency(ctx, msg, tc.allowedWaitingTime)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func Test_calculateObservedMessagesConsensus(t *testing.T) {
 	type args struct {
 		observations []ExecutionObservation

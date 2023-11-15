@@ -630,7 +630,6 @@ func (r *ExecutionReportingPlugin) buildBatch(
 
 // getTokenDataWithCappedLatency gets the token data for the provided message.
 // Stops and returns an error if more than allowedWaitingTime is passed.
-// todo: test
 func (r *ExecutionReportingPlugin) getTokenDataWithCappedLatency(
 	ctx context.Context,
 	msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta,

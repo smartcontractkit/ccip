@@ -37,7 +37,6 @@ type BackgroundWorker struct {
 	stopFn context.CancelFunc
 }
 
-// todo: expire
 type resultsCache struct {
 	results   map[uint64][]MsgResult
 	resultsMu *sync.RWMutex
@@ -86,8 +85,6 @@ func (w *BackgroundWorker) spawnWorkers(ctx context.Context) {
 					return
 				case msg := <-w.jobsChan:
 					res := w.work(ctx, msg)
-					// todo: consider keeping a set with the pending msgs to prevent storing empty results
-					// that way if a message is not pending it means that token data are empty
 					w.resultsCache.add(msg.SequenceNumber, res)
 				}
 			}
@@ -149,15 +146,13 @@ func (w *BackgroundWorker) GetReaders() map[common.Address]Reader {
 	return w.tokenDataReaders
 }
 
-// todo: return error if the same token appears twice in the message
 func (w *BackgroundWorker) GetMsgTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([][]byte, error) {
-	tokenDatas := make([][]byte, len(msg.TokenAmounts))
-
 	res, err := w.getMsgTokenData(ctx, msg.SequenceNumber)
 	if err != nil {
 		return nil, err
 	}
 
+	tokenDatas := make([][]byte, len(msg.TokenAmounts))
 	for _, r := range res {
 		if r.Err != nil {
 			return nil, r.Err
@@ -175,8 +170,6 @@ func (w *BackgroundWorker) getMsgTokenData(ctx context.Context, seqNum uint64) (
 	if msgTokenData, exists := w.resultsCache.get(seqNum); exists {
 		return msgTokenData, nil
 	}
-
-	// todo: don't wait if a message is not in a pending state
 
 	// wait until the results are ready or until context timeout is reached
 	tick := time.NewTicker(500 * time.Millisecond)
