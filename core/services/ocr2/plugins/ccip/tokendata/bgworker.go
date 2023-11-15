@@ -33,8 +33,6 @@ type BackgroundWorker struct {
 	numWorkers       int
 	jobsChan         chan internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
 	resultsCache     *resultsCache
-
-	stopFn context.CancelFunc
 }
 
 type resultsCache struct {
@@ -70,8 +68,6 @@ func NewBackgroundWorker(ctx context.Context, tokenDataReaders map[common.Addres
 		resultsCache:     newResultsCache(),
 	}
 
-	ctx, cf := context.WithCancel(ctx)
-	w.stopFn = cf
 	w.spawnWorkers(ctx)
 	return w
 }
@@ -172,7 +168,7 @@ func (w *BackgroundWorker) getMsgTokenData(ctx context.Context, seqNum uint64) (
 	}
 
 	// wait until the results are ready or until context timeout is reached
-	tick := time.NewTicker(500 * time.Millisecond)
+	tick := time.NewTicker(100 * time.Millisecond)
 	for {
 		select {
 		case <-ctx.Done():
