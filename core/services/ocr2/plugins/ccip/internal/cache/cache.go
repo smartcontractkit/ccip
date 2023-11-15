@@ -60,16 +60,34 @@ func (c *CachedChain[T]) Get(ctx context.Context) (T, error) {
 		return c.initializeCache(ctx)
 	}
 
-	currentBlockNumber, err := c.logPoller.LatestBlockByEventSigsAddrsWithConfs(lastChangeBlock, c.observedEvents, c.address, logpoller.Confirmations(c.optimisticConfirmations), pg.WithParentCtx(ctx))
+	// Ordering matters here, we need to fetch latestBlock, before we fetch logs.
+	latestBlock, err := c.logPoller.LatestBlock(pg.WithParentCtx(ctx))
+	if err != nil {
+		// Intentionally ignore the error here
+		latestBlock = logpoller.LogPollerBlock{}
+	}
 
+	currentBlockNumber, err := c.logPoller.LatestBlockByEventSigsAddrsWithConfs(
+		lastChangeBlock,
+		c.observedEvents,
+		c.address,
+		logpoller.Confirmations(c.optimisticConfirmations),
+		pg.WithParentCtx(ctx),
+	)
 	if err != nil {
 		return empty, err
 	}
 
 	// In case of new updates, fetch fresh data from the origin
 	if currentBlockNumber > lastChangeBlock {
-		return c.fetchFromOrigin(ctx, currentBlockNumber)
+		// Pick whichever is higher
+		return c.fetchFromOrigin(ctx, max(currentBlockNumber, latestBlock.FinalizedBlockNumber))
 	}
+
+	// In case of no updates, return cached value and update lastChangeBlock to the latest finalized block.
+	// This is performance improvement that will prevent for large db scans in case of no changes on the chain for a long time.
+	// We use finalizedBlock for that to prevent missing data when chain is reorganized.
+	defer c.maybeCacheLatestFinalizedBlock(latestBlock)
 	return c.copyCachedValue(), nil
 }
 
@@ -135,4 +153,11 @@ func (c *CachedChain[T]) copyCachedValue() T {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return c.origin.Copy(c.value)
+}
+
+func (c *CachedChain[T]) maybeCacheLatestFinalizedBlock(block logpoller.LogPollerBlock) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	c.lastChangeBlock = max(c.lastChangeBlock, block.FinalizedBlockNumber)
 }

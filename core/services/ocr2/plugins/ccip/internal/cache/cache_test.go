@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -32,15 +33,54 @@ func TestGet_InitDataForTheFirstTime(t *testing.T) {
 }
 
 func TestGet_ReturnDataFromCacheIfNoNewEvents(t *testing.T) {
-	latestBlock := int64(100)
-	lp := lpMocks.NewLogPoller(t)
-	mockLogPollerQuery(lp, latestBlock)
+	tests := []struct {
+		name                    string
+		lastFinalizedBlock      int64
+		lastChangeBlock         int64
+		lastBlockError          error
+		expectedLastChangeBlock int64
+	}{
+		{
+			name:                    "last finalized block is 0",
+			lastFinalizedBlock:      10,
+			lastChangeBlock:         100,
+			expectedLastChangeBlock: 100,
+		},
+		{
+			name:                    "last finalized block is lower than last change block",
+			lastFinalizedBlock:      10,
+			lastChangeBlock:         100,
+			expectedLastChangeBlock: 100,
+		},
+		{
+			name:                    "last finalized block is higher than last change block",
+			lastFinalizedBlock:      200,
+			lastChangeBlock:         100,
+			expectedLastChangeBlock: 200,
+		},
+		{
+			name:                    "should ignore error when fetching latest block",
+			lastFinalizedBlock:      5000,
+			lastChangeBlock:         100,
+			lastBlockError:          assert.AnError,
+			expectedLastChangeBlock: 100,
+		},
+	}
 
-	contract := newCachedContract(lp, cachedValue, []string{"value1"}, latestBlock)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lp := lpMocks.NewLogPoller(t)
+			lp.On("LatestBlockByEventSigsAddrsWithConfs", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(tt.lastChangeBlock, nil)
+			lp.On("LatestBlock", mock.Anything).Return(logpoller.LogPollerBlock{FinalizedBlockNumber: tt.lastFinalizedBlock}, tt.lastBlockError)
 
-	value, err := contract.Get(testutils.Context(t))
-	require.NoError(t, err)
-	require.Equal(t, cachedValue, value)
+			contract := newCachedContract(lp, cachedValue, []string{"value1"}, tt.lastChangeBlock)
+
+			value, err := contract.Get(testutils.Context(t))
+			require.NoError(t, err)
+			assert.Equal(t, cachedValue, value)
+			assert.Equal(t, tt.expectedLastChangeBlock, contract.lastChangeBlock)
+		})
+	}
 }
 
 func TestGet_CallOriginForNewEvents(t *testing.T) {
@@ -137,6 +177,7 @@ func newCachedContract(lp logpoller.LogPoller, cacheValue string, originValue []
 }
 
 func mockLogPollerQuery(lp *lpMocks.LogPoller, latestBlock int64) *mock.Call {
+	lp.On("LatestBlock", mock.Anything).Maybe().Return(logpoller.LogPollerBlock{}, nil)
 	return lp.On("LatestBlockByEventSigsAddrsWithConfs", mock.Anything, []common.Hash{{}}, []common.Address{{}}, logpoller.Confirmations(0), mock.Anything).
 		Maybe().Return(latestBlock, nil)
 }
@@ -152,6 +193,12 @@ func (lp *ProgressingLogPoller) LatestBlockByEventSigsAddrsWithConfs(int64, []co
 	defer lp.lock.Unlock()
 	lp.latestBlock++
 	return lp.latestBlock, nil
+}
+
+func (lp *ProgressingLogPoller) LatestBlock(...pg.QOpt) (logpoller.LogPollerBlock, error) {
+	lp.lock.Lock()
+	defer lp.lock.Unlock()
+	return logpoller.LogPollerBlock{BlockNumber: lp.latestBlock}, nil
 }
 
 type FakeContractOrigin struct {
