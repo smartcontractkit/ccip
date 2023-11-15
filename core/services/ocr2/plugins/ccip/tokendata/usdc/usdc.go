@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -27,6 +29,10 @@ const (
 	apiVersion                = "v1"
 	attestationPath           = "attestations"
 	defaultAttestationTimeout = 5 * time.Second
+
+	// defaultCoolDownDurationSec defines the default time to wait after getting rate limited.
+	// this value is only used if the 429 response does not contain the Retry-After header
+	defaultCoolDownDuration = 60 * time.Second
 )
 
 type attestationStatus string
@@ -69,8 +75,10 @@ type TokenDataReader struct {
 	usdcReader            ccipdata.USDCReader
 	attestationApi        *url.URL
 	attestationApiTimeout time.Duration
-	// todo: monitor the 429s and add a field which stops requests from being sent.
-	// i.e. 'coolDown time.Duration' if it's positive then return error immediately
+
+	// coolDownUntil defines whether requests are blocked or not.
+	coolDownUntil time.Time
+	coolDownMu    sync.RWMutex
 }
 
 type attestationResponse struct {
@@ -95,6 +103,11 @@ func NewUSDCTokenDataReader(lggr logger.Logger, usdcReader ccipdata.USDCReader, 
 }
 
 func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) (messageAndAttestation []byte, err error) {
+	if s.inCoolDownPeriod() {
+		// rate limiting cool-down period, we prevent new requests from being sent
+		return nil, tokendata.ErrRequestsBlocked
+	}
+
 	messageBody, err := s.getUSDCMessageBody(ctx, msg)
 	if err != nil {
 		return []byte{}, errors.Wrap(err, "failed getting the USDC message body")
@@ -145,30 +158,41 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.E
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
-	fullAttestationUrl := fmt.Sprintf("%s/%s/%s/0x%x", s.attestationApi, apiVersion, attestationPath, usdcMessageHash)
-
 	// Use a timeout to guard against attestation API hanging, causing observation timeout and failing to make any progress.
 	timeoutCtx, cancel := context.WithTimeout(ctx, s.attestationApiTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(timeoutCtx, "GET", fullAttestationUrl, nil)
 
+	req, err := http.NewRequestWithContext(
+		timeoutCtx,
+		http.MethodGet,
+		fmt.Sprintf("%s/%s/%s/0x%x", s.attestationApi, apiVersion, attestationPath, usdcMessageHash),
+		nil,
+	)
 	if err != nil {
-		return attestationResponse{}, err
+		return attestationResponse{}, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Add("accept", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return attestationResponse{}, tokendata.ErrTimeout
-		}
-		return attestationResponse{}, err
-	}
-	defer res.Body.Close()
 
-	// Explicitly signal if the API is being rate limited
-	if res.StatusCode == http.StatusTooManyRequests {
+	res, err := http.DefaultClient.Do(req)
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return attestationResponse{}, tokendata.ErrTimeout
+	case err != nil:
+		return attestationResponse{}, fmt.Errorf("request error: %w", err)
+	case res.StatusCode == http.StatusTooManyRequests:
+		coolDownDuration := defaultCoolDownDuration
+		if retryAfterHeader, exists := res.Header["Retry-After"]; exists && len(retryAfterHeader) > 0 {
+			if retryAfterSec, err := strconv.ParseInt(retryAfterHeader[0], 10, 64); err == nil {
+				coolDownDuration = time.Duration(retryAfterSec) * time.Second
+			}
+		}
+		s.setCoolDownPeriod(coolDownDuration)
+
+		// Explicitly signal if the API is being rate limited
 		return attestationResponse{}, tokendata.ErrRateLimit
 	}
+
+	defer func() { _ = res.Body.Close() }()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -186,6 +210,18 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 	}
 
 	return response, nil
+}
+
+func (s *TokenDataReader) setCoolDownPeriod(d time.Duration) {
+	s.coolDownMu.Lock()
+	s.coolDownUntil = time.Now().Add(d)
+	s.coolDownMu.Unlock()
+}
+
+func (s *TokenDataReader) inCoolDownPeriod() bool {
+	s.coolDownMu.RLock()
+	defer s.coolDownMu.RUnlock()
+	return time.Now().Before(s.coolDownUntil)
 }
 
 func (s *TokenDataReader) Close(qopts ...pg.QOpt) error {
