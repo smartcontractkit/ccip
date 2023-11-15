@@ -30,7 +30,6 @@ type expected struct {
 }
 
 func TestUSDCClientMonitoring(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		server   *httptest.Server
@@ -52,7 +51,7 @@ func TestUSDCClientMonitoring(t *testing.T) {
 			requests: 26,
 			expected: []expected{
 				{"200", "true", 0},
-				{"429", "false", 26},
+				{"429", "false", 1},
 			},
 		},
 	}

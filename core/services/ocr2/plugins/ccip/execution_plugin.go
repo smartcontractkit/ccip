@@ -198,14 +198,13 @@ func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Execution
 		if err != nil {
 			return nil, err
 		}
-		tokenDataProviders[pluginConfig.USDCConfig.SourceTokenAddress] = tokendata.NewCachedReader(
-			usdc.NewUSDCTokenDataReader(
-				lggr,
-				usdcReader,
-				attestationURI,
-				pluginConfig.USDCConfig.AttestationAPITimeoutSeconds,
-			),
+		tokenDataProviders[pluginConfig.USDCConfig.SourceTokenAddress] = usdc.NewUSDCTokenDataReader(
+			lggr,
+			usdcReader,
+			attestationURI,
+			pluginConfig.USDCConfig.AttestationAPITimeoutSeconds,
 		)
+
 	}
 
 	return tokenDataProviders, nil

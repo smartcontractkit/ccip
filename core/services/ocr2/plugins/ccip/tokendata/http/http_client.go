@@ -31,7 +31,7 @@ func (s *HttpClient) Get(ctx context.Context, url string, timeout time.Duration)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, http.StatusRequestTimeout, res.Header, tokendata.ErrTimeout
+			return nil, http.StatusRequestTimeout, nil, tokendata.ErrTimeout
 		}
 		return nil, res.StatusCode, res.Header, err
 	}

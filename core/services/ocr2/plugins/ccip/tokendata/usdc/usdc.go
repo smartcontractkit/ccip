@@ -110,6 +110,7 @@ func NewUSDCTokenDataReaderWithHttpClient(origin TokenDataReader, httpClient htt
 		httpClient:            httpClient,
 		attestationApi:        origin.attestationApi,
 		attestationApiTimeout: origin.attestationApiTimeout,
+		coolDownMu:            origin.coolDownMu,
 	}
 }
 
