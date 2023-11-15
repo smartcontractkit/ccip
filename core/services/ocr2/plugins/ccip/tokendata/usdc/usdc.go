@@ -78,7 +78,7 @@ type TokenDataReader struct {
 
 	// coolDownUntil defines whether requests are blocked or not.
 	coolDownUntil time.Time
-	coolDownMu    sync.RWMutex
+	coolDownMu    *sync.RWMutex
 }
 
 type attestationResponse struct {
@@ -99,6 +99,7 @@ func NewUSDCTokenDataReader(lggr logger.Logger, usdcReader ccipdata.USDCReader, 
 		httpClient:            http.NewObservedIHttpClient(&http.HttpClient{}),
 		attestationApi:        usdcAttestationApi,
 		attestationApiTimeout: timeout,
+		coolDownMu:            &sync.RWMutex{},
 	}
 }
 
@@ -168,15 +169,11 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg internal.E
 }
 
 func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHash [32]byte) (attestationResponse, error) {
-	res, _, headers, err := s.httpClient.Get(
+	body, _, headers, err := s.httpClient.Get(
 		ctx,
 		fmt.Sprintf("%s/%s/%s/0x%x", s.attestationApi, apiVersion, attestationPath, usdcMessageHash),
 		s.attestationApiTimeout,
 	)
-	if err != nil {
-		return attestationResponse{}, fmt.Errorf("build request: %w", err)
-	}
-
 	switch {
 	case errors.Is(err, tokendata.ErrRateLimit):
 		coolDownDuration := defaultCoolDownDuration
@@ -194,12 +191,12 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 	}
 
 	var response attestationResponse
-	err = json.Unmarshal(res, &response)
+	err = json.Unmarshal(body, &response)
 	if err != nil {
 		return attestationResponse{}, err
 	}
 	if response.Status == "" {
-		return attestationResponse{}, fmt.Errorf("invalid attestation response: %s", string(res))
+		return attestationResponse{}, fmt.Errorf("invalid attestation response: %s", string(body))
 	}
 	return response, nil
 }
