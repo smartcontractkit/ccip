@@ -95,12 +95,9 @@ func getCommitReportForSeqNum(ctx context.Context, commitStoreReader ccipdata.Co
 		return ccipdata.CommitStoreReport{}, err
 	}
 
-	for _, acceptedReport := range acceptedReports {
-		reportInterval := acceptedReport.Data.Interval
-		if reportInterval.Min <= seqNum && seqNum <= reportInterval.Max {
-			return acceptedReport.Data, nil
-		}
+	if len(acceptedReports) < 1 {
+		return ccipdata.CommitStoreReport{}, errors.Errorf("seq number not committed")
 	}
 
-	return ccipdata.CommitStoreReport{}, errors.Errorf("seq number not committed")
+	return acceptedReports[0].Data, nil
 }

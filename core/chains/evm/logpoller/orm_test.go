@@ -49,6 +49,21 @@ func GenLogWithTimestamp(chainID *big.Int, logIndex int64, blockNum int64, block
 	}
 }
 
+func GenLogWithData(chainID *big.Int, address common.Address, eventSig common.Hash, logIndex int64, blockNum int64, data []byte) logpoller.Log {
+	return logpoller.Log{
+		EvmChainId:     utils.NewBig(chainID),
+		LogIndex:       logIndex,
+		BlockHash:      utils.RandomBytes32(),
+		BlockNumber:    blockNum,
+		EventSig:       eventSig,
+		Topics:         [][]byte{},
+		Address:        address,
+		TxHash:         utils.RandomBytes32(),
+		Data:           data,
+		BlockTimestamp: time.Now(),
+	}
+}
+
 func TestLogPoller_Batching(t *testing.T) {
 	t.Parallel()
 	th := SetupTH(t, false, 2, 3, 2, 1000)
@@ -1430,6 +1445,68 @@ func TestInsertLogsInTx(t *testing.T) {
 			} else {
 				assert.NoError(t, insertErr)
 				assert.Len(t, logsFromDb, len(tt.logs))
+			}
+		})
+	}
+}
+
+func TestSelectLogsDataWordBetween(t *testing.T) {
+	address := utils.RandomAddress()
+	eventSig := utils.RandomBytes32()
+	th := SetupTH(t, false, 2, 3, 2, 1000)
+
+	firstLogData := make([]byte, 0, 64)
+	firstLogData = append(firstLogData, logpoller.EvmWord(1).Bytes()...)
+	firstLogData = append(firstLogData, logpoller.EvmWord(10).Bytes()...)
+
+	secondLogData := make([]byte, 0, 64)
+	secondLogData = append(secondLogData, logpoller.EvmWord(5).Bytes()...)
+	secondLogData = append(secondLogData, logpoller.EvmWord(20).Bytes()...)
+
+	err := th.ORM.InsertLogsWithBlock(
+		[]logpoller.Log{
+			GenLogWithData(th.ChainID, address, eventSig, 1, 1, firstLogData),
+			GenLogWithData(th.ChainID, address, eventSig, 2, 2, secondLogData),
+		},
+		logpoller.NewLogPollerBlock(utils.RandomBytes32(), 10, time.Now(), 1),
+	)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name         string
+		wordValue    uint64
+		expectedLogs []int64
+	}{
+		{
+			name:         "returns only first log",
+			wordValue:    2,
+			expectedLogs: []int64{1},
+		},
+		{
+			name:         "returns only second log",
+			wordValue:    11,
+			expectedLogs: []int64{2},
+		},
+		{
+			name:         "returns both logs if word value is between",
+			wordValue:    5,
+			expectedLogs: []int64{1, 2},
+		},
+		{
+			name:         "returns no logs if word value is outside of the rang",
+			wordValue:    21,
+			expectedLogs: []int64{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logs, err1 := th.ORM.SelectLogsDataWordBetween(address, eventSig, 0, 1, logpoller.EvmWord(tt.wordValue), logpoller.Unconfirmed)
+			assert.NoError(t, err1)
+			assert.Len(t, logs, len(tt.expectedLogs))
+
+			for index := range logs {
+				assert.Equal(t, tt.expectedLogs[index], logs[index].BlockNumber)
 			}
 		})
 	}
