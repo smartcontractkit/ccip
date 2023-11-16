@@ -281,10 +281,11 @@ func (c *CommitStoreV1_2_0) parseReport(log types.Log) (*CommitStoreReport, erro
 	}, nil
 }
 
-func (c *CommitStoreV1_2_0) GetAcceptedCommitReportsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[CommitStoreReport], error) {
-	logs, err := c.lp.LogsDataWordGreaterThan(
+func (c *CommitStoreV1_2_0) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[CommitStoreReport], error) {
+	logs, err := c.lp.LogsDataWordBetween(
 		c.reportAcceptedSig,
 		c.address,
+		c.reportAcceptedMaxSeqIndex-1,
 		c.reportAcceptedMaxSeqIndex,
 		logpoller.EvmWord(seqNum),
 		logpoller.Confirmations(confs),
