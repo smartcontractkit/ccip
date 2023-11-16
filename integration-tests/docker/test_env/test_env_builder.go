@@ -1,7 +1,6 @@
 package test_env
 
 import (
-	"fmt"
 	"math/big"
 	"os"
 	"testing"
@@ -214,20 +213,23 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 	}
 
 	if b.nonDevGethNetworks != nil {
-		b.te.WithPrivateChain(b.nonDevGethNetworks)
-		err := b.te.StartPrivateChain()
-		if err != nil {
-			return b.te, err
-		}
+		// b.te.WithPrivateChain(b.nonDevGethNetworks)
+		// err := b.te.StartPrivateChain()
+		// if err != nil {
+		// 	return b.te, err
+		// }
 		var nonDevNetworks []blockchain.EVMNetwork
-		for i, n := range b.te.PrivateChain {
-			primaryNode := n.GetPrimaryNode()
-			if primaryNode == nil {
-				return b.te, errors.WithStack(fmt.Errorf("primary node is nil in PrivateChain interface"))
-			}
-			nonDevNetworks = append(nonDevNetworks, *n.GetNetworkConfig())
-			nonDevNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
-			nonDevNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
+		// for i, n := range b.te.PrivateChain {
+		// 	primaryNode := n.GetPrimaryNode()
+		// 	if primaryNode == nil {
+		// 		return b.te, errors.WithStack(fmt.Errorf("primary node is nil in PrivateChain interface"))
+		// 	}
+		// 	nonDevNetworks = append(nonDevNetworks, *n.GetNetworkConfig())
+		// 	nonDevNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
+		// 	nonDevNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
+		// }
+		for _, n := range b.nonDevGethNetworks {
+			nonDevNetworks = append(nonDevNetworks, n)
 		}
 		if nonDevNetworks == nil {
 			return nil, errors.New("cannot create nodes with custom config without nonDevNetworks")

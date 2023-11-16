@@ -49,6 +49,50 @@ var (
 	}
 )
 
+func GetSourceNetwork(hostPov bool) blockchain.EVMNetwork {
+	var host string
+	if !hostPov {
+		host = "host.docker.internal"
+	} else {
+		host = "localhost"
+	}
+	return blockchain.EVMNetwork{
+		Name:            "source",
+		ChainID:         1337,
+		HTTPURLs:        []string{fmt.Sprintf("http://%s:60005", host)},
+		URLs:            []string{fmt.Sprintf("ws://%s:60001", host)},
+		PrivateKeys:     []string{"bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31"},
+		Simulated:       false,
+		SupportsEIP1559: false,
+		FinalityTag:     true,
+		Timeout: blockchain.JSONStrDuration{
+			Duration: 4 * time.Minute,
+		},
+	}
+}
+
+func GetDestinationNetwork(hostPov bool) blockchain.EVMNetwork {
+	var host string
+	if !hostPov {
+		host = "host.docker.internal"
+	} else {
+		host = "localhost"
+	}
+	return blockchain.EVMNetwork{
+		Name:            "destination",
+		ChainID:         2337,
+		HTTPURLs:        []string{fmt.Sprintf("http://%s:60085", host)},
+		URLs:            []string{fmt.Sprintf("ws://%s:60081", host)},
+		PrivateKeys:     []string{"bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31"},
+		Simulated:       false,
+		SupportsEIP1559: false,
+		FinalityTag:     true,
+		Timeout: blockchain.JSONStrDuration{
+			Duration: 4 * time.Minute,
+		},
+	}
+}
+
 type NetworkPair struct {
 	NetworkA     blockchain.EVMNetwork
 	NetworkB     blockchain.EVMNetwork
@@ -699,30 +743,49 @@ func CCIPDefaultTestSetUp(
 	}
 
 	chainByChainID := make(map[int64]blockchain.EVMClient)
-	if pointer.GetBool(inputs.TestGroupInput.LocalCluster) {
-		require.NotNil(t, ccipEnv.LocalCluster, "Local cluster shouldn't be nil")
-		for _, n := range ccipEnv.LocalCluster.PrivateChain {
-			primaryNode := n.GetPrimaryNode()
-			require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
-			chainByChainID[primaryNode.GetEVMClient().GetChainID().Int64()] = primaryNode.GetEVMClient()
-			chains = append(chains, primaryNode.GetEVMClient())
+	// if pointer.GetBool(inputs.TestGroupInput.LocalCluster) {
+	// 	require.NotNil(t, ccipEnv.LocalCluster, "Local cluster shouldn't be nil")
+	// 	for _, n := range ccipEnv.LocalCluster.PrivateChain {
+	// 		primaryNode := n.GetPrimaryNode()
+	// 		require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
+	// 		chainByChainID[primaryNode.GetEVMClient().GetChainID().Int64()] = primaryNode.GetEVMClient()
+	// 		chains = append(chains, primaryNode.GetEVMClient())
+	// 	}
+	// } else {
+
+	// here we need to connect to EVM client from the POV of host machine, so using localhost
+	networks := make([]blockchain.EVMNetwork, len(inputs.SelectedNetworks))
+	networks[0] = GetSourceNetwork(true)
+	networks[1] = GetDestinationNetwork(true)
+
+	for _, n := range networks {
+		if _, ok := chainByChainID[n.ChainID]; ok {
+			continue
 		}
-	} else {
-		for _, n := range inputs.SelectedNetworks {
-			if _, ok := chainByChainID[n.ChainID]; ok {
-				continue
-			}
-			var ec blockchain.EVMClient
-			if k8Env == nil {
-				ec, err = blockchain.ConnectEVMClient(n, lggr)
-			} else {
-				ec, err = blockchain.NewEVMClient(n, k8Env, lggr)
-			}
-			require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-			chains = append(chains, ec)
-			chainByChainID[n.ChainID] = ec
+		var ec blockchain.EVMClient
+		// if this doesn't work check how else I can copy it
+		// localN := blockchain.EVMNetwork{
+		// 	Name:        n.Name,
+		// 	ChainID:     n.ChainID,
+		// 	Simulated:   n.Simulated,
+		// 	PrivateKeys: n.PrivateKeys,
+		// 	URLs:        n.URLs,
+		// 	HTTPURLs:    n.HTTPURLs,
+		// }
+		// localN.URLs[0] = strings.Replace(localN.URLs[0], "host.docker.internal", "localhost", 1)
+		// localN.HTTPURLs[0] = strings.Replace(localN.HTTPURLs[0], "host.docker.internal", "localhost", 1)
+
+		if k8Env == nil {
+			ec, err = blockchain.ConnectEVMClient(n, lggr)
+		} else {
+			ec, err = blockchain.NewEVMClient(n, k8Env, lggr)
 		}
+		require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
+		ec.LoadWallets(n)
+		chains = append(chains, ec)
+		chainByChainID[n.ChainID] = ec
 	}
+	// }
 	printStats := func() {
 		for k := range setUpArgs.Reporter.LaneStats {
 			setUpArgs.Reporter.LaneStats[k].Finalize(k)

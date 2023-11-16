@@ -99,3 +99,6 @@ contracts/yarn.lock
 
 # dependencies generated after running `go mod vendor`
 vendor/
+
+go.work
+go.work.sum
