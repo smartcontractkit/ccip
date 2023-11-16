@@ -35,6 +35,8 @@ type CCIPTestConfig struct {
 	AmountPerToken             int64              `toml:",omitempty"`
 	MaxNoOfLanes               int                `toml:",omitempty"`
 	ChaosDuration              *models.Duration   `toml:",omitempty"`
+	UseKurtosis                bool               `toml:",omitempty"`
+	ChainConfigFiles           []string           `toml:",omitempty"`
 }
 
 func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
@@ -121,6 +123,12 @@ func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
 	}
 	if fromCfg.NoOfSendsInMulticall != 0 {
 		c.NoOfSendsInMulticall = fromCfg.NoOfSendsInMulticall
+	}
+	if fromCfg.UseKurtosis {
+		c.UseKurtosis = fromCfg.UseKurtosis
+	}
+	if len(fromCfg.ChainConfigFiles) != 0 {
+		c.ChainConfigFiles = fromCfg.ChainConfigFiles
 	}
 
 	return nil

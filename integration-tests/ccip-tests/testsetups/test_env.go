@@ -164,21 +164,42 @@ func DeployLocalCluster(
 	t *testing.T,
 	testInputs *CCIPTestConfig,
 ) (*test_env.CLClusterTestEnv, func() error) {
-	selectedNetworks := testInputs.SelectedNetworks
-	env, err := test_env.NewCLTestEnvBuilder().
-		WithTestLogger(t).
-		WithPrivateGethChains(selectedNetworks).
-		WithoutCleanup().
-		Build()
-	require.NoError(t, err)
-	for _, n := range env.PrivateChain {
-		primaryNode := n.GetPrimaryNode()
-		require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
-		for i, networkCfg := range selectedNetworks {
-			if networkCfg.ChainID == n.GetNetworkConfig().ChainID {
-				selectedNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
-				selectedNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
+	var selectedNetworks []blockchain.EVMNetwork
+	var env *test_env.CLClusterTestEnv
+	if !testInputs.TestGroupInput.UseKurtosis {
+		selectedNetworks = testInputs.SelectedNetworks
+		env, err := test_env.NewCLTestEnvBuilder().
+			WithTestLogger(t).
+			WithPrivateGethChains(selectedNetworks).
+			WithoutCleanup().
+			Build()
+		require.NoError(t, err)
+		for _, n := range env.PrivateChain {
+			primaryNode := n.GetPrimaryNode()
+			require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
+			for i, networkCfg := range selectedNetworks {
+				if networkCfg.ChainID == n.GetNetworkConfig().ChainID {
+					selectedNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
+					selectedNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
+				}
 			}
+		}
+	} else {
+		env, err := test_env.NewCLTestEnvBuilder().
+			WithTestLogger(t).
+			WithKurtosis(testInputs.TestGroupInput.ChainConfigFiles).
+			WithoutCleanup().
+			Build()
+		require.NoError(t, err)
+
+		testInputs.AllNetworks = make(map[string]blockchain.EVMNetwork)
+		for _, network := range env.PrivateChain {
+			testInputs.AllNetworks[network.GetNetworkConfig().Name] = *network.GetNetworkConfig()
+		}
+
+		testInputs.SelectedNetworks = make([]blockchain.EVMNetwork, 0)
+		for _, network := range env.PrivateChain {
+			testInputs.SelectedNetworks = append(testInputs.SelectedNetworks, *network.GetNetworkConfig())
 		}
 	}
 

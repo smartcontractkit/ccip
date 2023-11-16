@@ -24,6 +24,7 @@ const (
 	Load               string = "load"
 	Chaos              string = "chaos"
 	Smoke              string = "smoke"
+	Kurtosis           string = "kurtosis"
 	ProductCCIP               = "CCIP"
 )
 

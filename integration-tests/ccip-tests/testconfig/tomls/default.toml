@@ -208,3 +208,24 @@ WaitBetweenChaosDuringLoad = '2m'
 ChaosDuration = '10m'
 MulticallInOneTx = false
 NoOfSendsInMulticall = 5
+
+[CCIP.Groups.kurtosis]
+KeepEnvAlive = false
+BiDirectionalLane = true
+CommitAndExecuteOnSameDON = true
+NoOfCommitNodes = 5
+MsgType = 'WithToken'
+PhaseTimeout = '10m'
+LocalCluster = true
+UseKurtosis = true
+ChainConfigFiles = ["source.yaml", "destination.yaml"]
+ExistingDeployment = false
+ReuseContracts = true
+SequentialLaneAddition = false
+NodeFunding = 1.0
+NoOfRoutersPerPair = 1
+NoOfTokensPerChain = 2
+NoOfTokensInMsg = 2
+AmountPerToken = 1
+MulticallInOneTx = false
+NoOfSendsInMulticall = 5

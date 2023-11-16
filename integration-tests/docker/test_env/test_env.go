@@ -96,6 +96,8 @@ func (te *CLClusterTestEnv) WithPrivateChain(evmNetworks []blockchain.EVMNetwork
 		switch n.SimulationType {
 		case "besu":
 			privateChain = test_env.NewPrivateBesuChain(&n, []string{te.Network.Name})
+		case "kurtosis":
+			privateChain = te.NewPrivateKurtosisChain(&n)
 		default:
 			privateChain = test_env.NewPrivateGethChain(&n, []string{te.Network.Name})
 		}
@@ -106,6 +108,72 @@ func (te *CLClusterTestEnv) WithPrivateChain(evmNetworks []blockchain.EVMNetwork
 	}
 	te.PrivateChain = chains
 	return te
+}
+
+type KurtosisEvmNode struct {
+	ExternalHttpUrl string
+	InternalHttpUrl string
+	ExternalWsUrl   string
+	InternalWsUrl   string
+	EVMClient       blockchain.EVMClient
+	t               *testing.T
+	l               zerolog.Logger
+}
+
+func (n KurtosisEvmNode) GetInternalHttpUrl() string {
+	return n.InternalHttpUrl
+}
+
+func (n KurtosisEvmNode) GetInternalWsUrl() string {
+	return n.InternalWsUrl
+}
+
+func (n KurtosisEvmNode) GetEVMClient() blockchain.EVMClient {
+	return n.EVMClient
+}
+
+func (n KurtosisEvmNode) WithTestLogger(t *testing.T) test_env.NonDevNode {
+	n.t = t
+	n.l = logging.GetTestLogger(t)
+	return n
+}
+
+func (n KurtosisEvmNode) Start() error {
+	n.l.Info().Msg("KurtosisEvmNode.Start() called, nothing to do")
+	return nil
+}
+
+func (n KurtosisEvmNode) ConnectToClient() error {
+	panic("not implemented")
+}
+
+type KurtosisPrivateChain struct {
+	blockchain.EVMNetwork
+	primaryNode KurtosisEvmNode
+}
+
+func (k KurtosisPrivateChain) GetPrimaryNode() test_env.NonDevNode {
+	return k.primaryNode
+}
+
+func (k KurtosisPrivateChain) GetNodes() []test_env.NonDevNode {
+	panic("not implemented")
+}
+func (k KurtosisPrivateChain) GetNetworkConfig() *blockchain.EVMNetwork {
+	return &k.EVMNetwork
+}
+func (k KurtosisPrivateChain) GetDockerNetworks() []string {
+	return []string{fmt.Sprintf("kt-%s", k.Name)}
+}
+
+func (te *CLClusterTestEnv) NewPrivateKurtosisChain(evmNetwork *blockchain.EVMNetwork) test_env.PrivateChain {
+	return KurtosisPrivateChain{
+		EVMNetwork: *evmNetwork,
+		primaryNode: KurtosisEvmNode{
+			InternalHttpUrl: evmNetwork.HTTPURLs[0],
+			InternalWsUrl:   evmNetwork.URLs[0],
+		},
+	}
 }
 
 func (te *CLClusterTestEnv) StartPrivateChain() error {
