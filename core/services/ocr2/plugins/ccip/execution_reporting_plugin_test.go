@@ -1734,12 +1734,12 @@ func Test_selectReportsToFillBatch(t *testing.T) {
 		{Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 10}},
 		{Interval: ccipdata.CommitStoreInterval{Min: 11, Max: 20}},
 		{Interval: ccipdata.CommitStoreInterval{Min: 21, Max: 25}},
-		{Interval: ccipdata.CommitStoreInterval{Min: 26, Max: 35}},
+		{Interval: ccipdata.CommitStoreInterval{Min: 26, Max: math.MaxUint64}},
 	}
 
 	tests := []struct {
 		name            string
-		step            int
+		step            uint64
 		numberOfBatches int
 	}{
 		{

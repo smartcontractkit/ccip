@@ -213,36 +213,22 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 }
 
 func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context, lggr logger.Logger, timestamp types.ReportTimestamp, inflight []InflightInternalExecutionReport) ([]ObservedMessage, error) {
-	allUnexpiredReports, err := getUnexpiredCommitReports(
+	unexpiredReports, err := r.getUnexpiredCommitReports(
 		ctx,
 		r.config.commitStoreReader,
 		r.onchainConfig.PermissionLessExecutionThresholdSeconds,
+		lggr,
 	)
 	if err != nil {
 		return nil, err
 	}
-	lggr.Infow("Unexpired roots", "n", len(allUnexpiredReports))
-	if len(allUnexpiredReports) == 0 {
+
+	if len(unexpiredReports) == 0 {
 		return []ObservedMessage{}, nil
 	}
 
-	allUnexpiredNotSnoozedReports := func() []ccipdata.CommitStoreReport {
-		index := 0
-		for _, rep := range allUnexpiredReports {
-			if r.snoozedRoots.IsSnoozed(rep.MerkleRoot) {
-				lggr.Debug("Skipping snoozed root", "minSeqNr", rep.Interval.Min, "maxSeqNr", rep.Interval.Max)
-			} else {
-				allUnexpiredReports[index] = rep
-				index++
-			}
-		}
-		return allUnexpiredReports[:index]
-	}()
-
-	lggr.Infow("Unexpired roots", "all", len(allUnexpiredReports), "notSnoozed", len(allUnexpiredNotSnoozedReports))
-
-	for j := 0; j < len(allUnexpiredReports); {
-		unexpiredReports, step := selectReportsToFillBatch(allUnexpiredNotSnoozedReports[j:], MessagesIterationStep)
+	for j := 0; j < len(unexpiredReports); {
+		unexpiredReportsPart, step := selectReportsToFillBatch(unexpiredReports[j:], MessagesIterationStep)
 		j += step
 
 		// This could result in slightly different values on each call as
@@ -275,9 +261,9 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			return r.gasPriceEstimator.GetGasPrice(ctx)
 		})
 
-		measureNumberOfReportsProcessed(timestamp, len(unexpiredReports))
+		measureNumberOfReportsProcessed(timestamp, len(unexpiredReportsPart))
 
-		unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReports)
+		unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReportsPart)
 		if err != nil {
 			return nil, err
 		}
@@ -1154,10 +1140,11 @@ func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegis
 	return prices, nil
 }
 
-func getUnexpiredCommitReports(
+func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	ctx context.Context,
 	commitStoreReader ccipdata.CommitStoreReader,
 	permissionExecutionThreshold time.Duration,
+	lggr logger.Logger,
 ) ([]ccipdata.CommitStoreReport, error) {
 	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
@@ -1172,15 +1159,33 @@ func getUnexpiredCommitReports(
 	for _, acceptedReport := range acceptedReports {
 		reports = append(reports, acceptedReport.Data)
 	}
-	return reports, nil
+
+	notSnoozedReports := make([]ccipdata.CommitStoreReport, 0)
+	for _, report := range reports {
+		if r.snoozedRoots.IsSnoozed(report.MerkleRoot) {
+			lggr.Debug("Skipping snoozed root", "minSeqNr", report.Interval.Min, "maxSeqNr", report.Interval.Max)
+		} else {
+			notSnoozedReports = append(notSnoozedReports, report)
+		}
+	}
+
+	lggr.Infow("Unexpired roots", "all", len(reports), "notSnoozed", len(notSnoozedReports))
+	return notSnoozedReports, nil
 }
 
-func selectReportsToFillBatch(unexpiredReports []ccipdata.CommitStoreReport, messagesLimit int) ([]ccipdata.CommitStoreReport, int) {
-	currentNumberOfMessages := 0
+// selectReportsToFillBatch returns the reports to fill the message limit. Single Commit Root contains exactly (Interval.Max - Interval.Min + 1) messages.
+// We keep adding reports until we reach the message limit. Please see the tests for more examples and edge cases.
+// unexpiredReports have to be sorted by Interval.Min. Otherwise, the batching logic will not be efficient,
+// because it picks messages and execution states based on the report[0].Interval.Min - report[len-1].Interval.Max range.
+// Having unexpiredReports not sorted properly will lead to fetching more messages and execution states to the memory than the messagesLimit provided.
+// However, logs from LogPoller are returned ordered by (block_number, log_index), so it should preserve the order of Interval.Min.
+// Single CommitRoot can have up to 256 messages, with current MessagesIterationStep of 800, it means processing 4 CommitRoots at once.
+func selectReportsToFillBatch(unexpiredReports []ccipdata.CommitStoreReport, messagesLimit uint64) ([]ccipdata.CommitStoreReport, int) {
+	currentNumberOfMessages := uint64(0)
 	var index int
 
-	for index = 0; index < len(unexpiredReports); index++ {
-		currentNumberOfMessages += int(unexpiredReports[index].Interval.Max - unexpiredReports[index].Interval.Min + 1)
+	for index = range unexpiredReports {
+		currentNumberOfMessages += unexpiredReports[index].Interval.Max - unexpiredReports[index].Interval.Min + 1
 		if currentNumberOfMessages >= messagesLimit {
 			break
 		}
