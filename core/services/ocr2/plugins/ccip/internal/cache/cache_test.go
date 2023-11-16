@@ -23,7 +23,7 @@ const (
 
 func TestGet_InitDataForTheFirstTime(t *testing.T) {
 	lp := lpMocks.NewLogPoller(t)
-	lp.On("LatestBlock", mock.Anything).Maybe().Return(logpoller.LogPollerBlock{BlockNumber: 100}, nil)
+	lp.On("LatestBlock", mock.Anything).Maybe().Return(logpoller.LogPollerBlock{BlockNumber: 100, FinalizedBlockNumber: 80}, nil)
 
 	contract := newCachedContract(lp, "", []string{"value1"}, 0)
 
@@ -79,6 +79,48 @@ func TestGet_ReturnDataFromCacheIfNoNewEvents(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, cachedValue, value)
 			assert.Equal(t, tt.expectedLastChangeBlock, contract.lastChangeBlock)
+		})
+	}
+}
+
+func TestGet_DifferentOriginBehaviour(t *testing.T) {
+	lp := lpMocks.NewLogPoller(t)
+	mockLogPollerQuery(lp, 100)
+
+	tests := []struct {
+		name           string
+		originResponse func() (string, error)
+		wantErr        bool
+		expectedValue  string
+	}{
+		{
+			name:           "origin returns error",
+			originResponse: func() (string, error) { return "", assert.AnError },
+			wantErr:        true,
+		},
+		{
+			name:           "origin returns value",
+			originResponse: func() (string, error) { return "success", nil },
+			expectedValue:  "success",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originValue, originErr := tt.originResponse()
+			cache := &CachedChain[string]{
+				logPoller:       lp,
+				lock:            &sync.RWMutex{},
+				lastChangeBlock: 1,
+				origin:          &FakeContractOrigin{values: []string{originValue}, err: originErr},
+			}
+
+			value, err := cache.Get(testutils.Context(t))
+			if tt.wantErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Equal(t, tt.expectedValue, value)
+			}
 		})
 	}
 }
@@ -164,11 +206,7 @@ func TestGet_ConcurrentAccess(t *testing.T) {
 
 func newCachedContract(lp logpoller.LogPoller, cacheValue string, originValue []string, lastChangeBlock int64) *CachedChain[string] {
 	return &CachedChain[string]{
-		observedEvents:          []common.Hash{{}},
-		logPoller:               lp,
-		address:                 []common.Address{{}},
-		optimisticConfirmations: 0,
-
+		logPoller:       lp,
 		lock:            &sync.RWMutex{},
 		value:           cacheValue,
 		lastChangeBlock: lastChangeBlock,
@@ -178,7 +216,7 @@ func newCachedContract(lp logpoller.LogPoller, cacheValue string, originValue []
 
 func mockLogPollerQuery(lp *lpMocks.LogPoller, latestBlock int64) *mock.Call {
 	lp.On("LatestBlock", mock.Anything).Maybe().Return(logpoller.LogPollerBlock{}, nil)
-	return lp.On("LatestBlockByEventSigsAddrsWithConfs", mock.Anything, []common.Hash{{}}, []common.Address{{}}, logpoller.Confirmations(0), mock.Anything).
+	return lp.On("LatestBlockByEventSigsAddrsWithConfs", mock.Anything, mock.Anything, mock.Anything, logpoller.Finalized, mock.Anything).
 		Maybe().Return(latestBlock, nil)
 }
 
@@ -203,6 +241,7 @@ func (lp *ProgressingLogPoller) LatestBlock(...pg.QOpt) (logpoller.LogPollerBloc
 
 type FakeContractOrigin struct {
 	values  []string
+	err     error
 	counter int
 	lock    sync.Mutex
 }
@@ -213,6 +252,9 @@ func (f *FakeContractOrigin) CallOrigin(context.Context) (string, error) {
 		f.counter++
 		f.lock.Unlock()
 	}()
+	if f.err != nil {
+		return "", f.err
+	}
 	return f.values[f.counter], nil
 }
 
