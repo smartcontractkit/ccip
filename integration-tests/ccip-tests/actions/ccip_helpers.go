@@ -158,6 +158,7 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 		ARMContract:        ccipModule.ARMContract,
 		ARM:                arm,
 		WrappedNative:      ccipModule.WrappedNative,
+		MulticallContract:  ccipModule.MulticallContract,
 		ExistingDeployment: ccipModule.ExistingDeployment,
 		MulticallEnabled:   ccipModule.MulticallEnabled,
 		poolFunds:          ccipModule.poolFunds,
