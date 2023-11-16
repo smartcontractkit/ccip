@@ -95,7 +95,7 @@ func getCommitReportForSeqNum(ctx context.Context, commitStoreReader ccipdata.Co
 		return ccipdata.CommitStoreReport{}, err
 	}
 
-	if len(acceptedReports) < 1 {
+	if len(acceptedReports) == 0 {
 		return ccipdata.CommitStoreReport{}, errors.Errorf("seq number not committed")
 	}
 

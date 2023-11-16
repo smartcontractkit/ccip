@@ -1493,7 +1493,7 @@ func TestSelectLogsDataWordBetween(t *testing.T) {
 			expectedLogs: []int64{1, 2},
 		},
 		{
-			name:         "returns no logs if word value is outside of the rang",
+			name:         "returns no logs if word value is outside of the range",
 			wordValue:    21,
 			expectedLogs: []int64{},
 		},
