@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -224,6 +225,60 @@ func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddress
 
 func (o *OffRampV1_0_0) GetSupportedTokens(ctx context.Context) ([]common.Address, error) {
 	return o.offRamp.GetSupportedTokens(&bind.CallOpts{Context: ctx})
+}
+
+// TODO: cache
+func (o *OffRampV1_0_0) GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error) {
+	sourceTokens, err := o.GetSupportedTokens(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	destTokens, err := o.GetDestinationTokensFromSourceTokens(ctx, sourceTokens)
+	if err != nil {
+		return nil, fmt.Errorf("get destination tokens from source tokens: %w", err)
+	}
+
+	srcToDstTokenMapping := make(map[common.Address]common.Address, len(sourceTokens))
+	for i, sourceToken := range sourceTokens {
+		srcToDstTokenMapping[sourceToken] = destTokens[i]
+	}
+
+	return srcToDstTokenMapping, nil
+}
+
+// TODO: cache and batched calls
+func (o *OffRampV1_0_0) GetDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error) {
+	destTokens, err := o.GetDestinationTokens(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get destination tokens")
+	}
+
+	eg := new(errgroup.Group)
+	eg.SetLimit(10)
+	var mu sync.Mutex
+
+	mapping := make(map[common.Address]common.Address, len(destTokens))
+	for _, token := range destTokens {
+		token := token
+		eg.Go(func() error {
+			poolAddress, err := o.GetPoolByDestToken(ctx, token)
+			if err != nil {
+				return fmt.Errorf("get token pool for token '%s': %w", token, err)
+			}
+
+			mu.Lock()
+			mapping[token] = poolAddress
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+
+	return mapping, nil
 }
 
 func (o *OffRampV1_0_0) GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error) {
