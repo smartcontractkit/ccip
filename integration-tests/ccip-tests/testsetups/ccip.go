@@ -14,6 +14,7 @@ import (
 
 	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/kurtosis-tech/kurtosis/api/golang/engine/lib/kurtosis_context"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -740,6 +741,52 @@ func CCIPDefaultTestSetUp(
 				for k := range setUpArgs.Reporter.LaneStats {
 					setUpArgs.Reporter.LaneStats[k].Finalize(k)
 				}
+
+				if len(inputs.TestGroupInput.KurtosisChainConfigFiles) > 0 {
+					timeout := 90 * time.Second
+					pollInterval := 2 * time.Second
+					endTime := time.Now().Add(timeout)
+
+					for _, chain := range ccipEnv.LocalCluster.PrivateChain {
+						destroyEnclave := func(enclaveName string) (bool, error) {
+							kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
+							if err != nil {
+								return false, err
+							}
+							ctx := context.Background()
+							err = kurtosisCtx.DestroyEnclave(ctx, enclaveName)
+
+							if strings.Contains(err.Error(), "has active endpoints") {
+								return false, nil
+							}
+
+							return false, err
+						}
+
+						enclaveName := chain.GetNetworkConfig().Name
+						enclaveDestroyed := false
+
+						for {
+							enclaveDestroyed, err = destroyEnclave(enclaveName)
+
+							if err != nil {
+								// ignore for now
+								lggr.Warn().Str("Enclave name", enclaveName).Msgf("Error destroying enclave: %v", err)
+							}
+
+							if enclaveDestroyed || time.Now().After(endTime) {
+								break
+							}
+
+							time.Sleep(pollInterval)
+						}
+
+						if !enclaveDestroyed {
+							lggr.Warn().Str("Enclave name", enclaveName).Msgf("Enclave not destroyed by running: kurtosis enclave rm %s", enclaveName)
+						}
+					}
+				}
+
 				return
 			}
 			if pointer.GetBool(inputs.TestGroupInput.KeepEnvAlive) {

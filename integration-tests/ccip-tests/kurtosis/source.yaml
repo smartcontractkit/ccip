@@ -1,15 +1,15 @@
 participants:
-    - el_client_type: nethermind
-      el_client_image: nethermind/nethermind:latest
+    - el_client_type: geth
+      el_client_image: ethereum/client-go:v1.13.4
       el_client_log_level: ''
-      el_extra_params: []
-      cl_client_type: lighthouse
-      cl_client_image: sigp/lighthouse:latest
+      el_extra_params: [--nodiscover]
+      cl_client_type: prysm
+      cl_client_image: gcr.io/prysmaticlabs/prysm/beacon-chain:v4.1.1,gcr.io/prysmaticlabs/prysm/validator:v4.1.1
       cl_client_log_level: ''
-      beacon_extra_params: []
+      beacon_extra_params: [--minimum-peers-per-subnet=0]
       validator_extra_params: []
       builder_network_params:
-      count: 2
+      count: 1
 network_params:
   network_id: '1337'
   deposit_contract_address: '0x4242424242424242424242424242424242424242'

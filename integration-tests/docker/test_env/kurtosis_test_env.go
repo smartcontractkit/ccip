@@ -64,7 +64,7 @@ func (n *KurtosisEvmNode) Start() error {
 	}
 	ctx := context.Background()
 
-	network, err := n.readKurtosisNetworkConfig(n.configFile)
+	chainConfig, err := n.readKurtosisConfig(n.configFile)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,8 @@ func (n *KurtosisEvmNode) Start() error {
 	}
 
 	starlarkRunConfig := starlark_run_config.NewRunStarlarkConfig(starlark_run_config.WithSerializedParams(packageArgs))
-	_, err = enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, kurtosisPackage, starlarkRunConfig)
+	// _, err = enclaveCtx.RunStarlarkRemotePackageBlocking(ctx, kurtosisPackage, starlarkRunConfig)
+	_, err = enclaveCtx.RunStarlarkPackageBlocking(ctx, "/Users/btofel/Desktop/repos/ethereum-package", starlarkRunConfig)
 	if err != nil {
 		return err
 	}
@@ -99,14 +100,24 @@ func (n *KurtosisEvmNode) Start() error {
 	}
 	rpcs := make(map[string]map[string]string)
 
-	// for now we only want to get non-bootstrap EL node's endpoints (so that's the second EL node)
-	// in the future depending on the service count set in the cofngi we should either get the first one
-	// if count == 1 or all the others, which have the index > 1
-	// but to get that count we'll need to at least partially parse kurtosis config file
 	elNodeFound := false
 	containerName := ""
+
+	var primaryElNodeKey string
+	if len(chainConfig.Participants) != 1 {
+		return fmt.Errorf("exactly one participant is supported in kurtosis chain config, but %d were found", len(chainConfig.Participants))
+	}
+
+	// TODO here we could add support for a situation, when we have different network participants running different clients
+	// which could get complicated, because each participant could have multiple nodes (bootstrap, primary, the rest)
+	if chainConfig.Participants[0].Count == 1 {
+		primaryElNodeKey = "el-1"
+	} else {
+		primaryElNodeKey = "el-2"
+	}
+
 	for _, serviceName := range services.GetOrderedListOfNames() {
-		if strings.Contains(serviceName, "el-2") {
+		if strings.Contains(serviceName, primaryElNodeKey) {
 			elNodeFound = true
 			serviceCtx, err := enclaveCtx.GetServiceContext(serviceName)
 			if err != nil {
@@ -189,7 +200,7 @@ func (n *KurtosisEvmNode) Start() error {
 		return errors.New("no execution layer node found")
 	}
 
-	chainId, err := strconv.Atoi(network.NetworkParams.NetworkId)
+	chainId, err := strconv.Atoi(chainConfig.NetworkParams.NetworkId)
 	if err != nil {
 		return err
 	}
@@ -262,7 +273,12 @@ func (n *KurtosisEvmNode) ConnectToClient() error {
 	return nil
 }
 
-type kurtosisNetwork struct {
+type kurtosisParticipant struct {
+	Count int `yaml:"count"`
+}
+
+type kurtosisConfig struct {
+	Participants  []kurtosisParticipant `yaml:"participants"`
 	NetworkParams struct {
 		NetworkId string `yaml:"network_id"`
 	} `yaml:"network_params"`
@@ -274,8 +290,8 @@ var (
 	wsKeys = []string{"ws-rpc", "ws"}
 )
 
-func (c *KurtosisEvmNode) readKurtosisNetworkConfig(filePath string) (kurtosisNetwork, error) {
-	var network kurtosisNetwork
+func (c *KurtosisEvmNode) readKurtosisConfig(filePath string) (kurtosisConfig, error) {
+	var network kurtosisConfig
 
 	// Open YAML file
 	file, err := os.Open(filePath)

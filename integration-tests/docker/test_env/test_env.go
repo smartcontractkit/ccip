@@ -160,17 +160,6 @@ func (te *CLClusterTestEnv) StartPrivateChain() error {
 				configFile:  chain.(*KurtosisPrivateChain).configFile,
 				primaryNode: kurtosisNode,
 			}
-
-			//TODO where to place that?
-			// te.t.Cleanup(func() {
-			// 	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
-			// 	if err != nil {
-			// 		require.NoError(te.t, err, fmt.Sprintf("Error creating kurtosis context: %v", err))
-			// 	}
-			// 	ctx := context.Background()
-			// 	err = kurtosisCtx.DestroyEnclave(ctx, kurtosisNode.EVMNetwork.Name)
-			// 	require.NoError(te.t, err, fmt.Sprintf("Error destroying enclave %s", kurtosisNode.EVMNetwork.Name))
-			// })
 		}
 	}
 	return nil

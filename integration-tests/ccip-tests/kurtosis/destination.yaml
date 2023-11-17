@@ -1,22 +1,22 @@
 participants:
-    - el_client_type: geth
-      el_client_image: ethereum/client-go:v1.13.4
+    - el_client_type: nethermind
+      el_client_image: nethermind/nethermind:latest
       el_client_log_level: ''
       el_extra_params: []
       cl_client_type: prysm
       cl_client_image: gcr.io/prysmaticlabs/prysm/beacon-chain:v4.1.1,gcr.io/prysmaticlabs/prysm/validator:v4.1.1
       cl_client_log_level: ''
-      beacon_extra_params: []
+      beacon_extra_params: [--minimum-peers-per-subnet=0]
       validator_extra_params: []
       builder_network_params:
-      count: 2
+      count: 1
 network_params:
   network_id: '2337'
   deposit_contract_address: '0x4242424242424242424242424242424242424242'
   seconds_per_slot: 6
   slots_per_epoch: 4
   genesis_delay: 30
-  num_validator_keys_per_node: 64
+  num_validator_keys_per_node: 8
   preregistered_validator_keys_mnemonic: 'giant issue aisle success illegal bike spike
     question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy
     very lucky have athlete'
