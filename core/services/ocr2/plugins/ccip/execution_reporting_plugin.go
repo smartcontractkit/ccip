@@ -1164,9 +1164,9 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	for _, report := range reports {
 		if r.snoozedRoots.IsSnoozed(report.MerkleRoot) {
 			lggr.Debug("Skipping snoozed root", "minSeqNr", report.Interval.Min, "maxSeqNr", report.Interval.Max)
-		} else {
-			notSnoozedReports = append(notSnoozedReports, report)
+			continue
 		}
+		notSnoozedReports = append(notSnoozedReports, report)
 	}
 
 	lggr.Infow("Unexpired roots", "all", len(reports), "notSnoozed", len(notSnoozedReports))
