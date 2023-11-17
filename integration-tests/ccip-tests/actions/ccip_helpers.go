@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink-env/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
+	ctfEnv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
@@ -2626,4 +2627,39 @@ func NewBalanceSheet() *BalanceSheet {
 		Items:       make(map[string]BalanceItem),
 		PrevBalance: make(map[string]*big.Int),
 	}
+}
+
+func WaitForChainsToProduceBlocks(lggr zerolog.Logger, chains []ctfEnv.PrivateChain) error {
+	lggr.Info().Msg("Waiting for private chains to start producing blocks")
+
+	timeout := 90 * time.Second
+	pollInterval := 2 * time.Second
+	endTime := time.Now().Add(timeout)
+
+	for _, chain := range chains {
+		chainStarted := false
+		for {
+			ctx, cancel := context.WithTimeout(context.Background(), pollInterval)
+			defer cancel()
+
+			latest, err := chain.GetPrimaryNode().GetEVMClient().LatestBlockNumber(ctx)
+			if err != nil {
+				lggr.Err(err).Msgf("latest block number for %s", chain.GetPrimaryNode().GetEVMClient().GetNetworkName())
+			}
+
+			if latest > 0 || time.Now().After(endTime) {
+				lggr.Info().Msgf("Chain '%s' started producing blocks", chain.GetPrimaryNode().GetEVMClient().GetNetworkName())
+				chainStarted = true
+				break
+			}
+
+			time.Sleep(pollInterval)
+		}
+
+		if !chainStarted {
+			return fmt.Errorf("chain %s failed to start", chain.GetPrimaryNode().GetEVMClient().GetNetworkName())
+		}
+	}
+
+	return nil
 }

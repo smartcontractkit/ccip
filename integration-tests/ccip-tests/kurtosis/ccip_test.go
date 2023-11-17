@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 )
 
+var testGroup = testconfig.Kurtosis
+
 func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	t.Parallel()
 	type subtestInput struct {
@@ -25,7 +27,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 		lane     *actions.CCIPLane
 	}
 	l := logging.GetTestLogger(t)
-	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Kurtosis)
+	TestCfg := testsetups.NewCCIPTestConfig(t, l, testGroup)
 
 	//check if NetworkPairs and AllNetworks need to be updated as well
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "kurtosis-ccip", nil, TestCfg)
@@ -80,7 +82,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 		lane     *actions.CCIPLane
 	}
 	l := logging.GetTestLogger(t)
-	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)
+	TestCfg := testsetups.NewCCIPTestConfig(t, l, testGroup)
 	require.Equal(t, actions.TokenTransfer, TestCfg.TestGroupInput.MsgType, "Test config should have token transfer message type")
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(
 		t, l, "smoke-ccip", nil, TestCfg)
@@ -368,7 +370,7 @@ func TestSmokeCCIPMulticall(t *testing.T) {
 		lane     *actions.CCIPLane
 	}
 	l := logging.GetTestLogger(t)
-	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)
+	TestCfg := testsetups.NewCCIPTestConfig(t, l, testGroup)
 	// enable multicall in one tx for this test
 	TestCfg.TestGroupInput.MulticallInOneTx = utils.Ptr(true)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", nil, TestCfg)

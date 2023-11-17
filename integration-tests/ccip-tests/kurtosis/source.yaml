@@ -1,10 +1,10 @@
 participants:
-    - el_client_type: erigon
-      el_client_image: thorax/erigon:devel
+    - el_client_type: nethermind
+      el_client_image: nethermind/nethermind:latest
       el_client_log_level: ''
       el_extra_params: []
-      cl_client_type: teku
-      cl_client_image: consensys/teku:latest
+      cl_client_type: lighthouse
+      cl_client_image: sigp/lighthouse:latest
       cl_client_log_level: ''
       beacon_extra_params: []
       validator_extra_params: []
@@ -21,7 +21,5 @@ network_params:
     question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy
     very lucky have athlete'
   deneb_for_epoch: 500
-verifications_epoch_limit: 1
 global_client_log_level: info
 additional_services: []
-wait_for_finalization: true

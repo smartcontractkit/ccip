@@ -164,34 +164,24 @@ func DeployLocalCluster(
 	t *testing.T,
 	testInputs *CCIPTestConfig,
 ) (*test_env.CLClusterTestEnv, func() error) {
-	var selectedNetworks []blockchain.EVMNetwork
 	var env *test_env.CLClusterTestEnv
-	if !testInputs.TestGroupInput.UseKurtosis {
-		selectedNetworks = testInputs.SelectedNetworks
-		env, err := test_env.NewCLTestEnvBuilder().
+	var err error
+	if len(testInputs.TestGroupInput.KurtosisChainConfigFiles) == 0 {
+		env, err = test_env.NewCLTestEnvBuilder().
 			WithTestLogger(t).
-			WithPrivateGethChains(selectedNetworks).
+			WithPrivateGethChains(testInputs.SelectedNetworks).
 			WithoutCleanup().
 			Build()
 		require.NoError(t, err)
-		for _, n := range env.PrivateChain {
-			primaryNode := n.GetPrimaryNode()
-			require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
-			for i, networkCfg := range selectedNetworks {
-				if networkCfg.ChainID == n.GetNetworkConfig().ChainID {
-					selectedNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
-					selectedNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
-				}
-			}
-		}
 	} else {
-		env, err := test_env.NewCLTestEnvBuilder().
+		env, err = test_env.NewCLTestEnvBuilder().
 			WithTestLogger(t).
-			WithKurtosis(testInputs.TestGroupInput.ChainConfigFiles).
+			WithKurtosis(testInputs.TestGroupInput.KurtosisChainConfigFiles).
 			WithoutCleanup().
 			Build()
 		require.NoError(t, err)
 
+		//TODO overwriting read config to skip validations, this should be done nicer
 		testInputs.AllNetworks = make(map[string]blockchain.EVMNetwork)
 		for _, network := range env.PrivateChain {
 			testInputs.AllNetworks[network.GetNetworkConfig().Name] = *network.GetNetworkConfig()
@@ -200,6 +190,21 @@ func DeployLocalCluster(
 		testInputs.SelectedNetworks = make([]blockchain.EVMNetwork, 0)
 		for _, network := range env.PrivateChain {
 			testInputs.SelectedNetworks = append(testInputs.SelectedNetworks, *network.GetNetworkConfig())
+		}
+
+		testInputs.NetworkPairs = make([]NetworkPair, 0)
+		testInputs.AddPairToNetworkList(testInputs.SelectedNetworks[0], testInputs.SelectedNetworks[1])
+	}
+
+	selectedNetworks := testInputs.SelectedNetworks
+	for _, n := range env.PrivateChain {
+		primaryNode := n.GetPrimaryNode()
+		require.NotNil(t, primaryNode, "Primary node is nil in PrivateChain interface")
+		for i, networkCfg := range selectedNetworks {
+			if networkCfg.ChainID == n.GetNetworkConfig().ChainID {
+				selectedNetworks[i].URLs = []string{primaryNode.GetInternalWsUrl()}
+				selectedNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
+			}
 		}
 	}
 

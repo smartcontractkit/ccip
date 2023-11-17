@@ -36,7 +36,7 @@ var (
 
 type CLClusterTestEnv struct {
 	Cfg      *TestEnvConfig
-	Network  *tc.DockerNetwork
+	Network  []*tc.DockerNetwork
 	LogWatch *logwatch.LogWatch
 
 	/* components */
@@ -61,7 +61,7 @@ func NewTestEnv() (*CLClusterTestEnv, error) {
 	return &CLClusterTestEnv{
 		Geth:        test_env.NewGeth(n),
 		MockAdapter: test_env.NewKillgrave(n, ""),
-		Network:     network,
+		Network:     []*tc.DockerNetwork{network},
 		l:           log.Logger,
 	}, nil
 }
@@ -70,10 +70,19 @@ func NewTestEnv() (*CLClusterTestEnv, error) {
 // Sets up the Geth and MockAdapter containers with the provided cfg.
 func (te *CLClusterTestEnv) WithTestEnvConfig(cfg *TestEnvConfig) *CLClusterTestEnv {
 	te.Cfg = cfg
-	n := []string{te.Network.Name}
+	n := te.getDockerNetworkNames()
 	te.Geth = test_env.NewGeth(n, test_env.WithContainerName(te.Cfg.Geth.ContainerName))
 	te.MockAdapter = test_env.NewKillgrave(n, te.Cfg.MockAdapter.ImpostersPath, test_env.WithContainerName(te.Cfg.MockAdapter.ContainerName))
 	return te
+}
+
+func (te *CLClusterTestEnv) getDockerNetworkNames() []string {
+	n := []string{}
+	for _, network := range te.Network {
+		n = append(n, network.Name)
+	}
+
+	return n
 }
 
 func (te *CLClusterTestEnv) WithTestLogger(t *testing.T) *CLClusterTestEnv {
@@ -88,6 +97,20 @@ func (te *CLClusterTestEnv) ParallelTransactions(enabled bool) {
 	te.EVMClient.ParallelTransactions(enabled)
 }
 
+func (te *CLClusterTestEnv) WithKurtosisPrivateChain(files []string) *CLClusterTestEnv {
+	var chains []test_env.PrivateChain
+	for _, f := range files {
+		privateChain := NewPrivateKurtosisChain(f)
+		if te.t != nil {
+			privateChain.GetPrimaryNode().WithTestLogger(te.t)
+		}
+		chains = append(chains, privateChain)
+	}
+	te.PrivateChain = chains
+	return te
+}
+
+// TODO we'd get rid of this completely if everything is moved to Kurtosis
 func (te *CLClusterTestEnv) WithPrivateChain(evmNetworks []blockchain.EVMNetwork) *CLClusterTestEnv {
 	var chains []test_env.PrivateChain
 	for _, evmNetwork := range evmNetworks {
@@ -95,11 +118,9 @@ func (te *CLClusterTestEnv) WithPrivateChain(evmNetworks []blockchain.EVMNetwork
 		var privateChain test_env.PrivateChain
 		switch n.SimulationType {
 		case "besu":
-			privateChain = test_env.NewPrivateBesuChain(&n, []string{te.Network.Name})
-		case "kurtosis":
-			privateChain = te.NewPrivateKurtosisChain(&n)
+			privateChain = test_env.NewPrivateBesuChain(&n, te.getDockerNetworkNames())
 		default:
-			privateChain = test_env.NewPrivateGethChain(&n, []string{te.Network.Name})
+			privateChain = test_env.NewPrivateGethChain(&n, te.getDockerNetworkNames())
 		}
 		if te.t != nil {
 			privateChain.GetPrimaryNode().WithTestLogger(te.t)
@@ -110,78 +131,13 @@ func (te *CLClusterTestEnv) WithPrivateChain(evmNetworks []blockchain.EVMNetwork
 	return te
 }
 
-type KurtosisEvmNode struct {
-	ExternalHttpUrl string
-	InternalHttpUrl string
-	ExternalWsUrl   string
-	InternalWsUrl   string
-	EVMClient       blockchain.EVMClient
-	t               *testing.T
-	l               zerolog.Logger
-}
-
-func (n KurtosisEvmNode) GetInternalHttpUrl() string {
-	return n.InternalHttpUrl
-}
-
-func (n KurtosisEvmNode) GetInternalWsUrl() string {
-	return n.InternalWsUrl
-}
-
-func (n KurtosisEvmNode) GetEVMClient() blockchain.EVMClient {
-	return n.EVMClient
-}
-
-func (n KurtosisEvmNode) WithTestLogger(t *testing.T) test_env.NonDevNode {
-	n.t = t
-	n.l = logging.GetTestLogger(t)
-	return n
-}
-
-func (n KurtosisEvmNode) Start() error {
-	n.l.Info().Msg("KurtosisEvmNode.Start() called, nothing to do")
-	return nil
-}
-
-func (n KurtosisEvmNode) ConnectToClient() error {
-	panic("not implemented")
-}
-
-type KurtosisPrivateChain struct {
-	blockchain.EVMNetwork
-	primaryNode KurtosisEvmNode
-}
-
-func (k KurtosisPrivateChain) GetPrimaryNode() test_env.NonDevNode {
-	return k.primaryNode
-}
-
-func (k KurtosisPrivateChain) GetNodes() []test_env.NonDevNode {
-	panic("not implemented")
-}
-func (k KurtosisPrivateChain) GetNetworkConfig() *blockchain.EVMNetwork {
-	return &k.EVMNetwork
-}
-func (k KurtosisPrivateChain) GetDockerNetworks() []string {
-	return []string{fmt.Sprintf("kt-%s", k.Name)}
-}
-
-func (te *CLClusterTestEnv) NewPrivateKurtosisChain(evmNetwork *blockchain.EVMNetwork) test_env.PrivateChain {
-	return KurtosisPrivateChain{
-		EVMNetwork: *evmNetwork,
-		primaryNode: KurtosisEvmNode{
-			InternalHttpUrl: evmNetwork.HTTPURLs[0],
-			InternalWsUrl:   evmNetwork.URLs[0],
-		},
-	}
-}
-
 func (te *CLClusterTestEnv) StartPrivateChain() error {
-	for _, chain := range te.PrivateChain {
+	for i, chain := range te.PrivateChain {
 		primaryNode := chain.GetPrimaryNode()
 		if primaryNode == nil {
 			return errors.WithStack(fmt.Errorf("primary node is nil in PrivateChain interface"))
 		}
+		//TODO we'd move this method to chain, not the node
 		err := primaryNode.Start()
 		if err != nil {
 			return err
@@ -189,6 +145,32 @@ func (te *CLClusterTestEnv) StartPrivateChain() error {
 		err = primaryNode.ConnectToClient()
 		if err != nil {
 			return err
+		}
+
+		// TODO Argh.... hate it, but for quick PoC that's easier
+		// basically I need to set network config here, because I don't know it beforehand (or rather: I could if I parsed kurtosis config file)
+		if _, ok := primaryNode.(*KurtosisEvmNode); ok {
+			kurtosisNode := primaryNode.(*KurtosisEvmNode)
+			te.Network = append(te.Network, &tc.DockerNetwork{
+				Name: kurtosisNode.DockerNetworkName,
+			})
+
+			te.PrivateChain[i] = &KurtosisPrivateChain{
+				EVMNetwork:  kurtosisNode.EVMNetwork,
+				configFile:  chain.(*KurtosisPrivateChain).configFile,
+				primaryNode: kurtosisNode,
+			}
+
+			//TODO where to place that?
+			// te.t.Cleanup(func() {
+			// 	kurtosisCtx, err := kurtosis_context.NewKurtosisContextFromLocalEngine()
+			// 	if err != nil {
+			// 		require.NoError(te.t, err, fmt.Sprintf("Error creating kurtosis context: %v", err))
+			// 	}
+			// 	ctx := context.Background()
+			// 	err = kurtosisCtx.DestroyEnclave(ctx, kurtosisNode.EVMNetwork.Name)
+			// 	require.NoError(te.t, err, fmt.Sprintf("Error destroying enclave %s", kurtosisNode.EVMNetwork.Name))
+			// })
 		}
 	}
 	return nil
@@ -208,7 +190,7 @@ func (te *CLClusterTestEnv) StartClCluster(nodeConfig *chainlink.Config, count i
 	} else {
 		te.ClCluster = &ClCluster{}
 		for i := 0; i < count; i++ {
-			ocrNode := NewClNode([]string{te.Network.Name}, nodeConfig,
+			ocrNode := NewClNode(te.getDockerNetworkNames(), nodeConfig,
 				WithSecrets(secretsConfig),
 			)
 			te.ClCluster.Nodes = append(te.ClCluster.Nodes, ocrNode)
