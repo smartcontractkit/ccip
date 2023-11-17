@@ -141,7 +141,7 @@ FeeCapDefault = '200 gwei'
 [GasEstimator.BlockHistory]
 BlockHistorySize = 200
 EIP1559FeeCapBufferBlocks = 0
-"""                       
+"""
 
 [CCIP.Groups]
 [CCIP.Groups.smoke]
