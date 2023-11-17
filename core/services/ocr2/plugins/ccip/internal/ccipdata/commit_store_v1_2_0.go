@@ -295,11 +295,20 @@ func (c *CommitStoreV1_2_0) GetCommitReportMatchingSeqNum(ctx context.Context, s
 		return nil, err
 	}
 
-	return parseLogs[CommitStoreReport](
+	parsedLogs, err := parseLogs[CommitStoreReport](
 		logs,
 		c.lggr,
 		c.parseReport,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parsedLogs) > 1 {
+		c.lggr.Errorw("More than one report found for seqNum", "seqNum", seqNum, "commitReports", parsedLogs)
+		return parsedLogs[:1], nil
+	}
+	return parsedLogs, nil
 }
 
 func (c *CommitStoreV1_2_0) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]Event[CommitStoreReport], error) {
