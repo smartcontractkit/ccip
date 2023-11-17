@@ -32,13 +32,7 @@ type onRampReaderTH struct {
 func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 	_, bc := newSimulation(t)
 	lp := lpmocks.NewLogPoller(t)
-	_, err := ccipdata.NewOnRampReader(
-		logger.TestLogger(t),
-		testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(),
-		common.Address{},
-		lp,
-		bc,
-	)
+	_, err := ccipdata.NewOnRampReader(logger.TestLogger(t), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), common.Address{}, lp, bc, false)
 	assert.EqualError(t, err, "expected 'EVM2EVMOnRamp' got '' (no contract code at given address)")
 }
 
@@ -94,7 +88,7 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 	}
 
 	// Create the version-specific reader.
-	reader, err := ccipdata.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc)
+	reader, err := ccipdata.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc, false)
 	require.NoError(t, err)
 
 	return onRampReaderTH{
@@ -330,7 +324,7 @@ func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress com
 	require.NoError(t, err)
 	require.Equal(t, expectedRouterAddress, res)
 
-	msg, err := th.reader.GetSendRequestsGteSeqNum(ctx, 0, 0)
+	msg, err := th.reader.GetFinalizedSendRequestsGteSeqNum(ctx, 0, 0)
 	require.NoError(t, err)
 	require.NotNil(t, msg)
 	require.Equal(t, []ccipdata.Event[internal.EVM2EVMMessage]{}, msg)

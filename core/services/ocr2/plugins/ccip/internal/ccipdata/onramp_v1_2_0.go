@@ -206,6 +206,7 @@ type OnRampV1_2_0 struct {
 	filterName                 string
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
+	useFinalityTags            bool
 }
 
 func (o *OnRampV1_2_0) Address() (common.Address, error) {
@@ -269,17 +270,17 @@ func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 	}, nil
 }
 
-func (o *OnRampV1_2_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
-	logs, err2 := o.lp.LogsDataWordGreaterThan(
+func (o *OnRampV1_2_0) GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
+	logs, err := o.lp.LogsDataWordGreaterThan(
 		o.sendRequestedEventSig,
 		o.address,
 		o.sendRequestedSeqNumberWord,
 		abihelpers.EvmWord(seqNum),
-		logpoller.Confirmations(confs),
+		finalizedLogsConfirmations(o.useFinalityTags, confs),
 		pg.WithParentCtx(ctx),
 	)
-	if err2 != nil {
-		return nil, fmt.Errorf("logs data word greater than: %w", err2)
+	if err != nil {
+		return nil, fmt.Errorf("logs data word greater than: %w", err)
 	}
 	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
@@ -311,14 +312,7 @@ func (o *OnRampV1_2_0) Close(qopts ...pg.QOpt) error {
 	return o.lp.UnregisterFilter(o.filterName, qopts...)
 }
 
-func NewOnRampV1_2_0(
-	lggr logger.Logger,
-	sourceSelector,
-	destSelector uint64,
-	onRampAddress common.Address,
-	sourceLP logpoller.LogPoller,
-	source client.Client,
-) (*OnRampV1_2_0, error) {
+func NewOnRampV1_2_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, useFinalityTags bool) (*OnRampV1_2_0, error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -343,5 +337,6 @@ func NewOnRampV1_2_0(
 		address:                    onRampAddress,
 		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndexV1_2_0,
 		sendRequestedEventSig:      CCIPSendRequestEventSigV1_2_0,
+		useFinalityTags:            useFinalityTags,
 	}, nil
 }

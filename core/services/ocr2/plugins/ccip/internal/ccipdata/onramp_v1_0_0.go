@@ -105,6 +105,7 @@ type OnRampV1_0_0 struct {
 	filterName                 string
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
+	useFinalityTags            bool
 }
 
 func (o *OnRampV1_0_0) Address() (common.Address, error) {
@@ -137,7 +138,7 @@ func (o *OnRampV1_0_0) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context
 	return nil, errors.New("USDC not supported in < 1.2.0")
 }
 
-func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_0_0, error) {
+func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, useFinalityTags bool) (*OnRampV1_0_0, error) {
 	onRamp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -165,6 +166,7 @@ func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 		// offset || sourceChainID || seqNum || ...
 		sendRequestedSeqNumberWord: 2,
 		sendRequestedEventSig:      eventSig,
+		useFinalityTags:            useFinalityTags,
 	}, nil
 }
 
@@ -202,13 +204,13 @@ func (o *OnRampV1_0_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 	}, nil
 }
 
-func (o *OnRampV1_0_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
+func (o *OnRampV1_0_0) GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
 	logs, err2 := o.lp.LogsDataWordGreaterThan(
 		o.sendRequestedEventSig,
 		o.address,
 		o.sendRequestedSeqNumberWord,
 		abihelpers.EvmWord(seqNum),
-		logpoller.Confirmations(confs),
+		finalizedLogsConfirmations(o.useFinalityTags, confs),
 		pg.WithParentCtx(ctx),
 	)
 	if err2 != nil {

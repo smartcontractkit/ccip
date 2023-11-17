@@ -91,7 +91,7 @@ func TestLogPollerClient_GetSendRequestsGteSeqNum(t *testing.T) {
 
 	lp := mocks.NewLogPoller(t)
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
-	onRampV2, err := NewOnRampV1_2_0(lggr, 1, 1, onRampAddr, lp, nil)
+	onRampV2, err := NewOnRampV1_2_0(lggr, 1, 1, onRampAddr, lp, nil, false)
 	require.NoError(t, err)
 	lp.On("LogsDataWordGreaterThan",
 		onRampV2.sendRequestedEventSig,
@@ -102,7 +102,7 @@ func TestLogPollerClient_GetSendRequestsGteSeqNum(t *testing.T) {
 		mock.Anything,
 	).Return([]logpoller.Log{}, nil)
 
-	events, err := onRampV2.GetSendRequestsGteSeqNum(
+	events, err := onRampV2.GetFinalizedSendRequestsGteSeqNum(
 		context.Background(),
 		seqNum,
 		confs,
