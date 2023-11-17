@@ -291,6 +291,7 @@ func (o *OffRampV1_0_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
 }
 
+// TODO: cache
 func (o *OffRampV1_0_0) GetDestinationTokens(ctx context.Context) ([]common.Address, error) {
 	return o.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
 }

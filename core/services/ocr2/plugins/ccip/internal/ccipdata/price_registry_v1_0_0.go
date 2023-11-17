@@ -69,6 +69,7 @@ func (p *PriceRegistryV1_0_0) Address() common.Address {
 	return p.address
 }
 
+// TODO: cache
 func (p *PriceRegistryV1_0_0) GetFeeTokens(ctx context.Context) ([]common.Address, error) {
 	return p.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
 }
@@ -141,6 +142,7 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 	)
 }
 
+// TODO: cache
 func (p *PriceRegistryV1_0_0) GetTokensDecimals(ctx context.Context, tokenAddresses []common.Address) ([]uint8, error) {
 	if len(tokenAddresses) == 0 {
 		return nil, nil
