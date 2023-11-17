@@ -102,7 +102,7 @@ func TestLogPollerClient_GetSendRequestsGteSeqNum(t *testing.T) {
 		mock.Anything,
 	).Return([]logpoller.Log{}, nil)
 
-	events, err := onRampV2.GetFinalizedSendRequestsGteSeqNum(
+	events, err := onRampV2.GetSendRequestsGteSeqNum(
 		context.Background(),
 		seqNum,
 		confs,

@@ -27,15 +27,15 @@ func NewObservedOnRampReader(origin ccipdata.OnRampReader, chainID int64, plugin
 	}
 }
 
-func (o ObservedOnRampReader) GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, finalityDepth int) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
-	return withObservedInteractionAndResults(o.metric, "GetFinalizedSendRequestsGteSeqNum", func() ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
-		return o.OnRampReader.GetFinalizedSendRequestsGteSeqNum(ctx, seqNum, finalityDepth)
+func (o ObservedOnRampReader) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, finalityDepth int) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
+	return withObservedInteractionAndResults(o.metric, "GetSendRequestsGteSeqNum", func() ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
+		return o.OnRampReader.GetSendRequestsGteSeqNum(ctx, seqNum, finalityDepth)
 	})
 }
 
-func (o ObservedOnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
+func (o ObservedOnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalityDepth int) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
 	return withObservedInteractionAndResults(o.metric, "GetSendRequestsBetweenSeqNums", func() ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
-		return o.OnRampReader.GetSendRequestsBetweenSeqNums(ctx, seqNumMin, seqNumMax, confs)
+		return o.OnRampReader.GetSendRequestsBetweenSeqNums(ctx, seqNumMin, seqNumMax, finalityDepth)
 	})
 }
 

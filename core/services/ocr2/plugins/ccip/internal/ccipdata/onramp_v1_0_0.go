@@ -204,7 +204,7 @@ func (o *OnRampV1_0_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 	}, nil
 }
 
-func (o *OnRampV1_0_0) GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, finalityDepth int) ([]Event[internal.EVM2EVMMessage], error) {
+func (o *OnRampV1_0_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, finalityDepth int) ([]Event[internal.EVM2EVMMessage], error) {
 	logs, err2 := o.lp.LogsDataWordGreaterThan(
 		o.sendRequestedEventSig,
 		o.address,
@@ -227,14 +227,14 @@ func (o *OnRampV1_0_0) RouterAddress() (common.Address, error) {
 	return config.Router, nil
 }
 
-func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
+func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalityDepth int) ([]Event[internal.EVM2EVMMessage], error) {
 	logs, err := o.lp.LogsDataWordRange(
 		o.sendRequestedEventSig,
 		o.address,
 		o.sendRequestedSeqNumberWord,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
-		logpoller.Confirmations(confs),
+		finalizedLogsConfirmations(o.useFinalityTags, finalityDepth),
 		pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
