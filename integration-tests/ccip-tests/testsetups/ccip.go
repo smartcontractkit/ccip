@@ -49,50 +49,6 @@ var (
 	}
 )
 
-func GetSourceNetwork(hostPov bool) blockchain.EVMNetwork {
-	var host string
-	if !hostPov {
-		host = "host.docker.internal"
-	} else {
-		host = "localhost"
-	}
-	return blockchain.EVMNetwork{
-		Name:            "source",
-		ChainID:         1337,
-		HTTPURLs:        []string{fmt.Sprintf("http://%s:60005", host)},
-		URLs:            []string{fmt.Sprintf("ws://%s:60001", host)},
-		PrivateKeys:     []string{"bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31"},
-		Simulated:       false,
-		SupportsEIP1559: false,
-		FinalityTag:     true,
-		Timeout: blockchain.JSONStrDuration{
-			Duration: 4 * time.Minute,
-		},
-	}
-}
-
-func GetDestinationNetwork(hostPov bool) blockchain.EVMNetwork {
-	var host string
-	if !hostPov {
-		host = "host.docker.internal"
-	} else {
-		host = "localhost"
-	}
-	return blockchain.EVMNetwork{
-		Name:            "destination",
-		ChainID:         2337,
-		HTTPURLs:        []string{fmt.Sprintf("http://%s:60085", host)},
-		URLs:            []string{fmt.Sprintf("ws://%s:60081", host)},
-		PrivateKeys:     []string{"bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31"},
-		Simulated:       false,
-		SupportsEIP1559: false,
-		FinalityTag:     true,
-		Timeout: blockchain.JSONStrDuration{
-			Duration: 4 * time.Minute,
-		},
-	}
-}
-
 type NetworkPair struct {
 	NetworkA     blockchain.EVMNetwork
 	NetworkB     blockchain.EVMNetwork
@@ -760,14 +716,12 @@ func CCIPDefaultTestSetUp(
 				continue
 			}
 			var ec blockchain.EVMClient
-
 			if k8Env == nil {
 				ec, err = blockchain.ConnectEVMClient(n, lggr)
 			} else {
 				ec, err = blockchain.NewEVMClient(n, k8Env, lggr)
 			}
 			require.NoError(t, err, "Connecting to blockchain nodes shouldn't fail")
-			ec.LoadWallets(n)
 			chains = append(chains, ec)
 			chainByChainID[n.ChainID] = ec
 		}

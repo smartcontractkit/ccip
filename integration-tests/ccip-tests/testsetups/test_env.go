@@ -176,7 +176,7 @@ func DeployLocalCluster(
 	} else {
 		env, err = test_env.NewCLTestEnvBuilder().
 			WithTestLogger(t).
-			WithKurtosis(testInputs.TestGroupInput.KurtosisChainConfigFiles).
+			WithKurtosisPrivateChains(testInputs.TestGroupInput.KurtosisChainConfigFiles).
 			WithoutCleanup().
 			Build()
 		require.NoError(t, err)

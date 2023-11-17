@@ -25,22 +25,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 		lane     *actions.CCIPLane
 	}
 	l := logging.GetTestLogger(t)
-	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)
-	// source := testsetups.GetSourceNetwork(false)
-	// destination := testsetups.GetDestinationNetwork(false)
-	// TestCfg.SelectedNetworks[0] = source
-	// TestCfg.SelectedNetworks[1] = destination
-	// TestCfg.AllNetworks = make(map[string]blockchain.EVMNetwork)
-	// TestCfg.AllNetworks[source.Name] = source
-	// TestCfg.AllNetworks[destination.Name] = destination
-	// TestCfg.NetworkPairs = []testsetups.NetworkPair{
-	// 	{
-	// 		NetworkA: source,
-	// 		NetworkB: destination,
-	// 	},
-	// }
-
-	//check if NetworkPairs and AllNetworks need to be updated as well
+	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)∂
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", nil, TestCfg)
 	var tcs []subtestInput
 	if len(setUpOutput.Lanes) == 0 {

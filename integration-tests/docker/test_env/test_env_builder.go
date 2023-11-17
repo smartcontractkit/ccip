@@ -127,7 +127,7 @@ func (b *CLTestEnvBuilder) WithPrivateGethChains(evmNetworks []blockchain.EVMNet
 	return b
 }
 
-func (b *CLTestEnvBuilder) WithKurtosis(kurtosisConfigFiles []string) *CLTestEnvBuilder {
+func (b *CLTestEnvBuilder) WithKurtosisPrivateChains(kurtosisConfigFiles []string) *CLTestEnvBuilder {
 	b.kurtosisConfigFiles = kurtosisConfigFiles
 	return b
 }
@@ -254,7 +254,6 @@ func (b *CLTestEnvBuilder) Build() (*CLClusterTestEnv, error) {
 		}
 		return b.te, nil
 	}
-
 	networkConfig := networks.SelectedNetwork
 	var internalDockerUrls test_env.InternalDockerUrls
 	if b.hasGeth && networkConfig.Simulated {
