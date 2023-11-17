@@ -1430,13 +1430,16 @@ func (args *ManualExecArgs) ExecuteManually() (*types.Transaction, error) {
 		!common.IsHexAddress(args.OnRamp) {
 		return nil, fmt.Errorf("contract addresses must be valid hex address")
 	}
-	if args.SendReqTxHash == "" && args.SendReqLogIndex < 1 {
-		return nil, fmt.Errorf("log index for CCIPSendRequested event and tx hash of ccip-send request are required")
+	if args.SendReqTxHash == "" {
+		return nil, fmt.Errorf("tx hash of ccip-send request are required")
 	}
 	if args.SourceStartBlock == nil {
 		return nil, fmt.Errorf("must provide the value of source block in/after which ccip-send tx was included")
 	}
 	if args.SeqNr == 0 {
+		if args.SendReqLogIndex == 0 {
+			return nil, fmt.Errorf("must provide the value of log index of ccip-send request")
+		}
 		// locate seq nr from CCIPSendRequested log
 		seqNr, err := args.FindSeqNrFromCCIPSendRequested()
 		if err != nil {
