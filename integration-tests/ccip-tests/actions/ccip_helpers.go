@@ -1832,6 +1832,7 @@ func (lane *CCIPLane) ExecuteManually() error {
 				SendReqLogIndex:  logIndex,
 				GasLimit:         big.NewInt(600_000),
 			}
+			timeNow := time.Now().UTC()
 			tx, err := args.ExecuteManually()
 			if err != nil {
 				return fmt.Errorf("could not execute manually: %v seqNum %d", err, seqNum)
@@ -1845,6 +1846,11 @@ func (lane *CCIPLane) ExecuteManually() error {
 				return fmt.Errorf("manual execution failed: %v seqNum %d", err, seqNum)
 			}
 			lane.Logger.Info().Uint64("seqNum", seqNum).Msg("Manual Execution completed")
+			_, err = lane.Dest.AssertEventExecutionStateChanged(lane.Logger, seqNum, lane.ValidationTimeout,
+				timeNow, ccipReq.RequestStat, testhelpers.ExecutionStateSuccess)
+			if err != nil {
+				return fmt.Errorf("could not validate ExecutionStateChanged event: %+v", err)
+			}
 		}
 	}
 	return nil
