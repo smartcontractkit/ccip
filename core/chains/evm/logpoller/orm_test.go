@@ -1511,3 +1511,55 @@ func TestSelectLogsDataWordBetween(t *testing.T) {
 		})
 	}
 }
+
+func Benchmark_LogsDataWordBetween(b *testing.B) {
+	chainId := big.NewInt(137)
+	_, db := heavyweight.FullTestDBV2(b, "logs_data_word_between", nil)
+	o := logpoller.NewORM(chainId, db, logger.TestLogger(b), pgtest.NewQConfig(false))
+
+	numberOfReports := 100_000
+	numberOfMessagesPerReport := 256
+
+	commitStoreAddress := utils.RandomAddress()
+	commitReportAccepted := utils.RandomBytes32()
+
+	var dbLogs []logpoller.Log
+	for i := 0; i < numberOfReports; i++ {
+		data := make([]byte, 96)
+		// MinSeqNr
+		data = append(data, logpoller.EvmWord(uint64(numberOfMessagesPerReport*i+1)).Bytes()...)
+		// MaxSeqNr
+		data = append(data, logpoller.EvmWord(uint64(numberOfMessagesPerReport*(i+1))).Bytes()...)
+
+		dbLogs = append(dbLogs, logpoller.Log{
+			EvmChainId:     utils.NewBig(chainId),
+			LogIndex:       int64(i + 1),
+			BlockHash:      utils.RandomBytes32(),
+			BlockNumber:    int64(i + 1),
+			BlockTimestamp: time.Now(),
+			EventSig:       commitReportAccepted,
+			Topics:         [][]byte{},
+			Address:        commitStoreAddress,
+			TxHash:         utils.RandomAddress().Hash(),
+			Data:           data,
+			CreatedAt:      time.Now(),
+		})
+	}
+	require.NoError(b, o.InsertBlock(utils.RandomAddress().Hash(), int64(numberOfReports*numberOfMessagesPerReport), time.Now(), int64(numberOfReports*numberOfMessagesPerReport)))
+	require.NoError(b, o.InsertLogs(dbLogs))
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		logs, err := o.SelectLogsDataWordBetween(
+			commitStoreAddress,
+			commitReportAccepted,
+			3,
+			4,
+			logpoller.EvmWord(uint64(numberOfReports*numberOfMessagesPerReport/2)), // Pick the middle report
+			logpoller.Unconfirmed,
+		)
+		assert.NoError(b, err)
+		assert.Len(b, logs, 1)
+	}
+}
