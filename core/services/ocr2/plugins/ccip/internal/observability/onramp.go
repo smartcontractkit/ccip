@@ -27,9 +27,9 @@ func NewObservedOnRampReader(origin ccipdata.OnRampReader, chainID int64, plugin
 	}
 }
 
-func (o ObservedOnRampReader) GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
+func (o ObservedOnRampReader) GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, finalityDepth int) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
 	return withObservedInteractionAndResults(o.metric, "GetFinalizedSendRequestsGteSeqNum", func() ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
-		return o.OnRampReader.GetFinalizedSendRequestsGteSeqNum(ctx, seqNum, confs)
+		return o.OnRampReader.GetFinalizedSendRequestsGteSeqNum(ctx, seqNum, finalityDepth)
 	})
 }
 

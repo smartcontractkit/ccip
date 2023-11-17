@@ -270,13 +270,13 @@ func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 	}, nil
 }
 
-func (o *OnRampV1_2_0) GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
+func (o *OnRampV1_2_0) GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, finalityDepth int) ([]Event[internal.EVM2EVMMessage], error) {
 	logs, err := o.lp.LogsDataWordGreaterThan(
 		o.sendRequestedEventSig,
 		o.address,
 		o.sendRequestedSeqNumberWord,
 		abihelpers.EvmWord(seqNum),
-		finalizedLogsConfirmations(o.useFinalityTags, confs),
+		finalizedLogsConfirmations(o.useFinalityTags, finalityDepth),
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {

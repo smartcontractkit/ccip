@@ -41,8 +41,8 @@ type OnRampDynamicConfig struct {
 type OnRampReader interface {
 	Closer
 	// GetFinalizedSendRequestsGteSeqNum returns all the finalized message send requests with sequence number greater than or equal to the provided.
-	// If checkFinalityTags is set to true then confs param is ignored, the latest finalized block is used in the query.
-	GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
+	// If checkFinalityTags is set to true then finalityDepth param is ignored, the latest finalized block is used in the query.
+	GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, finalityDepth int) ([]Event[internal.EVM2EVMMessage], error)
 	// GetSendRequestsBetweenSeqNums returns all the message send requests in the provided sequence numbers range (inclusive).
 	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
 	// Get router configured in the onRamp
@@ -69,9 +69,9 @@ func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	}
 }
 
-func finalizedLogsConfirmations(useFinalityTags bool, sourceConfs int) logpoller.Confirmations {
+func finalizedLogsConfirmations(useFinalityTags bool, sourceFinalityDepth int) logpoller.Confirmations {
 	if useFinalityTags {
 		return logpoller.Finalized
 	}
-	return logpoller.Confirmations(sourceConfs)
+	return logpoller.Confirmations(sourceFinalityDepth)
 }
