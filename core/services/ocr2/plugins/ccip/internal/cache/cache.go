@@ -79,8 +79,7 @@ func (c *CachedChain[T]) Get(ctx context.Context) (T, error) {
 		return empty, err1
 	}
 
-	// This is performance improvement that will prevent for large db scans in case of no changes on the chain for a long time.
-	// We can update lastChangeBloWe use finalizedBlock for that to prevent missing data when chain is reorganized.
+	// This is performance improvement that will prevent for large db scans, by updating the lower bound of the search query
 	c.maybeCacheLatestFinalizedBlock(cachedLastChangeBlock, latestBlock.FinalizedBlockNumber)
 	return c.copyCachedValue(), nil
 }
