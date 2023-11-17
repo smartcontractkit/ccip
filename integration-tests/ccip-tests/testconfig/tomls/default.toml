@@ -132,7 +132,7 @@ FeeCapDefault = '200 gwei'
 BumpThreshold = 60
 """
 
-11155111 = """
+11155111 = """ 
 [GasEstimator]
 PriceMax = '200 gwei'
 LimitDefault = 6000000
@@ -141,70 +141,83 @@ FeeCapDefault = '200 gwei'
 [GasEstimator.BlockHistory]
 BlockHistorySize = 200
 EIP1559FeeCapBufferBlocks = 0
-"""
+"""                       
 
 [CCIP.Groups]
 [CCIP.Groups.smoke]
-KeepEnvAlive = false
-BiDirectionalLane = true
-CommitAndExecuteOnSameDON = true
-NoOfCommitNodes = 5
-MsgType = 'WithToken'
-PhaseTimeout = '10m'
-LocalCluster = true
-ExistingDeployment = false
-ReuseContracts = true
-SequentialLaneAddition = false
-NodeFunding = 1.0
-NoOfRoutersPerPair = 1
-NoOfTokensPerChain = 2
-NoOfTokensInMsg = 2
-AmountPerToken = 1
-MulticallInOneTx = false
-NoOfSendsInMulticall = 5
+KeepEnvAlive = false                # if true, the test will not tear down the test environment after the test is finished
+CommitAndExecuteOnSameDON = true    # boolean
+BiDirectionalLane = true            # True uses both the lanes. If bidirectional is false only one way lane is set up.
+MsgType = 'WithToken'               # options `WithToken` and `WithoutToken`, default is `WithToken`
+NoOfCommitNodes = 5                 #
+PhaseTimeout = '10m'                # Duration to wait for the each phase validation(SendRequested, Commit, Execution) to time-out.
+LocalCluster = true                 #
+ExistingDeployment = false          # the real CCIP, smart contracts, etc... has already been deployed
+ExistingEnv = false                 # If true, the test environment has already been set up
+ReuseContracts = true               # Whether to reuse the contracts deployed in the previous run. Default value is true unless specified
+SequentialLaneAddition = false      #
+NodeFunding = 1.0                   # Amount of native currency to fund the chainlink node with for each network. Default value is 1 for smoke and 20 unless specified
+NoOfRoutersPerPair = 1              #
+NoOfTokensPerChain = 2              #
+NoOfTokensInMsg = 2                 #       
+AmountPerToken = 1                  #
+MulticallInOneTx = false            #   
+NoOfSendsInMulticall = 5            #
+NoOfNetworks = 2                    # if you want to run the ccip tests on more than 2 networks, you need to provide the env name accordingly, not used with network pairs
+Blockscout = false                  # if true, the test will use blockscout
 
 [CCIP.Groups.load]
 KeepEnvAlive = false
-BiDirectionalLane = true
 CommitAndExecuteOnSameDON = true
-NoOfCommitNodes = 5
+BiDirectionalLane = true
 MsgType = 'WithToken'
+NoOfCommitNodes = 5
 PhaseTimeout = '50m'
-TestDuration = '10m'
+TestDuration = '10m'                # load test duration, not used for smoke tests
 LocalCluster = false
 ExistingDeployment = false
-ReuseContracts = true
+ExistingEnv = false
+ReuseContracts = true               
 SequentialLaneAddition = false
 NodeFunding = 20.0
-RequestPerUnitTime = [1]
-TimeUnit = '1s'
 NoOfRoutersPerPair = 1
 NoOfTokensPerChain = 2
 NoOfTokensInMsg = 2
 AmountPerToken = 1
 MulticallInOneTx = false
 NoOfSendsInMulticall = 5
+RequestPerUnitTime = [1]
+TimeUnit = '1s'
+NoOfNetworks = 2               
+Blockscout = false   
 
 [CCIP.Groups.chaos]
 KeepEnvAlive = false
-BiDirectionalLane = true
 CommitAndExecuteOnSameDON = false
-NoOfCommitNodes = 5
+BiDirectionalLane = true
 MsgType = 'WithToken'
+NoOfCommitNodes = 5
 PhaseTimeout = '50m'
-TestDuration = '10m'
+TestDuration = '10m'                # load test duration, not used for smoke tests
 LocalCluster = false
 ExistingDeployment = false
 ReuseContracts = true
 SequentialLaneAddition = false
 NodeFunding = 20.0
-RequestPerUnitTime = [1]
-TimeUnit = '1s'
 NoOfRoutersPerPair = 1
 NoOfTokensPerChain = 2
 NoOfTokensInMsg = 2
 AmountPerToken = 1
-WaitBetweenChaosDuringLoad = '2m'
-ChaosDuration = '10m'
 MulticallInOneTx = false
 NoOfSendsInMulticall = 5
+RequestPerUnitTime = [1]
+TimeUnit = '1s'
+NoOfNetworks = 2         # if you want to run the ccip tests on more than 2 networks, you need to provide the env name accordingly 
+Blockscout = false
+# chaos test settings
+ChaosDuration = '10m'               # Duration for which chaos will be injected; only valid for chaos tests
+WaitBetweenChaosDuringLoad = '2m'   # Duration to wait between each chaos injection during load test; only valid for chaos tests
+
+# These are other values that can be set for the tests
+# StepDuration                    
+# MaxNoOfLanes    
