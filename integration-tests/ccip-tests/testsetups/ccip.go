@@ -685,6 +685,7 @@ func CCIPDefaultTestSetUp(
 	}
 
 	// TODO wait_for_finalization: true is ignored, we need to wait manually for chain to start, but would be better to have that wait fixed in Kurtosis
+	// the safest would probably be waiting for first finalised block
 	actions.WaitForChainsToProduceBlocks(lggr, ccipEnv.LocalCluster.PrivateChain)
 
 	_, err = os.Stat(setUpArgs.LaneConfigFile)

@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
+	tc "github.com/testcontainers/testcontainers-go"
 	"gopkg.in/yaml.v2"
 )
 
@@ -35,6 +36,7 @@ type KurtosisEvmNode struct {
 	configFile        string
 	t                 *testing.T
 	l                 zerolog.Logger
+	tc                *tc.Container
 }
 
 func (n *KurtosisEvmNode) GetInternalHttpUrl() string {
@@ -102,6 +104,7 @@ func (n *KurtosisEvmNode) Start() error {
 	// if count == 1 or all the others, which have the index > 1
 	// but to get that count we'll need to at least partially parse kurtosis config file
 	elNodeFound := false
+	containerName := ""
 	for _, serviceName := range services.GetOrderedListOfNames() {
 		if strings.Contains(serviceName, "el-2") {
 			elNodeFound = true
@@ -109,6 +112,9 @@ func (n *KurtosisEvmNode) Start() error {
 			if err != nil {
 				return err
 			}
+
+			serviceUUID := string(serviceCtx.GetServiceUUID())
+			containerName = fmt.Sprintf("%s--%s", serviceName, serviceUUID)
 
 			publicPorts := serviceCtx.GetPublicPorts()
 			privatePorts := serviceCtx.GetPrivatePorts()
@@ -150,7 +156,6 @@ func (n *KurtosisEvmNode) Start() error {
 				}
 			}
 
-			serviceUUID := string(serviceCtx.GetServiceUUID())
 			//TODO for external host we'd need some method to get it reliably, like we do in case of testcontainers-go
 			host := "localhost"
 
@@ -210,6 +215,22 @@ func (n *KurtosisEvmNode) Start() error {
 		PrivateKeys: []string{"bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31"},
 	}
 	n.DockerNetworkName = fmt.Sprintf("kt-%s", enclaveName)
+
+	// Reuse existing container to wrap it in testcontainers-go
+	req := tc.GenericContainerRequest{
+		ContainerRequest: tc.ContainerRequest{
+			Name: containerName,
+		},
+		Reuse:        true,
+		ProviderType: tc.ProviderDocker,
+	}
+
+	container, err := tc.GenericContainer(context.Background(), req)
+	if err != nil {
+		return err
+	}
+
+	n.tc = &container
 
 	return nil
 }
