@@ -269,17 +269,18 @@ func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 	}, nil
 }
 
-func (o *OnRampV1_2_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
-	logs, err2 := o.lp.LogsDataWordGreaterThan(
+func (o *OnRampV1_2_0) GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, limit uint64, confs int) ([]Event[internal.EVM2EVMMessage], error) {
+	logs, err := o.lp.LogsDataWordRange(
 		o.sendRequestedEventSig,
 		o.address,
 		o.sendRequestedSeqNumberWord,
 		abihelpers.EvmWord(seqNum),
+		abihelpers.EvmWord(seqNum+limit),
 		logpoller.Confirmations(confs),
 		pg.WithParentCtx(ctx),
 	)
-	if err2 != nil {
-		return nil, fmt.Errorf("logs data word greater than: %w", err2)
+	if err != nil {
+		return nil, fmt.Errorf("logs data word greater than: %w", err)
 	}
 	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }

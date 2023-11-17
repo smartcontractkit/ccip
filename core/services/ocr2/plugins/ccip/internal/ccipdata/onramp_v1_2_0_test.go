@@ -93,20 +93,17 @@ func TestLogPollerClient_GetSendRequestsGteSeqNum(t *testing.T) {
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
 	onRampV2, err := NewOnRampV1_2_0(lggr, 1, 1, onRampAddr, lp, nil)
 	require.NoError(t, err)
-	lp.On("LogsDataWordGreaterThan",
+	lp.On("LogsDataWordRange",
 		onRampV2.sendRequestedEventSig,
 		onRampAddr,
 		onRampV2.sendRequestedSeqNumberWord,
 		abihelpers.EvmWord(seqNum),
+		abihelpers.EvmWord(seqNum+10),
 		logpoller.Confirmations(confs),
 		mock.Anything,
 	).Return([]logpoller.Log{}, nil)
 
-	events, err := onRampV2.GetSendRequestsGteSeqNum(
-		context.Background(),
-		seqNum,
-		confs,
-	)
+	events, err := onRampV2.GetSendRequestsGteSeqNum(context.Background(), seqNum, 10, confs)
 	assert.NoError(t, err)
 	assert.Empty(t, events)
 	lp.AssertExpectations(t)
