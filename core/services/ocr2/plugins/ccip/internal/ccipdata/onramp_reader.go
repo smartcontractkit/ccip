@@ -40,10 +40,10 @@ type OnRampDynamicConfig struct {
 //go:generate mockery --quiet --name OnRampReader --filename onramp_reader_mock.go --case=underscore
 type OnRampReader interface {
 	Closer
-	// GetFinalizedSendRequestsGteSeqNum returns all the finalized message send requests with sequence number greater than or equal to the provided.
-	GetFinalizedSendRequestsGteSeqNum(ctx context.Context, seqNum uint64) ([]Event[internal.EVM2EVMMessage], error)
-	// GetSendRequestsBetweenSeqNums returns all the message send requests in the provided sequence numbers range (inclusive).
-	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
+	// GetSendRequestsGteSeqNum returns all the finalized message send requests with sequence number greater than or equal to the provided.
+	GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64) ([]Event[internal.EVM2EVMMessage], error)
+	// GetSendRequestsBetweenSeqNums returns all the finalized message send requests in the provided sequence numbers range (inclusive).
+	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64) ([]Event[internal.EVM2EVMMessage], error)
 	// Get router configured in the onRamp
 	RouterAddress() (common.Address, error)
 	Address() (common.Address, error)
