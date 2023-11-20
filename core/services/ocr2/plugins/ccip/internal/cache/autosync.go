@@ -95,11 +95,9 @@ func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool,
 
 	latestBlock, err := c.logPoller.LatestBlock(pg.WithParentCtx(ctx))
 	latestBlockNumber := int64(0)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return false, 0, fmt.Errorf("get latest log poller block: %w", err)
-		}
-	} else {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return false, 0, fmt.Errorf("get latest log poller block: %w", err)
+	} else if err == nil {
 		latestBlockNumber = latestBlock.BlockNumber
 	}
 

@@ -1102,7 +1102,6 @@ func inflightAggregates(
 }
 
 // getTokensPrices returns token prices of the given price registry,
-// results include feeTokens and passed-in tokens
 // price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
 func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryReader, tokens []common.Address) (map[common.Address]*big.Int, error) {
