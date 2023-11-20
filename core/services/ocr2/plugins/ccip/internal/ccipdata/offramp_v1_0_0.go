@@ -101,6 +101,7 @@ type OffRampV1_0_0 struct {
 	eventSig                common.Hash
 	destinationTokensCache  cachev2.Cache[[]common.Address]
 	supportedTokensCache    cachev2.Cache[[]common.Address]
+	destinationPoolsCache   cachev2.Cache[map[common.Address]common.Address]
 	sourceToDestTokensCache sync.Map
 
 	// Dynamic config
@@ -265,38 +266,40 @@ func (o *OffRampV1_0_0) GetSourceToDestTokensMapping(ctx context.Context) (map[c
 	return srcToDstTokenMapping, nil
 }
 
-// TODO: cache and batched calls
+// TODO: batched calls
 func (o *OffRampV1_0_0) GetDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error) {
-	destTokens, err := o.GetDestinationTokens(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get destination tokens")
-	}
+	return o.destinationPoolsCache.Get(ctx, func(ctx context.Context) (map[common.Address]common.Address, error) {
+		destTokens, err := o.GetDestinationTokens(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("get destination tokens")
+		}
 
-	eg := new(errgroup.Group)
-	eg.SetLimit(10)
-	var mu sync.Mutex
+		eg := new(errgroup.Group)
+		eg.SetLimit(10)
+		var mu sync.Mutex
 
-	mapping := make(map[common.Address]common.Address, len(destTokens))
-	for _, token := range destTokens {
-		token := token
-		eg.Go(func() error {
-			poolAddress, err := o.GetPoolByDestToken(ctx, token)
-			if err != nil {
-				return fmt.Errorf("get token pool for token '%s': %w", token, err)
-			}
+		mapping := make(map[common.Address]common.Address, len(destTokens))
+		for _, token := range destTokens {
+			token := token
+			eg.Go(func() error {
+				poolAddress, err := o.GetPoolByDestToken(ctx, token)
+				if err != nil {
+					return fmt.Errorf("get token pool for token '%s': %w", token, err)
+				}
 
-			mu.Lock()
-			mapping[token] = poolAddress
-			mu.Unlock()
-			return nil
-		})
-	}
+				mu.Lock()
+				mapping[token] = poolAddress
+				mu.Unlock()
+				return nil
+			})
+		}
 
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
+		if err := eg.Wait(); err != nil {
+			return nil, err
+		}
 
-	return mapping, nil
+		return mapping, nil
+	})
 }
 
 func (o *OffRampV1_0_0) GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error) {
@@ -519,7 +522,10 @@ func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ExecReport, error)
 }
 
 func (o *OffRampV1_0_0) TokenEvents() []common.Hash {
-	return []common.Hash{abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0), abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)}
+	return []common.Hash{
+		abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
+		abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
+	}
 }
 
 func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_0_0, error) {
@@ -578,6 +584,15 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 			0, // todo: check
 		),
 		supportedTokensCache: cachev2.NewLPCache[[]common.Address](
+			lp,
+			[]common.Hash{
+				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
+				abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
+			},
+			offRamp.Address(),
+			0, // todo: check
+		),
+		destinationPoolsCache: cachev2.NewLPCache[map[common.Address]common.Address](
 			lp,
 			[]common.Hash{
 				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
