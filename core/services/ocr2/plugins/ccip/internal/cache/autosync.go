@@ -15,6 +15,7 @@ import (
 
 type AutoSync[T any] interface {
 	Get(ctx context.Context, syncFunc func(ctx context.Context) (T, error)) (T, error)
+	SetOptimisticConfirmations(confs int64)
 }
 
 type LogpollerEventsBased[T any] struct {
@@ -79,6 +80,12 @@ func (c *LogpollerEventsBased[T]) Get(ctx context.Context, syncFunc func(ctx con
 	c.lock.Unlock()
 
 	return cachedValue, nil
+}
+
+func (c *LogpollerEventsBased[T]) SetOptimisticConfirmations(confs int64) {
+	c.lock.Lock()
+	c.optimisticConfirmations = confs
+	c.lock.Unlock()
 }
 
 func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool, blockOfLatestEvent int64, err error) {

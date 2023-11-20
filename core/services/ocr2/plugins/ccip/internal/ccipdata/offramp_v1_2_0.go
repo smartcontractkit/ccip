@@ -124,6 +124,11 @@ func (o *OffRampV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte
 	o.onchainConfig = ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
 	o.gasPriceEstimator = prices.NewDAGasPriceEstimator(o.estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0, 0)
 	o.configMu.Unlock()
+
+	o.destinationPoolsCache.SetOptimisticConfirmations(int64(o.offchainConfig.DestOptimisticConfirmations))
+	o.supportedTokensCache.SetOptimisticConfirmations(int64(o.offchainConfig.DestOptimisticConfirmations))
+	o.destinationTokensCache.SetOptimisticConfirmations(int64(o.offchainConfig.DestOptimisticConfirmations))
+
 	o.lggr.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
 		"onchainConfig", offchainConfigParsed)

@@ -99,8 +99,8 @@ type OffRampV1_0_0 struct {
 	executionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
-	destinationTokensCache  cache.AutoSync[[]common.Address]
-	supportedTokensCache    cache.AutoSync[[]common.Address]
+	destinationTokensCache  cache.AutoSync[[]common.Address] // dest tokens
+	supportedTokensCache    cache.AutoSync[[]common.Address] // source tokens
 	destinationPoolsCache   cache.AutoSync[map[common.Address]common.Address]
 	sourceToDestTokensCache sync.Map
 
@@ -361,6 +361,10 @@ func (o *OffRampV1_0_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte
 	o.gasPriceEstimator = prices.NewExecGasPriceEstimator(o.estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0)
 	o.configMu.Unlock()
 
+	o.destinationPoolsCache.SetOptimisticConfirmations(int64(o.offchainConfig.DestOptimisticConfirmations))
+	o.supportedTokensCache.SetOptimisticConfirmations(int64(o.offchainConfig.DestOptimisticConfirmations))
+	o.destinationTokensCache.SetOptimisticConfirmations(int64(o.offchainConfig.DestOptimisticConfirmations))
+
 	o.lggr.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
 		"onchainConfig", offchainConfigParsed)
@@ -581,7 +585,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 				abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
 			},
 			offRamp.Address(),
-			0, // todo: check
+			0, // filled on-the-fly
 		),
 		supportedTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
@@ -590,7 +594,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 				abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
 			},
 			offRamp.Address(),
-			0, // todo: check
+			0, // filled on-the-fly
 		),
 		destinationPoolsCache: cache.NewLogpollerEventsBased[map[common.Address]common.Address](
 			lp,
@@ -599,7 +603,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 				abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
 			},
 			offRamp.Address(),
-			0, // todo: check
+			0, // filled on-the-fly
 		),
 
 		// values set on the fly after ChangeConfig is called

@@ -202,7 +202,7 @@ func (p *PriceRegistryV1_0_0) GetTokensDecimals(ctx context.Context, tokenAddres
 	return tokenDecimals, nil
 }
 
-func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistryV1_0_0, error) {
+func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client, sourceFinality int64) (*PriceRegistryV1_0_0, error) {
 	priceRegistry, err := price_registry_1_0_0.NewPriceRegistry(priceRegistryAddr, ec)
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 			lp,
 			[]common.Hash{feeTokenAdded, feeTokenRemoved},
 			priceRegistryAddr,
-			0, // todo: check
+			0,
 		),
 	}, nil
 }

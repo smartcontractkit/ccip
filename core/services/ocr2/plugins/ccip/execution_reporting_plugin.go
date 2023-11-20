@@ -114,7 +114,7 @@ func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(newPriceRegAddr 
 			return err
 		}
 	}
-	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, newPriceRegAddr, rf.config.destLP, rf.config.destClient)
+	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, newPriceRegAddr, rf.config.destLP, rf.config.destClient, int64(rf.config.offRampReader.OffchainConfig().DestOptimisticConfirmations))
 	if err != nil {
 		return err
 	}
