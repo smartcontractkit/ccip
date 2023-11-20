@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cachev2"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -44,7 +44,7 @@ type PriceRegistryV1_0_0 struct {
 	feeTokenAdded   common.Hash
 	feeTokenRemoved common.Hash
 
-	feeTokensCache     cachev2.Cache[[]common.Address]
+	feeTokensCache     cache.AutoSync[[]common.Address]
 	tokenDecimalsCache sync.Map
 }
 
@@ -247,7 +247,7 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 		feeTokenRemoved: feeTokenRemoved,
 		feeTokenAdded:   feeTokenAdded,
 		filters:         filters,
-		feeTokensCache: cachev2.NewLPCache[[]common.Address](
+		feeTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
 			[]common.Hash{feeTokenAdded, feeTokenRemoved},
 			priceRegistryAddr,

@@ -25,7 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cachev2"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -99,9 +99,9 @@ type OffRampV1_0_0 struct {
 	executionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
-	destinationTokensCache  cachev2.Cache[[]common.Address]
-	supportedTokensCache    cachev2.Cache[[]common.Address]
-	destinationPoolsCache   cachev2.Cache[map[common.Address]common.Address]
+	destinationTokensCache  cache.AutoSync[[]common.Address]
+	supportedTokensCache    cache.AutoSync[[]common.Address]
+	destinationPoolsCache   cache.AutoSync[map[common.Address]common.Address]
 	sourceToDestTokensCache sync.Map
 
 	// Dynamic config
@@ -574,7 +574,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 			rpclib.DefaultRpcBatchSizeLimit,
 			rpclib.DefaultRpcBatchBackOffMultiplier,
 		),
-		destinationTokensCache: cachev2.NewLPCache[[]common.Address](
+		destinationTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
 			[]common.Hash{
 				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
@@ -583,7 +583,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 			offRamp.Address(),
 			0, // todo: check
 		),
-		supportedTokensCache: cachev2.NewLPCache[[]common.Address](
+		supportedTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
 			[]common.Hash{
 				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
@@ -592,7 +592,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 			offRamp.Address(),
 			0, // todo: check
 		),
-		destinationPoolsCache: cachev2.NewLPCache[map[common.Address]common.Address](
+		destinationPoolsCache: cache.NewLogpollerEventsBased[map[common.Address]common.Address](
 			lp,
 			[]common.Hash{
 				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
