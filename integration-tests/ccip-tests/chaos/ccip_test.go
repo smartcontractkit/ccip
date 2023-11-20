@@ -1,6 +1,7 @@
 package chaos_test
 
 import (
+	"math/big"
 	"testing"
 	"time"
 
@@ -123,9 +124,9 @@ func TestChaosCCIP(t *testing.T) {
 
 			lane.RecordStateBeforeTransfer()
 			// Send the ccip-request and verify ocr2 is running
-			err := lane.SendRequests(1, testCfg.TestGroupInput.MsgType)
+			err := lane.SendRequests(1, testCfg.TestGroupInput.MsgType, big.NewInt(600_000))
 			require.NoError(t, err)
-			lane.ValidateRequests()
+			lane.ValidateRequests(true)
 
 			// apply chaos
 			chaosId, err := testEnvironment.Chaos.Run(in.chaosFunc(testEnvironment.Cfg.Namespace, in.chaosProps))
@@ -138,7 +139,7 @@ func TestChaosCCIP(t *testing.T) {
 			})
 			lane.RecordStateBeforeTransfer()
 			// Now send the ccip-request while the chaos is at play
-			err = lane.SendRequests(numOfRequests, testCfg.TestGroupInput.MsgType)
+			err = lane.SendRequests(numOfRequests, testCfg.TestGroupInput.MsgType, big.NewInt(600_000))
 			require.NoError(t, err)
 			if in.waitForChaosRecovery {
 				// wait for chaos to be recovered before further validation
@@ -146,7 +147,7 @@ func TestChaosCCIP(t *testing.T) {
 			} else {
 				l.Info().Msg("proceeding without waiting for chaos recovery")
 			}
-			lane.ValidateRequests()
+			lane.ValidateRequests(true)
 		})
 	}
 }
