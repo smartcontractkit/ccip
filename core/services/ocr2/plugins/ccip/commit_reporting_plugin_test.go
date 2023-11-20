@@ -1118,7 +1118,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			for tk := range tc.tokenDecimals {
 				tokens = append(tokens, tk)
 			}
-			tokens = append(tokens, tc.sourceNativeToken)
+			tokens = ccipcalc.FlattenUniqueSlice(tokens, []common.Address{tc.sourceNativeToken})
 			sort.Slice(tokens, func(i, j int) bool { return tokens[i].String() < tokens[j].String() })
 
 			if len(tokens) > 0 {
