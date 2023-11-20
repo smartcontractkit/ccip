@@ -9,6 +9,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/conversions"
 
+	commonassets "github.com/smartcontractkit/chainlink-common/pkg/assets"
+
 	"github.com/smartcontractkit/chainlink/v2/core/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/vrfv2plus_wrapper_load_test_consumer"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/actions/vrfv2plus/vrfv2plus_config"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -868,7 +871,7 @@ func retreiveLoadTestMetrics(
 func LogSubDetails(l zerolog.Logger, subscription vrf_coordinator_v2_5.GetSubscription, subID *big.Int, coordinator contracts.VRFCoordinatorV2_5) {
 	l.Debug().
 		Str("Coordinator", coordinator.Address()).
-		Str("Link Balance", (*assets.Link)(subscription.Balance).Link()).
+		Str("Link Balance", (*commonassets.Link)(subscription.Balance).Link()).
 		Str("Native Token Balance", assets.FormatWei(subscription.NativeBalance)).
 		Str("Subscription ID", subID.String()).
 		Str("Subscription Owner", subscription.Owner.String()).
@@ -971,11 +974,11 @@ func LogFulfillmentDetailsLinkBilling(
 	randomWordsFulfilledEvent *vrf_coordinator_v2_5.VRFCoordinatorV25RandomWordsFulfilled,
 ) {
 	l.Debug().
-		Str("Consumer Balance Before Request (Link)", (*assets.Link)(wrapperConsumerJuelsBalanceBeforeRequest).Link()).
-		Str("Consumer Balance After Request (Link)", (*assets.Link)(wrapperConsumerJuelsBalanceAfterRequest).Link()).
+		Str("Consumer Balance Before Request (Link)", (*commonassets.Link)(wrapperConsumerJuelsBalanceBeforeRequest).Link()).
+		Str("Consumer Balance After Request (Link)", (*commonassets.Link)(wrapperConsumerJuelsBalanceAfterRequest).Link()).
 		Bool("Fulfilment Status", consumerStatus.Fulfilled).
-		Str("Paid by Consumer Contract (Link)", (*assets.Link)(consumerStatus.Paid).Link()).
-		Str("Paid by Coordinator Sub (Link)", (*assets.Link)(randomWordsFulfilledEvent.Payment).Link()).
+		Str("Paid by Consumer Contract (Link)", (*commonassets.Link)(consumerStatus.Paid).Link()).
+		Str("Paid by Coordinator Sub (Link)", (*commonassets.Link)(randomWordsFulfilledEvent.Payment).Link()).
 		Str("RequestTimestamp", consumerStatus.RequestTimestamp.String()).
 		Str("FulfilmentTimestamp", consumerStatus.FulfilmentTimestamp.String()).
 		Str("RequestBlockNumber", consumerStatus.RequestBlockNumber.String()).
