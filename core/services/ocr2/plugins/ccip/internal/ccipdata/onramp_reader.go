@@ -41,11 +41,9 @@ type OnRampDynamicConfig struct {
 type OnRampReader interface {
 	Closer
 	// GetSendRequestsGteSeqNum returns all the finalized message send requests with sequence number greater than or equal to the provided.
-	// If useFinalityTags is set to true then finalityDepth param is ignored, the latest finalized block is used in the query.
-	GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, finalityDepth int) ([]Event[internal.EVM2EVMMessage], error)
+	GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
 	// GetSendRequestsBetweenSeqNums returns all the message send requests in the provided sequence numbers range (inclusive).
-	// If useFinalityTags is set to true then finalityDepth param is ignored, the latest finalized block is used in the query.
-	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalityDepth int) ([]Event[internal.EVM2EVMMessage], error)
+	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
 	// Get router configured in the onRamp
 	RouterAddress() (common.Address, error)
 	Address() (common.Address, error)
