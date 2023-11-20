@@ -53,7 +53,6 @@ type PriceRegistryReader interface {
 	// The returned updates are sorted by timestamp in ascending order.
 	GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]Event[GasPriceUpdate], error)
 	Address() common.Address
-	// TODO: remove this method from the interface
 	FeeTokenEvents() []common.Hash
 	GetFeeTokens(ctx context.Context) ([]common.Address, error)
 	GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error)

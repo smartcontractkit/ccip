@@ -372,17 +372,9 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	require.NoError(t, err)
 	require.Equal(t, []common.Address{}, addresses)
 
-	tokens, err := th.reader.GetSupportedTokens(ctx)
-	require.NoError(t, err)
-	require.Equal(t, []common.Address{}, tokens)
-
 	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(ctx, 0, 10, 0)
 	require.NoError(t, err)
 	require.Equal(t, []ccipdata.Event[ccipdata.ExecutionStateChanged]{}, events)
-
-	destTokens, err := th.reader.GetDestinationTokensFromSourceTokens(ctx, tokens)
-	require.NoError(t, err)
-	require.Empty(t, destTokens)
 
 	rateLimits, err := th.reader.GetTokenPoolsRateLimits(ctx, []common.Address{})
 	require.NoError(t, err)
