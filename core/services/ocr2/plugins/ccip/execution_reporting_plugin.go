@@ -69,6 +69,7 @@ type ExecutionReportingPlugin struct {
 	lggr               logger.Logger
 	offchainConfig     ccipdata.ExecOffchainConfig
 	tokenDataProviders map[common.Address]tokendata.Reader
+	metricsCollector   PluginMetricsCollector
 	// Source
 	gasPriceEstimator        prices.GasPriceEstimatorExec
 	sourcePriceRegistry      ccipdata.PriceRegistryReader
@@ -160,6 +161,7 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			offRampReader:            rf.config.offRampReader,
 			inflightReports:          newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
 			snoozedRoots:             cache.NewSnoozedRoots(rf.config.offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
+			metricsCollector:         NewPluginMetricsCollector(ExecPluginLabel, rf.config.sourceClient.ConfiguredChainID(), rf.config.destClient.ConfiguredChainID()),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -207,7 +209,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 		return nil, err
 	}
 	executableObservations = executableObservations[:capped]
-	(&PluginMetricsCollector{}).NumberOfMessagesProcessed(Observation, len(executableObservations))
+	r.metricsCollector.NumberOfMessagesProcessed(Observation, len(executableObservations))
 
 	lggr.Infow("Observation", "executableMessages", executableObservations)
 	// Note can be empty
@@ -371,7 +373,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 }
 
 // destPoolRateLimits returns a map that consists of the rate limits of each destination token of the provided reports.
-// If a token is missing from the returned map it either means that token was not found or token pool is disabled for this token.
+// If a token is missing from the returned map it either means that token was not found or token pool is noop for this token.
 func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commitReports []commitReportWithSendRequests, sourceToDestToken map[common.Address]common.Address) (map[common.Address]*big.Int, error) {
 	tokenPools, err := r.offRampReader.GetDestinationTokenPools(ctx)
 	if err != nil {
@@ -420,7 +422,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 
 	res := make(map[common.Address]*big.Int, len(dstTokenToPool))
 	for i, rateLimit := range rateLimits {
-		// if the rate limit is disabled for this token pool then we omit it from the result
+		// if the rate limit is noop for this token pool then we omit it from the result
 		if !rateLimit.IsEnabled {
 			continue
 		}
@@ -882,7 +884,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		return nil, err
 	}
 
-	(&PluginMetricsCollector{}).NumberOfMessagesProcessed(Report, len(execReport.Messages))
+	r.metricsCollector.NumberOfMessagesProcessed(Report, len(execReport.Messages))
 
 	encodedReport, err := r.offRampReader.EncodeExecutionReport(execReport)
 	if err != nil {
@@ -1165,7 +1167,7 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 		}
 		notSnoozedReports = append(notSnoozedReports, report)
 	}
-	(&PluginMetricsCollector{}).UnexpiredCommitRoots(len(notSnoozedReports))
+	r.metricsCollector.UnexpiredCommitRoots(len(notSnoozedReports))
 	lggr.Infow("Unexpired roots", "all", len(reports), "notSnoozed", len(notSnoozedReports))
 	return notSnoozedReports, nil
 }

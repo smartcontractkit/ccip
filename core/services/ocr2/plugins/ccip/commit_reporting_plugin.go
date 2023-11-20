@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -85,7 +86,8 @@ type CommitReportingPlugin struct {
 	// Offchain
 	priceGetter pricegetter.PriceGetter
 	// State
-	inflightReports *inflightCommitReportsContainer
+	inflightReports  *inflightCommitReportsContainer
+	metricsCollector PluginMetricsCollector
 }
 
 type CommitReportingPluginFactory struct {
@@ -147,6 +149,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
+	sourceChainId, err := chainselectors.ChainIdFromSelector(rf.config.sourceChainSelector)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
@@ -166,6 +169,7 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			offRampReader:           rf.config.offRamp,
 			gasPriceEstimator:       rf.config.commitStore.GasPriceEstimator(),
 			offchainConfig:          pluginOffChainConfig,
+			metricsCollector:  NewPluginMetricsCollector(ExecPluginLabel, big.NewInt(int64(sourceChainId)), rf.config.destClient.ConfiguredChainID()),
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -223,7 +227,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		"sourceGasPriceUSD", sourceGasPriceUSD,
 		"tokenPricesUSD", tokenPricesUSD,
 		"epochAndRound", epochAndRound)
-	(&PluginMetricsCollector{}).NumberOfMessagesBasedOnInterval(Observation, min, max)
+	r.metricsCollector.NumberOfMessagesBasedOnInterval(Observation, min, max)
 
 	// Even if all values are empty we still want to communicate our observation
 	// with the other nodes, therefore, we always return the observed values.
@@ -498,8 +502,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 		return false, nil, err
 	}
 
-	(&PluginMetricsCollector{}).NumberOfMessagesBasedOnInterval(Report, report.Interval.Min, report.Interval.Max)
-
+	r.metricsCollector.NumberOfMessagesBasedOnInterval(Report, report.Interval.Min, report.Interval.Max)
 	lggr.Infow("Report",
 		"merkleRoot", hex.EncodeToString(report.MerkleRoot[:]),
 		"minSeqNr", report.Interval.Min,
@@ -760,7 +763,7 @@ func (r *CommitReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Context,
 	if err := r.inflightReports.add(lggr, parsedReport, epochAndRound); err != nil {
 		return false, err
 	}
-	(&PluginMetricsCollector{}).SequenceNumber(parsedReport.Interval.Max)
+	r.metricsCollector.SequenceNumber(parsedReport.Interval.Max)
 
 	lggr.Infow("Accepting finalized report", "merkleRoot", hexutil.Encode(parsedReport.MerkleRoot[:]))
 	return true, nil

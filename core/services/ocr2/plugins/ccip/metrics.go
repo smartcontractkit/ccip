@@ -1,6 +1,7 @@
 package ccip
 
 import (
+	"math/big"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -40,45 +41,53 @@ func incSkippedRequests(reason skipReason) {
 	metricReportSkipped.WithLabelValues(string(reason)).Inc()
 }
 
-type PluginMetricsCollector struct {
+type ocrPhase string
+
+const (
+	Observation ocrPhase = "observation"
+	Report      ocrPhase = "report"
+)
+
+type PluginMetricsCollector interface {
+	NumberOfMessagesProcessed(phase ocrPhase, count int)
+	NumberOfMessagesBasedOnInterval(phase ocrPhase, seqNrMin, seqNrMax uint64)
+	UnexpiredCommitRoots(count int)
+	SequenceNumber(seqNr uint64)
+}
+
+type pluginMetricsCollector struct {
 	pluginName   string
 	source, dest string
 }
 
-func NewPluginMetricsCollector(pluginLabel string, sourceChainId, destChainId int64) *PluginMetricsCollector {
-	return &PluginMetricsCollector{
+func NewPluginMetricsCollector(pluginLabel string, sourceChainId, destChainId *big.Int) *pluginMetricsCollector {
+	return &pluginMetricsCollector{
 		pluginName: pluginLabel,
-		source:     strconv.FormatInt(sourceChainId, 10),
-		dest:       strconv.FormatInt(destChainId, 10),
+		source:     sourceChainId.String(),
+		dest:       destChainId.String(),
 	}
 }
 
-type Phase string
-
-const (
-	Observation Phase = "observation"
-	Report      Phase = "report"
-)
-
-func (p *PluginMetricsCollector) NumberOfMessagesProcessed(phase Phase, count int) {
+func (p *pluginMetricsCollector) NumberOfMessagesProcessed(phase ocrPhase, count int) {
 	messagesProcessed.
 		WithLabelValues(p.pluginName, p.source, p.dest, string(phase)).
 		Set(float64(count))
 }
 
-func (p *PluginMetricsCollector) NumberOfMessagesBasedOnInterval(phase Phase, seqNrMin, seqNrMax uint64) {
+func (p *pluginMetricsCollector) NumberOfMessagesBasedOnInterval(phase ocrPhase, seqNrMin, seqNrMax uint64) {
 	messagesProcessed.
 		WithLabelValues(p.pluginName, p.source, p.dest, string(phase)).
 		Set(float64(seqNrMax - seqNrMin + 1))
 }
 
-func (p *PluginMetricsCollector) UnexpiredCommitRoots(count int) {
+func (p *pluginMetricsCollector) UnexpiredCommitRoots(count int) {
 	execPluginReportsCount.
 		WithLabelValues(p.pluginName, p.source, p.dest).
 		Set(float64(count))
 }
 
-func (p *PluginMetricsCollector) SequenceNumber(seqNr uint64) {
+func (p *pluginMetricsCollector) SequenceNumber(seqNr uint64) {
+	// Don't publish price reports
 	if seqNr == 0 {
 		return
 	}

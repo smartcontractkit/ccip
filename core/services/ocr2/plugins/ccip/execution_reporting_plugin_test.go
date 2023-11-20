@@ -150,6 +150,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.sourcePriceRegistry = sourcePriceRegReader
 
 			p.snoozedRoots = cache.NewSnoozedRoots(time.Minute, time.Minute)
+			p.metricsCollector = NoopMetricsCollector
 
 			_, err := p.Observation(ctx, types.ReportTimestamp{}, types.Query{})
 			if tc.expErr {
@@ -332,6 +333,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	// ensure that buildReport should cap the built report to fit in MaxExecutionReportLength
 	p := &ExecutionReportingPlugin{}
 	p.lggr = logger.TestLogger(t)
+	p.metricsCollector = NoopMetricsCollector
 
 	commitStore := ccipdatamocks.NewCommitStoreReader(t)
 	commitStore.On("VerifyExecutionReport", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -797,7 +799,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "pool is disabled",
+			name: "pool is noop",
 			tokenAmounts: []internal.TokenAmount{
 				{Token: tk1},
 				{Token: tk2},
