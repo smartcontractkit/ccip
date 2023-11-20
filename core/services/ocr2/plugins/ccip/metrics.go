@@ -2,11 +2,9 @@ package ccip
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type skipReason string
@@ -20,19 +18,6 @@ const (
 )
 
 var (
-	execPluginLabels          = []string{"configDigest"}
-	execPluginDurationBuckets = []float64{
-		float64(10 * time.Millisecond),
-		float64(20 * time.Millisecond),
-		float64(50 * time.Millisecond),
-		float64(100 * time.Millisecond),
-		float64(200 * time.Millisecond),
-		float64(500 * time.Millisecond),
-		float64(1 * time.Second),
-		float64(2 * time.Second),
-		float64(5 * time.Second),
-		float64(10 * time.Second),
-	}
 	metricReportSkipped = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ccip_unexpired_report_skipped",
 		Help: "Times report is skipped for the possible reasons",
@@ -40,54 +25,67 @@ var (
 	execPluginReportsCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ccip_execution_observation_reports_count",
 		Help: "Number of reports that are being processed by Execution Plugin during single observation",
-	}, execPluginLabels)
-	execPluginObservationBuildDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "ccip_execution_observation_build_duration",
-		Help:    "Duration of generating Observation in Execution Plugin",
-		Buckets: execPluginDurationBuckets,
-	}, execPluginLabels)
-	execPluginBatchBuildDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "ccip_execution_build_single_batch",
-		Help:    "Duration of building single batch in Execution Plugin",
-		Buckets: execPluginDurationBuckets,
-	}, execPluginLabels)
-	execPluginReportsIterationDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "ccip_execution_reports_iteration_build_batch",
-		Help:    "Duration of iterating over all unexpired reports in Execution Plugin",
-		Buckets: execPluginDurationBuckets,
-	}, execPluginLabels)
+	}, []string{"plugin", "source", "dest"})
+	messagesProcessed = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ccip_number_of_messages_processed",
+		Help: "Number of messages processed by the plugin during different OCR phases",
+	}, []string{"plugin", "source", "dest", "ocr_phase"})
+	sequenceNumberCounter = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ccip_sequence_number_counter",
+		Help: "Sequence number of the last message processed by the plugin",
+	}, []string{"plugin", "source", "dest"})
 )
-
-func measureExecPluginDuration(histogram *prometheus.HistogramVec, timestamp types.ReportTimestamp, duration time.Duration) {
-	histogram.
-		WithLabelValues(timestampToLabels(timestamp)...).
-		Observe(float64(duration))
-}
-
-func measureObservationBuildDuration(timestamp types.ReportTimestamp, duration time.Duration) {
-	measureExecPluginDuration(execPluginObservationBuildDuration, timestamp, duration)
-}
-
-func measureBatchBuildDuration(timestamp types.ReportTimestamp, duration time.Duration) {
-	measureExecPluginDuration(execPluginBatchBuildDuration, timestamp, duration)
-}
-
-func measureReportsIterationDuration(timestamp types.ReportTimestamp, duration time.Duration) {
-	measureExecPluginDuration(execPluginReportsIterationDuration, timestamp, duration)
-}
-
-func measureNumberOfReportsProcessed(timestamp types.ReportTimestamp, count int) {
-	execPluginReportsCount.
-		WithLabelValues(timestampToLabels(timestamp)...).
-		Set(float64(count))
-}
 
 func incSkippedRequests(reason skipReason) {
 	metricReportSkipped.WithLabelValues(string(reason)).Inc()
 }
 
-func timestampToLabels(t types.ReportTimestamp) []string {
-	return []string{t.ConfigDigest.Hex()}
+type PluginMetricsCollector struct {
+	pluginName   string
+	source, dest string
+}
+
+func NewPluginMetricsCollector(pluginLabel string, sourceChainId, destChainId int64) *PluginMetricsCollector {
+	return &PluginMetricsCollector{
+		pluginName: pluginLabel,
+		source:     strconv.FormatInt(sourceChainId, 10),
+		dest:       strconv.FormatInt(destChainId, 10),
+	}
+}
+
+type Phase string
+
+const (
+	Observation Phase = "observation"
+	Report      Phase = "report"
+)
+
+func (p *PluginMetricsCollector) NumberOfMessagesProcessed(phase Phase, count int) {
+	messagesProcessed.
+		WithLabelValues(p.pluginName, p.source, p.dest, string(phase)).
+		Set(float64(count))
+}
+
+func (p *PluginMetricsCollector) NumberOfMessagesBasedOnInterval(phase Phase, seqNrMin, seqNrMax uint64) {
+	messagesProcessed.
+		WithLabelValues(p.pluginName, p.source, p.dest, string(phase)).
+		Set(float64(seqNrMax - seqNrMin + 1))
+}
+
+func (p *PluginMetricsCollector) UnexpiredCommitRoots(count int) {
+	execPluginReportsCount.
+		WithLabelValues(p.pluginName, p.source, p.dest).
+		Set(float64(count))
+}
+
+func (p *PluginMetricsCollector) SequenceNumber(seqNr uint64) {
+	if seqNr == 0 {
+		return
+	}
+
+	sequenceNumberCounter.
+		WithLabelValues(p.pluginName, p.source, p.dest).
+		Set(float64(seqNr))
 }
 
 // ChainName returns the name of the EVM network based on its chainID

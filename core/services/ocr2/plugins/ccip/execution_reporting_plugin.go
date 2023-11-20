@@ -189,10 +189,7 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 	r.inflightReports.expire(lggr)
 	inFlight := r.inflightReports.getAll()
 
-	observationBuildStart := time.Now()
-
 	executableObservations, err := r.getExecutableObservations(ctx, lggr, timestamp, inFlight)
-	measureObservationBuildDuration(timestamp, time.Since(observationBuildStart))
 	if err != nil {
 		return nil, err
 	}
@@ -210,6 +207,8 @@ func (r *ExecutionReportingPlugin) Observation(ctx context.Context, timestamp ty
 		return nil, err
 	}
 	executableObservations = executableObservations[:capped]
+	(&PluginMetricsCollector{}).NumberOfMessagesProcessed(Observation, len(executableObservations))
+
 	lggr.Infow("Observation", "executableMessages", executableObservations)
 	// Note can be empty
 	return NewExecutionObservation(executableObservations).Marshal()
@@ -276,8 +275,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		getDestGasPrice := cache.LazyFetch(func() (prices.GasPrice, error) {
 			return r.gasPriceEstimator.GetGasPrice(ctx)
 		})
-
-		measureNumberOfReportsProcessed(timestamp, len(unexpiredReportsPart))
 
 		unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReportsPart)
 		if err != nil {
@@ -353,7 +350,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				return nil, fmt.Errorf("get source to dest tokens: %w", err)
 			}
 
-			buildBatchDuration := time.Now()
 			batch := r.buildBatch(
 				ctx,
 				rootLggr,
@@ -365,7 +361,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				getDestGasPrice,
 				sourceToDestTokens,
 				destPoolRateLimits)
-			measureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 			if len(batch) != 0 {
 				return batch, nil
 			}
@@ -887,6 +882,8 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		return nil, err
 	}
 
+	(&PluginMetricsCollector{}).NumberOfMessagesProcessed(Report, len(execReport.Messages))
+
 	encodedReport, err := r.offRampReader.EncodeExecutionReport(execReport)
 	if err != nil {
 		return nil, err
@@ -898,6 +895,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 			len(observedMessages), capped, len(encodedReport), MaxExecutionReportLength,
 		)
 	}
+
 	// Double check this verifies before sending.
 	valid, err := r.commitStoreReader.VerifyExecutionReport(ctx, execReport)
 	if err != nil {
@@ -1167,7 +1165,7 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 		}
 		notSnoozedReports = append(notSnoozedReports, report)
 	}
-
+	(&PluginMetricsCollector{}).UnexpiredCommitRoots(len(notSnoozedReports))
 	lggr.Infow("Unexpired roots", "all", len(reports), "notSnoozed", len(notSnoozedReports))
 	return notSnoozedReports, nil
 }
