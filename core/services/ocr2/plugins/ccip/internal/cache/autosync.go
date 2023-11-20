@@ -2,10 +2,12 @@ package cache
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -85,13 +87,17 @@ func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool,
 	c.lock.RUnlock()
 
 	latestBlock, err := c.logPoller.LatestBlock(pg.WithParentCtx(ctx))
+	latestBlockNumber := int64(0)
 	if err != nil {
-		return false, 0, fmt.Errorf("get latest log poller block: %w", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			return false, 0, fmt.Errorf("get latest log poller block: %w", err)
+		}
+	} else {
+		latestBlockNumber = latestBlock.BlockNumber
 	}
-	latestBlockNumber := latestBlock.BlockNumber
 
 	if blockOfCurrentValue == 0 {
-		return true, latestBlockNumber, err
+		return true, latestBlockNumber, nil
 	}
 
 	blockOfLatestEvent, err = c.logPoller.LatestBlockByEventSigsAddrsWithConfs(

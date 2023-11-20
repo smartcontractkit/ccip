@@ -25,8 +25,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -248,7 +248,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		})
 
 		getDestTokensPrices := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
-			destFeeTokens, destBridgedTokens, err := r.getDestinationTokens(ctx)
+			destFeeTokens, destBridgedTokens, err := ccipcommon.GetDestinationTokens(ctx, r.config.offRampReader, r.destPriceRegistry)
 			if err != nil {
 				return nil, fmt.Errorf("get destination tokens: %w", err)
 			}
@@ -426,38 +426,6 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 	}
 
 	return res, nil
-}
-
-// TODO: dedup - it's the same for commit plugin
-func (r *ExecutionReportingPlugin) getDestinationTokens(ctx context.Context) (fee, bridged []common.Address, err error) {
-	eg := new(errgroup.Group)
-
-	var destFeeTokens []common.Address
-	var destBridgeableTokens []common.Address
-
-	eg.Go(func() error {
-		tokens, err := r.destPriceRegistry.GetFeeTokens(ctx)
-		if err != nil {
-			return fmt.Errorf("get dest fee tokens: %w", err)
-		}
-		destFeeTokens = tokens
-		return nil
-	})
-
-	eg.Go(func() error {
-		tokens, err := r.config.offRampReader.GetDestinationTokens(ctx)
-		if err != nil {
-			return fmt.Errorf("get dest bridgeable tokens: %w", err)
-		}
-		destBridgeableTokens = tokens
-		return nil
-	})
-
-	if err := eg.Wait(); err != nil {
-		return nil, nil, err
-	}
-
-	return destFeeTokens, destBridgeableTokens, nil
 }
 
 // Calculates a map that indicated whether a sequence number has already been executed
@@ -1031,7 +999,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, err
 	}
-	lggr = lggr.With("messageIDs", contractutil.GetMessageIDsAsHexString(execReport.Messages))
+	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
 	stale, err := r.isStaleReport(execReport.Messages)
@@ -1057,7 +1025,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 		lggr.Errorw("Unable to decode report", "err", err)
 		return false, nil
 	}
-	lggr = lggr.With("messageIDs", contractutil.GetMessageIDsAsHexString(execReport.Messages))
+	lggr = lggr.With("messageIDs", ccipcommon.GetMessageIDsAsHexString(execReport.Messages))
 
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,

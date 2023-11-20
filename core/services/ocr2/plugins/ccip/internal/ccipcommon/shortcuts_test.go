@@ -1,4 +1,4 @@
-package contractutil
+package ccipcommon
 
 import (
 	"math/rand"

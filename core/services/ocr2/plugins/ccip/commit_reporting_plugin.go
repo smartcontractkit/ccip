@@ -15,12 +15,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/sync/errgroup"
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -203,10 +203,11 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		return nil, err
 	}
 
-	destTokens, err := r.getDestinationTokens(ctx)
+	feeTokens, bridgeableTokens, err := ccipcommon.GetDestinationTokens(ctx, r.offRampReader, r.destPriceRegistryReader)
 	if err != nil {
 		return nil, fmt.Errorf("get destination tokens: %w", err)
 	}
+	destTokens := ccipcalc.FlattenUniqueSlice(feeTokens, bridgeableTokens)
 
 	sourceGasPriceUSD, tokenPricesUSD, err := r.generatePriceUpdates(ctx, lggr, destTokens)
 	if err != nil {
@@ -346,47 +347,6 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	return sourceGasPriceUSD, tokenPricesUSD, nil
 }
 
-func (r *CommitReportingPlugin) getDestinationTokens(ctx context.Context) ([]common.Address, error) {
-	eg := new(errgroup.Group)
-
-	var destFeeTokens []common.Address
-	var destBridgeableTokens []common.Address
-
-	eg.Go(func() error {
-		tokens, err := r.destPriceRegistryReader.GetFeeTokens(ctx)
-		if err != nil {
-			return fmt.Errorf("get dest fee tokens: %w", err)
-		}
-		destFeeTokens = tokens
-		return nil
-	})
-
-	eg.Go(func() error {
-		tokens, err := r.offRampReader.GetDestinationTokens(ctx)
-		if err != nil {
-			return fmt.Errorf("get dest bridgeable tokens: %w", err)
-		}
-		destBridgeableTokens = tokens
-		return nil
-	})
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
-
-	destTokens := make([]common.Address, 0, len(destFeeTokens)+len(destBridgeableTokens))
-	seen := make(map[common.Address]struct{}, len(destFeeTokens)+len(destBridgeableTokens))
-
-	for _, tk := range append(destFeeTokens, destBridgeableTokens...) {
-		if _, s := seen[tk]; s {
-			continue
-		}
-		seen[tk] = struct{}{}
-		destTokens = append(destTokens, tk)
-	}
-
-	return destTokens, nil
-}
-
 // Input price is USD per full token, with 18 decimal precision
 // Result price is USD per 1e18 of smallest token denomination, with 18 decimal precision
 // Example: 1 USDC = 1.00 USD per full token, each full token is 6 decimals -> 1 * 1e18 * 1e18 / 1e6 = 1e30
@@ -482,10 +442,11 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	lggr := r.lggr.Named("CommitReport")
 	parsableObservations := getParsableObservations[CommitObservation](lggr, observations)
 
-	destTokens, err := r.getDestinationTokens(ctx)
+	feeTokens, bridgeableTokens, err := ccipcommon.GetDestinationTokens(ctx, r.offRampReader, r.destPriceRegistryReader)
 	if err != nil {
 		return false, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
+	destTokens := ccipcalc.FlattenUniqueSlice(feeTokens, bridgeableTokens)
 
 	// Filters out parsable but faulty observations
 	validObservations, err := validateObservations(ctx, lggr, destTokens, r.F, parsableObservations)
