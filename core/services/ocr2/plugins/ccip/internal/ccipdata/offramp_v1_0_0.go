@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cachev2"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -87,17 +88,20 @@ func (d ExecOnchainConfigV1_0_0) PermissionLessExecutionThresholdDuration() time
 }
 
 type OffRampV1_0_0 struct {
-	offRamp             *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
-	addr                common.Address
-	lp                  logpoller.LogPoller
-	lggr                logger.Logger
-	ec                  client.Client
-	evmBatchCaller      rpclib.EvmBatchCaller
-	filters             []logpoller.Filter
-	estimator           gas.EvmFeeEstimator
-	executionReportArgs abi.Arguments
-	eventIndex          int
-	eventSig            common.Hash
+	offRamp                 *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
+	addr                    common.Address
+	lp                      logpoller.LogPoller
+	lggr                    logger.Logger
+	ec                      client.Client
+	evmBatchCaller          rpclib.EvmBatchCaller
+	filters                 []logpoller.Filter
+	estimator               gas.EvmFeeEstimator
+	executionReportArgs     abi.Arguments
+	eventIndex              int
+	eventSig                common.Hash
+	destinationTokensCache  cachev2.Cache[[]common.Address]
+	supportedTokensCache    cachev2.Cache[[]common.Address]
+	sourceToDestTokensCache sync.Map
 
 	// Dynamic config
 	configMu          sync.RWMutex
@@ -151,13 +155,26 @@ func (o *OffRampV1_0_0) GetDestinationToken(ctx context.Context, address common.
 }
 
 func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error) {
-	if len(tokenAddresses) == 0 {
+	destTokens := make([]common.Address, len(tokenAddresses))
+	found := make(map[common.Address]bool)
+	for i, tokenAddress := range tokenAddresses {
+		if v, exists := o.sourceToDestTokensCache.Load(tokenAddress); exists {
+			if destToken, isAddr := v.(common.Address); isAddr {
+				destTokens[i] = destToken
+				found[tokenAddress] = true
+			}
+		}
+	}
+
+	if len(found) == len(tokenAddresses) {
 		return []common.Address{}, nil
 	}
 
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddresses))
 	for _, sourceTk := range tokenAddresses {
-		evmCalls = append(evmCalls, rpclib.NewEvmCall(abiOffRampV1_0_0, "getDestinationToken", o.addr, sourceTk))
+		if !found[sourceTk] {
+			evmCalls = append(evmCalls, rpclib.NewEvmCall(abiOffRampV1_0_0, "getDestinationToken", o.addr, sourceTk))
+		}
 	}
 
 	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
@@ -170,19 +187,19 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
 
-	destTokens, err := rpclib.ParseOutputs[common.Address](results, func(d rpclib.DataAndErr) (common.Address, error) {
+	destTokensFromRpc, err := rpclib.ParseOutputs[common.Address](results, func(d rpclib.DataAndErr) (common.Address, error) {
 		return rpclib.ParseOutput[common.Address](d, 0)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("parse outputs: %w", err)
 	}
 
-	seenDestTokens := make(map[common.Address]struct{})
-	for _, destToken := range destTokens {
-		if _, exists := seenDestTokens[destToken]; exists {
-			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destToken)
+	j := 0
+	for i, sourceToken := range tokenAddresses {
+		if !found[sourceToken] {
+			destTokens[i] = destTokensFromRpc[j]
+			j++
 		}
-		seenDestTokens[destToken] = struct{}{}
 	}
 
 	return destTokens, nil
@@ -224,10 +241,11 @@ func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddress
 }
 
 func (o *OffRampV1_0_0) GetSupportedTokens(ctx context.Context) ([]common.Address, error) {
-	return o.offRamp.GetSupportedTokens(&bind.CallOpts{Context: ctx})
+	return o.supportedTokensCache.Get(ctx, func(ctx context.Context) ([]common.Address, error) {
+		return o.offRamp.GetSupportedTokens(&bind.CallOpts{Context: ctx})
+	})
 }
 
-// TODO: cache
 func (o *OffRampV1_0_0) GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error) {
 	sourceTokens, err := o.GetSupportedTokens(ctx)
 	if err != nil {
@@ -346,9 +364,10 @@ func (o *OffRampV1_0_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
 }
 
-// TODO: cache
 func (o *OffRampV1_0_0) GetDestinationTokens(ctx context.Context) ([]common.Address, error) {
-	return o.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
+	return o.destinationTokensCache.Get(ctx, func(ctx context.Context) ([]common.Address, error) {
+		return o.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
+	})
 }
 
 func (o *OffRampV1_0_0) Close(qopts ...pg.QOpt) error {
@@ -548,6 +567,24 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 			ec,
 			rpclib.DefaultRpcBatchSizeLimit,
 			rpclib.DefaultRpcBatchBackOffMultiplier,
+		),
+		destinationTokensCache: cachev2.NewLPCache[[]common.Address](
+			lp,
+			[]common.Hash{
+				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
+				abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
+			},
+			offRamp.Address(),
+			0, // todo: check
+		),
+		supportedTokensCache: cachev2.NewLPCache[[]common.Address](
+			lp,
+			[]common.Hash{
+				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
+				abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
+			},
+			offRamp.Address(),
+			0, // todo: check
 		),
 
 		// values set on the fly after ChangeConfig is called
