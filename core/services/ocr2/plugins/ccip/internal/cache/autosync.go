@@ -13,16 +13,16 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
+// AutoSync IMPORTANT: Cache refresh relies on the events that are finalized. This introduces some delay between the event onchain occurrence
+// and cache refreshing. This is intentional, because we want to prevent handling reorgs within the cache.
 type AutoSync[T any] interface {
 	Get(ctx context.Context, syncFunc func(ctx context.Context) (T, error)) (T, error)
-	SetOptimisticConfirmations(confs int64)
 }
 
 type LogpollerEventsBased[T any] struct {
-	logPoller               logpoller.LogPoller
-	observedEvents          []common.Hash
-	address                 common.Address
-	optimisticConfirmations int64
+	logPoller      logpoller.LogPoller
+	observedEvents []common.Hash
+	address        common.Address
 
 	lock            *sync.RWMutex
 	value           T
@@ -33,14 +33,12 @@ func NewLogpollerEventsBased[T any](
 	lp logpoller.LogPoller,
 	observedEvents []common.Hash,
 	contractAddress common.Address,
-	optimisticConfirmations int64,
 ) *LogpollerEventsBased[T] {
 	var emptyValue T
 	return &LogpollerEventsBased[T]{
-		logPoller:               lp,
-		observedEvents:          observedEvents,
-		address:                 contractAddress,
-		optimisticConfirmations: optimisticConfirmations,
+		logPoller:      lp,
+		observedEvents: observedEvents,
+		address:        contractAddress,
 
 		lock:            &sync.RWMutex{},
 		value:           emptyValue,
@@ -82,12 +80,6 @@ func (c *LogpollerEventsBased[T]) Get(ctx context.Context, syncFunc func(ctx con
 	return cachedValue, nil
 }
 
-func (c *LogpollerEventsBased[T]) SetOptimisticConfirmations(confs int64) {
-	c.lock.Lock()
-	c.optimisticConfirmations = confs
-	c.lock.Unlock()
-}
-
 func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool, blockOfLatestEvent int64, err error) {
 	c.lock.RLock()
 	blockOfCurrentValue := c.lastChangeBlock
@@ -109,7 +101,7 @@ func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool,
 		c.lastChangeBlock,
 		c.observedEvents,
 		[]common.Address{c.address},
-		logpoller.Confirmations(c.optimisticConfirmations),
+		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {

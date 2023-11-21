@@ -22,9 +22,8 @@ func TestLogpollerEventsBased(t *testing.T) {
 		utils.Bytes32FromString("event a"),
 		utils.Bytes32FromString("event b"),
 	}
-	confs := 0
 	contractAddress := utils.RandomAddress()
-	c := cache.NewLogpollerEventsBased[[]int](lp, observedEvents, contractAddress, 0)
+	c := cache.NewLogpollerEventsBased[[]int](lp, observedEvents, contractAddress)
 
 	testRounds := []struct {
 		logPollerLatestBlock int64 // latest block that logpoller parsed
@@ -116,7 +115,7 @@ func TestLogpollerEventsBased(t *testing.T) {
 				round.stateLatestBlock,
 				observedEvents,
 				[]common.Address{contractAddress},
-				logpoller.Confirmations(confs),
+				logpoller.Finalized,
 				mock.Anything,
 			).Return(round.latestEventBlock, nil).Once()
 		}

@@ -251,7 +251,6 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 			lp,
 			[]common.Hash{feeTokenAdded, feeTokenRemoved},
 			priceRegistryAddr,
-			0,
 		),
 	}, nil
 }
