@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/collections"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/parseutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
@@ -66,7 +66,7 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Add
 		return nil, errors.Errorf("expected map output of price pipeline, got %T", finalResult.Values[0])
 	}
 
-	providedTokensSet := internal.NewSet[common.Address](tokens...)
+	providedTokensSet := collections.NewSet[common.Address](tokens...)
 	tokenPrices := make(map[common.Address]*big.Int)
 	for tokenAddressStr, rawPrice := range prices {
 		castedPrice, err := parseutil.ParseBigIntFromAny(rawPrice)

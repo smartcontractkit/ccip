@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/collections"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -1426,7 +1427,7 @@ func Test_inflightAggregates(t *testing.T) {
 		destTokenPrices map[common.Address]*big.Int
 		sourceToDest    map[common.Address]common.Address
 
-		expInflightSeqNrs          internal.Set[uint64]
+		expInflightSeqNrs          collections.Set[uint64]
 		expInflightAggrVal         *big.Int
 		expMaxInflightSenderNonces map[common.Address]uint64
 		expInflightTokenAmounts    map[common.Address]*big.Int
@@ -1467,7 +1468,7 @@ func Test_inflightAggregates(t *testing.T) {
 				tokenAddrs[0]: tokenAddrs[1],
 				tokenAddrs[2]: tokenAddrs[3],
 			},
-			expInflightSeqNrs:  internal.NewSet[uint64](100, 106),
+			expInflightSeqNrs:  collections.NewSet[uint64](100, 106),
 			expInflightAggrVal: big.NewInt(9*1000 + 5*500),
 			expMaxInflightSenderNonces: map[common.Address]uint64{
 				addrs[0]: 4,
@@ -1505,7 +1506,7 @@ func Test_inflightAggregates(t *testing.T) {
 		{
 			name:                       "nothing inflight",
 			inflight:                   []InflightInternalExecutionReport{},
-			expInflightSeqNrs:          internal.NewSet[uint64](),
+			expInflightSeqNrs:          collections.NewSet[uint64](),
 			expInflightAggrVal:         big.NewInt(0),
 			expMaxInflightSenderNonces: map[common.Address]uint64{},
 			expInflightTokenAmounts:    map[common.Address]*big.Int{},

@@ -1,4 +1,4 @@
-package internal
+package collections
 
 import (
 	"testing"
@@ -21,6 +21,7 @@ func TestSet(t *testing.T) {
 	assert.False(t, s.Equal(&s2))
 	s2.Remove("bar")
 	assert.True(t, s.Equal(&s2))
+	assert.False(t, s2.Remove("zoo"))
 
 	s2 = NewSet[string]("foo")
 	assert.True(t, s.Equal(&s2))

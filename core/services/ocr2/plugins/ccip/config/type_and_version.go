@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/collections"
 )
 
 type ContractType string
@@ -19,7 +19,7 @@ var (
 	EVM2EVMOffRamp ContractType = "EVM2EVMOffRamp"
 	CommitStore    ContractType = "CommitStore"
 	PriceRegistry  ContractType = "PriceRegistry"
-	ContractTypes               = internal.NewSet[ContractType](
+	ContractTypes               = collections.NewSet[ContractType](
 		EVM2EVMOffRamp,
 		EVM2EVMOnRamp,
 		CommitStore,

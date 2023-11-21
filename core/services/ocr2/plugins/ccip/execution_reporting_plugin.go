@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/collections"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
@@ -1066,8 +1067,8 @@ func inflightAggregates(
 	inflight []InflightInternalExecutionReport,
 	destTokenPrices map[common.Address]*big.Int,
 	sourceToDest map[common.Address]common.Address,
-) (*internal.Set[uint64], *big.Int, map[common.Address]uint64, map[common.Address]*big.Int, error) {
-	inflightSeqNrs := internal.NewSet[uint64]()
+) (*collections.Set[uint64], *big.Int, map[common.Address]uint64, map[common.Address]*big.Int, error) {
+	inflightSeqNrs := collections.NewSet[uint64]()
 	inflightAggregateValue := big.NewInt(0)
 	maxInflightSenderNonces := make(map[common.Address]uint64)
 	inflightTokenAmounts := make(map[common.Address]*big.Int)
