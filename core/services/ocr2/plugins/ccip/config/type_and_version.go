@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 )
 
 type ContractType string
@@ -18,12 +19,12 @@ var (
 	EVM2EVMOffRamp ContractType = "EVM2EVMOffRamp"
 	CommitStore    ContractType = "CommitStore"
 	PriceRegistry  ContractType = "PriceRegistry"
-	ContractTypes               = map[ContractType]struct{}{
-		EVM2EVMOffRamp: {},
-		EVM2EVMOnRamp:  {},
-		CommitStore:    {},
-		PriceRegistry:  {},
-	}
+	ContractTypes               = internal.NewSet[ContractType](
+		EVM2EVMOffRamp,
+		EVM2EVMOnRamp,
+		CommitStore,
+		PriceRegistry,
+	)
 )
 
 func VerifyTypeAndVersion(addr common.Address, client bind.ContractBackend, expectedType ContractType) (semver.Version, error) {
@@ -56,7 +57,7 @@ func TypeAndVersion(addr common.Address, client bind.ContractBackend) (ContractT
 		return "", semver.Version{}, err
 	}
 
-	if _, ok := ContractTypes[ContractType(contractType)]; !ok {
+	if !ContractTypes.Contains(ContractType(contractType)) {
 		return "", semver.Version{}, errors.Errorf("unrecognized contract type %v", contractType)
 	}
 	return ContractType(contractType), *v, nil

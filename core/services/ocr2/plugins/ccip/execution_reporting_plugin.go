@@ -481,7 +481,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			msgLggr.Infow("Skipping message already executed", "seqNr", msg.SequenceNumber)
 			continue
 		}
-		if _, isInflight := inflightSeqNrs[msg.SequenceNumber]; isInflight {
+		if inflightSeqNrs.Contains(msg.SequenceNumber) {
 			msgLggr.Infow("Skipping message already inflight", "seqNr", msg.SequenceNumber)
 			continue
 		}
@@ -1066,15 +1066,15 @@ func inflightAggregates(
 	inflight []InflightInternalExecutionReport,
 	destTokenPrices map[common.Address]*big.Int,
 	sourceToDest map[common.Address]common.Address,
-) (map[uint64]struct{}, *big.Int, map[common.Address]uint64, map[common.Address]*big.Int, error) {
-	inflightSeqNrs := make(map[uint64]struct{})
+) (*internal.Set[uint64], *big.Int, map[common.Address]uint64, map[common.Address]*big.Int, error) {
+	inflightSeqNrs := internal.NewSet[uint64]()
 	inflightAggregateValue := big.NewInt(0)
 	maxInflightSenderNonces := make(map[common.Address]uint64)
 	inflightTokenAmounts := make(map[common.Address]*big.Int)
 
 	for _, rep := range inflight {
 		for _, message := range rep.messages {
-			inflightSeqNrs[message.SequenceNumber] = struct{}{}
+			inflightSeqNrs.Add(message.SequenceNumber)
 			msgValue, err := aggregateTokenValue(destTokenPrices, sourceToDest, message.TokenAmounts)
 			if err != nil {
 				return nil, nil, nil, nil, err
@@ -1094,7 +1094,7 @@ func inflightAggregates(
 			}
 		}
 	}
-	return inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, inflightTokenAmounts, nil
+	return &inflightSeqNrs, inflightAggregateValue, maxInflightSenderNonces, inflightTokenAmounts, nil
 }
 
 // getTokensPrices returns token prices of the given price registry,
