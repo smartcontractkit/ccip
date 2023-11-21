@@ -101,7 +101,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
 			if len(tc.sendReqs) > 0 {
-				onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.commitStoreSeqNum).
+				onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.commitStoreSeqNum, tc.commitStoreSeqNum+OnRampMessagesScanLimit).
 					Return(tc.sendReqs, nil)
 			}
 
@@ -1351,7 +1351,7 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 					},
 				})
 			}
-			onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.expQueryMin).Return(sendReqs, nil)
+			onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expQueryMin, tc.expQueryMin+OnRampMessagesScanLimit).Return(sendReqs, nil)
 			p.onRampReader = onRampReader
 
 			minSeqNum, maxSeqNum, err := p.calculateMinMaxSequenceNumbers(ctx, lggr)
