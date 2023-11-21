@@ -114,7 +114,11 @@ func NewUSDCTokenDataReaderWithHttpClient(origin TokenDataReader, httpClient htt
 	}
 }
 
-func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) (messageAndAttestation []byte, err error) {
+func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenIndex int) (messageAndAttestation []byte, err error) {
+	if tokenIndex < 0 || tokenIndex >= len(msg.TokenAmounts) {
+		return nil, fmt.Errorf("token index out of bounds")
+	}
+
 	if s.inCoolDownPeriod() {
 		// rate limiting cool-down period, we prevent new requests from being sent
 		return nil, tokendata.ErrRequestsBlocked
