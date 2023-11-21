@@ -17,12 +17,7 @@ func getProofData(
 	sourceReader ccipdata.OnRampReader,
 	interval ccipdata.CommitStoreInterval,
 ) (sendReqsInRoot []ccipdata.Event[internal.EVM2EVMMessage], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
-	sendReqs, err := sourceReader.GetSendRequestsBetweenSeqNums(
-		ctx,
-		interval.Min,
-		interval.Max,
-		0, // no need for confirmations, commitReport was already confirmed and we need all msgs in it
-	)
+	sendReqs, err := sourceReader.GetSendRequestsBetweenSeqNums(ctx, interval.Min, interval.Max)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -90,17 +85,14 @@ func validateSeqNumbers(serviceCtx context.Context, commitStore ccipdata.CommitS
 
 // Gets the commit report from the saved logs for a given sequence number.
 func getCommitReportForSeqNum(ctx context.Context, commitStoreReader ccipdata.CommitStoreReader, seqNum uint64) (ccipdata.CommitStoreReport, error) {
-	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteSeqNum(ctx, seqNum, 0)
+	acceptedReports, err := commitStoreReader.GetCommitReportMatchingSeqNum(ctx, seqNum, 0)
 	if err != nil {
 		return ccipdata.CommitStoreReport{}, err
 	}
 
-	for _, acceptedReport := range acceptedReports {
-		reportInterval := acceptedReport.Data.Interval
-		if reportInterval.Min <= seqNum && seqNum <= reportInterval.Max {
-			return acceptedReport.Data, nil
-		}
+	if len(acceptedReports) == 0 {
+		return ccipdata.CommitStoreReport{}, errors.Errorf("seq number not committed")
 	}
 
-	return ccipdata.CommitStoreReport{}, errors.Errorf("seq number not committed")
+	return acceptedReports[0].Data, nil
 }

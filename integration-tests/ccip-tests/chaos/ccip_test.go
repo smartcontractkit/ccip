@@ -1,12 +1,13 @@
 package chaos_test
 
 import (
+	"math/big"
 	"testing"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/chaos"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
-	"github.com/smartcontractkit/chainlink-testing-framework/utils"
+	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
@@ -32,9 +33,9 @@ func TestChaosCCIP(t *testing.T) {
 			testName:  "CCIP works after rpc is down for NetworkA @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels: &map[string]*string{actions.ChaosGroupNetworkACCIPGeth: utils.Ptr("1")},
+				FromLabels: &map[string]*string{actions.ChaosGroupNetworkACCIPGeth: ptr.Ptr("1")},
 				// chainlink-0 is default label set for all cll nodes
-				ToLabels:    &map[string]*string{"app": utils.Ptr("chainlink-0")},
+				ToLabels:    &map[string]*string{"app": ptr.Ptr("chainlink-0")},
 				DurationStr: "1m",
 			},
 			waitForChaosRecovery: true,
@@ -43,8 +44,8 @@ func TestChaosCCIP(t *testing.T) {
 			testName:  "CCIP works after rpc is down for NetworkB @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels:  &map[string]*string{actions.ChaosGroupNetworkBCCIPGeth: utils.Ptr("1")},
-				ToLabels:    &map[string]*string{"app": utils.Ptr("chainlink-0")},
+				FromLabels:  &map[string]*string{actions.ChaosGroupNetworkBCCIPGeth: ptr.Ptr("1")},
+				ToLabels:    &map[string]*string{"app": ptr.Ptr("chainlink-0")},
 				DurationStr: "1m",
 			},
 			waitForChaosRecovery: true,
@@ -53,8 +54,8 @@ func TestChaosCCIP(t *testing.T) {
 			testName:  "CCIP works after 2 rpc's are down for all cll nodes @network-chaos",
 			chaosFunc: chaos.NewNetworkPartition,
 			chaosProps: &chaos.Props{
-				FromLabels:  &map[string]*string{"geth": utils.Ptr(actions.ChaosGroupCCIPGeth)},
-				ToLabels:    &map[string]*string{"app": utils.Ptr("chainlink-0")},
+				FromLabels:  &map[string]*string{"geth": ptr.Ptr(actions.ChaosGroupCCIPGeth)},
+				ToLabels:    &map[string]*string{"app": ptr.Ptr("chainlink-0")},
 				DurationStr: "1m",
 			},
 			waitForChaosRecovery: true,
@@ -63,7 +64,7 @@ func TestChaosCCIP(t *testing.T) {
 			testName:  "CCIP Commit works after majority of CL nodes are recovered from pod failure @pod-chaos",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
-				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaultyPlus: utils.Ptr("1")},
+				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaultyPlus: ptr.Ptr("1")},
 				DurationStr:    "1m",
 			},
 			waitForChaosRecovery: true,
@@ -72,7 +73,7 @@ func TestChaosCCIP(t *testing.T) {
 			testName:  "CCIP Execution works after majority of CL nodes are recovered from pod failure @pod-chaos",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
-				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaultyPlus: utils.Ptr("1")},
+				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaultyPlus: ptr.Ptr("1")},
 				DurationStr:    "1m",
 			},
 			waitForChaosRecovery: true,
@@ -81,7 +82,7 @@ func TestChaosCCIP(t *testing.T) {
 			testName:  "CCIP Commit works while minority of CL nodes are in failed state for pod failure @pod-chaos",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
-				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaulty: utils.Ptr("1")},
+				LabelsSelector: &map[string]*string{actions.ChaosGroupCommitFaulty: ptr.Ptr("1")},
 				DurationStr:    "90s",
 			},
 			waitForChaosRecovery: false,
@@ -90,7 +91,7 @@ func TestChaosCCIP(t *testing.T) {
 			testName:  "CCIP Execution works while minority of CL nodes are in failed state for pod failure @pod-chaos",
 			chaosFunc: chaos.NewFailPods,
 			chaosProps: &chaos.Props{
-				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaulty: utils.Ptr("1")},
+				LabelsSelector: &map[string]*string{actions.ChaosGroupExecutionFaulty: ptr.Ptr("1")},
 				DurationStr:    "90s",
 			},
 			waitForChaosRecovery: false,
@@ -123,9 +124,9 @@ func TestChaosCCIP(t *testing.T) {
 
 			lane.RecordStateBeforeTransfer()
 			// Send the ccip-request and verify ocr2 is running
-			err := lane.SendRequests(1, testCfg.TestGroupInput.MsgType)
+			err := lane.SendRequests(1, testCfg.TestGroupInput.MsgType, big.NewInt(600_000))
 			require.NoError(t, err)
-			lane.ValidateRequests()
+			lane.ValidateRequests(true)
 
 			// apply chaos
 			chaosId, err := testEnvironment.Chaos.Run(in.chaosFunc(testEnvironment.Cfg.Namespace, in.chaosProps))
@@ -138,7 +139,7 @@ func TestChaosCCIP(t *testing.T) {
 			})
 			lane.RecordStateBeforeTransfer()
 			// Now send the ccip-request while the chaos is at play
-			err = lane.SendRequests(numOfRequests, testCfg.TestGroupInput.MsgType)
+			err = lane.SendRequests(numOfRequests, testCfg.TestGroupInput.MsgType, big.NewInt(600_000))
 			require.NoError(t, err)
 			if in.waitForChaosRecovery {
 				// wait for chaos to be recovered before further validation
@@ -146,7 +147,7 @@ func TestChaosCCIP(t *testing.T) {
 			} else {
 				l.Info().Msg("proceeding without waiting for chaos recovery")
 			}
-			lane.ValidateRequests()
+			lane.ValidateRequests(true)
 		})
 	}
 }

@@ -135,7 +135,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.config.offRampReader = mockOffRampReader
 
 			mockOnRampReader := ccipdatamocks.NewOnRampReader(t)
-			mockOnRampReader.On("GetSendRequestsBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
+			mockOnRampReader.On("GetSendRequestsBetweenSeqNums", ctx, mock.Anything, mock.Anything).
 				Return(tc.sendRequests, nil).Maybe()
 			p.config.onRampReader = mockOnRampReader
 
@@ -359,7 +359,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	commitStore.On("VerifyExecutionReport", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
 		Return(executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1, nil)
-	commitStore.On("GetAcceptedCommitReportsGteSeqNum", ctx, observations[0].SeqNr, 0).
+	commitStore.On("GetCommitReportMatchingSeqNum", ctx, observations[0].SeqNr, 0).
 		Return([]ccipdata.Event[ccipdata.CommitStoreReport]{
 			{
 				Data: ccipdata.CommitStoreReport{
@@ -398,7 +398,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 		sendReqs[i] = ccipdata.Event[internal.EVM2EVMMessage]{Data: msg}
 	}
 	sourceReader.On("GetSendRequestsBetweenSeqNums",
-		ctx, observations[0].SeqNr, observations[len(observations)-1].SeqNr, 0).Return(sendReqs, nil)
+		ctx, observations[0].SeqNr, observations[len(observations)-1].SeqNr).Return(sendReqs, nil)
 	p.config.onRampReader = sourceReader
 
 	execReport, err := p.buildReport(ctx, p.lggr, observations)
@@ -1016,7 +1016,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			p.config.offRampReader = offRampReader
 
 			sourceReader := ccipdatamocks.NewOnRampReader(t)
-			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expQueryMin, tc.expQueryMax, 0).
+			sourceReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expQueryMin, tc.expQueryMax).
 				Return(tc.onchainEvents, nil).Maybe()
 			p.config.onRampReader = sourceReader
 
@@ -1784,5 +1784,65 @@ func generateExecutionReport(t *testing.T, numMsgs, tokensPerMsg, bytesPerMsg in
 		OffchainTokenData: offChainTokenData,
 		Proofs:            make([][32]byte, numMsgs),
 		ProofFlagBits:     big.NewInt(rand.Int64()),
+	}
+}
+
+func Test_selectReportsToFillBatch(t *testing.T) {
+	reports := []ccipdata.CommitStoreReport{
+		{Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 10}},
+		{Interval: ccipdata.CommitStoreInterval{Min: 11, Max: 20}},
+		{Interval: ccipdata.CommitStoreInterval{Min: 21, Max: 25}},
+		{Interval: ccipdata.CommitStoreInterval{Min: 26, Max: math.MaxUint64}},
+	}
+
+	tests := []struct {
+		name            string
+		step            uint64
+		numberOfBatches int
+	}{
+		{
+			name:            "pick all at once when step size is high",
+			step:            100,
+			numberOfBatches: 1,
+		},
+		{
+			name:            "pick one by one when step size is 1",
+			step:            1,
+			numberOfBatches: 4,
+		},
+		{
+			name:            "pick two when step size doesn't match report",
+			step:            15,
+			numberOfBatches: 2,
+		},
+		{
+			name:            "pick one by one when step size is smaller then reports",
+			step:            4,
+			numberOfBatches: 4,
+		},
+		{
+			name:            "batch some reports together",
+			step:            7,
+			numberOfBatches: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var unexpiredReportsBatches [][]ccipdata.CommitStoreReport
+			for i := 0; i < len(reports); {
+				unexpiredReports, step := selectReportsToFillBatch(reports[i:], tt.step)
+				unexpiredReportsBatches = append(unexpiredReportsBatches, unexpiredReports)
+				i += step
+			}
+			assert.Len(t, unexpiredReportsBatches, tt.numberOfBatches)
+
+			var flatten []ccipdata.CommitStoreReport
+			for _, r := range unexpiredReportsBatches {
+				flatten = append(flatten, r...)
+			}
+			assert.Len(t, flatten, len(reports))
+			assert.Equal(t, reports, flatten)
+		})
 	}
 }
