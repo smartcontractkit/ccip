@@ -58,7 +58,7 @@ func TestBackgroundWorker(t *testing.T) {
 		}
 
 		reader := readers[tk]
-		reader.On("ReadTokenData", mock.Anything, msgs[i]).Run(func(args mock.Arguments) {
+		reader.On("ReadTokenData", mock.Anything, msgs[i], 0).Run(func(args mock.Arguments) {
 			time.Sleep(delays[tk])
 		}).Return(tokenData[tk], nil).Maybe()
 	}
@@ -118,11 +118,11 @@ func TestBackgroundWorker_RetryOnErrors(t *testing.T) {
 		}},
 	}
 
-	rdr1.On("ReadTokenData", mock.Anything, msgs[0]).
+	rdr1.On("ReadTokenData", mock.Anything, msgs[0], 0).
 		Return([]byte("some data"), nil).Once()
 
 	// reader2 returns an error
-	rdr2.On("ReadTokenData", mock.Anything, msgs[1]).
+	rdr2.On("ReadTokenData", mock.Anything, msgs[1], 0).
 		Return(nil, fmt.Errorf("some err")).Once()
 
 	w.AddJobsFromMsgs(ctx, msgs)
@@ -137,7 +137,7 @@ func TestBackgroundWorker_RetryOnErrors(t *testing.T) {
 	assert.Errorf(t, err, "some error")
 
 	// we make the second reader to return data
-	rdr2.On("ReadTokenData", mock.Anything, msgs[1]).
+	rdr2.On("ReadTokenData", mock.Anything, msgs[1], 0).
 		Return([]byte("some other data"), nil).Once()
 
 	// add the jobs again, at this point jobs that previously returned
