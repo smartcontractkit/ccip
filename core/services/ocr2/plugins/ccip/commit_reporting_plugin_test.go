@@ -93,8 +93,6 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 	ctx := testutils.Context(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sourceFinalityDepth := 10
-
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 			commitStoreReader.On("IsDown", ctx).Return(tc.commitStoreIsPaused, nil)
 			if !tc.commitStoreIsPaused {
@@ -103,7 +101,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
 			if len(tc.sendReqs) > 0 {
-				onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.commitStoreSeqNum, sourceFinalityDepth).
+				onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.commitStoreSeqNum).
 					Return(tc.sendReqs, nil)
 			}
 
@@ -142,7 +140,6 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.lggr = logger.TestLogger(t)
 			p.inflightReports = newInflightCommitReportsContainer(time.Hour)
 			p.commitStoreReader = commitStoreReader
-			p.offchainConfig.SourceFinalityDepth = uint32(sourceFinalityDepth)
 			p.onRampReader = onRampReader
 			p.offRampReader = offRampReader
 			p.destPriceRegistryReader = destPriceRegReader
@@ -238,7 +235,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				MerkleRoot:  [32]byte{},
 				Interval:    ccipdata.CommitStoreInterval{Min: 1, Max: 1},
 				TokenPrices: nil,
-				GasPrices:   []ccipdata.GasPrice{{DestChainSelector: uint64(sourceChainSelector), Value: gasPrice}},
+				GasPrices:   []ccipdata.GasPrice{{DestChainSelector: sourceChainSelector, Value: gasPrice}},
 			},
 			expErr: false,
 		},
@@ -283,7 +280,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
 			if len(tc.sendRequests) > 0 {
-				onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expSeqNumRange.Min, tc.expSeqNumRange.Max, 0).Return(tc.sendRequests, nil)
+				onRampReader.On("GetSendRequestsBetweenSeqNums", ctx, tc.expSeqNumRange.Min, tc.expSeqNumRange.Max).Return(tc.sendRequests, nil)
 			}
 
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
@@ -1354,7 +1351,7 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 					},
 				})
 			}
-			onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.expQueryMin, 0).Return(sendReqs, nil)
+			onRampReader.On("GetSendRequestsGteSeqNum", ctx, tc.expQueryMin).Return(sendReqs, nil)
 			p.onRampReader = onRampReader
 
 			minSeqNum, maxSeqNum, err := p.calculateMinMaxSequenceNumbers(ctx, lggr)
