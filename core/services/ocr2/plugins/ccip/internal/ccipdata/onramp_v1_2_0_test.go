@@ -86,7 +86,6 @@ func TestHasherV1_2_0(t *testing.T) {
 func TestLogPollerClient_GetSendRequestsGteSeqNum(t *testing.T) {
 	onRampAddr := utils.RandomAddress()
 	seqNum := uint64(100)
-	confs := 4
 	lggr := logger.TestLogger(t)
 
 	lp := mocks.NewLogPoller(t)
@@ -99,11 +98,11 @@ func TestLogPollerClient_GetSendRequestsGteSeqNum(t *testing.T) {
 		onRampV2.sendRequestedSeqNumberWord,
 		abihelpers.EvmWord(seqNum),
 		abihelpers.EvmWord(seqNum+10),
-		logpoller.Confirmations(confs),
+		logpoller.Finalized,
 		mock.Anything,
 	).Return([]logpoller.Log{}, nil)
 
-	events, err := onRampV2.GetSendRequestsGteSeqNum(context.Background(), seqNum, 10, confs)
+	events, err := onRampV2.GetSendRequestsGteSeqNum(context.Background(), seqNum, 10)
 	assert.NoError(t, err)
 	assert.Empty(t, events)
 	lp.AssertExpectations(t)

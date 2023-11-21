@@ -162,15 +162,9 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 			lggr:                    rf.config.lggr.Named("CommitReportingPlugin"),
 			inflightReports:         newInflightCommitReportsContainer(rf.config.commitStore.OffchainConfig().InflightCacheExpiry),
 			destPriceRegistryReader: rf.destPriceRegReader,
-			tokenDecimalsCache: cache.NewTokenToDecimals(
-				rf.config.lggr,
-				rf.config.destLP,
-				rf.config.offRamp,
-				rf.destPriceRegReader,
-				int64(rf.config.commitStore.OffchainConfig().DestFinalityDepth),
-			),
-			gasPriceEstimator: rf.config.commitStore.GasPriceEstimator(),
-			offchainConfig:    pluginOffChainConfig,
+			tokenDecimalsCache:      cache.NewTokenToDecimals(rf.config.lggr, rf.config.destLP, rf.config.offRamp, rf.destPriceRegReader),
+			gasPriceEstimator:       rf.config.commitStore.GasPriceEstimator(),
+			offchainConfig:          pluginOffChainConfig,
 		},
 		types.ReportingPluginInfo{
 			Name:          "CCIPCommit",
@@ -245,7 +239,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, err
 	}
 
-	msgRequests, err := r.onRampReader.GetSendRequestsGteSeqNum(ctx, nextInflightMin, OnRampMessagesRangeScan, int(r.offchainConfig.SourceFinalityDepth))
+	msgRequests, err := r.onRampReader.GetSendRequestsGteSeqNum(ctx, nextInflightMin, OnRampMessagesRangeScan)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -702,12 +696,7 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 
 	// Logs are guaranteed to be in order of seq num, since these are finalized logs only
 	// and the contract's seq num is auto-incrementing.
-	sendRequests, err := r.onRampReader.GetSendRequestsBetweenSeqNums(
-		ctx,
-		interval.Min,
-		interval.Max,
-		int(r.offchainConfig.SourceFinalityDepth),
-	)
+	sendRequests, err := r.onRampReader.GetSendRequestsBetweenSeqNums(ctx, interval.Min, interval.Max)
 	if err != nil {
 		return ccipdata.CommitStoreReport{}, err
 	}

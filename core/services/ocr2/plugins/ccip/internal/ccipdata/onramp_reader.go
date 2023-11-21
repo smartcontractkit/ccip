@@ -41,9 +41,9 @@ type OnRampDynamicConfig struct {
 type OnRampReader interface {
 	Closer
 	// GetSendRequestsGteSeqNum returns all the finalized message send requests with sequence number greater than or equal to the provided. but lower than the limit.
-	GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, limit uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
+	GetSendRequestsGteSeqNum(ctx context.Context, seqNum uint64, limit uint64) ([]Event[internal.EVM2EVMMessage], error)
 	// GetSendRequestsBetweenSeqNums returns all the finalized message send requests in the provided sequence numbers range (inclusive).
-	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[internal.EVM2EVMMessage], error)
+	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64) ([]Event[internal.EVM2EVMMessage], error)
 	// Get router configured in the onRamp
 	RouterAddress() (common.Address, error)
 	Address() (common.Address, error)
