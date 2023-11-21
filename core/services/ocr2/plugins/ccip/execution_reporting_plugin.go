@@ -11,12 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/pkg/errors"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -30,6 +25,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -61,11 +59,11 @@ type ExecutionPluginStaticConfig struct {
 	destChainEVMID           *big.Int
 	destGasEstimator         gas.EvmFeeEstimator
 	tokenDataProviders       map[common.Address]tokendata.Reader
+	monitoringEndpoint       commontypes.MonitoringEndpoint // Telemetry
 }
 
 type ExecutionReportingPlugin struct {
-	config ExecutionPluginStaticConfig
-
+	config                ExecutionPluginStaticConfig
 	F                     int
 	lggr                  logger.Logger
 	inflightReports       *inflightExecReportsContainer
@@ -78,6 +76,7 @@ type ExecutionReportingPlugin struct {
 	cachedDestTokens      cache.AutoSync[cache.CachedTokens]
 	cachedTokenPools      cache.AutoSync[map[common.Address]common.Address]
 	gasPriceEstimator     prices.GasPriceEstimatorExec
+	telemetryCollector    TelemetryCollector
 }
 
 type ExecutionReportingPluginFactory struct {
@@ -157,6 +156,9 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			cachedSourceFeeTokens: cachedSourceFeeTokens,
 			cachedTokenPools:      cachedTokenPools,
 			gasPriceEstimator:     rf.config.offRampReader.GasPriceEstimator(),
+			telemetryCollector: NewTelemetryCollector(
+				rf.config.monitoringEndpoint,
+				rf.config.lggr.Named("ExecutionReportingPlugin")),
 		}, types.ReportingPluginInfo{
 			Name: "CCIPExecution",
 			// Setting this to false saves on calldata since OffRamp doesn't require agreement between NOPs
@@ -924,6 +926,8 @@ func (r *ExecutionReportingPlugin) Report(ctx context.Context, timestamp types.R
 	if len(observedMessages) == 0 {
 		return false, nil, nil
 	}
+
+	r.telemetryCollector.ReportExec(observedMessages, timestamp) // asynchronously send execution telemetry
 
 	report, err := r.buildReport(ctx, lggr, observedMessages)
 	if err != nil {
