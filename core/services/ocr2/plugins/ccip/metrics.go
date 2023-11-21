@@ -30,7 +30,7 @@ var (
 	messagesProcessed = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ccip_number_of_messages_processed",
 		Help: "Number of messages processed by the plugin during different OCR phases",
-	}, []string{"plugin", "source", "dest", "ocr_phase"})
+	}, []string{"plugin", "source", "dest", "ocrPhase"})
 	sequenceNumberCounter = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ccip_sequence_number_counter",
 		Help: "Sequence number of the last message processed by the plugin",
