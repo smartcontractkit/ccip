@@ -60,6 +60,32 @@ func TestObservationCompat100_120(t *testing.T) {
 	assert.Equal(t, b10, b12)
 }
 
+func TestCommitObservationJsonDeserialization(t *testing.T) {
+	expectedObservation := CommitObservation{
+		Interval: ccipdata.CommitStoreInterval{
+			Min: 1,
+			Max: 12,
+		},
+		TokenPricesUSD:    map[common.Address]*big.Int{common.HexToAddress("0x1"): big.NewInt(1)},
+		SourceGasPriceUSD: big.NewInt(3),
+	}
+
+	json := `{
+		"interval": {
+			"Min":1, 
+			"Max":12 
+		},
+		"tokensPerFeeCoin": {
+			"0x0000000000000000000000000000000000000001": 1
+		},
+		"sourceGasPrice": 3 
+	}`
+
+	observations := getParsableObservations[CommitObservation](logger.TestLogger(t), []types.AttributedObservation{{Observation: []byte(json)}})
+	assert.Equal(t, 1, len(observations))
+	assert.Equal(t, expectedObservation, observations[0])
+}
+
 func TestExecutionObservationJsonDeserialization(t *testing.T) {
 	expectedObservation := ExecutionObservation{Messages: map[uint64]MsgData{
 		2: {TokenData: tokenData("c")},
