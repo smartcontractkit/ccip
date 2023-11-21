@@ -998,7 +998,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	lggr = lggr.With("messageIDs", contractutil.GetMessageIDsAsHexString(execReport.Messages))
 
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
-	stale, err := r.isStaleReport(nil, execReport.Messages)
+	stale, err := r.isStaleReport(ctx, execReport.Messages)
 	if err != nil {
 		return false, err
 	}
