@@ -501,7 +501,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			} else {
 				// Nothing inflight take from chain.
 				// Chain holds existing nonce.
-				nonce, err := r.config.offRampReader.GetSenderNonce(nil, msg.Sender)
+				nonce, err := r.config.offRampReader.GetSenderNonce(ctx, msg.Sender)
 				if err != nil {
 					lggr.Errorw("unable to get sender nonce", "err", err, "seqNr", msg.SequenceNumber)
 					continue
@@ -997,7 +997,7 @@ func (r *ExecutionReportingPlugin) ShouldAcceptFinalizedReport(ctx context.Conte
 	lggr = lggr.With("messageIDs", contractutil.GetMessageIDsAsHexString(execReport.Messages))
 
 	// If the first message is executed already, this execution report is stale, and we do not accept it.
-	stale, err := r.isStaleReport(execReport.Messages)
+	stale, err := r.isStaleReport(ctx, execReport.Messages)
 	if err != nil {
 		return false, err
 	}
@@ -1025,7 +1025,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	// If report is not stale we transmit.
 	// When the executeTransmitter enqueues the tx for tx manager,
 	// we mark it as execution_sent, removing it from the set of inflight messages.
-	stale, err := r.isStaleReport(execReport.Messages)
+	stale, err := r.isStaleReport(ctx, execReport.Messages)
 	if err != nil {
 		return false, err
 	}
@@ -1038,7 +1038,7 @@ func (r *ExecutionReportingPlugin) ShouldTransmitAcceptedReport(ctx context.Cont
 	return true, err
 }
 
-func (r *ExecutionReportingPlugin) isStaleReport(messages []internal.EVM2EVMMessage) (bool, error) {
+func (r *ExecutionReportingPlugin) isStaleReport(ctx context.Context, messages []internal.EVM2EVMMessage) (bool, error) {
 	if len(messages) == 0 {
 		return true, fmt.Errorf("messages are empty")
 	}
@@ -1046,7 +1046,7 @@ func (r *ExecutionReportingPlugin) isStaleReport(messages []internal.EVM2EVMMess
 	// If the first message is executed already, this execution report is stale.
 	// Note the default execution state, including for arbitrary seq number not yet committed
 	// is ExecutionStateUntouched.
-	msgState, err := r.config.offRampReader.GetExecutionState(nil, messages[0].SequenceNumber)
+	msgState, err := r.config.offRampReader.GetExecutionState(ctx, messages[0].SequenceNumber)
 	if err != nil {
 		return true, err
 	}
