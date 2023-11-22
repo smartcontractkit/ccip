@@ -34,6 +34,10 @@ func (s *Set[T]) Add(el T) bool {
 func (s *Set[T]) Contains(el T) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.contains(el)
+}
+
+func (s *Set[T]) contains(el T) bool {
 	_, contains := s.mem[el]
 	return contains
 }
@@ -61,9 +65,15 @@ func (s *Set[T]) Equal(s2 *Set[T]) bool {
 	}
 
 	for el := range s.mem {
-		if !s2.Contains(el) {
+		if !s2.contains(el) {
 			return false
 		}
 	}
 	return true
+}
+
+func (s *Set[T]) Size() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.mem)
 }
