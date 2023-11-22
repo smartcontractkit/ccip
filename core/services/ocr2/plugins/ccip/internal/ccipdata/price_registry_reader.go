@@ -61,20 +61,20 @@ type PriceRegistryReader interface {
 }
 
 // NewPriceRegistryReader determines the appropriate version of the price registry and returns a reader for it.
-func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Address, lp logpoller.LogPoller, cl client.Client, sourceFinality int64) (PriceRegistryReader, error) {
+func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Address, lp logpoller.LogPoller, cl client.Client) (PriceRegistryReader, error) {
 	_, version, err := ccipconfig.TypeAndVersion(priceRegistryAddress, cl)
 	if err != nil {
 		if strings.Contains(err.Error(), "execution reverted") {
 			lggr.Infof("Assuming %v is 1.0.0 price registry, got %v", priceRegistryAddress.String(), err)
 			// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it reverts
 			// its v1.
-			return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl, sourceFinality)
+			return NewPriceRegistryV1_0_0(lggr, priceRegistryAddress, lp, cl)
 		}
 		return nil, err
 	}
 	switch version.String() {
 	case V1_2_0:
-		return NewPriceRegistryV1_2_0(lggr, priceRegistryAddress, lp, cl, sourceFinality)
+		return NewPriceRegistryV1_2_0(lggr, priceRegistryAddress, lp, cl)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}

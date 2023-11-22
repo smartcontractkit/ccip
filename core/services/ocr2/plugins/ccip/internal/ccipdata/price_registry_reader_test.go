@@ -31,13 +31,13 @@ func TestPriceRegistryFilters(t *testing.T) {
 	cl := mocks.NewClient(t)
 
 	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewPriceRegistryV1_0_0(logger.TestLogger(t), addr, lp, cl, 0)
+		c, err := ccipdata.NewPriceRegistryV1_0_0(logger.TestLogger(t), addr, lp, cl)
 		require.NoError(t, err)
 		return c
 	}, 3)
 
 	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewPriceRegistryV1_2_0(logger.TestLogger(t), addr, lp, cl, 0)
+		c, err := ccipdata.NewPriceRegistryV1_2_0(logger.TestLogger(t), addr, lp, cl)
 		require.NoError(t, err)
 		return c
 	}, 3)
@@ -120,10 +120,10 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	addr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, nil, feeTokens, 1000)
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
-	pr10r, err := ccipdata.NewPriceRegistryReader(lggr, addr, lp, ec, 0)
+	pr10r, err := ccipdata.NewPriceRegistryReader(lggr, addr, lp, ec)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(pr10r).String(), reflect.TypeOf(&ccipdata.PriceRegistryV1_0_0{}).String())
-	pr12r, err := ccipdata.NewPriceRegistryReader(lggr, addr2, lp, ec, 0)
+	pr12r, err := ccipdata.NewPriceRegistryReader(lggr, addr2, lp, ec)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(pr12r).String(), reflect.TypeOf(&ccipdata.PriceRegistryV1_2_0{}).String())
 	// Apply block1.
