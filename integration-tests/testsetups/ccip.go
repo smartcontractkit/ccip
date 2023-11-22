@@ -101,6 +101,7 @@ type CCIPTestConfig struct {
 	MsgType                 string
 	PhaseTimeout            time.Duration
 	TestDuration            time.Duration
+	SkipEventValidation     bool
 	LocalCluster            bool
 	ExistingDeployment      bool
 	ExistingEnv             string
@@ -390,6 +391,16 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			allError = multierr.Append(allError, fmt.Errorf("invalid CCIP_CHAINLINK_NODE_FUNDING env variable value: %s", fundingAmountStr))
 		} else {
 			p.NodeFunding = fundingAmount
+		}
+	}
+
+	skip, _ := utils.GetEnv("CCIP_SKIP_VALIDATION")
+	if skip != "" {
+		e, err := strconv.ParseBool(skip)
+		if err != nil {
+			allError = multierr.Append(allError, err)
+		} else {
+			p.SkipEventValidation = e
 		}
 	}
 

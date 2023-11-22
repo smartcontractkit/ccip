@@ -1448,6 +1448,7 @@ type CCIPLane struct {
 	SrcNetworkLaneCfg       *laneconfig.LaneConfig
 	DstNetworkLaneCfg       *laneconfig.LaneConfig
 	Subscriptions           []event.Subscription
+	SkipValidation          bool
 }
 
 func (lane *CCIPLane) UpdateLaneConfig() {
@@ -1604,6 +1605,10 @@ func (lane *CCIPLane) ValidateRequests() {
 }
 
 func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmattion time.Time, reqNo int64) error {
+	if lane.SkipValidation {
+		lane.Logger.Info().Msg("Skipping validation")
+		return nil
+	}
 	msgLog, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
 		lane.Logger, reqNo, txHash, lane.ValidationTimeout, txConfirmattion, lane.Reports)
 	if err != nil || msgLog == nil {
@@ -1795,10 +1800,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	lane.UpdateLaneConfig()
 
-	// start event watchers
-	err = lane.StartEventWatchers()
-	if err != nil {
-		return errors.WithStack(err)
+	if !lane.SkipValidation {
+		// start event watchers
+		err = lane.StartEventWatchers()
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 	// if lane is being set up for already configured CL nodes and contracts
 	// no further action is necessary

@@ -215,6 +215,11 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 			NoOfTokensSent:     len(msg.TokenAmounts),
 			MessageBytesLength: len(msg.Data),
 		})
+	// if skip validation is true, return
+	if c.Lane.SkipValidation {
+		res.Failed = false
+		return res
+	}
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
 	msgLog, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(
