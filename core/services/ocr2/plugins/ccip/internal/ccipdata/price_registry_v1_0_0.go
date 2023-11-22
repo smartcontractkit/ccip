@@ -161,6 +161,8 @@ func (p *PriceRegistryV1_0_0) GetTokensDecimals(ctx context.Context, tokenAddres
 			if decimals, isUint8 := v.(uint8); isUint8 {
 				tokenDecimals[i] = decimals
 				found[tokenAddress] = true
+			} else {
+				p.lggr.Errorf("token decimals cache contains invalid type %T", v)
 			}
 		}
 	}
@@ -196,6 +198,7 @@ func (p *PriceRegistryV1_0_0) GetTokensDecimals(ctx context.Context, tokenAddres
 	for i, tokenAddress := range tokenAddresses {
 		if !found[tokenAddress] {
 			tokenDecimals[i] = decimals[j]
+			p.tokenDecimalsCache.Store(tokenAddresses, tokenDecimals[i])
 			j++
 		}
 	}

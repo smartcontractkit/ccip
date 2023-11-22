@@ -163,6 +163,8 @@ func (o *OffRampV1_0_0) getDestinationTokensFromSourceTokens(ctx context.Context
 			if destToken, isAddr := v.(common.Address); isAddr {
 				destTokens[i] = destToken
 				found[tokenAddress] = true
+			} else {
+				o.lggr.Errorf("source to dest cache contains invalid type %T", v)
 			}
 		}
 	}
@@ -199,6 +201,7 @@ func (o *OffRampV1_0_0) getDestinationTokensFromSourceTokens(ctx context.Context
 	for i, sourceToken := range tokenAddresses {
 		if !found[sourceToken] {
 			destTokens[i] = destTokensFromRpc[j]
+			o.sourceToDestTokensCache.Store(sourceToken, destTokens[i])
 			j++
 		}
 	}
