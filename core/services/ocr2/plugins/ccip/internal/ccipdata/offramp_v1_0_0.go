@@ -559,6 +559,12 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 	if err := logpollerutil.RegisterLpFilters(lp, filters); err != nil {
 		return nil, err
 	}
+
+	tokenEvents := []common.Hash{
+		abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
+		abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
+	}
+
 	return &OffRampV1_0_0{
 		offRamp:             offRamp,
 		ec:                  ec,
@@ -579,26 +585,17 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		),
 		destinationTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
-			[]common.Hash{
-				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
-				abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
-			},
+			tokenEvents,
 			offRamp.Address(),
 		),
 		supportedTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
-			[]common.Hash{
-				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
-				abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
-			},
+			tokenEvents,
 			offRamp.Address(),
 		),
 		destinationPoolsCache: cache.NewLogpollerEventsBased[map[common.Address]common.Address](
 			lp,
-			[]common.Hash{
-				abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
-				abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
-			},
+			tokenEvents,
 			offRamp.Address(),
 		),
 

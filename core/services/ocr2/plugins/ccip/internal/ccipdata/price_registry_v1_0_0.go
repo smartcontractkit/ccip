@@ -48,10 +48,6 @@ type PriceRegistryV1_0_0 struct {
 	tokenDecimalsCache sync.Map
 }
 
-func (p *PriceRegistryV1_0_0) FeeTokenEvents() []common.Hash {
-	return []common.Hash{p.feeTokenAdded, p.feeTokenRemoved}
-}
-
 func (p *PriceRegistryV1_0_0) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error) {
 	tps, err := p.priceRegistry.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
 	if err != nil {
@@ -198,7 +194,7 @@ func (p *PriceRegistryV1_0_0) GetTokensDecimals(ctx context.Context, tokenAddres
 	for i, tokenAddress := range tokenAddresses {
 		if !found[tokenAddress] {
 			tokenDecimals[i] = decimals[j]
-			p.tokenDecimalsCache.Store(tokenAddresses, tokenDecimals[i])
+			p.tokenDecimalsCache.Store(tokenAddress, tokenDecimals[i])
 			j++
 		}
 	}
