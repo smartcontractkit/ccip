@@ -107,7 +107,7 @@ func TestLogpollerEventsBased(t *testing.T) {
 
 	for _, round := range testRounds {
 		lp.On("LatestBlock", mock.Anything).
-			Return(logpoller.LogPollerBlock{BlockNumber: round.logPollerLatestBlock}, nil).Once()
+			Return(logpoller.LogPollerBlock{FinalizedBlockNumber: round.logPollerLatestBlock}, nil).Once()
 
 		if round.stateLatestBlock > 0 {
 			lp.On(

@@ -170,7 +170,7 @@ func (o *OffRampV1_0_0) getDestinationTokensFromSourceTokens(ctx context.Context
 	}
 
 	if len(found) == len(tokenAddresses) {
-		return []common.Address{}, nil
+		return destTokens, nil
 	}
 
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddresses))
