@@ -24,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -253,7 +252,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				return nil, fmt.Errorf("get destination tokens: %w", err)
 			}
 
-			destTokens := ccipcalc.FlattenUniqueSlice(
+			destTokens := ccipcommon.FlattenUniqueSlice(
 				destFeeTokens,
 				destBridgedTokens,
 				[]common.Address{r.destWrappedNative},

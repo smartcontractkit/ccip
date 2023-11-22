@@ -210,7 +210,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 	if err != nil {
 		return nil, fmt.Errorf("get destination tokens: %w", err)
 	}
-	destTokens := ccipcalc.FlattenUniqueSlice(feeTokens, bridgeableTokens)
+	destTokens := ccipcommon.FlattenUniqueSlice(feeTokens, bridgeableTokens)
 
 	sourceGasPriceUSD, tokenPricesUSD, err := r.generatePriceUpdates(ctx, lggr, destTokens)
 	if err != nil {
@@ -302,7 +302,7 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 ) (sourceGasPriceUSD prices.GasPrice, tokenPricesUSD map[common.Address]*big.Int, err error) {
 	// Include wrapped native in our token query as way to identify the source native USD price.
 	// notice USD is in 1e18 scale, i.e. $1 = 1e18
-	queryTokens := ccipcalc.FlattenUniqueSlice([]common.Address{r.sourceNative}, destTokens)
+	queryTokens := ccipcommon.FlattenUniqueSlice([]common.Address{r.sourceNative}, destTokens)
 	sort.Slice(queryTokens, func(i, j int) bool { return queryTokens[i].String() < queryTokens[j].String() }) // make the query deterministic
 
 	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
@@ -449,7 +449,7 @@ func (r *CommitReportingPlugin) Report(ctx context.Context, epochAndRound types.
 	if err != nil {
 		return false, nil, fmt.Errorf("get destination tokens: %w", err)
 	}
-	destTokens := ccipcalc.FlattenUniqueSlice(feeTokens, bridgeableTokens)
+	destTokens := ccipcommon.FlattenUniqueSlice(feeTokens, bridgeableTokens)
 
 	// Filters out parsable but faulty observations
 	validObservations, err := validateObservations(ctx, lggr, destTokens, r.F, parsableObservations)

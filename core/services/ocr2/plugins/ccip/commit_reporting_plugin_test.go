@@ -30,6 +30,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -1115,7 +1116,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 			for tk := range tc.tokenDecimals {
 				tokens = append(tokens, tk)
 			}
-			tokens = ccipcalc.FlattenUniqueSlice(tokens, []common.Address{tc.sourceNativeToken})
+			tokens = ccipcommon.FlattenUniqueSlice(tokens, []common.Address{tc.sourceNativeToken})
 			sort.Slice(tokens, func(i, j int) bool { return tokens[i].String() < tokens[j].String() })
 
 			if len(tokens) > 0 {
