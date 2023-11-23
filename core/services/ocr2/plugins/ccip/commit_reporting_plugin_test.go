@@ -353,6 +353,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		p := &CommitReportingPlugin{}
 		p.lggr = logger.TestLogger(t)
 		p.inflightReports = newInflightCommitReportsContainer(time.Minute)
+		p.metricsCollector = NoopMetricsCollector
 		return p
 	}
 
