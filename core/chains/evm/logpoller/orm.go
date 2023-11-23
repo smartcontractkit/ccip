@@ -682,7 +682,7 @@ func (o *DbORM) SelectIndexedLogsCreatedAfter(address common.Address, eventSig c
 			AND topics[:topic_index] = ANY(:topic_values)
 			AND block_timestamp > :block_timestamp_after
 			AND block_number <= %s
-			ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
+			ORDER BY (block_number, log_index) DESC LIMIT 1`, nestedBlockNumberQuery(confs))
 
 	var logs []Log
 	if err = o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
