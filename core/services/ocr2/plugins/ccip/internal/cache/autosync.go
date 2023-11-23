@@ -85,11 +85,17 @@ func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool,
 	blockOfCurrentValue := c.lastChangeBlock
 	c.lock.RUnlock()
 
+	// NOTE: latest block should be fetched before LatestBlockByEventSigsAddrsWithConfs
+	// Otherwise there might be new events between LatestBlockByEventSigsAddrsWithConfs and
+	// latestBlock which will be missed.
 	latestBlock, err := c.logPoller.LatestBlock(pg.WithParentCtx(ctx))
 	latestBlockNumber := int64(0)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return false, 0, fmt.Errorf("get latest log poller block: %w", err)
 	} else if err == nil {
+		// Since we know that we have all the events till latestBlock.FinalizedBlockNumber
+		// we want to return the block number instead of the block of the latest event
+		// for reducing the scan window on the next call.
 		latestBlockNumber = latestBlock.FinalizedBlockNumber
 	}
 
@@ -98,7 +104,7 @@ func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool,
 	}
 
 	blockOfLatestEvent, err = c.logPoller.LatestBlockByEventSigsAddrsWithConfs(
-		c.lastChangeBlock,
+		blockOfCurrentValue,
 		c.observedEvents,
 		[]common.Address{c.address},
 		logpoller.Finalized,
@@ -114,17 +120,17 @@ func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool,
 	return blockOfLatestEvent > blockOfCurrentValue, latestBlockNumber, nil
 }
 
-func (c *LogpollerEventsBased[T]) set(_ context.Context, value T, blockNum int64) bool {
+func (c *LogpollerEventsBased[T]) set(_ context.Context, value T, blockNum int64) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	if c.lastChangeBlock > blockNum {
-		return false
+		return
 	}
 
 	c.value = value
 	c.lastChangeBlock = blockNum
-	return true
+	return
 }
 
 func (c *LogpollerEventsBased[T]) get(_ context.Context) (T, int64, error) {

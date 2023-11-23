@@ -74,3 +74,15 @@ func (o *ObservedOffRampReader) GetStaticConfig(ctx context.Context) (ccipdata.O
 		return o.OffRampReader.GetStaticConfig(ctx)
 	})
 }
+
+func (o *ObservedOffRampReader) GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error) {
+	return withObservedInteraction(o.metric, "GetSourceToDestTokensMapping", func() (map[common.Address]common.Address, error) {
+		return o.OffRampReader.GetSourceToDestTokensMapping(ctx)
+	})
+}
+
+func (o *ObservedOffRampReader) GetDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error) {
+	return withObservedInteraction(o.metric, "GetDestinationTokenPools", func() (map[common.Address]common.Address, error) {
+		return o.OffRampReader.GetDestinationTokenPools(ctx)
+	})
+}
