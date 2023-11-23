@@ -78,9 +78,21 @@ func (p *PriceRegistryV1_0_0) Close(opts ...pg.QOpt) error {
 }
 
 func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]Event[TokenPriceUpdate], error) {
-	logs, err := p.lp.LogsCreatedAfter(
-		p.tokenUpdated,
+	//logs, err := p.lp.LogsCreatedAfter(
+	//	p.tokenUpdated,
+	//	p.address,
+	//	ts,
+	//	logpoller.Confirmations(confs),
+	//	pg.WithParentCtx(ctx),
+	//)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	logs, err := p.lp.LatestIndexedLogs(
 		p.address,
+		p.tokenUpdated,
+		1,
 		ts,
 		logpoller.Confirmations(confs),
 		pg.WithParentCtx(ctx),

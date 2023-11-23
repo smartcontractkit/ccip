@@ -59,6 +59,7 @@ type LogPoller interface {
 	LogsDataWordRange(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin, wordValueMax common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
 	LogsDataWordGreaterThan(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
 	LogsDataWordBetween(eventSig common.Hash, address common.Address, wordIndexMin, wordIndexMax int, wordValue common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
+	LatestIndexedLogs(address common.Address, eventSig common.Hash, topicIndex int, after time.Time, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
 }
 
 type Confirmations int
@@ -1172,6 +1173,10 @@ func (lp *logPoller) batchFetchBlocks(ctx context.Context, blocksRequested []str
 // The order of events is not significant. Both logs must be inside the block range and have the minimum number of confirmations
 func (lp *logPoller) IndexedLogsWithSigsExcluding(address common.Address, eventSigA, eventSigB common.Hash, topicIndex int, fromBlock, toBlock int64, confs Confirmations, qopts ...pg.QOpt) ([]Log, error) {
 	return lp.orm.SelectIndexedLogsWithSigsExcluding(eventSigA, eventSigB, topicIndex, address, fromBlock, toBlock, confs, qopts...)
+}
+
+func (lp *logPoller) LatestIndexedLogs(address common.Address, eventSig common.Hash, topicIndex int, after time.Time, confs Confirmations, qopts ...pg.QOpt) ([]Log, error) {
+	return lp.orm.SelectLatestIndexedLogs(address, eventSig, topicIndex, after, confs, qopts...)
 }
 
 func EvmWord(i uint64) common.Hash {

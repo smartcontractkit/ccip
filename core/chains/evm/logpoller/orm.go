@@ -52,6 +52,8 @@ type ORM interface {
 	SelectLogsDataWordRange(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin, wordValueMax common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
 	SelectLogsDataWordGreaterThan(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
 	SelectLogsDataWordBetween(address common.Address, eventSIg common.Hash, wordIndexMin int, wordIndexMax int, wordValue common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
+
+	SelectLatestIndexedLogs(address common.Address, eventSig common.Hash, topicIndex int, after time.Time, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
 }
 
 type DbORM struct {
@@ -746,6 +748,55 @@ func (o *DbORM) SelectIndexedLogsWithSigsExcluding(sigA, sigB common.Hash, topic
 	    AND 	   b.block_number BETWEEN :start_block AND :end_block
 		AND		   b.block_number <= %s
 		ORDER BY block_number,log_index ASC`, nestedQuery, nestedQuery)
+	var logs []Log
+	if err := o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
+		return nil, err
+	}
+	return logs, nil
+}
+
+func (o *DbORM) SelectLatestIndexedLogs(address common.Address, eventSig common.Hash, topicIndex int, after time.Time, confs Confirmations, qopts ...pg.QOpt) ([]Log, error) {
+	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
+		withTopicIndex(topicIndex).
+		withBlockTimestampAfter(after).
+		withConfs(confs).
+		toArgs()
+	if err != nil {
+		return nil, err
+	}
+	query := fmt.Sprintf(`
+		WITH LatestIndexedLogs AS (
+			SELECT
+				evm_chain_id,
+				log_index,
+				block_hash,
+				block_number,
+				address,
+				event_sig,
+				topics,
+				tx_hash,
+				data,
+				created_at,
+				block_timestamp,
+				ROW_NUMBER() OVER (
+					PARTITION BY topics[:topic_index], evm_chain_id, address, event_sig
+					ORDER BY block_number DESC, log_index DESC
+				) AS rn
+			FROM
+				evm.logs
+			WHERE
+					evm_chain_id = :evm_chain_id AND
+					address = :address AND
+					event_sig = :event_sig AND
+					block_timestamp > :block_timestamp
+ 					block_number <= %s
+		)
+		SELECT
+			*
+		FROM
+			LatestIndexedLogs
+		WHERE
+			rn = 1`, nestedBlockNumberQuery(confs))
 	var logs []Log
 	if err := o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
 		return nil, err
