@@ -799,7 +799,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "pool is noop",
+			name: "pool is disabled",
 			tokenAmounts: []internal.TokenAmount{
 				{Token: tk1},
 				{Token: tk2},

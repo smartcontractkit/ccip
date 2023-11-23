@@ -373,7 +373,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 }
 
 // destPoolRateLimits returns a map that consists of the rate limits of each destination token of the provided reports.
-// If a token is missing from the returned map it either means that token was not found or token pool is noop for this token.
+// If a token is missing from the returned map it either means that token was not found or token pool is disabled for this token.
 func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commitReports []commitReportWithSendRequests, sourceToDestToken map[common.Address]common.Address) (map[common.Address]*big.Int, error) {
 	tokenPools, err := r.offRampReader.GetDestinationTokenPools(ctx)
 	if err != nil {
@@ -422,7 +422,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 
 	res := make(map[common.Address]*big.Int, len(dstTokenToPool))
 	for i, rateLimit := range rateLimits {
-		// if the rate limit is noop for this token pool then we omit it from the result
+		// if the rate limit is disabled for this token pool then we omit it from the result
 		if !rateLimit.IsEnabled {
 			continue
 		}
