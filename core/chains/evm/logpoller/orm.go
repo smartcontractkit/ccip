@@ -788,11 +788,21 @@ func (o *DbORM) SelectLatestIndexedLogs(address common.Address, eventSig common.
 					evm_chain_id = :evm_chain_id AND
 					address = :address AND
 					event_sig = :event_sig AND
-					block_timestamp > :block_timestamp
+					block_timestamp > :block_timestamp_after AND
  					block_number <= %s
 		)
 		SELECT
-			*
+			evm_chain_id,
+			log_index,
+			block_hash,
+			block_number,
+			address,
+			event_sig,
+			topics,
+			tx_hash,
+			data,
+			created_at,
+			block_timestamp
 		FROM
 			LatestIndexedLogs
 		WHERE
