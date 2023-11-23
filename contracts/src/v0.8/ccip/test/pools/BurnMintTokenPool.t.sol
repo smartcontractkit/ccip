@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {IPool} from "../../interfaces/pools/IPool.sol";
+
 import "../BaseTest.t.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 import {BurnMintSetup} from "./BurnMintSetup.t.sol";
+
+import {IERC165} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/utils/introspection/IERC165.sol";
 
 contract BurnMintTokenPoolSetup is BurnMintSetup {
   BurnMintTokenPool internal s_pool;
@@ -90,5 +94,13 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
 
     vm.expectRevert(TokenPool.PermissionsError.selector);
     s_pool.releaseOrMint(bytes(""), OWNER, 1, 0, bytes(""));
+  }
+}
+
+contract BurnMintTokenPool_supportsInterface is BurnMintTokenPoolSetup {
+  function testSupportsInterfaceSuccess() public {
+    assertTrue(s_pool.supportsInterface(s_pool.getBurnMintInterfaceId()));
+    assertTrue(s_pool.supportsInterface(type(IPool).interfaceId));
+    assertTrue(s_pool.supportsInterface(type(IERC165).interfaceId));
   }
 }
