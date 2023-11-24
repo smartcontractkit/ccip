@@ -81,7 +81,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	}
 
 	// Load all the readers relevant for this plugin.
-	onRampReader, err := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled(), qopts...)
+	onRampReader, err := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), sourceChain.Config().EVM().FinalityTagEnabled())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed onramp reader")
 	}
@@ -142,6 +142,18 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 		return nil, err
 	}
 	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
+
+	if err1 := pluginConfig.onRampReader.RegisterFilters(qopts...); err1 != nil {
+		return nil, err1
+	}
+
+	if err1 := pluginConfig.commitStore.RegisterFilters(qopts...); err1 != nil {
+		return nil, err1
+	}
+
+	if err1 := pluginConfig.offRamp.RegisterFilters(qopts...); err1 != nil {
+		return nil, err1
+	}
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, pluginConfig.destChainEVMID)
 	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(pluginConfig.lggr, true, logError)

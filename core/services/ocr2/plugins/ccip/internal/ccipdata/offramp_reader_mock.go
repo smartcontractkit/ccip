@@ -314,6 +314,26 @@ func (_m *MockOffRampReader) OnchainConfig() ExecOnchainConfig {
 	return r0
 }
 
+// RegisterFilters provides a mock function with given fields: qopts
+func (_m *MockOffRampReader) RegisterFilters(qopts ...pg.QOpt) error {
+	_va := make([]interface{}, len(qopts))
+	for _i := range qopts {
+		_va[_i] = qopts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(...pg.QOpt) error); ok {
+		r0 = rf(qopts...)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // TokenEvents provides a mock function with given fields:
 func (_m *MockOffRampReader) TokenEvents() []common.Hash {
 	ret := _m.Called()

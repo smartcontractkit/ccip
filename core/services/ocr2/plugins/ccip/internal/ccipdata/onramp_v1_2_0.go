@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -203,9 +204,9 @@ type OnRampV1_2_0 struct {
 	leafHasher                 LeafHasherInterface[[32]byte]
 	client                     client.Client
 	finalityTags               bool
-	filterName                 string
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
+	filters                    []logpoller.Filter
 }
 
 func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, error) {
@@ -300,7 +301,11 @@ func (o *OnRampV1_2_0) RouterAddress() (common.Address, error) {
 }
 
 func (o *OnRampV1_2_0) Close(qopts ...pg.QOpt) error {
-	return o.lp.UnregisterFilter(o.filterName, qopts...)
+	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
+}
+
+func (o *OnRampV1_2_0) RegisterFilters(qopts ...pg.QOpt) error {
+	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
 }
 
 func NewOnRampV1_2_0(
@@ -318,13 +323,12 @@ func NewOnRampV1_2_0(
 	}
 	// Subscribe to the relevant logs
 	// Note we can keep the same prefix across 1.0/1.1 and 1.2 because the onramp addresses will be different
-	name := logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress)
-	if err = sourceLP.RegisterFilter(logpoller.Filter{
-		Name:      name,
-		EventSigs: []common.Hash{CCIPSendRequestEventSigV1_2_0},
-		Addresses: []common.Address{onRampAddress},
-	}); err != nil {
-		return nil, err
+	filters := []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress),
+			EventSigs: []common.Hash{CCIPSendRequestEventSigV1_2_0},
+			Addresses: []common.Address{onRampAddress},
+		},
 	}
 	return &OnRampV1_2_0{
 		finalityTags:               finalityTags,
@@ -333,7 +337,7 @@ func NewOnRampV1_2_0(
 		lp:                         sourceLP,
 		leafHasher:                 NewLeafHasherV1_2_0(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
 		onRamp:                     onRamp,
-		filterName:                 name,
+		filters:                    filters,
 		address:                    onRampAddress,
 		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndexV1_2_0,
 		sendRequestedEventSig:      CCIPSendRequestEventSigV1_2_0,
