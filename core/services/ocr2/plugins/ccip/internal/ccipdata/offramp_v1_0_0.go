@@ -447,7 +447,7 @@ func (o *OffRampV1_0_0) TokenEvents() []common.Hash {
 	return []common.Hash{abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0), abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)}
 }
 
-func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_0_0, error) {
+func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, qopts ...pg.QOpt) (*OffRampV1_0_0, error) {
 	offRamp, err := evm_2_evm_offramp_1_0_0.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
 		return nil, err
@@ -472,7 +472,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 			Addresses: []common.Address{addr},
 		},
 	}
-	if err := logpollerutil.RegisterLpFilters(lp, filters); err != nil {
+	if err := logpollerutil.RegisterLpFilters(lp, filters, qopts...); err != nil {
 		return nil, err
 	}
 	return &OffRampV1_0_0{

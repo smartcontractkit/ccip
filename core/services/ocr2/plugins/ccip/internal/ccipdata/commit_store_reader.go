@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 type CommitStoreInterval struct {
@@ -113,7 +114,7 @@ type CommitStoreReader interface {
 	GetCommitStoreStaticConfig(ctx context.Context) (CommitStoreStaticConfig, error)
 }
 
-func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (CommitStoreReader, error) {
+func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, qopts ...pg.QOpt) (CommitStoreReader, error) {
 	contractType, version, err := ccipconfig.TypeAndVersion(address, ec)
 	if err != nil {
 		return nil, errors.Errorf("expected %v got %v", ccipconfig.EVM2EVMOnRamp, contractType)
@@ -121,9 +122,9 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 	switch version.String() {
 	case V1_0_0, V1_1_0:
 		// Versions are identical
-		return NewCommitStoreV1_0_0(lggr, address, ec, lp, estimator)
+		return NewCommitStoreV1_0_0(lggr, address, ec, lp, estimator, qopts...)
 	case V1_2_0:
-		return NewCommitStoreV1_2_0(lggr, address, ec, lp, estimator)
+		return NewCommitStoreV1_2_0(lggr, address, ec, lp, estimator, qopts...)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}

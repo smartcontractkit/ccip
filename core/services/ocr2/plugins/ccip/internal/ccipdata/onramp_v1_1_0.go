@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_1_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 var _ OnRampReader = &OnRampV1_1_0{}
@@ -19,12 +20,12 @@ type OnRampV1_1_0 struct {
 	onRamp *evm_2_evm_onramp_1_1_0.EVM2EVMOnRamp
 }
 
-func NewOnRampV1_1_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_1_0, error) {
+func NewOnRampV1_1_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, qopts ...pg.QOpt) (*OnRampV1_1_0, error) {
 	onRamp, err := evm_2_evm_onramp_1_1_0.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
 	}
-	onRamp100, err := NewOnRampV1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
+	onRamp100, err := NewOnRampV1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, qopts...)
 	if err != nil {
 		return nil, err
 	}

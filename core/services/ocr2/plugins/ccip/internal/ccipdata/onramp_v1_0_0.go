@@ -137,7 +137,7 @@ func (o *OnRampV1_0_0) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context
 	return nil, errors.New("USDC not supported in < 1.2.0")
 }
 
-func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_0_0, error) {
+func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, qopts ...pg.QOpt) (*OnRampV1_0_0, error) {
 	onRamp, err := evm_2_evm_onramp_1_0_0.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 		Name:      name,
 		EventSigs: []common.Hash{eventSig},
 		Addresses: []common.Address{onRampAddress},
-	})
+	}, qopts...)
 	if err != nil {
 		return nil, err
 	}

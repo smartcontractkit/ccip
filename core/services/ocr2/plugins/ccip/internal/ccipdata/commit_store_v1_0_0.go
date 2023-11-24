@@ -346,7 +346,7 @@ func (c *CommitStoreV1_0_0) VerifyExecutionReport(ctx context.Context, report Ex
 	return true, nil
 }
 
-func NewCommitStoreV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*CommitStoreV1_0_0, error) {
+func NewCommitStoreV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, qopts ...pg.QOpt) (*CommitStoreV1_0_0, error) {
 	commitStore, err := commit_store_1_0_0.NewCommitStore(addr, ec)
 	if err != nil {
 		return nil, err
@@ -361,7 +361,7 @@ func NewCommitStoreV1_0_0(lggr logger.Logger, addr common.Address, ec client.Cli
 			Addresses: []common.Address{addr},
 		},
 	}
-	if err := logpollerutil.RegisterLpFilters(lp, filters); err != nil {
+	if err := logpollerutil.RegisterLpFilters(lp, filters, qopts...); err != nil {
 		return nil, err
 	}
 	return &CommitStoreV1_0_0{

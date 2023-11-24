@@ -296,14 +296,7 @@ func (o *OnRampV1_2_0) Close(qopts ...pg.QOpt) error {
 	return o.lp.UnregisterFilter(o.filterName, qopts...)
 }
 
-func NewOnRampV1_2_0(
-	lggr logger.Logger,
-	sourceSelector,
-	destSelector uint64,
-	onRampAddress common.Address,
-	sourceLP logpoller.LogPoller,
-	source client.Client,
-) (*OnRampV1_2_0, error) {
+func NewOnRampV1_2_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, qopts ...pg.QOpt) (*OnRampV1_2_0, error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -315,7 +308,7 @@ func NewOnRampV1_2_0(
 		Name:      name,
 		EventSigs: []common.Hash{CCIPSendRequestEventSigV1_2_0},
 		Addresses: []common.Address{onRampAddress},
-	}); err != nil {
+	}, qopts...); err != nil {
 		return nil, err
 	}
 	return &OnRampV1_2_0{
