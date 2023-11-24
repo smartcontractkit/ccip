@@ -46,21 +46,22 @@ type OnRampReader interface {
 	RouterAddress() (common.Address, error)
 	Address() (common.Address, error)
 	GetDynamicConfig() (OnRampDynamicConfig, error)
+	RegisterFilters(qopts ...pg.QOpt) error
 }
 
 // NewOnRampReader determines the appropriate version of the onramp and returns a reader for it
-func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, qopts ...pg.QOpt) (OnRampReader, error) {
+func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (OnRampReader, error) {
 	contractType, version, err := ccipconfig.TypeAndVersion(onRampAddress, source)
 	if err != nil {
 		return nil, errors.Errorf("expected '%v' got '%v' (%v)", ccipconfig.EVM2EVMOnRamp, contractType, err)
 	}
 	switch version.String() {
 	case V1_0_0:
-		return NewOnRampV1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, qopts...)
+		return NewOnRampV1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 	case V1_1_0:
-		return NewOnRampV1_1_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, qopts...)
+		return NewOnRampV1_1_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 	case V1_2_0:
-		return NewOnRampV1_2_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, qopts...)
+		return NewOnRampV1_2_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}

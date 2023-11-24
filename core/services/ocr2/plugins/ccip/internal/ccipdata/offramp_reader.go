@@ -114,6 +114,7 @@ type TokenBucketRateLimit struct {
 //go:generate mockery --quiet --name OffRampReader --filename offramp_reader_mock.go --case=underscore
 type OffRampReader interface {
 	Closer
+	RegisterFilters(qopts ...pg.QOpt) error
 	// Will error if messages are not a compatible version.
 	EncodeExecutionReport(report ExecReport) ([]byte, error)
 	DecodeExecutionReport(report []byte) (ExecReport, error)
@@ -150,16 +151,16 @@ const (
 	ExecutionStateFailure
 )
 
-func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, qopts ...pg.QOpt) (OffRampReader, error) {
+func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (OffRampReader, error) {
 	_, version, err := ccipconfig.TypeAndVersion(addr, destClient)
 	if err != nil {
 		return nil, err
 	}
 	switch version.String() {
 	case V1_0_0, V1_1_0:
-		return NewOffRampV1_0_0(lggr, addr, destClient, lp, estimator, qopts...)
+		return NewOffRampV1_0_0(lggr, addr, destClient, lp, estimator)
 	case V1_2_0:
-		return NewOffRampV1_2_0(lggr, addr, destClient, lp, estimator, qopts...)
+		return NewOffRampV1_2_0(lggr, addr, destClient, lp, estimator)
 	default:
 		return nil, errors.Errorf("unsupported offramp version %v", version.String())
 	}

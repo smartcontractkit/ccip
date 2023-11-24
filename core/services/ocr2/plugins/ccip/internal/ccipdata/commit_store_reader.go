@@ -112,9 +112,10 @@ type CommitStoreReader interface {
 	DecodeCommitReport(report []byte) (CommitStoreReport, error)
 	VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error)
 	GetCommitStoreStaticConfig(ctx context.Context) (CommitStoreStaticConfig, error)
+	RegisterFilters(qopts ...pg.QOpt) error
 }
 
-func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, qopts ...pg.QOpt) (CommitStoreReader, error) {
+func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (CommitStoreReader, error) {
 	contractType, version, err := ccipconfig.TypeAndVersion(address, ec)
 	if err != nil {
 		return nil, errors.Errorf("expected %v got %v", ccipconfig.EVM2EVMOnRamp, contractType)
@@ -122,9 +123,9 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 	switch version.String() {
 	case V1_0_0, V1_1_0:
 		// Versions are identical
-		return NewCommitStoreV1_0_0(lggr, address, ec, lp, estimator, qopts...)
+		return NewCommitStoreV1_0_0(lggr, address, ec, lp, estimator)
 	case V1_2_0:
-		return NewCommitStoreV1_2_0(lggr, address, ec, lp, estimator, qopts...)
+		return NewCommitStoreV1_2_0(lggr, address, ec, lp, estimator)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}

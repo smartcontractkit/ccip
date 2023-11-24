@@ -22,7 +22,6 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 var (
@@ -268,8 +267,8 @@ func (o *OffRampV1_2_0) DecodeExecutionReport(report []byte) (ExecReport, error)
 	return decodeExecReportV1_2_0(o.executionReportArgs, report)
 }
 
-func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, qopts ...pg.QOpt) (*OffRampV1_2_0, error) {
-	v100, err := NewOffRampV1_0_0(lggr, addr, ec, lp, estimator, qopts...)
+func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_2_0, error) {
+	v100, err := NewOffRampV1_0_0(lggr, addr, ec, lp, estimator)
 	if err != nil {
 		return nil, err
 	}
