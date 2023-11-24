@@ -103,7 +103,6 @@ type OnRampV1_0_0 struct {
 	lggr                       logger.Logger
 	client                     client.Client
 	leafHasher                 LeafHasherInterface[[32]byte]
-	filterName                 string
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
 	filters                    []logpoller.Filter
@@ -137,6 +136,10 @@ func (o *OnRampV1_0_0) GetDynamicConfig() (OnRampDynamicConfig, error) {
 
 func (o *OnRampV1_0_0) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
 	return nil, errors.New("USDC not supported in < 1.2.0")
+}
+
+func (o *OnRampV1_0_0) Close(qopts ...pg.QOpt) error {
+	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
 }
 
 func (o *OnRampV1_0_0) RegisterFilters(qopts ...pg.QOpt) error {
@@ -229,8 +232,4 @@ func (o *OnRampV1_0_0) RouterAddress() (common.Address, error) {
 		return common.Address{}, err
 	}
 	return config.Router, nil
-}
-
-func (o *OnRampV1_0_0) Close(qopts ...pg.QOpt) error {
-	return o.lp.UnregisterFilter(o.filterName, qopts...)
 }
