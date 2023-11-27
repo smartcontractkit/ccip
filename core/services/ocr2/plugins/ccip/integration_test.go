@@ -277,10 +277,10 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			t.Logf("deleting job %d", id)
 			err = node.App.DeleteJob(context.Background(), id)
 			require.NoError(t, err)
-
-			ccipTH.Source.Chain.Commit()
-			ccipTH.Dest.Chain.Commit()
 		}
+
+		ccipTH.Source.Chain.Commit()
+		ccipTH.Dest.Chain.Commit()
 
 		// create new jobs
 		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock)
