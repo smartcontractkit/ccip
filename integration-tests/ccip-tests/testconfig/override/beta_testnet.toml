@@ -7,10 +7,10 @@ Data = """
       "is_mock_arm": true,
       "fee_token": "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
       "bridge_tokens": [
-        "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28",
+        "0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28"
       ],
       "bridge_tokens_pools": [
-        "0xC274570C956B840b71eDe9771e2d3B7Ad1A8C164",
+        "0xC274570C956B840b71eDe9771e2d3B7Ad1A8C164"
       ],
       "arm": "0xA763A65f7697bE1D9A890c2AD006386Ad0a16fcB",
       "router": "0x94151Cd467ff2312bC2e0980D4Ae3EE3Fb8f88ac",
@@ -142,10 +142,10 @@ Data = """
       "is_mock_arm": true,
       "fee_token": "0xD886E2286Fd1073df82462ea1822119600Af80b6",
       "bridge_tokens": [
-        "0xD886E2286Fd1073df82462ea1822119600Af80b6",
+        "0xD886E2286Fd1073df82462ea1822119600Af80b6"
       ],
       "bridge_tokens_pools": [
-        "0x8B29d2F18c448835c45df5E3f6de004C27C9cC11",
+        "0x8B29d2F18c448835c45df5E3f6de004C27C9cC11"
       ],
       "arm": "0x27B882c393151ADD910F3557849AF0bb09c7d5A6",
       "router": "0x8Aed531563568dde9FF437d86c65b637535a5DA3",
@@ -169,10 +169,10 @@ Data = """
       "is_mock_arm": true,
       "fee_token": "0xdc2CC710e42857672E7907CF474a69B63B93089f",
       "bridge_tokens": [
-        "0xdc2CC710e42857672E7907CF474a69B63B93089f",
+        "0xdc2CC710e42857672E7907CF474a69B63B93089f"
       ],
       "bridge_tokens_pools": [
-        "0x7d3baccb582f1F40DD366f47bb70d495bFA71100",
+        "0x7d3baccb582f1F40DD366f47bb70d495bFA71100"
       ],
       "arm": "0xC1b9bcdC6bE9f4D6224672F18fC46ff330F487e1",
       "router": "0xDDDf978Fd8613Dbd06E807a39bca5ce4383D3Ff5",
