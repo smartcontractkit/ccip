@@ -366,10 +366,6 @@ func (c *CommitStoreV1_2_0) VerifyExecutionReport(ctx context.Context, report Ex
 	return true, nil
 }
 
-func (c *CommitStoreV1_2_0) RegisterFilters(qopts ...pg.QOpt) error {
-	return logpollerutil.RegisterLpFilters(c.lp, c.filters, qopts...)
-}
-
 func NewCommitStoreV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*CommitStoreV1_2_0, error) {
 	commitStore, err := commit_store.NewCommitStore(addr, ec)
 	if err != nil {
@@ -378,13 +374,17 @@ func NewCommitStoreV1_2_0(lggr logger.Logger, addr common.Address, ec client.Cli
 	commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
 	eventSig := abihelpers.MustGetEventID(ReportAccepted, commitStoreABI)
 	commitReportArgs := abihelpers.MustGetEventInputs(ReportAccepted, commitStoreABI)
-	filters := []logpoller.Filter{
+	var filters = []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, addr.String()),
 			EventSigs: []common.Hash{eventSig},
 			Addresses: []common.Address{addr},
 		},
 	}
+	if err := logpollerutil.RegisterLpFilters(lp, filters); err != nil {
+		return nil, err
+	}
+
 	lggr.Infow("Initializing CommitStoreV1_2_0 with estimator", "estimator", estimator)
 
 	return &CommitStoreV1_2_0{

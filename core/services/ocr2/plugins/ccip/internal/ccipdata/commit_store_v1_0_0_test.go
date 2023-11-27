@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
@@ -31,7 +32,10 @@ func TestCommitReportEncodingV1_0_0(t *testing.T) {
 		Interval:   CommitStoreInterval{Min: 1, Max: 10},
 	}
 
-	c, err := NewCommitStoreV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, mocks.NewLogPoller(t), nil)
+	lp := mocks.NewLogPoller(t)
+	lp.On("RegisterFilter", mock.Anything).Return(nil)
+
+	c, err := NewCommitStoreV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 	assert.NoError(t, err)
 
 	encodedReport, err := c.EncodeCommitReport(report)
