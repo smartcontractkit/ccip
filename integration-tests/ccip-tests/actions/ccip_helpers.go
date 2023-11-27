@@ -1029,7 +1029,7 @@ func DefaultSourceCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMCl
 	if err != nil {
 		return nil, err
 	}
-	// if transfer amount is provided for number of tokens greater than the number of supported bridge tokens, then update the transfer amount to
+	// if transfer amounts are provided for number of tokens greater than the number of supported bridge tokens, then update the transfer amount to be
 	// equivalent to the number of tokens supported by the bridge
 	if len(transferAmount) > 0 && len(transferAmount) > len(cmn.BridgeTokens) {
 		transferAmount = transferAmount[:len(cmn.BridgeTokens)]
