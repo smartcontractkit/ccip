@@ -149,16 +149,16 @@ const (
 	ExecutionStateFailure
 )
 
-func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (OffRampReader, error) {
+func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, jobID int32) (OffRampReader, error) {
 	_, version, err := ccipconfig.TypeAndVersion(addr, destClient)
 	if err != nil {
 		return nil, err
 	}
 	switch version.String() {
 	case V1_0_0, V1_1_0:
-		return NewOffRampV1_0_0(lggr, addr, destClient, lp, estimator)
+		return NewOffRampV1_0_0(lggr, addr, destClient, lp, estimator, jobID)
 	case V1_2_0:
-		return NewOffRampV1_2_0(lggr, addr, destClient, lp, estimator)
+		return NewOffRampV1_2_0(lggr, addr, destClient, lp, estimator, jobID)
 	default:
 		return nil, errors.Errorf("unsupported offramp version %v", version.String())
 	}

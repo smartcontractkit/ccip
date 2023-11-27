@@ -32,7 +32,7 @@ type BackfillArgs struct {
 	sourceStartBlock, destStartBlock int64
 }
 
-func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *BackfillArgs, error) {
+func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer) (*CommitPluginStaticConfig, *BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, nil, errors.New("spec is nil")
 	}
@@ -57,7 +57,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, err
 	}
-	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
+	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator(), jb.ID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not create commitStore reader")
 	}
@@ -70,11 +70,11 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	}
 
 	// Load all the readers relevant for this plugin.
-	onRampReader, err := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), qopts...)
+	onRampReader, err := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), jb.ID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed onramp reader")
 	}
-	offRampReader, err := ccipdata.NewOffRampReader(commitLggr, common.HexToAddress(pluginConfig.OffRamp), destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampReader, err := ccipdata.NewOffRampReader(commitLggr, common.HexToAddress(pluginConfig.OffRamp), destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), jb.ID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed offramp reader")
 	}
@@ -122,7 +122,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 }
 
 func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
+	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet)
 	if err != nil {
 		return nil, err
 	}

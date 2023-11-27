@@ -296,21 +296,14 @@ func (o *OnRampV1_2_0) Close(qopts ...pg.QOpt) error {
 	return o.lp.UnregisterFilter(o.filterName, qopts...)
 }
 
-func NewOnRampV1_2_0(
-	lggr logger.Logger,
-	sourceSelector,
-	destSelector uint64,
-	onRampAddress common.Address,
-	sourceLP logpoller.LogPoller,
-	source client.Client,
-) (*OnRampV1_2_0, error) {
+func NewOnRampV1_2_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, jobID int32) (*OnRampV1_2_0, error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
 	}
 	// Subscribe to the relevant logs
 	// Note we can keep the same prefix across 1.0/1.1 and 1.2 because the onramp addresses will be different
-	name := logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress)
+	name := logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress, jobID)
 	if err = sourceLP.RegisterFilter(logpoller.Filter{
 		Name:      name,
 		EventSigs: []common.Hash{CCIPSendRequestEventSigV1_2_0},

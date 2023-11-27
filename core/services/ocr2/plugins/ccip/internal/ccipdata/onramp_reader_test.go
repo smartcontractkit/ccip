@@ -2,6 +2,7 @@ package ccipdata_test
 
 import (
 	"math/big"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -38,6 +39,7 @@ func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 		common.Address{},
 		lp,
 		bc,
+		rand.Int31(),
 	)
 	assert.EqualError(t, err, "expected 'EVM2EVMOnRamp' got '' (no contract code at given address)")
 }
@@ -94,7 +96,7 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 	}
 
 	// Create the version-specific reader.
-	reader, err := ccipdata.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc)
+	reader, err := ccipdata.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc, rand.Int31())
 	require.NoError(t, err)
 
 	return onRampReaderTH{

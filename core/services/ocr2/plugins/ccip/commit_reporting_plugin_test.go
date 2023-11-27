@@ -283,7 +283,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 
 			lp := mocks2.NewLogPoller(t)
 			lp.On("RegisterFilter", mock.Anything).Return(nil)
-			commitStoreReader, err := ccipdata.NewCommitStoreV1_2_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+			commitStoreReader, err := ccipdata.NewCommitStoreV1_2_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil, rand.Int31())
 			assert.NoError(t, err)
 
 			p := &CommitReportingPlugin{}

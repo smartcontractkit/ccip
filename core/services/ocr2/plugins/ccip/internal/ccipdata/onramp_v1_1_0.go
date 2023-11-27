@@ -19,12 +19,12 @@ type OnRampV1_1_0 struct {
 	onRamp *evm_2_evm_onramp_1_1_0.EVM2EVMOnRamp
 }
 
-func NewOnRampV1_1_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_1_0, error) {
+func NewOnRampV1_1_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, jobID int32) (*OnRampV1_1_0, error) {
 	onRamp, err := evm_2_evm_onramp_1_1_0.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
 	}
-	onRamp100, err := NewOnRampV1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
+	onRamp100, err := NewOnRampV1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, jobID)
 	if err != nil {
 		return nil, err
 	}

@@ -447,7 +447,7 @@ func (o *OffRampV1_0_0) TokenEvents() []common.Hash {
 	return []common.Hash{abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0), abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)}
 }
 
-func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_0_0, error) {
+func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, jobID int32) (*OffRampV1_0_0, error) {
 	offRamp, err := evm_2_evm_offramp_1_0_0.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
 		return nil, err
@@ -457,17 +457,17 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRampV1_0_0)[:1]
 	var filters = []logpoller.Filter{
 		{
-			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, addr.String()),
+			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, addr.String(), jobID),
 			EventSigs: []common.Hash{ExecutionStateChangedEventV1_0_0},
 			Addresses: []common.Address{addr},
 		},
 		{
-			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, addr.String()),
+			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, addr.String(), jobID),
 			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0)},
 			Addresses: []common.Address{addr},
 		},
 		{
-			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, addr.String()),
+			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, addr.String(), jobID),
 			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)},
 			Addresses: []common.Address{addr},
 		},

@@ -61,12 +61,12 @@ func assertFilterRegistration(t *testing.T, lp *lpmocks.LogPoller, buildCloser f
 
 func TestCommitFilters(t *testing.T) {
 	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewCommitStoreV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+		c, err := ccipdata.NewCommitStoreV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil, 0)
 		require.NoError(t, err)
 		return c
 	}, 1)
 	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewCommitStoreV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+		c, err := ccipdata.NewCommitStoreV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil, 0)
 		require.NoError(t, err)
 		return c
 	}, 1)
@@ -211,10 +211,10 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
-	c10r, err := ccipdata.NewCommitStoreReader(lggr, addr, ec, lp, ge)
+	c10r, err := ccipdata.NewCommitStoreReader(lggr, addr, ec, lp, ge, 0)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&ccipdata.CommitStoreV1_0_0{}).String())
-	c12r, err := ccipdata.NewCommitStoreReader(lggr, addr2, ec, lp, ge)
+	c12r, err := ccipdata.NewCommitStoreReader(lggr, addr2, ec, lp, ge, 0)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&ccipdata.CommitStoreV1_2_0{}).String())
 

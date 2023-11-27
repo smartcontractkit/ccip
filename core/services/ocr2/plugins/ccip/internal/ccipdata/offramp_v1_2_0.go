@@ -267,8 +267,8 @@ func (o *OffRampV1_2_0) DecodeExecutionReport(report []byte) (ExecReport, error)
 	return decodeExecReportV1_2_0(o.executionReportArgs, report)
 }
 
-func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_2_0, error) {
-	v100, err := NewOffRampV1_0_0(lggr, addr, ec, lp, estimator)
+func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, jobID int32) (*OffRampV1_2_0, error) {
+	v100, err := NewOffRampV1_0_0(lggr, addr, ec, lp, estimator, jobID)
 	if err != nil {
 		return nil, err
 	}

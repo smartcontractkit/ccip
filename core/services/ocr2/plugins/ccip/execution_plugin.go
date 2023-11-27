@@ -51,7 +51,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 
 	// Create the offRamp reader.
 	offRampAddress := common.HexToAddress(spec.ContractID)
-	offRampReader, err := ccipdata.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampReader, err := ccipdata.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), jb.ID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create offRampReader")
 	}
@@ -74,7 +74,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 		"sourceChain", ChainName(int64(chainID)),
 		"destChain", ChainName(destChainID))
 	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector,
-		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
+		offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), jb.ID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create onramp reader")
 	}
@@ -98,7 +98,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 		return nil, nil, errors.Wrap(err, "could not load source registry")
 	}
 
-	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), jb.ID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
 	}
