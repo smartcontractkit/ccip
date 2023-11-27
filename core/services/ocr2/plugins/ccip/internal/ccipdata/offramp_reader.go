@@ -21,6 +21,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
@@ -96,6 +97,7 @@ type ExecReport struct {
 //go:generate mockery --quiet --name OffRampReader --output . --filename offramp_reader_mock.go --inpackage --case=underscore
 type OffRampReader interface {
 	Closer
+	RegisterFilters(qopts ...pg.QOpt) error
 	// Will error if messages are not a compatible verion
 	EncodeExecutionReport(report ExecReport) ([]byte, error)
 	DecodeExecutionReport(report []byte) (ExecReport, error)

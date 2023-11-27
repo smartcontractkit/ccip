@@ -34,7 +34,7 @@ import (
 )
 
 // TODO pass context?
-func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer) (*ExecutionPluginStaticConfig, *BackfillArgs, error) {
+func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) (*ExecutionPluginStaticConfig, *BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, nil, errors.New("spec is nil")
 	}
@@ -149,11 +149,21 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 }
 
 func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(lggr, jb, chainSet)
+	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(lggr, jb, chainSet, qopts...)
 	if err != nil {
 		return nil, err
 	}
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(*execPluginConfig)
+
+	if err1 := execPluginConfig.offRampReader.RegisterFilters(qopts...); err1 != nil {
+		return nil, err1
+	}
+	if err1 := execPluginConfig.onRampReader.RegisterFilters(qopts...); err1 != nil {
+		return nil, err1
+	}
+	if err1 := execPluginConfig.commitStoreReader.RegisterFilters(qopts...); err1 != nil {
+		return nil, err1
+	}
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, execPluginConfig.destChainEVMID)
 	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(execPluginConfig.lggr, true, logError)
@@ -211,7 +221,7 @@ func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Execution
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
 // See comment in UnregisterCommitPluginLpFilters
 func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	execPluginConfig, _, err := jobSpecToExecPluginConfig(lggr, jb, chainSet)
+	execPluginConfig, _, err := jobSpecToExecPluginConfig(lggr, jb, chainSet, qopts...)
 	if err != nil {
 		return err
 	}
