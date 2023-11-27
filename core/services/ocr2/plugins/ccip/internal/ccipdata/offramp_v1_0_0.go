@@ -295,8 +295,8 @@ func (o *OffRampV1_0_0) GetDestinationTokens(ctx context.Context) ([]common.Addr
 	return o.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
 }
 
-func (o *OffRampV1_0_0) Close(qopts ...pg.QOpt) error {
-	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
+func (o *OffRampV1_0_0) Close() error {
+	return logpollerutil.UnregisterLpFilters(o.lp, o.filters)
 }
 
 func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error) {

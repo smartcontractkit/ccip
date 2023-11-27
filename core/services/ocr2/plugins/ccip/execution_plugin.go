@@ -205,24 +205,23 @@ func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Execution
 }
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
-// See comment in UnregisterCommitPluginLpFilters
-func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
+func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer) error {
 	execPluginConfig, _, err := jobSpecToExecPluginConfig(lggr, jb, chainSet)
 	if err != nil {
 		return err
 	}
-	if err := execPluginConfig.onRampReader.Close(qopts...); err != nil {
+	if err := execPluginConfig.onRampReader.Close(); err != nil {
 		return err
 	}
 	for _, tokenReader := range execPluginConfig.tokenDataProviders {
-		if err := tokenReader.Close(qopts...); err != nil {
+		if err := tokenReader.Close(); err != nil {
 			return err
 		}
 	}
-	if err := execPluginConfig.offRampReader.Close(qopts...); err != nil {
+	if err := execPluginConfig.offRampReader.Close(); err != nil {
 		return err
 	}
-	return execPluginConfig.commitStoreReader.Close(qopts...)
+	return execPluginConfig.commitStoreReader.Close()
 }
 
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.

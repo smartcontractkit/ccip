@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
@@ -45,7 +44,7 @@ type GasPriceUpdate struct {
 
 //go:generate mockery --quiet --name PriceRegistryReader --filename price_registry_reader_mock.go --case=underscore
 type PriceRegistryReader interface {
-	Close(qopts ...pg.QOpt) error
+	Closer
 	// GetTokenPriceUpdatesCreatedAfter returns all the token price updates that happened after the provided timestamp.
 	// The returned updates are sorted by timestamp in ascending order.
 	GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]Event[TokenPriceUpdate], error)

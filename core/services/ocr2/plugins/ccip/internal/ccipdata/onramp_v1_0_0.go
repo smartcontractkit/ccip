@@ -225,6 +225,6 @@ func (o *OnRampV1_0_0) RouterAddress() (common.Address, error) {
 	return config.Router, nil
 }
 
-func (o *OnRampV1_0_0) Close(qopts ...pg.QOpt) error {
-	return o.lp.UnregisterFilter(o.filterName, qopts...)
+func (o *OnRampV1_0_0) Close() error {
+	return o.lp.UnregisterFilter(o.filterName)
 }

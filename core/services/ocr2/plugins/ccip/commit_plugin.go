@@ -153,20 +153,16 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 }
 
 // UnregisterCommitPluginLpFilters unregisters all the registered filters for both source and dest chains.
-// NOTE: The transaction MUST be used here for CLO's monster tx to function as expected
-// https://github.com/smartcontractkit/ccip/blob/68e2197472fb017dd4e5630d21e7878d58bc2a44/core/services/feeds/service.go#L716
-// TODO once that transaction is broken up, we should be able to simply rely on oracle.Close() to cleanup the filters.
-// Until then we have to deterministically reload the readers from the spec (and thus their filters) and close them.
-func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
+func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer) error {
 	commitPluginConfig, _, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet)
 	if err != nil {
 		return errors.New("spec is nil")
 	}
-	if err := commitPluginConfig.onRampReader.Close(qopts...); err != nil {
+	if err := commitPluginConfig.onRampReader.Close(); err != nil {
 		return err
 	}
-	if err := commitPluginConfig.commitStore.Close(qopts...); err != nil {
+	if err := commitPluginConfig.commitStore.Close(); err != nil {
 		return err
 	}
-	return commitPluginConfig.offRamp.Close(qopts...)
+	return commitPluginConfig.offRamp.Close()
 }

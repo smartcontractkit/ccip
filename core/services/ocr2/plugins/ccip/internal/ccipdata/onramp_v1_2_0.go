@@ -292,8 +292,8 @@ func (o *OnRampV1_2_0) RouterAddress() (common.Address, error) {
 	return config.Router, nil
 }
 
-func (o *OnRampV1_2_0) Close(qopts ...pg.QOpt) error {
-	return o.lp.UnregisterFilter(o.filterName, qopts...)
+func (o *OnRampV1_2_0) Close() error {
+	return o.lp.UnregisterFilter(o.filterName)
 }
 
 func NewOnRampV1_2_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, jobID int32) (*OnRampV1_2_0, error) {

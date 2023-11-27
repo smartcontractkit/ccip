@@ -73,8 +73,8 @@ func (p *PriceRegistryV1_0_0) GetFeeTokens(ctx context.Context) ([]common.Addres
 	return p.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
 }
 
-func (p *PriceRegistryV1_0_0) Close(opts ...pg.QOpt) error {
-	return logpollerutil.UnregisterLpFilters(p.lp, p.filters, opts...)
+func (p *PriceRegistryV1_0_0) Close() error {
+	return logpollerutil.UnregisterLpFilters(p.lp, p.filters)
 }
 
 func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]Event[TokenPriceUpdate], error) {

@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 type Event[T any] struct {
@@ -29,7 +28,7 @@ const (
 )
 
 type Closer interface {
-	Close(qopts ...pg.QOpt) error
+	Close() error
 }
 
 // Client can be used to fetch CCIP related parsed on-chain data.

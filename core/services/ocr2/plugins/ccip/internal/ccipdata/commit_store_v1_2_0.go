@@ -248,8 +248,8 @@ func (c *CommitStoreV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []
 	return onchainConfigParsed.PriceRegistry, nil
 }
 
-func (c *CommitStoreV1_2_0) Close(qopts ...pg.QOpt) error {
-	return logpollerutil.UnregisterLpFilters(c.lp, c.filters, qopts...)
+func (c *CommitStoreV1_2_0) Close() error {
+	return logpollerutil.UnregisterLpFilters(c.lp, c.filters)
 }
 
 func (c *CommitStoreV1_2_0) parseReport(log types.Log) (*CommitStoreReport, error) {
