@@ -217,6 +217,8 @@ NoOfNetworks = 2   # same as above
 Blockscout = false   # same as above
 
 [CCIP.Groups.chaos]
+
+NetworkPairs =
 KeepEnvAlive = false
 CommitAndExecuteOnSameDON = false
 BiDirectionalLane = true
