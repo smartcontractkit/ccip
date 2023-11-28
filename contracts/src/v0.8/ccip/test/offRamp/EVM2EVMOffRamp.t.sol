@@ -74,7 +74,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
     assertEq(block.number, blockNumber);
 
     // OffRamp initial values
-    assertEq("EVM2EVMOffRamp 1.2.0", s_offRamp.typeAndVersion());
+    assertEq("EVM2EVMOffRamp 1.3.0-dev", s_offRamp.typeAndVersion());
     assertEq(OWNER, s_offRamp.owner());
   }
 
@@ -1002,15 +1002,20 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     // sets the report to be repeated on the ReentrancyAbuser to be able to replay
     receiver.setPayload(report);
 
-    s_offRamp.manuallyExecute(report, _getGasLimitsFromMessages(messages));
-
     // The first entry should be fine and triggers the second entry. This one fails
-    // but since it's an inner tx of the first one it is caught in the cry-catch.
-    // This failure of the inner tx flags the outer tx as failed.
-    assertEq(
-      uint256(s_offRamp.getExecutionState(messages[0].sequenceNumber)),
-      uint256(Internal.MessageExecutionState.FAILURE)
+    // but since it's an inner tx of the first one it is caught in the try-catch.
+    // Since this is manual exec, the entire tx fails on any failure.
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMOffRamp.ExecutionError.selector,
+        abi.encodeWithSelector(
+          EVM2EVMOffRamp.ReceiverError.selector,
+          abi.encodeWithSelector(EVM2EVMOffRamp.AlreadyExecuted.selector, messages[0].sequenceNumber)
+        )
+      )
     );
+
+    s_offRamp.manuallyExecute(report, _getGasLimitsFromMessages(messages));
 
     // Since the tx failed we don't release the tokens
     assertEq(tokenToAbuse.balanceOf(address(receiver)), balancePre);
