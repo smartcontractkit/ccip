@@ -160,6 +160,11 @@ EIP1559FeeCapBufferBlocks = 0
 # the following configs are specific to each test type, smoke, load , chaos, etc...
 [CCIP.Groups]
 [CCIP.Groups.smoke]
+# uncomment the following with specific values of lane combinations to be tested, if you want to run your tests to run only on these specific network pairs
+# if specific network pairs are not mentioned, then all the network pairs will be tested based on values in CCIP.Env.NetworkPairs and CCIP.Groups.<test_type>.NoOfNetworks
+# if specified, CCIP.Groups.<test_type>.NetworkPairs takes precedence over CCIP.Env.NetworkPairs and CCIP.Groups.<test_type>.NoOfNetworks
+#NetworkPairs =  ['SEPOLIA,OPTIMISM_GOERLI','SEPOLIA,POLYGON_MUMBAI','AVALANCHE_FUJI,SEPOLIA','SEPOLIA,BASE_GOERLI','SEPOLIA,BSC_TESTNET','SEPOLIA,WEMIX_TESTNET','AVALANCHE_FUJI,OPTIMISM_GOERLI','AVALANCHE_FUJI,POLYGON_MUMBAI','AVALANCHE_FUJI,BSC_TESTNET','AVALANCHE_FUJI,BASE_GOERLI','OPTIMISM_GOERLI,BASE_GOERLI','OPTIMISM_GOERLI,POLYGON_MUMBAI','BSC_TESTNET,POLYGON_MUMBAI','BSC_TESTNET,BASE_GOERLI','WEMIX_TESTNET,KROMA_SEPOLIA']
+
 KeepEnvAlive = false                # if true, the test will not tear down the test environment after the test is finished
 CommitAndExecuteOnSameDON = true    # if true, and the test is building the env from scratch, same chainlink nodes will be used for Commit and Execution jobs.
 # Otherwise Commit and execution jobs will be set up in different nodes based on the number of nodes specified in NoOfCommitNodes and CCIP.Env.Chainlink.NoOfNodes
@@ -188,7 +193,19 @@ NoOfNetworks = 2                    # this is used with Networks in `CCIP.Env`, 
 
 Blockscout = false                  # if true, the test will use blockscout
 
+# uncomment the following if you want to run your tests with specific number of lanes;
+# in this case out of all the possible lane combinations, only the ones with the specified number of lanes will be considered
+# for example, if you have provided CCIP.Env.Networks = ['SIMULATED_1', 'SIMULATED_2', 'SIMULATED_3'] and CCIP.Groups.<test_type>.MaxNoOfLanes = 2,
+# then only random combinations of 2 lanes from the following will be considered for the test :
+# ['SIMULATED_1', 'SIMULATED_2'], ['SIMULATED_1', 'SIMULATED_3'], ['SIMULATED_2', 'SIMULATED_3']
+#MaxNoOfLanes = <no_of_lanes> # maximum number of lanes to be added in the test; mainly used for scalability tests
+
 [CCIP.Groups.load]
+# uncomment the following with specific values of lane combinations to be tested, if you want to run your tests to run only on these specific network pairs
+# if specific network pairs are not mentioned, then all the network pairs will be tested based on values in CCIP.Env.NetworkPairs and CCIP.Groups.<test_type>.NoOfNetworks
+# if specified, CCIP.Groups.<test_type>.NetworkPairs takes precedence over CCIP.Env.NetworkPairs and CCIP.Groups.<test_type>.NoOfNetworks
+#NetworkPairs =  ['SEPOLIA,OPTIMISM_GOERLI','SEPOLIA,POLYGON_MUMBAI','AVALANCHE_FUJI,SEPOLIA','SEPOLIA,BASE_GOERLI','SEPOLIA,BSC_TESTNET','SEPOLIA,WEMIX_TESTNET','AVALANCHE_FUJI,OPTIMISM_GOERLI','AVALANCHE_FUJI,POLYGON_MUMBAI','AVALANCHE_FUJI,BSC_TESTNET','AVALANCHE_FUJI,BASE_GOERLI','OPTIMISM_GOERLI,BASE_GOERLI','OPTIMISM_GOERLI,POLYGON_MUMBAI','BSC_TESTNET,POLYGON_MUMBAI','BSC_TESTNET,BASE_GOERLI','WEMIX_TESTNET,KROMA_SEPOLIA']
+
 KeepEnvAlive = false # same as above
 CommitAndExecuteOnSameDON = true # same as above
 BiDirectionalLane = true # same as above
@@ -216,9 +233,18 @@ TimeUnit = '1s' # unit of time for RequestPerUnitTime
 NoOfNetworks = 2   # same as above
 Blockscout = false   # same as above
 
-[CCIP.Groups.chaos]
+# uncomment the following if you want to run your tests with specific number of lanes;
+# in this case out of all the possible lane combinations, only the ones with the specified number of lanes will be considered
+# for example, if you have provided CCIP.Env.Networks = ['SIMULATED_1', 'SIMULATED_2', 'SIMULATED_3'] and CCIP.Groups.<test_type>.MaxNoOfLanes = 2,
+# then only random combinations of 2 lanes from the following will be considered for the test :
+# ['SIMULATED_1', 'SIMULATED_2'], ['SIMULATED_1', 'SIMULATED_3'], ['SIMULATED_2', 'SIMULATED_3']
+#MaxNoOfLanes = <no_of_lanes> # maximum number of lanes to be added in the test; mainly used for scalability tests
 
-NetworkPairs =
+[CCIP.Groups.chaos]
+# uncomment the following with specific values of lane combinations to be tested, if you want to run your tests to run only on these specific network pairs
+# if specific network pairs are not mentioned, then all the network pairs will be tested based on values in CCIP.Env.NetworkPairs and CCIP.Groups.<test_type>.NoOfNetworks
+# if specified, CCIP.Groups.<test_type>.NetworkPairs takes precedence over CCIP.Env.NetworkPairs and CCIP.Groups.<test_type>.NoOfNetworks
+#NetworkPairs =  ['SEPOLIA,OPTIMISM_GOERLI','SEPOLIA,POLYGON_MUMBAI','AVALANCHE_FUJI,SEPOLIA','SEPOLIA,BASE_GOERLI','SEPOLIA,BSC_TESTNET','SEPOLIA,WEMIX_TESTNET','AVALANCHE_FUJI,OPTIMISM_GOERLI','AVALANCHE_FUJI,POLYGON_MUMBAI','AVALANCHE_FUJI,BSC_TESTNET','AVALANCHE_FUJI,BASE_GOERLI','OPTIMISM_GOERLI,BASE_GOERLI','OPTIMISM_GOERLI,POLYGON_MUMBAI','BSC_TESTNET,POLYGON_MUMBAI','BSC_TESTNET,BASE_GOERLI','WEMIX_TESTNET,KROMA_SEPOLIA']
 KeepEnvAlive = false
 CommitAndExecuteOnSameDON = false
 BiDirectionalLane = true
@@ -244,3 +270,10 @@ Blockscout = false
 # chaos test settings
 ChaosDuration = '10m'               # Duration for whichever chaos will be injected; only valid for chaos tests
 WaitBetweenChaosDuringLoad = '2m'   # Duration to wait between each chaos injection during load test; only valid for chaos tests
+
+# uncomment the following if you want to run your tests with specific number of lanes;
+# in this case out of all the possible lane combinations, only the ones with the specified number of lanes will be considered
+# for example, if you have provided CCIP.Env.Networks = ['SIMULATED_1', 'SIMULATED_2', 'SIMULATED_3'] and CCIP.Groups.<test_type>.MaxNoOfLanes = 2,
+# then only random combinations of 2 lanes from the following will be considered for the test :
+# ['SIMULATED_1', 'SIMULATED_2'], ['SIMULATED_1', 'SIMULATED_3'], ['SIMULATED_2', 'SIMULATED_3']
+#MaxNoOfLanes = <no_of_lanes> # maximum number of lanes to be added in the test; mainly used for scalability tests
