@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -269,44 +268,56 @@ func (o *OffRampV1_0_0) GetSourceToDestTokensMapping(ctx context.Context) (map[c
 	return srcToDstTokenMapping, nil
 }
 
-// TODO: batched calls
 func (o *OffRampV1_0_0) GetDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error) {
 	return o.destinationPoolsCache.Get(ctx, func(ctx context.Context) (map[common.Address]common.Address, error) {
 		destTokens, err := o.GetDestinationTokens(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("get destination tokens")
+			return nil, fmt.Errorf("get destination tokens: %w", err)
 		}
 
-		eg := new(errgroup.Group)
-		eg.SetLimit(10)
-		var mu sync.Mutex
-
-		mapping := make(map[common.Address]common.Address, len(destTokens))
-		for _, token := range destTokens {
-			token := token
-			eg.Go(func() error {
-				poolAddress, err := o.GetPoolByDestToken(ctx, token)
-				if err != nil {
-					return fmt.Errorf("get token pool for token '%s': %w", token, err)
-				}
-
-				mu.Lock()
-				mapping[token] = poolAddress
-				mu.Unlock()
-				return nil
-			})
+		destPools, err := o.getPoolsByDestTokens(ctx, destTokens)
+		if err != nil {
+			return nil, fmt.Errorf("get pools by dest tokens: %w", err)
 		}
 
-		if err := eg.Wait(); err != nil {
-			return nil, err
+		tokenToPool := make(map[common.Address]common.Address, len(destTokens))
+		for i := range destTokens {
+			tokenToPool[destTokens[i]] = destPools[i]
 		}
 
-		return mapping, nil
+		return tokenToPool, nil
 	})
 }
 
-func (o *OffRampV1_0_0) GetPoolByDestToken(ctx context.Context, address common.Address) (common.Address, error) {
-	return o.offRamp.GetPoolByDestToken(&bind.CallOpts{Context: ctx}, address)
+func (o *OffRampV1_0_0) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.Address) ([]common.Address, error) {
+	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddrs))
+	for _, tk := range tokenAddrs {
+		evmCalls = append(evmCalls, rpclib.NewEvmCall(
+			abiOffRampV1_0_0,
+			"getPoolByDestToken",
+			o.addr,
+			tk,
+		))
+	}
+
+	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("get latest block: %w", err)
+	}
+
+	results, err := o.evmBatchCaller.BatchCall(ctx, uint64(latestBlock.FinalizedBlockNumber), evmCalls)
+	if err != nil {
+		return nil, fmt.Errorf("batch call limit: %w", err)
+	}
+
+	destPools, err := rpclib.ParseOutputs[common.Address](results, func(d rpclib.DataAndErr) (common.Address, error) {
+		return rpclib.ParseOutput[common.Address](d, 0)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("parse outputs: %w", err)
+	}
+
+	return destPools, nil
 }
 
 func (o *OffRampV1_0_0) OffchainConfig() ExecOffchainConfig {
