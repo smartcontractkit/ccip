@@ -29,9 +29,11 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   event FeeTokenRemoved(address indexed feeToken);
   event UsdPerUnitGasUpdated(uint64 indexed destChain, uint256 value, uint256 timestamp);
   event UsdPerTokenUpdated(address indexed token, uint256 value, uint256 timestamp);
+  event FeedIdAdded(address indexed token, bytes32 feedId);
+  event FeedIdRemoved(address indexed token, bytes32 feedId);
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
-  string public constant override typeAndVersion = "PriceRegistry 1.2.0";
+  string public constant override typeAndVersion = "PriceRegistry 1.3.0";
 
   /// @dev The gas price per unit of gas for a given destination chain, in USD with 18 decimals.
   /// Multiple gas prices can be encoded into the same value. Each price takes {Internal.GAS_PRICE_BITS} bits.
@@ -50,6 +52,15 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   ///     1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
   ///     1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
   mapping(address token => Internal.TimestampedPackedUint224 price) private s_usdPerToken;
+
+  /// @dev The Mercury feed ID for a given token.
+  mapping(address token => bytes32 feedId) private s_tokenToFeedId;
+
+  /// @dev Helper struct used to update s_tokenToFeedId.
+  struct FeedIdUpdate {
+    address token;
+    bytes32 feedId;
+  }
 
   // Price updaters are allowed to update the prices.
   EnumerableSet.AddressSet private s_priceUpdaters;
@@ -144,6 +155,41 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
     uint256 timePassed = block.timestamp - tokenPrice.timestamp;
     if (timePassed > i_stalenessThreshold) revert StaleTokenPrice(token, i_stalenessThreshold, timePassed);
     return tokenPrice.value;
+  }
+
+  // ================================================================
+  // │                         Feeds                                │
+  // ================================================================
+
+  /// @notice Get the feed IDs for a given list of tokens.
+  /// @param tokens The addresses of the tokens to get the feed IDs for.
+  /// @return The feed IDs.
+  function getFeedIds(address[] calldata tokens) external view returns (bytes32[] memory) {
+    uint256 length = tokens.length;
+    bytes32[] memory feedIds = new bytes32[](length);
+    for (uint256 i = 0; i < length; ++i) {
+      feedIds[i] = s_tokenToFeedId[tokens[i]];
+    }
+    return feedIds;
+  }
+
+  /// @notice Associate or disassociate tokens with feed IDs.
+  /// @param adds The tokens to associate with feed IDs.
+  /// @param removes The tokens to disassociate with feed IDs.
+  function applyFeedIdsUpdates(
+    FeedIdUpdate[] memory adds,
+    FeedIdUpdate[] memory removes
+  ) external onlyOwner {
+    for (uint256 i = 0; i < removes.length; ++i) {
+      bytes32 deletedFeedId = s_tokenToFeedId[removes[i].token];
+      delete s_tokenToFeedId[removes[i].token];
+      emit FeedIdRemoved(removes[i].token, deletedFeedId);
+    }
+
+    for (uint256 i = 0; i < adds.length; ++i) {
+      s_tokenToFeedId[adds[i].token] = adds[i].feedId;
+      emit FeedIdAdded(adds[i].token, adds[i].feedId);
+    }
   }
 
   // ================================================================

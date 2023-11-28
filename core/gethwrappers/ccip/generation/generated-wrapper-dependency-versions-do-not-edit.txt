@@ -14,7 +14,7 @@ lock_release_token_pool: ../../../contracts/solc/v0.8.19/LockReleaseTokenPool.ab
 maybe_revert_message_receiver: ../../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.abi ../../../contracts/solc/v0.8.19/MaybeRevertMessageReceiver.bin aaa90eac8cc555ee4b0fbe57d1fb8d72d6689b29510b238177c97ab9b7979ac5
 mock_arm_contract: ../../../contracts/solc/v0.8.19/MockARM.abi ../../../contracts/solc/v0.8.19/MockARM.bin efcf4cb260a2b6a6e189639f62bb50ab650a135715c1fcd42c92dfa9d04aa0e3
 ping_pong_demo: ../../../contracts/solc/v0.8.19/PingPongDemo.abi ../../../contracts/solc/v0.8.19/PingPongDemo.bin 61e6f809128174e884559a2015f6a60b29b56ffde1a1a380912f631a48508a6e
-price_registry: ../../../contracts/solc/v0.8.19/PriceRegistry.abi ../../../contracts/solc/v0.8.19/PriceRegistry.bin 36e8d2c44a16fefb5258557cb1eae25eca1cc12efcd3c3270f91a90a5f81e7ea
+price_registry: ../../../contracts/solc/v0.8.19/PriceRegistry.abi ../../../contracts/solc/v0.8.19/PriceRegistry.bin 0a779a634c8c537262c04cc2e2085e0a7d685d692ba2adf3319ecfb7f16a3457
 router: ../../../contracts/solc/v0.8.19/Router.abi ../../../contracts/solc/v0.8.19/Router.bin 9bca5ba6ba53231f23196ed57e8e45fc216cd6d2614e6c26433b54ed678167ce
 self_funded_ping_pong: ../../../contracts/solc/v0.8.19/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.19/SelfFundedPingPong.bin fc2f9ac93f49f4a2a0a0008c2a660444cc5c127688f64beeb63e5f96a10c995e
 usdc_token_pool: ../../../contracts/solc/v0.8.19/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool.bin 855b633851201fba6bdad7667115a1ba097c45b0c8234ae35f7a76efcb37b27a

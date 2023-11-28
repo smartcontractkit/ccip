@@ -20,6 +20,8 @@ const (
 	COMMIT_PRICE_UPDATES = "Commit price updates"
 	FEE_TOKEN_ADDED      = "Fee token added"
 	FEE_TOKEN_REMOVED    = "Fee token removed"
+	FEED_ID_ADDED        = "Feed ID added"
+	FEED_ID_REMOVED      = "Feed ID removed"
 	ExecPluginLabel      = "exec"
 )
 
@@ -54,9 +56,13 @@ type PriceRegistryReader interface {
 	GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]Event[GasPriceUpdate], error)
 	Address() common.Address
 	FeeTokenEvents() []common.Hash
+	FeedIDEvents() []common.Hash
 	GetFeeTokens(ctx context.Context) ([]common.Address, error)
 	GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error)
 	GetTokensDecimals(ctx context.Context, tokenAddresses []common.Address) ([]uint8, error)
+
+	// GetFeedIDsForTokens returns the feed IDs for the given tokens.
+	GetFeedIDsForTokens(ctx context.Context, tokenAddresses []common.Address) ([][32]byte, error)
 }
 
 // NewPriceRegistryReader determines the appropriate version of the price registry and returns a reader for it.
@@ -74,6 +80,8 @@ func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Addr
 	switch version.String() {
 	case V1_2_0:
 		return NewPriceRegistryV1_2_0(lggr, priceRegistryAddress, lp, cl)
+	case V1_3_0:
+		return NewPriceRegistryV1_3_0(lggr, priceRegistryAddress, lp, cl)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}

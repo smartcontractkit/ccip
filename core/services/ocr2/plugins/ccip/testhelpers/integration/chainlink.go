@@ -28,6 +28,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
 	ctfClient "github.com/smartcontractkit/chainlink/integration-tests/client"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -264,12 +265,13 @@ func setupNodeCCIP(
 	sourceChainID *big.Int, destChainID *big.Int,
 	bootstrapPeerID string,
 	bootstrapPort int64,
+	mercuryURL *string,
 ) (chainlink.Application, string, common.Address, ocr2key.KeyBundle) {
 	trueRef, falseRef := true, false
 
 	// Do not want to load fixtures as they contain a dummy chainID.
 	loglevel := configv2.LogLevel(zap.DebugLevel)
-	config, db := heavyweight.FullTestDBNoFixturesV2(t, fmt.Sprintf("%s%d", dbName, port), func(c *chainlink.Config, _ *chainlink.Secrets) {
+	config, db := heavyweight.FullTestDBNoFixturesV2(t, fmt.Sprintf("%s%d", dbName, port), func(c *chainlink.Config, s *chainlink.Secrets) {
 		p2pAddresses := []string{
 			fmt.Sprintf("127.0.0.1:%d", port),
 		}
@@ -297,6 +299,15 @@ func setupNodeCCIP(
 						fmt.Sprintf("127.0.0.1:%d", bootstrapPort),
 					},
 				},
+			}
+		}
+
+		if mercuryURL != nil {
+			s.Mercury.Credentials = make(map[string]configv2.MercuryCredentials)
+			s.Mercury.Credentials["ccip_commit"] = configv2.MercuryCredentials{
+				URL:      models.MustSecretURL(*mercuryURL),
+				Username: models.NewSecret("ccip_commit"),
+				Password: models.NewSecret("password"),
 			}
 		}
 	})
@@ -620,10 +631,10 @@ func (c *CCIPIntegrationTestHarness) ConsistentlyReportNotCommitted(t *testing.T
 	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeFalse(), "report has been committed")
 }
 
-func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *testing.T, bootstrapNodePort int64) (Node, []Node, int64) {
+func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *testing.T, bootstrapNodePort int64, mercuryURL *string) (Node, []Node, int64) {
 	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := setupNodeCCIP(t, c.Dest.User, bootstrapNodePort,
 		"bootstrap_ccip", c.Source.Chain, c.Dest.Chain, big.NewInt(0).SetUint64(c.Source.ChainID),
-		big.NewInt(0).SetUint64(c.Dest.ChainID), "", 0)
+		big.NewInt(0).SetUint64(c.Dest.ChainID), "", 0, mercuryURL)
 	var (
 		oracles []confighelper.OracleIdentityExtra
 		nodes   []Node
@@ -651,6 +662,7 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 			big.NewInt(0).SetUint64(c.Dest.ChainID),
 			bootstrapPeerID,
 			bootstrapNodePort,
+			mercuryURL,
 		)
 		nodes = append(nodes, Node{
 			App:         app,
@@ -686,11 +698,11 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 	return bootstrapNode, nodes, configBlock
 }
 
-func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64, mercuryURL *string) CCIPJobSpecParams {
 	// setup Jobs
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, bootstrapNodePort)
+	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, bootstrapNodePort, mercuryURL)
 
 	jobParams := c.NewCCIPJobSpecParams(pricePipeline, configBlock)
 
@@ -706,6 +718,34 @@ func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeli
 
 	return jobParams
 }
+
+func (c *CCIPIntegrationTestHarness) SetFeedIDsOnPriceRegistries(t *testing.T, sourceTokenToFeedIDs, destTokenToFeedIDs map[common.Address][32]byte) {
+	var (
+		destAdds   []price_registry.PriceRegistryFeedIdUpdate
+		sourceAdds []price_registry.PriceRegistryFeedIdUpdate
+	)
+	for token, feedID := range destTokenToFeedIDs {
+		destAdds = append(destAdds, price_registry.PriceRegistryFeedIdUpdate{
+			Token:  token,
+			FeedId: feedID,
+		})
+	}
+	for token, feedID := range sourceTokenToFeedIDs {
+		sourceAdds = append(sourceAdds, price_registry.PriceRegistryFeedIdUpdate{
+			Token:  token,
+			FeedId: feedID,
+		})
+	}
+	t.Log("applying feed id updates on destination chain:", destAdds)
+	_, err := c.Dest.PriceRegistry.ApplyFeedIdsUpdates(c.Dest.User, destAdds, []price_registry.PriceRegistryFeedIdUpdate{})
+	require.NoError(t, err)
+	c.Dest.Chain.Commit()
+	t.Log("applying feed id updates on source chain:", sourceAdds)
+	_, err = c.Source.PriceRegistry.ApplyFeedIdsUpdates(c.Source.User, sourceAdds, []price_registry.PriceRegistryFeedIdUpdate{})
+	require.NoError(t, err)
+	c.Source.Chain.Commit()
+}
+
 func DecodeCommitOnChainConfig(encoded []byte) (ccipdata.CommitOnchainConfig, error) {
 	var onchainConfig ccipdata.CommitOnchainConfig
 	unpacked, err := abihelpers.DecodeOCR2Config(encoded)

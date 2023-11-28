@@ -11,7 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
@@ -21,7 +21,7 @@ var (
 
 type PriceRegistryV1_2_0 struct {
 	*PriceRegistryV1_0_0
-	pr *price_registry.PriceRegistry
+	pr *price_registry_1_2_0.PriceRegistry
 }
 
 func NewPriceRegistryV1_2_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistryV1_2_0, error) {
@@ -29,7 +29,7 @@ func NewPriceRegistryV1_2_0(lggr logger.Logger, priceRegistryAddr common.Address
 	if err != nil {
 		return nil, err
 	}
-	priceRegistry, err := price_registry.NewPriceRegistry(priceRegistryAddr, ec)
+	priceRegistry, err := price_registry_1_2_0.NewPriceRegistry(priceRegistryAddr, ec)
 	if err != nil {
 		return nil, err
 	}
@@ -60,29 +60,34 @@ func (p *PriceRegistryV1_2_0) GetTokenPrices(ctx context.Context, wantedTokens [
 	return tpu, nil
 }
 
+func (p *PriceRegistryV1_2_0) FeedIDEvents() []common.Hash {
+	// Unsupported on V1.2
+	return nil
+}
+
 // ApplyPriceRegistryUpdateV1_2_0 is a helper function used in tests only.
 func ApplyPriceRegistryUpdateV1_2_0(t *testing.T, user *bind.TransactOpts, addr common.Address, ec client.Client, gasPrices []GasPrice, tokenPrices []TokenPrice) common.Hash {
 	require.True(t, len(gasPrices) <= 1)
-	pr, err := price_registry.NewPriceRegistry(addr, ec)
+	pr, err := price_registry_1_2_0.NewPriceRegistry(addr, ec)
 	require.NoError(t, err)
 	o, err := pr.Owner(nil)
 	require.NoError(t, err)
 	require.Equal(t, user.From, o)
-	var tps []price_registry.InternalTokenPriceUpdate
+	var tps []price_registry_1_2_0.InternalTokenPriceUpdate
 	for _, tp := range tokenPrices {
-		tps = append(tps, price_registry.InternalTokenPriceUpdate{
+		tps = append(tps, price_registry_1_2_0.InternalTokenPriceUpdate{
 			SourceToken: tp.Token,
 			UsdPerToken: tp.Value,
 		})
 	}
-	var gps []price_registry.InternalGasPriceUpdate
+	var gps []price_registry_1_2_0.InternalGasPriceUpdate
 	for _, gp := range gasPrices {
-		gps = append(gps, price_registry.InternalGasPriceUpdate{
+		gps = append(gps, price_registry_1_2_0.InternalGasPriceUpdate{
 			DestChainSelector: gp.DestChainSelector,
 			UsdPerUnitGas:     gp.Value,
 		})
 	}
-	tx, err := pr.UpdatePrices(user, price_registry.InternalPriceUpdates{
+	tx, err := pr.UpdatePrices(user, price_registry_1_2_0.InternalPriceUpdates{
 		TokenPriceUpdates: tps,
 		GasPriceUpdates:   gps,
 	})

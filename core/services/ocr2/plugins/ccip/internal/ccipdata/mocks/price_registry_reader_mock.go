@@ -72,6 +72,22 @@ func (_m *PriceRegistryReader) FeeTokenEvents() []common.Hash {
 	return r0
 }
 
+// FeedIDEvents provides a mock function with given fields:
+func (_m *PriceRegistryReader) FeedIDEvents() []common.Hash {
+	ret := _m.Called()
+
+	var r0 []common.Hash
+	if rf, ok := ret.Get(0).(func() []common.Hash); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]common.Hash)
+		}
+	}
+
+	return r0
+}
+
 // GetFeeTokens provides a mock function with given fields: ctx
 func (_m *PriceRegistryReader) GetFeeTokens(ctx context.Context) ([]common.Address, error) {
 	ret := _m.Called(ctx)
@@ -91,6 +107,32 @@ func (_m *PriceRegistryReader) GetFeeTokens(ctx context.Context) ([]common.Addre
 
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
 		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetFeedIDsForTokens provides a mock function with given fields: ctx, tokenAddresses
+func (_m *PriceRegistryReader) GetFeedIDsForTokens(ctx context.Context, tokenAddresses []common.Address) ([][32]byte, error) {
+	ret := _m.Called(ctx, tokenAddresses)
+
+	var r0 [][32]byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) ([][32]byte, error)); ok {
+		return rf(ctx, tokenAddresses)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) [][32]byte); ok {
+		r0 = rf(ctx, tokenAddresses)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([][32]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []common.Address) error); ok {
+		r1 = rf(ctx, tokenAddresses)
 	} else {
 		r1 = ret.Error(1)
 	}

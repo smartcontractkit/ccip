@@ -57,4 +57,3 @@ compileContract ccip/test/WETH9.sol
 
 # Customer contracts
 compileContract ccip/pools/USDC/USDCTokenPool.sol
-

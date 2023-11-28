@@ -95,7 +95,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     assertEq(feeTokens, s_priceRegistry.getFeeTokens());
     assertEq(uint32(TWELVE_HOURS), s_priceRegistry.getStalenessThreshold());
     assertEq(priceUpdaters, s_priceRegistry.getPriceUpdaters());
-    assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.2.0");
+    assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.3.0");
   }
 
   function testInvalidStalenessThresholdReverts() public {
@@ -490,5 +490,80 @@ contract PriceRegistry_getTokenAndGasPrices is PriceRegistrySetup {
       abi.encodeWithSelector(PriceRegistry.StaleTokenPrice.selector, s_sourceTokens[0], TWELVE_HOURS, diff)
     );
     s_priceRegistry.getTokenAndGasPrices(s_sourceTokens[0], DEST_CHAIN_ID);
+  }
+}
+
+contract PriceRegistry_applyFeedIdsUpdates is PriceRegistrySetup {
+  event FeedIdAdded(address indexed token, bytes32 feedId);
+  event FeedIdRemoved(address indexed token, bytes32 feedId);
+
+  function testApplyFeedIdsUpdatesSuccess() public {
+    bytes32[] memory feedIds = new bytes32[](2);
+    feedIds[0] = bytes32(uint256(uint160(makeAddr("feed1"))) << 96);
+    feedIds[1] = bytes32(uint256(uint160(makeAddr("feed2"))) << 96);
+
+    address[] memory tokens = new address[](2);
+    tokens[0] = makeAddr("token1");
+    tokens[1] = makeAddr("token2");
+
+    PriceRegistry.FeedIdUpdate[] memory adds = new PriceRegistry.FeedIdUpdate[](2);
+    adds[0] = PriceRegistry.FeedIdUpdate({token: tokens[0], feedId: feedIds[0]});
+    adds[1] = PriceRegistry.FeedIdUpdate({token: tokens[1], feedId: feedIds[1]});
+
+    vm.expectEmit(true, false, false, true);
+    emit FeedIdAdded(tokens[0], feedIds[0]);
+    emit FeedIdAdded(tokens[1], feedIds[1]);
+    s_priceRegistry.applyFeedIdsUpdates(adds, new PriceRegistry.FeedIdUpdate[](0));
+    bytes32[] memory actualFeedIds = s_priceRegistry.getFeedIds(tokens);
+    assertEq(actualFeedIds.length, 2);
+    assertEq(actualFeedIds[0], feedIds[0]);
+    assertEq(actualFeedIds[1], feedIds[1]);
+
+    // add same feedId is no-op
+    // events are still emitted, however.
+    // TODO: should we not emit events if no changes are made?
+    vm.expectEmit(true, false, false, true);
+    emit FeedIdAdded(tokens[0], feedIds[0]);
+    emit FeedIdAdded(tokens[1], feedIds[1]);
+    s_priceRegistry.applyFeedIdsUpdates(adds, new PriceRegistry.FeedIdUpdate[](0));
+    actualFeedIds = s_priceRegistry.getFeedIds(tokens);
+    assertEq(actualFeedIds.length, 2);
+    assertEq(actualFeedIds[0], feedIds[0]);
+    assertEq(actualFeedIds[1], feedIds[1]);
+
+    // update a feed id
+    PriceRegistry.FeedIdUpdate[] memory adds2 = new PriceRegistry.FeedIdUpdate[](1);
+    bytes32 updatedFeedId = bytes32(uint256(uint160(makeAddr("feed3"))) << 96);
+    adds2[0] = PriceRegistry.FeedIdUpdate({token: tokens[0], feedId: updatedFeedId});
+
+    vm.expectEmit(true, false, false, true);
+    emit FeedIdAdded(tokens[0], updatedFeedId);
+    s_priceRegistry.applyFeedIdsUpdates(adds2, new PriceRegistry.FeedIdUpdate[](0));
+    actualFeedIds = s_priceRegistry.getFeedIds(tokens);
+    assertEq(actualFeedIds.length, 2);
+    assertEq(actualFeedIds[0], updatedFeedId);
+    assertEq(actualFeedIds[1], feedIds[1]);
+
+    // delete a feed id
+    PriceRegistry.FeedIdUpdate[] memory removes2 = new PriceRegistry.FeedIdUpdate[](1);
+    removes2[0] = PriceRegistry.FeedIdUpdate({token: tokens[0], feedId: updatedFeedId});
+    vm.expectEmit(true, false, false, true);
+    emit FeedIdRemoved(tokens[0], updatedFeedId);
+    s_priceRegistry.applyFeedIdsUpdates(new PriceRegistry.FeedIdUpdate[](0), removes2);
+    actualFeedIds = s_priceRegistry.getFeedIds(tokens);
+    // length will still be 2, but the feed id will be 0
+    assertEq(actualFeedIds.length, 2);
+    assertEq(actualFeedIds[0], bytes32(0));
+    assertEq(actualFeedIds[1], feedIds[1]);
+  }
+
+  function testOnlyCallableByOwnerReverts() public {
+    bytes32[] memory feedIds = new bytes32[](1);
+    feedIds[0] = bytes32(uint256(uint160(makeAddr("feed1"))) << 96);
+    PriceRegistry.FeedIdUpdate[] memory adds = new PriceRegistry.FeedIdUpdate[](1);
+    adds[0] = PriceRegistry.FeedIdUpdate({token: makeAddr("token1"), feedId: feedIds[0]});
+    changePrank(STRANGER);
+    vm.expectRevert("Only callable by owner");
+    s_priceRegistry.applyFeedIdsUpdates(adds, new PriceRegistry.FeedIdUpdate[](0));
   }
 }
