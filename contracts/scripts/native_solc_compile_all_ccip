@@ -59,7 +59,6 @@ compileContract ccip/ARMProxy.sol
 # Test helpers
 compileContract ccip/test/helpers/BurnMintERC677Helper.sol
 compileContract ccip/test/helpers/CommitStoreHelper.sol
-compileContract ccip/test/helpers/EVM2EVMOffRampHelper.sol
 compileContract ccip/test/helpers/CustomTokenPool.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 compileContract ccip/test/mocks/MockARM.sol
