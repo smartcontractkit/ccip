@@ -16,23 +16,23 @@ Networks = ['SIMULATED_1', 'SIMULATED_2']
 #
 [CCIP.Env.Chainlink]
 NoOfNodes = 6 # number of chainlink nodes to be set up in DON, including one bootstrap node
-# if tests are run in k8, then the following values will be used to set up chainlink nodes and postgresql database,
+# if tests are run in k8s, then the following values will be used to set up chainlink nodes and postgresql database,
 # in case of local deployment through docker container, these values will be ignored
-# for k8 deployment, helm charts are used from https://github.com/smartcontractkit/chainlink-testing-framework/tree/main/charts/chainlink/templates
-NodeMemory = '4Gi' # memory to be allocated to each chainlink node; only used if tests are in k8
-NodeCPU = '2' # cpu to be allocated to each chainlink node ; only used if tests are in k8
-DBMemory = '4Gi' # memory to be allocated to postgresql database ; only used if tests are in k8
-DBCPU = '2' # cpu to be allocated to postgresql database ; only used if tests are in k8
-DBCapacity = '10Gi' # disk space to be allocated to postgresql database ; only used if tests are in k8 in stateful deployment
-IsStateful = true # if true, chainlink nodes and postgresql database will be deployed as stateful set in k8
-DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB'] # postgresql database arguments ; only used if tests are in k8
+# for k8s deployment, helm charts are used from https://github.com/smartcontractkit/chainlink-testing-framework/tree/main/charts/chainlink/templates
+NodeMemory = '4Gi' # memory to be allocated to each chainlink node; only used if tests are in k8s
+NodeCPU = '2' # cpu to be allocated to each chainlink node ; only used if tests are in k8s
+DBMemory = '4Gi' # memory to be allocated to postgresql database ; only used if tests are in k8s
+DBCPU = '2' # cpu to be allocated to postgresql database ; only used if tests are in k8s
+DBCapacity = '10Gi' # disk space to be allocated to postgresql database ; only used if tests are in k8s in stateful deployment
+IsStateful = true # if true, chainlink nodes and postgresql database will be deployed as stateful set in k8s
+DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB'] # postgresql database arguments ; only used if tests are in k8s
 
 
 # these values will be used to set up chainlink DON, if all the chainlink nodes are deployed with same configuration
 [CCIP.Env.Chainlink.Common]
-Name = 'node1' # name of the chainlink node, used as prefix for all the chainlink node names , used for k8 deployment
-DBImage = 'postgres' # postgresql database image to be used for k8 deployment
-DBTag = '13.12' # postgresql database image tag to be used for k8 deployment
+Name = 'node1' # name of the chainlink node, used as prefix for all the chainlink node names , used for k8s deployment
+DBImage = 'postgres' # postgresql database image to be used for k8s deployment
+DBTag = '13.12' # postgresql database image tag to be used for k8s deployment
 # override config toml file for chainlink nodes
 BaseConfigTOML = """
 [Feature]
@@ -172,7 +172,7 @@ BiDirectionalLane = true            # True uses both the lanes. If bidirectional
 MsgType = 'WithToken'               # options `WithToken` for messages with Token (refer to NoOfTokensPerChain and NoOfTokensInMsg for token set up) and `WithoutToken` for data-only messages,
 NoOfCommitNodes = 5                 # no of chainlink nodes with Commit job
 PhaseTimeout = '10m'                # Duration to wait for the each phase validation(SendRequested, Commit, RMN Blessing, Execution) to time-out.
-LocalCluster = true                 # if true, the test will use the local docker container, otherwise it will use the k8 cluster
+LocalCluster = true                 # if true, the test will use the local docker container, otherwise it will use the k8s cluster
 ExistingDeployment = false          # true if the tests are run on existing environment with already set-up jobs, smart contracts, etc...
 # In this case the test will only be used to send and verify ccip requests considering that lanes are already functioning.
 # In case of ExistingDeployment = false, the test will deploy it's own contracts and spin up new chainlink nodes with ccip jobs. It will then use
