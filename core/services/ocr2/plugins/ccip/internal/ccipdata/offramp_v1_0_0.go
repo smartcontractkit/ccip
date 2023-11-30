@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -203,6 +204,14 @@ func (o *OffRampV1_0_0) getDestinationTokensFromSourceTokens(ctx context.Context
 			o.sourceToDestTokensCache.Store(sourceToken, destTokens[i])
 			j++
 		}
+	}
+
+	seenDestTokens := mapset.NewSet[common.Address]()
+	for _, destToken := range destTokens {
+		if seenDestTokens.Contains(destToken) {
+			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destToken)
+		}
+		seenDestTokens.Add(destToken)
 	}
 
 	return destTokens, nil
