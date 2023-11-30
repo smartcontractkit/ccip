@@ -99,7 +99,8 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports = newInflightExecReportsContainer(time.Minute)
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
-			p.config.tokenDataWorker = tokendata.NewBackgroundWorker(ctx, make(map[common.Address]tokendata.Reader), 10)
+			p.config.tokenDataWorker = tokendata.NewBackgroundWorker(
+				ctx, make(map[common.Address]tokendata.Reader), 10, 5*time.Second)
 
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 			commitStoreReader.On("IsDown", mock.Anything).Return(tc.commitStorePaused, nil)
@@ -639,7 +640,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 				config: ExecutionPluginStaticConfig{
 					offRampReader: mockOffRampReader,
 					tokenDataWorker: tokendata.NewBackgroundWorker(
-						ctx, map[common.Address]tokendata.Reader{}, 10),
+						ctx, map[common.Address]tokendata.Reader{}, 10, 5*time.Second),
 				},
 				destWrappedNative: destNative,
 				offchainConfig: ccipdata.ExecOffchainConfig{

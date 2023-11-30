@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -139,6 +140,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 				ctx,
 				tokenDataProviders,
 				numTokenDataWorkers,
+				5*time.Second,
 			),
 		}, &BackfillArgs{
 			sourceLP:         sourceChain.LogPoller(),

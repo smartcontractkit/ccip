@@ -33,6 +33,7 @@ type BackgroundWorker struct {
 	numWorkers       int
 	jobsChan         chan internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
 	resultsCache     *resultsCache
+	timeoutDur       time.Duration
 }
 
 func (w *BackgroundWorker) AddJobsFromMsgs(ctx context.Context, msgs []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) {
@@ -74,12 +75,18 @@ func (w *BackgroundWorker) GetMsgTokenData(ctx context.Context, msg internal.EVM
 	return tokenDatas, nil
 }
 
-func NewBackgroundWorker(ctx context.Context, tokenDataReaders map[common.Address]Reader, numWorkers int) *BackgroundWorker {
+func NewBackgroundWorker(
+	ctx context.Context,
+	tokenDataReaders map[common.Address]Reader,
+	numWorkers int,
+	timeoutDur time.Duration,
+) *BackgroundWorker {
 	w := &BackgroundWorker{
 		tokenDataReaders: tokenDataReaders,
 		numWorkers:       numWorkers,
 		jobsChan:         make(chan internal.EVM2EVMOnRampCCIPSendRequestedWithMeta),
 		resultsCache:     newResultsCache(),
+		timeoutDur:       timeoutDur,
 	}
 
 	w.spawnWorkers(ctx)
@@ -141,6 +148,9 @@ func (w *BackgroundWorker) getMsgTokenData(ctx context.Context, seqNum uint64) (
 	if msgTokenData, exists := w.resultsCache.get(seqNum); exists {
 		return msgTokenData, nil
 	}
+
+	ctx, cf := context.WithTimeout(ctx, w.timeoutDur)
+	defer cf()
 
 	// wait until the results are ready or until context timeout is reached
 	tick := time.NewTicker(100 * time.Millisecond)

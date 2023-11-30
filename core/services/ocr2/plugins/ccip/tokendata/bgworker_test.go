@@ -44,7 +44,7 @@ func TestBackgroundWorker(t *testing.T) {
 		readerLatency := rand.Intn(maxReaderLatencyMS)
 		delays[tokens[i]] = time.Duration(readerLatency) * time.Millisecond
 	}
-	w := tokendata.NewBackgroundWorker(ctx, tokenDataReaders, numWorkers)
+	w := tokendata.NewBackgroundWorker(ctx, tokenDataReaders, numWorkers, 5*time.Second)
 
 	msgs := make([]internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, numMessages)
 	for i := range msgs {
@@ -105,7 +105,7 @@ func TestBackgroundWorker_RetryOnErrors(t *testing.T) {
 	w := tokendata.NewBackgroundWorker(ctx, map[common.Address]tokendata.Reader{
 		tk1: rdr1,
 		tk2: rdr2,
-	}, 10)
+	}, 10, 5*time.Second)
 
 	msgs := []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 		{EVM2EVMMessage: internal.EVM2EVMMessage{
@@ -167,7 +167,8 @@ func TestBackgroundWorker_Timeout(t *testing.T) {
 	rdr1 := tokendata.NewMockReader(t)
 	rdr2 := tokendata.NewMockReader(t)
 
-	w := tokendata.NewBackgroundWorker(ctx, map[common.Address]tokendata.Reader{tk1: rdr1, tk2: rdr2}, 10)
+	w := tokendata.NewBackgroundWorker(
+		ctx, map[common.Address]tokendata.Reader{tk1: rdr1, tk2: rdr2}, 10, 5*time.Second)
 
 	ctx, cf := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cf()
