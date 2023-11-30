@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -24,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/collections"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -177,7 +177,7 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		return nil, fmt.Errorf("parse outputs: %w", err)
 	}
 
-	seenDestTokens := collections.NewSet[common.Address]()
+	seenDestTokens := mapset.NewSet[common.Address]()
 	for _, destToken := range destTokens {
 		if seenDestTokens.Contains(destToken) {
 			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destToken)

@@ -4,12 +4,12 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/collections"
 )
 
 type ContractType string
@@ -19,7 +19,7 @@ var (
 	EVM2EVMOffRamp ContractType = "EVM2EVMOffRamp"
 	CommitStore    ContractType = "CommitStore"
 	PriceRegistry  ContractType = "PriceRegistry"
-	ContractTypes               = collections.NewSet[ContractType](
+	ContractTypes               = mapset.NewSet[ContractType](
 		EVM2EVMOffRamp,
 		EVM2EVMOnRamp,
 		CommitStore,
