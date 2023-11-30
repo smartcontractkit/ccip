@@ -101,15 +101,14 @@ func (w *BackgroundWorker) spawnWorkers(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				case msg := <-w.jobsChan:
-					res := w.work(ctx, msg)
-					w.resultsCache.add(msg.SequenceNumber, res)
+					w.workOnMsg(ctx, msg)
 				}
 			}
 		}()
 	}
 }
 
-func (w *BackgroundWorker) work(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) []msgResult {
+func (w *BackgroundWorker) workOnMsg(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) {
 	results := make([]msgResult, 0, len(msg.TokenAmounts))
 
 	cachedTokenData := make(map[int]msgResult) // tokenAmount index -> token data
@@ -141,7 +140,7 @@ func (w *BackgroundWorker) work(ctx context.Context, msg internal.EVM2EVMOnRampC
 		})
 	}
 
-	return results
+	w.resultsCache.add(msg.SequenceNumber, results)
 }
 
 func (w *BackgroundWorker) getMsgTokenData(ctx context.Context, seqNum uint64) ([]msgResult, error) {
