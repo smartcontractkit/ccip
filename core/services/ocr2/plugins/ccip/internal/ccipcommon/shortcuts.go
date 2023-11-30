@@ -53,7 +53,7 @@ func GetDestinationTokens(ctx context.Context, offRamp ccipdata.OffRampReader, p
 	return destFeeTokens, destBridgeableTokens, nil
 }
 
-// FlattenUniqueSlice returns a flattened slice that contains unique elements.
+// FlattenUniqueSlice returns a flattened slice that contains unique elements by preserving their order.
 func FlattenUniqueSlice[T comparable](slices ...[]T) []T {
 	seen := make(map[T]struct{})
 	flattened := make([]T, 0)

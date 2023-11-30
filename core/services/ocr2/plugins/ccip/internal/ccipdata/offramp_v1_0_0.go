@@ -98,8 +98,8 @@ type OffRampV1_0_0 struct {
 	executionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
-	destinationTokensCache  cache.AutoSync[[]common.Address] // dest tokens
-	supportedTokensCache    cache.AutoSync[[]common.Address] // source tokens
+	destinationTokensCache  cache.AutoSync[[]common.Address]
+	sourceTokensCache       cache.AutoSync[[]common.Address]
 	destinationPoolsCache   cache.AutoSync[map[common.Address]common.Address]
 	sourceToDestTokensCache sync.Map
 
@@ -243,14 +243,14 @@ func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddress
 	return rateLimits, nil
 }
 
-func (o *OffRampV1_0_0) getSupportedTokens(ctx context.Context) ([]common.Address, error) {
-	return o.supportedTokensCache.Get(ctx, func(ctx context.Context) ([]common.Address, error) {
+func (o *OffRampV1_0_0) getSourceTokens(ctx context.Context) ([]common.Address, error) {
+	return o.sourceTokensCache.Get(ctx, func(ctx context.Context) ([]common.Address, error) {
 		return o.offRamp.GetSupportedTokens(&bind.CallOpts{Context: ctx})
 	})
 }
 
 func (o *OffRampV1_0_0) GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error) {
-	sourceTokens, err := o.getSupportedTokens(ctx)
+	sourceTokens, err := o.getSourceTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +604,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 			tokenEvents,
 			offRamp.Address(),
 		),
-		supportedTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
+		sourceTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
 			tokenEvents,
 			offRamp.Address(),

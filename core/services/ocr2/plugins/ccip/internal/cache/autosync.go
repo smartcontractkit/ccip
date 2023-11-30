@@ -13,12 +13,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-// AutoSync IMPORTANT: Cache refresh relies on the events that are finalized. This introduces some delay between the event onchain occurrence
-// and cache refreshing. This is intentional, because we want to prevent handling reorgs within the cache.
 type AutoSync[T any] interface {
 	Get(ctx context.Context, syncFunc func(ctx context.Context) (T, error)) (T, error)
 }
 
+// LogpollerEventsBased IMPORTANT: Cache refresh relies on the events that are finalized.
+// This introduces some delay between the event onchain occurrence and cache refreshing.
+// This is intentional, because we want to prevent handling reorgs within the cache.
 type LogpollerEventsBased[T any] struct {
 	logPoller      logpoller.LogPoller
 	observedEvents []common.Hash
@@ -89,18 +90,18 @@ func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool,
 	// Otherwise there might be new events between LatestBlockByEventSigsAddrsWithConfs and
 	// latestBlock which will be missed.
 	latestBlock, err := c.logPoller.LatestBlock(pg.WithParentCtx(ctx))
-	latestBlockNumber := int64(0)
+	latestFinalizedBlock := int64(0)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return false, 0, fmt.Errorf("get latest log poller block: %w", err)
 	} else if err == nil {
 		// Since we know that we have all the events till latestBlock.FinalizedBlockNumber
 		// we want to return the block number instead of the block of the latest event
 		// for reducing the scan window on the next call.
-		latestBlockNumber = latestBlock.FinalizedBlockNumber
+		latestFinalizedBlock = latestBlock.FinalizedBlockNumber
 	}
 
 	if blockOfCurrentValue == 0 {
-		return true, latestBlockNumber, nil
+		return true, latestFinalizedBlock, nil
 	}
 
 	blockOfLatestEvent, err = c.logPoller.LatestBlockByEventSigsAddrsWithConfs(
@@ -114,10 +115,10 @@ func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool,
 		return false, 0, fmt.Errorf("get latest events form lp: %w", err)
 	}
 
-	if blockOfLatestEvent > latestBlockNumber {
-		latestBlockNumber = blockOfLatestEvent
+	if blockOfLatestEvent > latestFinalizedBlock {
+		latestFinalizedBlock = blockOfLatestEvent
 	}
-	return blockOfLatestEvent > blockOfCurrentValue, latestBlockNumber, nil
+	return blockOfLatestEvent > blockOfCurrentValue, latestFinalizedBlock, nil
 }
 
 func (c *LogpollerEventsBased[T]) set(_ context.Context, value T, blockNum int64) {
