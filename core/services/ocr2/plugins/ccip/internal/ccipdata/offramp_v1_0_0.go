@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -176,12 +177,12 @@ func (o *OffRampV1_0_0) GetDestinationTokensFromSourceTokens(ctx context.Context
 		return nil, fmt.Errorf("parse outputs: %w", err)
 	}
 
-	seenDestTokens := make(map[common.Address]struct{})
+	seenDestTokens := mapset.NewSet[common.Address]()
 	for _, destToken := range destTokens {
-		if _, exists := seenDestTokens[destToken]; exists {
+		if seenDestTokens.Contains(destToken) {
 			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destToken)
 		}
-		seenDestTokens[destToken] = struct{}{}
+		seenDestTokens.Add(destToken)
 	}
 
 	return destTokens, nil
@@ -447,6 +448,10 @@ func (o *OffRampV1_0_0) TokenEvents() []common.Hash {
 	return []common.Hash{abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0), abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)}
 }
 
+func (o *OffRampV1_0_0) RegisterFilters(qopts ...pg.QOpt) error {
+	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
+}
+
 func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_0_0, error) {
 	offRamp, err := evm_2_evm_offramp_1_0_0.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
@@ -455,7 +460,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 
 	executionStateChangedSequenceNumberIndex := 1
 	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRampV1_0_0)[:1]
-	var filters = []logpoller.Filter{
+	filters := []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, addr.String()),
 			EventSigs: []common.Hash{ExecutionStateChangedEventV1_0_0},
@@ -471,9 +476,6 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)},
 			Addresses: []common.Address{addr},
 		},
-	}
-	if err := logpollerutil.RegisterLpFilters(lp, filters); err != nil {
-		return nil, err
 	}
 	return &OffRampV1_0_0{
 		offRamp:             offRamp,

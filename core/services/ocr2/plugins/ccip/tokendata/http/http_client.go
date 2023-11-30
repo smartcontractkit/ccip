@@ -21,7 +21,7 @@ type HttpClient struct {
 
 func (s *HttpClient) Get(ctx context.Context, url string, timeout time.Duration) ([]byte, int, http.Header, error) {
 	// Use a timeout to guard against attestation API hanging, causing observation timeout and failing to make any progress.
-	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	timeoutCtx, cancel := context.WithTimeoutCause(ctx, timeout, tokendata.ErrTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(timeoutCtx, http.MethodGet, url, nil)
 	if err != nil {
@@ -33,7 +33,8 @@ func (s *HttpClient) Get(ctx context.Context, url string, timeout time.Duration)
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, http.StatusRequestTimeout, nil, tokendata.ErrTimeout
 		}
-		return nil, res.StatusCode, res.Header, err
+		// On error, res is nil in most cases, do not read res.StatusCode, return BadRequest
+		return nil, http.StatusBadRequest, res.Header, err
 	}
 	defer res.Body.Close()
 
