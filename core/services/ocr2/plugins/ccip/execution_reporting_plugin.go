@@ -42,7 +42,7 @@ const (
 
 	// MaximumAllowedTokenDataWaitTimePerBatchSec defines the maximum time that is allowed
 	// for the plugin to wait for token data to be fetched from external providers per batch.
-	MaximumAllowedTokenDataWaitTimePerBatchSec = 5
+	MaximumAllowedTokenDataWaitTimePerBatchSec = 2
 
 	// MessagesIterationStep limits number of messages fetched to memory at once when iterating through unexpired CommitRoots
 	MessagesIterationStep = 800
