@@ -18,7 +18,7 @@ contract BurnFromMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   using SafeERC20 for IBurnMintERC20;
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
-  string public constant override typeAndVersion = "BurnFromMintTokenPool 1.2.0";
+  string public constant override typeAndVersion = "BurnFromMintTokenPool 1.3.0-dev";
 
   constructor(
     IBurnMintERC20 token,
