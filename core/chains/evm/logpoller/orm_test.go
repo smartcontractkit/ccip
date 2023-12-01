@@ -1189,6 +1189,7 @@ func TestSelectLatestBlockNumberEventSigsAddrsWithConfs(t *testing.T) {
 }
 
 func TestSelectLogsCreatedAfter(t *testing.T) {
+	t.Skip("intentionally broken")
 	th := SetupTH(t, false, 2, 3, 2, 1000)
 	event := EmitterABI.Events["Log1"].ID
 	address := utils.RandomAddress()

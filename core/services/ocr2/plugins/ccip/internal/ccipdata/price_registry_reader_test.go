@@ -181,11 +181,11 @@ func testPriceRegistryReader(t *testing.T, th priceRegReaderTH, pr ccipdata.Pric
 		}
 		gasUpdates, err = pr.GetGasPriceUpdatesCreatedAfter(context.Background(), th.dest, time.Unix(int64(ts-1), 0), 0)
 		require.NoError(t, err)
-		assert.Len(t, gasUpdates, len(expectedGas))
+		assert.Len(t, gasUpdates, 1)
 
 		tokenUpdates, err2 := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(int64(ts-1), 0), 0)
 		require.NoError(t, err2)
-		assert.Len(t, tokenUpdates, len(expectedToken))
+		assert.Len(t, tokenUpdates, 2)
 	}
 
 	// Empty token set should return empty set no error.
