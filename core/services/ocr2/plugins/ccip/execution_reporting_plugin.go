@@ -768,7 +768,12 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 	var sendRequests []ccipdata.Event[internal.EVM2EVMMessage]
 	eg.Go(func() error {
-		sendReqs, err := r.config.onRampReader.GetSendRequestsBetweenSeqNums(ctx, intervalMin, intervalMax)
+		sendReqs, err := r.config.onRampReader.GetSendRequestsBetweenSeqNums(
+			ctx,
+			intervalMin,
+			intervalMax,
+			// confs = 0 or confs = SourceFinalityDepth
+		)
 		if err != nil {
 			return err
 		}
