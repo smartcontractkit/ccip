@@ -830,7 +830,7 @@ func (lp *logPoller) PollAndSaveLogs(ctx context.Context, currentBlockNumber int
 			lp.lggr.Warnw("Unable to query for logs, retrying", "err", err, "block", currentBlockNumber)
 			return
 		}
-		lp.lggr.Debugw("Unfinalized log query", "logs", len(logs), "currentBlockNumber", currentBlockNumber, "blockHash", currentBlock.Hash, "timestamp", currentBlock.Timestamp.Unix())
+		lp.lggr.Debugw("Unfinalized log query", "logs", len(logs), "currentBlockNumber", currentBlockNumber, "finalizedBlockNumber", latestFinalizedBlockNumber, "blockHash", currentBlock.Hash, "timestamp", currentBlock.Timestamp.Unix())
 		block := NewLogPollerBlock(h, currentBlockNumber, currentBlock.Timestamp, latestFinalizedBlockNumber)
 		err = lp.orm.InsertLogsWithBlock(
 			convertLogs(logs, []LogPollerBlock{block}, lp.lggr, lp.ec.ConfiguredChainID()),
@@ -882,6 +882,7 @@ func (lp *logPoller) latestBlocks(ctx context.Context) (*evmtypes.Head, int64, e
 	}
 	latest := blocks[0]
 	finalized := blocks[1]
+	lp.lggr.Debugw("Latest blocks read from chain", "latest", latest.Number, "finalized", finalized.Number)
 	return latest, finalized.Number, nil
 }
 
