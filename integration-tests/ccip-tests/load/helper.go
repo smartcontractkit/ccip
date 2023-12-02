@@ -63,6 +63,7 @@ func (l *loadArgs) setSchedule() {
 	var segments []*wasp.Segment
 	var segmentDuration time.Duration
 	require.Greater(l.t, len(l.TestCfg.TestGroupInput.RequestPerUnitTime), 0, "RequestPerUnitTime must be set")
+
 	if len(l.TestCfg.TestGroupInput.RequestPerUnitTime) > 1 {
 		for i, req := range l.TestCfg.TestGroupInput.RequestPerUnitTime {
 			duration := l.TestCfg.TestGroupInput.StepDuration[i].Duration()
