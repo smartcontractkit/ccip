@@ -30,7 +30,7 @@ import (
 type CCIPE2ELoad struct {
 	t                         *testing.T
 	Lane                      *actions.CCIPLane
-	NoOfReq                   int64         // no of Request fired - required for balance assertion at the end
+	NoOfReq                   int64         // approx no of Request fired
 	CurrentMsgSerialNo        *atomic.Int64 // current msg serial number in the load sequence
 	CallTimeOut               time.Duration // max time to wait for various on-chain events
 	msg                       router.ClientEVM2AnyMessage
@@ -108,7 +108,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 
 	lggr := c.Lane.Logger.With().Int("msg Number", int(msgSerialNo)).Logger()
 	stats := testreporters.NewCCIPRequestStats(msgSerialNo)
-
+	defer c.Lane.Reports.UpdatePhaseStatsForReq(stats)
 	// form the message for transfer
 	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
 
