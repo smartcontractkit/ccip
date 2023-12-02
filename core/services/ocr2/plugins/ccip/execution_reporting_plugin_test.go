@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cometbft/cometbft/libs/rand"
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -371,7 +372,6 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p.config.commitStoreReader = commitStore
 
 	lp := lpMocks.NewLogPoller(t)
-	lp.On("RegisterFilter", mock.Anything).Return(nil)
 	offRampReader, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 	assert.NoError(t, err)
 	p.config.offRampReader = offRampReader
@@ -1426,7 +1426,7 @@ func Test_inflightAggregates(t *testing.T) {
 		destTokenPrices map[common.Address]*big.Int
 		sourceToDest    map[common.Address]common.Address
 
-		expInflightSeqNrs          map[uint64]struct{}
+		expInflightSeqNrs          mapset.Set[uint64]
 		expInflightAggrVal         *big.Int
 		expMaxInflightSenderNonces map[common.Address]uint64
 		expInflightTokenAmounts    map[common.Address]*big.Int
@@ -1467,10 +1467,7 @@ func Test_inflightAggregates(t *testing.T) {
 				tokenAddrs[0]: tokenAddrs[1],
 				tokenAddrs[2]: tokenAddrs[3],
 			},
-			expInflightSeqNrs: map[uint64]struct{}{
-				100: {},
-				106: {},
-			},
+			expInflightSeqNrs:  mapset.NewSet[uint64](100, 106),
 			expInflightAggrVal: big.NewInt(9*1000 + 5*500),
 			expMaxInflightSenderNonces: map[common.Address]uint64{
 				addrs[0]: 4,
@@ -1508,7 +1505,7 @@ func Test_inflightAggregates(t *testing.T) {
 		{
 			name:                       "nothing inflight",
 			inflight:                   []InflightInternalExecutionReport{},
-			expInflightSeqNrs:          map[uint64]struct{}{},
+			expInflightSeqNrs:          mapset.NewSet[uint64](),
 			expInflightAggrVal:         big.NewInt(0),
 			expMaxInflightSenderNonces: map[common.Address]uint64{},
 			expInflightTokenAmounts:    map[common.Address]*big.Int{},
@@ -1526,7 +1523,7 @@ func Test_inflightAggregates(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.True(t, reflect.DeepEqual(tc.expInflightSeqNrs, inflightSeqNrs))
+			assert.True(t, tc.expInflightSeqNrs.Equal(inflightSeqNrs))
 			assert.True(t, reflect.DeepEqual(tc.expInflightAggrVal, inflightAggrVal))
 			assert.True(t, reflect.DeepEqual(tc.expMaxInflightSenderNonces, maxInflightSenderNonces))
 			assert.True(t, reflect.DeepEqual(tc.expInflightTokenAmounts, inflightTokenAmounts))
