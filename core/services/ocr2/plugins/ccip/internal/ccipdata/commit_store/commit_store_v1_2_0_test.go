@@ -1,4 +1,4 @@
-package ccipdata
+package commit_store
 
 import (
 	"math/big"
@@ -10,12 +10,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestCommitReportEncodingV_1_2_0(t *testing.T) {
 	report := CommitStoreReport{
-		TokenPrices: []TokenPrice{
+		TokenPrices: []price_registry.TokenPrice{
 			{
 				Token: utils.RandomAddress(),
 				Value: big.NewInt(9e18),
@@ -25,7 +26,7 @@ func TestCommitReportEncodingV_1_2_0(t *testing.T) {
 				Value: big.NewInt(1e18),
 			},
 		},
-		GasPrices: []GasPrice{
+		GasPrices: []price_registry.GasPrice{
 			{
 				DestChainSelector: rand.Uint64(),
 				Value:             big.NewInt(2000e9),

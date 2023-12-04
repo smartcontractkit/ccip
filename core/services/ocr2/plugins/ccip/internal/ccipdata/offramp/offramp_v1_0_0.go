@@ -1,4 +1,4 @@
-package ccipdata
+package offramp
 
 import (
 	"context"
@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -300,7 +301,7 @@ func (o *OffRampV1_0_0) Close(qopts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error) {
+func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]ccipdata.Event[ExecutionStateChanged], error) {
 	logs, err := o.lp.IndexedLogsTopicRange(
 		o.eventSig,
 		o.addr,
@@ -314,7 +315,7 @@ func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Conte
 		return nil, err
 	}
 
-	return parseLogs[ExecutionStateChanged](
+	return ccipdata.ParseLogs[ExecutionStateChanged](
 		logs,
 		o.lggr,
 		func(log types.Log) (*ExecutionStateChanged, error) {

@@ -1,4 +1,4 @@
-package ccipdata
+package price_registry
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
@@ -48,10 +49,10 @@ type PriceRegistryReader interface {
 	Close(qopts ...pg.QOpt) error
 	// GetTokenPriceUpdatesCreatedAfter returns all the token price updates that happened after the provided timestamp.
 	// The returned updates are sorted by timestamp in ascending order.
-	GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]Event[TokenPriceUpdate], error)
+	GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]ccipdata.Event[TokenPriceUpdate], error)
 	// GetGasPriceUpdatesCreatedAfter returns all the gas price updates that happened after the provided timestamp.
 	// The returned updates are sorted by timestamp in ascending order.
-	GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]Event[GasPriceUpdate], error)
+	GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]ccipdata.Event[GasPriceUpdate], error)
 	Address() common.Address
 	FeeTokenEvents() []common.Hash
 	GetFeeTokens(ctx context.Context) ([]common.Address, error)
@@ -72,7 +73,7 @@ func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Addr
 		return nil, err
 	}
 	switch version.String() {
-	case V1_2_0:
+	case ccipdata.V1_2_0:
 		return NewPriceRegistryV1_2_0(lggr, priceRegistryAddress, lp, cl)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())

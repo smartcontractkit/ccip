@@ -10,14 +10,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 var PermissionLessExecutionThresholdSeconds = uint32(FirstBlockAge.Seconds())
 
 func (c *CCIPContracts) CreateDefaultCommitOnchainConfig(t *testing.T) []byte {
-	config, err := abihelpers.EncodeAbiStruct(ccipdata.CommitOnchainConfig{
+	config, err := abihelpers.EncodeAbiStruct(commit_store.CommitOnchainConfig{
 		PriceRegistry: c.Dest.PriceRegistry.Address(),
 	})
 	require.NoError(t, err)
@@ -29,7 +30,7 @@ func (c *CCIPContracts) CreateDefaultCommitOffchainConfig(t *testing.T) []byte {
 }
 
 func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBeat time.Duration, inflightCacheExpiry time.Duration) []byte {
-	config, err := ccipconfig.EncodeOffchainConfig(ccipdata.CommitOffchainConfigV1_2_0{
+	config, err := ccipconfig.EncodeOffchainConfig(commit_store.CommitOffchainConfigV1_2_0{
 		SourceFinalityDepth:      1,
 		DestFinalityDepth:        1,
 		GasPriceHeartBeat:        models.MustMakeDuration(feeUpdateHearBeat),
@@ -45,7 +46,7 @@ func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBe
 }
 
 func (c *CCIPContracts) CreateDefaultExecOnchainConfig(t *testing.T) []byte {
-	config, err := abihelpers.EncodeAbiStruct(ccipdata.ExecOnchainConfigV1_2_0{
+	config, err := abihelpers.EncodeAbiStruct(offramp.ExecOnchainConfigV1_2_0{
 		PermissionLessExecutionThresholdSeconds: PermissionLessExecutionThresholdSeconds,
 		Router:                                  c.Dest.Router.Address(),
 		PriceRegistry:                           c.Dest.PriceRegistry.Address(),
@@ -62,7 +63,7 @@ func (c *CCIPContracts) CreateDefaultExecOffchainConfig(t *testing.T) []byte {
 }
 
 func (c *CCIPContracts) createExecOffchainConfig(t *testing.T, inflightCacheExpiry time.Duration, rootSnoozeTime time.Duration) []byte {
-	config, err := ccipconfig.EncodeOffchainConfig(ccipdata.ExecOffchainConfig{
+	config, err := ccipconfig.EncodeOffchainConfig(offramp.ExecOffchainConfig{
 		SourceFinalityDepth:         1,
 		DestOptimisticConfirmations: 1,
 		DestFinalityDepth:           1,

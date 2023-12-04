@@ -1,4 +1,4 @@
-package ccipdata
+package commit_store
 
 import (
 	"context"
@@ -19,6 +19,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -124,18 +127,18 @@ func decodeCommitReportV1_0_0(commitReportArgs abi.Arguments, report []byte) (Co
 		return CommitStoreReport{}, errors.Errorf("invalid commit report got %T", unpacked[0])
 	}
 
-	var tokenPriceUpdates []TokenPrice
+	var tokenPriceUpdates []price_registry.TokenPrice
 	for _, u := range commitReport.PriceUpdates.TokenPriceUpdates {
-		tokenPriceUpdates = append(tokenPriceUpdates, TokenPrice{
+		tokenPriceUpdates = append(tokenPriceUpdates, price_registry.TokenPrice{
 			Token: u.SourceToken,
 			Value: u.UsdPerToken,
 		})
 	}
 
-	var gasPrices []GasPrice
+	var gasPrices []price_registry.GasPrice
 	if commitReport.PriceUpdates.DestChainSelector != 0 {
 		// No gas price update	{
-		gasPrices = append(gasPrices, GasPrice{
+		gasPrices = append(gasPrices, price_registry.GasPrice{
 			DestChainSelector: commitReport.PriceUpdates.DestChainSelector,
 			Value:             commitReport.PriceUpdates.UsdPerUnitGas,
 		})
@@ -246,22 +249,22 @@ func (c *CommitStoreV1_0_0) parseReport(log types.Log) (*CommitStoreReport, erro
 		return nil, err
 	}
 	// Translate to common struct.
-	var tokenPrices []TokenPrice
+	var tokenPrices []price_registry.TokenPrice
 	for _, tpu := range repAccepted.Report.PriceUpdates.TokenPriceUpdates {
-		tokenPrices = append(tokenPrices, TokenPrice{
+		tokenPrices = append(tokenPrices, price_registry.TokenPrice{
 			Token: tpu.SourceToken,
 			Value: tpu.UsdPerToken,
 		})
 	}
 	return &CommitStoreReport{
 		TokenPrices: tokenPrices,
-		GasPrices:   []GasPrice{{DestChainSelector: repAccepted.Report.PriceUpdates.DestChainSelector, Value: repAccepted.Report.PriceUpdates.UsdPerUnitGas}},
+		GasPrices:   []price_registry.GasPrice{{DestChainSelector: repAccepted.Report.PriceUpdates.DestChainSelector, Value: repAccepted.Report.PriceUpdates.UsdPerUnitGas}},
 		MerkleRoot:  repAccepted.Report.MerkleRoot,
 		Interval:    CommitStoreInterval{Min: repAccepted.Report.Interval.Min, Max: repAccepted.Report.Interval.Max},
 	}, nil
 }
 
-func (c *CommitStoreV1_0_0) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[CommitStoreReport], error) {
+func (c *CommitStoreV1_0_0) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]ccipdata.Event[CommitStoreReport], error) {
 	logs, err := c.lp.LogsDataWordBetween(
 		c.reportAcceptedSig,
 		c.address,
@@ -275,7 +278,7 @@ func (c *CommitStoreV1_0_0) GetCommitReportMatchingSeqNum(ctx context.Context, s
 		return nil, err
 	}
 
-	parsedLogs, err := parseLogs[CommitStoreReport](
+	parsedLogs, err := ccipdata.ParseLogs[CommitStoreReport](
 		logs,
 		c.lggr,
 		c.parseReport,
@@ -291,7 +294,7 @@ func (c *CommitStoreV1_0_0) GetCommitReportMatchingSeqNum(ctx context.Context, s
 	return parsedLogs, nil
 }
 
-func (c *CommitStoreV1_0_0) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]Event[CommitStoreReport], error) {
+func (c *CommitStoreV1_0_0) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]ccipdata.Event[CommitStoreReport], error) {
 	logs, err := c.lp.LogsCreatedAfter(
 		c.reportAcceptedSig,
 		c.address,
@@ -303,7 +306,7 @@ func (c *CommitStoreV1_0_0) GetAcceptedCommitReportsGteTimestamp(ctx context.Con
 		return nil, err
 	}
 
-	return parseLogs[CommitStoreReport](
+	return ccipdata.ParseLogs[CommitStoreReport](
 		logs,
 		c.lggr,
 		c.parseReport,
@@ -328,7 +331,7 @@ func (c *CommitStoreV1_0_0) IsDown(ctx context.Context) (bool, error) {
 	return !unPausedAndHealthy, nil
 }
 
-func (c *CommitStoreV1_0_0) VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error) {
+func (c *CommitStoreV1_0_0) VerifyExecutionReport(ctx context.Context, report offramp.ExecReport) (bool, error) {
 	var hashes [][32]byte
 	for _, msg := range report.Messages {
 		hashes = append(hashes, msg.Hash)

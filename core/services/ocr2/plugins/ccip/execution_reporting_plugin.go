@@ -26,6 +26,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/contractutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
@@ -51,11 +55,11 @@ var (
 type ExecutionPluginStaticConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
-	onRampReader             ccipdata.OnRampReader
+	onRampReader             onramp.OnRampReader
 	destReader               ccipdata.Reader
-	offRampReader            ccipdata.OffRampReader
-	commitStoreReader        ccipdata.CommitStoreReader
-	sourcePriceRegistry      ccipdata.PriceRegistryReader
+	offRampReader            offramp.OffRampReader
+	commitStoreReader        commit_store.CommitStoreReader
+	sourcePriceRegistry      price_registry.PriceRegistryReader
 	sourceWrappedNativeToken common.Address
 	destClient               evmclient.Client
 	sourceClient             evmclient.Client
@@ -71,10 +75,10 @@ type ExecutionReportingPlugin struct {
 	lggr                  logger.Logger
 	inflightReports       *inflightExecReportsContainer
 	snoozedRoots          cache.SnoozedRoots
-	destPriceRegistry     ccipdata.PriceRegistryReader
+	destPriceRegistry     price_registry.PriceRegistryReader
 	destWrappedNative     common.Address
-	onchainConfig         ccipdata.ExecOnchainConfig
-	offchainConfig        ccipdata.ExecOffchainConfig
+	onchainConfig         offramp.ExecOnchainConfig
+	offchainConfig        offramp.ExecOffchainConfig
 	cachedSourceFeeTokens cache.AutoSync[[]common.Address]
 	cachedDestTokens      cache.AutoSync[cache.CachedTokens]
 	cachedTokenPools      cache.AutoSync[map[common.Address]common.Address]
@@ -85,7 +89,7 @@ type ExecutionReportingPluginFactory struct {
 	// Config derived from job specs and does not change between instances.
 	config ExecutionPluginStaticConfig
 
-	destPriceRegReader ccipdata.PriceRegistryReader
+	destPriceRegReader price_registry.PriceRegistryReader
 	destPriceRegAddr   common.Address
 	readersMu          *sync.Mutex
 }
@@ -117,7 +121,7 @@ func (rf *ExecutionReportingPluginFactory) UpdateDynamicReaders(newPriceRegAddr 
 			return err
 		}
 	}
-	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(rf.config.lggr, newPriceRegAddr, rf.config.destLP, rf.config.destClient)
+	destPriceRegistryReader, err := price_registry.NewPriceRegistryReader(rf.config.lggr, newPriceRegAddr, rf.config.destLP, rf.config.destClient)
 	if err != nil {
 		return err
 	}
@@ -713,7 +717,7 @@ func calculateMessageMaxGas(gasLimit *big.Int, numRequests, dataLen, numTokens i
 
 // helper struct to hold the commitReport and the related send requests
 type commitReportWithSendRequests struct {
-	commitReport         ccipdata.CommitStoreReport
+	commitReport         commit_store.CommitStoreReport
 	sendRequestsWithMeta []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
 }
 
@@ -745,7 +749,7 @@ func (r *commitReportWithSendRequests) sendReqFits(sendReq internal.EVM2EVMOnRam
 // getReportsWithSendRequests returns the target reports with populated send requests.
 func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	ctx context.Context,
-	reports []ccipdata.CommitStoreReport,
+	reports []commit_store.CommitStoreReport,
 ) ([]commitReportWithSendRequests, error) {
 	if len(reports) == 0 {
 		return nil, nil
@@ -1052,7 +1056,7 @@ func (r *ExecutionReportingPlugin) isStaleReport(ctx context.Context, messages [
 	if err != nil {
 		return true, err
 	}
-	if state := ccipdata.MessageExecutionState(msgState); state == ccipdata.ExecutionStateFailure || state == ccipdata.ExecutionStateSuccess {
+	if state := offramp.MessageExecutionState(msgState); state == offramp.ExecutionStateFailure || state == offramp.ExecutionStateSuccess {
 		return true, nil
 	}
 
@@ -1102,7 +1106,7 @@ func inflightAggregates(
 // results include feeTokens and passed-in tokens
 // price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
-func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegistry ccipdata.PriceRegistryReader, tokens []common.Address) (map[common.Address]*big.Int, error) {
+func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegistry price_registry.PriceRegistryReader, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	priceRegistryAddress := priceRegistry.Address()
 	prices := make(map[common.Address]*big.Int)
 
@@ -1138,10 +1142,10 @@ func getTokensPrices(ctx context.Context, feeTokens []common.Address, priceRegis
 
 func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 	ctx context.Context,
-	commitStoreReader ccipdata.CommitStoreReader,
+	commitStoreReader commit_store.CommitStoreReader,
 	permissionExecutionThreshold time.Duration,
 	lggr logger.Logger,
-) ([]ccipdata.CommitStoreReport, error) {
+) ([]commit_store.CommitStoreReport, error) {
 	acceptedReports, err := commitStoreReader.GetAcceptedCommitReportsGteTimestamp(
 		ctx,
 		time.Now().Add(-permissionExecutionThreshold),
@@ -1151,12 +1155,12 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 		return nil, err
 	}
 
-	var reports []ccipdata.CommitStoreReport
+	var reports []commit_store.CommitStoreReport
 	for _, acceptedReport := range acceptedReports {
 		reports = append(reports, acceptedReport.Data)
 	}
 
-	notSnoozedReports := make([]ccipdata.CommitStoreReport, 0)
+	notSnoozedReports := make([]commit_store.CommitStoreReport, 0)
 	for _, report := range reports {
 		if r.snoozedRoots.IsSnoozed(report.MerkleRoot) {
 			lggr.Debug("Skipping snoozed root", "minSeqNr", report.Interval.Min, "maxSeqNr", report.Interval.Max)
@@ -1176,7 +1180,7 @@ func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
 // Having unexpiredReports not sorted properly will lead to fetching more messages and execution states to the memory than the messagesLimit provided.
 // However, logs from LogPoller are returned ordered by (block_number, log_index), so it should preserve the order of Interval.Min.
 // Single CommitRoot can have up to 256 messages, with current MessagesIterationStep of 800, it means processing 4 CommitRoots at once.
-func selectReportsToFillBatch(unexpiredReports []ccipdata.CommitStoreReport, messagesLimit uint64) ([]ccipdata.CommitStoreReport, int) {
+func selectReportsToFillBatch(unexpiredReports []commit_store.CommitStoreReport, messagesLimit uint64) ([]commit_store.CommitStoreReport, int) {
 	currentNumberOfMessages := uint64(0)
 	var index int
 

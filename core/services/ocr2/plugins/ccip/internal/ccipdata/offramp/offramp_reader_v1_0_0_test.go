@@ -1,4 +1,4 @@
-package ccipdata_test
+package offramp_test
 
 import (
 	"math/big"
@@ -13,6 +13,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -20,14 +22,14 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 	// Note could consider some fancier testing here (fuzz/property)
 	// but I think that would essentially be testing geth's abi library
 	// as our encode/decode is a thin wrapper around that.
-	report := ccipdata.ExecReport{
+	report := offramp.ExecReport{
 		Messages:          []internal.EVM2EVMMessage{},
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{testutils.Random32Byte()},
 		ProofFlagBits:     big.NewInt(133),
 	}
 
-	offRamp, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lpmocks.NewLogPoller(t), nil)
+	offRamp, err := offramp.NewOffRampV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lpmocks.NewLogPoller(t), nil)
 	require.NoError(t, err)
 
 	encodeExecutionReport, err := offRamp.EncodeExecutionReport(report)
@@ -39,8 +41,8 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 }
 
 func TestOffRampFiltersV100(t *testing.T) {
-	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+	commit_store.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+		c, err := offramp.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		require.NoError(t, c.RegisterFilters())
 		return c

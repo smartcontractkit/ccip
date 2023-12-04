@@ -1,4 +1,4 @@
-package ccipdata
+package offramp
 
 import (
 	"fmt"

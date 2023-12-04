@@ -1,4 +1,4 @@
-package ccipdata
+package onramp
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -270,7 +271,7 @@ func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 	}, nil
 }
 
-func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64) ([]Event[internal.EVM2EVMMessage], error) {
+func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
 	logs, err := o.lp.LogsDataWordRange(
 		o.sendRequestedEventSig,
 		o.address,
@@ -282,7 +283,7 @@ func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNum
 	if err != nil {
 		return nil, err
 	}
-	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
+	return ccipdata.ParseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
 func (o *OnRampV1_2_0) RouterAddress() (common.Address, error) {

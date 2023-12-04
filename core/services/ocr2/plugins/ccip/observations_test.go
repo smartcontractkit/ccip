@@ -2,10 +2,13 @@ package ccip
 
 import (
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_0_0"
 	"math/big"
 	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
 
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
@@ -15,12 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
 func TestObservationFilter(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	obs1 := CommitObservation{Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 10}}
+	obs1 := CommitObservation{Interval: commit_store.CommitStoreInterval{Min: 1, Max: 10}}
 	b1, err := obs1.Marshal()
 	require.NoError(t, err)
 	nonEmpty := getParsableObservations[CommitObservation](lggr, []types.AttributedObservation{{Observation: b1}, {Observation: []byte{}}})
@@ -47,7 +49,7 @@ func TestObservationCompat100_120(t *testing.T) {
 	b10, err := json.Marshal(v10)
 	require.NoError(t, err)
 	v12 := CommitObservation{
-		Interval: ccipdata.CommitStoreInterval{
+		Interval: commit_store.CommitStoreInterval{
 			Min: 1,
 			Max: 12,
 		},
@@ -62,7 +64,7 @@ func TestObservationCompat100_120(t *testing.T) {
 
 func TestCommitObservationJsonDeserialization(t *testing.T) {
 	expectedObservation := CommitObservation{
-		Interval: ccipdata.CommitStoreInterval{
+		Interval: commit_store.CommitStoreInterval{
 			Min: 1,
 			Max: 12,
 		},

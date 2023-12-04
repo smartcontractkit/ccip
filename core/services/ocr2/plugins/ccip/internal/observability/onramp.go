@@ -7,14 +7,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/onramp"
 )
 
 type ObservedOnRampReader struct {
-	ccipdata.OnRampReader
+	onramp.OnRampReader
 	metric metricDetails
 }
 
-func NewObservedOnRampReader(origin ccipdata.OnRampReader, chainID int64, pluginName string) *ObservedOnRampReader {
+func NewObservedOnRampReader(origin onramp.OnRampReader, chainID int64, pluginName string) *ObservedOnRampReader {
 	return &ObservedOnRampReader{
 		OnRampReader: origin,
 		metric: metricDetails{
@@ -45,8 +46,8 @@ func (o ObservedOnRampReader) Address() (common.Address, error) {
 	})
 }
 
-func (o ObservedOnRampReader) GetDynamicConfig() (ccipdata.OnRampDynamicConfig, error) {
-	return withObservedInteraction(o.metric, "GetDynamicConfig", func() (ccipdata.OnRampDynamicConfig, error) {
+func (o ObservedOnRampReader) GetDynamicConfig() (onramp.OnRampDynamicConfig, error) {
+	return withObservedInteraction(o.metric, "GetDynamicConfig", func() (onramp.OnRampDynamicConfig, error) {
 		return o.OnRampReader.GetDynamicConfig()
 	})
 }

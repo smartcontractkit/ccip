@@ -8,7 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
 )
 
 const (
@@ -26,13 +27,13 @@ const (
 // we are able to obtain high throughput during happy path yet still naturally recover
 // if a reorg or issue causes onchain reverts.
 type InflightCommitReport struct {
-	report    ccipdata.CommitStoreReport
+	report    commit_store.CommitStoreReport
 	createdAt time.Time
 }
 
 type InflightPriceUpdate struct {
-	gasPrices     []ccipdata.GasPrice
-	tokenPrices   []ccipdata.TokenPrice
+	gasPrices     []price_registry.GasPrice
+	tokenPrices   []price_registry.TokenPrice
 	createdAt     time.Time
 	epochAndRound uint64
 }
@@ -151,7 +152,7 @@ func (c *inflightCommitReportsContainer) expire(lggr logger.Logger) {
 	c.inFlightPriceUpdates = stillInflight
 }
 
-func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report ccipdata.CommitStoreReport, epochAndRound uint64) error {
+func (c *inflightCommitReportsContainer) add(lggr logger.Logger, report commit_store.CommitStoreReport, epochAndRound uint64) error {
 	c.locker.Lock()
 	defer c.locker.Unlock()
 

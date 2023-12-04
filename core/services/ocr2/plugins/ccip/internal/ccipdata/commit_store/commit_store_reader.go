@@ -1,4 +1,4 @@
-package ccipdata
+package commit_store
 
 import (
 	"context"
@@ -18,6 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -27,8 +30,8 @@ type CommitStoreInterval struct {
 }
 
 type CommitStoreReport struct {
-	TokenPrices []TokenPrice
-	GasPrices   []GasPrice
+	TokenPrices []price_registry.TokenPrice
+	GasPrices   []price_registry.GasPrice
 	Interval    CommitStoreInterval
 	MerkleRoot  [32]byte
 }
@@ -94,14 +97,14 @@ func NewCommitOffchainConfig(
 
 //go:generate mockery --quiet --name CommitStoreReader --filename commit_store_reader_mock.go --case=underscore
 type CommitStoreReader interface {
-	Closer
+	ccipdata.Closer
 	GetExpectedNextSequenceNumber(context context.Context) (uint64, error)
 	GetLatestPriceEpochAndRound(context context.Context) (uint64, error)
 	// GetCommitReportMatchingSeqNum returns accepted commit report that satisfies Interval.Min <= seqNum <= Interval.Max. Returned slice should be empty or have exactly one element
-	GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[CommitStoreReport], error)
+	GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]ccipdata.Event[CommitStoreReport], error)
 	// GetAcceptedCommitReportsGteTimestamp returns all the commit reports with timestamp greater than or equal to the provided.
 	// Returned Commit Reports have to be sorted by Interval.Min/Interval.Max in ascending order.
-	GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]Event[CommitStoreReport], error)
+	GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]ccipdata.Event[CommitStoreReport], error)
 	IsDown(ctx context.Context) (bool, error)
 	IsBlessed(ctx context.Context, root [32]byte) (bool, error)
 	// Notifies the reader that the config has changed onchain
@@ -110,7 +113,7 @@ type CommitStoreReader interface {
 	GasPriceEstimator() prices.GasPriceEstimatorCommit
 	EncodeCommitReport(report CommitStoreReport) ([]byte, error)
 	DecodeCommitReport(report []byte) (CommitStoreReport, error)
-	VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error)
+	VerifyExecutionReport(ctx context.Context, report offramp.ExecReport) (bool, error)
 	GetCommitStoreStaticConfig(ctx context.Context) (CommitStoreStaticConfig, error)
 	RegisterFilters(qopts ...pg.QOpt) error
 }
@@ -121,10 +124,10 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 		return nil, errors.Errorf("expected %v got %v", ccipconfig.EVM2EVMOnRamp, contractType)
 	}
 	switch version.String() {
-	case V1_0_0, V1_1_0:
+	case ccipdata.V1_0_0, ccipdata.V1_1_0:
 		// Versions are identical
 		return NewCommitStoreV1_0_0(lggr, address, ec, lp, estimator)
-	case V1_2_0:
+	case ccipdata.V1_2_0:
 		return NewCommitStoreV1_2_0(lggr, address, ec, lp, estimator)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
@@ -160,7 +163,7 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 		return nil, errors.Errorf("expected %v got %v", ccipconfig.CommitStore, typ)
 	}
 	switch ver.String() {
-	case V1_0_0, V1_1_0:
+	case ccipdata.V1_0_0, ccipdata.V1_1_0:
 		commitStoreABI := abihelpers.MustParseABI(commit_store_1_0_0.CommitStoreABI)
 		return func(report []byte) (*txmgr.TxMeta, error) {
 			commitReport, err := decodeCommitReportV1_0_0(abihelpers.MustGetEventInputs(ReportAccepted, commitStoreABI), report)
@@ -169,7 +172,7 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 			}
 			return commitReportToEthTxMeta(commitReport)
 		}, nil
-	case V1_2_0:
+	case ccipdata.V1_2_0:
 		commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
 		return func(report []byte) (*txmgr.TxMeta, error) {
 			commitReport, err := decodeCommitReportV1_2_0(abihelpers.MustGetEventInputs(ReportAccepted, commitStoreABI), report)

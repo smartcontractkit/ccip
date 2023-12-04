@@ -1,4 +1,4 @@
-package ccipdata
+package onramp
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -39,9 +40,9 @@ type OnRampDynamicConfig struct {
 
 //go:generate mockery --quiet --name OnRampReader --filename onramp_reader_mock.go --case=underscore
 type OnRampReader interface {
-	Closer
+	ccipdata.Closer
 	// GetSendRequestsBetweenSeqNums returns all the finalized message send requests in the provided sequence numbers range (inclusive).
-	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64) ([]Event[internal.EVM2EVMMessage], error)
+	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64) ([]ccipdata.Event[internal.EVM2EVMMessage], error)
 	// Get router configured in the onRamp
 	RouterAddress() (common.Address, error)
 	Address() (common.Address, error)
@@ -56,11 +57,11 @@ func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, on
 		return nil, errors.Errorf("expected '%v' got '%v' (%v)", ccipconfig.EVM2EVMOnRamp, contractType, err)
 	}
 	switch version.String() {
-	case V1_0_0:
+	case ccipdata.V1_0_0:
 		return NewOnRampV1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
-	case V1_1_0:
+	case ccipdata.V1_1_0:
 		return NewOnRampV1_1_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
-	case V1_2_0:
+	case ccipdata.V1_2_0:
 		return NewOnRampV1_2_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())

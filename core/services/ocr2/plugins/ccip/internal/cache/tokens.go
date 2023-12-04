@@ -10,13 +10,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
 )
 
 // NewCachedFeeTokens cache fee tokens returned from PriceRegistry
 func NewCachedFeeTokens(
 	lp logpoller.LogPoller,
-	priceRegistry ccipdata.PriceRegistryReader,
+	priceRegistry price_registry.PriceRegistryReader,
 ) *CachedChain[[]common.Address] {
 	return &CachedChain[[]common.Address]{
 		observedEvents:  priceRegistry.FeeTokenEvents(),
@@ -38,8 +39,8 @@ type CachedTokens struct {
 // when checking for changes in logpoller.LogPoller
 func NewCachedSupportedTokens(
 	lp logpoller.LogPoller,
-	offRamp ccipdata.OffRampReader,
-	priceRegistry ccipdata.PriceRegistryReader,
+	offRamp offramp.OffRampReader,
+	priceRegistry price_registry.PriceRegistryReader,
 ) *CachedChain[CachedTokens] {
 	return &CachedChain[CachedTokens]{
 		observedEvents:  append(priceRegistry.FeeTokenEvents(), offRamp.TokenEvents()...),
@@ -57,8 +58,8 @@ func NewCachedSupportedTokens(
 func NewTokenToDecimals(
 	lggr logger.Logger,
 	lp logpoller.LogPoller,
-	offRamp ccipdata.OffRampReader,
-	priceRegistryReader ccipdata.PriceRegistryReader,
+	offRamp offramp.OffRampReader,
+	priceRegistryReader price_registry.PriceRegistryReader,
 ) *CachedChain[map[common.Address]uint8] {
 	return &CachedChain[map[common.Address]uint8]{
 		observedEvents:  append(priceRegistryReader.FeeTokenEvents(), offRamp.TokenEvents()...),
@@ -76,7 +77,7 @@ func NewTokenToDecimals(
 }
 
 type supportedTokensOrigin struct {
-	offRamp ccipdata.OffRampReader
+	offRamp offramp.OffRampReader
 }
 
 func (t *supportedTokensOrigin) Copy(value map[common.Address]common.Address) map[common.Address]common.Address {
@@ -104,7 +105,7 @@ func (t *supportedTokensOrigin) CallOrigin(ctx context.Context) (map[common.Addr
 }
 
 type feeTokensOrigin struct {
-	priceRegistry ccipdata.PriceRegistryReader
+	priceRegistry price_registry.PriceRegistryReader
 }
 
 func (t *feeTokensOrigin) Copy(value []common.Address) []common.Address {
@@ -158,8 +159,8 @@ func copyMap[M ~map[K]V, K comparable, V any](m M) M {
 
 type tokenToDecimals struct {
 	lggr                logger.Logger
-	offRamp             ccipdata.OffRampReader
-	priceRegistryReader ccipdata.PriceRegistryReader
+	offRamp             offramp.OffRampReader
+	priceRegistryReader price_registry.PriceRegistryReader
 	tokenDecimals       sync.Map
 }
 
@@ -202,7 +203,7 @@ func (t *tokenToDecimals) CallOrigin(ctx context.Context) (map[common.Address]ui
 	return mapping, nil
 }
 
-func getDestinationAndFeeTokens(ctx context.Context, offRamp ccipdata.OffRampReader, priceRegistry ccipdata.PriceRegistryReader) ([]common.Address, error) {
+func getDestinationAndFeeTokens(ctx context.Context, offRamp offramp.OffRampReader, priceRegistry price_registry.PriceRegistryReader) ([]common.Address, error) {
 	destTokens, err := offRamp.GetDestinationTokens(ctx)
 	if err != nil {
 		return nil, err

@@ -1,4 +1,4 @@
-package ccipdata
+package price_registry
 
 import (
 	"context"

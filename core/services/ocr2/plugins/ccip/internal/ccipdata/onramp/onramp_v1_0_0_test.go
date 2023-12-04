@@ -1,4 +1,4 @@
-package ccipdata
+package onramp
 
 import (
 	"encoding/hex"

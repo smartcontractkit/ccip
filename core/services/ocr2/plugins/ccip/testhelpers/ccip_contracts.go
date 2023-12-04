@@ -38,7 +38,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	commit_store2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -71,13 +73,13 @@ var (
 // Backwards compat, in principle these statuses are version dependent
 // TODO: Adjust integration tests to be version agnostic using readers
 var (
-	ExecutionStateSuccess = MessageExecutionState(ccipdata.ExecutionStateSuccess)
-	ExecutionStateFailure = MessageExecutionState(ccipdata.ExecutionStateFailure)
+	ExecutionStateSuccess = MessageExecutionState(offramp.ExecutionStateSuccess)
+	ExecutionStateFailure = MessageExecutionState(offramp.ExecutionStateFailure)
 )
 
-type MessageExecutionState ccipdata.MessageExecutionState
+type MessageExecutionState offramp.MessageExecutionState
 type CommitOffchainConfig struct {
-	ccipdata.CommitOffchainConfigV1_2_0
+	commit_store2.CommitOffchainConfigV1_2_0
 }
 
 func NewCommitOffchainConfig(SourceFinalityDepth uint32,
@@ -89,7 +91,7 @@ func NewCommitOffchainConfig(SourceFinalityDepth uint32,
 	TokenPriceDeviationPPB uint32,
 	MaxGasPrice uint64,
 	InflightCacheExpiry models.Duration) CommitOffchainConfig {
-	return CommitOffchainConfig{ccipdata.CommitOffchainConfigV1_2_0{
+	return CommitOffchainConfig{commit_store2.CommitOffchainConfigV1_2_0{
 		SourceFinalityDepth:      SourceFinalityDepth,
 		DestFinalityDepth:        DestFinalityDepth,
 		GasPriceHeartBeat:        GasPriceHeartBeat,
@@ -103,19 +105,19 @@ func NewCommitOffchainConfig(SourceFinalityDepth uint32,
 }
 
 type CommitOnchainConfig struct {
-	ccipdata.CommitOnchainConfig
+	commit_store2.CommitOnchainConfig
 }
 
 func NewCommitOnchainConfig(
 	PriceRegistry common.Address,
 ) CommitOnchainConfig {
-	return CommitOnchainConfig{ccipdata.CommitOnchainConfig{
+	return CommitOnchainConfig{commit_store2.CommitOnchainConfig{
 		PriceRegistry: PriceRegistry,
 	}}
 }
 
 type ExecOnchainConfig struct {
-	ccipdata.ExecOnchainConfigV1_2_0
+	offramp.ExecOnchainConfigV1_2_0
 }
 
 func NewExecOnchainConfig(
@@ -126,7 +128,7 @@ func NewExecOnchainConfig(
 	MaxDataBytes uint32,
 	MaxPoolReleaseOrMintGas uint32,
 ) ExecOnchainConfig {
-	return ExecOnchainConfig{ccipdata.ExecOnchainConfigV1_2_0{
+	return ExecOnchainConfig{offramp.ExecOnchainConfigV1_2_0{
 		PermissionLessExecutionThresholdSeconds: PermissionLessExecutionThresholdSeconds,
 		Router:                                  Router,
 		PriceRegistry:                           PriceRegistry,
@@ -137,7 +139,7 @@ func NewExecOnchainConfig(
 }
 
 type ExecOffchainConfig struct {
-	ccipdata.ExecOffchainConfig
+	offramp.ExecOffchainConfig
 }
 
 func NewExecOffchainConfig(
@@ -150,7 +152,7 @@ func NewExecOffchainConfig(
 	InflightCacheExpiry models.Duration,
 	RootSnoozeTime models.Duration,
 ) ExecOffchainConfig {
-	return ExecOffchainConfig{ccipdata.ExecOffchainConfig{
+	return ExecOffchainConfig{offramp.ExecOffchainConfig{
 		SourceFinalityDepth:         SourceFinalityDepth,
 		DestOptimisticConfirmations: DestOptimisticConfirmations,
 		DestFinalityDepth:           DestFinalityDepth,
@@ -1486,7 +1488,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	if err != nil {
 		return nil, err
 	}
-	leafHasher := ccipdata.NewLeafHasherV1_2_0(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx, onRampContract)
+	leafHasher := onramp.NewLeafHasherV1_2_0(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx, onRampContract)
 	if leafHasher == nil {
 		return nil, fmt.Errorf("unable to create leaf hasher")
 	}

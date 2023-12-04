@@ -8,14 +8,17 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 )
 
 func getProofData(
 	ctx context.Context,
-	sourceReader ccipdata.OnRampReader,
-	interval ccipdata.CommitStoreInterval,
+	sourceReader onramp.OnRampReader,
+	interval commit_store.CommitStoreInterval,
 ) (sendReqsInRoot []ccipdata.Event[internal.EVM2EVMMessage], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
 	sendReqs, err := sourceReader.GetSendRequestsBetweenSeqNums(ctx, interval.Min, interval.Max)
 	if err != nil {
@@ -36,9 +39,9 @@ func buildExecutionReportForMessages(
 	msgsInRoot []ccipdata.Event[internal.EVM2EVMMessage],
 	leaves [][32]byte,
 	tree *merklemulti.Tree[[32]byte],
-	commitInterval ccipdata.CommitStoreInterval,
+	commitInterval commit_store.CommitStoreInterval,
 	observedMessages []ObservedMessage,
-) (ccipdata.ExecReport, error) {
+) (offramp.ExecReport, error) {
 	innerIdxs := make([]int, 0, len(observedMessages))
 	var messages []internal.EVM2EVMMessage
 	var offchainTokenData [][][]byte
@@ -55,11 +58,11 @@ func buildExecutionReportForMessages(
 
 	merkleProof, err := tree.Prove(innerIdxs)
 	if err != nil {
-		return ccipdata.ExecReport{}, err
+		return offramp.ExecReport{}, err
 	}
 
 	// any capped proof will have length <= this one, so we reuse it to avoid proving inside loop, and update later if changed
-	return ccipdata.ExecReport{
+	return offramp.ExecReport{
 		Messages:          messages,
 		Proofs:            merkleProof.Hashes,
 		ProofFlagBits:     abihelpers.ProofFlagsToBits(merkleProof.SourceFlags),
@@ -69,7 +72,7 @@ func buildExecutionReportForMessages(
 
 // Validates the given message observations do not exceed the committed sequence numbers
 // in the commitStoreReader.
-func validateSeqNumbers(serviceCtx context.Context, commitStore ccipdata.CommitStoreReader, observedMessages []ObservedMessage) error {
+func validateSeqNumbers(serviceCtx context.Context, commitStore commit_store.CommitStoreReader, observedMessages []ObservedMessage) error {
 	nextMin, err := commitStore.GetExpectedNextSequenceNumber(serviceCtx)
 	if err != nil {
 		return err
@@ -84,14 +87,14 @@ func validateSeqNumbers(serviceCtx context.Context, commitStore ccipdata.CommitS
 }
 
 // Gets the commit report from the saved logs for a given sequence number.
-func getCommitReportForSeqNum(ctx context.Context, commitStoreReader ccipdata.CommitStoreReader, seqNum uint64) (ccipdata.CommitStoreReport, error) {
+func getCommitReportForSeqNum(ctx context.Context, commitStoreReader commit_store.CommitStoreReader, seqNum uint64) (commit_store.CommitStoreReport, error) {
 	acceptedReports, err := commitStoreReader.GetCommitReportMatchingSeqNum(ctx, seqNum, 0)
 	if err != nil {
-		return ccipdata.CommitStoreReport{}, err
+		return commit_store.CommitStoreReport{}, err
 	}
 
 	if len(acceptedReports) == 0 {
-		return ccipdata.CommitStoreReport{}, errors.Errorf("seq number not committed")
+		return commit_store.CommitStoreReport{}, errors.Errorf("seq number not committed")
 	}
 
 	return acceptedReports[0].Data, nil

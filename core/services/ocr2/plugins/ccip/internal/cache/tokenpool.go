@@ -10,13 +10,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
 )
 
 func NewTokenPools(
 	lggr logger.Logger,
 	lp logpoller.LogPoller,
-	offRamp ccipdata.OffRampReader,
+	offRamp offramp.OffRampReader,
 	numWorkers int,
 ) *CachedChain[map[common.Address]common.Address] {
 	return &CachedChain[map[common.Address]common.Address]{
@@ -32,7 +32,7 @@ func NewTokenPools(
 
 func newTokenPoolsOrigin(
 	lggr logger.Logger,
-	offRamp ccipdata.OffRampReader,
+	offRamp offramp.OffRampReader,
 	numWorkers int) *tokenPools {
 	return &tokenPools{
 		lggr:       lggr,
@@ -43,7 +43,7 @@ func newTokenPoolsOrigin(
 
 type tokenPools struct {
 	lggr       logger.Logger
-	offRamp    ccipdata.OffRampReader
+	offRamp    offramp.OffRampReader
 	numWorkers int
 }
 

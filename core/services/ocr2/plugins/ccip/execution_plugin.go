@@ -24,6 +24,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
@@ -51,7 +55,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 
 	// Create the offRamp reader.
 	offRampAddress := common.HexToAddress(spec.ContractID)
-	offRampReader, err := ccipdata.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampReader, err := offramp.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create offRampReader")
 	}
@@ -73,7 +77,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	execLggr := lggr.Named("CCIPExecution").With(
 		"sourceChain", ChainName(int64(chainID)),
 		"destChain", ChainName(destChainID))
-	onRampReader, err := ccipdata.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
+	onRampReader, err := onramp.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create onramp reader")
 	}
@@ -92,12 +96,12 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	}
 
 	// TODO: we don't support onramp source registry changes without a reboot yet?
-	sourcePriceRegistry, err := ccipdata.NewPriceRegistryReader(lggr, dynamicOnRampConfig.PriceRegistry, sourceChain.LogPoller(), sourceChain.Client())
+	sourcePriceRegistry, err := price_registry.NewPriceRegistryReader(lggr, dynamicOnRampConfig.PriceRegistry, sourceChain.LogPoller(), sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load source registry")
 	}
 
-	commitStoreReader, err := ccipdata.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
+	commitStoreReader, err := commit_store.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
 	}
@@ -237,5 +241,5 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 // ExecutionReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
 // Only MessageIDs will be populated in the TxMeta.
 func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
-	return ccipdata.ExecReportToEthTxMeta(typ, ver)
+	return offramp.ExecReportToEthTxMeta(typ, ver)
 }

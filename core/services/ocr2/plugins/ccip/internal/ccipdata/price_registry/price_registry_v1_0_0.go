@@ -1,4 +1,4 @@
-package ccipdata
+package price_registry
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -77,7 +78,7 @@ func (p *PriceRegistryV1_0_0) Close(opts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(p.lp, p.filters, opts...)
 }
 
-func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]Event[TokenPriceUpdate], error) {
+func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]ccipdata.Event[TokenPriceUpdate], error) {
 	logs, err := p.lp.LogsCreatedAfter(
 		p.tokenUpdated,
 		p.address,
@@ -89,7 +90,7 @@ func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Conte
 		return nil, err
 	}
 
-	return parseLogs[TokenPriceUpdate](
+	return ccipdata.ParseLogs[TokenPriceUpdate](
 		logs,
 		p.lggr,
 		func(log types.Log) (*TokenPriceUpdate, error) {
@@ -108,7 +109,7 @@ func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Conte
 	)
 }
 
-func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]Event[GasPriceUpdate], error) {
+func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]ccipdata.Event[GasPriceUpdate], error) {
 	logs, err := p.lp.IndexedLogsCreatedAfter(
 		p.gasUpdated,
 		p.address,
@@ -122,7 +123,7 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 		return nil, err
 	}
 
-	return parseLogs[GasPriceUpdate](
+	return ccipdata.ParseLogs[GasPriceUpdate](
 		logs,
 		p.lggr,
 		func(log types.Log) (*GasPriceUpdate, error) {

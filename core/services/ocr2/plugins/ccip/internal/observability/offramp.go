@@ -7,14 +7,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
 )
 
 type ObservedOffRampReader struct {
-	ccipdata.OffRampReader
+	offramp.OffRampReader
 	metric metricDetails
 }
 
-func NewObservedOffRampReader(origin ccipdata.OffRampReader, chainID int64, pluginName string) *ObservedOffRampReader {
+func NewObservedOffRampReader(origin offramp.OffRampReader, chainID int64, pluginName string) *ObservedOffRampReader {
 	return &ObservedOffRampReader{
 		OffRampReader: origin,
 		metric: metricDetails{
@@ -27,20 +28,20 @@ func NewObservedOffRampReader(origin ccipdata.OffRampReader, chainID int64, plug
 	}
 }
 
-func (o *ObservedOffRampReader) EncodeExecutionReport(report ccipdata.ExecReport) ([]byte, error) {
+func (o *ObservedOffRampReader) EncodeExecutionReport(report offramp.ExecReport) ([]byte, error) {
 	return withObservedInteraction(o.metric, "EncodeExecutionReport", func() ([]byte, error) {
 		return o.OffRampReader.EncodeExecutionReport(report)
 	})
 }
 
-func (o *ObservedOffRampReader) DecodeExecutionReport(report []byte) (ccipdata.ExecReport, error) {
-	return withObservedInteraction(o.metric, "DecodeExecutionReport", func() (ccipdata.ExecReport, error) {
+func (o *ObservedOffRampReader) DecodeExecutionReport(report []byte) (offramp.ExecReport, error) {
+	return withObservedInteraction(o.metric, "DecodeExecutionReport", func() (offramp.ExecReport, error) {
 		return o.OffRampReader.DecodeExecutionReport(report)
 	})
 }
 
-func (o *ObservedOffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]ccipdata.Event[ccipdata.ExecutionStateChanged], error) {
-	return withObservedInteraction(o.metric, "GetExecutionStateChangesBetweenSeqNums", func() ([]ccipdata.Event[ccipdata.ExecutionStateChanged], error) {
+func (o *ObservedOffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]ccipdata.Event[offramp.ExecutionStateChanged], error) {
+	return withObservedInteraction(o.metric, "GetExecutionStateChangesBetweenSeqNums", func() ([]ccipdata.Event[offramp.ExecutionStateChanged], error) {
 		return o.OffRampReader.GetExecutionStateChangesBetweenSeqNums(ctx, seqNumMin, seqNumMax, confs)
 	})
 }
@@ -87,8 +88,8 @@ func (o *ObservedOffRampReader) GetExecutionState(ctx context.Context, sequenceN
 	})
 }
 
-func (o *ObservedOffRampReader) GetStaticConfig(ctx context.Context) (ccipdata.OffRampStaticConfig, error) {
-	return withObservedInteraction(o.metric, "GetStaticConfig", func() (ccipdata.OffRampStaticConfig, error) {
+func (o *ObservedOffRampReader) GetStaticConfig(ctx context.Context) (offramp.OffRampStaticConfig, error) {
+	return withObservedInteraction(o.metric, "GetStaticConfig", func() (offramp.OffRampStaticConfig, error) {
 		return o.OffRampReader.GetStaticConfig(ctx)
 	})
 }

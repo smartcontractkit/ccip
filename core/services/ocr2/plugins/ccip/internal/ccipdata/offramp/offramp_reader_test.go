@@ -1,4 +1,4 @@
-package ccipdata_test
+package offramp_test
 
 import (
 	"math/big"
@@ -24,24 +24,25 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type offRampReaderTH struct {
 	user   *bind.TransactOpts
-	reader ccipdata.OffRampReader
+	reader offramp.OffRampReader
 }
 
 func TestOffRampFilters(t *testing.T) {
-	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+	commit_store_test.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+		c, err := offramp.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		require.NoError(t, c.RegisterFilters())
 		return c
 	}, 3)
-	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewOffRampV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+	commit_store_test.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+		c, err := offramp.NewOffRampV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		require.NoError(t, c.RegisterFilters())
 		return c
@@ -50,11 +51,11 @@ func TestOffRampFilters(t *testing.T) {
 
 func TestExecOffchainConfig_Encoding(t *testing.T) {
 	tests := map[string]struct {
-		want      ccipdata.ExecOffchainConfig
+		want      offramp.ExecOffchainConfig
 		expectErr bool
 	}{
 		"encodes and decodes config with all fields set": {
-			want: ccipdata.ExecOffchainConfig{
+			want: offramp.ExecOffchainConfig{
 				SourceFinalityDepth:         3,
 				DestOptimisticConfirmations: 6,
 				DestFinalityDepth:           3,
@@ -66,7 +67,7 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 			},
 		},
 		"fails decoding when all fields present but with 0 values": {
-			want: ccipdata.ExecOffchainConfig{
+			want: offramp.ExecOffchainConfig{
 				SourceFinalityDepth:         0,
 				DestFinalityDepth:           0,
 				DestOptimisticConfirmations: 0,
@@ -79,11 +80,11 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 			expectErr: true,
 		},
 		"fails decoding when all fields are missing": {
-			want:      ccipdata.ExecOffchainConfig{},
+			want:      offramp.ExecOffchainConfig{},
 			expectErr: true,
 		},
 		"fails decoding when some fields are missing": {
-			want: ccipdata.ExecOffchainConfig{
+			want: offramp.ExecOffchainConfig{
 				SourceFinalityDepth: 99999999,
 				InflightCacheExpiry: models.MustMakeDuration(64 * time.Second),
 			},
@@ -95,7 +96,7 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 			exp := tc.want
 			encode, err := ccipconfig.EncodeOffchainConfig(&exp)
 			require.NoError(t, err)
-			got, err := ccipconfig.DecodeOffchainConfig[ccipdata.ExecOffchainConfig](encode)
+			got, err := ccipconfig.DecodeOffchainConfig[offramp.ExecOffchainConfig](encode)
 
 			if tc.expectErr {
 				require.ErrorContains(t, err, "must set")
@@ -110,12 +111,12 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 func TestExecOnchainConfig100(t *testing.T) {
 	tests := []struct {
 		name      string
-		want      ccipdata.ExecOnchainConfigV1_0_0
+		want      offramp.ExecOnchainConfigV1_0_0
 		expectErr bool
 	}{
 		{
 			name: "encodes and decodes config with all fields set",
-			want: ccipdata.ExecOnchainConfigV1_0_0{
+			want: offramp.ExecOnchainConfigV1_0_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  utils.RandomAddress(),
 				PriceRegistry:                           utils.RandomAddress(),
@@ -125,7 +126,7 @@ func TestExecOnchainConfig100(t *testing.T) {
 		},
 		{
 			name: "encodes and fails decoding config with missing fields",
-			want: ccipdata.ExecOnchainConfigV1_0_0{
+			want: offramp.ExecOnchainConfigV1_0_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				MaxDataSize:                             rand.Uint32(),
 			},
@@ -137,7 +138,7 @@ func TestExecOnchainConfig100(t *testing.T) {
 			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := abihelpers.DecodeAbiStruct[ccipdata.ExecOnchainConfigV1_0_0](encoded)
+			decoded, err := abihelpers.DecodeAbiStruct[offramp.ExecOnchainConfigV1_0_0](encoded)
 			if tt.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {
@@ -151,12 +152,12 @@ func TestExecOnchainConfig100(t *testing.T) {
 func TestExecOnchainConfig120(t *testing.T) {
 	tests := []struct {
 		name      string
-		want      ccipdata.ExecOnchainConfigV1_2_0
+		want      offramp.ExecOnchainConfigV1_2_0
 		expectErr bool
 	}{
 		{
 			name: "encodes and decodes config with all fields set",
-			want: ccipdata.ExecOnchainConfigV1_2_0{
+			want: offramp.ExecOnchainConfigV1_2_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  utils.RandomAddress(),
 				PriceRegistry:                           utils.RandomAddress(),
@@ -167,7 +168,7 @@ func TestExecOnchainConfig120(t *testing.T) {
 		},
 		{
 			name: "encodes and fails decoding config with missing fields",
-			want: ccipdata.ExecOnchainConfigV1_2_0{
+			want: offramp.ExecOnchainConfigV1_2_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				MaxDataBytes:                            rand.Uint32(),
 			},
@@ -179,7 +180,7 @@ func TestExecOnchainConfig120(t *testing.T) {
 			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := abihelpers.DecodeAbiStruct[ccipdata.ExecOnchainConfigV1_2_0](encoded)
+			decoded, err := abihelpers.DecodeAbiStruct[offramp.ExecOnchainConfigV1_2_0](encoded)
 			if tt.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {
@@ -219,7 +220,7 @@ func TestOffRampReaderInit(t *testing.T) {
 }
 
 func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
-	user, bc := newSimulation(t)
+	user, bc := ccipdata.newSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -243,7 +244,7 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 	}
 
 	// Create the version-specific reader.
-	reader, err := ccipdata.NewOffRampReader(log, offRampAddress, bc, lp, nil)
+	reader, err := offramp.NewOffRampReader(log, offRampAddress, bc, lp, nil)
 	require.NoError(t, err)
 	require.Equal(t, offRampAddress, reader.Address())
 
@@ -278,7 +279,7 @@ func setupOffRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	offRampAddr, tx, offRamp, err := evm_2_evm_offramp_1_0_0.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.assertNonRevert(t, tx, bc, user)
 
 	// Verify the deployed OffRamp.
 	tav, err := offRamp.TypeAndVersion(&bind.CallOpts{
@@ -315,7 +316,7 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.assertNonRevert(t, tx, bc, user)
 
 	// Verify the deployed OffRamp.
 	tav, err := offRamp.TypeAndVersion(&bind.CallOpts{
@@ -334,7 +335,7 @@ func deployMockArm(
 	armAddr, tx, _, err := mock_arm_contract.DeployMockARMContract(user, bc)
 	require.NoError(t, err)
 	bc.Commit()
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.assertNonRevert(t, tx, bc, user)
 	require.NotEqual(t, common.Address{}, armAddr)
 	return armAddr
 }
@@ -356,7 +357,7 @@ func deployCommitStore(
 	})
 	require.NoError(t, err)
 	bc.Commit()
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.assertNonRevert(t, tx, bc, user)
 
 	// Test the deployed CommitStore.
 	callOpts := &bind.CallOpts{
@@ -380,7 +381,7 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 
 	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(ctx, 0, 10, 0)
 	require.NoError(t, err)
-	require.Equal(t, []ccipdata.Event[ccipdata.ExecutionStateChanged]{}, events)
+	require.Equal(t, []ccipdata.Event[offramp.ExecutionStateChanged]{}, events)
 
 	destTokens, err := th.reader.GetDestinationTokensFromSourceTokens(ctx, tokens)
 	require.NoError(t, err)

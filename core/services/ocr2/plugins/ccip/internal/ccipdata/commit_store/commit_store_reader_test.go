@@ -1,4 +1,4 @@
-package ccipdata_test
+package commit_store_test
 
 import (
 	"context"
@@ -31,11 +31,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
+	price_registry2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-func assertFilterRegistration(t *testing.T, lp *lpmocks.LogPoller, buildCloser func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer, numFilter int) {
+func AssertFilterRegistration(t *testing.T, lp *lpmocks.LogPoller, buildCloser func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer, numFilter int) {
 	// Expected filter properties for a closer:
 	// - Should be the same filter set registered that is unregistered
 	// - Should be registered to the address specified
@@ -60,14 +62,14 @@ func assertFilterRegistration(t *testing.T, lp *lpmocks.LogPoller, buildCloser f
 }
 
 func TestCommitFilters(t *testing.T) {
-	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewCommitStoreV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+	AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+		c, err := commit_store.NewCommitStoreV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		require.NoError(t, c.RegisterFilters())
 		return c
 	}, 1)
-	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewCommitStoreV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+	AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+		c, err := commit_store.NewCommitStoreV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		require.NoError(t, c.RegisterFilters())
 		return c
@@ -76,11 +78,11 @@ func TestCommitFilters(t *testing.T) {
 
 func TestCommitOffchainConfig_Encoding(t *testing.T) {
 	tests := map[string]struct {
-		want      ccipdata.CommitOffchainConfigV1_2_0
+		want      commit_store.CommitOffchainConfigV1_2_0
 		expectErr bool
 	}{
 		"encodes and decodes config with all fields set": {
-			want: ccipdata.CommitOffchainConfigV1_2_0{
+			want: commit_store.CommitOffchainConfigV1_2_0{
 				SourceFinalityDepth:      3,
 				DestFinalityDepth:        3,
 				GasPriceHeartBeat:        models.MustMakeDuration(1 * time.Hour),
@@ -93,7 +95,7 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 			},
 		},
 		"fails decoding when all fields present but with 0 values": {
-			want: ccipdata.CommitOffchainConfigV1_2_0{
+			want: commit_store.CommitOffchainConfigV1_2_0{
 				SourceFinalityDepth:      0,
 				DestFinalityDepth:        0,
 				GasPriceHeartBeat:        models.MustMakeDuration(0),
@@ -107,11 +109,11 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 			expectErr: true,
 		},
 		"fails decoding when all fields are missing": {
-			want:      ccipdata.CommitOffchainConfigV1_2_0{},
+			want:      commit_store.CommitOffchainConfigV1_2_0{},
 			expectErr: true,
 		},
 		"fails decoding when some fields are missing": {
-			want: ccipdata.CommitOffchainConfigV1_2_0{
+			want: commit_store.CommitOffchainConfigV1_2_0{
 				SourceFinalityDepth:      3,
 				GasPriceHeartBeat:        models.MustMakeDuration(1 * time.Hour),
 				DAGasPriceDeviationPPB:   5e7,
@@ -127,7 +129,7 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			encode, err := ccipconfig.EncodeOffchainConfig(tc.want)
 			require.NoError(t, err)
-			got, err := ccipconfig.DecodeOffchainConfig[ccipdata.CommitOffchainConfigV1_2_0](encode)
+			got, err := ccipconfig.DecodeOffchainConfig[commit_store.CommitOffchainConfigV1_2_0](encode)
 
 			if tc.expectErr {
 				require.ErrorContains(t, err, "must set")
@@ -142,19 +144,19 @@ func TestCommitOffchainConfig_Encoding(t *testing.T) {
 func TestCommitOnchainConfig(t *testing.T) {
 	tests := []struct {
 		name      string
-		want      ccipdata.CommitOnchainConfig
+		want      commit_store.CommitOnchainConfig
 		expectErr bool
 	}{
 		{
 			name: "encodes and decodes config with all fields set",
-			want: ccipdata.CommitOnchainConfig{
+			want: commit_store.CommitOnchainConfig{
 				PriceRegistry: utils.RandomAddress(),
 			},
 			expectErr: false,
 		},
 		{
 			name:      "encodes and fails decoding config with missing fields",
-			want:      ccipdata.CommitOnchainConfig{},
+			want:      commit_store.CommitOnchainConfig{},
 			expectErr: true,
 		},
 	}
@@ -163,7 +165,7 @@ func TestCommitOnchainConfig(t *testing.T) {
 			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := abihelpers.DecodeAbiStruct[ccipdata.CommitOnchainConfig](encoded)
+			decoded, err := abihelpers.DecodeAbiStruct[commit_store.CommitOnchainConfig](encoded)
 			if tt.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {
@@ -175,7 +177,7 @@ func TestCommitOnchainConfig(t *testing.T) {
 }
 
 func TestCommitStoreReaders(t *testing.T) {
-	user, ec := newSim(t)
+	user, ec := ccipdata.newSim(t)
 	lggr := logger.TestLogger(t)
 	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, false, 2, 3, 2, 1000)
 
@@ -183,10 +185,10 @@ func TestCommitStoreReaders(t *testing.T) {
 	onramp1 := utils.RandomAddress()
 	onramp2 := utils.RandomAddress()
 	// Report
-	rep := ccipdata.CommitStoreReport{
-		TokenPrices: []ccipdata.TokenPrice{{Token: utils.RandomAddress(), Value: big.NewInt(1)}},
-		GasPrices:   []ccipdata.GasPrice{{DestChainSelector: 1, Value: big.NewInt(1)}},
-		Interval:    ccipdata.CommitStoreInterval{Min: 1, Max: 10},
+	rep := commit_store.CommitStoreReport{
+		TokenPrices: []price_registry2.TokenPrice{{Token: utils.RandomAddress(), Value: big.NewInt(1)}},
+		GasPrices:   []price_registry2.GasPrice{{DestChainSelector: 1, Value: big.NewInt(1)}},
+		Interval:    commit_store.CommitStoreInterval{Min: 1, Max: 10},
 		MerkleRoot:  common.HexToHash("0x1"),
 	}
 	er := big.NewInt(1)
@@ -206,31 +208,31 @@ func TestCommitStoreReaders(t *testing.T) {
 		ArmProxy:            armAddr,
 	})
 	require.NoError(t, err)
-	commitAndGetBlockTs(ec) // Deploy these
+	ccipdata.CommitAndGetBlockTs(ec) // Deploy these
 	pr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, ec, []common.Address{addr}, nil, 1e6)
 	require.NoError(t, err)
 	pr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, []common.Address{addr2}, nil, 1e6)
 	require.NoError(t, err)
-	commitAndGetBlockTs(ec) // Deploy these
+	ccipdata.CommitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
-	c10r, err := ccipdata.NewCommitStoreReader(lggr, addr, ec, lp, ge)
+	c10r, err := commit_store.NewCommitStoreReader(lggr, addr, ec, lp, ge)
 	require.NoError(t, err)
 	require.NoError(t, c10r.RegisterFilters())
-	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&ccipdata.CommitStoreV1_0_0{}).String())
-	c12r, err := ccipdata.NewCommitStoreReader(lggr, addr2, ec, lp, ge)
+	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&commit_store.CommitStoreV1_0_0{}).String())
+	c12r, err := commit_store.NewCommitStoreReader(lggr, addr2, ec, lp, ge)
 	require.NoError(t, err)
 	require.NoError(t, c12r.RegisterFilters())
-	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&ccipdata.CommitStoreV1_2_0{}).String())
+	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&commit_store.CommitStoreV1_2_0{}).String())
 
 	// Apply config
 	signers := []common.Address{utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress()}
 	transmitters := []common.Address{utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress()}
-	onchainConfig, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
+	onchainConfig, err := abihelpers.EncodeAbiStruct[commit_store.CommitOnchainConfig](commit_store.CommitOnchainConfig{
 		PriceRegistry: pr,
 	})
 	require.NoError(t, err)
 
-	commonOffchain := ccipdata.CommitOffchainConfig{
+	commonOffchain := commit_store.CommitOffchainConfig{
 		SourceFinalityDepth:    1,
 		GasPriceDeviationPPB:   1e6,
 		GasPriceHeartBeat:      1 * time.Hour,
@@ -240,7 +242,7 @@ func TestCommitStoreReaders(t *testing.T) {
 		DestFinalityDepth:      2,
 	}
 	maxGas := uint64(1e9)
-	offchainConfig, err := ccipconfig.EncodeOffchainConfig[ccipdata.CommitOffchainConfigV1_0_0](ccipdata.CommitOffchainConfigV1_0_0{
+	offchainConfig, err := ccipconfig.EncodeOffchainConfig[commit_store.CommitOffchainConfigV1_0_0](commit_store.CommitOffchainConfigV1_0_0{
 		SourceFinalityDepth:   commonOffchain.SourceFinalityDepth,
 		DestFinalityDepth:     commonOffchain.DestFinalityDepth,
 		FeeUpdateHeartBeat:    models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
@@ -251,11 +253,11 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	_, err = ch.SetOCR2Config(user, signers, transmitters, 1, onchainConfig, 1, []byte{})
 	require.NoError(t, err)
-	onchainConfig2, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
+	onchainConfig2, err := abihelpers.EncodeAbiStruct[commit_store.CommitOnchainConfig](commit_store.CommitOnchainConfig{
 		PriceRegistry: pr2,
 	})
 	require.NoError(t, err)
-	offchainConfig2, err := ccipconfig.EncodeOffchainConfig[ccipdata.CommitOffchainConfigV1_2_0](ccipdata.CommitOffchainConfigV1_2_0{
+	offchainConfig2, err := ccipconfig.EncodeOffchainConfig[commit_store.CommitOffchainConfigV1_2_0](commit_store.CommitOffchainConfigV1_2_0{
 		SourceFinalityDepth:      commonOffchain.SourceFinalityDepth,
 		DestFinalityDepth:        commonOffchain.DestFinalityDepth,
 		MaxGasPrice:              maxGas,
@@ -269,7 +271,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	_, err = ch2.SetOCR2Config(user, signers, transmitters, 1, onchainConfig2, 1, []byte{})
 	require.NoError(t, err)
-	commitAndGetBlockTs(ec)
+	ccipdata.commitAndGetBlockTs(ec)
 
 	// Apply report
 	b, err := c10r.EncodeCommitReport(rep)
@@ -280,7 +282,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	_, err = ch2.Report(user, b, er)
 	require.NoError(t, err)
-	commitAndGetBlockTs(ec)
+	ccipdata.commitAndGetBlockTs(ec)
 
 	// Capture all logs.
 	lp.PollAndSaveLogs(context.Background(), 1)
@@ -289,7 +291,7 @@ func TestCommitStoreReaders(t *testing.T) {
 		ccipdata.V1_0_0: {onchainConfig, offchainConfig},
 		ccipdata.V1_2_0: {onchainConfig2, offchainConfig2},
 	}
-	crs := map[string]ccipdata.CommitStoreReader{
+	crs := map[string]commit_store.CommitStoreReader{
 		ccipdata.V1_0_0: c10r,
 		ccipdata.V1_2_0: c12r,
 	}
@@ -372,7 +374,7 @@ func TestCommitStoreReaders(t *testing.T) {
 			assert.Equal(t, reps[0].Data, rep)
 
 			// Until we detect the config, we'll have empty offchain config
-			assert.Equal(t, cr.OffchainConfig(), ccipdata.CommitOffchainConfig{})
+			assert.Equal(t, cr.OffchainConfig(), commit_store.CommitOffchainConfig{})
 			newPr, err := cr.ChangeConfig(configs[v][0], configs[v][1])
 			require.NoError(t, err)
 			assert.Equal(t, newPr, prs[v])
