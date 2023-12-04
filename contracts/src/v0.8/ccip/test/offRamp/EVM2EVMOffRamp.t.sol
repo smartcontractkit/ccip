@@ -978,6 +978,28 @@ contract EVM2EVMOffRamp_manuallyExecute is EVM2EVMOffRampSetup {
     s_offRamp.manuallyExecute(_generateReportFromMessages(messages), gasLimits);
   }
 
+  function testManualExecFailedTxReverts() public {
+    Internal.EVM2EVMMessage[] memory messages = _generateBasicMessages();
+
+    messages[0].receiver = address(s_reverting_receiver);
+    messages[0].messageId = Internal._hash(messages[0], s_offRamp.metadataHash());
+
+    s_offRamp.execute(_generateReportFromMessages(messages), new uint256[](0));
+
+    s_reverting_receiver.setRevert(true);
+
+    vm.expectRevert(
+      abi.encodeWithSelector(
+        EVM2EVMOffRamp.ExecutionError.selector,
+        abi.encodeWithSelector(
+          EVM2EVMOffRamp.ReceiverError.selector,
+          abi.encodeWithSelector(MaybeRevertMessageReceiver.CustomError.selector, bytes(""))
+        )
+      )
+    );
+    s_offRamp.manuallyExecute(_generateReportFromMessages(messages), _getGasLimitsFromMessages(messages));
+  }
+
   function testReentrancyManualExecuteFAILS() public {
     uint256 tokenAmount = 1e9;
     IERC20 tokenToAbuse = IERC20(s_destFeeToken);
