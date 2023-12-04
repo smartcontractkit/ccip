@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -25,19 +23,20 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	price_registry2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/test_utils"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestPriceRegistryFilters(t *testing.T) {
 	cl := mocks.NewClient(t)
 
-	commit_store_test.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+	test_utils.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
 		c, err := price_registry2.NewPriceRegistryV1_0_0(logger.TestLogger(t), addr, lp, cl)
 		require.NoError(t, err)
 		return c
 	}, 3)
 
-	commit_store_test.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+	test_utils.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
 		c, err := price_registry2.NewPriceRegistryV1_2_0(logger.TestLogger(t), addr, lp, cl)
 		require.NoError(t, err)
 		return c
@@ -59,27 +58,10 @@ type priceRegReaderTH struct {
 	dest                 uint64
 }
 
-func CommitAndGetBlockTs(ec *client.SimulatedBackendClient) uint64 {
-	h := ec.Commit()
-	b, _ := ec.BlockByHash(context.Background(), h)
-	return b.Time()
-}
-
-func newSim(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
-	user := testutils.MustNewSimTransactor(t)
-	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
-		user.From: {
-			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),
-		},
-	}, 10e6)
-	ec := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
-	return user, ec
-}
-
 // setupPriceRegistryReaderTH instantiates all versions of the price registry reader
 // with a snapshot of data so reader tests can do multi-version assertions.
 func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
-	user, ec := newSim(t)
+	user, ec := test_utils.NewSim(t)
 	lggr := logger.TestLogger(t)
 	// TODO: We should be able to use an in memory log poller ORM here to speed up the tests.
 	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, false, 2, 3, 2, 1000)
@@ -120,7 +102,7 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	require.NoError(t, err)
 	addr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, nil, feeTokens, 1000)
 	require.NoError(t, err)
-	CommitAndGetBlockTs(ec) // Deploy these
+	test_utils.CommitAndGetBlockTs(ec) // Deploy these
 	pr10r, err := price_registry2.NewPriceRegistryReader(lggr, addr, lp, ec)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(pr10r).String(), reflect.TypeOf(&price_registry2.PriceRegistryV1_0_0{}).String())
@@ -130,11 +112,11 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	// Apply block1.
 	price_registry2.ApplyPriceRegistryUpdateV1_0_0(t, user, addr, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
 	price_registry2.ApplyPriceRegistryUpdateV1_2_0(t, user, addr2, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
-	b1 := CommitAndGetBlockTs(ec)
+	b1 := test_utils.CommitAndGetBlockTs(ec)
 	// Apply block2
 	price_registry2.ApplyPriceRegistryUpdateV1_0_0(t, user, addr, ec, gasPriceUpdatesBlock2, tokenPriceUpdatesBlock2)
 	price_registry2.ApplyPriceRegistryUpdateV1_2_0(t, user, addr2, ec, gasPriceUpdatesBlock2, tokenPriceUpdatesBlock2)
-	b2 := CommitAndGetBlockTs(ec)
+	b2 := test_utils.CommitAndGetBlockTs(ec)
 
 	// Capture all lp data.
 	lp.PollAndSaveLogs(context.Background(), 1)

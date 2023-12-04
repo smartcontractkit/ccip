@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/test_utils"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -31,7 +32,7 @@ type onRampReaderTH struct {
 }
 
 func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
-	_, bc := ccipdata.newSimulation(t)
+	_, bc := test_utils.NewSimulation(t)
 	lp := lpmocks.NewLogPoller(t)
 	_, err := onramp.NewOnRampReader(logger.TestLogger(t), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), common.Address{}, lp, bc)
 	assert.EqualError(t, err, "expected 'EVM2EVMOnRamp' got '' (no contract code at given address)")
@@ -66,7 +67,7 @@ func TestOnRampReaderInit(t *testing.T) {
 }
 
 func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
-	user, bc := ccipdata.newSimulation(t)
+	user, bc := test_utils.NewSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -162,7 +163,7 @@ func setupOnRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	)
 	bc.Commit()
 	require.NoError(t, err)
-	ccipdata.assertNonRevert(t, transaction, bc, user)
+	test_utils.AssertNonRevert(t, transaction, bc, user)
 	return onRampAddress
 }
 
@@ -230,7 +231,7 @@ func setupOnRampV1_1_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	)
 	bc.Commit()
 	require.NoError(t, err)
-	ccipdata.assertNonRevert(t, transaction, bc, user)
+	test_utils.AssertNonRevert(t, transaction, bc, user)
 	return onRampAddress
 }
 
@@ -302,7 +303,7 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	)
 	bc.Commit()
 	require.NoError(t, err)
-	ccipdata.assertNonRevert(t, transaction, bc, user)
+	test_utils.AssertNonRevert(t, transaction, bc, user)
 	return onRampAddress
 }
 

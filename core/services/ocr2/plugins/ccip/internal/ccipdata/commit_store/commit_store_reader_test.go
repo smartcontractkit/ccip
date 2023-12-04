@@ -33,42 +33,19 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/commit_store"
 	price_registry2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/test_utils"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-func AssertFilterRegistration(t *testing.T, lp *lpmocks.LogPoller, buildCloser func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer, numFilter int) {
-	// Expected filter properties for a closer:
-	// - Should be the same filter set registered that is unregistered
-	// - Should be registered to the address specified
-	// - Number of events specific to this component should be registered
-	addr := common.HexToAddress("0x1234")
-	var filters []logpoller.Filter
-
-	lp.On("RegisterFilter", mock.Anything).Run(func(args mock.Arguments) {
-		f := args.Get(0).(logpoller.Filter)
-		require.Equal(t, len(f.Addresses), 1)
-		require.Equal(t, f.Addresses[0], addr)
-		filters = append(filters, f)
-	}).Return(nil).Times(numFilter)
-
-	c := buildCloser(lp, addr)
-	for _, filter := range filters {
-		lp.On("UnregisterFilter", filter.Name).Return(nil)
-	}
-
-	require.NoError(t, c.Close())
-	lp.AssertExpectations(t)
-}
-
 func TestCommitFilters(t *testing.T) {
-	AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+	test_utils.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
 		c, err := commit_store.NewCommitStoreV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		require.NoError(t, c.RegisterFilters())
 		return c
 	}, 1)
-	AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+	test_utils.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
 		c, err := commit_store.NewCommitStoreV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		require.NoError(t, c.RegisterFilters())
@@ -177,7 +154,7 @@ func TestCommitOnchainConfig(t *testing.T) {
 }
 
 func TestCommitStoreReaders(t *testing.T) {
-	user, ec := ccipdata.newSim(t)
+	user, ec := test_utils.NewSim(t)
 	lggr := logger.TestLogger(t)
 	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, false, 2, 3, 2, 1000)
 
@@ -208,12 +185,12 @@ func TestCommitStoreReaders(t *testing.T) {
 		ArmProxy:            armAddr,
 	})
 	require.NoError(t, err)
-	ccipdata.CommitAndGetBlockTs(ec) // Deploy these
+	test_utils.CommitAndGetBlockTs(ec) // Deploy these
 	pr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, ec, []common.Address{addr}, nil, 1e6)
 	require.NoError(t, err)
 	pr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, []common.Address{addr2}, nil, 1e6)
 	require.NoError(t, err)
-	ccipdata.CommitAndGetBlockTs(ec) // Deploy these
+	test_utils.CommitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
 	c10r, err := commit_store.NewCommitStoreReader(lggr, addr, ec, lp, ge)
 	require.NoError(t, err)
@@ -271,7 +248,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	_, err = ch2.SetOCR2Config(user, signers, transmitters, 1, onchainConfig2, 1, []byte{})
 	require.NoError(t, err)
-	ccipdata.commitAndGetBlockTs(ec)
+	test_utils.CommitAndGetBlockTs(ec)
 
 	// Apply report
 	b, err := c10r.EncodeCommitReport(rep)
@@ -282,7 +259,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	_, err = ch2.Report(user, b, er)
 	require.NoError(t, err)
-	ccipdata.commitAndGetBlockTs(ec)
+	test_utils.CommitAndGetBlockTs(ec)
 
 	// Capture all logs.
 	lp.PollAndSaveLogs(context.Background(), 1)
