@@ -89,10 +89,6 @@ func TestLogPollerClient_GetSendRequestsBetweenSeqNums(t *testing.T) {
 	limit := uint64(10)
 	lggr := logger.TestLogger(t)
 
-	lp := mocks.NewLogPoller(t)
-	onRampV2, err := NewOnRampV1_2_0(lggr, 1, 1, onRampAddr, lp, nil)
-	require.NoError(t, err)
-
 	tests := []struct {
 		name          string
 		finalized     bool
@@ -104,6 +100,10 @@ func TestLogPollerClient_GetSendRequestsBetweenSeqNums(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			lp := mocks.NewLogPoller(t)
+			onRampV2, err := NewOnRampV1_2_0(lggr, 1, 1, onRampAddr, lp, nil)
+			require.NoError(t, err)
+
 			lp.On("LogsDataWordRange",
 				onRampV2.sendRequestedEventSig,
 				onRampAddr,
@@ -112,7 +112,7 @@ func TestLogPollerClient_GetSendRequestsBetweenSeqNums(t *testing.T) {
 				abihelpers.EvmWord(seqNum+limit),
 				tt.confirmations,
 				mock.Anything,
-			).Once().Return([]logpoller.Log{{LogIndex: 1}}, nil)
+			).Once().Return([]logpoller.Log{}, nil)
 
 			events, err1 := onRampV2.GetSendRequestsBetweenSeqNums(context.Background(), seqNum, seqNum+limit, tt.finalized)
 			assert.NoError(t, err1)
