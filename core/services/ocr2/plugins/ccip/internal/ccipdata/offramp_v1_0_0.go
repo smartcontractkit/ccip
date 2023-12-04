@@ -46,6 +46,11 @@ var (
 	ExecutionStateChangedSeqNrIndexV1_0_0               = 1
 )
 
+var offRampV1_0_0_poolAddedPoolRemovedEvents = []common.Hash{
+	abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
+	abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
+}
+
 type ExecOnchainConfigV1_0_0 evm_2_evm_offramp_1_0_0.EVM2EVMOffRampDynamicConfig
 
 func (d ExecOnchainConfigV1_0_0) AbiString() string {
@@ -545,10 +550,7 @@ func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ExecReport, error)
 }
 
 func (o *OffRampV1_0_0) TokenEvents() []common.Hash {
-	return []common.Hash{
-		abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
-		abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
-	}
+	return offRampV1_0_0_poolAddedPoolRemovedEvents
 }
 
 func (o *OffRampV1_0_0) RegisterFilters(qopts ...pg.QOpt) error {
@@ -585,11 +587,6 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		return nil, err
 	}
 
-	tokenEvents := []common.Hash{
-		abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
-		abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
-	}
-
 	return &OffRampV1_0_0{
 		offRamp:             offRamp,
 		ec:                  ec,
@@ -610,17 +607,17 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		),
 		destinationTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
-			tokenEvents,
+			offRampV1_0_0_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
 		),
 		sourceTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
-			tokenEvents,
+			offRampV1_0_0_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
 		),
 		destinationPoolsCache: cache.NewLogpollerEventsBased[map[common.Address]common.Address](
 			lp,
-			tokenEvents,
+			offRampV1_0_0_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
 		),
 

@@ -61,11 +61,11 @@ func (c *LogpollerEventsBased[T]) Get(ctx context.Context, syncFunc func(ctx con
 			return empty, fmt.Errorf("sync func: %w", err)
 		}
 
-		c.set(ctx, latestValue, newEventBlockNum)
+		c.set(latestValue, newEventBlockNum)
 		return latestValue, nil
 	}
 
-	cachedValue, _, err := c.get(ctx)
+	cachedValue := c.get()
 	if err != nil {
 		return empty, fmt.Errorf("get cached value: %w", err)
 	}
@@ -121,7 +121,7 @@ func (c *LogpollerEventsBased[T]) hasExpired(ctx context.Context) (expired bool,
 	return blockOfLatestEvent > blockOfCurrentValue, latestFinalizedBlock, nil
 }
 
-func (c *LogpollerEventsBased[T]) set(_ context.Context, value T, blockNum int64) {
+func (c *LogpollerEventsBased[T]) set(value T, blockNum int64) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -134,8 +134,8 @@ func (c *LogpollerEventsBased[T]) set(_ context.Context, value T, blockNum int64
 	return
 }
 
-func (c *LogpollerEventsBased[T]) get(_ context.Context) (T, int64, error) {
+func (c *LogpollerEventsBased[T]) get() T {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return c.value, c.lastChangeBlock, nil
+	return c.value
 }
