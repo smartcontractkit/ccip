@@ -13,12 +13,9 @@ DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB
 [CCIP.Groups]
 [CCIP.Groups.load]
 KeepEnvAlive = true
-NumberOfCommitNodes = 16
 MsgType = 'WithoutToken'
 PhaseTimeout = '50m'
-TestDuration = '1h'
-NodeFunding = 1000.0
-RequestPerUnitTime = [1]
+TestDuration = '1m'
+NodeFunding = 100.0
+RequestPerUnitTime = [5]
 TimeUnit = '10s'
-NoOfRoutersPerPair = 2
-NoOfNetworks = 10

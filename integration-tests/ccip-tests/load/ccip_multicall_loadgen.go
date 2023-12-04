@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"strconv"
 	"testing"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 )
 
 // CCIPMultiCallLoadGenerator represents a load generator for the CCIP lanes originating from same network
@@ -33,7 +31,7 @@ type CCIPMultiCallLoadGenerator struct {
 	client                  blockchain.EVMClient
 	E2ELoads                map[string]*CCIPE2ELoad
 	MultiCall               string
-	NoOfRequestsPerUnitTime int
+	NoOfRequestsPerUnitTime int64
 }
 
 type ReturnValues struct {
@@ -41,7 +39,7 @@ type ReturnValues struct {
 	Stats []*testreporters.RequestStat
 }
 
-func NewMultiCallLoadGenerator(t *testing.T, lanes []*actions.CCIPLane) (*CCIPMultiCallLoadGenerator, error) {
+func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*actions.CCIPLane, noOfRequestsPerUnitTime int64) (*CCIPMultiCallLoadGenerator, error) {
 	// check if all lanes are from same network
 	source := lanes[0].SourceChain.GetChainID()
 	multiCall := lanes[0].SrcNetworkLaneCfg.Multicall
@@ -57,21 +55,21 @@ func NewMultiCallLoadGenerator(t *testing.T, lanes []*actions.CCIPLane) (*CCIPMu
 		}
 	}
 	client := lanes[0].SourceChain
-	lggr := logging.GetTestLogger(t).With().Str("Source Network", client.GetNetworkName()).Logger()
-	return &CCIPMultiCallLoadGenerator{
-		t:         t,
-		client:    client,
-		MultiCall: multiCall,
-		logger:    lggr,
-	}, nil
-}
-
-func (m *CCIPMultiCallLoadGenerator) BeforeAll(testCfg *testsetups.CCIPTestConfig, lanes []*actions.CCIPLane) {
+	lggr := logging.GetTestLogger(testCfg.Test).With().Str("Source Network", client.GetNetworkName()).Logger()
+	m := &CCIPMultiCallLoadGenerator{
+		t:                       testCfg.Test,
+		client:                  client,
+		MultiCall:               multiCall,
+		logger:                  lggr,
+		NoOfRequestsPerUnitTime: noOfRequestsPerUnitTime,
+		E2ELoads:                make(map[string]*CCIPE2ELoad),
+	}
 	for _, lane := range lanes {
 		ccipLoad := NewCCIPLoad(testCfg.Test, lane, testCfg.TestGroupInput.PhaseTimeout.Duration(), 100000)
 		ccipLoad.BeforeAllCall(testCfg.TestGroupInput.MsgType)
 		m.E2ELoads[fmt.Sprintf("%s-%s", lane.SourceNetworkName, lane.DestNetworkName)] = ccipLoad
 	}
+	return m, nil
 }
 
 func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.CallResult {
@@ -105,103 +103,47 @@ func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.CallResult {
 	if rcpt != nil {
 		gasUsed = rcpt.GasUsed
 	}
-	for i, allStats := range stats {
-		for _, stat := range allStats {
+	for _, rValues := range returnValuesByDest {
+		if len(rValues.Stats) != len(rValues.Msgs) {
+			res.Error = fmt.Sprintf("number of stats and msgs should be same")
+			res.Failed = true
+			return res
+		}
+		for i, stat := range rValues.Stats {
+			msg := rValues.Msgs[i]
 			stat.UpdateState(lggr, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
 				testreporters.TransactionStats{
-					Fee:                msgs[i].Fee.String(),
+					Fee:                msg.Fee.String(),
 					GasUsed:            gasUsed,
 					TxHash:             sendTx.Hash().Hex(),
-					NoOfTokensSent:     len(msgs[i].Msg.TokenAmounts),
-					MessageBytesLength: len(msgs[i].Msg.Data),
+					NoOfTokensSent:     len(msg.Msg.TokenAmounts),
+					MessageBytesLength: len(msg.Msg.Data),
 				})
 		}
 	}
 
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
-	for _, allstates := range stats {
-		key := fmt.Sprintf("%s-%s", stat.SourceNetwork, stat.DestNetwork)
+	for _, rValues := range returnValuesByDest {
+		key := fmt.Sprintf("%s-%s", rValues.Stats[0].SourceNetwork, rValues.Stats[0].DestNetwork)
 		c, ok := m.E2ELoads[key]
 		if !ok {
 			res.Error = fmt.Sprintf("load for %s not found", key)
 			res.Failed = true
 			return res
 		}
-		msgLogs, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(lggr, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, []*testreporters.RequestStat{stat})
 
-		if err != nil || msgLogs == nil || len(msgLogs) == 0 {
-			res.Error = err.Error()
-			res.Data = allStats
-			res.Failed = true
-			return res
-		}
-		msgLog := msgLogs[0]
-		sentMsg := msgLog.Message
-		seqNum := sentMsg.SequenceNumber
-		lggr = lggr.With().Str("msgId ", fmt.Sprintf("0x%x", sentMsg.MessageId[:])).Logger()
+		lggr = lggr.With().Str("Source Network", c.Lane.SourceChain.GetNetworkName()).Str("Dest Network", c.Lane.DestChain.GetNetworkName()).Logger()
 
-		lstFinalizedBlock := c.LastFinalizedTxBlock.Load()
-		var sourceLogFinalizedAt time.Time
-		// if the finality tag is enabled and the last finalized block is greater than the block number of the message
-		// consider the message finalized
-		if c.Lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 &&
-			lstFinalizedBlock != 0 && lstFinalizedBlock > msgLog.Raw.BlockNumber {
-			sourceLogFinalizedAt = c.LastFinalizedTimestamp.Load()
-			stat.UpdateState(lggr, seqNum, testreporters.SourceLogFinalized,
-				sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
-				testreporters.TransactionStats{
-					TxHash:           msgLog.Raw.TxHash.String(),
-					FinalizedByBlock: strconv.FormatUint(lstFinalizedBlock, 10),
-					FinalizedAt:      sourceLogFinalizedAt.String(),
-				})
-		} else {
-			var finalizingBlock uint64
-			sourceLogFinalizedAt, finalizingBlock, err = c.Lane.Source.AssertSendRequestedLogFinalized(
-				lggr, sendTx.Hash(), sourceLogTime, []*testreporters.RequestStat{stats})
-			if err != nil {
-				res.Error = err.Error()
-				res.Data = allStats
-				res.Failed = true
-				return res
-			}
-			c.LastFinalizedTxBlock.Store(finalizingBlock)
-			c.LastFinalizedTimestamp.Store(sourceLogFinalizedAt)
-		}
-
-		// wait for
-		// - CommitStore to increase the seq number,
-		err = c.Lane.Dest.AssertSeqNumberExecuted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stat)
+		err := c.Validate(lggr, sendTx, txConfirmationTime, rValues.Stats)
 		if err != nil {
 			res.Error = err.Error()
-			res.Data = allStats
 			res.Failed = true
+			res.Data = allStats
 			return res
 		}
-		// wait for ReportAccepted event
-		commitReport, reportAcceptedAt, err := c.Lane.Dest.AssertEventReportAccepted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stat)
-		if err != nil || commitReport == nil {
-			res.Error = err.Error()
-			res.Data = allStats
-			res.Failed = true
-			return res
-		}
-		blessedAt, err := c.Lane.Dest.AssertReportBlessed(lggr, seqNum, c.CallTimeOut, *commitReport, reportAcceptedAt, stat)
-		if err != nil {
-			res.Error = err.Error()
-			res.Data = allStats
-			res.Failed = true
-			return res
-		}
-		_, err = c.Lane.Dest.AssertEventExecutionStateChanged(lggr, seqNum, c.CallTimeOut, blessedAt, stat, testhelpers.ExecutionStateSuccess)
-		if err != nil {
-			res.Error = err.Error()
-			res.Data = allStats
-			res.Failed = true
-			return res
-		}
+
 	}
-
 	res.Data = allStats
 	return res
 }
@@ -219,7 +161,7 @@ func (m *CCIPMultiCallLoadGenerator) MergeCalls() ([]contracts.CCIPMsgData, map[
 		allFee := big.NewInt(0)
 		var allStatsForDest []*testreporters.RequestStat
 		var allMsgsForDest []contracts.CCIPMsgData
-		for i := 0; i < m.NoOfRequestsPerUnitTime; i++ {
+		for i := int64(0); i < m.NoOfRequestsPerUnitTime; i++ {
 			msg, stats := e2eLoad.CCIPMsg()
 			msg.FeeToken = common.Address{}
 			fee, err := e2eLoad.Lane.Source.Common.Router.GetFee(destChainSelector, msg)
