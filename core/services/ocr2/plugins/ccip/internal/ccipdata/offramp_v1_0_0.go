@@ -43,13 +43,12 @@ var (
 	abiCustomTokenPool                                  = abihelpers.MustParseABI(custom_token_pool.CustomTokenPoolABI)
 	_                                     OffRampReader = &OffRampV1_0_0{}
 	ExecutionStateChangedEventV1_0_0                    = abihelpers.MustGetEventID("ExecutionStateChanged", abiOffRampV1_0_0)
+	PoolAddedEventV1_0_0                                = abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0)
+	PoolRemovedEventV1_0_0                              = abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)
 	ExecutionStateChangedSeqNrIndexV1_0_0               = 1
 )
 
-var offRampV1_0_0_poolAddedPoolRemovedEvents = []common.Hash{
-	abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0),
-	abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0),
-}
+var offRampV1_0_0_poolAddedPoolRemovedEvents = []common.Hash{PoolAddedEventV1_0_0, PoolRemovedEventV1_0_0}
 
 type ExecOnchainConfigV1_0_0 evm_2_evm_offramp_1_0_0.EVM2EVMOffRampDynamicConfig
 
@@ -573,12 +572,12 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, addr.String()),
-			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0)},
+			EventSigs: []common.Hash{PoolAddedEventV1_0_0},
 			Addresses: []common.Address{addr},
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, addr.String()),
-			EventSigs: []common.Hash{abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)},
+			EventSigs: []common.Hash{PoolRemovedEventV1_0_0},
 			Addresses: []common.Address{addr},
 		},
 	}
