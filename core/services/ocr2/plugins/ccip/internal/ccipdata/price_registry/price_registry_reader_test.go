@@ -61,7 +61,7 @@ type priceRegReaderTH struct {
 // setupPriceRegistryReaderTH instantiates all versions of the price registry reader
 // with a snapshot of data so reader tests can do multi-version assertions.
 func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
-	user, ec := test_utils.NewSim(t)
+	user, ec := test_utils.NewSimulation(t)
 	lggr := logger.TestLogger(t)
 	// TODO: We should be able to use an in memory log poller ORM here to speed up the tests.
 	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, false, 2, 3, 2, 1000)

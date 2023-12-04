@@ -154,7 +154,7 @@ func TestCommitOnchainConfig(t *testing.T) {
 }
 
 func TestCommitStoreReaders(t *testing.T) {
-	user, ec := test_utils.NewSim(t)
+	user, ec := test_utils.NewSimulation(t)
 	lggr := logger.TestLogger(t)
 	lp := logpoller.NewLogPoller(logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), lggr, pgtest.NewQConfig(true)), ec, lggr, 100*time.Millisecond, false, 2, 3, 2, 1000)
 

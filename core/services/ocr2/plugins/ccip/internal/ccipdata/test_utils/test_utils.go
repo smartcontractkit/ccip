@@ -69,14 +69,3 @@ func CommitAndGetBlockTs(ec *client.SimulatedBackendClient) uint64 {
 	b, _ := ec.BlockByHash(context.Background(), h)
 	return b.Time()
 }
-
-func NewSim(t *testing.T) (*bind.TransactOpts, *client.SimulatedBackendClient) {
-	user := testutils.MustNewSimTransactor(t)
-	sim := backends.NewSimulatedBackend(map[common.Address]core.GenesisAccount{
-		user.From: {
-			Balance: big.NewInt(0).Mul(big.NewInt(10), big.NewInt(1e18)),
-		},
-	}, 10e6)
-	ec := client.NewSimulatedBackendClient(t, sim, testutils.SimulatedChainID)
-	return user, ec
-}
