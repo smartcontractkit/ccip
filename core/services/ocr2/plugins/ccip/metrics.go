@@ -122,7 +122,7 @@ func ChainName(chainID int64) string {
 	case 4002:
 		return "fantom-testnet"
 	case 8453:
-		return "base-mainnet"
+		return "ethereum-mainnet-base-1"
 	case 84531:
 		return "ethereum-testnet-goerli-base-1"
 	case 84532:
