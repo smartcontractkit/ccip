@@ -92,6 +92,32 @@ func (_m *PriceRegistryInterface) ApplyFeeTokensUpdates(opts *bind.TransactOpts,
 	return r0, r1
 }
 
+// ApplyFeedIdsUpdates provides a mock function with given fields: opts, adds, removes
+func (_m *PriceRegistryInterface) ApplyFeedIdsUpdates(opts *bind.TransactOpts, adds []price_registry.PriceRegistryFeedIdUpdate, removes []price_registry.PriceRegistryFeedIdUpdate) (*types.Transaction, error) {
+	ret := _m.Called(opts, adds, removes)
+
+	var r0 *types.Transaction
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryFeedIdUpdate, []price_registry.PriceRegistryFeedIdUpdate) (*types.Transaction, error)); ok {
+		return rf(opts, adds, removes)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.TransactOpts, []price_registry.PriceRegistryFeedIdUpdate, []price_registry.PriceRegistryFeedIdUpdate) *types.Transaction); ok {
+		r0 = rf(opts, adds, removes)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*types.Transaction)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, []price_registry.PriceRegistryFeedIdUpdate, []price_registry.PriceRegistryFeedIdUpdate) error); ok {
+		r1 = rf(opts, adds, removes)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ApplyPriceUpdatersUpdates provides a mock function with given fields: opts, priceUpdatersToAdd, priceUpdatersToRemove
 func (_m *PriceRegistryInterface) ApplyPriceUpdatersUpdates(opts *bind.TransactOpts, priceUpdatersToAdd []common.Address, priceUpdatersToRemove []common.Address) (*types.Transaction, error) {
 	ret := _m.Called(opts, priceUpdatersToAdd, priceUpdatersToRemove)
@@ -189,6 +215,58 @@ func (_m *PriceRegistryInterface) FilterFeeTokenRemoved(opts *bind.FilterOpts, f
 
 	if rf, ok := ret.Get(1).(func(*bind.FilterOpts, []common.Address) error); ok {
 		r1 = rf(opts, feeToken)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FilterFeedIdAdded provides a mock function with given fields: opts, token
+func (_m *PriceRegistryInterface) FilterFeedIdAdded(opts *bind.FilterOpts, token []common.Address) (*price_registry.PriceRegistryFeedIdAddedIterator, error) {
+	ret := _m.Called(opts, token)
+
+	var r0 *price_registry.PriceRegistryFeedIdAddedIterator
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address) (*price_registry.PriceRegistryFeedIdAddedIterator, error)); ok {
+		return rf(opts, token)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address) *price_registry.PriceRegistryFeedIdAddedIterator); ok {
+		r0 = rf(opts, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*price_registry.PriceRegistryFeedIdAddedIterator)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.FilterOpts, []common.Address) error); ok {
+		r1 = rf(opts, token)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FilterFeedIdRemoved provides a mock function with given fields: opts, token
+func (_m *PriceRegistryInterface) FilterFeedIdRemoved(opts *bind.FilterOpts, token []common.Address) (*price_registry.PriceRegistryFeedIdRemovedIterator, error) {
+	ret := _m.Called(opts, token)
+
+	var r0 *price_registry.PriceRegistryFeedIdRemovedIterator
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address) (*price_registry.PriceRegistryFeedIdRemovedIterator, error)); ok {
+		return rf(opts, token)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address) *price_registry.PriceRegistryFeedIdRemovedIterator); ok {
+		r0 = rf(opts, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*price_registry.PriceRegistryFeedIdRemovedIterator)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.FilterOpts, []common.Address) error); ok {
+		r1 = rf(opts, token)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -395,6 +473,32 @@ func (_m *PriceRegistryInterface) GetFeeTokens(opts *bind.CallOpts) ([]common.Ad
 
 	if rf, ok := ret.Get(1).(func(*bind.CallOpts) error); ok {
 		r1 = rf(opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetFeedIds provides a mock function with given fields: opts, tokens
+func (_m *PriceRegistryInterface) GetFeedIds(opts *bind.CallOpts, tokens []common.Address) ([][32]byte, error) {
+	ret := _m.Called(opts, tokens)
+
+	var r0 [][32]byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, []common.Address) ([][32]byte, error)); ok {
+		return rf(opts, tokens)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.CallOpts, []common.Address) [][32]byte); ok {
+		r0 = rf(opts, tokens)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([][32]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.CallOpts, []common.Address) error); ok {
+		r1 = rf(opts, tokens)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -620,6 +724,58 @@ func (_m *PriceRegistryInterface) ParseFeeTokenRemoved(log types.Log) (*price_re
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*price_registry.PriceRegistryFeeTokenRemoved)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
+		r1 = rf(log)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ParseFeedIdAdded provides a mock function with given fields: log
+func (_m *PriceRegistryInterface) ParseFeedIdAdded(log types.Log) (*price_registry.PriceRegistryFeedIdAdded, error) {
+	ret := _m.Called(log)
+
+	var r0 *price_registry.PriceRegistryFeedIdAdded
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.Log) (*price_registry.PriceRegistryFeedIdAdded, error)); ok {
+		return rf(log)
+	}
+	if rf, ok := ret.Get(0).(func(types.Log) *price_registry.PriceRegistryFeedIdAdded); ok {
+		r0 = rf(log)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*price_registry.PriceRegistryFeedIdAdded)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
+		r1 = rf(log)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ParseFeedIdRemoved provides a mock function with given fields: log
+func (_m *PriceRegistryInterface) ParseFeedIdRemoved(log types.Log) (*price_registry.PriceRegistryFeedIdRemoved, error) {
+	ret := _m.Called(log)
+
+	var r0 *price_registry.PriceRegistryFeedIdRemoved
+	var r1 error
+	if rf, ok := ret.Get(0).(func(types.Log) (*price_registry.PriceRegistryFeedIdRemoved, error)); ok {
+		return rf(log)
+	}
+	if rf, ok := ret.Get(0).(func(types.Log) *price_registry.PriceRegistryFeedIdRemoved); ok {
+		r0 = rf(log)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*price_registry.PriceRegistryFeedIdRemoved)
 		}
 	}
 
@@ -935,6 +1091,58 @@ func (_m *PriceRegistryInterface) WatchFeeTokenRemoved(opts *bind.WatchOpts, sin
 
 	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryFeeTokenRemoved, []common.Address) error); ok {
 		r1 = rf(opts, sink, feeToken)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// WatchFeedIdAdded provides a mock function with given fields: opts, sink, token
+func (_m *PriceRegistryInterface) WatchFeedIdAdded(opts *bind.WatchOpts, sink chan<- *price_registry.PriceRegistryFeedIdAdded, token []common.Address) (event.Subscription, error) {
+	ret := _m.Called(opts, sink, token)
+
+	var r0 event.Subscription
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryFeedIdAdded, []common.Address) (event.Subscription, error)); ok {
+		return rf(opts, sink, token)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryFeedIdAdded, []common.Address) event.Subscription); ok {
+		r0 = rf(opts, sink, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(event.Subscription)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryFeedIdAdded, []common.Address) error); ok {
+		r1 = rf(opts, sink, token)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// WatchFeedIdRemoved provides a mock function with given fields: opts, sink, token
+func (_m *PriceRegistryInterface) WatchFeedIdRemoved(opts *bind.WatchOpts, sink chan<- *price_registry.PriceRegistryFeedIdRemoved, token []common.Address) (event.Subscription, error) {
+	ret := _m.Called(opts, sink, token)
+
+	var r0 event.Subscription
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryFeedIdRemoved, []common.Address) (event.Subscription, error)); ok {
+		return rf(opts, sink, token)
+	}
+	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryFeedIdRemoved, []common.Address) event.Subscription); ok {
+		r0 = rf(opts, sink, token)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(event.Subscription)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *price_registry.PriceRegistryFeedIdRemoved, []common.Address) error); ok {
+		r1 = rf(opts, sink, token)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -201,6 +201,16 @@ func (p *PriceRegistryV1_0_0) GetTokensDecimals(ctx context.Context, tokenAddres
 	return tokenDecimals, nil
 }
 
+func (p *PriceRegistryV1_0_0) FeedIDEvents() []common.Hash {
+	// Unsupported on V1.0
+	return nil
+}
+
+func (p *PriceRegistryV1_0_0) GetFeedIDsForTokens(context.Context, []common.Address) ([][32]byte, error) {
+	// Unsupported on V1.0
+	return nil, nil
+}
+
 func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistryV1_0_0, error) {
 	priceRegistry, err := price_registry_1_0_0.NewPriceRegistry(priceRegistryAddr, ec)
 	if err != nil {

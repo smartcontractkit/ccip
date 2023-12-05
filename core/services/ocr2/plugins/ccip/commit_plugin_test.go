@@ -68,7 +68,7 @@ func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
 				}
 			}
 
-			err := UnregisterCommitPluginLpFilters(context.Background(), lggr, job.Job{OCR2OracleSpec: tc.spec}, prMock, chainSet)
+			err := UnregisterCommitPluginLpFilters(context.Background(), lggr, job.Job{OCR2OracleSpec: tc.spec}, prMock, chainSet, nil)
 			if tc.expectingErr {
 				assert.Error(t, err)
 			} else {

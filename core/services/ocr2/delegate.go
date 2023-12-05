@@ -286,7 +286,7 @@ func (d *Delegate) cleanupEVM(jb job.Job, q pg.Queryer, relayID relay.ID) error 
 			d.lggr.Errorw("failed to derive ocr2keeper filter names from spec", "err", err, "spec", spec)
 		}
 	case types.CCIPCommit:
-		err = ccip.UnregisterCommitPluginLpFilters(context.Background(), d.lggr, jb, d.pipelineRunner, d.legacyChains, pg.WithQueryer(q))
+		err = ccip.UnregisterCommitPluginLpFilters(context.Background(), d.lggr, jb, d.pipelineRunner, d.legacyChains, d.cfg.Mercury(), pg.WithQueryer(q))
 		if err != nil {
 			d.lggr.Errorw("failed to unregister ccip commit plugin filters", "err", err, "spec", spec)
 		}
@@ -1371,7 +1371,7 @@ func (d *Delegate) newServicesCCIPCommit(lggr logger.SugaredLogger, jb job.Job, 
 	logError := func(msg string) {
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
-	return ccip.NewCommitServices(lggr, jb, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError, qopts...)
+	return ccip.NewCommitServices(lggr, jb, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError, d.cfg.Mercury(), qopts...)
 }
 
 func (d *Delegate) newServicesCCIPExecution(lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {

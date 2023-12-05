@@ -11,13 +11,17 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 	"github.com/test-go/testify/assert"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
@@ -47,113 +51,12 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	defer linkUSD.Close()
 	defer ethUSD.Close()
 
-	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399)
+	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399, nil)
 
 	currentSeqNum := 1
 
 	t.Run("single", func(t *testing.T) {
-		tokenAmount := big.NewInt(500000003) // prime number
-		gasLimit := big.NewInt(200_003)      // prime number
-
-		extraArgs, err2 := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
-		require.NoError(t, err2)
-
-		sourceBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
-			{Name: testhelpers.SourcePool, Addr: ccipTH.Source.Pool.Address(), Getter: ccipTH.GetSourceLinkBalance},
-			{Name: testhelpers.OnRamp, Addr: ccipTH.Source.OnRamp.Address(), Getter: ccipTH.GetSourceLinkBalance},
-			{Name: testhelpers.SourceRouter, Addr: ccipTH.Source.Router.Address(), Getter: ccipTH.GetSourceLinkBalance},
-			{Name: testhelpers.SourcePrices, Addr: ccipTH.Source.PriceRegistry.Address(), Getter: ccipTH.GetSourceLinkBalance},
-		})
-		require.NoError(t, err2)
-		destBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
-			{Name: testhelpers.Receiver, Addr: ccipTH.Dest.Receivers[0].Receiver.Address(), Getter: ccipTH.GetDestLinkBalance},
-			{Name: testhelpers.DestPool, Addr: ccipTH.Dest.Pool.Address(), Getter: ccipTH.GetDestLinkBalance},
-			{Name: testhelpers.OffRamp, Addr: ccipTH.Dest.OffRamp.Address(), Getter: ccipTH.GetDestLinkBalance},
-		})
-		require.NoError(t, err2)
-
-		msg := router.ClientEVM2AnyMessage{
-			Receiver: testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[0].Receiver.Address()),
-			Data:     []byte("hello"),
-			TokenAmounts: []router.ClientEVMTokenAmount{
-				{
-					Token:  ccipTH.Source.LinkToken.Address(),
-					Amount: tokenAmount,
-				},
-			},
-			FeeToken:  ccipTH.Source.LinkToken.Address(),
-			ExtraArgs: extraArgs,
-		}
-		fee, err2 := ccipTH.Source.Router.GetFee(nil, testhelpers.DestChainSelector, msg)
-		require.NoError(t, err2)
-		// Currently no overhead and 10gwei dest gas price. So fee is simply (gasLimit * gasPrice)* link/native
-		// require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
-		// Approve the fee amount + the token amount
-		_, err2 = ccipTH.Source.LinkToken.Approve(ccipTH.Source.User, ccipTH.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
-		require.NoError(t, err2)
-		ccipTH.Source.Chain.Commit()
-		ccipTH.SendRequest(t, msg)
-		// Should eventually see this executed.
-		ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum)
-		ccipTH.EventuallyReportCommitted(t, currentSeqNum)
-
-		executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum)
-		assert.Len(t, executionLogs, 1)
-		ccipTH.AssertExecState(t, executionLogs[0], testhelpers.ExecutionStateSuccess)
-
-		// Asserts
-		// 1) The total pool input == total pool output
-		// 2) Pool flow equals tokens sent
-		// 3) Sent tokens arrive at the receiver
-
-		ccipTH.AssertBalances(t, []testhelpers.BalanceAssertion{
-			{
-				Name:     testhelpers.SourcePool,
-				Address:  ccipTH.Source.Pool.Address(),
-				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], tokenAmount.String()).String(),
-				Getter:   ccipTH.GetSourceLinkBalance,
-			},
-			{
-				Name:     testhelpers.SourcePrices,
-				Address:  ccipTH.Source.PriceRegistry.Address(),
-				Expected: sourceBalances[testhelpers.SourcePrices].String(),
-				Getter:   ccipTH.GetSourceLinkBalance,
-			},
-			{
-				// Fees end up in the onramp.
-				Name:     testhelpers.OnRamp,
-				Address:  ccipTH.Source.OnRamp.Address(),
-				Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePrices], fee.String()).String(),
-				Getter:   ccipTH.GetSourceLinkBalance,
-			},
-			{
-				Name:     testhelpers.SourceRouter,
-				Address:  ccipTH.Source.Router.Address(),
-				Expected: sourceBalances[testhelpers.SourceRouter].String(),
-				Getter:   ccipTH.GetSourceLinkBalance,
-			},
-		})
-		ccipTH.AssertBalances(t, []testhelpers.BalanceAssertion{
-			{
-				Name:     testhelpers.Receiver,
-				Address:  ccipTH.Dest.Receivers[0].Receiver.Address(),
-				Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], tokenAmount.String()).String(),
-				Getter:   ccipTH.GetDestLinkBalance,
-			},
-			{
-				Name:     testhelpers.DestPool,
-				Address:  ccipTH.Dest.Pool.Address(),
-				Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], tokenAmount.String()).String(),
-				Getter:   ccipTH.GetDestLinkBalance,
-			},
-			{
-				Name:     testhelpers.OffRamp,
-				Address:  ccipTH.Dest.OffRamp.Address(),
-				Expected: destBalances[testhelpers.OffRamp].String(),
-				Getter:   ccipTH.GetDestLinkBalance,
-			},
-		})
-		currentSeqNum++
+		currentSeqNum = testSingle(t, ccipTH, currentSeqNum)
 	})
 
 	t.Run("multiple batches", func(t *testing.T) {
@@ -526,5 +429,160 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			node.EventuallyNodeUsesUpdatedPriceRegistry(t, ccipTH)
 		}
 		currentSeqNum = endSeq
+	})
+}
+
+func testSingle(t *testing.T, ccipTH integrationtesthelpers.CCIPIntegrationTestHarness, currentSeqNum int) int {
+	tokenAmount := big.NewInt(500000003) // prime number
+	gasLimit := big.NewInt(200_003)      // prime number
+
+	extraArgs, err2 := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
+	require.NoError(t, err2)
+
+	sourceBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
+		{Name: testhelpers.SourcePool, Addr: ccipTH.Source.Pool.Address(), Getter: ccipTH.GetSourceLinkBalance},
+		{Name: testhelpers.OnRamp, Addr: ccipTH.Source.OnRamp.Address(), Getter: ccipTH.GetSourceLinkBalance},
+		{Name: testhelpers.SourceRouter, Addr: ccipTH.Source.Router.Address(), Getter: ccipTH.GetSourceLinkBalance},
+		{Name: testhelpers.SourcePrices, Addr: ccipTH.Source.PriceRegistry.Address(), Getter: ccipTH.GetSourceLinkBalance},
+	})
+	require.NoError(t, err2)
+	destBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
+		{Name: testhelpers.Receiver, Addr: ccipTH.Dest.Receivers[0].Receiver.Address(), Getter: ccipTH.GetDestLinkBalance},
+		{Name: testhelpers.DestPool, Addr: ccipTH.Dest.Pool.Address(), Getter: ccipTH.GetDestLinkBalance},
+		{Name: testhelpers.OffRamp, Addr: ccipTH.Dest.OffRamp.Address(), Getter: ccipTH.GetDestLinkBalance},
+	})
+	require.NoError(t, err2)
+
+	msg := router.ClientEVM2AnyMessage{
+		Receiver: testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[0].Receiver.Address()),
+		Data:     []byte("hello"),
+		TokenAmounts: []router.ClientEVMTokenAmount{
+			{
+				Token:  ccipTH.Source.LinkToken.Address(),
+				Amount: tokenAmount,
+			},
+		},
+		FeeToken:  ccipTH.Source.LinkToken.Address(),
+		ExtraArgs: extraArgs,
+	}
+	fee, err2 := ccipTH.Source.Router.GetFee(nil, testhelpers.DestChainSelector, msg)
+	require.NoError(t, err2)
+	// Currently no overhead and 10gwei dest gas price. So fee is simply (gasLimit * gasPrice)* link/native
+	// require.Equal(t, new(big.Int).Mul(gasLimit, gasPrice).String(), fee.String())
+	// Approve the fee amount + the token amount
+	_, err2 = ccipTH.Source.LinkToken.Approve(ccipTH.Source.User, ccipTH.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
+	require.NoError(t, err2)
+	ccipTH.Source.Chain.Commit()
+	ccipTH.SendRequest(t, msg)
+	// Should eventually see this executed.
+	ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum)
+	ccipTH.EventuallyReportCommitted(t, currentSeqNum)
+
+	executionLogs := ccipTH.AllNodesHaveExecutedSeqNums(t, currentSeqNum, currentSeqNum)
+	assert.Len(t, executionLogs, 1)
+	ccipTH.AssertExecState(t, executionLogs[0], testhelpers.ExecutionStateSuccess)
+
+	// Asserts
+	// 1) The total pool input == total pool output
+	// 2) Pool flow equals tokens sent
+	// 3) Sent tokens arrive at the receiver
+
+	ccipTH.AssertBalances(t, []testhelpers.BalanceAssertion{
+		{
+			Name:     testhelpers.SourcePool,
+			Address:  ccipTH.Source.Pool.Address(),
+			Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], tokenAmount.String()).String(),
+			Getter:   ccipTH.GetSourceLinkBalance,
+		},
+		{
+			Name:     testhelpers.SourcePrices,
+			Address:  ccipTH.Source.PriceRegistry.Address(),
+			Expected: sourceBalances[testhelpers.SourcePrices].String(),
+			Getter:   ccipTH.GetSourceLinkBalance,
+		},
+		{
+			// Fees end up in the onramp.
+			Name:     testhelpers.OnRamp,
+			Address:  ccipTH.Source.OnRamp.Address(),
+			Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePrices], fee.String()).String(),
+			Getter:   ccipTH.GetSourceLinkBalance,
+		},
+		{
+			Name:     testhelpers.SourceRouter,
+			Address:  ccipTH.Source.Router.Address(),
+			Expected: sourceBalances[testhelpers.SourceRouter].String(),
+			Getter:   ccipTH.GetSourceLinkBalance,
+		},
+	})
+	ccipTH.AssertBalances(t, []testhelpers.BalanceAssertion{
+		{
+			Name:     testhelpers.Receiver,
+			Address:  ccipTH.Dest.Receivers[0].Receiver.Address(),
+			Expected: testhelpers.MustAddBigInt(destBalances[testhelpers.Receiver], tokenAmount.String()).String(),
+			Getter:   ccipTH.GetDestLinkBalance,
+		},
+		{
+			Name:     testhelpers.DestPool,
+			Address:  ccipTH.Dest.Pool.Address(),
+			Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], tokenAmount.String()).String(),
+			Getter:   ccipTH.GetDestLinkBalance,
+		},
+		{
+			Name:     testhelpers.OffRamp,
+			Address:  ccipTH.Dest.OffRamp.Address(),
+			Expected: destBalances[testhelpers.OffRamp].String(),
+			Getter:   ccipTH.GetDestLinkBalance,
+		},
+	})
+	currentSeqNum++
+	return currentSeqNum
+}
+
+func TestIntegration_CCIP_Mercury(t *testing.T) {
+	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
+
+	var (
+		feedIDUSDPerLink = testutils.RandomFeedIDV3()
+		feedIDUSDPerEth  = testutils.RandomFeedIDV3()
+		usdPerLink       = decimal.RequireFromString("8000000000000000000").BigInt()
+		usdPerEth        = decimal.RequireFromString("1700000000000000000000").BigInt()
+		prices           = map[[32]byte]*big.Int{
+			feedIDUSDPerLink: usdPerLink,
+			feedIDUSDPerEth:  usdPerEth,
+		}
+		sharedSecret = "password"
+	)
+
+	mercuryHandler := merclib.XXXTestOnlyMercuryHandler(t, prices, sharedSecret)
+	mercuryServer := httptest.NewServer(mercuryHandler)
+	defer mercuryServer.Close()
+
+	ccipTH.SetUpNodesAndJobs(t, "", 19399, &mercuryServer.URL)
+
+	t.Log("feed id usd per link:", hexutil.Encode(feedIDUSDPerLink[:]),
+		"feed id usd per eth:", hexutil.Encode(feedIDUSDPerEth[:]),
+		"source link address:", ccipTH.Source.LinkToken.Address().Hex(),
+		"source wrapped native address:", ccipTH.Source.WrappedNative.Address().Hex(),
+		"dest link address:", ccipTH.Dest.LinkToken.Address().Hex(),
+		"dest wrapped native address:", ccipTH.Dest.WrappedNative.Address().Hex())
+
+	ccipTH.SetFeedIDsOnPriceRegistries(
+		t,
+		// source price registry updates
+		map[common.Address][32]byte{
+			ccipTH.Source.LinkToken.Address():   feedIDUSDPerLink,
+			ccipTH.Dest.WrappedNative.Address(): feedIDUSDPerEth,
+		},
+		// dest price registry updates
+		map[common.Address][32]byte{
+			ccipTH.Dest.LinkToken.Address():       feedIDUSDPerLink,
+			ccipTH.Source.WrappedNative.Address(): feedIDUSDPerEth,
+		},
+	)
+
+	currentSeqNum := 1
+
+	t.Run("single", func(t *testing.T) {
+		testSingle(t, ccipTH, currentSeqNum)
 	})
 }
