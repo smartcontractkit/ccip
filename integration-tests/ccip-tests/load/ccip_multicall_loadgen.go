@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/wasp"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
@@ -46,9 +47,9 @@ func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*acti
 	if multiCall == "" {
 		return nil, fmt.Errorf("multicall address cannot be empty")
 	}
-	for i := 0; i < len(lanes); i++ {
+	for i := 1; i < len(lanes); i++ {
 		if source != lanes[i].SourceChain.GetChainID() {
-			return nil, fmt.Errorf("all lanes should be from same network")
+			return nil, fmt.Errorf("all lanes should be from same network; expected %s, got %s", source, lanes[i].SourceChain.GetChainID())
 		}
 		if lanes[i].SrcNetworkLaneCfg.Multicall != multiCall {
 			return nil, fmt.Errorf("multicall address should be same for all lanes")
@@ -80,6 +81,7 @@ func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.CallResult {
 		res.Failed = true
 		return res
 	}
+	m.logger.Info().Interface("msgs", msgs).Msgf("Sending %d ccip-send calls", len(msgs))
 	startTime := time.Now().UTC()
 	// for now we are using all ccip-sends with native
 	sendTx, err := contracts.MultiCallCCIP(m.client, m.MultiCall, msgs, true)
@@ -122,6 +124,7 @@ func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.CallResult {
 		}
 	}
 
+	validateGrp := errgroup.Group{}
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
 	for _, rValues := range returnValuesByDest {
@@ -134,15 +137,16 @@ func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.CallResult {
 		}
 
 		lggr = lggr.With().Str("Source Network", c.Lane.SourceChain.GetNetworkName()).Str("Dest Network", c.Lane.DestChain.GetNetworkName()).Logger()
-
-		err := c.Validate(lggr, sendTx, txConfirmationTime, rValues.Stats)
-		if err != nil {
-			res.Error = err.Error()
-			res.Failed = true
-			res.Data = allStats
-			return res
-		}
-
+		validateGrp.Go(func() error {
+			return c.Validate(lggr, sendTx, txConfirmationTime, rValues.Stats)
+		})
+	}
+	err = validateGrp.Wait()
+	if err != nil {
+		res.Error = err.Error()
+		res.Failed = true
+		res.Data = allStats
+		return res
 	}
 	res.Data = allStats
 	return res

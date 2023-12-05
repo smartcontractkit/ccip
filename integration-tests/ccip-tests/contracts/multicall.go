@@ -90,7 +90,7 @@ func WaitForSuccessfulTxMined(evmClient blockchain.EVMClient, tx *types.Transact
 	if receipt.Status != types.ReceiptStatusSuccessful {
 		return fmt.Errorf("tx failed %s", tx.Hash().Hex())
 	}
-	log.Info().Str("tx", tx.Hash().Hex()).Msg("tx mined successfully")
+	log.Info().Str("tx", tx.Hash().Hex()).Str("Network", evmClient.GetNetworkName()).Msg("tx mined successfully")
 	return nil
 }
 
@@ -122,6 +122,9 @@ func MultiCallCCIP(
 		allValue := big.NewInt(0)
 		// create call data for each msg
 		for _, msg := range msgData {
+			if msg.Msg.FeeToken != (common.Address{}) {
+				return nil, fmt.Errorf("fee token should be %s for native as fee", common.HexToAddress("0x0").Hex())
+			}
 			// approve bridge token
 			for _, tokenAndAmount := range msg.Msg.TokenAmounts {
 				inputs, err := ApproveTokenCallData(msg.RouterAddr, tokenAndAmount.Amount)
@@ -152,8 +155,9 @@ func MultiCallCCIP(
 		}
 		err = WaitForSuccessfulTxMined(evmClient, tx)
 		if err != nil {
-			return nil, errors.Wrapf(err, "multicall failed for ccip-send; router %s", contractAddress.Hex())
+			return nil, errors.Wrapf(err, "multicall failed for ccip-send; multicall %s", contractAddress.Hex())
 		}
+		return tx, nil
 	}
 	// if with feetoken, use aggregate3 to send msg without value
 	var callData []Call

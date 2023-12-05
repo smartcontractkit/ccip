@@ -295,6 +295,7 @@ Data = """
       "router": "0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59",
       "price_registry": "0x9EF7D57a4ea30b9e37794E55b0C75F2A70275dCc",
       "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+      "multicall": "0x21CA8aC8df982eC644E7623463adAD52F993C5Aa",
       "src_contracts": {
         "Avalanche Fuji": {
           "on_ramp": "0x0477cA0a35eE05D3f9f424d88bC0977ceCf339D4",

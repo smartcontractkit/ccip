@@ -198,8 +198,11 @@ func (l *loadArgs) TriggerLoadBySource() {
 	var laneBySource = make(map[string][]*actions.CCIPLane)
 	for _, lane := range l.TestSetupArgs.Lanes {
 		laneBySource[lane.ForwardLane.SourceNetworkName] = append(laneBySource[lane.ForwardLane.SourceNetworkName], lane.ForwardLane)
-		laneBySource[lane.ReverseLane.SourceNetworkName] = append(laneBySource[lane.ReverseLane.SourceNetworkName], lane.ReverseLane)
+		if lane.ReverseLane != nil {
+			laneBySource[lane.ReverseLane.SourceNetworkName] = append(laneBySource[lane.ReverseLane.SourceNetworkName], lane.ReverseLane)
+		}
 	}
+
 	for source, lanes := range laneBySource {
 		l.lggr.Info().
 			Str("Source Network", source).

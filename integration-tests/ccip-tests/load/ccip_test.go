@@ -36,6 +36,7 @@ func TestLoadCCIPStableRPSTriggerBySource(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background())
+	testArgs.TestCfg.TestGroupInput.MulticallInOneTx = ptr.Ptr(true)
 	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
