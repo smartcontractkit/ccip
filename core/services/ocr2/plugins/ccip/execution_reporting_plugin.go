@@ -52,7 +52,6 @@ type ExecutionPluginStaticConfig struct {
 	lggr                     logger.Logger
 	sourceLP, destLP         logpoller.LogPoller
 	onRampReader             ccipdata.OnRampReader
-	destReader               ccipdata.Reader
 	offRampReader            ccipdata.OffRampReader
 	commitStoreReader        ccipdata.CommitStoreReader
 	sourcePriceRegistry      ccipdata.PriceRegistryReader
@@ -81,7 +80,6 @@ type ExecutionReportingPlugin struct {
 	destWrappedNative common.Address
 	onchainConfig     ccipdata.ExecOnchainConfig
 	offRampReader     ccipdata.OffRampReader
-	destReader        ccipdata.Reader // todo: remove
 	// State
 	inflightReports *inflightExecReportsContainer
 	snoozedRoots    cache.SnoozedRoots
@@ -160,7 +158,6 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 			destWrappedNative:        destWrappedNative,
 			onchainConfig:            rf.config.offRampReader.OnchainConfig(),
 			offRampReader:            rf.config.offRampReader,
-			destReader:               rf.config.destReader,
 			inflightReports:          newInflightExecReportsContainer(offchainConfig.InflightCacheExpiry.Duration()),
 			snoozedRoots:             cache.NewSnoozedRoots(rf.config.offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds, offchainConfig.RootSnoozeTime.Duration()),
 		}, types.ReportingPluginInfo{
@@ -443,10 +440,10 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 	return res, nil
 }
 
-// Calculates a map that indicated whether a sequence number has already been executed
-// before. It doesn't matter if the executed succeeded, since we don't retry previous
+// Calculates a map that indicates whether a sequence number has already been executed.
+// It doesn't matter if the execution succeeded, since we don't retry previous
 // attempts even if they failed. Value in the map indicates whether the log is finalized or not.
-func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64, latestBlock int64) (map[uint64]bool, error) {
+func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context, min, max uint64) (map[uint64]bool, error) {
 	stateChanges, err := r.offRampReader.GetExecutionStateChangesBetweenSeqNums(
 		ctx,
 		min,
@@ -458,8 +455,7 @@ func (r *ExecutionReportingPlugin) getExecutedSeqNrsInRange(ctx context.Context,
 	}
 	executedMp := make(map[uint64]bool, len(stateChanges))
 	for _, stateChange := range stateChanges {
-		finalized := (latestBlock - stateChange.BlockNumber) >= int64(r.offchainConfig.DestFinalityDepth)
-		executedMp[stateChange.Data.SequenceNumber] = finalized
+		executedMp[stateChange.Data.SequenceNumber] = stateChange.Data.Finalized
 	}
 	return executedMp, nil
 }
@@ -792,13 +788,8 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 	var executedSeqNums map[uint64]bool
 	eg.Go(func() error {
-		latestBlock, err := r.destReader.LatestBlock(ctx)
-		if err != nil {
-			return err
-		}
-
-		// get executable sequence numbers
-		executedMp, err := r.getExecutedSeqNrsInRange(ctx, intervalMin, intervalMax, latestBlock.BlockNumber)
+		// get executed sequence numbers
+		executedMp, err := r.getExecutedSeqNrsInRange(ctx, intervalMin, intervalMax)
 		if err != nil {
 			return err
 		}
