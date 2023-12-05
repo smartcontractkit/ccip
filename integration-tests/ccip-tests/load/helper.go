@@ -29,14 +29,15 @@ type ChaosConfig struct {
 }
 
 type loadArgs struct {
-	t             *testing.T
-	lggr          zerolog.Logger
-	ctx           context.Context
-	schedules     []*wasp.Segment
-	RunnerWg      *errgroup.Group // to wait on individual load generators run
-	TestCfg       *testsetups.CCIPTestConfig
-	TestSetupArgs *testsetups.CCIPTestSetUpOutputs
-	ChaosExps     []ChaosConfig
+	t                *testing.T
+	lggr             zerolog.Logger
+	ctx              context.Context
+	schedules        []*wasp.Segment
+	RunnerWg         *errgroup.Group // to wait on individual load generators run
+	TestCfg          *testsetups.CCIPTestConfig
+	TestSetupArgs    *testsetups.CCIPTestSetUpOutputs
+	ChaosExps        []ChaosConfig
+	LoadgenTearDowns []func()
 }
 
 func (l *loadArgs) Setup() {
@@ -151,6 +152,7 @@ func (l *loadArgs) Wait() {
 	// wait for load runner to finish
 	err := l.RunnerWg.Wait()
 	require.NoError(l.t, err, "load run is failed")
+	l.lggr.Info().Msg("Load finished on all lanes")
 }
 
 func (l *loadArgs) ApplyChaos() {
@@ -184,6 +186,9 @@ func (l *loadArgs) ApplyChaos() {
 }
 
 func (l *loadArgs) TearDown() {
+	for _, tearDn := range l.LoadgenTearDowns {
+		tearDn()
+	}
 	if l.TestSetupArgs.TearDown != nil {
 		require.NoError(l.t, l.TestSetupArgs.TearDown())
 	}
@@ -202,16 +207,23 @@ func (l *loadArgs) TriggerLoadBySource() {
 			laneBySource[lane.ReverseLane.SourceNetworkName] = append(laneBySource[lane.ReverseLane.SourceNetworkName], lane.ReverseLane)
 		}
 	}
-
 	for source, lanes := range laneBySource {
 		l.lggr.Info().
 			Str("Source Network", source).
 			Msg("Starting load for source")
-		multiCallGen, err := NewMultiCallLoadGenerator(l.TestCfg, lanes, l.TestCfg.TestGroupInput.RequestPerUnitTime[0])
-		require.NoError(l.t, err)
 		if lanes[0].TestEnv != nil && lanes[0].TestEnv.K8Env != nil && lanes[0].TestEnv.K8Env.Cfg != nil {
 			namespace = lanes[0].TestEnv.K8Env.Cfg.Namespace
 		}
+		allLabels := map[string]string{
+			"test_group":   "load",
+			"cluster":      "sdlc",
+			"namespace":    namespace,
+			"test_id":      "ccip",
+			"source_chain": source,
+		}
+		multiCallGen, err := NewMultiCallLoadGenerator(l.TestCfg, lanes, l.TestCfg.TestGroupInput.RequestPerUnitTime[0], allLabels)
+		require.NoError(l.t, err)
+
 		loadRunner, err := wasp.NewGenerator(&wasp.Config{
 			T:                     l.TestCfg.Test,
 			GenName:               fmt.Sprintf("Source %s", source),
@@ -223,17 +235,14 @@ func (l *loadArgs) TriggerLoadBySource() {
 			Gun:                   multiCallGen,
 			Logger:                multiCallGen.logger,
 			LokiConfig:            wasp.NewEnvLokiConfig(),
-			Labels: map[string]string{
-				"test_group":   "load",
-				"cluster":      "sdlc",
-				"namespace":    namespace,
-				"test_id":      "ccip",
-				"source_chain": source,
-			},
+			Labels:                allLabels,
 		})
 		require.NoError(l.TestCfg.Test, err, "initiating loadgen for source %s", source)
 		loadRunner.Run(false)
 		l.AddToRunnerGroup(loadRunner)
+		l.LoadgenTearDowns = append(l.LoadgenTearDowns, func() {
+			multiCallGen.Done <- struct{}{}
+		})
 	}
 }
 

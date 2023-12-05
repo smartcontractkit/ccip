@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -33,14 +34,18 @@ type CCIPMultiCallLoadGenerator struct {
 	E2ELoads                map[string]*CCIPE2ELoad
 	MultiCall               string
 	NoOfRequestsPerUnitTime int64
+	labels                  model.LabelSet
+	loki                    *wasp.LokiClient
+	responses               chan map[string]MultiCallReturnValues
+	Done                    chan struct{}
 }
 
-type ReturnValues struct {
+type MultiCallReturnValues struct {
 	Msgs  []contracts.CCIPMsgData
 	Stats []*testreporters.RequestStat
 }
 
-func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*actions.CCIPLane, noOfRequestsPerUnitTime int64) (*CCIPMultiCallLoadGenerator, error) {
+func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*actions.CCIPLane, noOfRequestsPerUnitTime int64, labels map[string]string) (*CCIPMultiCallLoadGenerator, error) {
 	// check if all lanes are from same network
 	source := lanes[0].SourceChain.GetChainID()
 	multiCall := lanes[0].SrcNetworkLaneCfg.Multicall
@@ -57,6 +62,14 @@ func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*acti
 	}
 	client := lanes[0].SourceChain
 	lggr := logging.GetTestLogger(testCfg.Test).With().Str("Source Network", client.GetNetworkName()).Logger()
+	ls := wasp.LabelsMapToModel(labels)
+	if err := ls.Validate(); err != nil {
+		return nil, err
+	}
+	loki, err := wasp.NewLokiClient(wasp.NewEnvLokiConfig())
+	if err != nil {
+		return nil, err
+	}
 	m := &CCIPMultiCallLoadGenerator{
 		t:                       testCfg.Test,
 		client:                  client,
@@ -64,23 +77,63 @@ func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*acti
 		logger:                  lggr,
 		NoOfRequestsPerUnitTime: noOfRequestsPerUnitTime,
 		E2ELoads:                make(map[string]*CCIPE2ELoad),
+		labels:                  ls,
+		loki:                    loki,
+		responses:               make(chan map[string]MultiCallReturnValues),
+		Done:                    make(chan struct{}),
 	}
 	for _, lane := range lanes {
 		ccipLoad := NewCCIPLoad(testCfg.Test, lane, testCfg.TestGroupInput.PhaseTimeout.Duration(), 100000)
 		ccipLoad.BeforeAllCall(testCfg.TestGroupInput.MsgType)
 		m.E2ELoads[fmt.Sprintf("%s-%s", lane.SourceNetworkName, lane.DestNetworkName)] = ccipLoad
 	}
+
+	m.StartLokiStream()
 	return m, nil
+}
+
+func (m *CCIPMultiCallLoadGenerator) StartLokiStream() {
+	go func() {
+		for {
+			select {
+			case <-m.Done:
+				m.logger.Info().Msg("stopping loki client from multi call load generator")
+				m.loki.Stop()
+				return
+			case rValues := <-m.responses:
+				m.HandleLokiLogs(rValues)
+			}
+		}
+	}()
+}
+
+func (m *CCIPMultiCallLoadGenerator) HandleLokiLogs(rValues map[string]MultiCallReturnValues) {
+	for dest, rValue := range rValues {
+		labels := m.labels.Merge(model.LabelSet{
+			"dest_chain":     model.LabelValue(dest),
+			"test_data_type": "responses",
+			"go_test_name":   model.LabelValue(m.t.Name()),
+		})
+		for _, stat := range rValue.Stats {
+			err := m.loki.HandleStruct(labels, time.Now().UTC(), stat.StatusByPhase)
+			if err != nil {
+				m.logger.Error().Err(err).Msg("error while handling loki logs")
+			}
+		}
+	}
 }
 
 func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.CallResult {
 	res := &wasp.CallResult{}
-	msgs, returnValuesByDest, allStats, err := m.MergeCalls()
+	msgs, returnValuesByDest, err := m.MergeCalls()
 	if err != nil {
 		res.Error = err.Error()
 		res.Failed = true
 		return res
 	}
+	defer func() {
+		m.responses <- returnValuesByDest
+	}()
 	m.logger.Info().Interface("msgs", msgs).Msgf("Sending %d ccip-send calls", len(msgs))
 	startTime := time.Now().UTC()
 	// for now we are using all ccip-sends with native
@@ -88,7 +141,6 @@ func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.CallResult {
 	if err != nil {
 		res.Error = err.Error()
 		res.Failed = true
-		res.Data = allStats
 		return res
 	}
 
@@ -145,21 +197,20 @@ func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.CallResult {
 	if err != nil {
 		res.Error = err.Error()
 		res.Failed = true
-		res.Data = allStats
 		return res
 	}
-	res.Data = allStats
+
 	return res
 }
 
-func (m *CCIPMultiCallLoadGenerator) MergeCalls() ([]contracts.CCIPMsgData, map[string]ReturnValues, []*testreporters.RequestStat, error) {
+func (m *CCIPMultiCallLoadGenerator) MergeCalls() ([]contracts.CCIPMsgData, map[string]MultiCallReturnValues, error) {
 	var ccipMsgs []contracts.CCIPMsgData
-	statDetails := make(map[string]ReturnValues)
-	var allStats []*testreporters.RequestStat
+	statDetails := make(map[string]MultiCallReturnValues)
+
 	for _, e2eLoad := range m.E2ELoads {
 		destChainSelector, err := chain_selectors.SelectorFromChainId(e2eLoad.Lane.Source.DestinationChainId)
 		if err != nil {
-			return ccipMsgs, statDetails, allStats, err
+			return ccipMsgs, statDetails, err
 		}
 
 		allFee := big.NewInt(0)
@@ -170,7 +221,7 @@ func (m *CCIPMultiCallLoadGenerator) MergeCalls() ([]contracts.CCIPMsgData, map[
 			msg.FeeToken = common.Address{}
 			fee, err := e2eLoad.Lane.Source.Common.Router.GetFee(destChainSelector, msg)
 			if err != nil {
-				return ccipMsgs, statDetails, allStats, err
+				return ccipMsgs, statDetails, err
 			}
 			// transfer fee to the multicall address
 			if msg.FeeToken != (common.Address{}) {
@@ -183,20 +234,20 @@ func (m *CCIPMultiCallLoadGenerator) MergeCalls() ([]contracts.CCIPMsgData, map[
 				Fee:           fee,
 			}
 			ccipMsgs = append(ccipMsgs, msgData)
-			allStats = append(allStats, stats)
+
 			allStatsForDest = append(allStatsForDest, stats)
 			allMsgsForDest = append(allMsgsForDest, msgData)
 		}
-		statDetails[e2eLoad.Lane.DestNetworkName] = ReturnValues{
+		statDetails[e2eLoad.Lane.DestNetworkName] = MultiCallReturnValues{
 			Stats: allStatsForDest,
 			Msgs:  allMsgsForDest,
 		}
 		// transfer fee to the multicall address
 		if allFee.Cmp(big.NewInt(0)) > 0 {
 			if err := e2eLoad.Lane.Source.Common.FeeToken.Transfer(e2eLoad.Lane.Source.Common.MulticallContract.Hex(), allFee); err != nil {
-				return ccipMsgs, statDetails, allStats, err
+				return ccipMsgs, statDetails, err
 			}
 		}
 	}
-	return ccipMsgs, statDetails, allStats, nil
+	return ccipMsgs, statDetails, nil
 }
