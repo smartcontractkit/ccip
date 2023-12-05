@@ -176,10 +176,7 @@ contract PriceRegistry is IPriceRegistry, OwnerIsCreator, ITypeAndVersion {
   /// @notice Associate or disassociate tokens with feed IDs.
   /// @param adds The tokens to associate with feed IDs.
   /// @param removes The tokens to disassociate with feed IDs.
-  function applyFeedIdsUpdates(
-    FeedIdUpdate[] memory adds,
-    FeedIdUpdate[] memory removes
-  ) external onlyOwner {
+  function applyFeedIdsUpdates(FeedIdUpdate[] memory adds, FeedIdUpdate[] memory removes) external onlyOwner {
     for (uint256 i = 0; i < removes.length; ++i) {
       bytes32 deletedFeedId = s_tokenToFeedId[removes[i].token];
       delete s_tokenToFeedId[removes[i].token];
