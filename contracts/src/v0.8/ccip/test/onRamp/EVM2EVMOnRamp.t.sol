@@ -1525,12 +1525,12 @@ contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
     s_onRamp.withdrawNonLinkFees(address(s_token), address(this));
   }
 
-  function testWithdrawalOnlyLeftoverLinkSuccess() public {
+  function testFuzz_FuzzWithdrawalOnlyLeftoverLinkSuccess(uint96 nopFeeJuels, uint64 extraJuels) public {
+    nopFeeJuels = uint96(bound(nopFeeJuels, 1, MAX_NOP_FEES_JUELS));
+
     // Set Nop fee juels
-    uint96 nopFeesJuels = 10000000;
-    uint96 extraJuels = 123456789;
     changePrank(address(s_sourceRouter));
-    s_onRamp.forwardFromRouter(DEST_CHAIN_ID, _generateEmptyMessage(), nopFeesJuels, OWNER);
+    s_onRamp.forwardFromRouter(DEST_CHAIN_ID, _generateEmptyMessage(), nopFeeJuels, OWNER);
     changePrank(OWNER);
 
     vm.expectRevert(EVM2EVMOnRamp.LinkBalanceNotSettled.selector);
@@ -1540,7 +1540,7 @@ contract EVM2EVMOnRamp_withdrawNonLinkFees is EVM2EVMOnRampSetup {
     // It doesnt matter how the link tokens get to the onRamp
     // In this case we simply deal them to the ramp to show
     // anyone can settle the balance
-    deal(linkToken, address(s_onRamp), nopFeesJuels + extraJuels);
+    deal(linkToken, address(s_onRamp), nopFeeJuels + uint96(extraJuels));
 
     // Now that we've sent nopFeesJuels + extraJuels, we should be able to withdraw extraJuels
     address linkRecipient = address(0x123456789);
