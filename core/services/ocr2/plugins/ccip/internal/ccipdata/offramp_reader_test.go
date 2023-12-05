@@ -8,6 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -225,7 +226,7 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 		bc,
 		log,
 		100*time.Millisecond, false, 2, 3, 2, 1000)
-
+	assert.NoError(t, orm.InsertBlock(common.Hash{}, 1, time.Now(), 1))
 	// Setup offRamp.
 	var offRampAddress common.Address
 	switch version {
@@ -379,4 +380,12 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	rateLimits, err := th.reader.GetTokenPoolsRateLimits(ctx, []common.Address{})
 	require.NoError(t, err)
 	require.Empty(t, rateLimits)
+
+	sourceToDestTokens, err := th.reader.GetSourceToDestTokensMapping(ctx)
+	require.NoError(t, err)
+	require.Empty(t, sourceToDestTokens)
+
+	destPools, err := th.reader.GetDestinationTokenPools(ctx)
+	require.NoError(t, err)
+	require.Empty(t, destPools)
 }
