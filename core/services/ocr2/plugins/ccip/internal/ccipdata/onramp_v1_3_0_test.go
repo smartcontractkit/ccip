@@ -83,27 +83,42 @@ func TestHasherV1_3_0(t *testing.T) {
 	require.Equal(t, "4362a13a42e52ff5ce4324e7184dc7aa41704c3146bc842d35d95b94b32a78b6", hex.EncodeToString(hash[:]))
 }
 
-func TestLogPollerClient_GetSendRequestsBetweenSeqNumsV1_3_0(t *testing.T) {
+func TestLogPollerClient_GetSendRequestsBetweenSeqNums1_3_0(t *testing.T) {
 	onRampAddr := utils.RandomAddress()
 	seqNum := uint64(100)
 	limit := uint64(10)
 	lggr := logger.TestLogger(t)
 
-	lp := mocks.NewLogPoller(t)
-	onRampV2, err := NewOnRampV1_3_0(lggr, 1, 1, onRampAddr, lp, nil)
-	require.NoError(t, err)
-	lp.On("LogsDataWordRange",
-		onRampV2.sendRequestedEventSig,
-		onRampAddr,
-		onRampV2.sendRequestedSeqNumberWord,
-		abihelpers.EvmWord(seqNum),
-		abihelpers.EvmWord(seqNum+limit),
-		logpoller.Finalized,
-		mock.Anything,
-	).Return([]logpoller.Log{}, nil)
+	tests := []struct {
+		name          string
+		finalized     bool
+		confirmations logpoller.Confirmations
+	}{
+		{"finalized", true, logpoller.Finalized},
+		{"unfinalized", false, logpoller.Confirmations(0)},
+	}
 
-	events, err := onRampV2.GetSendRequestsBetweenSeqNums(context.Background(), seqNum, seqNum+limit)
-	assert.NoError(t, err)
-	assert.Empty(t, events)
-	lp.AssertExpectations(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lp := mocks.NewLogPoller(t)
+			onRampV2, err := NewOnRampV1_3_0(lggr, 1, 1, onRampAddr, lp, nil)
+			require.NoError(t, err)
+
+			lp.On("LogsDataWordRange",
+				onRampV2.sendRequestedEventSig,
+				onRampAddr,
+				onRampV2.sendRequestedSeqNumberWord,
+				abihelpers.EvmWord(seqNum),
+				abihelpers.EvmWord(seqNum+limit),
+				tt.confirmations,
+				mock.Anything,
+			).Once().Return([]logpoller.Log{}, nil)
+
+			events, err1 := onRampV2.GetSendRequestsBetweenSeqNums(context.Background(), seqNum, seqNum+limit, tt.finalized)
+			assert.NoError(t, err1)
+			assert.Empty(t, events)
+
+			lp.AssertExpectations(t)
+		})
+	}
 }
