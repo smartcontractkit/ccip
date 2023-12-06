@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/readers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -33,7 +34,7 @@ type onRampReaderTH struct {
 func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 	_, bc := newSimulation(t)
 	lp := lpmocks.NewLogPoller(t)
-	_, err := ccipdata.NewOnRampReader(logger.TestLogger(t), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), common.Address{}, lp, bc)
+	_, err := readers.NewOnRampReader(logger.TestLogger(t), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), common.Address{}, lp, bc)
 	assert.EqualError(t, err, "expected 'EVM2EVMOnRamp' got '' (no contract code at given address)")
 }
 
@@ -95,7 +96,7 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 	}
 
 	// Create the version-specific reader.
-	reader, err := ccipdata.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc)
+	reader, err := readers.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc)
 	require.NoError(t, err)
 
 	return onRampReaderTH{

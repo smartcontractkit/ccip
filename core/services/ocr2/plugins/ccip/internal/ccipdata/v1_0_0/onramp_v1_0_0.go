@@ -1,4 +1,4 @@
-package ccipdata
+package v1_0_0
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -27,7 +28,7 @@ const (
 	MetaDataHashPrefixV1_0_0         = "EVM2EVMMessageEvent"
 )
 
-var leafDomainSeparator = [1]byte{0x00}
+var LeafDomainSeparator = [1]byte{0x00}
 
 type LeafHasherV1_0_0 struct {
 	metaDataHash [32]byte
@@ -35,14 +36,14 @@ type LeafHasherV1_0_0 struct {
 	onRamp       *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp
 }
 
-func getMetaDataHash[H hashlib.Hash](ctx hashlib.Ctx[H], prefix [32]byte, sourceChainSelector uint64, onRampId common.Address, destChainSelector uint64) H {
+func GetMetaDataHash[H hashlib.Hash](ctx hashlib.Ctx[H], prefix [32]byte, sourceChainSelector uint64, onRampId common.Address, destChainSelector uint64) H {
 	paddedOnRamp := onRampId.Hash()
 	return ctx.Hash(utils.ConcatBytes(prefix[:], math.U256Bytes(big.NewInt(0).SetUint64(sourceChainSelector)), math.U256Bytes(big.NewInt(0).SetUint64(destChainSelector)), paddedOnRamp[:]))
 }
 
 func NewLeafHasherV1_0_0(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp_1_0_0.EVM2EVMOnRamp) *LeafHasherV1_0_0 {
 	return &LeafHasherV1_0_0{
-		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_0_0)), sourceChainSelector, onRampId, destChainSelector),
+		metaDataHash: GetMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_0_0)), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
 		onRamp:       onRamp,
 	}
@@ -75,7 +76,7 @@ func (t *LeafHasherV1_0_0) HashLeaf(log types.Log) ([32]byte, error) {
 {"name": "feeToken","type": "address"},
 {"name": "feeTokenAmount","type": "uint256"}
 ]`,
-		leafDomainSeparator,
+		LeafDomainSeparator,
 		t.metaDataHash,
 		message.Message.SequenceNumber,
 		message.Message.Nonce,
@@ -94,7 +95,7 @@ func (t *LeafHasherV1_0_0) HashLeaf(log types.Log) ([32]byte, error) {
 	return t.ctx.Hash(packedValues), nil
 }
 
-var _ OnRampReader = &OnRampV1_0_0{}
+var _ ccipdata.OnRampReader = &OnRampV1_0_0{}
 
 type OnRampV1_0_0 struct {
 	address                    common.Address
@@ -102,7 +103,7 @@ type OnRampV1_0_0 struct {
 	lp                         logpoller.LogPoller
 	lggr                       logger.Logger
 	client                     client.Client
-	leafHasher                 LeafHasherInterface[[32]byte]
+	leafHasher                 ccipdata.LeafHasherInterface[[32]byte]
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
 	filters                    []logpoller.Filter
@@ -112,15 +113,15 @@ func (o *OnRampV1_0_0) Address() (common.Address, error) {
 	return o.onRamp.Address(), nil
 }
 
-func (o *OnRampV1_0_0) GetDynamicConfig() (OnRampDynamicConfig, error) {
+func (o *OnRampV1_0_0) GetDynamicConfig() (ccipdata.OnRampDynamicConfig, error) {
 	if o.onRamp == nil {
-		return OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
+		return ccipdata.OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 	}
 	legacyDynamicConfig, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
-		return OnRampDynamicConfig{}, err
+		return ccipdata.OnRampDynamicConfig{}, err
 	}
-	return OnRampDynamicConfig{
+	return ccipdata.OnRampDynamicConfig{
 		Router:                            legacyDynamicConfig.Router,
 		MaxNumberOfTokensPerMsg:           legacyDynamicConfig.MaxTokensLength,
 		DestGasOverhead:                   0,
@@ -155,7 +156,7 @@ func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	eventSig := abihelpers.MustGetEventID(CCIPSendRequestedEventNameV1_0_0, onRampABI)
 	filters := []logpoller.Filter{
 		{
-			Name:      logpoller.FilterName(COMMIT_CCIP_SENDS, onRampAddress),
+			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
 			EventSigs: []common.Hash{eventSig},
 			Addresses: []common.Address{onRampAddress},
 		},
@@ -211,19 +212,19 @@ func (o *OnRampV1_0_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 	}, nil
 }
 
-func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]Event[internal.EVM2EVMMessage], error) {
+func (o *OnRampV1_0_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
 	logs, err := o.lp.LogsDataWordRange(
 		o.sendRequestedEventSig,
 		o.address,
 		o.sendRequestedSeqNumberWord,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
-		logsConfirmations(finalized),
+		LogsConfirmations(finalized),
 		pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
 	}
-	return parseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
+	return ccipdata.ParseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
 func (o *OnRampV1_0_0) RouterAddress() (common.Address, error) {
@@ -232,4 +233,11 @@ func (o *OnRampV1_0_0) RouterAddress() (common.Address, error) {
 		return common.Address{}, err
 	}
 	return config.Router, nil
+}
+
+func LogsConfirmations(finalized bool) logpoller.Confirmations {
+	if finalized {
+		return logpoller.Finalized
+	}
+	return logpoller.Confirmations(0)
 }

@@ -1,4 +1,4 @@
-package ccipdata
+package v1_2_0
 
 import (
 	"context"
@@ -19,13 +19,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
-var _ CommitStoreReader = &CommitStoreV1_2_0{}
+var _ ccipdata.CommitStoreReader = &CommitStoreV1_2_0{}
 
 type CommitStoreV1_2_0 struct {
 	// Static config
@@ -42,15 +44,15 @@ type CommitStoreV1_2_0 struct {
 	// Dynamic config
 	configMu          sync.RWMutex
 	gasPriceEstimator prices.DAGasPriceEstimator
-	offchainConfig    CommitOffchainConfig
+	offchainConfig    ccipdata.CommitOffchainConfig
 }
 
-func (c *CommitStoreV1_2_0) GetCommitStoreStaticConfig(ctx context.Context) (CommitStoreStaticConfig, error) {
+func (c *CommitStoreV1_2_0) GetCommitStoreStaticConfig(ctx context.Context) (ccipdata.CommitStoreStaticConfig, error) {
 	config, err := c.commitStore.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return CommitStoreStaticConfig{}, err
+		return ccipdata.CommitStoreStaticConfig{}, err
 	}
-	return CommitStoreStaticConfig{
+	return ccipdata.CommitStoreStaticConfig{
 		ChainSelector:       config.ChainSelector,
 		SourceChainSelector: config.SourceChainSelector,
 		OnRamp:              config.OnRamp,
@@ -58,11 +60,11 @@ func (c *CommitStoreV1_2_0) GetCommitStoreStaticConfig(ctx context.Context) (Com
 	}, nil
 }
 
-func (c *CommitStoreV1_2_0) EncodeCommitReport(report CommitStoreReport) ([]byte, error) {
-	return encodeCommitReportV1_2_0(c.commitReportArgs, report)
+func (c *CommitStoreV1_2_0) EncodeCommitReport(report ccipdata.CommitStoreReport) ([]byte, error) {
+	return EncodeCommitReportV1_2_0(c.commitReportArgs, report)
 }
 
-func encodeCommitReportV1_2_0(commitReportArgs abi.Arguments, report CommitStoreReport) ([]byte, error) {
+func EncodeCommitReportV1_2_0(commitReportArgs abi.Arguments, report ccipdata.CommitStoreReport) ([]byte, error) {
 	var tokenPriceUpdates []commit_store.InternalTokenPriceUpdate
 	for _, tokenPriceUpdate := range report.TokenPrices {
 		tokenPriceUpdates = append(tokenPriceUpdates, commit_store.InternalTokenPriceUpdate{
@@ -90,13 +92,13 @@ func encodeCommitReportV1_2_0(commitReportArgs abi.Arguments, report CommitStore
 	return commitReportArgs.PackValues([]interface{}{rep})
 }
 
-func decodeCommitReportV1_2_0(commitReportArgs abi.Arguments, report []byte) (CommitStoreReport, error) {
+func DecodeCommitReportV1_2_0(commitReportArgs abi.Arguments, report []byte) (ccipdata.CommitStoreReport, error) {
 	unpacked, err := commitReportArgs.Unpack(report)
 	if err != nil {
-		return CommitStoreReport{}, err
+		return ccipdata.CommitStoreReport{}, err
 	}
 	if len(unpacked) != 1 {
-		return CommitStoreReport{}, errors.New("expected single struct value")
+		return ccipdata.CommitStoreReport{}, errors.New("expected single struct value")
 	}
 
 	commitReport, ok := unpacked[0].(struct {
@@ -117,29 +119,29 @@ func decodeCommitReportV1_2_0(commitReportArgs abi.Arguments, report []byte) (Co
 		MerkleRoot [32]byte `json:"merkleRoot"`
 	})
 	if !ok {
-		return CommitStoreReport{}, errors.Errorf("invalid commit report got %T", unpacked[0])
+		return ccipdata.CommitStoreReport{}, errors.Errorf("invalid commit report got %T", unpacked[0])
 	}
 
-	var tokenPriceUpdates []TokenPrice
+	var tokenPriceUpdates []ccipdata.TokenPrice
 	for _, u := range commitReport.PriceUpdates.TokenPriceUpdates {
-		tokenPriceUpdates = append(tokenPriceUpdates, TokenPrice{
+		tokenPriceUpdates = append(tokenPriceUpdates, ccipdata.TokenPrice{
 			Token: u.SourceToken,
 			Value: u.UsdPerToken,
 		})
 	}
 
-	var gasPrices []GasPrice
+	var gasPrices []ccipdata.GasPrice
 	for _, u := range commitReport.PriceUpdates.GasPriceUpdates {
-		gasPrices = append(gasPrices, GasPrice{
+		gasPrices = append(gasPrices, ccipdata.GasPrice{
 			DestChainSelector: u.DestChainSelector,
 			Value:             u.UsdPerUnitGas,
 		})
 	}
 
-	return CommitStoreReport{
+	return ccipdata.CommitStoreReport{
 		TokenPrices: tokenPriceUpdates,
 		GasPrices:   gasPrices,
-		Interval: CommitStoreInterval{
+		Interval: ccipdata.CommitStoreInterval{
 			Min: commitReport.Interval.Min,
 			Max: commitReport.Interval.Max,
 		},
@@ -147,15 +149,15 @@ func decodeCommitReportV1_2_0(commitReportArgs abi.Arguments, report []byte) (Co
 	}, nil
 }
 
-func (c *CommitStoreV1_2_0) DecodeCommitReport(report []byte) (CommitStoreReport, error) {
-	return decodeCommitReportV1_2_0(c.commitReportArgs, report)
+func (c *CommitStoreV1_2_0) DecodeCommitReport(report []byte) (ccipdata.CommitStoreReport, error) {
+	return DecodeCommitReportV1_2_0(c.commitReportArgs, report)
 }
 
 func (c *CommitStoreV1_2_0) IsBlessed(ctx context.Context, root [32]byte) (bool, error) {
 	return c.commitStore.IsBlessed(&bind.CallOpts{Context: ctx}, root)
 }
 
-func (c *CommitStoreV1_2_0) OffchainConfig() CommitOffchainConfig {
+func (c *CommitStoreV1_2_0) OffchainConfig() ccipdata.CommitOffchainConfig {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
 	return c.offchainConfig
@@ -212,7 +214,7 @@ func (c CommitOffchainConfigV1_2_0) Validate() error {
 }
 
 func (c *CommitStoreV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
-	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[CommitOnchainConfig](onchainConfig)
+	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ccipdata.CommitOnchainConfig](onchainConfig)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -230,7 +232,7 @@ func (c *CommitStoreV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []
 		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
 		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
 	)
-	c.offchainConfig = NewCommitOffchainConfig(
+	c.offchainConfig = ccipdata.NewCommitOffchainConfig(
 		offchainConfigParsed.SourceFinalityDepth,
 		offchainConfigParsed.ExecGasPriceDeviationPPB,
 		offchainConfigParsed.GasPriceHeartBeat.Duration(),
@@ -252,36 +254,36 @@ func (c *CommitStoreV1_2_0) Close(qopts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(c.lp, c.filters, qopts...)
 }
 
-func (c *CommitStoreV1_2_0) parseReport(log types.Log) (*CommitStoreReport, error) {
+func (c *CommitStoreV1_2_0) parseReport(log types.Log) (*ccipdata.CommitStoreReport, error) {
 	repAccepted, err := c.commitStore.ParseReportAccepted(log)
 	if err != nil {
 		return nil, err
 	}
 	// Translate to common struct.
-	var tokenPrices []TokenPrice
+	var tokenPrices []ccipdata.TokenPrice
 	for _, tpu := range repAccepted.Report.PriceUpdates.TokenPriceUpdates {
-		tokenPrices = append(tokenPrices, TokenPrice{
+		tokenPrices = append(tokenPrices, ccipdata.TokenPrice{
 			Token: tpu.SourceToken,
 			Value: tpu.UsdPerToken,
 		})
 	}
-	var gasPrices []GasPrice
+	var gasPrices []ccipdata.GasPrice
 	for _, tpu := range repAccepted.Report.PriceUpdates.GasPriceUpdates {
-		gasPrices = append(gasPrices, GasPrice{
+		gasPrices = append(gasPrices, ccipdata.GasPrice{
 			DestChainSelector: tpu.DestChainSelector,
 			Value:             tpu.UsdPerUnitGas,
 		})
 	}
 
-	return &CommitStoreReport{
+	return &ccipdata.CommitStoreReport{
 		TokenPrices: tokenPrices,
 		GasPrices:   gasPrices,
 		MerkleRoot:  repAccepted.Report.MerkleRoot,
-		Interval:    CommitStoreInterval{Min: repAccepted.Report.Interval.Min, Max: repAccepted.Report.Interval.Max},
+		Interval:    ccipdata.CommitStoreInterval{Min: repAccepted.Report.Interval.Min, Max: repAccepted.Report.Interval.Max},
 	}, nil
 }
 
-func (c *CommitStoreV1_2_0) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]Event[CommitStoreReport], error) {
+func (c *CommitStoreV1_2_0) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]ccipdata.Event[ccipdata.CommitStoreReport], error) {
 	logs, err := c.lp.LogsDataWordBetween(
 		c.reportAcceptedSig,
 		c.address,
@@ -295,7 +297,7 @@ func (c *CommitStoreV1_2_0) GetCommitReportMatchingSeqNum(ctx context.Context, s
 		return nil, err
 	}
 
-	parsedLogs, err := parseLogs[CommitStoreReport](
+	parsedLogs, err := ccipdata.ParseLogs[ccipdata.CommitStoreReport](
 		logs,
 		c.lggr,
 		c.parseReport,
@@ -311,7 +313,7 @@ func (c *CommitStoreV1_2_0) GetCommitReportMatchingSeqNum(ctx context.Context, s
 	return parsedLogs, nil
 }
 
-func (c *CommitStoreV1_2_0) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]Event[CommitStoreReport], error) {
+func (c *CommitStoreV1_2_0) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]ccipdata.Event[ccipdata.CommitStoreReport], error) {
 	logs, err := c.lp.LogsCreatedAfter(
 		c.reportAcceptedSig,
 		c.address,
@@ -323,7 +325,7 @@ func (c *CommitStoreV1_2_0) GetAcceptedCommitReportsGteTimestamp(ctx context.Con
 		return nil, err
 	}
 
-	return parseLogs[CommitStoreReport](
+	return ccipdata.ParseLogs[ccipdata.CommitStoreReport](
 		logs,
 		c.lggr,
 		c.parseReport,
@@ -348,7 +350,7 @@ func (c *CommitStoreV1_2_0) IsDown(ctx context.Context) (bool, error) {
 	return !unPausedAndHealthy, nil
 }
 
-func (c *CommitStoreV1_2_0) VerifyExecutionReport(ctx context.Context, report ExecReport) (bool, error) {
+func (c *CommitStoreV1_2_0) VerifyExecutionReport(ctx context.Context, report ccipdata.ExecReport) (bool, error) {
 	var hashes [][32]byte
 	for _, msg := range report.Messages {
 		hashes = append(hashes, msg.Hash)
@@ -376,11 +378,11 @@ func NewCommitStoreV1_2_0(lggr logger.Logger, addr common.Address, ec client.Cli
 		return nil, err
 	}
 	commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
-	eventSig := abihelpers.MustGetEventID(ReportAccepted, commitStoreABI)
-	commitReportArgs := abihelpers.MustGetEventInputs(ReportAccepted, commitStoreABI)
+	eventSig := abihelpers.MustGetEventID(v1_0_0.ReportAccepted, commitStoreABI)
+	commitReportArgs := abihelpers.MustGetEventInputs(v1_0_0.ReportAccepted, commitStoreABI)
 	filters := []logpoller.Filter{
 		{
-			Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, addr.String()),
+			Name:      logpoller.FilterName(v1_0_0.EXEC_REPORT_ACCEPTS, addr.String()),
 			EventSigs: []common.Hash{eventSig},
 			Addresses: []common.Address{addr},
 		},
@@ -401,7 +403,7 @@ func NewCommitStoreV1_2_0(lggr logger.Logger, addr common.Address, ec client.Cli
 		configMu:                  sync.RWMutex{},
 
 		// The fields below are initially empty and set on ChangeConfig method
-		offchainConfig:    CommitOffchainConfig{},
+		offchainConfig:    ccipdata.CommitOffchainConfig{},
 		gasPriceEstimator: prices.DAGasPriceEstimator{},
 	}, nil
 }

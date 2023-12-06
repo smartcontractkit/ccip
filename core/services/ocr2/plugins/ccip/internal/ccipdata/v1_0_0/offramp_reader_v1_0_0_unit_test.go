@@ -1,4 +1,4 @@
-package ccipdata
+package v1_0_0
 
 import (
 	"fmt"

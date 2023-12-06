@@ -26,6 +26,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/readers"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -36,13 +39,13 @@ type offRampReaderTH struct {
 }
 
 func TestOffRampFilters(t *testing.T) {
-	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+		c, err := v1_0_0.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		return c
 	}, 3)
-	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewOffRampV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+		c, err := v1_2_0.NewOffRampV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		return c
 	}, 3)
@@ -110,12 +113,12 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 func TestExecOnchainConfig100(t *testing.T) {
 	tests := []struct {
 		name      string
-		want      ccipdata.ExecOnchainConfigV1_0_0
+		want      v1_0_0.ExecOnchainConfigV1_0_0
 		expectErr bool
 	}{
 		{
 			name: "encodes and decodes config with all fields set",
-			want: ccipdata.ExecOnchainConfigV1_0_0{
+			want: v1_0_0.ExecOnchainConfigV1_0_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  utils.RandomAddress(),
 				PriceRegistry:                           utils.RandomAddress(),
@@ -125,7 +128,7 @@ func TestExecOnchainConfig100(t *testing.T) {
 		},
 		{
 			name: "encodes and fails decoding config with missing fields",
-			want: ccipdata.ExecOnchainConfigV1_0_0{
+			want: v1_0_0.ExecOnchainConfigV1_0_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				MaxDataSize:                             rand.Uint32(),
 			},
@@ -137,7 +140,7 @@ func TestExecOnchainConfig100(t *testing.T) {
 			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := abihelpers.DecodeAbiStruct[ccipdata.ExecOnchainConfigV1_0_0](encoded)
+			decoded, err := abihelpers.DecodeAbiStruct[v1_0_0.ExecOnchainConfigV1_0_0](encoded)
 			if tt.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {
@@ -151,12 +154,12 @@ func TestExecOnchainConfig100(t *testing.T) {
 func TestExecOnchainConfig120(t *testing.T) {
 	tests := []struct {
 		name      string
-		want      ccipdata.ExecOnchainConfigV1_2_0
+		want      v1_2_0.ExecOnchainConfigV1_2_0
 		expectErr bool
 	}{
 		{
 			name: "encodes and decodes config with all fields set",
-			want: ccipdata.ExecOnchainConfigV1_2_0{
+			want: v1_2_0.ExecOnchainConfigV1_2_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  utils.RandomAddress(),
 				PriceRegistry:                           utils.RandomAddress(),
@@ -167,7 +170,7 @@ func TestExecOnchainConfig120(t *testing.T) {
 		},
 		{
 			name: "encodes and fails decoding config with missing fields",
-			want: ccipdata.ExecOnchainConfigV1_2_0{
+			want: v1_2_0.ExecOnchainConfigV1_2_0{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				MaxDataBytes:                            rand.Uint32(),
 			},
@@ -179,7 +182,7 @@ func TestExecOnchainConfig120(t *testing.T) {
 			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := abihelpers.DecodeAbiStruct[ccipdata.ExecOnchainConfigV1_2_0](encoded)
+			decoded, err := abihelpers.DecodeAbiStruct[v1_2_0.ExecOnchainConfigV1_2_0](encoded)
 			if tt.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {
@@ -249,7 +252,7 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 	}
 
 	// Create the version-specific reader.
-	reader, err := ccipdata.NewOffRampReader(log, offRampAddress, bc, lp, nil)
+	reader, err := readers.NewOffRampReader(log, offRampAddress, bc, lp, nil)
 	require.NoError(t, err)
 	require.Equal(t, offRampAddress, reader.Address())
 

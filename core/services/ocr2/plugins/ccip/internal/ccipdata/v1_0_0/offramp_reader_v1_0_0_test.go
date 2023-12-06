@@ -1,4 +1,4 @@
-package ccipdata_test
+package v1_0_0_test
 
 import (
 	"math/big"
@@ -14,10 +14,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-func TestExecutionReportEncodingV120(t *testing.T) {
+func TestExecutionReportEncodingV100(t *testing.T) {
 	// Note could consider some fancier testing here (fuzz/property)
 	// but I think that would essentially be testing geth's abi library
 	// as our encode/decode is a thin wrapper around that.
@@ -30,7 +31,7 @@ func TestExecutionReportEncodingV120(t *testing.T) {
 
 	lp := lpmocks.NewLogPoller(t)
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
-	offRamp, err := ccipdata.NewOffRampV1_2_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+	offRamp, err := v1_0_0.NewOffRampV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 	require.NoError(t, err)
 
 	encodeExecutionReport, err := offRamp.EncodeExecutionReport(report)
@@ -41,9 +42,9 @@ func TestExecutionReportEncodingV120(t *testing.T) {
 	require.Equal(t, report, decodeCommitReport)
 }
 
-func TestOffRampFiltersV120(t *testing.T) {
-	assertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := ccipdata.NewOffRampV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+func TestOffRampFiltersV100(t *testing.T) {
+	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
+		c, err := v1_0_0.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		return c
 	}, 3)

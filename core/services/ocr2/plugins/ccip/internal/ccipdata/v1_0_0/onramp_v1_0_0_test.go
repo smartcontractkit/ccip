@@ -1,4 +1,4 @@
-package ccipdata
+package v1_0_0
 
 import (
 	"encoding/hex"
@@ -78,6 +78,6 @@ func TestMetaDataHash(t *testing.T) {
 	sourceChainSelector, destChainSelector := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 	ctx := hashlib.NewKeccakCtx()
-	hash := getMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_0_0)), sourceChainSelector, onRampAddress, destChainSelector)
+	hash := GetMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_0_0)), sourceChainSelector, onRampAddress, destChainSelector)
 	require.Equal(t, "1409948abde219f43870c3d6d1c16beabd8878eb5039a3fa765eb56e4b8ded9e", hex.EncodeToString(hash[:]))
 }

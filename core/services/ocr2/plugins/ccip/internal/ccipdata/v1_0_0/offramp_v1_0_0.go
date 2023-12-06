@@ -1,4 +1,4 @@
-package ccipdata
+package v1_0_0
 
 import (
 	"context"
@@ -26,6 +26,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -39,13 +40,13 @@ const (
 )
 
 var (
-	abiOffRampV1_0_0                                    = abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
-	abiCustomTokenPool                                  = abihelpers.MustParseABI(custom_token_pool.CustomTokenPoolABI)
-	_                                     OffRampReader = &OffRampV1_0_0{}
-	ExecutionStateChangedEventV1_0_0                    = abihelpers.MustGetEventID("ExecutionStateChanged", abiOffRampV1_0_0)
-	PoolAddedEventV1_0_0                                = abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0)
-	PoolRemovedEventV1_0_0                              = abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)
-	ExecutionStateChangedSeqNrIndexV1_0_0               = 1
+	abiOffRampV1_0_0                                             = abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
+	abiCustomTokenPool                                           = abihelpers.MustParseABI(custom_token_pool.CustomTokenPoolABI)
+	_                                     ccipdata.OffRampReader = &OffRampV1_0_0{}
+	ExecutionStateChangedEventV1_0_0                             = abihelpers.MustGetEventID("ExecutionStateChanged", abiOffRampV1_0_0)
+	PoolAddedEventV1_0_0                                         = abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0)
+	PoolRemovedEventV1_0_0                                       = abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)
+	ExecutionStateChangedSeqNrIndexV1_0_0                        = 1
 )
 
 var offRampV1_0_0_poolAddedPoolRemovedEvents = []common.Hash{PoolAddedEventV1_0_0, PoolRemovedEventV1_0_0}
@@ -95,11 +96,11 @@ type OffRampV1_0_0 struct {
 	offRamp                 *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
 	addr                    common.Address
 	lp                      logpoller.LogPoller
-	lggr                    logger.Logger
-	ec                      client.Client
+	Lggr                    logger.Logger
+	Ec                      client.Client
 	evmBatchCaller          rpclib.EvmBatchCaller
 	filters                 []logpoller.Filter
-	estimator               gas.EvmFeeEstimator
+	Estimator               gas.EvmFeeEstimator
 	executionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
@@ -111,19 +112,19 @@ type OffRampV1_0_0 struct {
 	// Dynamic config
 	configMu          sync.RWMutex
 	gasPriceEstimator prices.GasPriceEstimatorExec
-	offchainConfig    ExecOffchainConfig
-	onchainConfig     ExecOnchainConfig
+	offchainConfig    ccipdata.ExecOffchainConfig
+	onchainConfig     ccipdata.ExecOnchainConfig
 }
 
-func (o *OffRampV1_0_0) GetStaticConfig(ctx context.Context) (OffRampStaticConfig, error) {
+func (o *OffRampV1_0_0) GetStaticConfig(ctx context.Context) (ccipdata.OffRampStaticConfig, error) {
 	if o.offRamp == nil {
-		return OffRampStaticConfig{}, fmt.Errorf("offramp not initialized")
+		return ccipdata.OffRampStaticConfig{}, fmt.Errorf("offramp not initialized")
 	}
 	c, err := o.offRamp.GetStaticConfig(&bind.CallOpts{Context: ctx})
 	if err != nil {
-		return OffRampStaticConfig{}, fmt.Errorf("error while retrieving offramp config: %w", err)
+		return ccipdata.OffRampStaticConfig{}, fmt.Errorf("error while retrieving offramp config: %w", err)
 	}
-	return OffRampStaticConfig{
+	return ccipdata.OffRampStaticConfig{
 		CommitStore:         c.CommitStore,
 		ChainSelector:       c.ChainSelector,
 		SourceChainSelector: c.SourceChainSelector,
@@ -168,7 +169,7 @@ func (o *OffRampV1_0_0) getDestinationTokensFromSourceTokens(ctx context.Context
 				destTokens[i] = destToken
 				found[tokenAddress] = true
 			} else {
-				o.lggr.Errorf("source to dest cache contains invalid type %T", v)
+				o.Lggr.Errorf("source to dest cache contains invalid type %T", v)
 			}
 		}
 	}
@@ -221,7 +222,7 @@ func (o *OffRampV1_0_0) getDestinationTokensFromSourceTokens(ctx context.Context
 	return destTokens, nil
 }
 
-func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []common.Address) ([]TokenBucketRateLimit, error) {
+func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []common.Address) ([]ccipdata.TokenBucketRateLimit, error) {
 	if len(poolAddresses) == 0 {
 		return nil, nil
 	}
@@ -246,8 +247,8 @@ func (o *OffRampV1_0_0) GetTokenPoolsRateLimits(ctx context.Context, poolAddress
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
 
-	rateLimits, err := rpclib.ParseOutputs[TokenBucketRateLimit](results, func(d rpclib.DataAndErr) (TokenBucketRateLimit, error) {
-		return rpclib.ParseOutput[TokenBucketRateLimit](d, 0)
+	rateLimits, err := rpclib.ParseOutputs[ccipdata.TokenBucketRateLimit](results, func(d rpclib.DataAndErr) (ccipdata.TokenBucketRateLimit, error) {
+		return rpclib.ParseOutput[ccipdata.TokenBucketRateLimit](d, 0)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("parse outputs: %w", err)
@@ -333,13 +334,13 @@ func (o *OffRampV1_0_0) getPoolsByDestTokens(ctx context.Context, tokenAddrs []c
 	return destPools, nil
 }
 
-func (o *OffRampV1_0_0) OffchainConfig() ExecOffchainConfig {
+func (o *OffRampV1_0_0) OffchainConfig() ccipdata.ExecOffchainConfig {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
 	return o.offchainConfig
 }
 
-func (o *OffRampV1_0_0) OnchainConfig() ExecOnchainConfig {
+func (o *OffRampV1_0_0) OnchainConfig() ccipdata.ExecOnchainConfig {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
 	return o.onchainConfig
@@ -361,11 +362,11 @@ func (o *OffRampV1_0_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte
 		return common.Address{}, common.Address{}, err
 	}
 
-	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[ExecOffchainConfig](offchainConfig)
+	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[ccipdata.ExecOffchainConfig](offchainConfig)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	destRouter, err := router.NewRouter(onchainConfigParsed.Router, o.ec)
+	destRouter, err := router.NewRouter(onchainConfigParsed.Router, o.Ec)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
@@ -374,7 +375,7 @@ func (o *OffRampV1_0_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte
 		return common.Address{}, common.Address{}, err
 	}
 	o.configMu.Lock()
-	o.offchainConfig = ExecOffchainConfig{
+	o.offchainConfig = ccipdata.ExecOffchainConfig{
 		SourceFinalityDepth:         offchainConfigParsed.SourceFinalityDepth,
 		DestFinalityDepth:           offchainConfigParsed.DestFinalityDepth,
 		DestOptimisticConfirmations: offchainConfigParsed.DestOptimisticConfirmations,
@@ -384,11 +385,11 @@ func (o *OffRampV1_0_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
-	o.onchainConfig = ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
-	o.gasPriceEstimator = prices.NewExecGasPriceEstimator(o.estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0)
+	o.onchainConfig = ccipdata.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
+	o.gasPriceEstimator = prices.NewExecGasPriceEstimator(o.Estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0)
 	o.configMu.Unlock()
 
-	o.lggr.Infow("Starting exec plugin",
+	o.Lggr.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
 		"onchainConfig", offchainConfigParsed)
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
@@ -404,7 +405,7 @@ func (o *OffRampV1_0_0) Close(qopts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error) {
+func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]ccipdata.Event[ccipdata.ExecutionStateChanged], error) {
 	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("get lp latest block: %w", err)
@@ -423,16 +424,16 @@ func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Conte
 		return nil, err
 	}
 
-	return parseLogs[ExecutionStateChanged](
+	return ccipdata.ParseLogs[ccipdata.ExecutionStateChanged](
 		logs,
-		o.lggr,
-		func(log types.Log) (*ExecutionStateChanged, error) {
+		o.Lggr,
+		func(log types.Log) (*ccipdata.ExecutionStateChanged, error) {
 			sc, err := o.offRamp.ParseExecutionStateChanged(log)
 			if err != nil {
 				return nil, err
 			}
 
-			return &ExecutionStateChanged{
+			return &ccipdata.ExecutionStateChanged{
 				SequenceNumber: sc.SequenceNumber,
 				Finalized:      sc.Raw.BlockNumber >= uint64(latestBlock.FinalizedBlockNumber),
 			}, nil
@@ -440,7 +441,7 @@ func (o *OffRampV1_0_0) GetExecutionStateChangesBetweenSeqNums(ctx context.Conte
 	)
 }
 
-func encodeExecutionReportV1_0_0(args abi.Arguments, report ExecReport) ([]byte, error) {
+func encodeExecutionReportV1_0_0(args abi.Arguments, report ccipdata.ExecReport) ([]byte, error) {
 	var msgs []evm_2_evm_offramp_1_0_0.InternalEVM2EVMMessage
 	for _, msg := range report.Messages {
 		var ta []evm_2_evm_offramp_1_0_0.ClientEVMTokenAmount
@@ -475,17 +476,17 @@ func encodeExecutionReportV1_0_0(args abi.Arguments, report ExecReport) ([]byte,
 	return args.PackValues([]interface{}{&rep})
 }
 
-func (o *OffRampV1_0_0) EncodeExecutionReport(report ExecReport) ([]byte, error) {
+func (o *OffRampV1_0_0) EncodeExecutionReport(report ccipdata.ExecReport) ([]byte, error) {
 	return encodeExecutionReportV1_0_0(o.executionReportArgs, report)
 }
 
-func decodeExecReportV1_0_0(args abi.Arguments, report []byte) (ExecReport, error) {
+func DecodeExecReportV1_0_0(args abi.Arguments, report []byte) (ccipdata.ExecReport, error) {
 	unpacked, err := args.Unpack(report)
 	if err != nil {
-		return ExecReport{}, err
+		return ccipdata.ExecReport{}, err
 	}
 	if len(unpacked) == 0 {
-		return ExecReport{}, errors.New("assumptionViolation: expected at least one element")
+		return ccipdata.ExecReport{}, errors.New("assumptionViolation: expected at least one element")
 	}
 
 	erStruct, ok := unpacked[0].(struct {
@@ -512,7 +513,7 @@ func decodeExecReportV1_0_0(args abi.Arguments, report []byte) (ExecReport, erro
 	})
 
 	if !ok {
-		return ExecReport{}, fmt.Errorf("got %T", unpacked[0])
+		return ccipdata.ExecReport{}, fmt.Errorf("got %T", unpacked[0])
 	}
 	messages := []internal.EVM2EVMMessage{}
 	for _, msg := range erStruct.Messages {
@@ -544,7 +545,7 @@ func decodeExecReportV1_0_0(args abi.Arguments, report []byte) (ExecReport, erro
 
 	// Unpack will populate with big.Int{false, <allocated empty nat>} for 0 values,
 	// which is different from the expected big.NewInt(0). Rebuild to the expected value for this case.
-	return ExecReport{
+	return ccipdata.ExecReport{
 		Messages:          messages,
 		OffchainTokenData: erStruct.OffchainTokenData,
 		Proofs:            erStruct.Proofs,
@@ -553,8 +554,8 @@ func decodeExecReportV1_0_0(args abi.Arguments, report []byte) (ExecReport, erro
 
 }
 
-func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ExecReport, error) {
-	return decodeExecReportV1_0_0(o.executionReportArgs, report)
+func (o *OffRampV1_0_0) DecodeExecutionReport(report []byte) (ccipdata.ExecReport, error) {
+	return DecodeExecReportV1_0_0(o.executionReportArgs, report)
 }
 
 func (o *OffRampV1_0_0) TokenEvents() []common.Hash {
@@ -597,12 +598,12 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 
 	return &OffRampV1_0_0{
 		offRamp:             offRamp,
-		ec:                  ec,
+		Ec:                  ec,
 		addr:                addr,
-		lggr:                lggr,
+		Lggr:                lggr,
 		lp:                  lp,
 		filters:             filters,
-		estimator:           estimator,
+		Estimator:           estimator,
 		executionReportArgs: executionReportArgs,
 		eventSig:            ExecutionStateChangedEventV1_0_0,
 		eventIndex:          executionStateChangedSequenceNumberIndex,
@@ -631,7 +632,7 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 
 		// values set on the fly after ChangeConfig is called
 		gasPriceEstimator: prices.ExecGasPriceEstimator{},
-		offchainConfig:    ExecOffchainConfig{},
-		onchainConfig:     ExecOnchainConfig{},
+		offchainConfig:    ccipdata.ExecOffchainConfig{},
+		onchainConfig:     ccipdata.ExecOnchainConfig{},
 	}, nil
 }
