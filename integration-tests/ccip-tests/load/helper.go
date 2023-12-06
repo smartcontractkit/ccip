@@ -241,7 +241,7 @@ func (l *loadArgs) TriggerLoadBySource() {
 		loadRunner.Run(false)
 		l.AddToRunnerGroup(loadRunner)
 		l.LoadgenTearDowns = append(l.LoadgenTearDowns, func() {
-			multiCallGen.Done <- struct{}{}
+			require.NoError(l.t, multiCallGen.Stop())
 		})
 	}
 }

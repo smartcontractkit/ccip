@@ -47,6 +47,20 @@ type CCIPMsgData struct {
 	Fee           *big.Int
 }
 
+func TransferTokenCallData(to common.Address, amount *big.Int) ([]byte, error) {
+	erc20ABI, err := abi.JSON(strings.NewReader(erc20.ERC20ABI))
+	if err != nil {
+		return nil, err
+	}
+	transferToken := erc20ABI.Methods["transfer"]
+	inputs, err := transferToken.Inputs.Pack(to, amount)
+	if err != nil {
+		return nil, err
+	}
+	inputs = append(transferToken.ID[:], inputs...)
+	return inputs, nil
+}
+
 // ApproveTokenCallData returns the call data for approving a token with approve function of erc20 contract
 func ApproveTokenCallData(to common.Address, amount *big.Int) ([]byte, error) {
 	erc20ABI, err := abi.JSON(strings.NewReader(erc20.ERC20ABI))
@@ -216,4 +230,46 @@ func MultiCallCCIP(
 		return tx, errors.Wrapf(err, "multicall failed for ccip-send; router %s", contractAddress.Hex())
 	}
 	return tx, nil
+}
+
+func TransferTokens(
+	evmClient blockchain.EVMClient,
+	contractAddress common.Address,
+	tokens []*ERC20Token,
+) error {
+	multiCallABI, err := abi.JSON(strings.NewReader(MultiCallABI))
+	if err != nil {
+		return err
+	}
+	var callData []Call
+	boundContract := bind.NewBoundContract(contractAddress, multiCallABI, evmClient.Backend(), evmClient.Backend(), evmClient.Backend())
+	for _, token := range tokens {
+		var inputs []byte
+		balance, err := token.BalanceOf(nil, contractAddress.Hex())
+		if err != nil {
+			return err
+		}
+		inputs, err = TransferTokenCallData(common.HexToAddress(evmClient.GetDefaultWallet().Address()), balance)
+		if err != nil {
+			return err
+		}
+		data := Call{Target: token.ContractAddress, AllowFailure: false, CallData: inputs}
+		callData = append(callData, data)
+	}
+
+	opts, err := evmClient.TransactionOpts(evmClient.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+
+	// call aggregate3 to group all msg call data and send them in a single transaction
+	tx, err := boundContract.Transact(opts, "aggregate3", callData)
+	if err != nil {
+		return err
+	}
+	err = WaitForSuccessfulTxMined(evmClient, tx)
+	if err != nil {
+		return errors.Wrapf(err, "token transfer failed for token; router %s", contractAddress.Hex())
+	}
+	return nil
 }

@@ -53,7 +53,7 @@ func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*acti
 		return nil, fmt.Errorf("multicall address cannot be empty")
 	}
 	for i := 1; i < len(lanes); i++ {
-		if source != lanes[i].SourceChain.GetChainID() {
+		if source.String() != lanes[i].SourceChain.GetChainID().String() {
 			return nil, fmt.Errorf("all lanes should be from same network; expected %s, got %s", source, lanes[i].SourceChain.GetChainID())
 		}
 		if lanes[i].SrcNetworkLaneCfg.Multicall != multiCall {
@@ -90,6 +90,23 @@ func NewMultiCallLoadGenerator(testCfg *testsetups.CCIPTestConfig, lanes []*acti
 
 	m.StartLokiStream()
 	return m, nil
+}
+
+func (m *CCIPMultiCallLoadGenerator) Stop() error {
+	m.Done <- struct{}{}
+	tokenMap := make(map[string]struct{})
+	var tokens []*contracts.ERC20Token
+	for _, e2eLoad := range m.E2ELoads {
+		for i := range e2eLoad.Lane.Source.TransferAmount {
+			if _, ok := tokenMap[e2eLoad.Lane.Source.Common.BridgeTokens[i].Address()]; !ok {
+				tokens = append(tokens, e2eLoad.Lane.Source.Common.BridgeTokens[i])
+			}
+		}
+	}
+	if len(tokens) > 0 {
+		return contracts.TransferTokens(m.client, common.HexToAddress(m.MultiCall), tokens)
+	}
+	return nil
 }
 
 func (m *CCIPMultiCallLoadGenerator) StartLokiStream() {
@@ -189,8 +206,12 @@ func (m *CCIPMultiCallLoadGenerator) Call(_ *wasp.Generator) *wasp.CallResult {
 		}
 
 		lggr = lggr.With().Str("Source Network", c.Lane.SourceChain.GetNetworkName()).Str("Dest Network", c.Lane.DestChain.GetNetworkName()).Logger()
+		stats := rValues.Stats
+		txConfirmationTime := txConfirmationTime
+		sendTx := sendTx
+		lggr := lggr
 		validateGrp.Go(func() error {
-			return c.Validate(lggr, sendTx, txConfirmationTime, rValues.Stats)
+			return c.Validate(lggr, sendTx, txConfirmationTime, stats)
 		})
 	}
 	err = validateGrp.Wait()
