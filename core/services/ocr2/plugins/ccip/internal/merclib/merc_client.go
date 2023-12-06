@@ -19,9 +19,10 @@ import (
 
 	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/llo_feeds"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/verifier_proxy"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 const (
@@ -29,7 +30,7 @@ const (
 )
 
 var (
-	verifierProxyABI = evmtypes.MustGetABI(llo_feeds.LLOVerifierProxyMetaData.ABI)
+	verifierProxyABI = evmtypes.MustGetABI(verifier_proxy.VerifierProxyMetaData.ABI)
 )
 
 // MercuryV03Response represents the response from Mercury from the batch endpoint
@@ -151,7 +152,7 @@ func (m *mercClient) BatchFetchPrices(ctx context.Context, fids [][32]byte) ([]*
 
 	err = m.verifyReports(ctx, func() (sr [][]byte) {
 		for _, rwc := range reportsWithContext {
-			sr = append(sr, rwc.FullReport.ReportBlob)
+			sr = append(sr, rwc.RawFullReport)
 		}
 		return sr
 	}())
@@ -213,7 +214,13 @@ func (m *mercClient) generateHMAC(method, path string, body []byte, clientId, se
 func (m *mercClient) verifyReports(ctx context.Context, signedReports [][]byte) error {
 	// payment options don't really matter since an eth_call won't pay anything in the end
 	// NOTE: the fromAddress passed into the client must have 100% discount on the mercury fee manager contract.
-	calldata, err := verifierProxyABI.Pack("verifyBulk", signedReports, m.wrappedNativeAddress.Bytes())
+	// need to abi-encode the address first before passing it in because the fee manager uses abi.decode()
+	// and expects 32 bytes
+	encodedAddr, err := utils.ABIEncode(`[{ "type": "address" }]`, m.wrappedNativeAddress)
+	if err != nil {
+		return fmt.Errorf("failed to abi encode address '%s': %w", m.wrappedNativeAddress.String(), err)
+	}
+	calldata, err := verifierProxyABI.Pack("verifyBulk", signedReports, encodedAddr)
 	if err != nil {
 		return fmt.Errorf("failed to pack verifyBulk: %w", err)
 	}

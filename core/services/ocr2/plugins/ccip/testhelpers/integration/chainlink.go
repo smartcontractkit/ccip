@@ -28,9 +28,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
 	ctfClient "github.com/smartcontractkit/chainlink/integration-tests/client"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_mercury_verifier_proxy"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	v2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
@@ -39,6 +36,12 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_mercury_verifier_proxy"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/fee_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/reward_manager"
+	llo_verifier "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/verifier"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/verifier_proxy"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -461,6 +464,91 @@ func (c *CCIPIntegrationTestHarness) DeployMockMercuryVerifier(t *testing.T) com
 	return addr
 }
 
+func (c *CCIPIntegrationTestHarness) DeployMercuryVerifier(
+	t *testing.T, mercuryOCR2Keys []ocr2key.KeyBundle, feedIDs [][32]byte) (
+	proxyAddress common.Address,
+	feeManagerAddress common.Address,
+	feedIDToConfigDigest map[[32]byte][32]byte) {
+	feedIDToConfigDigest = make(map[[32]byte][32]byte)
+	var err error
+	proxyAddress, _, _, err = verifier_proxy.DeployVerifierProxy(c.Source.User, c.Source.Chain, common.HexToAddress("0x0"))
+	require.NoError(t, err, "deploying mercury verifier proxy")
+	c.Source.Chain.Commit()
+	verifierProxy, err := verifier_proxy.NewVerifierProxy(proxyAddress, c.Source.Chain)
+	require.NoError(t, err, "creating mercury verifier proxy")
+
+	verifierAddress, _, _, err := llo_verifier.DeployVerifier(c.Source.User, c.Source.Chain, proxyAddress)
+	require.NoError(t, err, "deploying mercury verifier")
+	c.Source.Chain.Commit()
+	verifier, err := llo_verifier.NewVerifier(verifierAddress, c.Source.Chain)
+	require.NoError(t, err, "creating mercury verifier")
+
+	// initialize the verifier on the verifier proxy
+	_, err = verifierProxy.InitializeVerifier(c.Source.User, verifierAddress)
+	require.NoError(t, err, "initializing verifier")
+	c.Source.Chain.Commit()
+
+	// set config on the verifier for the relevant feed ids
+	// the verifier is set on the proxy for each setConfig call
+	signers, offchainTransmitters := func() (ss []common.Address, ts [][32]byte) {
+		for _, kb := range mercuryOCR2Keys {
+			ss = append(ss, common.BytesToAddress(kb.PublicKey()))
+			ts = append(ts, kb.OffchainPublicKey())
+		}
+		return
+	}()
+	t.Log("signers:", signers, "offchainTransmitters:", func() []string {
+		var s []string
+		for _, t := range offchainTransmitters {
+			s = append(s, hex.EncodeToString(t[:]))
+		}
+		return s
+	}())
+	var configDigests [][32]byte
+	for _, feedID := range feedIDs {
+		_, err := verifier.SetConfig(c.Source.User, feedID, signers, offchainTransmitters, 1, []byte{}, 2, []byte{}, []llo_verifier.CommonAddressAndWeight{})
+		require.NoErrorf(t, err, "setting config on feed id %s", hex.EncodeToString(feedID[:]))
+		c.Source.Chain.Commit()
+		iter, err := verifier.FilterConfigSet(&bind.FilterOpts{Start: c.Source.Chain.Blockchain().CurrentBlock().Number.Uint64() - 1}, [][32]byte{feedID})
+		require.NoError(t, err, "filtering config set")
+		var found bool
+		for iter.Next() {
+			configDigests = append(configDigests, iter.Event.ConfigDigest)
+			found = true
+		}
+		require.True(t, found, "config set event not found")
+		feedIDToConfigDigest[feedID] = configDigests[len(configDigests)-1]
+	}
+	require.Len(t, configDigests, len(feedIDs), "config set events slice not matching in length to feed ids")
+
+	t.Log("config digests:", func() []string {
+		var s []string
+		for _, d := range configDigests {
+			s = append(s, hex.EncodeToString(d[:]))
+		}
+		return s
+	}())
+
+	// deploy the reward and fee managers
+	rewardManagerAddress, _, _, err := reward_manager.DeployRewardManager(c.Source.User, c.Source.Chain, c.Source.LinkToken.Address())
+	require.NoError(t, err, "deploying reward manager")
+	c.Source.Chain.Commit()
+	feeManagerAddress, _, _, err = fee_manager.DeployFeeManager(c.Source.User, c.Source.Chain, c.Source.LinkToken.Address(), c.Source.WrappedNative.Address(), proxyAddress, rewardManagerAddress)
+	require.NoError(t, err, "deploying fee manager")
+	c.Source.Chain.Commit()
+
+	// set fee manager on the verifier proxy so that we can simulate billing
+	_, err = verifierProxy.SetFeeManager(c.Source.User, feeManagerAddress)
+	require.NoError(t, err, "setting fee manager")
+	c.Source.Chain.Commit()
+
+	onchainFeeManager, err := verifierProxy.SFeeManager(nil)
+	require.NoError(t, err, "getting fee manager")
+	require.Equal(t, feeManagerAddress, onchainFeeManager, "fee manager not set correctly")
+
+	return proxyAddress, feeManagerAddress, feedIDToConfigDigest
+}
+
 func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams) {
 	jobParams.OffRamp = c.Dest.OffRamp.Address()
 
@@ -711,11 +799,11 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 	return bootstrapNode, nodes, configBlock
 }
 
-func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64, mercOpts *MercuryOpts) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64, mercOpts *MercuryOpts) (CCIPJobSpecParams, []ocr2key.KeyBundle) {
 	// setup Jobs
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, bootstrapNodePort, mercOpts)
+	bootstrapNode, nodes, configBlock := c.SetupAndStartNodes(ctx, t, bootstrapNodePort, mercOpts)
 
 	jobParams := c.NewCCIPJobSpecParams(pricePipeline, configBlock, mercOpts)
 
@@ -729,7 +817,12 @@ func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeli
 	require.NoError(t, bc.LogPoller().Replay(context.Background(), configBlock))
 	c.Dest.Chain.Commit()
 
-	return jobParams
+	return jobParams, func() (r []ocr2key.KeyBundle) {
+		for _, node := range nodes {
+			r = append(r, node.KeyBundle)
+		}
+		return
+	}()
 }
 
 func (c *CCIPIntegrationTestHarness) SetFeedIDsOnPriceRegistries(t *testing.T, sourceTokenToFeedIDs, destTokenToFeedIDs map[common.Address][32]byte) {
@@ -757,6 +850,18 @@ func (c *CCIPIntegrationTestHarness) SetFeedIDsOnPriceRegistries(t *testing.T, s
 	_, err = c.Source.PriceRegistry.ApplyFeedIdsUpdates(c.Source.User, sourceAdds, []price_registry.PriceRegistryFeedIdUpdate{})
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
+}
+
+func (c *CCIPIntegrationTestHarness) SetMercuryDiscounts(t *testing.T, feeManagerAddress common.Address, feedIDs [][32]byte, ccipOCR2Keys []ocr2key.KeyBundle) {
+	feeManager, err := fee_manager.NewFeeManager(feeManagerAddress, c.Source.Chain)
+	require.NoError(t, err, "creating fee manager")
+	for _, feedID := range feedIDs {
+		for _, kb := range ccipOCR2Keys {
+			_, err := feeManager.UpdateSubscriberDiscount(c.Source.User, common.BytesToAddress(kb.PublicKey()), feedID, c.Source.WrappedNative.Address(), 1e18)
+			require.NoError(t, err, "updating subscriber discount")
+			c.Source.Chain.Commit()
+		}
+	}
 }
 
 func DecodeCommitOnChainConfig(encoded []byte) (ccipdata.CommitOnchainConfig, error) {

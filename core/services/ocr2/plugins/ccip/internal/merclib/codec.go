@@ -15,15 +15,15 @@ import (
 )
 
 type ReportWithContext struct {
-	FeedId      mercuryutils.FeedID
-	FeedVersion mercuryutils.FeedVersion
-	V1Report    *v1report.Report
-	V2Report    *v2report.Report
-	V3Report    *v3report.Report
-	Round       uint8
-	Epoch       uint32
-	Digest      []byte
-	FullReport  *FullReport
+	FeedId        mercuryutils.FeedID
+	FeedVersion   mercuryutils.FeedVersion
+	V1Report      *v1report.Report
+	V2Report      *v2report.Report
+	V3Report      *v3report.Report
+	Round         uint8
+	Epoch         uint32
+	Digest        []byte
+	RawFullReport []byte
 }
 
 type FullReport struct {
@@ -146,12 +146,12 @@ func DecodeFullReportAndReportData(payload []byte) (*ReportWithContext, error) {
 	}
 
 	result := &ReportWithContext{
-		FeedId:      feedID,
-		FeedVersion: feedID.Version(),
-		Digest:      fullReport.ReportContext[0][:],
-		Round:       fullReport.ReportContext[1][31],
-		Epoch:       binary.BigEndian.Uint32(fullReport.ReportContext[1][32-5 : 32-1]),
-		FullReport:  fullReport,
+		FeedId:        feedID,
+		FeedVersion:   feedID.Version(),
+		Digest:        fullReport.ReportContext[0][:],
+		Round:         fullReport.ReportContext[1][31],
+		Epoch:         binary.BigEndian.Uint32(fullReport.ReportContext[1][32-5 : 32-1]),
+		RawFullReport: payload,
 	}
 
 	switch feedID.Version() {

@@ -20,6 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -51,7 +53,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	defer linkUSD.Close()
 	defer ethUSD.Close()
 
-	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399, nil)
+	jobParams, _ := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399, nil)
 
 	currentSeqNum := 1
 
@@ -551,10 +553,9 @@ func TestIntegration_CCIP_Mercury(t *testing.T) {
 			feedIDUSDPerLink: usdPerLink,
 			feedIDUSDPerEth:  usdPerEth,
 		}
-		sharedSecret = "password"
 	)
 
-	mercuryHandler := merclib.XXXTestOnlyMercuryHandler(t, prices, sharedSecret)
+	mercuryHandler := merclib.XXXTestOnlyMercuryHandler(t, prices)
 	mercuryServer := httptest.NewServer(mercuryHandler)
 	defer mercuryServer.Close()
 
@@ -562,6 +563,70 @@ func TestIntegration_CCIP_Mercury(t *testing.T) {
 		VerifierAddress: mercVerifierAddress,
 		MercuryURL:      mercuryServer.URL,
 	})
+
+	t.Log("feed id usd per link:", hexutil.Encode(feedIDUSDPerLink[:]),
+		"feed id usd per eth:", hexutil.Encode(feedIDUSDPerEth[:]),
+		"source link address:", ccipTH.Source.LinkToken.Address().Hex(),
+		"source wrapped native address:", ccipTH.Source.WrappedNative.Address().Hex(),
+		"dest link address:", ccipTH.Dest.LinkToken.Address().Hex(),
+		"dest wrapped native address:", ccipTH.Dest.WrappedNative.Address().Hex())
+
+	ccipTH.SetFeedIDsOnPriceRegistries(
+		t,
+		// source price registry updates
+		map[common.Address][32]byte{
+			ccipTH.Source.LinkToken.Address():   feedIDUSDPerLink,
+			ccipTH.Dest.WrappedNative.Address(): feedIDUSDPerEth,
+		},
+		// dest price registry updates
+		map[common.Address][32]byte{
+			ccipTH.Dest.LinkToken.Address():       feedIDUSDPerLink,
+			ccipTH.Source.WrappedNative.Address(): feedIDUSDPerEth,
+		},
+	)
+
+	currentSeqNum := 1
+
+	t.Run("single", func(t *testing.T) {
+		testSingle(t, ccipTH, currentSeqNum)
+	})
+}
+
+func TestIntegration_CCIP_Mercury_RealVerifier(t *testing.T) {
+	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
+
+	var (
+		feedIDUSDPerLink = testutils.RandomFeedIDV3()
+		feedIDUSDPerEth  = testutils.RandomFeedIDV3()
+		usdPerLink       = decimal.RequireFromString("8000000000000000000").BigInt()
+		usdPerEth        = decimal.RequireFromString("1700000000000000000000").BigInt()
+		prices           = map[[32]byte]*big.Int{
+			feedIDUSDPerLink: usdPerLink,
+			feedIDUSDPerEth:  usdPerEth,
+		}
+	)
+
+	// create 4 OCR keys for the 4 mercury signers
+	// note that f is set to 1, so really only 2 signatures are required (f+1)
+	var mercuryOCR2Keys []ocr2key.KeyBundle
+	for i := 0; i < 4; i++ {
+		kb, err := ocr2key.New(chaintype.EVM)
+		require.NoError(t, err, "creating OCR2 key")
+		mercuryOCR2Keys = append(mercuryOCR2Keys, kb)
+	}
+	verifierProxy, feeManagerAddress, feedIDToConfigDigest := ccipTH.DeployMercuryVerifier(t, mercuryOCR2Keys, [][32]byte{feedIDUSDPerLink, feedIDUSDPerEth})
+
+	mercuryHandler := merclib.XXXTestOnlyMercuryHandlerWithReportSigning(t, prices, mercuryOCR2Keys, feedIDToConfigDigest, 1)
+	mercuryServer := httptest.NewServer(mercuryHandler)
+	defer mercuryServer.Close()
+
+	_, ocr2KeyBundles := ccipTH.SetUpNodesAndJobs(t, "", 19399, &integrationtesthelpers.MercuryOpts{
+		VerifierAddress: verifierProxy,
+		MercuryURL:      mercuryServer.URL,
+	})
+
+	// set 100% discounts on the CCIP nop ocr2 onchain keys
+	ccipTH.SetMercuryDiscounts(t, feeManagerAddress, [][32]byte{feedIDUSDPerLink, feedIDUSDPerEth}, ocr2KeyBundles)
 
 	t.Log("feed id usd per link:", hexutil.Encode(feedIDUSDPerLink[:]),
 		"feed id usd per eth:", hexutil.Encode(feedIDUSDPerEth[:]),
