@@ -22,7 +22,6 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/PingPongDemo/PingPongDemo.abi ../../../contracts/solc/v0.8.19/PingPongDemo/PingPongDemo.bin PingPongDemo ping_pong_demo
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/SelfFundedPingPong/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.19/SelfFundedPingPong/SelfFundedPingPong.bin SelfFundedPingPong self_funded_ping_pong
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/WETH9/WETH9.abi ../../../contracts/solc/v0.8.19/WETH9/WETH9.bin WETH9 weth9
-//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MockMercuryVerifierProxy/MockMercuryVerifierProxy.abi ../../../contracts/solc/v0.8.19/MockMercuryVerifierProxy/MockMercuryVerifierProxy.bin MockMercuryVerifierProxy mock_mercury_verifier_proxy
 
 // Customer contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool/USDCTokenPool.bin USDCTokenPool usdc_token_pool

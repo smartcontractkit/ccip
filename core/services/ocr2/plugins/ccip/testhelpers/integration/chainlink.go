@@ -36,7 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_mercury_verifier_proxy"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/fee_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/reward_manager"
@@ -455,13 +454,6 @@ func SetupCCIPIntegrationTH(t *testing.T, sourceChainID, sourceChainSelector, de
 	return CCIPIntegrationTestHarness{
 		CCIPContracts: c,
 	}
-}
-
-func (c *CCIPIntegrationTestHarness) DeployMockMercuryVerifier(t *testing.T) common.Address {
-	addr, _, _, err := mock_mercury_verifier_proxy.DeployMockMercuryVerifierProxy(c.Source.User, c.Source.Chain)
-	require.NoError(t, err, "deploying mock mercury verifier")
-	c.Source.Chain.Commit()
-	return addr
 }
 
 func (c *CCIPIntegrationTestHarness) DeployMercuryVerifier(

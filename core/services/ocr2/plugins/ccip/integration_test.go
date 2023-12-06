@@ -540,58 +540,6 @@ func testSingle(t *testing.T, ccipTH integrationtesthelpers.CCIPIntegrationTestH
 	return currentSeqNum
 }
 
-func TestIntegration_CCIP_Mercury(t *testing.T) {
-	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
-	mercVerifierAddress := ccipTH.DeployMockMercuryVerifier(t)
-
-	var (
-		feedIDUSDPerLink = testutils.RandomFeedIDV3()
-		feedIDUSDPerEth  = testutils.RandomFeedIDV3()
-		usdPerLink       = decimal.RequireFromString("8000000000000000000").BigInt()
-		usdPerEth        = decimal.RequireFromString("1700000000000000000000").BigInt()
-		prices           = map[[32]byte]*big.Int{
-			feedIDUSDPerLink: usdPerLink,
-			feedIDUSDPerEth:  usdPerEth,
-		}
-	)
-
-	mercuryHandler := merclib.XXXTestOnlyMercuryHandler(t, prices)
-	mercuryServer := httptest.NewServer(mercuryHandler)
-	defer mercuryServer.Close()
-
-	ccipTH.SetUpNodesAndJobs(t, "", 19399, &integrationtesthelpers.MercuryOpts{
-		VerifierAddress: mercVerifierAddress,
-		MercuryURL:      mercuryServer.URL,
-	})
-
-	t.Log("feed id usd per link:", hexutil.Encode(feedIDUSDPerLink[:]),
-		"feed id usd per eth:", hexutil.Encode(feedIDUSDPerEth[:]),
-		"source link address:", ccipTH.Source.LinkToken.Address().Hex(),
-		"source wrapped native address:", ccipTH.Source.WrappedNative.Address().Hex(),
-		"dest link address:", ccipTH.Dest.LinkToken.Address().Hex(),
-		"dest wrapped native address:", ccipTH.Dest.WrappedNative.Address().Hex())
-
-	ccipTH.SetFeedIDsOnPriceRegistries(
-		t,
-		// source price registry updates
-		map[common.Address][32]byte{
-			ccipTH.Source.LinkToken.Address():   feedIDUSDPerLink,
-			ccipTH.Dest.WrappedNative.Address(): feedIDUSDPerEth,
-		},
-		// dest price registry updates
-		map[common.Address][32]byte{
-			ccipTH.Dest.LinkToken.Address():       feedIDUSDPerLink,
-			ccipTH.Source.WrappedNative.Address(): feedIDUSDPerEth,
-		},
-	)
-
-	currentSeqNum := 1
-
-	t.Run("single", func(t *testing.T) {
-		testSingle(t, ccipTH, currentSeqNum)
-	})
-}
-
 func TestIntegration_CCIP_Mercury_RealVerifier(t *testing.T) {
 	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
 

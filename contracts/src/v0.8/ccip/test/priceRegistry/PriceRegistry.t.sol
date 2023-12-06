@@ -95,7 +95,7 @@ contract PriceRegistry_constructor is PriceRegistrySetup {
     assertEq(feeTokens, s_priceRegistry.getFeeTokens());
     assertEq(uint32(TWELVE_HOURS), s_priceRegistry.getStalenessThreshold());
     assertEq(priceUpdaters, s_priceRegistry.getPriceUpdaters());
-    assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.3.0");
+    assertEq(s_priceRegistry.typeAndVersion(), "PriceRegistry 1.3.0-dev");
   }
 
   function testInvalidStalenessThresholdReverts() public {
