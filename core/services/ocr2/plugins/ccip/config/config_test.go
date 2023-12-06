@@ -5,14 +5,17 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 )
 
 func TestCommitConfig(t *testing.T) {
 	exampleConfig := CommitPluginJobSpecConfig{
-		SourceStartBlock:       222,
-		DestStartBlock:         333,
-		OffRamp:                "0x123",
-		TokenPricesUSDPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
+		SourceStartBlock:            222,
+		DestStartBlock:              333,
+		OffRamp:                     "0x123",
+		TokenPricesUSDPipeline:      `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
+		MercuryVerifierProxyAddress: testutils.NewAddress().String(),
 	}
 
 	bts, err := json.Marshal(exampleConfig)

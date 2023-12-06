@@ -11,6 +11,8 @@ import (
 	evmmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	pipelinemocks "github.com/smartcontractkit/chainlink/v2/core/services/pipeline/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
@@ -68,7 +70,9 @@ func TestGetCommitPluginFilterNamesFromSpec(t *testing.T) {
 				}
 			}
 
-			err := UnregisterCommitPluginLpFilters(context.Background(), lggr, job.Job{OCR2OracleSpec: tc.spec}, prMock, chainSet, nil)
+			kb, err := ocr2key.New(chaintype.EVM)
+			assert.NoError(t, err)
+			err = UnregisterCommitPluginLpFilters(context.Background(), lggr, job.Job{OCR2OracleSpec: tc.spec}, prMock, chainSet, nil, kb)
 			if tc.expectingErr {
 				assert.Error(t, err)
 			} else {

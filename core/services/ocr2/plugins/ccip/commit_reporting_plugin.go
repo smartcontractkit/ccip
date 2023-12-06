@@ -61,9 +61,11 @@ type update struct {
 type CommitPluginStaticConfig struct {
 	lggr logger.Logger
 	// Source
-	onRampReader        ccipdata.OnRampReader
-	sourceChainSelector uint64
-	sourceNative        common.Address
+	onRampReader         ccipdata.OnRampReader
+	sourceChainSelector  uint64
+	sourceNative         common.Address
+	mercuryVerifierProxy common.Address
+	sourceClient         evmclient.Client
 	// Dest
 	destLP         logpoller.LogPoller
 	offRamp        ccipdata.OffRampReader
@@ -78,6 +80,9 @@ type CommitPluginStaticConfig struct {
 	tokenPricesUSDPipeline string
 	pipelineRunner         pipeline.Runner
 	job                    job.Job
+	// identity
+	// ocr2Address is the OCR2 key's on-chain public key represented as an ethereum address
+	ocr2Address common.Address
 }
 
 type CommitReportingPlugin struct {
@@ -152,8 +157,18 @@ func (rf *CommitReportingPluginFactory) UpdatePriceGetter(priceRegistryReader cc
 	var (
 		priceGetter pricegetter.PriceGetter
 	)
-	if rf.config.mercCreds != nil {
-		mercClient := merclib.NewMercuryClient(rf.config.mercCreds, http.DefaultClient, rf.config.lggr.Named("MercuryClient"))
+	// only use mercury if valid parameters are set:
+	// mercury config available
+	// verifier proxy set in plugin config
+	if rf.config.mercCreds != nil && rf.config.mercuryVerifierProxy.Big().Cmp(big.NewInt(0)) >= 1 {
+		mercClient := merclib.NewMercuryClient(
+			rf.config.mercCreds,
+			http.DefaultClient,
+			rf.config.lggr.Named("MercuryClient"),
+			rf.config.sourceClient,
+			rf.config.ocr2Address,
+			rf.config.mercuryVerifierProxy,
+			rf.config.sourceNative)
 		priceGetter = pricegetter.NewMercuryGetter(mercClient, priceRegistryReader)
 	} else {
 		var err error

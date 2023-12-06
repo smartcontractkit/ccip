@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	evmclient_mocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
@@ -39,6 +40,10 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Body:       reader,
 		}, nil)
+		evmClient := &evmclient_mocks.Client{}
+		evmClient.
+			On("CallContract", mock.Anything, mock.AnythingOfType("ethereum.CallMsg"), mock.Anything).
+			Return(nil, nil)
 		mercClient := merclib.NewMercuryClient(
 			&models.MercuryCredentials{
 				Username: "testusername",
@@ -46,7 +51,11 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 				URL:      "https://testmercury.com",
 			},
 			doer,
-			logger.TestLogger(t))
+			logger.TestLogger(t),
+			evmClient,
+			testutils.NewAddress(),
+			testutils.NewAddress(),
+			testutils.NewAddress())
 		rwcs, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
 		require.NoError(tt, err)
 		actualPrices := make(map[[32]byte]*big.Int)
@@ -63,6 +72,7 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 		}
 		doer := &mocks.Doer{}
 		doer.On("Do", mock.Anything).Return(nil, errors.New("http error"))
+		evmClient := &evmclient_mocks.Client{}
 		mercClient := merclib.NewMercuryClient(
 			&models.MercuryCredentials{
 				Username: "testusername",
@@ -70,7 +80,11 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 				URL:      "https://testmercury.com",
 			},
 			doer,
-			logger.TestLogger(t))
+			logger.TestLogger(t),
+			evmClient,
+			testutils.NewAddress(),
+			testutils.NewAddress(),
+			testutils.NewAddress())
 		_, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
 		require.Error(tt, err)
 	})
@@ -85,6 +99,7 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			StatusCode: http.StatusInternalServerError,
 			Body:       io.NopCloser(bytes.NewReader([]byte("blah"))),
 		}, nil)
+		evmClient := &evmclient_mocks.Client{}
 		mercClient := merclib.NewMercuryClient(
 			&models.MercuryCredentials{
 				Username: "testusername",
@@ -92,7 +107,11 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 				URL:      "https://testmercury.com",
 			},
 			doer,
-			logger.TestLogger(t))
+			logger.TestLogger(t),
+			evmClient,
+			testutils.NewAddress(),
+			testutils.NewAddress(),
+			testutils.NewAddress())
 		_, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
 		require.Error(tt, err)
 	})
@@ -107,6 +126,7 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(bytes.NewReader([]byte("invalid json"))),
 		}, nil)
+		evmClient := &evmclient_mocks.Client{}
 		mercClient := merclib.NewMercuryClient(
 			&models.MercuryCredentials{
 				Username: "testusername",
@@ -114,7 +134,48 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 				URL:      "https://testmercury.com",
 			},
 			doer,
-			logger.TestLogger(t))
+			logger.TestLogger(t),
+			evmClient,
+			testutils.NewAddress(),
+			testutils.NewAddress(),
+			testutils.NewAddress())
+		_, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
+		require.Error(tt, err)
+	})
+	t.Run("report verification error", func(tt *testing.T) {
+		feedIDs := [][32]byte{
+			testutils.RandomFeedIDV3(),
+			testutils.RandomFeedIDV3(),
+			testutils.RandomFeedIDV3(),
+		}
+		prices := map[[32]byte]*big.Int{
+			feedIDs[0]: big.NewInt(1),
+			feedIDs[1]: big.NewInt(2),
+			feedIDs[2]: big.NewInt(3),
+		}
+		response := genMercuryResponse(tt, feedIDs, prices)
+		reader := io.NopCloser(bytes.NewReader(response))
+		doer := &mocks.Doer{}
+		doer.On("Do", mock.Anything).Return(&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       reader,
+		}, nil)
+		evmClient := &evmclient_mocks.Client{}
+		evmClient.
+			On("CallContract", mock.Anything, mock.AnythingOfType("ethereum.CallMsg"), mock.Anything).
+			Return(nil, errors.New("call error"))
+		mercClient := merclib.NewMercuryClient(
+			&models.MercuryCredentials{
+				Username: "testusername",
+				Password: "testpassword",
+				URL:      "https://testmercury.com",
+			},
+			doer,
+			logger.TestLogger(t),
+			evmClient,
+			testutils.NewAddress(),
+			testutils.NewAddress(),
+			testutils.NewAddress())
 		_, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
 		require.Error(tt, err)
 	})

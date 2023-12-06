@@ -28,6 +28,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-relay/pkg/loop"
 	ctfClient "github.com/smartcontractkit/chainlink/integration-tests/client"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_mercury_verifier_proxy"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
@@ -265,7 +266,7 @@ func setupNodeCCIP(
 	sourceChainID *big.Int, destChainID *big.Int,
 	bootstrapPeerID string,
 	bootstrapPort int64,
-	mercuryURL *string,
+	mercOpts *MercuryOpts,
 ) (chainlink.Application, string, common.Address, ocr2key.KeyBundle) {
 	trueRef, falseRef := true, false
 
@@ -302,10 +303,10 @@ func setupNodeCCIP(
 			}
 		}
 
-		if mercuryURL != nil {
+		if mercOpts != nil {
 			s.Mercury.Credentials = make(map[string]configv2.MercuryCredentials)
 			s.Mercury.Credentials["ccip_commit"] = configv2.MercuryCredentials{
-				URL:      models.MustSecretURL(*mercuryURL),
+				URL:      models.MustSecretURL(mercOpts.MercuryURL),
 				Username: models.NewSecret("ccip_commit"),
 				Password: models.NewSecret("password"),
 			}
@@ -435,6 +436,11 @@ func createConfigV2Chain(chainId *big.Int) *v2.EVMConfig {
 	}
 }
 
+type MercuryOpts struct {
+	MercuryURL      string
+	VerifierAddress common.Address
+}
+
 type CCIPIntegrationTestHarness struct {
 	testhelpers.CCIPContracts
 	Nodes     []Node
@@ -446,6 +452,13 @@ func SetupCCIPIntegrationTH(t *testing.T, sourceChainID, sourceChainSelector, de
 	return CCIPIntegrationTestHarness{
 		CCIPContracts: c,
 	}
+}
+
+func (c *CCIPIntegrationTestHarness) DeployMockMercuryVerifier(t *testing.T) common.Address {
+	addr, _, _, err := mock_mercury_verifier_proxy.DeployMockMercuryVerifierProxy(c.Source.User, c.Source.Chain)
+	require.NoError(t, err, "deploying mock mercury verifier")
+	c.Source.Chain.Commit()
+	return addr
 }
 
 func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams) {
@@ -631,10 +644,10 @@ func (c *CCIPIntegrationTestHarness) ConsistentlyReportNotCommitted(t *testing.T
 	}, testutils.WaitTimeout(t), time.Second).Should(gomega.BeFalse(), "report has been committed")
 }
 
-func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *testing.T, bootstrapNodePort int64, mercuryURL *string) (Node, []Node, int64) {
+func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *testing.T, bootstrapNodePort int64, mercOpts *MercuryOpts) (Node, []Node, int64) {
 	appBootstrap, bootstrapPeerID, bootstrapTransmitter, bootstrapKb := setupNodeCCIP(t, c.Dest.User, bootstrapNodePort,
 		"bootstrap_ccip", c.Source.Chain, c.Dest.Chain, big.NewInt(0).SetUint64(c.Source.ChainID),
-		big.NewInt(0).SetUint64(c.Dest.ChainID), "", 0, mercuryURL)
+		big.NewInt(0).SetUint64(c.Dest.ChainID), "", 0, mercOpts)
 	var (
 		oracles []confighelper.OracleIdentityExtra
 		nodes   []Node
@@ -662,7 +675,7 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 			big.NewInt(0).SetUint64(c.Dest.ChainID),
 			bootstrapPeerID,
 			bootstrapNodePort,
-			mercuryURL,
+			mercOpts,
 		)
 		nodes = append(nodes, Node{
 			App:         app,
@@ -698,13 +711,13 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 	return bootstrapNode, nodes, configBlock
 }
 
-func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64, mercuryURL *string) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64, mercOpts *MercuryOpts) CCIPJobSpecParams {
 	// setup Jobs
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, bootstrapNodePort, mercuryURL)
+	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, bootstrapNodePort, mercOpts)
 
-	jobParams := c.NewCCIPJobSpecParams(pricePipeline, configBlock)
+	jobParams := c.NewCCIPJobSpecParams(pricePipeline, configBlock, mercOpts)
 
 	// Add the bootstrap job
 	c.Bootstrap.AddBootstrapJob(t, jobParams.BootstrapJob(c.Dest.CommitStore.Address().Hex()))

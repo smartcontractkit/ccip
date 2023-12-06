@@ -187,7 +187,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 		ccipTH.Dest.Chain.Commit()
 
 		// create new jobs
-		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock)
+		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock, nil)
 		jobParams.Version = "v2"
 		jobParams.SourceStartBlock = srcStartBlock
 		ccipTH.AddAllJobs(t, jobParams)
@@ -540,6 +540,7 @@ func testSingle(t *testing.T, ccipTH integrationtesthelpers.CCIPIntegrationTestH
 
 func TestIntegration_CCIP_Mercury(t *testing.T) {
 	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
+	mercVerifierAddress := ccipTH.DeployMockMercuryVerifier(t)
 
 	var (
 		feedIDUSDPerLink = testutils.RandomFeedIDV3()
@@ -557,7 +558,10 @@ func TestIntegration_CCIP_Mercury(t *testing.T) {
 	mercuryServer := httptest.NewServer(mercuryHandler)
 	defer mercuryServer.Close()
 
-	ccipTH.SetUpNodesAndJobs(t, "", 19399, &mercuryServer.URL)
+	ccipTH.SetUpNodesAndJobs(t, "", 19399, &integrationtesthelpers.MercuryOpts{
+		VerifierAddress: mercVerifierAddress,
+		MercuryURL:      mercuryServer.URL,
+	})
 
 	t.Log("feed id usd per link:", hexutil.Encode(feedIDUSDPerLink[:]),
 		"feed id usd per eth:", hexutil.Encode(feedIDUSDPerEth[:]),

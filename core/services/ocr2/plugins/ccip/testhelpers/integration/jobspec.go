@@ -43,6 +43,7 @@ type CCIPJobSpecParams struct {
 	SourceStartBlock       uint64
 	DestStartBlock         uint64
 	P2PV2Bootstrappers     pq.StringArray
+	MercuryOpts            *MercuryOpts
 }
 
 func (params CCIPJobSpecParams) Validate() error {
@@ -81,6 +82,15 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 	if err != nil {
 		return nil, err
 	}
+	pluginConfig := map[string]interface{}{
+		"offRamp": fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
+		"tokenPricesUSDPipeline": fmt.Sprintf(`"""
+%s
+"""`, params.TokenPricesUSDPipeline),
+	}
+	if params.MercuryOpts != nil {
+		pluginConfig["verifierProxyAddress"] = fmt.Sprintf(`"%s"`, params.MercuryOpts.VerifierAddress.Hex())
+	}
 	ocrSpec := job.OCR2OracleSpec{
 		Relay:                             relay.EVM,
 		PluginType:                        types.CCIPCommit,
@@ -88,12 +98,7 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*client.OCR2TaskJobSpec, error)
 		ContractConfigConfirmations:       1,
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
-		PluginConfig: map[string]interface{}{
-			"offRamp": fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
-			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
-%s
-"""`, params.TokenPricesUSDPipeline),
-		},
+		PluginConfig:                      pluginConfig,
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestEvmChainId,
 		},
@@ -161,7 +166,7 @@ func (params CCIPJobSpecParams) BootstrapJob(contractID string) *client.OCR2Task
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64, mercOpts *MercuryOpts) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
 		CommitStore:            c.Dest.CommitStore.Address(),
 		OffRamp:                c.Dest.OffRamp.Address(),
@@ -170,5 +175,6 @@ func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline
 		DestChainName:          "SimulatedDest",
 		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
 		DestStartBlock:         uint64(configBlock),
+		MercuryOpts:            mercOpts,
 	}
 }
