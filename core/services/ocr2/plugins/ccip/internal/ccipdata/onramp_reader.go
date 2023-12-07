@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -43,11 +42,4 @@ type OnRampReader interface {
 	Address() (common.Address, error)
 	GetDynamicConfig() (OnRampDynamicConfig, error)
 	RegisterFilters(qopts ...pg.QOpt) error
-}
-
-func logsConfirmations(finalized bool) logpoller.Confirmations {
-	if finalized {
-		return logpoller.Finalized
-	}
-	return logpoller.Confirmations(0)
 }
