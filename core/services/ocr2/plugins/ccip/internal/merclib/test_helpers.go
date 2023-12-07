@@ -127,54 +127,18 @@ func (x *xxxTestOnlyMercuryHandlerWithSignedReports) ServeHTTP(w http.ResponseWr
 		expiresTs = obsTs + 3600
 	)
 	for _, feedID := range feedIDs {
-		r, err := EncodeReportDataV3(feedID, obsTs, obsTs, big.NewInt(0), big.NewInt(0),
-			expiresTs, x.prices[feedID], x.prices[feedID], x.prices[feedID])
-		if err != nil {
-			w.Write([]byte(fmt.Sprintf("failed to encode report data: %s", err)))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
 		configDigest, ok := x.feedIDToConfigDigest[feedID]
 		if !ok {
 			w.Write([]byte(fmt.Sprintf("missing config digest for feedID %s", feedID)))
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		rawCtx, reportCtx := createReportContext(configDigest)
-		x.t.Log("rawCtx[0]:", hexutil.Encode(rawCtx[0][:]),
-			"rawCtx[1]:", hexutil.Encode(rawCtx[1][:]),
-			"rawCtx[2]:", hexutil.Encode(rawCtx[2][:]),
-			"reportCtx.ExtraHash", hexutil.Encode(reportCtx.ExtraHash[:]),
-			"reportCtx.ReportTimestamp.ConfigDigest", hexutil.Encode(reportCtx.ReportTimestamp.ConfigDigest[:]),
-			"reportCtx.ReportTimestamp.Epoch", reportCtx.ReportTimestamp.Epoch,
-			"reportCtx.ReportTimestamp.Round", reportCtx.ReportTimestamp.Round,
-			"reportBlob", hexutil.Encode(r))
-		rawRs, rawSs, rawVs, err := signReport(r, x.ocr2Keys, reportCtx, x.f)
-		if err != nil {
-			w.Write([]byte(fmt.Sprintf("failed to sign report: %s", err)))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		x.t.Log("rawRs:", func() []string {
-			var result []string
-			for _, r := range rawRs {
-				result = append(result, hexutil.Encode(r[:]))
-			}
-			return result
-		}(), "rawSs:", func() []string {
-			var result []string
-			for _, s := range rawSs {
-				result = append(result, hexutil.Encode(s[:]))
-			}
-			return result
-		}(), "rawVs:", hexutil.Encode(rawVs[:]))
-		fullReport, err := EncodeFullReport(rawCtx, r, rawRs, rawSs, rawVs)
+		fullReport, err := generateReport(feedID, configDigest, obsTs, expiresTs, x.prices[feedID], x.ocr2Keys, x.f)
 		if err != nil {
-			w.Write([]byte(fmt.Sprintf("failed to encode full report: %s", err)))
+			w.Write([]byte(fmt.Sprintf("failed to generate report: %s", err)))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		x.t.Log("full report:", hexutil.Encode(fullReport))
 		reports = append(reports, MercuryV03Report{
 			FeedID:                hexutil.Encode(feedID[:]),
 			ValidFromTimestamp:    obsTs,
@@ -193,6 +157,33 @@ func (x *xxxTestOnlyMercuryHandlerWithSignedReports) ServeHTTP(w http.ResponseWr
 	}
 	w.Write(jsonified)
 	w.Header().Add("Content-Type", "application/json")
+}
+
+func generateReport(
+	feedID, configDigest [32]byte,
+	obsTs uint32,
+	expiresTs uint32,
+	price *big.Int,
+	ocr2Keys []ocr2key.KeyBundle,
+	f int) ([]byte, error) {
+	r, err := EncodeReportDataV3(feedID, obsTs, obsTs, big.NewInt(0), big.NewInt(0),
+		expiresTs, price, price, price)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode report data: %s", err)
+	}
+
+	rawCtx, reportCtx := createReportContext(configDigest)
+	rawRs, rawSs, rawVs, err := signReport(r, ocr2Keys, reportCtx, f)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign report: %s", err)
+	}
+
+	fullReport, err := EncodeFullReport(rawCtx, r, rawRs, rawSs, rawVs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode full report: %s", err)
+	}
+
+	return fullReport, nil
 }
 
 func createReportContext(configDigest [32]byte) (rawCtx [3][32]byte, ctx ocrtypes.ReportContext) {
