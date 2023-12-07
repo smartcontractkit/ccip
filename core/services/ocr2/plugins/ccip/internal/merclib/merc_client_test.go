@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	evmclient_mocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
@@ -40,10 +39,10 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Body:       reader,
 		}, nil)
-		evmClient := &evmclient_mocks.Client{}
-		evmClient.
-			On("CallContract", mock.Anything, mock.AnythingOfType("ethereum.CallMsg"), mock.Anything).
-			Return(nil, nil)
+		defer doer.AssertExpectations(tt)
+		mockVerifier := &mocks.ReportVerifier{}
+		mockVerifier.On("VerifyReports", mock.Anything, mock.Anything).Return(nil)
+		defer mockVerifier.AssertExpectations(tt)
 		mercClient := merclib.NewMercuryClient(
 			&models.MercuryCredentials{
 				Username: "testusername",
@@ -51,11 +50,7 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 				URL:      "https://testmercury.com",
 			},
 			doer,
-			logger.TestLogger(t),
-			evmClient,
-			testutils.NewAddress(),
-			testutils.NewAddress(),
-			testutils.NewAddress())
+			logger.TestLogger(t), mockVerifier)
 		rwcs, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
 		require.NoError(tt, err)
 		actualPrices := make(map[[32]byte]*big.Int)
@@ -72,7 +67,8 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 		}
 		doer := &mocks.Doer{}
 		doer.On("Do", mock.Anything).Return(nil, errors.New("http error"))
-		evmClient := &evmclient_mocks.Client{}
+		defer doer.AssertExpectations(tt)
+		mockVerifier := &mocks.ReportVerifier{}
 		mercClient := merclib.NewMercuryClient(
 			&models.MercuryCredentials{
 				Username: "testusername",
@@ -81,10 +77,7 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			},
 			doer,
 			logger.TestLogger(t),
-			evmClient,
-			testutils.NewAddress(),
-			testutils.NewAddress(),
-			testutils.NewAddress())
+			mockVerifier)
 		_, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
 		require.Error(tt, err)
 	})
@@ -99,7 +92,8 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			StatusCode: http.StatusInternalServerError,
 			Body:       io.NopCloser(bytes.NewReader([]byte("blah"))),
 		}, nil)
-		evmClient := &evmclient_mocks.Client{}
+		defer doer.AssertExpectations(tt)
+		mockVerifier := &mocks.ReportVerifier{}
 		mercClient := merclib.NewMercuryClient(
 			&models.MercuryCredentials{
 				Username: "testusername",
@@ -108,10 +102,7 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			},
 			doer,
 			logger.TestLogger(t),
-			evmClient,
-			testutils.NewAddress(),
-			testutils.NewAddress(),
-			testutils.NewAddress())
+			mockVerifier)
 		_, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
 		require.Error(tt, err)
 	})
@@ -126,7 +117,7 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Body:       io.NopCloser(bytes.NewReader([]byte("invalid json"))),
 		}, nil)
-		evmClient := &evmclient_mocks.Client{}
+		mockVerifier := &mocks.ReportVerifier{}
 		mercClient := merclib.NewMercuryClient(
 			&models.MercuryCredentials{
 				Username: "testusername",
@@ -135,10 +126,7 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			},
 			doer,
 			logger.TestLogger(t),
-			evmClient,
-			testutils.NewAddress(),
-			testutils.NewAddress(),
-			testutils.NewAddress())
+			mockVerifier)
 		_, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
 		require.Error(tt, err)
 	})
@@ -160,10 +148,10 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Body:       reader,
 		}, nil)
-		evmClient := &evmclient_mocks.Client{}
-		evmClient.
-			On("CallContract", mock.Anything, mock.AnythingOfType("ethereum.CallMsg"), mock.Anything).
-			Return(nil, errors.New("call error"))
+		defer doer.AssertExpectations(tt)
+		mockVerifier := &mocks.ReportVerifier{}
+		mockVerifier.On("VerifyReports", mock.Anything, mock.Anything).Return(errors.New("verification error"))
+		defer mockVerifier.AssertExpectations(tt)
 		mercClient := merclib.NewMercuryClient(
 			&models.MercuryCredentials{
 				Username: "testusername",
@@ -172,10 +160,7 @@ func TestMercClient_BatchFetchPrices(t *testing.T) {
 			},
 			doer,
 			logger.TestLogger(t),
-			evmClient,
-			testutils.NewAddress(),
-			testutils.NewAddress(),
-			testutils.NewAddress())
+			mockVerifier)
 		_, err := mercClient.BatchFetchPrices(testutils.Context(t), feedIDs)
 		require.Error(tt, err)
 	})

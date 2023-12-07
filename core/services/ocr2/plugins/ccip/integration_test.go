@@ -552,6 +552,7 @@ func TestIntegration_CCIP_Mercury_RealVerifier(t *testing.T) {
 			feedIDUSDPerLink: usdPerLink,
 			feedIDUSDPerEth:  usdPerEth,
 		}
+		sharedSecret = "password"
 	)
 
 	// create 4 OCR keys for the 4 mercury signers
@@ -564,13 +565,14 @@ func TestIntegration_CCIP_Mercury_RealVerifier(t *testing.T) {
 	}
 	verifierProxy, feeManagerAddress, feedIDToConfigDigest := ccipTH.DeployMercuryVerifier(t, mercuryOCR2Keys, [][32]byte{feedIDUSDPerLink, feedIDUSDPerEth})
 
-	mercuryHandler := merclib.XXXTestOnlyMercuryHandlerWithReportSigning(t, prices, mercuryOCR2Keys, feedIDToConfigDigest, 1)
+	mercuryHandler := merclib.XXXTestOnlyMercuryHandlerWithReportSigning(t, prices, mercuryOCR2Keys, feedIDToConfigDigest, 1, sharedSecret)
 	mercuryServer := httptest.NewServer(mercuryHandler)
 	defer mercuryServer.Close()
 
 	_, ocr2KeyBundles := ccipTH.SetUpNodesAndJobs(t, "", 19399, &integrationtesthelpers.MercuryOpts{
 		VerifierAddress: verifierProxy,
 		MercuryURL:      mercuryServer.URL,
+		SharedSecret:    sharedSecret,
 	})
 
 	// set 100% discounts on the CCIP nop ocr2 onchain keys

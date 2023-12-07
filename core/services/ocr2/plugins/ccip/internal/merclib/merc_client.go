@@ -2,27 +2,18 @@ package merclib
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"slices"
-	"strings"
-	"time"
 
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
-	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/llo-feeds/generated/verifier_proxy"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 const (
@@ -62,16 +53,20 @@ type Doer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// ReportVerifier is an interface for verifying mercury reports
+//
+//go:generate mockery --name ReportVerifier --output ./mocks/ --case=underscore
+type ReportVerifier interface {
+	// VerifyReports returns an error if any of the reports are invalid
+	// or there was an error verifying them
+	VerifyReports(ctx context.Context, signedReports [][]byte) error
+}
+
 type mercClient struct {
-	ethClient            evmclient.Client
-	verifierProxyAddress common.Address
-	wrappedNativeAddress common.Address
-	// fromAddress is the address that is used to call the verifier proxy contract
-	// in practice this is the OCR2 onchain key as an ethereum address
-	fromAddress common.Address
-	creds       *models.MercuryCredentials
-	h           Doer
-	lggr        logger.Logger
+	verifier ReportVerifier
+	creds    *models.MercuryCredentials
+	h        Doer
+	lggr     logger.Logger
 }
 
 // MercuryClient is an interface for fetching offchain token data from Mercury
@@ -87,18 +82,12 @@ func NewMercuryClient(
 	creds *models.MercuryCredentials,
 	doer Doer,
 	lggr logger.Logger,
-	ethClient evmclient.Client,
-	fromAddress,
-	verifierProxyAddress,
-	wrappedNativeAddress common.Address) *mercClient {
+	verifier ReportVerifier) *mercClient {
 	return &mercClient{
-		creds:                creds,
-		h:                    doer,
-		lggr:                 lggr,
-		ethClient:            ethClient,
-		verifierProxyAddress: verifierProxyAddress,
-		wrappedNativeAddress: wrappedNativeAddress,
-		fromAddress:          fromAddress,
+		creds:    creds,
+		h:        doer,
+		lggr:     lggr,
+		verifier: verifier,
 	}
 }
 
@@ -113,7 +102,7 @@ func (m *mercClient) BatchFetchPrices(ctx context.Context, fids [][32]byte) ([]*
 	// sort the feed IDs for deterministic batching
 	slices.Sort(feedIDs)
 
-	req, err := m.generateRequest(ctx, feedIDs)
+	req, err := GenerateBatchRequest(ctx, feedIDs, m.creds.URL, m.creds.Username, m.creds.Password)
 	if err != nil {
 		return nil, fmt.Errorf("generating request: %w", err)
 	}
@@ -150,7 +139,7 @@ func (m *mercClient) BatchFetchPrices(ctx context.Context, fids [][32]byte) ([]*
 		reportsWithContext = append(reportsWithContext, rwc)
 	}
 
-	err = m.verifyReports(ctx, func() (sr [][]byte) {
+	err = m.verifier.VerifyReports(ctx, func() (sr [][]byte) {
 		for _, rwc := range reportsWithContext {
 			sr = append(sr, rwc.RawFullReport)
 		}
@@ -161,90 +150,4 @@ func (m *mercClient) BatchFetchPrices(ctx context.Context, fids [][32]byte) ([]*
 	}
 
 	return reportsWithContext, nil
-}
-
-func (m *mercClient) generateRequest(ctx context.Context, feedIDs []string) (*http.Request, error) {
-	// mostly cribbed from streams_lookup.go
-	tsNow := time.Now().UTC().UnixMilli()
-	params := fmt.Sprintf("?%s=%s&%s=%d",
-		// feedIDs param
-		"feedIDs", strings.Join(feedIDs, ","),
-		// timestamp param
-		"timestamp", tsNow,
-	)
-	reqURL := fmt.Sprintf("%s%s%s",
-		cleanMercURL(m.creds.URL),
-		MercuryBatchPath,
-		params,
-	)
-	m.lggr.Debugw("generating request URL",
-		"mercuryUsername", m.creds.Username,
-		"feedIDs", feedIDs,
-		"reqURL", reqURL)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	sig := m.generateHMAC(http.MethodGet, MercuryBatchPath+params, nil, m.creds.Username, m.creds.Password, tsNow)
-	req.Header.Set("Authorization", m.creds.Username)
-	req.Header.Set("X-Authorization-Timestamp", fmt.Sprintf("%d", tsNow))
-	req.Header.Set("X-Authorization-Signature-SHA256", sig)
-	req.Header.Set("Content-Type", "application/json")
-	// TODO: check if we should have another header for CCIP specifically, similar to automation
-
-	return req, nil
-}
-
-func (m *mercClient) generateHMAC(method, path string, body []byte, clientId, secret string, ts int64) (sig string) {
-	bodyHash := sha256.New()
-	bodyHash.Write(body)
-	hashString := fmt.Sprintf("%s %s %s %s %d",
-		method,
-		path,
-		hex.EncodeToString(bodyHash.Sum(nil)),
-		clientId,
-		ts)
-	signedMessage := hmac.New(sha256.New, []byte(secret))
-	signedMessage.Write([]byte(hashString))
-	return hex.EncodeToString(signedMessage.Sum(nil))
-}
-
-func (m *mercClient) verifyReports(ctx context.Context, signedReports [][]byte) error {
-	// payment options don't really matter since an eth_call won't pay anything in the end
-	// NOTE: the fromAddress passed into the client must have 100% discount on the mercury fee manager contract.
-	// need to abi-encode the address first before passing it in because the fee manager uses abi.decode()
-	// and expects 32 bytes
-	encodedAddr, err := utils.ABIEncode(`[{ "type": "address" }]`, m.wrappedNativeAddress)
-	if err != nil {
-		return fmt.Errorf("failed to abi encode address '%s': %w", m.wrappedNativeAddress.String(), err)
-	}
-	calldata, err := verifierProxyABI.Pack("verifyBulk", signedReports, encodedAddr)
-	if err != nil {
-		return fmt.Errorf("failed to pack verifyBulk: %w", err)
-	}
-	callMsg := ethereum.CallMsg{
-		From:     m.fromAddress,
-		Data:     calldata,
-		To:       &m.verifierProxyAddress,
-		GasPrice: nil,
-		Gas:      0,
-	}
-	m.lggr.Debugw("calling verifier contract",
-		"verifierProxyAddress", m.verifierProxyAddress.String(), "calldata", hexutil.Encode(calldata), "callMsg", callMsg)
-	_, err = m.ethClient.CallContract(ctx, callMsg, nil)
-	if err != nil {
-		return fmt.Errorf("failed to call verifier contract at %s: %w, calldata: %s", m.verifierProxyAddress.String(), err, hexutil.Encode(calldata))
-	}
-
-	// simulation passing means verification succeeded
-	return nil
-}
-
-func cleanMercURL(url string) string {
-	if !strings.HasSuffix(url, "/") {
-		url += "/"
-	}
-	return url
 }

@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +24,8 @@ func XXXTestOnlyMercuryHandlerWithReportSigning(
 	prices map[[32]byte]*big.Int,
 	ocr2KeyBundles []ocr2key.KeyBundle,
 	feedIDToConfigDigest map[[32]byte][32]byte,
-	f int) http.Handler {
+	f int,
+	sharedSecret string) http.Handler {
 	mux := http.NewServeMux()
 	handler := &xxxTestOnlyMercuryHandlerWithSignedReports{
 		ocr2Keys:             ocr2KeyBundles,
@@ -31,6 +33,7 @@ func XXXTestOnlyMercuryHandlerWithReportSigning(
 		t:                    t,
 		prices:               prices,
 		f:                    f,
+		sharedSecret:         sharedSecret,
 	}
 	mux.Handle(MercuryBatchPath, handler)
 	return mux
@@ -42,6 +45,7 @@ type xxxTestOnlyMercuryHandlerWithSignedReports struct {
 	t                    *testing.T
 	prices               map[[32]byte]*big.Int
 	f                    int
+	sharedSecret         string
 }
 
 func (x *xxxTestOnlyMercuryHandlerWithSignedReports) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -82,6 +86,12 @@ func (x *xxxTestOnlyMercuryHandlerWithSignedReports) ServeHTTP(w http.ResponseWr
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	authTs, err := strconv.ParseInt(authorizationTimestamp, 10, 64)
+	if err != nil {
+		w.Write([]byte(fmt.Sprintf("invalid X-Authorization-Timestamp header: %s", err)))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	authorizationSignature := r.Header.Get("X-Authorization-Signature-SHA256")
 	if authorizationSignature == "" {
 		w.Write([]byte("missing X-Authorization-Signature-SHA256 header"))
@@ -91,6 +101,20 @@ func (x *xxxTestOnlyMercuryHandlerWithSignedReports) ServeHTTP(w http.ResponseWr
 	username := r.Header.Get("Authorization")
 	if username == "" {
 		w.Write([]byte("missing Authorization header"))
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	hmacString := GenerateHMAC(
+		http.MethodGet,
+		r.URL.RequestURI(),
+		[]byte(""),
+		username,
+		authTs,
+		x.sharedSecret,
+		"testserver")
+	if hmacString != authorizationSignature {
+		w.Write([]byte(fmt.Sprintf("invalid signature, expected '%s' got '%s'", hmacString, authorizationSignature)))
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}

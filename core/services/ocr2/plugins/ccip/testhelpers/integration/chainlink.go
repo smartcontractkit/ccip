@@ -310,7 +310,7 @@ func setupNodeCCIP(
 			s.Mercury.Credentials["ccip_commit"] = configv2.MercuryCredentials{
 				URL:      models.MustSecretURL(mercOpts.MercuryURL),
 				Username: models.NewSecret("ccip_commit"),
-				Password: models.NewSecret("password"),
+				Password: models.NewSecret(mercOpts.SharedSecret),
 			}
 		}
 	})
@@ -441,6 +441,7 @@ func createConfigV2Chain(chainId *big.Int) *v2.EVMConfig {
 type MercuryOpts struct {
 	MercuryURL      string
 	VerifierAddress common.Address
+	SharedSecret    string
 }
 
 type CCIPIntegrationTestHarness struct {
