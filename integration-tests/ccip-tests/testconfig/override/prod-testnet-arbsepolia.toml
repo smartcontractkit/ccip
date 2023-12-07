@@ -1,0 +1,78 @@
+[CCIP]
+[CCIP.Deployments]
+Data = """
+{
+    "lane_configs": {
+      "Arbitrum Sepolia": {
+        "is_native_fee_token": true,
+        "fee_token": "0xb1D4538B4571d411F07960EF2838Ce337FE1E80E",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
+        "arm": "0x5ef7a726fd21fd9d77d34e3c56cfdd8691f7f0ac",
+        "router": "0x2a9c5afb0d0e4bab2bcdae109ec4b0c4be15a165",
+        "price_registry": "0x89d5b13908b9063abcc6791dc724bf7b7c93634c",
+        "wrapped_native": "0xE591bf0A0CF924A0674d7792db046B23CEbF5f34",
+        "src_contracts": {
+          "Sepolia Testnet": {
+            "on_ramp": "0x4205e1ca0202a248a5d42f5975a8fe56f3e302e9",
+            "deployed_at": 11111111
+          }
+        },
+        "dest_contracts": {
+          "Sepolia Testnet": {
+            "off_ramp": "0x1c71f141b4630ebe52d6af4894812960abe207eb",
+            "commit_store": "0xab0c8ba51e7fa3e5693a4fbb39473520fd85d173",
+            "receiver_dapp": "0x5fD09c34fddeBEa3266E0dAd616A5657b23fE0aA"
+          }
+        }
+      },
+      "Sepolia Testnet": {
+        "is_native_fee_token": true,
+        "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
+        "arm": "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
+        "router": "0x0bf3de8c5d3e8a2b34d2beeb17abfcebaf363a59",
+        "price_registry": "0x9ef7d57a4ea30b9e37794e55b0c75f2a70275dcc",
+        "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+        "src_contracts": {
+          "Arbitrum Sepolia": {
+            "on_ramp": "0xe4dd3b16e09c016402585a8adfdb4a18f772a07e",
+            "deployed_at": 11111111
+          }
+        },
+        "dest_contracts": {
+          "Arbitrum Sepolia": {
+            "off_ramp": "0xf18896ab20a09a29e64fdeba99fdb8ec328f43b1",
+            "commit_store": "0x93ff9dd39dc01eac1fc4d2c9211d95ee458cab94",
+            "receiver_dapp": "0x5fD09c34fddeBEa3266E0dAd616A5657b23fE0aA"
+          }
+        }
+      }
+    }
+  }
+"""
+
+[CCIP.Groups.load]
+NetworkPairs = ['SEPOLIA,OPTIMISM_GOERLI','SEPOLIA,POLYGON_MUMBAI','AVALANCHE_FUJI,SEPOLIA','SEPOLIA,BASE_GOERLI','SEPOLIA,BSC_TESTNET','SEPOLIA,WEMIX_TESTNET','AVALANCHE_FUJI,OPTIMISM_GOERLI','AVALANCHE_FUJI,POLYGON_MUMBAI','AVALANCHE_FUJI,BSC_TESTNET','AVALANCHE_FUJI,BASE_GOERLI','OPTIMISM_GOERLI,BASE_GOERLI','OPTIMISM_GOERLI,POLYGON_MUMBAI','BSC_TESTNET,POLYGON_MUMBAI','BSC_TESTNET,BASE_GOERLI','WEMIX_TESTNET,KROMA_SEPOLIA']
+MsgType = 'WithoutToken'
+PhaseTimeout = '50m'
+TestDuration = '2h'
+ExistingDeployment = true
+RequestPerUnitTime = [1]
+TimeUnit = '5m'
+NoOfTokensPerChain = 1
+NoOfTokensInMsg = 1
+AmountPerToken = 1
+ExistingEnv = 'prod-testnet-2.7.1-ccip1.2.1-beta'
+
+[CCIP.Groups.smoke]
+MsgType = 'WithoutToken'
+NetworkPairs = ['ARBITRUM_SEPOLIA,SEPOLIA']
+# NetworkPairs = ['SEPOLIA,OPTIMISM_GOERLI','SEPOLIA,POLYGON_MUMBAI','AVALANCHE_FUJI,SEPOLIA','SEPOLIA,BASE_GOERLI','SEPOLIA,BSC_TESTNET','SEPOLIA,WEMIX_TESTNET','AVALANCHE_FUJI,OPTIMISM_GOERLI','AVALANCHE_FUJI,POLYGON_MUMBAI','AVALANCHE_FUJI,BSC_TESTNET','AVALANCHE_FUJI,BASE_GOERLI','OPTIMISM_GOERLI,BASE_GOERLI','OPTIMISM_GOERLI,POLYGON_MUMBAI','BSC_TESTNET,POLYGON_MUMBAI','BSC_TESTNET,BASE_GOERLI','WEMIX_TESTNET,KROMA_SEPOLIA']
+PhaseTimeout = '50m'
+LocalCluster = false
+ExistingDeployment = true
+ReuseContracts = true
+NoOfTokensPerChain = 1
+NoOfTokensInMsg = 1
