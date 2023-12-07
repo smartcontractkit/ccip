@@ -173,7 +173,12 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	} else {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, fee)
 	}
-
+	err = sourceCCIP.Common.ChainClient.MarkTxAsSentOnL2(sendTx)
+	if err != nil {
+		res.Error = err.Error()
+		res.Failed = true
+		return res
+	}
 	if err != nil {
 		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
 		res.Error = fmt.Sprintf("ccip-send tx error %+v for msg ID %d", err, msgSerialNo)

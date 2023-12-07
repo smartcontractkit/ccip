@@ -156,14 +156,20 @@ func MultiCallCCIP(
 			callData = append(callData, data)
 			allValue.Add(allValue, msg.Fee)
 		}
+
 		opts, err := evmClient.TransactionOpts(evmClient.GetDefaultWallet())
 		if err != nil {
 			return nil, err
 		}
 		// the value of transactionOpts is the sum of the value of all msg, which is the total fee of all ccip-sends
 		opts.Value = allValue
+
 		// call aggregate3Value to group all msg call data and send them in a single transaction
 		tx, err := boundContract.Transact(opts, "aggregate3Value", callData)
+		if err != nil {
+			return nil, err
+		}
+		err = evmClient.MarkTxAsSentOnL2(tx)
 		if err != nil {
 			return nil, err
 		}
