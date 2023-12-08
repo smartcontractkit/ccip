@@ -19,6 +19,7 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
+	"github.com/smartcontractkit/sqlx"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
@@ -47,7 +48,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/csakey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
+	ksMocks "github.com/smartcontractkit/chainlink/v2/core/services/keystore/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -316,7 +319,12 @@ func setupNodeCCIP(
 	// signs 1337 see https://github.com/smartcontractkit/chainlink-ccip/blob/a24dd436810250a458d27d8bb3fb78096afeb79c/core/services/ocr2/plugins/ccip/testhelpers/simulated_backend.go#L35
 	sourceClient := client.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := client.NewSimulatedBackendClient(t, destChain, destChainID)
-	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config.Database())
+	csaKeyStore := ksMocks.NewCSA(t)
+
+	key, err := csakey.NewV2()
+	csaKeyStore.On("GetAll").Return([]csakey.KeyV2{key}, nil)
+	keyStore := NewKsa(db, lggr, csaKeyStore, config)
+
 	simEthKeyStore := testhelpers.EthKeyStoreSim{
 		ETHKS: keyStore.Eth(),
 		CSAKS: keyStore.CSA(),
@@ -768,4 +776,20 @@ func DecodeExecOnChainConfig(encoded []byte) (ccipdata.ExecOnchainConfigV1_2_0, 
 		return onchainConfig, err
 	}
 	return onchainConfig, nil
+}
+
+type ksa struct {
+	keystore.Master
+	csa keystore.CSA
+}
+
+func (k *ksa) CSA() keystore.CSA {
+	return k.csa
+}
+
+func NewKsa(db *sqlx.DB, lggr logger.Logger, csa keystore.CSA, config chainlink.GeneralConfig) *ksa {
+	return &ksa{
+		Master: keystore.New(db, utils.FastScryptParams, lggr, config.Database()),
+		csa:    csa,
+	}
 }
