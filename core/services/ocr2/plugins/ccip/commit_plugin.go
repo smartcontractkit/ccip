@@ -85,7 +85,7 @@ func parseJobSpec(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet e
 		nil,
 		nil,
 	)
-	onRampReader, err := sourceServiceProvider.NewOnRampReader(context.Background(), staticConfig.OnRamp)
+	onRampReader, err := sourceServiceProvider.NewOnRampReader(context.Background(), staticConfig.OnRamp, qopts...)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -154,13 +154,13 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 	if _, err := sourceServiceProvider.NewPriceGetter(ctx); err != nil {
 		return nil, fmt.Errorf("init price getter: %w", err)
 	}
-	if _, err := sourceServiceProvider.NewOnRampReader(ctx, pluginConfig.OnRampAddress); err != nil {
+	if _, err := sourceServiceProvider.NewOnRampReader(ctx, pluginConfig.OnRampAddress, qopts...); err != nil {
 		return nil, fmt.Errorf("init on ramp reader: %w", err)
 	}
-	if _, err := destServiceProvider.NewCommitStoreReader(ctx, pluginConfig.CommitStoreAddress); err != nil {
+	if _, err := destServiceProvider.NewCommitStoreReader(ctx, pluginConfig.CommitStoreAddress, qopts...); err != nil {
 		return nil, fmt.Errorf("init commit store reader: %w", err)
 	}
-	if _, err := destServiceProvider.NewOffRampReader(ctx, pluginConfig.OffRampAddress); err != nil {
+	if _, err := destServiceProvider.NewOffRampReader(ctx, pluginConfig.OffRampAddress, qopts...); err != nil {
 		return nil, fmt.Errorf("init off ramp reader: %w", err)
 	}
 

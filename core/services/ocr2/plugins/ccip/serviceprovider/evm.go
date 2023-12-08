@@ -142,7 +142,7 @@ func (c *EvmServiceProvider) NewPriceRegistryReader(ctx context.Context, addr co
 	return c.priceRegistryReader, nil
 }
 
-func (c *EvmServiceProvider) NewOffRampReader(ctx context.Context, addr common.Address) (ccipdata.OffRampReader, error) {
+func (c *EvmServiceProvider) NewOffRampReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.OffRampReader, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -164,7 +164,7 @@ func (c *EvmServiceProvider) NewOffRampReader(ctx context.Context, addr common.A
 		return nil, err
 	}
 
-	if err := offRampReader.RegisterFilters(pg.WithParentCtx(ctx)); err != nil {
+	if err := offRampReader.RegisterFilters(append(qopts, pg.WithParentCtx(ctx))...); err != nil {
 		return nil, err
 	}
 
@@ -179,7 +179,7 @@ func (c *EvmServiceProvider) NewOffRampReader(ctx context.Context, addr common.A
 	return c.offRampReader, nil
 }
 
-func (c *EvmServiceProvider) NewCommitStoreReader(ctx context.Context, addr common.Address) (ccipdata.CommitStoreReader, error) {
+func (c *EvmServiceProvider) NewCommitStoreReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.CommitStoreReader, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -201,7 +201,7 @@ func (c *EvmServiceProvider) NewCommitStoreReader(ctx context.Context, addr comm
 		return nil, err
 	}
 
-	if err := commitStoreReader.RegisterFilters(pg.WithParentCtx(ctx)); err != nil {
+	if err := commitStoreReader.RegisterFilters(append(qopts, pg.WithParentCtx(ctx))...); err != nil {
 		return nil, err
 	}
 
@@ -216,7 +216,7 @@ func (c *EvmServiceProvider) NewCommitStoreReader(ctx context.Context, addr comm
 	return c.commitStoreReader, nil
 }
 
-func (c *EvmServiceProvider) NewOnRampReader(ctx context.Context, addr common.Address) (ccipdata.OnRampReader, error) {
+func (c *EvmServiceProvider) NewOnRampReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.OnRampReader, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -242,7 +242,7 @@ func (c *EvmServiceProvider) NewOnRampReader(ctx context.Context, addr common.Ad
 		return nil, err
 	}
 
-	if err := onRampReader.RegisterFilters(pg.WithParentCtx(ctx)); err != nil {
+	if err := onRampReader.RegisterFilters(append(qopts, pg.WithParentCtx(ctx))...); err != nil {
 		return nil, err
 	}
 

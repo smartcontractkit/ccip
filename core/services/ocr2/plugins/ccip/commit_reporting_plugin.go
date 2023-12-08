@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -82,13 +83,13 @@ type CommitPluginGenericServiceProvider interface {
 }
 
 type CommitPluginSourceServiceProvider interface {
-	NewOnRampReader(ctx context.Context, addr common.Address) (ccipdata.OnRampReader, error)
+	NewOnRampReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.OnRampReader, error)
 }
 
 type CommitPluginDestServiceProvider interface {
 	NewPriceRegistryReader(ctx context.Context, addr common.Address) (ccipdata.PriceRegistryReader, error)
-	NewOffRampReader(ctx context.Context, addr common.Address) (ccipdata.OffRampReader, error)
-	NewCommitStoreReader(ctx context.Context, addr common.Address) (ccipdata.CommitStoreReader, error)
+	NewOffRampReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.OffRampReader, error)
+	NewCommitStoreReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.CommitStoreReader, error)
 }
 
 type CommitReportingPluginFactory struct {
