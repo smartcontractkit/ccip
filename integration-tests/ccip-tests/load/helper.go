@@ -31,7 +31,6 @@ type ChaosConfig struct {
 type loadArgs struct {
 	t                *testing.T
 	lggr             zerolog.Logger
-	ctx              context.Context
 	schedules        []*wasp.Segment
 	RunnerWg         *errgroup.Group // to wait on individual load generators run
 	TestCfg          *testsetups.CCIPTestConfig
@@ -247,12 +246,11 @@ func (l *loadArgs) TriggerLoadBySource() {
 }
 
 func NewLoadArgs(t *testing.T, lggr zerolog.Logger, parent context.Context, chaosExps ...ChaosConfig) *loadArgs {
-	wg, ctx := errgroup.WithContext(parent)
+	wg, _ := errgroup.WithContext(parent)
 	return &loadArgs{
 		t:         t,
 		lggr:      lggr,
 		RunnerWg:  wg,
-		ctx:       ctx,
 		TestCfg:   testsetups.NewCCIPTestConfig(t, lggr, testconfig.Load),
 		ChaosExps: chaosExps,
 	}
