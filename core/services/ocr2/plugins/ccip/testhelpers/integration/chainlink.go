@@ -19,11 +19,11 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/sqlx"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	types4 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/sqlx"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"k8s.io/utils/pointer"
@@ -45,6 +45,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger/audit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	feeds2 "github.com/smartcontractkit/chainlink/v2/core/services/feeds"
+	feedsMocks "github.com/smartcontractkit/chainlink/v2/core/services/feeds/mocks"
+	pb "github.com/smartcontractkit/chainlink/v2/core/services/feeds/proto"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
@@ -60,8 +62,32 @@ import (
 	evmrelay "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
+
+const Spec = `
+type = "offchainreporting2"
+schemaVersion = 1
+name = "ccip-exec-1"
+externalJobID      = "67ffad71-d90f-4fe3-b4e4-494924b707fb"
+forwardingAllowed = false
+maxTaskDuration = "0s"
+contractID = "%s"
+contractConfigConfirmations = 1
+contractConfigTrackerPollInterval = "20s"
+ocrKeyBundleID = "%s"
+relay = "evm"
+pluginType = "ccip-execution"
+transmitterID = "%s"
+
+[relayConfig]
+chainID = 1_337
+
+[pluginConfig]
+destStartBlock = 54_107_661
+sourceStartBlock = 17_052_797
+`
 
 type Node struct {
 	App             chainlink.Application
@@ -462,35 +488,68 @@ func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobS
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) jobSpecProposal(t *testing.T, f func() (*ctfClient.OCR2TaskJobSpec, error)) feeds2.ProposeJobArgs {
+func (c *CCIPIntegrationTestHarness) jobSpecProposal(
+	t *testing.T,
+	f func() (*ctfClient.OCR2TaskJobSpec, error),
+	keyBundleID string,
+	transmitter string,
+
+) feeds2.ProposeJobArgs {
 	spec, err := f()
 	require.NoError(t, err)
 
-	rawSpec, err := toml.Marshal(&spec)
+	spec.OCR2OracleSpec.OCRKeyBundleID.SetValid(keyBundleID)
+	spec.OCR2OracleSpec.TransmitterID.SetValid(transmitter)
+
+	rawSpec, err := toml.Marshal(&spec.OCR2OracleSpec)
 	require.NoError(t, err)
+	fmt.Println(rawSpec)
+
+	s, err := spec.String()
+	require.NoError(t, err)
+	fmt.Println(s)
 
 	return feeds2.ProposeJobArgs{
-		FeedsManagerID: 0,
+		FeedsManagerID: 1,
 		RemoteUUID:     uuid.UUID{},
 		Multiaddrs:     nil,
-		Version:        0,
-		Spec:           string(rawSpec),
+		Version:        1,
+		Spec:           fmt.Sprintf(Spec, spec.OCR2OracleSpec.ContractID, keyBundleID, transmitter),
 	}
 }
 
 func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams) {
 	ctx := testutils.Context(t)
 
-	commitSpec := c.jobSpecProposal(t, jobParams.CommitJobSpec)
-	//execSpec := c.jobSpecProposal(t, jobParams.ExecutionJobSpec)
+	//commitSpec := c.jobSpecProposal(t, jobParams.CommitJobSpec)
 
 	for _, node := range c.Nodes {
-		feeds := node.App.GetFeedsService()
+		f := node.App.GetFeedsService()
 
-		id, err := feeds.ProposeJob(ctx, &commitSpec)
+		pkey, err := crypto.PublicKeyFromHex("aaf296b9252377d04ef51c1a5ed9640f82bd8cd31e2ac5895565b3c340a8f053")
 		require.NoError(t, err)
 
-		err = feeds.ApproveSpec(ctx, id, true)
+		m := feeds2.RegisterManagerParams{
+			Name:      "CCIP",
+			URI:       "http://localhost:8080",
+			PublicKey: *pkey,
+		}
+
+		execSpec := c.jobSpecProposal(t, jobParams.ExecutionJobSpec, node.KeyBundle.ID(), node.Transmitter.Hex())
+
+		id, err := f.RegisterManager(ctx, m)
+		require.NoError(t, err)
+		fmt.Println(id)
+
+		connManager := feedsMocks.NewConnectionsManager(t)
+		connManager.On("GetClient", mock.Anything).Return(NoopFeedsClient{}, nil)
+		connManager.On("Close").Return()
+		f.Unsafe_SetConnectionsManager(connManager)
+
+		id, err = f.ProposeJob(ctx, &execSpec)
+		require.NoError(t, err)
+
+		err = f.ApproveSpec(ctx, id, true)
 		require.NoError(t, err)
 	}
 }
@@ -792,4 +851,26 @@ func NewKsa(db *sqlx.DB, lggr logger.Logger, csa keystore.CSA, config chainlink.
 		Master: keystore.New(db, utils.FastScryptParams, lggr, config.Database()),
 		csa:    csa,
 	}
+}
+
+type NoopFeedsClient struct{}
+
+func (n NoopFeedsClient) ApprovedJob(ctx context.Context, in *pb.ApprovedJobRequest) (*pb.ApprovedJobResponse, error) {
+	return &pb.ApprovedJobResponse{}, nil
+}
+
+func (n NoopFeedsClient) Healthcheck(ctx context.Context, in *pb.HealthcheckRequest) (*pb.HealthcheckResponse, error) {
+	return &pb.HealthcheckResponse{}, nil
+}
+
+func (n NoopFeedsClient) UpdateNode(ctx context.Context, in *pb.UpdateNodeRequest) (*pb.UpdateNodeResponse, error) {
+	return &pb.UpdateNodeResponse{}, nil
+}
+
+func (n NoopFeedsClient) RejectedJob(ctx context.Context, in *pb.RejectedJobRequest) (*pb.RejectedJobResponse, error) {
+	return &pb.RejectedJobResponse{}, nil
+}
+
+func (n NoopFeedsClient) CancelledJob(ctx context.Context, in *pb.CancelledJobRequest) (*pb.CancelledJobResponse, error) {
+	return &pb.CancelledJobResponse{}, nil
 }
