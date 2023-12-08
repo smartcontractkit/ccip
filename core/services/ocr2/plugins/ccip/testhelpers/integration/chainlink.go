@@ -17,6 +17,7 @@ import (
 	types3 "github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
 	"github.com/onsi/gomega"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -42,6 +43,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/logger/audit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
+	feeds2 "github.com/smartcontractkit/chainlink/v2/core/services/feeds"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
@@ -276,6 +278,7 @@ func setupNodeCCIP(
 		c.Log.Level = &loglevel
 		c.Feature.CCIP = &trueRef
 		c.Feature.UICSAKeys = &trueRef
+		c.Feature.FeedsManager = &trueRef
 		c.OCR.Enabled = &falseRef
 		c.OCR.DefaultTransactionQueueDepth = pointer.Uint32(200)
 		c.OCR2.Enabled = &trueRef
@@ -448,6 +451,39 @@ func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobS
 	for _, node := range nodes {
 		node.AddJobsWithSpec(t, commitSpec)
 		node.AddJobsWithSpec(t, geExecutionSpec)
+	}
+}
+
+func (c *CCIPIntegrationTestHarness) jobSpecProposal(t *testing.T, f func() (*ctfClient.OCR2TaskJobSpec, error)) feeds2.ProposeJobArgs {
+	spec, err := f()
+	require.NoError(t, err)
+
+	rawSpec, err := toml.Marshal(&spec)
+	require.NoError(t, err)
+
+	return feeds2.ProposeJobArgs{
+		FeedsManagerID: 0,
+		RemoteUUID:     uuid.UUID{},
+		Multiaddrs:     nil,
+		Version:        0,
+		Spec:           string(rawSpec),
+	}
+}
+
+func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams) {
+	ctx := testutils.Context(t)
+
+	commitSpec := c.jobSpecProposal(t, jobParams.CommitJobSpec)
+	//execSpec := c.jobSpecProposal(t, jobParams.ExecutionJobSpec)
+
+	for _, node := range c.Nodes {
+		feeds := node.App.GetFeedsService()
+
+		id, err := feeds.ProposeJob(ctx, &commitSpec)
+		require.NoError(t, err)
+
+		err = feeds.ApproveSpec(ctx, id, true)
+		require.NoError(t, err)
 	}
 }
 
