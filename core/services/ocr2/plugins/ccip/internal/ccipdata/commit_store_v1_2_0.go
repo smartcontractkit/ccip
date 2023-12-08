@@ -58,6 +58,10 @@ func (c *CommitStoreV1_2_0) GetCommitStoreStaticConfig(ctx context.Context) (Com
 	}, nil
 }
 
+func (c *CommitStoreV1_2_0) Address() common.Address {
+	return c.address
+}
+
 func (c *CommitStoreV1_2_0) EncodeCommitReport(report CommitStoreReport) ([]byte, error) {
 	return encodeCommitReportV1_2_0(c.commitReportArgs, report)
 }

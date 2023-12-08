@@ -240,6 +240,10 @@ func (c *CommitStoreV1_0_0) Close(qopts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(c.lp, c.filters, qopts...)
 }
 
+func (c *CommitStoreV1_0_0) Address() common.Address {
+	return c.address
+}
+
 func (c *CommitStoreV1_0_0) parseReport(log types.Log) (*CommitStoreReport, error) {
 	repAccepted, err := c.commitStore.ParseReportAccepted(log)
 	if err != nil {
