@@ -3,6 +3,8 @@ package ccip
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math/big"
 	"net/url"
 	"strconv"
 
@@ -114,6 +116,11 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ExecPluginLabel)
 	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, ExecPluginLabel)
 
+	destChainSelector, err := chainselectors.SelectorFromChainId(uint64(destChainID))
+	if err != nil {
+		return nil, nil, fmt.Errorf("get chain %d selector: %w", destChainID, err)
+	}
+
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", pluginConfig,
 		"onRampAddress", offRampConfig.OnRamp,
@@ -129,7 +136,7 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 			sourcePriceRegistry:      sourcePriceRegistry,
 			sourceWrappedNativeToken: sourceWrappedNative,
 			destGasEstimator:         destChain.GasEstimator(),
-			destChainEVMID:           destChain.ID(),
+			destChainSelector:        destChainSelector,
 			tokenDataProviders:       tokenDataProviders,
 			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), execLggr, ExecPluginLabel),
 		}, &BackfillArgs{
@@ -157,7 +164,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 		return nil, err1
 	}
 
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, execPluginConfig.destChainEVMID)
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(execPluginConfig.destChainSelector))
 	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(execPluginConfig.lggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {

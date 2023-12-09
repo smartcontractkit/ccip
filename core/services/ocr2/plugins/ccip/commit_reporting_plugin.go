@@ -60,7 +60,7 @@ type CommitPluginStaticConfig struct {
 	// Dest
 	offRamp               ccipdata.OffRampReader
 	commitStore           ccipdata.CommitStoreReader
-	destChainEVMID        *big.Int // todo: this field is not initialized
+	destChainSelector     uint64
 	priceRegistryProvider ccipdataprovider.PriceRegistry
 	// Offchain
 	priceGetter pricegetter.PriceGetter

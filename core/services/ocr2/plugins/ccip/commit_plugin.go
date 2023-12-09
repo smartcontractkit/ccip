@@ -3,6 +3,7 @@ package ccip
 import (
 	"context"
 	"encoding/json"
+	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -110,6 +111,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			priceGetter:           pipelinePriceGetter,
 			sourceNative:          sourceNative,
 			sourceChainSelector:   staticConfig.SourceChainSelector,
+			destChainSelector:     staticConfig.ChainSelector,
 			commitStore:           commitStoreReader,
 			priceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), commitLggr, CommitPluginLabel),
 		}, &BackfillArgs{
@@ -139,7 +141,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainC
 		return nil, err1
 	}
 
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, pluginConfig.destChainEVMID)
+	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(pluginConfig.destChainSelector))
 	argsNoPlugin.Logger = relaylogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
 	oracle, err := libocr2.NewOracle(argsNoPlugin)
 	if err != nil {
