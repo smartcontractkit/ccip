@@ -131,12 +131,6 @@ func (c *EvmServiceProvider) NewPriceRegistryReader(ctx context.Context, addr co
 		return nil, err
 	}
 
-	if c.priceRegistryReader != nil {
-		if err := c.priceRegistryReader.Close(pg.WithParentCtx(ctx)); err != nil {
-			return nil, err
-		}
-	}
-
 	c.priceRegistryReader = observability.NewPriceRegistryReader(
 		priceRegistryReader, c.EC.ConfiguredChainID().Int64(), c.pluginLabel)
 	return c.priceRegistryReader, nil
@@ -168,12 +162,6 @@ func (c *EvmServiceProvider) NewOffRampReader(ctx context.Context, addr common.A
 		return nil, err
 	}
 
-	if c.offRampReader != nil {
-		if err := c.offRampReader.Close(pg.WithParentCtx(ctx)); err != nil {
-			return nil, err
-		}
-	}
-
 	c.offRampReader = observability.NewObservedOffRampReader(
 		offRampReader, c.EC.ConfiguredChainID().Int64(), c.pluginLabel)
 	return c.offRampReader, nil
@@ -203,12 +191,6 @@ func (c *EvmServiceProvider) NewCommitStoreReader(ctx context.Context, addr comm
 
 	if err := commitStoreReader.RegisterFilters(append(qopts, pg.WithParentCtx(ctx))...); err != nil {
 		return nil, err
-	}
-
-	if c.commitStoreReader != nil {
-		if err := c.commitStoreReader.Close(pg.WithParentCtx(ctx)); err != nil {
-			return nil, err
-		}
 	}
 
 	c.commitStoreReader = observability.NewObservedCommitStoreReader(
@@ -244,12 +226,6 @@ func (c *EvmServiceProvider) NewOnRampReader(ctx context.Context, addr common.Ad
 
 	if err := onRampReader.RegisterFilters(append(qopts, pg.WithParentCtx(ctx))...); err != nil {
 		return nil, err
-	}
-
-	if c.onRampReader != nil {
-		if err := c.onRampReader.Close(pg.WithParentCtx(ctx)); err != nil {
-			return nil, err
-		}
 	}
 
 	c.onRampReader = observability.NewObservedOnRampReader(
