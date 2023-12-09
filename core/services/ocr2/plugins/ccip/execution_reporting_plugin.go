@@ -18,7 +18,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
@@ -54,7 +53,6 @@ type ExecutionPluginStaticConfig struct {
 	sourcePriceRegistry      ccipdata.PriceRegistryReader
 	sourceWrappedNativeToken common.Address
 	destChainSelector        uint64
-	destGasEstimator         gas.EvmFeeEstimator // todo: this is evm specific
 	tokenDataProviders       map[common.Address]tokendata.Reader
 	priceRegistryProvider    ccipdataprovider.PriceRegistry
 }

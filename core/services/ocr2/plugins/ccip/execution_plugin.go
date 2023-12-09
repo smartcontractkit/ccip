@@ -135,7 +135,6 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 			offRampReader:            offRampReader,
 			sourcePriceRegistry:      sourcePriceRegistry,
 			sourceWrappedNativeToken: sourceWrappedNative,
-			destGasEstimator:         destChain.GasEstimator(),
 			destChainSelector:        destChainSelector,
 			tokenDataProviders:       tokenDataProviders,
 			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), execLggr, ExecPluginLabel),
