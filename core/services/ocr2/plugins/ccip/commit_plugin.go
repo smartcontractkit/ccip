@@ -33,7 +33,7 @@ type BackfillArgs struct {
 	sourceStartBlock, destStartBlock int64
 }
 
-func parseJobSpec(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) (
+func parseJobSpec(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer) (
 	logger.Logger, *serviceprovider.EvmServiceProvider, *serviceprovider.EvmServiceProvider, *CommitPluginStaticConfig, *BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, nil, nil, nil, nil, errors.New("spec is nil")
@@ -85,7 +85,7 @@ func parseJobSpec(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet e
 		nil,
 		nil,
 	)
-	onRampReader, err := sourceServiceProvider.NewOnRampReader(context.Background(), staticConfig.OnRamp, qopts...)
+	onRampReader, err := sourceServiceProvider.NewOnRampReader(context.Background(), staticConfig.OnRamp)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -145,31 +145,49 @@ func parseJobSpec(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet e
 func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	ctx := context.Background()
 
-	lggr, sourceServiceProvider, destServiceProvider, pluginConfig, backfillArgs, err := parseJobSpec(lggr, jb, pr, chainSet, qopts...)
+	lggr, sourceServiceProvider, destServiceProvider, pluginConfig, backfillArgs, err := parseJobSpec(lggr, jb, pr, chainSet)
 	if err != nil {
 		return nil, err
 	}
 
-	// preload the readers - ensures filters are registered
-	if _, err := sourceServiceProvider.NewPriceGetter(ctx); err != nil {
-		return nil, fmt.Errorf("init price getter: %w", err)
-	}
-	if _, err := sourceServiceProvider.NewOnRampReader(ctx, pluginConfig.OnRampAddress, qopts...); err != nil {
+	// preload the readers - and register their filters
+	onRampReader, err := sourceServiceProvider.NewOnRampReader(ctx, pluginConfig.OnRampAddress)
+	if err != nil {
 		return nil, fmt.Errorf("init on ramp reader: %w", err)
 	}
-	if _, err := destServiceProvider.NewCommitStoreReader(ctx, pluginConfig.CommitStoreAddress, qopts...); err != nil {
+	if err := onRampReader.RegisterFilters(qopts...); err != nil {
+		return nil, fmt.Errorf("register onRamp filters: %w", err)
+	}
+
+	commitStoreReader, err := destServiceProvider.NewCommitStoreReader(ctx, pluginConfig.CommitStoreAddress)
+	if err != nil {
 		return nil, fmt.Errorf("init commit store reader: %w", err)
 	}
-	if _, err := destServiceProvider.NewOffRampReader(ctx, pluginConfig.OffRampAddress, qopts...); err != nil {
+	if err := commitStoreReader.RegisterFilters(qopts...); err != nil {
+		return nil, fmt.Errorf("register commit store filters: %w", err)
+	}
+
+	offRampReader, err := destServiceProvider.NewOffRampReader(ctx, pluginConfig.OffRampAddress)
+	if err != nil {
 		return nil, fmt.Errorf("init off ramp reader: %w", err)
+	}
+	if err := offRampReader.RegisterFilters(qopts...); err != nil {
+		return nil, fmt.Errorf("register off-ramp filters: %w", err)
+	}
+
+	priceGetter, err := sourceServiceProvider.NewPriceGetter(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("init price getter: %w", err)
 	}
 
 	commitPluginFactory := NewCommitReportingPluginFactory(
 		lggr,
 		*pluginConfig,
-		sourceServiceProvider,
 		destServiceProvider,
-		sourceServiceProvider,
+		onRampReader,
+		offRampReader,
+		commitStoreReader,
+		priceGetter,
 	)
 
 	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(

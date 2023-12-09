@@ -21,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -78,42 +77,39 @@ type CommitPluginStaticConfig struct {
 	DestChainID         *big.Int // todo: use selector
 }
 
-type CommitPluginGenericServiceProvider interface {
-	NewPriceGetter(ctx context.Context) (pricegetter.PriceGetter, error)
-}
-
-type CommitPluginSourceServiceProvider interface {
-	NewOnRampReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.OnRampReader, error)
-}
-
 type CommitPluginDestServiceProvider interface {
 	NewPriceRegistryReader(ctx context.Context, addr common.Address) (ccipdata.PriceRegistryReader, error)
-	NewOffRampReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.OffRampReader, error)
-	NewCommitStoreReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.CommitStoreReader, error)
 }
 
 type CommitReportingPluginFactory struct {
-	lggr                   logger.Logger
-	staticCfg              CommitPluginStaticConfig
-	sourceServiceProvider  CommitPluginSourceServiceProvider
-	destServiceProvider    CommitPluginDestServiceProvider
-	genericServiceProvider CommitPluginGenericServiceProvider
+	lggr                logger.Logger
+	staticCfg           CommitPluginStaticConfig
+	destServiceProvider CommitPluginDestServiceProvider
+
+	onRampReader      ccipdata.OnRampReader
+	offRampReader     ccipdata.OffRampReader
+	commitStoreReader ccipdata.CommitStoreReader
+	priceGetter       pricegetter.PriceGetter
 }
 
 // NewCommitReportingPluginFactory return a new CommitReportingPluginFactory.
 func NewCommitReportingPluginFactory(
 	lggr logger.Logger,
 	staticCfg CommitPluginStaticConfig,
-	sourceServiceProvider CommitPluginSourceServiceProvider,
 	destServiceProvider CommitPluginDestServiceProvider,
-	genericServiceProvider CommitPluginGenericServiceProvider,
+	onRampReader ccipdata.OnRampReader,
+	offRampReader ccipdata.OffRampReader,
+	commitStoreReader ccipdata.CommitStoreReader,
+	priceGetter pricegetter.PriceGetter,
 ) *CommitReportingPluginFactory {
 	return &CommitReportingPluginFactory{
-		lggr:                   lggr,
-		staticCfg:              staticCfg,
-		sourceServiceProvider:  sourceServiceProvider,
-		destServiceProvider:    destServiceProvider,
-		genericServiceProvider: genericServiceProvider,
+		lggr:                lggr,
+		staticCfg:           staticCfg,
+		destServiceProvider: destServiceProvider,
+		onRampReader:        onRampReader,
+		offRampReader:       offRampReader,
+		commitStoreReader:   commitStoreReader,
+		priceGetter:         priceGetter,
 	}
 }
 
@@ -121,54 +117,32 @@ func NewCommitReportingPluginFactory(
 func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
 	ctx := context.Background()
 
-	commitStoreReader, err := rf.destServiceProvider.NewCommitStoreReader(ctx, rf.staticCfg.CommitStoreAddress)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{},
-			fmt.Errorf("init commit store reader %s: %w", rf.staticCfg.CommitStoreAddress, err)
-	}
-
-	offRampReader, err := rf.destServiceProvider.NewOffRampReader(ctx, rf.staticCfg.OffRampAddress)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{},
-			fmt.Errorf("init off ramp reader %s: %w", rf.staticCfg.OffRampAddress, err)
-	}
-
-	onRampReader, err := rf.sourceServiceProvider.NewOnRampReader(ctx, rf.staticCfg.OnRampAddress)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{},
-			fmt.Errorf("init on ramp reader %s: %w", rf.staticCfg.OnRampAddress, err)
-	}
-
-	priceGetter, err := rf.genericServiceProvider.NewPriceGetter(ctx)
-	if err != nil {
-		return nil, types.ReportingPluginInfo{}, fmt.Errorf("init price getter: %w", err)
-	}
-
-	priceRegistryAddress, err := commitStoreReader.ChangeConfig(config.OnchainConfig, config.OffchainConfig)
+	priceRegistryAddress, err := rf.commitStoreReader.ChangeConfig(config.OnchainConfig, config.OffchainConfig)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{},
 			fmt.Errorf("get dynamic config from commit store: %w", err)
 	}
+
 	priceRegistryReader, err := rf.destServiceProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{},
 			fmt.Errorf("init dynamic price registry %s: %w", priceRegistryAddress, err)
 	}
 
-	offChainConfig := commitStoreReader.OffchainConfig()
+	offChainConfig := rf.commitStoreReader.OffchainConfig()
 
 	return &CommitReportingPlugin{
 			sourceChainSelector:     rf.staticCfg.SourceChainSelector,
 			sourceNative:            rf.staticCfg.SourceNative,
-			onRampReader:            onRampReader,
-			commitStoreReader:       commitStoreReader,
-			priceGetter:             priceGetter,
+			onRampReader:            rf.onRampReader,
+			commitStoreReader:       rf.commitStoreReader,
+			priceGetter:             rf.priceGetter,
 			F:                       config.F,
 			lggr:                    rf.lggr.Named("CommitReportingPlugin"),
 			inflightReports:         newInflightCommitReportsContainer(offChainConfig.InflightCacheExpiry),
 			destPriceRegistryReader: priceRegistryReader,
-			offRampReader:           offRampReader,
-			gasPriceEstimator:       commitStoreReader.GasPriceEstimator(),
+			offRampReader:           rf.offRampReader,
+			gasPriceEstimator:       rf.commitStoreReader.GasPriceEstimator(),
 			offchainConfig:          offChainConfig,
 		},
 		types.ReportingPluginInfo{

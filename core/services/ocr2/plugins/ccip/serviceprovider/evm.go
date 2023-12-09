@@ -14,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
@@ -120,7 +119,6 @@ func (c *EvmServiceProvider) NewPriceRegistryReader(ctx context.Context, addr co
 		}
 	}
 
-	// logpoller filters are registered on the constructor
 	priceRegistryReader, err := ccipdata.NewPriceRegistryReader(
 		c.PriceRegistryReaderArgs.Lggr,
 		addr,
@@ -136,7 +134,7 @@ func (c *EvmServiceProvider) NewPriceRegistryReader(ctx context.Context, addr co
 	return c.priceRegistryReader, nil
 }
 
-func (c *EvmServiceProvider) NewOffRampReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.OffRampReader, error) {
+func (c *EvmServiceProvider) NewOffRampReader(ctx context.Context, addr common.Address) (ccipdata.OffRampReader, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -158,16 +156,12 @@ func (c *EvmServiceProvider) NewOffRampReader(ctx context.Context, addr common.A
 		return nil, err
 	}
 
-	if err := offRampReader.RegisterFilters(append(qopts, pg.WithParentCtx(ctx))...); err != nil {
-		return nil, err
-	}
-
 	c.offRampReader = observability.NewObservedOffRampReader(
 		offRampReader, c.EC.ConfiguredChainID().Int64(), c.pluginLabel)
 	return c.offRampReader, nil
 }
 
-func (c *EvmServiceProvider) NewCommitStoreReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.CommitStoreReader, error) {
+func (c *EvmServiceProvider) NewCommitStoreReader(ctx context.Context, addr common.Address) (ccipdata.CommitStoreReader, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -189,16 +183,12 @@ func (c *EvmServiceProvider) NewCommitStoreReader(ctx context.Context, addr comm
 		return nil, err
 	}
 
-	if err := commitStoreReader.RegisterFilters(append(qopts, pg.WithParentCtx(ctx))...); err != nil {
-		return nil, err
-	}
-
 	c.commitStoreReader = observability.NewObservedCommitStoreReader(
 		commitStoreReader, c.EC.ConfiguredChainID().Int64(), c.pluginLabel)
 	return c.commitStoreReader, nil
 }
 
-func (c *EvmServiceProvider) NewOnRampReader(ctx context.Context, addr common.Address, qopts ...pg.QOpt) (ccipdata.OnRampReader, error) {
+func (c *EvmServiceProvider) NewOnRampReader(ctx context.Context, addr common.Address) (ccipdata.OnRampReader, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -221,10 +211,6 @@ func (c *EvmServiceProvider) NewOnRampReader(ctx context.Context, addr common.Ad
 		c.EC,
 	)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := onRampReader.RegisterFilters(append(qopts, pg.WithParentCtx(ctx))...); err != nil {
 		return nil, err
 	}
 
