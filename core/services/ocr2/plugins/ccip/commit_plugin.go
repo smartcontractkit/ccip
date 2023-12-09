@@ -10,8 +10,6 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
@@ -20,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -112,7 +111,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			sourceNative:          sourceNative,
 			sourceChainSelector:   staticConfig.SourceChainSelector,
 			commitStore:           commitStoreReader,
-			priceRegistryProvider: newEvmPriceRegistryProvider(destChain.LogPoller(), destChain.Client(), commitLggr, CommitPluginLabel),
+			priceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), commitLggr, CommitPluginLabel),
 		}, &BackfillArgs{
 			sourceLP:         sourceChain.LogPoller(),
 			destLP:           destChain.LogPoller(),
@@ -181,28 +180,4 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 		return err
 	}
 	return commitPluginConfig.offRamp.Close(qopts...)
-}
-
-type evmPriceRegistryProvider struct {
-	lp          logpoller.LogPoller
-	ec          client.Client
-	lggr        logger.Logger
-	pluginLabel string
-}
-
-func newEvmPriceRegistryProvider(lp logpoller.LogPoller, ec client.Client, lggr logger.Logger, pluginLabel string) *evmPriceRegistryProvider {
-	return &evmPriceRegistryProvider{
-		lp:          lp,
-		ec:          ec,
-		lggr:        lggr,
-		pluginLabel: pluginLabel,
-	}
-}
-
-func (e *evmPriceRegistryProvider) NewPriceRegistryReader(_ context.Context, addr common.Address) (ccipdata.PriceRegistryReader, error) {
-	destPriceRegistryReader, err := ccipdata.NewPriceRegistryReader(e.lggr, addr, e.lp, e.ec)
-	if err != nil {
-		return nil, err
-	}
-	return observability.NewPriceRegistryReader(destPriceRegistryReader, e.ec.ConfiguredChainID().Int64(), e.pluginLabel), nil
 }

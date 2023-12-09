@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
@@ -50,10 +51,6 @@ type update struct {
 	value     *big.Int
 }
 
-type PriceRegistryProvider interface {
-	NewPriceRegistryReader(ctx context.Context, addr common.Address) (ccipdata.PriceRegistryReader, error)
-}
-
 type CommitPluginStaticConfig struct {
 	lggr logger.Logger
 	// Source
@@ -64,7 +61,7 @@ type CommitPluginStaticConfig struct {
 	offRamp               ccipdata.OffRampReader
 	commitStore           ccipdata.CommitStoreReader
 	destChainEVMID        *big.Int // todo: this field is not initialized
-	priceRegistryProvider PriceRegistryProvider
+	priceRegistryProvider ccipdataprovider.PriceRegistry
 	// Offchain
 	priceGetter pricegetter.PriceGetter
 }

@@ -15,6 +15,7 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -122,17 +123,15 @@ func jobSpecToExecPluginConfig(lggr logger.Logger, jb job.Job, chainSet evm.Lega
 		"sourceRouter", sourceRouter.Address())
 	return &ExecutionPluginStaticConfig{
 			lggr:                     execLggr,
-			sourceLP:                 sourceChain.LogPoller(),
-			destLP:                   destChain.LogPoller(),
 			onRampReader:             onRampReader,
 			commitStoreReader:        commitStoreReader,
 			offRampReader:            offRampReader,
 			sourcePriceRegistry:      sourcePriceRegistry,
 			sourceWrappedNativeToken: sourceWrappedNative,
-			destClient:               destChain.Client(),
 			destGasEstimator:         destChain.GasEstimator(),
 			destChainEVMID:           destChain.ID(),
 			tokenDataProviders:       tokenDataProviders,
+			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), execLggr, ExecPluginLabel),
 		}, &BackfillArgs{
 			sourceLP:         sourceChain.LogPoller(),
 			destLP:           destChain.LogPoller(),
