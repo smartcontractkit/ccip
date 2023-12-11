@@ -1,4 +1,4 @@
-package readers
+package factory
 
 import (
 	"github.com/Masterminds/semver/v3"

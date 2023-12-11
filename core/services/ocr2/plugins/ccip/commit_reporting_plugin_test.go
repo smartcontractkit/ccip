@@ -32,8 +32,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/readers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
@@ -338,7 +338,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 
 			if tc.expCommitReport != nil {
 				assert.True(t, gotSomeReport)
-				encodedExpectedReport, err := readers.EncodeCommitReport(*tc.expCommitReport)
+				encodedExpectedReport, err := factory.EncodeCommitReport(*tc.expCommitReport)
 				assert.NoError(t, err)
 				assert.Equal(t, types.Report(encodedExpectedReport), gotReport)
 			}
@@ -379,7 +379,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		p.commitStoreReader = commitStoreReader
 		commitStoreReader.On("DecodeCommitReport", mock.Anything).Return(report, nil)
 
-		encodedReport, err := readers.EncodeCommitReport(report)
+		encodedReport, err := factory.EncodeCommitReport(report)
 		assert.NoError(t, err)
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
 		assert.NoError(t, err)
@@ -406,7 +406,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 		// stale since report interval is behind on chain seq num
 		report.Interval = ccipdata.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
-		encodedReport, err := readers.EncodeCommitReport(report)
+		encodedReport, err := factory.EncodeCommitReport(report)
 		assert.NoError(t, err)
 
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
@@ -450,7 +450,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 
 		// non-stale since report interval is not behind on-chain seq num
 		report.Interval = ccipdata.CommitStoreInterval{Min: onChainSeqNum, Max: onChainSeqNum + 10}
-		encodedReport, err := readers.EncodeCommitReport(report)
+		encodedReport, err := factory.EncodeCommitReport(report)
 		assert.NoError(t, err)
 
 		shouldAccept, err := p.ShouldAcceptFinalizedReport(ctx, types.ReportTimestamp{}, encodedReport)
@@ -491,7 +491,7 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	t.Run("should transmit when report is not stale", func(t *testing.T) {
 		// not-stale since report interval is not behind on chain seq num
 		report.Interval = ccipdata.CommitStoreInterval{Min: onChainSeqNum, Max: onChainSeqNum + 10}
-		encodedReport, err := readers.EncodeCommitReport(report)
+		encodedReport, err := factory.EncodeCommitReport(report)
 		assert.NoError(t, err)
 		commitStoreReader.On("DecodeCommitReport", encodedReport).Return(report, nil).Once()
 		shouldTransmit, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, encodedReport)
@@ -502,7 +502,7 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	t.Run("should not transmit when report is stale", func(t *testing.T) {
 		// stale since report interval is behind on chain seq num
 		report.Interval = ccipdata.CommitStoreInterval{Min: onChainSeqNum - 2, Max: onChainSeqNum + 10}
-		encodedReport, err := readers.EncodeCommitReport(report)
+		encodedReport, err := factory.EncodeCommitReport(report)
 		assert.NoError(t, err)
 		commitStoreReader.On("DecodeCommitReport", encodedReport).Return(report, nil).Once()
 		shouldTransmit, err := p.ShouldTransmitAcceptedReport(ctx, types.ReportTimestamp{}, encodedReport)
@@ -1586,7 +1586,7 @@ func Test_commitReportSize(t *testing.T) {
 	p.Property("bounded commit report size", prop.ForAll(func(root []byte, min, max uint64) bool {
 		var root32 [32]byte
 		copy(root32[:], root)
-		rep, err := readers.EncodeCommitReport(ccipdata.CommitStoreReport{
+		rep, err := factory.EncodeCommitReport(ccipdata.CommitStoreReport{
 			MerkleRoot:  root32,
 			Interval:    ccipdata.CommitStoreInterval{Min: min, Max: max},
 			TokenPrices: []ccipdata.TokenPrice{},
@@ -1720,10 +1720,10 @@ func TestCommitReportToEthTxMeta(t *testing.T) {
 				MerkleRoot: tree.Root(),
 				Interval:   ccipdata.CommitStoreInterval{Min: tc.min, Max: tc.max},
 			}
-			out, err := readers.EncodeCommitReport(report)
+			out, err := factory.EncodeCommitReport(report)
 			require.NoError(t, err)
 
-			fn, err := readers.CommitReportToEthTxMeta(ccipconfig.CommitStore, *semver.MustParse("1.0.0"))
+			fn, err := factory.CommitReportToEthTxMeta(ccipconfig.CommitStore, *semver.MustParse("1.0.0"))
 			require.NoError(t, err)
 			txMeta, err := fn(out)
 			require.NoError(t, err)
