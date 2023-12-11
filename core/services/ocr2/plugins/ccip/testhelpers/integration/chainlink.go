@@ -86,7 +86,7 @@ func (node *Node) EventuallyNodeUsesUpdatedPriceRegistry(t *testing.T, ccipContr
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		log, err := c.LogPoller().LatestLogByEventSigWithConfs(
-			v1_0_0.UsdPerUnitGasUpdatedV1_0_0,
+			v1_0_0.UsdPerUnitGasUpdated,
 			ccipContracts.Dest.PriceRegistry.Address(),
 			0,
 			pg.WithParentCtx(testutils.Context(t)),

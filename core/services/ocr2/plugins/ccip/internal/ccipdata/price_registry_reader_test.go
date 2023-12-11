@@ -34,13 +34,13 @@ func TestPriceRegistryFilters(t *testing.T) {
 	cl := mocks.NewClient(t)
 
 	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_0_0.NewPriceRegistryV1_0_0(logger.TestLogger(t), addr, lp, cl)
+		c, err := v1_0_0.NewPriceRegistry(logger.TestLogger(t), addr, lp, cl)
 		require.NoError(t, err)
 		return c
 	}, 3)
 
 	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_2_0.NewPriceRegistryV1_2_0(logger.TestLogger(t), addr, lp, cl)
+		c, err := v1_2_0.NewPriceRegistry(logger.TestLogger(t), addr, lp, cl)
 		require.NoError(t, err)
 		return c
 	}, 3)
@@ -125,17 +125,17 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	commitAndGetBlockTs(ec) // Deploy these
 	pr10r, err := factory.NewPriceRegistryReader(lggr, addr, lp, ec)
 	require.NoError(t, err)
-	assert.Equal(t, reflect.TypeOf(pr10r).String(), reflect.TypeOf(&v1_0_0.PriceRegistryV1_0_0{}).String())
+	assert.Equal(t, reflect.TypeOf(pr10r).String(), reflect.TypeOf(&v1_0_0.PriceRegistry{}).String())
 	pr12r, err := factory.NewPriceRegistryReader(lggr, addr2, lp, ec)
 	require.NoError(t, err)
-	assert.Equal(t, reflect.TypeOf(pr12r).String(), reflect.TypeOf(&v1_2_0.PriceRegistryV1_2_0{}).String())
+	assert.Equal(t, reflect.TypeOf(pr12r).String(), reflect.TypeOf(&v1_2_0.PriceRegistry{}).String())
 	// Apply block1.
 	v1_0_0.ApplyPriceRegistryUpdateV1_0_0(t, user, addr, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
-	v1_2_0.ApplyPriceRegistryUpdateV1_2_0(t, user, addr2, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
+	v1_2_0.ApplyPriceRegistryUpdate(t, user, addr2, ec, gasPriceUpdatesBlock1, tokenPriceUpdatesBlock1)
 	b1 := commitAndGetBlockTs(ec)
 	// Apply block2
 	v1_0_0.ApplyPriceRegistryUpdateV1_0_0(t, user, addr, ec, gasPriceUpdatesBlock2, tokenPriceUpdatesBlock2)
-	v1_2_0.ApplyPriceRegistryUpdateV1_2_0(t, user, addr2, ec, gasPriceUpdatesBlock2, tokenPriceUpdatesBlock2)
+	v1_2_0.ApplyPriceRegistryUpdate(t, user, addr2, ec, gasPriceUpdatesBlock2, tokenPriceUpdatesBlock2)
 	b2 := commitAndGetBlockTs(ec)
 
 	// Capture all lp data.

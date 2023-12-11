@@ -96,11 +96,11 @@ type OffRamp struct {
 	offRamp                 *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
 	addr                    common.Address
 	lp                      logpoller.LogPoller
-	Lggr                    logger.Logger
-	Ec                      client.Client
+	lggr                    logger.Logger
+	ec                      client.Client
 	evmBatchCaller          rpclib.EvmBatchCaller
 	filters                 []logpoller.Filter
-	Estimator               gas.EvmFeeEstimator
+	estimator               gas.EvmFeeEstimator
 	executionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
@@ -169,7 +169,7 @@ func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, toke
 				destTokens[i] = destToken
 				found[tokenAddress] = true
 			} else {
-				o.Lggr.Errorf("source to dest cache contains invalid type %T", v)
+				o.lggr.Errorf("source to dest cache contains invalid type %T", v)
 			}
 		}
 	}
@@ -366,7 +366,7 @@ func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (com
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	destRouter, err := router.NewRouter(onchainConfigParsed.Router, o.Ec)
+	destRouter, err := router.NewRouter(onchainConfigParsed.Router, o.ec)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
@@ -386,10 +386,10 @@ func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (com
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
 	o.onchainConfig = ccipdata.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
-	o.gasPriceEstimator = prices.NewExecGasPriceEstimator(o.Estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0)
+	o.gasPriceEstimator = prices.NewExecGasPriceEstimator(o.estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0)
 	o.configMu.Unlock()
 
-	o.Lggr.Infow("Starting exec plugin",
+	o.lggr.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
 		"onchainConfig", offchainConfigParsed)
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
@@ -426,7 +426,7 @@ func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, se
 
 	return ccipdata.ParseLogs[ccipdata.ExecutionStateChanged](
 		logs,
-		o.Lggr,
+		o.lggr,
 		func(log types.Log) (*ccipdata.ExecutionStateChanged, error) {
 			sc, err := o.offRamp.ParseExecutionStateChanged(log)
 			if err != nil {
@@ -598,12 +598,12 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 
 	return &OffRamp{
 		offRamp:             offRamp,
-		Ec:                  ec,
+		ec:                  ec,
 		addr:                addr,
-		Lggr:                lggr,
+		lggr:                lggr,
 		lp:                  lp,
 		filters:             filters,
-		Estimator:           estimator,
+		estimator:           estimator,
 		executionReportArgs: executionReportArgs,
 		eventSig:            ExecutionStateChangedEvent,
 		eventIndex:          executionStateChangedSequenceNumberIndex,

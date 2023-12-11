@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	abiOffRampV1_2_0                        = abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
-	_                ccipdata.OffRampReader = &OffRamp{}
+	abiOffRamp                        = abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
+	_          ccipdata.OffRampReader = &OffRamp{}
 )
 
 type ExecOnchainConfig evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig
@@ -82,6 +82,9 @@ type OffRamp struct {
 
 	offRamp             *evm_2_evm_offramp.EVM2EVMOffRamp
 	executionReportArgs abi.Arguments
+	lggr                logger.Logger
+	ec                  client.Client
+	estimator           gas.EvmFeeEstimator
 
 	// Dynamic config
 	configMu          sync.RWMutex
@@ -104,7 +107,7 @@ func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (com
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	destRouter, err := router.NewRouter(onchainConfigParsed.Router, o.Ec)
+	destRouter, err := router.NewRouter(onchainConfigParsed.Router, o.ec)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
@@ -124,10 +127,10 @@ func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (com
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
 	o.onchainConfig = ccipdata.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
-	o.gasPriceEstimator = prices.NewDAGasPriceEstimator(o.Estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0, 0)
+	o.gasPriceEstimator = prices.NewDAGasPriceEstimator(o.estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0, 0)
 	o.configMu.Unlock()
 
-	o.Lggr.Infow("Starting exec plugin",
+	o.lggr.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
 		"onchainConfig", offchainConfigParsed)
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
@@ -281,13 +284,17 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 		return nil, err
 	}
 
-	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRampV1_2_0)[:1]
+	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRamp)[:1]
 
 	return &OffRamp{
 		OffRamp:             v100,
 		offRamp:             offRamp,
 		executionReportArgs: executionReportArgs,
-		configMu:            sync.RWMutex{},
+		lggr:                lggr,
+		ec:                  ec,
+		estimator:           estimator,
+
+		configMu: sync.RWMutex{},
 
 		// values set on the fly after ChangeConfig is called
 		gasPriceEstimator: prices.ExecGasPriceEstimator{},

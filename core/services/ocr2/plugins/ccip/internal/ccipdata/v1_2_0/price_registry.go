@@ -18,16 +18,16 @@ import (
 )
 
 var (
-	_ ccipdata.PriceRegistryReader = &PriceRegistryV1_2_0{}
+	_ ccipdata.PriceRegistryReader = &PriceRegistry{}
 )
 
-type PriceRegistryV1_2_0 struct {
-	*v1_0_0.PriceRegistryV1_0_0
+type PriceRegistry struct {
+	*v1_0_0.PriceRegistry
 	pr *price_registry.PriceRegistry
 }
 
-func NewPriceRegistryV1_2_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistryV1_2_0, error) {
-	v100, err := v1_0_0.NewPriceRegistryV1_0_0(lggr, priceRegistryAddr, lp, ec)
+func NewPriceRegistry(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistry, error) {
+	v100, err := v1_0_0.NewPriceRegistry(lggr, priceRegistryAddr, lp, ec)
 	if err != nil {
 		return nil, err
 	}
@@ -35,15 +35,15 @@ func NewPriceRegistryV1_2_0(lggr logger.Logger, priceRegistryAddr common.Address
 	if err != nil {
 		return nil, err
 	}
-	return &PriceRegistryV1_2_0{
-		PriceRegistryV1_0_0: v100,
-		pr:                  priceRegistry,
+	return &PriceRegistry{
+		PriceRegistry: v100,
+		pr:            priceRegistry,
 	}, nil
 }
 
 // GetTokenPrices must be overridden to use the 1.2 ABI (return parameter changed from uint192 to uint224)
 // See https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/PriceRegistry.sol#L141
-func (p *PriceRegistryV1_2_0) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]ccipdata.TokenPriceUpdate, error) {
+func (p *PriceRegistry) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]ccipdata.TokenPriceUpdate, error) {
 	// Make call using 224 ABI.
 	tps, err := p.pr.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
 	if err != nil {
@@ -62,8 +62,8 @@ func (p *PriceRegistryV1_2_0) GetTokenPrices(ctx context.Context, wantedTokens [
 	return tpu, nil
 }
 
-// ApplyPriceRegistryUpdateV1_2_0 is a helper function used in tests only.
-func ApplyPriceRegistryUpdateV1_2_0(t *testing.T, user *bind.TransactOpts, addr common.Address, ec client.Client, gasPrices []ccipdata.GasPrice, tokenPrices []ccipdata.TokenPrice) common.Hash {
+// ApplyPriceRegistryUpdate is a helper function used in tests only.
+func ApplyPriceRegistryUpdate(t *testing.T, user *bind.TransactOpts, addr common.Address, ec client.Client, gasPrices []ccipdata.GasPrice, tokenPrices []ccipdata.TokenPrice) common.Hash {
 	require.True(t, len(gasPrices) <= 1)
 	pr, err := price_registry.NewPriceRegistry(addr, ec)
 	require.NoError(t, err)

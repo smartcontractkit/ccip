@@ -28,12 +28,12 @@ import (
 
 var (
 	abiERC20                              = abihelpers.MustParseABI(erc20.ERC20ABI)
-	_        ccipdata.PriceRegistryReader = &PriceRegistryV1_0_0{}
+	_        ccipdata.PriceRegistryReader = &PriceRegistry{}
 	// Exposed only for backwards compatibility with tests.
-	UsdPerUnitGasUpdatedV1_0_0 = abihelpers.MustGetEventID("UsdPerUnitGasUpdated", abihelpers.MustParseABI(price_registry_1_0_0.PriceRegistryABI))
+	UsdPerUnitGasUpdated = abihelpers.MustGetEventID("UsdPerUnitGasUpdated", abihelpers.MustParseABI(price_registry_1_0_0.PriceRegistryABI))
 )
 
-type PriceRegistryV1_0_0 struct {
+type PriceRegistry struct {
 	priceRegistry   price_registry_1_0_0.PriceRegistryInterface
 	address         common.Address
 	lp              logpoller.LogPoller
@@ -49,7 +49,7 @@ type PriceRegistryV1_0_0 struct {
 	tokenDecimalsCache sync.Map
 }
 
-func (p *PriceRegistryV1_0_0) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]ccipdata.TokenPriceUpdate, error) {
+func (p *PriceRegistry) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]ccipdata.TokenPriceUpdate, error) {
 	tps, err := p.priceRegistry.GetTokenPrices(&bind.CallOpts{Context: ctx}, wantedTokens)
 	if err != nil {
 		return nil, err
@@ -67,11 +67,11 @@ func (p *PriceRegistryV1_0_0) GetTokenPrices(ctx context.Context, wantedTokens [
 	return tpu, nil
 }
 
-func (p *PriceRegistryV1_0_0) Address() common.Address {
+func (p *PriceRegistry) Address() common.Address {
 	return p.address
 }
 
-func (p *PriceRegistryV1_0_0) GetFeeTokens(ctx context.Context) ([]common.Address, error) {
+func (p *PriceRegistry) GetFeeTokens(ctx context.Context) ([]common.Address, error) {
 	feeTokens, err := p.feeTokensCache.Get(ctx, func(ctx context.Context) ([]common.Address, error) {
 		return p.priceRegistry.GetFeeTokens(&bind.CallOpts{Context: ctx})
 	})
@@ -82,11 +82,11 @@ func (p *PriceRegistryV1_0_0) GetFeeTokens(ctx context.Context) ([]common.Addres
 	return feeTokens, nil
 }
 
-func (p *PriceRegistryV1_0_0) Close(opts ...pg.QOpt) error {
+func (p *PriceRegistry) Close(opts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(p.lp, p.filters, opts...)
 }
 
-func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]ccipdata.Event[ccipdata.TokenPriceUpdate], error) {
+func (p *PriceRegistry) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]ccipdata.Event[ccipdata.TokenPriceUpdate], error) {
 	logs, err := p.lp.LogsCreatedAfter(
 		p.tokenUpdated,
 		p.address,
@@ -117,7 +117,7 @@ func (p *PriceRegistryV1_0_0) GetTokenPriceUpdatesCreatedAfter(ctx context.Conte
 	)
 }
 
-func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]ccipdata.Event[ccipdata.GasPriceUpdate], error) {
+func (p *PriceRegistry) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]ccipdata.Event[ccipdata.GasPriceUpdate], error) {
 	logs, err := p.lp.IndexedLogsCreatedAfter(
 		p.gasUpdated,
 		p.address,
@@ -150,7 +150,7 @@ func (p *PriceRegistryV1_0_0) GetGasPriceUpdatesCreatedAfter(ctx context.Context
 	)
 }
 
-func (p *PriceRegistryV1_0_0) GetTokensDecimals(ctx context.Context, tokenAddresses []common.Address) ([]uint8, error) {
+func (p *PriceRegistry) GetTokensDecimals(ctx context.Context, tokenAddresses []common.Address) ([]uint8, error) {
 	found := make(map[common.Address]bool)
 	tokenDecimals := make([]uint8, len(tokenAddresses))
 	for i, tokenAddress := range tokenAddresses {
@@ -228,7 +228,7 @@ func ApplyPriceRegistryUpdateV1_0_0(t *testing.T, user *bind.TransactOpts, addr 
 	require.NoError(t, err)
 }
 
-func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistryV1_0_0, error) {
+func NewPriceRegistry(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistry, error) {
 	priceRegistry, err := price_registry_1_0_0.NewPriceRegistry(priceRegistryAddr, ec)
 	if err != nil {
 		return nil, err
@@ -240,7 +240,7 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 	var filters = []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(ccipdata.COMMIT_PRICE_UPDATES, priceRegistryAddr.String()),
-			EventSigs: []common.Hash{UsdPerUnitGasUpdatedV1_0_0, usdPerTokenUpdated},
+			EventSigs: []common.Hash{UsdPerUnitGasUpdated, usdPerTokenUpdated},
 			Addresses: []common.Address{priceRegistryAddr},
 		},
 		{
@@ -257,7 +257,7 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 	if err != nil {
 		return nil, err
 	}
-	return &PriceRegistryV1_0_0{
+	return &PriceRegistry{
 		priceRegistry: priceRegistry,
 		address:       priceRegistryAddr,
 		lp:            lp,
@@ -268,7 +268,7 @@ func NewPriceRegistryV1_0_0(lggr logger.Logger, priceRegistryAddr common.Address
 			rpclib.DefaultRpcBatchBackOffMultiplier,
 		),
 		lggr:            lggr,
-		gasUpdated:      UsdPerUnitGasUpdatedV1_0_0,
+		gasUpdated:      UsdPerUnitGasUpdated,
 		tokenUpdated:    usdPerTokenUpdated,
 		feeTokenRemoved: feeTokenRemoved,
 		feeTokenAdded:   feeTokenAdded,
