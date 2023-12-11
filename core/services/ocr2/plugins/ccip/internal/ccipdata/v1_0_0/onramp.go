@@ -219,7 +219,7 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 		o.sendRequestedSeqNumberWord,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
-		LogsConfirmations(finalized),
+		ccipdata.LogsConfirmations(finalized),
 		pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
@@ -233,11 +233,4 @@ func (o *OnRamp) RouterAddress() (common.Address, error) {
 		return common.Address{}, err
 	}
 	return config.Router, nil
-}
-
-func LogsConfirmations(finalized bool) logpoller.Confirmations {
-	if finalized {
-		return logpoller.Finalized
-	}
-	return logpoller.Confirmations(0)
 }

@@ -40,16 +40,16 @@ const (
 )
 
 var (
-	abiOffRampV1_0_0                                             = abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
-	abiCustomTokenPool                                           = abihelpers.MustParseABI(custom_token_pool.CustomTokenPoolABI)
-	_                                     ccipdata.OffRampReader = &OffRamp{}
-	ExecutionStateChangedEventV1_0_0                             = abihelpers.MustGetEventID("ExecutionStateChanged", abiOffRampV1_0_0)
-	PoolAddedEventV1_0_0                                         = abihelpers.MustGetEventID("PoolAdded", abiOffRampV1_0_0)
-	PoolRemovedEventV1_0_0                                       = abihelpers.MustGetEventID("PoolRemoved", abiOffRampV1_0_0)
-	ExecutionStateChangedSeqNrIndexV1_0_0                        = 1
+	abiOffRamp                                             = abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
+	abiCustomTokenPool                                     = abihelpers.MustParseABI(custom_token_pool.CustomTokenPoolABI)
+	_                               ccipdata.OffRampReader = &OffRamp{}
+	ExecutionStateChangedEvent                             = abihelpers.MustGetEventID("ExecutionStateChanged", abiOffRamp)
+	PoolAddedEvent                                         = abihelpers.MustGetEventID("PoolAdded", abiOffRamp)
+	PoolRemovedEvent                                       = abihelpers.MustGetEventID("PoolRemoved", abiOffRamp)
+	ExecutionStateChangedSeqNrIndex                        = 1
 )
 
-var offRampV1_0_0_poolAddedPoolRemovedEvents = []common.Hash{PoolAddedEventV1_0_0, PoolRemovedEventV1_0_0}
+var offRamp_poolAddedPoolRemovedEvents = []common.Hash{PoolAddedEvent, PoolRemovedEvent}
 
 type ExecOnchainConfig evm_2_evm_offramp_1_0_0.EVM2EVMOffRampDynamicConfig
 
@@ -181,7 +181,7 @@ func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, toke
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddresses))
 	for _, sourceTk := range tokenAddresses {
 		if !found[sourceTk] {
-			evmCalls = append(evmCalls, rpclib.NewEvmCall(abiOffRampV1_0_0, "getDestinationToken", o.addr, sourceTk))
+			evmCalls = append(evmCalls, rpclib.NewEvmCall(abiOffRamp, "getDestinationToken", o.addr, sourceTk))
 		}
 	}
 
@@ -307,7 +307,7 @@ func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddrs))
 	for _, tk := range tokenAddrs {
 		evmCalls = append(evmCalls, rpclib.NewEvmCall(
-			abiOffRampV1_0_0,
+			abiOffRamp,
 			"getPoolByDestToken",
 			o.addr,
 			tk,
@@ -559,7 +559,7 @@ func (o *OffRamp) DecodeExecutionReport(report []byte) (ccipdata.ExecReport, err
 }
 
 func (o *OffRamp) TokenEvents() []common.Hash {
-	return offRampV1_0_0_poolAddedPoolRemovedEvents
+	return offRamp_poolAddedPoolRemovedEvents
 }
 
 func (o *OffRamp) RegisterFilters(qopts ...pg.QOpt) error {
@@ -573,21 +573,21 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 	}
 
 	executionStateChangedSequenceNumberIndex := 1
-	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRampV1_0_0)[:1]
+	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRamp)[:1]
 	filters := []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(EXEC_EXECUTION_STATE_CHANGES, addr.String()),
-			EventSigs: []common.Hash{ExecutionStateChangedEventV1_0_0},
+			EventSigs: []common.Hash{ExecutionStateChangedEvent},
 			Addresses: []common.Address{addr},
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_ADDED, addr.String()),
-			EventSigs: []common.Hash{PoolAddedEventV1_0_0},
+			EventSigs: []common.Hash{PoolAddedEvent},
 			Addresses: []common.Address{addr},
 		},
 		{
 			Name:      logpoller.FilterName(EXEC_TOKEN_POOL_REMOVED, addr.String()),
-			EventSigs: []common.Hash{PoolRemovedEventV1_0_0},
+			EventSigs: []common.Hash{PoolRemovedEvent},
 			Addresses: []common.Address{addr},
 		},
 	}
@@ -605,7 +605,7 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 		filters:             filters,
 		Estimator:           estimator,
 		executionReportArgs: executionReportArgs,
-		eventSig:            ExecutionStateChangedEventV1_0_0,
+		eventSig:            ExecutionStateChangedEvent,
 		eventIndex:          executionStateChangedSequenceNumberIndex,
 		configMu:            sync.RWMutex{},
 		evmBatchCaller: rpclib.NewDynamicLimitedBatchCaller(
@@ -616,17 +616,17 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 		),
 		destinationTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
-			offRampV1_0_0_poolAddedPoolRemovedEvents,
+			offRamp_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
 		),
 		sourceTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
 			lp,
-			offRampV1_0_0_poolAddedPoolRemovedEvents,
+			offRamp_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
 		),
 		destinationPoolsCache: cache.NewLogpollerEventsBased[map[common.Address]common.Address](
 			lp,
-			offRampV1_0_0_poolAddedPoolRemovedEvents,
+			offRamp_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
 		),
 

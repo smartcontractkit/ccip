@@ -158,7 +158,7 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPIntegr
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().LogsDataWordRange(
-			v1_2_0.CCIPSendRequestEventSigV1_2_0,
+			v1_2_0.CCIPSendRequestEventSig,
 			onRamp,
 			v1_2_0.CCIPSendRequestSeqNumIndex,
 			abihelpers.EvmWord(uint64(seqNum)),
@@ -185,9 +185,9 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts *CCIP
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
-			v1_0_0.ExecutionStateChangedEventV1_0_0,
+			v1_0_0.ExecutionStateChangedEvent,
 			offRamp,
-			v1_0_0.ExecutionStateChangedSeqNrIndexV1_0_0,
+			v1_0_0.ExecutionStateChangedSeqNrIndex,
 			abihelpers.EvmWord(uint64(minSeqNum)),
 			abihelpers.EvmWord(uint64(maxSeqNum)),
 			1,
@@ -213,9 +213,9 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
-			v1_0_0.ExecutionStateChangedEventV1_0_0,
+			v1_0_0.ExecutionStateChangedEvent,
 			offRamp,
-			v1_0_0.ExecutionStateChangedSeqNrIndexV1_0_0,
+			v1_0_0.ExecutionStateChangedSeqNrIndex,
 			abihelpers.EvmWord(uint64(seqNum)),
 			abihelpers.EvmWord(uint64(seqNum)),
 			1,

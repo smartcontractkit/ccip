@@ -26,7 +26,7 @@ import (
 
 var (
 	// Backwards compat for integration tests
-	CCIPSendRequestEventSigV1_2_0 common.Hash
+	CCIPSendRequestEventSig common.Hash
 )
 
 const (
@@ -41,7 +41,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	CCIPSendRequestEventSigV1_2_0 = abihelpers.MustGetEventID(CCIPSendRequestedEventName, onRampABI)
+	CCIPSendRequestEventSig = abihelpers.MustGetEventID(CCIPSendRequestedEventName, onRampABI)
 }
 
 type LeafHasher struct {
@@ -128,11 +128,11 @@ func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	return t.ctx.Hash(packedValues), nil
 }
 
-var _ ccipdata.OnRampReader = &OnRampV1_2_0{}
+var _ ccipdata.OnRampReader = &OnRamp{}
 
 // Significant change in 1.2:
 // - CCIPSendRequested event signature has changed
-type OnRampV1_2_0 struct {
+type OnRamp struct {
 	onRamp                     *evm_2_evm_onramp_1_2_0.EVM2EVMOnRamp
 	address                    common.Address
 	lggr                       logger.Logger
@@ -144,11 +144,11 @@ type OnRampV1_2_0 struct {
 	filters                    []logpoller.Filter
 }
 
-func (o *OnRampV1_2_0) Address() (common.Address, error) {
+func (o *OnRamp) Address() (common.Address, error) {
 	return o.onRamp.Address(), nil
 }
 
-func (o *OnRampV1_2_0) GetDynamicConfig() (ccipdata.OnRampDynamicConfig, error) {
+func (o *OnRamp) GetDynamicConfig() (ccipdata.OnRampDynamicConfig, error) {
 	if o.onRamp == nil {
 		return ccipdata.OnRampDynamicConfig{}, fmt.Errorf("onramp not initialized")
 	}
@@ -170,7 +170,7 @@ func (o *OnRampV1_2_0) GetDynamicConfig() (ccipdata.OnRampDynamicConfig, error) 
 	}, nil
 }
 
-func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, error) {
+func (o *OnRamp) logToMessage(log types.Log) (*internal.EVM2EVMMessage, error) {
 	msg, err := o.onRamp.ParseCCIPSendRequested(log)
 	if err != nil {
 		return nil, err
@@ -205,14 +205,14 @@ func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 	}, nil
 }
 
-func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
+func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
 	logs, err := o.lp.LogsDataWordRange(
 		o.sendRequestedEventSig,
 		o.address,
 		o.sendRequestedSeqNumberWord,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
-		v1_0_0.LogsConfirmations(finalized),
+		ccipdata.LogsConfirmations(finalized),
 		pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
@@ -220,7 +220,7 @@ func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNum
 	return ccipdata.ParseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
-func (o *OnRampV1_2_0) RouterAddress() (common.Address, error) {
+func (o *OnRamp) RouterAddress() (common.Address, error) {
 	config, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
 		return common.Address{}, err
@@ -228,15 +228,15 @@ func (o *OnRampV1_2_0) RouterAddress() (common.Address, error) {
 	return config.Router, nil
 }
 
-func (o *OnRampV1_2_0) Close(qopts ...pg.QOpt) error {
+func (o *OnRamp) Close(qopts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func (o *OnRampV1_2_0) RegisterFilters(qopts ...pg.QOpt) error {
+func (o *OnRamp) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_2_0, error) {
+func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRamp, error) {
 	onRamp, err := evm_2_evm_onramp_1_2_0.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -246,11 +246,11 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 	filters := []logpoller.Filter{
 		{
 			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
-			EventSigs: []common.Hash{CCIPSendRequestEventSigV1_2_0},
+			EventSigs: []common.Hash{CCIPSendRequestEventSig},
 			Addresses: []common.Address{onRampAddress},
 		},
 	}
-	return &OnRampV1_2_0{
+	return &OnRamp{
 		lggr:                       lggr,
 		client:                     source,
 		lp:                         sourceLP,
@@ -259,6 +259,6 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 		filters:                    filters,
 		address:                    onRampAddress,
 		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndex,
-		sendRequestedEventSig:      CCIPSendRequestEventSigV1_2_0,
+		sendRequestedEventSig:      CCIPSendRequestEventSig,
 	}, nil
 }

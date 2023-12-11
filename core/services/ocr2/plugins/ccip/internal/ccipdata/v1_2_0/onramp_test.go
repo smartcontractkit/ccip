@@ -49,7 +49,7 @@ func TestHasherV1_2_0(t *testing.T) {
 
 	data, err := onRampABI.Events[CCIPSendRequestedEventName].Inputs.Pack(message)
 	require.NoError(t, err)
-	hash, err := hasher.HashLeaf(types.Log{Topics: []common.Hash{CCIPSendRequestEventSigV1_2_0}, Data: data})
+	hash, err := hasher.HashLeaf(types.Log{Topics: []common.Hash{CCIPSendRequestEventSig}, Data: data})
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
@@ -76,7 +76,7 @@ func TestHasherV1_2_0(t *testing.T) {
 
 	data, err = onRampABI.Events[CCIPSendRequestedEventName].Inputs.Pack(message)
 	require.NoError(t, err)
-	hash, err = hasher.HashLeaf(types.Log{Topics: []common.Hash{CCIPSendRequestEventSigV1_2_0}, Data: data})
+	hash, err = hasher.HashLeaf(types.Log{Topics: []common.Hash{CCIPSendRequestEventSig}, Data: data})
 	require.NoError(t, err)
 
 	// NOTE: Must match spec
