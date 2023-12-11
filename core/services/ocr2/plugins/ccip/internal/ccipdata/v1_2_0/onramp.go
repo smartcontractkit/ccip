@@ -30,10 +30,10 @@ var (
 )
 
 const (
-	CCIPSendRequestSeqNumIndexV1_2_0 = 4
-	CCIPSendRequestedEventNameV1_2_0 = "CCIPSendRequested"
-	EVM2EVMOffRampEventNameV1_2_0    = "EVM2EVMMessage"
-	MetaDataHashPrefixV1_2_0         = "EVM2EVMMessageHashV2"
+	CCIPSendRequestSeqNumIndex = 4
+	CCIPSendRequestedEventName = "CCIPSendRequested"
+	EVM2EVMOffRampEventName    = "EVM2EVMMessage"
+	MetaDataHashPrefix         = "EVM2EVMMessageHashV2"
 )
 
 func init() {
@@ -41,24 +41,24 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	CCIPSendRequestEventSigV1_2_0 = abihelpers.MustGetEventID(CCIPSendRequestedEventNameV1_2_0, onRampABI)
+	CCIPSendRequestEventSigV1_2_0 = abihelpers.MustGetEventID(CCIPSendRequestedEventName, onRampABI)
 }
 
-type LeafHasherV1_2_0 struct {
+type LeafHasher struct {
 	metaDataHash [32]byte
 	ctx          hashlib.Ctx[[32]byte]
 	onRamp       *evm_2_evm_onramp_1_2_0.EVM2EVMOnRamp
 }
 
-func NewLeafHasherV1_2_0(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp_1_2_0.EVM2EVMOnRamp) *LeafHasherV1_2_0 {
-	return &LeafHasherV1_2_0{
-		metaDataHash: v1_0_0.GetMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_2_0)), sourceChainSelector, onRampId, destChainSelector),
+func NewLeafHasher(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp_1_2_0.EVM2EVMOnRamp) *LeafHasher {
+	return &LeafHasher{
+		metaDataHash: v1_0_0.GetMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefix)), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
 		onRamp:       onRamp,
 	}
 }
 
-func (t *LeafHasherV1_2_0) HashLeaf(log types.Log) ([32]byte, error) {
+func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	msg, err := t.onRamp.ParseCCIPSendRequested(log)
 	if err != nil {
 		return [32]byte{}, err
@@ -236,7 +236,7 @@ func (o *OnRampV1_2_0) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func NewOnRampV1_2_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_2_0, error) {
+func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_2_0, error) {
 	onRamp, err := evm_2_evm_onramp_1_2_0.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -254,11 +254,11 @@ func NewOnRampV1_2_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 		lggr:                       lggr,
 		client:                     source,
 		lp:                         sourceLP,
-		leafHasher:                 NewLeafHasherV1_2_0(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
+		leafHasher:                 NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
 		onRamp:                     onRamp,
 		filters:                    filters,
 		address:                    onRampAddress,
-		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndexV1_2_0,
+		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndex,
 		sendRequestedEventSig:      CCIPSendRequestEventSigV1_2_0,
 	}, nil
 }

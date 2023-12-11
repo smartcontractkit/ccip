@@ -28,12 +28,12 @@ import (
 
 var (
 	abiOffRampV1_2_0                        = abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
-	_                ccipdata.OffRampReader = &OffRampV1_2_0{}
+	_                ccipdata.OffRampReader = &OffRamp{}
 )
 
-type ExecOnchainConfigV1_2_0 evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig
+type ExecOnchainConfig evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig
 
-func (d ExecOnchainConfigV1_2_0) AbiString() string {
+func (d ExecOnchainConfig) AbiString() string {
 	return `
 	[
 		{
@@ -50,7 +50,7 @@ func (d ExecOnchainConfigV1_2_0) AbiString() string {
 	]`
 }
 
-func (d ExecOnchainConfigV1_2_0) Validate() error {
+func (d ExecOnchainConfig) Validate() error {
 	if d.PermissionLessExecutionThresholdSeconds == 0 {
 		return errors.New("must set PermissionLessExecutionThresholdSeconds")
 	}
@@ -72,13 +72,13 @@ func (d ExecOnchainConfigV1_2_0) Validate() error {
 	return nil
 }
 
-func (d ExecOnchainConfigV1_2_0) PermissionLessExecutionThresholdDuration() time.Duration {
+func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Duration {
 	return time.Duration(d.PermissionLessExecutionThresholdSeconds) * time.Second
 }
 
 // In 1.2 we have a different estimator impl
-type OffRampV1_2_0 struct {
-	*v1_0_0.OffRampV1_0_0
+type OffRamp struct {
+	*v1_0_0.OffRamp
 
 	offRamp             *evm_2_evm_offramp.EVM2EVMOffRamp
 	executionReportArgs abi.Arguments
@@ -90,12 +90,12 @@ type OffRampV1_2_0 struct {
 	onchainConfig     ccipdata.ExecOnchainConfig
 }
 
-func (o *OffRampV1_2_0) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
 	return o.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 }
 
-func (o *OffRampV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
-	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfigV1_2_0](onchainConfig)
+func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
+	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfig)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
@@ -133,25 +133,25 @@ func (o *OffRampV1_2_0) ChangeConfig(onchainConfig []byte, offchainConfig []byte
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
 }
 
-func (o *OffRampV1_2_0) OffchainConfig() ccipdata.ExecOffchainConfig {
+func (o *OffRamp) OffchainConfig() ccipdata.ExecOffchainConfig {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
 	return o.offchainConfig
 }
 
-func (o *OffRampV1_2_0) OnchainConfig() ccipdata.ExecOnchainConfig {
+func (o *OffRamp) OnchainConfig() ccipdata.ExecOnchainConfig {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
 	return o.onchainConfig
 }
 
-func (o *OffRampV1_2_0) GasPriceEstimator() prices.GasPriceEstimatorExec {
+func (o *OffRamp) GasPriceEstimator() prices.GasPriceEstimatorExec {
 	o.configMu.RLock()
 	defer o.configMu.RUnlock()
 	return o.gasPriceEstimator
 }
 
-func EncodeExecutionReportV1_2_0(args abi.Arguments, report ccipdata.ExecReport) ([]byte, error) {
+func EncodeExecutionReport(args abi.Arguments, report ccipdata.ExecReport) ([]byte, error) {
 	var msgs []evm_2_evm_offramp.InternalEVM2EVMMessage
 	for _, msg := range report.Messages {
 		var ta []evm_2_evm_offramp.ClientEVMTokenAmount
@@ -187,11 +187,11 @@ func EncodeExecutionReportV1_2_0(args abi.Arguments, report ccipdata.ExecReport)
 	return args.PackValues([]interface{}{&rep})
 }
 
-func (o *OffRampV1_2_0) EncodeExecutionReport(report ccipdata.ExecReport) ([]byte, error) {
-	return EncodeExecutionReportV1_2_0(o.executionReportArgs, report)
+func (o *OffRamp) EncodeExecutionReport(report ccipdata.ExecReport) ([]byte, error) {
+	return EncodeExecutionReport(o.executionReportArgs, report)
 }
 
-func DecodeExecReportV1_2_0(args abi.Arguments, report []byte) (ccipdata.ExecReport, error) {
+func DecodeExecReport(args abi.Arguments, report []byte) (ccipdata.ExecReport, error) {
 	unpacked, err := args.Unpack(report)
 	if err != nil {
 		return ccipdata.ExecReport{}, err
@@ -266,12 +266,12 @@ func DecodeExecReportV1_2_0(args abi.Arguments, report []byte) (ccipdata.ExecRep
 
 }
 
-func (o *OffRampV1_2_0) DecodeExecutionReport(report []byte) (ccipdata.ExecReport, error) {
-	return DecodeExecReportV1_2_0(o.executionReportArgs, report)
+func (o *OffRamp) DecodeExecutionReport(report []byte) (ccipdata.ExecReport, error) {
+	return DecodeExecReport(o.executionReportArgs, report)
 }
 
-func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRampV1_2_0, error) {
-	v100, err := v1_0_0.NewOffRampV1_0_0(lggr, addr, ec, lp, estimator)
+func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRamp, error) {
+	v100, err := v1_0_0.NewOffRamp(lggr, addr, ec, lp, estimator)
 	if err != nil {
 		return nil, err
 	}
@@ -283,8 +283,8 @@ func NewOffRampV1_2_0(lggr logger.Logger, addr common.Address, ec client.Client,
 
 	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRampV1_2_0)[:1]
 
-	return &OffRampV1_2_0{
-		OffRampV1_0_0:       v100,
+	return &OffRamp{
+		OffRamp:             v100,
 		offRamp:             offRamp,
 		executionReportArgs: executionReportArgs,
 		configMu:            sync.RWMutex{},

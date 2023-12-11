@@ -40,13 +40,13 @@ import (
 
 func TestCommitFilters(t *testing.T) {
 	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_0_0.NewCommitStoreV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+		c, err := v1_0_0.NewCommitStore(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		require.NoError(t, c.RegisterFilters())
 		return c
 	}, 1)
 	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_2_0.NewCommitStoreV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+		c, err := v1_2_0.NewCommitStore(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		require.NoError(t, c.RegisterFilters())
 		return c
@@ -195,11 +195,11 @@ func TestCommitStoreReaders(t *testing.T) {
 	c10r, err := readers.NewCommitStoreReader(lggr, addr, ec, lp, ge)
 	require.NoError(t, err)
 	require.NoError(t, c10r.RegisterFilters())
-	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStoreV1_0_0{}).String())
+	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
 	c12r, err := readers.NewCommitStoreReader(lggr, addr2, ec, lp, ge)
 	require.NoError(t, err)
 	require.NoError(t, c12r.RegisterFilters())
-	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStoreV1_2_0{}).String())
+	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStore{}).String())
 
 	// Apply config
 	signers := []common.Address{utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress()}

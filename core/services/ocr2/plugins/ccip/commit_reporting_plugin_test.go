@@ -306,7 +306,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			destPriceRegistryReader.On("GetTokensDecimals", ctx, destTokens).Return(destDecimals, nil).Maybe()
 
 			lp := mocks2.NewLogPoller(t)
-			commitStoreReader, err := v1_2_0.NewCommitStoreV1_2_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+			commitStoreReader, err := v1_2_0.NewCommitStore(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 			assert.NoError(t, err)
 
 			p := &CommitReportingPlugin{}

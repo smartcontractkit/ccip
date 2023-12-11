@@ -354,7 +354,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 
 	lp := lpMocks.NewLogPoller(t)
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
-	offRampReader, err := v1_0_0.NewOffRampV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+	offRampReader, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 	assert.NoError(t, err)
 	p.offRampReader = offRampReader
 

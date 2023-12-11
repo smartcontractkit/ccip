@@ -31,7 +31,7 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 
 	lp := lpmocks.NewLogPoller(t)
 	lp.On("RegisterFilter", mock.Anything).Return(nil)
-	offRamp, err := v1_0_0.NewOffRampV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
+	offRamp, err := v1_0_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 	require.NoError(t, err)
 
 	encodeExecutionReport, err := offRamp.EncodeExecutionReport(report)
@@ -44,7 +44,7 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 
 func TestOffRampFiltersV100(t *testing.T) {
 	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_0_0.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+		c, err := v1_0_0.NewOffRamp(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		return c
 	}, 3)

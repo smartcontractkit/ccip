@@ -27,9 +27,9 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
 		// Versions are identical
-		return v1_0_0.NewCommitStoreV1_0_0(lggr, address, ec, lp, estimator)
+		return v1_0_0.NewCommitStore(lggr, address, ec, lp, estimator)
 	case ccipdata.V1_2_0, ccipdata.V1_3_0:
-		return v1_2_0.NewCommitStoreV1_2_0(lggr, address, ec, lp, estimator)
+		return v1_2_0.NewCommitStore(lggr, address, ec, lp, estimator)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}
@@ -43,7 +43,7 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
 		commitStoreABI := abihelpers.MustParseABI(commit_store_1_0_0.CommitStoreABI)
 		return func(report []byte) (*txmgr.TxMeta, error) {
-			commitReport, err := v1_0_0.DecodeCommitReportV1_0_0(abihelpers.MustGetEventInputs(v1_0_0.ReportAccepted, commitStoreABI), report)
+			commitReport, err := v1_0_0.DecodeCommitReport(abihelpers.MustGetEventInputs(v1_0_0.ReportAccepted, commitStoreABI), report)
 			if err != nil {
 				return nil, err
 			}
@@ -52,7 +52,7 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 	case ccipdata.V1_2_0, ccipdata.V1_3_0:
 		commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
 		return func(report []byte) (*txmgr.TxMeta, error) {
-			commitReport, err := v1_2_0.DecodeCommitReportV1_2_0(abihelpers.MustGetEventInputs(v1_0_0.ReportAccepted, commitStoreABI), report)
+			commitReport, err := v1_2_0.DecodeCommitReport(abihelpers.MustGetEventInputs(v1_0_0.ReportAccepted, commitStoreABI), report)
 			if err != nil {
 				return nil, err
 			}

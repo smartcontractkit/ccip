@@ -117,7 +117,7 @@ func NewCommitOnchainConfig(
 }
 
 type ExecOnchainConfig struct {
-	v1_2_0.ExecOnchainConfigV1_2_0
+	v1_2_0.ExecOnchainConfig
 }
 
 func NewExecOnchainConfig(
@@ -128,7 +128,7 @@ func NewExecOnchainConfig(
 	MaxDataBytes uint32,
 	MaxPoolReleaseOrMintGas uint32,
 ) ExecOnchainConfig {
-	return ExecOnchainConfig{v1_2_0.ExecOnchainConfigV1_2_0{
+	return ExecOnchainConfig{v1_2_0.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: PermissionLessExecutionThresholdSeconds,
 		Router:                                  Router,
 		PriceRegistry:                           PriceRegistry,
@@ -1488,7 +1488,7 @@ func (args *ManualExecArgs) execute(report *commit_store.CommitStoreCommitReport
 	if err != nil {
 		return nil, err
 	}
-	leafHasher := v1_2_0.NewLeafHasherV1_2_0(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx, onRampContract)
+	leafHasher := v1_2_0.NewLeafHasher(args.SourceChainID, args.DestChainID, common.HexToAddress(args.OnRamp), mctx, onRampContract)
 	if leafHasher == nil {
 		return nil, fmt.Errorf("unable to create leaf hasher")
 	}

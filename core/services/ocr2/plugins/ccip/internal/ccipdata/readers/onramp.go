@@ -23,13 +23,13 @@ func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	}
 	switch version.String() {
 	case ccipdata.V1_0_0:
-		return v1_0_0.NewOnRampV1_0_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
+		return v1_0_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 	case ccipdata.V1_1_0:
-		return v1_1_0.NewOnRampV1_1_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
+		return v1_1_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 	case ccipdata.V1_2_0:
-		return v1_2_0.NewOnRampV1_2_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
+		return v1_2_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 	case ccipdata.V1_3_0:
-		return v1_3_0.NewOnRampV1_3_0(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
+		return v1_3_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 	default:
 		return nil, errors.Errorf("got unexpected version %v", version.String())
 	}

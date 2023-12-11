@@ -27,9 +27,9 @@ func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client
 	}
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
-		return v1_0_0.NewOffRampV1_0_0(lggr, addr, destClient, lp, estimator)
+		return v1_0_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
 	case ccipdata.V1_2_0, ccipdata.V1_3_0:
-		return v1_2_0.NewOffRampV1_2_0(lggr, addr, destClient, lp, estimator)
+		return v1_2_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
 	default:
 		return nil, errors.Errorf("unsupported offramp version %v", version.String())
 	}
@@ -44,7 +44,7 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
 		offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
 		return func(report []byte) (*txmgr.TxMeta, error) {
-			execReport, err := v1_0_0.DecodeExecReportV1_0_0(abihelpers.MustGetMethodInputs(ccipdata.ManuallyExecute, offRampABI)[:1], report)
+			execReport, err := v1_0_0.DecodeExecReport(abihelpers.MustGetMethodInputs(ccipdata.ManuallyExecute, offRampABI)[:1], report)
 			if err != nil {
 				return nil, err
 			}
@@ -53,7 +53,7 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 	case ccipdata.V1_2_0, ccipdata.V1_3_0:
 		offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
 		return func(report []byte) (*txmgr.TxMeta, error) {
-			execReport, err := v1_2_0.DecodeExecReportV1_2_0(abihelpers.MustGetMethodInputs(ccipdata.ManuallyExecute, offRampABI)[:1], report)
+			execReport, err := v1_2_0.DecodeExecReport(abihelpers.MustGetMethodInputs(ccipdata.ManuallyExecute, offRampABI)[:1], report)
 			if err != nil {
 				return nil, err
 			}
@@ -79,5 +79,5 @@ func execReportToEthTxMeta(execReport ccipdata.ExecReport) (*txmgr.TxMeta, error
 // TODO should remove it and update tests to use Reader interface.
 func EncodeExecutionReport(report ccipdata.ExecReport) ([]byte, error) {
 	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
-	return v1_2_0.EncodeExecutionReportV1_2_0(abihelpers.MustGetMethodInputs(ccipdata.ManuallyExecute, offRampABI)[:1], report)
+	return v1_2_0.EncodeExecutionReport(abihelpers.MustGetMethodInputs(ccipdata.ManuallyExecute, offRampABI)[:1], report)
 }

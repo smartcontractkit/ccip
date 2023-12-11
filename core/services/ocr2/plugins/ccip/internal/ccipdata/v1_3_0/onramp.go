@@ -44,21 +44,21 @@ func init() {
 	CCIPSendRequestEventSigV1_3_0 = abihelpers.MustGetEventID(CCIPSendRequestedEventNameV1_3_0, onRampABI)
 }
 
-type LeafHasherV1_3_0 struct {
+type LeafHasher struct {
 	metaDataHash [32]byte
 	ctx          hashlib.Ctx[[32]byte]
 	onRamp       *evm_2_evm_onramp.EVM2EVMOnRamp
 }
 
-func NewLeafHasherV1_3_0(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp.EVM2EVMOnRamp) *LeafHasherV1_3_0 {
-	return &LeafHasherV1_3_0{
+func NewLeafHasher(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp.EVM2EVMOnRamp) *LeafHasher {
+	return &LeafHasher{
 		metaDataHash: v1_0_0.GetMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_3_0)), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
 		onRamp:       onRamp,
 	}
 }
 
-func (t *LeafHasherV1_3_0) HashLeaf(log types.Log) ([32]byte, error) {
+func (t *LeafHasher) HashLeaf(log types.Log) ([32]byte, error) {
 	msg, err := t.onRamp.ParseCCIPSendRequested(log)
 	if err != nil {
 		return [32]byte{}, err
@@ -236,7 +236,7 @@ func (o *OnRampV1_3_0) RegisterFilters(qopts ...pg.QOpt) error {
 	return logpollerutil.RegisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func NewOnRampV1_3_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_3_0, error) {
+func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_3_0, error) {
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
@@ -254,7 +254,7 @@ func NewOnRampV1_3_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 		lggr:                       lggr,
 		client:                     source,
 		lp:                         sourceLP,
-		leafHasher:                 NewLeafHasherV1_3_0(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
+		leafHasher:                 NewLeafHasher(sourceSelector, destSelector, onRampAddress, hashlib.NewKeccakCtx(), onRamp),
 		onRamp:                     onRamp,
 		filters:                    filters,
 		address:                    onRampAddress,

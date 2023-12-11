@@ -516,7 +516,7 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 			node.EventuallyNodeUsesNewCommitConfig(t, ccipTH, ccipdata.CommitOnchainConfig{
 				PriceRegistry: ccipTH.Dest.PriceRegistry.Address(),
 			})
-			node.EventuallyNodeUsesNewExecConfig(t, ccipTH, v1_2_0.ExecOnchainConfigV1_2_0{
+			node.EventuallyNodeUsesNewExecConfig(t, ccipTH, v1_2_0.ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: testhelpers.PermissionLessExecutionThresholdSeconds,
 				Router:                                  ccipTH.Dest.Router.Address(),
 				PriceRegistry:                           ccipTH.Dest.PriceRegistry.Address(),

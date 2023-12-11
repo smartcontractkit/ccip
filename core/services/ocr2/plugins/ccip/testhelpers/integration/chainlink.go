@@ -125,7 +125,7 @@ func (node *Node) EventuallyNodeUsesNewCommitConfig(t *testing.T, ccipContracts 
 	return log
 }
 
-func (node *Node) EventuallyNodeUsesNewExecConfig(t *testing.T, ccipContracts CCIPIntegrationTestHarness, execCfg v1_2_0.ExecOnchainConfigV1_2_0) logpoller.Log {
+func (node *Node) EventuallyNodeUsesNewExecConfig(t *testing.T, ccipContracts CCIPIntegrationTestHarness, execCfg v1_2_0.ExecOnchainConfig) logpoller.Log {
 	c, err := node.App.GetRelayers().LegacyEVMChains().Get(strconv.FormatUint(ccipContracts.Dest.ChainID, 10))
 	require.NoError(t, err)
 	var log logpoller.Log
@@ -139,7 +139,7 @@ func (node *Node) EventuallyNodeUsesNewExecConfig(t *testing.T, ccipContracts CC
 			pg.WithParentCtx(testutils.Context(t)),
 		)
 		require.NoError(t, err)
-		var latestCfg v1_2_0.ExecOnchainConfigV1_2_0
+		var latestCfg v1_2_0.ExecOnchainConfig
 		if log != nil {
 			latestCfg, err = DecodeExecOnChainConfig(log.Data)
 			require.NoError(t, err)
@@ -160,7 +160,7 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPIntegr
 		lgs, err := c.LogPoller().LogsDataWordRange(
 			v1_2_0.CCIPSendRequestEventSigV1_2_0,
 			onRamp,
-			v1_2_0.CCIPSendRequestSeqNumIndexV1_2_0,
+			v1_2_0.CCIPSendRequestSeqNumIndex,
 			abihelpers.EvmWord(uint64(seqNum)),
 			abihelpers.EvmWord(uint64(seqNum)),
 			1,
@@ -722,14 +722,14 @@ func DecodeCommitOnChainConfig(encoded []byte) (ccipdata.CommitOnchainConfig, er
 	return onchainConfig, nil
 }
 
-func DecodeExecOnChainConfig(encoded []byte) (v1_2_0.ExecOnchainConfigV1_2_0, error) {
-	var onchainConfig v1_2_0.ExecOnchainConfigV1_2_0
+func DecodeExecOnChainConfig(encoded []byte) (v1_2_0.ExecOnchainConfig, error) {
+	var onchainConfig v1_2_0.ExecOnchainConfig
 	unpacked, err := abihelpers.DecodeOCR2Config(encoded)
 	if err != nil {
 		return onchainConfig, errors.Wrap(err, "failed to unpack log data")
 	}
 	onChainCfg := unpacked.OnchainConfig
-	onchainConfig, err = abihelpers.DecodeAbiStruct[v1_2_0.ExecOnchainConfigV1_2_0](onChainCfg)
+	onchainConfig, err = abihelpers.DecodeAbiStruct[v1_2_0.ExecOnchainConfig](onChainCfg)
 	if err != nil {
 		return onchainConfig, err
 	}

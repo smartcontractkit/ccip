@@ -46,7 +46,7 @@ func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBe
 }
 
 func (c *CCIPContracts) CreateDefaultExecOnchainConfig(t *testing.T) []byte {
-	config, err := abihelpers.EncodeAbiStruct(v1_2_0.ExecOnchainConfigV1_2_0{
+	config, err := abihelpers.EncodeAbiStruct(v1_2_0.ExecOnchainConfig{
 		PermissionLessExecutionThresholdSeconds: PermissionLessExecutionThresholdSeconds,
 		Router:                                  c.Dest.Router.Address(),
 		PriceRegistry:                           c.Dest.PriceRegistry.Address(),

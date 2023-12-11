@@ -40,12 +40,12 @@ type offRampReaderTH struct {
 
 func TestOffRampFilters(t *testing.T) {
 	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_0_0.NewOffRampV1_0_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+		c, err := v1_0_0.NewOffRamp(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		return c
 	}, 3)
 	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_2_0.NewOffRampV1_2_0(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
+		c, err := v1_2_0.NewOffRamp(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
 		require.NoError(t, err)
 		return c
 	}, 3)
@@ -113,12 +113,12 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 func TestExecOnchainConfig100(t *testing.T) {
 	tests := []struct {
 		name      string
-		want      v1_0_0.ExecOnchainConfigV1_0_0
+		want      v1_0_0.ExecOnchainConfig
 		expectErr bool
 	}{
 		{
 			name: "encodes and decodes config with all fields set",
-			want: v1_0_0.ExecOnchainConfigV1_0_0{
+			want: v1_0_0.ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  utils.RandomAddress(),
 				PriceRegistry:                           utils.RandomAddress(),
@@ -128,7 +128,7 @@ func TestExecOnchainConfig100(t *testing.T) {
 		},
 		{
 			name: "encodes and fails decoding config with missing fields",
-			want: v1_0_0.ExecOnchainConfigV1_0_0{
+			want: v1_0_0.ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				MaxDataSize:                             rand.Uint32(),
 			},
@@ -140,7 +140,7 @@ func TestExecOnchainConfig100(t *testing.T) {
 			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := abihelpers.DecodeAbiStruct[v1_0_0.ExecOnchainConfigV1_0_0](encoded)
+			decoded, err := abihelpers.DecodeAbiStruct[v1_0_0.ExecOnchainConfig](encoded)
 			if tt.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {
@@ -154,12 +154,12 @@ func TestExecOnchainConfig100(t *testing.T) {
 func TestExecOnchainConfig120(t *testing.T) {
 	tests := []struct {
 		name      string
-		want      v1_2_0.ExecOnchainConfigV1_2_0
+		want      v1_2_0.ExecOnchainConfig
 		expectErr bool
 	}{
 		{
 			name: "encodes and decodes config with all fields set",
-			want: v1_2_0.ExecOnchainConfigV1_2_0{
+			want: v1_2_0.ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				Router:                                  utils.RandomAddress(),
 				PriceRegistry:                           utils.RandomAddress(),
@@ -170,7 +170,7 @@ func TestExecOnchainConfig120(t *testing.T) {
 		},
 		{
 			name: "encodes and fails decoding config with missing fields",
-			want: v1_2_0.ExecOnchainConfigV1_2_0{
+			want: v1_2_0.ExecOnchainConfig{
 				PermissionLessExecutionThresholdSeconds: rand.Uint32(),
 				MaxDataBytes:                            rand.Uint32(),
 			},
@@ -182,7 +182,7 @@ func TestExecOnchainConfig120(t *testing.T) {
 			encoded, err := abihelpers.EncodeAbiStruct(tt.want)
 			require.NoError(t, err)
 
-			decoded, err := abihelpers.DecodeAbiStruct[v1_2_0.ExecOnchainConfigV1_2_0](encoded)
+			decoded, err := abihelpers.DecodeAbiStruct[v1_2_0.ExecOnchainConfig](encoded)
 			if tt.expectErr {
 				require.ErrorContains(t, err, "must set")
 			} else {
