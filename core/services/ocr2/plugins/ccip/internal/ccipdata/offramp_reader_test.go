@@ -226,7 +226,7 @@ func TestOffRampReaderInit(t *testing.T) {
 }
 
 func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
-	user, bc := newSimulation(t)
+	user, bc := ccipdata.NewSimulation(t)
 	log := logger.TestLogger(t)
 	orm := logpoller.NewORM(testutils.SimulatedChainID, pgtest.NewSqlxDB(t), log, pgtest.NewQConfig(true))
 	lp := logpoller.NewLogPoller(
@@ -287,7 +287,7 @@ func setupOffRampV1_0_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	offRampAddr, tx, offRamp, err := evm_2_evm_offramp_1_0_0.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.AssertNonRevert(t, tx, bc, user)
 
 	// Verify the deployed OffRamp.
 	tav, err := offRamp.TypeAndVersion(&bind.CallOpts{
@@ -324,7 +324,7 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	offRampAddr, tx, offRamp, err := evm_2_evm_offramp_1_2_0.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.AssertNonRevert(t, tx, bc, user)
 
 	// Verify the deployed OffRamp.
 	tav, err := offRamp.TypeAndVersion(&bind.CallOpts{
@@ -361,7 +361,7 @@ func setupOffRampV1_3_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	offRampAddr, tx, offRamp, err := evm_2_evm_offramp.DeployEVM2EVMOffRamp(user, bc, staticConfig, sourceTokens, pools, rateLimiterConfig)
 	bc.Commit()
 	require.NoError(t, err)
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.AssertNonRevert(t, tx, bc, user)
 
 	// Verify the deployed OffRamp.
 	tav, err := offRamp.TypeAndVersion(&bind.CallOpts{
@@ -380,7 +380,7 @@ func deployMockArm(
 	armAddr, tx, _, err := mock_arm_contract.DeployMockARMContract(user, bc)
 	require.NoError(t, err)
 	bc.Commit()
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.AssertNonRevert(t, tx, bc, user)
 	require.NotEqual(t, common.Address{}, armAddr)
 	return armAddr
 }
@@ -402,7 +402,7 @@ func deployCommitStore(
 	})
 	require.NoError(t, err)
 	bc.Commit()
-	assertNonRevert(t, tx, bc, user)
+	ccipdata.AssertNonRevert(t, tx, bc, user)
 
 	// Test the deployed CommitStore.
 	callOpts := &bind.CallOpts{
