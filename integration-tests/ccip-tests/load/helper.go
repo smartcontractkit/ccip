@@ -267,10 +267,11 @@ func (l *loadArgs) TriggerLoadBySource() {
 func NewLoadArgs(t *testing.T, lggr zerolog.Logger, parent context.Context, chaosExps ...ChaosConfig) *loadArgs {
 	wg, _ := errgroup.WithContext(parent)
 	return &loadArgs{
-		t:         t,
-		lggr:      lggr,
-		RunnerWg:  wg,
-		TestCfg:   testsetups.NewCCIPTestConfig(t, lggr, testconfig.Load),
-		ChaosExps: chaosExps,
+		t:             t,
+		lggr:          lggr,
+		RunnerWg:      wg,
+		TestCfg:       testsetups.NewCCIPTestConfig(t, lggr, testconfig.Load),
+		ChaosExps:     chaosExps,
+		LoadStarterWg: &sync.WaitGroup{},
 	}
 }
