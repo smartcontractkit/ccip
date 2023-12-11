@@ -198,6 +198,7 @@ func (c *Chainlink) ApplyOverrides(from *Chainlink) {
 			} else {
 				c.Nodes = append(c.Nodes, node)
 			}
+			c.Nodes[i].ApplyOverrides(c.Common)
 		}
 	}
 	if from.NodeMemory != "" {
