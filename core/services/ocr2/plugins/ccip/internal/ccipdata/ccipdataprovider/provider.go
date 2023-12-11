@@ -37,5 +37,6 @@ func (p *EvmPriceRegistry) NewPriceRegistryReader(_ context.Context, addr common
 	if err != nil {
 		return nil, err
 	}
+
 	return observability.NewPriceRegistryReader(destPriceRegistryReader, p.ec.ConfiguredChainID().Int64(), p.pluginLabel), nil
 }
