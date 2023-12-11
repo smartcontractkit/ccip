@@ -196,6 +196,7 @@ jobs:
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
+          aws_role_duration_seconds: "7200"
 
       ## Run Cleanup if the job succeeds
       - name: cleanup
