@@ -1,0 +1,13 @@
+[CCIP]
+[CCIP.Env]
+[CCIP.Env.Chainlink]
+NoOfNodes = 6
+NodeMemory = '4Gi'
+NodeCPU = '2'
+DBMemory = '4Gi'
+DBCPU = '2'
+DBCapacity = '10Gi'
+IsStateful = true
+DBArgs = ['shared_buffers=1536MB', 'effective_cache_size=4096MB', 'work_mem=64MB']
+
+[CCIP.Env.Chainlink.Nodes]
