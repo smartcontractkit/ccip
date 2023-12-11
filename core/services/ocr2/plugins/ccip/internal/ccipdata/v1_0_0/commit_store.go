@@ -173,8 +173,8 @@ func (c *CommitStore) GasPriceEstimator() prices.GasPriceEstimatorCommit {
 	return c.gasPriceEstimator
 }
 
-// CommitOffchainConfigV1_0_0 is a legacy version of CommitOffchainConfigV1_2_0, used for CommitStore version 1.0.0 and 1.1.0
-type CommitOffchainConfigV1_0_0 struct {
+// CommitOffchainConfig is a legacy version of CommitOffchainConfig, used for CommitStore version 1.0.0 and 1.1.0
+type CommitOffchainConfig struct {
 	SourceFinalityDepth   uint32
 	DestFinalityDepth     uint32
 	FeeUpdateHeartBeat    models.Duration
@@ -183,7 +183,7 @@ type CommitOffchainConfigV1_0_0 struct {
 	InflightCacheExpiry   models.Duration
 }
 
-func (c CommitOffchainConfigV1_0_0) Validate() error {
+func (c CommitOffchainConfig) Validate() error {
 	if c.SourceFinalityDepth == 0 {
 		return errors.New("must set SourceFinalityDepth")
 	}
@@ -212,7 +212,7 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 		return common.Address{}, err
 	}
 
-	offchainConfigV1, err := ccipconfig.DecodeOffchainConfig[CommitOffchainConfigV1_0_0](offchainConfig)
+	offchainConfigV1, err := ccipconfig.DecodeOffchainConfig[CommitOffchainConfig](offchainConfig)
 	if err != nil {
 		return common.Address{}, err
 	}

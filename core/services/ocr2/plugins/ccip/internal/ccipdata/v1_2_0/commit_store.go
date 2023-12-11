@@ -171,7 +171,7 @@ func (c *CommitStore) GasPriceEstimator() prices.GasPriceEstimatorCommit {
 
 // Do not change the JSON format of this struct without consulting with
 // the RDD people first.
-type CommitOffchainConfigV1_2_0 struct {
+type CommitOffchainConfig struct {
 	SourceFinalityDepth      uint32
 	DestFinalityDepth        uint32
 	GasPriceHeartBeat        models.Duration
@@ -183,7 +183,7 @@ type CommitOffchainConfigV1_2_0 struct {
 	InflightCacheExpiry      models.Duration
 }
 
-func (c CommitOffchainConfigV1_2_0) Validate() error {
+func (c CommitOffchainConfig) Validate() error {
 	if c.SourceFinalityDepth == 0 {
 		return errors.New("must set SourceFinalityDepth")
 	}
@@ -219,7 +219,7 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 		return common.Address{}, err
 	}
 
-	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[CommitOffchainConfigV1_2_0](offchainConfig)
+	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[CommitOffchainConfig](offchainConfig)
 	if err != nil {
 		return common.Address{}, err
 	}

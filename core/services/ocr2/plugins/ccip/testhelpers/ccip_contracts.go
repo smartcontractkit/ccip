@@ -79,7 +79,7 @@ var (
 
 type MessageExecutionState ccipdata.MessageExecutionState
 type CommitOffchainConfig struct {
-	v1_2_0.CommitOffchainConfigV1_2_0
+	v1_2_0.CommitOffchainConfig
 }
 
 func NewCommitOffchainConfig(SourceFinalityDepth uint32,
@@ -91,7 +91,7 @@ func NewCommitOffchainConfig(SourceFinalityDepth uint32,
 	TokenPriceDeviationPPB uint32,
 	MaxGasPrice uint64,
 	InflightCacheExpiry models.Duration) CommitOffchainConfig {
-	return CommitOffchainConfig{v1_2_0.CommitOffchainConfigV1_2_0{
+	return CommitOffchainConfig{v1_2_0.CommitOffchainConfig{
 		SourceFinalityDepth:      SourceFinalityDepth,
 		DestFinalityDepth:        DestFinalityDepth,
 		GasPriceHeartBeat:        GasPriceHeartBeat,

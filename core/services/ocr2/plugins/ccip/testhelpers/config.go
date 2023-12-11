@@ -30,7 +30,7 @@ func (c *CCIPContracts) CreateDefaultCommitOffchainConfig(t *testing.T) []byte {
 }
 
 func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBeat time.Duration, inflightCacheExpiry time.Duration) []byte {
-	config, err := ccipconfig.EncodeOffchainConfig(v1_2_0.CommitOffchainConfigV1_2_0{
+	config, err := ccipconfig.EncodeOffchainConfig(v1_2_0.CommitOffchainConfig{
 		SourceFinalityDepth:      1,
 		DestFinalityDepth:        1,
 		GasPriceHeartBeat:        models.MustMakeDuration(feeUpdateHearBeat),
