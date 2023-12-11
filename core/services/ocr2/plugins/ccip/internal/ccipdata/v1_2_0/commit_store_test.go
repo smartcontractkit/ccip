@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
-func TestCommitReportEncodingV_1_2_0(t *testing.T) {
+func TestCommitReportEncoding(t *testing.T) {
 	report := ccipdata.CommitStoreReport{
 		TokenPrices: []ccipdata.TokenPrice{
 			{
