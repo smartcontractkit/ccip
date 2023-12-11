@@ -128,7 +128,11 @@ func (l *loadArgs) TriggerLoadByLane() {
 		l.AddToRunnerGroup(loadRunner)
 	}
 	for _, lane := range l.TestSetupArgs.Lanes {
-		startLoad(lane.ForwardLane)
+		l.LoadStarterWg.Add(1)
+		go func() {
+			defer l.LoadStarterWg.Done()
+			startLoad(lane.ForwardLane)
+		}()
 		if pointer.GetBool(l.TestSetupArgs.Cfg.TestGroupInput.BiDirectionalLane) {
 			l.LoadStarterWg.Add(1)
 			go func() {
