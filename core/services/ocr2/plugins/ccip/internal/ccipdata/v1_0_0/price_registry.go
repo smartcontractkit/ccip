@@ -202,8 +202,8 @@ func (p *PriceRegistry) GetTokensDecimals(ctx context.Context, tokenAddresses []
 	return tokenDecimals, nil
 }
 
-// ApplyPriceRegistryUpdateV1_0_0 is a helper function used in tests only.
-func ApplyPriceRegistryUpdateV1_0_0(t *testing.T, user *bind.TransactOpts, addr common.Address, ec client.Client, gasPrice []ccipdata.GasPrice, tokenPrices []ccipdata.TokenPrice) {
+// ApplyPriceRegistryUpdate is a helper function used in tests only.
+func ApplyPriceRegistryUpdate(t *testing.T, user *bind.TransactOpts, addr common.Address, ec client.Client, gasPrice []ccipdata.GasPrice, tokenPrices []ccipdata.TokenPrice) {
 	require.True(t, len(gasPrice) <= 1)
 	pr, err := price_registry_1_0_0.NewPriceRegistry(addr, ec)
 	require.NoError(t, err)

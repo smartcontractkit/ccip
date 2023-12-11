@@ -61,10 +61,10 @@ func (c *CommitStore) GetCommitStoreStaticConfig(ctx context.Context) (ccipdata.
 }
 
 func (c *CommitStore) EncodeCommitReport(report ccipdata.CommitStoreReport) ([]byte, error) {
-	return EncodeCommitReportV1_2_0(c.commitReportArgs, report)
+	return EncodeCommitReport(c.commitReportArgs, report)
 }
 
-func EncodeCommitReportV1_2_0(commitReportArgs abi.Arguments, report ccipdata.CommitStoreReport) ([]byte, error) {
+func EncodeCommitReport(commitReportArgs abi.Arguments, report ccipdata.CommitStoreReport) ([]byte, error) {
 	var tokenPriceUpdates []commit_store.InternalTokenPriceUpdate
 	for _, tokenPriceUpdate := range report.TokenPrices {
 		tokenPriceUpdates = append(tokenPriceUpdates, commit_store.InternalTokenPriceUpdate{
