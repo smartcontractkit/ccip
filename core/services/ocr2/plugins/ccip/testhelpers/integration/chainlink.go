@@ -17,7 +17,6 @@ import (
 	types3 "github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
 	"github.com/onsi/gomega"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
@@ -66,28 +65,56 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
 
-const Spec = `
-type = "offchainreporting2"
-schemaVersion = 1
-name = "ccip-exec-1"
-externalJobID      = "67ffad71-d90f-4fe3-b4e4-494924b707fb"
-forwardingAllowed = false
-maxTaskDuration = "0s"
-contractID = "%s"
-contractConfigConfirmations = 1
-contractConfigTrackerPollInterval = "20s"
-ocrKeyBundleID = "%s"
-relay = "evm"
-pluginType = "ccip-execution"
-transmitterID = "%s"
-
-[relayConfig]
-chainID = 1_337
-
-[pluginConfig]
-destStartBlock = 54_107_661
-sourceStartBlock = 17_052_797
-`
+const (
+	execSpecTemplate = `
+		type = "offchainreporting2"
+		schemaVersion = 1
+		name = "ccip-exec-1"
+		externalJobID      = "67ffad71-d90f-4fe3-b4e4-494924b707fb"
+		forwardingAllowed = false
+		maxTaskDuration = "0s"
+		contractID = "%s"
+		contractConfigConfirmations = 1
+		contractConfigTrackerPollInterval = "20s"
+		ocrKeyBundleID = "%s"
+		relay = "evm"
+		pluginType = "ccip-execution"
+		transmitterID = "%s"
+		
+		[relayConfig]
+		chainID = 1_337
+		
+		[pluginConfig]
+		destStartBlock = 54_107_661
+		sourceStartBlock = 17_052_797
+	`
+	commitSpecTemplate = `
+		type = "offchainreporting2"
+		schemaVersion = 1
+		name = "ccip-commit-1"
+		externalJobID = "13c997cf-1a14-4ab7-9068-07ee6d2afa55"
+		forwardingAllowed = false
+		maxTaskDuration = "0s"
+		contractID = "%s"
+		contractConfigConfirmations = 1
+		contractConfigTrackerPollInterval = "20s"
+		ocrKeyBundleID = "%s"
+		relay = "evm"
+		pluginType = "ccip-commit"
+		transmitterID = "%s"
+		
+		[relayConfig]
+		chainID = 1_337
+		
+		[pluginConfig]
+		destStartBlock = 54_107_661
+		offRamp = "%s"
+		sourceStartBlock = 17_052_797
+		tokenPricesUSDPipeline = """
+		merge [type=merge left="{}" right="{\\"0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28\\":\\"10000000000000000000\\",\\"0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63\\":\\"1000000\\",\\"0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a\\":\\"1800000000000000000000\\",\\"0x4200000000000000000000000000000000000006\\":\\"1800000000000000000000\\"}"];
+		"""
+	`
+)
 
 type Node struct {
 	App             chainlink.Application
@@ -490,38 +517,28 @@ func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobS
 
 func (c *CCIPIntegrationTestHarness) jobSpecProposal(
 	t *testing.T,
+	specTemplate string,
 	f func() (*ctfClient.OCR2TaskJobSpec, error),
-	keyBundleID string,
-	transmitter string,
-
+	version int32,
+	opts ...any,
 ) feeds2.ProposeJobArgs {
 	spec, err := f()
 	require.NoError(t, err)
 
-	spec.OCR2OracleSpec.OCRKeyBundleID.SetValid(keyBundleID)
-	spec.OCR2OracleSpec.TransmitterID.SetValid(transmitter)
-
-	rawSpec, err := toml.Marshal(&spec.OCR2OracleSpec)
-	require.NoError(t, err)
-	fmt.Println(rawSpec)
-
-	s, err := spec.String()
-	require.NoError(t, err)
-	fmt.Println(s)
+	args := []any{spec.OCR2OracleSpec.ContractID}
+	args = append(args, opts...)
 
 	return feeds2.ProposeJobArgs{
 		FeedsManagerID: 1,
-		RemoteUUID:     uuid.UUID{},
+		RemoteUUID:     uuid.New(),
 		Multiaddrs:     nil,
-		Version:        1,
-		Spec:           fmt.Sprintf(Spec, spec.OCR2OracleSpec.ContractID, keyBundleID, transmitter),
+		Version:        version,
+		Spec:           fmt.Sprintf(specTemplate, args...),
 	}
 }
 
 func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams) {
 	ctx := testutils.Context(t)
-
-	//commitSpec := c.jobSpecProposal(t, jobParams.CommitJobSpec)
 
 	for _, node := range c.Nodes {
 		f := node.App.GetFeedsService()
@@ -535,9 +552,7 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 			PublicKey: *pkey,
 		}
 
-		execSpec := c.jobSpecProposal(t, jobParams.ExecutionJobSpec, node.KeyBundle.ID(), node.Transmitter.Hex())
-
-		id, err := f.RegisterManager(ctx, m)
+		execId, err := f.RegisterManager(ctx, m)
 		require.NoError(t, err)
 
 		connManager := feedsMocks.NewConnectionsManager(t)
@@ -545,10 +560,34 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 		connManager.On("Close").Maybe().Return()
 		f.Unsafe_SetConnectionsManager(connManager)
 
-		id, err = f.ProposeJob(ctx, &execSpec)
+		execSpec := c.jobSpecProposal(
+			t,
+			execSpecTemplate,
+			jobParams.ExecutionJobSpec,
+			1,
+			node.KeyBundle.ID(),
+			node.Transmitter.Hex(),
+		)
+		execId, err = f.ProposeJob(ctx, &execSpec)
 		require.NoError(t, err)
 
-		err = f.ApproveSpec(ctx, id, true)
+		err = f.ApproveSpec(ctx, execId, true)
+		require.NoError(t, err)
+
+		commitSpec := c.jobSpecProposal(
+			t,
+			commitSpecTemplate,
+			jobParams.CommitJobSpec,
+			2,
+			node.KeyBundle.ID(),
+			node.Transmitter.Hex(),
+			jobParams.OffRamp.String(),
+		)
+
+		commitId, err := f.ProposeJob(ctx, &commitSpec)
+		require.NoError(t, err)
+
+		err = f.ApproveSpec(ctx, commitId, true)
 		require.NoError(t, err)
 	}
 }
