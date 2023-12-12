@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net/http"
 	"slices"
 	"sort"
 	"sync"
@@ -16,13 +17,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	evmclient "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/utils/mathutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
@@ -54,9 +60,11 @@ type update struct {
 type CommitPluginStaticConfig struct {
 	lggr logger.Logger
 	// Source
-	onRampReader        ccipdata.OnRampReader
-	sourceChainSelector uint64
-	sourceNative        common.Address
+	onRampReader         ccipdata.OnRampReader
+	sourceChainSelector  uint64
+	sourceNative         common.Address
+	mercuryVerifierProxy common.Address
+	sourceClient         evmclient.Client
 	// Dest
 	offRamp               ccipdata.OffRampReader
 	commitStore           ccipdata.CommitStoreReader
@@ -64,6 +72,15 @@ type CommitPluginStaticConfig struct {
 	priceRegistryProvider ccipdataprovider.PriceRegistry
 	// Offchain
 	priceGetter pricegetter.PriceGetter
+	mercCreds   *models.MercuryCredentials
+
+	// job info
+	tokenPricesUSDPipeline string
+	pipelineRunner         pipeline.Runner
+	job                    job.Job
+	// identity
+	// ocr2Address is the OCR2 key's on-chain public key represented as an ethereum address
+	ocr2Address common.Address
 }
 
 type CommitReportingPlugin struct {
@@ -134,6 +151,38 @@ func (rf *CommitReportingPluginFactory) UpdateDynamicReaders(newPriceRegAddr com
 	return nil
 }
 
+func (rf *CommitReportingPluginFactory) UpdatePriceGetter(priceRegistryReader ccipdata.PriceRegistryReader) error {
+	var (
+		priceGetter pricegetter.PriceGetter
+	)
+	// only use mercury if valid parameters are set:
+	// mercury config available
+	// verifier proxy set in plugin config
+	if rf.config.mercCreds != nil && rf.config.mercuryVerifierProxy.Big().Cmp(big.NewInt(0)) >= 1 {
+		configInfoGetter, err := merclib.NewCachedConfigInfoGetter(rf.config.sourceClient, 2*time.Hour, rf.config.mercuryVerifierProxy)
+		if err != nil {
+			return fmt.Errorf("error creating mercury config info getter: %w", err)
+		}
+		reportVerifier := merclib.NewOfflineVerifier(configInfoGetter)
+		mercClient := merclib.NewMercuryClient(
+			rf.config.mercCreds,
+			http.DefaultClient,
+			rf.config.lggr.Named("MercuryClient"),
+			reportVerifier)
+		priceGetter = pricegetter.NewMercuryGetter(mercClient, priceRegistryReader)
+	} else {
+		var err error
+		priceGetter, err = pricegetter.NewPipelineGetter(
+			rf.config.tokenPricesUSDPipeline, rf.config.pipelineRunner, rf.config.job.ID, rf.config.job.ExternalJobID, rf.config.job.Name.ValueOrZero(), rf.config.lggr.Named("PipelineGetter"))
+		if err != nil {
+			return fmt.Errorf("error creating pipeline price getter: %w", err)
+		}
+	}
+
+	rf.config.priceGetter = priceGetter
+	return nil
+}
+
 // NewReportingPlugin returns the ccip CommitReportingPlugin and satisfies the ReportingPluginFactory interface.
 func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.ReportingPluginConfig) (types.ReportingPlugin, types.ReportingPluginInfo, error) {
 	destPriceReg, err := rf.config.commitStore.ChangeConfig(config.OnchainConfig, config.OffchainConfig)
@@ -141,6 +190,9 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 	if err = rf.UpdateDynamicReaders(destPriceReg); err != nil {
+		return nil, types.ReportingPluginInfo{}, err
+	}
+	if err = rf.UpdatePriceGetter(rf.destPriceRegReader); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 

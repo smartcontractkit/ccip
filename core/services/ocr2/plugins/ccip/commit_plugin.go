@@ -15,15 +15,16 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
+	"github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
@@ -34,7 +35,7 @@ type BackfillArgs struct {
 	sourceStartBlock, destStartBlock int64
 }
 
-func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *BackfillArgs, error) {
+func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, mercConfig config.Mercury, kb ocr2key.KeyBundle, qopts ...pg.QOpt) (*CommitPluginStaticConfig, *BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, nil, errors.New("spec is nil")
 	}
@@ -66,10 +67,6 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	commitLggr := lggr.Named("CCIPCommit").With(
 		"sourceChain", ChainName(sourceChainID),
 		"destChain", ChainName(destChainID))
-	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	// Load all the readers relevant for this plugin.
 	onRampReader, err := ccipdata.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
@@ -106,15 +103,21 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		"sourceNative", sourceNative,
 		"sourceRouter", sourceRouter.Address())
 	return &CommitPluginStaticConfig{
-			lggr:                  commitLggr,
-			onRampReader:          onRampReader,
-			offRamp:               offRampReader,
-			priceGetter:           pipelinePriceGetter,
-			sourceNative:          sourceNative,
-			sourceChainSelector:   staticConfig.SourceChainSelector,
-			destChainSelector:     staticConfig.ChainSelector,
-			commitStore:           commitStoreReader,
-			priceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), commitLggr, CommitPluginLabel),
+			lggr:                   commitLggr,
+			onRampReader:           onRampReader,
+			offRamp:                offRampReader,
+			sourceNative:           sourceNative,
+			sourceChainSelector:    staticConfig.SourceChainSelector,
+			destChainSelector:      staticConfig.ChainSelector,
+			commitStore:            commitStoreReader,
+			priceRegistryProvider:  ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), commitLggr, CommitPluginLabel),
+			mercCreds:              mercConfig.Credentials("ccip_commit"),
+			job:                    jb,
+			pipelineRunner:         pr,
+			tokenPricesUSDPipeline: pluginConfig.TokenPricesUSDPipeline,
+			mercuryVerifierProxy:   common.HexToAddress(pluginConfig.MercuryVerifierProxyAddress),
+			ocr2Address:            common.BytesToAddress(kb.PublicKey()),
+			sourceClient:           sourceChain.Client(),
 		}, &BackfillArgs{
 			sourceLP:         sourceChain.LogPoller(),
 			destLP:           destChain.LogPoller(),
@@ -123,8 +126,8 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		}, nil
 }
 
-func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
+func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), mercConfig config.Mercury, kb ocr2key.KeyBundle, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, mercConfig, kb, qopts...)
 	if err != nil {
 		return nil, err
 	}
@@ -175,8 +178,8 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 // https://github.com/smartcontractkit/ccip/blob/68e2197472fb017dd4e5630d21e7878d58bc2a44/core/services/feeds/service.go#L716
 // TODO once that transaction is broken up, we should be able to simply rely on oracle.Close() to cleanup the filters.
 // Until then we have to deterministically reload the readers from the spec (and thus their filters) and close them.
-func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	commitPluginConfig, _, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet)
+func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet evm.LegacyChainContainer, mercConfig config.Mercury, kb ocr2key.KeyBundle, qopts ...pg.QOpt) error {
+	commitPluginConfig, _, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, mercConfig, kb, qopts...)
 	if err != nil {
 		return errors.New("spec is nil")
 	}

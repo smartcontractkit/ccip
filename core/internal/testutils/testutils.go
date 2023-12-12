@@ -109,6 +109,15 @@ func Random32Byte() (b [32]byte) {
 	return b
 }
 
+// RandomFeedIDV3 returns a random Mercury feed ID for schema version 3
+func RandomFeedIDV3() (r [32]byte) {
+	randBytes := Random32Byte()
+	schemaBytes := hexutil.MustDecode("0x0003")
+	feedID := append(schemaBytes, randBytes[2:]...)
+	copy(r[:], feedID)
+	return
+}
+
 // RandomizeName appends a random UUID to the provided name
 func RandomizeName(n string) string {
 	id := uuid.New().String()

@@ -16,6 +16,9 @@ type CommitPluginJobSpecConfig struct {
 	//		The SOURCE chain wrapped native
 	// 		The DESTINATION supported tokens (including fee tokens) as defined in destination OffRamp and PriceRegistry.
 	TokenPricesUSDPipeline string `json:"tokenPricesUSDPipeline"`
+	// MercuryVerifierProxyAddress is the address of the mercury DON verifier proxy contract
+	// on the source chain.
+	MercuryVerifierProxyAddress string `json:"verifierProxyAddress"`
 }
 
 // ExecutionPluginJobSpecConfig contains the plugin specific variables for the ccip.CCIPExecution plugin.
