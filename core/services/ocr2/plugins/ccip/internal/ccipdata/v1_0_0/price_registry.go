@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -47,6 +45,59 @@ type PriceRegistry struct {
 
 	feeTokensCache     cache.AutoSync[[]common.Address]
 	tokenDecimalsCache sync.Map
+}
+
+func NewPriceRegistry(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistry, error) {
+	priceRegistry, err := price_registry_1_0_0.NewPriceRegistry(priceRegistryAddr, ec)
+	if err != nil {
+		return nil, err
+	}
+	priceRegABI := abihelpers.MustParseABI(price_registry_1_0_0.PriceRegistryABI)
+	usdPerTokenUpdated := abihelpers.MustGetEventID("UsdPerTokenUpdated", priceRegABI)
+	feeTokenRemoved := abihelpers.MustGetEventID("FeeTokenRemoved", priceRegABI)
+	feeTokenAdded := abihelpers.MustGetEventID("FeeTokenAdded", priceRegABI)
+	var filters = []logpoller.Filter{
+		{
+			Name:      logpoller.FilterName(ccipdata.COMMIT_PRICE_UPDATES, priceRegistryAddr.String()),
+			EventSigs: []common.Hash{UsdPerUnitGasUpdated, usdPerTokenUpdated},
+			Addresses: []common.Address{priceRegistryAddr},
+		},
+		{
+			Name:      logpoller.FilterName(ccipdata.FEE_TOKEN_ADDED, priceRegistryAddr.String()),
+			EventSigs: []common.Hash{feeTokenAdded},
+			Addresses: []common.Address{priceRegistryAddr},
+		},
+		{
+			Name:      logpoller.FilterName(ccipdata.FEE_TOKEN_REMOVED, priceRegistryAddr.String()),
+			EventSigs: []common.Hash{feeTokenRemoved},
+			Addresses: []common.Address{priceRegistryAddr},
+		}}
+	err = logpollerutil.RegisterLpFilters(lp, filters)
+	if err != nil {
+		return nil, err
+	}
+	return &PriceRegistry{
+		priceRegistry: priceRegistry,
+		address:       priceRegistryAddr,
+		lp:            lp,
+		evmBatchCaller: rpclib.NewDynamicLimitedBatchCaller(
+			lggr,
+			ec,
+			rpclib.DefaultRpcBatchSizeLimit,
+			rpclib.DefaultRpcBatchBackOffMultiplier,
+		),
+		lggr:            lggr,
+		gasUpdated:      UsdPerUnitGasUpdated,
+		tokenUpdated:    usdPerTokenUpdated,
+		feeTokenRemoved: feeTokenRemoved,
+		feeTokenAdded:   feeTokenAdded,
+		filters:         filters,
+		feeTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
+			lp,
+			[]common.Hash{feeTokenAdded, feeTokenRemoved},
+			priceRegistryAddr,
+		),
+	}, nil
 }
 
 func (p *PriceRegistry) GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]ccipdata.TokenPriceUpdate, error) {
@@ -200,83 +251,4 @@ func (p *PriceRegistry) GetTokensDecimals(ctx context.Context, tokenAddresses []
 		}
 	}
 	return tokenDecimals, nil
-}
-
-// ApplyPriceRegistryUpdate is a helper function used in tests only.
-func ApplyPriceRegistryUpdate(t *testing.T, user *bind.TransactOpts, addr common.Address, ec client.Client, gasPrice []ccipdata.GasPrice, tokenPrices []ccipdata.TokenPrice) {
-	require.True(t, len(gasPrice) <= 1)
-	pr, err := price_registry_1_0_0.NewPriceRegistry(addr, ec)
-	require.NoError(t, err)
-	var tps []price_registry_1_0_0.InternalTokenPriceUpdate
-	for _, tp := range tokenPrices {
-		tps = append(tps, price_registry_1_0_0.InternalTokenPriceUpdate{
-			SourceToken: tp.Token,
-			UsdPerToken: tp.Value,
-		})
-	}
-	dest := uint64(0)
-	gas := big.NewInt(0)
-	if len(gasPrice) == 1 {
-		dest = gasPrice[0].DestChainSelector
-		gas = gasPrice[0].Value
-	}
-	_, err = pr.UpdatePrices(user, price_registry_1_0_0.InternalPriceUpdates{
-		TokenPriceUpdates: tps,
-		DestChainSelector: dest,
-		UsdPerUnitGas:     gas,
-	})
-	require.NoError(t, err)
-}
-
-func NewPriceRegistry(lggr logger.Logger, priceRegistryAddr common.Address, lp logpoller.LogPoller, ec client.Client) (*PriceRegistry, error) {
-	priceRegistry, err := price_registry_1_0_0.NewPriceRegistry(priceRegistryAddr, ec)
-	if err != nil {
-		return nil, err
-	}
-	priceRegABI := abihelpers.MustParseABI(price_registry_1_0_0.PriceRegistryABI)
-	usdPerTokenUpdated := abihelpers.MustGetEventID("UsdPerTokenUpdated", priceRegABI)
-	feeTokenRemoved := abihelpers.MustGetEventID("FeeTokenRemoved", priceRegABI)
-	feeTokenAdded := abihelpers.MustGetEventID("FeeTokenAdded", priceRegABI)
-	var filters = []logpoller.Filter{
-		{
-			Name:      logpoller.FilterName(ccipdata.COMMIT_PRICE_UPDATES, priceRegistryAddr.String()),
-			EventSigs: []common.Hash{UsdPerUnitGasUpdated, usdPerTokenUpdated},
-			Addresses: []common.Address{priceRegistryAddr},
-		},
-		{
-			Name:      logpoller.FilterName(ccipdata.FEE_TOKEN_ADDED, priceRegistryAddr.String()),
-			EventSigs: []common.Hash{feeTokenAdded},
-			Addresses: []common.Address{priceRegistryAddr},
-		},
-		{
-			Name:      logpoller.FilterName(ccipdata.FEE_TOKEN_REMOVED, priceRegistryAddr.String()),
-			EventSigs: []common.Hash{feeTokenRemoved},
-			Addresses: []common.Address{priceRegistryAddr},
-		}}
-	err = logpollerutil.RegisterLpFilters(lp, filters)
-	if err != nil {
-		return nil, err
-	}
-	return &PriceRegistry{
-		priceRegistry: priceRegistry,
-		address:       priceRegistryAddr,
-		lp:            lp,
-		evmBatchCaller: rpclib.NewDynamicLimitedBatchCaller(
-			lggr,
-			ec,
-			rpclib.DefaultRpcBatchSizeLimit,
-			rpclib.DefaultRpcBatchBackOffMultiplier,
-		),
-		lggr:            lggr,
-		gasUpdated:      UsdPerUnitGasUpdated,
-		tokenUpdated:    usdPerTokenUpdated,
-		feeTokenRemoved: feeTokenRemoved,
-		feeTokenAdded:   feeTokenAdded,
-		filters:         filters,
-		feeTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
-			lp,
-			[]common.Hash{feeTokenAdded, feeTokenRemoved},
-			priceRegistryAddr,
-		),
-	}, nil
 }
