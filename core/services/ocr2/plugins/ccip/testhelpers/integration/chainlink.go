@@ -109,7 +109,7 @@ const (
 		destStartBlock = 50
 		offRamp = "%s"
 		tokenPricesUSDPipeline = """
-		merge [type=merge left="{}" right="{\\"0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28\\":\\"10000000000000000000\\",\\"0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63\\":\\"1000000\\",\\"0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a\\":\\"1800000000000000000000\\",\\"0x4200000000000000000000000000000000000006\\":\\"1800000000000000000000\\"}"];
+		%s
 		"""
 	`
 )
@@ -535,11 +535,15 @@ func (c *CCIPIntegrationTestHarness) jobSpecProposal(
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams) {
-	ctx := testutils.Context(t)
-
+func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
 	for _, node := range c.Nodes {
 		f := node.App.GetFeedsService()
+
+		managers, err := f.ListManagers()
+		if len(managers) > 0 {
+			// Use at most one feeds manager, don't register if one already exists
+			continue
+		}
 
 		pkey, err := crypto.PublicKeyFromHex("aaf296b9252377d04ef51c1a5ed9640f82bd8cd31e2ac5895565b3c340a8f053")
 		require.NoError(t, err)
@@ -550,13 +554,21 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 			PublicKey: *pkey,
 		}
 
-		execId, err := f.RegisterManager(ctx, m)
+		_, err = f.RegisterManager(testutils.Context(t), m)
 		require.NoError(t, err)
 
 		connManager := feedsMocks.NewConnectionsManager(t)
 		connManager.On("GetClient", mock.Anything).Return(NoopFeedsClient{}, nil)
 		connManager.On("Close").Maybe().Return()
 		f.Unsafe_SetConnectionsManager(connManager)
+	}
+}
+
+func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams, pipeline string) {
+	ctx := testutils.Context(t)
+
+	for _, node := range c.Nodes {
+		f := node.App.GetFeedsService()
 
 		execSpec := c.jobSpecProposal(
 			t,
@@ -566,7 +578,7 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 			node.KeyBundle.ID(),
 			node.Transmitter.Hex(),
 		)
-		execId, err = f.ProposeJob(ctx, &execSpec)
+		execId, err := f.ProposeJob(ctx, &execSpec)
 		require.NoError(t, err)
 
 		err = f.ApproveSpec(ctx, execId, true)
@@ -580,6 +592,7 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 			node.KeyBundle.ID(),
 			node.Transmitter.Hex(),
 			jobParams.OffRamp.String(),
+			pipeline,
 		)
 
 		commitId, err := f.ProposeJob(ctx, &commitSpec)

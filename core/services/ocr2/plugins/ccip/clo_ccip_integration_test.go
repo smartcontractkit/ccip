@@ -39,6 +39,8 @@ merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_p
 	defer ethUSD.Close()
 
 	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399)
+	ccipTH.SetupFeedsManager(t)
 
-	ccipTH.ApproveJobSpecs(t, jobParams)
+	ccipTH.ApproveJobSpecs(t, jobParams, tokenPricesUSDPipeline)
+	//ccipTH.ApproveJobSpecs(t, jobParams)
 }
