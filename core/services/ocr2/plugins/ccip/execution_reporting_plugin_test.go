@@ -351,7 +351,6 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	p.commitStoreReader = commitStore
 
 	lp := lpMocks.NewLogPoller(t)
-	lp.On("RegisterFilter", mock.Anything).Return(nil)
 	offRampReader, err := ccipdata.NewOffRampV1_0_0(logger.TestLogger(t), utils.RandomAddress(), nil, lp, nil)
 	assert.NoError(t, err)
 	p.offRampReader = offRampReader
