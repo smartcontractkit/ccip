@@ -75,10 +75,3 @@ func commitReportToEthTxMeta(commitReport ccipdata.CommitStoreReport) (*txmgr.Tx
 		SeqNumbers: seqRange,
 	}, nil
 }
-
-// EncodeCommitReport is only used in tests
-// TODO should remove it and update tests to use Reader interface.
-func EncodeCommitReport(report ccipdata.CommitStoreReport) ([]byte, error) {
-	commitStoreABI := abihelpers.MustParseABI(commit_store.CommitStoreABI)
-	return v1_2_0.EncodeCommitReport(abihelpers.MustGetEventInputs(v1_0_0.ReportAccepted, commitStoreABI), report)
-}
