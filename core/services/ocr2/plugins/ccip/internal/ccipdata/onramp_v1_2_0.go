@@ -3,7 +3,6 @@ package ccipdata
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -13,8 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
@@ -37,85 +35,20 @@ const (
 )
 
 func init() {
-	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp.EVM2EVMOnRampABI))
+	onRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_onramp_1_2_0.EVM2EVMOnRampABI))
 	if err != nil {
 		panic(err)
 	}
 	CCIPSendRequestEventSigV1_2_0 = abihelpers.MustGetEventID(CCIPSendRequestedEventNameV1_2_0, onRampABI)
 }
 
-// Backwards compat for integration tests
-func DecodeOffRampMessageV1_2_0(b []byte) (*evm_2_evm_offramp.InternalEVM2EVMMessage, error) {
-	offRampABI, err := abi.JSON(strings.NewReader(evm_2_evm_offramp.EVM2EVMOffRampABI))
-	if err != nil {
-		panic(err)
-	}
-	event, ok := offRampABI.Events[EVM2EVMOffRampEventNameV1_2_0]
-	if !ok {
-		panic("no such event")
-	}
-	unpacked, err := event.Inputs.Unpack(b)
-	if err != nil {
-		return nil, err
-	}
-	if len(unpacked) == 0 {
-		return nil, fmt.Errorf("no message found when unpacking")
-	}
-
-	// Note must use unnamed type here
-	receivedCp, ok := unpacked[0].(struct {
-		SourceChainSelector uint64         `json:"sourceChainSelector"`
-		Sender              common.Address `json:"sender"`
-		Receiver            common.Address `json:"receiver"`
-		SequenceNumber      uint64         `json:"sequenceNumber"`
-		GasLimit            *big.Int       `json:"gasLimit"`
-		Strict              bool           `json:"strict"`
-		Nonce               uint64         `json:"nonce"`
-		FeeToken            common.Address `json:"feeToken"`
-		FeeTokenAmount      *big.Int       `json:"feeTokenAmount"`
-		Data                []uint8        `json:"data"`
-		TokenAmounts        []struct {
-			Token  common.Address `json:"token"`
-			Amount *big.Int       `json:"amount"`
-		} `json:"tokenAmounts"`
-		SourceTokenData [][]byte `json:"sourceTokenData"`
-		MessageId       [32]byte `json:"messageId"`
-	})
-	if !ok {
-		return nil, fmt.Errorf("invalid format have %T want %T", unpacked[0], receivedCp)
-	}
-	var tokensAndAmounts []evm_2_evm_offramp.ClientEVMTokenAmount
-	for _, tokenAndAmount := range receivedCp.TokenAmounts {
-		tokensAndAmounts = append(tokensAndAmounts, evm_2_evm_offramp.ClientEVMTokenAmount{
-			Token:  tokenAndAmount.Token,
-			Amount: tokenAndAmount.Amount,
-		})
-	}
-
-	return &evm_2_evm_offramp.InternalEVM2EVMMessage{
-		SourceChainSelector: receivedCp.SourceChainSelector,
-		Sender:              receivedCp.Sender,
-		Receiver:            receivedCp.Receiver,
-		SequenceNumber:      receivedCp.SequenceNumber,
-		GasLimit:            receivedCp.GasLimit,
-		Strict:              receivedCp.Strict,
-		Nonce:               receivedCp.Nonce,
-		FeeToken:            receivedCp.FeeToken,
-		FeeTokenAmount:      receivedCp.FeeTokenAmount,
-		Data:                receivedCp.Data,
-		TokenAmounts:        tokensAndAmounts,
-		SourceTokenData:     receivedCp.SourceTokenData,
-		MessageId:           receivedCp.MessageId,
-	}, nil
-}
-
 type LeafHasherV1_2_0 struct {
 	metaDataHash [32]byte
 	ctx          hashlib.Ctx[[32]byte]
-	onRamp       *evm_2_evm_onramp.EVM2EVMOnRamp
+	onRamp       *evm_2_evm_onramp_1_2_0.EVM2EVMOnRamp
 }
 
-func NewLeafHasherV1_2_0(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp.EVM2EVMOnRamp) *LeafHasherV1_2_0 {
+func NewLeafHasherV1_2_0(sourceChainSelector uint64, destChainSelector uint64, onRampId common.Address, ctx hashlib.Ctx[[32]byte], onRamp *evm_2_evm_onramp_1_2_0.EVM2EVMOnRamp) *LeafHasherV1_2_0 {
 	return &LeafHasherV1_2_0{
 		metaDataHash: getMetaDataHash(ctx, ctx.Hash([]byte(MetaDataHashPrefixV1_2_0)), sourceChainSelector, onRampId, destChainSelector),
 		ctx:          ctx,
@@ -198,7 +131,7 @@ var _ OnRampReader = &OnRampV1_2_0{}
 // Significant change in 1.2:
 // - CCIPSendRequested event signature has changed
 type OnRampV1_2_0 struct {
-	onRamp                     *evm_2_evm_onramp.EVM2EVMOnRamp
+	onRamp                     *evm_2_evm_onramp_1_2_0.EVM2EVMOnRamp
 	address                    common.Address
 	lggr                       logger.Logger
 	lp                         logpoller.LogPoller
@@ -270,14 +203,14 @@ func (o *OnRampV1_2_0) logToMessage(log types.Log) (*internal.EVM2EVMMessage, er
 	}, nil
 }
 
-func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64) ([]Event[internal.EVM2EVMMessage], error) {
+func (o *OnRampV1_2_0) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]Event[internal.EVM2EVMMessage], error) {
 	logs, err := o.lp.LogsDataWordRange(
 		o.sendRequestedEventSig,
 		o.address,
 		o.sendRequestedSeqNumberWord,
 		logpoller.EvmWord(seqNumMin),
 		logpoller.EvmWord(seqNumMax),
-		logpoller.Finalized,
+		logsConfirmations(finalized),
 		pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, err
@@ -302,7 +235,7 @@ func (o *OnRampV1_2_0) RegisterFilters(qopts ...pg.QOpt) error {
 }
 
 func NewOnRampV1_2_0(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client) (*OnRampV1_2_0, error) {
-	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, source)
+	onRamp, err := evm_2_evm_onramp_1_2_0.NewEVM2EVMOnRamp(onRampAddress, source)
 	if err != nil {
 		return nil, err
 	}

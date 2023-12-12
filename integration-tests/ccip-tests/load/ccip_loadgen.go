@@ -1,12 +1,11 @@
 package load
 
 import (
-	"bytes"
 	"context"
+	crypto_rand "crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -14,8 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/rs/zerolog"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/wasp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -31,36 +30,24 @@ import (
 type CCIPE2ELoad struct {
 	t                         *testing.T
 	Lane                      *actions.CCIPLane
-	NoOfReq                   int64 // no of Request fired - required for balance assertion at the end
-	totalGEFee                *big.Int
-	BalanceStats              BalanceStats  // balance assertion details
+	NoOfReq                   int64         // approx no of Request fired
 	CurrentMsgSerialNo        *atomic.Int64 // current msg serial number in the load sequence
-	InitialSourceBlockNum     uint64
-	InitialDestBlockNum       uint64        // blocknumber before the first message is fired in the load sequence
 	CallTimeOut               time.Duration // max time to wait for various on-chain events
-	reports                   *testreporters.CCIPLaneStats
 	msg                       router.ClientEVM2AnyMessage
 	MaxDataBytes              uint32
 	SendMaxDataIntermittently bool
 	LastFinalizedTxBlock      atomic.Uint64
 	LastFinalizedTimestamp    atomic.Time
 }
-type BalanceStats struct {
-	SourceBalanceReq        map[string]*big.Int
-	SourceBalanceAssertions []testhelpers.BalanceAssertion
-	DestBalanceReq          map[string]*big.Int
-	DestBalanceAssertions   []testhelpers.BalanceAssertion
-}
 
-func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, noOfReq int64, reporter *testreporters.CCIPLaneStats) *CCIPE2ELoad {
+func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, noOfReq int64) *CCIPE2ELoad {
 	return &CCIPE2ELoad{
 		t:                         t,
 		Lane:                      lane,
 		CurrentMsgSerialNo:        atomic.NewInt64(1),
 		CallTimeOut:               timeout,
 		NoOfReq:                   noOfReq,
-		reports:                   reporter,
-		SendMaxDataIntermittently: false,
+		SendMaxDataIntermittently: true,
 	}
 }
 
@@ -81,22 +68,6 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	err := sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(c.t, err, "Failed to wait for events")
 
-	// save the current block numbers to use in various filter log requests
-	currentBlockOnSource, err := sourceCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(c.t, err, "failed to fetch latest source block num")
-	currentBlockOnDest, err := destCCIP.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(c.t, err, "failed to fetch latest dest block num")
-	c.InitialDestBlockNum = currentBlockOnDest
-	c.InitialSourceBlockNum = currentBlockOnSource
-	// collect the balance requirement to verify balances after transfer
-	sourceBalances, err := testhelpers.GetBalances(c.t, sourceCCIP.CollectBalanceRequirements())
-	require.NoError(c.t, err, "fetching source balance")
-	destBalances, err := testhelpers.GetBalances(c.t, destCCIP.CollectBalanceRequirements())
-	require.NoError(c.t, err, "fetching dest balance")
-	c.BalanceStats = BalanceStats{
-		SourceBalanceReq: sourceBalances,
-		DestBalanceReq:   destBalances,
-	}
 	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
 	require.NoError(c.t, err, "Failed encoding the options field")
 
@@ -116,7 +87,19 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 		require.NoError(c.t, err, "failed to fetch dynamic config")
 		c.MaxDataBytes = dCfg.MaxDataBytes
 	}
-
+	// if the msg is sent via multicall, transfer the token transfer amount to multicall contract
+	if sourceCCIP.Common.MulticallEnabled && sourceCCIP.Common.MulticallContract != (common.Address{}) {
+		for i, amount := range sourceCCIP.TransferAmount {
+			token := sourceCCIP.Common.BridgeTokens[i]
+			amountToApprove := new(big.Int).Mul(amount, big.NewInt(c.NoOfReq))
+			bal, err := token.BalanceOf(context.Background(), sourceCCIP.Common.MulticallContract.Hex())
+			require.NoError(c.t, err, "Failed to get token balance")
+			if bal.Cmp(amountToApprove) < 0 {
+				err := token.Transfer(sourceCCIP.Common.MulticallContract.Hex(), amountToApprove)
+				require.NoError(c.t, err, "Failed to approve token transfer amount")
+			}
+		}
+	}
 	// wait for any pending txs before moving on
 	err = sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(c.t, err, "Failed to wait for events")
@@ -127,61 +110,42 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 
 	sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
-	// close all header subscriptions for dest chains
-	queuedEvents := destCCIP.Common.ChainClient.GetHeaderSubscriptions()
-	for subName := range queuedEvents {
-		destCCIP.Common.ChainClient.DeleteHeaderEventSubscription(subName)
-	}
-	// close all header subscriptions for source chains except for finalized header
-	queuedEvents = sourceCCIP.Common.ChainClient.GetHeaderSubscriptions()
-	for subName := range queuedEvents {
-		if subName == blockchain.FinalizedHeaderKey {
-			continue
+}
+
+func (c *CCIPE2ELoad) CCIPMsg() (router.ClientEVM2AnyMessage, *testreporters.RequestStat) {
+	msgSerialNo := c.CurrentMsgSerialNo.Load()
+	c.CurrentMsgSerialNo.Inc()
+
+	stats := testreporters.NewCCIPRequestStats(msgSerialNo, c.Lane.SourceNetworkName, c.Lane.DestNetworkName)
+	// form the message for transfer
+	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
+	if c.SendMaxDataIntermittently {
+		// every 100th message will have extra data with almost MaxDataBytes
+		if msgSerialNo%100 == 0 {
+			length := c.MaxDataBytes - 1
+			b := make([]byte, c.MaxDataBytes-1)
+			_, err := crypto_rand.Read(b)
+			if err == nil {
+				randomString := base64.URLEncoding.EncodeToString(b)
+				msgStr = randomString[:length]
+			}
 		}
-		sourceCCIP.Common.ChainClient.DeleteHeaderEventSubscription(subName)
 	}
+	msg := c.msg
+	msg.Data = []byte(msgStr)
+
+	return msg, stats
 }
 
 func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	res := &wasp.CallResult{}
 	sourceCCIP := c.Lane.Source
-	msgSerialNo := c.CurrentMsgSerialNo.Load()
-	c.CurrentMsgSerialNo.Inc()
 
-	lggr := c.Lane.Logger.With().Int("msg Number", int(msgSerialNo)).Logger()
-	stats := testreporters.NewCCIPRequestStats(msgSerialNo)
-	defer c.reports.UpdatePhaseStatsForReq(stats)
-	// form the message for transfer
-	msgStr := fmt.Sprintf("new message with Id %d", msgSerialNo)
+	msg, stats := c.CCIPMsg()
+	msgSerialNo := stats.ReqNo
+	lggr := c.Lane.Logger.With().Int64("msg Number", stats.ReqNo).Logger()
 
-	if c.SendMaxDataIntermittently {
-		lggr.Info().Msg("sending max data intermittently")
-		// every 10th message will have extra data with almost MaxDataBytes
-		if msgSerialNo%10 == 0 {
-			length := c.MaxDataBytes - 1
-			b := make([]byte, c.MaxDataBytes-1)
-			_, err := rand.Read(b)
-			if err != nil {
-				res.Error = err.Error()
-				res.Failed = true
-				return res
-			}
-			randomString := base64.URLEncoding.EncodeToString(b)
-			msgStr = randomString[:length]
-		}
-	}
-	msg := c.msg
-	// if msg contains more than 2 tokens, selectively choose random 2 tokens
-	if len(msg.TokenAmounts) > 2 {
-		// randomize the order of elements in the slice
-		rand.Shuffle(len(msg.TokenAmounts), func(i, j int) {
-			msg.TokenAmounts[i], msg.TokenAmounts[j] = msg.TokenAmounts[j], msg.TokenAmounts[i]
-		})
-		// select first 2 tokens
-		msg.TokenAmounts = msg.TokenAmounts[:2]
-	}
-	msg.Data = []byte(msgStr)
-
+	defer c.Lane.Reports.UpdatePhaseStatsForReq(stats)
 	feeToken := sourceCCIP.Common.FeeToken.EthAddress
 	// initiate the transfer
 	lggr.Debug().Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
@@ -209,7 +173,12 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	} else {
 		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, fee)
 	}
-
+	err = sourceCCIP.Common.ChainClient.MarkTxAsSentOnL2(sendTx)
+	if err != nil {
+		res.Error = err.Error()
+		res.Failed = true
+		return res
+	}
 	if err != nil {
 		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
 		res.Error = fmt.Sprintf("ccip-send tx error %+v for msg ID %d", err, msgSerialNo)
@@ -238,26 +207,24 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 			NoOfTokensSent:     len(msg.TokenAmounts),
 			MessageBytesLength: len(msg.Data),
 		})
-	// wait for
-	// - CCIPSendRequested Event log to be generated,
-	msgLogs, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(lggr, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, []*testreporters.RequestStat{stats})
-
-	if err != nil || msgLogs == nil || len(msgLogs) == 0 {
+	err = c.Validate(lggr, sendTx, txConfirmationTime, []*testreporters.RequestStat{stats})
+	if err != nil {
 		res.Error = err.Error()
-		res.Data = stats.StatusByPhase
 		res.Failed = true
+		res.Data = stats.StatusByPhase
 		return res
 	}
-	msgLog := msgLogs[0]
-	sentMsg := msgLog.Message
-	seqNum := sentMsg.SequenceNumber
-	lggr = lggr.With().Str("msgId ", fmt.Sprintf("0x%x", sentMsg.MessageId[:])).Logger()
+	res.Data = stats.StatusByPhase
+	return res
+}
 
-	if bytes.Compare(sentMsg.Data, []byte(msgStr)) != 0 {
-		res.Error = fmt.Sprintf("the message byte didnot match expected %s received %s msg ID %d", msgStr, string(sentMsg.Data), msgSerialNo)
-		res.Data = stats.StatusByPhase
-		res.Failed = true
-		return res
+func (c *CCIPE2ELoad) Validate(lggr zerolog.Logger, sendTx *types.Transaction, txConfirmationTime time.Time, stats []*testreporters.RequestStat) error {
+	// wait for
+	// - CCIPSendRequested Event log to be generated,
+	msgLogs, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(lggr, sendTx.Hash().Hex(), c.CallTimeOut, txConfirmationTime, stats)
+
+	if err != nil || msgLogs == nil || len(msgLogs) == 0 {
+		return err
 	}
 
 	lstFinalizedBlock := c.LastFinalizedTxBlock.Load()
@@ -265,74 +232,61 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	// if the finality tag is enabled and the last finalized block is greater than the block number of the message
 	// consider the message finalized
 	if c.Lane.Source.Common.ChainClient.GetNetworkConfig().FinalityDepth == 0 &&
-		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLog.Raw.BlockNumber {
+		lstFinalizedBlock != 0 && lstFinalizedBlock > msgLogs[0].Raw.BlockNumber {
 		sourceLogFinalizedAt = c.LastFinalizedTimestamp.Load()
-		stats.UpdateState(lggr, seqNum, testreporters.SourceLogFinalized,
-			sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
-			testreporters.TransactionStats{
-				TxHash:           msgLog.Raw.TxHash.String(),
-				FinalizedByBlock: strconv.FormatUint(lstFinalizedBlock, 10),
-				FinalizedAt:      sourceLogFinalizedAt.String(),
-			})
+		for _, stat := range stats {
+			stat.UpdateState(lggr, stat.SeqNum, testreporters.SourceLogFinalized,
+				sourceLogFinalizedAt.Sub(sourceLogTime), testreporters.Success,
+				testreporters.TransactionStats{
+					TxHash:           msgLogs[0].Raw.TxHash.String(),
+					FinalizedByBlock: strconv.FormatUint(lstFinalizedBlock, 10),
+					FinalizedAt:      sourceLogFinalizedAt.String(),
+				})
+		}
 	} else {
 		var finalizingBlock uint64
 		sourceLogFinalizedAt, finalizingBlock, err = c.Lane.Source.AssertSendRequestedLogFinalized(
-			lggr, sendTx.Hash(), sourceLogTime, []*testreporters.RequestStat{stats})
+			lggr, sendTx.Hash(), sourceLogTime, stats)
 		if err != nil {
-			res.Error = err.Error()
-			res.Data = stats.StatusByPhase
-			res.Failed = true
-			return res
+			return err
 		}
 		c.LastFinalizedTxBlock.Store(finalizingBlock)
 		c.LastFinalizedTimestamp.Store(sourceLogFinalizedAt)
 	}
 
-	// wait for
-	// - CommitStore to increase the seq number,
-	err = c.Lane.Dest.AssertSeqNumberExecuted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stats)
-	if err != nil {
-		res.Error = err.Error()
-		res.Data = stats.StatusByPhase
-		res.Failed = true
-		return res
-	}
-	// wait for ReportAccepted event
-	commitReport, reportAcceptedAt, err := c.Lane.Dest.AssertEventReportAccepted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, stats)
-	if err != nil || commitReport == nil {
-		res.Error = err.Error()
-		res.Data = stats.StatusByPhase
-		res.Failed = true
-		return res
-	}
-	blessedAt, err := c.Lane.Dest.AssertReportBlessed(lggr, seqNum, c.CallTimeOut, *commitReport, reportAcceptedAt, stats)
-	if err != nil {
-		res.Error = err.Error()
-		res.Data = stats.StatusByPhase
-		res.Failed = true
-		return res
-	}
-	_, err = c.Lane.Dest.AssertEventExecutionStateChanged(lggr, seqNum, c.CallTimeOut, blessedAt, stats, testhelpers.ExecutionStateSuccess)
-	if err != nil {
-		res.Error = err.Error()
-		res.Data = stats.StatusByPhase
-		res.Failed = true
-		return res
+	for _, msgLog := range msgLogs {
+		seqNum := msgLog.Message.SequenceNumber
+		var reqStat *testreporters.RequestStat
+		lggr = lggr.With().Str("msgId ", fmt.Sprintf("0x%x", msgLog.Message.MessageId[:])).Logger()
+		for _, stat := range stats {
+			if stat.SeqNum == seqNum {
+				reqStat = stat
+				break
+			}
+		}
+		if reqStat == nil {
+			return fmt.Errorf("could not find request stat for seq number %d", seqNum)
+		}
+		// wait for
+		// - CommitStore to increase the seq number,
+		err = c.Lane.Dest.AssertSeqNumberExecuted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, reqStat)
+		if err != nil {
+			return err
+		}
+		// wait for ReportAccepted event
+		commitReport, reportAcceptedAt, err := c.Lane.Dest.AssertEventReportAccepted(lggr, seqNum, c.CallTimeOut, sourceLogFinalizedAt, reqStat)
+		if err != nil || commitReport == nil {
+			return err
+		}
+		blessedAt, err := c.Lane.Dest.AssertReportBlessed(lggr, seqNum, c.CallTimeOut, *commitReport, reportAcceptedAt, reqStat)
+		if err != nil {
+			return err
+		}
+		_, err = c.Lane.Dest.AssertEventExecutionStateChanged(lggr, seqNum, c.CallTimeOut, blessedAt, reqStat, testhelpers.ExecutionStateSuccess)
+		if err != nil {
+			return err
+		}
 	}
 
-	res.Data = stats.StatusByPhase
-	return res
-}
-
-func (c *CCIPE2ELoad) ReportAcceptedLog() {
-	c.Lane.Logger.Info().Msg("Commit Report stats")
-	it, err := c.Lane.Dest.CommitStore.Instance.FilterReportAccepted(&bind.FilterOpts{Start: c.InitialDestBlockNum})
-	require.NoError(c.t, err, "report committed result")
-	i := 1
-	event := c.Lane.Logger.Info()
-	for it.Next() {
-		event.Interface(fmt.Sprintf("%d Report Intervals", i), it.Event.Report.Interval)
-		i++
-	}
-	event.Msgf("CommitStore-Reports Accepted")
+	return nil
 }
