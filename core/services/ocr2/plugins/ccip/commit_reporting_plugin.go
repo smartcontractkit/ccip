@@ -161,12 +161,11 @@ func (rf *CommitReportingPluginFactory) UpdatePriceGetter(priceRegistryReader cc
 	// mercury config available
 	// verifier proxy set in plugin config
 	if rf.config.mercCreds != nil && rf.config.mercuryVerifierProxy.Big().Cmp(big.NewInt(0)) >= 1 {
-		reportVerifier := merclib.NewEthCallVerifier(
-			rf.config.sourceClient,
-			rf.config.mercuryVerifierProxy,
-			rf.config.sourceNative,
-			rf.config.ocr2Address,
-			rf.config.lggr.Named("ReportVerifier"))
+		configInfoGetter, err := merclib.NewCachedConfigInfoGetter(rf.config.sourceClient, 2*time.Hour, rf.config.mercuryVerifierProxy)
+		if err != nil {
+			return fmt.Errorf("error creating mercury config info getter: %w", err)
+		}
+		reportVerifier := merclib.NewOfflineVerifier(configInfoGetter)
 		mercClient := merclib.NewMercuryClient(
 			rf.config.mercCreds,
 			http.DefaultClient,

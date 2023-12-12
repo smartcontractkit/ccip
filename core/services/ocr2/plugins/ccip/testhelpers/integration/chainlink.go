@@ -820,29 +820,45 @@ func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeli
 
 func (c *CCIPIntegrationTestHarness) SetFeedIDsOnPriceRegistries(t *testing.T, sourceTokenToFeedIDs, destTokenToFeedIDs map[common.Address][32]byte) {
 	var (
-		destAdds   []price_registry.PriceRegistryFeedIdUpdate
-		sourceAdds []price_registry.PriceRegistryFeedIdUpdate
+		destAdds      []price_registry.PriceRegistryFeedIdUpdate
+		destTokens    []common.Address
+		destFeedIDs   [][32]byte
+		sourceAdds    []price_registry.PriceRegistryFeedIdUpdate
+		sourceTokens  []common.Address
+		sourceFeedIDs [][32]byte
 	)
 	for token, feedID := range destTokenToFeedIDs {
 		destAdds = append(destAdds, price_registry.PriceRegistryFeedIdUpdate{
 			Token:  token,
 			FeedId: feedID,
 		})
+		destTokens = append(destTokens, token)
+		destFeedIDs = append(destFeedIDs, feedID)
 	}
 	for token, feedID := range sourceTokenToFeedIDs {
 		sourceAdds = append(sourceAdds, price_registry.PriceRegistryFeedIdUpdate{
 			Token:  token,
 			FeedId: feedID,
 		})
+		sourceTokens = append(sourceTokens, token)
+		sourceFeedIDs = append(sourceFeedIDs, feedID)
 	}
 	t.Log("applying feed id updates on destination chain:", destAdds)
 	_, err := c.Dest.PriceRegistry.ApplyFeedIdsUpdates(c.Dest.User, destAdds, []price_registry.PriceRegistryFeedIdUpdate{})
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
+	destActual, err := c.Dest.PriceRegistry.GetFeedIds(nil, destTokens)
+	require.NoError(t, err, "getting feed ids on destination chain")
+	require.Len(t, destActual, len(destAdds), "feed ids not set correctly on destination chain")
+	require.Equal(t, destFeedIDs, destActual, "feed ids not set correctly on destination chain")
 	t.Log("applying feed id updates on source chain:", sourceAdds)
 	_, err = c.Source.PriceRegistry.ApplyFeedIdsUpdates(c.Source.User, sourceAdds, []price_registry.PriceRegistryFeedIdUpdate{})
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
+	sourceActual, err := c.Source.PriceRegistry.GetFeedIds(nil, sourceTokens)
+	require.NoError(t, err, "getting feed ids on source chain")
+	require.Len(t, sourceActual, len(sourceAdds), "feed ids not set correctly on source chain")
+	require.Equal(t, sourceFeedIDs, sourceActual, "feed ids not set correctly on source chain")
 }
 
 func (c *CCIPIntegrationTestHarness) SetMercuryDiscounts(t *testing.T, feeManagerAddress common.Address, feedIDs [][32]byte, ccipOCR2Keys []ocr2key.KeyBundle) {

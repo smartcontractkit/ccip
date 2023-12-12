@@ -146,7 +146,7 @@ func (m *mercClient) BatchFetchPrices(ctx context.Context, fids [][32]byte) ([]*
 		return sr
 	}())
 	if err != nil {
-		return nil, fmt.Errorf("could not verify report onchain: %w", err)
+		return nil, fmt.Errorf("could not verify report: %w", err)
 	}
 
 	return reportsWithContext, nil

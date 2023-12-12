@@ -24,6 +24,7 @@ type ReportWithContext struct {
 	Epoch         uint32
 	Digest        []byte
 	RawFullReport []byte
+	FullReport    *FullReport
 }
 
 type FullReport struct {
@@ -152,6 +153,7 @@ func DecodeFullReportAndReportData(payload []byte) (*ReportWithContext, error) {
 		Round:         fullReport.ReportContext[1][31],
 		Epoch:         binary.BigEndian.Uint32(fullReport.ReportContext[1][32-5 : 32-1]),
 		RawFullReport: payload,
+		FullReport:    fullReport,
 	}
 
 	switch feedID.Version() {

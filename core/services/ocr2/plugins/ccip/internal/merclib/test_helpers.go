@@ -49,7 +49,7 @@ type xxxTestOnlyMercuryHandlerWithSignedReports struct {
 }
 
 func (x *xxxTestOnlyMercuryHandlerWithSignedReports) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	x.t.Log("received request to MercuryBatchPath: ", r.URL.Path, "headers:", r.Header)
+	x.t.Log("received request to MercuryBatchPath: ", r.URL.Path, "headers:", r.Header, "query params:", r.URL.Query())
 	// parse the feed IDs from the request query params
 	feedIDsStr, ok := r.URL.Query()["feedIDs"]
 	if !ok {

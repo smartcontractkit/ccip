@@ -23,13 +23,13 @@ func TestVerifySingle(t *testing.T) {
 		expiresTs := obsTs + 100
 		var ocr2Keys []ocr2key.KeyBundle
 		for i := 0; i < 2*f+1; i++ {
-			kb, err := ocr2key.New(chaintype.EVM)
-			require.NoError(tt, err)
-			ocr2Keys = append(ocr2Keys, kb)
+			ocr2Keys = append(ocr2Keys, mustNewOCR2KeyBundle(tt))
 		}
 		signedReport, err := generateReport(feedID, configDigest, obsTs, expiresTs, price, ocr2Keys, f)
 		require.NoError(tt, err)
-		err = verifySingle(signedReport, f, func() []ocrtypes.OnchainPublicKey {
+		fullReport, err := DecodeFullReport(signedReport)
+		require.NoError(tt, err)
+		err = verifySingle(fullReport, f, func() []ocrtypes.OnchainPublicKey {
 			var ocr2PubKeys []ocrtypes.OnchainPublicKey
 			for _, kb := range ocr2Keys {
 				ocr2PubKeys = append(ocr2PubKeys, kb.PublicKey())
@@ -47,14 +47,14 @@ func TestVerifySingle(t *testing.T) {
 		expiresTs := obsTs + 100
 		var ocr2Keys []ocr2key.KeyBundle
 		for i := 0; i < 2*f+1; i++ {
-			kb, err := ocr2key.New(chaintype.EVM)
-			require.NoError(tt, err)
-			ocr2Keys = append(ocr2Keys, kb)
+			ocr2Keys = append(ocr2Keys, mustNewOCR2KeyBundle(tt))
 		}
 		signedReport, err := generateReport(feedID, configDigest, obsTs, expiresTs, price, ocr2Keys, f)
 		require.NoError(tt, err)
+		fullReport, err := DecodeFullReport(signedReport)
+		require.NoError(tt, err)
 		// verification expects f + 2 signatures but only f + 1 are provided
-		err = verifySingle(signedReport, f+1, func() []ocrtypes.OnchainPublicKey {
+		err = verifySingle(fullReport, f+1, func() []ocrtypes.OnchainPublicKey {
 			var ocr2PubKeys []ocrtypes.OnchainPublicKey
 			for _, kb := range ocr2Keys {
 				ocr2PubKeys = append(ocr2PubKeys, kb.PublicKey())
@@ -64,4 +64,10 @@ func TestVerifySingle(t *testing.T) {
 		require.Error(tt, err)
 		require.ErrorContainsf(tt, err, "expected 3 signatures, got 2", "err: %v", err)
 	})
+}
+
+func mustNewOCR2KeyBundle(tt *testing.T) ocr2key.KeyBundle {
+	kb, err := ocr2key.New(chaintype.EVM)
+	require.NoError(tt, err)
+	return kb
 }
