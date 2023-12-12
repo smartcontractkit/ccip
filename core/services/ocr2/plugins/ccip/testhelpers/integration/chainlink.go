@@ -376,6 +376,7 @@ func setupNodeCCIP(
 	csaKeyStore := ksMocks.NewCSA(t)
 
 	key, err := csakey.NewV2()
+	require.NoError(t, err)
 	csaKeyStore.On("GetAll").Return([]csakey.KeyV2{key}, nil)
 	keyStore := NewKsa(db, lggr, csaKeyStore, config)
 
@@ -541,13 +542,7 @@ func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobS
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) jobSpecProposal(
-	t *testing.T,
-	specTemplate string,
-	f func() (*ctfClient.OCR2TaskJobSpec, error),
-	version int32,
-	opts ...any,
-) feeds2.ProposeJobArgs {
+func (c *CCIPIntegrationTestHarness) jobSpecProposal(t *testing.T, specTemplate string, f func() (*ctfClient.OCR2TaskJobSpec, error), feedsManagerId int64, version int32, opts ...any) feeds2.ProposeJobArgs {
 	spec, err := f()
 	require.NoError(t, err)
 
@@ -555,7 +550,7 @@ func (c *CCIPIntegrationTestHarness) jobSpecProposal(
 	args = append(args, opts...)
 
 	return feeds2.ProposeJobArgs{
-		FeedsManagerID: 1,
+		FeedsManagerID: feedsManagerId,
 		RemoteUUID:     uuid.New(),
 		Multiaddrs:     nil,
 		Version:        version,
@@ -568,6 +563,7 @@ func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
 		f := node.App.GetFeedsService()
 
 		managers, err := f.ListManagers()
+		require.NoError(t, err)
 		if len(managers) > 0 {
 			// Use at most one feeds manager, don't register if one already exists
 			continue
@@ -586,8 +582,9 @@ func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
 		require.NoError(t, err)
 
 		connManager := feedsMocks.NewConnectionsManager(t)
-		connManager.On("GetClient", mock.Anything).Return(NoopFeedsClient{}, nil)
+		connManager.On("GetClient", mock.Anything).Maybe().Return(NoopFeedsClient{}, nil)
 		connManager.On("Close").Maybe().Return()
+		connManager.On("IsConnected", mock.Anything).Maybe().Return(true)
 		f.Unsafe_SetConnectionsManager(connManager)
 	}
 }
@@ -597,11 +594,15 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 
 	for _, node := range c.Nodes {
 		f := node.App.GetFeedsService()
+		managers, err := f.ListManagers()
+		require.NoError(t, err)
+		require.Len(t, managers, 1, "expected exactly one feeds manager")
 
 		execSpec := c.jobSpecProposal(
 			t,
 			execSpecTemplate,
 			jobParams.ExecutionJobSpec,
+			managers[0].ID,
 			1,
 			node.KeyBundle.ID(),
 			node.Transmitter.Hex(),
@@ -616,6 +617,7 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 			t,
 			commitSpecTemplate,
 			jobParams.CommitJobSpec,
+			managers[0].ID,
 			2,
 			node.KeyBundle.ID(),
 			node.Transmitter.Hex(),
