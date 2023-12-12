@@ -20,7 +20,7 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	defer ethUSD.Close()
 
 	// Create initial job specs
-	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399)
+	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline)
 	ccipTH.SetupFeedsManager(t)
 
 	// Propose and approve new specs

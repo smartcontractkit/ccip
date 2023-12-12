@@ -27,7 +27,7 @@ func TestIntegration_CCIP(t *testing.T) {
 	defer linkUSD.Close()
 	defer ethUSD.Close()
 
-	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, 19399)
+	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline)
 
 	currentSeqNum := 1
 

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -869,11 +870,11 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 	return bootstrapNode, nodes, configBlock
 }
 
-func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string) CCIPJobSpecParams {
 	// setup Jobs
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, bootstrapNodePort)
+	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, generateRandomBootstrapPort())
 
 	jobParams := c.NewCCIPJobSpecParams(pricePipeline, configBlock)
 
@@ -953,4 +954,10 @@ func (n NoopFeedsClient) RejectedJob(ctx context.Context, in *pb.RejectedJobRequ
 
 func (n NoopFeedsClient) CancelledJob(ctx context.Context, in *pb.CancelledJobRequest) (*pb.CancelledJobResponse, error) {
 	return &pb.CancelledJobResponse{}, nil
+}
+
+func generateRandomBootstrapPort() int64 {
+	minPort := int64(10000)
+	maxPort := int64(30000)
+	return rand.Int63n(maxPort-minPort+1) + minPort
 }
