@@ -85,8 +85,7 @@ const (
 		chainID = 1_337
 		
 		[pluginConfig]
-		destStartBlock = 54_107_661
-		sourceStartBlock = 17_052_797
+		destStartBlock = 50
 	`
 	commitSpecTemplate = `
 		type = "offchainreporting2"
@@ -107,9 +106,8 @@ const (
 		chainID = 1_337
 		
 		[pluginConfig]
-		destStartBlock = 54_107_661
+		destStartBlock = 50
 		offRamp = "%s"
-		sourceStartBlock = 17_052_797
 		tokenPricesUSDPipeline = """
 		merge [type=merge left="{}" right="{\\"0xd14838A68E8AFBAdE5efb411d5871ea0011AFd28\\":\\"10000000000000000000\\",\\"0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63\\":\\"1000000\\",\\"0x32d5D5978905d9c6c2D4C417F0E06Fe768a4FB5a\\":\\"1800000000000000000000\\",\\"0x4200000000000000000000000000000000000006\\":\\"1800000000000000000000\\"}"];
 		"""
