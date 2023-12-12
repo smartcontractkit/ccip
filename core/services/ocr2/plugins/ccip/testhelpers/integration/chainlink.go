@@ -569,7 +569,8 @@ func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
 			continue
 		}
 
-		pkey, err := crypto.PublicKeyFromHex("aaf296b9252377d04ef51c1a5ed9640f82bd8cd31e2ac5895565b3c340a8f053")
+		secret := utils.RandomBytes32()
+		pkey, err := crypto.PublicKeyFromHex(hex.EncodeToString(secret[:]))
 		require.NoError(t, err)
 
 		m := feeds2.RegisterManagerParams{

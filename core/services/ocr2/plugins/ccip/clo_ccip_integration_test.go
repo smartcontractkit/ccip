@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func Test_CLOSpecApprovalFlow(t *testing.T) {
@@ -35,7 +36,7 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 
 	msg := router.ClientEVM2AnyMessage{
 		Receiver:     testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[0].Receiver.Address()),
-		Data:         []byte("hello CLO"),
+		Data:         utils.RandomAddress().Bytes(),
 		TokenAmounts: []router.ClientEVMTokenAmount{},
 		FeeToken:     ccipTH.Source.LinkToken.Address(),
 		ExtraArgs:    extraArgs,
