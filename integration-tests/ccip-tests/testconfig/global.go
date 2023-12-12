@@ -198,7 +198,7 @@ func (c *Chainlink) ApplyOverrides(from *Chainlink) {
 			} else {
 				c.Nodes = append(c.Nodes, node)
 			}
-			c.Nodes[i].ApplyOverrides(c.Common)
+			c.Nodes[i].Merge(c.Common)
 		}
 	}
 	if from.NodeMemory != "" {
@@ -281,6 +281,46 @@ type Node struct {
 	ChainConfigTOMLByChain map[string]string `toml:",omitempty"` // key is chainID
 	DBImage                string            `toml:",omitempty"`
 	DBTag                  string            `toml:",omitempty"`
+}
+
+func (n *Node) Merge(from *Node) {
+	if from == nil {
+		return
+	}
+	if n == nil {
+		n = from
+		return
+	}
+	if n.Name == "" {
+		n.Name = from.Name
+	}
+	if n.Image == "" {
+		n.Image = from.Image
+	}
+	if n.Tag == "" {
+		n.Tag = from.Tag
+	}
+	if n.DBImage == "" {
+		n.DBImage = from.DBImage
+	}
+	if n.DBTag == "" {
+		n.DBTag = from.DBTag
+	}
+	if n.BaseConfigTOML == "" {
+		n.BaseConfigTOML = from.BaseConfigTOML
+	}
+	if n.CommonChainConfigTOML == "" {
+		n.CommonChainConfigTOML = from.CommonChainConfigTOML
+	}
+	if n.ChainConfigTOMLByChain == nil {
+		n.ChainConfigTOMLByChain = from.ChainConfigTOMLByChain
+	} else {
+		for k, v := range from.ChainConfigTOMLByChain {
+			if _, ok := n.ChainConfigTOMLByChain[k]; !ok {
+				n.ChainConfigTOMLByChain[k] = v
+			}
+		}
+	}
 }
 
 func (n *Node) ApplyOverrides(from *Node) {
