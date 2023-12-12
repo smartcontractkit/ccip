@@ -476,7 +476,8 @@ func NewOffRampV1_0_0(lggr logger.Logger, addr common.Address, ec client.Client,
 			Addresses: []common.Address{addr},
 		},
 	}
-	return &OffRampV1_0_0{
+
+	return &OffRamp{
 		offRamp:             offRamp,
 		ec:                  ec,
 		addr:                addr,
