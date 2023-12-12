@@ -1,0 +1,78 @@
+[CCIP]
+[CCIP.Deployments]
+Data = """
+{
+    "lane_configs": {
+      "WeMix Mainnet": {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
+        "arm": "0x07aaC8B69A62dB5bd3d244091916EbF2fac17b76",
+        "router": "0x7798b795Fde864f4Cd1b124a38Ba9619B7F8A442",
+        "price_registry": "0x252863688762aD86868D3d3076233Eacd80c7055",
+        "wrapped_native": "",
+        "src_contracts": {
+          "Kroma Mainnet": {
+            "on_ramp": "0x47E9AE0A815C94836202E696748A5d5476aD8735",
+            "deployed_at": 11111111
+          }
+        },
+        "dest_contracts": {
+          "Kroma Mainnet": {
+            "off_ramp": "0xF886d8DC64E544af4835cbf91e5678A54D95B80e",
+            "commit_store": "0x8794C9534658fdCC44f2FF6645Bf31cf9F6d2d5D",
+            "receiver_dapp": ""
+          }
+        }
+      },
+      "Kroma Mainnet": {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
+        "arm": "0xB59779d3364BC6d71168245f9ebb96469E5a5a98",
+        "router": "0xE93E8B0d1b1CEB44350C8758ed1E2799CCee31aB",
+        "price_registry": "0x8155B4710e7bbC90924E957104F94Afd4f95Eca2",
+        "wrapped_native": "",
+        "src_contracts": {
+          "WeMix Mainnet": {
+            "on_ramp": "0x3C5Ab46fA1dB1dECD854224654313a69bf9fcAD3",
+            "deployed_at": 11111111
+          }
+        },
+        "dest_contracts": {
+          "WeMix Mainnet": {
+            "off_ramp": "0x2B555774B3D1dcbcd76efb7751F3c5FbCFABC5C4",
+            "commit_store": "0x213124614aAf31eBCE7c612A12aac5f8aAD77DE4",
+            "receiver_dapp": ""
+          }
+        }
+      }
+    }
+  }
+"""
+
+[CCIP.Groups.load]
+NetworkPairs = ['WEMIX_MAINNET,KROMA_MAINNET']
+MsgType = 'WithoutToken'
+PhaseTimeout = '50m'
+TestDuration = '168h'
+ExistingDeployment = true
+RequestPerUnitTime = [1]
+TimeUnit = '1h'
+NoOfTokensPerChain = 1
+NoOfTokensInMsg = 1
+AmountPerToken = 1
+ExistingEnv = 'mainnet-2.7-ccip1.2'
+
+[CCIP.Groups.smoke]
+MsgType = 'WithToken'
+NetworkPairs = ['WEMIX_MAINNET,KROMA_MAINNET']
+PhaseTimeout = '50m'
+LocalCluster = false
+ExistingDeployment = true
+ReuseContracts = true
+NoOfTokensPerChain = 1
+NoOfTokensInMsg = 1
+AmountPerToken = 1

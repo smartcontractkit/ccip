@@ -1,0 +1,78 @@
+[CCIP]
+[CCIP.Deployments]
+Data = """
+{
+    "lane_configs": {
+      "WeMix Mainnet": {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
+        "arm": "0x07aaC8B69A62dB5bd3d244091916EbF2fac17b76",
+        "router": "0x7798b795Fde864f4Cd1b124a38Ba9619B7F8A442",
+        "price_registry": "0x252863688762aD86868D3d3076233Eacd80c7055",
+        "wrapped_native": "",
+        "src_contracts": {
+          "Ethereum Mainnet": {
+            "on_ramp": "0x190bcE84CF2d500B878966F4Cf98a50d78f2675E",
+            "deployed_at": 11111111
+          }
+        },
+        "dest_contracts": {
+          "Ethereum Mainnet": {
+            "off_ramp": "0xF92Fa796F5307b029c65CA26f322a6D86f211194",
+            "commit_store": "0xbeC110FF43D52be2066B06525304A9924E16b73b",
+            "receiver_dapp": ""
+          }
+        }
+      },
+      "Ethereum Mainnet": {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
+        "arm": "0x8B63b3DE93431C0f756A493644d128134291fA1b",
+        "router": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
+        "price_registry": "0x8c9b2Efb7c64C394119270bfecE7f54763b958Ad",
+        "wrapped_native": "",
+        "src_contracts": {
+          "WeMix Mainnet": {
+            "on_ramp": "0xCbE7e5DA76dC99Ac317adF6d99137005FDA4E2C4",
+            "deployed_at": 11111111
+          }
+        },
+        "dest_contracts": {
+          "WeMix Mainnet": {
+            "off_ramp": "0x3a129e6C18b23d18BA9E6Aa14Dc2e79d1f91c6c5",
+            "commit_store": "0x31f6ab382DDeb9A316Ab61C3945a5292a50a89AB",
+            "receiver_dapp": ""
+          }
+        }
+      }
+    }
+  }
+"""
+
+[CCIP.Groups.load]
+NetworkPairs = ['WEMIX_MAINNET,ETHEREUM_MAINNET']
+MsgType = 'WithoutToken'
+PhaseTimeout = '50m'
+TestDuration = '168h'
+ExistingDeployment = true
+RequestPerUnitTime = [1]
+TimeUnit = '1h'
+NoOfTokensPerChain = 1
+NoOfTokensInMsg = 1
+AmountPerToken = 1
+ExistingEnv = 'mainnet-2.7-ccip1.2'
+
+[CCIP.Groups.smoke]
+MsgType = 'WithToken'
+NetworkPairs = ['WEMIX_MAINNET,ETHEREUM_MAINNET']
+PhaseTimeout = '50m'
+LocalCluster = false
+ExistingDeployment = true
+ReuseContracts = true
+NoOfTokensPerChain = 1
+NoOfTokensInMsg = 1
+AmountPerToken = 1
