@@ -211,7 +211,7 @@ BiDirectionalLane = true # same as above
 MsgType = 'WithToken' # same as above
 NoOfCommitNodes = 5 # same as above
 PhaseTimeout = '50m' # same as above
-TestDuration = '1m'                # load test duration, not used for smoke tests
+TestDuration = '10m'                # load test duration, not used for smoke tests
 LocalCluster = false # same as above
 ExistingDeployment = false # same as above
 
