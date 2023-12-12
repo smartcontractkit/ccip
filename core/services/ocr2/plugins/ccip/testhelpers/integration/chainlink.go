@@ -539,11 +539,10 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 
 		id, err := f.RegisterManager(ctx, m)
 		require.NoError(t, err)
-		fmt.Println(id)
 
 		connManager := feedsMocks.NewConnectionsManager(t)
 		connManager.On("GetClient", mock.Anything).Return(NoopFeedsClient{}, nil)
-		connManager.On("Close").Return()
+		connManager.On("Close").Maybe().Return()
 		f.Unsafe_SetConnectionsManager(connManager)
 
 		id, err = f.ProposeJob(ctx, &execSpec)
