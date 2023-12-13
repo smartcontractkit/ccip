@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/client"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/cdk8s/blockscout"
@@ -179,10 +180,36 @@ func DeployLocalCluster(
 				selectedNetworks[i].HTTPURLs = []string{primaryNode.GetInternalHttpUrl()}
 			}
 		}
+		testInputs.SelectedNetworks = selectedNetworks
 	}
 
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
+		noOfNodes := pointer.GetInt(testInputs.EnvInput.Chainlink.NoOfNodes)
+		if len(testInputs.EnvInput.Chainlink.Nodes) > 0 {
+			for _, clNode := range testInputs.EnvInput.Chainlink.Nodes {
+				toml, _, err := setNodeConfig(
+					selectedNetworks,
+					clNode.BaseConfigTOML,
+					clNode.CommonChainConfigTOML,
+					clNode.ChainConfigTOMLByChain,
+				)
+				if err != nil {
+					return err
+				}
+				ccipNode, err := test_env.NewClNode(
+					[]string{env.Network.Name},
+					clNode.Image, clNode.Tag, toml, test_env.WithPgDBOptions(
+						ctftestenv.WithPostgresImageName(clNode.DBImage),
+						ctftestenv.WithPostgresImageVersion(clNode.DBTag)))
+				if err != nil {
+					return err
+				}
+				ccipNode.SetTestLogger(t)
+				env.ClCluster.Nodes = append(env.ClCluster.Nodes, ccipNode)
+			}
+			return env.ClCluster.Start()
+		}
 		toml, _, err := setNodeConfig(
 			selectedNetworks,
 			testInputs.EnvInput.Chainlink.Common.BaseConfigTOML,
@@ -192,11 +219,34 @@ func DeployLocalCluster(
 		if err != nil {
 			return err
 		}
-
-		noOfNodes := pointer.GetInt(testInputs.EnvInput.Chainlink.NoOfNodes)
-		return env.StartClCluster(toml, noOfNodes, "")
+		return env.StartClCluster(toml, noOfNodes, "",
+			test_env.WithImage(testInputs.EnvInput.Chainlink.Common.Image),
+			test_env.WithVersion(testInputs.EnvInput.Chainlink.Common.Tag),
+			test_env.WithPgDBOptions(
+				ctftestenv.WithPostgresImageName(testInputs.EnvInput.Chainlink.Common.DBImage),
+				ctftestenv.WithPostgresImageVersion(testInputs.EnvInput.Chainlink.Common.DBTag)))
 	}
 	return env, deployCL
+}
+
+func RestartNodes(
+	testInputs *CCIPTestConfig,
+	env *test_env.CLClusterTestEnv,
+) error {
+	for i, clNode := range env.ClCluster.Nodes {
+		upgradeImage := testInputs.EnvInput.Chainlink.Common.UpgradeImage
+		upgradeTag := testInputs.EnvInput.Chainlink.Common.UpgradeTag
+		// if individual node upgrade image is provided, use that
+		if len(testInputs.EnvInput.Chainlink.Nodes) > 0 {
+			upgradeImage = testInputs.EnvInput.Chainlink.Nodes[i].UpgradeImage
+			upgradeTag = testInputs.EnvInput.Chainlink.Nodes[i].UpgradeTag
+		}
+		err := clNode.UpgradeVersion(upgradeImage, upgradeTag)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DeployEnvironments deploys K8 env for CCIP tests. For tests running on simulated geth it deploys -
