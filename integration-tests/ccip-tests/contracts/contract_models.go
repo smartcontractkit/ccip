@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strconv"
 
@@ -525,8 +526,8 @@ func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMess
 		Str("Router", r.Address()).
 		Interface("TokensAndAmounts", msg.TokenAmounts).
 		Str("FeeToken", msg.FeeToken.Hex()).
-		Str("ExtraArgs", string(msg.ExtraArgs)).
-		Str("Receiver", string(msg.Receiver)).
+		Str("ExtraArgs", fmt.Sprintf("0x%x", msg.ExtraArgs[:])).
+		Str("Receiver", fmt.Sprintf("0x%x", msg.Receiver[:])).
 		Msg("Sending msg")
 	return r.Instance.CcipSend(opts, destChainSelector, msg)
 }

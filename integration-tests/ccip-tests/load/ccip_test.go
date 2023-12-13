@@ -20,7 +20,6 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background())
 	testArgs.Setup()
-	log.Info().Int("No of lanes", len(testArgs.TestSetupArgs.Lanes)).Msg("Starting the test")
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
 		return
@@ -33,7 +32,7 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 	testArgs.Wait()
 }
 
-func TestLoadCCIPTriggerBySource(t *testing.T) {
+func TestLoadCCIPStableRPSTriggerBySource(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background())
