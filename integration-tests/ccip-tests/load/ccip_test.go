@@ -33,7 +33,7 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 	testArgs.Wait()
 }
 
-func TestLoadCCIPStableRPSTriggerBySource(t *testing.T) {
+func TestLoadCCIPTriggerBySource(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background())
