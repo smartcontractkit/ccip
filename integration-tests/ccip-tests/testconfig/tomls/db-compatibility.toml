@@ -11,7 +11,7 @@ DBTag = '13.12'
 [[CCIP.Env.Chainlink.Nodes]]
 Name = 'node2'
 DBImage = 'postgres'
-DBTag = '11.22'
+DBTag = '11.22-alpine'
 
 [[CCIP.Env.Chainlink.Nodes]]
 Name = 'node3'
@@ -27,3 +27,8 @@ DBTag = '14.8'
 Name = 'node5'
 DBImage = 'postgres'
 DBTag = '15.5'
+
+[[CCIP.Env.Chainlink.Nodes]]
+Name = 'node6'
+DBImage = 'postgres'
+DBTag = '16.1'
