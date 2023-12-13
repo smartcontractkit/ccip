@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,10 +20,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/onsi/gomega"
 	"github.com/pkg/errors"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2/confighelper"
 	types4 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/sqlx"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"k8s.io/utils/pointer"
@@ -42,12 +45,19 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/logger/audit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
+	feeds2 "github.com/smartcontractkit/chainlink/v2/core/services/feeds"
+	feedsMocks "github.com/smartcontractkit/chainlink/v2/core/services/feeds/mocks"
+	pb "github.com/smartcontractkit/chainlink/v2/core/services/feeds/proto"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/csakey"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
+	ksMocks "github.com/smartcontractkit/chainlink/v2/core/services/keystore/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
@@ -55,7 +65,57 @@ import (
 	evmrelay "github.com/smartcontractkit/chainlink/v2/core/services/relay/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/utils/crypto"
 	"github.com/smartcontractkit/chainlink/v2/plugins"
+)
+
+const (
+	execSpecTemplate = `
+		type = "offchainreporting2"
+		schemaVersion = 1
+		name = "ccip-exec-1"
+		externalJobID      = "67ffad71-d90f-4fe3-b4e4-494924b707fb"
+		forwardingAllowed = false
+		maxTaskDuration = "0s"
+		contractID = "%s"
+		contractConfigConfirmations = 1
+		contractConfigTrackerPollInterval = "20s"
+		ocrKeyBundleID = "%s"
+		relay = "evm"
+		pluginType = "ccip-execution"
+		transmitterID = "%s"
+		
+		[relayConfig]
+		chainID = 1_337
+		
+		[pluginConfig]
+		destStartBlock = 50
+	`
+	commitSpecTemplate = `
+		type = "offchainreporting2"
+		schemaVersion = 1
+		name = "ccip-commit-1"
+		externalJobID = "13c997cf-1a14-4ab7-9068-07ee6d2afa55"
+		forwardingAllowed = false
+		maxTaskDuration = "0s"
+		contractID = "%s"
+		contractConfigConfirmations = 1
+		contractConfigTrackerPollInterval = "20s"
+		ocrKeyBundleID = "%s"
+		relay = "evm"
+		pluginType = "ccip-commit"
+		transmitterID = "%s"
+		
+		[relayConfig]
+		chainID = 1_337
+		
+		[pluginConfig]
+		destStartBlock = 50
+		offRamp = "%s"
+		tokenPricesUSDPipeline = """
+		%s
+		"""
+	`
 )
 
 type Node struct {
@@ -84,7 +144,7 @@ func (node *Node) EventuallyNodeUsesUpdatedPriceRegistry(t *testing.T, ccipContr
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		log, err := c.LogPoller().LatestLogByEventSigWithConfs(
-			ccipdata.UsdPerUnitGasUpdatedV1_0_0,
+			v1_0_0.UsdPerUnitGasUpdated,
 			ccipContracts.Dest.PriceRegistry.Address(),
 			0,
 			pg.WithParentCtx(testutils.Context(t)),
@@ -123,7 +183,7 @@ func (node *Node) EventuallyNodeUsesNewCommitConfig(t *testing.T, ccipContracts 
 	return log
 }
 
-func (node *Node) EventuallyNodeUsesNewExecConfig(t *testing.T, ccipContracts CCIPIntegrationTestHarness, execCfg ccipdata.ExecOnchainConfigV1_2_0) logpoller.Log {
+func (node *Node) EventuallyNodeUsesNewExecConfig(t *testing.T, ccipContracts CCIPIntegrationTestHarness, execCfg v1_2_0.ExecOnchainConfig) logpoller.Log {
 	c, err := node.App.GetRelayers().LegacyEVMChains().Get(strconv.FormatUint(ccipContracts.Dest.ChainID, 10))
 	require.NoError(t, err)
 	var log logpoller.Log
@@ -137,7 +197,7 @@ func (node *Node) EventuallyNodeUsesNewExecConfig(t *testing.T, ccipContracts CC
 			pg.WithParentCtx(testutils.Context(t)),
 		)
 		require.NoError(t, err)
-		var latestCfg ccipdata.ExecOnchainConfigV1_2_0
+		var latestCfg v1_2_0.ExecOnchainConfig
 		if log != nil {
 			latestCfg, err = DecodeExecOnChainConfig(log.Data)
 			require.NoError(t, err)
@@ -156,9 +216,9 @@ func (node *Node) EventuallyHasReqSeqNum(t *testing.T, ccipContracts *CCIPIntegr
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().LogsDataWordRange(
-			ccipdata.CCIPSendRequestEventSigV1_2_0,
+			v1_2_0.CCIPSendRequestEventSig,
 			onRamp,
-			ccipdata.CCIPSendRequestSeqNumIndexV1_2_0,
+			v1_2_0.CCIPSendRequestSeqNumIndex,
 			abihelpers.EvmWord(uint64(seqNum)),
 			abihelpers.EvmWord(uint64(seqNum)),
 			1,
@@ -183,9 +243,9 @@ func (node *Node) EventuallyHasExecutedSeqNums(t *testing.T, ccipContracts *CCIP
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
-			ccipdata.ExecutionStateChangedEventV1_0_0,
+			v1_0_0.ExecutionStateChangedEvent,
 			offRamp,
-			ccipdata.ExecutionStateChangedSeqNrIndexV1_0_0,
+			v1_0_0.ExecutionStateChangedSeqNrIndex,
 			abihelpers.EvmWord(uint64(minSeqNum)),
 			abihelpers.EvmWord(uint64(maxSeqNum)),
 			1,
@@ -211,9 +271,9 @@ func (node *Node) ConsistentlySeqNumHasNotBeenExecuted(t *testing.T, ccipContrac
 		ccipContracts.Source.Chain.Commit()
 		ccipContracts.Dest.Chain.Commit()
 		lgs, err := c.LogPoller().IndexedLogsTopicRange(
-			ccipdata.ExecutionStateChangedEventV1_0_0,
+			v1_0_0.ExecutionStateChangedEvent,
 			offRamp,
-			ccipdata.ExecutionStateChangedSeqNrIndexV1_0_0,
+			v1_0_0.ExecutionStateChangedSeqNrIndex,
 			abihelpers.EvmWord(uint64(seqNum)),
 			abihelpers.EvmWord(uint64(seqNum)),
 			1,
@@ -276,6 +336,7 @@ func setupNodeCCIP(
 		c.Log.Level = &loglevel
 		c.Feature.CCIP = &trueRef
 		c.Feature.UICSAKeys = &trueRef
+		c.Feature.FeedsManager = &trueRef
 		c.OCR.Enabled = &falseRef
 		c.OCR.DefaultTransactionQueueDepth = pointer.Uint32(200)
 		c.OCR2.Enabled = &trueRef
@@ -313,7 +374,13 @@ func setupNodeCCIP(
 	// signs 1337 see https://github.com/smartcontractkit/chainlink-ccip/blob/a24dd436810250a458d27d8bb3fb78096afeb79c/core/services/ocr2/plugins/ccip/testhelpers/simulated_backend.go#L35
 	sourceClient := client.NewSimulatedBackendClient(t, sourceChain, sourceChainID)
 	destClient := client.NewSimulatedBackendClient(t, destChain, destChainID)
-	keyStore := keystore.New(db, utils.FastScryptParams, lggr, config.Database())
+	csaKeyStore := ksMocks.NewCSA(t)
+
+	key, err := csakey.NewV2()
+	require.NoError(t, err)
+	csaKeyStore.On("GetAll").Return([]csakey.KeyV2{key}, nil)
+	keyStore := NewKsa(db, lggr, csaKeyStore, config)
+
 	simEthKeyStore := testhelpers.EthKeyStoreSim{
 		ETHKS: keyStore.Eth(),
 		CSAKS: keyStore.CSA(),
@@ -437,6 +504,31 @@ func SetupCCIPIntegrationTH(t *testing.T, sourceChainID, sourceChainSelector, de
 	}
 }
 
+func (c *CCIPIntegrationTestHarness) CreatePricesPipeline(t *testing.T) (string, *httptest.Server, *httptest.Server) {
+	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
+		require.NoError(t, err)
+	}))
+	ethUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(`{"UsdPerETH": "1700000000000000000000"}`))
+		require.NoError(t, err)
+	}))
+	wrapped, err1 := c.Source.Router.GetWrappedNative(nil)
+	require.NoError(t, err1)
+	tokenPricesUSDPipeline := fmt.Sprintf(`
+// Price 1
+link [type=http method=GET url="%s"];
+link_parse [type=jsonparse path="UsdPerLink"];
+link->link_parse;
+eth [type=http method=GET url="%s"];
+eth_parse [type=jsonparse path="UsdPerETH"];
+eth->eth_parse;
+merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse)}"];`,
+		linkUSD.URL, ethUSD.URL, c.Dest.LinkToken.Address(), wrapped)
+
+	return tokenPricesUSDPipeline, linkUSD, ethUSD
+}
+
 func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams) {
 	jobParams.OffRamp = c.Dest.OffRamp.Address()
 
@@ -448,6 +540,98 @@ func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobS
 	for _, node := range nodes {
 		node.AddJobsWithSpec(t, commitSpec)
 		node.AddJobsWithSpec(t, geExecutionSpec)
+	}
+}
+
+func (c *CCIPIntegrationTestHarness) jobSpecProposal(t *testing.T, specTemplate string, f func() (*ctfClient.OCR2TaskJobSpec, error), feedsManagerId int64, version int32, opts ...any) feeds2.ProposeJobArgs {
+	spec, err := f()
+	require.NoError(t, err)
+
+	args := []any{spec.OCR2OracleSpec.ContractID}
+	args = append(args, opts...)
+
+	return feeds2.ProposeJobArgs{
+		FeedsManagerID: feedsManagerId,
+		RemoteUUID:     uuid.New(),
+		Multiaddrs:     nil,
+		Version:        version,
+		Spec:           fmt.Sprintf(specTemplate, args...),
+	}
+}
+
+func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
+	for _, node := range c.Nodes {
+		f := node.App.GetFeedsService()
+
+		managers, err := f.ListManagers()
+		require.NoError(t, err)
+		if len(managers) > 0 {
+			// Use at most one feeds manager, don't register if one already exists
+			continue
+		}
+
+		secret := utils.RandomBytes32()
+		pkey, err := crypto.PublicKeyFromHex(hex.EncodeToString(secret[:]))
+		require.NoError(t, err)
+
+		m := feeds2.RegisterManagerParams{
+			Name:      "CCIP",
+			URI:       "http://localhost:8080",
+			PublicKey: *pkey,
+		}
+
+		_, err = f.RegisterManager(testutils.Context(t), m)
+		require.NoError(t, err)
+
+		connManager := feedsMocks.NewConnectionsManager(t)
+		connManager.On("GetClient", mock.Anything).Maybe().Return(NoopFeedsClient{}, nil)
+		connManager.On("Close").Maybe().Return()
+		connManager.On("IsConnected", mock.Anything).Maybe().Return(true)
+		f.Unsafe_SetConnectionsManager(connManager)
+	}
+}
+
+func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams, pipeline string) {
+	ctx := testutils.Context(t)
+
+	for _, node := range c.Nodes {
+		f := node.App.GetFeedsService()
+		managers, err := f.ListManagers()
+		require.NoError(t, err)
+		require.Len(t, managers, 1, "expected exactly one feeds manager")
+
+		execSpec := c.jobSpecProposal(
+			t,
+			execSpecTemplate,
+			jobParams.ExecutionJobSpec,
+			managers[0].ID,
+			1,
+			node.KeyBundle.ID(),
+			node.Transmitter.Hex(),
+		)
+		execId, err := f.ProposeJob(ctx, &execSpec)
+		require.NoError(t, err)
+
+		err = f.ApproveSpec(ctx, execId, true)
+		require.NoError(t, err)
+
+		commitSpec := c.jobSpecProposal(
+			t,
+			commitSpecTemplate,
+			jobParams.CommitJobSpec,
+			managers[0].ID,
+			2,
+			node.KeyBundle.ID(),
+			node.Transmitter.Hex(),
+			jobParams.OffRamp.String(),
+			pipeline,
+		)
+
+		commitId, err := f.ProposeJob(ctx, &commitSpec)
+		require.NoError(t, err)
+
+		err = f.ApproveSpec(ctx, commitId, true)
+		require.NoError(t, err)
 	}
 }
 
@@ -686,11 +870,11 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 	return bootstrapNode, nodes, configBlock
 }
 
-func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, bootstrapNodePort int64) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string) CCIPJobSpecParams {
 	// setup Jobs
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
-	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, bootstrapNodePort)
+	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, generateRandomBootstrapPort())
 
 	jobParams := c.NewCCIPJobSpecParams(pricePipeline, configBlock)
 
@@ -720,16 +904,60 @@ func DecodeCommitOnChainConfig(encoded []byte) (ccipdata.CommitOnchainConfig, er
 	return onchainConfig, nil
 }
 
-func DecodeExecOnChainConfig(encoded []byte) (ccipdata.ExecOnchainConfigV1_2_0, error) {
-	var onchainConfig ccipdata.ExecOnchainConfigV1_2_0
+func DecodeExecOnChainConfig(encoded []byte) (v1_2_0.ExecOnchainConfig, error) {
+	var onchainConfig v1_2_0.ExecOnchainConfig
 	unpacked, err := abihelpers.DecodeOCR2Config(encoded)
 	if err != nil {
 		return onchainConfig, errors.Wrap(err, "failed to unpack log data")
 	}
 	onChainCfg := unpacked.OnchainConfig
-	onchainConfig, err = abihelpers.DecodeAbiStruct[ccipdata.ExecOnchainConfigV1_2_0](onChainCfg)
+	onchainConfig, err = abihelpers.DecodeAbiStruct[v1_2_0.ExecOnchainConfig](onChainCfg)
 	if err != nil {
 		return onchainConfig, err
 	}
 	return onchainConfig, nil
+}
+
+type ksa struct {
+	keystore.Master
+	csa keystore.CSA
+}
+
+func (k *ksa) CSA() keystore.CSA {
+	return k.csa
+}
+
+func NewKsa(db *sqlx.DB, lggr logger.Logger, csa keystore.CSA, config chainlink.GeneralConfig) *ksa {
+	return &ksa{
+		Master: keystore.New(db, utils.FastScryptParams, lggr, config.Database()),
+		csa:    csa,
+	}
+}
+
+type NoopFeedsClient struct{}
+
+func (n NoopFeedsClient) ApprovedJob(context.Context, *pb.ApprovedJobRequest) (*pb.ApprovedJobResponse, error) {
+	return &pb.ApprovedJobResponse{}, nil
+}
+
+func (n NoopFeedsClient) Healthcheck(context.Context, *pb.HealthcheckRequest) (*pb.HealthcheckResponse, error) {
+	return &pb.HealthcheckResponse{}, nil
+}
+
+func (n NoopFeedsClient) UpdateNode(context.Context, *pb.UpdateNodeRequest) (*pb.UpdateNodeResponse, error) {
+	return &pb.UpdateNodeResponse{}, nil
+}
+
+func (n NoopFeedsClient) RejectedJob(context.Context, *pb.RejectedJobRequest) (*pb.RejectedJobResponse, error) {
+	return &pb.RejectedJobResponse{}, nil
+}
+
+func (n NoopFeedsClient) CancelledJob(context.Context, *pb.CancelledJobRequest) (*pb.CancelledJobResponse, error) {
+	return &pb.CancelledJobResponse{}, nil
+}
+
+func generateRandomBootstrapPort() int64 {
+	minPort := int64(10000)
+	maxPort := int64(30000)
+	return rand.Int63n(maxPort-minPort+1) + minPort
 }
