@@ -67,14 +67,14 @@ func TestUSDCValidate(t *testing.T) {
 		{
 			config: USDCConfig{
 				AttestationAPI:     "api",
-				SourceTokenAddress: common.HexToAddress("0x0123456789012345678901234567890123456789"),
+				SourceTokenAddress: utils.RandomAddress(),
 			},
 			err: "SourceMessageTransmitterAddress is required",
 		},
 		{
 			config: USDCConfig{
 				AttestationAPI:                  "api",
-				SourceTokenAddress:              common.HexToAddress("0x0123456789012345678901234567890123456789"),
+				SourceTokenAddress:              utils.RandomAddress(),
 				SourceMessageTransmitterAddress: utils.ZeroAddress,
 			},
 			err: "SourceMessageTransmitterAddress is required",
@@ -82,16 +82,16 @@ func TestUSDCValidate(t *testing.T) {
 		{
 			config: USDCConfig{
 				AttestationAPI:                  "api",
-				SourceTokenAddress:              common.HexToAddress("0x0123456789012345678901234567890123456789"),
-				SourceMessageTransmitterAddress: common.HexToAddress("0x0123456789012345678901234567890123456789"),
+				SourceTokenAddress:              utils.RandomAddress(),
+				SourceMessageTransmitterAddress: utils.RandomAddress(),
 			},
 			err: "",
 		},
 		{
 			config: USDCConfig{
 				AttestationAPI:                  "api",
-				SourceTokenAddress:              common.HexToAddress("0x0123456789012345678901234567890123456789"),
-				SourceMessageTransmitterAddress: common.HexToAddress("0x0123456789012345678901234567890123456789"),
+				SourceTokenAddress:              utils.RandomAddress(),
+				SourceMessageTransmitterAddress: utils.RandomAddress(),
 				AttestationAPITimeoutSeconds:    -1,
 			},
 			err: "AttestationAPITimeoutSeconds must be non-negative",
