@@ -22,7 +22,7 @@ func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, on
 		return nil, errors.Wrapf(err, "unable to read type and version")
 	}
 	if contractType != ccipconfig.EVM2EVMOnRamp {
-		return nil, errors.Errorf("expected %v got %v", ccipconfig.EVM2EVMOffRamp, contractType)
+		return nil, errors.Errorf("expected %v got %v", ccipconfig.EVM2EVMOnRamp, contractType)
 	}
 	switch version.String() {
 	case ccipdata.V1_0_0:
@@ -34,6 +34,6 @@ func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, on
 	case ccipdata.V1_3_0:
 		return v1_3_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source)
 	default:
-		return nil, errors.Errorf("got unexpected version %v", version.String())
+		return nil, errors.Errorf("unsupported onramp version %v", version.String())
 	}
 }

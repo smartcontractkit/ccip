@@ -34,6 +34,6 @@ func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Addr
 	case ccipdata.V1_2_0:
 		return v1_2_0.NewPriceRegistry(lggr, priceRegistryAddress, lp, cl)
 	default:
-		return nil, errors.Errorf("got unexpected version %v", version.String())
+		return nil, errors.Errorf("unsupported price registry version %v", version.String())
 	}
 }

@@ -34,7 +34,7 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 	case ccipdata.V1_2_0, ccipdata.V1_3_0:
 		return v1_2_0.NewCommitStore(lggr, address, ec, lp, estimator)
 	default:
-		return nil, errors.Errorf("got unexpected version %v", version.String())
+		return nil, errors.Errorf("unsupported commit store version %v", version.String())
 	}
 }
 
