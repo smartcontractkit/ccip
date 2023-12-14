@@ -24,12 +24,13 @@ import (
 
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -242,7 +243,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
 	}
-	encodedReport, err := factory.EncodeExecutionReport(report)
+	encodedReport, err := encodeExecutionReport(report)
 	require.NoError(t, err)
 
 	mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
@@ -287,7 +288,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
 	}
-	encodedReport, err := factory.EncodeExecutionReport(report)
+	encodedReport, err := encodeExecutionReport(report)
 	require.NoError(t, err)
 
 	mockCommitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
@@ -321,7 +322,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	const bytesPerMessage = 1000
 
 	executionReport := generateExecutionReport(t, numMessages, tokensPerMessage, bytesPerMessage)
-	encodedReport, err := factory.EncodeExecutionReport(executionReport)
+	encodedReport, err := encodeExecutionReport(executionReport)
 	assert.NoError(t, err)
 	// ensure "naive" full report would be bigger than limit
 	assert.Greater(t, len(encodedReport), MaxExecutionReportLength, "full execution report length")
@@ -1655,4 +1656,11 @@ func Test_selectReportsToFillBatch(t *testing.T) {
 			assert.Equal(t, reports, flatten)
 		})
 	}
+}
+
+// encodeExecutionReport is only used in tests
+// TODO should remove it and update tests to use Reader interface.
+func encodeExecutionReport(report ccipdata.ExecReport) ([]byte, error) {
+	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
+	return v1_2_0.EncodeExecutionReport(abihelpers.MustGetMethodInputs(ccipdata.ManuallyExecute, offRampABI)[:1], report)
 }
