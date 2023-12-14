@@ -178,5 +178,6 @@ func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline
 		DestChainName:          "SimulatedDest",
 		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
 		DestStartBlock:         uint64(configBlock),
+		USDCAttestationAPI:     "http://blah.com",
 	}
 }

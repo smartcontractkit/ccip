@@ -163,8 +163,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 			require.NoError(t, err)
 			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, test.customTimeoutSeconds)
 			lp.On("RegisterFilter", mock.Anything).Return(nil)
-			err = usdcReader.RegisterFilters()
-			require.NoError(t, err)
+			require.NoError(t, usdcReader.RegisterFilters())
 
 			parentCtx, cancel := context.WithTimeout(context.Background(), time.Duration(test.parentTimeoutSeconds)*time.Second)
 			defer cancel()
@@ -175,6 +174,8 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 			if test.expectedError != nil {
 				require.True(t, errors.Is(err, test.expectedError))
 			}
+			lp.On("UnregisterFilter", mock.Anything).Return(nil)
+			require.NoError(t, usdcReader.Close())
 		})
 	}
 }
