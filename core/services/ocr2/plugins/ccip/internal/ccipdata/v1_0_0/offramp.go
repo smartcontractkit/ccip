@@ -99,21 +99,18 @@ type CachedOffRampTokens struct {
 }
 
 type OffRamp struct {
-	offRamp             *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
-	addr                common.Address
-	lp                  logpoller.LogPoller
-	lggr                logger.Logger
-	ec                  client.Client
-	evmBatchCaller      rpclib.EvmBatchCaller
-	filters             []logpoller.Filter
-	estimator           gas.EvmFeeEstimator
-	executionReportArgs abi.Arguments
-	eventIndex          int
-	eventSig            common.Hash
-	cache               cache.AutoSync[*CachedOffRampTokens]
-	//destinationTokensCache  cache.AutoSync[[]common.Address]
-	//sourceTokensCache       cache.AutoSync[[]common.Address]
-	//destinationPoolsCache   cache.AutoSync[map[common.Address]common.Address]
+	offRamp                 *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
+	addr                    common.Address
+	lp                      logpoller.LogPoller
+	lggr                    logger.Logger
+	ec                      client.Client
+	evmBatchCaller          rpclib.EvmBatchCaller
+	filters                 []logpoller.Filter
+	estimator               gas.EvmFeeEstimator
+	executionReportArgs     abi.Arguments
+	eventIndex              int
+	eventSig                common.Hash
+	cache                   cache.AutoSync[*CachedOffRampTokens]
 	sourceToDestTokensCache sync.Map
 
 	// Dynamic config
