@@ -16,7 +16,7 @@ concurrency:
 
 env:
   INPUT_CHAINLINK_TEST_VERSION: ${{ inputs.chainlinkTestVersion || github.sha}}
-  INPUT_CHAINLINK_IMAGE: ${{ inputs.chainlinkImage || ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink}}
+  INPUT_CHAINLINK_IMAGE: ${{ inputs.chainlinkImage }}
   INPUT_CHAINLINK_VERSION: ${{ inputs.chainlinkVersion || github.sha}}
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ inputs.chainlinkTestVersion || github.sha }}
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
@@ -139,6 +139,12 @@ jobs:
             echo "BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
             echo "TEST_BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
           fi
+          if [[ "${{ env.INPUT_CHAINLINK_IMAGE }}" == "" ]]; then
+            echo "INPUT_CHAINLINK_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink" >> $GITHUB_ENV
+          fi
+          if [[ "${{ env.INPUT_CHAINLINK_TEST_VERSION }}" == "" ]]; then
+            echo "INPUT_CHAINLINK_TEST_VERSION=${{ github.sha }}" >> $GITHUB_ENV
+          fi
       - name: step summary
         shell: bash
         run: |
@@ -229,6 +235,12 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
             echo "TEST_BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
+          fi
+          if [[ "${{ env.INPUT_CHAINLINK_IMAGE }}" == "" ]]; then
+            echo "INPUT_CHAINLINK_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink" >> $GITHUB_ENV
+          fi
+          if [[ "${{ env.INPUT_CHAINLINK_TEST_VERSION }}" == "" ]]; then
+            echo "INPUT_CHAINLINK_TEST_VERSION=${{ github.sha }}" >> $GITHUB_ENV
           fi
           untrimmed_ver=$(curl --header "Authorization: token ${{ secrets.GITHUB_TOKEN }}" --request GET https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .name)
           last_release="${untrimmed_ver:1}"
