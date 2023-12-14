@@ -46,7 +46,7 @@ Data = """
         "0x5425890298aed601595a70AB815c96711a31Bc65"
       ],
       "bridge_tokens_pools": [
-        "0xb2d8B88C4b23d0D86818bc9783E6B508a7771b84"
+        "0x7a4d8f8c18762d362e64b411d7490fba112811cd"
       ],
       "arm": "0xD4A51dC0F5C680A8A18eA4Ec3A2f25C6db9424B7",
       "router": "0xa62e685aDFF45f38eC94378513D128F168964E99",
@@ -146,7 +146,7 @@ Data = """
         "0xF175520C52418dfE19C8098071a252da48Cd1C19"
       ],
       "bridge_tokens_pools": [
-        "0x14D66e53299174B8Ef117d33285E1c814ED652dE"
+        "0x5c576130b38e914abe4f422074fd8f86d1aa829b"
       ],
       "arm": "0x27B882c393151ADD910F3557849AF0bb09c7d5A6",
       "router": "0x8Aed531563568dde9FF437d86c65b637535a5DA3",
@@ -173,7 +173,7 @@ Data = """
         "0xe05606174bac4A6364B31bd0eCA4bf4dD368f8C6"
       ],
       "bridge_tokens_pools": [
-        "0xc03Bc54187069e22fB78f3fcE2d7B5dCe3f6eCEA"
+        "0x4849a40e3e64c3315a8e1875525301b19fc5babd"
       ],
       "arm": "0xC1b9bcdC6bE9f4D6224672F18fC46ff330F487e1",
       "router": "0xDDDf978Fd8613Dbd06E807a39bca5ce4383D3Ff5",
