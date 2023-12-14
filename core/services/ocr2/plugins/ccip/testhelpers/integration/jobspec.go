@@ -169,7 +169,7 @@ func (params CCIPJobSpecParams) BootstrapJob(contractID string) *client.OCR2Task
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, configBlock int64, usdcAttestationAPI string) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
 		CommitStore:            c.Dest.CommitStore.Address(),
 		OffRamp:                c.Dest.OffRamp.Address(),
@@ -178,6 +178,6 @@ func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline
 		DestChainName:          "SimulatedDest",
 		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
 		DestStartBlock:         uint64(configBlock),
-		USDCAttestationAPI:     "http://blah.com",
+		USDCAttestationAPI:     usdcAttestationAPI,
 	}
 }
