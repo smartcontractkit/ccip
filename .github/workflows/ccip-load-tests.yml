@@ -213,8 +213,6 @@ jobs:
       SEPOLIA_HTTP_URLS: ${{ secrets.QA_SEPOLIA_HTTP_URLS }}
       AVALANCHE_FUJI_URLS: ${{ secrets.QA_AVALANCHE_FUJI_URLS }}
       AVALANCHE_FUJI_HTTP_URLS: ${{ secrets.QA_AVALANCHE_FUJI_HTTP_URLS }}
-      UPGRADE_VERSION: ${{ env.INPUT_CHAINLINK_VERSION }}
-      UPGRADE_IMAGE: ${{ env.INPUT_CHAINLINK_IMAGE }}
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
@@ -249,6 +247,8 @@ jobs:
         shell: bash
         run: |
           echo "ENV_JOB_IMAGE=${{ env.ENV_JOB_IMAGE_BASE }}:${{ env.INPUT_CHAINLINK_TEST_VERSION }}" >> $GITHUB_ENV
+          echo "UPGRADE_VERSION=${{ env.INPUT_CHAINLINK_TEST_VERSION }}" >> $GITHUB_ENV
+          echo "UPGRADE_IMAGE=${{ env.INPUT_CHAINLINK_IMAGE }}" >> $GITHUB_ENV
           echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.INPUT_CHAINLINK_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
