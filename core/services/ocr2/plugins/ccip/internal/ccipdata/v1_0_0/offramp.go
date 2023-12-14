@@ -92,21 +92,28 @@ func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Durat
 	return time.Duration(d.PermissionLessExecutionThresholdSeconds) * time.Second
 }
 
+type CachedOffRampTokens struct {
+	destinationTokens []common.Address
+	sourceTokens      []common.Address
+	destinationPool   map[common.Address]common.Address
+}
+
 type OffRamp struct {
-	offRamp                 *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
-	addr                    common.Address
-	lp                      logpoller.LogPoller
-	lggr                    logger.Logger
-	ec                      client.Client
-	evmBatchCaller          rpclib.EvmBatchCaller
-	filters                 []logpoller.Filter
-	estimator               gas.EvmFeeEstimator
-	executionReportArgs     abi.Arguments
-	eventIndex              int
-	eventSig                common.Hash
-	destinationTokensCache  cache.AutoSync[[]common.Address]
-	sourceTokensCache       cache.AutoSync[[]common.Address]
-	destinationPoolsCache   cache.AutoSync[map[common.Address]common.Address]
+	offRamp             *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
+	addr                common.Address
+	lp                  logpoller.LogPoller
+	lggr                logger.Logger
+	ec                  client.Client
+	evmBatchCaller      rpclib.EvmBatchCaller
+	filters             []logpoller.Filter
+	estimator           gas.EvmFeeEstimator
+	executionReportArgs abi.Arguments
+	eventIndex          int
+	eventSig            common.Hash
+	cache               cache.AutoSync[*CachedOffRampTokens]
+	//destinationTokensCache  cache.AutoSync[[]common.Address]
+	//sourceTokensCache       cache.AutoSync[[]common.Address]
+	//destinationPoolsCache   cache.AutoSync[map[common.Address]common.Address]
 	sourceToDestTokensCache sync.Map
 
 	// Dynamic config
@@ -258,9 +265,11 @@ func (o *OffRamp) GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []c
 }
 
 func (o *OffRamp) getSourceTokens(ctx context.Context) ([]common.Address, error) {
-	return o.sourceTokensCache.Get(ctx, func(ctx context.Context) ([]common.Address, error) {
-		return o.offRamp.GetSupportedTokens(&bind.CallOpts{Context: ctx})
-	})
+	cached, err := o.getCache(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return cached.sourceTokens, nil
 }
 
 func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error) {
@@ -283,24 +292,57 @@ func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[common.
 }
 
 func (o *OffRamp) GetDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error) {
-	return o.destinationPoolsCache.Get(ctx, func(ctx context.Context) (map[common.Address]common.Address, error) {
-		destTokens, err := o.GetDestinationTokens(ctx)
+	cached, err := o.getCache(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return cached.destinationPool, nil
+}
+
+func (o *OffRamp) getCache(ctx context.Context) (*CachedOffRampTokens, error) {
+	return o.cache.Get(ctx, func(ctx context.Context) (*CachedOffRampTokens, error) {
+		destinationTokens, err := o.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
 		if err != nil {
-			return nil, fmt.Errorf("get destination tokens: %w", err)
+			return nil, err
 		}
-
-		destPools, err := o.getPoolsByDestTokens(ctx, destTokens)
+		sourceTokens, err := o.offRamp.GetSupportedTokens(&bind.CallOpts{Context: ctx})
 		if err != nil {
-			return nil, fmt.Errorf("get pools by dest tokens: %w", err)
+			return nil, err
 		}
-
-		tokenToPool := make(map[common.Address]common.Address, len(destTokens))
-		for i := range destTokens {
-			tokenToPool[destTokens[i]] = destPools[i]
+		destinationPool, err := o.getDestinationTokenPools(ctx)
+		if err != nil {
+			return nil, err
 		}
-
-		return tokenToPool, nil
+		return &CachedOffRampTokens{
+			destinationTokens: destinationTokens,
+			sourceTokens:      sourceTokens,
+			destinationPool:   destinationPool,
+		}, nil
 	})
+}
+
+func (o *OffRamp) getDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error) {
+	destTokens, err := o.GetDestinationTokens(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get destination tokens: %w", err)
+	}
+	destPools, err := o.getPoolsByDestTokens(ctx, destTokens)
+	if err != nil {
+		return nil, fmt.Errorf("get pools by dest tokens: %w", err)
+	}
+	tokenToPool := make(map[common.Address]common.Address, len(destTokens))
+	for i := range destTokens {
+		tokenToPool[destTokens[i]] = destPools[i]
+	}
+	return tokenToPool, nil
+}
+
+func (o *OffRamp) GetDestinationTokens(ctx context.Context) ([]common.Address, error) {
+	cached, err := o.getCache(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return cached.destinationTokens, nil
 }
 
 func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.Address) ([]common.Address, error) {
@@ -393,12 +435,6 @@ func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (com
 		"offchainConfig", onchainConfigParsed,
 		"onchainConfig", offchainConfigParsed)
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
-}
-
-func (o *OffRamp) GetDestinationTokens(ctx context.Context) ([]common.Address, error) {
-	return o.destinationTokensCache.Get(ctx, func(ctx context.Context) ([]common.Address, error) {
-		return o.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
-	})
 }
 
 func (o *OffRamp) Close(qopts ...pg.QOpt) error {
@@ -610,17 +646,7 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 			rpclib.DefaultRpcBatchSizeLimit,
 			rpclib.DefaultRpcBatchBackOffMultiplier,
 		),
-		destinationTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
-			lp,
-			offRamp_poolAddedPoolRemovedEvents,
-			offRamp.Address(),
-		),
-		sourceTokensCache: cache.NewLogpollerEventsBased[[]common.Address](
-			lp,
-			offRamp_poolAddedPoolRemovedEvents,
-			offRamp.Address(),
-		),
-		destinationPoolsCache: cache.NewLogpollerEventsBased[map[common.Address]common.Address](
+		cache: cache.NewLogpollerEventsBased[*CachedOffRampTokens](
 			lp,
 			offRamp_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
