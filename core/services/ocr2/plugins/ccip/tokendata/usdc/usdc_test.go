@@ -57,7 +57,6 @@ func TestUSDCReader_callAttestationApiMock(t *testing.T) {
 
 	lggr := logger.TestLogger(t)
 	lp := mocks.NewLogPoller(t)
-	lp.On("RegisterFilter", mock.Anything).Return(nil)
 	usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
 	require.NoError(t, err)
 	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0)
@@ -160,10 +159,12 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 
 			lggr := logger.TestLogger(t)
 			lp := mocks.NewLogPoller(t)
-			lp.On("RegisterFilter", mock.Anything).Return(nil)
 			usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
 			require.NoError(t, err)
 			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, test.customTimeoutSeconds)
+			lp.On("RegisterFilter", mock.Anything).Return(nil)
+			err = usdcReader.RegisterFilters()
+			require.NoError(t, err)
 
 			parentCtx, cancel := context.WithTimeout(context.Background(), time.Duration(test.parentTimeoutSeconds)*time.Second)
 			defer cancel()

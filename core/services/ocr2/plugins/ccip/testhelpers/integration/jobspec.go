@@ -2,6 +2,7 @@ package integrationtesthelpers
 
 import (
 	"fmt"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -42,6 +43,7 @@ type CCIPJobSpecParams struct {
 	TokenPricesUSDPipeline string
 	SourceStartBlock       uint64
 	DestStartBlock         uint64
+	USDCAttestationAPI     string
 	P2PV2Bootstrappers     pq.StringArray
 }
 
@@ -136,6 +138,12 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 	}
 	if params.SourceStartBlock > 0 {
 		ocrSpec.PluginConfig["sourceStartBlock"] = params.SourceStartBlock
+	}
+	if params.USDCAttestationAPI != "" {
+		ocrSpec.PluginConfig["USDCConfig.AttestationAPI"] = params.USDCAttestationAPI
+		ocrSpec.PluginConfig["USDCConfig.SourceTokenAddress"] = utils.RandomAddress()
+		ocrSpec.PluginConfig["USDCConfig.SourceMessageTransmitterAddress"] = utils.RandomAddress()
+		ocrSpec.PluginConfig["USDCConfig.AttestationAPITimeoutSeconds"] = 5
 	}
 	return &client.OCR2TaskJobSpec{
 		OCR2OracleSpec: ocrSpec,

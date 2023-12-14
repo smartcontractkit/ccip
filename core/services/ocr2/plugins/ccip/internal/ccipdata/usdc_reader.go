@@ -37,7 +37,7 @@ func (u *USDCReaderImpl) Close(qopts ...pg.QOpt) error {
 }
 
 func (u *USDCReaderImpl) RegisterFilters(qopts ...pg.QOpt) error {
-	return u.lp.UnregisterFilter(u.filter.Name, qopts...)
+	return u.lp.RegisterFilter(u.filter, qopts...)
 }
 
 // usdcPayload has to match the onchain event emitted by the USDC message transmitter
