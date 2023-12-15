@@ -4,6 +4,7 @@ Data = """
 {
   "lane_configs": {
     "Arbitrum Sepolia": {
+      "is_native_fee_token": true,
       "fee_token": "0xb1D4538B4571d411F07960EF2838Ce337FE1E80E",
       "bridge_tokens": [
         "0xA8C0c11bf64AF62CDCA6f93D3769B88BdD7cb93D",
@@ -32,6 +33,7 @@ Data = """
       }
     },
     "Avalanche Fuji": {
+      "is_native_fee_token": true,
       "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
       "bridge_tokens": [
         "0xA6C01A7E40e784934739BAC707DE1d6463e76cb7",
@@ -531,17 +533,17 @@ Data = """
 """
 
 [CCIP.Groups.load]
-NetworkPairs = ['SEPOLIA,ARBITRUM_SEPOLIA','SEPOLIA,OPTIMISM_GOERLI','SEPOLIA,POLYGON_MUMBAI','AVALANCHE_FUJI,SEPOLIA','SEPOLIA,BASE_GOERLI','SEPOLIA,BSC_TESTNET','SEPOLIA,WEMIX_TESTNET','AVALANCHE_FUJI,OPTIMISM_GOERLI','AVALANCHE_FUJI,POLYGON_MUMBAI','AVALANCHE_FUJI,BSC_TESTNET','AVALANCHE_FUJI,BASE_GOERLI','OPTIMISM_GOERLI,BASE_GOERLI','OPTIMISM_GOERLI,POLYGON_MUMBAI','BSC_TESTNET,POLYGON_MUMBAI','BSC_TESTNET,BASE_GOERLI','WEMIX_TESTNET,KROMA_SEPOLIA']
+NetworkPairs = ['SEPOLIA,ARBITRUM_SEPOLIA','SEPOLIA,OPTIMISM_GOERLI','SEPOLIA,POLYGON_MUMBAI','SEPOLIA,BASE_GOERLI','SEPOLIA,BSC_TESTNET','SEPOLIA,WEMIX_TESTNET','OPTIMISM_GOERLI,BASE_GOERLI','OPTIMISM_GOERLI,POLYGON_MUMBAI','BSC_TESTNET,POLYGON_MUMBAI','BSC_TESTNET,BASE_GOERLI','WEMIX_TESTNET,KROMA_SEPOLIA']
 MsgType = 'WithoutToken'
 PhaseTimeout = '50m'
-TestDuration = '1m'
+TestDuration = '1h'
 ExistingDeployment = true
 RequestPerUnitTime = [1]
 TimeUnit = '5m'
 NoOfTokensPerChain = 1
 NoOfTokensInMsg = 1
 AmountPerToken = 1
-ExistingEnv = 'prod-testnet-2.7.1-ccip1.2.2-beta'
+ExistingEnv = 'prod-testnet-2.7.1-ccip1.2.3'
 
 [CCIP.Groups.smoke]
 MsgType = 'WithoutToken'
