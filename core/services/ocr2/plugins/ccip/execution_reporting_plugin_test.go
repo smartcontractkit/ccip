@@ -24,13 +24,11 @@ import (
 
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
@@ -243,10 +241,10 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
 	}
-	encodedReport, err := encodeExecutionReport(report)
-	require.NoError(t, err)
 
 	mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
+	encodedReport, err := mockOffRampReader.EncodeExecutionReport(report)
+	require.NoError(t, err)
 	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
 
 	plugin := ExecutionReportingPlugin{
@@ -288,12 +286,12 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
 	}
-	encodedReport, err := encodeExecutionReport(report)
-	require.NoError(t, err)
 
 	mockCommitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 
 	mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
+	encodedReport, err := mockOffRampReader.EncodeExecutionReport(report)
+	require.NoError(t, err)
 	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
 	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(ccipdata.ExecutionStateUntouched), nil).Once()
 
@@ -322,8 +320,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	const bytesPerMessage = 1000
 
 	executionReport := generateExecutionReport(t, numMessages, tokensPerMessage, bytesPerMessage)
-	encodedReport, err := encodeExecutionReport(executionReport)
-	assert.NoError(t, err)
+	encodedReport := encodeExecutionReport(t, executionReport)
 	// ensure "naive" full report would be bigger than limit
 	assert.Greater(t, len(encodedReport), MaxExecutionReportLength, "full execution report length")
 
@@ -1658,9 +1655,8 @@ func Test_selectReportsToFillBatch(t *testing.T) {
 	}
 }
 
-// encodeExecutionReport is only used in tests
-// TODO should remove it and update tests to use Reader interface.
-func encodeExecutionReport(report ccipdata.ExecReport) ([]byte, error) {
-	offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
-	return v1_2_0.EncodeExecutionReport(abihelpers.MustGetMethodInputs(ccipdata.ManuallyExecute, offRampABI)[:1], report)
+func encodeExecutionReport(t *testing.T, report ccipdata.ExecReport) []byte {
+	encodedReport, err := ccipdatamocks.NewOffRampReader(t).EncodeExecutionReport(report)
+	require.NoError(t, err)
+	return encodedReport
 }
