@@ -83,7 +83,7 @@ jobs:
       - name: Build Test Image
         uses: ./.github/actions/build-test-image
         with:
-          tag: ${{ env.ENV_JOB_IMAGE }}
+          tag: ${{ env.INPUT_CHAINLINK_TEST_VERSION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
