@@ -160,9 +160,6 @@ func NewOnRampV1_0_0(lggr logger.Logger, sourceSelector, destSelector uint64, on
 			Addresses: []common.Address{onRampAddress},
 		},
 	}
-	if err != nil {
-		return nil, err
-	}
 	return &OnRampV1_0_0{
 		lggr:       lggr,
 		address:    onRampAddress,
