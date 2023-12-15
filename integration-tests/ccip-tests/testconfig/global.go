@@ -393,6 +393,5 @@ func (n *Node) ApplyOverrides(from *Node) {
 				n.ChainConfigTOMLByChain[chainID] = cfg
 			}
 		}
-
 	}
 }
