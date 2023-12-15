@@ -139,6 +139,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				Return(tc.sendRequests, nil).Maybe()
 			p.onRampReader = mockOnRampReader
 
+			mockGasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
+			mockGasPriceEstimator.On("GetGasPrice", ctx).Return(prices.GasPrice(big.NewInt(1)), nil).Maybe()
+			p.gasPriceEstimator = mockGasPriceEstimator
+
 			destPriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
 				[]ccipdata.TokenPriceUpdate{{TokenPrice: ccipdata.TokenPrice{Token: common.HexToAddress("0x1"), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
@@ -632,7 +636,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 				tc.tokenLimit,
 				tc.srcPrices,
 				tc.dstPrices,
-				func() (prices.GasPrice, error) { return tc.destGasPrice, nil },
+				tc.destGasPrice,
 				tc.srcToDestTokens,
 				tc.destRateLimits,
 			)
