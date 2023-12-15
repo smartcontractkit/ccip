@@ -91,6 +91,12 @@ const (
 		
 		[pluginConfig]
 		destStartBlock = 50
+
+	    [pluginConfig.USDCConfig]
+	    AttestationAPI = "http://blah.com"
+	    SourceMessageTransmitterAddress = "%s"
+	    SourceTokenAddress = "%s"
+		AttestationAPITimeoutSeconds = 10
 	`
 	commitSpecTemplate = `
 		type = "offchainreporting2"
@@ -609,6 +615,8 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 			1,
 			node.KeyBundle.ID(),
 			node.Transmitter.Hex(),
+			utils.RandomAddress().String(),
+			utils.RandomAddress().String(),
 		)
 		execId, err := f.ProposeJob(ctx, &execSpec)
 		require.NoError(t, err)
