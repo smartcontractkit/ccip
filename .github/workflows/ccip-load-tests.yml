@@ -15,10 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  INPUT_CHAINLINK_TEST_VERSION: ${{ inputs.chainlinkTestVersion || github.sha}}
-  INPUT_CHAINLINK_IMAGE: ${{ inputs.chainlinkImage }}
-  INPUT_CHAINLINK_VERSION: ${{ inputs.chainlinkVersion || github.sha}}
-  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ inputs.chainlinkTestVersion || github.sha }}
+  INPUT_CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
+  INPUT_CHAINLINK_VERSION: ${{ github.sha}}
+  INPUT_CHAINLINK_TEST_VERSION: ${{ github.sha}}
+  ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ github.sha }}
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
 
 jobs:
@@ -83,7 +83,7 @@ jobs:
       - name: Build Test Image
         uses: ./.github/actions/build-test-image
         with:
-          tag: ${{ env.INPUT_CHAINLINK_TEST_VERSION }}
+          tag: ${{ env.ENV_JOB_IMAGE }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
@@ -139,16 +139,9 @@ jobs:
             echo "BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
             echo "TEST_BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
           fi
-          if [[ "${{ env.INPUT_CHAINLINK_IMAGE }}" == "" ]]; then
-            echo "INPUT_CHAINLINK_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink" >> $GITHUB_ENV
-          fi
-          if [[ "${{ env.INPUT_CHAINLINK_TEST_VERSION }}" == "" ]]; then
-            echo "INPUT_CHAINLINK_TEST_VERSION=${{ github.sha }}" >> $GITHUB_ENV
-          fi
       - name: step summary
         shell: bash
         run: |
-          echo "ENV_JOB_IMAGE=${{ env.ENV_JOB_IMAGE_BASE }}:${{ env.INPUT_CHAINLINK_TEST_VERSION }}" >> $GITHUB_ENV
           echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.INPUT_CHAINLINK_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
@@ -185,7 +178,7 @@ jobs:
 
 
   ccip_version_compatibility_test:
-    name: CCIP Load Test
+    name: CCIP Load With Version Compatibility Test
     environment: integration
     runs-on: ubuntu-latest
     needs: [ build-chainlink, build-test-image ]
@@ -234,28 +227,21 @@ jobs:
             echo "BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
             echo "TEST_BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
           fi
-          if [[ "${{ env.INPUT_CHAINLINK_IMAGE }}" == "" ]]; then
-            echo "INPUT_CHAINLINK_IMAGE=${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink" >> $GITHUB_ENV
-          fi
-          if [[ "${{ env.INPUT_CHAINLINK_TEST_VERSION }}" == "" ]]; then
-            echo "INPUT_CHAINLINK_TEST_VERSION=${{ github.sha }}" >> $GITHUB_ENV
-          fi
-          untrimmed_ver=$(curl --header "Authorization: token ${{ secrets.GITHUB_TOKEN }}" --request GET https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .name)
+          echo "UPGRADE_VERSION=${{ env.INPUT_CHAINLINK_VERSION }}" >> $GITHUB_ENV
+          echo "UPGRADE_IMAGE=${{ env.INPUT_CHAINLINK_IMAGE }}" >> $GITHUB_ENV
+          untrimmed_ver=$(curl --header "Authorization: token ${{ secrets.GITHUB_TOKEN }}" --request GET https://api.github.com/repos/${{ github.repository }}/releases | jq -r --arg SUFFIX "release" '.[] | select(.tag_name | endswith("release"))  | .tag_name' | sort -V | tail -n 1)
           last_release="${untrimmed_ver:1}"
           echo "last_release=${last_release} | tee -a $GITHUB_OUTPUT"
       - name: step summary
         shell: bash
         run: |
-          echo "ENV_JOB_IMAGE=${{ env.ENV_JOB_IMAGE_BASE }}:${{ env.INPUT_CHAINLINK_TEST_VERSION }}" >> $GITHUB_ENV
-          echo "UPGRADE_VERSION=${{ env.INPUT_CHAINLINK_TEST_VERSION }}" >> $GITHUB_ENV
-          echo "UPGRADE_IMAGE=${{ env.INPUT_CHAINLINK_IMAGE }}" >> $GITHUB_ENV
-          echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
+          echo "### chainlink upgrade image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.INPUT_CHAINLINK_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.INPUT_CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "### test input override :link:" >>$GITHUB_STEP_SUMMARY
           echo "$(base64 -d <<< "${{ inputs.base64_test_input }}")" >>$GITHUB_STEP_SUMMARY
-          echo "### testing upgrade against :link:" >>$GITHUB_STEP_SUMMARY
+          echo "### testing upgrade against release :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ steps.set_env_vars.outputs.last_release }}\`" >>$GITHUB_STEP_SUMMARY
       - name: Run Tests
         uses: smartcontractkit/chainlink-github-actions/chainlink-testing-framework/run-tests@e865e376b8c2d594028c8d645dd6c47169b72974 # v2.2.16
