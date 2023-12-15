@@ -140,9 +140,9 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*client.OCR2TaskJobSpec, err
 		ocrSpec.PluginConfig["sourceStartBlock"] = params.SourceStartBlock
 	}
 	if params.USDCAttestationAPI != "" {
-		ocrSpec.PluginConfig["USDCConfig.AttestationAPI"] = params.USDCAttestationAPI
-		ocrSpec.PluginConfig["USDCConfig.SourceTokenAddress"] = utils.RandomAddress()
-		ocrSpec.PluginConfig["USDCConfig.SourceMessageTransmitterAddress"] = utils.RandomAddress()
+		ocrSpec.PluginConfig["USDCConfig.AttestationAPI"] = fmt.Sprintf("\"%s\"", params.USDCAttestationAPI)
+		ocrSpec.PluginConfig["USDCConfig.SourceTokenAddress"] = fmt.Sprintf("\"%s\"", utils.RandomAddress().String())
+		ocrSpec.PluginConfig["USDCConfig.SourceMessageTransmitterAddress"] = fmt.Sprintf("\"%s\"", utils.RandomAddress().String())
 		ocrSpec.PluginConfig["USDCConfig.AttestationAPITimeoutSeconds"] = 5
 	}
 	return &client.OCR2TaskJobSpec{
