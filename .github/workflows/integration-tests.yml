@@ -533,7 +533,7 @@ jobs:
         run: |
           # if the matrix.product.config_path is set, use it as the override config
           if [ "${{ matrix.product.config_path }}" != "" ]; then
-            echo "base_64_override=$(base64 -i ${{ matrix.product.config_path }})" >> "$GITHUB_OUTPUT"
+            echo "base_64_override=$(base64 -w 0 -i ${{ matrix.product.config_path }})" >> "$GITHUB_OUTPUT"
           fi
       ## Run this step when changes that require tests to be run are made
       - name: Run Tests
