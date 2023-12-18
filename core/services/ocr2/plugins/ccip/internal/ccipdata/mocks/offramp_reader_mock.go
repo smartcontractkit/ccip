@@ -385,6 +385,30 @@ func (_m *OffRampReader) GetTokenPoolsRateLimits(ctx context.Context, poolAddres
 	return r0, r1
 }
 
+// GetTokens provides a mock function with given fields: ctx
+func (_m *OffRampReader) GetTokens(ctx context.Context) (ccipdata.OffRampTokens, error) {
+	ret := _m.Called(ctx)
+
+	var r0 ccipdata.OffRampTokens
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (ccipdata.OffRampTokens, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) ccipdata.OffRampTokens); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(ccipdata.OffRampTokens)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // OffchainConfig provides a mock function with given fields:
 func (_m *OffRampReader) OffchainConfig() ccipdata.ExecOffchainConfig {
 	ret := _m.Called()

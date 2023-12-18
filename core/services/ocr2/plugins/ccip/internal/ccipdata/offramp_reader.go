@@ -94,6 +94,12 @@ type OffRampStaticConfig struct {
 	ArmProxy            common.Address
 }
 
+type OffRampTokens struct {
+	DestinationTokens []common.Address
+	SourceTokens      []common.Address
+	DestinationPool   map[common.Address]common.Address
+}
+
 type TokenBucketRateLimit struct {
 	Tokens      *big.Int
 	LastUpdated uint32
@@ -125,6 +131,7 @@ type OffRampReader interface {
 	GetStaticConfig(ctx context.Context) (OffRampStaticConfig, error)
 	GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error)
 	GetDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error)
+	GetTokens(ctx context.Context) (OffRampTokens, error)
 }
 
 // MessageExecutionState defines the execution states of CCIP messages.
