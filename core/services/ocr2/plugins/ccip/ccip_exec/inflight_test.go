@@ -1,4 +1,4 @@
-package ccip
+package ccip_exec
 
 import (
 	"testing"
