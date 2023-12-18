@@ -151,6 +151,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 				tokenDataProviders,
 				numTokenDataWorkers,
 				5*time.Second,
+				offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds,
 			),
 		}, &BackfillArgs{
 			sourceLP:         sourceChain.LogPoller(),

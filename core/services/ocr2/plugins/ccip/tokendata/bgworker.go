@@ -80,12 +80,17 @@ func NewBackgroundWorker(
 	tokenDataReaders map[common.Address]Reader,
 	numWorkers int,
 	timeoutDur time.Duration,
+	expirationDur time.Duration,
 ) *BackgroundWorker {
+	if expirationDur == 0 {
+		expirationDur = 24 * time.Hour
+	}
+
 	w := &BackgroundWorker{
 		tokenDataReaders: tokenDataReaders,
 		numWorkers:       numWorkers,
 		jobsChan:         make(chan internal.EVM2EVMOnRampCCIPSendRequestedWithMeta),
-		resultsCache:     newResultsCache(),
+		resultsCache:     newResultsCache(ctx, expirationDur, expirationDur/2),
 		timeoutDur:       timeoutDur,
 	}
 
@@ -166,21 +171,40 @@ func (w *BackgroundWorker) getMsgTokenData(ctx context.Context, seqNum uint64) (
 }
 
 type resultsCache struct {
-	results   map[uint64][]msgResult
-	resultsMu *sync.RWMutex
+	expirationDuration time.Duration
+	expiresAt          map[uint64]time.Time
+	results            map[uint64][]msgResult
+	resultsMu          *sync.RWMutex
 }
 
-func newResultsCache() *resultsCache {
-	return &resultsCache{
-		results:   make(map[uint64][]msgResult),
-		resultsMu: &sync.RWMutex{},
+func newResultsCache(ctx context.Context, expirationDuration, cleanupInterval time.Duration) *resultsCache {
+	c := &resultsCache{
+		expirationDuration: expirationDuration,
+		expiresAt:          make(map[uint64]time.Time),
+		results:            make(map[uint64][]msgResult),
+		resultsMu:          &sync.RWMutex{},
 	}
+
+	ticker := time.NewTicker(cleanupInterval)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				c.cleanExpiredItems()
+			}
+		}
+	}()
+
+	return c
 }
 
 func (c *resultsCache) add(msgSeqNum uint64, results []msgResult) {
 	c.resultsMu.Lock()
 	defer c.resultsMu.Unlock()
 	c.results[msgSeqNum] = results
+	c.expiresAt[msgSeqNum] = time.Now().Add(c.expirationDuration)
 }
 
 func (c *resultsCache) get(msgSeqNum uint64) ([]msgResult, bool) {
@@ -188,4 +212,26 @@ func (c *resultsCache) get(msgSeqNum uint64) ([]msgResult, bool) {
 	defer c.resultsMu.RUnlock()
 	v, exists := c.results[msgSeqNum]
 	return v, exists
+}
+
+func (c *resultsCache) cleanExpiredItems() {
+	c.resultsMu.RLock()
+	expiredKeys := make([]uint64, 0, len(c.expiresAt))
+	for seqNum, expiresAt := range c.expiresAt {
+		if expiresAt.Before(time.Now()) {
+			expiredKeys = append(expiredKeys, seqNum)
+		}
+	}
+	c.resultsMu.RUnlock()
+
+	if len(expiredKeys) == 0 {
+		return
+	}
+
+	c.resultsMu.Lock()
+	for _, seqNum := range expiredKeys {
+		delete(c.results, seqNum)
+		delete(c.expiresAt, seqNum)
+	}
+	c.resultsMu.Unlock()
 }
