@@ -110,7 +110,7 @@ type OffRamp struct {
 	executionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
-	cachedOffRampTokens     cache.AutoSync[*OffRampTokens]
+	cachedOffRampTokens     cache.AutoSync[OffRampTokens]
 	sourceToDestTokensCache sync.Map
 
 	// Dynamic config
@@ -304,29 +304,26 @@ func (o *OffRamp) getSourceTokens(ctx context.Context) ([]common.Address, error)
 	return cached.sourceTokens, nil
 }
 
-func (o *OffRamp) getCachedOffRampTokens(ctx context.Context) (*OffRampTokens, error) {
-	return o.cachedOffRampTokens.Get(ctx, func(ctx context.Context) (*OffRampTokens, error) {
-		// destination tokens.
+func (o *OffRamp) getCachedOffRampTokens(ctx context.Context) (OffRampTokens, error) {
+	return o.cachedOffRampTokens.Get(ctx, func(ctx context.Context) (OffRampTokens, error) {
 		destTokens, err := o.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
 		if err != nil {
-			return nil, fmt.Errorf("get destination tokens: %w", err)
+			return OffRampTokens{}, fmt.Errorf("get destination tokens: %w", err)
 		}
-		// source tokens.
 		sourceTokens, err := o.offRamp.GetSupportedTokens(&bind.CallOpts{Context: ctx})
 		if err != nil {
-			return nil, err
+			return OffRampTokens{}, err
 		}
-		// destination pools.
 		destPools, err := o.getPoolsByDestTokens(ctx, destTokens)
 		if err != nil {
-			return nil, fmt.Errorf("get pools by dest tokens: %w", err)
+			return OffRampTokens{}, fmt.Errorf("get pools by dest tokens: %w", err)
 		}
 		tokenToPool := make(map[common.Address]common.Address, len(destTokens))
 		for i := range destTokens {
 			tokenToPool[destTokens[i]] = destPools[i]
 		}
 
-		return &OffRampTokens{
+		return OffRampTokens{
 			destinationTokens: destTokens,
 			sourceTokens:      sourceTokens,
 			destinationPool:   tokenToPool,
@@ -635,7 +632,7 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 			rpclib.DefaultRpcBatchSizeLimit,
 			rpclib.DefaultRpcBatchBackOffMultiplier,
 		),
-		cachedOffRampTokens: cache.NewLogpollerEventsBased[*OffRampTokens](
+		cachedOffRampTokens: cache.NewLogpollerEventsBased[OffRampTokens](
 			lp,
 			offRamp_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
