@@ -92,7 +92,7 @@ func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Durat
 	return time.Duration(d.PermissionLessExecutionThresholdSeconds) * time.Second
 }
 
-type CachedOffRampTokens struct {
+type OffRampTokens struct {
 	destinationTokens []common.Address
 	sourceTokens      []common.Address
 	destinationPool   map[common.Address]common.Address
@@ -110,7 +110,7 @@ type OffRamp struct {
 	executionReportArgs     abi.Arguments
 	eventIndex              int
 	eventSig                common.Hash
-	cache                   cache.AutoSync[*CachedOffRampTokens]
+	cachedOffRampTokens     cache.AutoSync[*OffRampTokens]
 	sourceToDestTokensCache sync.Map
 
 	// Dynamic config
@@ -281,7 +281,7 @@ func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[common.
 }
 
 func (o *OffRamp) GetDestinationTokens(ctx context.Context) ([]common.Address, error) {
-	cached, err := o.getCache(ctx)
+	cached, err := o.getCachedOffRampTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ func (o *OffRamp) GetDestinationTokens(ctx context.Context) ([]common.Address, e
 }
 
 func (o *OffRamp) GetDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error) {
-	cached, err := o.getCache(ctx)
+	cached, err := o.getCachedOffRampTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -297,15 +297,15 @@ func (o *OffRamp) GetDestinationTokenPools(ctx context.Context) (map[common.Addr
 }
 
 func (o *OffRamp) getSourceTokens(ctx context.Context) ([]common.Address, error) {
-	cached, err := o.getCache(ctx)
+	cached, err := o.getCachedOffRampTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return cached.sourceTokens, nil
 }
 
-func (o *OffRamp) getCache(ctx context.Context) (*CachedOffRampTokens, error) {
-	return o.cache.Get(ctx, func(ctx context.Context) (*CachedOffRampTokens, error) {
+func (o *OffRamp) getCachedOffRampTokens(ctx context.Context) (*OffRampTokens, error) {
+	return o.cachedOffRampTokens.Get(ctx, func(ctx context.Context) (*OffRampTokens, error) {
 		// destination tokens.
 		destTokens, err := o.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
 		if err != nil {
@@ -326,7 +326,7 @@ func (o *OffRamp) getCache(ctx context.Context) (*CachedOffRampTokens, error) {
 			tokenToPool[destTokens[i]] = destPools[i]
 		}
 
-		return &CachedOffRampTokens{
+		return &OffRampTokens{
 			destinationTokens: destTokens,
 			sourceTokens:      sourceTokens,
 			destinationPool:   tokenToPool,
@@ -635,7 +635,7 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 			rpclib.DefaultRpcBatchSizeLimit,
 			rpclib.DefaultRpcBatchBackOffMultiplier,
 		),
-		cache: cache.NewLogpollerEventsBased[*CachedOffRampTokens](
+		cachedOffRampTokens: cache.NewLogpollerEventsBased[*OffRampTokens](
 			lp,
 			offRamp_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
