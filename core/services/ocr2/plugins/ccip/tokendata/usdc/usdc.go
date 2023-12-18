@@ -32,6 +32,9 @@ const (
 	// defaultCoolDownDurationSec defines the default time to wait after getting rate limited.
 	// this value is only used if the 429 response does not contain the Retry-After header
 	defaultCoolDownDuration = 60 * time.Second
+
+	// maxCoolDownDuration defines the maximum duration we can wait till firing the next request
+	maxCoolDownDuration = 10 * time.Minute
 )
 
 type attestationStatus string
@@ -208,6 +211,9 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 
 func (s *TokenDataReader) setCoolDownPeriod(d time.Duration) {
 	s.coolDownMu.Lock()
+	if d > maxCoolDownDuration {
+		d = maxCoolDownDuration
+	}
 	s.coolDownUntil = time.Now().Add(d)
 	s.coolDownMu.Unlock()
 }
