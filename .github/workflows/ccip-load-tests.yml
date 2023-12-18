@@ -89,7 +89,7 @@ jobs:
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
 
-  ccip_load_test:
+  ccip-load-test:
     name: CCIP Load Test
     environment: integration
     runs-on: ubuntu-latest
@@ -178,7 +178,7 @@ jobs:
           should_cleanup: "true"
 
 
-  ccip_version_compatibility_test:
+  ccip-version-compatibility-test:
     name: CCIP Load With Version Compatibility Test
     environment: integration
     runs-on: ubuntu-latest

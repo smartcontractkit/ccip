@@ -322,7 +322,7 @@ jobs:
             run: -run ^TestSmokeCCIPForBidirectionalLane$
           - name: ccip-smoke-db-compatibility
             nodes: 1
-            os: ubuntu20.04-16cores-64GB
+            os: ubuntu20.04-8cores-32GB
             file: ccip
             dir: ccip-tests/smoke
             run: -run ^TestSmokeCCIPForBidirectionalLane$
