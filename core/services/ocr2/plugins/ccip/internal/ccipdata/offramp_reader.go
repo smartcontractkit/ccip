@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
@@ -114,6 +115,7 @@ type OffRampReader interface {
 	GetDestinationTokens(ctx context.Context) ([]common.Address, error)
 	GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []common.Address) ([]TokenBucketRateLimit, error)
 	Address() common.Address
+	ABI() abi.ABI
 	// Notifies the reader that the config has changed onchain
 	ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error)
 	OffchainConfig() ExecOffchainConfig

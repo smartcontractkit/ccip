@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -47,6 +48,7 @@ type PriceRegistryReader interface {
 	// The returned updates are sorted by timestamp in ascending order.
 	GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]Event[GasPriceUpdate], error)
 	Address() common.Address
+	ABI() abi.ABI
 	GetFeeTokens(ctx context.Context) ([]common.Address, error)
 	GetTokenPrices(ctx context.Context, wantedTokens []common.Address) ([]TokenPriceUpdate, error)
 	// TODO: consider moving this method to a different interface since it's not related to the price registry

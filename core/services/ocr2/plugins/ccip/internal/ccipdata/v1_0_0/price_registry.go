@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -34,6 +35,7 @@ var (
 type PriceRegistry struct {
 	priceRegistry   price_registry_1_0_0.PriceRegistryInterface
 	address         common.Address
+	abi             abi.ABI
 	lp              logpoller.LogPoller
 	evmBatchCaller  rpclib.EvmBatchCaller
 	lggr            logger.Logger
@@ -79,6 +81,7 @@ func NewPriceRegistry(lggr logger.Logger, priceRegistryAddr common.Address, lp l
 	return &PriceRegistry{
 		priceRegistry: priceRegistry,
 		address:       priceRegistryAddr,
+		abi:           priceRegABI,
 		lp:            lp,
 		evmBatchCaller: rpclib.NewDynamicLimitedBatchCaller(
 			lggr,
@@ -120,6 +123,10 @@ func (p *PriceRegistry) GetTokenPrices(ctx context.Context, wantedTokens []commo
 
 func (p *PriceRegistry) Address() common.Address {
 	return p.address
+}
+
+func (p *PriceRegistry) ABI() abi.ABI {
+	return p.abi
 }
 
 func (p *PriceRegistry) GetFeeTokens(ctx context.Context) ([]common.Address, error) {

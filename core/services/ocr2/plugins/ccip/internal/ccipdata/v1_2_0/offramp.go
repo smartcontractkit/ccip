@@ -97,6 +97,10 @@ func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offram
 	return o.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 }
 
+func (o *OffRamp) ABI() abi.ABI {
+	return abiOffRamp
+}
+
 func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfig)
 	if err != nil {

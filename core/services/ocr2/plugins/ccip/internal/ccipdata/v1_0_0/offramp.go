@@ -95,6 +95,7 @@ func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Durat
 type OffRamp struct {
 	offRamp                 *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
 	addr                    common.Address
+	abi                     abi.ABI
 	lp                      logpoller.LogPoller
 	lggr                    logger.Logger
 	ec                      client.Client
@@ -356,6 +357,10 @@ func (o *OffRamp) Address() common.Address {
 	return o.addr
 }
 
+func (o *OffRamp) ABI() abi.ABI {
+	return o.abi
+}
+
 func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfig)
 	if err != nil {
@@ -596,6 +601,7 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 		offRamp:             offRamp,
 		ec:                  ec,
 		addr:                addr,
+		abi:                 abiOffRamp,
 		lggr:                lggr,
 		lp:                  lp,
 		filters:             filters,
