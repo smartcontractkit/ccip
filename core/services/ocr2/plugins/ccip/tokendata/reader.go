@@ -22,5 +22,6 @@ type Reader interface {
 	// ReadTokenData returns the attestation bytes if ready, and throws an error if not ready.
 	// It supports messages with a single token transfer, the returned []byte has the token data for the first token of the msg.
 	ReadTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tokenIndex int) (tokenData []byte, err error)
+	RegisterFilters(qopts ...pg.QOpt) error
 	Close(qopts ...pg.QOpt) error
 }

@@ -221,3 +221,7 @@ func (s *TokenDataReader) inCoolDownPeriod() bool {
 func (s *TokenDataReader) Close(qopts ...pg.QOpt) error {
 	return s.usdcReader.Close(qopts...)
 }
+
+func (s *TokenDataReader) RegisterFilters(qopts ...pg.QOpt) error {
+	return s.usdcReader.RegisterFilters(qopts...)
+}

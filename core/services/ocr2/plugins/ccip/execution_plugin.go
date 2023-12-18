@@ -18,6 +18,7 @@ import (
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 
 	relaylogger "github.com/smartcontractkit/chainlink-relay/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm"
@@ -39,7 +40,7 @@ import (
 
 const numTokenDataWorkers = 5
 
-func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) (*ExecutionPluginStaticConfig, *BackfillArgs, error) {
+func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer) (*ExecutionPluginStaticConfig, *BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, nil, errors.New("spec is nil")
 	}
@@ -76,9 +77,11 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, errors.Wrap(err, "open source chain")
 	}
 
-	execLggr := lggr.Named("CCIPExecution").With(
-		"sourceChain", ChainName(int64(chainID)),
-		"destChain", ChainName(destChainID))
+	sourceChainName, destChainName, err := ccipconfig.ResolveChainNames(int64(chainID), destChainID)
+	if err != nil {
+		return nil, nil, err
+	}
+	execLggr := lggr.Named("CCIPExecution").With("sourceChain", sourceChainName, "destChain", destChainName)
 	onRampReader, err := factory.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create onramp reader")
@@ -159,7 +162,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 
 func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	ctx := context.Background()
-	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
+	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +177,11 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet evm.LegacyCha
 	if err1 := execPluginConfig.commitStoreReader.RegisterFilters(qopts...); err1 != nil {
 		return nil, err1
 	}
-
+	for _, dp := range execPluginConfig.tokenDataWorker.GetReaders() {
+		if err1 := dp.RegisterFilters(qopts...); err1 != nil {
+			return nil, err1
+		}
+	}
 	destChainID, err := chainselectors.ChainIdFromSelector(execPluginConfig.destChainSelector)
 	if err != nil {
 		return nil, err
@@ -233,8 +240,9 @@ func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Execution
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
 // See comment in UnregisterCommitPluginLpFilters
+// It MUST mirror the filters registered in NewExecutionServices.
 func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet evm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	execPluginConfig, _, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
+	execPluginConfig, _, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet)
 	if err != nil {
 		return err
 	}
