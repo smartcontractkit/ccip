@@ -231,7 +231,7 @@ jobs:
           echo "UPGRADE_IMAGE=${{ env.INPUT_CHAINLINK_IMAGE }}" >> $GITHUB_ENV
           untrimmed_ver=$(curl --header "Authorization: token ${{ secrets.GITHUB_TOKEN }}" --request GET https://api.github.com/repos/${{ github.repository }}/releases | jq -r --arg SUFFIX "release" '.[] | select(.tag_name | endswith("release"))  | .tag_name' | sort -V | tail -n 1)
           last_release="${untrimmed_ver:1}"
-          echo "last_release=${last_release} >> $GITHUB_OUTPUT
+          echo "last_release=${last_release}" >> $GITHUB_OUTPUT
       - name: step summary
         shell: bash
         run: |
