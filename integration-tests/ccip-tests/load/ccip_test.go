@@ -36,6 +36,7 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 // TestLoadCCIPWithUpgradeNodeVersion starts all nodes with a specific version, triggers load and then upgrades the node version as the load is running
 func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
 	t.Parallel()
+	t.Skipf("skipping this test until we have a better way to find the right onchain-offchain version pair")
 	lggr := logging.GetTestLogger(t)
 	testArgs := NewLoadArgs(t, lggr, context.Background())
 	testArgs.Setup()
