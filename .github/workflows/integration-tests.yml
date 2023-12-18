@@ -326,7 +326,7 @@ jobs:
             file: ccip
             dir: ccip-tests/smoke
             run: -run ^TestSmokeCCIPForBidirectionalLane$
-            configpath: ./integration-tests/ccip-tests/testconfig/tomls/db-compatibility.toml
+            config_path: ./integration-tests/ccip-tests/testconfig/tomls/db-compatibility.toml
           - name: ccip-smoke-rate-limit
             nodes: 1
             dir: ccip-tests/smoke
@@ -531,9 +531,9 @@ jobs:
       - name: Set Override Config
         id: set_override_config
         run: |
-          # if the matrix.product.config is set, use it as the override config
-          if [ "${{ matrix.product.config }}" != "" ]; then
-            echo "base_64_override=$(base64 -in ${{ matrix.product.config }})"> "$GITHUB_OUTPUT"
+          # if the matrix.product.config_path is set, use it as the override config
+          if [ "${{ matrix.product.config_path }}" != "" ]; then
+            echo "base_64_override=$(base64 -in ${{ matrix.product.config_path }})"> "$GITHUB_OUTPUT"
           fi
       ## Run this step when changes that require tests to be run are made
       - name: Run Tests
