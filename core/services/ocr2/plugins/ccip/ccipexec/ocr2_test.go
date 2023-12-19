@@ -1,4 +1,4 @@
-package ccip_exec
+package ccipexec
 
 import (
 	"bytes"

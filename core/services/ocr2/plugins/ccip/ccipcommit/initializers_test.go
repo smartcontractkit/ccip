@@ -1,4 +1,4 @@
-package ccip_commit
+package ccipcommit
 
 import (
 	"context"
