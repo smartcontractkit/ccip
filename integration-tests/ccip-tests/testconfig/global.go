@@ -306,11 +306,7 @@ type Node struct {
 }
 
 func (n *Node) Merge(from *Node) {
-	if from == nil {
-		return
-	}
-	if n == nil {
-		n = from
+	if from == nil || n == nil {
 		return
 	}
 	if n.Name == "" {
