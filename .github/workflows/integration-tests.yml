@@ -543,7 +543,6 @@ jobs:
           PYROSCOPE_SERVER: ${{ matrix.product.pyroscope_env == '' && '' || !startsWith(github.ref, 'refs/tags/') && '' || secrets.QA_PYROSCOPE_INSTANCE }} # Avoid sending blank envs https://github.com/orgs/community/discussions/25725
           PYROSCOPE_ENVIRONMENT: ${{ matrix.product.pyroscope_env }}
           PYROSCOPE_KEY: ${{ secrets.QA_PYROSCOPE_KEY }}
-<<<<<<< HEAD
           ETH2_EL_CLIENT: ${{matrix.product.client}}
           LOKI_TENANT_ID: ${{ vars.LOKI_TENANT_ID }}
           LOKI_URL: ${{ secrets.LOKI_URL }}
@@ -552,10 +551,8 @@ jobs:
           GRAFANA_URL: ${{ vars.GRAFANA_URL }}
           GRAFANA_DATASOURCE: ${{ vars.GRAFANA_DATASOURCE }}
           RUN_ID: ${{ github.run_id }}
-=======
           BASE64_TEST_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
           TEST_BASE64_TEST_CONFIG_OVERRIDE: ${{ steps.set_override_config.outputs.base_64_override }}
->>>>>>> bd8c36f8f3 (more upgrade stuff)
         with:
           test_command_to_run: cd ./integration-tests && go test -timeout 30m -count=1 -json -test.parallel=${{ matrix.product.nodes }} ${{ steps.build-go-test-command.outputs.run_command }} 2>&1 | tee /tmp/gotest.log | gotestfmt
           test_download_vendor_packages_command: cd ./integration-tests && go mod download
