@@ -6,7 +6,7 @@ on:
       - "v*"
     branches:
       - ccip-develop
-      - deployment-test
+      - "release/**"
 
 jobs:
   build-and-publish:
@@ -28,7 +28,20 @@ jobs:
         continue-on-error: true
 
       - name: Checkout the repo
-        uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: Build and publish chainlink image
+        uses: ./.github/actions/build-sign-publish-chainlink
+        with:
+            publish: true
+            aws-role-to-assume: ${{ secrets.AWS_OIDC_IAM_ROLE_PROD_PUBLISH_ARN }}
+            aws-role-duration-seconds: ${{ secrets.AWS_ROLE_DURATION_SECONDS }}
+            aws-region: ${{ secrets.AWS_REGION }}
+            ecr-hostname: ${{ secrets.AWS_ECR_REPO_URL }}
+            ecr-image-name: ${{ secrets.AWS_ECR_REPO_URL }}
+            sign-images: false
+            dockerfile: ./core/chainlink.Dockerfile
+
+
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25 # v1.6.0

@@ -79,7 +79,7 @@ runs:
         SHARED_IMAGES=${{ inputs.ecr-hostname }}/${{ inputs.ecr-image-name }}
 
         SHARED_TAG_LIST=$(cat << EOF
-        type=ref,event=branch,suffix=${{ inputs.ecr-tag-suffix }}
+        type=ref,event=branch,suffix=${{ inputs.ecr-tag-suffix }}v"release/**""release/**""release/**"
         type=semver,pattern={{version}},suffix=${{ inputs.ecr-tag-suffix }}
         type=sha,format=short,suffix=${{ inputs.ecr-tag-suffix }}
         EOF
