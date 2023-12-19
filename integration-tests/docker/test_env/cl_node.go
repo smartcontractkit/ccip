@@ -106,28 +106,6 @@ func WithPgDBOptions(opts ...test_env.PostgresDbOption) ClNodeOption {
 	}
 }
 
-func WithImage(image string) ClNodeOption {
-	return func(c *ClNode) {
-		c.ContainerImage = image
-	}
-}
-
-func WithVersion(version string) ClNodeOption {
-	return func(c *ClNode) {
-		c.ContainerVersion = version
-	}
-}
-
-func WithPgDBOptions(opts ...test_env.PostgresDbOption) ClNodeOption {
-	return func(c *ClNode) {
-		var err error
-		c.PostgresDb, err = test_env.NewPostgresDb(c.EnvComponent.Networks, opts...)
-		if err != nil {
-			c.t.Fatalf("failed to create postgres db: %v", err)
-		}
-	}
-}
-
 func NewClNode(networks []string, imageName, imageVersion string, nodeConfig *chainlink.Config, opts ...ClNodeOption) (*ClNode, error) {
 	nodeDefaultCName := fmt.Sprintf("%s-%s", "cl-node", uuid.NewString()[0:8])
 	pgDefaultCName := fmt.Sprintf("pg-%s", nodeDefaultCName)
