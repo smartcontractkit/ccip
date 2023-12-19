@@ -233,9 +233,9 @@ func DeployLocalCluster(
 	return env, deployCL
 }
 
-// RestartNodes restarts chainlink nodes in the given range with upgrade image
+// UpgradeNodes restarts chainlink nodes in the given range with upgrade image
 // startIndex and endIndex are inclusive
-func RestartNodes(
+func UpgradeNodes(
 	lggr zerolog.Logger,
 	startIndex int,
 	endIndex int,

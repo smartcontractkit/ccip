@@ -55,7 +55,7 @@ func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
 	// sleep for 30s to let load run for a while
 	time.Sleep(30 * time.Second)
 	// upgrade node version for few nodes
-	err := testsetups.RestartNodes(testArgs.lggr, 2, 3, testArgs.TestCfg, testArgs.TestSetupArgs.Env)
+	err := testsetups.UpgradeNodes(testArgs.lggr, 2, 3, testArgs.TestCfg, testArgs.TestSetupArgs.Env)
 	require.NoError(t, err)
 	testArgs.Wait()
 }
