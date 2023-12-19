@@ -953,7 +953,6 @@ func inflightAggregates(
 // price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
 func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryReader, tokens []common.Address) (map[common.Address]*big.Int, error) {
-	priceRegistryAddress := priceRegistry.Address()
 	prices := make(map[common.Address]*big.Int)
 
 	fetchedPrices, err := priceRegistry.GetTokenPrices(ctx, tokens)
@@ -969,7 +968,7 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 	for i, token := range tokens {
 		// price of a token can never be zero
 		if fetchedPrices[i].Value.BitLen() == 0 {
-			return nil, fmt.Errorf("price of token %s is zero (price registry=%s)", token, priceRegistryAddress)
+			return nil, fmt.Errorf("price of token %s is zero (price registry=%s)", token, priceRegistry.Address())
 		}
 
 		// price registry should not report different price for the same token
@@ -1048,13 +1047,11 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) cac
 		sourceTokensPrices, err := getTokensPrices(
 			ctx,
 			r.sourcePriceRegistry,
-			append([]common.Address{r.sourceWrappedNativeToken}, sourceFeeTokens...),
+			ccipcommon.FlattenUniqueSlice(
+				sourceFeeTokens,
+				[]common.Address{r.sourceWrappedNativeToken},
+			),
 		)
-		if err != nil {
-			return execTokenData{}, err
-		}
-
-		sourceToDestTokens, err := r.offRampReader.GetSourceToDestTokensMapping(ctx)
 		if err != nil {
 			return execTokenData{}, err
 		}
@@ -1063,14 +1060,20 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) cac
 		if err != nil {
 			return execTokenData{}, fmt.Errorf("get destination tokens: %w", err)
 		}
-
-		destTokens := ccipcommon.FlattenUniqueSlice(
-			destFeeTokens,
-			destBridgedTokens,
-			[]common.Address{r.destWrappedNative},
+		destTokenPrices, err := getTokensPrices(
+			ctx,
+			r.destPriceRegistry,
+			ccipcommon.FlattenUniqueSlice(
+				destFeeTokens,
+				destBridgedTokens,
+				[]common.Address{r.destWrappedNative},
+			),
 		)
+		if err != nil {
+			return execTokenData{}, err
+		}
 
-		destTokenPrices, err := getTokensPrices(ctx, r.destPriceRegistry, destTokens)
+		sourceToDestTokens, err := r.offRampReader.GetSourceToDestTokensMapping(ctx)
 		if err != nil {
 			return execTokenData{}, err
 		}
