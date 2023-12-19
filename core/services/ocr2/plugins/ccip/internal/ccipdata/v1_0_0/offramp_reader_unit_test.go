@@ -140,18 +140,6 @@ func TestCachedOffRampTokens(t *testing.T) {
 		SourceTokens:      srcTks,
 		DestinationPool:   expectedPools,
 	}, tokens)
-
-	// Verify shortcut accessors work.
-	actual, err := offRamp.GetDestinationTokens(ctx)
-	require.NoError(t, err)
-	require.Equal(t, dstTks, actual)
-	actualPools, err := offRamp.GetDestinationTokenPools(ctx)
-	require.NoError(t, err)
-	require.Equal(t, expectedPools, actualPools)
-	actual, err = offRamp.getSourceTokens(ctx)
-	require.NoError(t, err)
-	require.Equal(t, srcTks, actual)
-
 }
 
 func generateTokensAndOutputs(nbTokens uint) ([]common.Address, []common.Address, []rpclib.DataAndErr) {

@@ -1,11 +1,12 @@
 package ccipdata_test
 
 import (
-	"github.com/stretchr/testify/mock"
 	"math/big"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/mock"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -420,9 +421,9 @@ func deployCommitStore(
 
 func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	ctx := th.user.Context
-	addresses, err := th.reader.GetDestinationTokens(ctx)
+	tokens, err := th.reader.GetTokens(ctx)
 	require.NoError(t, err)
-	require.Equal(t, []common.Address{}, addresses)
+	require.Equal(t, []common.Address{}, tokens.DestinationTokens)
 
 	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(ctx, 0, 10, 0)
 	require.NoError(t, err)
@@ -436,9 +437,8 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	require.NoError(t, err)
 	require.Empty(t, sourceToDestTokens)
 
-	destPools, err := th.reader.GetDestinationTokenPools(ctx)
 	require.NoError(t, err)
-	require.Empty(t, destPools)
+	require.Empty(t, tokens.DestinationPool)
 }
 
 func TestNewOffRampReader(t *testing.T) {

@@ -274,22 +274,6 @@ func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[common.
 	return srcToDstTokenMapping, nil
 }
 
-func (o *OffRamp) GetDestinationTokens(ctx context.Context) ([]common.Address, error) {
-	cached, err := o.getCachedOffRampTokens(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return cached.DestinationTokens, nil
-}
-
-func (o *OffRamp) GetDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error) {
-	cached, err := o.getCachedOffRampTokens(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return cached.DestinationPool, nil
-}
-
 func (o *OffRamp) getSourceTokens(ctx context.Context) ([]common.Address, error) {
 	cached, err := o.getCachedOffRampTokens(ctx)
 	if err != nil {
