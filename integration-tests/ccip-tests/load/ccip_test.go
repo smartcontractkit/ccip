@@ -38,7 +38,7 @@ func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
 	t.Parallel()
 	t.Skipf("skipping this test until we have a better way to find the right onchain-offchain version pair")
 	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr, context.Background())
+	testArgs := NewLoadArgs(t, lggr)
 	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
