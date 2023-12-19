@@ -93,7 +93,7 @@ func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Durat
 }
 
 type OffRamp struct {
-	offRamp                 *evm_2_evm_offramp_1_0_0.EVM2EVMOffRamp
+	offRamp                 evm_2_evm_offramp.EVM2EVMOffRampInterface
 	addr                    common.Address
 	lp                      logpoller.LogPoller
 	lggr                    logger.Logger
@@ -587,7 +587,7 @@ func (o *OffRamp) RegisterFilters(qopts ...pg.QOpt) error {
 }
 
 func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRamp, error) {
-	offRamp, err := evm_2_evm_offramp_1_0_0.NewEVM2EVMOffRamp(addr, ec)
+	offRamp, err := evm_2_evm_offramp.NewEVM2EVMOffRamp(addr, ec)
 	if err != nil {
 		return nil, err
 	}
