@@ -32,7 +32,7 @@ jobs:
           go-module-file: core/scripts/go.sum
       - name: Run Tests
         shell: bash
-        working-directory: core/scripts
+        working-directory: core/scripts/ccip
         run: go test ./...
       - name: Collect Metrics
         if: always()
