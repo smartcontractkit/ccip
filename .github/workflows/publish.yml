@@ -37,7 +37,6 @@ jobs:
             aws-role-duration-seconds: ${{ secrets.AWS_ROLE_DURATION_SECONDS }}
             aws-region: ${{ secrets.AWS_REGION }}
             ecr-hostname: ${{ secrets.AWS_ECR_REPO_URL }}
-            ecr-image-name: ${{ secrets.AWS_ECR_REPO_URL }}
             sign-images: false
             dockerfile: ./core/chainlink.Dockerfile
 
@@ -65,16 +64,6 @@ jobs:
 
       - name: Checkout the repo
         uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f # v3.4.0
-      - name: Generate Docker image version tag
-        id: generate-docker-image-tag
-        shell: bash
-        run: |
-          # The "#v" removes the "v" prefix from the ref name
-          GITHUB_REF_NAME="${GITHUB_REF_NAME#v}"
-          # Replace any "+" with "-" to make it a valid Docker tag
-          GITHUB_REF_NAME="${GITHUB_REF_NAME//+/-}"
-          OUTPUT="type=raw,value=${GITHUB_REF_NAME},enable=true"
-          echo "tag=${OUTPUT}" | tee -a "${GITHUB_OUTPUT}"
       - name: Build and publish chainlink image
         uses: ./.github/actions/build-sign-publish-chainlink
         with:
@@ -83,8 +72,7 @@ jobs:
           aws-role-duration-seconds: ${{ secrets.AWS_ROLE_DURATION_SECONDS }}
           aws-region: ${{ env.AWS_REGION }}
           ecr-hostname: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}
-          ecr-image-name: ${{ env.AWS_ECR_REPO_PUBLIC_REGISTRY }}/w0i8p0z9/chainlink-ccip
+          ecr-image-name: w0i8p0z9/chainlink-ccip
           sign-images: false
           dockerfile: ./core/chainlink.Dockerfile
-          git-commit-sha: ${{ steps.generate-docker-image-tag.outputs.tag }}
 
