@@ -256,37 +256,23 @@ func (o *OffRamp) GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []c
 }
 
 func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error) {
-	sourceTokens, err := o.getSourceTokens(ctx)
+	tokens, err := o.GetTokens(ctx)
 	if err != nil {
 		return nil, err
 	}
-
+	sourceTokens := tokens.SourceTokens
 	destTokens, err := o.getDestinationTokensFromSourceTokens(ctx, sourceTokens)
 	if err != nil {
 		return nil, fmt.Errorf("get destination tokens from source tokens: %w", err)
 	}
-
 	srcToDstTokenMapping := make(map[common.Address]common.Address, len(sourceTokens))
 	for i, sourceToken := range sourceTokens {
 		srcToDstTokenMapping[sourceToken] = destTokens[i]
 	}
-
 	return srcToDstTokenMapping, nil
 }
 
-func (o *OffRamp) getSourceTokens(ctx context.Context) ([]common.Address, error) {
-	cached, err := o.getCachedOffRampTokens(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return cached.SourceTokens, nil
-}
-
 func (o *OffRamp) GetTokens(ctx context.Context) (ccipdata.OffRampTokens, error) {
-	return o.getCachedOffRampTokens(ctx)
-}
-
-func (o *OffRamp) getCachedOffRampTokens(ctx context.Context) (ccipdata.OffRampTokens, error) {
 	return o.cachedOffRampTokens.Get(ctx, func(ctx context.Context) (ccipdata.OffRampTokens, error) {
 		destTokens, err := o.offRamp.GetDestinationTokens(&bind.CallOpts{Context: ctx})
 		if err != nil {
