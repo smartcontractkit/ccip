@@ -84,8 +84,8 @@ Data = """
         "Ethereum Mainnet": {
           "is_native_fee_token": true,
           "fee_token": "",
-          "bridge_tokens": [""],
-          "bridge_tokens_pools": [""],
+          "bridge_tokens": [],
+          "bridge_tokens_pools": [],
           "arm" : "0x8B63b3DE93431C0f756A493644d128134291fA1b",
           "router": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
           "price_registry": "0x8c9b2Efb7c64C394119270bfecE7f54763b958Ad",
