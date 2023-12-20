@@ -7,7 +7,6 @@ on:
     branches:
       - ccip-develop
       - "release/**"
-      - ccip-1459-publish-flow
 
 jobs:
   build-and-publish:
