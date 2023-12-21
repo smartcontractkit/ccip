@@ -20,3 +20,9 @@ type Transfer struct {
 func (t Transfer) String() string {
 	return fmt.Sprintf("%v->%v %s", t.From, t.To, t.Amount.String())
 }
+
+type ReportMetadata struct {
+	Transfer                Transfer
+	LiquidityManagerAddress Address
+	NetworkID               NetworkID
+}

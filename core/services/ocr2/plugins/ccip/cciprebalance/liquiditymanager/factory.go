@@ -13,7 +13,11 @@ type Factory interface {
 
 type BaseLiquidityManagerFactory struct{}
 
-func (b BaseLiquidityManagerFactory) NewLiquidityManager(networkID models.NetworkID, address models.Address) (LiquidityManager, error) {
+func NewBaseLiquidityManagerFactory() *BaseLiquidityManagerFactory {
+	return &BaseLiquidityManagerFactory{}
+}
+
+func (b *BaseLiquidityManagerFactory) NewLiquidityManager(networkID models.NetworkID, address models.Address) (LiquidityManager, error) {
 	switch networkID {
 	case 1: // todo
 		return NewEvmLiquidityManager(address), nil

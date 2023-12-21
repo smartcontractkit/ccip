@@ -16,6 +16,20 @@ type LiquidityManager struct {
 	mock.Mock
 }
 
+// Close provides a mock function with given fields: ctx
+func (_m *LiquidityManager) Close(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetBalance provides a mock function with given fields: ctx
 func (_m *LiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) {
 	ret := _m.Called(ctx)

@@ -7,6 +7,7 @@ import (
 )
 
 // LiquidityGraph contains graphs functionality that is used by the service.
+// Graph operations should be thread-safe.
 type LiquidityGraph interface {
 	Reset()
 	GetNodes() []models.NetworkID
