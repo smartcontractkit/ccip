@@ -245,29 +245,3 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) error {
 
 	return nil
 }
-
-func (p *Plugin) balanceLiquidity(ctx context.Context) error {
-	transfersToBalance, err := p.liquidityGraph.ComputeTransfersToBalance(p.pendingTransfers)
-	if err != nil {
-		return fmt.Errorf("compute transfers to balance: %w", err)
-	}
-
-	for _, transfer := range transfersToBalance {
-		lmAddress, exists := p.liquidityManagers[transfer.From]
-		if !exists {
-			return fmt.Errorf("liquidity manager for %v does not exist", transfer.From)
-		}
-
-		lm, err := p.liquidityManagerFactory.NewLiquidityManager(transfer.From, lmAddress)
-		if err != nil {
-			return fmt.Errorf("init liquidity manager: %w", err)
-		}
-
-		if err := lm.MoveLiquidity(ctx, transfer.To, transfer.Amount); err != nil {
-			return fmt.Errorf("move liquidity %v: %w", transfer, err)
-		}
-		p.pendingTransfers = append(p.pendingTransfers, transfer)
-	}
-
-	return nil
-}
