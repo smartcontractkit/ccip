@@ -1,24 +1,25 @@
 package load
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/chaos"
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 func TestLoadCCIPStableRPS(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr, context.Background())
+	testArgs := NewLoadArgs(t, lggr)
 	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
@@ -32,10 +33,37 @@ func TestLoadCCIPStableRPS(t *testing.T) {
 	testArgs.Wait()
 }
 
+// TestLoadCCIPWithUpgradeNodeVersion starts all nodes with a specific version, triggers load and then upgrades the node version as the load is running
+func TestLoadCCIPWithUpgradeNodeVersion(t *testing.T) {
+	t.Parallel()
+	t.Skipf("skipping this test until we have a better way to find the right onchain-offchain version pair")
+	lggr := logging.GetTestLogger(t)
+	testArgs := NewLoadArgs(t, lggr)
+	testArgs.Setup()
+	// if the test runs on remote runner
+	if len(testArgs.TestSetupArgs.Lanes) == 0 {
+		return
+	}
+	t.Cleanup(func() {
+		log.Info().Msg("Tearing down the environment")
+		require.NoError(t, testArgs.TestSetupArgs.TearDown())
+	})
+	testArgs.TriggerLoadByLane()
+	testArgs.lggr.Info().Msg("Waiting for load to start on all lanes")
+	// wait for load runner to start
+	testArgs.LoadStarterWg.Wait()
+	// sleep for 30s to let load run for a while
+	time.Sleep(30 * time.Second)
+	// upgrade node version for few nodes
+	err := testsetups.UpgradeNodes(testArgs.lggr, 2, 3, testArgs.TestCfg, testArgs.TestSetupArgs.Env)
+	require.NoError(t, err)
+	testArgs.Wait()
+}
+
 func TestLoadCCIPStableRPSTriggerBySource(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr, context.Background())
+	testArgs := NewLoadArgs(t, lggr)
 	testArgs.TestCfg.TestGroupInput.MulticallInOneTx = ptr.Ptr(true)
 	testArgs.Setup()
 	// if the test runs on remote runner
@@ -53,7 +81,7 @@ func TestLoadCCIPStableRPSTriggerBySource(t *testing.T) {
 func TestLoadCCIPStableRequestTriggeringWithNetworkChaos(t *testing.T) {
 	t.Parallel()
 	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr, context.Background())
+	testArgs := NewLoadArgs(t, lggr)
 	testArgs.Setup()
 	// if the test runs on remote runner
 	if len(testArgs.TestSetupArgs.Lanes) == 0 {
@@ -113,7 +141,7 @@ func TestLoadCCIPStableWithMajorityNodeFailure(t *testing.T) {
 	}
 
 	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr, context.Background(), inputs...)
+	testArgs := NewLoadArgs(t, lggr, inputs...)
 
 	var allChaosDur time.Duration
 	// to override the default duration of chaos with test input
@@ -167,7 +195,7 @@ func TestLoadCCIPStableWithMinorityNodeFailure(t *testing.T) {
 	}
 
 	lggr := logging.GetTestLogger(t)
-	testArgs := NewLoadArgs(t, lggr, context.Background(), inputs...)
+	testArgs := NewLoadArgs(t, lggr, inputs...)
 
 	var allChaosDur time.Duration
 	// to override the default duration of chaos with test input
@@ -246,7 +274,7 @@ func TestLoadCCIPStableWithPodChaosDiffCommitAndExec(t *testing.T) {
 		t.Run(in.ChaosName, func(t *testing.T) {
 			t.Parallel()
 			lggr := logging.GetTestLogger(t)
-			testArgs := NewLoadArgs(t, lggr, context.Background(), in)
+			testArgs := NewLoadArgs(t, lggr, in)
 			testArgs.TestCfg.TestGroupInput.TestDuration = models.MustNewDuration(5 * time.Minute)
 			testArgs.TestCfg.TestGroupInput.TimeUnit = models.MustNewDuration(1 * time.Second)
 			testArgs.TestCfg.TestGroupInput.RequestPerUnitTime = []int64{2}
