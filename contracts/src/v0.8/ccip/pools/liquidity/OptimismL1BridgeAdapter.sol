@@ -6,8 +6,8 @@ import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
 import {IL1StandardBridge} from "@eth-optimism/contracts/L1/messaging/IL1StandardBridge.sol";
 import {IL1CrossDomainMessenger} from "@eth-optimism/contracts/L1/messaging/IL1CrossDomainMessenger.sol";
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.0/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract OptimismL1BridgeAdapter is IL1Bridge {
   using SafeERC20 for IERC20;
@@ -32,7 +32,7 @@ contract OptimismL1BridgeAdapter is IL1Bridge {
     i_wrappedNative = wrappedNative;
   }
 
-  function depositERC20ToL2(address l1Token, address l2Token, address recipient, uint256 amount) external {
+  function depositERC20ToL2(address l1Token, address l2Token, address recipient, uint256 amount) external payable {
     IERC20(l1Token).safeTransferFrom(msg.sender, address(this), amount);
 
     // If the token is the wrapped native, we unwrap it and deposit native

@@ -35,6 +35,9 @@ package ccip
 //go:generate mockery --quiet --dir ./generated/price_registry/ --name PriceRegistryInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 //go:generate mockery --quiet --dir ../generated/link_token_interface/ --name LinkTokenInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 
+// Liquidity management contracts
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.abi ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.bin ArbitrumL1BridgeAdapter arbitrum_l1_bridge_adapter
+
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:
 //

@@ -5,14 +5,10 @@ interface IBridge {
   error BridgeAddressCannotBeZero();
 
   function getL1Bridge() external view returns (address);
-
-  function getL2Bridge() external returns (address);
-
-  function getWrappedNative() external view returns (address);
 }
 
 interface IL1Bridge is IBridge {
-  function depositERC20ToL2(address l1Token, address l2Token, address recipient, uint256 amount) external;
+  function depositERC20ToL2(address l1Token, address l2Token, address recipient, uint256 amount) external payable;
 
   function depositNativeToL2(address recipient, uint256 amount) external payable;
 
