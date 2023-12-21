@@ -147,15 +147,15 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 
 		ccip.MeasureNumberOfReportsProcessed(timestamp, len(unexpiredReportsPart))
 
-		unexpiredReportsWithSendReqs, err1 := r.getReportsWithSendRequests(ctx, unexpiredReportsPart)
-		if err1 != nil {
-			return nil, err1
+		unexpiredReportsWithSendReqs, err := r.getReportsWithSendRequests(ctx, unexpiredReportsPart)
+		if err != nil {
+			return nil, err
 		}
 
 		getDestPoolRateLimits := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
-			tokenExecData, err2 := getExecTokenData()
-			if err2 != nil {
-				return nil, err2
+			tokenExecData, err1 := getExecTokenData()
+			if err1 != nil {
+				return nil, err1
 			}
 			return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, tokenExecData.sourceToDestTokens)
 		})
@@ -173,8 +173,8 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				"maxSeqNr", rep.commitReport.Interval.Max,
 			)
 
-			if err2 := rep.validate(); err2 != nil {
-				rootLggr.Errorw("Skipping invalid report", "err", err2)
+			if err := rep.validate(); err != nil {
+				rootLggr.Errorw("Skipping invalid report", "err", err)
 				continue
 			}
 
@@ -187,9 +187,9 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				continue
 			}
 
-			blessed, err2 := r.commitStoreReader.IsBlessed(ctx, merkleRoot)
-			if err2 != nil {
-				return nil, err2
+			blessed, err := r.commitStoreReader.IsBlessed(ctx, merkleRoot)
+			if err != nil {
+				return nil, err
 			}
 			if !blessed {
 				rootLggr.Infow("Report is accepted but not blessed")
@@ -197,14 +197,14 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				continue
 			}
 
-			tokenExecData, err2 := getExecTokenData()
-			if err2 != nil {
-				return nil, err2
+			tokenExecData, err := getExecTokenData()
+			if err != nil {
+				return nil, err
 			}
 
-			destPoolRateLimits, err2 := getDestPoolRateLimits()
-			if err2 != nil {
-				return nil, err2
+			destPoolRateLimits, err := getDestPoolRateLimits()
+			if err != nil {
+				return nil, err
 			}
 
 			buildBatchDuration := time.Now()
