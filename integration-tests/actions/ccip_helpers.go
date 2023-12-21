@@ -467,11 +467,14 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		return errors.WithStack(err)
 	}
 
-	err = sourceCCIP.Common.ApproveTokens()
-	if err != nil {
-		return err
-	}
-	
+	/*
+		err = sourceCCIP.Common.ApproveTokens()
+		if err != nil {
+			return err
+		}
+
+	*/
+
 	sourceCCIP.LoadContracts(lane)
 	// update transfer amount array length to be equal to the number of tokens
 	// each index in TransferAmount array corresponds to the amount to be transferred for the token at the same index in BridgeTokens array
