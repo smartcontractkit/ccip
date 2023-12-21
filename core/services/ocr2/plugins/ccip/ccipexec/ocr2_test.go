@@ -1763,7 +1763,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 				destWrappedNative:        wavax,
 			}
 
-			tokenData, err := reportingPlugin.prepareTokenExecData(ctx)()
+			tokenData, err := reportingPlugin.prepareTokenExecData(ctx)
 			if tt.destFeeTokensErr != nil || tt.sourceFeeTokensErr != nil || tt.destTokensErr != nil {
 				require.Error(t, err)
 				return

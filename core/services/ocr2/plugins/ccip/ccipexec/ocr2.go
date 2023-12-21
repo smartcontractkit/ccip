@@ -137,7 +137,9 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		return []ccip.ObservedMessage{}, nil
 	}
 
-	getExecTokenData := r.prepareTokenExecData(ctx)
+	getExecTokenData := cache.LazyFunction[execTokenData](func() (execTokenData, error) {
+		return r.prepareTokenExecData(ctx)
+	})
 
 	for j := 0; j < len(unexpiredReports); {
 		unexpiredReportsPart, step := selectReportsToFillBatch(unexpiredReports[j:], MessagesIterationStep)
@@ -151,11 +153,11 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 		}
 
 		getDestPoolRateLimits := cache.LazyFetch(func() (map[common.Address]*big.Int, error) {
-			tokens, err2 := getExecTokenData()
+			tokenExecData, err2 := getExecTokenData()
 			if err2 != nil {
 				return nil, err2
 			}
-			return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, tokens.sourceToDestTokens)
+			return r.destPoolRateLimits(ctx, unexpiredReportsWithSendReqs, tokenExecData.sourceToDestTokens)
 		})
 
 		for _, rep := range unexpiredReportsWithSendReqs {
@@ -195,7 +197,7 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				continue
 			}
 
-			token, err2 := getExecTokenData()
+			tokenExecData, err2 := getExecTokenData()
 			if err2 != nil {
 				return nil, err2
 			}
@@ -211,11 +213,11 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 				rootLggr,
 				rep,
 				inflight,
-				token.rateLimiterTokenBucket.Tokens,
-				token.sourceTokenPrices,
-				token.destTokenPrices,
-				token.gasPrice,
-				token.sourceToDestTokens,
+				tokenExecData.rateLimiterTokenBucket.Tokens,
+				tokenExecData.sourceTokenPrices,
+				tokenExecData.destTokenPrices,
+				tokenExecData.gasPrice,
+				tokenExecData.sourceToDestTokens,
 				destPoolRateLimits)
 			ccip.MeasureBatchBuildDuration(timestamp, time.Since(buildBatchDuration))
 			if len(batch) != 0 {
@@ -1028,69 +1030,67 @@ type execTokenData struct {
 // prepareTokenExecData gather all the pre-execution data needed for token execution into a single lazy call.
 // This is done to avoid fetching the data multiple times for each message. Additionally, most of the RPC calls
 // within that function is cached, so it should be relatively fast and not require any RPC batching.
-func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) cache.LazyFunction[execTokenData] {
-	return cache.LazyFetch(func() (execTokenData, error) {
-		// This could result in slightly different values on each call as
-		// the function returns the allowed amount at the time of the last block.
-		// Since this will only increase over time, the highest observed value will
-		// always be the lower bound of what would be available on chain
-		// since we already account for inflight txs.
-		rateLimiterTokenBucket, err := r.offRampReader.CurrentRateLimiterState(ctx)
-		if err != nil {
-			return execTokenData{}, err
-		}
+func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (execTokenData, error) {
+	// This could result in slightly different values on each call as
+	// the function returns the allowed amount at the time of the last block.
+	// Since this will only increase over time, the highest observed value will
+	// always be the lower bound of what would be available on chain
+	// since we already account for inflight txs.
+	rateLimiterTokenBucket, err := r.offRampReader.CurrentRateLimiterState(ctx)
+	if err != nil {
+		return execTokenData{}, err
+	}
 
-		sourceFeeTokens, err := r.sourcePriceRegistry.GetFeeTokens(ctx)
-		if err != nil {
-			return execTokenData{}, fmt.Errorf("get source fee tokens: %w", err)
-		}
-		sourceTokensPrices, err := getTokensPrices(
-			ctx,
-			r.sourcePriceRegistry,
-			ccipcommon.FlattenUniqueSlice(
-				sourceFeeTokens,
-				[]common.Address{r.sourceWrappedNativeToken},
-			),
-		)
-		if err != nil {
-			return execTokenData{}, err
-		}
+	sourceFeeTokens, err := r.sourcePriceRegistry.GetFeeTokens(ctx)
+	if err != nil {
+		return execTokenData{}, fmt.Errorf("get source fee tokens: %w", err)
+	}
+	sourceTokensPrices, err := getTokensPrices(
+		ctx,
+		r.sourcePriceRegistry,
+		ccipcommon.FlattenUniqueSlice(
+			sourceFeeTokens,
+			[]common.Address{r.sourceWrappedNativeToken},
+		),
+	)
+	if err != nil {
+		return execTokenData{}, err
+	}
 
-		destFeeTokens, destBridgedTokens, err := ccipcommon.GetDestinationTokens(ctx, r.offRampReader, r.destPriceRegistry)
-		if err != nil {
-			return execTokenData{}, fmt.Errorf("get destination tokens: %w", err)
-		}
-		destTokenPrices, err := getTokensPrices(
-			ctx,
-			r.destPriceRegistry,
-			ccipcommon.FlattenUniqueSlice(
-				destFeeTokens,
-				destBridgedTokens,
-				[]common.Address{r.destWrappedNative},
-			),
-		)
-		if err != nil {
-			return execTokenData{}, err
-		}
+	destFeeTokens, destBridgedTokens, err := ccipcommon.GetDestinationTokens(ctx, r.offRampReader, r.destPriceRegistry)
+	if err != nil {
+		return execTokenData{}, fmt.Errorf("get destination tokens: %w", err)
+	}
+	destTokenPrices, err := getTokensPrices(
+		ctx,
+		r.destPriceRegistry,
+		ccipcommon.FlattenUniqueSlice(
+			destFeeTokens,
+			destBridgedTokens,
+			[]common.Address{r.destWrappedNative},
+		),
+	)
+	if err != nil {
+		return execTokenData{}, err
+	}
 
-		sourceToDestTokens, err := r.offRampReader.GetSourceToDestTokensMapping(ctx)
-		if err != nil {
-			return execTokenData{}, err
-		}
+	sourceToDestTokens, err := r.offRampReader.GetSourceToDestTokensMapping(ctx)
+	if err != nil {
+		return execTokenData{}, err
+	}
 
-		gasPrice, err := r.gasPriceEstimator.GetGasPrice(ctx)
-		if err != nil {
-			return execTokenData{}, err
-		}
+	gasPrice, err := r.gasPriceEstimator.GetGasPrice(ctx)
+	if err != nil {
+		return execTokenData{}, err
+	}
 
-		return execTokenData{
-			rateLimiterTokenBucket: rateLimiterTokenBucket,
-			sourceTokenPrices:      sourceTokensPrices,
-			sourceToDestTokens:     sourceToDestTokens,
-			destTokenPrices:        destTokenPrices,
-			gasPrice:               gasPrice,
-		}, nil
-	})
+	return execTokenData{
+		rateLimiterTokenBucket: rateLimiterTokenBucket,
+		sourceTokenPrices:      sourceTokensPrices,
+		sourceToDestTokens:     sourceToDestTokens,
+		destTokenPrices:        destTokenPrices,
+		gasPrice:               gasPrice,
+	}, nil
 }
 
 // selectReportsToFillBatch returns the reports to fill the message limit. Single Commit Root contains exactly (Interval.Max - Interval.Min + 1) messages.
