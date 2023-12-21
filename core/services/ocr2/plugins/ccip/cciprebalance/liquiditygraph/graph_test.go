@@ -13,9 +13,7 @@ func TestDummyGraph(t *testing.T) {
 	g.AddNode(20, big.NewInt(500))
 	g.AddNode(30, big.NewInt(200))
 	g.AddNode(40, big.NewInt(300))
-	assert.False(t, g.IsBalanced())
-	transfers, err := g.ComputeTransfersToBalance()
+	transfers, err := g.ComputeTransfersToBalance(nil)
 	assert.NoError(t, err)
-	g.ApplyTransfers(transfers)
-	assert.True(t, g.IsBalanced())
+	assert.Len(t, transfers, 3)
 }

@@ -16,7 +16,7 @@ import (
 type Service struct {
 	assetAddress     models.Address
 	lmFactory        liquiditymanager.Factory
-	lms              map[models.NetworkID]models.Address
+	lms              map[models.NetworkID]models.Address // todo: single lm
 	pendingTransfers []models.Transfer
 	graph            liquiditygraph.LiquidityGraph
 }

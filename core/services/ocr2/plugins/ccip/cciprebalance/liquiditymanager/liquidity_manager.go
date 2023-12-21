@@ -12,6 +12,7 @@ import (
 //go:generate mockery --quiet --name LiquidityManager --output ../cciprebalancemocks --filename lm_mock.go --case=underscore
 type LiquidityManager interface {
 	// MoveLiquidity moves the target amount to the liquidity manager of the provided chain.
+	// todo: consider passing some meta
 	MoveLiquidity(ctx context.Context, chainID models.NetworkID, amount *big.Int) error
 
 	// GetLiquidityManagers returns a mapping that contains the liquidity managers for each destination chain.
