@@ -1751,7 +1751,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 			offrampReader.On("GetSourceToDestTokensMapping", ctx).Return(map[common.Address]common.Address{}, nil).Maybe()
 			gasPriceEstimator.On("GetGasPrice", ctx).Return(prices.GasPrice(big.NewInt(1e9)), nil).Maybe()
 
-			offrampReader.On("GetDestinationTokens", ctx).Return(tt.destTokens, tt.destTokensErr).Maybe()
+			offrampReader.On("GetTokens", ctx).Return(ccipdata.OffRampTokens{DestinationTokens: tt.destTokens}, tt.destTokensErr).Maybe()
 			sourcePriceRegistry.On("GetFeeTokens", ctx).Return(tt.sourceFeeTokens, tt.sourceFeeTokensErr).Maybe()
 			sourcePriceRegistry.On("GetTokenPrices", ctx, mock.Anything).Return(tt.sourcePrices, nil).Maybe()
 			destPriceRegistry.On("GetFeeTokens", ctx).Return(tt.destFeeTokens, tt.destFeeTokensErr).Maybe()
