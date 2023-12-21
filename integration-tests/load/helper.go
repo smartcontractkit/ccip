@@ -181,21 +181,22 @@ func (l *loadArgs) Start() {
 
 				ccipLoad := NewCCIPLoad(l.TestCfg.Test, lane, l.TestCfg.PhaseTimeout, 100000, lane.Reports)
 				ccipLoad.BeforeAllCall(l.TestCfg.MsgType)
-				if lane.TestEnv != nil && lane.TestEnv.K8Env != nil && lane.TestEnv.K8Env.Cfg != nil {
+				if namespace == "" && lane.TestEnv != nil && lane.TestEnv.K8Env != nil && lane.TestEnv.K8Env.Cfg != nil {
 					namespace = lane.TestEnv.K8Env.Cfg.Namespace
 				}
 
 				loadRunner, err := wasp.NewGenerator(&wasp.Config{
-					T:                     l.TestCfg.Test,
-					GenName:               fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
-					Schedule:              l.schedules,
-					LoadType:              wasp.RPS,
+					T:        l.TestCfg.Test,
+					GenName:  fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
+					Schedule: l.schedules,
+					LoadType: wasp.RPS,
+					//	FailOnErr:             true,
 					RateLimitUnitDuration: l.TestCfg.Load.TimeUnit,
 					CallTimeout:           l.TestCfg.Load.LoadTimeOut,
 					Gun:                   ccipLoad,
 					Logger:                ccipLoad.Lane.Logger,
 					SharedData:            l.TestCfg.MsgType,
-					//LokiConfig:            wasp.NewEnvLokiConfig(),
+					LokiConfig:            wasp.NewEnvLokiConfig(),
 					Labels: map[string]string{
 						"test_group":   "load",
 						"cluster":      "sdlc",

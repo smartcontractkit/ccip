@@ -516,20 +516,20 @@ func setURLs(prefix string, network *blockchain.EVMNetwork) {
 	httpEnvVar := fmt.Sprintf("%s_HTTP_URLS", prefix)
 	wsEnvURLs, err := utils.GetEnv(wsEnvVar)
 	if err != nil {
-		log.Fatal().Err(err).Str("env var", wsEnvVar).Msg("Error getting env var")
+		log.Warn().Err(err).Str("env var", wsEnvVar).Msg("Error getting env var")
 	}
 	httpEnvURLs, err := utils.GetEnv(httpEnvVar)
 	if err != nil {
-		log.Fatal().Err(err).Str("env var", httpEnvVar).Msg("Error getting env var")
+		log.Warn().Err(err).Str("env var", httpEnvVar).Msg("Error getting env var")
 	}
 	if wsEnvURLs == "" {
 		evmUrls, err := utils.GetEnv("EVM_URLS")
 		if err != nil {
-			log.Fatal().Err(err).Str("env var", "EVM_URLS").Msg("Error getting env var")
+			log.Warn().Err(err).Str("env var", "EVM_URLS").Msg("Error getting env var")
 		}
 		evmhttpUrls, err := utils.GetEnv("EVM_HTTP_URLS")
 		if err != nil {
-			log.Fatal().Err(err).Str("env var", "EVM_HTTP_URLS").Msg("Error getting env var")
+			log.Warn().Err(err).Str("env var", "EVM_HTTP_URLS").Msg("Error getting env var")
 		}
 		wsURLs := strings.Split(evmUrls, ",")
 		httpURLs := strings.Split(evmhttpUrls, ",")
@@ -561,7 +561,7 @@ func setKeys(prefix string, network *blockchain.EVMNetwork) {
 	envVar := fmt.Sprintf("%s_KEYS", prefix)
 	keysEnv, err := utils.GetEnv(envVar)
 	if err != nil {
-		log.Fatal().Err(err).Str("env var", envVar).Msg("Error getting env var")
+		log.Warn().Err(err).Str("env var", envVar).Msg("Error getting env var")
 	}
 	if keysEnv == "" {
 		keys := strings.Split(os.Getenv("EVM_KEYS"), ",")

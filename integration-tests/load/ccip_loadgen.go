@@ -203,14 +203,23 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 			txConfirmationTime = hdr.Timestamp
 		}
 	}
+	var gasUsed uint64
+	if rcpt != nil {
+		gasUsed = rcpt.GasUsed
+	}
 	c.reports.UpdatePhaseStats(msgSerialNo, 0, testreporters.TX, startTime.Sub(txConfirmationTime), testreporters.Success,
 		testreporters.TransactionStats{
 			Fee:                fee.String(),
-			GasUsed:            rcpt.GasUsed,
+			GasUsed:            gasUsed,
 			TxHash:             sendTx.Hash().Hex(),
 			NoOfTokensSent:     len(msg.TokenAmounts),
 			MessageBytesLength: len(msg.Data),
 		})
+	// if skip validation is true, return
+	if c.Lane.SkipValidation {
+		res.Failed = false
+		return res
+	}
 	// wait for
 	// - CCIPSendRequested Event log to be generated,
 	msgLog, sourceLogTime, err := c.Lane.Source.AssertEventCCIPSendRequested(
@@ -223,7 +232,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.CallResult {
 	}
 	sentMsg := msgLog.Message
 	seqNum := sentMsg.SequenceNumber
-	lggr = lggr.With().Str("msgId ", string(sentMsg.MessageId[:])).Logger()
+	lggr = lggr.With().Str("msgId ", fmt.Sprintf("0x%x", sentMsg.MessageId[:])).Logger()
 
 	if bytes.Compare(sentMsg.Data, []byte(msgStr)) != 0 {
 		res.Error = fmt.Sprintf("the message byte didnot match expected %s received %s msg ID %d", msgStr, string(sentMsg.Data), msgSerialNo)

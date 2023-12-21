@@ -467,14 +467,18 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 		return errors.WithStack(err)
 	}
 
-	err = sourceCCIP.Common.ApproveTokens()
-	if err != nil {
-		return err
-	}
+	/*
+		err = sourceCCIP.Common.ApproveTokens()
+		if err != nil {
+			return err
+		}
+
+	*/
+
 	sourceCCIP.LoadContracts(lane)
 	// update transfer amount array length to be equal to the number of tokens
 	// each index in TransferAmount array corresponds to the amount to be transferred for the token at the same index in BridgeTokens array
-	if len(sourceCCIP.TransferAmount) != len(sourceCCIP.Common.BridgeTokens) {
+	if len(sourceCCIP.TransferAmount) != len(sourceCCIP.Common.BridgeTokens) && len(sourceCCIP.TransferAmount) > 0 {
 		sourceCCIP.TransferAmount = sourceCCIP.TransferAmount[:len(sourceCCIP.Common.BridgeTokens)]
 	}
 	sourceChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.Common.ChainClient.GetChainID().Uint64())
@@ -674,23 +678,24 @@ func (sourceCCIP *SourceCCIPModule) UpdateBalance(
 	totalFee *big.Int,
 	balances *BalanceSheet,
 ) {
-	for i, token := range sourceCCIP.Common.BridgeTokens {
-		name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), sourceCCIP.Sender.Hex())
-		balances.Update(name, BalanceItem{
-			Address:  sourceCCIP.Sender,
-			Getter:   GetterForLinkToken(token.BalanceOf, sourceCCIP.Sender.Hex()),
-			AmtToSub: bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i]),
-		})
+	if len(sourceCCIP.TransferAmount) > 0 {
+		for i, token := range sourceCCIP.Common.BridgeTokens {
+			name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), sourceCCIP.Sender.Hex())
+			balances.Update(name, BalanceItem{
+				Address:  sourceCCIP.Sender,
+				Getter:   GetterForLinkToken(token.BalanceOf, sourceCCIP.Sender.Hex()),
+				AmtToSub: bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i]),
+			})
+		}
+		for i, pool := range sourceCCIP.Common.BridgeTokenPools {
+			name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", sourceCCIP.Common.BridgeTokens[i].Address(), pool.Address())
+			balances.Update(name, BalanceItem{
+				Address:  pool.EthAddress,
+				Getter:   GetterForLinkToken(sourceCCIP.Common.BridgeTokens[i].BalanceOf, pool.Address()),
+				AmtToAdd: bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i]),
+			})
+		}
 	}
-	for i, pool := range sourceCCIP.Common.BridgeTokenPools {
-		name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", sourceCCIP.Common.BridgeTokens[i].Address(), pool.Address())
-		balances.Update(name, BalanceItem{
-			Address:  pool.EthAddress,
-			Getter:   GetterForLinkToken(sourceCCIP.Common.BridgeTokens[i].BalanceOf, pool.Address()),
-			AmtToAdd: bigmath.Mul(big.NewInt(noOfReq), sourceCCIP.TransferAmount[i]),
-		})
-	}
-
 	if sourceCCIP.Common.FeeToken.Address() != common.HexToAddress("0x0").String() {
 		name := fmt.Sprintf("FeeToken-%s-Address-%s", sourceCCIP.Common.FeeToken.Address(), sourceCCIP.Sender.Hex())
 		balances.Update(name, BalanceItem{
@@ -817,7 +822,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 		FeeToken:     feeToken,
 		ExtraArgs:    extraArgsV1,
 	}
-	log.Info().Interface("ge msg details", msg).Msg("ccip message to be sent")
+	log.Info().Interface("msg details", msg).Msg("ccip message to be sent")
 	fee, err := sourceCCIP.Common.Router.GetFee(destChainSelector, msg)
 	if err != nil {
 		reason, _ := blockchain.RPCErrorFromError(err)
@@ -1138,21 +1143,23 @@ func (destCCIP *DestCCIPModule) UpdateBalance(
 	noOfReq int64,
 	balance *BalanceSheet,
 ) {
-	for i, token := range destCCIP.Common.BridgeTokens {
-		name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), destCCIP.ReceiverDapp.Address())
-		balance.Update(name, BalanceItem{
-			Address:  destCCIP.ReceiverDapp.EthAddress,
-			Getter:   GetterForLinkToken(token.BalanceOf, destCCIP.ReceiverDapp.Address()),
-			AmtToAdd: bigmath.Mul(big.NewInt(noOfReq), transferAmount[i]),
-		})
-	}
-	for i, pool := range destCCIP.Common.BridgeTokenPools {
-		name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", destCCIP.Common.BridgeTokens[i].Address(), pool.Address())
-		balance.Update(name, BalanceItem{
-			Address:  pool.EthAddress,
-			Getter:   GetterForLinkToken(destCCIP.Common.BridgeTokens[i].BalanceOf, pool.Address()),
-			AmtToSub: bigmath.Mul(big.NewInt(noOfReq), transferAmount[i]),
-		})
+	if len(transferAmount) > 0 {
+		for i, token := range destCCIP.Common.BridgeTokens {
+			name := fmt.Sprintf("BridgeToken-%s-Address-%s", token.Address(), destCCIP.ReceiverDapp.Address())
+			balance.Update(name, BalanceItem{
+				Address:  destCCIP.ReceiverDapp.EthAddress,
+				Getter:   GetterForLinkToken(token.BalanceOf, destCCIP.ReceiverDapp.Address()),
+				AmtToAdd: bigmath.Mul(big.NewInt(noOfReq), transferAmount[i]),
+			})
+		}
+		for i, pool := range destCCIP.Common.BridgeTokenPools {
+			name := fmt.Sprintf("BridgeToken-%s-TokenPool-%s", destCCIP.Common.BridgeTokens[i].Address(), pool.Address())
+			balance.Update(name, BalanceItem{
+				Address:  pool.EthAddress,
+				Getter:   GetterForLinkToken(destCCIP.Common.BridgeTokens[i].BalanceOf, pool.Address()),
+				AmtToSub: bigmath.Mul(big.NewInt(noOfReq), transferAmount[i]),
+			})
+		}
 	}
 	if destCCIP.Common.FeeToken.Address() != common.HexToAddress("0x0").String() {
 		name := fmt.Sprintf("FeeToken-%s-OffRamp-%s", destCCIP.Common.FeeToken.Address(), destCCIP.OffRamp.Address())
@@ -1198,12 +1205,16 @@ func (destCCIP *DestCCIPModule) AssertEventExecutionStateChanged(
 				if err != nil {
 					lggr.Warn().Msg("Failed to get receipt for ExecStateChanged event")
 				}
+				var gasUsed uint64
+				if receipt != nil {
+					gasUsed = receipt.GasUsed
+				}
 				if abihelpers.MessageExecutionState(e.State) == abihelpers.ExecutionStateSuccess {
 					reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ExecStateChanged, receivedAt.Sub(timeNow),
 						testreporters.Success,
 						testreporters.TransactionStats{
 							TxHash:  vLogs.TxHash.Hex(),
-							GasUsed: receipt.GasUsed,
+							GasUsed: gasUsed,
 						})
 					return nil
 				} else {
@@ -1263,9 +1274,13 @@ func (destCCIP *DestCCIPModule) AssertEventReportAccepted(
 				if err != nil {
 					lggr.Warn().Msg("Failed to get receipt for ReportAccepted event")
 				}
+				var gasUsed uint64
+				if receipt != nil {
+					gasUsed = receipt.GasUsed
+				}
 				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.Commit, totalTime, testreporters.Success,
 					testreporters.TransactionStats{
-						GasUsed:    receipt.GasUsed,
+						GasUsed:    gasUsed,
 						TxHash:     reportAccepted.Raw.TxHash.String(),
 						CommitRoot: fmt.Sprintf("%x", reportAccepted.Report.MerkleRoot),
 					})
@@ -1312,9 +1327,13 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 				if err != nil {
 					lggr.Fatal().Err(err).Msg("Failed to get receipt for ReportBlessed event")
 				}
+				var gasUsed uint64
+				if receipt != nil {
+					gasUsed = receipt.GasUsed
+				}
 				reports.UpdatePhaseStats(reqNo, seqNum, testreporters.ReportBlessed, receivedAt.Sub(prevEventAt), testreporters.Success,
 					testreporters.TransactionStats{
-						GasUsed:    receipt.GasUsed,
+						GasUsed:    gasUsed,
 						TxHash:     vLogs.TxHash.String(),
 						CommitRoot: fmt.Sprintf("%x", CommitReport.MerkleRoot),
 					})
@@ -1432,6 +1451,7 @@ type CCIPLane struct {
 	SrcNetworkLaneCfg       *laneconfig.LaneConfig
 	DstNetworkLaneCfg       *laneconfig.LaneConfig
 	Subscriptions           []event.Subscription
+	SkipValidation          bool
 }
 
 func (lane *CCIPLane) UpdateLaneConfig() {
@@ -1581,11 +1601,17 @@ func (lane *CCIPLane) ValidateRequests() {
 	}
 	// Asserting balances reliably work only for simulated private chains. The testnet contract balances might get updated by other transactions
 	// verify the fee amount is deducted from sender, added to receiver token balances and
-	lane.Source.UpdateBalance(int64(lane.NumberOfReq), lane.TotalFee, lane.Balance)
-	lane.Dest.UpdateBalance(lane.Source.TransferAmount, int64(lane.NumberOfReq), lane.Balance)
+	if len(lane.Source.TransferAmount) > 0 {
+		lane.Source.UpdateBalance(int64(lane.NumberOfReq), lane.TotalFee, lane.Balance)
+		lane.Dest.UpdateBalance(lane.Source.TransferAmount, int64(lane.NumberOfReq), lane.Balance)
+	}
 }
 
 func (lane *CCIPLane) ValidateRequestByTxHash(txHash string, txConfirmattion time.Time, reqNo int64) error {
+	if lane.SkipValidation {
+		lane.Logger.Info().Msg("Skipping validation")
+		return nil
+	}
 	msgLog, ccipSendReqGenAt, err := lane.Source.AssertEventCCIPSendRequested(
 		lane.Logger, reqNo, txHash, lane.ValidationTimeout, txConfirmattion, lane.Reports)
 	if err != nil || msgLog == nil {
@@ -1777,10 +1803,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	lane.UpdateLaneConfig()
 
-	// start event watchers
-	err = lane.StartEventWatchers()
-	if err != nil {
-		return errors.WithStack(err)
+	if !lane.SkipValidation {
+		// start event watchers
+		err = lane.StartEventWatchers()
+		if err != nil {
+			return errors.WithStack(err)
+		}
 	}
 	// if lane is being set up for already configured CL nodes and contracts
 	// no further action is necessary
