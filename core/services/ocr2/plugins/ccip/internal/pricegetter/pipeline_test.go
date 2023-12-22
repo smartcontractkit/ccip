@@ -62,8 +62,9 @@ func TestDataSource(t *testing.T) {
 	})
 
 	// Ask a non-existent price.
-	_, err = priceGetter.TokenPricesUSD(context.Background(), []common.Address{common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e11")})
-	require.Error(t, err)
+	prices, err = priceGetter.TokenPricesUSD(context.Background(), []common.Address{common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e11")})
+	require.NoError(t, err)
+	assert.Empty(t, prices)
 
 	// Ask only one price
 	prices, err = priceGetter.TokenPricesUSD(context.Background(), []common.Address{linkTokenAddress})

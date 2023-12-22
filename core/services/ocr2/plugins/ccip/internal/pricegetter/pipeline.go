@@ -82,9 +82,11 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Add
 
 	// The mapping of token address to source of token price has to live offchain.
 	// Best we can do is sanity check that the token price spec covers all our desired execution token prices.
+	// We don't want to fail here in case of spotting missing token, but rather log it. This should make CCIP more resilient.
+	// In case of missing tokens in the spec, Exec will skip messages containing those tokens.
 	for _, token := range tokens {
 		if _, ok = tokenPrices[token]; !ok {
-			return nil, errors.Errorf("missing token %s from tokensForFeeCoin spec", token)
+			d.lggr.Errorw("missing token from tokensForFeeCoin spec", "token", token.Hex())
 		}
 	}
 
