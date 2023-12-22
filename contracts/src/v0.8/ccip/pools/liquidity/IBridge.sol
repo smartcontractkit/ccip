@@ -3,29 +3,19 @@ pragma solidity ^0.8.0;
 
 interface IBridge {
   error BridgeAddressCannotBeZero();
-
-  function getL1Bridge() external view returns (address);
+  error MsgValueDoesNotMatchAmount(uint256 msgValue, uint256 amount);
 }
 
 interface IL1Bridge is IBridge {
   function depositERC20ToL2(address l1Token, address l2Token, address recipient, uint256 amount) external payable;
 
-  function depositNativeToL2(address recipient, uint256 amount) external payable;
-
   function finalizeWithdrawERC20FromL2(
-    address l1Token,
-    address l2Token,
-    address from,
-    address to,
-    uint256 amount,
-    bytes calldata data
+    address l2Sender,
+    address l1Receiver,
+    bytes calldata bridgeSpecificPayload
   ) external;
-
-  function finalizeWithdrawNativeFromL2(address from, address to, uint256 amount, bytes calldata data) external;
 }
 
 interface IL2Bridge is IBridge {
-  function depositERC20ToL1(address l2Token, address recipient, uint256 amount) external;
-
-  function depositNativeToL1(address recipient, uint256 amount) external payable;
+  function depositERC20ToL1(address l1Token, address l2Token, address recipient, uint256 amount) external;
 }

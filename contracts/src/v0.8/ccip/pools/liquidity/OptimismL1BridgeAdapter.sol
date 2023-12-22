@@ -48,18 +48,22 @@ contract OptimismL1BridgeAdapter is IL1Bridge {
   }
 
   function depositNativeToL2(address recipient, uint256 amount) public payable {
-    i_L1Bridge.depositETHTo{value: amount}(recipient, 0, abi.encode(s_nonce++));
+    if (msg.value != amount) {
+      revert MsgValueDoesNotMatchAmount(msg.value, amount);
+    }
+
+    i_L1Bridge.depositETHTo{value: msg.value}(recipient, 0, abi.encode(s_nonce++));
   }
 
-  function finalizeWithdrawERC20FromL2(
-    address l1Token,
-    address l2Token,
-    address from,
-    address to,
-    uint256 amount,
-    bytes calldata data
-  ) external {
-    i_L1Bridge.finalizeERC20Withdrawal(l1Token, l2Token, from, to, amount, data);
+  struct OptimismFinalizationPayload {
+    address l1Token;
+    address l2Token;
+    uint256 amount;
+  }
+
+  function finalizeWithdrawERC20FromL2(address from, address to, bytes calldata data) external {
+    OptimismFinalizationPayload memory payload = abi.decode(data, (OptimismFinalizationPayload));
+    i_L1Bridge.finalizeERC20Withdrawal(payload.l1Token, payload.l2Token, from, to, payload.amount, data);
   }
 
   function finalizeWithdrawNativeFromL2(address from, address to, uint256 amount, bytes calldata data) external {
@@ -75,14 +79,6 @@ contract OptimismL1BridgeAdapter is IL1Bridge {
   ) external {
     i_L1CrossDomainMessenger.relayMessage(target, sender, message, messageNonce, proof);
     // TODO
-  }
-
-  function getL1Bridge() external view returns (address) {
-    return address(i_L1Bridge);
-  }
-
-  function getL2Bridge() external returns (address) {
-    return i_L1Bridge.l2TokenBridge();
   }
 
   /// @notice returns the address of the

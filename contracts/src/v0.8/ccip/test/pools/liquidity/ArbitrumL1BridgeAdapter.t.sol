@@ -9,13 +9,13 @@ import "forge-std/Test.sol";
 import {IL1GatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
 import {IGatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/libraries/gateway/IGatewayRouter.sol";
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IOutbox} from "@arbitrum/nitro-contracts/src/bridge/IOutbox.sol";
 
 contract ArbitrumL1BridgeAdapterSetup is Test {
   uint256 internal mainnetFork;
   uint256 internal arbitrumFork;
 
   string internal constant MAINNET_RPC_URL = "<url>";
-  string internal constant ARBITRUM_RPC_URL = "<url>";
 
   address internal constant L1_GATEWAY_ROUTER = 0x72Ce9c846789fdB6fC1f34aC4AD25Dd9ef7031ef;
   address internal constant L1_ERC20_GATEWAY = 0xa3A7B6F88361F48403514059F1F16C8E78d60EeC;
@@ -46,8 +46,7 @@ contract ArbitrumL1BridgeAdapterSetup is Test {
     vm.selectFork(mainnetFork);
     s_l1BridgeAdapter = new ArbitrumL1BridgeAdapter(
       IL1GatewayRouter(L1_GATEWAY_ROUTER),
-      L1_INBOX,
-      L1_OUTBOX,
+      IOutbox(L1_OUTBOX),
       L1_ERC20_GATEWAY
     );
 

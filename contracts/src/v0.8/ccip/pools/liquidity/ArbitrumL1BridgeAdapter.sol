@@ -5,6 +5,7 @@ import {IL1Bridge} from "./IBridge.sol";
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
 import {IL1GatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
+import {IOutbox} from "@arbitrum/nitro-contracts/src/bridge/IOutbox.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -17,8 +18,7 @@ contract ArbitrumL1BridgeAdapter is IL1Bridge {
 
   IL1GatewayRouter internal immutable i_l1GatewayRouter;
   address internal immutable i_l1ERC20Gateway;
-  address internal immutable i_l1Inbox;
-  address internal immutable i_l1Outbox;
+  IOutbox internal immutable i_l1Outbox;
 
   // TODO not static?
   uint256 public constant MAX_GAS = 100_000;
@@ -28,21 +28,18 @@ contract ArbitrumL1BridgeAdapter is IL1Bridge {
   // Nonce to use for L2 deposits to allow for better tracking offchain.
   uint64 private s_nonce = 0;
 
-  constructor(IL1GatewayRouter l1GatewayRouter, address l1Inbox, address l1Outbox, address l1ERC20Gateway) {
+  constructor(IL1GatewayRouter l1GatewayRouter, IOutbox l1Outbox, address l1ERC20Gateway) {
     if (
-      address(l1GatewayRouter) == address(0) ||
-      address(l1Inbox) == address(0) ||
-      address(l1Outbox) == address(0) ||
-      address(l1ERC20Gateway) == address(0)
+      address(l1GatewayRouter) == address(0) || address(l1Outbox) == address(0) || address(l1ERC20Gateway) == address(0)
     ) {
       revert BridgeAddressCannotBeZero();
     }
     i_l1GatewayRouter = l1GatewayRouter;
-    i_l1Inbox = l1Inbox;
     i_l1Outbox = l1Outbox;
     i_l1ERC20Gateway = l1ERC20Gateway;
   }
 
+  /// @inheritdoc IL1Bridge
   function depositERC20ToL2(address l1Token, address, address recipient, uint256 amount) external payable {
     IERC20(l1Token).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -64,40 +61,42 @@ contract ArbitrumL1BridgeAdapter is IL1Bridge {
     );
   }
 
-  function depositNativeToL2(address recipient, uint256 amount) public payable {
-    // TODO
-    //    i_L1Bridge.depositETHTo{value: amount}(recipient, 0, abi.encode(s_nonce++));
+  /// @param proof Merkle proof of message inclusion in send root
+  /// @param index Merkle path to message
+  /// @param l2Block l2 block number at which sendTxToL1 call was made
+  /// @param l1Block l1 block number at which sendTxToL1 call was made
+  /// @param l2Timestamp l2 Timestamp at which sendTxToL1 call was made
+  /// @param value wei in L1 message
+  /// @param data abi-encoded L1 message data
+  struct ArbitrumFinalizationPayload {
+    bytes32[] proof;
+    uint256 index;
+    uint256 l2Block;
+    uint256 l1Block;
+    uint256 l2Timestamp;
+    uint256 value;
+    bytes data;
   }
 
+  /// @param l2Sender sender if original message (i.e., caller of ArbSys.sendTxToL1)
+  /// @param l1Receiver destination address for L1 contract call
   function finalizeWithdrawERC20FromL2(
-    address l1Token,
-    address,
-    address from,
-    address to,
-    uint256 amount,
-    bytes calldata data
+    address l2Sender,
+    address l1Receiver,
+    bytes calldata arbitrumFinalizationPayload
   ) external {
-    i_l1GatewayRouter.finalizeInboundTransfer(l1Token, from, to, amount, data);
-  }
-
-  function finalizeWithdrawNativeFromL2(address from, address to, uint256 amount, bytes calldata data) external {
-    // TODO
-    // Outbox.executeTransaction
-  }
-
-  //  function relayMessageFromL2ToL1(
-  //    address target,
-  //    address sender,
-  //    bytes memory message,
-  //    uint256 messageNonce,
-  //    IL1CrossDomainMessenger.L2MessageInclusionProof memory proof
-  //  ) external {
-  //    i_L1CrossDomainMessenger.relayMessage(target, sender, message, messageNonce, proof);
-  //    // TODO
-  //  }
-
-  function getL1Bridge() external view returns (address) {
-    return address(i_l1GatewayRouter);
+    ArbitrumFinalizationPayload memory payload = abi.decode(arbitrumFinalizationPayload, (ArbitrumFinalizationPayload));
+    i_l1Outbox.executeTransaction(
+      payload.proof,
+      payload.index,
+      l2Sender,
+      l1Receiver,
+      payload.l2Block,
+      payload.l1Block,
+      payload.l2Timestamp,
+      payload.value,
+      payload.data
+    );
   }
 
   function getL2Token(address l1Token) external view returns (address) {

@@ -24,13 +24,13 @@ contract OptimismL2BridgeAdapter is IL2Bridge {
     i_wrappedNative = wrappedNative;
   }
 
-  function depositERC20ToL1(address l2Token, address recipient, uint256 amount) external {
+  function depositERC20ToL1(address, address l2Token, address recipient, uint256 amount) external {
     IERC20(l2Token).safeTransferFrom(msg.sender, address(this), amount);
 
     // If the token is the wrapped native, we unwrap it and deposit native
     if (l2Token == address(i_wrappedNative)) {
       i_wrappedNative.withdraw(amount);
-      depositNativeToL1(recipient, amount);
+      _depositNativeToL1(recipient, amount);
       return;
     }
 
@@ -39,16 +39,12 @@ contract OptimismL2BridgeAdapter is IL2Bridge {
     i_L2Bridge.withdrawTo(l2Token, recipient, amount, 0, abi.encode(s_nonce++));
   }
 
-  function depositNativeToL1(address recipient, uint256 amount) public payable {
+  function depositNativeToL1(address recipient) public payable {
+    _depositNativeToL1(recipient, msg.value);
+  }
+
+  function _depositNativeToL1(address recipient, uint256 amount) internal {
     i_L2Bridge.withdrawTo(Lib_PredeployAddresses.OVM_ETH, recipient, amount, 0, abi.encode(s_nonce++));
-  }
-
-  function getL1Bridge() external view returns (address) {
-    return i_L2Bridge.l1TokenBridge();
-  }
-
-  function getL2Bridge() external view returns (address) {
-    return address(i_L2Bridge);
   }
 
   /// @notice returns the address of the
