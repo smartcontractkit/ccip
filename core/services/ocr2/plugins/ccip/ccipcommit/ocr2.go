@@ -213,18 +213,13 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	queryTokens := ccipcommon.FlattenUniqueSlice([]common.Address{r.sourceNative}, destTokens)
 	sort.Slice(queryTokens, func(i, j int) bool { return queryTokens[i].String() < queryTokens[j].String() }) // make the query deterministic
 
-	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
+	tokenPricesResults, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
 	if err != nil {
 		return nil, nil, err
 	}
-	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
-	// make sure that we got prices for all the tokens of our query
-	for _, token := range queryTokens {
-		if rawTokenPricesUSD[token] == nil {
-			return nil, nil, errors.Errorf("missing token price: %+v", token)
-		}
-	}
+	rawTokenPricesUSD := pricegetter.PriceResultsToMapSkipErrors(lggr, tokenPricesResults)
+	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
 	sourceNativePriceUSD, exists := rawTokenPricesUSD[r.sourceNative]
 	if !exists {
@@ -238,6 +233,9 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 
 	tokenPricesUSD = make(map[common.Address]*big.Int, len(rawTokenPricesUSD))
 	for i, token := range destTokens {
+		if _, exist := rawTokenPricesUSD[token]; !exist {
+			continue
+		}
 		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
 	}
 

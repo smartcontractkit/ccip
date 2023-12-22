@@ -2,7 +2,6 @@ package pricegetter
 
 import (
 	"context"
-	"math/big"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -42,7 +41,7 @@ func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, exter
 	}, nil
 }
 
-func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
+func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) ([]TokenPriceResult, error) {
 	_, trrs, err := d.runner.ExecuteRun(ctx, pipeline.Spec{
 		ID:           d.jobID,
 		DotDagSource: d.source,
@@ -67,28 +66,35 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Add
 	}
 
 	providedTokensSet := mapset.NewSet[common.Address](tokens...)
-	tokenPrices := make(map[common.Address]*big.Int)
+	tokenPrices := make(map[common.Address]TokenPriceResult)
 	for tokenAddressStr, rawPrice := range prices {
-		castedPrice, err := parseutil.ParseBigIntFromAny(rawPrice)
-		if err != nil {
-			return nil, err
-		}
-
 		tokenAddress := common.HexToAddress(tokenAddressStr)
+
 		if providedTokensSet.Contains(tokenAddress) {
-			tokenPrices[tokenAddress] = castedPrice
+			castedPrice, err1 := parseutil.ParseBigIntFromAny(rawPrice)
+
+			tokenPrices[tokenAddress] = TokenPriceResult{
+				TokenAddress: tokenAddress,
+				Price:        castedPrice,
+				Error:        err1,
+			}
 		}
 	}
 
-	// The mapping of token address to source of token price has to live offchain.
-	// Best we can do is sanity check that the token price spec covers all our desired execution token prices.
-	// We don't want to fail here in case of spotting missing token, but rather log it. This should make CCIP more resilient.
-	// In case of missing tokens in the spec, Exec will skip messages containing those tokens.
-	for _, token := range tokens {
-		if _, ok = tokenPrices[token]; !ok {
-			d.lggr.Errorw("missing token from tokensForFeeCoin spec", "token", token.Hex())
+	// Make sure that not found tokens are also returned with an error.
+	// All tokens should be returned in the same order as they were provided.
+	results := make([]TokenPriceResult, len(tokens))
+	for i, token := range tokens {
+		result, exist := tokenPrices[token]
+		if !exist {
+			results[i] = TokenPriceResult{
+				TokenAddress: token,
+				Error:        errors.Errorf("token price not found in spec"),
+			}
+		} else {
+			results[i] = result
 		}
 	}
 
-	return tokenPrices, nil
+	return results, nil
 }

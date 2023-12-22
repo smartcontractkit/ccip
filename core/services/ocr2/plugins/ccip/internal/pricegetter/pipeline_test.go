@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	pipelinemocks "github.com/smartcontractkit/chainlink/v2/core/services/pipeline/mocks"
 
@@ -38,8 +39,12 @@ func TestDataSource(t *testing.T) {
 		require.NoError(t, err)
 	}))
 	defer usdcEth.Close()
-	linkTokenAddress := common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e05")
-	usdcTokenAddress := common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e10")
+
+	linkTokenAddress := utils.RandomAddress()
+	usdcTokenAddress := utils.RandomAddress()
+	linkTokenPrice := new(big.Int).Mul(big.NewInt(200), big.NewInt(1e18))
+	usdcTokenPrice := new(big.Int).Mul(big.NewInt(1000), big.NewInt(1e18))
+
 	source := fmt.Sprintf(`
 	// Price 1
 	link [type=http method=GET url="%s"];
@@ -50,29 +55,80 @@ func TestDataSource(t *testing.T) {
 	usdc_parse [type=jsonparse path="USDCWeiPerETH"];
 	usdc->usdc_parse;
 	merge [type=merge left="{}" right="{\"%s\":$(link_parse), \"%s\":$(usdc_parse)}"];
-`, linkEth.URL, usdcEth.URL, linkTokenAddress, usdcTokenAddress)
+	`, linkEth.URL, usdcEth.URL, linkTokenAddress, usdcTokenAddress)
 
-	priceGetter := newTestPipelineGetter(t, source)
-	// Ask for all prices present in spec.
-	prices, err := priceGetter.TokenPricesUSD(context.Background(), []common.Address{linkTokenAddress, usdcTokenAddress})
-	require.NoError(t, err)
-	assert.Equal(t, prices, map[common.Address]*big.Int{
-		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
-		usdcTokenAddress: big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1000000000000000000)),
-	})
+	type expectedToken struct {
+		price *big.Int
+		err   bool
+	}
 
-	// Ask a non-existent price.
-	prices, err = priceGetter.TokenPricesUSD(context.Background(), []common.Address{common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e11")})
-	require.NoError(t, err)
-	assert.Empty(t, prices)
+	tests := []struct {
+		name          string
+		tokens        []common.Address
+		expectedValue []expectedToken
+	}{
+		{
+			name:   "all are returned",
+			tokens: []common.Address{linkTokenAddress, usdcTokenAddress},
+			expectedValue: []expectedToken{
+				{price: linkTokenPrice},
+				{price: usdcTokenPrice},
+			},
+		},
+		{
+			name:   "all are returned, ordered by input",
+			tokens: []common.Address{usdcTokenAddress, linkTokenAddress},
+			expectedValue: []expectedToken{
+				{price: usdcTokenPrice},
+				{price: linkTokenPrice},
+			},
+		},
+		{
+			name:   "ask a non-existent price",
+			tokens: []common.Address{utils.RandomAddress()},
+			expectedValue: []expectedToken{
+				{price: nil, err: true},
+			},
+		},
+		{
+			name:   "ask only one price",
+			tokens: []common.Address{linkTokenAddress},
+			expectedValue: []expectedToken{
+				{price: linkTokenPrice},
+			},
+		},
+		{
+			name:          "empty input returns empty result set",
+			tokens:        []common.Address{},
+			expectedValue: []expectedToken{},
+		},
+	}
 
-	// Ask only one price
-	prices, err = priceGetter.TokenPricesUSD(context.Background(), []common.Address{linkTokenAddress})
-	require.NoError(t, err)
-	assert.Equal(t, prices, map[common.Address]*big.Int{
-		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			priceGetter := newTestPipelineGetter(t, source)
+			prices, err := priceGetter.TokenPricesUSD(context.Background(), tt.tokens)
+			require.NoError(t, err)
+			assert.Equal(t, len(prices), len(tt.expectedValue))
 
+			for i, price := range prices {
+				assert.Equal(t, price.Price, tt.expectedValue[i].price)
+				assert.Equal(t, price.Error != nil, tt.expectedValue[i].err)
+			}
+		})
+	}
+}
+
+func TestTopLevelErrorWhenJobSpecIsInvalid(t *testing.T) {
+	source := `
+			coin [type=http method=GET url="thisisurl"];
+			coin_parse [type=jsonparse path="MyCoin"];
+			coin->coin_parse;
+	`
+
+	_, err := newTestPipelineGetter(t, source).
+		TokenPricesUSD(context.Background(), []common.Address{utils.RandomAddress()})
+	require.Error(t, err)
 }
 
 func TestParsingDifferentFormats(t *testing.T) {
@@ -138,12 +194,13 @@ func TestParsingDifferentFormats(t *testing.T) {
 			prices, err := newTestPipelineGetter(t, source).
 				TokenPricesUSD(context.Background(), []common.Address{address})
 
-			if tt.expectedError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, prices[address], tt.expectedValue)
-			}
+			require.NoError(t, err)
+			require.Len(t, prices, 1)
+
+			tokenPriceResult := prices[0]
+			assert.Equal(t, tokenPriceResult.Price, tt.expectedValue)
+			assert.Equal(t, tokenPriceResult.TokenAddress, address)
+			assert.Equal(t, tokenPriceResult.Error != nil, tt.expectedError)
 		})
 	}
 }
@@ -151,9 +208,9 @@ func TestParsingDifferentFormats(t *testing.T) {
 func newTestPipelineGetter(t *testing.T, source string) *pricegetter.PipelineGetter {
 	lggr, _ := logger.NewLogger()
 	cfg := pipelinemocks.NewConfig(t)
-	cfg.On("MaxRunDuration").Return(time.Second)
-	cfg.On("DefaultHTTPTimeout").Return(models.MakeDuration(time.Second))
-	cfg.On("DefaultHTTPLimit").Return(int64(1024 * 10))
+	cfg.On("MaxRunDuration").Return(time.Second).Maybe()
+	cfg.On("DefaultHTTPTimeout").Return(models.MakeDuration(time.Second)).Maybe()
+	cfg.On("DefaultHTTPLimit").Return(int64(1024 * 10)).Maybe()
 	db := pgtest.NewSqlxDB(t)
 	bridgeORM := bridges.NewORM(db, lggr, config.NewTestGeneralConfig(t).Database())
 	runner := pipeline.NewRunner(pipeline.NewORM(db, lggr, config.NewTestGeneralConfig(t).Database(), config.NewTestGeneralConfig(t).JobPipeline().MaxSuccessfulRuns()),

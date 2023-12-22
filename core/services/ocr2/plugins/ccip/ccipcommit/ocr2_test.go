@@ -49,6 +49,7 @@ import (
 
 func TestCommitReportingPlugin_Observation(t *testing.T) {
 	sourceNativeTokenAddr := common.HexToAddress("1000")
+	sourceNativeTokenPrice := big.NewInt(2)
 	someTokenAddr := common.HexToAddress("2000")
 
 	testCases := []struct {
@@ -56,7 +57,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 		epochAndRound       types.ReportTimestamp
 		commitStoreIsPaused bool
 		commitStoreSeqNum   uint64
-		tokenPrices         map[common.Address]*big.Int
+		tokenPrices         []pricegetter.TokenPriceResult
 		sendReqs            []ccipdata.Event[internal.EVM2EVMMessage]
 		tokenDecimals       map[common.Address]uint8
 		fee                 *big.Int
@@ -67,9 +68,9 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 		{
 			name:              "base report",
 			commitStoreSeqNum: 54,
-			tokenPrices: map[common.Address]*big.Int{
-				someTokenAddr:         big.NewInt(2),
-				sourceNativeTokenAddr: big.NewInt(2),
+			tokenPrices: []pricegetter.TokenPriceResult{
+				{TokenAddress: someTokenAddr, Price: big.NewInt(2)},
+				{TokenAddress: sourceNativeTokenAddr, Price: sourceNativeTokenPrice},
 			},
 			sendReqs: []ccipdata.Event[internal.EVM2EVMMessage]{
 				{Data: internal.EVM2EVMMessage{SequenceNumber: 54}},
@@ -124,9 +125,9 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorCommit(t)
 			if tc.fee != nil {
 				var p prices.GasPrice = tc.fee
-				var pUSD prices.GasPrice = ccipcalc.CalculateUsdPerUnitGas(p, tc.tokenPrices[sourceNativeTokenAddr])
+				var pUSD prices.GasPrice = ccipcalc.CalculateUsdPerUnitGas(p, sourceNativeTokenPrice)
 				gasPriceEstimator.On("GetGasPrice", ctx).Return(p, nil)
-				gasPriceEstimator.On("DenoteInUSD", p, tc.tokenPrices[sourceNativeTokenAddr]).Return(pUSD, nil)
+				gasPriceEstimator.On("DenoteInUSD", p, sourceNativeTokenPrice).Return(pUSD, nil)
 			}
 
 			destTokens := make([]common.Address, 0)
@@ -978,7 +979,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 		name                 string
 		tokenDecimals        map[common.Address]uint8
 		sourceNativeToken    common.Address
-		priceGetterRespData  map[common.Address]*big.Int
+		priceGetterRespData  []pricegetter.TokenPriceResult
 		priceGetterRespErr   error
 		feeEstimatorRespFee  prices.GasPrice
 		feeEstimatorRespErr  error
@@ -994,10 +995,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: map[common.Address]*big.Int{
-				tokens[0]: val1e18(100),
-				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300), // price getter returned a price for this token even though we didn't request it (should be skipped)
+			priceGetterRespData: []pricegetter.TokenPriceResult{
+				{TokenAddress: tokens[0], Price: val1e18(100)},
+				{TokenAddress: tokens[1], Price: val1e18(200)},
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(10),
@@ -1028,11 +1028,17 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: map[common.Address]*big.Int{
+			priceGetterRespData: []pricegetter.TokenPriceResult{
+				{TokenAddress: tokens[0], Price: val1e18(100)},
+			},
+			priceGetterRespErr:   nil,
+			feeEstimatorRespFee:  big.NewInt(10),
+			feeEstimatorRespErr:  nil,
+			maxGasPrice:          1e18,
+			expSourceGasPriceUSD: big.NewInt(1000),
+			expTokenPricesUSD: map[common.Address]*big.Int{
 				tokens[0]: val1e18(100),
 			},
-			priceGetterRespErr: nil,
-			expErr:             true,
 		},
 		{
 			name: "price getter skipped source native price",
@@ -1041,9 +1047,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[2],
-			priceGetterRespData: map[common.Address]*big.Int{
-				tokens[0]: val1e18(100),
-				tokens[1]: val1e18(200),
+			priceGetterRespData: []pricegetter.TokenPriceResult{
+				{TokenAddress: tokens[0], Price: val1e18(100)},
+				{TokenAddress: tokens[1], Price: val1e18(200)},
 			},
 			priceGetterRespErr: nil,
 			expErr:             true,
@@ -1055,10 +1061,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: map[common.Address]*big.Int{
-				tokens[0]: val1e18(100),
-				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300), // price getter returned a price for this token even though we didn't request it
+			priceGetterRespData: []pricegetter.TokenPriceResult{
+				{TokenAddress: tokens[0], Price: val1e18(100)},
+				{TokenAddress: tokens[1], Price: val1e18(200)},
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(10),
@@ -1078,10 +1083,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: map[common.Address]*big.Int{
-				tokens[0]: val1e18(100),
-				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300), // price getter returned a price for this token even though we didn't request it (should be skipped)
+			priceGetterRespData: []pricegetter.TokenPriceResult{
+				{TokenAddress: tokens[0], Price: val1e18(100)},
+				{TokenAddress: tokens[1], Price: val1e18(200)},
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(20),
@@ -1101,10 +1105,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: map[common.Address]*big.Int{
-				tokens[0]: val1e18(100),
-				tokens[1]: val1e18(200),
-				tokens[2]: val1e18(300), // price getter returned a price for this token even though we didn't request it (should be skipped)
+			priceGetterRespData: []pricegetter.TokenPriceResult{
+				{TokenAddress: tokens[0], Price: val1e18(100)},
+				{TokenAddress: tokens[1], Price: val1e18(200)},
 			},
 			feeEstimatorRespFee: nil,
 			maxGasPrice:         1e18,
