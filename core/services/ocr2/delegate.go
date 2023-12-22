@@ -750,6 +750,57 @@ func (d *Delegate) newServicesMercury(
 	return mercuryServices, err2
 }
 
+func (d *Delegate) newServicesTokenPrice(
+	ctx context.Context,
+	lggr logger.SugaredLogger,
+	jb job.Job,
+	bootstrapPeers []commontypes.BootstrapperLocator,
+	kb ocr2key.KeyBundle,
+	ocrDB *db,
+	lc ocrtypes.LocalConfig,
+	ocrLogger commontypes.Logger,
+) ([]job.ServiceCtx, error) {
+	spec := jb.OCR2OracleSpec
+
+	rid, err := spec.RelayID()
+	if err != nil {
+		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: "median"}
+	}
+
+	oracleArgsNoPlugin := libocr2.OCR2OracleArgs{
+		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
+		V2Bootstrappers:              bootstrapPeers,
+		Database:                     ocrDB,
+		LocalConfig:                  lc,
+		Logger:                       ocrLogger,
+		MonitoringEndpoint:           d.monitoringEndpointGen.GenMonitoringEndpoint(rid.Network, rid.ChainID, spec.ContractID, synchronization.OCR2Median),
+		OffchainKeyring:              kb,
+		OnchainKeyring:               kb,
+	}
+
+	errorLog := &errorLog{jobID: jb.ID, recordError: d.jobORM.RecordError}
+	enhancedTelemChan := make(chan ocrcommon.EnhancedTelemetryData, 100)
+	mConfig := tokenprice.NewTokenPriceConfig(
+		d.cfg,
+	)
+
+	relayer, err := d.RelayGetter.Get(rid)
+	if err != nil {
+		return nil, ErrRelayNotEnabled{Err: err, PluginName: "median", Relay: spec.Relay}
+	}
+
+	tokenPriceServices, err2 := tokenprice.NewTokenPriceServices(ctx, jb, d.isNewlyCreatedJob, relayer, d.pipelineRunner, lggr, oracleArgsNoPlugin, mConfig, enhancedTelemChan, errorLog)
+
+	if ocrcommon.ShouldCollectEnhancedTelemetry(&jb) {
+		enhancedTelemService := ocrcommon.NewEnhancedTelemetryService(&jb, enhancedTelemChan, make(chan struct{}), d.monitoringEndpointGen.GenMonitoringEndpoint(rid.Network, rid.ChainID, spec.ContractID, synchronization.EnhancedEA), lggr.Named("EnhancedTelemetry"))
+		tokenPriceServices = append(tokenPriceServices, enhancedTelemService)
+	} else {
+		lggr.Infow("Enhanced telemetry is disabled for job", "job", jb.Name)
+	}
+
+	return tokenPriceServices, err2
+}
+
 func (d *Delegate) newServicesMedian(
 	ctx context.Context,
 	lggr logger.SugaredLogger,

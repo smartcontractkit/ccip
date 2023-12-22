@@ -84,6 +84,8 @@ func (r *ServerAdapter) NewPluginProvider(ctx context.Context, rargs types.Relay
 	switch types.OCR2PluginType(rargs.ProviderType) {
 	case types.Median:
 		return r.NewMedianProvider(ctx, rargs, pargs)
+	case types.TokenPrice:
+		return r.NewTokenPriceProvider(ctx, rargs, pargs)
 	case types.Functions:
 		return r.NewFunctionsProvider(ctx, rargs, pargs)
 	case types.Mercury:
