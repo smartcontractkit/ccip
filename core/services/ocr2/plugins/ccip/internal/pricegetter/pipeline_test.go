@@ -42,6 +42,7 @@ func TestDataSource(t *testing.T) {
 
 	linkTokenAddress := utils.RandomAddress()
 	usdcTokenAddress := utils.RandomAddress()
+	notExistingToken := utils.RandomAddress()
 	linkTokenPrice := new(big.Int).Mul(big.NewInt(200), big.NewInt(1e18))
 	usdcTokenPrice := new(big.Int).Mul(big.NewInt(1000), big.NewInt(1e18))
 
@@ -65,42 +66,42 @@ func TestDataSource(t *testing.T) {
 	tests := []struct {
 		name          string
 		tokens        []common.Address
-		expectedValue []expectedToken
+		expectedValue map[common.Address]expectedToken
 	}{
 		{
 			name:   "all are returned",
 			tokens: []common.Address{linkTokenAddress, usdcTokenAddress},
-			expectedValue: []expectedToken{
-				{price: linkTokenPrice},
-				{price: usdcTokenPrice},
+			expectedValue: map[common.Address]expectedToken{
+				linkTokenAddress: {price: linkTokenPrice},
+				usdcTokenAddress: {price: usdcTokenPrice},
 			},
 		},
 		{
-			name:   "all are returned, ordered by input",
-			tokens: []common.Address{usdcTokenAddress, linkTokenAddress},
-			expectedValue: []expectedToken{
-				{price: usdcTokenPrice},
-				{price: linkTokenPrice},
+			name:   "duplicates are ignored",
+			tokens: []common.Address{linkTokenAddress, usdcTokenAddress, linkTokenAddress, usdcTokenAddress},
+			expectedValue: map[common.Address]expectedToken{
+				linkTokenAddress: {price: linkTokenPrice},
+				usdcTokenAddress: {price: usdcTokenPrice},
 			},
 		},
 		{
 			name:   "ask a non-existent price",
-			tokens: []common.Address{utils.RandomAddress()},
-			expectedValue: []expectedToken{
-				{price: nil, err: true},
+			tokens: []common.Address{notExistingToken},
+			expectedValue: map[common.Address]expectedToken{
+				notExistingToken: {price: nil, err: true},
 			},
 		},
 		{
 			name:   "ask only one price",
 			tokens: []common.Address{linkTokenAddress},
-			expectedValue: []expectedToken{
-				{price: linkTokenPrice},
+			expectedValue: map[common.Address]expectedToken{
+				linkTokenAddress: {price: linkTokenPrice},
 			},
 		},
 		{
 			name:          "empty input returns empty result set",
 			tokens:        []common.Address{},
-			expectedValue: []expectedToken{},
+			expectedValue: map[common.Address]expectedToken{},
 		},
 	}
 
@@ -197,9 +198,9 @@ func TestParsingDifferentFormats(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, prices, 1)
 
-			tokenPriceResult := prices[0]
+			tokenPriceResult := prices[address]
+			require.NotNil(t, tokenPriceResult)
 			assert.Equal(t, tokenPriceResult.Price, tt.expectedValue)
-			assert.Equal(t, tokenPriceResult.TokenAddress, address)
 			assert.Equal(t, tokenPriceResult.Error != nil, tt.expectedError)
 		})
 	}

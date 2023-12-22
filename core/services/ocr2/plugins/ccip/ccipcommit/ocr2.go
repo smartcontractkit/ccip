@@ -213,12 +213,10 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	queryTokens := ccipcommon.FlattenUniqueSlice([]common.Address{r.sourceNative}, destTokens)
 	sort.Slice(queryTokens, func(i, j int) bool { return queryTokens[i].String() < queryTokens[j].String() }) // make the query deterministic
 
-	tokenPricesResults, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
+	rawTokenPricesUSD, err := r.priceGetter.TokenPricesUSD(ctx, queryTokens)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	rawTokenPricesUSD := pricegetter.PriceResultsToMapSkipErrors(lggr, tokenPricesResults)
 	lggr.Infow("Raw token prices", "rawTokenPrices", rawTokenPricesUSD)
 
 	sourceNativePriceUSD, exists := rawTokenPricesUSD[r.sourceNative]
@@ -231,12 +229,21 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 		return nil, nil, fmt.Errorf("get tokens decimals: %w", err)
 	}
 
+	// We don't want to fail in case of spotting missing token, but rather log it. This should make CCIP more resilient.
+	// Therefore, we want to publish as many prices as we get from PriceGetter without interrupting processing.
+	// Exec will skip messages containing those tokens until they are successfully published to PriceRegistry
 	tokenPricesUSD = make(map[common.Address]*big.Int, len(rawTokenPricesUSD))
 	for i, token := range destTokens {
-		if _, exist := rawTokenPricesUSD[token]; !exist {
+		tokenPriceUSD, exist := rawTokenPricesUSD[token]
+		if !exist {
+			lggr.Errorw("missing token price", "token", token.String())
 			continue
 		}
-		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token], destTokensDecimals[i])
+		if tokenPriceUSD.Error != nil {
+			lggr.Errorw("error when fetching token price", "token", token.String(), "error", tokenPriceUSD.Error)
+			continue
+		}
+		tokenPricesUSD[token] = calculateUsdPer1e18TokenAmount(rawTokenPricesUSD[token].Price, destTokensDecimals[i])
 	}
 
 	sourceGasPrice, err := r.gasPriceEstimator.GetGasPrice(ctx)
@@ -246,13 +253,13 @@ func (r *CommitReportingPlugin) generatePriceUpdates(
 	if sourceGasPrice == nil {
 		return nil, nil, errors.Errorf("missing gas price")
 	}
-	sourceGasPriceUSD, err = r.gasPriceEstimator.DenoteInUSD(sourceGasPrice, sourceNativePriceUSD)
+	sourceGasPriceUSD, err = r.gasPriceEstimator.DenoteInUSD(sourceGasPrice, sourceNativePriceUSD.Price)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	lggr.Infow("Observing gas price", "observedGasPriceWei", sourceGasPrice, "observedGasPriceUSD", sourceGasPriceUSD)
-	lggr.Infow("Observing token prices", "tokenPrices", tokenPricesUSD, "sourceNativePriceUSD", sourceNativePriceUSD)
+	lggr.Infow("Observing token prices", "tokenPrices", tokenPricesUSD, "sourceNativePriceUSD", sourceNativePriceUSD.Price)
 	return sourceGasPriceUSD, tokenPricesUSD, nil
 }
 

@@ -57,7 +57,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 		epochAndRound       types.ReportTimestamp
 		commitStoreIsPaused bool
 		commitStoreSeqNum   uint64
-		tokenPrices         []pricegetter.TokenPriceResult
+		tokenPrices         map[common.Address]pricegetter.TokenPriceResult
 		sendReqs            []ccipdata.Event[internal.EVM2EVMMessage]
 		tokenDecimals       map[common.Address]uint8
 		fee                 *big.Int
@@ -68,9 +68,9 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 		{
 			name:              "base report",
 			commitStoreSeqNum: 54,
-			tokenPrices: []pricegetter.TokenPriceResult{
-				{TokenAddress: someTokenAddr, Price: big.NewInt(2)},
-				{TokenAddress: sourceNativeTokenAddr, Price: sourceNativeTokenPrice},
+			tokenPrices: map[common.Address]pricegetter.TokenPriceResult{
+				someTokenAddr:         {Price: big.NewInt(2)},
+				sourceNativeTokenAddr: {Price: sourceNativeTokenPrice},
 			},
 			sendReqs: []ccipdata.Event[internal.EVM2EVMMessage]{
 				{Data: internal.EVM2EVMMessage{SequenceNumber: 54}},
@@ -979,7 +979,7 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 		name                 string
 		tokenDecimals        map[common.Address]uint8
 		sourceNativeToken    common.Address
-		priceGetterRespData  []pricegetter.TokenPriceResult
+		priceGetterRespData  map[common.Address]pricegetter.TokenPriceResult
 		priceGetterRespErr   error
 		feeEstimatorRespFee  prices.GasPrice
 		feeEstimatorRespErr  error
@@ -995,9 +995,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: []pricegetter.TokenPriceResult{
-				{TokenAddress: tokens[0], Price: val1e18(100)},
-				{TokenAddress: tokens[1], Price: val1e18(200)},
+			priceGetterRespData: map[common.Address]pricegetter.TokenPriceResult{
+				tokens[0]: {Price: val1e18(100)},
+				tokens[1]: {Price: val1e18(200)},
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(10),
@@ -1028,8 +1028,8 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: []pricegetter.TokenPriceResult{
-				{TokenAddress: tokens[0], Price: val1e18(100)},
+			priceGetterRespData: map[common.Address]pricegetter.TokenPriceResult{
+				tokens[0]: {Price: val1e18(100)},
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(10),
@@ -1047,9 +1047,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[2],
-			priceGetterRespData: []pricegetter.TokenPriceResult{
-				{TokenAddress: tokens[0], Price: val1e18(100)},
-				{TokenAddress: tokens[1], Price: val1e18(200)},
+			priceGetterRespData: map[common.Address]pricegetter.TokenPriceResult{
+				tokens[0]: {Price: val1e18(100)},
+				tokens[1]: {Price: val1e18(200)},
 			},
 			priceGetterRespErr: nil,
 			expErr:             true,
@@ -1061,9 +1061,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: []pricegetter.TokenPriceResult{
-				{TokenAddress: tokens[0], Price: val1e18(100)},
-				{TokenAddress: tokens[1], Price: val1e18(200)},
+			priceGetterRespData: map[common.Address]pricegetter.TokenPriceResult{
+				tokens[0]: {Price: val1e18(100)},
+				tokens[1]: {Price: val1e18(200)},
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(10),
@@ -1083,9 +1083,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: []pricegetter.TokenPriceResult{
-				{TokenAddress: tokens[0], Price: val1e18(100)},
-				{TokenAddress: tokens[1], Price: val1e18(200)},
+			priceGetterRespData: map[common.Address]pricegetter.TokenPriceResult{
+				tokens[0]: {Price: val1e18(100)},
+				tokens[1]: {Price: val1e18(200)},
 			},
 			priceGetterRespErr:   nil,
 			feeEstimatorRespFee:  big.NewInt(20),
@@ -1105,9 +1105,9 @@ func TestCommitReportingPlugin_generatePriceUpdates(t *testing.T) {
 				tokens[1]: 18,
 			},
 			sourceNativeToken: tokens[0],
-			priceGetterRespData: []pricegetter.TokenPriceResult{
-				{TokenAddress: tokens[0], Price: val1e18(100)},
-				{TokenAddress: tokens[1], Price: val1e18(200)},
+			priceGetterRespData: map[common.Address]pricegetter.TokenPriceResult{
+				tokens[0]: {Price: val1e18(100)},
+				tokens[1]: {Price: val1e18(200)},
 			},
 			feeEstimatorRespFee: nil,
 			maxGasPrice:         1e18,

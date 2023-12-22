@@ -41,7 +41,7 @@ func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, exter
 	}, nil
 }
 
-func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) ([]TokenPriceResult, error) {
+func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]TokenPriceResult, error) {
 	_, trrs, err := d.runner.ExecuteRun(ctx, pipeline.Spec{
 		ID:           d.jobID,
 		DotDagSource: d.source,
@@ -74,27 +74,21 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Add
 			castedPrice, err1 := parseutil.ParseBigIntFromAny(rawPrice)
 
 			tokenPrices[tokenAddress] = TokenPriceResult{
-				TokenAddress: tokenAddress,
-				Price:        castedPrice,
-				Error:        err1,
+				Price: castedPrice,
+				Error: err1,
 			}
 		}
 	}
 
 	// Make sure that not found tokens are also returned with an error.
-	// All tokens should be returned in the same order as they were provided.
-	results := make([]TokenPriceResult, len(tokens))
-	for i, token := range tokens {
-		result, exist := tokenPrices[token]
-		if !exist {
-			results[i] = TokenPriceResult{
-				TokenAddress: token,
-				Error:        errors.Errorf("token price not found in spec"),
-			}
-		} else {
-			results[i] = result
+	for _, token := range tokens {
+		if _, exist := tokenPrices[token]; exist {
+			continue
+		}
+		tokenPrices[token] = TokenPriceResult{
+			Error: errors.Errorf("token price not found in spec"),
 		}
 	}
 
-	return results, nil
+	return tokenPrices, nil
 }

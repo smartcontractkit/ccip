@@ -16,23 +16,23 @@ type MockPriceGetter struct {
 }
 
 // TokenPricesUSD provides a mock function with given fields: ctx, tokens
-func (_m *MockPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) ([]TokenPriceResult, error) {
+func (_m *MockPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]TokenPriceResult, error) {
 	ret := _m.Called(ctx, tokens)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TokenPricesUSD")
 	}
 
-	var r0 []TokenPriceResult
+	var r0 map[common.Address]TokenPriceResult
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) ([]TokenPriceResult, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) (map[common.Address]TokenPriceResult, error)); ok {
 		return rf(ctx, tokens)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) []TokenPriceResult); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) map[common.Address]TokenPriceResult); ok {
 		r0 = rf(ctx, tokens)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]TokenPriceResult)
+			r0 = ret.Get(0).(map[common.Address]TokenPriceResult)
 		}
 	}
 
