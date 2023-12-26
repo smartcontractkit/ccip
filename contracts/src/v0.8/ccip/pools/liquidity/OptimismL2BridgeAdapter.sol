@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IL2Bridge} from "./IBridge.sol";
+import {IL2Bridge} from "./interfaces/IBridge.sol";
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
 import {L2StandardBridge} from "@eth-optimism/contracts/L2/messaging/L2StandardBridge.sol";

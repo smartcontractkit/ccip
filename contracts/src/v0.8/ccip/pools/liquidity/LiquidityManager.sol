@@ -1,21 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {OwnerIsCreator} from "../../../shared/access/OwnerIsCreator.sol";
+import {IBridge} from "./interfaces/IBridge.sol";
+import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
+import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
 
-import {IBridge} from "./IBridge.sol";
+import {OCR3Base} from "../../ocr/OCR3Base.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @notice Interface for a liquidity container, this can be a CCIP token pool.
-interface ILiquidityContainer {
-  function provideLiquidity(uint256 amount) external;
-
-  function withdrawLiquidity(uint256 amount) external;
-}
-
-contract LiquidityManager is OwnerIsCreator {
+contract LiquidityManager is ILiquidityManager, OCR3Base {
   using SafeERC20 for IERC20;
 
   error CannotBeZero();
@@ -26,17 +21,20 @@ contract LiquidityManager is OwnerIsCreator {
   event LiquidityTransferred(
     uint64 indexed fromChainSelector,
     uint64 indexed toChainSelector,
-    ILiquidityContainer indexed to,
+    address indexed to,
     uint256 amount
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
 
   struct CrossChainLiquidityContainer {
-    ILiquidityContainer liquidityContainer;
+    address liquidityContainer;
     IBridge bridge;
     // Potentially some fields related to the bridge
   }
+
+  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
+  string public constant override typeAndVersion = "LiquidityManager 1.3.0-dev";
 
   /// @notice The token that this pool manages liquidity for.
   IERC20 public immutable i_localToken;
@@ -56,7 +54,7 @@ contract LiquidityManager is OwnerIsCreator {
   /// between pre-approved locations. Only the owner can remove liquidity.
   address private s_liquidityManager;
 
-  constructor(IERC20 token, uint64 localChainSelector, address liquidityManager) {
+  constructor(IERC20 token, uint64 localChainSelector, address liquidityManager) OCR3Base(false) {
     if (address(token) == address(0) || localChainSelector == 0) {
       revert CannotBeZero();
     }
@@ -69,19 +67,28 @@ contract LiquidityManager is OwnerIsCreator {
   // │                    Liquidity management                      │
   // ================================================================
 
+  /// @inheritdoc ILiquidityManager
+  function getLiquidity() public view returns (uint256 currentLiquidity) {
+    return i_localToken.balanceOf(address(s_localLiquidityContainer));
+  }
+
   function rebalanceLiquidity(uint64 chainSelector, uint256 amount) external {
     // Ensure only the owner and the liquidity manager can transfer liquidity
     if (msg.sender != s_liquidityManager && msg.sender != owner()) {
       revert Unauthorized(msg.sender);
     }
 
-    uint256 currentBalance = i_localToken.balanceOf(address(s_localLiquidityContainer));
+    _rebalanceLiquidity(chainSelector, amount);
+  }
+
+  function _rebalanceLiquidity(uint64 chainSelector, uint256 amount) internal {
+    uint256 currentBalance = getLiquidity();
     if (currentBalance < amount) {
       revert InsufficientLiquidity(amount, currentBalance);
     }
 
-    ILiquidityContainer destChainAddress = s_crossChainLiquidityContainers[chainSelector].liquidityContainer;
-    if (address(destChainAddress) == address(0)) {
+    address destChainAddress = s_crossChainLiquidityContainers[chainSelector].liquidityContainer;
+    if (destChainAddress == address(0)) {
       revert InvalidDestinationChain(chainSelector);
     }
 
@@ -92,9 +99,16 @@ contract LiquidityManager is OwnerIsCreator {
     emit LiquidityTransferred(i_localChainSelector, chainSelector, destChainAddress, amount);
   }
 
+  function _receiveLiquidity(uint64 chainSelector, uint256 amount, bytes memory bridgeData) internal {
+    // TODO
+  }
+
   /// @notice Adds liquidity to the multi-chain system.
   /// @dev Anyone can call this function, but anyone other than the owner should regard
   /// adding liquidity as a donation to the system, as there is no way to get it out.
+  /// This function is open to anyone to be able to quickly add funds to the system
+  /// without having to go through potentially complicated multisig schemes to do it from
+  /// the owner address.
   function addLiquidity(uint256 amount) external {
     i_localToken.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -120,6 +134,32 @@ contract LiquidityManager is OwnerIsCreator {
     i_localToken.safeTransfer(msg.sender, amount);
 
     emit LiquidityRemoved(msg.sender, amount);
+  }
+
+  function _report(bytes calldata report, uint40) internal override {
+    ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(
+      report,
+      (ILiquidityManager.LiquidityInstructions)
+    );
+
+    uint256 sendInstructions = instructions.sendLiquidityParams.length;
+    for (uint256 i = 0; i < sendInstructions; ++i) {
+      _rebalanceLiquidity(
+        instructions.sendLiquidityParams[i].destChainSelector,
+        instructions.sendLiquidityParams[i].amount
+      );
+    }
+
+    uint256 receiveInstructions = instructions.receiveLiquidityParams.length;
+    for (uint256 i = 0; i < receiveInstructions; ++i) {
+      _receiveLiquidity(
+        instructions.receiveLiquidityParams[i].sourceChainSelector,
+        instructions.receiveLiquidityParams[i].amount,
+        instructions.receiveLiquidityParams[i].bridgeData
+      );
+    }
+
+    // todo emit?
   }
 
   // ================================================================
