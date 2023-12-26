@@ -54,7 +54,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// between pre-approved locations. Only the owner can remove liquidity.
   address private s_liquidityManager;
 
-  constructor(IERC20 token, uint64 localChainSelector, address liquidityManager) OCR3Base(false) {
+  constructor(IERC20 token, uint64 localChainSelector, address liquidityManager) OCR3Base() {
     if (address(token) == address(0) || localChainSelector == 0) {
       revert CannotBeZero();
     }
@@ -136,7 +136,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     emit LiquidityRemoved(msg.sender, amount);
   }
 
-  function _report(bytes calldata report, uint40) internal override {
+  function _report(bytes calldata report, uint64) internal override {
     ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(
       report,
       (ILiquidityManager.LiquidityInstructions)

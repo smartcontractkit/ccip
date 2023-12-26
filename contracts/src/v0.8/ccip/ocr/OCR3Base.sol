@@ -2,12 +2,12 @@
 pragma solidity ^0.8.0;
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
-import {OCR2Abstract} from "./OCR2Abstract.sol";
+import {OCR3Abstract} from "./OCR3Abstract.sol";
 
 /// @notice Onchain verification of reports from the offchain reporting protocol
 /// @dev For details on its operation, see the offchain reporting protocol design
 /// doc, which refers to this contract as simply the "contract".
-abstract contract OCR3Base is OwnerIsCreator, OCR2Abstract {
+abstract contract OCR3Base is OwnerIsCreator, OCR3Abstract {
   error InvalidConfig(string message);
   error WrongMessageLength(uint256 expected, uint256 actual);
   error ConfigDigestMismatch(bytes32 expected, bytes32 actual);
@@ -18,6 +18,7 @@ abstract contract OCR3Base is OwnerIsCreator, OCR2Abstract {
   error UnauthorizedSigner();
   error NonUniqueSignatures();
   error OracleCannotBeZeroAddress();
+  error NonIncreasingSequenceNumber(uint64 sequenceNumber, uint64 latestSequenceNumber);
 
   // Packing these fields used on the hot path in a ConfigInfo variable reduces the
   // retrieval of all of them to a minimum number of SLOADs.
@@ -36,7 +37,7 @@ abstract contract OCR3Base is OwnerIsCreator, OCR2Abstract {
     // signatures from this oracle should ecrecover back to address a.
     Signer,
     // Transmission address for the s_oracles[a].index'th oracle. I.e., if a
-    // report is received by OCR2Aggregator.transmit in which msg.sender is
+    // report is received by OCR3Aggregator.transmit in which msg.sender is
     // a, it is attributed to the s_oracles[a].index'th oracle.
     Transmitter
   }
@@ -54,6 +55,8 @@ abstract contract OCR3Base is OwnerIsCreator, OCR2Abstract {
   uint32 internal s_configCount;
   // makes it easier for offchain systems to extract config from logs.
   uint32 internal s_latestConfigBlockNumber;
+
+  uint64 internal s_latestSequenceNumber;
 
   // signer OR transmitter address
   mapping(address signerOrTransmitter => Oracle oracle) internal s_oracles;
@@ -80,11 +83,9 @@ abstract contract OCR3Base is OwnerIsCreator, OCR2Abstract {
       32 + // word containing length rs
       32; // word containing length of ss
 
-  bool internal immutable i_uniqueReports;
   uint256 internal immutable i_chainID;
 
-  constructor(bool uniqueReports) {
-    i_uniqueReports = uniqueReports;
+  constructor() {
     i_chainID = block.chainid;
   }
 
@@ -108,7 +109,7 @@ abstract contract OCR3Base is OwnerIsCreator, OCR2Abstract {
   /// @param onchainConfig encoded on-chain contract configuration
   /// @param offchainConfigVersion version number for offchainEncoding schema
   /// @param offchainConfig encoded off-chain oracle configuration
-  function setOCR2Config(
+  function setOCR3Config(
     address[] memory signers,
     address[] memory transmitters,
     uint8 f,
@@ -170,7 +171,7 @@ abstract contract OCR3Base is OwnerIsCreator, OCR2Abstract {
     );
   }
 
-  /// @dev Hook that is run from setOCR2Config() right after validating configuration.
+  /// @dev Hook that is run from setOCR3Config() right after validating configuration.
   /// Empty by default, please provide an implementation in a child contract if you need additional configuration processing
   function _beforeSetConfig(bytes memory _onchainConfig) internal virtual {}
 
@@ -194,35 +195,34 @@ abstract contract OCR3Base is OwnerIsCreator, OCR2Abstract {
     bytes32[] calldata ss,
     bytes32 rawVs // signatures
   ) external override {
-    // Scoping this reduces stack pressure and gas usage
-    {
-      // report and epochAndRound
-      _report(report, uint40(uint256(reportContext[1])));
+    uint64 sequenceNumber = uint64(uint256(reportContext[1]));
+    if (sequenceNumber <= s_latestSequenceNumber) {
+      revert NonIncreasingSequenceNumber(sequenceNumber, s_latestSequenceNumber);
     }
 
+    // Scoping this reduces stack pressure and gas usage
+    {
+      _report(report, sequenceNumber);
+    }
+
+    s_latestSequenceNumber = sequenceNumber;
     // reportContext consists of:
     // reportContext[0]: ConfigDigest
-    // reportContext[1]: 27 byte padding, 4-byte epoch and 1-byte round
-    // reportContext[2]: ExtraHash
+    // reportContext[1]: 24 byte padding, 8 byte sequence number
     bytes32 configDigest = reportContext[0];
     ConfigInfo memory configInfo = s_configInfo;
 
-    if (configInfo.latestConfigDigest != configDigest)
+    if (configInfo.latestConfigDigest != configDigest) {
       revert ConfigDigestMismatch(configInfo.latestConfigDigest, configDigest);
+    }
     // If the cached chainID at time of deployment doesn't match the current chainID, we reject all signed reports.
     // This avoids a (rare) scenario where chain A forks into chain A and A', A' still has configDigest
     // calculated from chain A and so OCR reports will be valid on both forks.
     if (i_chainID != block.chainid) revert ForkedChain(i_chainID, block.chainid);
 
-    emit Transmitted(configDigest, uint32(uint256(reportContext[1]) >> 8));
+    emit Transmitted(configDigest, sequenceNumber);
 
-    uint256 expectedNumSignatures;
-    if (i_uniqueReports) {
-      expectedNumSignatures = (configInfo.n + configInfo.f) / 2 + 1;
-    } else {
-      expectedNumSignatures = configInfo.f + 1;
-    }
-    if (rs.length != expectedNumSignatures) revert WrongNumberOfSignatures();
+    if (rs.length != configInfo.f + 1) revert WrongNumberOfSignatures();
     if (rs.length != ss.length) revert SignaturesOutOfRegistration();
 
     // Scoping this reduces stack pressure and gas usage
@@ -273,16 +273,16 @@ abstract contract OCR3Base is OwnerIsCreator, OCR2Abstract {
     return (s_configCount, s_latestConfigBlockNumber, s_configInfo.latestConfigDigest);
   }
 
-  /// @inheritdoc OCR2Abstract
+  /// @inheritdoc OCR3Abstract
   function latestConfigDigestAndEpoch()
     external
     view
     virtual
     override
-    returns (bool scanLogs, bytes32 configDigest, uint32 epoch)
+    returns (bool scanLogs, bytes32 configDigest, uint64 sequenceNumber)
   {
-    return (true, bytes32(0), uint32(0));
+    return (true, s_configInfo.latestConfigDigest, s_latestSequenceNumber);
   }
 
-  function _report(bytes calldata report, uint40 epochAndRound) internal virtual;
+  function _report(bytes calldata report, uint64 sequenceNumber) internal virtual;
 }
