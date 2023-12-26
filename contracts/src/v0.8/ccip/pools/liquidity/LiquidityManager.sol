@@ -15,7 +15,6 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
 
   error CannotBeZero();
   error InvalidDestinationChain(uint64 chainSelector);
-  error Unauthorized(address caller);
   error InsufficientLiquidity(uint256 requested, uint256 available);
 
   event LiquidityTransferred(
@@ -27,9 +26,17 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
 
-  struct CrossChainLiquidityContainer {
-    address liquidityContainer;
+  struct CrossChainLiquidityManagerArgs {
+    address destLiquidityManager;
     IBridge bridge;
+    uint64 destChainSelector;
+    bool enabled;
+  }
+
+  struct CrossChainLiquidityManager {
+    address destLiquidityManager;
+    IBridge bridge;
+    bool enabled;
     // Potentially some fields related to the bridge
   }
 
@@ -43,24 +50,19 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   uint64 internal immutable i_localChainSelector;
 
   /// @notice Mapping of chain selector to liquidity container on other chains
-  mapping(uint64 chainSelector => CrossChainLiquidityContainer) private s_crossChainLiquidityContainers;
+  mapping(uint64 chainSelector => CrossChainLiquidityManager) private s_crossChainLiquidityContainers;
 
   /// @notice The liquidity container on the local chain
   /// @dev In the case of CCIP, this would be the token pool.
   ILiquidityContainer private s_localLiquidityContainer;
 
-  /// @notice The address that is allowed to call rebalanceLiquidity
-  /// @dev This address cannot withdraw liquidity from the system, only rebalance it
-  /// between pre-approved locations. Only the owner can remove liquidity.
-  address private s_liquidityManager;
-
-  constructor(IERC20 token, uint64 localChainSelector, address liquidityManager) OCR3Base() {
+  constructor(IERC20 token, uint64 localChainSelector, ILiquidityContainer localLiquidityContainer) OCR3Base() {
     if (address(token) == address(0) || localChainSelector == 0) {
       revert CannotBeZero();
     }
     i_localToken = token;
     i_localChainSelector = localChainSelector;
-    s_liquidityManager = liquidityManager;
+    s_localLiquidityContainer = localLiquidityContainer;
   }
 
   // ================================================================
@@ -72,12 +74,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     return i_localToken.balanceOf(address(s_localLiquidityContainer));
   }
 
-  function rebalanceLiquidity(uint64 chainSelector, uint256 amount) external {
-    // Ensure only the owner and the liquidity manager can transfer liquidity
-    if (msg.sender != s_liquidityManager && msg.sender != owner()) {
-      revert Unauthorized(msg.sender);
-    }
-
+  function rebalanceLiquidity(uint64 chainSelector, uint256 amount) external onlyOwner {
     _rebalanceLiquidity(chainSelector, amount);
   }
 
@@ -87,7 +84,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       revert InsufficientLiquidity(amount, currentBalance);
     }
 
-    address destChainAddress = s_crossChainLiquidityContainers[chainSelector].liquidityContainer;
+    address destChainAddress = s_crossChainLiquidityContainers[chainSelector].destLiquidityManager;
     if (destChainAddress == address(0)) {
       revert InvalidDestinationChain(chainSelector);
     }
@@ -127,10 +124,6 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     }
 
     s_localLiquidityContainer.withdrawLiquidity(amount);
-
-    // Do we want to send to the msg.sender/owner or do we want a 2-phase withdraw?
-    // 2 phase would be safer if the multisig doesn't want to have tokens and we
-    // need to send to a different address.
     i_localToken.safeTransfer(msg.sender, amount);
 
     emit LiquidityRemoved(msg.sender, amount);
@@ -167,4 +160,17 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   // ================================================================
 
   // TODO
+
+  function setCrossChainLiquidityManager(
+    CrossChainLiquidityManagerArgs[] calldata crossChainLiquidityManagers
+  ) external onlyOwner {
+    for (uint256 i = 0; i < crossChainLiquidityManagers.length; ++i) {
+      CrossChainLiquidityManagerArgs calldata args = crossChainLiquidityManagers[i];
+      s_crossChainLiquidityContainers[args.destChainSelector] = CrossChainLiquidityManager({
+        destLiquidityManager: args.destLiquidityManager,
+        bridge: args.bridge,
+        enabled: args.enabled
+      });
+    }
+  }
 }
