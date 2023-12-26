@@ -4,12 +4,20 @@ pragma solidity 0.8.19;
 import {IL2Bridge} from "./interfaces/IBridge.sol";
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
-import {L2GatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/arbitrum/gateway/L2GatewayRouter.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface IArbSys {
   function withdrawEth(address destination) external payable returns (uint256);
+}
+
+interface IL2GatewayRouter {
+  function outboundTransfer(
+    address l1Token,
+    address to,
+    uint256 amount,
+    bytes calldata data
+  ) external payable returns (bytes memory);
 }
 
 /// @notice Arbitrum L2 Bridge adapter
@@ -39,8 +47,4 @@ contract ArbitrumL2BridgeAdapter is IL2Bridge {
   function depositNativeToL1(address recipient) external payable {
     ARB_SYS.withdrawEth{value: msg.value}(recipient);
   }
-}
-
-interface IL2GatewayRouter {
-  function outboundTransfer(address l1Token, address to, uint256 amount, bytes calldata data) external;
 }
