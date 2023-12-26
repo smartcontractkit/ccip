@@ -45,7 +45,7 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
       memory args = new LiquidityManager.CrossChainLiquidityManagerArgs[](1);
     args[0] = LiquidityManager.CrossChainLiquidityManagerArgs({
       destLiquidityManager: address(s_liquidityManager),
-      bridge: IBridge(address(0)),
+      bridge: IBridge(address(123123123123)), // TODO real bridge
       destChainSelector: destChainSelector,
       enabled: true
     });

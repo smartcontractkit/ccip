@@ -13,8 +13,9 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 contract LiquidityManager is ILiquidityManager, OCR3Base {
   using SafeERC20 for IERC20;
 
-  error CannotBeZero();
+  error ZeroAddress();
   error InvalidDestinationChain(uint64 chainSelector);
+  error ZeroChainSelector();
   error InsufficientLiquidity(uint256 requested, uint256 available);
 
   event LiquidityTransferred(
@@ -57,8 +58,12 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   ILiquidityContainer private s_localLiquidityContainer;
 
   constructor(IERC20 token, uint64 localChainSelector, ILiquidityContainer localLiquidityContainer) OCR3Base() {
-    if (address(token) == address(0) || localChainSelector == 0) {
-      revert CannotBeZero();
+    if (localChainSelector == 0) {
+      revert ZeroChainSelector();
+    }
+
+    if (address(token) == address(0)) {
+      revert ZeroAddress();
     }
     i_localToken = token;
     i_localChainSelector = localChainSelector;
@@ -159,18 +164,43 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   // │                           Config                             │
   // ================================================================
 
-  // TODO
+  function getCrossChainLiquidityManager(
+    uint64 chainSelector
+  ) external view returns (CrossChainLiquidityManager memory) {
+    return s_crossChainLiquidityContainers[chainSelector];
+  }
 
   function setCrossChainLiquidityManager(
     CrossChainLiquidityManagerArgs[] calldata crossChainLiquidityManagers
   ) external onlyOwner {
     for (uint256 i = 0; i < crossChainLiquidityManagers.length; ++i) {
-      CrossChainLiquidityManagerArgs calldata args = crossChainLiquidityManagers[i];
-      s_crossChainLiquidityContainers[args.destChainSelector] = CrossChainLiquidityManager({
-        destLiquidityManager: args.destLiquidityManager,
-        bridge: args.bridge,
-        enabled: args.enabled
-      });
+      setCrossChainLiquidityManager(crossChainLiquidityManagers[i]);
     }
+  }
+
+  function setCrossChainLiquidityManager(
+    CrossChainLiquidityManagerArgs calldata crossChainLiqManager
+  ) public onlyOwner {
+    if (crossChainLiqManager.destChainSelector == 0) {
+      revert ZeroChainSelector();
+    }
+
+    if (crossChainLiqManager.destLiquidityManager == address(0) || address(crossChainLiqManager.bridge) == address(0)) {
+      revert ZeroAddress();
+    }
+
+    s_crossChainLiquidityContainers[crossChainLiqManager.destChainSelector] = CrossChainLiquidityManager({
+      destLiquidityManager: crossChainLiqManager.destLiquidityManager,
+      bridge: crossChainLiqManager.bridge,
+      enabled: crossChainLiqManager.enabled
+    });
+  }
+
+  function getLocalLiquidityContainer() external view returns (address) {
+    return address(s_localLiquidityContainer);
+  }
+
+  function setLocalLiquidityContainer(ILiquidityContainer localLiquidityContainer) external onlyOwner {
+    s_localLiquidityContainer = localLiquidityContainer;
   }
 }
