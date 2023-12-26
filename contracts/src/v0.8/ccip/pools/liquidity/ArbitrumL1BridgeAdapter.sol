@@ -39,8 +39,7 @@ contract ArbitrumL1BridgeAdapter is IL1Bridge {
     i_l1ERC20Gateway = l1ERC20Gateway;
   }
 
-  /// @inheritdoc IL1Bridge
-  function depositERC20ToL2(address l1Token, address, address recipient, uint256 amount) external payable {
+  function sendERC20(address l1Token, address, address recipient, uint256 amount) external payable {
     IERC20(l1Token).safeTransferFrom(msg.sender, address(this), amount);
 
     IERC20(l1Token).approve(i_l1ERC20Gateway, amount);

@@ -41,7 +41,6 @@ contract ArbitrumL1BridgeAdapterSetup is Test {
     vm.startPrank(OWNER);
 
     mainnetFork = vm.createFork(MAINNET_RPC_URL);
-    arbitrumFork = vm.createFork(ARBITRUM_RPC_URL);
 
     vm.selectFork(mainnetFork);
     s_l1BridgeAdapter = new ArbitrumL1BridgeAdapter(
@@ -59,10 +58,10 @@ contract ArbitrumL1BridgeAdapterSetup is Test {
   }
 }
 
-contract ArbitrumL1BridgeAdapter_depositERC20ToL2 is ArbitrumL1BridgeAdapterSetup {
+contract ArbitrumL1BridgeAdapter_sendERC20 is ArbitrumL1BridgeAdapterSetup {
   event TransferRouted(address indexed token, address indexed _userFrom, address indexed _userTo, address gateway);
 
-  function test_depositERC20ToL2Success() public {
+  function test_sendERC20Success() public {
     L1_LINK.approve(address(s_l1BridgeAdapter), TOKEN_BALANCE);
 
     vm.expectEmit();
@@ -72,7 +71,7 @@ contract ArbitrumL1BridgeAdapter_depositERC20ToL2 is ArbitrumL1BridgeAdapterSetu
       s_l1BridgeAdapter.GAS_PRICE_BID() +
       s_l1BridgeAdapter.MAX_SUBMISSION_COST();
 
-    s_l1BridgeAdapter.depositERC20ToL2{value: expectedCost}(address(L1_LINK), OWNER, OWNER, TOKEN_BALANCE);
+    s_l1BridgeAdapter.sendERC20{value: expectedCost}(address(L1_LINK), OWNER, OWNER, TOKEN_BALANCE);
   }
 
   function test_BridgeFeeTooLowReverts() public {
@@ -85,7 +84,7 @@ contract ArbitrumL1BridgeAdapter_depositERC20ToL2 is ArbitrumL1BridgeAdapterSetu
       abi.encodeWithSelector(ArbitrumL1BridgeAdapter.InsufficientEthValue.selector, expectedCost, expectedCost - 1)
     );
 
-    s_l1BridgeAdapter.depositERC20ToL2{value: expectedCost - 1}(address(L1_LINK), OWNER, OWNER, TOKEN_BALANCE);
+    s_l1BridgeAdapter.sendERC20{value: expectedCost - 1}(address(L1_LINK), OWNER, OWNER, TOKEN_BALANCE);
   }
 
   function test_noApprovalReverts() public {
@@ -95,6 +94,6 @@ contract ArbitrumL1BridgeAdapter_depositERC20ToL2 is ArbitrumL1BridgeAdapterSetu
 
     vm.expectRevert("SafeERC20: low-level call failed");
 
-    s_l1BridgeAdapter.depositERC20ToL2{value: expectedCost}(address(L1_LINK), OWNER, OWNER, TOKEN_BALANCE);
+    s_l1BridgeAdapter.sendERC20{value: expectedCost}(address(L1_LINK), OWNER, OWNER, TOKEN_BALANCE);
   }
 }

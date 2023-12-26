@@ -30,7 +30,7 @@ contract ArbitrumL2BridgeAdapter is IL2Bridge {
     i_l2GatewayRouter = l2GatewayRouter;
   }
 
-  function depositERC20ToL1(address l1Token, address l2Token, address recipient, uint256 amount) external {
+  function sendERC20(address l1Token, address l2Token, address recipient, uint256 amount) external payable {
     IERC20(l2Token).safeTransferFrom(msg.sender, address(this), amount);
 
     i_l2GatewayRouter.outboundTransfer(l1Token, recipient, amount, bytes(""));

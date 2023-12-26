@@ -24,7 +24,7 @@ contract OptimismL2BridgeAdapter is IL2Bridge {
     i_wrappedNative = wrappedNative;
   }
 
-  function depositERC20ToL1(address, address l2Token, address recipient, uint256 amount) external {
+  function sendERC20(address, address l2Token, address recipient, uint256 amount) external payable {
     IERC20(l2Token).safeTransferFrom(msg.sender, address(this), amount);
 
     // If the token is the wrapped native, we unwrap it and deposit native

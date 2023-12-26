@@ -42,10 +42,10 @@ contract ArbitrumL2BridgeAdapterSetup is Test {
   }
 }
 
-contract ArbitrumL2BridgeAdapter_depositERC20ToL2 is ArbitrumL2BridgeAdapterSetup {
-  function test_depositERC20ToL2Success() public {
+contract ArbitrumL2BridgeAdapter_sendERC20 is ArbitrumL2BridgeAdapterSetup {
+  function test_sendERC20Success() public {
     L2_LINK.approve(address(s_l2BridgeAdapter), TOKEN_BALANCE);
 
-    s_l2BridgeAdapter.depositERC20ToL1(address(L1_LINK), address(L2_LINK), OWNER, TOKEN_BALANCE);
+    s_l2BridgeAdapter.sendERC20(address(L1_LINK), address(L2_LINK), OWNER, TOKEN_BALANCE);
   }
 }

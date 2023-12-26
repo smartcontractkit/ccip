@@ -26,14 +26,14 @@ contract LiquidityManager is OwnerIsCreator {
   event LiquidityTransferred(
     uint64 indexed fromChainSelector,
     uint64 indexed toChainSelector,
-    address indexed to,
+    ILiquidityContainer indexed to,
     uint256 amount
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
 
   struct CrossChainLiquidityContainer {
-    address liquidityContainer;
+    ILiquidityContainer liquidityContainer;
     IBridge bridge;
     // Potentially some fields related to the bridge
   }
@@ -80,8 +80,8 @@ contract LiquidityManager is OwnerIsCreator {
       revert InsufficientLiquidity(amount, currentBalance);
     }
 
-    address destChainAddress = s_crossChainLiquidityContainers[chainSelector].liquidityContainer;
-    if (destChainAddress == address(0)) {
+    ILiquidityContainer destChainAddress = s_crossChainLiquidityContainers[chainSelector].liquidityContainer;
+    if (address(destChainAddress) == address(0)) {
       revert InvalidDestinationChain(chainSelector);
     }
 
