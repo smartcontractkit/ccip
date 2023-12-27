@@ -4,12 +4,12 @@ pragma solidity ^0.8.0;
 interface ILiquidityManager {
   struct SendLiquidityParams {
     uint256 amount;
-    uint64 destChainSelector;
+    uint64 remoteChainSelector;
   }
 
   struct ReceiveLiquidityParams {
     uint256 amount;
-    uint64 sourceChainSelector;
+    uint64 remoteChainSelector;
     bytes bridgeData;
   }
 

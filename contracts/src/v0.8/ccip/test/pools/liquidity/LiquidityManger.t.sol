@@ -45,16 +45,16 @@ contract LiquidityManagerSetup is Test {
 contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
   function test_rebalanceLiquiditySuccess() external {
     uint256 amount = 12345679;
-    uint64 destChainSelector = 123;
+    uint64 remoteChainSelector = 123;
     deal(address(s_token), address(s_lockReleaseTokenPool), amount);
 
     LiquidityManager.CrossChainLiquidityManagerArgs[]
       memory args = new LiquidityManager.CrossChainLiquidityManagerArgs[](1);
     args[0] = LiquidityManager.CrossChainLiquidityManagerArgs({
-      destLiquidityManager: address(s_liquidityManager),
-      bridge: s_bridgeAdapter,
-      l2Token: i_l2Token,
-      destChainSelector: destChainSelector,
+      remoteLiquidityManager: address(s_liquidityManager),
+      localBridge: s_bridgeAdapter,
+      remoteToken: i_l2Token,
+      remoteChainSelector: remoteChainSelector,
       enabled: true
     });
     s_liquidityManager.setCrossChainLiquidityManager(args);
@@ -69,9 +69,9 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
     emit Transfer(address(s_liquidityManager), address(s_bridgeAdapter), amount);
 
     vm.expectEmit();
-    emit LiquidityTransferred(i_localChainSelector, destChainSelector, address(s_liquidityManager), amount);
+    emit LiquidityTransferred(i_localChainSelector, remoteChainSelector, address(s_liquidityManager), amount);
 
-    s_liquidityManager.rebalanceLiquidity(destChainSelector, amount);
+    s_liquidityManager.rebalanceLiquidity(remoteChainSelector, amount);
 
     assertEq(s_token.balanceOf(address(s_liquidityManager)), 0);
     assertEq(s_token.balanceOf(address(s_bridgeAdapter)), amount);
@@ -80,21 +80,21 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
 
   // Reverts
 
-  function test_InvalidDestinationChainReverts() external {
-    uint256 amount = 12345679;
-    uint64 destChainSelector = 123;
-    deal(address(s_token), address(s_lockReleaseTokenPool), amount);
-
-    vm.expectRevert(abi.encodeWithSelector(LiquidityManager.InvalidDestinationChain.selector, destChainSelector));
-
-    s_liquidityManager.rebalanceLiquidity(destChainSelector, amount);
-  }
-
   function test_InsufficientLiquidityReverts() external {
     uint256 amount = 1245;
 
     vm.expectRevert(abi.encodeWithSelector(LiquidityManager.InsufficientLiquidity.selector, amount, 0));
 
     s_liquidityManager.rebalanceLiquidity(0, amount);
+  }
+
+  function test_InvalidRemoteChainReverts() external {
+    uint256 amount = 12345679;
+    uint64 remoteChainSelector = 123;
+    deal(address(s_token), address(s_lockReleaseTokenPool), amount);
+
+    vm.expectRevert(abi.encodeWithSelector(LiquidityManager.InvalidRemoteChain.selector, remoteChainSelector));
+
+    s_liquidityManager.rebalanceLiquidity(remoteChainSelector, amount);
   }
 }

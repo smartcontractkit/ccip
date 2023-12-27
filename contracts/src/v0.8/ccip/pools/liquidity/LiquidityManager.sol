@@ -10,11 +10,22 @@ import {OCR3Base} from "../../ocr/OCR3Base.sol";
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
+/// @notice Liquidity manager for a single token over multiple chains.
+/// @dev This contract is designed to be used with the LockReleaseTokenPool contract but
+/// isn't constraint to it. It can be used with any contract that implements the ILiquidityContainer
+/// interface.
+/// @dev The OCR3 DON should only be able to transfer funds to other pre-approved contracts
+/// on other chains. Under no circumstances should it be able to transfer funds to arbitrary
+/// addresses. The owner is therefore in full control of the funds in this contract, not the DON.
+/// This is a security feature. The worst that can happen is that the DON can lock up funds in
+/// bridges, but it can't steal them.
+/// @dev References to local mean logic on the same chain as this contract is deployed on.
+/// References to remote mean logic on other chains.
 contract LiquidityManager is ILiquidityManager, OCR3Base {
   using SafeERC20 for IERC20;
 
   error ZeroAddress();
-  error InvalidDestinationChain(uint64 chainSelector);
+  error InvalidRemoteChain(uint64 chainSelector);
   error ZeroChainSelector();
   error InsufficientLiquidity(uint256 requested, uint256 available);
 
@@ -28,19 +39,18 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
 
   struct CrossChainLiquidityManagerArgs {
-    address destLiquidityManager;
-    IBridgeAdapter bridge;
-    address l2Token;
-    uint64 destChainSelector;
+    address remoteLiquidityManager;
+    IBridgeAdapter localBridge;
+    address remoteToken;
+    uint64 remoteChainSelector;
     bool enabled;
   }
 
   struct CrossChainLiquidityManager {
-    address destLiquidityManager;
-    IBridgeAdapter bridge;
-    address l2Token;
+    address remoteLiquidityManager;
+    IBridgeAdapter localBridge;
+    address remoteToken;
     bool enabled;
-    // Potentially some fields related to the bridge
   }
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
@@ -81,39 +91,6 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     return i_localToken.balanceOf(address(s_localLiquidityContainer));
   }
 
-  function rebalanceLiquidity(uint64 chainSelector, uint256 amount) external onlyOwner {
-    _rebalanceLiquidity(chainSelector, amount);
-  }
-
-  function _rebalanceLiquidity(uint64 chainSelector, uint256 amount) internal {
-    uint256 currentBalance = getLiquidity();
-    if (currentBalance < amount) {
-      revert InsufficientLiquidity(amount, currentBalance);
-    }
-
-    CrossChainLiquidityManager memory destLiqManager = s_crossChainLiquidityContainers[chainSelector];
-
-    if (!destLiqManager.enabled) {
-      revert InvalidDestinationChain(chainSelector);
-    }
-
-    s_localLiquidityContainer.withdrawLiquidity(amount);
-    i_localToken.approve(address(destLiqManager.bridge), amount);
-
-    destLiqManager.bridge.sendERC20(
-      address(i_localToken),
-      destLiqManager.l2Token,
-      destLiqManager.destLiquidityManager,
-      amount
-    );
-
-    emit LiquidityTransferred(i_localChainSelector, chainSelector, destLiqManager.destLiquidityManager, amount);
-  }
-
-  function _receiveLiquidity(uint64 chainSelector, uint256 amount, bytes memory bridgeData) internal {
-    // TODO
-  }
-
   /// @notice Adds liquidity to the multi-chain system.
   /// @dev Anyone can call this function, but anyone other than the owner should regard
   /// adding liquidity as a donation to the system, as there is no way to get it out.
@@ -131,6 +108,8 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     emit LiquidityAdded(msg.sender, amount);
   }
 
+  /// @notice Removes liquidity from the system and sends it to the caller, so the owner.
+  /// @dev Only the owner can call this function.
   function removeLiquidity(uint256 amount) external onlyOwner {
     uint256 currentBalance = i_localToken.balanceOf(address(s_localLiquidityContainer));
     if (currentBalance < amount) {
@@ -143,6 +122,45 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     emit LiquidityRemoved(msg.sender, amount);
   }
 
+  /// @notice Transfers liquidity to another chain.
+  /// @dev This function is a public version of the internal _rebalanceLiquidity function.
+  /// to allow the owner to also initiate a rebalancing when needed.
+  function rebalanceLiquidity(uint64 chainSelector, uint256 amount) external onlyOwner {
+    _rebalanceLiquidity(chainSelector, amount);
+  }
+
+  /// @notice Transfers liquidity to another chain.
+  /// @dev Called by both the owner and the DON.
+  function _rebalanceLiquidity(uint64 chainSelector, uint256 amount) internal {
+    uint256 currentBalance = getLiquidity();
+    if (currentBalance < amount) {
+      revert InsufficientLiquidity(amount, currentBalance);
+    }
+
+    CrossChainLiquidityManager memory remoteLiqManager = s_crossChainLiquidityContainers[chainSelector];
+
+    if (!remoteLiqManager.enabled) {
+      revert InvalidRemoteChain(chainSelector);
+    }
+
+    // Could be optimized by withdrawing once and then sending to all destinations
+    s_localLiquidityContainer.withdrawLiquidity(amount);
+    i_localToken.approve(address(remoteLiqManager.localBridge), amount);
+
+    remoteLiqManager.localBridge.sendERC20(
+      address(i_localToken),
+      remoteLiqManager.remoteToken,
+      remoteLiqManager.remoteLiquidityManager,
+      amount
+    );
+
+    emit LiquidityTransferred(i_localChainSelector, chainSelector, remoteLiqManager.remoteLiquidityManager, amount);
+  }
+
+  function _receiveLiquidity(uint64 remoteChainSelector, uint256 amount, bytes memory bridgeData) internal {
+    // TODO
+  }
+
   function _report(bytes calldata report, uint64) internal override {
     ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(
       report,
@@ -152,7 +170,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     uint256 sendInstructions = instructions.sendLiquidityParams.length;
     for (uint256 i = 0; i < sendInstructions; ++i) {
       _rebalanceLiquidity(
-        instructions.sendLiquidityParams[i].destChainSelector,
+        instructions.sendLiquidityParams[i].remoteChainSelector,
         instructions.sendLiquidityParams[i].amount
       );
     }
@@ -160,7 +178,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     uint256 receiveInstructions = instructions.receiveLiquidityParams.length;
     for (uint256 i = 0; i < receiveInstructions; ++i) {
       _receiveLiquidity(
-        instructions.receiveLiquidityParams[i].sourceChainSelector,
+        instructions.receiveLiquidityParams[i].remoteChainSelector,
         instructions.receiveLiquidityParams[i].amount,
         instructions.receiveLiquidityParams[i].bridgeData
       );
@@ -173,12 +191,14 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   // │                           Config                             │
   // ================================================================
 
+  /// @notice Gets the .
   function getCrossChainLiquidityManager(
     uint64 chainSelector
   ) external view returns (CrossChainLiquidityManager memory) {
     return s_crossChainLiquidityContainers[chainSelector];
   }
 
+  /// @notice Sets a list of cross chain liquidity managers.
   function setCrossChainLiquidityManager(
     CrossChainLiquidityManagerArgs[] calldata crossChainLiquidityManagers
   ) external onlyOwner {
@@ -187,29 +207,36 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     }
   }
 
+  /// @notice Sets a single cross chain liquidity manager.
   function setCrossChainLiquidityManager(
     CrossChainLiquidityManagerArgs calldata crossChainLiqManager
   ) public onlyOwner {
-    if (crossChainLiqManager.destChainSelector == 0) {
+    if (crossChainLiqManager.remoteChainSelector == 0) {
       revert ZeroChainSelector();
     }
 
-    if (crossChainLiqManager.destLiquidityManager == address(0) || address(crossChainLiqManager.bridge) == address(0)) {
+    if (
+      crossChainLiqManager.remoteLiquidityManager == address(0) ||
+      address(crossChainLiqManager.localBridge) == address(0)
+    ) {
       revert ZeroAddress();
     }
 
-    s_crossChainLiquidityContainers[crossChainLiqManager.destChainSelector] = CrossChainLiquidityManager({
-      destLiquidityManager: crossChainLiqManager.destLiquidityManager,
-      bridge: crossChainLiqManager.bridge,
-      l2Token: crossChainLiqManager.l2Token,
+    s_crossChainLiquidityContainers[crossChainLiqManager.remoteChainSelector] = CrossChainLiquidityManager({
+      remoteLiquidityManager: crossChainLiqManager.remoteLiquidityManager,
+      localBridge: crossChainLiqManager.localBridge,
+      remoteToken: crossChainLiqManager.remoteToken,
       enabled: crossChainLiqManager.enabled
     });
   }
 
+  /// @notice Gets the local liquidity container.
   function getLocalLiquidityContainer() external view returns (address) {
     return address(s_localLiquidityContainer);
   }
 
+  /// @notice Sets the local liquidity container.
+  /// @dev Only the owner can call this function.
   function setLocalLiquidityContainer(ILiquidityContainer localLiquidityContainer) external onlyOwner {
     s_localLiquidityContainer = localLiquidityContainer;
   }
