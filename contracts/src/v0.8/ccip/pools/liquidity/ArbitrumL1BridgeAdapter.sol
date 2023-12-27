@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IL1Bridge} from "./interfaces/IBridge.sol";
+import {IL1BridgeAdapter} from "./interfaces/IBridge.sol";
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
 import {IL1GatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
@@ -40,7 +40,7 @@ interface IOutbox {
 
 /// @notice Arbitrum L1 Bridge adapter
 /// @dev Auto unwraps and re-wraps wrapped eth in the bridge.
-contract ArbitrumL1BridgeAdapter is IL1Bridge {
+contract ArbitrumL1BridgeAdapter is IL1BridgeAdapter {
   using SafeERC20 for IERC20;
 
   error InsufficientEthValue(uint256 wanted, uint256 got);

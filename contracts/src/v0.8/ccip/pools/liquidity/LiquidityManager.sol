@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IBridge} from "./interfaces/IBridge.sol";
+import {IBridgeAdapter} from "./interfaces/IBridge.sol";
 import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
 import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
 
@@ -29,14 +29,14 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
 
   struct CrossChainLiquidityManagerArgs {
     address destLiquidityManager;
-    IBridge bridge;
+    IBridgeAdapter bridge;
     uint64 destChainSelector;
     bool enabled;
   }
 
   struct CrossChainLiquidityManager {
     address destLiquidityManager;
-    IBridge bridge;
+    IBridgeAdapter bridge;
     bool enabled;
     // Potentially some fields related to the bridge
   }

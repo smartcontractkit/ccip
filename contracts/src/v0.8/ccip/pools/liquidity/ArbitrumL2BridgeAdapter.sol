@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IL2Bridge} from "./interfaces/IBridge.sol";
+import {IBridgeAdapter} from "./interfaces/IBridge.sol";
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -22,7 +22,7 @@ interface IL2GatewayRouter {
 
 /// @notice Arbitrum L2 Bridge adapter
 /// @dev Auto unwraps and re-wraps wrapped eth in the bridge.
-contract ArbitrumL2BridgeAdapter is IL2Bridge {
+contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
   using SafeERC20 for IERC20;
 
   error InsufficientEthValue(uint256 wanted, uint256 got);

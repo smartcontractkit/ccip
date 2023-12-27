@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IL2Bridge} from "./interfaces/IBridge.sol";
+import {IBridgeAdapter} from "./interfaces/IBridge.sol";
 import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
 
 import {L2StandardBridge} from "@eth-optimism/contracts/L2/messaging/L2StandardBridge.sol";
@@ -10,7 +10,7 @@ import {Lib_PredeployAddresses} from "@eth-optimism/contracts/libraries/constant
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract OptimismL2BridgeAdapter is IL2Bridge {
+contract OptimismL2BridgeAdapter is IBridgeAdapter {
   using SafeERC20 for IERC20;
 
   L2StandardBridge internal i_L2Bridge = L2StandardBridge(Lib_PredeployAddresses.L2_STANDARD_BRIDGE);

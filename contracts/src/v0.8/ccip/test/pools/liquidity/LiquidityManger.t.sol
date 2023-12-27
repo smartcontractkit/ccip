@@ -3,11 +3,12 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 
-import {IBridge} from "../../../pools/liquidity/interfaces/IBridge.sol";
+import {IBridgeAdapter, IL1BridgeAdapter} from "../../../pools/liquidity/interfaces/IBridge.sol";
 import {ILiquidityContainer} from "../../../pools/liquidity/interfaces/ILiquidityContainer.sol";
 
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {LiquidityManager} from "../../../pools/liquidity/LiquidityManager.sol";
+import {MockL1BridgeAdapter} from "../../mocks/MockBridgeAdapter.sol";
 
 import {ERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -23,11 +24,13 @@ contract LiquidityManagerSetup is Test {
   IERC20 public s_token;
   LiquidityManager internal s_liquidityManager;
   LockReleaseTokenPool internal s_lockReleaseTokenPool;
+  IL1BridgeAdapter internal s_bridgeAdapter;
   uint64 internal immutable i_localChainSelector = 1234;
 
   function setUp() external {
     s_token = new ERC20("Test", "TEST");
 
+    s_bridgeAdapter = new MockL1BridgeAdapter();
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_token, new address[](0), address(1), true);
     s_liquidityManager = new LiquidityManager(s_token, i_localChainSelector, s_lockReleaseTokenPool);
 
@@ -45,7 +48,7 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
       memory args = new LiquidityManager.CrossChainLiquidityManagerArgs[](1);
     args[0] = LiquidityManager.CrossChainLiquidityManagerArgs({
       destLiquidityManager: address(s_liquidityManager),
-      bridge: IBridge(address(123123123123)), // TODO real bridge
+      bridge: s_bridgeAdapter,
       destChainSelector: destChainSelector,
       enabled: true
     });
