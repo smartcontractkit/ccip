@@ -30,6 +30,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   struct CrossChainLiquidityManagerArgs {
     address destLiquidityManager;
     IBridgeAdapter bridge;
+    address l2Token;
     uint64 destChainSelector;
     bool enabled;
   }
@@ -37,6 +38,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   struct CrossChainLiquidityManager {
     address destLiquidityManager;
     IBridgeAdapter bridge;
+    address l2Token;
     bool enabled;
     // Potentially some fields related to the bridge
   }
@@ -89,16 +91,23 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       revert InsufficientLiquidity(amount, currentBalance);
     }
 
-    address destChainAddress = s_crossChainLiquidityContainers[chainSelector].destLiquidityManager;
-    if (destChainAddress == address(0)) {
+    CrossChainLiquidityManager memory destLiqManager = s_crossChainLiquidityContainers[chainSelector];
+
+    if (!destLiqManager.enabled) {
       revert InvalidDestinationChain(chainSelector);
     }
 
     s_localLiquidityContainer.withdrawLiquidity(amount);
+    i_localToken.approve(address(destLiqManager.bridge), amount);
 
-    // TODO send funds to bridge
+    destLiqManager.bridge.sendERC20(
+      address(i_localToken),
+      destLiqManager.l2Token,
+      destLiqManager.destLiquidityManager,
+      amount
+    );
 
-    emit LiquidityTransferred(i_localChainSelector, chainSelector, destChainAddress, amount);
+    emit LiquidityTransferred(i_localChainSelector, chainSelector, destLiqManager.destLiquidityManager, amount);
   }
 
   function _receiveLiquidity(uint64 chainSelector, uint256 amount, bytes memory bridgeData) internal {
@@ -192,6 +201,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     s_crossChainLiquidityContainers[crossChainLiqManager.destChainSelector] = CrossChainLiquidityManager({
       destLiquidityManager: crossChainLiqManager.destLiquidityManager,
       bridge: crossChainLiqManager.bridge,
+      l2Token: crossChainLiqManager.l2Token,
       enabled: crossChainLiqManager.enabled
     });
   }

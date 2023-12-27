@@ -14,6 +14,8 @@ import {ERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/t
 import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract LiquidityManagerSetup is Test {
+  event Transfer(address indexed from, address indexed to, uint256 value);
+  event Approval(address indexed owner, address indexed spender, uint256 value);
   event LiquidityTransferred(
     uint64 indexed fromChainSelector,
     uint64 indexed toChainSelector,
@@ -26,6 +28,8 @@ contract LiquidityManagerSetup is Test {
   LockReleaseTokenPool internal s_lockReleaseTokenPool;
   IL1BridgeAdapter internal s_bridgeAdapter;
   uint64 internal immutable i_localChainSelector = 1234;
+
+  address internal immutable i_l2Token = address(0x22222222222222222222222222);
 
   function setUp() external {
     s_token = new ERC20("Test", "TEST");
@@ -49,16 +53,29 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
     args[0] = LiquidityManager.CrossChainLiquidityManagerArgs({
       destLiquidityManager: address(s_liquidityManager),
       bridge: s_bridgeAdapter,
+      l2Token: i_l2Token,
       destChainSelector: destChainSelector,
       enabled: true
     });
     s_liquidityManager.setCrossChainLiquidityManager(args);
 
     vm.expectEmit();
+    emit Transfer(address(s_lockReleaseTokenPool), address(s_liquidityManager), amount);
 
+    vm.expectEmit();
+    emit Approval(address(s_liquidityManager), address(s_bridgeAdapter), amount);
+
+    vm.expectEmit();
+    emit Transfer(address(s_liquidityManager), address(s_bridgeAdapter), amount);
+
+    vm.expectEmit();
     emit LiquidityTransferred(i_localChainSelector, destChainSelector, address(s_liquidityManager), amount);
 
     s_liquidityManager.rebalanceLiquidity(destChainSelector, amount);
+
+    assertEq(s_token.balanceOf(address(s_liquidityManager)), 0);
+    assertEq(s_token.balanceOf(address(s_bridgeAdapter)), amount);
+    assertEq(s_token.allowance(address(s_liquidityManager), address(s_bridgeAdapter)), 0);
   }
 
   // Reverts
