@@ -16,9 +16,6 @@ import {ILiquidityContainer} from "./liquidity/interfaces/ILiquidityContainer.so
 contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion {
   using SafeERC20 for IERC20;
 
-  event LiquidityAdded(address indexed provider, uint256 indexed amount);
-  event LiquidityRemoved(address indexed provider, uint256 indexed amount);
-
   error InsufficientLiquidity();
   error LiquidityNotAccepted();
   error Unauthorized(address caller);
