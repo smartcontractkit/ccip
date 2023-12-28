@@ -25,6 +25,10 @@ contract OptimismL2BridgeAdapter is IBridgeAdapter {
   }
 
   function sendERC20(address, address l2Token, address recipient, uint256 amount) external payable {
+    if (msg.value != 0) {
+      revert MsgShouldNotContainValue(msg.value);
+    }
+
     IERC20(l2Token).safeTransferFrom(msg.sender, address(this), amount);
 
     // If the token is the wrapped native, we unwrap it and deposit native
@@ -37,6 +41,11 @@ contract OptimismL2BridgeAdapter is IBridgeAdapter {
     // Token is normal ERC20
     IERC20(l2Token).approve(address(i_L2Bridge), amount);
     i_L2Bridge.withdrawTo(l2Token, recipient, amount, 0, abi.encode(s_nonce++));
+  }
+
+  /// @notice There are no fees to bridge back to L1
+  function getBridgeFeeInNative() external pure returns (uint256) {
+    return 0;
   }
 
   function depositNativeToL1(address recipient) public payable {

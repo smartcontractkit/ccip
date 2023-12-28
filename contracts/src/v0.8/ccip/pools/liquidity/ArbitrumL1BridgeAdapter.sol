@@ -43,8 +43,6 @@ interface IOutbox {
 contract ArbitrumL1BridgeAdapter is IL1BridgeAdapter {
   using SafeERC20 for IERC20;
 
-  error InsufficientEthValue(uint256 wanted, uint256 got);
-
   IL1GatewayRouter internal immutable i_l1GatewayRouter;
   address internal immutable i_l1ERC20Gateway;
   IOutbox internal immutable i_l1Outbox;
@@ -73,12 +71,12 @@ contract ArbitrumL1BridgeAdapter is IL1BridgeAdapter {
 
     IERC20(l1Token).approve(i_l1ERC20Gateway, amount);
 
-    uint256 wantedNativeFeeCoin = MAX_SUBMISSION_COST + MAX_GAS * GAS_PRICE_BID;
+    uint256 wantedNativeFeeCoin = getBridgeFeeInNative();
     if (msg.value < wantedNativeFeeCoin) {
       revert InsufficientEthValue(wantedNativeFeeCoin, msg.value);
     }
 
-    i_l1GatewayRouter.outboundTransferCustomRefund{value: wantedNativeFeeCoin}(
+    i_l1GatewayRouter.outboundTransferCustomRefund{value: msg.value}(
       l1Token,
       recipient,
       recipient,
@@ -87,6 +85,10 @@ contract ArbitrumL1BridgeAdapter is IL1BridgeAdapter {
       GAS_PRICE_BID,
       abi.encode(MAX_SUBMISSION_COST, bytes(""))
     );
+  }
+
+  function getBridgeFeeInNative() public pure returns (uint256) {
+    return MAX_SUBMISSION_COST + MAX_GAS * GAS_PRICE_BID;
   }
 
   /// @param proof Merkle proof of message inclusion in send root

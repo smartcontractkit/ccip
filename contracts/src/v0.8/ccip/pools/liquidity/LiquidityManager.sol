@@ -143,11 +143,13 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       revert InvalidRemoteChain(chainSelector);
     }
 
+    uint256 nativeBridgeFee = remoteLiqManager.localBridge.getBridgeFeeInNative();
+
     // Could be optimized by withdrawing once and then sending to all destinations
     s_localLiquidityContainer.withdrawLiquidity(amount);
     i_localToken.approve(address(remoteLiqManager.localBridge), amount);
 
-    remoteLiqManager.localBridge.sendERC20(
+    remoteLiqManager.localBridge.sendERC20{value: nativeBridgeFee}(
       address(i_localToken),
       remoteLiqManager.remoteToken,
       remoteLiqManager.remoteLiquidityManager,

@@ -25,8 +25,6 @@ interface IL2GatewayRouter {
 contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
   using SafeERC20 for IERC20;
 
-  error InsufficientEthValue(uint256 wanted, uint256 got);
-
   IL2GatewayRouter internal immutable i_l2GatewayRouter;
   //  address internal immutable i_l1ERC20Gateway;
   IArbSys internal constant ARB_SYS = IArbSys(address(0x64));
@@ -39,9 +37,19 @@ contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
   }
 
   function sendERC20(address l1Token, address l2Token, address recipient, uint256 amount) external payable {
+    if (msg.value != 0) {
+      revert MsgShouldNotContainValue(msg.value);
+    }
+
     IERC20(l2Token).safeTransferFrom(msg.sender, address(this), amount);
 
+    // No approval needed, the bridge will burn the tokens from this contract.
     i_l2GatewayRouter.outboundTransfer(l1Token, recipient, amount, bytes(""));
+  }
+
+  /// @notice There are no fees to bridge back to L1
+  function getBridgeFeeInNative() external pure returns (uint256) {
+    return 0;
   }
 
   function depositNativeToL1(address recipient) external payable {

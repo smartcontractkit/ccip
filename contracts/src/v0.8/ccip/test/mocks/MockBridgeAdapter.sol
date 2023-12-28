@@ -32,6 +32,10 @@ contract MockL1BridgeAdapter is IL1BridgeAdapter, ILiquidityContainer {
     bytes calldata bridgeSpecificPayload
   ) external {}
 
+  function getBridgeFeeInNative() external pure returns (uint256) {
+    return 0;
+  }
+
   function provideLiquidity(uint256 amount) external {
     i_token.safeTransferFrom(msg.sender, address(this), amount);
     emit LiquidityAdded(msg.sender, amount);
@@ -49,5 +53,9 @@ contract MockL1BridgeAdapter is IL1BridgeAdapter, ILiquidityContainer {
 contract MockL2BridgeAdapter is IBridgeAdapter {
   function sendERC20(address, address l2token, address, uint256 amount) external payable {
     IERC20(l2token).transferFrom(msg.sender, address(this), amount);
+  }
+
+  function getBridgeFeeInNative() external pure returns (uint256) {
+    return 0;
   }
 }
