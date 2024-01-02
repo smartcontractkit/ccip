@@ -12,41 +12,41 @@ import (
 )
 
 type DummyGraph struct {
-	g map[models.NetworkID][]models.NetworkID
-	w map[models.NetworkID]*big.Int
+	networksGraph  map[models.NetworkID][]models.NetworkID
+	networkBalance map[models.NetworkID]*big.Int
 }
 
 func NewDummyGraph() *DummyGraph {
 	return &DummyGraph{
-		g: map[models.NetworkID][]models.NetworkID{},
-		w: map[models.NetworkID]*big.Int{},
+		networksGraph:  map[models.NetworkID][]models.NetworkID{},
+		networkBalance: map[models.NetworkID]*big.Int{},
 	}
 }
 
 func (g *DummyGraph) GetNodes() []models.NetworkID {
-	n := make([]models.NetworkID, 0, len(g.w))
-	for networkID := range g.w {
-		n = append(n, networkID)
+	networks := make([]models.NetworkID, 0, len(g.networkBalance))
+	for networkID := range g.networkBalance {
+		networks = append(networks, networkID)
 	}
-	return n
+	return networks
 }
 
 func (g *DummyGraph) Reset() {
-	g.g = make(map[models.NetworkID][]models.NetworkID)
-	g.w = make(map[models.NetworkID]*big.Int)
+	g.networksGraph = make(map[models.NetworkID][]models.NetworkID)
+	g.networkBalance = make(map[models.NetworkID]*big.Int)
 }
 
 func (g *DummyGraph) AddNode(n models.NetworkID, v *big.Int) {
-	g.w[n] = v
-	g.g[n] = make([]models.NetworkID, 0)
+	g.networkBalance[n] = v
+	g.networksGraph[n] = make([]models.NetworkID, 0)
 }
 
 func (g *DummyGraph) SetWeight(n models.NetworkID, v *big.Int) {
-	g.w[n] = v
+	g.networkBalance[n] = v
 }
 
 func (g *DummyGraph) AddEdge(from, to models.NetworkID) {
-	g.g[from] = append(g.g[from], to)
+	g.networksGraph[from] = append(g.networksGraph[from], to)
 }
 
 func (g *DummyGraph) ComputeTransfersToBalance(inflightTransfers []models.Transfer) ([]models.Transfer, error) {
@@ -54,25 +54,25 @@ func (g *DummyGraph) ComputeTransfersToBalance(inflightTransfers []models.Transf
 	// and moves all the liquidity from the other nodes to it
 	// inflightTransfers are ignored
 
-	if len(g.w) == 0 {
+	if len(g.networkBalance) == 0 {
 		return nil, fmt.Errorf("empty graph")
 	}
 
-	keys := maps.Keys(g.w)
+	keys := maps.Keys(g.networkBalance)
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
 	luckyNode := keys[0]
-	maxV := g.w[luckyNode]
+	maxV := g.networkBalance[luckyNode]
 
 	for _, k := range keys {
-		if g.w[k].Cmp(maxV) > 0 {
+		if g.networkBalance[k].Cmp(maxV) > 0 {
 			luckyNode = k
-			maxV = g.w[k]
+			maxV = g.networkBalance[k]
 		}
 	}
 
 	transfers := make([]models.Transfer, 0)
-	for node, w := range g.w {
+	for node, w := range g.networkBalance {
 		if node == luckyNode {
 			continue
 		}
@@ -94,12 +94,12 @@ func (g *DummyGraph) String() string {
 	sb := strings.Builder{}
 
 	sb.WriteString("~~~ NODES ~~~\n")
-	for n, w := range g.w {
+	for n, w := range g.networkBalance {
 		sb.WriteString(fmt.Sprintf("[%d] %s\n", n, w))
 	}
 
 	sb.WriteString("\n~~~ LINKS ~~~\n")
-	for n, nbs := range g.g {
+	for n, nbs := range g.networksGraph {
 		sb.WriteString(fmt.Sprintf("%d: ", n))
 		for _, nb := range nbs {
 			sb.WriteString(fmt.Sprintf(" %d ", nb))
