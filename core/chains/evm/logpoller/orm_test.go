@@ -1633,3 +1633,54 @@ func Benchmark_SelectLatestIndexedLogs(b *testing.B) {
 	//	assert.Len(b, logs, numberOfLogs)
 	//}
 }
+
+func Benchmark_SelectIndexedLogsCreatedAfter(b *testing.B) {
+	chainId := big.NewInt(137)
+	_, db := heavyweight.FullTestDBV2(b, "logs_indexed", nil)
+	o := logpoller.NewORM(chainId, db, logger.TestLogger(b), pgtest.NewQConfig(false))
+
+	numberOfLogs := 20_000
+
+	addr := utils.RandomAddress()
+	event := utils.RandomBytes32()
+	topic := utils.RandomBytes32()
+
+	var dbLogs []logpoller.Log
+	for i := 0; i < numberOfLogs; i++ {
+		topics := make([][]byte, 4)
+		for j := 0; j < 4; j++ {
+			topics[j] = topic[:]
+		}
+
+		dbLogs = append(dbLogs, logpoller.Log{
+			EvmChainId:     utils.NewBig(chainId),
+			LogIndex:       int64(i + 1),
+			BlockHash:      utils.RandomBytes32(),
+			BlockNumber:    int64(i + 1),
+			BlockTimestamp: time.Now(),
+			EventSig:       event,
+			Topics:         topics,
+			Address:        addr,
+			TxHash:         utils.RandomAddress().Hash(),
+			Data:           []byte{},
+			CreatedAt:      time.Now(),
+		})
+	}
+	require.NoError(b, o.InsertBlock(utils.RandomAddress().Hash(), int64(numberOfLogs), time.Now(), int64(numberOfLogs)))
+	require.NoError(b, o.InsertLogs(dbLogs))
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		logs, err := o.SelectIndexedLogsCreatedAfter(
+			addr,
+			event,
+			1,
+			[]common.Hash{topic},
+			time.Now().Add(-1*time.Hour),
+			logpoller.Unconfirmed,
+		)
+		assert.NoError(b, err)
+		assert.Len(b, logs, 1)
+	}
+}
