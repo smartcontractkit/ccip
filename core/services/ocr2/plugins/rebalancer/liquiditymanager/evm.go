@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciprebalance/models"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
 type EvmLiquidityManager struct{}
