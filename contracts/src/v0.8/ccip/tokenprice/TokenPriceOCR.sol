@@ -15,12 +15,38 @@ contract TokenPriceOCR is ITypeAndVersion, OCR2Base {
   /// @dev The price registry to write price updates to.
   IPriceRegistry internal s_priceRegistry;
 
+  struct Report {
+    Internal.TokenPriceUpdate[] priceUpdates;
+  }
+
+  mapping(address token => Internal.TimestampedPackedUint224) internal s_tokenPriceUpdates;
+  mapping(uint64 destChainSelector => Internal.TimestampedPackedUint224) internal s_gasPriceUpdates;
+
   constructor(IPriceRegistry priceRegistry) OCR2Base(true) {
     s_priceRegistry = priceRegistry;
   }
 
+  function setPriceRegistry(IPriceRegistry priceRegistry) external onlyOwner {
+    s_priceRegistry = priceRegistry;
+  }
+
   function _report(bytes calldata report, uint40 /* epochAndRound */) internal override {
-    Internal.PriceUpdates memory priceUpdates = abi.decode(report, (Internal.PriceUpdates));
-    s_priceRegistry.updatePrices(priceUpdates);
+    Report memory decodedReport = abi.decode(report, (Report));
+    s_priceRegistry.updatePrices(Internal.PriceUpdates({
+      tokenPriceUpdates: decodedReport.priceUpdates,
+      gasPriceUpdates: new Internal.GasPriceUpdate[](0)
+    }));
+  }
+
+  function exposeForEncoding(Report memory report) external pure returns (bytes memory) {
+    return abi.encode(report);
+  }
+
+  function getGasPriceUpdate(uint64 destChainSelector) external view returns (uint224 value, uint32 timestamp) {
+    return (s_gasPriceUpdates[destChainSelector].value, s_gasPriceUpdates[destChainSelector].timestamp);
+  }
+
+  function getTokenPriceUpdate(address token) external view returns (uint224 value, uint32 timestamp) {
+    return (s_tokenPriceUpdates[token].value, s_tokenPriceUpdates[token].timestamp);
   }
 }

@@ -16,5 +16,6 @@ ping_pong_demo: ../../../contracts/solc/v0.8.19/PingPongDemo/PingPongDemo.abi ..
 price_registry: ../../../contracts/solc/v0.8.19/PriceRegistry/PriceRegistry.abi ../../../contracts/solc/v0.8.19/PriceRegistry/PriceRegistry.bin 36e8d2c44a16fefb5258557cb1eae25eca1cc12efcd3c3270f91a90a5f81e7ea
 router: ../../../contracts/solc/v0.8.19/Router/Router.abi ../../../contracts/solc/v0.8.19/Router/Router.bin 9bca5ba6ba53231f23196ed57e8e45fc216cd6d2614e6c26433b54ed678167ce
 self_funded_ping_pong: ../../../contracts/solc/v0.8.19/SelfFundedPingPong/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.19/SelfFundedPingPong/SelfFundedPingPong.bin fc2f9ac93f49f4a2a0a0008c2a660444cc5c127688f64beeb63e5f96a10c995e
+token_price_ocr: ../../../contracts/solc/v0.8.19/TokenPriceOCR/TokenPriceOCR.abi ../../../contracts/solc/v0.8.19/TokenPriceOCR/TokenPriceOCR.bin a8ec5fbd5de3d42cf78ab7932aa35696342807c084b6719dd82c1b95b3368f14
 usdc_token_pool: ../../../contracts/solc/v0.8.19/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool/USDCTokenPool.bin c8c523472593343f8a87edac4e3c9f5cf505372c6b70e35f212f1f698f9c5bdf
 weth9: ../../../contracts/solc/v0.8.19/WETH9/WETH9.abi ../../../contracts/solc/v0.8.19/WETH9/WETH9.bin 5a7d64fb19b62ec523c7667ce4c2983295c05f74935b5f994c06a6f70d440f8b

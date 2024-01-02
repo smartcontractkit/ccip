@@ -70,6 +70,8 @@ type chainReaderContract struct {
 	types.BoundContract
 }
 
+var _ ocrtypes.ContractTransmitter = &chainReaderContract{}
+
 // FromAccount implements types.ContractTransmitter.
 func (*chainReaderContract) FromAccount() (ocrtypes.Account, error) {
 	panic("unimplemented")

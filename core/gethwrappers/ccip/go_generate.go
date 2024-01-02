@@ -26,6 +26,8 @@ package ccip
 // Customer contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool/USDCTokenPool.bin USDCTokenPool usdc_token_pool
 
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/TokenPriceOCR/TokenPriceOCR.abi ../../../contracts/solc/v0.8.19/TokenPriceOCR/TokenPriceOCR.bin TokenPriceOCR token_price_ocr
+
 // Generate mocks for our contracts
 //go:generate mockery --quiet --dir ./generated/evm_2_evm_onramp/ --name EVM2EVMOnRampInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 //go:generate mockery --quiet --dir ./generated/evm_2_evm_offramp/ --name EVM2EVMOffRampInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
