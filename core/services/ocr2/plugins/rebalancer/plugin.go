@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/pkg/errors"
@@ -17,6 +18,7 @@ import (
 )
 
 type Plugin struct {
+	f                       int
 	liquidityManagers       map[models.NetworkID]models.Address
 	liquidityManagerFactory liquiditymanager.Factory
 	pendingTransfers        []models.PendingTransfer
@@ -25,6 +27,7 @@ type Plugin struct {
 }
 
 func NewPlugin(
+	f int,
 	liquidityManagerNetwork models.NetworkID,
 	liquidityManagerAddress models.Address,
 	liquidityManagerFactory liquiditymanager.Factory,
@@ -32,6 +35,7 @@ func NewPlugin(
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
 ) *Plugin {
 	return &Plugin{
+		f: f,
 		liquidityManagers: map[models.NetworkID]models.Address{
 			liquidityManagerNetwork: liquidityManagerAddress,
 		},
@@ -90,9 +94,23 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query ocrtyp
 }
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, aos []ocrtypes.AttributedObservation) (ocr3types.Outcome, error) {
-	// todo: consensus on observations
-	outcome := models.NewObservation(nil, nil).Encode()
-	return outcome, fmt.Errorf("not implemented")
+	observations := make([]models.Observation, 0, len(aos))
+	for _, encodedObs := range aos {
+		obs, err := models.DecodeObservation(encodedObs.Observation)
+		if err != nil {
+			return ocr3types.Outcome{}, fmt.Errorf("decode observation: %w", err)
+		}
+		observations = append(observations, obs)
+	}
+
+	medianLiquidityPerChain := p.computeMedianLiquidityPerChain(observations)
+
+	pendingTransfers, err := p.computePendingTransfersConsensus(observations)
+	if err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("compute pending transfers consensus: %w", err)
+	}
+
+	return models.NewObservation(medianLiquidityPerChain, pendingTransfers).Encode(), nil
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.ReportMetadata], error) {
@@ -270,4 +288,59 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observation) []models.ChainLiquidity {
+	liqObsPerChain := make(map[models.NetworkID][]*big.Int)
+	for _, ob := range observations {
+		for _, chainLiq := range ob.LiquidityPerChain {
+			liqObsPerChain[chainLiq.Chain] = append(liqObsPerChain[chainLiq.Chain], chainLiq.Liquidity)
+		}
+	}
+
+	medians := make([]models.ChainLiquidity, 0, len(liqObsPerChain))
+	for chainID, liqs := range liqObsPerChain {
+		medians = append(medians, models.NewChainLiquidity(chainID, bigIntSortedMiddle(liqs)))
+	}
+
+	return medians
+}
+
+func (p *Plugin) computePendingTransfersConsensus(observations []models.Observation) ([]models.PendingTransfer, error) {
+	counts := make(map[[32]byte]int)
+	for _, obs := range observations {
+		for _, tr := range obs.PendingTransfers {
+			h, err := tr.Hash()
+			if err != nil {
+				return nil, fmt.Errorf("hash %v: %w", tr, err)
+			}
+			counts[h]++
+		}
+	}
+
+	var quorumEvents []models.PendingTransfer
+	for _, count := range counts {
+		if count >= p.f+1 {
+			quorumEvents = append(quorumEvents)
+		}
+	}
+
+	return quorumEvents, nil
+}
+
+// bigIntSortedMiddle returns the middle number after sorting the provided numbers. nil is returned if the provided slice is empty.
+// If length of the provided slice is even, the right-hand-side value of the middle 2 numbers is returned.
+// The objective of this function is to always pick within the range of values reported by honest nodes when we have 2f+1 values.
+// todo: move to libs
+func bigIntSortedMiddle(vals []*big.Int) *big.Int {
+	if len(vals) == 0 {
+		return nil
+	}
+
+	valsCopy := make([]*big.Int, len(vals))
+	copy(valsCopy[:], vals[:])
+	sort.Slice(valsCopy, func(i, j int) bool {
+		return valsCopy[i].Cmp(valsCopy[j]) == -1
+	})
+	return valsCopy[len(valsCopy)/2]
 }

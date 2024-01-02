@@ -1,6 +1,7 @@
 package models
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -21,6 +22,14 @@ type Transfer struct {
 type PendingTransfer struct {
 	Transfer
 	Status TransferStatus
+}
+
+func (p PendingTransfer) Hash() ([32]byte, error) {
+	b, err := json.Marshal(p)
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("marshal: %w", err)
+	}
+	return sha256.Sum256(b), nil
 }
 
 func NewPendingTransfer(tr Transfer) PendingTransfer {
