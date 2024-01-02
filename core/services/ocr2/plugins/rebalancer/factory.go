@@ -8,6 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
 	models2 "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -23,7 +24,8 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("invalid config: %w", err)
 	}
 
-	liquidityGraph := liquiditygraph.NewDummyGraph()
+	liquidityRebalancer := liquidityrebalancer.NewDummyRebalancer()
+	liquidityGraph := liquiditygraph.NewGraph()
 	liquidityManagerFactory := liquiditymanager.NewBaseLiquidityManagerFactory()
 
 	return NewPlugin(
@@ -31,6 +33,7 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 			offchainConfig.LiquidityManagerAddress,
 			liquidityManagerFactory,
 			liquidityGraph,
+			liquidityRebalancer,
 		),
 		ocr3types.ReportingPluginInfo{
 			Name: models2.PluginName,

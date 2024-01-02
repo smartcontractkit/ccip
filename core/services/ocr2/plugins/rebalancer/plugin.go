@@ -13,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -21,6 +22,7 @@ type Plugin struct {
 	liquidityManagerFactory liquiditymanager.Factory
 	pendingTransfers        []models.Transfer
 	liquidityGraph          liquiditygraph.LiquidityGraph
+	liquidityRebalancer     liquidityrebalancer.Rebalancer
 }
 
 func NewPlugin(
@@ -28,6 +30,7 @@ func NewPlugin(
 	liquidityManagerAddress models.Address,
 	liquidityManagerFactory liquiditymanager.Factory,
 	liquidityGraph liquiditygraph.LiquidityGraph,
+	liquidityRebalancer liquidityrebalancer.Rebalancer,
 ) *Plugin {
 	return &Plugin{
 		liquidityManagers: map[models.NetworkID]models.Address{
@@ -36,6 +39,7 @@ func NewPlugin(
 		liquidityManagerFactory: liquidityManagerFactory,
 		pendingTransfers:        make([]models.Transfer, 0), // todo: thread-safe
 		liquidityGraph:          liquidityGraph,
+		liquidityRebalancer:     liquidityRebalancer,
 	}
 }
 
@@ -56,7 +60,7 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		return ocrtypes.Observation{}, fmt.Errorf("load pending transfers: %w", err)
 	}
 
-	transfersToBalance, err := p.liquidityGraph.ComputeTransfersToBalance(p.pendingTransfers)
+	transfersToBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(p.liquidityGraph, p.pendingTransfers)
 	if err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("compute transfers to balance: %w", err)
 	}
@@ -171,7 +175,7 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 			return errors.New("unexpected internal error, there is a bug in the algorithm")
 		}
 
-		p.liquidityGraph.AddNode(elem.networkID, big.NewInt(0))
+		p.liquidityGraph.AddNode(elem.networkID, big.NewInt(0)) // TODO: investigate fetching the balance here.
 
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(elem.networkID, elem.lmAddress)
 		if err != nil {

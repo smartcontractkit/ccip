@@ -13,6 +13,7 @@ type LiquidityGraph interface {
 	GetNodes() []models.NetworkID
 	AddNode(n models.NetworkID, v *big.Int)
 	SetWeight(n models.NetworkID, v *big.Int)
+	GetWeight(n models.NetworkID) (*big.Int, error)
 	AddEdge(from, to models.NetworkID)
-	ComputeTransfersToBalance(inflightTransfers []models.Transfer) ([]models.Transfer, error)
+	IsEmpty() bool
 }
