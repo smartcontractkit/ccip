@@ -255,7 +255,7 @@
         "fee_token": "",
         "bridge_tokens": ["0xC1F6f7622ad37C3f46cDF6F8AA0344ADE80BF450"],
         "bridge_tokens_pools": ["0xd9547B702673c61c84bb2dF6FDf6D2F5309fE536"],
-        "arm" : "0x6E4d2dBBF8a1A943412aD451422FE11A25C781DE",
+        "arm" : "0xB59779d3364BC6d71168245f9ebb96469E5a5a98",
         "router": "0xE93E8B0d1b1CEB44350C8758ed1E2799CCee31aB",
         "price_registry": "0x8155B4710e7bbC90924E957104F94Afd4f95Eca2",
         "wrapped_native": "0x4200000000000000000000000000000000000001",
