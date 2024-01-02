@@ -58,7 +58,7 @@ func NewTokenPriceServices(
 	relayer loop.Relayer,
 	pipelineRunner pipeline.Runner,
 	lggr logger.Logger,
-	argsNoPlugin libocr.OCR2OracleArgs,
+	argsNoPlugin libocr.OCR3OracleArgs[meta],
 	cfg TokenPriceConfig,
 	chEnhancedTelem chan ocrcommon.EnhancedTelemetryData,
 	errorLog loop.ErrorLog,
@@ -139,4 +139,16 @@ func NewTokenPriceServices(
 			return
 		}
 	}
+
+	var oracle libocr.Oracle
+	oracle, err = libocr.NewOracle(argsNoPlugin)
+	if err != nil {
+		abort()
+		return
+	}
+	srvs = append(srvs, runSaver, job.NewServiceAdapter(oracle))
+	if !jb.OCR2OracleSpec.CaptureEATelemetry {
+		lggr.Infof("Enhanced EA telemetry is disabled for job %s", jb.Name.ValueOrZero())
+	}
+	return
 }

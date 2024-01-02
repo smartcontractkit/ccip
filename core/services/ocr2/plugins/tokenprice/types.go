@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -132,44 +131,6 @@ func DecodeOffchainConfig(encodedConfig []byte) (OffchainConfig, error) {
 		DeltaC:          time.Duration(deltaC),
 		MaxPriceUpdates: maxPriceUpdates,
 	}, nil
-}
-
-type TokenPriceContract interface {
-	// GetTokenPriceUpdates returns the latest transmission details from the contract
-	// for the provided token addresses.
-	GetTokenPriceUpdates(ctx context.Context, addresses []common.Address) (
-		prices []*utilsbig.Big,
-		timestamps []int64,
-		err error,
-	)
-}
-
-func newTokenPriceContract(chainReader clcommontypes.ChainReader, address common.Address) TokenPriceContract {
-	contract := clcommontypes.BoundContract{Address: address.String(), Name: "tokenprice", Pending: true}
-	return &tokenPriceContract{chainReader, contract}
-}
-
-type tokenPriceContract struct {
-	chainReader clcommontypes.ChainReader
-	contract    clcommontypes.BoundContract
-}
-
-var _ TokenPriceContract = &tokenPriceContract{}
-
-func (t *tokenPriceContract) GetTokenPriceUpdates(ctx context.Context, addresses []common.Address) (
-	prices []*utilsbig.Big,
-	timestamps []int64,
-	err error,
-) {
-	var resp struct {
-		Prices []*utilsbig.Big
-		Times  []int64
-	}
-	err = t.chainReader.GetLatestValue(ctx, t.contract, "GetTokenPriceUpdates", addresses, &resp)
-	if err != nil {
-		return
-	}
-	return resp.Prices, resp.Times, nil
 }
 
 var tokenPriceABI = evmtypes.MustGetABI(token_price_ocr.TokenPriceOCRABI)

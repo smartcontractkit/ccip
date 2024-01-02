@@ -11,9 +11,10 @@ var (
 	Config = Var("CL_CONFIG")
 
 	// LOOPP commands and vars
-	MedianPluginCmd   = Var("CL_MEDIAN_CMD")
-	SolanaPluginCmd   = Var("CL_SOLANA_CMD")
-	StarknetPluginCmd = Var("CL_STARKNET_CMD")
+	MedianPluginCmd     = Var("CL_MEDIAN_CMD")
+	SolanaPluginCmd     = Var("CL_SOLANA_CMD")
+	StarknetPluginCmd   = Var("CL_STARKNET_CMD")
+	TokenPricePluginCmd = Var("CL_TOKENPRICE_CMD")
 	// PrometheusDiscoveryHostName is the externally accessible hostname
 	// published by the node in the `/discovery` endpoint. Generally, it is expected to match
 	// the public hostname of node.
