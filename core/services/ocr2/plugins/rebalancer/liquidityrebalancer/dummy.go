@@ -14,7 +14,7 @@ func NewDummyRebalancer() *DummyRebalancer {
 	return &DummyRebalancer{}
 }
 
-func (r *DummyRebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph, inflightTransfers []models.Transfer) ([]models.Transfer, error) {
+func (r *DummyRebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph, inflightTransfers []models.PendingTransfer) ([]models.Transfer, error) {
 	// selects the node with the highest balance
 	// and moves all the liquidity from the other nodes to it
 	// inflightTransfers are ignored

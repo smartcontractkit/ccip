@@ -95,23 +95,23 @@ func (_m *LiquidityManager) GetLiquidityManagers(ctx context.Context) (map[model
 }
 
 // GetPendingTransfers provides a mock function with given fields: ctx
-func (_m *LiquidityManager) GetPendingTransfers(ctx context.Context) ([]models.Transfer, error) {
+func (_m *LiquidityManager) GetPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPendingTransfers")
 	}
 
-	var r0 []models.Transfer
+	var r0 []models.PendingTransfer
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) ([]models.Transfer, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) ([]models.PendingTransfer, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) []models.Transfer); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) []models.PendingTransfer); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]models.Transfer)
+			r0 = ret.Get(0).([]models.PendingTransfer)
 		}
 	}
 

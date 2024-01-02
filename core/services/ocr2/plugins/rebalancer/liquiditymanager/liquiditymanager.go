@@ -22,7 +22,7 @@ type LiquidityManager interface {
 	GetBalance(ctx context.Context) (*big.Int, error)
 
 	// GetPendingTransfers returns the pending liquidity transfers.
-	GetPendingTransfers(ctx context.Context) ([]models.Transfer, error)
+	GetPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error)
 
 	// Close releases any resources.
 	Close(ctx context.Context) error

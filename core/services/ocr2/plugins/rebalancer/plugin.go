@@ -20,7 +20,7 @@ import (
 type Plugin struct {
 	liquidityManagers       map[models.NetworkID]models.Address
 	liquidityManagerFactory liquiditymanager.Factory
-	pendingTransfers        []models.Transfer
+	pendingTransfers        []models.PendingTransfer
 	liquidityGraph          liquiditygraph.LiquidityGraph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 }
@@ -37,7 +37,7 @@ func NewPlugin(
 			liquidityManagerNetwork: liquidityManagerAddress,
 		},
 		liquidityManagerFactory: liquidityManagerFactory,
-		pendingTransfers:        make([]models.Transfer, 0), // todo: thread-safe
+		pendingTransfers:        make([]models.PendingTransfer, 0), // todo: thread-safe
 		liquidityGraph:          liquidityGraph,
 		liquidityRebalancer:     liquidityRebalancer,
 	}
@@ -132,7 +132,10 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
-	p.pendingTransfers = append(p.pendingTransfers, r.Info.Transfer)
+	p.pendingTransfers = append(p.pendingTransfers, models.PendingTransfer{
+		Transfer: r.Info.Transfer,
+		Status:   models.TransferStatusNotReady,
+	})
 	return true, nil
 }
 
@@ -231,7 +234,7 @@ func (p *Plugin) syncGraphBalances(ctx context.Context) error {
 func (p *Plugin) loadPendingTransfers(ctx context.Context) error {
 	// todo: do not load pending transfers all the time
 
-	p.pendingTransfers = make([]models.Transfer, 0)
+	p.pendingTransfers = make([]models.PendingTransfer, 0)
 
 	for networkID, lmAddress := range p.liquidityManagers {
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddress)

@@ -16,7 +16,7 @@ type Rebalancer struct {
 }
 
 // ComputeTransfersToBalance provides a mock function with given fields: g, inflightTransfers
-func (_m *Rebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph, inflightTransfers []models.Transfer) ([]models.Transfer, error) {
+func (_m *Rebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph, inflightTransfers []models.PendingTransfer) ([]models.Transfer, error) {
 	ret := _m.Called(g, inflightTransfers)
 
 	if len(ret) == 0 {
@@ -25,10 +25,10 @@ func (_m *Rebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph,
 
 	var r0 []models.Transfer
 	var r1 error
-	if rf, ok := ret.Get(0).(func(liquiditygraph.LiquidityGraph, []models.Transfer) ([]models.Transfer, error)); ok {
+	if rf, ok := ret.Get(0).(func(liquiditygraph.LiquidityGraph, []models.PendingTransfer) ([]models.Transfer, error)); ok {
 		return rf(g, inflightTransfers)
 	}
-	if rf, ok := ret.Get(0).(func(liquiditygraph.LiquidityGraph, []models.Transfer) []models.Transfer); ok {
+	if rf, ok := ret.Get(0).(func(liquiditygraph.LiquidityGraph, []models.PendingTransfer) []models.Transfer); ok {
 		r0 = rf(g, inflightTransfers)
 	} else {
 		if ret.Get(0) != nil {
@@ -36,7 +36,7 @@ func (_m *Rebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph,
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(liquiditygraph.LiquidityGraph, []models.Transfer) error); ok {
+	if rf, ok := ret.Get(1).(func(liquiditygraph.LiquidityGraph, []models.PendingTransfer) error); ok {
 		r1 = rf(g, inflightTransfers)
 	} else {
 		r1 = ret.Error(1)

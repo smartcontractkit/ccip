@@ -17,6 +17,20 @@ type Transfer struct {
 	Amount *big.Int
 }
 
+type PendingTransfer struct {
+	Transfer
+	Status TransferStatus
+}
+
+type TransferStatus string
+
+const (
+	TransferStatusNotReady  = "not-ready"
+	TransferStatusReady     = "ready"
+	TransferStatusFinalized = "finalized"
+	TransferStatusExecuted  = "executed"
+)
+
 func (t Transfer) String() string {
 	return fmt.Sprintf("%v->%v %s", t.From, t.To, t.Amount.String())
 }

@@ -25,7 +25,7 @@ func (e EvmLiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) {
 	return big.NewInt(0), nil
 }
 
-func (e EvmLiquidityManager) GetPendingTransfers(ctx context.Context) ([]models.Transfer, error) {
+func (e EvmLiquidityManager) GetPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
 	return nil, nil
 }
 
