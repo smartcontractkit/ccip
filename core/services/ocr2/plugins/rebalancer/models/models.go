@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -22,6 +23,13 @@ type PendingTransfer struct {
 	Status TransferStatus
 }
 
+func NewPendingTransfer(tr Transfer) PendingTransfer {
+	return PendingTransfer{
+		Transfer: tr,
+		Status:   TransferStatusNotReady,
+	}
+}
+
 type TransferStatus string
 
 const (
@@ -36,7 +44,29 @@ func (t Transfer) String() string {
 }
 
 type ReportMetadata struct {
-	Transfer                Transfer
+	Transfers               []Transfer
 	LiquidityManagerAddress Address
 	NetworkID               NetworkID
+}
+
+func NewReportMetadata(transfers []Transfer, lmAddr Address, networkID NetworkID) ReportMetadata {
+	return ReportMetadata{
+		Transfers:               transfers,
+		LiquidityManagerAddress: lmAddr,
+		NetworkID:               networkID,
+	}
+}
+
+func (r ReportMetadata) Encode() []byte {
+	b, err := json.Marshal(r)
+	if err != nil {
+		panic(fmt.Errorf("report meta %#v encoding unexpected internal error: %w", r, err))
+	}
+	return b
+}
+
+func DecodeReportMetadata(b []byte) (ReportMetadata, error) {
+	var meta ReportMetadata
+	err := json.Unmarshal(b, &meta)
+	return meta, err
 }

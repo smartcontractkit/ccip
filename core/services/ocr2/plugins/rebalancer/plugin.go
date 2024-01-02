@@ -2,7 +2,6 @@ package rebalancer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -52,34 +51,36 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph edges: %w", err)
 	}
 
+	// todo: return the graph balances after syncing them
 	if err := p.syncGraphBalances(ctx); err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph balances: %w", err)
 	}
 
+	// todo: return the pending transfers after loading them
 	if err := p.loadPendingTransfers(ctx); err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("load pending transfers: %w", err)
 	}
 
-	transfersToBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(p.liquidityGraph, p.pendingTransfers)
-	if err != nil {
-		return ocrtypes.Observation{}, fmt.Errorf("compute transfers to balance: %w", err)
+	networks := p.liquidityGraph.GetNodes()
+	liquidityPerChain := make([]models.ChainLiquidity, 0, len(networks))
+	for _, network := range networks {
+		liq, err := p.liquidityGraph.GetWeight(network)
+		if err != nil {
+			return ocrtypes.Observation{}, fmt.Errorf("get network %v weight: %w", network, err)
+		}
+		liquidityPerChain = append(liquidityPerChain, models.NewChainLiquidity(network, liq))
 	}
 
-	if len(transfersToBalance) == 0 {
-		return nil, nil
-	}
-	return json.Marshal(transfersToBalance)
+	return models.NewObservation(liquidityPerChain, p.pendingTransfers).Encode(), nil
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
-	var transfers []models.Transfer
-	if err := json.Unmarshal(ao.Observation, &transfers); err != nil {
+	_, err := models.DecodeObservation(ao.Observation)
+	if err != nil {
 		return fmt.Errorf("invalid observation: %w", err)
 	}
 
-	if len(transfers) == 0 {
-		return errors.New("empty observation")
-	}
+	// todo: consider adding more validations
 
 	return nil
 }
@@ -90,36 +91,38 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query ocrtyp
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, aos []ocrtypes.AttributedObservation) (ocr3types.Outcome, error) {
 	// todo: consensus on observations
-	return ocr3types.Outcome{}, fmt.Errorf("not implemented")
+	outcome := models.NewObservation(nil, nil).Encode()
+	return outcome, fmt.Errorf("not implemented")
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.ReportMetadata], error) {
-	var transfersToReachBalance []models.Transfer
-	if err := json.Unmarshal(outcome, &transfersToReachBalance); err != nil {
-		return nil, fmt.Errorf("parse outcome: %w", err)
+	obs, err := models.DecodeObservation(outcome)
+	if err != nil {
+		return nil, fmt.Errorf("decode outcome: %w", err)
+	}
+
+	transfersToReachBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(
+		p.liquidityGraph, obs.PendingTransfers)
+	if err != nil {
+		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
+	}
+
+	// group transfers by source chain
+	transfersBySourceChain := make(map[models.NetworkID][]models.Transfer)
+	for _, tr := range transfersToReachBalance {
+		transfersBySourceChain[tr.From] = append(transfersBySourceChain[tr.From], tr)
 	}
 
 	var reports []ocr3types.ReportWithInfo[models.ReportMetadata]
-
-	for _, transfer := range transfersToReachBalance {
-		lmAddress, exists := p.liquidityManagers[transfer.From]
+	for sourceChain, transfers := range transfersBySourceChain {
+		lmAddress, exists := p.liquidityManagers[sourceChain]
 		if !exists {
-			return nil, fmt.Errorf("liquidity manager for %v does not exist", transfer.From)
+			return nil, fmt.Errorf("liquidity manager for %v does not exist", sourceChain)
 		}
 
-		reportMeta := models.ReportMetadata{
-			Transfer:                transfer,
-			LiquidityManagerAddress: lmAddress,
-			NetworkID:               transfer.From,
-		}
-
-		b, err := json.Marshal(reportMeta)
-		if err != nil {
-			return nil, fmt.Errorf("encode report meta: %w", err)
-		}
-
+		reportMeta := models.NewReportMetadata(transfers, lmAddress, sourceChain)
 		reports = append(reports, ocr3types.ReportWithInfo[models.ReportMetadata]{
-			Report: b,
+			Report: reportMeta.Encode(),
 			Info:   reportMeta,
 		})
 	}
@@ -128,19 +131,35 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
+	reportMeta, err := models.DecodeReportMetadata(r.Report)
+	if err != nil {
+		return false, fmt.Errorf("decode report metadata: %w", err)
+	}
+
+	fmt.Println(reportMeta.Transfers)
+	// todo: check if reportMeta.transfers are valid
+
 	return true, nil
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
-	p.pendingTransfers = append(p.pendingTransfers, models.PendingTransfer{
-		Transfer: r.Info.Transfer,
-		Status:   models.TransferStatusNotReady,
-	})
+	newPendingTransfers := make([]models.PendingTransfer, 0, len(r.Info.Transfers))
+	for _, tr := range r.Info.Transfers {
+		//if slices.Contains(p.pendingTransfers, tr) { // todo: use a struct for this ops
+		//	return false, nil
+		//}
+		newPendingTransfers = append(newPendingTransfers, models.NewPendingTransfer(tr))
+	}
+
+	p.pendingTransfers = append(p.pendingTransfers, newPendingTransfers...)
 	return true, nil
 }
 
 func (p *Plugin) Close() error {
+	// todo: init a ctx with timeout
+
 	for networkID, lmAddr := range p.liquidityManagers {
+		// todo: lmCloser := liquidityManagerFactory.NewLiquidityManagerCloser(); lmCloser.Close()
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddr)
 		if err != nil {
 			return err
