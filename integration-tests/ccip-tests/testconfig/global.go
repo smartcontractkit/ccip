@@ -10,6 +10,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/osutil"
@@ -29,16 +30,16 @@ const (
 
 var (
 	//go:embed tomls/default.toml
-	DefaultConfig    []byte
-	GlobalTestConfig *Config
+	DefaultConfig []byte
 )
 
-func init() {
+func GlobalTestConfig() *Config {
 	var err error
-	GlobalTestConfig, err = NewConfig()
+	cfg, err := NewConfig()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to load config")
 	}
+	return cfg
 }
 
 // GenericConfig is an interface for all product based config types to implement
@@ -80,6 +81,9 @@ func NewConfig() (*Config, error) {
 	if rawConfig != "" {
 		log.Info().Msg("Found BASE64_TEST_CONFIG_OVERRIDE env var, overriding default config")
 		d, err := base64.StdEncoding.DecodeString(rawConfig)
+		if err != nil {
+			return nil, errors.Wrap(err, ErrReadConfig)
+		}
 		err = toml.Unmarshal(d, &override)
 		if err != nil {
 			return nil, errors.Wrap(err, ErrUnmarshalConfig)
@@ -194,6 +198,7 @@ func (c *Chainlink) ApplyOverrides(from *Chainlink) {
 			} else {
 				c.Nodes = append(c.Nodes, node)
 			}
+			c.Nodes[i].Merge(c.Common)
 		}
 	}
 	if from.NodeMemory != "" {
@@ -228,6 +233,14 @@ func (c *Chainlink) ReadSecrets() error {
 	if tag != "" {
 		c.Common.Tag = tag
 	}
+	upgradeImage, _ := osutil.GetEnv("UPGRADE_IMAGE")
+	if upgradeImage != "" {
+		c.Common.UpgradeImage = upgradeImage
+	}
+	upgradeTag, _ := osutil.GetEnv("UPGRADE_VERSION")
+	if upgradeTag != "" {
+		c.Common.UpgradeTag = upgradeTag
+	}
 	for i, node := range c.Nodes {
 		image, _ := osutil.GetEnv(fmt.Sprintf("CHAINLINK_IMAGE-%d", i+1))
 		if image != "" {
@@ -240,6 +253,18 @@ func (c *Chainlink) ReadSecrets() error {
 			node.Tag = tag
 		} else {
 			node.Tag = c.Common.Tag
+		}
+		upgradeImage, _ := osutil.GetEnv(fmt.Sprintf("UPGRADE_IMAGE-%d", i+1))
+		if upgradeImage != "" {
+			node.UpgradeImage = upgradeImage
+		} else {
+			node.UpgradeImage = c.Common.UpgradeImage
+		}
+		upgradeTag, _ := osutil.GetEnv(fmt.Sprintf("UPGRADE_VERSION-%d", i+1))
+		if upgradeTag != "" {
+			node.UpgradeTag = upgradeTag
+		} else {
+			node.UpgradeTag = c.Common.UpgradeTag
 		}
 	}
 	return nil
@@ -271,6 +296,8 @@ type Node struct {
 	Name                   string            `toml:",omitempty"`
 	Image                  string            `toml:",omitempty"`
 	Tag                    string            `toml:",omitempty"`
+	UpgradeImage           string            `toml:",omitempty"`
+	UpgradeTag             string            `toml:",omitempty"`
 	BaseConfigTOML         string            `toml:",omitempty"`
 	CommonChainConfigTOML  string            `toml:",omitempty"`
 	ChainConfigTOMLByChain map[string]string `toml:",omitempty"` // key is chainID
@@ -278,12 +305,53 @@ type Node struct {
 	DBTag                  string            `toml:",omitempty"`
 }
 
+func (n *Node) Merge(from *Node) {
+	if from == nil || n == nil {
+		return
+	}
+	if n.Name == "" {
+		n.Name = from.Name
+	}
+	if n.Image == "" {
+		n.Image = from.Image
+	}
+	if n.Tag == "" {
+		n.Tag = from.Tag
+	}
+	if n.UpgradeImage == "" {
+		n.UpgradeImage = from.UpgradeImage
+	}
+	if n.UpgradeTag == "" {
+		n.UpgradeTag = from.UpgradeTag
+	}
+	if n.DBImage == "" {
+		n.DBImage = from.DBImage
+	}
+	if n.DBTag == "" {
+		n.DBTag = from.DBTag
+	}
+	if n.BaseConfigTOML == "" {
+		n.BaseConfigTOML = from.BaseConfigTOML
+	}
+	if n.CommonChainConfigTOML == "" {
+		n.CommonChainConfigTOML = from.CommonChainConfigTOML
+	}
+	if n.ChainConfigTOMLByChain == nil {
+		n.ChainConfigTOMLByChain = from.ChainConfigTOMLByChain
+	} else {
+		for k, v := range from.ChainConfigTOMLByChain {
+			if _, ok := n.ChainConfigTOMLByChain[k]; !ok {
+				n.ChainConfigTOMLByChain[k] = v
+			}
+		}
+	}
+}
+
 func (n *Node) ApplyOverrides(from *Node) {
 	if from == nil {
 		return
 	}
 	if n == nil {
-		n = from
 		return
 	}
 	if from.Name != "" {
@@ -294,6 +362,12 @@ func (n *Node) ApplyOverrides(from *Node) {
 	}
 	if from.Tag != "" {
 		n.Tag = from.Tag
+	}
+	if from.UpgradeImage != "" {
+		n.UpgradeImage = from.UpgradeImage
+	}
+	if from.UpgradeTag != "" {
+		n.UpgradeTag = from.UpgradeTag
 	}
 	if from.DBImage != "" {
 		n.DBImage = from.DBImage
@@ -311,10 +385,9 @@ func (n *Node) ApplyOverrides(from *Node) {
 		if n.ChainConfigTOMLByChain == nil {
 			n.ChainConfigTOMLByChain = from.ChainConfigTOMLByChain
 		} else {
-			for chainID, toml := range from.ChainConfigTOMLByChain {
-				n.ChainConfigTOMLByChain[chainID] = toml
+			for chainID, cfg := range from.ChainConfigTOMLByChain {
+				n.ChainConfigTOMLByChain[chainID] = cfg
 			}
 		}
-
 	}
 }

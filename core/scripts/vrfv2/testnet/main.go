@@ -21,10 +21,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 
-	"github.com/smartcontractkit/sqlx"
+	"github.com/jmoiron/sqlx"
 
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
-	"github.com/smartcontractkit/chainlink/v2/core/assets"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/batch_blockhash_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/batch_vrf_coordinator_v2"
@@ -1088,9 +1088,8 @@ func main() {
 				return true
 			} else if strings.Contains(err.Error(), "execution reverted") {
 				return false
-			} else {
-				panic(err)
 			}
+			panic(err)
 		}
 
 		result := helpers.BinarySearch(assets.Ether(int64(*start*2)).ToInt(), big.NewInt(0), isWithdrawable)

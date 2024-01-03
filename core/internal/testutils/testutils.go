@@ -27,7 +27,7 @@ import (
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/smartcontractkit/sqlx"
+	"github.com/jmoiron/sqlx"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -425,15 +425,6 @@ func AssertCount(t *testing.T, db *sqlx.DB, tableName string, expected int64) {
 	require.Equal(t, expected, count)
 }
 
-func AssertCountPerSubject(t *testing.T, db *sqlx.DB, expected int64, subject uuid.UUID) {
-	t.Helper()
-	var count int64
-	err := db.Get(&count, `SELECT COUNT(*) FROM evm.txes
-		WHERE state = 'unstarted' AND subject = $1;`, subject)
-	require.NoError(t, err)
-	require.Equal(t, expected, count)
-}
-
 func NewTestFlagSet() *flag.FlagSet {
 	return flag.NewFlagSet("test", flag.PanicOnError)
 }
@@ -450,4 +441,8 @@ func MustDecodeBase64(s string) (b []byte) {
 		panic(err)
 	}
 	return
+}
+
+func SkipFlakey(t *testing.T, ticketURL string) {
+	t.Skip("Flakey", ticketURL)
 }

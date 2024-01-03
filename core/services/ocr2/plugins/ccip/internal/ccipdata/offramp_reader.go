@@ -19,8 +19,7 @@ const (
 	ManuallyExecute = "manuallyExecute"
 )
 
-// Do not change the JSON format of this struct without consulting with
-// the RDD people first.
+// ExecOffchainConfig Do not change the JSON format of this struct without consulting with the RDD people first.
 type ExecOffchainConfig struct {
 	SourceFinalityDepth         uint32
 	DestOptimisticConfirmations uint32
@@ -94,6 +93,12 @@ type OffRampStaticConfig struct {
 	ArmProxy            common.Address
 }
 
+type OffRampTokens struct {
+	DestinationTokens []common.Address
+	SourceTokens      []common.Address
+	DestinationPool   map[common.Address]common.Address
+}
+
 type TokenBucketRateLimit struct {
 	Tokens      *big.Int
 	LastUpdated uint32
@@ -106,15 +111,15 @@ type TokenBucketRateLimit struct {
 type OffRampReader interface {
 	Closer
 	RegisterFilters(qopts ...pg.QOpt) error
-	// Will error if messages are not a compatible version.
+	// EncodeExecutionReport will error if messages are not a compatible version.
 	EncodeExecutionReport(report ExecReport) ([]byte, error)
+	// DecodeExecutionReport will error if messages are not a compatible version.
 	DecodeExecutionReport(report []byte) (ExecReport, error)
 	// GetExecutionStateChangesBetweenSeqNums returns all the execution state change events for the provided message sequence numbers (inclusive).
 	GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error)
-	GetDestinationTokens(ctx context.Context) ([]common.Address, error)
 	GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []common.Address) ([]TokenBucketRateLimit, error)
 	Address() common.Address
-	// Notifies the reader that the config has changed onchain
+	// ChangeConfig notifies the reader that the config has changed onchain
 	ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error)
 	OffchainConfig() ExecOffchainConfig
 	OnchainConfig() ExecOnchainConfig
@@ -124,7 +129,7 @@ type OffRampReader interface {
 	GetExecutionState(ctx context.Context, sequenceNumber uint64) (uint8, error)
 	GetStaticConfig(ctx context.Context) (OffRampStaticConfig, error)
 	GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error)
-	GetDestinationTokenPools(ctx context.Context) (map[common.Address]common.Address, error)
+	GetTokens(ctx context.Context) (OffRampTokens, error)
 }
 
 // MessageExecutionState defines the execution states of CCIP messages.
