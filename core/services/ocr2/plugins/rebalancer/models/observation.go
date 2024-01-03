@@ -6,25 +6,24 @@ import (
 	"math/big"
 )
 
-// TODO: rename chain -> net
-type ChainLiquidity struct {
-	Chain     NetworkID
+type NetworkLiquidity struct {
+	Network   NetworkID
 	Liquidity *big.Int
 }
 
-func NewChainLiquidity(chain NetworkID, liq *big.Int) ChainLiquidity {
-	return ChainLiquidity{
-		Chain:     chain,
+func NewNetworkLiquidity(chain NetworkID, liq *big.Int) NetworkLiquidity {
+	return NetworkLiquidity{
+		Network:   chain,
 		Liquidity: liq,
 	}
 }
 
 type Observation struct {
-	LiquidityPerChain []ChainLiquidity
+	LiquidityPerChain []NetworkLiquidity
 	PendingTransfers  []PendingTransfer
 }
 
-func NewObservation(liqPerChain []ChainLiquidity, pendingTransfers []PendingTransfer) Observation {
+func NewObservation(liqPerChain []NetworkLiquidity, pendingTransfers []PendingTransfer) Observation {
 	return Observation{
 		LiquidityPerChain: liqPerChain,
 		PendingTransfers:  pendingTransfers,

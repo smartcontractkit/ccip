@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/pkg/errors"
@@ -19,15 +20,17 @@ import (
 
 type Plugin struct {
 	f                       int
+	closePluginTimeout      time.Duration
 	liquidityManagers       map[models.NetworkID]models.Address
 	liquidityManagerFactory liquiditymanager.Factory
-	pendingTransfers        []models.PendingTransfer
+	pendingTransfers        []models.PendingTransfer // todo: create a ds
 	liquidityGraph          liquiditygraph.LiquidityGraph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 }
 
 func NewPlugin(
 	f int,
+	closePluginTimeout time.Duration,
 	liquidityManagerNetwork models.NetworkID,
 	liquidityManagerAddress models.Address,
 	liquidityManagerFactory liquiditymanager.Factory,
@@ -35,7 +38,8 @@ func NewPlugin(
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
 ) *Plugin {
 	return &Plugin{
-		f: f,
+		f:                  f,
+		closePluginTimeout: closePluginTimeout,
 		liquidityManagers: map[models.NetworkID]models.Address{
 			liquidityManagerNetwork: liquidityManagerAddress,
 		},
@@ -55,27 +59,17 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph edges: %w", err)
 	}
 
-	// todo: return the graph balances after syncing them
-	if err := p.syncGraphBalances(ctx); err != nil {
+	networkLiquidities, err := p.syncGraphBalances(ctx)
+	if err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph balances: %w", err)
 	}
 
-	// todo: return the pending transfers after loading them
-	if err := p.loadPendingTransfers(ctx); err != nil {
+	pendingTransfers, err := p.loadPendingTransfers(ctx)
+	if err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("load pending transfers: %w", err)
 	}
 
-	networks := p.liquidityGraph.GetNetworks()
-	liquidityPerChain := make([]models.ChainLiquidity, 0, len(networks))
-	for _, network := range networks {
-		liq, err := p.liquidityGraph.GetLiquidity(network)
-		if err != nil {
-			return ocrtypes.Observation{}, fmt.Errorf("get network %v weight: %w", network, err)
-		}
-		liquidityPerChain = append(liquidityPerChain, models.NewChainLiquidity(network, liq))
-	}
-
-	return models.NewObservation(liquidityPerChain, p.pendingTransfers).Encode(), nil
+	return models.NewObservation(networkLiquidities, pendingTransfers).Encode(), nil
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
@@ -126,13 +120,13 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	}
 
 	// group transfers by source chain
-	transfersBySourceChain := make(map[models.NetworkID][]models.Transfer)
+	transfersBySourceNet := make(map[models.NetworkID][]models.Transfer)
 	for _, tr := range transfersToReachBalance {
-		transfersBySourceChain[tr.From] = append(transfersBySourceChain[tr.From], tr)
+		transfersBySourceNet[tr.From] = append(transfersBySourceNet[tr.From], tr)
 	}
 
 	var reports []ocr3types.ReportWithInfo[models.ReportMetadata]
-	for sourceChain, transfers := range transfersBySourceChain {
+	for sourceChain, transfers := range transfersBySourceNet {
 		lmAddress, exists := p.liquidityManagers[sourceChain]
 		if !exists {
 			return nil, fmt.Errorf("liquidity manager for %v does not exist", sourceChain)
@@ -163,7 +157,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
 	newPendingTransfers := make([]models.PendingTransfer, 0, len(r.Info.Transfers))
 	for _, tr := range r.Info.Transfers {
-		//if slices.Contains(p.pendingTransfers, tr) { // todo: use a struct for this ops
+		//if slices.Contains(p.pendingTransfers, tr) { // todo: use hash / inflight cache to check if it contains this
 		//	return false, nil
 		//}
 		newPendingTransfers = append(newPendingTransfers, models.NewPendingTransfer(tr))
@@ -174,7 +168,8 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r o
 }
 
 func (p *Plugin) Close() error {
-	// todo: init a ctx with timeout
+	ctx, cf := context.WithTimeout(context.Background(), p.closePluginTimeout)
+	defer cf()
 
 	for networkID, lmAddr := range p.liquidityManagers {
 		// todo: lmCloser := liquidityManagerFactory.NewLiquidityManagerCloser(); lmCloser.Close()
@@ -183,7 +178,7 @@ func (p *Plugin) Close() error {
 			return err
 		}
 
-		if err := lm.Close(context.TODO()); err != nil {
+		if err := lm.Close(ctx); err != nil {
 			return err
 		}
 	}
@@ -245,62 +240,65 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 	return nil
 }
 
-func (p *Plugin) syncGraphBalances(ctx context.Context) error {
-	for _, networkID := range p.liquidityGraph.GetNetworks() {
+func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidity, error) {
+	networks := p.liquidityGraph.GetNetworks()
+	networkLiquidities := make([]models.NetworkLiquidity, 0, len(networks))
+
+	for _, networkID := range networks {
 		lmAddr, exists := p.liquidityManagers[networkID]
 		if !exists {
-			return fmt.Errorf("liquidity manager for network %v was not found", networkID)
+			return nil, fmt.Errorf("liquidity manager for network %v was not found", networkID)
 		}
 
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddr)
 		if err != nil {
-			return fmt.Errorf("init liquidity manager: %w", err)
+			return nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
 
 		balance, err := lm.GetBalance(ctx)
 		if err != nil {
-			return fmt.Errorf("get %v balance: %w", networkID, err)
+			return nil, fmt.Errorf("get %v balance: %w", networkID, err)
 		}
 
 		p.liquidityGraph.SetLiquidity(networkID, balance)
+		networkLiquidities = append(networkLiquidities, models.NewNetworkLiquidity(networkID, balance))
 	}
 
-	return nil
+	return networkLiquidities, nil
 }
 
-func (p *Plugin) loadPendingTransfers(ctx context.Context) error {
+func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
 	// todo: do not load pending transfers all the time
 
 	p.pendingTransfers = make([]models.PendingTransfer, 0)
-
 	for networkID, lmAddress := range p.liquidityManagers {
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddress)
 		if err != nil {
-			return fmt.Errorf("init liquidity manager: %w", err)
+			return nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
 
 		pendingTransfers, err := lm.GetPendingTransfers(ctx)
 		if err != nil {
-			return fmt.Errorf("get pending %v transfers: %w", networkID, err)
+			return nil, fmt.Errorf("get pending %v transfers: %w", networkID, err)
 		}
 
 		p.pendingTransfers = append(p.pendingTransfers, pendingTransfers...)
 	}
 
-	return nil
+	return p.pendingTransfers, nil
 }
 
-func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observation) []models.ChainLiquidity {
+func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observation) []models.NetworkLiquidity {
 	liqObsPerChain := make(map[models.NetworkID][]*big.Int)
 	for _, ob := range observations {
 		for _, chainLiq := range ob.LiquidityPerChain {
-			liqObsPerChain[chainLiq.Chain] = append(liqObsPerChain[chainLiq.Chain], chainLiq.Liquidity)
+			liqObsPerChain[chainLiq.Network] = append(liqObsPerChain[chainLiq.Network], chainLiq.Liquidity)
 		}
 	}
 
-	medians := make([]models.ChainLiquidity, 0, len(liqObsPerChain))
+	medians := make([]models.NetworkLiquidity, 0, len(liqObsPerChain))
 	for chainID, liqs := range liqObsPerChain {
-		medians = append(medians, models.NewChainLiquidity(chainID, bigIntSortedMiddle(liqs)))
+		medians = append(medians, models.NewNetworkLiquidity(chainID, bigIntSortedMiddle(liqs)))
 	}
 
 	return medians

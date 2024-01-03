@@ -28,7 +28,7 @@ type LiquidityGraph interface {
 	GetLiquidity(n models.NetworkID) (*big.Int, error)
 
 	// AddConnection adds a new directed graph edge.
-	AddConnection(from, to models.NetworkID) bool // todo: might not be required
+	AddConnection(from, to models.NetworkID) bool
 
 	// IsEmpty returns true when the graph does not contain any network.
 	IsEmpty() bool

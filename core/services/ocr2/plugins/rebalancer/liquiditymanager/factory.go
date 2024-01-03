@@ -1,11 +1,13 @@
 package liquiditymanager
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
+// Factory initializes a new liquidity manager instance.
+//
 //go:generate mockery --quiet --name Factory --output ../rebalancermocks --filename lm_factory_mock.go --case=underscore
 type Factory interface {
 	NewLiquidityManager(networkID models.NetworkID, address models.Address) (LiquidityManager, error)
@@ -18,10 +20,10 @@ func NewBaseLiquidityManagerFactory() *BaseLiquidityManagerFactory {
 }
 
 func (b *BaseLiquidityManagerFactory) NewLiquidityManager(networkID models.NetworkID, address models.Address) (LiquidityManager, error) {
-	switch networkID.Type() {
+	switch typ := networkID.Type(); typ {
 	case models.NetworkTypeEvm:
 		return NewEvmLiquidityManager(address), nil
 	default:
-		return nil, errors.New("liquidity manager not found")
+		return nil, fmt.Errorf("liquidity manager of type %v is not supported", typ)
 	}
 }

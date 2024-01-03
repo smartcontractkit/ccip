@@ -8,6 +8,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
+// DummyRebalancer selects the node with the highest balance
+// and moves all the liquidity from the other nodes to it.
+// inflightTransfers are ignored. This implementation is just an example.
 type DummyRebalancer struct{}
 
 func NewDummyRebalancer() *DummyRebalancer {
@@ -15,10 +18,6 @@ func NewDummyRebalancer() *DummyRebalancer {
 }
 
 func (r *DummyRebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph, inflightTransfers []models.PendingTransfer) ([]models.Transfer, error) {
-	// selects the node with the highest balance
-	// and moves all the liquidity from the other nodes to it
-	// inflightTransfers are ignored
-
 	if g.IsEmpty() {
 		return nil, fmt.Errorf("empty graph")
 	}
