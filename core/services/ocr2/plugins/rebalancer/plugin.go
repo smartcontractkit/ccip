@@ -21,7 +21,7 @@ import (
 type Plugin struct {
 	f                       int
 	closePluginTimeout      time.Duration
-	liquidityManagers       map[models.NetworkID]models.Address // todo: create some registry ds
+	liquidityManagers       *liquiditymanager.Registry
 	liquidityManagerFactory liquiditymanager.Factory
 	liquidityGraph          liquiditygraph.LiquidityGraph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
@@ -37,12 +37,14 @@ func NewPlugin(
 	liquidityGraph liquiditygraph.LiquidityGraph,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
 ) *Plugin {
+
+	liquidityManagers := liquiditymanager.NewRegistry()
+	liquidityManagers.Add(liquidityManagerNetwork, liquidityManagerAddress)
+
 	return &Plugin{
-		f:                  f,
-		closePluginTimeout: closePluginTimeout,
-		liquidityManagers: map[models.NetworkID]models.Address{
-			liquidityManagerNetwork: liquidityManagerAddress,
-		},
+		f:                       f,
+		closePluginTimeout:      closePluginTimeout,
+		liquidityManagers:       liquidityManagers,
 		liquidityManagerFactory: liquidityManagerFactory,
 		liquidityGraph:          liquidityGraph,
 		liquidityRebalancer:     liquidityRebalancer,
@@ -126,13 +128,13 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	}
 
 	var reports []ocr3types.ReportWithInfo[models.ReportMetadata]
-	for sourceChain, transfers := range transfersBySourceNet {
-		lmAddress, exists := p.liquidityManagers[sourceChain]
+	for sourceNet, transfers := range transfersBySourceNet {
+		lmAddress, exists := p.liquidityManagers.Get(sourceNet)
 		if !exists {
-			return nil, fmt.Errorf("liquidity manager for %v does not exist", sourceChain)
+			return nil, fmt.Errorf("liquidity manager for %v does not exist", sourceNet)
 		}
 
-		reportMeta := models.NewReportMetadata(transfers, lmAddress, sourceChain)
+		reportMeta := models.NewReportMetadata(transfers, lmAddress, sourceNet)
 		reports = append(reports, ocr3types.ReportWithInfo[models.ReportMetadata]{
 			Report: reportMeta.Encode(),
 			Info:   reportMeta,
@@ -171,7 +173,7 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), p.closePluginTimeout)
 	defer cf()
 
-	for networkID, lmAddr := range p.liquidityManagers {
+	for networkID, lmAddr := range p.liquidityManagers.GetAll() {
 		// todo: lmCloser := liquidityManagerFactory.NewLiquidityManagerCloser(); lmCloser.Close()
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddr)
 		if err != nil {
@@ -198,7 +200,7 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 
 	seen := mapset.NewSet[qItem]()
 	queue := mapset.NewSet[qItem]()
-	for networkID, lmAddress := range p.liquidityManagers {
+	for networkID, lmAddress := range p.liquidityManagers.GetAll() {
 		elem := qItem{networkID: networkID, lmAddress: lmAddress}
 		queue.Add(elem)
 		seen.Add(elem)
@@ -230,8 +232,8 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 				queue.Add(newElem)
 				seen.Add(newElem)
 
-				if _, exists := p.liquidityManagers[destNetworkID]; !exists {
-					p.liquidityManagers[destNetworkID] = lmAddr
+				if _, exists := p.liquidityManagers.Get(destNetworkID); !exists {
+					p.liquidityManagers.Add(destNetworkID, lmAddr)
 				}
 			}
 		}
@@ -245,7 +247,7 @@ func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidi
 	networkLiquidities := make([]models.NetworkLiquidity, 0, len(networks))
 
 	for _, networkID := range networks {
-		lmAddr, exists := p.liquidityManagers[networkID]
+		lmAddr, exists := p.liquidityManagers.Get(networkID)
 		if !exists {
 			return nil, fmt.Errorf("liquidity manager for network %v was not found", networkID)
 		}
@@ -271,7 +273,7 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 	// todo: do not load pending transfers all the time
 
 	pendingTransfers := make([]models.PendingTransfer, 0)
-	for networkID, lmAddress := range p.liquidityManagers {
+	for networkID, lmAddress := range p.liquidityManagers.GetAll() {
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddress)
 		if err != nil {
 			return nil, fmt.Errorf("init liquidity manager: %w", err)
