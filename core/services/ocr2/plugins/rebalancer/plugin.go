@@ -21,11 +21,11 @@ import (
 type Plugin struct {
 	f                       int
 	closePluginTimeout      time.Duration
-	liquidityManagers       map[models.NetworkID]models.Address
+	liquidityManagers       map[models.NetworkID]models.Address // todo: create some registry ds
 	liquidityManagerFactory liquiditymanager.Factory
-	pendingTransfers        []models.PendingTransfer // todo: create a ds
 	liquidityGraph          liquiditygraph.LiquidityGraph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
+	pendingTransfers        *PendingTransfersCache
 }
 
 func NewPlugin(
@@ -44,9 +44,9 @@ func NewPlugin(
 			liquidityManagerNetwork: liquidityManagerAddress,
 		},
 		liquidityManagerFactory: liquidityManagerFactory,
-		pendingTransfers:        make([]models.PendingTransfer, 0), // todo: thread-safe
 		liquidityGraph:          liquidityGraph,
 		liquidityRebalancer:     liquidityRebalancer,
+		pendingTransfers:        NewPendingTransfersCache(),
 	}
 }
 
@@ -157,13 +157,13 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
 	newPendingTransfers := make([]models.PendingTransfer, 0, len(r.Info.Transfers))
 	for _, tr := range r.Info.Transfers {
-		//if slices.Contains(p.pendingTransfers, tr) { // todo: use hash / inflight cache to check if it contains this
-		//	return false, nil
-		//}
+		if p.pendingTransfers.ContainsTransfer(tr) {
+			return false, nil
+		}
 		newPendingTransfers = append(newPendingTransfers, models.NewPendingTransfer(tr))
 	}
 
-	p.pendingTransfers = append(p.pendingTransfers, newPendingTransfers...)
+	p.pendingTransfers.Add(newPendingTransfers)
 	return true, nil
 }
 
@@ -270,22 +270,23 @@ func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidi
 func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
 	// todo: do not load pending transfers all the time
 
-	p.pendingTransfers = make([]models.PendingTransfer, 0)
+	pendingTransfers := make([]models.PendingTransfer, 0)
 	for networkID, lmAddress := range p.liquidityManagers {
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddress)
 		if err != nil {
 			return nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
 
-		pendingTransfers, err := lm.GetPendingTransfers(ctx)
+		netPendingTransfers, err := lm.GetPendingTransfers(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("get pending %v transfers: %w", networkID, err)
 		}
 
-		p.pendingTransfers = append(p.pendingTransfers, pendingTransfers...)
+		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
 	}
 
-	return p.pendingTransfers, nil
+	p.pendingTransfers.Set(pendingTransfers)
+	return pendingTransfers, nil
 }
 
 func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observation) []models.NetworkLiquidity {

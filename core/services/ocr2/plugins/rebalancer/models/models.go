@@ -38,6 +38,12 @@ type Transfer struct {
 	Amount *big.Int
 }
 
+func (t Transfer) Equals(other Transfer) bool {
+	return t.From == other.From &&
+		t.To == other.To &&
+		t.Amount.Cmp(other.Amount) == 0
+}
+
 type PendingTransfer struct {
 	Transfer
 	Status TransferStatus
