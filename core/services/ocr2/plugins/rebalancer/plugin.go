@@ -307,6 +307,7 @@ func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observatio
 }
 
 func (p *Plugin) computePendingTransfersConsensus(observations []models.Observation) ([]models.PendingTransfer, error) {
+	eventFromHash := make(map[[32]byte]models.PendingTransfer)
 	counts := make(map[[32]byte]int)
 	for _, obs := range observations {
 		for _, tr := range obs.PendingTransfers {
@@ -315,13 +316,18 @@ func (p *Plugin) computePendingTransfersConsensus(observations []models.Observat
 				return nil, fmt.Errorf("hash %v: %w", tr, err)
 			}
 			counts[h]++
+			eventFromHash[h] = tr
 		}
 	}
 
 	var quorumEvents []models.PendingTransfer
-	for _, count := range counts {
+	for h, count := range counts {
 		if count >= p.f+1 {
-			quorumEvents = append(quorumEvents)
+			ev, exists := eventFromHash[h]
+			if !exists {
+				return nil, fmt.Errorf("internal issue, event from hash %v not found", h)
+			}
+			quorumEvents = append(quorumEvents, ev)
 		}
 	}
 

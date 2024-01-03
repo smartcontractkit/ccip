@@ -13,6 +13,25 @@ type Address common.Address
 
 type NetworkID uint64
 
+const (
+	NetworkTypeUnknown = "unknown"
+	NetworkTypeEvm     = "evm"
+	NetworkTypeSolana  = "sol"
+)
+
+func (n NetworkID) Type() NetworkType {
+	switch n {
+	case 1, 2, 3: // todo: use some lib
+		return NetworkTypeEvm
+	case 4:
+		return NetworkTypeSolana
+	default:
+		return NetworkTypeUnknown
+	}
+}
+
+type NetworkType string
+
 type Transfer struct {
 	From   NetworkID
 	To     NetworkID

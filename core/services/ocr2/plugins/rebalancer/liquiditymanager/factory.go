@@ -18,10 +18,10 @@ func NewBaseLiquidityManagerFactory() *BaseLiquidityManagerFactory {
 }
 
 func (b *BaseLiquidityManagerFactory) NewLiquidityManager(networkID models.NetworkID, address models.Address) (LiquidityManager, error) {
-	switch networkID {
-	case 1: // todo
+	switch networkID.Type() {
+	case models.NetworkTypeEvm:
 		return NewEvmLiquidityManager(address), nil
 	default:
-		return nil, errors.New("not found")
+		return nil, errors.New("liquidity manager not found")
 	}
 }

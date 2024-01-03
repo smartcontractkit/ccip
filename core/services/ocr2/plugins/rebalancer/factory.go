@@ -29,7 +29,7 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 	liquidityManagerFactory := liquiditymanager.NewBaseLiquidityManagerFactory()
 
 	return NewPlugin(
-			offchainConfig.F,
+			config.F,
 			offchainConfig.LiquidityManagerNetwork,
 			offchainConfig.LiquidityManagerAddress,
 			liquidityManagerFactory,
