@@ -186,7 +186,7 @@ func (s *TokenDataReader) callAttestationApi(ctx context.Context, usdcMessageHas
 	case errors.Is(err, tokendata.ErrRateLimit):
 		coolDownDuration := defaultCoolDownDuration
 		if retryAfterHeader, exists := headers["Retry-After"]; exists && len(retryAfterHeader) > 0 {
-			if retryAfterSec, err := strconv.ParseInt(retryAfterHeader[0], 10, 64); err == nil {
+			if retryAfterSec, errParseInt := strconv.ParseInt(retryAfterHeader[0], 10, 64); errParseInt == nil {
 				coolDownDuration = time.Duration(retryAfterSec) * time.Second
 			}
 		}
