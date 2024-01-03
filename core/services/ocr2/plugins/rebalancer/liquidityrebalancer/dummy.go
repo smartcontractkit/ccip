@@ -23,17 +23,17 @@ func (r *DummyRebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGr
 		return nil, fmt.Errorf("empty graph")
 	}
 
-	keys := g.GetNodes()
+	keys := g.GetNetworks()
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 
 	luckyNode := keys[0]
-	maxV, err := g.GetWeight(luckyNode)
+	maxV, err := g.GetLiquidity(luckyNode)
 	if err != nil {
 		return nil, fmt.Errorf("get weight %v: %w", luckyNode, err)
 	}
 
 	for _, k := range keys {
-		w, err := g.GetWeight(k)
+		w, err := g.GetLiquidity(k)
 		if err != nil {
 			return nil, fmt.Errorf("get weight %v: %w", k, err)
 		}
@@ -45,12 +45,12 @@ func (r *DummyRebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGr
 	}
 
 	transfers := make([]models.Transfer, 0)
-	for _, node := range g.GetNodes() {
+	for _, node := range g.GetNetworks() {
 		if node == luckyNode {
 			continue
 		}
 
-		w, err := g.GetWeight(node)
+		w, err := g.GetLiquidity(node)
 		if err != nil {
 			return nil, fmt.Errorf("get weight %v: %w", node, err)
 		}

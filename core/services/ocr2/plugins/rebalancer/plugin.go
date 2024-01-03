@@ -65,10 +65,10 @@ func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContex
 		return ocrtypes.Observation{}, fmt.Errorf("load pending transfers: %w", err)
 	}
 
-	networks := p.liquidityGraph.GetNodes()
+	networks := p.liquidityGraph.GetNetworks()
 	liquidityPerChain := make([]models.ChainLiquidity, 0, len(networks))
 	for _, network := range networks {
-		liq, err := p.liquidityGraph.GetWeight(network)
+		liq, err := p.liquidityGraph.GetLiquidity(network)
 		if err != nil {
 			return ocrtypes.Observation{}, fmt.Errorf("get network %v weight: %w", network, err)
 		}
@@ -215,7 +215,7 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 			return errors.New("unexpected internal error, there is a bug in the algorithm")
 		}
 
-		p.liquidityGraph.AddNode(elem.networkID, big.NewInt(0)) // TODO: investigate fetching the balance here.
+		p.liquidityGraph.AddNetwork(elem.networkID, big.NewInt(0)) // TODO: investigate fetching the balance here.
 
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(elem.networkID, elem.lmAddress)
 		if err != nil {
@@ -228,7 +228,7 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 		}
 
 		for destNetworkID, lmAddr := range destinationLMs {
-			p.liquidityGraph.AddEdge(elem.networkID, destNetworkID)
+			p.liquidityGraph.AddConnection(elem.networkID, destNetworkID)
 
 			newElem := qItem{networkID: destNetworkID, lmAddress: lmAddr}
 			if !seen.Contains(newElem) {
@@ -246,7 +246,7 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 }
 
 func (p *Plugin) syncGraphBalances(ctx context.Context) error {
-	for _, networkID := range p.liquidityGraph.GetNodes() {
+	for _, networkID := range p.liquidityGraph.GetNetworks() {
 		lmAddr, exists := p.liquidityManagers[networkID]
 		if !exists {
 			return fmt.Errorf("liquidity manager for network %v was not found", networkID)
@@ -262,7 +262,7 @@ func (p *Plugin) syncGraphBalances(ctx context.Context) error {
 			return fmt.Errorf("get %v balance: %w", networkID, err)
 		}
 
-		p.liquidityGraph.SetWeight(networkID, balance)
+		p.liquidityGraph.SetLiquidity(networkID, balance)
 	}
 
 	return nil

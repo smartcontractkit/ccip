@@ -11,10 +11,10 @@ import (
 
 func TestDummyRebalancerComputeTransfersToBalance(t *testing.T) {
 	g := liquiditygraph.NewGraph()
-	g.AddNode(10, big.NewInt(1000))
-	g.AddNode(20, big.NewInt(500))
-	g.AddNode(30, big.NewInt(200))
-	g.AddNode(40, big.NewInt(300))
+	g.AddNetwork(10, big.NewInt(1000))
+	g.AddNetwork(20, big.NewInt(500))
+	g.AddNetwork(30, big.NewInt(200))
+	g.AddNetwork(40, big.NewInt(300))
 
 	r := NewDummyRebalancer()
 	transfers, err := r.ComputeTransfersToBalance(g, nil)
