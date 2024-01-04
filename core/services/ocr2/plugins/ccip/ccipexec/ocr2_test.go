@@ -1078,7 +1078,7 @@ func TestExecutionReportingPlugin_getTokenDataWithCappedLatency(t *testing.T) {
 				EVM2EVMMessage: internal.EVM2EVMMessage{TokenAmounts: make([]internal.TokenAmount, 1)},
 			}
 
-			_, _, err := p.getTokenDataWithCappedLatency(ctx, msg, tc.allowedWaitingTime)
+			_, _, err := p.getTokenDataWithTimeout(ctx, msg, tc.allowedWaitingTime)
 			if tc.expErr {
 				assert.Error(t, err)
 				return

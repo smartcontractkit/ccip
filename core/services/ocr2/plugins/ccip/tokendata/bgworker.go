@@ -67,7 +67,7 @@ func (w *BackgroundWorker) GetMsgTokenData(ctx context.Context, msg internal.EVM
 			return nil, r.Err
 		}
 		if r.TokenAmountIndex < 0 || r.TokenAmountIndex >= len(msg.TokenAmounts) {
-			return nil, fmt.Errorf("token data index incosistency")
+			return nil, fmt.Errorf("token data index inconsistency")
 		}
 		tokenDatas[r.TokenAmountIndex] = r.Data
 	}
@@ -89,7 +89,7 @@ func NewBackgroundWorker(
 	w := &BackgroundWorker{
 		tokenDataReaders: tokenDataReaders,
 		numWorkers:       numWorkers,
-		jobsChan:         make(chan internal.EVM2EVMOnRampCCIPSendRequestedWithMeta),
+		jobsChan:         make(chan internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, numWorkers*100),
 		resultsCache:     newResultsCache(ctx, expirationDur, expirationDur/2),
 		timeoutDur:       timeoutDur,
 	}
@@ -137,7 +137,9 @@ func (w *BackgroundWorker) workOnMsg(ctx context.Context, msg internal.EVM2EVMOn
 		}
 
 		// if there was any error or if the data do not exist in the cache make a call to the provider
-		tknData, err := offchainTokenDataProvider.ReadTokenData(ctx, msg, i)
+		timeoutCtx, cf := context.WithTimeout(ctx, w.timeoutDur)
+		tknData, err := offchainTokenDataProvider.ReadTokenData(timeoutCtx, msg, i)
+		cf()
 		results = append(results, msgResult{
 			TokenAmountIndex: i,
 			Err:              err,
