@@ -56,7 +56,7 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (ocrtypes.
 	return ocrtypes.Query{}, nil
 }
 
-func (p *Plugin) Observation(ctx context.Context, outctx ocr3types.OutcomeContext, query ocrtypes.Query) (ocrtypes.Observation, error) {
+func (p *Plugin) Observation(ctx context.Context, _ ocr3types.OutcomeContext, _ ocrtypes.Query) (ocrtypes.Observation, error) {
 	if err := p.syncGraphEdges(ctx); err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph edges: %w", err)
 	}
@@ -188,6 +188,7 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
+// todo: consider placing the graph exploration logic under graph package to keep the plugin logic cleaner
 func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 	// todo: if there wasn't any change to the graph stop earlier
 

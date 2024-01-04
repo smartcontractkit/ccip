@@ -38,6 +38,14 @@ type Transfer struct {
 	Amount *big.Int
 }
 
+func NewTransfer(from, to NetworkID, amount *big.Int) Transfer {
+	return Transfer{
+		From:   from,
+		To:     to,
+		Amount: amount,
+	}
+}
+
 func (t Transfer) Equals(other Transfer) bool {
 	return t.From == other.From &&
 		t.To == other.To &&
