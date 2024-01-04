@@ -57,11 +57,11 @@ func TestOffRampFilters(t *testing.T) {
 
 func TestExecOffchainConfig_Encoding(t *testing.T) {
 	tests := map[string]struct {
-		want      ccipdata.ExecOffchainConfig
+		want      v1_0_0.ExecOffchainConfig
 		expectErr bool
 	}{
 		"encodes and decodes config with all fields set": {
-			want: ccipdata.ExecOffchainConfig{
+			want: v1_0_0.ExecOffchainConfig{
 				SourceFinalityDepth:         3,
 				DestOptimisticConfirmations: 6,
 				DestFinalityDepth:           3,
@@ -73,7 +73,7 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 			},
 		},
 		"fails decoding when all fields present but with 0 values": {
-			want: ccipdata.ExecOffchainConfig{
+			want: v1_0_0.ExecOffchainConfig{
 				SourceFinalityDepth:         0,
 				DestFinalityDepth:           0,
 				DestOptimisticConfirmations: 0,
@@ -86,11 +86,11 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 			expectErr: true,
 		},
 		"fails decoding when all fields are missing": {
-			want:      ccipdata.ExecOffchainConfig{},
+			want:      v1_0_0.ExecOffchainConfig{},
 			expectErr: true,
 		},
 		"fails decoding when some fields are missing": {
-			want: ccipdata.ExecOffchainConfig{
+			want: v1_0_0.ExecOffchainConfig{
 				SourceFinalityDepth: 99999999,
 				InflightCacheExpiry: models.MustMakeDuration(64 * time.Second),
 			},
@@ -102,7 +102,7 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 			exp := tc.want
 			encode, err := ccipconfig.EncodeOffchainConfig(&exp)
 			require.NoError(t, err)
-			got, err := ccipconfig.DecodeOffchainConfig[ccipdata.ExecOffchainConfig](encode)
+			got, err := ccipconfig.DecodeOffchainConfig[v1_0_0.ExecOffchainConfig](encode)
 
 			if tc.expectErr {
 				require.ErrorContains(t, err, "must set")
