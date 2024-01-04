@@ -36,6 +36,7 @@ type Transfer struct {
 	From   NetworkID
 	To     NetworkID
 	Amount *big.Int
+	// todo: consider adding some unique id field
 }
 
 func NewTransfer(from, to NetworkID, amount *big.Int) Transfer {
