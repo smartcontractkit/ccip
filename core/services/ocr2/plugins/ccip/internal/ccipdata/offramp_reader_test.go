@@ -1,6 +1,7 @@
 package ccipdata_test
 
 import (
+	"encoding/json"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -55,7 +56,7 @@ func TestOffRampFilters(t *testing.T) {
 	}, 3)
 }
 
-func TestExecOffchainConfig_Encoding(t *testing.T) {
+func TestExecOffchainConfig100_Encoding(t *testing.T) {
 	tests := map[string]struct {
 		want      v1_0_0.ExecOffchainConfig
 		expectErr bool
@@ -111,6 +112,37 @@ func TestExecOffchainConfig_Encoding(t *testing.T) {
 				require.Equal(t, tc.want, got)
 			}
 		})
+	}
+}
+
+func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
+	config := v1_0_0.ExecOffchainConfig{
+		SourceFinalityDepth:         3,
+		DestOptimisticConfirmations: 6,
+		DestFinalityDepth:           3,
+		BatchGasLimit:               5_000_000,
+		RelativeBoostPerWaitHour:    0.07,
+		MaxGasPrice:                 200e9,
+		InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
+		RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
+	}
+	encoded, err := ccipconfig.EncodeOffchainConfig(&config)
+	require.NoError(t, err)
+
+	var configAsMap map[string]any
+	err = json.Unmarshal(encoded, &configAsMap)
+	require.NoError(t, err)
+	for keyToDelete := range configAsMap {
+		partialConfig := make(map[string]any)
+		for k, v := range configAsMap {
+			if k != keyToDelete {
+				partialConfig[k] = v
+			}
+		}
+		encodedPartialConfig, err := json.Marshal(partialConfig)
+		require.NoError(t, err)
+		_, err = ccipconfig.DecodeOffchainConfig[v1_0_0.ExecOffchainConfig](encodedPartialConfig)
+		require.ErrorContains(t, err, keyToDelete)
 	}
 }
 
