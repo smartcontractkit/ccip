@@ -1,7 +1,6 @@
 package ccipdata_test
 
 import (
-	"encoding/json"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -27,12 +26,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
@@ -54,96 +51,6 @@ func TestOffRampFilters(t *testing.T) {
 		require.NoError(t, c.RegisterFilters())
 		return c
 	}, 3)
-}
-
-func TestExecOffchainConfig100_Encoding(t *testing.T) {
-	tests := map[string]struct {
-		want      v1_0_0.ExecOffchainConfig
-		expectErr bool
-	}{
-		"encodes and decodes config with all fields set": {
-			want: v1_0_0.ExecOffchainConfig{
-				SourceFinalityDepth:         3,
-				DestOptimisticConfirmations: 6,
-				DestFinalityDepth:           3,
-				BatchGasLimit:               5_000_000,
-				RelativeBoostPerWaitHour:    0.07,
-				MaxGasPrice:                 200e9,
-				InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
-				RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
-			},
-		},
-		"fails decoding when all fields present but with 0 values": {
-			want: v1_0_0.ExecOffchainConfig{
-				SourceFinalityDepth:         0,
-				DestFinalityDepth:           0,
-				DestOptimisticConfirmations: 0,
-				BatchGasLimit:               0,
-				RelativeBoostPerWaitHour:    0,
-				MaxGasPrice:                 0,
-				InflightCacheExpiry:         models.MustMakeDuration(0),
-				RootSnoozeTime:              models.MustMakeDuration(0),
-			},
-			expectErr: true,
-		},
-		"fails decoding when all fields are missing": {
-			want:      v1_0_0.ExecOffchainConfig{},
-			expectErr: true,
-		},
-		"fails decoding when some fields are missing": {
-			want: v1_0_0.ExecOffchainConfig{
-				SourceFinalityDepth: 99999999,
-				InflightCacheExpiry: models.MustMakeDuration(64 * time.Second),
-			},
-			expectErr: true,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			exp := tc.want
-			encode, err := ccipconfig.EncodeOffchainConfig(&exp)
-			require.NoError(t, err)
-			got, err := ccipconfig.DecodeOffchainConfig[v1_0_0.ExecOffchainConfig](encode)
-
-			if tc.expectErr {
-				require.ErrorContains(t, err, "must set")
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tc.want, got)
-			}
-		})
-	}
-}
-
-func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
-	config := v1_0_0.ExecOffchainConfig{
-		SourceFinalityDepth:         3,
-		DestOptimisticConfirmations: 6,
-		DestFinalityDepth:           3,
-		BatchGasLimit:               5_000_000,
-		RelativeBoostPerWaitHour:    0.07,
-		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
-		RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
-	}
-	encoded, err := ccipconfig.EncodeOffchainConfig(&config)
-	require.NoError(t, err)
-
-	var configAsMap map[string]any
-	err = json.Unmarshal(encoded, &configAsMap)
-	require.NoError(t, err)
-	for keyToDelete := range configAsMap {
-		partialConfig := make(map[string]any)
-		for k, v := range configAsMap {
-			if k != keyToDelete {
-				partialConfig[k] = v
-			}
-		}
-		encodedPartialConfig, err := json.Marshal(partialConfig)
-		require.NoError(t, err)
-		_, err = ccipconfig.DecodeOffchainConfig[v1_0_0.ExecOffchainConfig](encodedPartialConfig)
-		require.ErrorContains(t, err, keyToDelete)
-	}
 }
 
 func TestExecOnchainConfig100(t *testing.T) {
