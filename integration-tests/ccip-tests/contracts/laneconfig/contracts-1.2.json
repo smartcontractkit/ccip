@@ -1,8 +1,7 @@
 {
     "lane_configs": {
       "Arbitrum Mainnet": {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "fee_token": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
         "bridge_tokens": [
           "0x94025780a1aB58868D9B2dBBB775f44b32e8E6e5",
           "0x27f485b62C4A7E635F561A87560Adf5090239E93",
@@ -12,17 +11,17 @@
           "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
           "0xe85411C030fB32A9D8b14Bbbc6CB19417391F711",
           "0x1c22531AA9747d76fFF8F0A43b37954ca67d28e0",
-          "0x8BF591Eae535f93a242D5A954d3Cde648b48A5A8"
+          "0x29B3b71FB61591a2c535f00841a4aE7137984ce0"
         ],
         "bridge_tokens_pools": [
-          "0x94025780a1aB58868D9B2dBBB775f44b32e8E6e5",
-          "0x27f485b62C4A7E635F561A87560Adf5090239E93",
-          "0x85225Ed797fd4128Ac45A992C46eA4681a7A15dA",
-          "0xfb9Fed8cB962548A11fE7F6F282949061395c7F5",
-          "0x1079563dc03AAd1fe2F3993073520A4725d3b8ba",
-          "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
-          "0xe85411C030fB32A9D8b14Bbbc6CB19417391F711",
-          "0x1c22531AA9747d76fFF8F0A43b37954ca67d28e0",
+          "0x84968c789Fc403714992fa43ecE311fE0a9173D2",
+          "0x0242F309138dd28fc665C30776d8EB6a88dB1F7c",
+          "0x403Ec7c5f1E0ED5394CBAbcBe285c47e64C2B148",
+          "0x57DfB084069620dBa08B69f38888ce92299B6104",
+          "0xDf8b4C581843E21d86EA3B7b9fb0278F13aCD671",
+          "0x69Ee2fC63B9Ff218EEcEDD2F2375D11da229BdA9",
+          "0xD550449aC82d2a0121F32d6e0a3B29e693071739",
+          "0xCE8E12B4C38eAB46044Ac9cAdea701D9AC1108E3",
           "0x8BF591Eae535f93a242D5A954d3Cde648b48A5A8"
         ],
         "arm": "0xe06b0e8c4bd455153e8794ad7Ea8Ff5A14B64E4b",
@@ -102,8 +101,7 @@
           }
       },
       "Base Mainnet": {
-          "is_native_fee_token": true,
-          "fee_token": "",
+          "fee_token": "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196",
           "bridge_tokens": [
             "0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196",
             "0xCA160D11087E03fd398d40f561cd4768825f4958",
@@ -227,10 +225,10 @@
         "is_native_fee_token": true,
         "fee_token": "",
         "bridge_tokens": [
+          "0x514910771AF9Ca656af840dff83E8264EcF986CA",
           "0x94025780a1aB58868D9B2dBBB775f44b32e8E6e5",
           "0x888888435FDe8e7d4c54cAb67f206e4199454c60",
           "0x85225Ed797fd4128Ac45A992C46eA4681a7A15dA",
-          "0x514910771AF9Ca656af840dff83E8264EcF986CA",
           "0xCA160D11087E03fd398d40f561cd4768825f4958",
           "0x183015a9bA6fF60230fdEaDc3F43b3D788b13e21",
           "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -240,10 +238,10 @@
           "0x8BF591Eae535f93a242D5A954d3Cde648b48A5A8"
         ],
         "bridge_tokens_pools": [
+          "0xC2291992A08eBFDfedfE248F2CCD34Da63570DF4",
           "0xf0D19c04f04382048fC9ad157C529CeB2c7be823",
           "0x50f6631B377be52E132DF35a2F05eA54fda882ac",
           "0x55562A08104837FF55E3A66c49A1419b6311c1E6",
-          "0xC2291992A08eBFDfedfE248F2CCD34Da63570DF4",
           "0x57D3bb46aF4A9b210FAE046796013090D428475F",
           "0xD0b84F42b3B88eeF7AA88c48Ac8EC08130d48595",
           "0xA81f4AB595dE5C14759245DE5ce9899D380FeFda",
@@ -325,8 +323,7 @@
         }
       },
       "Kroma Mainnet": {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "fee_token": "0xC1F6f7622ad37C3f46cDF6F8AA0344ADE80BF450",
         "bridge_tokens": ["0xC1F6f7622ad37C3f46cDF6F8AA0344ADE80BF450"],
         "bridge_tokens_pools": ["0xd9547B702673c61c84bb2dF6FDf6D2F5309fE536"],
         "arm" : "0xB59779d3364BC6d71168245f9ebb96469E5a5a98",
@@ -459,8 +456,7 @@
         }
       },
       "WeMix Mainnet": {
-          "is_native_fee_token": true,
-          "fee_token": "",
+          "fee_token": "0x80f1FcdC96B55e459BF52b998aBBE2c364935d69",
           "bridge_tokens": ["0x80f1FcdC96B55e459BF52b998aBBE2c364935d69"],
           "bridge_tokens_pools": ["0x80282dF25600c08Bde7560f6c1E509366c1BfBFC"],
           "arm" : "0x07aaC8B69A62dB5bd3d244091916EbF2fac17b76",
