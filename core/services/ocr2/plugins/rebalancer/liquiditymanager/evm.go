@@ -88,16 +88,10 @@ func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since tim
 			return nil, fmt.Errorf("invalid log: %w", err)
 		}
 
-		// todo: place the time in the event itself
-		block, err := e.ec.HeaderByNumber(ctx, big.NewInt(log.BlockNumber))
-		if err != nil {
-			return nil, fmt.Errorf("header by number %d: %w", log.BlockNumber, err)
-		}
-
 		tr := models.NewPendingTransfer(models.NewTransfer(
 			models.NetworkID(liqTransferred.FromChainSelector),
 			models.NetworkID(liqTransferred.ToChainSelector),
-			time.Unix(int64(block.Time), 0), // todo: test parsing
+			log.BlockTimestamp,
 			liqTransferred.Amount,
 		))
 		// tr.Status = models.TransferStatusExecuted // todo: determine the status
