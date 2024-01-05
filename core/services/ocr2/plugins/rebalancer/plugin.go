@@ -271,8 +271,6 @@ func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidi
 }
 
 func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
-	// todo: do not load pending transfers all the time
-
 	pendingTransfers := make([]models.PendingTransfer, 0)
 	for networkID, lmAddress := range p.liquidityManagers.GetAll() {
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddress)
@@ -280,15 +278,22 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 			return nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
 
-		netPendingTransfers, err := lm.GetPendingTransfers(ctx)
+		// todo: place in config and set a proper value
+		dateToStartLookingFrom := time.Now().Add(-10 * 24 * time.Hour)
+
+		if mostRecentTransfer, exists := p.pendingTransfers.LatestNetworkTransfer(networkID); exists {
+			dateToStartLookingFrom = mostRecentTransfer.Date
+		}
+
+		newPendingTransfers, err := lm.GetPendingTransfers(ctx, dateToStartLookingFrom)
 		if err != nil {
 			return nil, fmt.Errorf("get pending %v transfers: %w", networkID, err)
 		}
 
-		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
+		pendingTransfers = append(pendingTransfers, newPendingTransfers...)
 	}
 
-	p.pendingTransfers.Set(pendingTransfers)
+	p.pendingTransfers.Add(pendingTransfers)
 	return pendingTransfers, nil
 }
 

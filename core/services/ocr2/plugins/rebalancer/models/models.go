@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -36,13 +37,15 @@ type Transfer struct {
 	From   NetworkID
 	To     NetworkID
 	Amount *big.Int
+	Date   time.Time
 	// todo: consider adding some unique id field
 }
 
-func NewTransfer(from, to NetworkID, amount *big.Int) Transfer {
+func NewTransfer(from, to NetworkID, date time.Time, amount *big.Int) Transfer {
 	return Transfer{
 		From:   from,
 		To:     to,
+		Date:   date,
 		Amount: amount,
 	}
 }
