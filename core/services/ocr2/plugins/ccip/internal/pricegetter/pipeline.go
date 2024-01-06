@@ -2,7 +2,6 @@ package pricegetter
 
 import (
 	"context"
-	"math/big"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -42,7 +41,7 @@ func NewPipelineGetter(source string, runner pipeline.Runner, jobID int32, exter
 	}, nil
 }
 
-func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
+func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]TokenPriceResult, error) {
 	_, trrs, err := d.runner.ExecuteRun(ctx, pipeline.Spec{
 		ID:           d.jobID,
 		DotDagSource: d.source,
@@ -67,24 +66,27 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []common.Add
 	}
 
 	providedTokensSet := mapset.NewSet[common.Address](tokens...)
-	tokenPrices := make(map[common.Address]*big.Int)
+	tokenPrices := make(map[common.Address]TokenPriceResult)
 	for tokenAddressStr, rawPrice := range prices {
-		castedPrice, err := parseutil.ParseBigIntFromAny(rawPrice)
-		if err != nil {
-			return nil, err
-		}
-
 		tokenAddress := common.HexToAddress(tokenAddressStr)
+
 		if providedTokensSet.Contains(tokenAddress) {
-			tokenPrices[tokenAddress] = castedPrice
+			castedPrice, err1 := parseutil.ParseBigIntFromAny(rawPrice)
+
+			tokenPrices[tokenAddress] = TokenPriceResult{
+				Price: castedPrice,
+				Error: err1,
+			}
 		}
 	}
 
-	// The mapping of token address to source of token price has to live offchain.
-	// Best we can do is sanity check that the token price spec covers all our desired execution token prices.
+	// Make sure that not found tokens are also returned with an error.
 	for _, token := range tokens {
-		if _, ok = tokenPrices[token]; !ok {
-			return nil, errors.Errorf("missing token %s from tokensForFeeCoin spec", token)
+		if _, exist := tokenPrices[token]; exist {
+			continue
+		}
+		tokenPrices[token] = TokenPriceResult{
+			Error: errors.Errorf("token price not found in spec"),
 		}
 	}
 
