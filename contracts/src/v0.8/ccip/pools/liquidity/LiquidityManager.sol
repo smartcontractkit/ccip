@@ -63,7 +63,9 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   uint64 internal immutable i_localChainSelector;
 
   /// @notice Mapping of chain selector to liquidity container on other chains
-  mapping(uint64 chainSelector => CrossChainLiquidityManager) private s_crossChainLiquidityContainers;
+  mapping(uint64 chainSelector => CrossChainLiquidityManager) private s_crossChainLiquidityManager;
+
+  uint64[] private s_supportedDestChains;
 
   /// @notice The liquidity container on the local chain
   /// @dev In the case of CCIP, this would be the token pool.
@@ -137,7 +139,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       revert InsufficientLiquidity(amount, currentBalance);
     }
 
-    CrossChainLiquidityManager memory remoteLiqManager = s_crossChainLiquidityContainers[chainSelector];
+    CrossChainLiquidityManager memory remoteLiqManager = s_crossChainLiquidityManager[chainSelector];
 
     if (!remoteLiqManager.enabled) {
       revert InvalidRemoteChain(chainSelector);
@@ -193,14 +195,34 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   // │                           Config                             │
   // ================================================================
 
-  /// @notice Gets the .
+  /// @notice Gets the cross chain liquidity manager
   function getCrossChainLiquidityManager(
     uint64 chainSelector
   ) external view returns (CrossChainLiquidityManager memory) {
-    return s_crossChainLiquidityContainers[chainSelector];
+    return s_crossChainLiquidityManager[chainSelector];
+  }
+
+  /// @notice Gets all cross chain liquidity managers
+  /// @dev We don't care too much about gas since this function is intended for offchain usage.
+  function getAllCrossChainLiquidityMangers() external view returns (CrossChainLiquidityManagerArgs[] memory) {
+    CrossChainLiquidityManagerArgs[] memory managers;
+    for (uint256 i = 0; i < s_supportedDestChains.length; ++i) {
+      uint64 chainSelector = s_supportedDestChains[i];
+      CrossChainLiquidityManager memory currentManager = s_crossChainLiquidityManager[chainSelector];
+      managers[i] = CrossChainLiquidityManagerArgs({
+        remoteLiquidityManager: currentManager.remoteLiquidityManager,
+        localBridge: currentManager.localBridge,
+        remoteToken: currentManager.remoteToken,
+        remoteChainSelector: chainSelector,
+        enabled: currentManager.enabled
+      });
+    }
+
+    return managers;
   }
 
   /// @notice Sets a list of cross chain liquidity managers.
+  /// @dev Will update the list of supported dest chains if the chain is new.
   function setCrossChainLiquidityManager(
     CrossChainLiquidityManagerArgs[] calldata crossChainLiquidityManagers
   ) external onlyOwner {
@@ -210,6 +232,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   }
 
   /// @notice Sets a single cross chain liquidity manager.
+  /// @dev Will update the list of supported dest chains if the chain is new.
   function setCrossChainLiquidityManager(
     CrossChainLiquidityManagerArgs calldata crossChainLiqManager
   ) public onlyOwner {
@@ -219,12 +242,18 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
 
     if (
       crossChainLiqManager.remoteLiquidityManager == address(0) ||
-      address(crossChainLiqManager.localBridge) == address(0)
+      address(crossChainLiqManager.localBridge) == address(0) ||
+      crossChainLiqManager.remoteToken == address(0)
     ) {
       revert ZeroAddress();
     }
 
-    s_crossChainLiquidityContainers[crossChainLiqManager.remoteChainSelector] = CrossChainLiquidityManager({
+    // If the destination chain is new, add it to the list of supported chains
+    if (s_crossChainLiquidityManager[crossChainLiqManager.remoteChainSelector].remoteToken == address(0)) {
+      s_supportedDestChains.push(crossChainLiqManager.remoteChainSelector);
+    }
+
+    s_crossChainLiquidityManager[crossChainLiqManager.remoteChainSelector] = CrossChainLiquidityManager({
       remoteLiquidityManager: crossChainLiqManager.remoteLiquidityManager,
       localBridge: crossChainLiqManager.localBridge,
       remoteToken: crossChainLiqManager.remoteToken,
