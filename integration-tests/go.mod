@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/chainlink/integration-tests
+module github.com/smartcontractkit/ccip/integration-tests
 
 go 1.21.4
 
@@ -31,6 +31,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.1.7-0.20231222010926-795676d23c7a
 	github.com/smartcontractkit/chainlink-testing-framework v1.22.1
 	github.com/smartcontractkit/chainlink-vrf v0.0.0-20231120191722-fef03814f868
+	github.com/smartcontractkit/chainlink/integration-tests v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/libocr v0.0.0-20231130143053-c5102a9c0fb7
 	github.com/smartcontractkit/tdh2/go/tdh2 v0.0.0-20230906073235-9e478e5e19f1
@@ -488,4 +489,8 @@ replace (
 
 	// until merged upstream: https://github.com/mwitkow/grpc-proxy/pull/69
 	github.com/mwitkow/grpc-proxy => github.com/smartcontractkit/grpc-proxy v0.0.0-20230731113816-f1be6620749f
+
+	github.com/smartcontractkit/chainlink/integration-tests => ../integration-tests
+
+	k8s.io/apimachinery => k8s.io/apimachinery v0.25.11
 )
