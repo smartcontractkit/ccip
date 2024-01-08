@@ -15,9 +15,10 @@ import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 
 contract LiquidityManagerSetup is LiquidityBaseTest {
   event LiquidityTransferred(
+    uint64 indexed ocrSeqNum,
     uint64 indexed fromChainSelector,
     uint64 indexed toChainSelector,
-    address indexed to,
+    address to,
     uint256 amount
   );
 
@@ -62,7 +63,13 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
     emit Transfer(address(s_liquidityManager), address(s_bridgeAdapter), amount);
 
     vm.expectEmit();
-    emit LiquidityTransferred(i_localChainSelector, i_remoteChainSelector, address(s_liquidityManager), amount);
+    emit LiquidityTransferred(
+      type(uint64).max,
+      i_localChainSelector,
+      i_remoteChainSelector,
+      address(s_liquidityManager),
+      amount
+    );
 
     s_liquidityManager.rebalanceLiquidity(i_remoteChainSelector, amount);
 

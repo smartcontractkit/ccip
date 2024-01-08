@@ -30,9 +30,10 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   error InsufficientLiquidity(uint256 requested, uint256 available);
 
   event LiquidityTransferred(
+    uint64 indexed ocrSeqNum,
     uint64 indexed fromChainSelector,
     uint64 indexed toChainSelector,
-    address indexed to,
+    address to,
     uint256 amount
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
@@ -120,12 +121,12 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @dev This function is a public version of the internal _rebalanceLiquidity function.
   /// to allow the owner to also initiate a rebalancing when needed.
   function rebalanceLiquidity(uint64 chainSelector, uint256 amount) external onlyOwner {
-    _rebalanceLiquidity(chainSelector, amount);
+    _rebalanceLiquidity(chainSelector, amount, type(uint64).max);
   }
 
   /// @notice Transfers liquidity to another chain.
   /// @dev Called by both the owner and the DON.
-  function _rebalanceLiquidity(uint64 chainSelector, uint256 amount) internal {
+  function _rebalanceLiquidity(uint64 chainSelector, uint256 amount, uint64 ocrSeqNum) internal {
     uint256 currentBalance = getLiquidity();
     if (currentBalance < amount) {
       revert InsufficientLiquidity(amount, currentBalance);
@@ -150,14 +151,20 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       amount
     );
 
-    emit LiquidityTransferred(i_localChainSelector, chainSelector, remoteLiqManager.remoteLiquidityManager, amount);
+    emit LiquidityTransferred(
+      ocrSeqNum,
+      i_localChainSelector,
+      chainSelector,
+      remoteLiqManager.remoteLiquidityManager,
+      amount
+    );
   }
 
   function _receiveLiquidity(uint64 remoteChainSelector, uint256 amount, bytes memory bridgeData) internal {
     // TODO
   }
 
-  function _report(bytes calldata report, uint64) internal override {
+  function _report(bytes calldata report, uint64 ocrSeqNum) internal override {
     ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(
       report,
       (ILiquidityManager.LiquidityInstructions)
@@ -167,7 +174,8 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     for (uint256 i = 0; i < sendInstructions; ++i) {
       _rebalanceLiquidity(
         instructions.sendLiquidityParams[i].remoteChainSelector,
-        instructions.sendLiquidityParams[i].amount
+        instructions.sendLiquidityParams[i].amount,
+        ocrSeqNum
       );
     }
 
