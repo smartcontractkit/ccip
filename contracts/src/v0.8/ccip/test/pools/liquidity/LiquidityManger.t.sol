@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {IBridgeAdapter, IL1BridgeAdapter} from "../../../pools/liquidity/interfaces/IBridge.sol";
 import {ILiquidityContainer} from "../../../pools/liquidity/interfaces/ILiquidityContainer.sol";
+import {ILiquidityManager} from "../../../pools/liquidity/interfaces/ILiquidityManager.sol";
 
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
 import {LiquidityManager} from "../../../pools/liquidity/LiquidityManager.sol";
@@ -42,7 +43,7 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
 
     LiquidityManager.CrossChainLiquidityManagerArgs[]
       memory args = new LiquidityManager.CrossChainLiquidityManagerArgs[](1);
-    args[0] = LiquidityManager.CrossChainLiquidityManagerArgs({
+    args[0] = ILiquidityManager.CrossChainLiquidityManagerArgs({
       remoteLiquidityManager: address(s_liquidityManager),
       localBridge: s_bridgeAdapter,
       remoteToken: address(s_l2Token),
@@ -88,7 +89,7 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
 
     LiquidityManager.CrossChainLiquidityManagerArgs[]
       memory args = new LiquidityManager.CrossChainLiquidityManagerArgs[](1);
-    args[0] = LiquidityManager.CrossChainLiquidityManagerArgs({
+    args[0] = ILiquidityManager.CrossChainLiquidityManagerArgs({
       remoteLiquidityManager: address(mockRemoteLiquidityManager),
       localBridge: mockRemoteBridgeAdapter,
       remoteToken: address(s_l1Token),
@@ -98,7 +99,7 @@ contract LiquidityManager_rebalanceLiquidity is LiquidityManagerSetup {
 
     s_liquidityManager.setCrossChainLiquidityManager(args);
 
-    args[0] = LiquidityManager.CrossChainLiquidityManagerArgs({
+    args[0] = ILiquidityManager.CrossChainLiquidityManagerArgs({
       remoteLiquidityManager: address(s_liquidityManager),
       localBridge: s_bridgeAdapter,
       remoteToken: address(s_l1Token),

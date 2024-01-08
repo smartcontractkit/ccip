@@ -38,14 +38,6 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
 
-  struct CrossChainLiquidityManagerArgs {
-    address remoteLiquidityManager;
-    IBridgeAdapter localBridge;
-    address remoteToken;
-    uint64 remoteChainSelector;
-    bool enabled;
-  }
-
   struct CrossChainLiquidityManager {
     address remoteLiquidityManager;
     IBridgeAdapter localBridge;
