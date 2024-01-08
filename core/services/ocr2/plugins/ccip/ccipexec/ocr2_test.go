@@ -73,7 +73,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				},
 			},
 			blessedRoots: map[[32]byte]bool{
-				[32]byte{123}: true,
+				{123}: true,
 			},
 			rateLimiterState: evm_2_evm_offramp.RateLimiterTokenBucket{
 				IsEnabled: false,

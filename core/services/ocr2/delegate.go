@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	ocr2keepers20 "github.com/smartcontractkit/chainlink-automation/pkg/v2"
@@ -35,10 +36,16 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop/reportingplugins"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
+	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
 	coreconfig "github.com/smartcontractkit/chainlink/v2/core/config"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -57,6 +64,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/autotelemetry21"
 	ocr2keeper21core "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2keeper/evmregistry/v21/core"
 
+	"github.com/smartcontractkit/chainlink/v2/common/txmgr"
+	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	ocr2vrfconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2vrf/config"
 	ocr2coordinator "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2vrf/coordinator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2vrf/juelsfeecoin"
@@ -477,6 +486,8 @@ func (d *Delegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) ([]job.ServiceC
 		return d.newServicesCCIPCommit(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
 	case types.CCIPExecution:
 		return d.newServicesCCIPExecution(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
+	case types.Rebalancer:
+		return d.newServicesRebalancer(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, qopts...)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}
@@ -1598,6 +1609,117 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
 	return ccipexec.NewExecutionServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError, qopts...)
+}
+
+func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+	spec := jb.OCR2OracleSpec
+	if spec.Relay != relay.EVM {
+		return nil, errors.New("Non evm chains are not supported for rebalancer execution")
+	}
+	// the relay ID specified in the spec will be that of the main/master chain
+	rid, err := spec.RelayID()
+	if err != nil {
+		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
+	}
+	chain, err := d.legacyChains.Get(rid.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("rebalancer services; failed to get chain %s: %w", rid.ChainID, err)
+	}
+	chains := d.legacyChains.Slice()
+	var (
+		lps = make(map[relay.ID]logpoller.LogPoller)
+	)
+	for _, chain := range chains {
+		rid := relay.NewID(relay.EVM, chain.ID().String())
+		lps[rid] = chain.LogPoller()
+	}
+	lmFactory := liquiditymanager.NewBaseLiquidityManagerFactory()
+	configTracker, err := ocr3impls.NewMultichainConfigTracker(
+		rid,
+		lggr.Named("MultichainConfigTracker"),
+		lps,
+		chain.Client(),
+		common.HexToAddress(spec.ContractID),
+		lmFactory,
+		ocr3impls.TransmitterCombiner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create multichain config tracker: %w", err)
+	}
+
+	contractABI, err := no_op_ocr3.NoOpOCR3MetaData.GetAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get abi for no-op ocr3 contract: %w", err)
+	}
+	var (
+		contractAddresses = configTracker.GetContractAddresses()
+		transmitters      = make(map[relay.ID]ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata])
+	)
+	for _, chain := range chains {
+		fromAddresses, err := d.ethKs.EnabledAddressesForChain(chain.ID())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get enabled keys for chain %s: %w", chain.ID().String(), err)
+		}
+		if len(fromAddresses) != 1 {
+			return nil, fmt.Errorf("rebalancer services: expected only one enabled key for chain %s, got %d", chain.ID().String(), len(fromAddresses))
+		}
+		rid := relay.NewID(relay.EVM, chain.ID().String())
+		tm, err := ocrcommon.NewTransmitter(
+			chain.TxManager(),
+			fromAddresses,
+			1e6, // TODO: gas limit may vary depending on tx
+			fromAddresses[0],
+			txmgr.NewSendEveryStrategy(),
+			txmgrtypes.TransmitCheckerSpec[common.Address]{},
+			chain.ID(),
+			d.ethKs,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transmitter: %w", err)
+		}
+		t, err := ocr3impls.NewOCR3ContractTransmitter[rebalancermodels.ReportMetadata](
+			contractAddresses[rid],
+			*contractABI,
+			tm,
+			chain.LogPoller(),
+			lggr.Named(fmt.Sprintf("OCR3ContractTransmitter-%s", chain.ID().String())),
+			nil, // TODO: implement report to evm tx metadata
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ocr3 contract transmitter: %w", err)
+		}
+		transmitters[rid] = t
+	}
+	multichainTransmitter, err := ocr3impls.NewMultichainTransmitterOCR3[rebalancermodels.ReportMetadata](
+		transmitters,
+		nil, // TODO: log poller not needed?
+		lggr.Named("MultichainTransmitterOCR3"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create multichain transmitter: %w", err)
+	}
+	oracleArgsNoPlugin := libocr2.OCR3OracleArgs[rebalancermodels.ReportMetadata]{
+		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
+		V2Bootstrappers:              bootstrapPeers,
+		ContractTransmitter:          multichainTransmitter,
+		ContractConfigTracker:        configTracker,
+		Database:                     ocrDB,
+		LocalConfig:                  lc,
+		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
+			rid.Network,
+			rid.ChainID,
+			spec.ContractID,
+			synchronization.OCR3Rebalancer,
+		),
+		OffchainConfigDigester: nil, // TODO: implement offchain config digester
+		OffchainKeyring:        kb,
+		OnchainKeyring:         nil,                        // TODO: implement onchain keyring
+		ReportingPluginFactory: rebalancer.PluginFactory{}, // TODO: implement proper factory
+	}
+	oracle, err := libocr2.NewOracle(oracleArgsNoPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create oracle: %w", err)
+	}
+	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
 // errorLog implements [loop.ErrorLog]

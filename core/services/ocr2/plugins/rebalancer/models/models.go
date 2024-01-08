@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
 type Address common.Address
@@ -106,6 +107,10 @@ func (r ReportMetadata) Encode() []byte {
 		panic(fmt.Errorf("report meta %#v encoding unexpected internal error: %w", r, err))
 	}
 	return b
+}
+
+func (r ReportMetadata) GetDestinationChain() relay.ID {
+	return relay.NewID(relay.EVM, fmt.Sprintf("%d", r.NetworkID))
 }
 
 func DecodeReportMetadata(b []byte) (ReportMetadata, error) {
