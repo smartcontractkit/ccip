@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -80,24 +79,15 @@ func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Durat
 type OffRamp struct {
 	*v1_0_0.OffRamp
 
-	offRamp             *evm_2_evm_offramp.EVM2EVMOffRamp
-	executionReportArgs abi.Arguments
-	lggr                logger.Logger
-	ec                  client.Client
-	estimator           gas.EvmFeeEstimator
-
-	// Dynamic config
-	configMu          sync.RWMutex
-	gasPriceEstimator prices.GasPriceEstimatorExec
-	offchainConfig    ccipdata.ExecOffchainConfig
-	onchainConfig     ccipdata.ExecOnchainConfig
+	OffRampV120 *evm_2_evm_offramp.EVM2EVMOffRamp
 }
 
 func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
-	return o.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
+	return o.OffRampV120.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 }
 
 func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
+	// Same as the v1.0.0 method, except for the ExecOnchainConfig type.
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfig)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
@@ -107,7 +97,7 @@ func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (com
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	destRouter, err := router.NewRouter(onchainConfigParsed.Router, o.ec)
+	destRouter, err := router.NewRouter(onchainConfigParsed.Router, o.Client)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
@@ -115,40 +105,22 @@ func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (com
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	o.configMu.Lock()
-	o.offchainConfig = ccipdata.ExecOffchainConfig{
+	o.ConfigMu.Lock()
+	o.OffchainConfigCache = ccipdata.ExecOffchainConfig{
 		DestOptimisticConfirmations: offchainConfigParsed.DestOptimisticConfirmations,
 		BatchGasLimit:               offchainConfigParsed.BatchGasLimit,
 		RelativeBoostPerWaitHour:    offchainConfigParsed.RelativeBoostPerWaitHour,
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
-	o.onchainConfig = ccipdata.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
-	o.gasPriceEstimator = prices.NewDAGasPriceEstimator(o.estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0, 0)
-	o.configMu.Unlock()
+	o.OnchainConfigCache = ccipdata.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
+	o.GasPriceEstimatorExec = prices.NewDAGasPriceEstimator(o.Estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0, 0)
+	o.ConfigMu.Unlock()
 
-	o.lggr.Infow("Starting exec plugin",
+	o.Logger.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
 		"onchainConfig", offchainConfigParsed)
 	return onchainConfigParsed.PriceRegistry, destWrappedNative, nil
-}
-
-func (o *OffRamp) OffchainConfig() ccipdata.ExecOffchainConfig {
-	o.configMu.RLock()
-	defer o.configMu.RUnlock()
-	return o.offchainConfig
-}
-
-func (o *OffRamp) OnchainConfig() ccipdata.ExecOnchainConfig {
-	o.configMu.RLock()
-	defer o.configMu.RUnlock()
-	return o.onchainConfig
-}
-
-func (o *OffRamp) GasPriceEstimator() prices.GasPriceEstimatorExec {
-	o.configMu.RLock()
-	defer o.configMu.RUnlock()
-	return o.gasPriceEstimator
 }
 
 func EncodeExecutionReport(args abi.Arguments, report ccipdata.ExecReport) ([]byte, error) {
@@ -173,8 +145,9 @@ func EncodeExecutionReport(args abi.Arguments, report ccipdata.ExecReport) ([]by
 			FeeTokenAmount:      msg.FeeTokenAmount,
 			Data:                msg.Data,
 			TokenAmounts:        ta,
-			SourceTokenData:     msg.SourceTokenData,
 			MessageId:           msg.MessageId,
+			// NOTE: this field is new in v1.2.
+			SourceTokenData: msg.SourceTokenData,
 		})
 	}
 
@@ -188,7 +161,7 @@ func EncodeExecutionReport(args abi.Arguments, report ccipdata.ExecReport) ([]by
 }
 
 func (o *OffRamp) EncodeExecutionReport(report ccipdata.ExecReport) ([]byte, error) {
-	return EncodeExecutionReport(o.executionReportArgs, report)
+	return EncodeExecutionReport(o.ExecutionReportArgs, report)
 }
 
 func DecodeExecReport(args abi.Arguments, report []byte) (ccipdata.ExecReport, error) {
@@ -267,7 +240,7 @@ func DecodeExecReport(args abi.Arguments, report []byte) (ccipdata.ExecReport, e
 }
 
 func (o *OffRamp) DecodeExecutionReport(report []byte) (ccipdata.ExecReport, error) {
-	return DecodeExecReport(o.executionReportArgs, report)
+	return DecodeExecReport(o.ExecutionReportArgs, report)
 }
 
 func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (*OffRamp, error) {
@@ -281,21 +254,10 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 		return nil, err
 	}
 
-	executionReportArgs := abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRamp)[:1]
+	v100.ExecutionReportArgs = abihelpers.MustGetMethodInputs("manuallyExecute", abiOffRamp)[:1]
 
 	return &OffRamp{
-		OffRamp:             v100,
-		offRamp:             offRamp,
-		executionReportArgs: executionReportArgs,
-		lggr:                lggr,
-		ec:                  ec,
-		estimator:           estimator,
-
-		configMu: sync.RWMutex{},
-
-		// values set on the fly after ChangeConfig is called
-		gasPriceEstimator: prices.ExecGasPriceEstimator{},
-		offchainConfig:    ccipdata.ExecOffchainConfig{},
-		onchainConfig:     ccipdata.ExecOnchainConfig{},
+		OffRamp:     v100,
+		OffRampV120: offRamp,
 	}, nil
 }
