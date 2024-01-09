@@ -7,9 +7,10 @@ import (
 	"testing"
 
 	"github.com/AlekSi/pointer"
-
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
+	mockservercfg "github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver-cfg"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -173,6 +174,7 @@ func DeployLocalCluster(
 	env, err := test_env.NewCLTestEnvBuilder().
 		WithTestInstance(t).
 		WithPrivateGethChains(selectedNetworks).
+		WithMockAdapter().
 		WithoutCleanup().
 		Build()
 	require.NoError(t, err)
@@ -346,7 +348,11 @@ func DeployEnvironments(
 				},
 			}))
 	}
-	err := testEnvironment.Run()
+
+	err := testEnvironment.
+		AddHelm(mockservercfg.New(nil)).
+		AddHelm(mockserver.New(nil)).
+		Run()
 	require.NoError(t, err)
 
 	if testEnvironment.WillUseRemoteRunner() {

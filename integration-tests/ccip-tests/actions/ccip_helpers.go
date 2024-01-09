@@ -68,10 +68,8 @@ const (
 	// 1 day should be enough for most of the cases
 	PermissionlessExecThreshold = 60 * 60 * 24 // 1 day
 
-	MaxNoOfTokensInMsg = 50
-	// we keep the finality timeout high as it's out of our control
-	FinalityTimeout        = 1 * time.Hour
-	TokenTransfer   string = "WithToken"
+	MaxNoOfTokensInMsg        = 50
+	TokenTransfer      string = "WithToken"
 
 	DataOnlyTransfer string = "WithoutToken"
 )
@@ -2442,7 +2440,7 @@ func TokenFeeForMultipleTokenAddr(tokenAddrToURL map[string]string) string {
 	for addr, url := range tokenAddrToURL {
 		source = source + fmt.Sprintf(`
 token%d [type=http method=GET url="%s"];
-token%d_parse [type=jsonparse path="Data,Result"];
+token%d_parse [type=jsonparse path="data,result"];
 token%d->token%d_parse;`, i, url, i, i, i)
 		right = right + fmt.Sprintf(` \\\"%s\\\":$(token%d_parse),`, addr, i)
 		i++
@@ -2450,17 +2448,6 @@ token%d->token%d_parse;`, i, url, i, i, i)
 	right = right[:len(right)-1]
 	source = fmt.Sprintf(`%s
 merge [type=merge left="{}" right="{%s}"];`, source, right)
-
-	return source
-}
-
-func StaticTokenFeeForMultipleTokenAddr(tokenUSD map[string]string) string {
-	right := ""
-	for addr, value := range tokenUSD {
-		right = right + fmt.Sprintf(`\\"%s\\":\\"%s\\",`, addr, value)
-	}
-	right = right[:len(right)-1]
-	source := fmt.Sprintf(`merge [type=merge left="{}" right="{%s}"];`, right)
 
 	return source
 }
@@ -2780,11 +2767,11 @@ func SetMockServerWithSameTokenFeeConversionValue(
 		wg.Add(1)
 		tokenAddr := tokenAddr
 		go func() {
-			// keep updating token value every 5 second
+			// keep updating token value every 15 second
 			for {
 				select {
-				case <-time.After(5 * time.Second):
-					tokenValue := big.NewInt(time.Now().Unix()).String()
+				case <-time.After(15 * time.Second):
+					tokenValue := big.NewInt(time.Now().UnixNano()).String()
 					if killGrave != nil {
 						err := killGrave.SetAdapterBasedAnyValuePath(path, []string{http.MethodGet}, tokenValue)
 						if err != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
@@ -661,7 +662,12 @@ func CCIPDefaultTestSetUp(
 			lggr.Info().Msg("Deploying test environment")
 			// deploy the env if configureCLNode is true
 			k8Env = DeployEnvironments(t, envConfig, inputs)
-			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
+			mockServer, err := ctfClient.ConnectMockServer(k8Env)
+			require.NoError(t, err, "creating mockserver clients shouldn't fail")
+			ccipEnv = &actions.CCIPTestEnv{
+				K8Env:      k8Env,
+				MockServer: mockServer,
+			}
 		}
 
 		ccipEnv.CLNodeWithKeyReady, _ = errgroup.WithContext(parent)
