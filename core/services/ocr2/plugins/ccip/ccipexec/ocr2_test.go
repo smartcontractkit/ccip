@@ -36,7 +36,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
@@ -1802,7 +1801,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 			destPriceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
 
-			offrampReader.On("CurrentRateLimiterState", ctx).Return(evm_2_evm_offramp.RateLimiterTokenBucket{}, nil).Maybe()
+			offrampReader.On("CurrentRateLimiterState", ctx).Return(ccipdata.TokenBucketRateLimit{}, nil).Maybe()
 			offrampReader.On("GetSourceToDestTokensMapping", ctx).Return(map[common.Address]common.Address{}, nil).Maybe()
 			gasPriceEstimator.On("GetGasPrice", ctx).Return(prices.GasPrice(big.NewInt(1e9)), nil).Maybe()
 
