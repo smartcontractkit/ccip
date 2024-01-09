@@ -8,37 +8,37 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
 type Address common.Address
-
 type NetworkSelector uint64
 
-const (
-	NetworkTypeUnknown = "unknown"
-	NetworkTypeEvm     = "evm"
-	NetworkTypeSolana  = "sol"
-)
-
 func (n NetworkSelector) Type() NetworkType {
-	switch n {
-	case 1, 2, 3: // todo: use some lib
+	chainID, err := chainselectors.ChainIdFromSelector(uint64(n))
+	isEvm := err == nil && chainID >= 0
+	if isEvm {
 		return NetworkTypeEvm
-	case 4:
-		return NetworkTypeSolana
-	default:
-		return NetworkTypeUnknown
 	}
+
+	return NetworkTypeUnknown
 }
 
 type NetworkType string
+
+var (
+	NetworkTypeUnknown = NetworkType("Unknown")
+	NetworkTypeEvm     = NetworkType(relay.EVM)
+)
 
 type Transfer struct {
 	From   NetworkSelector
 	To     NetworkSelector
 	Amount *big.Int
 	Date   time.Time
-	// todo: consider adding some unique id field
+	//ID     uint64
 }
 
 func NewTransfer(from, to NetworkSelector, date time.Time, amount *big.Int) Transfer {
@@ -53,7 +53,8 @@ func NewTransfer(from, to NetworkSelector, date time.Time, amount *big.Int) Tran
 func (t Transfer) Equals(other Transfer) bool {
 	return t.From == other.From &&
 		t.To == other.To &&
-		t.Amount.Cmp(other.Amount) == 0
+		t.Amount.Cmp(other.Amount) == 0 &&
+		t.Date.Equal(other.Date)
 }
 
 type PendingTransfer struct {

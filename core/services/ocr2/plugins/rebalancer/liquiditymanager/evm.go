@@ -63,7 +63,16 @@ func NewEvmLiquidityManager(address models.Address, ec client.Client, lp logpoll
 }
 
 func (e *EvmLiquidityManager) GetLiquidityManagers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
-	// todo: implement this, after the functionality is added to the contract
+	lms, err := e.client.GetAllCrossChainLiquidityMangers(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("get all cross chain lms: %w", err)
+	}
+
+	res := make(map[models.NetworkSelector]models.Address)
+	for _, lm := range lms {
+		res[models.NetworkSelector(lm.RemoteChainSelector)] = models.Address(lm.RemoteLiquidityManager)
+	}
+
 	return nil, nil
 }
 
