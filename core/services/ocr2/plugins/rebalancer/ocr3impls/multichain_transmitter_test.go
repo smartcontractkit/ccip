@@ -31,7 +31,6 @@ func TestMultichainTransmitter(t *testing.T) {
 			relay.NewID(relay.EVM, "2"): unis[2].ocr3Transmitter,
 			relay.NewID(relay.EVM, "3"): unis[3].ocr3Transmitter,
 		},
-		nil, // log poller, unused for now
 		logger.TestLogger(t),
 	)
 	require.NoError(t, err)

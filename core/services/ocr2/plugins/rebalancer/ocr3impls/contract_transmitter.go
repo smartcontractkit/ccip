@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -29,10 +28,6 @@ func reportToEvmTxMetaNoop([]byte) (*txmgr.TxMeta, error) {
 	return nil, nil
 }
 
-func transmitterFilterName(addr gethcommon.Address) string {
-	return logpoller.FilterName("OCR3 ContractTransmitter", addr.String())
-}
-
 var _ ocr3types.ContractTransmitter[any] = &contractTransmitterOCR3[any]{}
 
 type contractTransmitterOCR3[RI any] struct {
@@ -40,7 +35,6 @@ type contractTransmitterOCR3[RI any] struct {
 	contractABI         abi.ABI
 	transmitter         Transmitter
 	transmittedEventSig gethcommon.Hash
-	lp                  logpoller.LogPoller
 	lggr                logger.Logger
 	reportToEvmTxMeta   ReportToEthMetadata
 }
@@ -49,7 +43,6 @@ func NewOCR3ContractTransmitter[RI any](
 	address gethcommon.Address,
 	contractABI abi.ABI,
 	transmitter Transmitter,
-	lp logpoller.LogPoller,
 	lggr logger.Logger,
 	reportToEvmTxMeta ReportToEthMetadata,
 ) (*contractTransmitterOCR3[RI], error) {
@@ -58,14 +51,6 @@ func NewOCR3ContractTransmitter[RI any](
 		return nil, fmt.Errorf("abi missing Transmitted event")
 	}
 
-	err := lp.RegisterFilter(logpoller.Filter{
-		Name:      transmitterFilterName(address),
-		EventSigs: []gethcommon.Hash{transmitted.ID},
-		Addresses: []gethcommon.Address{address},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to register filter: %w", err)
-	}
 	if reportToEvmTxMeta == nil {
 		reportToEvmTxMeta = reportToEvmTxMetaNoop
 	}
@@ -74,7 +59,6 @@ func NewOCR3ContractTransmitter[RI any](
 		contractABI:         contractABI,
 		transmitter:         transmitter,
 		transmittedEventSig: transmitted.ID,
-		lp:                  lp,
 		lggr:                lggr,
 		reportToEvmTxMeta:   reportToEvmTxMeta,
 	}, nil

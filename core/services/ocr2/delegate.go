@@ -1630,8 +1630,7 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 		lps = make(map[relay.ID]logpoller.LogPoller)
 	)
 	for _, chain := range chains {
-		rid := relay.NewID(relay.EVM, chain.ID().String())
-		lps[rid] = chain.LogPoller()
+		lps[relay.NewID(relay.EVM, chain.ID().String())] = chain.LogPoller()
 	}
 	lmFactory := liquiditymanager.NewBaseLiquidityManagerFactory()
 	configTracker, err := ocr3impls.NewMultichainConfigTracker(
@@ -1646,6 +1645,7 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 		return nil, fmt.Errorf("failed to create multichain config tracker: %w", err)
 	}
 
+	// create the transmitters for each enabled chain
 	contractABI, err := no_op_ocr3.NoOpOCR3MetaData.GetAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get abi for no-op ocr3 contract: %w", err)
@@ -1655,15 +1655,15 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 		transmitters      = make(map[relay.ID]ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata])
 	)
 	for _, chain := range chains {
-		fromAddresses, err := d.ethKs.EnabledAddressesForChain(chain.ID())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get enabled keys for chain %s: %w", chain.ID().String(), err)
+		fromAddresses, err2 := d.ethKs.EnabledAddressesForChain(chain.ID())
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to get enabled keys for chain %s: %w", chain.ID().String(), err2)
 		}
 		if len(fromAddresses) != 1 {
 			return nil, fmt.Errorf("rebalancer services: expected only one enabled key for chain %s, got %d", chain.ID().String(), len(fromAddresses))
 		}
-		rid := relay.NewID(relay.EVM, chain.ID().String())
-		tm, err := ocrcommon.NewTransmitter(
+		relayID := relay.NewID(relay.EVM, chain.ID().String())
+		tm, err2 := ocrcommon.NewTransmitter(
 			chain.TxManager(),
 			fromAddresses,
 			1e6, // TODO: gas limit may vary depending on tx
@@ -1673,25 +1673,23 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 			chain.ID(),
 			d.ethKs,
 		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create transmitter: %w", err)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to create transmitter: %w", err2)
 		}
-		t, err := ocr3impls.NewOCR3ContractTransmitter[rebalancermodels.ReportMetadata](
-			contractAddresses[rid],
+		t, err2 := ocr3impls.NewOCR3ContractTransmitter[rebalancermodels.ReportMetadata](
+			contractAddresses[relayID],
 			*contractABI,
 			tm,
-			chain.LogPoller(),
 			lggr.Named(fmt.Sprintf("OCR3ContractTransmitter-%s", chain.ID().String())),
 			nil, // TODO: implement report to evm tx metadata
 		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create ocr3 contract transmitter: %w", err)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to create ocr3 contract transmitter: %w", err2)
 		}
-		transmitters[rid] = t
+		transmitters[relayID] = t
 	}
 	multichainTransmitter, err := ocr3impls.NewMultichainTransmitterOCR3[rebalancermodels.ReportMetadata](
 		transmitters,
-		nil, // TODO: log poller not needed?
 		lggr.Named("MultichainTransmitterOCR3"),
 	)
 	if err != nil {

@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -20,7 +19,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	logpollermocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -111,14 +109,10 @@ func newTestUniverse[RI any](
 		from:    transmitters[0],
 		t:       t,
 	}
-	mockLogPoller := logpollermocks.NewLogPoller(t)
-	mockLogPoller.On("RegisterFilter", mock.Anything).Return(nil)
-	defer mockLogPoller.AssertExpectations(t)
 	ocr3Transmitter, err := ocr3impls.NewOCR3ContractTransmitter[RI](
 		addr,
 		*contractABI,
 		tImpl,
-		mockLogPoller,
 		logger.TestLogger(t),
 		nil, // reportToEvmTxMeta, unused
 	)

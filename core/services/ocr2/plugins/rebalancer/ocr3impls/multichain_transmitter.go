@@ -7,7 +7,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
@@ -21,18 +20,15 @@ type MultichainMeta interface {
 // Note that this would only work with the appropriate multi-chain config tracker implementation.
 type multichainTransmitterOCR3[RI MultichainMeta] struct {
 	transmitters map[relay.ID]ocr3types.ContractTransmitter[RI]
-	lp           logpoller.LogPoller
 	lggr         logger.Logger
 }
 
 func NewMultichainTransmitterOCR3[RI MultichainMeta](
 	transmitters map[relay.ID]ocr3types.ContractTransmitter[RI],
-	lp logpoller.LogPoller,
 	lggr logger.Logger,
 ) (*multichainTransmitterOCR3[RI], error) {
 	return &multichainTransmitterOCR3[RI]{
 		transmitters: transmitters,
-		lp:           lp,
 		lggr:         lggr,
 	}, nil
 }
