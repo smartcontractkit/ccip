@@ -27,10 +27,12 @@ func (w *onchainKeyringV3Wrapper[RI]) MaxSignatureLength() int {
 }
 
 func (w *onchainKeyringV3Wrapper[RI]) Sign(digest types.ConfigDigest, seqNr uint64, r ocr3types.ReportWithInfo[RI]) (signature []byte, err error) {
+	epoch, round := uint64ToUint32AndUint8(seqNr)
 	rCtx := types.ReportContext{
 		ReportTimestamp: types.ReportTimestamp{
 			ConfigDigest: digest,
-			Epoch:        uint32(seqNr),
+			Epoch:        epoch,
+			Round:        round,
 		},
 	}
 
@@ -38,12 +40,18 @@ func (w *onchainKeyringV3Wrapper[RI]) Sign(digest types.ConfigDigest, seqNr uint
 }
 
 func (w *onchainKeyringV3Wrapper[RI]) Verify(key types.OnchainPublicKey, digest types.ConfigDigest, seqNr uint64, r ocr3types.ReportWithInfo[RI], signature []byte) bool {
+	epoch, round := uint64ToUint32AndUint8(seqNr)
 	rCtx := types.ReportContext{
 		ReportTimestamp: types.ReportTimestamp{
 			ConfigDigest: digest,
-			Epoch:        uint32(seqNr),
+			Epoch:        epoch,
+			Round:        round,
 		},
 	}
 
 	return w.core.Verify(key, rCtx, r.Report, signature)
+}
+
+func uint64ToUint32AndUint8(x uint64) (uint32, uint8) {
+	return uint32(x >> 32), uint8(x)
 }

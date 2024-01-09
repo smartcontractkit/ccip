@@ -90,10 +90,18 @@ func (c *contractTransmitterOCR3[RI]) Transmit(ctx context.Context, configDigest
 	// reportContext[0]: ConfigDigest
 	// reportContext[1]: 24 byte padding, 8 byte sequence number
 	// reportContext[2]: unused
+	// convert seqNum, which is a uint64, into a uint32 epoch and uint8 round
+	// while this does truncate the sequence number, it is not a problem because
+	// it still gives us 2^40 - 1 possible sequence numbers.
+	// assuming a sequence number is generated every second, this gives us
+	// 1099511627775 seconds, or approximately 34,865 years, before we run out
+	// of sequence numbers.
+	epoch, round := uint64ToUint32AndUint8(seqNum)
 	rawReportCtx := evmutil.RawReportContext(types.ReportContext{
 		ReportTimestamp: types.ReportTimestamp{
 			ConfigDigest: configDigest,
-			Epoch:        uint32(seqNum),
+			Epoch:        epoch,
+			Round:        round,
 		},
 		// ExtraData not used in OCR3
 	})
