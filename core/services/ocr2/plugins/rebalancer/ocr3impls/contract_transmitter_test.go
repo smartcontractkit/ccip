@@ -2,13 +2,13 @@ package ocr3impls_test
 
 import (
 	"context"
-	"math/big"
+	cryptorand "crypto/rand"
 	"testing"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
@@ -23,8 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
-	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
 )
 
@@ -36,18 +34,18 @@ type testUniverse[RI any] struct {
 	signers         []common.Address
 	wrapper         *no_op_ocr3.NoOpOCR3
 	ocr3Transmitter ocr3types.ContractTransmitter[RI]
-	bundles         []ocr2key.KeyBundle
+	keyrings        []ocr3types.OnchainKeyring[RI]
 	f               uint8
 }
 
-type bundlesAndSigners struct {
-	bundles []ocr2key.KeyBundle
-	signers []common.Address
+type keyringsAndSigners[RI any] struct {
+	keyrings []ocr3types.OnchainKeyring[RI]
+	signers  []common.Address
 }
 
 func newTestUniverse[RI any](
 	t *testing.T,
-	bs *bundlesAndSigners) testUniverse[RI] {
+	ks *keyringsAndSigners[RI]) testUniverse[RI] {
 	t.Helper()
 
 	deployer := testutils.MustNewSimTransactor(t)
@@ -76,18 +74,18 @@ func newTestUniverse[RI any](
 	// create the oracle identities for setConfig
 	// need to create at least 4 identities otherwise setConfig will fail
 	var (
-		bundles []ocr2key.KeyBundle
-		signers []common.Address
+		keyrings []ocr3types.OnchainKeyring[RI]
+		signers  []common.Address
 	)
-	if bs != nil {
-		bundles = bs.bundles
-		signers = bs.signers
+	if ks != nil {
+		keyrings = ks.keyrings
+		signers = ks.signers
 	} else {
 		for i := 0; i < 4; i++ {
-			kb, err2 := ocr2key.New(chaintype.EVM)
-			require.NoError(t, err2, "failed to create key bundle")
-			signers = append(signers, common.HexToAddress(kb.OnChainPublicKey()))
-			bundles = append(bundles, kb)
+			kr, err2 := ocr3impls.NewEVMKeyring[RI](cryptorand.Reader)
+			require.NoError(t, err2, "failed to create keyring")
+			signers = append(signers, common.BytesToAddress(kr.PublicKey()))
+			keyrings = append(keyrings, kr)
 		}
 	}
 	f := uint8(1)
@@ -101,6 +99,17 @@ func newTestUniverse[RI any](
 		[]byte{})
 	require.NoError(t, err, "failed to set config")
 	backend.Commit()
+
+	// print config set event
+	iter, err := wrapper.FilterConfigSet(&bind.FilterOpts{
+		Start: 1,
+	})
+	require.NoError(t, err, "failed to create filter iterator")
+	for iter.Next() {
+		event := iter.Event
+		t.Log("onchain signers:", event.Signers, "set signers:", signers)
+		t.Log("transmitters:", event.Transmitters, "set transmitters:", transmitters)
+	}
 
 	contractABI, err := no_op_ocr3.NoOpOCR3MetaData.GetAbi()
 	require.NoError(t, err, "failed to get abi")
@@ -124,7 +133,7 @@ func newTestUniverse[RI any](
 		transmitters:    transmitters,
 		signers:         signers,
 		wrapper:         wrapper,
-		bundles:         bundles,
+		keyrings:        keyrings,
 		ocr3Transmitter: ocr3Transmitter,
 		f:               f,
 		simClient:       client.NewSimulatedBackendClient(t, backend, testutils.SimulatedChainID),
@@ -134,12 +143,8 @@ func newTestUniverse[RI any](
 func (uni testUniverse[RI]) SignReport(t *testing.T, configDigest ocrtypes.ConfigDigest, rwi ocr3types.ReportWithInfo[RI], seqNum uint64) []ocrtypes.AttributedOnchainSignature {
 	var attributedSigs []ocrtypes.AttributedOnchainSignature
 	for i := uint8(0); i < uni.f+1; i++ {
-		sig, err := uni.bundles[i].Sign(ocrtypes.ReportContext{
-			ReportTimestamp: ocrtypes.ReportTimestamp{
-				ConfigDigest: configDigest,
-				Epoch:        uint32(seqNum),
-			},
-		}, rwi.Report)
+		t.Log("signing report with", hexutil.Encode(uni.keyrings[i].PublicKey()))
+		sig, err := uni.keyrings[i].Sign(configDigest, seqNum, rwi)
 		require.NoError(t, err, "failed to sign report")
 		attributedSigs = append(attributedSigs, ocrtypes.AttributedOnchainSignature{
 			Signature: sig,
@@ -184,13 +189,18 @@ func TestContractTransmitter(t *testing.T) {
 	err = uni.ocr3Transmitter.Transmit(context.Background(), configDigest, seqNum, rwi, attributedSigs)
 	require.NoError(t, err, "failed to transmit report")
 
+	lcde, err := uni.wrapper.LatestConfigDigestAndEpoch(nil)
+	require.NoError(t, err, "failed to get latest config digest and epoch")
+	require.Equal(t, configDigest, lcde.ConfigDigest, "config digest mismatch")
+	require.Equal(t, seqNum, lcde.SequenceNumber, "seq number mismatch")
+
 	// check for transmitted event
 	// TODO: for some reason this event isn't being emitted in the simulated backend
-	// events := uni.TransmittedEvents(t)
-	// require.Len(t, events, 1, "expected one transmitted event")
-	// event := events[0]
-	// require.Equal(t, configDigest, event.ConfigDigest, "unexpected config digest")
-	// require.Equal(t, seqNum, event.SequenceNumber, "unexpected sequence number")
+	events := uni.TransmittedEvents(t)
+	require.Len(t, events, 1, "expected one transmitted event")
+	event := events[0]
+	require.Equal(t, configDigest, event.ConfigDigest, "unexpected config digest")
+	require.Equal(t, seqNum, event.SequenceNumber, "unexpected sequence number")
 }
 
 type transmitterImpl struct {
@@ -211,9 +221,8 @@ func (t *transmitterImpl) CreateEthTransaction(ctx context.Context, to common.Ad
 	rawTx := types.NewTx(&types.LegacyTx{
 		Nonce:    nonce,
 		GasPrice: gp,
-		Gas:      500_000,
+		Gas:      1e6,
 		To:       &to,
-		Value:    big.NewInt(0),
 		Data:     data,
 	})
 	signedTx, err := t.from.Signer(t.from.From, rawTx)
@@ -221,10 +230,8 @@ func (t *transmitterImpl) CreateEthTransaction(ctx context.Context, to common.Ad
 	err = t.backend.SendTransaction(ctx, signedTx)
 	require.NoError(t.t, err, "failed to send tx")
 	t.backend.Commit()
-	logs, err := t.backend.FilterLogs(ctx, ethereum.FilterQuery{})
-	require.NoError(t.t, err, "failed to filter logs")
-	for _, lg := range logs {
-		t.t.Log("topic:", lg.Topics[0], "transmitted topic:", no_op_ocr3.NoOpOCR3Transmitted{}.Topic(), "configset topic:", no_op_ocr3.NoOpOCR3ConfigSet{}.Topic())
-	}
+	receipt, err := t.backend.TransactionReceipt(ctx, signedTx.Hash())
+	require.NoError(t.t, err, "failed to get tx receipt")
+	require.Equal(t.t, uint64(1), receipt.Status, "tx failed")
 	return nil
 }

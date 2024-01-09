@@ -25,7 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
-func setupLogPoller[RI any](t *testing.T, db *sqlx.DB, bs *bundlesAndSigners) (logpoller.LogPoller, testUniverse[RI]) {
+func setupLogPoller[RI any](t *testing.T, db *sqlx.DB, bs *keyringsAndSigners[RI]) (logpoller.LogPoller, testUniverse[RI]) {
 	lggr := logger.TestLogger(t)
 
 	o := logpoller.NewORM(testutils.SimulatedChainID, db, lggr, pgtest.NewQConfig(false))
@@ -159,7 +159,7 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 	require.Equal(t, uint64(3), config.OffchainConfigVersion, "expected offchain config version to match")
 	expectedSigners := func() []ocrtypes.OnchainPublicKey {
 		var signers []ocrtypes.OnchainPublicKey
-		for _, b := range uni.bundles {
+		for _, b := range uni.keyrings {
 			signers = append(signers, b.PublicKey())
 		}
 		return signers
@@ -182,9 +182,9 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 	_, db2 := heavyweight.FullTestDBV2(t, nil)
 
 	lp1, uni1 := setupLogPoller[struct{}](t, db1, nil)
-	lp2, uni2 := setupLogPoller[struct{}](t, db2, &bundlesAndSigners{
-		bundles: uni1.bundles,
-		signers: uni1.signers,
+	lp2, uni2 := setupLogPoller[struct{}](t, db2, &keyringsAndSigners[struct{}]{
+		keyrings: uni1.keyrings,
+		signers:  uni1.signers,
 	})
 
 	// start the log pollers
@@ -249,7 +249,7 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 	require.Equal(t, uint64(3), config.OffchainConfigVersion, "expected offchain config version to match")
 	expectedSigners := func() []ocrtypes.OnchainPublicKey {
 		var signers []ocrtypes.OnchainPublicKey
-		for _, b := range uni1.bundles {
+		for _, b := range uni1.keyrings {
 			signers = append(signers, b.PublicKey())
 		}
 		return signers

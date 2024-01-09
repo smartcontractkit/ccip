@@ -2,12 +2,11 @@ package ocr3impls
 
 import (
 	"context"
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -93,21 +92,25 @@ func (c *contractTransmitterOCR3[RI]) Transmit(ctx context.Context, configDigest
 	// reportContext[2]: unused
 	var rawReportCtx [3][32]byte
 	copy(rawReportCtx[0][:], configDigest[:])
-	binary.BigEndian.PutUint64(rawReportCtx[1][24:], seqNum)
+	formattedSeqNr, err := formatSequenceNumber(seqNum)
+	if err != nil {
+		return fmt.Errorf("failed to format sequence number: %w", err)
+	}
+	copy(rawReportCtx[1][:], formattedSeqNr[:])
 
 	txMeta, err := c.reportToEvmTxMeta(rwi.Report)
 	if err != nil {
 		c.lggr.Warnw("failed to generate tx metadata for report", "err", err)
 	}
 
-	c.lggr.Debugw("Transmitting report", "report", hex.EncodeToString(rwi.Report), "rawReportCtx", rawReportCtx, "contractAddress", c.contractAddress, "txMeta", txMeta)
+	c.lggr.Debugw("Transmitting report", "report", hexutil.Encode(rwi.Report), "rawReportCtx", rawReportCtx, "contractAddress", c.contractAddress, "txMeta", txMeta)
 
 	payload, err := c.contractABI.Pack("transmit", rawReportCtx, []byte(rwi.Report), rs, ss, vs)
 	if err != nil {
-		return fmt.Errorf("%w: abi.Pack failed with args: (%+v, %s, %+v, %+v, %+v)", err, rawReportCtx, hex.EncodeToString(rwi.Report), rs, ss, vs)
+		return fmt.Errorf("%w: abi.Pack failed with args: (%+v, %s, %+v, %+v, %+v)", err, rawReportCtx, hexutil.Encode(rwi.Report), rs, ss, vs)
 	}
 
-	c.lggr.Debugw("payload", "payload", hex.EncodeToString(payload))
+	c.lggr.Debugw("transmit payload", "payload", hexutil.Encode(payload))
 
 	return errors.Wrap(c.transmitter.CreateEthTransaction(ctx, c.contractAddress, payload, txMeta), "failed to send Eth transaction")
 }

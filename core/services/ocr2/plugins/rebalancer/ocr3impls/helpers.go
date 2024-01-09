@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
+	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func configTrackerFilterName(id relay.ID, addr common.Address) string {
@@ -110,4 +111,16 @@ func JoinTransmitters(transmitters []string) string {
 	// sort first to ensure deterministic ordering
 	slices.Sort(transmitters)
 	return strings.Join(transmitters, ",")
+}
+
+func formatSequenceNumber(seqNum uint64) ([32]byte, error) {
+	// abi-encode because the contract does
+	// uint64(uint256(reportContext[1]))
+	encoded, err := utils.ABIEncode(`[{"type": "uint64"}]`, seqNum)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	var toReturn [32]byte
+	copy(toReturn[:], encoded)
+	return toReturn, nil
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,7 +46,7 @@ func TestMultichainTransmitter(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedFromAccount, string(fromAccount))
 
-	var configDigests []ocrtypes.ConfigDigest
+	var configDigests [][32]byte
 	for _, uni := range unis {
 		c, err2 := uni.wrapper.LatestConfigDigestAndEpoch(nil)
 		require.NoError(t, err2)
@@ -72,10 +71,10 @@ func TestMultichainTransmitter(t *testing.T) {
 		err = mct.Transmit(testutils.Context(t), configDigests[i], seqNum, reports[i], attributedSigs)
 		require.NoError(t, err)
 		// TODO: for some reason this event isn't being emitted in the simulated backend
-		// events := unis[i].TransmittedEvents(t)
-		// require.Len(t, events, 1)
-		// require.Equal(t, configDigests[i], events[0].ConfigDigest, "config digest mismatch")
-		// require.Equal(t, seqNum, events[0].SequenceNumber, "sequence number mismatch")
+		events := unis[i].TransmittedEvents(t)
+		require.Len(t, events, 1)
+		require.Equal(t, configDigests[i], events[0].ConfigDigest, "config digest mismatch")
+		require.Equal(t, seqNum, events[0].SequenceNumber, "sequence number mismatch")
 		// increment sequence number so that each chain gets a unique one for this test
 		seqNum++
 	}
