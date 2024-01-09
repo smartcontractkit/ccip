@@ -93,8 +93,18 @@ type OffRamp struct {
 	onchainConfig     ccipdata.ExecOnchainConfig
 }
 
-func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
-	return o.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
+func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (ccipdata.TokenBucketRateLimit, error) {
+	bucket, err := o.offRamp.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return ccipdata.TokenBucketRateLimit{}, err
+	}
+	return ccipdata.TokenBucketRateLimit{
+		Tokens:      bucket.Tokens,
+		LastUpdated: bucket.LastUpdated,
+		IsEnabled:   bucket.IsEnabled,
+		Capacity:    bucket.Capacity,
+		Rate:        bucket.Rate,
+	}, nil
 }
 
 func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
