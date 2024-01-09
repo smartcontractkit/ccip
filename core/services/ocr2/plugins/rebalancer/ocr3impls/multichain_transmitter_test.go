@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/stretchr/testify/require"
 )
 
 func TestMultichainTransmitter(t *testing.T) {
