@@ -77,7 +77,7 @@ func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			batchCaller := rpclibmocks.NewEvmBatchCaller(t)
-			o := &OffRamp{EvmBatchCaller: batchCaller, LogPoller: lp}
+			o := &OffRamp{evmBatchCaller: batchCaller, lp: lp}
 			srcTks, dstTks, outputs := generateTokensAndOutputs(numSrcTokens)
 			outputs = tc.outputChangeFn(outputs)
 			batchCaller.On("BatchCall", mock.Anything, mock.Anything, mock.Anything).
@@ -114,12 +114,12 @@ func TestCachedOffRampTokens(t *testing.T) {
 	batchCaller.On("BatchCall", mock.Anything, mock.Anything, mock.Anything).Return(outputs, nil)
 
 	offRamp := OffRamp{
-		OffRampV100:    mockOffRamp,
-		LogPoller:      lp,
+		offRampV100:    mockOffRamp,
+		lp:             lp,
 		Logger:         logger.TestLogger(t),
 		Client:         ec,
-		EvmBatchCaller: batchCaller,
-		CachedOffRampTokens: cache.NewLogpollerEventsBased[ccipdata.OffRampTokens](
+		evmBatchCaller: batchCaller,
+		cachedOffRampTokens: cache.NewLogpollerEventsBased[ccipdata.OffRampTokens](
 			lp,
 			offRamp_poolAddedPoolRemovedEvents,
 			mockOffRamp.Address(),

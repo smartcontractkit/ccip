@@ -78,22 +78,21 @@ func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Durat
 // OffRamp In 1.2 we have a different estimator impl
 type OffRamp struct {
 	*v1_0_0.OffRamp
-
-	OffRampV120 *evm_2_evm_offramp.EVM2EVMOffRamp
+	offRampV120 *evm_2_evm_offramp.EVM2EVMOffRamp
 }
 
 func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
-	return o.OffRampV120.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
+	return o.offRampV120.CurrentRateLimiterState(&bind.CallOpts{Context: ctx})
 }
 
-func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
+func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []byte) (common.Address, common.Address, error) {
 	// Same as the v1.0.0 method, except for the ExecOnchainConfig type.
-	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfig)
+	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfigBytes)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
 
-	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[v1_0_0.ExecOffchainConfig](offchainConfig)
+	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[v1_0_0.ExecOffchainConfig](offchainConfigBytes)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
@@ -105,17 +104,17 @@ func (o *OffRamp) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (com
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}
-	o.ConfigMu.Lock()
-	o.OffchainConfigCache = ccipdata.ExecOffchainConfig{
+	offchainConfig := ccipdata.ExecOffchainConfig{
 		DestOptimisticConfirmations: offchainConfigParsed.DestOptimisticConfirmations,
 		BatchGasLimit:               offchainConfigParsed.BatchGasLimit,
 		RelativeBoostPerWaitHour:    offchainConfigParsed.RelativeBoostPerWaitHour,
 		InflightCacheExpiry:         offchainConfigParsed.InflightCacheExpiry,
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
-	o.OnchainConfigCache = ccipdata.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
-	o.GasPriceEstimatorExec = prices.NewDAGasPriceEstimator(o.Estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0, 0)
-	o.ConfigMu.Unlock()
+	onchainConfig := ccipdata.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
+	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, big.NewInt(int64(offchainConfigParsed.MaxGasPrice)), 0, 0)
+
+	o.UpdateDynamicConfig(onchainConfig, offchainConfig, priceEstimator)
 
 	o.Logger.Infow("Starting exec plugin",
 		"offchainConfig", onchainConfigParsed,
@@ -258,6 +257,6 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 
 	return &OffRamp{
 		OffRamp:     v100,
-		OffRampV120: offRamp,
+		offRampV120: offRamp,
 	}, nil
 }
