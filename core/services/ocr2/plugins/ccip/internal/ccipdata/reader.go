@@ -48,7 +48,7 @@ func ParseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(l
 	for _, log := range logs {
 		data, err := parseFunc(log.ToGethLog())
 		if err != nil {
-			lggr.Warnw(fmt.Sprintf("Unable to parse log %v: %s", log, err.Error()))
+			lggr.Errorw("Unable to parse log", "err", err)
 			continue
 		}
 		reqs = append(reqs, Event[T]{
