@@ -47,13 +47,6 @@ func TestMultichainTransmitter(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedFromAccount, string(fromAccount))
 
-	var configDigests [][32]byte
-	for _, uni := range unis {
-		c, err2 := uni.wrapper.LatestConfigDigestAndEpoch(nil)
-		require.NoError(t, err2)
-		configDigests = append(configDigests, c.ConfigDigest)
-	}
-
 	// generate a report for each chain and sign it
 	// note that in this test each chain has a different set of signers
 	// this is okay because it's just a test
@@ -68,13 +61,15 @@ func TestMultichainTransmitter(t *testing.T) {
 	}
 	seqNum := uint64(1)
 	for i := range reports {
-		attributedSigs := unis[i].SignReport(t, configDigests[i], reports[i], seqNum)
-		err = mct.Transmit(testutils.Context(t), configDigests[i], seqNum, reports[i], attributedSigs)
+		c, err2 := unis[i].wrapper.LatestConfigDigestAndEpoch(nil)
+		require.NoError(t, err2, "failed to get latest config digest and epoch")
+		attributedSigs := unis[i].SignReport(t, c.ConfigDigest, reports[i], seqNum)
+		err = mct.Transmit(testutils.Context(t), c.ConfigDigest, seqNum, reports[i], attributedSigs)
 		require.NoError(t, err)
 		// TODO: for some reason this event isn't being emitted in the simulated backend
 		events := unis[i].TransmittedEvents(t)
 		require.Len(t, events, 1)
-		require.Equal(t, configDigests[i], events[0].ConfigDigest, "config digest mismatch")
+		require.Equal(t, c.ConfigDigest, events[0].ConfigDigest, "config digest mismatch")
 		require.Equal(t, seqNum, events[0].SequenceNumber, "sequence number mismatch")
 		// increment sequence number so that each chain gets a unique one for this test
 		seqNum++

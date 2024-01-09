@@ -5,6 +5,7 @@ import (
 	cryptorand "crypto/rand"
 	"testing"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/backends"
 	"github.com/ethereum/go-ethereum/common"
@@ -227,6 +228,15 @@ func (t *transmitterImpl) CreateEthTransaction(ctx context.Context, to common.Ad
 	})
 	signedTx, err := t.from.Signer(t.from.From, rawTx)
 	require.NoError(t.t, err, "failed to sign tx")
+	g, err := t.backend.EstimateGas(ctx, ethereum.CallMsg{
+		From:     t.from.From,
+		To:       &to,
+		Gas:      1e6,
+		GasPrice: gp,
+		Data:     data,
+	})
+	require.NoError(t.t, err, "failed to estimate gas")
+	t.t.Log("estimated gas:", g)
 	err = t.backend.SendTransaction(ctx, signedTx)
 	require.NoError(t.t, err, "failed to send tx")
 	t.backend.Commit()
