@@ -52,7 +52,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		tokenPoolsMapping map[common.Address]common.Address
 		blessedRoots      map[[32]byte]bool
 		senderNonce       uint64
-		rateLimiterState  evm_2_evm_offramp.RateLimiterTokenBucket
+		rateLimiterState  ccipdata.TokenBucketRateLimit
 		expErr            bool
 	}{
 		{
@@ -73,9 +73,9 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				},
 			},
 			blessedRoots: map[[32]byte]bool{
-				[32]byte{123}: true,
+				{123}: true,
 			},
-			rateLimiterState: evm_2_evm_offramp.RateLimiterTokenBucket{
+			rateLimiterState: ccipdata.TokenBucketRateLimit{
 				IsEnabled: false,
 			},
 			tokenPoolsMapping: map[common.Address]common.Address{},
