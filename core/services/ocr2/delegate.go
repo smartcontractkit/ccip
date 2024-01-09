@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -1708,9 +1709,12 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 			spec.ContractID,
 			synchronization.OCR3Rebalancer,
 		),
-		OffchainConfigDigester: nil, // TODO: implement offchain config digester
+		OffchainConfigDigester: evmutil.EVMOffchainConfigDigester{
+			ChainID:         chain.ID().Uint64(),
+			ContractAddress: common.HexToAddress(spec.ContractID),
+		}, // TODO: implement offchain config digester
 		OffchainKeyring:        kb,
-		OnchainKeyring:         nil,                        // TODO: implement onchain keyring
+		OnchainKeyring:         ocr3impls.NewOnchainKeyring[rebalancermodels.ReportMetadata](kb),
 		ReportingPluginFactory: rebalancer.PluginFactory{}, // TODO: implement proper factory
 	}
 	oracle, err := libocr2.NewOracle(oracleArgsNoPlugin)

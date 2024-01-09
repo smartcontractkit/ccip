@@ -90,13 +90,13 @@ func (c *contractTransmitterOCR3[RI]) Transmit(ctx context.Context, configDigest
 	// reportContext[0]: ConfigDigest
 	// reportContext[1]: 24 byte padding, 8 byte sequence number
 	// reportContext[2]: unused
-	var rawReportCtx [3][32]byte
-	copy(rawReportCtx[0][:], configDigest[:])
-	formattedSeqNr, err := formatSequenceNumber(seqNum)
-	if err != nil {
-		return fmt.Errorf("failed to format sequence number: %w", err)
-	}
-	copy(rawReportCtx[1][:], formattedSeqNr[:])
+	rawReportCtx := evmutil.RawReportContext(types.ReportContext{
+		ReportTimestamp: types.ReportTimestamp{
+			ConfigDigest: configDigest,
+			Epoch:        uint32(seqNum),
+		},
+		// ExtraData not used in OCR3
+	})
 
 	txMeta, err := c.reportToEvmTxMeta(rwi.Report)
 	if err != nil {

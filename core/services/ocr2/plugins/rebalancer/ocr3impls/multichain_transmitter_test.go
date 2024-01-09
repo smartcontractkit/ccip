@@ -70,7 +70,7 @@ func TestMultichainTransmitter(t *testing.T) {
 		events := unis[i].TransmittedEvents(t)
 		require.Len(t, events, 1)
 		require.Equal(t, c.ConfigDigest, events[0].ConfigDigest, "config digest mismatch")
-		require.Equal(t, seqNum, events[0].SequenceNumber, "sequence number mismatch")
+		require.Equal(t, mapToOnchainSeqNum(seqNum), events[0].SequenceNumber, "sequence number mismatch")
 		// increment sequence number so that each chain gets a unique one for this test
 		seqNum++
 	}

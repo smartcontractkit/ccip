@@ -2,7 +2,7 @@ package ocr3impls_test
 
 import (
 	"context"
-	cryptorand "crypto/rand"
+	"encoding/binary"
 	"testing"
 
 	"github.com/ethereum/go-ethereum"
@@ -24,6 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
+	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
 )
 
@@ -83,8 +85,9 @@ func newTestUniverse[RI any](
 		signers = ks.signers
 	} else {
 		for i := 0; i < 4; i++ {
-			kr, err2 := ocr3impls.NewEVMKeyring[RI](cryptorand.Reader)
-			require.NoError(t, err2, "failed to create keyring")
+			kb, err2 := ocr2key.New(chaintype.EVM)
+			require.NoError(t, err2, "failed to create key")
+			kr := ocr3impls.NewOnchainKeyring[RI](kb)
 			signers = append(signers, common.BytesToAddress(kr.PublicKey()))
 			keyrings = append(keyrings, kr)
 		}
@@ -191,9 +194,10 @@ func TestContractTransmitter(t *testing.T) {
 	require.NoError(t, err, "failed to transmit report")
 
 	lcde, err := uni.wrapper.LatestConfigDigestAndEpoch(nil)
+	onchainSeqNr := mapToOnchainSeqNum(seqNum)
 	require.NoError(t, err, "failed to get latest config digest and epoch")
 	require.Equal(t, configDigest, lcde.ConfigDigest, "config digest mismatch")
-	require.Equal(t, seqNum, lcde.SequenceNumber, "seq number mismatch")
+	require.Equal(t, onchainSeqNr, lcde.SequenceNumber, "seq number mismatch")
 
 	// check for transmitted event
 	// TODO: for some reason this event isn't being emitted in the simulated backend
@@ -201,7 +205,7 @@ func TestContractTransmitter(t *testing.T) {
 	require.Len(t, events, 1, "expected one transmitted event")
 	event := events[0]
 	require.Equal(t, configDigest, event.ConfigDigest, "unexpected config digest")
-	require.Equal(t, seqNum, event.SequenceNumber, "unexpected sequence number")
+	require.Equal(t, onchainSeqNr, event.SequenceNumber, "unexpected sequence number")
 }
 
 type transmitterImpl struct {
@@ -244,4 +248,14 @@ func (t *transmitterImpl) CreateEthTransaction(ctx context.Context, to common.Ad
 	require.NoError(t.t, err, "failed to get tx receipt")
 	require.Equal(t.t, uint64(1), receipt.Status, "tx failed")
 	return nil
+}
+
+// The reason this is needed is that evmutil.RawReportContext will
+// do a binary.BigEndian.PutUint32 on the epoch from bytes 32-5 to 32-1
+// on reportContext[1]. After this gets parsed as a uint64, it will be
+// larger than the seqNum that is specified offchain.
+func mapToOnchainSeqNum(seqNum uint64) uint64 {
+	var seqNumBytes [8]byte
+	binary.BigEndian.PutUint32(seqNumBytes[8-5:8-1], uint32(seqNum))
+	return binary.BigEndian.Uint64(seqNumBytes[:])
 }
