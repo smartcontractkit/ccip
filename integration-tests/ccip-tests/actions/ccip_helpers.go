@@ -18,11 +18,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
+
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
@@ -2769,32 +2770,36 @@ func SetMockServerWithSameTokenFeeConversionValue(
 		go func() {
 			// keep updating token value every 15 second
 			for {
-				select {
-				case <-time.After(15 * time.Second):
-					tokenValue := big.NewInt(time.Now().UnixNano()).String()
-					if killGrave != nil {
-						err := killGrave.SetAdapterBasedAnyValuePath(path, []string{http.MethodGet}, tokenValue)
-						if err != nil {
-							log.Fatal().Err(err).Msg("failed to set killgrave server value")
-						}
-						if _, ok := syncMapTokenURL.Load(tokenAddr); !ok {
-							syncMapTokenURL.Store(tokenAddr, fmt.Sprintf("%s/%s", killGrave.InternalEndpoint, path))
-							// call Done after setting the value for the first time
-							wg.Done()
-						}
+				if killGrave == nil && mockserver == nil {
+					log.Fatal().Msg("both killgrave and mockserver are nil")
+					return
+				}
+				tokenValue := big.NewInt(time.Now().UnixNano()).String()
+				if killGrave != nil {
+					err := killGrave.SetAdapterBasedAnyValuePath(path, []string{http.MethodGet}, tokenValue)
+					if err != nil {
+						log.Fatal().Err(err).Msg("failed to set killgrave server value")
+						return
 					}
-					if mockserver != nil {
-						err := mockserver.SetAnyValuePath(path, tokenValue)
-						if err != nil {
-							log.Fatal().Err(err).Msg("failed to set mockserver value")
-						}
-						if _, ok := syncMapTokenURL.Load(tokenAddr); !ok {
-							syncMapTokenURL.Store(tokenAddr, fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL, path))
-							// call Done after setting the value for the first time
-							wg.Done()
-						}
+					if _, ok := syncMapTokenURL.Load(tokenAddr); !ok {
+						syncMapTokenURL.Store(tokenAddr, fmt.Sprintf("%s/%s", killGrave.InternalEndpoint, path))
+						// call Done after setting the value for the first time
+						wg.Done()
 					}
 				}
+				if mockserver != nil {
+					err := mockserver.SetAnyValuePath(path, tokenValue)
+					if err != nil {
+						log.Fatal().Err(err).Msg("failed to set mockserver value")
+						return
+					}
+					if _, ok := syncMapTokenURL.Load(tokenAddr); !ok {
+						syncMapTokenURL.Store(tokenAddr, fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL, path))
+						// call Done after setting the value for the first time
+						wg.Done()
+					}
+				}
+				time.Sleep(15 * time.Second)
 			}
 		}()
 	}
