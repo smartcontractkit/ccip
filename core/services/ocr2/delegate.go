@@ -486,7 +486,7 @@ func (d *Delegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) ([]job.ServiceC
 		return d.newServicesCCIPCommit(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
 	case types.CCIPExecution:
 		return d.newServicesCCIPExecution(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
-	case types.Rebalancer:
+	case "rebalancer": // TODO: add constant to chainlink-common
 		return d.newServicesRebalancer(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, qopts...)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
