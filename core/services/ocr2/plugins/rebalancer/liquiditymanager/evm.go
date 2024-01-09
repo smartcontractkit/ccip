@@ -39,7 +39,7 @@ func NewEvmLiquidityManager(address models.Address, ec client.Client, lp logpoll
 	}
 
 	lpFilter := logpoller.Filter{
-		Name: "lm-liquidity-transferred",
+		Name: fmt.Sprintf("lm-liquidity-transferred-%s", address),
 		EventSigs: []common.Hash{
 			lmAbi.Events["LiquidityTransferred"].ID,
 		},
