@@ -1712,7 +1712,7 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 		OffchainConfigDigester: evmutil.EVMOffchainConfigDigester{
 			ChainID:         chain.ID().Uint64(),
 			ContractAddress: common.HexToAddress(spec.ContractID),
-		}, // TODO: implement offchain config digester
+		},
 		OffchainKeyring:        kb,
 		OnchainKeyring:         ocr3impls.NewOnchainKeyring[rebalancermodels.ReportMetadata](kb),
 		ReportingPluginFactory: rebalancer.PluginFactory{}, // TODO: implement proper factory
