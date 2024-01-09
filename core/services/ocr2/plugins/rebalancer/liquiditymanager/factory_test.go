@@ -16,8 +16,8 @@ func TestNewBaseLiquidityManagerFactory(t *testing.T) {
 	ethClient1 := evmtest.NewEthClientMock(t)
 	ethClient2 := evmtest.NewEthClientMock(t)
 	lmf := NewBaseLiquidityManagerFactory(
-		WithEvmDep(models.NetworkID(1), lp1, ethClient1),
-		WithEvmDep(models.NetworkID(2), lp2, ethClient2),
+		WithEvmDep(models.NetworkSelector(1), lp1, ethClient1),
+		WithEvmDep(models.NetworkSelector(2), lp2, ethClient2),
 	)
 	assert.Len(t, lmf.evmDeps, 2)
 }

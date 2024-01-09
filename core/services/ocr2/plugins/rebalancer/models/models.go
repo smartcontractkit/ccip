@@ -12,7 +12,7 @@ import (
 
 type Address common.Address
 
-type NetworkID uint64
+type NetworkSelector uint64
 
 const (
 	NetworkTypeUnknown = "unknown"
@@ -20,7 +20,7 @@ const (
 	NetworkTypeSolana  = "sol"
 )
 
-func (n NetworkID) Type() NetworkType {
+func (n NetworkSelector) Type() NetworkType {
 	switch n {
 	case 1, 2, 3: // todo: use some lib
 		return NetworkTypeEvm
@@ -34,14 +34,14 @@ func (n NetworkID) Type() NetworkType {
 type NetworkType string
 
 type Transfer struct {
-	From   NetworkID
-	To     NetworkID
+	From   NetworkSelector
+	To     NetworkSelector
 	Amount *big.Int
 	Date   time.Time
 	// todo: consider adding some unique id field
 }
 
-func NewTransfer(from, to NetworkID, date time.Time, amount *big.Int) Transfer {
+func NewTransfer(from, to NetworkSelector, date time.Time, amount *big.Int) Transfer {
 	return Transfer{
 		From:   from,
 		To:     to,
@@ -92,10 +92,10 @@ func (t Transfer) String() string {
 type ReportMetadata struct {
 	Transfers               []Transfer
 	LiquidityManagerAddress Address
-	NetworkID               NetworkID
+	NetworkID               NetworkSelector
 }
 
-func NewReportMetadata(transfers []Transfer, lmAddr Address, networkID NetworkID) ReportMetadata {
+func NewReportMetadata(transfers []Transfer, lmAddr Address, networkID NetworkSelector) ReportMetadata {
 	return ReportMetadata{
 		Transfers:               transfers,
 		LiquidityManagerAddress: lmAddr,

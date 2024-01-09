@@ -67,23 +67,23 @@ func (_m *LiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) {
 }
 
 // GetLiquidityManagers provides a mock function with given fields: ctx
-func (_m *LiquidityManager) GetLiquidityManagers(ctx context.Context) (map[models.NetworkID]models.Address, error) {
+func (_m *LiquidityManager) GetLiquidityManagers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetLiquidityManagers")
 	}
 
-	var r0 map[models.NetworkID]models.Address
+	var r0 map[models.NetworkSelector]models.Address
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (map[models.NetworkID]models.Address, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (map[models.NetworkSelector]models.Address, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) map[models.NetworkID]models.Address); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) map[models.NetworkSelector]models.Address); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[models.NetworkID]models.Address)
+			r0 = ret.Get(0).(map[models.NetworkSelector]models.Address)
 		}
 	}
 

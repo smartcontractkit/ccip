@@ -7,11 +7,11 @@ import (
 )
 
 type NetworkLiquidity struct {
-	Network   NetworkID
+	Network   NetworkSelector
 	Liquidity *big.Int
 }
 
-func NewNetworkLiquidity(chain NetworkID, liq *big.Int) NetworkLiquidity {
+func NewNetworkLiquidity(chain NetworkSelector, liq *big.Int) NetworkLiquidity {
 	return NetworkLiquidity{
 		Network:   chain,
 		Liquidity: liq,

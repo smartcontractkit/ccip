@@ -62,7 +62,7 @@ func NewEvmLiquidityManager(address models.Address, ec client.Client, lp logpoll
 	}, nil
 }
 
-func (e *EvmLiquidityManager) GetLiquidityManagers(ctx context.Context) (map[models.NetworkID]models.Address, error) {
+func (e *EvmLiquidityManager) GetLiquidityManagers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
 	// todo: implement this, after the functionality is added to the contract
 	return nil, nil
 }
@@ -89,8 +89,8 @@ func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since tim
 		}
 
 		tr := models.NewPendingTransfer(models.NewTransfer(
-			models.NetworkID(liqTransferred.FromChainSelector),
-			models.NetworkID(liqTransferred.ToChainSelector),
+			models.NetworkSelector(liqTransferred.FromChainSelector),
+			models.NetworkSelector(liqTransferred.ToChainSelector),
 			log.BlockTimestamp,
 			liqTransferred.Amount,
 		))

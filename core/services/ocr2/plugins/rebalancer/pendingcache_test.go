@@ -16,9 +16,9 @@ func TestPendingTransfersCache(t *testing.T) {
 	c := NewPendingTransfersCache()
 
 	date := time.Now()
-	from1to2 := models.NewTransfer(models.NetworkID(1), models.NetworkID(2), date, big.NewInt(10))
-	from1to3 := models.NewTransfer(models.NetworkID(1), models.NetworkID(3), date, big.NewInt(20))
-	from2to3 := models.NewTransfer(models.NetworkID(2), models.NetworkID(3), date, big.NewInt(30))
+	from1to2 := models.NewTransfer(models.NetworkSelector(1), models.NetworkSelector(2), date, big.NewInt(10))
+	from1to3 := models.NewTransfer(models.NetworkSelector(1), models.NetworkSelector(3), date, big.NewInt(20))
+	from2to3 := models.NewTransfer(models.NetworkSelector(2), models.NetworkSelector(3), date, big.NewInt(30))
 
 	c.Add([]models.PendingTransfer{
 		models.NewPendingTransfer(from1to2),
@@ -60,8 +60,8 @@ func runRandomRegistryOperations(c *PendingTransfersCache, numOps int) {
 	ops := []string{"add", "set", "contains"}
 	date := time.Now()
 	for i := 0; i < numOps; i++ {
-		tr1 := models.NewTransfer(models.NetworkID(rand.Intn(numOps)), models.NetworkID(rand.Intn(numOps)), date, big.NewInt(int64(numOps*rand.Intn(10))))
-		tr2 := models.NewTransfer(models.NetworkID(rand.Intn(numOps)), models.NetworkID(rand.Intn(numOps)), date, big.NewInt(int64(numOps*rand.Intn(10))))
+		tr1 := models.NewTransfer(models.NetworkSelector(rand.Intn(numOps)), models.NetworkSelector(rand.Intn(numOps)), date, big.NewInt(int64(numOps*rand.Intn(10))))
+		tr2 := models.NewTransfer(models.NetworkSelector(rand.Intn(numOps)), models.NetworkSelector(rand.Intn(numOps)), date, big.NewInt(int64(numOps*rand.Intn(10))))
 		transfers := []models.PendingTransfer{models.NewPendingTransfer(tr1), models.NewPendingTransfer(tr2)}
 
 		switch ops[rand.Intn(len(ops))] {

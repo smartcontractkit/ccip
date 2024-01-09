@@ -51,7 +51,7 @@ func (c *PendingTransfersCache) ContainsTransfer(tr models.Transfer) bool {
 	return false
 }
 
-func (c *PendingTransfersCache) LatestNetworkTransfer(net models.NetworkID) (models.PendingTransfer, bool) {
+func (c *PendingTransfersCache) LatestNetworkTransfer(net models.NetworkSelector) (models.PendingTransfer, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 

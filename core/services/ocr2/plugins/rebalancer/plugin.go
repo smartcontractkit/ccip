@@ -31,7 +31,7 @@ type Plugin struct {
 func NewPlugin(
 	f int,
 	closePluginTimeout time.Duration,
-	liquidityManagerNetwork models.NetworkID,
+	liquidityManagerNetwork models.NetworkSelector,
 	liquidityManagerAddress models.Address,
 	liquidityManagerFactory liquiditymanager.Factory,
 	liquidityGraph liquiditygraph.LiquidityGraph,
@@ -122,7 +122,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	}
 
 	// group transfers by source chain
-	transfersBySourceNet := make(map[models.NetworkID][]models.Transfer)
+	transfersBySourceNet := make(map[models.NetworkSelector][]models.Transfer)
 	for _, tr := range transfersToReachBalance {
 		transfersBySourceNet[tr.From] = append(transfersBySourceNet[tr.From], tr)
 	}
@@ -195,7 +195,7 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 	p.liquidityGraph.Reset()
 
 	type qItem struct {
-		networkID models.NetworkID
+		networkID models.NetworkSelector
 		lmAddress models.Address
 	}
 
@@ -298,7 +298,7 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 }
 
 func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observation) []models.NetworkLiquidity {
-	liqObsPerChain := make(map[models.NetworkID][]*big.Int)
+	liqObsPerChain := make(map[models.NetworkSelector][]*big.Int)
 	for _, ob := range observations {
 		for _, chainLiq := range ob.LiquidityPerChain {
 			liqObsPerChain[chainLiq.Network] = append(liqObsPerChain[chainLiq.Network], chainLiq.Liquidity)

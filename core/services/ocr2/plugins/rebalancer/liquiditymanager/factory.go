@@ -12,7 +12,7 @@ import (
 //
 //go:generate mockery --quiet --name Factory --output ../rebalancermocks --filename lm_factory_mock.go --case=underscore
 type Factory interface {
-	NewLiquidityManager(networkID models.NetworkID, address models.Address) (LiquidityManager, error)
+	NewLiquidityManager(networkID models.NetworkSelector, address models.Address) (LiquidityManager, error)
 }
 
 type evmDep struct {
@@ -21,12 +21,12 @@ type evmDep struct {
 }
 
 type BaseLiquidityManagerFactory struct {
-	evmDeps map[models.NetworkID]evmDep
+	evmDeps map[models.NetworkSelector]evmDep
 }
 
 func NewBaseLiquidityManagerFactory(opts ...func(f *BaseLiquidityManagerFactory)) *BaseLiquidityManagerFactory {
 	f := &BaseLiquidityManagerFactory{
-		evmDeps: make(map[models.NetworkID]evmDep),
+		evmDeps: make(map[models.NetworkSelector]evmDep),
 	}
 	for _, opt := range opts {
 		opt(f)
@@ -34,7 +34,7 @@ func NewBaseLiquidityManagerFactory(opts ...func(f *BaseLiquidityManagerFactory)
 	return f
 }
 
-func WithEvmDep(networkID models.NetworkID, lp logpoller.LogPoller, ethClient client.Client) func(f *BaseLiquidityManagerFactory) {
+func WithEvmDep(networkID models.NetworkSelector, lp logpoller.LogPoller, ethClient client.Client) func(f *BaseLiquidityManagerFactory) {
 	return func(f *BaseLiquidityManagerFactory) {
 		f.evmDeps[networkID] = evmDep{
 			lp:        lp,
@@ -43,7 +43,7 @@ func WithEvmDep(networkID models.NetworkID, lp logpoller.LogPoller, ethClient cl
 	}
 }
 
-func (b *BaseLiquidityManagerFactory) NewLiquidityManager(networkID models.NetworkID, address models.Address) (LiquidityManager, error) {
+func (b *BaseLiquidityManagerFactory) NewLiquidityManager(networkID models.NetworkSelector, address models.Address) (LiquidityManager, error) {
 	switch typ := networkID.Type(); typ {
 	case models.NetworkTypeEvm:
 		evmDeps, exists := b.evmDeps[networkID]

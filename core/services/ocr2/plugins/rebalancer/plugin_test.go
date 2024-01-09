@@ -27,7 +27,7 @@ type mockDeps struct {
 func newPlugin(t *testing.T) (*Plugin, mockDeps) {
 	f := 10
 	closeTimeout := 5 * time.Second
-	rootNetwork := models.NetworkID(1)
+	rootNetwork := models.NetworkSelector(1)
 	rootAddr := models.Address(utils.RandomAddress())
 
 	lmGraph := liquiditygraph.NewGraph()
@@ -58,7 +58,7 @@ func TestPluginObservation(t *testing.T) {
 	mockLM := mocks.NewLiquidityManager(t)
 	deps.mockFactory.On("NewLiquidityManager", net, addr).Return(mockLM, nil)
 
-	mockLM.On("GetLiquidityManagers", ctx).Return(map[models.NetworkID]models.Address{}, nil)
+	mockLM.On("GetLiquidityManagers", ctx).Return(map[models.NetworkSelector]models.Address{}, nil)
 	mockLM.On("GetBalance", ctx).Return(big.NewInt(1234), nil)
 	mockLM.On("GetPendingTransfers", ctx, mock.Anything).Return([]models.PendingTransfer{}, nil)
 

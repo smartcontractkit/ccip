@@ -13,7 +13,7 @@ import (
 //go:generate mockery --quiet --name LiquidityManager --output ../rebalancermocks --filename lm_mock.go --case=underscore
 type LiquidityManager interface {
 	// GetLiquidityManagers returns a mapping that contains the liquidity managers for each destination chain.
-	GetLiquidityManagers(ctx context.Context) (map[models.NetworkID]models.Address, error)
+	GetLiquidityManagers(ctx context.Context) (map[models.NetworkSelector]models.Address, error)
 
 	// GetBalance returns the current token/liquidity balance.
 	GetBalance(ctx context.Context) (*big.Int, error)
