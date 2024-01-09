@@ -20,20 +20,20 @@ func TestDynamicPriceGetter(t *testing.T) {
 	tk3 := utils.RandomAddress()
 
 	cfg := DynamicPriceGetterConfig{
-		//AggregatorPrices: map[common.Address]AggregatorPriceConfig{
-		//	tk1: {
-		//		ChainID:         1,
-		//		ContractAddress: common.HexToAddress("0xA55435A704"), // aggregator contract
-		//	},
-		//	tk2: {
-		//		ChainID:         1,
-		//		ContractAddress: common.HexToAddress("0xA55435A704"), // aggregator contract
-		//	},
-		//},
+		AggregatorPrices: map[common.Address]AggregatorPriceConfig{
+			tk1: {
+				ChainID:         1,
+				ContractAddress: common.HexToAddress("0xA550011"), // aggregator contract
+			},
+			tk2: {
+				ChainID:         2,
+				ContractAddress: common.HexToAddress("0xA550022"), // aggregator contract
+			},
+		},
 		StaticPrices: map[common.Address]StaticPriceConfig{
 			tk3: {
-				ChainID: 2,
-				Price:   1_000_000,
+				ChainID: 3,
+				Price:   1_234_000,
 			},
 		},
 	}
@@ -44,6 +44,6 @@ func TestDynamicPriceGetter(t *testing.T) {
 	pg := NewDynamicPriceGetter(cfg, map[int64]rpclib.EvmBatchCaller{})
 	prices, err := pg.TokenPricesUSD(ctx, []common.Address{tk1, tk2, tk3})
 	assert.NoError(t, err)
-	assert.Len(t, prices, 1)
+	assert.Len(t, prices, 3)
 	assert.Equal(t, cfg.StaticPrices[tk3].Price, prices[tk3].Uint64())
 }

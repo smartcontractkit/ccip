@@ -11,11 +11,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 )
 
+// AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
 type AggregatorPriceConfig struct {
 	ChainID         int64          `json:"chainID"`
 	ContractAddress common.Address `json:"contractAddress"`
 }
 
+// StaticPriceConfig specifies a price defined statically.
 type StaticPriceConfig struct {
 	ChainID int64  `json:"chainID"`
 	Price   uint64 `json:"price,string"`
@@ -38,6 +40,7 @@ func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[int64]rp
 	}
 }
 
+// TokenPricesUSD implements the PriceGetter interface.
 func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	prices := make(map[common.Address]*big.Int, len(tokens))
 
