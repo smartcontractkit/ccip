@@ -2788,7 +2788,7 @@ func SetMockServerWithSameTokenFeeConversionValue(
 					}
 				}
 				if mockserver != nil {
-					err := mockserver.SetAnyValuePath(path, tokenValue)
+					err := mockserver.SetAnyValuePath(fmt.Sprintf("/%s", path), tokenValue)
 					if err != nil {
 						log.Fatal().Err(err).Msg("failed to set mockserver value")
 						return
