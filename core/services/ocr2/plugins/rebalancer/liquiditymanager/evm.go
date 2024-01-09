@@ -10,8 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/liquidity_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
@@ -23,11 +23,11 @@ type EvmLiquidityManager struct {
 	lp          logpoller.LogPoller
 	lmAbi       abi.ABI
 	addr        common.Address
-	ec          bind.ContractBackend
+	ec          client.Client
 	cleanupFunc func() error
 }
 
-func NewEvmLiquidityManager(address models.Address, ec *ethclient.Client, lp logpoller.LogPoller) (*EvmLiquidityManager, error) {
+func NewEvmLiquidityManager(address models.Address, ec client.Client, lp logpoller.LogPoller) (*EvmLiquidityManager, error) {
 	lmClient, err := liquidity_manager.NewLiquidityManager(common.Address(address), ec)
 	if err != nil {
 		return nil, fmt.Errorf("init liquidity manager: %w", err)
