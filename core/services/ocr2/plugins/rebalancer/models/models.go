@@ -18,10 +18,6 @@ func (a *Address) String() string {
 	return common.Address(*a).Hex()
 }
 
-func (a *Address) Bytes() []byte {
-	return common.Address(*a).Bytes()
-}
-
 func (a *Address) UnmarshalJSON(input []byte) error {
 	ta := common.Address(*a)
 	err := ta.UnmarshalJSON(input)
