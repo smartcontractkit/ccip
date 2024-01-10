@@ -40,6 +40,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_3_0"
@@ -119,6 +120,10 @@ func NewCommitOnchainConfig(
 
 type ExecOnchainConfig struct {
 	v1_2_0.ExecOnchainConfig
+}
+
+func (c *ExecOnchainConfig) Encode() ([]byte, error) {
+	return ccipconfig.EncodeOffchainConfig(c.ExecOnchainConfig)
 }
 
 func NewExecOnchainConfig(
