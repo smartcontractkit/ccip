@@ -1,9 +1,10 @@
 package ocr3impls
 
 import (
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
 var _ ocr3types.OnchainKeyring[models.ReportMetadata] = &onchainKeyringV3Wrapper[models.ReportMetadata]{}

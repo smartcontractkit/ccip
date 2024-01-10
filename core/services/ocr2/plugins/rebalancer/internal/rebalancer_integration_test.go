@@ -11,6 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/hashicorp/consul/sdk/freeport"
+	"github.com/smartcontractkit/libocr/commontypes"
+	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/test-go/testify/require"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
@@ -23,11 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-	"github.com/smartcontractkit/libocr/commontypes"
-	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/test-go/testify/require"
 )
 
 func TestRebalancer_Integration(t *testing.T) {

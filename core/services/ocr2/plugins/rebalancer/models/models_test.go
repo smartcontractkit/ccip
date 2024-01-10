@@ -5,9 +5,10 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/test-go/testify/require"
+
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
-	"github.com/test-go/testify/require"
 )
 
 func TestMarshalReportMetadata(t *testing.T) {
