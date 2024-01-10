@@ -465,7 +465,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 			}
 		}
 
-		msgLggr.Infow("Adding msg to batch", "seqNum", msg.SequenceNumber, "nonce", msg.Nonce,
+		msgLggr.Infow("Adding msg to batch", "seqNr", msg.SequenceNumber, "nonce", msg.Nonce,
 			"value", msgValue, "aggregateTokenLimit", aggregateTokenLimit)
 		executableMessages = append(executableMessages, ccip.NewObservedMessage(msg.SequenceNumber, tokenData))
 
