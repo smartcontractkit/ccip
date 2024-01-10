@@ -1,14 +1,14 @@
 package ccip
 
 import (
-	"math/big"
+	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
-	execPluginReportsCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	unexpiredCommitRoots = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ccip_unexpired_commit_roots",
 		Help: "Number of unexpired commit roots processed by the plugin",
 	}, []string{"plugin", "source", "dest"})
@@ -41,11 +41,11 @@ type pluginMetricsCollector struct {
 	source, dest string
 }
 
-func NewPluginMetricsCollector(pluginLabel string, sourceChainId, destChainId *big.Int) *pluginMetricsCollector {
+func NewPluginMetricsCollector(pluginLabel string, sourceChainId, destChainId int64) *pluginMetricsCollector {
 	return &pluginMetricsCollector{
 		pluginName: pluginLabel,
-		source:     sourceChainId.String(),
-		dest:       destChainId.String(),
+		source:     strconv.FormatInt(sourceChainId, 10),
+		dest:       strconv.FormatInt(destChainId, 10),
 	}
 }
 
@@ -62,7 +62,7 @@ func (p *pluginMetricsCollector) NumberOfMessagesBasedOnInterval(phase ocrPhase,
 }
 
 func (p *pluginMetricsCollector) UnexpiredCommitRoots(count int) {
-	execPluginReportsCount.
+	unexpiredCommitRoots.
 		WithLabelValues(p.pluginName, p.source, p.dest).
 		Set(float64(count))
 }

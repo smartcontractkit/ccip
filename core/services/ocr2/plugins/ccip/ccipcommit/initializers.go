@@ -98,7 +98,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, ccip.CommitPluginLabel)
 	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, ccip.CommitPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.CommitPluginLabel)
-	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, big.NewInt(sourceChainID), big.NewInt(destChainID))
+	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, sourceChainID, destChainID)
 
 	lggr.Infow("NewCommitServices",
 		"pluginConfig", pluginConfig,
