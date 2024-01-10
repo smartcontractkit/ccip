@@ -4,22 +4,25 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v2v3_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/internal/gethwrappers2/generated/offchainaggregator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 )
 
 // AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
 type AggregatorPriceConfig struct {
-	ChainID         int64          `json:"chainID"`
+	ChainID         uint64         `json:"chainID"`
 	ContractAddress common.Address `json:"contractAddress"`
 }
 
 // StaticPriceConfig specifies a price defined statically.
 type StaticPriceConfig struct {
-	ChainID int64  `json:"chainID"`
+	ChainID uint64 `json:"chainID"`
 	Price   uint64 `json:"price,string"`
 }
 
@@ -30,10 +33,12 @@ type DynamicPriceGetterConfig struct {
 
 type DynamicPriceGetter struct {
 	cfg        DynamicPriceGetterConfig
-	evmClients map[int64]rpclib.EvmBatchCaller
+	evmClients map[uint64]rpclib.EvmBatchCaller
 }
 
-func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[int64]rpclib.EvmBatchCaller) *DynamicPriceGetter {
+// NewDynamicPriceGetter build a DynamicPriceGetter from a configuration and a map of chain ID to batch callers.
+// A batch caller should be provided for all retrieved prices.
+func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]rpclib.EvmBatchCaller) *DynamicPriceGetter {
 	return &DynamicPriceGetter{
 		cfg:        cfg,
 		evmClients: evmClients,
@@ -44,13 +49,19 @@ func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[int64]rp
 func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common.Address) (map[common.Address]*big.Int, error) {
 	prices := make(map[common.Address]*big.Int, len(tokens))
 
-	batchCallsPerChain := make(map[int64][]rpclib.EvmCall)
-	batchCallsTokensOrder := make(map[int64][]common.Address)
+	batchCallsPerChain := make(map[uint64][]rpclib.EvmCall)
+	batchCallsTokensOrder := make(map[uint64][]common.Address)
+
+	aggregatorAbi, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
+	if err != nil {
+		return nil, err
+	}
+
 	for _, tk := range tokens {
 		// group aggregator-based tokens to make batch call (one per chain)
 		if dynCfg, exists := d.cfg.AggregatorPrices[tk]; exists {
 			batchCallsPerChain[dynCfg.ChainID] = append(batchCallsPerChain[dynCfg.ChainID], rpclib.NewEvmCall(
-				abi.ABI{}, // todo
+				aggregatorAbi,
 				"latestRoundData",
 				dynCfg.ContractAddress,
 			))
@@ -77,18 +88,22 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 			return nil, fmt.Errorf("batch call: %w", err)
 		}
 
-		aggrPrices, err := rpclib.ParseOutputs[*big.Int](
-			results,
-			func(d rpclib.DataAndErr) (*big.Int, error) {
-				return nil, fmt.Errorf("todo")
-			},
-		)
+		//aggrPrices, err := rpclib.ParseOutputs[*big.Int](
+		//	results,
+		//	func(d rpclib.DataAndErr) (*big.Int, error) {
+		//		// TODO process price from result.
+		//		return nil, fmt.Errorf("todo")
+		//	},
+		//)
+		latestRounds, err := rpclib.ParseOutputs[aggregator_v2v3_interface.LatestRoundData](results, func(d rpclib.DataAndErr) (aggregator_v2v3_interface.LatestRoundData, error) {
+			return rpclib.ParseOutput[aggregator_v2v3_interface.LatestRoundData](d, 0)
+		})
 		if err != nil {
 			return nil, fmt.Errorf("parse outputs: %w", err)
 		}
 
 		for i := range tokensOrder {
-			prices[tokensOrder[i]] = aggrPrices[i]
+			prices[tokensOrder[i]] = big.NewInt(0).Mul(latestRounds[i].Answer, big.NewInt(10_000_000_000))
 		}
 	}
 

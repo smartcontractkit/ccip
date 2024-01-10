@@ -14,7 +14,10 @@ type CommitPluginJobSpecConfig struct {
 	// TokenPricesUSDPipeline should contain a token price pipeline for the following tokens:
 	//		The SOURCE chain wrapped native
 	// 		The DESTINATION supported tokens (including fee tokens) as defined in destination OffRamp and PriceRegistry.
+	// DEPRECATED
 	TokenPricesUSDPipeline string `json:"tokenPricesUSDPipeline"`
+	// TokenPricesConfig defines where to get the token prices from (i.e. static or dynamic config).
+	TokenPricesConfig string `json:"tokenPricesConfig"`
 }
 
 // ExecutionPluginJobSpecConfig contains the plugin specific variables for the ccip.CCIPExecution plugin.

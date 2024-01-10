@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -67,10 +68,28 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
-	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	//pipelinePriceGetter, err := pricegetter.NewPipelineGetter(pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	//if err != nil {
+	//	return nil, nil, err
+	//}
+
+	// TODO build evmClients, from the list of chain selectors.
+	// TODO e.g.: chain, chainID, err := ccipconfig.GetChainByChainSelector(chainSet, chainSelector)
+	sourceChain.Client()
+	destChain.Client()
+	sourceCaller := rpclib.NewDynamicLimitedBatchCaller(
+		lggr,
+		sourceChain.Client(),
+		rpclib.DefaultRpcBatchSizeLimit,
+		rpclib.DefaultRpcBatchBackOffMultiplier,
+	)
+	evmClients := map[uint64]rpclib.EvmBatchCaller{sourceChain.ID().Uint64(): sourceCaller}
+	cfg := pricegetter.DynamicPriceGetterConfig{}
+	err = json.Unmarshal([]byte(pluginConfig.TokenPricesConfig), &cfg)
 	if err != nil {
 		return nil, nil, err
 	}
+	priceGetter := pricegetter.NewDynamicPriceGetter(cfg, evmClients)
 
 	// Load all the readers relevant for this plugin.
 	onRampReader, err := factory.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
@@ -110,7 +129,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			lggr:                  commitLggr,
 			onRampReader:          onRampReader,
 			offRamp:               offRampReader,
-			priceGetter:           pipelinePriceGetter,
+			priceGetter:           priceGetter,
 			sourceNative:          sourceNative,
 			sourceChainSelector:   staticConfig.SourceChainSelector,
 			destChainSelector:     staticConfig.ChainSelector,
