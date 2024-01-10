@@ -2567,6 +2567,11 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 			c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 		}
 		c.CLNodes = chainlinkK8sNodes
+		mockServer, err := ctfClient.ConnectMockServer(c.K8Env)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		c.MockServer = mockServer
 	}
 
 	nodesWithKeys := make(map[string][]*client.CLNodesWithKeys)

@@ -22,8 +22,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
-
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -663,12 +661,7 @@ func CCIPDefaultTestSetUp(
 			lggr.Info().Msg("Deploying test environment")
 			// deploy the env if configureCLNode is true
 			k8Env = DeployEnvironments(t, envConfig, inputs)
-			mockServer, err := ctfClient.ConnectMockServer(k8Env)
-			require.NoError(t, err, "creating mockserver clients shouldn't fail")
-			ccipEnv = &actions.CCIPTestEnv{
-				K8Env:      k8Env,
-				MockServer: mockServer,
-			}
+			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
 		}
 
 		ccipEnv.CLNodeWithKeyReady, _ = errgroup.WithContext(parent)
