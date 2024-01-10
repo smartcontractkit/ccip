@@ -27,6 +27,8 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	}
 	l := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)
+	require.NotNil(t, TestCfg.TestGroupInput.DestGasLimit)
+	gasLimit := big.NewInt(*TestCfg.TestGroupInput.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", nil, TestCfg)
 	var tcs []subtestInput
 	if len(setUpOutput.Lanes) == 0 {
@@ -65,7 +67,8 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
 
 			tc.lane.RecordStateBeforeTransfer()
-			err := tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
+
+			err := tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, gasLimit)
 			require.NoError(t, err)
 			tc.lane.ValidateRequests(true)
 		})
