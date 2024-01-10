@@ -41,8 +41,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_3_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -140,7 +140,7 @@ func NewExecOnchainConfig(
 }
 
 type ExecOffchainConfig struct {
-	v1_0_0.ExecOffchainConfig
+	v1_3_0.ExecOffchainConfig
 }
 
 func NewExecOffchainConfig(
@@ -153,13 +153,11 @@ func NewExecOffchainConfig(
 	InflightCacheExpiry models.Duration,
 	RootSnoozeTime models.Duration,
 ) ExecOffchainConfig {
-	return ExecOffchainConfig{v1_0_0.ExecOffchainConfig{
-		SourceFinalityDepth:         SourceFinalityDepth,
+	return ExecOffchainConfig{v1_3_0.ExecOffchainConfig{
 		DestOptimisticConfirmations: DestOptimisticConfirmations,
-		DestFinalityDepth:           DestFinalityDepth,
 		BatchGasLimit:               BatchGasLimit,
 		RelativeBoostPerWaitHour:    RelativeBoostPerWaitHour,
-		MaxGasPrice:                 MaxGasPrice,
+		DestMaxGasPrice:             MaxGasPrice,
 		InflightCacheExpiry:         InflightCacheExpiry,
 		RootSnoozeTime:              RootSnoozeTime,
 	}}
