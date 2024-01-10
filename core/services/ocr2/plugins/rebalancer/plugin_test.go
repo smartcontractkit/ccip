@@ -12,6 +12,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
@@ -33,7 +34,7 @@ func newPlugin(t *testing.T) (*Plugin, mockDeps) {
 	lmGraph := liquiditygraph.NewGraph()
 	lmFactory := mocks.NewFactory(t)
 	rb := mocks.NewRebalancer(t)
-	return NewPlugin(f, closeTimeout, rootNetwork, rootAddr, lmFactory, lmGraph, rb), mockDeps{
+	return NewPlugin(f, closeTimeout, rootNetwork, rootAddr, lmFactory, lmGraph, rb, logger.TestLogger(t)), mockDeps{
 		mockFactory:    lmFactory,
 		mockRebalancer: rb,
 	}

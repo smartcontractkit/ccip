@@ -138,7 +138,7 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 	require.NoError(t, err, "failed to create multichain config tracker")
 
 	// Replay the log poller to get the ConfigSet log
-	err = tracker.Replay(testutils.Context(t), masterChain, 1)
+	err = tracker.ReplayChain(testutils.Context(t), masterChain, 1)
 	require.NoError(t, err, "failed to replay log poller")
 
 	// fetch config digest from the tracker
@@ -228,8 +228,8 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 
 	// Replay the log pollers to get the ConfigSet log
 	// on each respective chain
-	require.NoError(t, tracker.Replay(testutils.Context(t), masterChain, 1), "failed to replay log poller on master chain")
-	require.NoError(t, tracker.Replay(testutils.Context(t), secondChain, 1), "failed to replay log poller on second chain")
+	require.NoError(t, tracker.ReplayChain(testutils.Context(t), masterChain, 1), "failed to replay log poller on master chain")
+	require.NoError(t, tracker.ReplayChain(testutils.Context(t), secondChain, 1), "failed to replay log poller on second chain")
 
 	// fetch config digest from the tracker
 	changedInBlock, configDigest, err := tracker.LatestConfigDetails(testutils.Context(t))

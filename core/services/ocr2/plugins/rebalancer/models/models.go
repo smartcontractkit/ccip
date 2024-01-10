@@ -13,6 +13,28 @@ import (
 
 type Address common.Address
 
+func (a *Address) String() string {
+	return common.Address(*a).Hex()
+}
+
+func (a *Address) Bytes() []byte {
+	return common.Address(*a).Bytes()
+}
+
+func (a *Address) UnmarshalJSON(input []byte) error {
+	ta := common.Address(*a)
+	err := ta.UnmarshalJSON(input)
+	if err != nil {
+		return err
+	}
+	*a = Address(ta)
+	return nil
+}
+
+func (a Address) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf(`"%s"`, common.Address(a).Hex())), nil
+}
+
 type NetworkID uint64
 
 const (
@@ -23,13 +45,27 @@ const (
 
 func (n NetworkID) Type() NetworkType {
 	switch n {
-	case 1, 2, 3: // todo: use some lib
+	case 1, 2, 3, 1337: // todo: use some lib
 		return NetworkTypeEvm
 	case 4:
 		return NetworkTypeSolana
 	default:
 		return NetworkTypeUnknown
 	}
+}
+
+func (n *NetworkID) UnmarshalJSON(input []byte) error {
+	var i uint64
+	err := json.Unmarshal(input, &i)
+	if err != nil {
+		return err
+	}
+	*n = NetworkID(i)
+	return nil
+}
+
+func (n NetworkID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(uint64(n))
 }
 
 type NetworkType string
@@ -66,6 +102,10 @@ func (p PendingTransfer) Hash() ([32]byte, error) {
 		return [32]byte{}, fmt.Errorf("marshal: %w", err)
 	}
 	return sha256.Sum256(b), nil
+}
+
+func (p PendingTransfer) String() string {
+	return fmt.Sprintf("PendingTransfer{Transfer: %s, Status: %s}", p.Transfer.String(), p.Status)
 }
 
 func NewPendingTransfer(tr Transfer) PendingTransfer {
@@ -112,6 +152,10 @@ func (r ReportMetadata) Encode() []byte {
 
 func (r ReportMetadata) GetDestinationChain() relay.ID {
 	return relay.NewID(relay.EVM, fmt.Sprintf("%d", r.NetworkID))
+}
+
+func (r ReportMetadata) String() string {
+	return fmt.Sprintf("ReportMetadata{Transfers: %v, LiquidityManagerAddress: %s, NetworkID: %d}", r.Transfers, r.LiquidityManagerAddress, r.NetworkID)
 }
 
 func DecodeReportMetadata(b []byte) (ReportMetadata, error) {

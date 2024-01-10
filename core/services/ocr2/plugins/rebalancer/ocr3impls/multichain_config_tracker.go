@@ -168,12 +168,17 @@ func (m *multichainConfigTracker) Notify() <-chan struct{} {
 	return nil
 }
 
-// Replay abstracts the logpoller.LogPoller Replay() implementation
-func (m *multichainConfigTracker) Replay(ctx context.Context, id relay.ID, fromBlock int64) error {
+// ReplayChain replays the log poller for the provided chain
+func (m *multichainConfigTracker) ReplayChain(ctx context.Context, id relay.ID, fromBlock int64) error {
 	if _, ok := m.logPollers[id]; !ok {
 		return fmt.Errorf("chain %s not in log pollers", id)
 	}
 	return m.logPollers[id].Replay(ctx, fromBlock)
+}
+
+// Replay replays the log poller for the master chain
+func (m *multichainConfigTracker) Replay(ctx context.Context, fromBlock int64) error {
+	return m.logPollers[m.masterChain].Replay(ctx, fromBlock)
 }
 
 // LatestBlockHeight implements types.ContractConfigTracker.
