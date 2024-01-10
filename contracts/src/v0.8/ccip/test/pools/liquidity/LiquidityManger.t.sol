@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 import {IBridgeAdapter, IL1BridgeAdapter} from "../../../pools/liquidity/interfaces/IBridge.sol";
-import {ILiquidityContainer} from "../../../pools/liquidity/interfaces/ILiquidityContainer.sol";
 import {ILiquidityManager} from "../../../pools/liquidity/interfaces/ILiquidityManager.sol";
 
 import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";

@@ -2,12 +2,12 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
+import {ILiquidityContainer} from "../../liquidity-manager/interfaces/ILiquidityContainer.sol";
 
 import {TokenPool} from "./TokenPool.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ILiquidityContainer} from "./liquidity/interfaces/ILiquidityContainer.sol";
 
 /// @notice Token pool used for tokens on their native chain. This uses a lock and release mechanism.
 /// Because of lock/unlock requiring liquidity, this pool contract also has function to add and remove
@@ -83,13 +83,22 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
 
   // @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
-    return interfaceId == LOCK_RELEASE_INTERFACE_ID || super.supportsInterface(interfaceId);
+    return
+      interfaceId == LOCK_RELEASE_INTERFACE_ID ||
+      interfaceId == type(ILiquidityContainer).interfaceId ||
+      super.supportsInterface(interfaceId);
   }
 
   /// @notice Gets liquidity manager, can be address(0) if none is configured.
   /// @return The current liquidity manager.
-  function getProvidedManager() external view returns (address) {
+  function getLiquidityManager() external view returns (address) {
     return s_liquidityManager;
+  }
+
+  /// @notice Sets the liquidity manager address.
+  /// @dev Only callable by the owner.
+  function setLiquidityManager(address liquidityManager) external onlyOwner {
+    s_liquidityManager = liquidityManager;
   }
 
   /// @notice Checks if the pool can accept liquidity.
@@ -116,9 +125,5 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     if (i_token.balanceOf(address(this)) < amount) revert InsufficientLiquidity();
     i_token.safeTransfer(msg.sender, amount);
     emit LiquidityRemoved(msg.sender, amount);
-  }
-
-  function setLiquidityManager(address liquidityManager) external onlyOwner {
-    s_liquidityManager = liquidityManager;
   }
 }

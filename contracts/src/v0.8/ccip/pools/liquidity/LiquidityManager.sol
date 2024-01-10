@@ -2,8 +2,8 @@
 pragma solidity 0.8.19;
 
 import {IBridgeAdapter} from "./interfaces/IBridge.sol";
-import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
 import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
+import {ILiquidityContainer} from "../../../liquidity-manager/interfaces/ILiquidityContainer.sol";
 
 import {OCR3Base} from "../../ocr/OCR3Base.sol";
 
