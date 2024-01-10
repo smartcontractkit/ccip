@@ -62,7 +62,7 @@ func ParseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(l
 		})
 	}
 
-	if len(reqs) != len(logs) {
+	if len(logs) != len(reqs) {
 		return nil, fmt.Errorf("%d logs were not parsed", len(logs)-len(reqs))
 	}
 	return reqs, nil
