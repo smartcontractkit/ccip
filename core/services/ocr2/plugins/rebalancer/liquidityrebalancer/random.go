@@ -35,14 +35,10 @@ func (r *randomRebalancer) ComputeTransfersToBalance(
 	// seed the randomness source so that all rebalancers produce the same output
 	// for the same input
 	r.lggr.Infow("RandomRebalancer: using median liquidity as seed", "medianLiquidity1", medianLiquidities[0].Liquidity.String())
-	source := mathrand.NewSource(medianLiquidities[0].Liquidity.Int64())
+	source := mathrand.NewSource(medianLiquidities[0].Liquidity.Int64()) //nolint: gosec
 	rng := mathrand.New(source)
 	numTransfers := rng.Int63n(int64(r.maxNumTransfers))
 	r.lggr.Infow("RandomRebalancer: generated random number of transfers", "numTransfers", numTransfers)
-	// numTransfers, err := rand.Int(rand.Reader, big.NewInt(int64(r.maxNumTransfers)))
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to generate random number: %w", err)
-	// }
 	var transfers []models.Transfer
 	for i := 0; i < int(numTransfers); i++ {
 		randSourceChain := pickRandom(rng, g.GetNetworks())
