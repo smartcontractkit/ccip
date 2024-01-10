@@ -61,14 +61,12 @@ func Test_parseLogs_withErrors(t *testing.T) {
 	assert.Nil(t, parsedEvents, "No events are returned if there was an error.")
 
 	// logs are written for errors.
-	require.Equal(t, actualErrorCount+1, observed.Len(), "Expect 51 warnings: one for each error and a summary.")
-	for i, log := range observed.All() {
-		assert.Equal(t, zapcore.WarnLevel, log.Level)
-		if i < actualErrorCount {
-			assert.Contains(t, log.Message, fmt.Sprintf("cannot parse %d", (i+1)*2), "each error should be logged as a warning")
-		} else {
-			// summary is written at the end.
-			assert.Contains(t, log.Message, "Some logs were not parsed", "overview for entire batch of logs being parsed")
-		}
+	require.Equal(t, actualErrorCount, observed.Len(), "Expect 51 warnings: one for each error and a summary.")
+	for i, entry := range observed.All() {
+		assert.Equal(t, zapcore.ErrorLevel, entry.Level)
+		assert.Contains(t, entry.Message, "Unable to parse log")
+		contextMap := entry.ContextMap()
+		require.Contains(t, contextMap, "err")
+		assert.Contains(t, contextMap["err"], fmt.Sprintf("cannot parse %d", (i+1)*2), "each error should be logged as a warning")
 	}
 }
