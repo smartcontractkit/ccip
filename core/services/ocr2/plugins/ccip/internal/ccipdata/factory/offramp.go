@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_3_0"
 )
 
 func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (ccipdata.OffRampReader, error) {
@@ -31,8 +32,10 @@ func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
 		return v1_0_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
-	case ccipdata.V1_2_0, ccipdata.V1_3_0:
+	case ccipdata.V1_2_0:
 		return v1_2_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
+	case ccipdata.V1_3_0:
+		return v1_3_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
 	default:
 		return nil, errors.Errorf("unsupported offramp version %v", version.String())
 	}
