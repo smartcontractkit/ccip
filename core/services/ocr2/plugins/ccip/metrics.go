@@ -7,24 +7,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-type skipReason string
-
-const (
-	// ReasonNotBlessed describes when a report is skipped due to not being blessed.
-	ReasonNotBlessed skipReason = "not blessed"
-
-	// ReasonAllExecuted describes when a report is skipped due to messages being all executed.
-	ReasonAllExecuted skipReason = "all executed"
-)
-
 var (
-	metricReportSkipped = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "ccip_unexpired_report_skipped",
-		Help: "Times report is skipped for the possible reasons",
-	}, []string{"reason"})
 	execPluginReportsCount = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "ccip_execution_observation_reports_count",
-		Help: "Number of reports that are being processed by Execution Plugin during single observation",
+		Name: "ccip_unexpired_commit_roots",
+		Help: "Number of unexpired commit roots processed by the plugin",
 	}, []string{"plugin", "source", "dest"})
 	messagesProcessed = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "ccip_number_of_messages_processed",
@@ -92,6 +78,21 @@ func (p *pluginMetricsCollector) SequenceNumber(seqNr uint64) {
 		Set(float64(seqNr))
 }
 
-func IncSkippedRequests(reason skipReason) {
-	metricReportSkipped.WithLabelValues(string(reason)).Inc()
+var (
+	// NoopMetricsCollector is a no-op implementation of PluginMetricsCollector
+	NoopMetricsCollector PluginMetricsCollector = noop{}
+)
+
+type noop struct{}
+
+func (d noop) NumberOfMessagesProcessed(ocrPhase, int) {
+}
+
+func (d noop) NumberOfMessagesBasedOnInterval(ocrPhase, uint64, uint64) {
+}
+
+func (d noop) UnexpiredCommitRoots(int) {
+}
+
+func (d noop) SequenceNumber(uint64) {
 }

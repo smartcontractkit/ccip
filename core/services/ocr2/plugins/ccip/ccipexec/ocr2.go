@@ -188,7 +188,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			if allMsgsExecutedAndFinalized := rep.allRequestsAreExecutedAndFinalized(); allMsgsExecutedAndFinalized {
 				rootLggr.Infof("Snoozing root %s forever since there are no executable txs anymore", hex.EncodeToString(merkleRoot[:]))
 				r.snoozedRoots.MarkAsExecuted(merkleRoot)
-				ccip.IncSkippedRequests(ccip.ReasonAllExecuted)
 				continue
 			}
 
@@ -198,7 +197,6 @@ func (r *ExecutionReportingPlugin) getExecutableObservations(ctx context.Context
 			}
 			if !blessed {
 				rootLggr.Infow("Report is accepted but not blessed")
-				ccip.IncSkippedRequests(ccip.ReasonNotBlessed)
 				continue
 			}
 
