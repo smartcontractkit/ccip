@@ -11,10 +11,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 // OCR2TaskJobSpec represents an OCR2 job that is given to other nodes, meant to communicate with the bootstrap node,
@@ -125,7 +125,7 @@ observationSource                      = """
 	return MarshallTemplate(specWrap, "OCR2 Job", ocr2TemplateString)
 }
 
-// marshallTemplate Helper to marshall templates
+// MarshallTemplate Helper to marshall templates
 func MarshallTemplate(jobSpec interface{}, name, templateString string) (string, error) {
 	var buf bytes.Buffer
 	tmpl, err := template.New(name).Parse(templateString)

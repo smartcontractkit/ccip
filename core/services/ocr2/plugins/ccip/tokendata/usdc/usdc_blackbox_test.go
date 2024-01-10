@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type attestationResponse struct {
@@ -68,10 +68,11 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 	msgAndAttestation, err := usdcService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 		EVM2EVMMessage: internal.EVM2EVMMessage{
 			SequenceNumber: seqNum,
+			TokenAmounts:   []internal.TokenAmount{{Token: utils.RandomAddress(), Amount: nil}},
 		},
 		TxHash:   txHash,
 		LogIndex: uint(logIndex),
-	})
+	}, 0)
 	require.NoError(t, err)
 	// Expected attestation for parsed body.
 	require.Equal(t, expectedMessageAndAttestation, hexutil.Encode(msgAndAttestation))

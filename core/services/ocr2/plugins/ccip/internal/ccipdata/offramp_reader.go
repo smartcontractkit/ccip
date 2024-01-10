@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -19,46 +18,20 @@ const (
 	ManuallyExecute = "manuallyExecute"
 )
 
-// Do not change the JSON format of this struct without consulting with
-// the RDD people first.
+// ExecOffchainConfig specifies configuration for nodes executing committed messages.
 type ExecOffchainConfig struct {
-	SourceFinalityDepth         uint32
+	// DestOptimisticConfirmations is how many confirmations to wait for the dest chain event before we consider it confirmed (optimistically, need not be finalized).
 	DestOptimisticConfirmations uint32
-	DestFinalityDepth           uint32
-	BatchGasLimit               uint32
-	RelativeBoostPerWaitHour    float64
-	MaxGasPrice                 uint64
-	InflightCacheExpiry         models.Duration
-	RootSnoozeTime              models.Duration
-}
-
-func (c ExecOffchainConfig) Validate() error {
-	if c.SourceFinalityDepth == 0 {
-		return errors.New("must set SourceFinalityDepth")
-	}
-	if c.DestFinalityDepth == 0 {
-		return errors.New("must set DestFinalityDepth")
-	}
-	if c.DestOptimisticConfirmations == 0 {
-		return errors.New("must set DestOptimisticConfirmations")
-	}
-	if c.BatchGasLimit == 0 {
-		return errors.New("must set BatchGasLimit")
-	}
-	if c.RelativeBoostPerWaitHour == 0 {
-		return errors.New("must set RelativeBoostPerWaitHour")
-	}
-	if c.MaxGasPrice == 0 {
-		return errors.New("must set MaxGasPrice")
-	}
-	if c.InflightCacheExpiry.Duration() == 0 {
-		return errors.New("must set InflightCacheExpiry")
-	}
-	if c.RootSnoozeTime.Duration() == 0 {
-		return errors.New("must set RootSnoozeTime")
-	}
-
-	return nil
+	// BatchGasLimit is the maximum sum of user callback gas we permit in one execution report.
+	BatchGasLimit uint32
+	// RelativeBoostPerWaitHour indicates how much to increase (artificially) the fee paid on the source chain per hour of wait time, such that eventually the fee paid is greater than the execution cost and we’ll execute it.
+	// For example: if set to 0.5, that means the fee paid is increased by 50% every hour the message has been waiting.
+	RelativeBoostPerWaitHour float64
+	// InflightCacheExpiry indicates how long we keep a report in the plugin cache before we expire it.
+	// The caching prevents us from issuing another report while one is already in flight.
+	InflightCacheExpiry models.Duration
+	// RootSnoozeTime is the interval at which we check roots for executable messages.
+	RootSnoozeTime models.Duration
 }
 
 type ExecOnchainConfig struct {
@@ -112,20 +85,21 @@ type TokenBucketRateLimit struct {
 type OffRampReader interface {
 	Closer
 	RegisterFilters(qopts ...pg.QOpt) error
-	// Will error if messages are not a compatible version.
+	// EncodeExecutionReport will error if messages are not a compatible version.
 	EncodeExecutionReport(report ExecReport) ([]byte, error)
+	// DecodeExecutionReport will error if messages are not a compatible version.
 	DecodeExecutionReport(report []byte) (ExecReport, error)
 	// GetExecutionStateChangesBetweenSeqNums returns all the execution state change events for the provided message sequence numbers (inclusive).
 	GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error)
 	GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []common.Address) ([]TokenBucketRateLimit, error)
 	Address() common.Address
-	// Notifies the reader that the config has changed onchain
+	// ChangeConfig notifies the reader that the config has changed onchain
 	ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error)
 	OffchainConfig() ExecOffchainConfig
 	OnchainConfig() ExecOnchainConfig
 	GasPriceEstimator() prices.GasPriceEstimatorExec
 	GetSenderNonce(ctx context.Context, sender common.Address) (uint64, error)
-	CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error)
+	CurrentRateLimiterState(ctx context.Context) (TokenBucketRateLimit, error)
 	GetExecutionState(ctx context.Context, sequenceNumber uint64) (uint8, error)
 	GetStaticConfig(ctx context.Context) (OffRampStaticConfig, error)
 	GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error)
