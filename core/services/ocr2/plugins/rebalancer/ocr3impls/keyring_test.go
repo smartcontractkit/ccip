@@ -3,11 +3,12 @@ package ocr3impls
 import (
 	"testing"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/test-go/testify/require"
+
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/test-go/testify/require"
 )
 
 func TestKeyring(t *testing.T) {
