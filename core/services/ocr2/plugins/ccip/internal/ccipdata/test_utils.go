@@ -2,6 +2,7 @@ package ccipdata
 
 import (
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -16,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
 // NewSimulation returns a client and a simulated backend.
@@ -60,4 +62,29 @@ func AssertFilterRegistration(t *testing.T, lp *lpmocks.LogPoller, buildCloser f
 
 	require.NoError(t, c.Close())
 	lp.AssertExpectations(t)
+}
+
+// AssertAllFieldsAreRequired asserts that setting any struct field to zero value invalidates the value.
+// NOTE: the value argument must be valid.
+func AssertAllFieldsAreRequired[T config.OffchainConfig](t *testing.T, value T) {
+	// Iterate over all fields in the struct using the reflection API.
+	// Make a copy of the value and try setting the corresponding field to zero value.
+	// Then try to validate the value and assert that:
+	//   1. The modified copy became invalid.
+	//   2. The validation error contains the field name.
+	require.NoError(t, value.Validate())
+
+	src := reflect.ValueOf(value)
+	if src.Kind() != reflect.Struct {
+		t.Fatalf("expected struct, got %s", src.Kind())
+	}
+	fields := reflect.VisibleFields(src.Type())
+	for _, field := range fields {
+		valueCopy := value
+		dst := reflect.ValueOf(&valueCopy)
+		f := src.FieldByIndex(field.Index)
+		dst.Elem().FieldByIndex(field.Index).Set(reflect.Zero(f.Type()))
+		err := valueCopy.Validate()
+		require.Contains(t, err.Error(), field.Name)
+	}
 }
