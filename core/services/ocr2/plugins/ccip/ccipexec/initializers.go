@@ -77,7 +77,8 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, errors.Wrap(err, "open source chain")
 	}
 
-	sourceChainName, destChainName, err := ccipconfig.ResolveChainNames(int64(chainID), destChainID)
+	sourceChainId := int64(chainID)
+	sourceChainName, destChainName, err := ccipconfig.ResolveChainNames(sourceChainId, destChainID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,10 +118,11 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 	}
 
 	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, int64(chainID), ccip.ExecPluginLabel)
-	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, int64(chainID), ccip.ExecPluginLabel)
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainId, ccip.ExecPluginLabel)
+	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, sourceChainId, ccip.ExecPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.ExecPluginLabel)
 	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, ccip.ExecPluginLabel)
+	metricsCollector := ccip.NewPluginMetricsCollector(ccip.ExecPluginLabel, big.NewInt(sourceChainId), big.NewInt(destChainID))
 
 	destChainSelector, err := chainselectors.SelectorFromChainId(uint64(destChainID))
 	if err != nil {
@@ -151,6 +153,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 				5*time.Second,
 				offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds,
 			),
+			metricsCollector: metricsCollector,
 		}, &ccipcommon.BackfillArgs{
 			SourceLP:         sourceChain.LogPoller(),
 			DestLP:           destChain.LogPoller(),

@@ -98,6 +98,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, ccip.CommitPluginLabel)
 	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, ccip.CommitPluginLabel)
 	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.CommitPluginLabel)
+	metricsCollector := ccip.NewPluginMetricsCollector(ccip.CommitPluginLabel, big.NewInt(sourceChainID), big.NewInt(destChainID))
 
 	lggr.Infow("NewCommitServices",
 		"pluginConfig", pluginConfig,
@@ -116,6 +117,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			destChainSelector:     staticConfig.ChainSelector,
 			commitStore:           commitStoreReader,
 			priceRegistryProvider: ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), commitLggr, ccip.CommitPluginLabel),
+			metricsCollector:      metricsCollector,
 		}, &ccipcommon.BackfillArgs{
 			SourceLP:         sourceChain.LogPoller(),
 			DestLP:           destChain.LogPoller(),
