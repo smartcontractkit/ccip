@@ -168,42 +168,84 @@ func (uni testUniverse[RI]) TransmittedEvents(t *testing.T) []*no_op_ocr3.NoOpOC
 	return events
 }
 
+// TODO: might be useful to fuzz test this
 func TestContractTransmitter(t *testing.T) {
 	t.Parallel()
 
-	uni := newTestUniverse[struct{}](t, nil)
+	t.Run("empty report", func(t *testing.T) {
+		uni := newTestUniverse[struct{}](t, nil)
 
-	c, err := uni.wrapper.LatestConfigDigestAndEpoch(nil)
-	require.NoError(t, err, "failed to get latest config digest and epoch")
-	configDigest := c.ConfigDigest
+		c, err := uni.wrapper.LatestConfigDigestAndEpoch(nil)
+		require.NoError(t, err, "failed to get latest config digest and epoch")
+		configDigest := c.ConfigDigest
 
-	// create the attributed signatures
-	// only need f+1 which is 2 in this case
-	rwi := ocr3types.ReportWithInfo[struct{}]{
-		Report: []byte{},
-		Info:   struct{}{},
-	}
-	seqNum := uint64(1)
-	attributedSigs := uni.SignReport(t, configDigest, rwi, seqNum)
+		// create the attributed signatures
+		// only need f+1 which is 2 in this case
+		rwi := ocr3types.ReportWithInfo[struct{}]{
+			Report: []byte{},
+			Info:   struct{}{},
+		}
+		seqNum := uint64(1)
+		attributedSigs := uni.SignReport(t, configDigest, rwi, seqNum)
 
-	account, err := uni.ocr3Transmitter.FromAccount()
-	require.NoError(t, err, "failed to get from account")
-	require.Equal(t, account, ocrtypes.Account(uni.transmitters[0].From.Hex()), "unexpected from account")
-	err = uni.ocr3Transmitter.Transmit(context.Background(), configDigest, seqNum, rwi, attributedSigs)
-	require.NoError(t, err, "failed to transmit report")
+		account, err := uni.ocr3Transmitter.FromAccount()
+		require.NoError(t, err, "failed to get from account")
+		require.Equal(t, account, ocrtypes.Account(uni.transmitters[0].From.Hex()), "unexpected from account")
+		err = uni.ocr3Transmitter.Transmit(context.Background(), configDigest, seqNum, rwi, attributedSigs)
+		require.NoError(t, err, "failed to transmit report")
 
-	lcde, err := uni.wrapper.LatestConfigDigestAndEpoch(nil)
-	require.NoError(t, err, "failed to get latest config digest and epoch")
-	require.Equal(t, configDigest, lcde.ConfigDigest, "config digest mismatch")
-	require.Equal(t, seqNum, lcde.SequenceNumber, "seq number mismatch")
+		lcde, err := uni.wrapper.LatestConfigDigestAndEpoch(nil)
+		require.NoError(t, err, "failed to get latest config digest and epoch")
+		require.Equal(t, configDigest, lcde.ConfigDigest, "config digest mismatch")
+		require.Equal(t, seqNum, lcde.SequenceNumber, "seq number mismatch")
 
-	// check for transmitted event
-	// TODO: for some reason this event isn't being emitted in the simulated backend
-	events := uni.TransmittedEvents(t)
-	require.Len(t, events, 1, "expected one transmitted event")
-	event := events[0]
-	require.Equal(t, configDigest, event.ConfigDigest, "unexpected config digest")
-	require.Equal(t, seqNum, event.SequenceNumber, "unexpected sequence number")
+		// check for transmitted event
+		// TODO: for some reason this event isn't being emitted in the simulated backend
+		events := uni.TransmittedEvents(t)
+		require.Len(t, events, 1, "expected one transmitted event")
+		event := events[0]
+		require.Equal(t, configDigest, event.ConfigDigest, "unexpected config digest")
+		require.Equal(t, seqNum, event.SequenceNumber, "unexpected sequence number")
+	})
+
+	t.Run("non-empty report", func(t *testing.T) {
+		uni := newTestUniverse[struct{}](t, nil)
+
+		c, err := uni.wrapper.LatestConfigDigestAndEpoch(nil)
+		require.NoError(t, err, "failed to get latest config digest and epoch")
+		configDigest := c.ConfigDigest
+
+		// create the attributed signatures
+		// only need f+1 which is 2 in this case
+		rep := testutils.Random32Byte()
+		rwi := ocr3types.ReportWithInfo[struct{}]{
+			// Report bytes must always be aligned to 32 byte boundaries otherwise the on-chain
+			// length check will fail.
+			Report: rep[:],
+			Info:   struct{}{},
+		}
+		seqNum := uint64(1)
+		attributedSigs := uni.SignReport(t, configDigest, rwi, seqNum)
+
+		account, err := uni.ocr3Transmitter.FromAccount()
+		require.NoError(t, err, "failed to get from account")
+		require.Equal(t, account, ocrtypes.Account(uni.transmitters[0].From.Hex()), "unexpected from account")
+		err = uni.ocr3Transmitter.Transmit(context.Background(), configDigest, seqNum, rwi, attributedSigs)
+		require.NoError(t, err, "failed to transmit report")
+
+		lcde, err := uni.wrapper.LatestConfigDigestAndEpoch(nil)
+		require.NoError(t, err, "failed to get latest config digest and epoch")
+		require.Equal(t, configDigest, lcde.ConfigDigest, "config digest mismatch")
+		require.Equal(t, seqNum, lcde.SequenceNumber, "seq number mismatch")
+
+		// check for transmitted event
+		// TODO: for some reason this event isn't being emitted in the simulated backend
+		events := uni.TransmittedEvents(t)
+		require.Len(t, events, 1, "expected one transmitted event")
+		event := events[0]
+		require.Equal(t, configDigest, event.ConfigDigest, "unexpected config digest")
+		require.Equal(t, seqNum, event.SequenceNumber, "unexpected sequence number")
+	})
 }
 
 type transmitterImpl struct {

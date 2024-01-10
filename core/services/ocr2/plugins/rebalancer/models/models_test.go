@@ -13,26 +13,42 @@ import (
 func TestMarshalReportMetadata(t *testing.T) {
 	t.Parallel()
 
-	rm := models.ReportMetadata{}
-	b, err := json.Marshal(rm)
-	require.NoError(t, err, "failed to marshal empty ReportMetadata")
+	t.Run("marshal json", func(t *testing.T) {
+		rm := models.ReportMetadata{}
+		b, err := json.Marshal(rm)
+		require.NoError(t, err, "failed to marshal empty ReportMetadata")
 
-	var unmarshalled models.ReportMetadata
-	err = json.Unmarshal(b, &unmarshalled)
-	require.NoError(t, err, "failed to unmarshal empty ReportMetadata")
-	require.Equal(t, rm, unmarshalled, "marshalled and unmarshalled ReportMetadata should be equal")
+		var unmarshalled models.ReportMetadata
+		err = json.Unmarshal(b, &unmarshalled)
+		require.NoError(t, err, "failed to unmarshal empty ReportMetadata")
+		require.Equal(t, rm, unmarshalled, "marshalled and unmarshalled ReportMetadata should be equal")
 
-	rm = models.ReportMetadata{
-		Transfers: []models.Transfer{
-			models.NewTransfer(1, 2, big.NewInt(3)),
-		},
-		LiquidityManagerAddress: models.Address(testutils.NewAddress()),
-		NetworkID:               1,
-	}
-	b, err = json.Marshal(rm)
-	require.NoError(t, err, "failed to marshal ReportMetadata")
+		rm = models.ReportMetadata{
+			Transfers: []models.Transfer{
+				models.NewTransfer(1, 2, big.NewInt(3)),
+			},
+			LiquidityManagerAddress: models.Address(testutils.NewAddress()),
+			NetworkID:               1,
+		}
+		b, err = json.Marshal(rm)
+		require.NoError(t, err, "failed to marshal ReportMetadata")
 
-	err = json.Unmarshal(b, &unmarshalled)
-	require.NoError(t, err, "failed to unmarshal ReportMetadata")
-	require.Equal(t, rm, unmarshalled, "marshalled and unmarshalled ReportMetadata should be equal")
+		err = json.Unmarshal(b, &unmarshalled)
+		require.NoError(t, err, "failed to unmarshal ReportMetadata")
+		require.Equal(t, rm, unmarshalled, "marshalled and unmarshalled ReportMetadata should be equal")
+	})
+
+	t.Run("marshal onchain", func(t *testing.T) {
+		rm := models.ReportMetadata{
+			NetworkID:               1,
+			LiquidityManagerAddress: models.Address(testutils.NewAddress()),
+		}
+		b, err := rm.OnchainEncode()
+		require.NoError(t, err, "failed to marshal ReportMetadata")
+		require.Len(t, b, 64, "marshalled ReportMetadata should be 64 bytes")
+
+		r, err := models.DecodeReport(b)
+		require.NoError(t, err, "failed to unmarshal ReportMetadata")
+		require.Equal(t, rm, r, "marshalled and unmarshalled ReportMetadata should be equal")
+	})
 }

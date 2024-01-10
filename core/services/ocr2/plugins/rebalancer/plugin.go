@@ -159,8 +159,12 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		}
 
 		reportMeta := models.NewReportMetadata(transfers, lmAddress, sourceNet)
+		encoded, err := reportMeta.OnchainEncode()
+		if err != nil {
+			return nil, fmt.Errorf("encode report metadata for onchain usage: %w", err)
+		}
 		reports = append(reports, ocr3types.ReportWithInfo[models.ReportMetadata]{
-			Report: reportMeta.Encode(),
+			Report: encoded,
 			Info:   reportMeta,
 		})
 	}
@@ -173,12 +177,12 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
 	p.lggr.Infow("in should accept attested report", "seqNr", seqNr, "reportMeta", r.Info, "reportJSON", string(r.Report))
 
-	reportMeta, err := models.DecodeReportMetadata(r.Report)
+	report, err := models.DecodeReport(r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode report metadata: %w", err)
 	}
 
-	fmt.Println(reportMeta.Transfers)
+	fmt.Println(report.Transfers)
 	// todo: check if reportMeta.transfers are valid
 
 	return true, nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
@@ -150,6 +151,10 @@ func (r ReportMetadata) Encode() []byte {
 	return b
 }
 
+func (r ReportMetadata) OnchainEncode() ([]byte, error) {
+	return onchainReportArguments.Pack(big.NewInt(int64(r.NetworkID)), common.Address(r.LiquidityManagerAddress))
+}
+
 func (r ReportMetadata) GetDestinationChain() relay.ID {
 	return relay.NewID(relay.EVM, fmt.Sprintf("%d", r.NetworkID))
 }
@@ -162,4 +167,42 @@ func DecodeReportMetadata(b []byte) (ReportMetadata, error) {
 	var meta ReportMetadata
 	err := json.Unmarshal(b, &meta)
 	return meta, err
+}
+
+func DecodeReport(b []byte) (ReportMetadata, error) {
+	unpacked, err := onchainReportArguments.Unpack(b)
+	if err != nil {
+		return ReportMetadata{}, fmt.Errorf("failed to unpack report: %w", err)
+	}
+	var out ReportMetadata
+	chainID := *abi.ConvertType(unpacked[0], new(*big.Int)).(**big.Int)
+	lqmgrAddr := *abi.ConvertType(unpacked[1], new(common.Address)).(*common.Address)
+	out.NetworkID = NetworkID(chainID.Int64())
+	out.LiquidityManagerAddress = Address(lqmgrAddr)
+	return out, nil
+}
+
+var onchainReportArguments = ReportSchema()
+
+func ReportSchema() abi.Arguments {
+	mustNewType := func(t string) abi.Type {
+		result, err := abi.NewType(t, "", []abi.ArgumentMarshaling{})
+		if err != nil {
+			panic(fmt.Sprintf("Unexpected error during abi.NewType: %s", err))
+		}
+		return result
+	}
+	return abi.Arguments([]abi.Argument{
+		{
+			Name: "chainId",
+			Type: mustNewType("uint256"),
+		},
+		{
+			Name: "liquidityManagerAddress",
+			Type: mustNewType("address"),
+		},
+		// TODO: add transfer operations
+		// Once the onchain code is merged we can remove this function
+		// and just use the gethwrapper
+	})
 }
