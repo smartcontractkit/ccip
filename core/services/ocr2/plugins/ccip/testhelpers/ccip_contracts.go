@@ -122,10 +122,6 @@ type ExecOnchainConfig struct {
 	v1_2_0.ExecOnchainConfig
 }
 
-func (c *ExecOnchainConfig) Encode() ([]byte, error) {
-	return ccipconfig.EncodeOffchainConfig(c.ExecOnchainConfig)
-}
-
 func NewExecOnchainConfig(
 	PermissionLessExecutionThresholdSeconds uint32,
 	Router common.Address,
@@ -146,6 +142,10 @@ func NewExecOnchainConfig(
 
 type ExecOffchainConfig struct {
 	v1_3_0.ExecOffchainConfig
+}
+
+func (c ExecOffchainConfig) Encode() ([]byte, error) {
+	return ccipconfig.EncodeOffchainConfig(c.ExecOffchainConfig)
 }
 
 func NewExecOffchainConfig(
