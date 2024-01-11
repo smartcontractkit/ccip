@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v2v3_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/gethwrappers2/generated/offchainaggregator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 )
@@ -88,21 +88,15 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 			return nil, fmt.Errorf("batch call: %w", err)
 		}
 
-		//aggrPrices, err := rpclib.ParseOutputs[*big.Int](
-		//	results,
-		//	func(d rpclib.DataAndErr) (*big.Int, error) {
-		//		// TODO process price from result.
-		//		return nil, fmt.Errorf("todo")
-		//	},
-		//)
-		latestRounds, err := rpclib.ParseOutputs[aggregator_v2v3_interface.LatestRoundData](results, func(d rpclib.DataAndErr) (aggregator_v2v3_interface.LatestRoundData, error) {
-			return rpclib.ParseOutput[aggregator_v2v3_interface.LatestRoundData](d, 0)
+		latestRounds, err := rpclib.ParseOutputs[aggregator_v3_interface.LatestRoundData](results, func(d rpclib.DataAndErr) (aggregator_v3_interface.LatestRoundData, error) {
+			return rpclib.ParseOutput[aggregator_v3_interface.LatestRoundData](d, 0)
 		})
 		if err != nil {
 			return nil, fmt.Errorf("parse outputs: %w", err)
 		}
 
 		for i := range tokensOrder {
+			// Convert prices to wei (10e18).
 			prices[tokensOrder[i]] = big.NewInt(0).Mul(latestRounds[i].Answer, big.NewInt(10_000_000_000))
 		}
 	}
