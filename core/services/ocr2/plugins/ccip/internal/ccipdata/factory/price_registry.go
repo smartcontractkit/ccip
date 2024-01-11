@@ -31,11 +31,11 @@ func initOrClosePriceRegistryReader(lggr logger.Logger, priceRegistryAddress com
 		if strings.Contains(err.Error(), "execution reverted") {
 			lggr.Infof("Assuming %v is 1.0.0 price registry, got %v", priceRegistryAddress.String(), err)
 			// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it reverts its v1.
-			pr, err := v1_0_0.NewPriceRegistry(lggr, priceRegistryAddress, lp, cl)
-			if err == nil && closeReader {
+			pr, err2 := v1_0_0.NewPriceRegistry(lggr, priceRegistryAddress, lp, cl)
+			if err2 == nil && closeReader {
 				return nil, pr.Close()
 			}
-			return pr, err
+			return pr, err2
 		}
 		return nil, errors.Wrapf(err, "unable to read type and version")
 	}
