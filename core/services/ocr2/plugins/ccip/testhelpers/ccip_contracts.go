@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
@@ -45,7 +46,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 var (
@@ -929,9 +929,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	o, err := destPool.Owner(nil)
 	require.NoError(t, err)
 	require.Equal(t, destUser.From.String(), o.String())
+	_, err = destPool.SetLiquidityManager(destUser, destUser.From)
+	require.NoError(t, err)
 	_, err = destLinkToken.Approve(destUser, destPoolAddress, Link(200))
 	require.NoError(t, err)
-	_, err = destPool.AddLiquidity(destUser, Link(200))
+	_, err = destPool.ProvideLiquidity(destUser, Link(200))
 	require.NoError(t, err)
 	destChain.Commit()
 

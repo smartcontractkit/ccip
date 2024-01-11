@@ -7,10 +7,12 @@ import (
 	"testing"
 
 	"github.com/AlekSi/pointer"
-
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
+	mockservercfg "github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver-cfg"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
@@ -20,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
 	integrationclient "github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -27,7 +30,6 @@ import (
 	integrationnodes "github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 	evmcfg "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
 	corechainlink "github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/config"
 )
 
 func SetResourceProfile(cpu, mem string) map[string]interface{} {
@@ -173,6 +175,7 @@ func DeployLocalCluster(
 	env, err := test_env.NewCLTestEnvBuilder().
 		WithTestInstance(t).
 		WithPrivateGethChains(selectedNetworks).
+		WithMockAdapter().
 		WithoutCleanup().
 		Build()
 	require.NoError(t, err)
@@ -346,7 +349,11 @@ func DeployEnvironments(
 				},
 			}))
 	}
-	err := testEnvironment.Run()
+
+	err := testEnvironment.
+		AddHelm(mockservercfg.New(nil)).
+		AddHelm(mockserver.New(nil)).
+		Run()
 	require.NoError(t, err)
 
 	if testEnvironment.WillUseRemoteRunner() {
