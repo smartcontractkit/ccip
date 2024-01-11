@@ -349,6 +349,10 @@ checkSourceDestEqual = false
 	t.Log("waiting for a transmission")
 	waitForTransmissions(t, contractWrappers)
 
+	for _, app := range apps {
+		require.NoError(t, app.Stop(), "failed to stop app")
+	}
+
 	t.Log("done")
 }
 
