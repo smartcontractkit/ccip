@@ -55,7 +55,7 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 				Status:      "invalid",
 				Attestation: "720502893578a89a8a87982982ef781c18b193",
 			},
-			expectedError: usdc.ErrAttestionAPI,
+			expectedError: usdc.ErrUnknownResponse,
 		},
 	}
 	for _, test := range tests {

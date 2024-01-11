@@ -45,7 +45,7 @@ const (
 )
 
 var (
-	ErrAttestionAPI = errors.New("unexpected response from attestation API")
+	ErrUnknownResponse = errors.New("unexpected response from attestation API")
 )
 
 // messageAndAttestation has to match the onchain struct `MessageAndAttestation` in the
@@ -156,7 +156,7 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EV
 		return nil, tokendata.ErrNotReady
 	default:
 		s.lggr.Errorw("Unexpected response from attestation API", "attestationResp", attestationResp)
-		return nil, ErrAttestionAPI
+		return nil, ErrUnknownResponse
 	}
 }
 
