@@ -58,7 +58,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, err
 	}
-	commitStoreReader, err := factory.NewCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator(), qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not create commitStore reader")
 	}
@@ -73,11 +73,11 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	}
 
 	// Load all the readers relevant for this plugin.
-	onRampReader, err := factory.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
+	onRampReader, err := factory.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed onramp reader")
 	}
-	offRampReader, err := factory.NewOffRampReader(commitLggr, pluginConfig.OffRamp, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), true)
+	offRampReader, err := factory.NewOffRampReader(commitLggr, pluginConfig.OffRamp, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), true, qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed offramp reader")
 	}
@@ -189,17 +189,17 @@ func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb
 		return err
 	}
 
-	err = factory.CloseCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
+	err = factory.CloseCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator(), qopts...)
 	if err != nil {
 		return errors.Wrap(err, "could not close commitStore reader")
 	}
 
-	err = factory.CloseOnRampReader(lggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
+	err = factory.CloseOnRampReader(lggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), qopts...)
 	if err != nil {
 		return errors.Wrap(err, "failed onramp reader")
 	}
 
-	err = factory.CloseOffRampReader(lggr, pluginConfig.OffRamp, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	err = factory.CloseOffRampReader(lggr, pluginConfig.OffRamp, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), qopts...)
 	if err != nil {
 		return errors.Wrap(err, "failed offramp reader")
 	}

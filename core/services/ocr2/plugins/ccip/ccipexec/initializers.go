@@ -210,7 +210,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 	}
 
 	offRampAddress := common.HexToAddress(spec.ContractID)
-	offRampReader, err := factory.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), false)
+	offRampReader, err := factory.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), false, qopts...)
 	if err != nil {
 		return errors.Wrap(err, "create offRampReader")
 	}
@@ -237,13 +237,13 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 	}
 
 	// close on ramp
-	err = factory.CloseOnRampReader(lggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
+	err = factory.CloseOnRampReader(lggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), qopts...)
 	if err != nil {
 		return errors.Wrap(err, "close on ramp")
 	}
 
 	// close off ramp
-	err = factory.CloseOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	err = factory.CloseOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), qopts...)
 	if err != nil {
 		return errors.Wrap(err, "close off ramp")
 	}
