@@ -17,9 +17,19 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (ccipdata.CommitStoreReader, error) {
+func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) (ccipdata.CommitStoreReader, error) {
+	return initOrCloseCommitStoreReader(lggr, address, ec, lp, estimator, false, pgOpts...)
+}
+
+func CloseCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) error {
+	_, err := initOrCloseCommitStoreReader(lggr, address, ec, lp, estimator, true, pgOpts...)
+	return err
+}
+
+func initOrCloseCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, closeReader bool, pgOpts ...pg.QOpt) (ccipdata.CommitStoreReader, error) {
 	contractType, version, err := ccipconfig.TypeAndVersion(address, ec)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read type and version")
@@ -28,11 +38,28 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 		return nil, errors.Errorf("expected %v got %v", ccipconfig.CommitStore, contractType)
 	}
 	switch version.String() {
-	case ccipdata.V1_0_0, ccipdata.V1_1_0:
-		// Versions are identical
-		return v1_0_0.NewCommitStore(lggr, address, ec, lp, estimator)
+	case ccipdata.V1_0_0, ccipdata.V1_1_0: // Versions are identical
+		cs, err := v1_0_0.NewCommitStore(lggr, address, ec, lp, estimator)
+		if err == nil && closeReader {
+			return nil, cs.Close(pgOpts...)
+		}
+		if err == nil {
+			if errFilters := cs.RegisterFilters(pgOpts...); errFilters != nil {
+				return nil, errFilters
+			}
+		}
+		return cs, err
 	case ccipdata.V1_2_0, ccipdata.V1_3_0:
-		return v1_2_0.NewCommitStore(lggr, address, ec, lp, estimator)
+		cs, err := v1_2_0.NewCommitStore(lggr, address, ec, lp, estimator)
+		if err == nil && closeReader {
+			return nil, cs.Close(pgOpts...)
+		}
+		if err == nil {
+			if errFilters := cs.RegisterFilters(pgOpts...); errFilters != nil {
+				return nil, errFilters
+			}
+		}
+		return cs, err
 	default:
 		return nil, errors.Errorf("unsupported commit store version %v", version.String())
 	}

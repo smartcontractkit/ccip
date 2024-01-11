@@ -40,7 +40,7 @@ import (
 
 const numTokenDataWorkers = 5
 
-func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer) (*ExecutionPluginStaticConfig, *ccipcommon.BackfillArgs, error) {
+func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*ExecutionPluginStaticConfig, *ccipcommon.BackfillArgs, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, nil, errors.New("spec is nil")
 	}
@@ -58,7 +58,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 
 	// Create the offRamp reader.
 	offRampAddress := common.HexToAddress(spec.ContractID)
-	offRampReader, err := factory.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampReader, err := factory.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), true, qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create offRampReader")
 	}
@@ -82,7 +82,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, err
 	}
 	execLggr := lggr.Named("CCIPExecution").With("sourceChain", sourceChainName, "destChain", destChainName)
-	onRampReader, err := factory.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
+	onRampReader, err := factory.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "create onramp reader")
 	}
@@ -106,12 +106,12 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, errors.Wrap(err, "could not load source registry")
 	}
 
-	commitStoreReader, err := factory.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator(), qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
 	}
 
-	tokenDataProviders, err := getTokenDataProviders(lggr, pluginConfig, sourceChain.LogPoller())
+	tokenDataProviders, err := initTokenDataProviders(lggr, pluginConfig, sourceChain.LogPoller(), qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not get token data providers")
 	}
@@ -160,26 +160,11 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 }
 
 func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet)
+	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
 	if err != nil {
 		return nil, err
 	}
 	wrappedPluginFactory := NewExecutionReportingPluginFactory(*execPluginConfig)
-
-	if err1 := execPluginConfig.offRampReader.RegisterFilters(qopts...); err1 != nil {
-		return nil, err1
-	}
-	if err1 := execPluginConfig.onRampReader.RegisterFilters(qopts...); err1 != nil {
-		return nil, err1
-	}
-	if err1 := execPluginConfig.commitStoreReader.RegisterFilters(qopts...); err1 != nil {
-		return nil, err1
-	}
-	for _, dp := range execPluginConfig.tokenDataWorker.GetReaders() {
-		if err1 := dp.RegisterFilters(qopts...); err1 != nil {
-			return nil, err1
-		}
-	}
 	destChainID, err := chainselectors.ChainIdFromSelector(execPluginConfig.destChainSelector)
 	if err != nil {
 		return nil, err
@@ -205,9 +190,92 @@ func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, c
 	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
 }
 
-func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller) (map[common.Address]tokendata.Reader, error) {
+// UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
+// See comment in UnregisterCommitPluginLpFilters
+// It MUST mirror the filters registered in NewExecutionServices.
+func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) error {
+	if jb.OCR2OracleSpec == nil {
+		return errors.New("spec is nil")
+	}
+	spec := jb.OCR2OracleSpec
+	var pluginConfig ccipconfig.ExecutionPluginJobSpecConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+	if err != nil {
+		return err
+	}
+
+	destChain, _, err := ccipconfig.GetChainFromSpec(spec, chainSet)
+	if err != nil {
+		return err
+	}
+
+	offRampAddress := common.HexToAddress(spec.ContractID)
+	offRampReader, err := factory.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), false)
+	if err != nil {
+		return errors.Wrap(err, "create offRampReader")
+	}
+
+	offRampConfig, err := offRampReader.GetStaticConfig(context.Background())
+	if err != nil {
+		return errors.Wrap(err, "get offRamp static config")
+	}
+
+	chainID, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+
+	sourceChain, err := chainSet.Get(strconv.FormatUint(chainID, 10))
+	if err != nil {
+		return errors.Wrap(err, "open source chain")
+	}
+
+	// close commit store
+	err = factory.CloseCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator(), qopts...)
+	if err != nil {
+		return errors.Wrap(err, "could not load commitStoreReader reader")
+	}
+
+	// close on ramp
+	err = factory.CloseOnRampReader(lggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
+	if err != nil {
+		return errors.Wrap(err, "close on ramp")
+	}
+
+	// close off ramp
+	err = factory.CloseOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	if err != nil {
+		return errors.Wrap(err, "close off ramp")
+	}
+
+	// close usdc token data reader
+	if pluginConfig.USDCConfig.AttestationAPI != "" {
+		err := pluginConfig.USDCConfig.ValidateUSDCConfig()
+		if err != nil {
+			return err
+		}
+		usdcReader, err := ccipdata.NewUSDCReader(lggr, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceChain.LogPoller())
+		if err != nil {
+			return err
+		}
+		if err := usdcReader.Close(qopts...); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ExecReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
+// Only MessageIDs will be populated in the TxMeta.
+func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
+	return factory.ExecReportToEthTxMeta(typ, ver)
+}
+
+func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller, qopts ...pg.QOpt) (map[common.Address]tokendata.Reader, error) {
 	tokenDataProviders := make(map[common.Address]tokendata.Reader)
 
+	// init usdc token data provider
 	if pluginConfig.USDCConfig.AttestationAPI != "" {
 		lggr.Infof("USDC token data provider enabled")
 		err := pluginConfig.USDCConfig.ValidateUSDCConfig()
@@ -224,42 +292,17 @@ func getTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Execution
 		if err != nil {
 			return nil, err
 		}
+		if err := usdcReader.RegisterFilters(qopts...); err != nil {
+			return nil, err
+		}
+
 		tokenDataProviders[pluginConfig.USDCConfig.SourceTokenAddress] = usdc.NewUSDCTokenDataReader(
 			lggr,
 			usdcReader,
 			attestationURI,
 			pluginConfig.USDCConfig.AttestationAPITimeoutSeconds,
 		)
-
 	}
 
 	return tokenDataProviders, nil
-}
-
-// UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
-// See comment in UnregisterCommitPluginLpFilters
-// It MUST mirror the filters registered in NewExecutionServices.
-func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	execPluginConfig, _, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet)
-	if err != nil {
-		return err
-	}
-	if err := execPluginConfig.onRampReader.Close(qopts...); err != nil {
-		return err
-	}
-	for _, tokenReader := range execPluginConfig.tokenDataWorker.GetReaders() {
-		if err := tokenReader.Close(qopts...); err != nil {
-			return err
-		}
-	}
-	if err := execPluginConfig.offRampReader.Close(qopts...); err != nil {
-		return err
-	}
-	return execPluginConfig.commitStoreReader.Close(qopts...)
-}
-
-// ExecReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
-// Only MessageIDs will be populated in the TxMeta.
-func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
-	return factory.ExecReportToEthTxMeta(typ, ver)
 }

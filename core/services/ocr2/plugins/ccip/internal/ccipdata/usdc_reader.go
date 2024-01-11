@@ -20,10 +20,8 @@ const (
 
 //go:generate mockery --quiet --name USDCReader --filename usdc_reader_mock.go --case=underscore
 type USDCReader interface {
-	RegisterFilters(qopts ...pg.QOpt) error
 	// GetLastUSDCMessagePriorToLogIndexInTx returns the last USDC message that was sent before the provided log index in the given transaction.
 	GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error)
-	Close(qopts ...pg.QOpt) error
 }
 
 type USDCReaderImpl struct {

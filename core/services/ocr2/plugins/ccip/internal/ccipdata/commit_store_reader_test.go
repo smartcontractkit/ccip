@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	gasmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
@@ -40,18 +39,7 @@ import (
 )
 
 func TestCommitFilters(t *testing.T) {
-	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_0_0.NewCommitStore(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
-		require.NoError(t, err)
-		require.NoError(t, c.RegisterFilters())
-		return c
-	}, 1)
-	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_2_0.NewCommitStore(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
-		require.NoError(t, err)
-		require.NoError(t, c.RegisterFilters())
-		return c
-	}, 1)
+	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), 1)
 }
 
 func TestCommitOffchainConfig_Encoding(t *testing.T) {
@@ -195,11 +183,9 @@ func TestCommitStoreReaders(t *testing.T) {
 	ge := new(gasmocks.EvmFeeEstimator)
 	c10r, err := factory.NewCommitStoreReader(lggr, addr, ec, lp, ge)
 	require.NoError(t, err)
-	require.NoError(t, c10r.RegisterFilters())
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
 	c12r, err := factory.NewCommitStoreReader(lggr, addr2, ec, lp, ge)
 	require.NoError(t, err)
-	require.NoError(t, c12r.RegisterFilters())
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStore{}).String())
 
 	// Apply config

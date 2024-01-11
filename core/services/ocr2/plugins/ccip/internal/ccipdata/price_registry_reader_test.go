@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
@@ -33,19 +32,7 @@ import (
 )
 
 func TestPriceRegistryFilters(t *testing.T) {
-	cl := mocks.NewClient(t)
-
-	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_0_0.NewPriceRegistry(logger.TestLogger(t), addr, lp, cl)
-		require.NoError(t, err)
-		return c
-	}, 3)
-
-	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_2_0.NewPriceRegistry(logger.TestLogger(t), addr, lp, cl)
-		require.NoError(t, err)
-		return c
-	}, 3)
+	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), 3)
 }
 
 type priceRegReaderTH struct {

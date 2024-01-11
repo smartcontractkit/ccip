@@ -17,13 +17,25 @@ import (
 
 // NewPriceRegistryReader determines the appropriate version of the price registry and returns a reader for it.
 func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Address, lp logpoller.LogPoller, cl client.Client) (ccipdata.PriceRegistryReader, error) {
+	return initOrClosePriceRegistryReader(lggr, priceRegistryAddress, lp, cl, false)
+}
+
+func ClosePriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Address, lp logpoller.LogPoller, cl client.Client) error {
+	_, err := initOrClosePriceRegistryReader(lggr, priceRegistryAddress, lp, cl, true)
+	return err
+}
+
+func initOrClosePriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Address, lp logpoller.LogPoller, cl client.Client, closeReader bool) (ccipdata.PriceRegistryReader, error) {
 	contractType, version, err := ccipconfig.TypeAndVersion(priceRegistryAddress, cl)
 	if err != nil {
 		if strings.Contains(err.Error(), "execution reverted") {
 			lggr.Infof("Assuming %v is 1.0.0 price registry, got %v", priceRegistryAddress.String(), err)
-			// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it reverts
-			// its v1.
-			return v1_0_0.NewPriceRegistry(lggr, priceRegistryAddress, lp, cl)
+			// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it reverts its v1.
+			pr, err := v1_0_0.NewPriceRegistry(lggr, priceRegistryAddress, lp, cl)
+			if err == nil && closeReader {
+				return nil, pr.Close()
+			}
+			return pr, err
 		}
 		return nil, errors.Wrapf(err, "unable to read type and version")
 	}
@@ -32,7 +44,11 @@ func NewPriceRegistryReader(lggr logger.Logger, priceRegistryAddress common.Addr
 	}
 	switch version.String() {
 	case ccipdata.V1_2_0:
-		return v1_2_0.NewPriceRegistry(lggr, priceRegistryAddress, lp, cl)
+		pr, err := v1_2_0.NewPriceRegistry(lggr, priceRegistryAddress, lp, cl)
+		if err == nil && closeReader {
+			return nil, pr.Close()
+		}
+		return pr, err
 	default:
 		return nil, errors.Errorf("unsupported price registry version %v", version.String())
 	}

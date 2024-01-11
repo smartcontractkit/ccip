@@ -77,7 +77,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed onramp reader")
 	}
-	offRampReader, err := factory.NewOffRampReader(commitLggr, pluginConfig.OffRamp, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	offRampReader, err := factory.NewOffRampReader(commitLggr, pluginConfig.OffRamp, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), true)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed offramp reader")
 	}
@@ -130,19 +130,6 @@ func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chai
 		return nil, err
 	}
 	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
-
-	if err1 := pluginConfig.onRampReader.RegisterFilters(qopts...); err1 != nil {
-		return nil, err1
-	}
-
-	if err1 := pluginConfig.commitStore.RegisterFilters(qopts...); err1 != nil {
-		return nil, err1
-	}
-
-	if err1 := pluginConfig.offRamp.RegisterFilters(qopts...); err1 != nil {
-		return nil, err1
-	}
-
 	destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.destChainSelector)
 	if err != nil {
 		return nil, err
@@ -177,15 +164,45 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 // TODO once that transaction is broken up, we should be able to simply rely on oracle.Close() to cleanup the filters.
 // Until then we have to deterministically reload the readers from the spec (and thus their filters) and close them.
 func UnregisterCommitPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, pr pipeline.Runner, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	commitPluginConfig, _, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet)
-	if err != nil {
+	if jb.OCR2OracleSpec == nil {
 		return errors.New("spec is nil")
 	}
-	if err := commitPluginConfig.onRampReader.Close(qopts...); err != nil {
+	spec := jb.OCR2OracleSpec
+	var pluginConfig ccipconfig.CommitPluginJobSpecConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+	if err != nil {
 		return err
 	}
-	if err := commitPluginConfig.commitStore.Close(qopts...); err != nil {
+
+	destChain, _, err := ccipconfig.GetChainFromSpec(spec, chainSet)
+	if err != nil {
 		return err
 	}
-	return commitPluginConfig.offRamp.Close(qopts...)
+
+	commitStoreAddress := common.HexToAddress(spec.ContractID)
+	staticConfig, err := ccipdata.FetchCommitStoreStaticConfig(commitStoreAddress, destChain.Client())
+	if err != nil {
+		return errors.Wrap(err, "failed getting the static config from the commitStore")
+	}
+	sourceChain, _, err := ccipconfig.GetChainByChainSelector(chainSet, staticConfig.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+
+	err = factory.CloseCommitStoreReader(lggr, commitStoreAddress, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator())
+	if err != nil {
+		return errors.Wrap(err, "could not close commitStore reader")
+	}
+
+	err = factory.CloseOnRampReader(lggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
+	if err != nil {
+		return errors.Wrap(err, "failed onramp reader")
+	}
+
+	err = factory.CloseOffRampReader(lggr, pluginConfig.OffRamp, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator())
+	if err != nil {
+		return errors.Wrap(err, "failed offramp reader")
+	}
+
+	return nil
 }
