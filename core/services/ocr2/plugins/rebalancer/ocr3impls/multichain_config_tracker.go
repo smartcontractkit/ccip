@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"go.uber.org/multierr"
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -61,6 +63,9 @@ type multichainConfigTracker struct {
 	contractAddresses map[relay.ID]common.Address
 	masterContract    no_op_ocr3.NoOpOCR3Interface
 	combiner          CombinerFn
+	fromBlocks        map[string]int64
+
+	replaying atomic.Bool
 }
 
 func NewMultichainConfigTracker(
@@ -71,6 +76,7 @@ func NewMultichainConfigTracker(
 	masterContract common.Address,
 	lmFactory liquiditymanager.Factory,
 	combiner CombinerFn,
+	fromBlocks map[string]int64,
 ) (*multichainConfigTracker, error) {
 	// Ensure master chain is in the log pollers
 	if _, ok := logPollers[masterChain]; !ok {
@@ -108,6 +114,7 @@ func NewMultichainConfigTracker(
 		return nil, fmt.Errorf("failed to discover liquidity managers: %w", err)
 	}
 	all := lms.GetAll()
+	lggr.Infow("discovered liquidity managers", "lms", all)
 
 	// sanity check, there should be only one liquidity manager per-chain per-asset
 	if len(all) != len(logPollers) {
@@ -150,6 +157,7 @@ func NewMultichainConfigTracker(
 		masterClient:      masterClient,
 		contractAddresses: contracts,
 		masterContract:    wrapper,
+		fromBlocks:        fromBlocks,
 	}, nil
 }
 
@@ -157,7 +165,33 @@ func (m *multichainConfigTracker) GetContractAddresses() map[relay.ID]common.Add
 	return m.contractAddresses
 }
 
-func (m *multichainConfigTracker) Start() {}
+// Start is called by the configPoller after it replays the main chain
+func (m *multichainConfigTracker) Start() {
+	m.StartOnce("MultichainConfigTracker", func() error {
+		if m.fromBlocks != nil {
+			m.replaying.Store(true)
+			defer m.replaying.Store(false)
+
+			// TODO: replay multiple chains in parallel?
+			var errs error
+			for id, fromBlock := range m.fromBlocks {
+				err := m.ReplayChain(context.Background(), relay.NewID("evm", id), fromBlock)
+				if err != nil {
+					m.lggr.Errorw("failed to replay chain", "chain", id, "fromBlock", fromBlock, "err", err)
+					errs = multierr.Append(errs, err)
+				} else {
+					m.lggr.Infow("successfully replayed chain", "chain", id, "fromBlock", fromBlock)
+				}
+			}
+
+			if errs != nil {
+				m.lggr.Errorw("failed to replay some chains", "err", errs)
+				return errs
+			}
+		}
+		return nil
+	})
+}
 
 func (m *multichainConfigTracker) Close() error {
 	return nil
@@ -198,6 +232,11 @@ func (m *multichainConfigTracker) LatestBlockHeight(ctx context.Context) (blockH
 // LatestConfig fetches the config from the master chain and then fetches the
 // remaining configurations from all the other chains.
 func (m *multichainConfigTracker) LatestConfig(ctx context.Context, changedInBlock uint64) (ocrtypes.ContractConfig, error) {
+	// if we're still replaying the follower chains we won't have their configs
+	if m.replaying.Load() {
+		return ocrtypes.ContractConfig{}, errors.New("cannot call LatestConfig while replaying")
+	}
+
 	lgs, err := m.logPollers[m.masterChain].Logs(int64(changedInBlock), int64(changedInBlock), ConfigSet, m.contractAddresses[m.masterChain], pg.WithParentCtx(ctx))
 	if err != nil {
 		return ocrtypes.ContractConfig{}, err
@@ -219,17 +258,12 @@ func (m *multichainConfigTracker) LatestConfig(ctx context.Context, changedInBlo
 			continue
 		}
 
-		lgs, err2 := lp.Logs(int64(changedInBlock), int64(changedInBlock), ConfigSet, m.contractAddresses[id], pg.WithParentCtx(ctx))
+		lg, err2 := lp.LatestLogByEventSigWithConfs(ConfigSet, m.contractAddresses[id], 1, pg.WithParentCtx(ctx))
 		if err2 != nil {
 			return ocrtypes.ContractConfig{}, err2
 		}
 
-		if len(lgs) == 0 {
-			return ocrtypes.ContractConfig{}, fmt.Errorf("no logs found for config on contract %s (chain %s) at block %d",
-				m.contractAddresses[id].Hex(), id.String(), changedInBlock)
-		}
-
-		configSet, err2 := configFromLog(lgs[len(lgs)-1].Data)
+		configSet, err2 := configFromLog(lg.Data)
 		if err2 != nil {
 			return ocrtypes.ContractConfig{}, err2
 		}
