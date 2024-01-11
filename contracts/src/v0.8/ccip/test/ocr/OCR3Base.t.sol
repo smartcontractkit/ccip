@@ -88,7 +88,7 @@ contract OCR3BaseSetup is OCR3Setup {
   }
 }
 
-contract OCR2Base_transmit is OCR3BaseSetup {
+contract OCR3Base_transmit is OCR3BaseSetup {
   bytes32 internal s_configDigest;
 
   function setUp() public virtual override {
@@ -196,7 +196,7 @@ contract OCR2Base_transmit is OCR3BaseSetup {
   }
 }
 
-contract OCR2Base_setOCR3Config is OCR3BaseSetup {
+contract OCR3Base_setOCR3Config is OCR3BaseSetup {
   function testSetConfigSuccess_gas() public {
     vm.pauseGasMetering();
     bytes memory configBytes = abi.encode("");
