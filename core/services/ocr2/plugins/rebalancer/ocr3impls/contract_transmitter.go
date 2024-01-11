@@ -16,6 +16,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
+const (
+	// TransmittedOCR3 is the name of the Transmitted event in the OCR3 contract.
+	TransmittedOCR3 = "Transmitted"
+)
+
 type Transmitter interface {
 	CreateEthTransaction(ctx context.Context, toAddress gethcommon.Address, payload []byte, txMeta *txmgr.TxMeta) error
 	FromAddress() gethcommon.Address
@@ -45,9 +50,9 @@ func NewOCR3ContractTransmitter[RI any](
 	lggr logger.Logger,
 	reportToEvmTxMeta ReportToEthMetadata,
 ) (*contractTransmitterOCR3[RI], error) {
-	transmitted, ok := contractABI.Events["Transmitted"]
+	transmitted, ok := contractABI.Events[TransmittedOCR3]
 	if !ok {
-		return nil, fmt.Errorf("abi missing Transmitted event")
+		return nil, fmt.Errorf("abi missing transmitted event (name: %s)", TransmittedOCR3)
 	}
 
 	if reportToEvmTxMeta == nil {

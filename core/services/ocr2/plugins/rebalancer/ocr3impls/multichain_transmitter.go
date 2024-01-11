@@ -48,9 +48,10 @@ func (m *multichainTransmitterOCR3[RI]) FromAccount() (types.Account, error) {
 
 // Transmit implements ocr3types.ContractTransmitter.
 func (m *multichainTransmitterOCR3[RI]) Transmit(ctx context.Context, configDigest types.ConfigDigest, seqNr uint64, rwi ocr3types.ReportWithInfo[RI], sigs []types.AttributedOnchainSignature) error {
-	transmitter, ok := m.transmitters[rwi.Info.GetDestinationChain()]
+	destChain := rwi.Info.GetDestinationChain()
+	transmitter, ok := m.transmitters[destChain]
 	if !ok {
-		return fmt.Errorf("no transmitter for chain %s", rwi.Info.GetDestinationChain())
+		return fmt.Errorf("no transmitter for chain %s", destChain)
 	}
 	return transmitter.Transmit(ctx, configDigest, seqNr, rwi, sigs)
 }

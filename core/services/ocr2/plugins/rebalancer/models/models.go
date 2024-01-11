@@ -170,6 +170,9 @@ func DecodeReport(b []byte) (ReportMetadata, error) {
 	if err != nil {
 		return ReportMetadata{}, fmt.Errorf("failed to unpack report: %w", err)
 	}
+	if len(unpacked) != 2 {
+		return ReportMetadata{}, fmt.Errorf("unexpected number of arguments: %d", len(unpacked))
+	}
 	var out ReportMetadata
 	chainID := *abi.ConvertType(unpacked[0], new(*big.Int)).(**big.Int)
 	lqmgrAddr := *abi.ConvertType(unpacked[1], new(common.Address)).(*common.Address)

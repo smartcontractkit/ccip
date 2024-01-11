@@ -35,7 +35,7 @@ func (r *randomRebalancer) ComputeTransfersToBalance(
 	// seed the randomness source so that all rebalancers produce the same output
 	// for the same input
 	r.lggr.Infow("RandomRebalancer: using median liquidity as seed", "medianLiquidity1", medianLiquidities[0].Liquidity.String())
-	source := mathrand.NewSource(medianLiquidities[0].Liquidity.Int64()) //nolint: gosec
+	source := mathrand.NewSource(medianLiquidities[0].Liquidity.Int64()) //nolint:gosec
 	rng := mathrand.New(source)
 	numTransfers := rng.Int63n(int64(r.maxNumTransfers))
 	r.lggr.Infow("RandomRebalancer: generated random number of transfers", "numTransfers", numTransfers)

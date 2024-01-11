@@ -14,6 +14,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
+const (
+	PluginName = "Rebalancer"
+)
+
 type PluginFactory struct {
 	lggr   logger.Logger
 	config models.PluginConfig
@@ -25,27 +29,27 @@ func NewPluginFactory(lggr logger.Logger, pluginConfigBytes []byte) (*PluginFact
 		return nil, fmt.Errorf("failed to unmarshal plugin config: %w", err)
 	}
 	return &PluginFactory{
-		lggr:   lggr,
+		lggr:   lggr.Named(PluginName),
 		config: pluginConfig,
 	}, nil
 }
 
-func (p PluginFactory) buildRebalancer(config models.PluginConfig) (liquidityrebalancer.Rebalancer, error) {
-	switch config.RebalancerConfig.Type {
+func (p PluginFactory) buildRebalancer() (liquidityrebalancer.Rebalancer, error) {
+	switch p.config.RebalancerConfig.Type {
 	case models.RebalancerTypeDummy:
 		return liquidityrebalancer.NewDummyRebalancer(), nil
 	case models.RebalancerTypeRandom:
 		return liquidityrebalancer.NewRandomRebalancer(
-			config.RebalancerConfig.RandomRebalancerConfig.MaxNumTransfers,
-			config.RebalancerConfig.RandomRebalancerConfig.CheckSourceDestEqual,
+			p.config.RebalancerConfig.RandomRebalancerConfig.MaxNumTransfers,
+			p.config.RebalancerConfig.RandomRebalancerConfig.CheckSourceDestEqual,
 			p.lggr), nil
 	default:
-		return nil, fmt.Errorf("invalid rebalancer type %s", config.RebalancerConfig.Type)
+		return nil, fmt.Errorf("invalid rebalancer type %s", p.config.RebalancerConfig.Type)
 	}
 }
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig) (ocr3types.ReportingPlugin[models.ReportMetadata], ocr3types.ReportingPluginInfo, error) {
-	liquidityRebalancer, err := p.buildRebalancer(p.config)
+	liquidityRebalancer, err := p.buildRebalancer()
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to build rebalancer: %w", err)
 	}
