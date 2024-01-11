@@ -36,6 +36,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_3_0"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
@@ -210,19 +211,21 @@ func TestCommitStoreReaders(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	sourceFinalityDepth := uint32(1)
+	destFinalityDepth := uint32(1)
+
 	commonOffchain := ccipdata.CommitOffchainConfig{
-		SourceFinalityDepth:    1,
 		GasPriceDeviationPPB:   1e6,
 		GasPriceHeartBeat:      1 * time.Hour,
 		TokenPriceDeviationPPB: 1e6,
 		TokenPriceHeartBeat:    1 * time.Hour,
 		InflightCacheExpiry:    3 * time.Hour,
-		DestFinalityDepth:      2,
 	}
 	maxGas := uint64(1e9)
+
 	offchainConfig, err := ccipconfig.EncodeOffchainConfig[v1_0_0.CommitOffchainConfig](v1_0_0.CommitOffchainConfig{
-		SourceFinalityDepth:   commonOffchain.SourceFinalityDepth,
-		DestFinalityDepth:     commonOffchain.DestFinalityDepth,
+		SourceFinalityDepth:   sourceFinalityDepth,
+		DestFinalityDepth:     destFinalityDepth,
 		FeeUpdateHeartBeat:    models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
 		FeeUpdateDeviationPPB: commonOffchain.GasPriceDeviationPPB,
 		MaxGasPrice:           maxGas,
@@ -236,8 +239,8 @@ func TestCommitStoreReaders(t *testing.T) {
 	})
 	require.NoError(t, err)
 	offchainConfig2, err := ccipconfig.EncodeOffchainConfig[v1_2_0.CommitOffchainConfig](v1_2_0.CommitOffchainConfig{
-		SourceFinalityDepth:      commonOffchain.SourceFinalityDepth,
-		DestFinalityDepth:        commonOffchain.DestFinalityDepth,
+		SourceFinalityDepth:      sourceFinalityDepth,
+		DestFinalityDepth:        destFinalityDepth,
 		MaxGasPrice:              maxGas,
 		GasPriceHeartBeat:        models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
 		DAGasPriceDeviationPPB:   1e7,
@@ -249,6 +252,18 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	_, err = ch2.SetOCR2Config(user, signers, transmitters, 1, onchainConfig2, 1, []byte{})
 	require.NoError(t, err)
+
+	offchainConfig3, err := ccipconfig.EncodeOffchainConfig[v1_3_0.CommitOffchainConfig](v1_3_0.CommitOffchainConfig{
+		SourceMaxGasPrice:        maxGas,
+		GasPriceHeartBeat:        models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
+		DAGasPriceDeviationPPB:   1e7,
+		ExecGasPriceDeviationPPB: commonOffchain.GasPriceDeviationPPB,
+		TokenPriceDeviationPPB:   commonOffchain.TokenPriceDeviationPPB,
+		TokenPriceHeartBeat:      models.MustMakeDuration(commonOffchain.TokenPriceHeartBeat),
+		InflightCacheExpiry:      models.MustMakeDuration(commonOffchain.InflightCacheExpiry),
+	})
+	require.NoError(t, err)
+
 	commitAndGetBlockTs(ec)
 
 	// Apply report
@@ -268,20 +283,25 @@ func TestCommitStoreReaders(t *testing.T) {
 	configs := map[string][][]byte{
 		ccipdata.V1_0_0: {onchainConfig, offchainConfig},
 		ccipdata.V1_2_0: {onchainConfig2, offchainConfig2},
+		ccipdata.V1_3_0: {onchainConfig2, offchainConfig3},
 	}
 	crs := map[string]ccipdata.CommitStoreReader{
 		ccipdata.V1_0_0: c10r,
 		ccipdata.V1_2_0: c12r,
+		ccipdata.V1_3_0: c12r,
 	}
 	prs := map[string]common.Address{
 		ccipdata.V1_0_0: pr,
 		ccipdata.V1_2_0: pr2,
+		ccipdata.V1_3_0: pr2,
 	}
 	gasPrice := big.NewInt(10)
 	daPrice := big.NewInt(20)
+	daEstimatorString := fmt.Sprintf("DA Price: %s, Exec Price: %s", daPrice, gasPrice)
 	expectedGas := map[string]string{
 		ccipdata.V1_0_0: gasPrice.String(),
-		ccipdata.V1_2_0: fmt.Sprintf("DA Price: %s, Exec Price: %s", daPrice, gasPrice),
+		ccipdata.V1_2_0: daEstimatorString,
+		ccipdata.V1_3_0: daEstimatorString,
 	}
 	ge.On("GetFee", mock.Anything, mock.Anything, mock.Anything, assets.NewWei(big.NewInt(int64(maxGas)))).Return(gas.EvmFee{Legacy: assets.NewWei(gasPrice)}, uint32(0), nil)
 	lm := new(rollupMocks.L1Oracle)
@@ -291,7 +311,6 @@ func TestCommitStoreReaders(t *testing.T) {
 	for v, cr := range crs {
 		cr := cr
 		t.Run("CommitStoreReader "+v, func(t *testing.T) {
-
 			// Static config.
 			cfg, err := cr.GetCommitStoreStaticConfig(context.Background())
 			require.NoError(t, err)
@@ -361,13 +380,12 @@ func TestCommitStoreReaders(t *testing.T) {
 			gp, err := cr.GasPriceEstimator().GetGasPrice(context.Background())
 			require.NoError(t, err)
 			assert.Equal(t, expectedGas[v], cr.GasPriceEstimator().String(gp))
-
 		})
 	}
 }
 
 func TestNewCommitStoreReader(t *testing.T) {
-	var tt = []struct {
+	tt := []struct {
 		typeAndVersion string
 		expectedErr    string
 	}{
