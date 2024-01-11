@@ -7,3 +7,4 @@ package gethwrappers
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ERC20/ERC20.abi ../../../contracts/solc/v0.8.19/ERC20/ERC20.bin ERC20 erc20
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/WERC20Mock/WERC20Mock.abi ../../../contracts/solc/v0.8.19/WERC20Mock/WERC20Mock.bin WERC20Mock werc20_mock
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/NoOpOCR3/NoOpOCR3.abi ../../../contracts/solc/v0.8.19/NoOpOCR3/NoOpOCR3.bin NoOpOCR3 no_op_ocr3
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/GraphOCR3/GraphOCR3.abi ../../../contracts/solc/v0.8.19/GraphOCR3/GraphOCR3.bin GraphOCR3 graph_ocr3

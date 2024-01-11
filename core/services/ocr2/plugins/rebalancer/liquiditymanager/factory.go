@@ -3,6 +3,8 @@ package liquiditymanager
 import (
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -13,17 +15,45 @@ type Factory interface {
 	NewLiquidityManager(networkID models.NetworkID, address models.Address) (LiquidityManager, error)
 }
 
-type BaseLiquidityManagerFactory struct{}
+type evmDep struct {
+	lp        logpoller.LogPoller
+	ethClient client.Client
+}
 
-func NewBaseLiquidityManagerFactory() *BaseLiquidityManagerFactory {
-	return &BaseLiquidityManagerFactory{}
+type BaseLiquidityManagerFactory struct {
+	evmDeps map[models.NetworkID]evmDep
+}
+
+type Opt func(f *BaseLiquidityManagerFactory)
+
+func NewBaseLiquidityManagerFactory(opts ...Opt) *BaseLiquidityManagerFactory {
+	f := &BaseLiquidityManagerFactory{
+		evmDeps: make(map[models.NetworkID]evmDep),
+	}
+	for _, opt := range opts {
+		opt(f)
+	}
+	return f
+}
+
+func WithEvmDep(networkID models.NetworkID, lp logpoller.LogPoller, ethClient client.Client) Opt {
+	return func(f *BaseLiquidityManagerFactory) {
+		f.evmDeps[networkID] = evmDep{
+			lp:        lp,
+			ethClient: ethClient,
+		}
+	}
 }
 
 func (b *BaseLiquidityManagerFactory) NewLiquidityManager(networkID models.NetworkID, address models.Address) (LiquidityManager, error) {
 	switch typ := networkID.Type(); typ {
 	case models.NetworkTypeEvm:
-		return NewEvmLiquidityManager(address, networkID), nil
+		evmDeps, exists := b.evmDeps[networkID]
+		if !exists {
+			return nil, fmt.Errorf("evm dependencies not found for network id %d", networkID)
+		}
+		return NewEvmLiquidityManager(address, networkID, evmDeps.ethClient, evmDeps.lp)
 	default:
-		return nil, fmt.Errorf("liquidity manager of type %v (id %d) is not supported", typ, networkID)
+		return nil, fmt.Errorf("liquidity manager of type %v is not supported", typ)
 	}
 }

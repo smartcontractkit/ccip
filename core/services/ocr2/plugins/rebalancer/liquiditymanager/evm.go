@@ -5,23 +5,70 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/graph_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
 type EvmLiquidityManager struct {
-	address   models.Address
-	networkID models.NetworkID
+	client      graph_ocr3.GraphOCR3Interface
+	lp          logpoller.LogPoller
+	lmAbi       abi.ABI
+	addr        common.Address
+	ec          client.Client
+	cleanupFunc func() error
+	networkID   models.NetworkID
 }
 
-func NewEvmLiquidityManager(address models.Address, networkID models.NetworkID) *EvmLiquidityManager {
-	return &EvmLiquidityManager{
-		address:   address,
-		networkID: networkID,
+func NewEvmLiquidityManager(
+	address models.Address,
+	networkID models.NetworkID,
+	ec client.Client,
+	lp logpoller.LogPoller,
+) (*EvmLiquidityManager, error) {
+	lmClient, err := graph_ocr3.NewGraphOCR3(common.Address(address), ec)
+	if err != nil {
+		return nil, fmt.Errorf("init liquidity manager: %w", err)
 	}
+
+	lmAbi, err := abi.JSON(strings.NewReader(graph_ocr3.GraphOCR3ABI))
+	if err != nil {
+		return nil, fmt.Errorf("new lm abi: %w", err)
+	}
+
+	// lpFilter := logpoller.Filter{
+	// 	Name: fmt.Sprintf("lm-liquidity-transferred-%s", address),
+	// 	EventSigs: []common.Hash{
+	// 		lmAbi.Events["LiquidityTransferred"].ID,
+	// 	},
+	// 	Addresses: []common.Address{common.Address(address)},
+	// }
+
+	// if err := lp.RegisterFilter(lpFilter); err != nil {
+	// 	return nil, fmt.Errorf("register filter: %w", err)
+	// }
+
+	return &EvmLiquidityManager{
+		client: lmClient,
+		lp:     lp,
+		lmAbi:  lmAbi,
+		ec:     ec,
+		addr:   common.Address(address),
+		cleanupFunc: func() error {
+			// return lp.UnregisterFilter(lpFilter.Name)
+			return nil
+		},
+		networkID: networkID,
+	}, nil
 }
 
 func (e EvmLiquidityManager) MoveLiquidity(ctx context.Context, chainID models.NetworkID, amount *big.Int) error {
@@ -29,7 +76,17 @@ func (e EvmLiquidityManager) MoveLiquidity(ctx context.Context, chainID models.N
 }
 
 func (e EvmLiquidityManager) GetLiquidityManagers(ctx context.Context) (map[models.NetworkID]models.Address, error) {
-	return nil, nil
+	neighbors, err := e.client.GetNeighbors(&bind.CallOpts{
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get neighbors: %w", err)
+	}
+	neighborsMap := make(map[models.NetworkID]models.Address)
+	for _, neighbor := range neighbors {
+		neighborsMap[models.NetworkID(neighbor.ChainId.Int64())] = models.Address(neighbor.ContractAddress)
+	}
+	return neighborsMap, nil
 }
 
 func (e EvmLiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) {
@@ -56,7 +113,7 @@ func (e EvmLiquidityManager) Discover(ctx context.Context, lmFactory Factory) (*
 	seen := mapset.NewSet[qItem]()
 	queue := mapset.NewSet[qItem]()
 
-	elem := qItem{networkID: e.networkID, lmAddress: e.address}
+	elem := qItem{networkID: e.networkID, lmAddress: models.Address(e.client.Address())}
 	queue.Add(elem)
 	seen.Add(elem)
 

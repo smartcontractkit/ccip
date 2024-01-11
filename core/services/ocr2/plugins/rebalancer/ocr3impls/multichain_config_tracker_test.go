@@ -60,6 +60,7 @@ func TestMultichainConfigTracker_New(t *testing.T) {
 			uni.wrapper.Address(),
 			mockLMFactory,
 			ocr3impls.TransmitterCombiner,
+			nil, // not a multichain test
 		)
 		require.Error(t, err, "expected error creating multichain config tracker")
 	})
@@ -81,6 +82,7 @@ func TestMultichainConfigTracker_New(t *testing.T) {
 			uni.wrapper.Address(),
 			mockLMFactory,
 			nil,
+			nil, // not a multichain test
 		)
 		require.Error(t, err, "expected error creating multichain config tracker")
 	})
@@ -101,6 +103,7 @@ func TestMultichainConfigTracker_New(t *testing.T) {
 			uni.wrapper.Address(),
 			nil,
 			ocr3impls.TransmitterCombiner,
+			nil, // not a multichain test
 		)
 		require.Error(t, err, "expected error creating multichain config tracker")
 	})
@@ -134,6 +137,7 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 		uni.wrapper.Address(),
 		mockLMFactory,
 		ocr3impls.TransmitterCombiner,
+		nil, // not a multichain test
 	)
 	require.NoError(t, err, "failed to create multichain config tracker")
 
@@ -223,6 +227,7 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 		uni1.wrapper.Address(),
 		mockLMFactory,
 		ocr3impls.TransmitterCombiner,
+		nil, // we replay explicitly below
 	)
 	require.NoError(t, err, "failed to create multichain config tracker")
 
