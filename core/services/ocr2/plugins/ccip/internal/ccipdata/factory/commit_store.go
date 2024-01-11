@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_3_0"
 )
 
 func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (ccipdata.CommitStoreReader, error) {
@@ -31,8 +32,10 @@ func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
 		// Versions are identical
 		return v1_0_0.NewCommitStore(lggr, address, ec, lp, estimator)
-	case ccipdata.V1_2_0, ccipdata.V1_3_0:
+	case ccipdata.V1_2_0:
 		return v1_2_0.NewCommitStore(lggr, address, ec, lp, estimator)
+	case ccipdata.V1_3_0:
+		return v1_3_0.NewCommitStore(lggr, address, ec, lp, estimator)
 	default:
 		return nil, errors.Errorf("unsupported commit store version %v", version.String())
 	}

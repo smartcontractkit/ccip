@@ -42,6 +42,7 @@ type CommitStore struct {
 	commitReportArgs          abi.Arguments
 
 	// Dynamic config
+	// configMu protects the fields below.
 	configMu          sync.RWMutex
 	gasPriceEstimator prices.DAGasPriceEstimator
 	offchainConfig    ccipdata.CommitOffchainConfig
@@ -213,6 +214,13 @@ func (c CommitOffchainConfig) Validate() error {
 	return nil
 }
 
+func (c *CommitStore) UpdateDynamicConfig(offchainConfig ccipdata.CommitOffchainConfig, gasPriceEstimator prices.DAGasPriceEstimator) {
+	c.configMu.Lock()
+	c.offchainConfig = offchainConfig
+	c.gasPriceEstimator = gasPriceEstimator
+	c.configMu.Unlock()
+}
+
 func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ccipdata.CommitOnchainConfig](onchainConfig)
 	if err != nil {
@@ -223,25 +231,24 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 	if err != nil {
 		return common.Address{}, err
 	}
-	c.configMu.Lock()
 
 	c.lggr.Infow("Initializing NewDAGasPriceEstimator", "estimator", c.estimator, "l1Oracle", c.estimator.L1Oracle())
-	c.gasPriceEstimator = prices.NewDAGasPriceEstimator(
-		c.estimator,
-		big.NewInt(int64(offchainConfigParsed.MaxGasPrice)),
-		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
-		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
+
+	c.UpdateDynamicConfig(
+		ccipdata.NewCommitOffchainConfig(
+			offchainConfigParsed.ExecGasPriceDeviationPPB,
+			offchainConfigParsed.GasPriceHeartBeat.Duration(),
+			offchainConfigParsed.TokenPriceDeviationPPB,
+			offchainConfigParsed.TokenPriceHeartBeat.Duration(),
+			offchainConfigParsed.InflightCacheExpiry.Duration(),
+		),
+		prices.NewDAGasPriceEstimator(
+			c.estimator,
+			big.NewInt(int64(offchainConfigParsed.MaxGasPrice)),
+			int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
+			int64(offchainConfigParsed.DAGasPriceDeviationPPB),
+		),
 	)
-	c.offchainConfig = ccipdata.NewCommitOffchainConfig(
-		offchainConfigParsed.SourceFinalityDepth,
-		offchainConfigParsed.ExecGasPriceDeviationPPB,
-		offchainConfigParsed.GasPriceHeartBeat.Duration(),
-		offchainConfigParsed.TokenPriceDeviationPPB,
-		offchainConfigParsed.TokenPriceHeartBeat.Duration(),
-		offchainConfigParsed.InflightCacheExpiry.Duration(),
-		offchainConfigParsed.DestFinalityDepth,
-	)
-	c.configMu.Unlock()
 
 	c.lggr.Infow("ChangeConfig",
 		"offchainConfig", offchainConfigParsed,

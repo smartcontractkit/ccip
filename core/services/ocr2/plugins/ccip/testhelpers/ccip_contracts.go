@@ -40,9 +40,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_3_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -78,12 +80,15 @@ var (
 	ExecutionStateFailure = MessageExecutionState(ccipdata.ExecutionStateFailure)
 )
 
-type MessageExecutionState ccipdata.MessageExecutionState
-type CommitOffchainConfig struct {
-	v1_2_0.CommitOffchainConfig
-}
+type (
+	MessageExecutionState ccipdata.MessageExecutionState
+	CommitOffchainConfig  struct {
+		v1_3_0.CommitOffchainConfig
+	}
+)
 
-func NewCommitOffchainConfig(SourceFinalityDepth uint32,
+func NewCommitOffchainConfig(
+	SourceFinalityDepth uint32,
 	DestFinalityDepth uint32,
 	GasPriceHeartBeat models.Duration,
 	DAGasPriceDeviationPPB uint32,
@@ -91,18 +96,21 @@ func NewCommitOffchainConfig(SourceFinalityDepth uint32,
 	TokenPriceHeartBeat models.Duration,
 	TokenPriceDeviationPPB uint32,
 	MaxGasPrice uint64,
-	InflightCacheExpiry models.Duration) CommitOffchainConfig {
-	return CommitOffchainConfig{v1_2_0.CommitOffchainConfig{
-		SourceFinalityDepth:      SourceFinalityDepth,
-		DestFinalityDepth:        DestFinalityDepth,
+	InflightCacheExpiry models.Duration,
+) CommitOffchainConfig {
+	return CommitOffchainConfig{v1_3_0.CommitOffchainConfig{
 		GasPriceHeartBeat:        GasPriceHeartBeat,
 		DAGasPriceDeviationPPB:   DAGasPriceDeviationPPB,
 		ExecGasPriceDeviationPPB: ExecGasPriceDeviationPPB,
 		TokenPriceHeartBeat:      TokenPriceHeartBeat,
 		TokenPriceDeviationPPB:   TokenPriceDeviationPPB,
-		MaxGasPrice:              MaxGasPrice,
+		SourceMaxGasPrice:        MaxGasPrice,
 		InflightCacheExpiry:      InflightCacheExpiry,
 	}}
+}
+
+func (c CommitOffchainConfig) Encode() ([]byte, error) {
+	return ccipconfig.EncodeOffchainConfig(c.CommitOffchainConfig)
 }
 
 type CommitOnchainConfig struct {
@@ -163,7 +171,6 @@ func NewExecOffchainConfig(
 		InflightCacheExpiry:         InflightCacheExpiry,
 		RootSnoozeTime:              RootSnoozeTime,
 	}}
-
 }
 
 type MaybeRevertReceiver struct {
@@ -271,7 +278,8 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 func (c *CCIPContracts) EnableOffRamp(t *testing.T) {
 	_, err := c.Dest.Pool.ApplyRampUpdates(c.Dest.User,
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
-		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: c.Dest.OffRamp.Address(), Allowed: true,
+		[]lock_release_token_pool.TokenPoolRampUpdate{{
+			Ramp: c.Dest.OffRamp.Address(), Allowed: true,
 			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -628,7 +636,8 @@ func (c *CCIPContracts) SetupOnchainConfig(t *testing.T, commitOnchainConfig, co
 func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	sourceTokenAddress common.Address,
 	wrappedTokenName,
-	wrappedTokenSymbol string) (common.Address, *burn_mint_erc677.BurnMintERC677, error) {
+	wrappedTokenSymbol string,
+) (common.Address, *burn_mint_erc677.BurnMintERC677, error) {
 	// Deploy dest token & pool
 	destTokenAddress, _, _, err := burn_mint_erc677.DeployBurnMintERC677(c.Dest.User, c.Dest.Chain, wrappedTokenName, wrappedTokenSymbol, 18, big.NewInt(0))
 	if err != nil {
@@ -659,7 +668,8 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	}
 
 	_, err = destPool.ApplyRampUpdates(c.Dest.User, nil, []burn_mint_token_pool.TokenPoolRampUpdate{
-		{Ramp: c.Dest.OffRamp.Address(), Allowed: true,
+		{
+			Ramp: c.Dest.OffRamp.Address(), Allowed: true,
 			RateLimiterConfig: burn_mint_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -1082,7 +1092,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	onRamp, err := evm_2_evm_onramp.NewEVM2EVMOnRamp(onRampAddress, sourceChain)
 	require.NoError(t, err)
 	_, err = sourcePool.ApplyRampUpdates(sourceUser,
-		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true,
+		[]lock_release_token_pool.TokenPoolRampUpdate{{
+			Ramp: onRampAddress, Allowed: true,
 			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -1093,7 +1104,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	)
 	require.NoError(t, err)
 	_, err = sourceWeth9Pool.ApplyRampUpdates(sourceUser,
-		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true,
+		[]lock_release_token_pool.TokenPoolRampUpdate{{
+			Ramp: onRampAddress, Allowed: true,
 			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -1202,7 +1214,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = destPool.ApplyRampUpdates(destUser,
 		[]lock_release_token_pool.TokenPoolRampUpdate{},
-		[]lock_release_token_pool.TokenPoolRampUpdate{{Ramp: offRampAddress, Allowed: true,
+		[]lock_release_token_pool.TokenPoolRampUpdate{{
+			Ramp: offRampAddress, Allowed: true,
 			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
