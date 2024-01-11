@@ -126,7 +126,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 			expectedError:        tokendata.ErrTimeout,
 		},
 		{
-			name: "error reponse",
+			name: "error response",
 			getTs: func() *httptest.Server {
 				response := attestationResponse{
 					Error: "some error",
