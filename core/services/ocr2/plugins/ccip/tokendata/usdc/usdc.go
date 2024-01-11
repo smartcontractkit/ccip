@@ -44,6 +44,10 @@ const (
 	attestationStatusPending attestationStatus = "pending_confirmations"
 )
 
+var (
+	ErrAttestionAPI = errors.New("unexpected response from attestation API")
+)
+
 // messageAndAttestation has to match the onchain struct `MessageAndAttestation` in the
 // USDC token pool.
 type messageAndAttestation struct {
@@ -152,7 +156,7 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg internal.EVM2EV
 		return nil, tokendata.ErrNotReady
 	default:
 		s.lggr.Errorw("Unexpected response from attestation API", "attestationResp", attestationResp)
-		return nil, errors.New("unexpected response from attestation API")
+		return nil, ErrAttestionAPI
 	}
 }
 
