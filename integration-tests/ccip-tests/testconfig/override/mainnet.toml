@@ -404,6 +404,7 @@ Data = """
 [CCIP.Groups.load]
 NetworkPairs = ['ETHEREUM_MAINNET,BASE_MAINNET']
 MsgType = 'WithToken'
+DestGasLimit = 0
 BiDirectionalLane = true
 PhaseTimeout = '50m'
 TestDuration = '1h'
