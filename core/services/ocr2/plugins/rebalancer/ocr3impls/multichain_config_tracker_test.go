@@ -60,6 +60,7 @@ func TestMultichainConfigTracker_New(t *testing.T) {
 			uni.wrapper.Address(),
 			mockLMFactory,
 			ocr3impls.TransmitterCombiner,
+			nil,
 		)
 		require.Error(t, err, "expected error creating multichain config tracker")
 	})
@@ -81,6 +82,7 @@ func TestMultichainConfigTracker_New(t *testing.T) {
 			uni.wrapper.Address(),
 			mockLMFactory,
 			nil,
+			nil,
 		)
 		require.Error(t, err, "expected error creating multichain config tracker")
 	})
@@ -101,6 +103,7 @@ func TestMultichainConfigTracker_New(t *testing.T) {
 			uni.wrapper.Address(),
 			nil,
 			ocr3impls.TransmitterCombiner,
+			nil,
 		)
 		require.Error(t, err, "expected error creating multichain config tracker")
 	})
@@ -110,6 +113,9 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 	db := pgtest.NewSqlxDB(t)
 	lp, uni := setupLogPoller[struct{}](t, db, nil)
 	require.NoError(t, lp.Start(testutils.Context(t)))
+	t.Cleanup(func() {
+		require.NoError(t, lp.Close())
+	})
 
 	masterChain := relay.ID{
 		Network: relay.EVM,
@@ -134,6 +140,7 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 		uni.wrapper.Address(),
 		mockLMFactory,
 		ocr3impls.TransmitterCombiner,
+		nil,
 	)
 	require.NoError(t, err, "failed to create multichain config tracker")
 
@@ -186,6 +193,14 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 		keyrings: uni1.keyrings,
 		signers:  uni1.signers,
 	})
+	t.Cleanup(func() {
+		require.NoError(t, lp1.Close())
+		require.NoError(t, lp2.Close())
+	})
+
+	// give enough finality for the follower chain
+	uni2.backend.Commit()
+	uni2.backend.Commit()
 
 	// start the log pollers
 	require.NoError(t, lp1.Start(testutils.Context(t)))
@@ -223,6 +238,7 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 		uni1.wrapper.Address(),
 		mockLMFactory,
 		ocr3impls.TransmitterCombiner,
+		nil, // we call replay explicitly below
 	)
 	require.NoError(t, err, "failed to create multichain config tracker")
 

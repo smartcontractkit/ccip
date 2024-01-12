@@ -58,7 +58,8 @@ func NewPlugin(
 	}
 }
 
-func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (ocrtypes.Query, error) {
+func (p *Plugin) Query(_ context.Context, outcomeCtx ocr3types.OutcomeContext) (ocrtypes.Query, error) {
+	p.lggr.Infow("in query", "seqNr", outcomeCtx.SeqNr)
 	return ocrtypes.Query{}, nil
 }
 
@@ -179,7 +180,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
 	p.lggr.Infow("in should accept attested report", "seqNr", seqNr, "reportMeta", r.Info, "reportJSON", string(r.Report))
 
-	report, err := models.DecodeReportMetadata(r.Report)
+	report, err := models.DecodeReport(r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode report metadata: %w", err)
 	}
