@@ -126,8 +126,7 @@ Data = """
             }
       },
       "BSC Mainnet": {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "fee_token": "0x404460C6A5EdE2D891e8297795264fDe62ADBB75",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
         "arm": "0x3DB43b96B2625F4232e9Df900d464dd2c64C0021",
@@ -317,8 +316,8 @@ Data = """
       },
       "Polygon Mainnet": {
         "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
-        "bridge_tokens": [ ],
-        "bridge_tokens_pools": [],
+        "bridge_tokens": ["0xb0897686c545045aFc77CF20eC7A532E3120E0F1"],
+        "bridge_tokens_pools": ["0x086892015567fb8764d02c6845C85C25C8FcA389"],
         "arm": "0xD7AcF65dA1E1f34b663aB199a474F209bF2b0523",
         "router": "0x849c5ED5a80F5B408Dd4969b78c2C8fdf0565Bfe",
         "price_registry": "0x30D873664Ba766C983984C7AF9A921ccE36D34e1",
@@ -365,7 +364,6 @@ Data = """
         }
       },
       "WeMix Mainnet": {
-          "is_native_fee_token": true,
           "fee_token": "0x80f1FcdC96B55e459BF52b998aBBE2c364935d69",
           "bridge_tokens": [],
           "bridge_tokens_pools": [],
@@ -402,15 +400,31 @@ Data = """
 """
 
 [CCIP.Groups.load]
-NetworkPairs = ['ETHEREUM_MAINNET,BASE_MAINNET']
-MsgType = 'WithToken'
+NetworkPairs = [
+  'ETHEREUM_MAINNET,BASE_MAINNET',
+  'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
+  'ETHEREUM_MAINNET,WEMIX_MAINNET',
+  'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
+  'ETHEREUM_MAINNET,POLYGON_MAINNET',
+  'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
+  'ETHEREUM_MAINNET,BSC_MAINNET',
+  'BASE_MAINNET,ARBITRUM_MAINNET',
+  'WEMIX_MAINNET,KROMA_MAINNET',
+  'OPTIMISM_MAINNET,POLYGON_MAINNET',
+  'AVALANCHE_MAINNET,POLYGON_MAINNET',
+  'BSC_MAINNET,POLYGON_MAINNET',
+  'BASE_MAINNET,OPTIMISM_MAINNET',
+  'AVALANCHE_MAINNET,BSC_MAINNET',
+  'BASE_MAINNET,BSC_MAINNET',
+]
+MsgType = 'WithoutToken'
 DestGasLimit = 0
 BiDirectionalLane = true
 PhaseTimeout = '50m'
-TestDuration = '1h'
+TestDuration = '96h'
 ExistingDeployment = true
 RequestPerUnitTime = [1]
-TimeUnit = '15m'
+TimeUnit = '1h'
 NoOfTokensPerChain = 1
 NoOfTokensInMsg = 1
 AmountPerToken = 1
