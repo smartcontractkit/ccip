@@ -118,12 +118,12 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 	// for this test only one LM is "deployed"
 	// so the discovery will return a single LM which is the master LM
 	reg := liquiditymanager.NewRegistry()
-	reg.Add(models.NetworkID(mustStrToI64(t, masterChain.ChainID)), models.Address(uni.wrapper.Address()))
+	reg.Add(models.NetworkSelector(mustStrToI64(t, masterChain.ChainID)), models.Address(uni.wrapper.Address()))
 	mockMasterLM := mocks.NewLiquidityManager(t)
 	mockMasterLM.On("Discover", mock.Anything, mock.Anything).Return(reg, liquiditygraph.NewGraph(), nil)
 	defer mockMasterLM.AssertExpectations(t)
 	mockLMFactory := mocks.NewFactory(t)
-	mockLMFactory.On("NewLiquidityManager", models.NetworkID(mustStrToI64(t, masterChain.ChainID)), models.Address(uni.wrapper.Address())).
+	mockLMFactory.On("NewLiquidityManager", models.NetworkSelector(mustStrToI64(t, masterChain.ChainID)), models.Address(uni.wrapper.Address())).
 		Return(mockMasterLM, nil)
 	defer mockLMFactory.AssertExpectations(t)
 	tracker, err := ocr3impls.NewMultichainConfigTracker(
@@ -203,13 +203,13 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 		ChainID: testutils.NewRandomEVMChainID().String(),
 	}
 	reg := liquiditymanager.NewRegistry()
-	reg.Add(models.NetworkID(mustStrToI64(t, masterChain.ChainID)), models.Address(uni1.wrapper.Address()))
-	reg.Add(models.NetworkID(mustStrToI64(t, secondChain.ChainID)), models.Address(uni2.wrapper.Address()))
+	reg.Add(models.NetworkSelector(mustStrToI64(t, masterChain.ChainID)), models.Address(uni1.wrapper.Address()))
+	reg.Add(models.NetworkSelector(mustStrToI64(t, secondChain.ChainID)), models.Address(uni2.wrapper.Address()))
 	mockMasterLM := mocks.NewLiquidityManager(t)
 	mockMasterLM.On("Discover", mock.Anything, mock.Anything).Return(reg, liquiditygraph.NewGraph(), nil)
 	defer mockMasterLM.AssertExpectations(t)
 	mockLMFactory := mocks.NewFactory(t)
-	mockLMFactory.On("NewLiquidityManager", models.NetworkID(mustStrToI64(t, masterChain.ChainID)), models.Address(uni1.wrapper.Address())).
+	mockLMFactory.On("NewLiquidityManager", models.NetworkSelector(mustStrToI64(t, masterChain.ChainID)), models.Address(uni1.wrapper.Address())).
 		Return(mockMasterLM, nil)
 	defer mockLMFactory.AssertExpectations(t)
 	tracker, err := ocr3impls.NewMultichainConfigTracker(

@@ -28,7 +28,7 @@ type mockDeps struct {
 func newPlugin(t *testing.T) (*Plugin, mockDeps) {
 	f := 10
 	closeTimeout := 5 * time.Second
-	rootNetwork := models.NetworkID(1)
+	rootNetwork := models.NetworkSelector(1)
 	rootAddr := models.Address(utils.RandomAddress())
 
 	lmGraph := liquiditygraph.NewGraph()

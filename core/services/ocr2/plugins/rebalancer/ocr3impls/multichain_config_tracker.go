@@ -94,7 +94,7 @@ func NewMultichainConfigTracker(
 		return nil, fmt.Errorf("failed to parse network ID %s: %w", masterChain, err)
 	}
 	masterLM, err := lmFactory.NewLiquidityManager(
-		models.NetworkID(masterChainID),
+		models.NetworkSelector(masterChainID), // todo: probably need to find selector from chain id first
 		models.Address(masterContract))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create master liquidity manager: %w", err)
@@ -121,7 +121,7 @@ func NewMultichainConfigTracker(
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to parse network ID %s: %w", id, err2)
 		}
-		address, ok := all[models.NetworkID(nid)]
+		address, ok := all[models.NetworkSelector(nid)]
 		if !ok {
 			return nil, fmt.Errorf("no liquidity manager found for network ID %d", nid)
 		}

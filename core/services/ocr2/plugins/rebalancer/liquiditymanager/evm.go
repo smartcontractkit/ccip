@@ -2,61 +2,131 @@ package liquiditymanager
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager/liquidity_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 type EvmLiquidityManager struct {
-	address   models.Address
-	networkID models.NetworkID
+	client      liquidity_manager.LiquidityManagerInterface
+	lp          logpoller.LogPoller
+	lmAbi       abi.ABI
+	addr        common.Address
+	networkSel  models.NetworkSelector
+	ec          client.Client
+	cleanupFunc func() error
 }
 
-func NewEvmLiquidityManager(address models.Address, networkID models.NetworkID) *EvmLiquidityManager {
-	return &EvmLiquidityManager{
-		address:   address,
-		networkID: networkID,
-	}
-}
+func NewEvmLiquidityManager(address models.Address, net models.NetworkSelector, ec client.Client, lp logpoller.LogPoller) (*EvmLiquidityManager, error) {
+	var lmClient liquidity_manager.LiquidityManagerInterface
+	//lmClient, err := liquidity_manager.NewLiquidityManager(common.Address(address), ec)
+	//if err != nil {
+	//	return nil, fmt.Errorf("init liquidity manager: %w", err)
+	//}
 
-func (e EvmLiquidityManager) MoveLiquidity(ctx context.Context, chainID models.NetworkID, amount *big.Int) error {
-	return nil
-}
-
-func (e EvmLiquidityManager) GetLiquidityManagers(ctx context.Context) (map[models.NetworkID]models.Address, error) {
-	return nil, nil
-}
-
-func (e EvmLiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) {
-	r, err := rand.Int(rand.Reader, big.NewInt(1000))
+	lmAbi, err := abi.JSON(strings.NewReader(liquidity_manager.LiquidityManagerABI))
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate random number: %w", err)
+		return nil, fmt.Errorf("new lm abi: %w", err)
 	}
-	return r, nil
+
+	lpFilter := logpoller.Filter{
+		Name: fmt.Sprintf("lm-liquidity-transferred-%s", address),
+		EventSigs: []common.Hash{
+			lmAbi.Events["LiquidityTransferred"].ID,
+		},
+		Addresses: []common.Address{common.Address(address)},
+	}
+
+	if err := lp.RegisterFilter(lpFilter); err != nil {
+		return nil, fmt.Errorf("register filter: %w", err)
+	}
+
+	return &EvmLiquidityManager{
+		client:     lmClient,
+		lp:         lp,
+		lmAbi:      lmAbi,
+		ec:         ec,
+		addr:       common.Address(address),
+		networkSel: net,
+		cleanupFunc: func() error {
+			return lp.UnregisterFilter(lpFilter.Name)
+		},
+	}, nil
 }
 
-func (e EvmLiquidityManager) GetPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
+func (e *EvmLiquidityManager) GetLiquidityManagers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
+	lms, err := e.client.GetAllCrossChainLiquidityMangers(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("get all cross chain lms: %w", err)
+	}
+
+	res := make(map[models.NetworkSelector]models.Address)
+	for _, lm := range lms {
+		res[models.NetworkSelector(lm.RemoteChainSelector)] = models.Address(lm.RemoteLiquidityManager)
+	}
+
 	return nil, nil
 }
 
+func (e *EvmLiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) {
+	return e.client.GetLiquidity(&bind.CallOpts{Context: ctx})
+}
+
+func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error) {
+	logs, err := e.lp.LogsCreatedAfter(
+		e.lmAbi.Events["LiquidityTransferred"].ID,
+		e.addr,
+		since,
+		logpoller.Finalized,
+		pg.WithParentCtx(ctx),
+	)
+
+	pendingTransfers := make([]models.PendingTransfer, 0, len(logs))
+
+	for _, log := range logs {
+		liqTransferred, err := e.client.ParseLiquidityTransferred(log.ToGethLog())
+		if err != nil {
+			return nil, fmt.Errorf("invalid log: %w", err)
+		}
+
+		tr := models.NewPendingTransfer(models.NewTransfer(
+			models.NetworkSelector(liqTransferred.FromChainSelector),
+			models.NetworkSelector(liqTransferred.ToChainSelector),
+			liqTransferred.Amount,
+			log.BlockTimestamp,
+		))
+		// tr.Status = models.TransferStatusExecuted // todo: determine the status
+		pendingTransfers = append(pendingTransfers, tr)
+	}
+
+	return nil, err
+}
 func (e EvmLiquidityManager) Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error) {
 	g := liquiditygraph.NewGraph()
 	lms := NewRegistry()
 
 	type qItem struct {
-		networkID models.NetworkID
-		lmAddress models.Address
+		networkID models.NetworkSelector
+		lmAddress common.Address
 	}
 
 	seen := mapset.NewSet[qItem]()
 	queue := mapset.NewSet[qItem]()
 
-	elem := qItem{networkID: e.networkID, lmAddress: e.address}
+	elem := qItem{networkID: e.networkSel, lmAddress: e.addr}
 	queue.Add(elem)
 	seen.Add(elem)
 
@@ -69,12 +139,12 @@ func (e EvmLiquidityManager) Discover(ctx context.Context, lmFactory Factory) (*
 		// TODO: investigate fetching the balance here.
 		g.AddNetwork(elem.networkID, big.NewInt(0))
 
-		lm, err := lmFactory.NewLiquidityManager(elem.networkID, elem.lmAddress)
+		lm, err := lmFactory.NewLiquidityManager(elem.networkID, models.Address(elem.lmAddress))
 		if err != nil {
 			return nil, nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
 
-		lms.Add(elem.networkID, elem.lmAddress)
+		lms.Add(elem.networkID, models.Address(elem.lmAddress))
 
 		destinationLMs, err := lm.GetLiquidityManagers(ctx)
 		if err != nil {
@@ -88,7 +158,7 @@ func (e EvmLiquidityManager) Discover(ctx context.Context, lmFactory Factory) (*
 		for destNetworkID, lmAddr := range destinationLMs {
 			g.AddConnection(elem.networkID, destNetworkID)
 
-			newElem := qItem{networkID: destNetworkID, lmAddress: lmAddr}
+			newElem := qItem{networkID: destNetworkID, lmAddress: common.Address(lmAddr)}
 			if !seen.Contains(newElem) {
 				queue.Add(newElem)
 				seen.Add(newElem)
@@ -103,6 +173,6 @@ func (e EvmLiquidityManager) Discover(ctx context.Context, lmFactory Factory) (*
 	return lms, g, nil
 }
 
-func (e EvmLiquidityManager) Close(ctx context.Context) error {
-	return nil
+func (e *EvmLiquidityManager) Close(ctx context.Context) error {
+	return e.cleanupFunc()
 }

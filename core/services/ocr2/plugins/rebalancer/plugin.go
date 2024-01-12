@@ -7,6 +7,8 @@ import (
 	"sort"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/pkg/errors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -20,19 +22,17 @@ import (
 type Plugin struct {
 	f                       int
 	closePluginTimeout      time.Duration
-	rootNetwork             models.NetworkID
 	liquidityManagers       *liquiditymanager.Registry
 	liquidityManagerFactory liquiditymanager.Factory
 	liquidityGraph          liquiditygraph.LiquidityGraph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	pendingTransfers        *PendingTransfersCache
-	lggr                    logger.Logger
 }
 
 func NewPlugin(
 	f int,
 	closePluginTimeout time.Duration,
-	liquidityManagerNetwork models.NetworkID,
+	liquidityManagerNetwork models.NetworkSelector,
 	liquidityManagerAddress models.Address,
 	liquidityManagerFactory liquiditymanager.Factory,
 	liquidityGraph liquiditygraph.LiquidityGraph,
@@ -46,24 +46,19 @@ func NewPlugin(
 	return &Plugin{
 		f:                       f,
 		closePluginTimeout:      closePluginTimeout,
-		rootNetwork:             liquidityManagerNetwork,
 		liquidityManagers:       liquidityManagers,
 		liquidityManagerFactory: liquidityManagerFactory,
 		liquidityGraph:          liquidityGraph,
 		liquidityRebalancer:     liquidityRebalancer,
 		pendingTransfers:        NewPendingTransfersCache(),
-		lggr:                    lggr,
 	}
 }
 
-func (p *Plugin) Query(_ context.Context, outcomeCtx ocr3types.OutcomeContext) (ocrtypes.Query, error) {
-	p.lggr.Infow("in query", "seqNr", outcomeCtx.SeqNr)
+func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (ocrtypes.Query, error) {
 	return ocrtypes.Query{}, nil
 }
 
-func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeContext, _ ocrtypes.Query) (ocrtypes.Observation, error) {
-	p.lggr.Infow("in observation", "seqNr", outcomeCtx.SeqNr)
-
+func (p *Plugin) Observation(ctx context.Context, _ ocr3types.OutcomeContext, _ ocrtypes.Query) (ocrtypes.Observation, error) {
 	if err := p.syncGraphEdges(ctx); err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph edges: %w", err)
 	}
@@ -78,14 +73,10 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		return ocrtypes.Observation{}, fmt.Errorf("load pending transfers: %w", err)
 	}
 
-	p.lggr.Infow("finished observing", "networkLiquidities", networkLiquidities, "pendingTransfers", pendingTransfers)
-
 	return models.NewObservation(networkLiquidities, pendingTransfers).Encode(), nil
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
-	p.lggr.Infow("in validate observation", "seqNr", outctx.SeqNr)
-
 	_, err := models.DecodeObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("invalid observation: %w", err)
@@ -101,9 +92,6 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query ocrtyp
 }
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, aos []ocrtypes.AttributedObservation) (ocr3types.Outcome, error) {
-	lggr := p.lggr.With("seqNr", outctx.SeqNr)
-	lggr.Infow("in outcome", "seqNr", outctx.SeqNr, "numObs", len(aos))
-
 	observations := make([]models.Observation, 0, len(aos))
 	for _, encodedObs := range aos {
 		obs, err := models.DecodeObservation(encodedObs.Observation)
@@ -120,23 +108,15 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		return ocr3types.Outcome{}, fmt.Errorf("compute pending transfers consensus: %w", err)
 	}
 
-	lggr.Infow("finished computing outcome", "medianLiquidityPerChain", medianLiquidityPerChain, "pendingTransfers", pendingTransfers)
-
 	return models.NewObservation(medianLiquidityPerChain, pendingTransfers).Encode(), nil
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.ReportMetadata], error) {
-	lggr := p.lggr.With("seqNr", seqNr)
-	lggr.Infow("in reports", "seqNr", seqNr)
 	obs, err := models.DecodeObservation(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
-	lggr.Infow("computing transfers to reach balance",
-		"pendingTransfers", obs.PendingTransfers,
-		"liquidityGraph", p.liquidityGraph,
-		"liquidityPerChain", obs.LiquidityPerChain)
 	transfersToReachBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(
 		p.liquidityGraph, obs.PendingTransfers, obs.LiquidityPerChain)
 	if err != nil {
@@ -144,12 +124,10 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	}
 
 	// group transfers by source chain
-	transfersBySourceNet := make(map[models.NetworkID][]models.Transfer)
+	transfersBySourceNet := make(map[models.NetworkSelector][]models.Transfer)
 	for _, tr := range transfersToReachBalance {
 		transfersBySourceNet[tr.From] = append(transfersBySourceNet[tr.From], tr)
 	}
-
-	lggr.Infow("finished computing transfers to reach balance", "transfersBySourceNet", transfersBySourceNet)
 
 	var reports []ocr3types.ReportWithInfo[models.ReportMetadata]
 	for sourceNet, transfers := range transfersBySourceNet {
@@ -159,38 +137,28 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		}
 
 		reportMeta := models.NewReportMetadata(transfers, lmAddress, sourceNet)
-		encoded, err := reportMeta.OnchainEncode()
-		if err != nil {
-			return nil, fmt.Errorf("encode report metadata for onchain usage: %w", err)
-		}
 		reports = append(reports, ocr3types.ReportWithInfo[models.ReportMetadata]{
-			Report: encoded,
+			Report: reportMeta.Encode(),
 			Info:   reportMeta,
 		})
 	}
 
-	lggr.Infow("generated reports", "numReports", len(reports))
-
 	return reports, nil
 }
 
-func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
-	p.lggr.Infow("in should accept attested report", "seqNr", seqNr, "reportMeta", r.Info, "reportJSON", string(r.Report))
-
-	report, err := models.DecodeReport(r.Report)
+func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
+	reportMeta, err := models.DecodeReportMetadata(r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode report metadata: %w", err)
 	}
 
-	fmt.Println(report.Transfers)
+	fmt.Println(reportMeta.Transfers)
 	// todo: check if reportMeta.transfers are valid
 
 	return true, nil
 }
 
-func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
-	p.lggr.Infow("in should transmit accepted report", "seqNr", seqNr, "reportMeta", r.Info)
-
+func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, u uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
 	newPendingTransfers := make([]models.PendingTransfer, 0, len(r.Info.Transfers))
 	for _, tr := range r.Info.Transfers {
 		if p.pendingTransfers.ContainsTransfer(tr) {
@@ -204,8 +172,6 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64,
 }
 
 func (p *Plugin) Close() error {
-	p.lggr.Infow("closing plugin")
-
 	ctx, cf := context.WithTimeout(context.Background(), p.closePluginTimeout)
 	defer cf()
 
@@ -224,27 +190,57 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
+// todo: consider placing the graph exploration logic under graph package to keep the plugin logic cleaner
 func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 	// todo: if there wasn't any change to the graph stop earlier
-	p.lggr.Infow("syncing graph edges")
 
-	rootLM, exists := p.liquidityManagers.Get(p.rootNetwork)
-	if !exists {
-		return fmt.Errorf("root lm %v not found", p.rootNetwork)
+	p.liquidityGraph.Reset()
+
+	type qItem struct {
+		networkID models.NetworkSelector
+		lmAddress models.Address
 	}
 
-	lm, err := p.liquidityManagerFactory.NewLiquidityManager(p.rootNetwork, rootLM)
-	if err != nil {
-		return fmt.Errorf("init liquidity manager: %w", err)
+	seen := mapset.NewSet[qItem]()
+	queue := mapset.NewSet[qItem]()
+	for networkID, lmAddress := range p.liquidityManagers.GetAll() {
+		elem := qItem{networkID: networkID, lmAddress: lmAddress}
+		queue.Add(elem)
+		seen.Add(elem)
 	}
 
-	lms, g, err := lm.Discover(ctx, p.liquidityManagerFactory)
-	if err != nil {
-		return fmt.Errorf("discover lms: %w", err)
-	}
+	for queue.Cardinality() > 0 {
+		elem, ok := queue.Pop()
+		if !ok {
+			return errors.New("unexpected internal error, there is a bug in the algorithm")
+		}
 
-	p.liquidityGraph = g      // todo: thread safe
-	p.liquidityManagers = lms // todo: thread safe
+		p.liquidityGraph.AddNetwork(elem.networkID, big.NewInt(0)) // TODO: investigate fetching the balance here.
+
+		lm, err := p.liquidityManagerFactory.NewLiquidityManager(elem.networkID, elem.lmAddress)
+		if err != nil {
+			return fmt.Errorf("init liquidity manager: %w", err)
+		}
+
+		destinationLMs, err := lm.GetLiquidityManagers(ctx)
+		if err != nil {
+			return fmt.Errorf("get %v destination liquidity managers: %w", elem.networkID, err)
+		}
+
+		for destNetworkID, lmAddr := range destinationLMs {
+			p.liquidityGraph.AddConnection(elem.networkID, destNetworkID)
+
+			newElem := qItem{networkID: destNetworkID, lmAddress: lmAddr}
+			if !seen.Contains(newElem) {
+				queue.Add(newElem)
+				seen.Add(newElem)
+
+				if _, exists := p.liquidityManagers.Get(destNetworkID); !exists {
+					p.liquidityManagers.Add(destNetworkID, lmAddr)
+				}
+			}
+		}
+	}
 
 	return nil
 }
@@ -277,9 +273,6 @@ func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidi
 }
 
 func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
-	// todo: do not load pending transfers all the time
-	p.lggr.Infow("loading pending transfers")
-
 	pendingTransfers := make([]models.PendingTransfer, 0)
 	for networkID, lmAddress := range p.liquidityManagers.GetAll() {
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddress)
@@ -287,20 +280,27 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 			return nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
 
-		netPendingTransfers, err := lm.GetPendingTransfers(ctx)
+		// todo: place in config and set a proper value
+		dateToStartLookingFrom := time.Now().Add(-10 * 24 * time.Hour)
+
+		if mostRecentTransfer, exists := p.pendingTransfers.LatestNetworkTransfer(networkID); exists {
+			dateToStartLookingFrom = mostRecentTransfer.Date
+		}
+
+		newPendingTransfers, err := lm.GetPendingTransfers(ctx, dateToStartLookingFrom)
 		if err != nil {
 			return nil, fmt.Errorf("get pending %v transfers: %w", networkID, err)
 		}
 
-		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
+		pendingTransfers = append(pendingTransfers, newPendingTransfers...)
 	}
 
-	p.pendingTransfers.Set(pendingTransfers)
+	p.pendingTransfers.Add(pendingTransfers)
 	return pendingTransfers, nil
 }
 
 func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observation) []models.NetworkLiquidity {
-	liqObsPerChain := make(map[models.NetworkID][]*big.Int)
+	liqObsPerChain := make(map[models.NetworkSelector][]*big.Int)
 	for _, ob := range observations {
 		for _, chainLiq := range ob.LiquidityPerChain {
 			liqObsPerChain[chainLiq.Network] = append(liqObsPerChain[chainLiq.Network], chainLiq.Liquidity)
@@ -311,11 +311,6 @@ func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observatio
 	for chainID, liqs := range liqObsPerChain {
 		medians = append(medians, models.NewNetworkLiquidity(chainID, bigIntSortedMiddle(liqs)))
 	}
-
-	// sort by network id for deterministic results
-	sort.Slice(medians, func(i, j int) bool {
-		return medians[i].Network < medians[j].Network
-	})
 
 	return medians
 }
