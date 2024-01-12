@@ -9,7 +9,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -21,7 +20,7 @@ import (
 )
 
 type EvmLiquidityManager struct {
-	client      liquidity_manager.LiquidityManagerInterface
+	client      OnchainLiquidityManager
 	lp          logpoller.LogPoller
 	lmAbi       abi.ABI
 	addr        common.Address
@@ -31,11 +30,15 @@ type EvmLiquidityManager struct {
 }
 
 func NewEvmLiquidityManager(address models.Address, net models.NetworkSelector, ec client.Client, lp logpoller.LogPoller) (*EvmLiquidityManager, error) {
-	var lmClient liquidity_manager.LiquidityManagerInterface
-	//lmClient, err := liquidity_manager.NewLiquidityManager(common.Address(address), ec)
-	//if err != nil {
-	//	return nil, fmt.Errorf("init liquidity manager: %w", err)
-	//}
+	// uncomment when we implement the concrete lm
+	// client, err := NewConcreteLiquidityManager(common.Address(address), ec)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("new concrete lm: %w", err)
+	// }
+	dummyClient, err := NewDummyLiquidityManager(common.Address(address), ec, big.NewInt(1000))
+	if err != nil {
+		return nil, fmt.Errorf("new dummy lm: %w", err)
+	}
 
 	lmAbi, err := abi.JSON(strings.NewReader(liquidity_manager.LiquidityManagerABI))
 	if err != nil {
@@ -43,7 +46,7 @@ func NewEvmLiquidityManager(address models.Address, net models.NetworkSelector, 
 	}
 
 	lpFilter := logpoller.Filter{
-		Name: fmt.Sprintf("lm-liquidity-transferred-%s", address),
+		Name: fmt.Sprintf("lm-liquidity-transferred-%s", common.Address(address)),
 		EventSigs: []common.Hash{
 			lmAbi.Events["LiquidityTransferred"].ID,
 		},
@@ -55,7 +58,7 @@ func NewEvmLiquidityManager(address models.Address, net models.NetworkSelector, 
 	}
 
 	return &EvmLiquidityManager{
-		client:     lmClient,
+		client:     dummyClient,
 		lp:         lp,
 		lmAbi:      lmAbi,
 		ec:         ec,
@@ -68,21 +71,11 @@ func NewEvmLiquidityManager(address models.Address, net models.NetworkSelector, 
 }
 
 func (e *EvmLiquidityManager) GetLiquidityManagers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
-	lms, err := e.client.GetAllCrossChainLiquidityMangers(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, fmt.Errorf("get all cross chain lms: %w", err)
-	}
-
-	res := make(map[models.NetworkSelector]models.Address)
-	for _, lm := range lms {
-		res[models.NetworkSelector(lm.RemoteChainSelector)] = models.Address(lm.RemoteLiquidityManager)
-	}
-
-	return nil, nil
+	return e.client.GetAllCrossChainLiquidityMangers(ctx)
 }
 
 func (e *EvmLiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) {
-	return e.client.GetLiquidity(&bind.CallOpts{Context: ctx})
+	return e.client.GetLiquidity(ctx)
 }
 
 func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error) {
@@ -93,26 +86,29 @@ func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since tim
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("get logs created after: %w", err)
+	}
 
 	pendingTransfers := make([]models.PendingTransfer, 0, len(logs))
 
 	for _, log := range logs {
-		liqTransferred, err := e.client.ParseLiquidityTransferred(log.ToGethLog())
-		if err != nil {
-			return nil, fmt.Errorf("invalid log: %w", err)
+		liqTransferred, err2 := e.client.ParseLiquidityTransferred(log.ToGethLog())
+		if err2 != nil {
+			return nil, fmt.Errorf("invalid log: %w", err2)
 		}
 
 		tr := models.NewPendingTransfer(models.NewTransfer(
-			models.NetworkSelector(liqTransferred.FromChainSelector),
-			models.NetworkSelector(liqTransferred.ToChainSelector),
-			liqTransferred.Amount,
+			models.NetworkSelector(liqTransferred.FromChainSelector()),
+			models.NetworkSelector(liqTransferred.ToChainSelector()),
+			liqTransferred.Amount(),
 			log.BlockTimestamp,
 		))
 		// tr.Status = models.TransferStatusExecuted // todo: determine the status
 		pendingTransfers = append(pendingTransfers, tr)
 	}
 
-	return nil, err
+	return pendingTransfers, nil
 }
 func (e EvmLiquidityManager) Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error) {
 	g := liquiditygraph.NewGraph()

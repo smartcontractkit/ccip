@@ -24,7 +24,9 @@ type BaseLiquidityManagerFactory struct {
 	evmDeps map[models.NetworkSelector]evmDep
 }
 
-func NewBaseLiquidityManagerFactory(opts ...func(f *BaseLiquidityManagerFactory)) *BaseLiquidityManagerFactory {
+type Opt func(f *BaseLiquidityManagerFactory)
+
+func NewBaseLiquidityManagerFactory(opts ...Opt) *BaseLiquidityManagerFactory {
 	f := &BaseLiquidityManagerFactory{
 		evmDeps: make(map[models.NetworkSelector]evmDep),
 	}
@@ -34,7 +36,7 @@ func NewBaseLiquidityManagerFactory(opts ...func(f *BaseLiquidityManagerFactory)
 	return f
 }
 
-func WithEvmDep(networkID models.NetworkSelector, lp logpoller.LogPoller, ethClient client.Client) func(f *BaseLiquidityManagerFactory) {
+func WithEvmDep(networkID models.NetworkSelector, lp logpoller.LogPoller, ethClient client.Client) Opt {
 	return func(f *BaseLiquidityManagerFactory) {
 		f.evmDeps[networkID] = evmDep{
 			lp:        lp,
