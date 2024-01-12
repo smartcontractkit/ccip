@@ -523,10 +523,16 @@ func (r *Router) SetOnRamp(chainSelector uint64, onRamp common.Address) error {
 
 func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMessage, fee *big.Int) (*types.Transaction, error) {
 	withNative := msg.FeeToken == (common.Address{})
+	feeTokenIsTransferToken := false
 	// approve all tokens
 	for _, tokenAndAmounts := range msg.TokenAmounts {
 		tokenAddr := tokenAndAmounts.Token
 		amount := tokenAndAmounts.Amount
+		// if fee token is transfer token, add fee to amount
+		if tokenAddr == msg.FeeToken {
+			feeTokenIsTransferToken = true
+			amount = new(big.Int).Add(amount, fee)
+		}
 		token, err := erc20.NewERC20(tokenAddr, r.client.Backend())
 		if err != nil {
 			return nil, err
@@ -546,7 +552,8 @@ func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMess
 		}
 	}
 
-	if msg.FeeToken != (common.Address{}) {
+	// approve fee token if it is not transfer token and fee is not deducted as native
+	if !withNative && !feeTokenIsTransferToken {
 		token, err := erc20.NewERC20(msg.FeeToken, r.client.Backend())
 		if err != nil {
 			return nil, err
@@ -570,6 +577,7 @@ func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMess
 	if err != nil {
 		return nil, err
 	}
+	// set fee value if fee is deducted as native
 	if withNative {
 		opts.Value = fee
 	}
