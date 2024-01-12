@@ -146,7 +146,6 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	lggr := c.Lane.Logger.With().Int64("msg Number", stats.ReqNo).Logger()
 
 	defer c.Lane.Reports.UpdatePhaseStatsForReq(stats)
-	feeToken := sourceCCIP.Common.FeeToken.EthAddress
 	// initiate the transfer
 	lggr.Debug().Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
 	var sendTx *types.Transaction
@@ -168,11 +167,8 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		return res
 	}
 	startTime := time.Now()
-	if feeToken != common.HexToAddress("0x0") {
-		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, nil)
-	} else {
-		sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, fee)
-	}
+
+	sendTx, err = sourceCCIP.Common.Router.CCIPSend(destChainSelector, msg, fee)
 	if err != nil {
 		stats.UpdateState(lggr, 0, testreporters.TX, time.Since(startTime), testreporters.Failure)
 		res.Error = err.Error()

@@ -87,12 +87,7 @@ var (
 	GethLabel = func(name string) string {
 		return fmt.Sprintf("%s-ethereum-geth", name)
 	}
-	// ApprovedAmountToRouter is the default amount which gets approved for router so that it can transfer token and use the fee token for fee payment
-	ApprovedAmountToRouter           = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1))
-	ApprovedFeeAmountToRouter        = new(big.Int).Mul(big.NewInt(int64(GasFeeMultiplier)), big.NewInt(1e5))
-	GasFeeMultiplier          uint64 = 12e17
-	LinkToUSD                        = big.NewInt(6e18)
-	WrappedNativeToUSD               = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1.7e3))
+	GasFeeMultiplier uint64 = 12e17
 )
 
 type CCIPCommon struct {
@@ -244,36 +239,6 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 			ccipModule.BridgeTokenPools = pools
 		}
 	}
-}
-
-// ApproveTokens approve tokens for router - usually a massive amount of tokens enough to cover all the ccip transfers
-// to be triggered by the test
-func (ccipModule *CCIPCommon) ApproveTokens() error {
-	isApproved := false
-	for _, token := range ccipModule.BridgeTokens {
-		err := token.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		if token.ContractAddress == ccipModule.FeeToken.EthAddress {
-			isApproved = true
-		}
-	}
-	if ccipModule.FeeToken.EthAddress != common.HexToAddress("0x0") {
-		if !isApproved {
-			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), ApprovedFeeAmountToRouter)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-		} else {
-			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), new(big.Int).Add(ApprovedAmountToRouter, ApprovedFeeAmountToRouter))
-			if err != nil {
-				return errors.WithStack(err)
-			}
-		}
-	}
-
-	return nil
 }
 
 func (ccipModule *CCIPCommon) CleanUp() error {
@@ -681,11 +646,6 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 	contractDeployer := sourceCCIP.Common.Deployer
 	log.Info().Msg("Deploying source chain specific contracts")
 
-	err = sourceCCIP.Common.ApproveTokens()
-	if err != nil {
-		return err
-	}
-
 	sourceCCIP.LoadContracts(lane)
 	sourceChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
@@ -1006,19 +966,11 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 
 	var sendTx *types.Transaction
 	timeNow := time.Now()
-	feeToken := common.HexToAddress(sourceCCIP.Common.FeeToken.Address())
 	// initiate the transfer
 	// if the token address is 0x0 it will use Native as fee token and the fee amount should be mentioned in bind.TransactOpts's value
-	if feeToken != (common.Address{}) {
-		sendTx, err = sourceCCIP.Common.Router.CCIPSendAndProcessTx(destChainSelector, msg, nil)
-		if err != nil {
-			return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
-		}
-	} else {
-		sendTx, err = sourceCCIP.Common.Router.CCIPSendAndProcessTx(destChainSelector, msg, fee)
-		if err != nil {
-			return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
-		}
+	sendTx, err = sourceCCIP.Common.Router.CCIPSendAndProcessTx(destChainSelector, msg, fee)
+	if err != nil {
+		return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
 	}
 
 	log.Info().

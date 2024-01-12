@@ -521,15 +521,58 @@ func (r *Router) SetOnRamp(chainSelector uint64, onRamp common.Address) error {
 	return r.client.ProcessTransaction(tx)
 }
 
-func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMessage, valueForNative *big.Int) (*types.Transaction, error) {
+func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMessage, fee *big.Int) (*types.Transaction, error) {
+	withNative := msg.FeeToken == (common.Address{})
+	// approve all tokens
+	for _, tokenAndAmounts := range msg.TokenAmounts {
+		tokenAddr := tokenAndAmounts.Token
+		amount := tokenAndAmounts.Amount
+		token, err := erc20.NewERC20(tokenAddr, r.client.Backend())
+		if err != nil {
+			return nil, err
+		}
+		opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
+		if err != nil {
+			return nil, err
+		}
+		// approve the amount for router
+		tx, err := token.Approve(opts, r.EthAddress, amount)
+		if err != nil {
+			return nil, err
+		}
+		err = r.client.ProcessTransaction(tx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if msg.FeeToken != (common.Address{}) {
+		token, err := erc20.NewERC20(msg.FeeToken, r.client.Backend())
+		if err != nil {
+			return nil, err
+		}
+		opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
+		if err != nil {
+			return nil, err
+		}
+		// approve the amount for router
+		tx, err := token.Approve(opts, r.EthAddress, fee)
+		if err != nil {
+			return nil, err
+		}
+		err = r.client.ProcessTransaction(tx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
 		return nil, err
 	}
-	if valueForNative != nil {
-		opts.Value = valueForNative
+	if withNative {
+		opts.Value = fee
 	}
-
 	log.Info().
 		Str("Network", r.client.GetNetworkName()).
 		Str("Router", r.Address()).
