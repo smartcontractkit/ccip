@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -65,7 +66,7 @@ func TestPluginObservation(t *testing.T) {
 	reg.Add(net, addr)
 	mockLM.On("Discover", ctx, deps.mockFactory).Return(reg, g, nil)
 	mockLM.On("GetBalance", ctx).Return(big.NewInt(1234), nil)
-	mockLM.On("GetPendingTransfers", ctx).Return([]models.PendingTransfer{}, nil)
+	mockLM.On("GetPendingTransfers", ctx, mock.Anything).Return([]models.PendingTransfer{}, nil)
 
 	obs, err := p.Observation(ctx, ocr3types.OutcomeContext{}, ocrtypes.Query{})
 	assert.NoError(t, err)
