@@ -83,6 +83,10 @@ contract DummyLiquidityManager is ILiquidityManager, OCR3Base {
   // │                           Config                             │
   // ================================================================
 
+  function getSupportedDestChains() external view returns (uint64[] memory) {
+    return s_supportedDestChains;
+  }
+
   /// @notice Gets the cross chain liquidity manager
   function getCrossChainLiquidityManager(
     uint64 chainSelector
@@ -93,7 +97,7 @@ contract DummyLiquidityManager is ILiquidityManager, OCR3Base {
   /// @notice Gets all cross chain liquidity managers
   /// @dev We don't care too much about gas since this function is intended for offchain usage.
   function getAllCrossChainLiquidityMangers() external view returns (CrossChainLiquidityManagerArgs[] memory) {
-    CrossChainLiquidityManagerArgs[] memory managers;
+    CrossChainLiquidityManagerArgs[] memory managers = new CrossChainLiquidityManagerArgs[](s_supportedDestChains.length);
     for (uint256 i = 0; i < s_supportedDestChains.length; ++i) {
       uint64 chainSelector = s_supportedDestChains[i];
       CrossChainLiquidityManager memory currentManager = s_crossChainLiquidityManager[chainSelector];
@@ -128,6 +132,11 @@ contract DummyLiquidityManager is ILiquidityManager, OCR3Base {
 
     if (crossChainLiqManager.remoteLiquidityManager == address(0)) {
       revert ZeroAddress();
+    }
+
+    // If the destination chain is new, add it to the list of supported chains
+    if (s_crossChainLiquidityManager[crossChainLiqManager.remoteChainSelector].remoteLiquidityManager == address(0)) {
+      s_supportedDestChains.push(crossChainLiqManager.remoteChainSelector);
     }
 
     s_crossChainLiquidityManager[crossChainLiqManager.remoteChainSelector] = CrossChainLiquidityManager({
