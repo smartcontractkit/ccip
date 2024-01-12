@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
+	"go.uber.org/multierr"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -39,125 +40,6 @@ import (
 )
 
 const numTokenDataWorkers = 5
-
-func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*ExecutionPluginStaticConfig, *ccipcommon.BackfillArgs, error) {
-	if jb.OCR2OracleSpec == nil {
-		return nil, nil, errors.New("spec is nil")
-	}
-	spec := jb.OCR2OracleSpec
-	var pluginConfig ccipconfig.ExecutionPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	destChain, destChainID, err := ccipconfig.GetChainFromSpec(spec, chainSet)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Create the offRamp reader.
-	offRampAddress := common.HexToAddress(spec.ContractID)
-	offRampReader, err := factory.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), true, qopts...)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "create offRampReader")
-	}
-	offRampConfig, err := offRampReader.GetStaticConfig(context.Background())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "get offRamp static config")
-	}
-
-	chainID, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sourceChain, err := chainSet.Get(strconv.FormatUint(chainID, 10))
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "open source chain")
-	}
-
-	sourceChainName, destChainName, err := ccipconfig.ResolveChainNames(int64(chainID), destChainID)
-	if err != nil {
-		return nil, nil, err
-	}
-	execLggr := lggr.Named("CCIPExecution").With("sourceChain", sourceChainName, "destChain", destChainName)
-	onRampReader, err := factory.NewOnRampReader(execLggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), qopts...)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "create onramp reader")
-	}
-	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "get onramp dynamic config")
-	}
-
-	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, sourceChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed loading source router")
-	}
-	sourceWrappedNative, err := sourceRouter.GetWrappedNative(&bind.CallOpts{})
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not get source native token")
-	}
-
-	// TODO: we don't support onramp source registry changes without a reboot yet?
-	sourcePriceRegistry, err := factory.NewPriceRegistryReader(lggr, dynamicOnRampConfig.PriceRegistry, sourceChain.LogPoller(), sourceChain.Client())
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load source registry")
-	}
-
-	commitStoreReader, err := factory.NewCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator(), qopts...)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
-	}
-
-	tokenDataProviders, err := initTokenDataProviders(lggr, pluginConfig, sourceChain.LogPoller(), qopts...)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not get token data providers")
-	}
-
-	// Prom wrappers
-	onRampReader = observability.NewObservedOnRampReader(onRampReader, int64(chainID), ccip.ExecPluginLabel)
-	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, int64(chainID), ccip.ExecPluginLabel)
-	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.ExecPluginLabel)
-	offRampReader = observability.NewObservedOffRampReader(offRampReader, destChainID, ccip.ExecPluginLabel)
-
-	destChainSelector, err := chainselectors.SelectorFromChainId(uint64(destChainID))
-	if err != nil {
-		return nil, nil, fmt.Errorf("get chain %d selector: %w", destChainID, err)
-	}
-
-	execLggr.Infow("Initialized exec plugin",
-		"pluginConfig", pluginConfig,
-		"onRampAddress", offRampConfig.OnRamp,
-		"sourcePriceRegistry", sourcePriceRegistry.Address(),
-		"dynamicOnRampConfig", dynamicOnRampConfig,
-		"sourceNative", sourceWrappedNative,
-		"sourceRouter", sourceRouter.Address())
-
-	return &ExecutionPluginStaticConfig{
-			lggr:                     execLggr,
-			onRampReader:             onRampReader,
-			commitStoreReader:        commitStoreReader,
-			offRampReader:            offRampReader,
-			sourcePriceRegistry:      sourcePriceRegistry,
-			sourceWrappedNativeToken: sourceWrappedNative,
-			destChainSelector:        destChainSelector,
-			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(destChain.LogPoller(), destChain.Client(), execLggr, ccip.ExecPluginLabel),
-			tokenDataWorker: tokendata.NewBackgroundWorker(
-				ctx,
-				tokenDataProviders,
-				numTokenDataWorkers,
-				5*time.Second,
-				offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds,
-			),
-		}, &ccipcommon.BackfillArgs{
-			SourceLP:         sourceChain.LogPoller(),
-			DestLP:           destChain.LogPoller(),
-			SourceStartBlock: pluginConfig.SourceStartBlock,
-			DestStartBlock:   pluginConfig.DestStartBlock,
-		}, nil
-}
 
 func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
@@ -194,76 +76,43 @@ func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, c
 // See comment in UnregisterCommitPluginLpFilters
 // It MUST mirror the filters registered in NewExecutionServices.
 func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	if jb.OCR2OracleSpec == nil {
-		return errors.New("spec is nil")
-	}
-	spec := jb.OCR2OracleSpec
-	var pluginConfig ccipconfig.ExecutionPluginJobSpecConfig
-	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+	params, err := extractJobSpecParams(lggr, jb, chainSet, false, qopts...)
 	if err != nil {
 		return err
 	}
 
-	destChain, _, err := ccipconfig.GetChainFromSpec(spec, chainSet)
-	if err != nil {
-		return err
+	unregisterFuncs := []func() error{
+		func() error {
+			return factory.CloseCommitStoreReader(lggr, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), qopts...)
+		},
+		func() error {
+			return factory.CloseOnRampReader(lggr, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client(), qopts...)
+		},
+		func() error {
+			return factory.CloseOffRampReader(lggr, params.offRampReader.Address(), params.destChain.Client(), params.destChain.LogPoller(), params.destChain.GasEstimator(), qopts...)
+		},
+		func() error { // usdc token data reader
+			if usdcDisabled := params.pluginConfig.USDCConfig.AttestationAPI == ""; usdcDisabled {
+				return nil
+			}
+			usdcReader, err := ccipdata.NewUSDCReader(lggr, params.pluginConfig.USDCConfig.SourceMessageTransmitterAddress, params.sourceChain.LogPoller())
+			if err != nil {
+				return err
+			}
+			if err := usdcReader.Close(qopts...); err != nil {
+				return err
+			}
+			return nil
+		},
 	}
 
-	offRampAddress := common.HexToAddress(spec.ContractID)
-	offRampReader, err := factory.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), false, qopts...)
-	if err != nil {
-		return errors.Wrap(err, "create offRampReader")
-	}
-
-	offRampConfig, err := offRampReader.GetStaticConfig(context.Background())
-	if err != nil {
-		return errors.Wrap(err, "get offRamp static config")
-	}
-
-	chainID, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-
-	sourceChain, err := chainSet.Get(strconv.FormatUint(chainID, 10))
-	if err != nil {
-		return errors.Wrap(err, "open source chain")
-	}
-
-	// close commit store
-	err = factory.CloseCommitStoreReader(lggr, offRampConfig.CommitStore, destChain.Client(), destChain.LogPoller(), sourceChain.GasEstimator(), qopts...)
-	if err != nil {
-		return errors.Wrap(err, "could not load commitStoreReader reader")
-	}
-
-	// close on ramp
-	err = factory.CloseOnRampReader(lggr, offRampConfig.SourceChainSelector, offRampConfig.ChainSelector, offRampConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client(), qopts...)
-	if err != nil {
-		return errors.Wrap(err, "close on ramp")
-	}
-
-	// close off ramp
-	err = factory.CloseOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), qopts...)
-	if err != nil {
-		return errors.Wrap(err, "close off ramp")
-	}
-
-	// close usdc token data reader
-	if pluginConfig.USDCConfig.AttestationAPI != "" {
-		err := pluginConfig.USDCConfig.ValidateUSDCConfig()
-		if err != nil {
-			return err
-		}
-		usdcReader, err := ccipdata.NewUSDCReader(lggr, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceChain.LogPoller())
-		if err != nil {
-			return err
-		}
-		if err := usdcReader.Close(qopts...); err != nil {
-			return err
+	var multiErr error
+	for _, fn := range unregisterFuncs {
+		if err := fn(); err != nil {
+			multiErr = multierr.Append(multiErr, err)
 		}
 	}
-
-	return nil
+	return multiErr
 }
 
 // ExecReportToEthTxMeta generates a txmgr.EthTxMeta from the given report.
@@ -305,4 +154,149 @@ func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Executio
 	}
 
 	return tokenDataProviders, nil
+}
+
+func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*ExecutionPluginStaticConfig, *ccipcommon.BackfillArgs, error) {
+	params, err := extractJobSpecParams(lggr, jb, chainSet, true, qopts...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sourceChainID := params.sourceChain.ID().Int64()
+	destChainID := params.destChain.ID().Int64()
+
+	sourceChainName, destChainName, err := ccipconfig.ResolveChainNames(sourceChainID, destChainID)
+	if err != nil {
+		return nil, nil, err
+	}
+	execLggr := lggr.Named("CCIPExecution").With("sourceChain", sourceChainName, "destChain", destChainName)
+	onRampReader, err := factory.NewOnRampReader(execLggr, params.offRampConfig.SourceChainSelector, params.offRampConfig.ChainSelector, params.offRampConfig.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client(), qopts...)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "create onramp reader")
+	}
+	dynamicOnRampConfig, err := onRampReader.GetDynamicConfig()
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "get onramp dynamic config")
+	}
+
+	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, params.sourceChain.Client())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed loading source router")
+	}
+	sourceWrappedNative, err := sourceRouter.GetWrappedNative(&bind.CallOpts{})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not get source native token")
+	}
+
+	// TODO: we don't support onramp source registry changes without a reboot yet?
+	sourcePriceRegistry, err := factory.NewPriceRegistryReader(lggr, dynamicOnRampConfig.PriceRegistry, params.sourceChain.LogPoller(), params.sourceChain.Client())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not load source registry")
+	}
+
+	commitStoreReader, err := factory.NewCommitStoreReader(lggr, params.offRampConfig.CommitStore, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), qopts...)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
+	}
+
+	tokenDataProviders, err := initTokenDataProviders(lggr, params.pluginConfig, params.sourceChain.LogPoller(), qopts...)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "could not get token data providers")
+	}
+
+	// Prom wrappers
+	onRampReader = observability.NewObservedOnRampReader(onRampReader, sourceChainID, ccip.ExecPluginLabel)
+	sourcePriceRegistry = observability.NewPriceRegistryReader(sourcePriceRegistry, sourceChainID, ccip.ExecPluginLabel)
+	commitStoreReader = observability.NewObservedCommitStoreReader(commitStoreReader, destChainID, ccip.ExecPluginLabel)
+	offRampReader := observability.NewObservedOffRampReader(params.offRampReader, destChainID, ccip.ExecPluginLabel)
+
+	destChainSelector, err := chainselectors.SelectorFromChainId(uint64(destChainID))
+	if err != nil {
+		return nil, nil, fmt.Errorf("get chain %d selector: %w", destChainID, err)
+	}
+
+	execLggr.Infow("Initialized exec plugin",
+		"pluginConfig", params.pluginConfig,
+		"onRampAddress", params.offRampConfig.OnRamp,
+		"sourcePriceRegistry", sourcePriceRegistry.Address(),
+		"dynamicOnRampConfig", dynamicOnRampConfig,
+		"sourceNative", sourceWrappedNative,
+		"sourceRouter", sourceRouter.Address())
+
+	return &ExecutionPluginStaticConfig{
+			lggr:                     execLggr,
+			onRampReader:             onRampReader,
+			commitStoreReader:        commitStoreReader,
+			offRampReader:            offRampReader,
+			sourcePriceRegistry:      sourcePriceRegistry,
+			sourceWrappedNativeToken: sourceWrappedNative,
+			destChainSelector:        destChainSelector,
+			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
+			tokenDataWorker: tokendata.NewBackgroundWorker(
+				ctx,
+				tokenDataProviders,
+				numTokenDataWorkers,
+				5*time.Second,
+				offRampReader.OnchainConfig().PermissionLessExecutionThresholdSeconds,
+			),
+		}, &ccipcommon.BackfillArgs{
+			SourceLP:         params.sourceChain.LogPoller(),
+			DestLP:           params.destChain.LogPoller(),
+			SourceStartBlock: params.pluginConfig.SourceStartBlock,
+			DestStartBlock:   params.pluginConfig.DestStartBlock,
+		}, nil
+}
+
+type jobSpecParams struct {
+	pluginConfig  ccipconfig.ExecutionPluginJobSpecConfig
+	offRampConfig ccipdata.OffRampStaticConfig
+	offRampReader ccipdata.OffRampReader
+	sourceChain   legacyevm.Chain
+	destChain     legacyevm.Chain
+}
+
+func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, registerFilters bool, qopts ...pg.QOpt) (*jobSpecParams, error) {
+	if jb.OCR2OracleSpec == nil {
+		return nil, errors.New("spec is nil")
+	}
+	spec := jb.OCR2OracleSpec
+	var pluginConfig ccipconfig.ExecutionPluginJobSpecConfig
+	err := json.Unmarshal(spec.PluginConfig.Bytes(), &pluginConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	destChain, _, err := ccipconfig.GetChainFromSpec(spec, chainSet)
+	if err != nil {
+		return nil, err
+	}
+
+	offRampAddress := common.HexToAddress(spec.ContractID)
+	offRampReader, err := factory.NewOffRampReader(lggr, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), registerFilters, qopts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "create offRampReader")
+	}
+
+	offRampConfig, err := offRampReader.GetStaticConfig(context.Background())
+	if err != nil {
+		return nil, errors.Wrap(err, "get offRamp static config")
+	}
+
+	chainID, err := chainselectors.ChainIdFromSelector(offRampConfig.SourceChainSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	sourceChain, err := chainSet.Get(strconv.FormatUint(chainID, 10))
+	if err != nil {
+		return nil, errors.Wrap(err, "open source chain")
+	}
+
+	return &jobSpecParams{
+		pluginConfig:  pluginConfig,
+		offRampConfig: offRampConfig,
+		offRampReader: offRampReader,
+		sourceChain:   sourceChain,
+		destChain:     destChain,
+	}, nil
 }
