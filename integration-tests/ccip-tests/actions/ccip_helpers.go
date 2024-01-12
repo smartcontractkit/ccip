@@ -111,6 +111,9 @@ type CCIPCommon struct {
 	MulticallEnabled   bool
 	MulticallContract  common.Address
 	ExistingDeployment bool
+	USDCDeployment     bool
+	TokenMessenger     common.Address
+	TokenTransmitter   common.Address
 	poolFunds          *big.Int
 	gasUpdateWatcherMu *sync.Mutex
 	gasUpdateWatcher   map[uint64]*big.Int // key - destchain id; value - timestamp of update
@@ -164,6 +167,9 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 		MulticallContract:  ccipModule.MulticallContract,
 		ExistingDeployment: ccipModule.ExistingDeployment,
 		MulticallEnabled:   ccipModule.MulticallEnabled,
+		USDCDeployment:     ccipModule.USDCDeployment,
+		TokenMessenger:     ccipModule.TokenMessenger,
+		TokenTransmitter:   ccipModule.TokenTransmitter,
 		poolFunds:          ccipModule.poolFunds,
 		gasUpdateWatcherMu: &sync.Mutex{},
 		gasUpdateWatcher:   make(map[uint64]*big.Int),
@@ -220,6 +226,12 @@ func (ccipModule *CCIPCommon) LoadContractAddresses(conf *laneconfig.LaneConfig)
 		}
 		if common.IsHexAddress(conf.Multicall) {
 			ccipModule.MulticallContract = common.HexToAddress(conf.Multicall)
+		}
+		if common.IsHexAddress(conf.TokenMessenger) {
+			ccipModule.TokenMessenger = common.HexToAddress(conf.TokenMessenger)
+		}
+		if common.IsHexAddress(conf.TokenTransmitter) {
+			ccipModule.TokenTransmitter = common.HexToAddress(conf.TokenTransmitter)
 		}
 		if len(conf.BridgeTokens) > 0 {
 			var tokens []*contracts.ERC20Token
@@ -581,6 +593,14 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		ccipModule.MulticallContract, err = cd.DeployMultiCallContract()
 		if err != nil {
 			return errors.WithStack(err)
+		}
+	}
+	if ccipModule.USDCDeployment {
+		if ccipModule.TokenMessenger == (common.Address{}) {
+			ccipModule.TokenMessenger, err = cd.DeployTokenMessenger()
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 	}
 	log.Info().Msg("finished deploying common contracts")

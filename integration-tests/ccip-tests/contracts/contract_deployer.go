@@ -87,6 +87,29 @@ func (e *CCIPContractsDeployer) DeployMultiCallContract() (common.Address, error
 	return *address, nil
 }
 
+func (e *CCIPContractsDeployer) DeployTokenMessenger(tokenTransmitter common.Address) (common.Address, error) {
+	address, tx, _, err := e.evmClient.DeployContract("Mock Token Messenger", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		address, tx, contract, err :=
+		if err != nil {
+			return common.Address{}, nil, nil, err
+		}
+		return address, tx, contract, err
+	})
+	if err != nil {
+		return common.Address{}, err
+	}
+	r, err := bind.WaitMined(context.Background(), e.evmClient.DeployBackend(), tx)
+	if err != nil {
+		return common.Address{}, err
+	}
+	if r.Status != types.ReceiptStatusSuccessful {
+		return common.Address{}, fmt.Errorf("deploy multicall failed")
+	}
+	return *address, nil
+}
 func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	address, _, instance, err := e.evmClient.DeployContract("Link Token", func(
 		auth *bind.TransactOpts,
