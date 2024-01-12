@@ -95,14 +95,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 			if usdcDisabled := params.pluginConfig.USDCConfig.AttestationAPI == ""; usdcDisabled {
 				return nil
 			}
-			usdcReader, err := ccipdata.NewUSDCReader(lggr, params.pluginConfig.USDCConfig.SourceMessageTransmitterAddress, params.sourceChain.LogPoller())
-			if err != nil {
-				return err
-			}
-			if err := usdcReader.Close(qopts...); err != nil {
-				return err
-			}
-			return nil
+			return ccipdata.CloseUSDCReader(lggr, params.pluginConfig.USDCConfig.SourceMessageTransmitterAddress, params.sourceChain.LogPoller(), qopts...)
 		},
 	}
 
@@ -137,10 +130,8 @@ func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Executio
 			return nil, errors.Wrap(err, "failed to parse USDC attestation API")
 		}
 
-		usdcReader, err := ccipdata.NewUSDCReader(lggr, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceLP)
-		if err != nil {
-			return nil, err
-		}
+		usdcReader := ccipdata.NewUSDCReader(lggr, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceLP)
+
 		if err := usdcReader.RegisterFilters(qopts...); err != nil {
 			return nil, err
 		}
