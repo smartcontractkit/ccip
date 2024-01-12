@@ -66,7 +66,6 @@ func TestMultichainTransmitter(t *testing.T) {
 		attributedSigs := unis[i].SignReport(t, c.ConfigDigest, reports[i], seqNum)
 		err = mct.Transmit(testutils.Context(t), c.ConfigDigest, seqNum, reports[i], attributedSigs)
 		require.NoError(t, err)
-		// TODO: for some reason this event isn't being emitted in the simulated backend
 		events := unis[i].TransmittedEvents(t)
 		require.Len(t, events, 1)
 		require.Equal(t, c.ConfigDigest, events[0].ConfigDigest, "config digest mismatch")
