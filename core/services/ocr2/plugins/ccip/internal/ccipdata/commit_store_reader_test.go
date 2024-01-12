@@ -163,6 +163,8 @@ func TestCommitStoreReaders(t *testing.T) {
 	// Deploy 2 commit store versions
 	onramp1 := utils.RandomAddress()
 	onramp2 := utils.RandomAddress()
+	onramp3 := utils.RandomAddress()
+
 	// Report
 	rep := ccipdata.CommitStoreReport{
 		TokenPrices: []ccipdata.TokenPrice{{Token: utils.RandomAddress(), Value: big.NewInt(1)}},
@@ -187,21 +189,38 @@ func TestCommitStoreReaders(t *testing.T) {
 		ArmProxy:            armAddr,
 	})
 	require.NoError(t, err)
+	// TODO: use commit_store_helper 1.3
+	addr3, _, ch3, err := commit_store_helper.DeployCommitStoreHelper(user, ec, commit_store_helper.CommitStoreStaticConfig{
+		ChainSelector:       testutils.SimulatedChainID.Uint64(),
+		SourceChainSelector: testutils.SimulatedChainID.Uint64(),
+		OnRamp:              onramp3,
+		ArmProxy:            armAddr,
+	})
+	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	pr, _, _, err := price_registry_1_0_0.DeployPriceRegistry(user, ec, []common.Address{addr}, nil, 1e6)
 	require.NoError(t, err)
 	pr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, []common.Address{addr2}, nil, 1e6)
 	require.NoError(t, err)
+	pr3, _, _, err := price_registry.DeployPriceRegistry(user, ec, []common.Address{addr3}, nil, 1e6)
+	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
+
 	c10r, err := factory.NewCommitStoreReader(lggr, addr, ec, lp, ge)
 	require.NoError(t, err)
 	require.NoError(t, c10r.RegisterFilters())
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
+
 	c12r, err := factory.NewCommitStoreReader(lggr, addr2, ec, lp, ge)
 	require.NoError(t, err)
 	require.NoError(t, c12r.RegisterFilters())
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStore{}).String())
+
+	c13r, err := factory.NewCommitStoreReader(lggr, addr2, ec, lp, ge)
+	require.NoError(t, err)
+	require.NoError(t, c13r.RegisterFilters())
+	assert.Equal(t, reflect.TypeOf(c13r).String(), reflect.TypeOf(&v1_3_0.CommitStore{}).String())
 
 	// Apply config
 	signers := []common.Address{utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress(), utils.RandomAddress()}
@@ -253,6 +272,10 @@ func TestCommitStoreReaders(t *testing.T) {
 	_, err = ch2.SetOCR2Config(user, signers, transmitters, 1, onchainConfig2, 1, []byte{})
 	require.NoError(t, err)
 
+	onchainConfig3, err := abihelpers.EncodeAbiStruct[ccipdata.CommitOnchainConfig](ccipdata.CommitOnchainConfig{
+		PriceRegistry: pr3,
+	})
+	require.NoError(t, err)
 	offchainConfig3, err := ccipconfig.EncodeOffchainConfig[v1_3_0.CommitOffchainConfig](v1_3_0.CommitOffchainConfig{
 		SourceMaxGasPrice:        maxGas,
 		GasPriceHeartBeat:        models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
@@ -262,6 +285,8 @@ func TestCommitStoreReaders(t *testing.T) {
 		TokenPriceHeartBeat:      models.MustMakeDuration(commonOffchain.TokenPriceHeartBeat),
 		InflightCacheExpiry:      models.MustMakeDuration(commonOffchain.InflightCacheExpiry),
 	})
+	require.NoError(t, err)
+	_, err = ch3.SetOCR2Config(user, signers, transmitters, 1, onchainConfig3, 1, []byte{})
 	require.NoError(t, err)
 
 	commitAndGetBlockTs(ec)
@@ -283,17 +308,17 @@ func TestCommitStoreReaders(t *testing.T) {
 	configs := map[string][][]byte{
 		ccipdata.V1_0_0: {onchainConfig, offchainConfig},
 		ccipdata.V1_2_0: {onchainConfig2, offchainConfig2},
-		ccipdata.V1_3_0: {onchainConfig2, offchainConfig3},
+		ccipdata.V1_3_0: {onchainConfig3, offchainConfig3},
 	}
 	crs := map[string]ccipdata.CommitStoreReader{
 		ccipdata.V1_0_0: c10r,
 		ccipdata.V1_2_0: c12r,
-		ccipdata.V1_3_0: c12r,
+		ccipdata.V1_3_0: c13r,
 	}
 	prs := map[string]common.Address{
 		ccipdata.V1_0_0: pr,
 		ccipdata.V1_2_0: pr2,
-		ccipdata.V1_3_0: pr2,
+		ccipdata.V1_3_0: pr3,
 	}
 	gasPrice := big.NewInt(10)
 	daPrice := big.NewInt(20)
