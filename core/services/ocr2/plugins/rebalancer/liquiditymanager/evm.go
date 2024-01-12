@@ -13,7 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/liquidity_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager/liquidity_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -28,10 +28,11 @@ type EvmLiquidityManager struct {
 }
 
 func NewEvmLiquidityManager(address models.Address, ec client.Client, lp logpoller.LogPoller) (*EvmLiquidityManager, error) {
-	lmClient, err := liquidity_manager.NewLiquidityManager(common.Address(address), ec)
-	if err != nil {
-		return nil, fmt.Errorf("init liquidity manager: %w", err)
-	}
+	var lmClient liquidity_manager.LiquidityManagerInterface
+	//lmClient, err := liquidity_manager.NewLiquidityManager(common.Address(address), ec)
+	//if err != nil {
+	//	return nil, fmt.Errorf("init liquidity manager: %w", err)
+	//}
 
 	lmAbi, err := abi.JSON(strings.NewReader(liquidity_manager.LiquidityManagerABI))
 	if err != nil {
