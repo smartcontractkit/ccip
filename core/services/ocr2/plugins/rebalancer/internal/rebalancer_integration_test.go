@@ -290,6 +290,11 @@ outer:
 		}
 	}
 
+	// cleanly shut down apps so that we don't get a "log after test finish" panic
+	for _, app := range apps {
+		require.NoError(t, app.Stop(), "failed to stop app")
+	}
+
 	t.Log("done")
 }
 

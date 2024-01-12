@@ -29,7 +29,7 @@ func (c *PendingTransfersCache) Add(transfers []models.PendingTransfer) {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.mem = append(c.mem, transfers...)
+	c.mem = append(c.mem, newTransfers...)
 }
 
 func (c *PendingTransfersCache) Set(transfers []models.PendingTransfer) {
