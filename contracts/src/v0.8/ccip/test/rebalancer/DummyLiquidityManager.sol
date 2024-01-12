@@ -126,9 +126,7 @@ contract DummyLiquidityManager is ILiquidityManager, OCR3Base {
       revert ZeroChainSelector();
     }
 
-    if (
-      crossChainLiqManager.remoteLiquidityManager == address(0)
-    ) {
+    if (crossChainLiqManager.remoteLiquidityManager == address(0)) {
       revert ZeroAddress();
     }
 

@@ -86,13 +86,16 @@ func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since tim
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("get logs created after: %w", err)
+	}
 
 	pendingTransfers := make([]models.PendingTransfer, 0, len(logs))
 
 	for _, log := range logs {
-		liqTransferred, err := e.client.ParseLiquidityTransferred(log.ToGethLog())
-		if err != nil {
-			return nil, fmt.Errorf("invalid log: %w", err)
+		liqTransferred, err2 := e.client.ParseLiquidityTransferred(log.ToGethLog())
+		if err2 != nil {
+			return nil, fmt.Errorf("invalid log: %w", err2)
 		}
 
 		tr := models.NewPendingTransfer(models.NewTransfer(
@@ -105,7 +108,7 @@ func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since tim
 		pendingTransfers = append(pendingTransfers, tr)
 	}
 
-	return nil, err
+	return pendingTransfers, nil
 }
 func (e EvmLiquidityManager) Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error) {
 	g := liquiditygraph.NewGraph()
