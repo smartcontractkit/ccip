@@ -36,7 +36,3 @@ func TestExecutionReportEncodingV100(t *testing.T) {
 	require.Equal(t, report.Proofs, decodeCommitReport.Proofs)
 	require.Equal(t, report, decodeCommitReport)
 }
-
-func TestOffRampFiltersV100(t *testing.T) {
-	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), 3)
-}

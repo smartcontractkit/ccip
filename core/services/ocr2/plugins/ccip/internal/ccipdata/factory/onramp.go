@@ -17,17 +17,17 @@ import (
 )
 
 // NewOnRampReader determines the appropriate version of the onramp and returns a reader for it
-func NewOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, pgOpts ...pg.QOpt) (ccipdata.OnRampReader, error) {
-	return initOrCloseOnRampReader(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, false, pgOpts...)
+func NewOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, pgOpts ...pg.QOpt) (ccipdata.OnRampReader, error) {
+	return initOrCloseOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source, false, pgOpts...)
 }
 
-func CloseOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, pgOpts ...pg.QOpt) error {
-	_, err := initOrCloseOnRampReader(lggr, sourceSelector, destSelector, onRampAddress, sourceLP, source, true, pgOpts...)
+func CloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, pgOpts ...pg.QOpt) error {
+	_, err := initOrCloseOnRampReader(lggr, versionFinder, sourceSelector, destSelector, onRampAddress, sourceLP, source, true, pgOpts...)
 	return err
 }
 
-func initOrCloseOnRampReader(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, closeReader bool, pgOpts ...pg.QOpt) (ccipdata.OnRampReader, error) {
-	contractType, version, err := ccipconfig.TypeAndVersion(onRampAddress, source)
+func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, sourceSelector, destSelector uint64, onRampAddress common.Address, sourceLP logpoller.LogPoller, source client.Client, closeReader bool, pgOpts ...pg.QOpt) (ccipdata.OnRampReader, error) {
+	contractType, version, err := versionFinder.TypeAndVersion(onRampAddress, source)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read type and version")
 	}

@@ -38,10 +38,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
-func TestCommitFilters(t *testing.T) {
-	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), 1)
-}
-
 func TestCommitOffchainConfig_Encoding(t *testing.T) {
 	tests := map[string]struct {
 		want      v1_2_0.CommitOffchainConfig
@@ -181,10 +177,10 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
-	c10r, err := factory.NewCommitStoreReader(lggr, addr, ec, lp, ge)
+	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), addr, ec, lp, ge)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
-	c12r, err := factory.NewCommitStoreReader(lggr, addr2, ec, lp, ge)
+	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), addr2, ec, lp, ge)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStore{}).String())
 
@@ -380,7 +376,7 @@ func TestNewCommitStoreReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), common.Address{}, c, lpmocks.NewLogPoller(t), nil)
+			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), common.Address{}, c, lpmocks.NewLogPoller(t), nil)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

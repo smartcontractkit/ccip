@@ -21,17 +21,17 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
-	return initOrCloseOffRampReader(lggr, addr, destClient, lp, estimator, false, registerFilters, pgOpts...)
+func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
+	return initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, false, registerFilters, pgOpts...)
 }
 
-func CloseOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) error {
-	_, err := initOrCloseOffRampReader(lggr, addr, destClient, lp, estimator, true, false, pgOpts...)
+func CloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) error {
+	_, err := initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, true, false, pgOpts...)
 	return err
 }
 
-func initOrCloseOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, closeReader bool, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
-	contractType, version, err := ccipconfig.TypeAndVersion(addr, destClient)
+func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, closeReader bool, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
+	contractType, version, err := versionFinder.TypeAndVersion(addr, destClient)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read type and version")
 	}

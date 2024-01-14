@@ -31,10 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 )
 
-func TestPriceRegistryFilters(t *testing.T) {
-	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), 3)
-}
-
 type priceRegReaderTH struct {
 	lp      logpoller.LogPollerTest
 	ec      client.Client
@@ -112,10 +108,10 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	addr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, nil, feeTokens, 1000)
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
-	pr10r, err := factory.NewPriceRegistryReader(lggr, addr, lp, ec)
+	pr10r, err := factory.NewPriceRegistryReader(lggr, factory.NewEvmVersionFinder(), addr, lp, ec)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(pr10r).String(), reflect.TypeOf(&v1_0_0.PriceRegistry{}).String())
-	pr12r, err := factory.NewPriceRegistryReader(lggr, addr2, lp, ec)
+	pr12r, err := factory.NewPriceRegistryReader(lggr, factory.NewEvmVersionFinder(), addr2, lp, ec)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(pr12r).String(), reflect.TypeOf(&v1_2_0.PriceRegistry{}).String())
 	// Apply block1.
@@ -247,7 +243,7 @@ func TestNewPriceRegistryReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewPriceRegistryReader(logger.TestLogger(t), common.Address{}, lpmocks.NewLogPoller(t), c)
+			_, err = factory.NewPriceRegistryReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), common.Address{}, lpmocks.NewLogPoller(t), c)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

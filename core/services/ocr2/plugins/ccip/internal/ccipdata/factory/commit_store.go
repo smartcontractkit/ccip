@@ -20,17 +20,17 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-func NewCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) (ccipdata.CommitStoreReader, error) {
-	return initOrCloseCommitStoreReader(lggr, address, ec, lp, estimator, false, pgOpts...)
+func NewCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) (ccipdata.CommitStoreReader, error) {
+	return initOrCloseCommitStoreReader(lggr, versionFinder, address, ec, lp, estimator, false, pgOpts...)
 }
 
-func CloseCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) error {
-	_, err := initOrCloseCommitStoreReader(lggr, address, ec, lp, estimator, true, pgOpts...)
+func CloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) error {
+	_, err := initOrCloseCommitStoreReader(lggr, versionFinder, address, ec, lp, estimator, true, pgOpts...)
 	return err
 }
 
-func initOrCloseCommitStoreReader(lggr logger.Logger, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, closeReader bool, pgOpts ...pg.QOpt) (ccipdata.CommitStoreReader, error) {
-	contractType, version, err := ccipconfig.TypeAndVersion(address, ec)
+func initOrCloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinder, address common.Address, ec client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, closeReader bool, pgOpts ...pg.QOpt) (ccipdata.CommitStoreReader, error) {
+	contractType, version, err := versionFinder.TypeAndVersion(address, ec)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read type and version")
 	}
