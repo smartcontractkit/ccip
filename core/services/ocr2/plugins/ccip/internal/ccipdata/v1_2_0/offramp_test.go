@@ -119,3 +119,23 @@ func TestExecOffchainConfig120_MaxGasPrice(t *testing.T) {
 	require.NoError(t, config.Validate())
 	require.Equal(t, uint64(250e9), config.ComputeDestMaxGasPrice())
 }
+
+func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
+	decoded, err := ccipconfig.DecodeOffchainConfig[ExecOffchainConfig]([]byte(`{
+		"DestOptimisticConfirmations": 6,
+		"BatchGasLimit": 5000000,
+		"RelativeBoostPerWaitHour": 0.07,
+		"MaxGasPrice": 200000000000,
+		"InflightCacheExpiry": "64s",
+		"RootSnoozeTime": "128m"
+	}`))
+	require.NoError(t, err)
+	require.Equal(t, ExecOffchainConfig{
+		DestOptimisticConfirmations: 6,
+		BatchGasLimit:               5_000_000,
+		RelativeBoostPerWaitHour:    0.07,
+		MaxGasPrice:                 200e9,
+		InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
+		RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
+	}, decoded)
+}
