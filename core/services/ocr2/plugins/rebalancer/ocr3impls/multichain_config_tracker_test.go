@@ -172,7 +172,7 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 	expectedTransmitters := func() []ocrtypes.Account {
 		var accounts []ocrtypes.Account
 		for _, tm := range uni.transmitters {
-			accounts = append(accounts, ocrtypes.Account(tm.From.Hex()))
+			accounts = append(accounts, ocrtypes.Account(ocr3impls.EncodeTransmitter(masterChain, ocrtypes.Account(tm.From.Hex()))))
 		}
 		return accounts
 	}()
@@ -272,7 +272,8 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 	expectedTransmitters := func() []ocrtypes.Account {
 		var accounts []ocrtypes.Account
 		for i := range uni1.transmitters {
-			t1, t2 := uni1.transmitters[i].From.Hex(), uni2.transmitters[i].From.Hex()
+			t1 := ocr3impls.EncodeTransmitter(masterChain, ocrtypes.Account(uni1.transmitters[i].From.Hex()))
+			t2 := ocr3impls.EncodeTransmitter(secondChain, ocrtypes.Account(uni2.transmitters[i].From.Hex()))
 			accounts = append(accounts, ocrtypes.Account(ocr3impls.JoinTransmitters([]string{t1, t2})))
 		}
 		return accounts

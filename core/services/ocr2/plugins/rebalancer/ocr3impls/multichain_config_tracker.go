@@ -49,7 +49,7 @@ func init() {
 	ConfigSet = defaultABI.Events["ConfigSet"].ID
 }
 
-type CombinerFn func(masterConfig ocrtypes.ContractConfig, followerConfigs []ocrtypes.ContractConfig) (ocrtypes.ContractConfig, error)
+type CombinerFn func(masterChain relay.ID, contractConfigs map[relay.ID]ocrtypes.ContractConfig) (ocrtypes.ContractConfig, error)
 
 type multichainConfigTracker struct {
 	services.StateMachine
@@ -249,7 +249,9 @@ func (m *multichainConfigTracker) LatestConfig(ctx context.Context, changedInBlo
 	m.lggr.Infow("LatestConfig from master chain", "latestConfig", masterConfig)
 
 	// check all other chains for their config
-	var followerConfigs []ocrtypes.ContractConfig
+	contractConfigs := map[relay.ID]ocrtypes.ContractConfig{
+		m.masterChain: masterConfig,
+	}
 	for id, lp := range m.logPollers {
 		if id == m.masterChain {
 			continue
@@ -264,11 +266,11 @@ func (m *multichainConfigTracker) LatestConfig(ctx context.Context, changedInBlo
 		if err2 != nil {
 			return ocrtypes.ContractConfig{}, err2
 		}
-		followerConfigs = append(followerConfigs, configSet)
+		contractConfigs[id] = configSet
 	}
 
 	// at this point we can combine the configs into a single one
-	combined, err := m.combiner(masterConfig, followerConfigs)
+	combined, err := m.combiner(m.masterChain, contractConfigs)
 	if err != nil {
 		return ocrtypes.ContractConfig{}, fmt.Errorf("error combining configs: %w", err)
 	}

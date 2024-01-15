@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/chains/evmutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -200,8 +201,10 @@ func newRebalancerConfigProvider(
 	}
 
 	digester := ocr3impls.MultichainConfigDigester{
-		ChainID:         masterChain.ID().Uint64(),
-		ContractAddress: contractAddress,
+		MasterChainDigester: evmutil.EVMOffchainConfigDigester{
+			ChainID:         masterChain.ID().Uint64(),
+			ContractAddress: contractAddress,
+		},
 	}
 
 	return newConfigWatcher(
