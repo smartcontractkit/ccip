@@ -40,26 +40,22 @@ func initOrCloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinde
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0: // Versions are identical
 		cs, err := v1_0_0.NewCommitStore(lggr, address, ec, lp, estimator)
-		if err == nil && closeReader {
+		if err != nil {
+			return nil, err
+		}
+		if closeReader {
 			return nil, cs.Close(pgOpts...)
 		}
-		if err == nil {
-			if errFilters := cs.RegisterFilters(pgOpts...); errFilters != nil {
-				return nil, errFilters
-			}
-		}
-		return cs, err
+		return cs, cs.RegisterFilters(pgOpts...)
 	case ccipdata.V1_2_0, ccipdata.V1_3_0:
 		cs, err := v1_2_0.NewCommitStore(lggr, address, ec, lp, estimator)
-		if err == nil && closeReader {
+		if err != nil {
+			return nil, err
+		}
+		if closeReader {
 			return nil, cs.Close(pgOpts...)
 		}
-		if err == nil {
-			if errFilters := cs.RegisterFilters(pgOpts...); errFilters != nil {
-				return nil, errFilters
-			}
-		}
-		return cs, err
+		return cs, cs.RegisterFilters(pgOpts...)
 	default:
 		return nil, errors.Errorf("unsupported commit store version %v", version.String())
 	}

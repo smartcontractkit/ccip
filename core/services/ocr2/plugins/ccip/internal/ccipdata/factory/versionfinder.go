@@ -8,6 +8,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
+// VersionFinder accepts a contract address and a client and performs an on-chain call to
+// determine the contract type.
 type VersionFinder interface {
 	TypeAndVersion(addr common.Address, client bind.ContractBackend) (config.ContractType, semver.Version, error)
 }

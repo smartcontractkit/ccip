@@ -41,26 +41,22 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
 		offRamp, err := v1_0_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
-		if err == nil && closeReader {
+		if err != nil {
+			return nil, err
+		}
+		if closeReader {
 			return nil, offRamp.Close(pgOpts...)
 		}
-		if err == nil && registerFilters {
-			if errFilters := offRamp.RegisterFilters(pgOpts...); errFilters != nil {
-				return nil, errFilters
-			}
-		}
-		return offRamp, err
+		return offRamp, offRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_2_0, ccipdata.V1_3_0:
 		offRamp, err := v1_2_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
-		if err == nil && closeReader {
+		if err != nil {
+			return nil, err
+		}
+		if closeReader {
 			return nil, offRamp.Close(pgOpts...)
 		}
-		if err == nil && registerFilters {
-			if errFilters := offRamp.RegisterFilters(pgOpts...); errFilters != nil {
-				return nil, errFilters
-			}
-		}
-		return offRamp, err
+		return offRamp, offRamp.RegisterFilters(pgOpts...)
 	default:
 		return nil, errors.Errorf("unsupported offramp version %v", version.String())
 	}
