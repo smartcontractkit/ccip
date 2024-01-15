@@ -198,6 +198,9 @@ func newTestUniverse(t *testing.T) {
 	t.Log("adding bootstrap node job")
 	err = bootstrapNode.app.Start(ctx)
 	require.NoError(t, err, "failed to start bootstrap node")
+	t.Cleanup(func() {
+		require.NoError(t, bootstrapNode.app.Stop())
+	})
 
 	evmChains := bootstrapNode.app.GetRelayers().LegacyEVMChains()
 	require.NotNil(t, evmChains)
@@ -228,6 +231,10 @@ fromBlock = %d
 		}
 		err = apps[i].Start(testutils.Context(t))
 		require.NoError(t, err)
+		tapp := apps[i]
+		t.Cleanup(func() {
+			require.NoError(t, tapp.Stop())
+		})
 
 		jobSpec := fmt.Sprintf(
 			`
