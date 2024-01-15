@@ -113,9 +113,7 @@ func TestMultichainConfigTracker_SingleChain(t *testing.T) {
 	db := pgtest.NewSqlxDB(t)
 	lp, uni := setupLogPoller[struct{}](t, db, nil)
 	require.NoError(t, lp.Start(testutils.Context(t)))
-	t.Cleanup(func() {
-		require.NoError(t, lp.Close())
-	})
+	t.Cleanup(func() { require.NoError(t, lp.Close()) })
 
 	masterChain := relay.ID{
 		Network: relay.EVM,
@@ -198,7 +196,7 @@ func TestMultichainConfigTracker_Multichain(t *testing.T) {
 		require.NoError(t, lp2.Close())
 	})
 
-	// give enough finality for the follower chain
+	// finality depth
 	uni2.backend.Commit()
 	uni2.backend.Commit()
 
