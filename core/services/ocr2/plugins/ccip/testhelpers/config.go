@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
@@ -64,16 +63,16 @@ func (c *CCIPContracts) CreateDefaultExecOffchainConfig(t *testing.T) []byte {
 }
 
 func (c *CCIPContracts) createExecOffchainConfig(t *testing.T, inflightCacheExpiry time.Duration, rootSnoozeTime time.Duration) []byte {
-	config, err := ccipconfig.EncodeOffchainConfig(v1_0_0.ExecOffchainConfig{
-		SourceFinalityDepth:         1,
-		DestOptimisticConfirmations: 1,
-		DestFinalityDepth:           1,
-		BatchGasLimit:               5_000_000,
-		RelativeBoostPerWaitHour:    0.07,
-		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(inflightCacheExpiry),
-		RootSnoozeTime:              models.MustMakeDuration(rootSnoozeTime),
-	})
+	config, err := NewExecOffchainConfig(
+		1,
+		1,
+		1,
+		5_000_000,
+		0.07,
+		200e9,
+		models.MustMakeDuration(inflightCacheExpiry),
+		models.MustMakeDuration(rootSnoozeTime),
+	).Encode()
 	require.NoError(t, err)
 	return config
 }
