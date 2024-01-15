@@ -286,10 +286,10 @@ func newTestUniverse(t *testing.T, numChains int) {
 
 	t.Log("adding bootstrap node job")
 	err := bootstrapNode.app.Start(testutils.Context(t))
+	require.NoError(t, err, "failed to start bootstrap node")
 	t.Cleanup(func() {
 		require.NoError(t, bootstrapNode.app.Stop())
 	})
-	require.NoError(t, err, "failed to start bootstrap node")
 
 	evmChains := bootstrapNode.app.GetRelayers().LegacyEVMChains()
 	require.NotNil(t, evmChains)
