@@ -176,6 +176,14 @@ func newRebalancerConfigProvider(
 		logPollers[relay.NewID(relay.EVM, chain.ID().String())] = chain.LogPoller()
 	}
 
+	// sanity check that all chains specified in RelayConfig.fromBlocks are present
+	for chainID := range relayConfig.FromBlocks {
+		_, err2 := chains.Get(chainID)
+		if err2 != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get chain %s specified in RelayConfig.fromBlocks: %w", chainID, err2)
+		}
+	}
+
 	contractAddress := common.HexToAddress(rargs.ContractID)
 
 	mcct, err := ocr3impls.NewMultichainConfigTracker(
@@ -186,14 +194,17 @@ func newRebalancerConfigProvider(
 		contractAddress,
 		lmFactory,
 		ocr3impls.TransmitterCombiner,
+		relayConfig.FromBlocks,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create multichain config tracker: %w", err)
 	}
 
-	digester := evmutil.EVMOffchainConfigDigester{
-		ChainID:         masterChain.ID().Uint64(),
-		ContractAddress: contractAddress,
+	digester := ocr3impls.MultichainConfigDigester{
+		MasterChainDigester: evmutil.EVMOffchainConfigDigester{
+			ChainID:         masterChain.ID().Uint64(),
+			ContractAddress: contractAddress,
+		},
 	}
 
 	return newConfigWatcher(

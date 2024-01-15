@@ -43,7 +43,7 @@ const (
 
 func (n NetworkSelector) Type() NetworkType {
 	switch n {
-	case 1, 2, 3, 1337: // todo: use some lib
+	case 1, 2, 3, 1337, 1338, 1339, 1340: // todo: use some lib
 		return NetworkTypeEvm
 	case 4:
 		return NetworkTypeSolana
