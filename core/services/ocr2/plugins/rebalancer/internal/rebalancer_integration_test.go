@@ -18,7 +18,7 @@ import (
 	"github.com/test-go/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/no_op_ocr3"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/dummy_liquidity_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -132,11 +132,11 @@ func newTestUniverse(t *testing.T) {
 	}, 30e6)
 
 	// deploy the ocr3 contract
-	addr, _, _, err := no_op_ocr3.DeployNoOpOCR3(owner, mainBackend)
-	require.NoError(t, err, "failed to deploy NoOpOCR3 contract")
+	addr, _, _, err := dummy_liquidity_manager.DeployDummyLiquidityManager(owner, mainBackend, testutils.SimulatedChainID.Uint64())
+	require.NoError(t, err, "failed to deploy DummyLiquidityManager contract")
 	mainBackend.Commit()
-	wrapper, err := no_op_ocr3.NewNoOpOCR3(addr, mainBackend)
-	require.NoError(t, err, "failed to create NoOpOCR3 wrapper")
+	wrapper, err := dummy_liquidity_manager.NewDummyLiquidityManager(addr, mainBackend)
+	require.NoError(t, err, "failed to create DummyLiquidityManager wrapper")
 
 	t.Log("Creating bootstrap node")
 	bootstrapNodePort := freeport.GetOne(t)
@@ -198,6 +198,9 @@ func newTestUniverse(t *testing.T) {
 	t.Log("adding bootstrap node job")
 	err = bootstrapNode.app.Start(ctx)
 	require.NoError(t, err, "failed to start bootstrap node")
+	t.Cleanup(func() {
+		require.NoError(t, bootstrapNode.app.Stop())
+	})
 
 	evmChains := bootstrapNode.app.GetRelayers().LegacyEVMChains()
 	require.NotNil(t, evmChains)
@@ -228,6 +231,10 @@ fromBlock = %d
 		}
 		err = apps[i].Start(testutils.Context(t))
 		require.NoError(t, err)
+		tapp := apps[i]
+		t.Cleanup(func() {
+			require.NoError(t, tapp.Stop())
+		})
 
 		jobSpec := fmt.Sprintf(
 			`
@@ -272,7 +279,7 @@ checkSourceDestEqual = false
 
 	t.Log("waiting for a transmission")
 	start := uint64(1)
-	sink := make(chan *no_op_ocr3.NoOpOCR3Transmitted)
+	sink := make(chan *dummy_liquidity_manager.DummyLiquidityManagerTransmitted)
 	sub, err := wrapper.WatchTransmitted(&bind.WatchOpts{
 		Start: &start,
 	}, sink)
@@ -290,13 +297,18 @@ outer:
 		}
 	}
 
+	// cleanly shut down apps so that we don't get a "log after test finish" panic
+	for _, app := range apps {
+		require.NoError(t, app.Stop(), "failed to stop app")
+	}
+
 	t.Log("done")
 }
 
 func setRebalancerConfig(
 	t *testing.T,
 	owner *bind.TransactOpts,
-	wrapper *no_op_ocr3.NoOpOCR3,
+	wrapper *dummy_liquidity_manager.DummyLiquidityManager,
 	mainBackend *backends.SimulatedBackend,
 	onchainPubKeys,
 	effectiveTransmitters []common.Address,
