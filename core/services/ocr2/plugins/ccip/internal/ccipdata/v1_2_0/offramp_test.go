@@ -28,71 +28,82 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 		RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
 	}
 
-	tests := map[string]struct {
+	tests := []struct {
+		name       string
 		want       ExecOffchainConfig
 		errPattern string
 	}{
-		"legacy offchain config format parses": {
+		{
+			name: "legacy offchain config format parses",
 			want: validConfig,
 		},
-		"can omit finality depth": {
+		{
+			name: "can omit finality depth",
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.SourceFinalityDepth = 0
 				c.DestFinalityDepth = 0
 			}),
 		},
-		"can set the DestMaxGasPrice": {
+		{
+			name: "can set the DestMaxGasPrice",
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.MaxGasPrice = 0
 				c.DestMaxGasPrice = 200e9
 			}),
 		},
-		"must set DestMaxGasPrice": {
+		{
+			name: "must set DestMaxGasPrice",
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.MaxGasPrice = 0
 				c.DestMaxGasPrice = 0
 			}),
 			errPattern: "DestMaxGasPrice",
 		},
-		"cannot set both MaxGasPrice and DestMaxGasPrice": {
+		{
+			name: "cannot set both MaxGasPrice and DestMaxGasPrice",
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.DestMaxGasPrice = c.MaxGasPrice
 			}),
 			errPattern: "MaxGasPrice and DestMaxGasPrice",
 		},
-		"must set BatchGasLimit": {
+		{
+			name: "must set BatchGasLimit",
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.BatchGasLimit = 0
 			}),
 			errPattern: "BatchGasLimit",
 		},
-		"must set DestOptimisticConfirmations": {
+		{
+			name: "must set DestOptimisticConfirmations",
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.DestOptimisticConfirmations = 0
 			}),
 			errPattern: "DestOptimisticConfirmations",
 		},
-		"must set RelativeBoostPerWaitHour": {
+		{
+			name: "must set RelativeBoostPerWaitHour",
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.RelativeBoostPerWaitHour = 0
 			}),
 			errPattern: "RelativeBoostPerWaitHour",
 		},
-		"must set InflightCacheExpiry": {
+		{
+			name: "must set InflightCacheExpiry",
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.InflightCacheExpiry = models.MustMakeDuration(0)
 			}),
 			errPattern: "InflightCacheExpiry",
 		},
-		"must set RootSnoozeTime": {
+		{
+			name: "must set RootSnoozeTime",
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.RootSnoozeTime = models.MustMakeDuration(0)
 			}),
 			errPattern: "RootSnoozeTime",
 		},
 	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			exp := tc.want
 			encode, err := ccipconfig.EncodeOffchainConfig(&exp)
 			require.NoError(t, err)

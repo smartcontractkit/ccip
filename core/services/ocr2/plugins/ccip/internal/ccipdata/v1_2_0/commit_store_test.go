@@ -72,71 +72,82 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 
 	require.NoError(t, validConfig.Validate())
 
-	tests := map[string]struct {
+	tests := []struct {
+		name       string
 		want       CommitOffchainConfig
 		errPattern string
 	}{
-		"legacy offchain config format parses": {
+		{
+			name: "legacy offchain config format parses",
 			want: validConfig,
 		},
-		"can omit finality depth": {
+		{
+			name: "can omit finality depth",
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.SourceFinalityDepth = 0
 				c.DestFinalityDepth = 0
 			}),
 		},
-		"can set the SourceMaxGasPrice": {
+		{
+			name: "can set the SourceMaxGasPrice",
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.MaxGasPrice = 0
 				c.SourceMaxGasPrice = 200e9
 			}),
 		},
-		"must set SourceMaxGasPrice": {
+		{
+			name: "must set SourceMaxGasPrice",
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.MaxGasPrice = 0
 				c.SourceMaxGasPrice = 0
 			}),
 			errPattern: "SourceMaxGasPrice",
 		},
-		"cannot set both MaxGasPrice and SourceMaxGasPrice": {
+		{
+			name: "cannot set both MaxGasPrice and SourceMaxGasPrice",
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.SourceMaxGasPrice = c.MaxGasPrice
 			}),
 			errPattern: "MaxGasPrice and SourceMaxGasPrice",
 		},
-		"must set GasPriceHeartBeat": {
+		{
+			name: "must set GasPriceHeartBeat",
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.GasPriceHeartBeat = models.MustMakeDuration(0)
 			}),
 			errPattern: "GasPriceHeartBeat",
 		},
-		"must set ExecGasPriceDeviationPPB": {
+		{
+			name: "must set ExecGasPriceDeviationPPB",
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.ExecGasPriceDeviationPPB = 0
 			}),
 			errPattern: "ExecGasPriceDeviationPPB",
 		},
-		"must set TokenPriceHeartBeat": {
+		{
+			name: "must set TokenPriceHeartBeat",
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.TokenPriceHeartBeat = models.MustMakeDuration(0)
 			}),
 			errPattern: "TokenPriceHeartBeat",
 		},
-		"must set TokenPriceDeviationPPB": {
+		{
+			name: "must set TokenPriceDeviationPPB",
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.TokenPriceDeviationPPB = 0
 			}),
 			errPattern: "TokenPriceDeviationPPB",
 		},
-		"must set InflightCacheExpiry": {
+		{
+			name: "must set InflightCacheExpiry",
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.InflightCacheExpiry = models.MustMakeDuration(0)
 			}),
 			errPattern: "InflightCacheExpiry",
 		},
 	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			exp := tc.want
 			encode, err := ccipconfig.EncodeOffchainConfig(&exp)
 			require.NoError(t, err)
