@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {OCR3Setup} from "./OCR3Setup.t.sol";
-import {OCR3Base} from "../../../rebalancer/ocr/OCR3Base.sol";
+import {OCR3Base} from "../../ocr/OCR3Base.sol";
 import {OCR3Helper} from "../helpers/OCR3Helper.sol";
 
 contract OCR3BaseSetup is OCR3Setup {

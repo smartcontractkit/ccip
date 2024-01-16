@@ -23,12 +23,9 @@ compileContract () {
   local contract
   contract=$(basename "$1" ".sol")
 
-  solc @arbitrum/="$ROOT"/contracts/node_modules/@arbitrum/ \
-       @eth-optimism/="$ROOT"/contracts/node_modules/@eth-optimism/ \
-       @openzeppelin/="$ROOT"/contracts/node_modules/@openzeppelin/ \
-       --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS --metadata-hash none \
+  solc --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS --metadata-hash none \
       -o "$ROOT"/contracts/solc/v$SOLC_VERSION/"$contract" \
-      --abi --bin --allow-paths "$ROOT"/contracts/src/v0.8,"$ROOT"/contracts/node_modules \
+     --abi --bin --allow-paths "$ROOT"/contracts/src/v0.8 \
       "$ROOT"/contracts/src/v0.8/"$1"
 }
 
@@ -70,12 +67,3 @@ compileContract ccip/test/rebalancer/DummyLiquidityManager.sol
 
 # Customer contracts
 compileContract ccip/pools/USDC/USDCTokenPool.sol
-
-# Liquidity Management
-compileContract ccip/pools/liquidity/LiquidityManager.sol
-compileContract ccip/pools/liquidity/ArbitrumL1BridgeAdapter.sol
-compileContract ccip/pools/liquidity/ArbitrumL2BridgeAdapter.sol
-compileContract ccip/pools/liquidity/OptimismL1BridgeAdapter.sol
-compileContract ccip/pools/liquidity/OptimismL2BridgeAdapter.sol
-
-
