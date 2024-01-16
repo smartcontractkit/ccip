@@ -9,9 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- OffRamp offchain config format changed:
+- `OffRamp` offchain config format changed:
   - Renamed the `MaxGasPrice` field to `DestMaxGasPrice`.
   - Removed obsolete `SourceFinalityDepth` and `DestFinalityDepth` fields.
+
+  This change is not breaking: the config decoder still accepts old field names.
+
+- `CommitStore` offchain config format changed:
+  - Renamed the `MaxGasPrice` field to `SourceMaxGasPrice`.
+  - Removed obsolete `SourceFinalityDepth` and `DestFinalityDepth` fields.
+
+  This change is not breaking: the config decoder still accepts old field names.
 
 ## 1.2.0 - 2023-11-20
 

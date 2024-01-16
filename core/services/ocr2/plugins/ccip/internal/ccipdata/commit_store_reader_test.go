@@ -210,19 +210,19 @@ func TestCommitStoreReaders(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	sourceFinalityDepth := uint32(1)
+	destFinalityDepth := uint32(2)
 	commonOffchain := ccipdata.CommitOffchainConfig{
-		SourceFinalityDepth:    1,
 		GasPriceDeviationPPB:   1e6,
 		GasPriceHeartBeat:      1 * time.Hour,
 		TokenPriceDeviationPPB: 1e6,
 		TokenPriceHeartBeat:    1 * time.Hour,
 		InflightCacheExpiry:    3 * time.Hour,
-		DestFinalityDepth:      2,
 	}
 	maxGas := uint64(1e9)
 	offchainConfig, err := ccipconfig.EncodeOffchainConfig[v1_0_0.CommitOffchainConfig](v1_0_0.CommitOffchainConfig{
-		SourceFinalityDepth:   commonOffchain.SourceFinalityDepth,
-		DestFinalityDepth:     commonOffchain.DestFinalityDepth,
+		SourceFinalityDepth:   sourceFinalityDepth,
+		DestFinalityDepth:     destFinalityDepth,
 		FeeUpdateHeartBeat:    models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
 		FeeUpdateDeviationPPB: commonOffchain.GasPriceDeviationPPB,
 		MaxGasPrice:           maxGas,
@@ -236,8 +236,8 @@ func TestCommitStoreReaders(t *testing.T) {
 	})
 	require.NoError(t, err)
 	offchainConfig2, err := ccipconfig.EncodeOffchainConfig[v1_2_0.CommitOffchainConfig](v1_2_0.CommitOffchainConfig{
-		SourceFinalityDepth:      commonOffchain.SourceFinalityDepth,
-		DestFinalityDepth:        commonOffchain.DestFinalityDepth,
+		SourceFinalityDepth:      sourceFinalityDepth,
+		DestFinalityDepth:        destFinalityDepth,
 		MaxGasPrice:              maxGas,
 		GasPriceHeartBeat:        models.MustMakeDuration(commonOffchain.GasPriceHeartBeat),
 		DAGasPriceDeviationPPB:   1e7,

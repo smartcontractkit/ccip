@@ -180,16 +180,11 @@ type CommitOffchainConfig struct {
 	TokenPriceHeartBeat      models.Duration
 	TokenPriceDeviationPPB   uint32
 	MaxGasPrice              uint64
+	SourceMaxGasPrice        uint64
 	InflightCacheExpiry      models.Duration
 }
 
 func (c CommitOffchainConfig) Validate() error {
-	if c.SourceFinalityDepth == 0 {
-		return errors.New("must set SourceFinalityDepth")
-	}
-	if c.DestFinalityDepth == 0 {
-		return errors.New("must set DestFinalityDepth")
-	}
 	if c.GasPriceHeartBeat.Duration() == 0 {
 		return errors.New("must set GasPriceHeartBeat")
 	}
@@ -202,8 +197,11 @@ func (c CommitOffchainConfig) Validate() error {
 	if c.TokenPriceDeviationPPB == 0 {
 		return errors.New("must set TokenPriceDeviationPPB")
 	}
-	if c.MaxGasPrice == 0 {
-		return errors.New("must set MaxGasPrice")
+	if c.SourceMaxGasPrice == 0 && c.MaxGasPrice == 0 {
+		return errors.New("must set SourceMaxGasPrice")
+	}
+	if c.SourceMaxGasPrice != 0 && c.MaxGasPrice != 0 {
+		return errors.New("cannot set both MaxGasPrice and SourceMaxGasPrice")
 	}
 	if c.InflightCacheExpiry.Duration() == 0 {
 		return errors.New("must set InflightCacheExpiry")
@@ -211,6 +209,13 @@ func (c CommitOffchainConfig) Validate() error {
 	// DAGasPriceDeviationPPB is not validated because it can be 0 on non-rollups
 
 	return nil
+}
+
+func (c *CommitOffchainConfig) ComputeSourceMaxGasPrice() uint64 {
+	if c.SourceMaxGasPrice != 0 {
+		return c.SourceMaxGasPrice
+	}
+	return c.MaxGasPrice
 }
 
 func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, error) {
@@ -228,18 +233,16 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 	c.lggr.Infow("Initializing NewDAGasPriceEstimator", "estimator", c.estimator, "l1Oracle", c.estimator.L1Oracle())
 	c.gasPriceEstimator = prices.NewDAGasPriceEstimator(
 		c.estimator,
-		big.NewInt(int64(offchainConfigParsed.MaxGasPrice)),
+		big.NewInt(int64(offchainConfigParsed.ComputeSourceMaxGasPrice())),
 		int64(offchainConfigParsed.ExecGasPriceDeviationPPB),
 		int64(offchainConfigParsed.DAGasPriceDeviationPPB),
 	)
 	c.offchainConfig = ccipdata.NewCommitOffchainConfig(
-		offchainConfigParsed.SourceFinalityDepth,
 		offchainConfigParsed.ExecGasPriceDeviationPPB,
 		offchainConfigParsed.GasPriceHeartBeat.Duration(),
 		offchainConfigParsed.TokenPriceDeviationPPB,
 		offchainConfigParsed.TokenPriceHeartBeat.Duration(),
 		offchainConfigParsed.InflightCacheExpiry.Duration(),
-		offchainConfigParsed.DestFinalityDepth,
 	)
 	c.configMu.Unlock()
 
