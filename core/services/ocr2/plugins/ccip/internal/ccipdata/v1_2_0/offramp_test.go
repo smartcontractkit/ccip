@@ -16,6 +16,7 @@ func modifyCopy[T any](c T, f func(c *T)) T {
 }
 
 func TestExecOffchainConfig120_Encoding(t *testing.T) {
+	t.Parallel()
 	validConfig := ExecOffchainConfig{
 		SourceFinalityDepth:         3,
 		DestOptimisticConfirmations: 6,
@@ -128,6 +129,7 @@ func TestExecOffchainConfig120_MaxGasPrice(t *testing.T) {
 }
 
 func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
+	t.Parallel()
 	decoded, err := ccipconfig.DecodeOffchainConfig[ExecOffchainConfig]([]byte(`{
 		"DestOptimisticConfirmations": 6,
 		"BatchGasLimit": 5000000,

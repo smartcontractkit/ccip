@@ -18,6 +18,7 @@ import (
 )
 
 func TestCommitReportEncoding(t *testing.T) {
+	t.Parallel()
 	report := ccipdata.CommitStoreReport{
 		TokenPrices: []ccipdata.TokenPrice{
 			{
@@ -56,6 +57,7 @@ func TestCommitReportEncoding(t *testing.T) {
 }
 
 func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
+	t.Parallel()
 	validConfig := CommitOffchainConfig{
 		SourceFinalityDepth:      3,
 		DestFinalityDepth:        4,
