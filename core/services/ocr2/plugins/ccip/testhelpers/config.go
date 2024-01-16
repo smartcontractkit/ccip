@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
@@ -30,17 +29,17 @@ func (c *CCIPContracts) CreateDefaultCommitOffchainConfig(t *testing.T) []byte {
 }
 
 func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBeat time.Duration, inflightCacheExpiry time.Duration) []byte {
-	config, err := ccipconfig.EncodeOffchainConfig(v1_2_0.CommitOffchainConfig{
-		SourceFinalityDepth:      1,
-		DestFinalityDepth:        1,
-		GasPriceHeartBeat:        models.MustMakeDuration(feeUpdateHearBeat),
-		DAGasPriceDeviationPPB:   1,
-		ExecGasPriceDeviationPPB: 1,
-		TokenPriceHeartBeat:      models.MustMakeDuration(feeUpdateHearBeat),
-		TokenPriceDeviationPPB:   1,
-		MaxGasPrice:              200e9,
-		InflightCacheExpiry:      models.MustMakeDuration(inflightCacheExpiry),
-	})
+	config, err := NewCommitOffchainConfig(
+		1,
+		1,
+		models.MustMakeDuration(feeUpdateHearBeat),
+		1,
+		1,
+		models.MustMakeDuration(feeUpdateHearBeat),
+		1,
+		200e9,
+		models.MustMakeDuration(inflightCacheExpiry),
+	).Encode()
 	require.NoError(t, err)
 	return config
 }

@@ -83,6 +83,10 @@ type CommitOffchainConfig struct {
 	v1_2_0.CommitOffchainConfig
 }
 
+func (c CommitOffchainConfig) Encode() ([]byte, error) {
+	return ccipconfig.EncodeOffchainConfig(c.CommitOffchainConfig)
+}
+
 func NewCommitOffchainConfig(SourceFinalityDepth uint32,
 	DestFinalityDepth uint32,
 	GasPriceHeartBeat models.Duration,
@@ -93,14 +97,12 @@ func NewCommitOffchainConfig(SourceFinalityDepth uint32,
 	MaxGasPrice uint64,
 	InflightCacheExpiry models.Duration) CommitOffchainConfig {
 	return CommitOffchainConfig{v1_2_0.CommitOffchainConfig{
-		SourceFinalityDepth:      SourceFinalityDepth,
-		DestFinalityDepth:        DestFinalityDepth,
 		GasPriceHeartBeat:        GasPriceHeartBeat,
 		DAGasPriceDeviationPPB:   DAGasPriceDeviationPPB,
 		ExecGasPriceDeviationPPB: ExecGasPriceDeviationPPB,
 		TokenPriceHeartBeat:      TokenPriceHeartBeat,
 		TokenPriceDeviationPPB:   TokenPriceDeviationPPB,
-		MaxGasPrice:              MaxGasPrice,
+		SourceMaxGasPrice:        MaxGasPrice,
 		InflightCacheExpiry:      InflightCacheExpiry,
 	}}
 }
