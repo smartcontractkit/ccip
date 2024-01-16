@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {OCR3Base} from "../../ocr/OCR3Base.sol";
+import {OCR3Base} from "../../../rebalancer/ocr/OCR3Base.sol";
 
 contract OCR3Helper is OCR3Base {
   function configDigestFromConfigData(

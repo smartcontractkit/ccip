@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IBridgeAdapter} from "./interfaces/IBridge.sol";
-import {IWrappedNative} from "../../interfaces/IWrappedNative.sol";
+import {IBridgeAdapter} from "../interfaces/IBridge.sol";
+import {IWrappedNative} from "../../ccip/interfaces/IWrappedNative.sol";
 
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface IArbSys {
   function withdrawEth(address destination) external payable returns (uint256);

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IWrappedNative} from "../../../interfaces/IWrappedNative.sol";
+import {IWrappedNative} from "../../../ccip/interfaces/IWrappedNative.sol";
 
-import {ArbitrumL1BridgeAdapter, IOutbox} from "../../../pools/liquidity/ArbitrumL1BridgeAdapter.sol";
+import {ArbitrumL1BridgeAdapter, IOutbox} from "../../bridge-adapters/ArbitrumL1BridgeAdapter.sol";
 import "forge-std/Test.sol";
 
 import {IL1GatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
 import {IGatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/libraries/gateway/IGatewayRouter.sol";
-import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 //contract ArbitrumL1BridgeAdapterSetup is Test {
 //  uint256 internal mainnetFork;

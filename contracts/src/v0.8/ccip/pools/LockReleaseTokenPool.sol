@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {ITypeAndVersion} from "../../shared/interfaces/ITypeAndVersion.sol";
-import {ILiquidityContainer} from "../../liquidity-manager/interfaces/ILiquidityContainer.sol";
+import {ILiquidityContainer} from "../../rebalancer/interfaces/ILiquidityContainer.sol";
 
 import {TokenPool} from "./TokenPool.sol";
 

@@ -1,0 +1,10 @@
+// Package gethwrappers_ccip provides tools for wrapping solidity contracts with
+// golang packages, using abigen.
+package rebalancer
+
+// Liquidity management contracts
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/LiquidityManager/LiquidityManager.abi ../../../contracts/solc/v0.8.19/LiquidityManager/LiquidityManager.bin LiquidityManager liquidity_manager
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.abi ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.bin ArbitrumL1BridgeAdapter arbitrum_l1_bridge_adapter
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/ArbitrumL2BridgeAdapter/ArbitrumL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/ArbitrumL2BridgeAdapter/ArbitrumL2BridgeAdapter.bin ArbitrumL2BridgeAdapter arbitrum_l2_bridge_adapter
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/OptimismL1BridgeAdapter/OptimismL1BridgeAdapter.abi ../../../contracts/solc/v0.8.19/OptimismL1BridgeAdapter/OptimismL1BridgeAdapter.bin OptimismL1BridgeAdapter optimism_l1_bridge_adapter
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/OptimismL2BridgeAdapter/OptimismL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/OptimismL2BridgeAdapter/OptimismL2BridgeAdapter.bin OptimismL2BridgeAdapter optimism_l2_bridge_adapter

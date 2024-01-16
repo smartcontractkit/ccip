@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IBridgeAdapter, IL1BridgeAdapter} from "../../../pools/liquidity/interfaces/IBridge.sol";
-import {ILiquidityManager} from "../../../pools/liquidity/interfaces/ILiquidityManager.sol";
+import {IBridgeAdapter, IL1BridgeAdapter} from "../interfaces/IBridge.sol";
+import {ILiquidityManager} from "../interfaces/ILiquidityManager.sol";
 
-import {LockReleaseTokenPool} from "../../../pools/LockReleaseTokenPool.sol";
-import {LiquidityManager} from "../../../pools/liquidity/LiquidityManager.sol";
-import {MockL1BridgeAdapter} from "../../mocks/MockBridgeAdapter.sol";
-import {LiquidityBaseTest} from "./LiquidityBaseTest.sol";
+import {LockReleaseTokenPool} from "../../ccip/pools/LockReleaseTokenPool.sol";
+import {LiquidityManager} from "../LiquidityManager.sol";
+import {MockL1BridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
+import {RebalancerBaseTest} from "./RebalancerBaseTest.sol";
 
-import {ERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
-import {IERC20} from "../../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {ERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-contract LiquidityManagerSetup is LiquidityBaseTest {
+contract LiquidityManagerSetup is RebalancerBaseTest {
   event LiquidityTransferred(
     uint64 indexed ocrSeqNum,
     uint64 indexed fromChainSelector,
@@ -26,7 +26,7 @@ contract LiquidityManagerSetup is LiquidityBaseTest {
   MockL1BridgeAdapter internal s_bridgeAdapter;
 
   function setUp() public override {
-    LiquidityBaseTest.setUp();
+    RebalancerBaseTest.setUp();
 
     s_bridgeAdapter = new MockL1BridgeAdapter(s_l1Token);
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_l1Token, new address[](0), address(1), true);

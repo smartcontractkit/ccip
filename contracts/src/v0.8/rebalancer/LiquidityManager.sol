@@ -3,12 +3,12 @@ pragma solidity 0.8.19;
 
 import {IBridgeAdapter} from "./interfaces/IBridge.sol";
 import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
-import {ILiquidityContainer} from "../../../liquidity-manager/interfaces/ILiquidityContainer.sol";
+import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
 
-import {OCR3Base} from "../../ocr/OCR3Base.sol";
+import {OCR3Base} from "./ocr/OCR3Base.sol";
 
-import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @notice Liquidity manager for a single token over multiple chains.
 /// @dev This contract is designed to be used with the LockReleaseTokenPool contract but
