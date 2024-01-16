@@ -36,6 +36,12 @@ package ccip
 //go:generate mockery --quiet --dir ./generated/price_registry/ --name PriceRegistryInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 //go:generate mockery --quiet --dir ../generated/link_token_interface/ --name LinkTokenInterface --output ./mocks/ --outpkg mock_contracts --case=underscore
 
+// Liquidity management contracts
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/LiquidityManager/LiquidityManager.abi ../../../contracts/solc/v0.8.19/LiquidityManager/LiquidityManager.bin LiquidityManager liquidity_manager
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MockBridgeAdapter/MockL1BridgeAdapter.abi ../../../contracts/solc/v0.8.19/MockBridgeAdapter/MockL1BridgeAdapter.bin MockL1BridgeAdapter mock_l1_bridge_adapter
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MockBridgeAdapter/MockL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/MockBridgeAdapter/MockL2BridgeAdapter.bin MockL2BridgeAdapter mock_l2_bridge_adapter
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/TestOnlyLiquidityManager/TestOnlyLiquidityManager.abi ../../../contracts/solc/v0.8.19/TestOnlyLiquidityManager/TestOnlyLiquidityManager.bin TestOnlyLiquidityManager testonly_liquidity_manager
+
 // To run these commands, you must either install docker, or the correct version
 // of abigen. The latter can be installed with these commands, at least on linux:
 //

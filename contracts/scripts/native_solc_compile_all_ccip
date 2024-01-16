@@ -64,6 +64,11 @@ compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 compileContract ccip/test/mocks/MockARM.sol
 compileContract ccip/test/WETH9.sol
 compileContract ccip/test/rebalancer/DummyLiquidityManager.sol
+compileContract ccip/test/mocks/MockBridgeAdapter.sol
 
 # Customer contracts
 compileContract ccip/pools/USDC/USDCTokenPool.sol
+
+# Liquidity Management
+compileContract ccip/pools/liquidity/LiquidityManager.sol
+compileContract ccip/test/liquidity/TestOnlyLiquidityManager.sol
