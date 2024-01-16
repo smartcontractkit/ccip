@@ -89,6 +89,13 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 				c.SourceMaxGasPrice = 200e9
 			}),
 		},
+		"must set SourceMaxGasPrice": {
+			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+				c.MaxGasPrice = 0
+				c.SourceMaxGasPrice = 0
+			}),
+			errPattern: "SourceMaxGasPrice",
+		},
 		"cannot set both MaxGasPrice and SourceMaxGasPrice": {
 			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
 				c.SourceMaxGasPrice = c.MaxGasPrice

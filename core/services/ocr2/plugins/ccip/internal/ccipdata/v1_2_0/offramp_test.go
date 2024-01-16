@@ -46,6 +46,13 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 				c.DestMaxGasPrice = 200e9
 			}),
 		},
+		"must set DestMaxGasPrice": {
+			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+				c.MaxGasPrice = 0
+				c.DestMaxGasPrice = 0
+			}),
+			errPattern: "DestMaxGasPrice",
+		},
 		"cannot set both MaxGasPrice and DestMaxGasPrice": {
 			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
 				c.DestMaxGasPrice = c.MaxGasPrice
