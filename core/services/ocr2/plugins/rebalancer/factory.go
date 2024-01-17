@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
@@ -63,6 +64,8 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 		closePluginTimeout = time.Duration(p.config.ClosePluginTimeoutSec) * time.Second
 	}
 
+	bridgesContainer := bridge.NewContainer()
+
 	return NewPlugin(
 			config.F,
 			closePluginTimeout,
@@ -71,6 +74,7 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 			p.lmFactory,
 			liquidityGraph,
 			liquidityRebalancer,
+			bridgesContainer,
 			p.lggr,
 		),
 		ocr3types.ReportingPluginInfo{

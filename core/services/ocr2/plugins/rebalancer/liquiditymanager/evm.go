@@ -78,7 +78,7 @@ func (e *EvmLiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) 
 	return e.client.GetLiquidity(ctx)
 }
 
-func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error) {
+func (e *EvmLiquidityManager) GetTransfers(ctx context.Context, since time.Time) ([]models.Transfer, error) {
 	logs, err := e.lp.LogsCreatedAfter(
 		e.lmAbi.Events["LiquidityTransferred"].ID,
 		e.addr,
@@ -90,7 +90,7 @@ func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since tim
 		return nil, fmt.Errorf("get logs created after: %w", err)
 	}
 
-	pendingTransfers := make([]models.PendingTransfer, 0, len(logs))
+	transfers := make([]models.Transfer, 0, len(logs))
 
 	for _, log := range logs {
 		liqTransferred, err2 := e.client.ParseLiquidityTransferred(log.ToGethLog())
@@ -98,18 +98,17 @@ func (e *EvmLiquidityManager) GetPendingTransfers(ctx context.Context, since tim
 			return nil, fmt.Errorf("invalid log: %w", err2)
 		}
 
-		tr := models.NewPendingTransfer(models.NewTransfer(
+		transfers = append(transfers, models.NewTransfer(
 			models.NetworkSelector(liqTransferred.FromChainSelector()),
 			models.NetworkSelector(liqTransferred.ToChainSelector()),
 			liqTransferred.Amount(),
 			log.BlockTimestamp,
 		))
-		// tr.Status = models.TransferStatusExecuted // todo: determine the status
-		pendingTransfers = append(pendingTransfers, tr)
 	}
 
-	return pendingTransfers, nil
+	return transfers, nil
 }
+
 func (e EvmLiquidityManager) Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error) {
 	g := liquiditygraph.NewGraph()
 	lms := NewRegistry()

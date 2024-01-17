@@ -19,8 +19,8 @@ type LiquidityManager interface {
 	// GetBalance returns the current token/liquidity balance.
 	GetBalance(ctx context.Context) (*big.Int, error)
 
-	// GetPendingTransfers returns the pending liquidity transfers.
-	GetPendingTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error)
+	// GetTransfers returns the liquidity transfers.
+	GetTransfers(ctx context.Context, since time.Time) ([]models.Transfer, error)
 
 	// Discover discovers other liquidity managers
 	Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error)
