@@ -13,6 +13,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
@@ -22,7 +25,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
@@ -37,6 +42,35 @@ type ARMConfig struct {
 	ARMWeightsByParticipants map[string]*big.Int // mapping : ARM participant address => weight
 	ThresholdForBlessing     *big.Int
 	ThresholdForBadSignal    *big.Int
+}
+
+type TokenTransmitter struct {
+	client          blockchain.EVMClient
+	instance        *mock_usdc_token_transmitter.MockUSDCTransmitter
+	ContractAddress common.Address
+}
+
+type ERC677Token struct {
+	client          blockchain.EVMClient
+	instance        *burn_mint_erc677.BurnMintERC677
+	ContractAddress common.Address
+}
+
+func (token *ERC677Token) GrantMintAndBurn(burnAndMinter common.Address) error {
+	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Network", token.client.GetNetworkName()).
+		Str("BurnAndMinter", burnAndMinter.Hex()).
+		Str("Token", token.ContractAddress.Hex()).
+		Msg("Granting mint and burn roles")
+	tx, err := token.instance.GrantMintAndBurnRoles(opts, burnAndMinter)
+	if err != nil {
+		return err
+	}
+	return token.client.ProcessTransaction(tx)
 }
 
 type ERC20Token struct {
@@ -177,18 +211,62 @@ func (l *LinkToken) Transfer(to string, amount *big.Int) error {
 	return l.client.ProcessTransaction(tx)
 }
 
-// LockReleaseTokenPool represents a LockReleaseTokenPool address
-type LockReleaseTokenPool struct {
-	client     blockchain.EVMClient
-	Instance   *lock_release_token_pool.LockReleaseTokenPool
-	EthAddress common.Address
+// TokenPool represents a TokenPool address
+type TokenPool struct {
+	client          blockchain.EVMClient
+	PoolInterface   *token_pool.TokenPool
+	LockReleasePool *lock_release_token_pool.LockReleaseTokenPool
+	USDCPool        *usdc_token_pool.USDCTokenPool
+	EthAddress      common.Address
 }
 
-func (pool *LockReleaseTokenPool) Address() string {
+func (pool *TokenPool) Address() string {
 	return pool.EthAddress.Hex()
 }
 
-func (pool *LockReleaseTokenPool) RemoveLiquidity(amount *big.Int) error {
+func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, destPoolAddr common.Address, destChainSelector uint64) error {
+	if pool.USDCPool == nil {
+		return fmt.Errorf("USDCPool is nil")
+	}
+
+	var allowedCallerBytes [32]byte
+	copy(allowedCallerBytes[12:], destPoolAddr.Bytes())
+	destTokenTransmitterIns, err := mock_usdc_token_transmitter.NewMockUSDCTransmitter(destTokenTransmitter.ContractAddress, destTokenTransmitter.client.Backend())
+	if err != nil {
+		return err
+	}
+	domain, err := destTokenTransmitterIns.LocalDomain(nil)
+	if err != nil {
+		return err
+	}
+	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Uint32("Domain", domain).
+		Str("Allowed Caller", destPoolAddr.Hex()).
+		Str("Dest Chain Selector", fmt.Sprintf("%d", destChainSelector)).
+		Msg("Syncing USDC Domain")
+	tx, err := pool.USDCPool.SetDomains(opts, []usdc_token_pool.USDCTokenPoolDomainUpdate{
+		{
+			AllowedCaller:     allowedCallerBytes,
+			DomainIdentifier:  domain,
+			DestChainSelector: destChainSelector,
+			Enabled:           true,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set domain: %w", err)
+	}
+	return pool.client.ProcessTransaction(tx)
+}
+
+func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
+	if pool.LockReleasePool == nil {
+		return fmt.Errorf("LockReleasePool is nil")
+	}
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
@@ -197,7 +275,7 @@ func (pool *LockReleaseTokenPool) RemoveLiquidity(amount *big.Int) error {
 		Str("Token Pool", pool.Address()).
 		Str("Amount", amount.String()).
 		Msg("Initiating removing funds from pool")
-	tx, err := pool.Instance.WithdrawLiquidity(opts, amount)
+	tx, err := pool.LockReleasePool.WithdrawLiquidity(opts, amount)
 	if err != nil {
 		return err
 	}
@@ -211,7 +289,10 @@ func (pool *LockReleaseTokenPool) RemoveLiquidity(amount *big.Int) error {
 
 type tokenApproveFn func(string, *big.Int) error
 
-func (pool *LockReleaseTokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, amount *big.Int) error {
+func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, amount *big.Int) error {
+	if pool.LockReleasePool == nil {
+		return fmt.Errorf("cannot add liquidity to pool")
+	}
 	log.Info().
 		Str("Link Token", tokenAddr).
 		Str("Token Pool", pool.Address()).
@@ -239,7 +320,7 @@ func (pool *LockReleaseTokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAd
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Initiating adding Tokens in pool")
-	tx, err := pool.Instance.ProvideLiquidity(opts, amount)
+	tx, err := pool.LockReleasePool.ProvideLiquidity(opts, amount)
 	if err != nil {
 		return err
 	}
@@ -251,7 +332,7 @@ func (pool *LockReleaseTokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAd
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
+func (pool *TokenPool) SetOnRamp(onRamp common.Address) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
@@ -259,17 +340,19 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting on ramp for onramp router")
-	tx, err := pool.Instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{
+
+	tx, err := pool.PoolInterface.ApplyRampUpdates(opts, []token_pool.TokenPoolRampUpdate{
 		{Ramp: onRamp, Allowed: true,
-			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+			RateLimiterConfig: token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			}}}, []lock_release_token_pool.TokenPoolRampUpdate{})
+			}}}, []token_pool.TokenPoolRampUpdate{})
 
 	if err != nil {
 		return err
 	}
+
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Str("OnRamp", onRamp.Hex()).
@@ -278,7 +361,7 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *LockReleaseTokenPool) SetOnRampRateLimit(onRamp common.Address, rl lock_release_token_pool.RateLimiterConfig) error {
+func (pool *TokenPool) SetOnRampRateLimit(onRamp common.Address, rl token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
@@ -288,11 +371,13 @@ func (pool *LockReleaseTokenPool) SetOnRampRateLimit(onRamp common.Address, rl l
 		Str("OnRamp", onRamp.Hex()).
 		Interface("RateLimiterConfig", rl).
 		Msg("Setting Rate Limit on token pool")
-	tx, err := pool.Instance.SetOnRampRateLimiterConfig(opts, onRamp, rl)
+
+	tx, err := pool.PoolInterface.SetOnRampRateLimiterConfig(opts, onRamp, rl)
 
 	if err != nil {
 		return err
 	}
+
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Str("OnRamp", onRamp.Hex()).
@@ -301,7 +386,7 @@ func (pool *LockReleaseTokenPool) SetOnRampRateLimit(onRamp common.Address, rl l
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *LockReleaseTokenPool) SetOffRampRateLimit(offRamp common.Address, rl lock_release_token_pool.RateLimiterConfig) error {
+func (pool *TokenPool) SetOffRampRateLimit(offRamp common.Address, rl token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
@@ -311,7 +396,7 @@ func (pool *LockReleaseTokenPool) SetOffRampRateLimit(offRamp common.Address, rl
 		Str("OffRamp", offRamp.Hex()).
 		Interface("RateLimiterConfig", rl).
 		Msg("Setting Rate Limit offramp")
-	tx, err := pool.Instance.SetOffRampRateLimiterConfig(opts, offRamp, rl)
+	tx, err := pool.PoolInterface.SetOffRampRateLimiterConfig(opts, offRamp, rl)
 
 	if err != nil {
 		return err
@@ -324,7 +409,7 @@ func (pool *LockReleaseTokenPool) SetOffRampRateLimit(offRamp common.Address, rl
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
+func (pool *TokenPool) SetOffRamp(offRamp common.Address) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
@@ -333,8 +418,8 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 		Str("Token Pool", pool.Address()).
 		Msg("Setting off ramp for Token Pool")
 
-	tx, err := pool.Instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{
-		{Ramp: offRamp, Allowed: true, RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+	tx, err := pool.PoolInterface.ApplyRampUpdates(opts, []token_pool.TokenPoolRampUpdate{}, []token_pool.TokenPoolRampUpdate{
+		{Ramp: offRamp, Allowed: true, RateLimiterConfig: token_pool.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),

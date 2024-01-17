@@ -31,10 +31,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_messenger"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -87,29 +92,59 @@ func (e *CCIPContractsDeployer) DeployMultiCallContract() (common.Address, error
 	return *address, nil
 }
 
-func (e *CCIPContractsDeployer) DeployTokenMessenger(tokenTransmitter common.Address) (common.Address, error) {
-	address, tx, _, err := e.evmClient.DeployContract("Mock Token Messenger", func(
+func (e *CCIPContractsDeployer) DeployTokenMessenger(tokenTransmitter common.Address) (*common.Address, error) {
+	address, _, _, err := e.evmClient.DeployContract("Mock Token Messenger", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err :=
+		address, tx, contract, err := mock_usdc_token_messenger.DeployMockUSDCTokenMessenger(auth, backend, 0, tokenTransmitter)
 		if err != nil {
 			return common.Address{}, nil, nil, err
 		}
 		return address, tx, contract, err
 	})
-	if err != nil {
-		return common.Address{}, err
-	}
-	r, err := bind.WaitMined(context.Background(), e.evmClient.DeployBackend(), tx)
-	if err != nil {
-		return common.Address{}, err
-	}
-	if r.Status != types.ReceiptStatusSuccessful {
-		return common.Address{}, fmt.Errorf("deploy multicall failed")
-	}
-	return *address, nil
+
+	return address, err
 }
+
+func (e *CCIPContractsDeployer) NewTokenTransmitter(addr common.Address) (*TokenTransmitter, error) {
+	transmitter, err := mock_usdc_token_transmitter.NewMockUSDCTransmitter(addr, e.evmClient.Backend())
+
+	if err != nil {
+		return nil, err
+	}
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "Mock USDC Token Transmitter").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	return &TokenTransmitter{
+		client:          e.evmClient,
+		instance:        transmitter,
+		ContractAddress: addr,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) DeployTokenTransmitter(domain uint32) (*TokenTransmitter, error) {
+	address, _, instance, err := e.evmClient.DeployContract("Mock Token Transmitter", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		address, tx, contract, err := mock_usdc_token_transmitter.DeployMockUSDCTransmitter(auth, backend, 0, domain)
+		if err != nil {
+			return common.Address{}, nil, nil, err
+		}
+		return address, tx, contract, err
+	})
+
+	return &TokenTransmitter{
+		client:          e.evmClient,
+		instance:        instance.(*mock_usdc_token_transmitter.MockUSDCTransmitter),
+		ContractAddress: *address,
+	}, err
+}
+
 func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	address, _, instance, err := e.evmClient.DeployContract("Link Token", func(
 		auth *bind.TransactOpts,
@@ -125,6 +160,25 @@ func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 		client:     e.evmClient,
 		instance:   instance.(*link_token_interface.LinkToken),
 		EthAddress: *address,
+	}, err
+}
+
+// DeployBurnMintERC677 deploys a BurnMintERC677 contract and returns the ERC20Token wrapper instance
+func (e *CCIPContractsDeployer) DeployBurnMintERC677() (*ERC677Token, error) {
+	address, _, instance, err := e.evmClient.DeployContract("Burn Mint ERC 677", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return burn_mint_erc677.DeployBurnMintERC677(auth, backend, "Test Token ERC677", "TERC677", 6, new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &ERC677Token{
+		client:          e.evmClient,
+		ContractAddress: *address,
+		instance:        instance.(*burn_mint_erc677.BurnMintERC677),
 	}, err
 }
 
@@ -179,7 +233,7 @@ func (e *CCIPContractsDeployer) NewERC20TokenContract(addr common.Address) (*ERC
 }
 
 func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Address) (
-	*LockReleaseTokenPool,
+	*TokenPool,
 	error,
 ) {
 	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, e.evmClient.Backend())
@@ -193,20 +247,77 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 		Str("From", e.evmClient.GetDefaultWallet().Address()).
 		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
 		Msg("New contract")
-	return &LockReleaseTokenPool{
-		client:     e.evmClient,
-		Instance:   pool,
-		EthAddress: addr,
+	poolInstance, err := token_pool.NewTokenPool(addr, e.evmClient.Backend())
+	if err != nil {
+		return nil, err
+	}
+	return &TokenPool{
+		client:          e.evmClient,
+		PoolInterface:   poolInstance,
+		LockReleasePool: pool,
+		EthAddress:      addr,
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr string, armProxy common.Address) (
-	*LockReleaseTokenPool,
+func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
+	*TokenPool,
 	error,
 ) {
-	log.Debug().Str("token", linkAddr).Msg("Deploying native token pool")
-	token := common.HexToAddress(linkAddr)
-	address, _, instance, err := e.evmClient.DeployContract("Native Token Pool", func(
+	pool, err := usdc_token_pool.NewUSDCTokenPool(addr, e.evmClient.Backend())
+
+	if err != nil {
+		return nil, err
+	}
+	log.Info().
+		Str("Contract Address", addr.Hex()).
+		Str("Contract Name", "USDC Token Pool").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
+	poolInterface, err := token_pool.NewTokenPool(addr, e.evmClient.Backend())
+	if err != nil {
+		return nil, err
+	}
+	return &TokenPool{
+		client:        e.evmClient,
+		PoolInterface: poolInterface,
+		USDCPool:      pool,
+		EthAddress:    addr,
+	}, err
+}
+
+func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, tokenMessenger, armProxy common.Address) (
+	*TokenPool,
+	error,
+) {
+	log.Debug().Str("token", tokenAddr).Msg("Deploying usdc token pool")
+	token := common.HexToAddress(tokenAddr)
+	address, _, _, err := e.evmClient.DeployContract("USDC Token Pool", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return usdc_token_pool.DeployUSDCTokenPool(
+			auth,
+			backend,
+			tokenMessenger,
+			token,
+			[]common.Address{},
+			armProxy)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return e.NewUSDCTokenPoolContract(*address)
+}
+
+func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr string, armProxy common.Address) (
+	*TokenPool,
+	error,
+) {
+	log.Debug().Str("token", tokenAddr).Msg("Deploying lock & release token pool")
+	token := common.HexToAddress(tokenAddr)
+	address, _, _, err := e.evmClient.DeployContract("LockRelease Token Pool", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
@@ -222,11 +333,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 	if err != nil {
 		return nil, err
 	}
-	return &LockReleaseTokenPool{
-		client:     e.evmClient,
-		Instance:   instance.(*lock_release_token_pool.LockReleaseTokenPool),
-		EthAddress: *address,
-	}, err
+	return e.NewLockReleaseTokenPoolContract(*address)
 }
 
 func (e *CCIPContractsDeployer) DeployMockARMContract() (*common.Address, error) {

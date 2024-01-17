@@ -305,7 +305,11 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 
 	chain.ParallelTransactions(true)
 	defer chain.Close()
-	ccipCommon, err := actions.DefaultCCIPModule(lggr, chain, pointer.GetBool(o.Cfg.TestGroupInput.ExistingDeployment), pointer.GetBool(o.Cfg.TestGroupInput.MulticallInOneTx))
+	ccipCommon, err := actions.DefaultCCIPModule(
+		lggr, chain,
+		pointer.GetBool(o.Cfg.TestGroupInput.ExistingDeployment),
+		pointer.GetBool(o.Cfg.TestGroupInput.MulticallInOneTx),
+		pointer.GetBool(o.Cfg.TestGroupInput.USDCDeployment))
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %w", networkCfg.Name, err))
 	}
@@ -483,18 +487,18 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp)
 			if err != nil {
 				lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkB.Name, networkA.Name)
-				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err -  %w", networkB.Name, networkA.Name, err)))
+				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err -  %w", networkB.Name, networkA.Name, errors.WithStack(err))))
 				return err
 			}
 
 			err = o.LaneConfig.WriteLaneConfig(networkB.Name, srcConfig)
 			if err != nil {
-				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkA.Name, err)))
+				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkA.Name, errors.WithStack(err))))
 				return err
 			}
 			err = o.LaneConfig.WriteLaneConfig(networkA.Name, destConfig)
 			if err != nil {
-				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, err)))
+				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, errors.WithStack(err))))
 				return err
 			}
 			lggr.Info().Msgf("done setting up lane %s to %s", networkB.Name, networkA.Name)
