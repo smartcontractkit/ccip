@@ -164,7 +164,7 @@ func newRebalancerConfigProvider(
 			chain.Client(),
 		))
 	}
-	lmFactory := liquiditymanager.NewBaseLiquidityManagerFactory(lmFactoryOpts...)
+	lmFactory := liquiditymanager.NewBaseRebalancerFactory(lmFactoryOpts...)
 
 	masterChain, err := chains.Get(relayConfig.ChainID.String())
 	if err != nil {

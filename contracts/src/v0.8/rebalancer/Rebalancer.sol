@@ -267,4 +267,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
   function setLocalLiquidityContainer(ILiquidityContainer localLiquidityContainer) external onlyOwner {
     s_localLiquidityContainer = localLiquidityContainer;
   }
+
+  /// @dev exposed so that we can encode the report for OCR offchain
+  function exposeForEncoding(IRebalancer.LiquidityInstructions memory instructions) public pure {}
 }

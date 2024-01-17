@@ -98,7 +98,7 @@ func NewMultichainConfigTracker(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse network ID %s: %w", masterChain, err)
 	}
-	masterLM, err := lmFactory.NewLiquidityManager(
+	masterLM, err := lmFactory.NewRebalancer(
 		models.NetworkSelector(masterChainID), // todo: probably need to find selector from chain id first
 		models.Address(masterContract))
 	if err != nil {

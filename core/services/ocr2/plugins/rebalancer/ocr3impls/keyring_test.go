@@ -7,8 +7,10 @@ import (
 	"github.com/test-go/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
 func TestKeyring(t *testing.T) {
@@ -16,7 +18,7 @@ func TestKeyring(t *testing.T) {
 		t.Parallel()
 		bundle, err := ocr2key.New(chaintype.EVM)
 		require.NoError(t, err, "failed to create key bundle")
-		keyring := NewOnchainKeyring[struct{}](bundle)
+		keyring := NewOnchainKeyring[models.ReportMetadata](bundle, logger.TestLogger(t))
 		require.Equal(t, bundle.PublicKey(), keyring.PublicKey())
 	})
 
@@ -24,7 +26,7 @@ func TestKeyring(t *testing.T) {
 		t.Parallel()
 		bundle, err := ocr2key.New(chaintype.EVM)
 		require.NoError(t, err, "failed to create key bundle")
-		keyring := NewOnchainKeyring[struct{}](bundle)
+		keyring := NewOnchainKeyring[models.ReportMetadata](bundle, logger.TestLogger(t))
 		require.Equal(t, 65, keyring.MaxSignatureLength())
 	})
 
@@ -32,12 +34,14 @@ func TestKeyring(t *testing.T) {
 		t.Parallel()
 		bundle, err := ocr2key.New(chaintype.EVM)
 		require.NoError(t, err, "failed to create key bundle")
-		keyring := NewOnchainKeyring[struct{}](bundle)
+		keyring := NewOnchainKeyring[models.ReportMetadata](bundle, logger.TestLogger(t))
 		digest := testutils.Random32Byte()
 		seqNr := uint64(1)
 		report := testutils.Random32Byte()
-		sig, err := keyring.Sign(digest, seqNr, ocr3types.ReportWithInfo[struct{}]{
-			Info:   struct{}{},
+		sig, err := keyring.Sign(digest, seqNr, ocr3types.ReportWithInfo[models.ReportMetadata]{
+			Info: models.ReportMetadata{
+				ConfigDigest: digest,
+			},
 			Report: report[:],
 		})
 		require.NoError(t, err, "failed to sign")
@@ -45,8 +49,10 @@ func TestKeyring(t *testing.T) {
 			keyring.PublicKey(),
 			digest,
 			seqNr,
-			ocr3types.ReportWithInfo[struct{}]{
-				Info:   struct{}{},
+			ocr3types.ReportWithInfo[models.ReportMetadata]{
+				Info: models.ReportMetadata{
+					ConfigDigest: digest,
+				},
 				Report: report[:],
 			},
 			sig,
@@ -59,8 +65,10 @@ func TestKeyring(t *testing.T) {
 			keyring.PublicKey(),
 			digest,
 			seqNr,
-			ocr3types.ReportWithInfo[struct{}]{
-				Info:   struct{}{},
+			ocr3types.ReportWithInfo[models.ReportMetadata]{
+				Info: models.ReportMetadata{
+					ConfigDigest: digest,
+				},
 				Report: report[:],
 			},
 			sig,
@@ -73,8 +81,25 @@ func TestKeyring(t *testing.T) {
 			keyring.PublicKey(),
 			digest,
 			seqNr,
-			ocr3types.ReportWithInfo[struct{}]{
-				Info:   struct{}{},
+			ocr3types.ReportWithInfo[models.ReportMetadata]{
+				Info: models.ReportMetadata{
+					ConfigDigest: digest,
+				},
+				Report: report[:],
+			},
+			sig,
+		))
+
+		// bork config digest, verify should fail
+		digest[0] = digest[0] ^ 0xFF
+		require.False(t, keyring.Verify(
+			keyring.PublicKey(),
+			digest,
+			seqNr,
+			ocr3types.ReportWithInfo[models.ReportMetadata]{
+				Info: models.ReportMetadata{
+					ConfigDigest: digest,
+				},
 				Report: report[:],
 			},
 			sig,
