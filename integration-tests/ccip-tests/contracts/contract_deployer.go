@@ -163,8 +163,8 @@ func (e *CCIPContractsDeployer) DeployLinkTokenContract() (*LinkToken, error) {
 	}, err
 }
 
-// DeployBurnMintERC677 deploys a BurnMintERC677 contract and returns the ERC20Token wrapper instance
-func (e *CCIPContractsDeployer) DeployBurnMintERC677() (*ERC677Token, error) {
+// DeployBurnMintERC677 deploys a BurnMintERC677 contract, mints given amount ( if provided) to the owner address and returns the ERC20Token wrapper instance
+func (e *CCIPContractsDeployer) DeployBurnMintERC677(ownerMintingAmount *big.Int) (*ERC677Token, error) {
 	address, _, instance, err := e.evmClient.DeployContract("Burn Mint ERC 677", func(
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
@@ -175,11 +175,27 @@ func (e *CCIPContractsDeployer) DeployBurnMintERC677() (*ERC677Token, error) {
 		return nil, err
 	}
 
-	return &ERC677Token{
+	token := &ERC677Token{
 		client:          e.evmClient,
 		ContractAddress: *address,
 		instance:        instance.(*burn_mint_erc677.BurnMintERC677),
-	}, err
+	}
+	if ownerMintingAmount != nil {
+		// grant minter role to owner and mint tokens
+		err = token.GrantMintRole(common.HexToAddress(e.evmClient.GetDefaultWallet().Address()))
+		if err != nil {
+			return token, fmt.Errorf("granting minter role to owner shouldn't fail %w", err)
+		}
+		err = e.evmClient.WaitForEvents()
+		if err != nil {
+			return token, fmt.Errorf("error in waiting for granting mint role %w", err)
+		}
+		err = token.Mint(common.HexToAddress(e.evmClient.GetDefaultWallet().Address()), ownerMintingAmount)
+		if err != nil {
+			return token, fmt.Errorf("minting tokens shouldn't fail %w", err)
+		}
+	}
+	return token, err
 }
 
 func (e *CCIPContractsDeployer) DeployERC20TokenContract(deployerFn blockchain.ContractDeployer) (*ERC20Token, error) {

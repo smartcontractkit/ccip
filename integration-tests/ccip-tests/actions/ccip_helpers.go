@@ -568,7 +568,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 				if len(tokenDeployerFns) != noOfTokens {
 					if ccipModule.USDCDeployment {
 						// if it's USDC deployment, we deploy the burn mint token 677 with decimal 6 and cast it to ERC20Token
-						erc677Token, err := cd.DeployBurnMintERC677()
+						erc677Token, err := cd.DeployBurnMintERC677(new(big.Int).Mul(big.NewInt(1e6), big.NewInt(1e18)))
 						if err != nil {
 							return fmt.Errorf("deploying bridge usdc token contract shouldn't fail %w", err)
 						}
@@ -2990,6 +2990,7 @@ func SetMockServerWithMsgHashAttestation(
 				log.Fatal().Msg("both killgrave and mockserver are nil")
 				return
 			}
+			log.Info().Str("msgHash", msg).Str("path", path).Msg("setting attestation-api response for msgHash")
 			if killGrave != nil {
 				err := killGrave.SetAdapterBasedAnyValuePath(path, []string{http.MethodGet}, response)
 				if err != nil {

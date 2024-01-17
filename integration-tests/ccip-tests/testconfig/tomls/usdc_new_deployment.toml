@@ -169,7 +169,7 @@ MsgType = 'WithToken'               # options `WithToken` for messages with Toke
 DestGasLimit = 100000               # change this to 0 gas limit if you are doing ccip-send to an EOA
 NoOfCommitNodes = 5                 # no of chainlink nodes with Commit job
 PhaseTimeout = '10m'                # Duration to wait for the each phase validation(SendRequested, Commit, RMN Blessing, Execution) to time-out.
-LocalCluster = true                 # if true, the test will use the local docker container, otherwise it will use the k8s cluster
+LocalCluster = false                 # if true, the test will use the local docker container, otherwise it will use the k8s cluster
 ExistingDeployment = false          # true if the tests are run on existing environment with already set-up jobs, smart contracts, etc...
 USDCDeployment = true              # true if the tests are run for usdc smoke test
 # In this case the test will only be used to send and verify ccip requests considering that lanes are already functioning.

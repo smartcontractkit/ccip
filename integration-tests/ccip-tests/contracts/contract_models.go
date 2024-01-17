@@ -73,6 +73,41 @@ func (token *ERC677Token) GrantMintAndBurn(burnAndMinter common.Address) error {
 	return token.client.ProcessTransaction(tx)
 }
 
+func (token *ERC677Token) GrantMintRole(minter common.Address) error {
+	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Network", token.client.GetNetworkName()).
+		Str("Minter", minter.Hex()).
+		Str("Token", token.ContractAddress.Hex()).
+		Msg("Granting mint roles")
+	tx, err := token.instance.GrantMintRole(opts, minter)
+	if err != nil {
+		return err
+	}
+	return token.client.ProcessTransaction(tx)
+}
+
+func (token *ERC677Token) Mint(to common.Address, amount *big.Int) error {
+	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
+	if err != nil {
+		return err
+	}
+	log.Info().
+		Str("Network", token.client.GetNetworkName()).
+		Str("To", to.Hex()).
+		Str("Token", token.ContractAddress.Hex()).
+		Str("Amount", amount.String()).
+		Msg("Minting tokens")
+	tx, err := token.instance.Mint(opts, to, amount)
+	if err != nil {
+		return err
+	}
+	return token.client.ProcessTransaction(tx)
+}
+
 type ERC20Token struct {
 	client          blockchain.EVMClient
 	instance        *erc20.ERC20
