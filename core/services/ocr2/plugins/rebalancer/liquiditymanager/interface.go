@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/dummy_liquidity_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager/liquidity_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
@@ -93,19 +93,19 @@ func (c *concreteLiquidityTransferredEvent) Amount() *big.Int {
 // using the dummy liquidity manager gethwrapper,
 // which only manages neighbors and has no business logic.
 type dummyLiquidityManager struct {
-	client       dummy_liquidity_manager.DummyLiquidityManagerInterface
+	client       *rebalancer.Rebalancer
 	maxLiquidity *big.Int
 }
 
 // GetAllCrossChainLiquidityMangers implements OnchainLiquidityManager.
 func (d *dummyLiquidityManager) GetAllCrossChainLiquidityMangers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
-	lms, err := d.client.GetAllCrossChainLiquidityMangers(&bind.CallOpts{Context: ctx})
+	lms, err := d.client.GetAllCrossChainRebalancers(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("get all cross chain liquidity managers: %w", err)
 	}
 	ret := make(map[models.NetworkSelector]models.Address)
 	for _, lm := range lms {
-		ret[models.NetworkSelector(lm.RemoteChainSelector)] = models.Address(lm.RemoteLiquidityManager)
+		ret[models.NetworkSelector(lm.RemoteChainSelector)] = models.Address(lm.RemoteRebalancer)
 	}
 	return ret, nil
 }
@@ -131,7 +131,7 @@ func (d *dummyLiquidityManager) ParseLiquidityTransferred(log gethtypes.Log) (Li
 var _ OnchainLiquidityManager = &dummyLiquidityManager{}
 
 func NewDummyLiquidityManager(address common.Address, backend bind.ContractBackend, maxLiquidity *big.Int) (*dummyLiquidityManager, error) {
-	client, err := dummy_liquidity_manager.NewDummyLiquidityManager(address, backend)
+	client, err := rebalancer.NewRebalancer(address, backend)
 	if err != nil {
 		return nil, fmt.Errorf("init dummy liquidity manager: %w", err)
 	}
@@ -139,7 +139,7 @@ func NewDummyLiquidityManager(address common.Address, backend bind.ContractBacke
 }
 
 type dummyLiquidityTransferredEvent struct {
-	e *dummy_liquidity_manager.DummyLiquidityManagerLiquidityTransferred
+	e *rebalancer.RebalancerLiquidityTransferred
 }
 
 var _ LiquidityTransferredEvent = &dummyLiquidityTransferredEvent{}

@@ -192,6 +192,10 @@ contract Rebalancer is IRebalancer, OCR3Base {
   // │                           Config                             │
   // ================================================================
 
+  function getSupportedDestChains() external view returns (uint64[] memory) {
+    return s_supportedDestChains;
+  }
+
   /// @notice Gets the cross chain liquidity manager
   function getCrossChainRebalancer(uint64 chainSelector) external view returns (CrossChainRebalancer memory) {
     return s_crossChainRebalancer[chainSelector];

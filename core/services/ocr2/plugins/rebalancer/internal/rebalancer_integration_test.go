@@ -18,21 +18,21 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/google/uuid"
 	"github.com/hashicorp/consul/sdk/freeport"
+	"github.com/smartcontractkit/chainlink-common/pkg/loop"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/libocr/commontypes"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/test-go/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/loop"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
-
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	v2toml "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
+	utils2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	evmutils "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/dummy_liquidity_manager"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -376,10 +376,10 @@ checkSourceDestEqual = false
 
 func waitForTransmissions(
 	t *testing.T,
-	wrappers map[int64]*dummy_liquidity_manager.DummyLiquidityManager,
+	wrappers map[int64]*rebalancer.Rebalancer,
 ) {
 	start := uint64(1)
-	sink := make(chan *dummy_liquidity_manager.DummyLiquidityManagerTransmitted)
+	sink := make(chan *rebalancer.RebalancerTransmitted)
 	var subs []event.Subscription
 	for _, wrapper := range wrappers {
 		sub, err := wrapper.WatchTransmitted(&bind.WatchOpts{
@@ -409,7 +409,7 @@ outer:
 func setRebalancerConfig(
 	t *testing.T,
 	owner *bind.TransactOpts,
-	wrapper *dummy_liquidity_manager.DummyLiquidityManager,
+	wrapper *rebalancer.Rebalancer,
 	chain *backends.SimulatedBackend,
 	onchainPubKeys []common.Address,
 	transmitters []common.Address,
@@ -462,7 +462,7 @@ func setRebalancerConfig(
 func setRebalancerConfigs(
 	t *testing.T,
 	owner *bind.TransactOpts,
-	wrappers map[int64]*dummy_liquidity_manager.DummyLiquidityManager,
+	wrappers map[int64]*rebalancer.Rebalancer,
 	chains map[int64]*backends.SimulatedBackend,
 	onchainPubKeys []common.Address,
 	transmitters map[int64][]common.Address,
@@ -556,15 +556,18 @@ func deployContracts(
 	chains map[int64]*backends.SimulatedBackend,
 ) (
 	contractAddresses map[int64]common.Address,
-	contractWrappers map[int64]*dummy_liquidity_manager.DummyLiquidityManager,
+	contractWrappers map[int64]*rebalancer.Rebalancer,
 ) {
 	contractAddresses = make(map[int64]common.Address)
-	contractWrappers = make(map[int64]*dummy_liquidity_manager.DummyLiquidityManager)
+	contractWrappers = make(map[int64]*rebalancer.Rebalancer)
 	for chainID, backend := range chains {
-		addr, _, _, err := dummy_liquidity_manager.DeployDummyLiquidityManager(owner, backend, uint64(chainID))
+		// TODO @makram
+		token := utils2.RandomAddress()
+		liquidityContainer := utils2.RandomAddress()
+		addr, _, _, err := rebalancer.DeployRebalancer(owner, backend, token, uint64(chainID), liquidityContainer)
 		require.NoError(t, err, "failed to deploy DummyLiquidityManager contract")
 		contractAddresses[chainID] = addr
-		wrapper, err := dummy_liquidity_manager.NewDummyLiquidityManager(addr, backend)
+		wrapper, err := rebalancer.NewRebalancer(addr, backend)
 		require.NoError(t, err, "failed to create DummyLiquidityManager wrapper")
 		contractWrappers[chainID] = wrapper
 	}
@@ -582,7 +585,7 @@ func buildFollowerChainsFromBlocksToml(fromBlocks map[int64]int64) string {
 	return s
 }
 
-func createConnectedNetwork(t *testing.T, owner *bind.TransactOpts, chains map[int64]*backends.SimulatedBackend, wrappers map[int64]*dummy_liquidity_manager.DummyLiquidityManager) {
+func createConnectedNetwork(t *testing.T, owner *bind.TransactOpts, chains map[int64]*backends.SimulatedBackend, wrappers map[int64]*rebalancer.Rebalancer) {
 	// create a connection from the main chain to all follower chains
 	// and from all follower chains to the main chain
 	for chainID, wrapper := range wrappers {
@@ -590,35 +593,37 @@ func createConnectedNetwork(t *testing.T, owner *bind.TransactOpts, chains map[i
 			continue
 		}
 		// follower -> main connection
-		_, err := wrapper.SetCrossChainLiquidityManager(
+		_, err := wrapper.SetCrossChainRebalancer(
 			owner,
-			dummy_liquidity_manager.ILiquidityManagerCrossChainLiquidityManagerArgs{
-				RemoteLiquidityManager: wrappers[mainChainID].Address(),
-				RemoteChainSelector:    uint64(mainChainID),
-				Enabled:                true,
+			rebalancer.IRebalancerCrossChainRebalancerArgs{
+				RemoteRebalancer:    wrappers[mainChainID].Address(),
+				RemoteChainSelector: uint64(mainChainID),
+				Enabled:             true,
+				RemoteToken:         utils2.RandomAddress(), // TODO @makram
 			})
 		require.NoError(t, err, "failed to add neighbor from follower to main chain")
 		chains[chainID].Commit()
 
-		mgr, err := wrapper.GetCrossChainLiquidityManager(&bind.CallOpts{Context: testutils.Context(t)}, uint64(mainChainID))
+		mgr, err := wrapper.GetCrossChainRebalancer(&bind.CallOpts{Context: testutils.Context(t)}, uint64(mainChainID))
 		require.NoError(t, err)
-		require.Equal(t, wrappers[mainChainID].Address(), mgr.RemoteLiquidityManager)
+		require.Equal(t, wrappers[mainChainID].Address(), mgr.RemoteRebalancer)
 		require.True(t, mgr.Enabled)
 
 		// main -> follower connection
-		_, err = wrappers[mainChainID].SetCrossChainLiquidityManager(
+		_, err = wrappers[mainChainID].SetCrossChainRebalancer(
 			owner,
-			dummy_liquidity_manager.ILiquidityManagerCrossChainLiquidityManagerArgs{
-				RemoteLiquidityManager: wrapper.Address(),
-				RemoteChainSelector:    uint64(chainID),
-				Enabled:                true,
+			rebalancer.IRebalancerCrossChainRebalancerArgs{
+				RemoteRebalancer:    wrapper.Address(),
+				RemoteChainSelector: uint64(chainID),
+				Enabled:             true,
+				RemoteToken:         utils2.RandomAddress(), // TODO @makram
 			})
 		require.NoError(t, err, "failed to add neighbor from main to follower chain")
 		chains[mainChainID].Commit()
 
-		mgr, err = wrappers[mainChainID].GetCrossChainLiquidityManager(&bind.CallOpts{Context: testutils.Context(t)}, uint64(chainID))
+		mgr, err = wrappers[mainChainID].GetCrossChainRebalancer(&bind.CallOpts{Context: testutils.Context(t)}, uint64(chainID))
 		require.NoError(t, err)
-		require.Equal(t, wrapper.Address(), mgr.RemoteLiquidityManager)
+		require.Equal(t, wrapper.Address(), mgr.RemoteRebalancer)
 		require.True(t, mgr.Enabled)
 	}
 
@@ -632,7 +637,7 @@ func createConnectedNetwork(t *testing.T, owner *bind.TransactOpts, chains map[i
 		} else {
 			require.Len(t, destChains, 1)
 		}
-		mgrs, err := wrapper.GetAllCrossChainLiquidityMangers(&bind.CallOpts{
+		mgrs, err := wrapper.GetAllCrossChainRebalancers(&bind.CallOpts{
 			Context: testutils.Context(t),
 		})
 		require.NoError(t, err, "couldn't get all cross-chain liquidity managers")
