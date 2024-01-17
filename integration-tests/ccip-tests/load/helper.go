@@ -103,17 +103,9 @@ func (l *LoadArgs) TriggerLoadByLane() {
 		}
 
 		loadRunner, err := wasp.NewGenerator(&wasp.Config{
-			T:                     l.TestCfg.Test,
-			GenName:               fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
-			Schedule:              l.schedules,
-			LoadType:              wasp.RPS,
-			RateLimitUnitDuration: l.TestCfg.TestGroupInput.TimeUnit.Duration(),
-			CallResultBufLen:      10, // we keep the last 10 call results for each generator, as the detailed report is generated at the end of the test
-			CallTimeout:           (l.TestCfg.TestGroupInput.PhaseTimeout.Duration()) * 5,
-			Gun:                   ccipLoad,
-			Logger:                ccipLoad.Lane.Logger,
-			SharedData:            l.TestCfg.TestGroupInput.MsgType,
-			LokiConfig:            wasp.NewEnvLokiConfig(),
+			T:        l.TestCfg.Test,
+			GenName:  fmt.Sprintf("lane %s-> %s", lane.SourceNetworkName, lane.DestNetworkName),
+			LoadType: wasp.RPS,
 			Labels: map[string]string{
 				"test_group":   "load",
 				"cluster":      "sdlc",
@@ -122,6 +114,20 @@ func (l *LoadArgs) TriggerLoadByLane() {
 				"source_chain": lane.SourceNetworkName,
 				"dest_chain":   lane.DestNetworkName,
 			},
+			LokiConfig:            wasp.NewEnvLokiConfig(),
+			Schedule:              l.schedules,
+			RateLimitUnitDuration: l.TestCfg.TestGroupInput.TimeUnit.Duration(),
+			CallResultBufLen:      10, // we keep the last 10 call results for each generator, as the detailed report is generated at the end of the test
+			StatsPollInterval:     0,
+			CallTimeout:           (l.TestCfg.TestGroupInput.PhaseTimeout.Duration()) * 5,
+			SetupTimeout:          0,
+			TeardownTimeout:       0,
+			FailOnErr:             true,
+			Gun:                   ccipLoad,
+			VU:                    nil,
+			Logger:                ccipLoad.Lane.Logger,
+			SharedData:            l.TestCfg.TestGroupInput.MsgType,
+			SamplerConfig:         nil,
 		})
 		require.NoError(l.TestCfg.Test, err, "initiating loadgen for lane %s --> %s",
 			lane.SourceNetworkName, lane.DestNetworkName)
@@ -255,6 +261,7 @@ func (l *LoadArgs) TriggerLoadBySource() {
 				Logger:                multiCallGen.logger,
 				LokiConfig:            wasp.NewEnvLokiConfig(),
 				Labels:                allLabels,
+				FailOnErr:             true,
 			})
 			require.NoError(l.TestCfg.Test, err, "initiating loadgen for source %s", source)
 			loadRunner.Run(false)
