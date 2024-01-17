@@ -13,7 +13,7 @@ import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 contract OptimismL2BridgeAdapter is IBridgeAdapter {
   using SafeERC20 for IERC20;
 
-  L2StandardBridge internal i_L2Bridge = L2StandardBridge(Lib_PredeployAddresses.L2_STANDARD_BRIDGE);
+  L2StandardBridge internal immutable i_L2Bridge = L2StandardBridge(Lib_PredeployAddresses.L2_STANDARD_BRIDGE);
   IWrappedNative internal immutable i_wrappedNative;
 
   // Nonce to use for L1 withdrawals to allow for better tracking offchain.

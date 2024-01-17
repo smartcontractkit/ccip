@@ -205,8 +205,9 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   /// @notice Gets all cross chain liquidity managers
   /// @dev We don't care too much about gas since this function is intended for offchain usage.
   function getAllCrossChainLiquidityMangers() external view returns (CrossChainLiquidityManagerArgs[] memory) {
-    CrossChainLiquidityManagerArgs[] memory managers;
-    for (uint256 i = 0; i < s_supportedDestChains.length; ++i) {
+    uint256 numChains = s_supportedDestChains.length;
+    CrossChainLiquidityManagerArgs[] memory managers = new CrossChainLiquidityManagerArgs[](numChains);
+    for (uint256 i = 0; i < numChains; ++i) {
       uint64 chainSelector = s_supportedDestChains[i];
       CrossChainLiquidityManager memory currentManager = s_crossChainLiquidityManager[chainSelector];
       managers[i] = CrossChainLiquidityManagerArgs({
