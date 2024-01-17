@@ -599,6 +599,7 @@ func createConnectedNetwork(t *testing.T, owner *bind.TransactOpts, chains map[i
 				RemoteRebalancer:    wrappers[mainChainID].Address(),
 				RemoteChainSelector: uint64(mainChainID),
 				Enabled:             true,
+				LocalBridge:         utils2.RandomAddress(), // TODO @makram
 				RemoteToken:         utils2.RandomAddress(), // TODO @makram
 			})
 		require.NoError(t, err, "failed to add neighbor from follower to main chain")
@@ -616,6 +617,7 @@ func createConnectedNetwork(t *testing.T, owner *bind.TransactOpts, chains map[i
 				RemoteRebalancer:    wrapper.Address(),
 				RemoteChainSelector: uint64(chainID),
 				Enabled:             true,
+				LocalBridge:         utils2.RandomAddress(), // TODO @makram
 				RemoteToken:         utils2.RandomAddress(), // TODO @makram
 			})
 		require.NoError(t, err, "failed to add neighbor from main to follower chain")
