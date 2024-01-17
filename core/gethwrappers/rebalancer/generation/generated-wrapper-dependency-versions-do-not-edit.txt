@@ -1,6 +1,6 @@
 GETH_VERSION: 1.12.2
 arbitrum_l1_bridge_adapter: ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.abi ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.bin 0db9176a5f9f29f9a0b84f3373bab90d15f6763be474eba5b8babfd8950ff29e
 arbitrum_l2_bridge_adapter: ../../../contracts/solc/v0.8.19/ArbitrumL2BridgeAdapter/ArbitrumL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/ArbitrumL2BridgeAdapter/ArbitrumL2BridgeAdapter.bin 385417c91df3b54e6469d3cec3768a59bbff846da968611a1878fbcfcfeaff1d
-liquidity_manager: ../../../contracts/solc/v0.8.19/LiquidityManager/LiquidityManager.abi ../../../contracts/solc/v0.8.19/LiquidityManager/LiquidityManager.bin e1474d95a50d935f229aa444d61497b164362e5a6e41374168b78bc242d33b89
 optimism_l1_bridge_adapter: ../../../contracts/solc/v0.8.19/OptimismL1BridgeAdapter/OptimismL1BridgeAdapter.abi ../../../contracts/solc/v0.8.19/OptimismL1BridgeAdapter/OptimismL1BridgeAdapter.bin 0f02eb1541ea9e4ca0d763065ab7b8286887dd2ed49c7dd46cbc7b570c92ca4e
-optimism_l2_bridge_adapter: ../../../contracts/solc/v0.8.19/OptimismL2BridgeAdapter/OptimismL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/OptimismL2BridgeAdapter/OptimismL2BridgeAdapter.bin b865b3a44c281efe0284cd2038f4e0024f1979ec3cb704862244581dbd8bdade
+optimism_l2_bridge_adapter: ../../../contracts/solc/v0.8.19/OptimismL2BridgeAdapter/OptimismL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/OptimismL2BridgeAdapter/OptimismL2BridgeAdapter.bin ba3d72304c719da2adb5c29a77853c49cc32631012acb012c40cb75057331b6f
+rebalancer: ../../../contracts/solc/v0.8.19/Rebalancer/Rebalancer.abi ../../../contracts/solc/v0.8.19/Rebalancer/Rebalancer.bin 56870576066b5c39f01dc93b4545d319b6447b1b0711cff5b86c79e8d3105119

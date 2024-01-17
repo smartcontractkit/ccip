@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {IBridgeAdapter} from "./interfaces/IBridge.sol";
-import {ILiquidityManager} from "./interfaces/ILiquidityManager.sol";
+import {IRebalancer} from "./interfaces/IRebalancer.sol";
 import {ILiquidityContainer} from "./interfaces/ILiquidityContainer.sol";
 
 import {OCR3Base} from "./ocr/OCR3Base.sol";
@@ -10,7 +10,7 @@ import {OCR3Base} from "./ocr/OCR3Base.sol";
 import {IERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @notice Liquidity manager for a single token over multiple chains.
+/// @notice Rebalancer for a single token over multiple chains.
 /// @dev This contract is designed to be used with the LockReleaseTokenPool contract but
 /// isn't constraint to it. It can be used with any contract that implements the ILiquidityContainer
 /// interface.
@@ -21,7 +21,7 @@ import {SafeERC20} from "../vendor/openzeppelin-solidity/v4.8.3/contracts/token/
 /// bridges, but it can't steal them.
 /// @dev References to local mean logic on the same chain as this contract is deployed on.
 /// References to remote mean logic on other chains.
-contract LiquidityManager is ILiquidityManager, OCR3Base {
+contract Rebalancer is IRebalancer, OCR3Base {
   using SafeERC20 for IERC20;
 
   error ZeroAddress();
@@ -39,15 +39,15 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
 
-  struct CrossChainLiquidityManager {
-    address remoteLiquidityManager;
+  struct CrossChainRebalancer {
+    address remoteRebalancer;
     IBridgeAdapter localBridge;
     address remoteToken;
     bool enabled;
   }
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
-  string public constant override typeAndVersion = "LiquidityManager 1.3.0-dev";
+  string public constant override typeAndVersion = "Rebalancer 1.0.0-dev";
 
   /// @notice The token that this pool manages liquidity for.
   IERC20 public immutable i_localToken;
@@ -56,7 +56,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   uint64 internal immutable i_localChainSelector;
 
   /// @notice Mapping of chain selector to liquidity container on other chains
-  mapping(uint64 chainSelector => CrossChainLiquidityManager) private s_crossChainLiquidityManager;
+  mapping(uint64 chainSelector => CrossChainRebalancer) private s_crossChainRebalancer;
 
   uint64[] private s_supportedDestChains;
 
@@ -81,7 +81,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   // │                    Liquidity management                      │
   // ================================================================
 
-  /// @inheritdoc ILiquidityManager
+  /// @inheritdoc IRebalancer
   function getLiquidity() public view returns (uint256 currentLiquidity) {
     return i_localToken.balanceOf(address(s_localLiquidityContainer));
   }
@@ -132,7 +132,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       revert InsufficientLiquidity(amount, currentBalance);
     }
 
-    CrossChainLiquidityManager memory remoteLiqManager = s_crossChainLiquidityManager[chainSelector];
+    CrossChainRebalancer memory remoteLiqManager = s_crossChainRebalancer[chainSelector];
 
     if (!remoteLiqManager.enabled) {
       revert InvalidRemoteChain(chainSelector);
@@ -147,7 +147,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     remoteLiqManager.localBridge.sendERC20{value: nativeBridgeFee}(
       address(i_localToken),
       remoteLiqManager.remoteToken,
-      remoteLiqManager.remoteLiquidityManager,
+      remoteLiqManager.remoteRebalancer,
       amount
     );
 
@@ -155,7 +155,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
       ocrSeqNum,
       i_localChainSelector,
       chainSelector,
-      remoteLiqManager.remoteLiquidityManager,
+      remoteLiqManager.remoteRebalancer,
       amount
     );
   }
@@ -165,10 +165,7 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   }
 
   function _report(bytes calldata report, uint64 ocrSeqNum) internal override {
-    ILiquidityManager.LiquidityInstructions memory instructions = abi.decode(
-      report,
-      (ILiquidityManager.LiquidityInstructions)
-    );
+    IRebalancer.LiquidityInstructions memory instructions = abi.decode(report, (IRebalancer.LiquidityInstructions));
 
     uint256 sendInstructions = instructions.sendLiquidityParams.length;
     for (uint256 i = 0; i < sendInstructions; ++i) {
@@ -196,22 +193,20 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
   // ================================================================
 
   /// @notice Gets the cross chain liquidity manager
-  function getCrossChainLiquidityManager(
-    uint64 chainSelector
-  ) external view returns (CrossChainLiquidityManager memory) {
-    return s_crossChainLiquidityManager[chainSelector];
+  function getCrossChainRebalancer(uint64 chainSelector) external view returns (CrossChainRebalancer memory) {
+    return s_crossChainRebalancer[chainSelector];
   }
 
   /// @notice Gets all cross chain liquidity managers
   /// @dev We don't care too much about gas since this function is intended for offchain usage.
-  function getAllCrossChainLiquidityMangers() external view returns (CrossChainLiquidityManagerArgs[] memory) {
+  function getAllCrossChainRebalancers() external view returns (CrossChainRebalancerArgs[] memory) {
     uint256 numChains = s_supportedDestChains.length;
-    CrossChainLiquidityManagerArgs[] memory managers = new CrossChainLiquidityManagerArgs[](numChains);
+    CrossChainRebalancerArgs[] memory managers = new CrossChainRebalancerArgs[](numChains);
     for (uint256 i = 0; i < numChains; ++i) {
       uint64 chainSelector = s_supportedDestChains[i];
-      CrossChainLiquidityManager memory currentManager = s_crossChainLiquidityManager[chainSelector];
-      managers[i] = CrossChainLiquidityManagerArgs({
-        remoteLiquidityManager: currentManager.remoteLiquidityManager,
+      CrossChainRebalancer memory currentManager = s_crossChainRebalancer[chainSelector];
+      managers[i] = CrossChainRebalancerArgs({
+        remoteRebalancer: currentManager.remoteRebalancer,
         localBridge: currentManager.localBridge,
         remoteToken: currentManager.remoteToken,
         remoteChainSelector: chainSelector,
@@ -224,25 +219,21 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
 
   /// @notice Sets a list of cross chain liquidity managers.
   /// @dev Will update the list of supported dest chains if the chain is new.
-  function setCrossChainLiquidityManager(
-    CrossChainLiquidityManagerArgs[] calldata crossChainLiquidityManagers
-  ) external onlyOwner {
-    for (uint256 i = 0; i < crossChainLiquidityManagers.length; ++i) {
-      setCrossChainLiquidityManager(crossChainLiquidityManagers[i]);
+  function setCrossChainRebalancer(CrossChainRebalancerArgs[] calldata crossChainRebalancers) external onlyOwner {
+    for (uint256 i = 0; i < crossChainRebalancers.length; ++i) {
+      setCrossChainRebalancer(crossChainRebalancers[i]);
     }
   }
 
   /// @notice Sets a single cross chain liquidity manager.
   /// @dev Will update the list of supported dest chains if the chain is new.
-  function setCrossChainLiquidityManager(
-    CrossChainLiquidityManagerArgs calldata crossChainLiqManager
-  ) public onlyOwner {
+  function setCrossChainRebalancer(CrossChainRebalancerArgs calldata crossChainLiqManager) public onlyOwner {
     if (crossChainLiqManager.remoteChainSelector == 0) {
       revert ZeroChainSelector();
     }
 
     if (
-      crossChainLiqManager.remoteLiquidityManager == address(0) ||
+      crossChainLiqManager.remoteRebalancer == address(0) ||
       address(crossChainLiqManager.localBridge) == address(0) ||
       crossChainLiqManager.remoteToken == address(0)
     ) {
@@ -250,12 +241,12 @@ contract LiquidityManager is ILiquidityManager, OCR3Base {
     }
 
     // If the destination chain is new, add it to the list of supported chains
-    if (s_crossChainLiquidityManager[crossChainLiqManager.remoteChainSelector].remoteToken == address(0)) {
+    if (s_crossChainRebalancer[crossChainLiqManager.remoteChainSelector].remoteToken == address(0)) {
       s_supportedDestChains.push(crossChainLiqManager.remoteChainSelector);
     }
 
-    s_crossChainLiquidityManager[crossChainLiqManager.remoteChainSelector] = CrossChainLiquidityManager({
-      remoteLiquidityManager: crossChainLiqManager.remoteLiquidityManager,
+    s_crossChainRebalancer[crossChainLiqManager.remoteChainSelector] = CrossChainRebalancer({
+      remoteRebalancer: crossChainLiqManager.remoteRebalancer,
       localBridge: crossChainLiqManager.localBridge,
       remoteToken: crossChainLiqManager.remoteToken,
       enabled: crossChainLiqManager.enabled

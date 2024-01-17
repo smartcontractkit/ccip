@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IBridgeAdapter} from "./IBridge.sol";
 
-interface ILiquidityManager {
+interface IRebalancer {
   struct SendLiquidityParams {
     uint256 amount;
     uint64 remoteChainSelector;
@@ -20,8 +20,8 @@ interface ILiquidityManager {
     ReceiveLiquidityParams[] receiveLiquidityParams;
   }
 
-  struct CrossChainLiquidityManagerArgs {
-    address remoteLiquidityManager;
+  struct CrossChainRebalancerArgs {
+    address remoteRebalancer;
     IBridgeAdapter localBridge;
     address remoteToken;
     uint64 remoteChainSelector;
@@ -31,5 +31,5 @@ interface ILiquidityManager {
   /// @notice Returns the current liquidity in the liquidity container.
   function getLiquidity() external view returns (uint256 currentLiquidity);
 
-  function getAllCrossChainLiquidityMangers() external view returns (CrossChainLiquidityManagerArgs[] memory);
+  function getAllCrossChainRebalancers() external view returns (CrossChainRebalancerArgs[] memory);
 }
