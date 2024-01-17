@@ -124,7 +124,6 @@ type Delegate struct {
 	RelayGetter
 	isNewlyCreatedJob bool // Set to true if this is a new job freshly added, false if job was present already on node boot.
 	mailMon           *mailbox.Monitor
-	eventBroadcaster  pg.EventBroadcaster
 	legacyChains      legacyevm.LegacyChainContainer // legacy: use relayers instead
 }
 
@@ -254,7 +253,6 @@ func NewDelegate(
 		RelayGetter:           relayers,
 		isNewlyCreatedJob:     false,
 		mailMon:               mailMon,
-		eventBroadcaster:      eventBroadcaster,
 	}
 }
 
@@ -318,7 +316,7 @@ func (d *Delegate) cleanupEVM(jb job.Job, q pg.Queryer, relayID relay.ID) error 
 			d.lggr.Errorw("failed to derive ocr2keeper filter names from spec", "err", err, "spec", spec)
 		}
 	case types.CCIPCommit:
-		err = ccipcommit.UnregisterCommitPluginLpFilters(context.Background(), d.lggr, jb, d.pipelineRunner, d.legacyChains, pg.WithQueryer(q))
+		err = ccipcommit.UnregisterCommitPluginLpFilters(context.Background(), d.lggr, jb, d.legacyChains, pg.WithQueryer(q))
 		if err != nil {
 			d.lggr.Errorw("failed to unregister ccip commit plugin filters", "err", err, "spec", spec)
 		}
@@ -1524,7 +1522,6 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		},
 		transmitterID,
 		d.ethKs,
-		d.eventBroadcaster,
 	)
 	if err2 != nil {
 		return nil, err2
@@ -1577,7 +1574,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		},
 		transmitterID,
 		d.ethKs,
-		d.eventBroadcaster,
 	)
 	if err2 != nil {
 		return nil, err2
@@ -1634,7 +1630,7 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer provider: %w", err)
 	}
-	factory, err := rebalancer.NewPluginFactory(lggr, spec.PluginConfig.Bytes())
+	factory, err := rebalancer.NewPluginFactory(lggr, spec.PluginConfig.Bytes(), rebalancerProvider.LiquidityManagerFactory())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer plugin factory: %w", err)
 	}
