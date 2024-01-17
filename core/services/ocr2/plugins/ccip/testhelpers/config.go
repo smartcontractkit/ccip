@@ -30,8 +30,6 @@ func (c *CCIPContracts) CreateDefaultCommitOffchainConfig(t *testing.T) []byte {
 
 func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBeat time.Duration, inflightCacheExpiry time.Duration) []byte {
 	config, err := NewCommitOffchainConfig(
-		1,
-		1,
 		models.MustMakeDuration(feeUpdateHearBeat),
 		1,
 		1,
@@ -63,8 +61,6 @@ func (c *CCIPContracts) CreateDefaultExecOffchainConfig(t *testing.T) []byte {
 
 func (c *CCIPContracts) createExecOffchainConfig(t *testing.T, inflightCacheExpiry time.Duration, rootSnoozeTime time.Duration) []byte {
 	config, err := NewExecOffchainConfig(
-		1,
-		1,
 		1,
 		5_000_000,
 		0.07,

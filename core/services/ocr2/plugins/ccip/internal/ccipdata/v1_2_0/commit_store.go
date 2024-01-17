@@ -171,7 +171,7 @@ func (c *CommitStore) GasPriceEstimator() prices.GasPriceEstimatorCommit {
 
 // Do not change the JSON format of this struct without consulting with
 // the RDD people first.
-type CommitOffchainConfig struct {
+type JSONCommitOffchainConfig struct {
 	SourceFinalityDepth      uint32
 	DestFinalityDepth        uint32
 	GasPriceHeartBeat        models.Duration
@@ -184,7 +184,7 @@ type CommitOffchainConfig struct {
 	InflightCacheExpiry      models.Duration
 }
 
-func (c CommitOffchainConfig) Validate() error {
+func (c JSONCommitOffchainConfig) Validate() error {
 	if c.GasPriceHeartBeat.Duration() == 0 {
 		return errors.New("must set GasPriceHeartBeat")
 	}
@@ -211,7 +211,7 @@ func (c CommitOffchainConfig) Validate() error {
 	return nil
 }
 
-func (c *CommitOffchainConfig) ComputeSourceMaxGasPrice() uint64 {
+func (c *JSONCommitOffchainConfig) ComputeSourceMaxGasPrice() uint64 {
 	if c.SourceMaxGasPrice != 0 {
 		return c.SourceMaxGasPrice
 	}
@@ -224,7 +224,7 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 		return common.Address{}, err
 	}
 
-	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[CommitOffchainConfig](offchainConfig)
+	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[JSONCommitOffchainConfig](offchainConfig)
 	if err != nil {
 		return common.Address{}, err
 	}

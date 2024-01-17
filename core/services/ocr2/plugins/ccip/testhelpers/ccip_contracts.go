@@ -80,15 +80,14 @@ var (
 
 type MessageExecutionState ccipdata.MessageExecutionState
 type CommitOffchainConfig struct {
-	v1_2_0.CommitOffchainConfig
+	v1_2_0.JSONCommitOffchainConfig
 }
 
 func (c CommitOffchainConfig) Encode() ([]byte, error) {
-	return ccipconfig.EncodeOffchainConfig(c.CommitOffchainConfig)
+	return ccipconfig.EncodeOffchainConfig(c.JSONCommitOffchainConfig)
 }
 
-func NewCommitOffchainConfig(SourceFinalityDepth uint32,
-	DestFinalityDepth uint32,
+func NewCommitOffchainConfig(
 	GasPriceHeartBeat models.Duration,
 	DAGasPriceDeviationPPB uint32,
 	ExecGasPriceDeviationPPB uint32,
@@ -96,7 +95,7 @@ func NewCommitOffchainConfig(SourceFinalityDepth uint32,
 	TokenPriceDeviationPPB uint32,
 	MaxGasPrice uint64,
 	InflightCacheExpiry models.Duration) CommitOffchainConfig {
-	return CommitOffchainConfig{v1_2_0.CommitOffchainConfig{
+	return CommitOffchainConfig{v1_2_0.JSONCommitOffchainConfig{
 		GasPriceHeartBeat:        GasPriceHeartBeat,
 		DAGasPriceDeviationPPB:   DAGasPriceDeviationPPB,
 		ExecGasPriceDeviationPPB: ExecGasPriceDeviationPPB,
@@ -142,24 +141,22 @@ func NewExecOnchainConfig(
 }
 
 type ExecOffchainConfig struct {
-	v1_2_0.ExecOffchainConfig
+	v1_2_0.JSONExecOffchainConfig
 }
 
 func (c ExecOffchainConfig) Encode() ([]byte, error) {
-	return ccipconfig.EncodeOffchainConfig(c.ExecOffchainConfig)
+	return ccipconfig.EncodeOffchainConfig(c.JSONExecOffchainConfig)
 }
 
 func NewExecOffchainConfig(
-	SourceFinalityDepth uint32,
 	DestOptimisticConfirmations uint32,
-	DestFinalityDepth uint32,
 	BatchGasLimit uint32,
 	RelativeBoostPerWaitHour float64,
 	MaxGasPrice uint64,
 	InflightCacheExpiry models.Duration,
 	RootSnoozeTime models.Duration,
 ) ExecOffchainConfig {
-	return ExecOffchainConfig{v1_2_0.ExecOffchainConfig{
+	return ExecOffchainConfig{v1_2_0.JSONExecOffchainConfig{
 		DestOptimisticConfirmations: DestOptimisticConfirmations,
 		BatchGasLimit:               BatchGasLimit,
 		RelativeBoostPerWaitHour:    RelativeBoostPerWaitHour,

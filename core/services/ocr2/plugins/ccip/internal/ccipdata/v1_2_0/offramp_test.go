@@ -17,7 +17,7 @@ func modifyCopy[T any](c T, f func(c *T)) T {
 
 func TestExecOffchainConfig120_Encoding(t *testing.T) {
 	t.Parallel()
-	validConfig := ExecOffchainConfig{
+	validConfig := JSONExecOffchainConfig{
 		SourceFinalityDepth:         3,
 		DestOptimisticConfirmations: 6,
 		DestFinalityDepth:           3,
@@ -30,7 +30,7 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		want       ExecOffchainConfig
+		want       JSONExecOffchainConfig
 		errPattern string
 	}{
 		{
@@ -39,21 +39,21 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 		},
 		{
 			name: "can omit finality depth",
-			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
 				c.SourceFinalityDepth = 0
 				c.DestFinalityDepth = 0
 			}),
 		},
 		{
 			name: "can set the DestMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
 				c.MaxGasPrice = 0
 				c.DestMaxGasPrice = 200e9
 			}),
 		},
 		{
 			name: "must set DestMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
 				c.MaxGasPrice = 0
 				c.DestMaxGasPrice = 0
 			}),
@@ -61,42 +61,42 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 		},
 		{
 			name: "cannot set both MaxGasPrice and DestMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
 				c.DestMaxGasPrice = c.MaxGasPrice
 			}),
 			errPattern: "MaxGasPrice and DestMaxGasPrice",
 		},
 		{
 			name: "must set BatchGasLimit",
-			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
 				c.BatchGasLimit = 0
 			}),
 			errPattern: "BatchGasLimit",
 		},
 		{
 			name: "must set DestOptimisticConfirmations",
-			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
 				c.DestOptimisticConfirmations = 0
 			}),
 			errPattern: "DestOptimisticConfirmations",
 		},
 		{
 			name: "must set RelativeBoostPerWaitHour",
-			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
 				c.RelativeBoostPerWaitHour = 0
 			}),
 			errPattern: "RelativeBoostPerWaitHour",
 		},
 		{
 			name: "must set InflightCacheExpiry",
-			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
 				c.InflightCacheExpiry = models.MustMakeDuration(0)
 			}),
 			errPattern: "InflightCacheExpiry",
 		},
 		{
 			name: "must set RootSnoozeTime",
-			want: modifyCopy(validConfig, func(c *ExecOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
 				c.RootSnoozeTime = models.MustMakeDuration(0)
 			}),
 			errPattern: "RootSnoozeTime",
@@ -107,7 +107,7 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 			exp := tc.want
 			encode, err := ccipconfig.EncodeOffchainConfig(&exp)
 			require.NoError(t, err)
-			got, err := ccipconfig.DecodeOffchainConfig[ExecOffchainConfig](encode)
+			got, err := ccipconfig.DecodeOffchainConfig[JSONExecOffchainConfig](encode)
 
 			if tc.errPattern != "" {
 				require.ErrorContains(t, err, tc.errPattern)
@@ -120,7 +120,7 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 }
 
 func TestExecOffchainConfig120_MaxGasPrice(t *testing.T) {
-	config := ExecOffchainConfig{
+	config := JSONExecOffchainConfig{
 		SourceFinalityDepth:         3,
 		DestOptimisticConfirmations: 6,
 		DestFinalityDepth:           3,
@@ -141,7 +141,7 @@ func TestExecOffchainConfig120_MaxGasPrice(t *testing.T) {
 
 func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
 	t.Parallel()
-	decoded, err := ccipconfig.DecodeOffchainConfig[ExecOffchainConfig]([]byte(`{
+	decoded, err := ccipconfig.DecodeOffchainConfig[JSONExecOffchainConfig]([]byte(`{
 		"DestOptimisticConfirmations": 6,
 		"BatchGasLimit": 5000000,
 		"RelativeBoostPerWaitHour": 0.07,
@@ -150,7 +150,7 @@ func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
 		"RootSnoozeTime": "128m"
 	}`))
 	require.NoError(t, err)
-	require.Equal(t, ExecOffchainConfig{
+	require.Equal(t, JSONExecOffchainConfig{
 		DestOptimisticConfirmations: 6,
 		BatchGasLimit:               5_000_000,
 		RelativeBoostPerWaitHour:    0.07,

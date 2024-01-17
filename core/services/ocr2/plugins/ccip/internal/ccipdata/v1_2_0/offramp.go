@@ -76,10 +76,10 @@ func (d ExecOnchainConfig) PermissionLessExecutionThresholdDuration() time.Durat
 	return time.Duration(d.PermissionLessExecutionThresholdSeconds) * time.Second
 }
 
-// ExecOffchainConfig is the configuration for nodes executing committed CCIP messages (v1.2).
+// JSONExecOffchainConfig is the configuration for nodes executing committed CCIP messages (v1.2).
 // It comes from the OffchainConfig field of the corresponding OCR2 plugin configuration.
 // NOTE: do not change the JSON format of this struct without consulting with the RDD people first.
-type ExecOffchainConfig struct {
+type JSONExecOffchainConfig struct {
 	// SourceFinalityDepth indicates how many confirmations a transaction should get on the source chain event before we consider it finalized.
 	//
 	// Deprecated: we now use the source chain finality instead.
@@ -106,14 +106,14 @@ type ExecOffchainConfig struct {
 	RootSnoozeTime models.Duration
 }
 
-func (c ExecOffchainConfig) ComputeDestMaxGasPrice() uint64 {
+func (c JSONExecOffchainConfig) ComputeDestMaxGasPrice() uint64 {
 	if c.DestMaxGasPrice != 0 {
 		return c.DestMaxGasPrice
 	}
 	return c.MaxGasPrice
 }
 
-func (c ExecOffchainConfig) Validate() error {
+func (c JSONExecOffchainConfig) Validate() error {
 	if c.DestOptimisticConfirmations == 0 {
 		return errors.New("must set DestOptimisticConfirmations")
 	}
@@ -168,7 +168,7 @@ func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []
 		return common.Address{}, common.Address{}, err
 	}
 
-	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[ExecOffchainConfig](offchainConfigBytes)
+	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[JSONExecOffchainConfig](offchainConfigBytes)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
 	}

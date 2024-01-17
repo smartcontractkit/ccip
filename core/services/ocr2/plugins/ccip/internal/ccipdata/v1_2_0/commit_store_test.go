@@ -58,7 +58,7 @@ func TestCommitReportEncoding(t *testing.T) {
 
 func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 	t.Parallel()
-	validConfig := CommitOffchainConfig{
+	validConfig := JSONCommitOffchainConfig{
 		SourceFinalityDepth:      3,
 		DestFinalityDepth:        4,
 		MaxGasPrice:              200e9,
@@ -74,7 +74,7 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		want       CommitOffchainConfig
+		want       JSONCommitOffchainConfig
 		errPattern string
 	}{
 		{
@@ -83,21 +83,21 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 		},
 		{
 			name: "can omit finality depth",
-			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.SourceFinalityDepth = 0
 				c.DestFinalityDepth = 0
 			}),
 		},
 		{
 			name: "can set the SourceMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.MaxGasPrice = 0
 				c.SourceMaxGasPrice = 200e9
 			}),
 		},
 		{
 			name: "must set SourceMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.MaxGasPrice = 0
 				c.SourceMaxGasPrice = 0
 			}),
@@ -105,42 +105,42 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 		},
 		{
 			name: "cannot set both MaxGasPrice and SourceMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.SourceMaxGasPrice = c.MaxGasPrice
 			}),
 			errPattern: "MaxGasPrice and SourceMaxGasPrice",
 		},
 		{
 			name: "must set GasPriceHeartBeat",
-			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.GasPriceHeartBeat = models.MustMakeDuration(0)
 			}),
 			errPattern: "GasPriceHeartBeat",
 		},
 		{
 			name: "must set ExecGasPriceDeviationPPB",
-			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.ExecGasPriceDeviationPPB = 0
 			}),
 			errPattern: "ExecGasPriceDeviationPPB",
 		},
 		{
 			name: "must set TokenPriceHeartBeat",
-			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.TokenPriceHeartBeat = models.MustMakeDuration(0)
 			}),
 			errPattern: "TokenPriceHeartBeat",
 		},
 		{
 			name: "must set TokenPriceDeviationPPB",
-			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.TokenPriceDeviationPPB = 0
 			}),
 			errPattern: "TokenPriceDeviationPPB",
 		},
 		{
 			name: "must set InflightCacheExpiry",
-			want: modifyCopy(validConfig, func(c *CommitOffchainConfig) {
+			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
 				c.InflightCacheExpiry = models.MustMakeDuration(0)
 			}),
 			errPattern: "InflightCacheExpiry",
@@ -151,7 +151,7 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 			exp := tc.want
 			encode, err := ccipconfig.EncodeOffchainConfig(&exp)
 			require.NoError(t, err)
-			got, err := ccipconfig.DecodeOffchainConfig[CommitOffchainConfig](encode)
+			got, err := ccipconfig.DecodeOffchainConfig[JSONCommitOffchainConfig](encode)
 
 			if tc.errPattern != "" {
 				require.ErrorContains(t, err, tc.errPattern)
@@ -164,7 +164,7 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 }
 
 func TestCommitStoreV120ComputesGasPrice(t *testing.T) {
-	validConfig := CommitOffchainConfig{
+	validConfig := JSONCommitOffchainConfig{
 		SourceFinalityDepth:      3,
 		DestFinalityDepth:        4,
 		MaxGasPrice:              200e9,
