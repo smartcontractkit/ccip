@@ -31,8 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
-var HundredCoins = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
-
 type RateLimiterConfig struct {
 	Rate     *big.Int
 	Capacity *big.Int
