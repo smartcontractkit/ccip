@@ -165,7 +165,7 @@ func DecodeReport(networkID NetworkSelector, rebalancerAddress Address, binaryRe
 	out.LiquidityManagerAddress = rebalancerAddress
 	for _, send := range instructions.SendLiquidityParams {
 		out.Transfers = append(out.Transfers, Transfer{
-			From:   NetworkSelector(networkID),
+			From:   networkID,
 			To:     NetworkSelector(send.RemoteChainSelector),
 			Amount: send.Amount,
 		})
@@ -174,7 +174,7 @@ func DecodeReport(networkID NetworkSelector, rebalancerAddress Address, binaryRe
 	for _, recv := range instructions.ReceiveLiquidityParams {
 		out.Transfers = append(out.Transfers, Transfer{
 			From:       NetworkSelector(recv.RemoteChainSelector),
-			To:         NetworkSelector(networkID),
+			To:         networkID,
 			Amount:     recv.Amount,
 			BridgeData: recv.BridgeData,
 		})
