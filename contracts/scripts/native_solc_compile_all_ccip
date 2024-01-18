@@ -63,8 +63,8 @@ compileContract ccip/test/helpers/CommitStoreHelper.sol
 compileContract ccip/test/helpers/CustomTokenPool.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 compileContract ccip/test/mocks/MockARM.sol
-compileContract ccip/test/mocks/MockUSDCTokenMessenger.sol
-compileContract ccip/test/mocks/MockUSDCTransmitter.sol
+compileContract ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
+compileContract ccip/test/mocks/MockE2EUSDCTransmitter.sol
 compileContract ccip/test/WETH9.sol
 
 # Customer contracts

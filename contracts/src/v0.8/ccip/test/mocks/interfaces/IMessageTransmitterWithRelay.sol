@@ -15,7 +15,7 @@
  */
 pragma solidity ^0.8.0;
 
-import "../../pools/USDC/IMessageTransmitter.sol";
+import "../../../pools/USDC/IMessageTransmitter.sol";
 
 interface IMessageTransmitterWithRelay is IMessageTransmitter{
   /**

@@ -7,20 +7,20 @@ import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 
 // This contract mocks both the ITokenMessenger and IMessageTransmitter
 // contracts involved with the Cross Chain Token Protocol.
-contract MockUSDCTokenMessenger is ITokenMessenger {
+contract MockE2EUSDCTokenMessenger is ITokenMessenger {
   uint32 private immutable i_messageBodyVersion;
   bytes32 public constant i_destinationTokenMessenger = keccak256("i_destinationTokenMessenger");
   uint64 public s_nonce;
   address private i_transmitter;
 
   // Local Message Transmitter responsible for sending and receiving messages to/from remote domains
-  IMessageTransmitterWithRelay public immutable localMessageTransmitter;
+  IMessageTransmitterWithRelay public immutable localMessageTransmitterWithRelay;
 
   constructor(uint32 version, address transmitter) {
     i_messageBodyVersion = version;
     s_nonce = 1;
     i_transmitter = transmitter;
-    localMessageTransmitter = IMessageTransmitterWithRelay(transmitter);
+    localMessageTransmitterWithRelay = IMessageTransmitterWithRelay(transmitter);
   }
 
   function depositForBurnWithCaller(
@@ -38,9 +38,9 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
       burnToken,
       mintRecipient,
       amount,
-      Message.addressToBytes32(msg.sender)
+      bytes32(uint256(uint160((msg.sender))))
     );
-    uint64 s_nonce = _sendDepositForBurnMessage(
+    s_nonce = _sendDepositForBurnMessage(
       destinationDomain,
       i_destinationTokenMessenger,
       destinationCaller,
@@ -86,14 +86,14 @@ contract MockUSDCTokenMessenger is ITokenMessenger {
   ) internal returns (uint64 nonce) {
     if (_destinationCaller == bytes32(0)) {
       return
-      localMessageTransmitter.sendMessage(
+      localMessageTransmitterWithRelay.sendMessage(
         _destinationDomain,
         _destinationTokenMessenger,
         _burnMessage
       );
     } else {
       return
-      localMessageTransmitter.sendMessageWithCaller(
+      localMessageTransmitterWithRelay.sendMessageWithCaller(
         _destinationDomain,
         _destinationTokenMessenger,
         _destinationCaller,

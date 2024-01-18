@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IMessageTransmitterWithRelay} from "./interfaces/IMessageTransmitterWithRelay.sol";
 
-contract MockUSDCTransmitter is IMessageTransmitterWithRelay {
+contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   // Indicated whether the receiveMessage() call should succeed.
   bool public s_shouldSucceed;
   uint32 private immutable i_version;
@@ -11,9 +11,15 @@ contract MockUSDCTransmitter is IMessageTransmitterWithRelay {
   // Next available nonce from this source domain
   uint64 public nextAvailableNonce;
 
-  constructor(uint32 version, uint32 localDomain) {
-    i_version = version;
-    i_localDomain = localDomain;
+  /**
+     * @notice Emitted when a new message is dispatched
+     * @param message Raw bytes of message
+     */
+  event MessageSent(bytes message);
+
+  constructor(uint32 _version, uint32 _localDomain) {
+    i_version = _version;
+    i_localDomain = _localDomain;
     s_shouldSucceed = true;
   }
 
@@ -45,7 +51,7 @@ contract MockUSDCTransmitter is IMessageTransmitterWithRelay {
     uint32 destinationDomain,
     bytes32 recipient,
     bytes calldata messageBody
-  ) external override whenNotPaused returns (uint64) {
+  ) external returns (uint64) {
     bytes32 _emptyDestinationCaller = bytes32(0);
     uint64 _nonce = _reserveAndIncrementNonce();
     bytes32 _messageSender = bytes32(uint256(uint160((msg.sender))));
@@ -80,7 +86,7 @@ contract MockUSDCTransmitter is IMessageTransmitterWithRelay {
     bytes32 recipient,
     bytes32 destinationCaller,
     bytes calldata messageBody
-  ) external override whenNotPaused returns (uint64) {
+  ) external returns (uint64) {
     require(
       destinationCaller != bytes32(0),
       "Destination caller must be nonzero"
@@ -109,5 +115,41 @@ contract MockUSDCTransmitter is IMessageTransmitterWithRelay {
     uint64 _nonceReserved = nextAvailableNonce;
     nextAvailableNonce = nextAvailableNonce + 1;
     return _nonceReserved;
+  }
+
+  /**
+     * @notice Send the message to the destination domain and recipient. If `_destinationCaller` is not equal to bytes32(0),
+     * the message can only be received on the destination chain when called by `_destinationCaller`.
+     * @dev Format the message and emit `MessageSent` event with message information.
+     * @param _destinationDomain Domain of destination chain
+     * @param _recipient Address of message recipient on destination domain as bytes32
+     * @param _destinationCaller caller on the destination domain, as bytes32
+     * @param _sender message sender, as bytes32
+     * @param _nonce nonce reserved for message
+     * @param _messageBody Raw bytes content of message
+     */
+  function _sendMessage(
+    uint32 _destinationDomain,
+    bytes32 _recipient,
+    bytes32 _destinationCaller,
+    bytes32 _sender,
+    uint64 _nonce,
+    bytes calldata _messageBody
+  ) internal {
+    require(_recipient != bytes32(0), "Recipient must be nonzero");
+    // serialize message
+    bytes memory _message =  abi.encodePacked(
+      i_version,
+      i_localDomain,
+      _destinationDomain,
+      _nonce,
+      _sender,
+      _recipient,
+      _destinationCaller,
+      _messageBody
+    );
+
+    // Emit MessageSent event
+    emit MessageSent(_message);
   }
 }
