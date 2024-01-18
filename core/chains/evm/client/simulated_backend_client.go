@@ -333,7 +333,6 @@ func (c *SimulatedBackendClient) HeaderByHash(ctx context.Context, h common.Hash
 }
 
 func (c *SimulatedBackendClient) SendTransactionReturnCode(ctx context.Context, tx *types.Transaction, fromAddress common.Address) (commonclient.SendTxReturnCode, error) {
-	c.t.Log("SendTransactionReturnCode: ", tx.Hash().Hex(), " from ", fromAddress.Hex())
 	err := c.SendTransaction(ctx, tx)
 	if err == nil {
 		return commonclient.Successful, nil
