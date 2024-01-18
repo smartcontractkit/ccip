@@ -70,16 +70,12 @@ type ocr3Node struct {
 }
 
 type onchainUniverse struct {
-	backend              *backends.SimulatedBackend
-	chainID              uint64
-	wethAddress          common.Address
-	wethToken            *weth9.WETH9
-	lockReleasePoolAddr  common.Address
-	lockReleasePool      *lock_release_token_pool.LockReleaseTokenPool
-	rebalancerAddress    common.Address
-	rebalancer           *rebalancer.Rebalancer
-	bridgeAdapterAddress common.Address
-	bridgeAdapter        *mock_l2_bridge_adapter.MockL2BridgeAdapter
+	backend         *backends.SimulatedBackend
+	chainID         uint64
+	wethToken       *weth9.WETH9
+	lockReleasePool *lock_release_token_pool.LockReleaseTokenPool
+	rebalancer      *rebalancer.Rebalancer
+	bridgeAdapter   *mock_l2_bridge_adapter.MockL2BridgeAdapter
 }
 
 func setupNodeOCR3(
@@ -223,7 +219,7 @@ func newTestUniverse(t *testing.T, numChains int) {
 	universes := deployContracts(t, owner, chains)
 	createConnectedNetwork(t, owner, chains, universes)
 	transferBalances(t, owner, universes)
-	mainContract := universes[mainChainID].rebalancerAddress
+	mainContract := universes[mainChainID].rebalancer.Address()
 
 	t.Log("Creating bootstrap node")
 	bootstrapNodePort := freeport.GetOne(t)
@@ -668,16 +664,12 @@ func deployContracts(
 		require.NoError(t, err)
 
 		universes[chainID] = onchainUniverse{
-			backend:              backend,
-			chainID:              uint64(chainID),
-			wethAddress:          wethAddress,
-			wethToken:            wethToken,
-			lockReleasePoolAddr:  lockReleasePoolAddress,
-			lockReleasePool:      lockReleasePool,
-			rebalancerAddress:    rebalancerAddr,
-			rebalancer:           rebalancer,
-			bridgeAdapterAddress: bridgeAdapterAddress,
-			bridgeAdapter:        bridgeAdapter,
+			backend:         backend,
+			chainID:         uint64(chainID),
+			wethToken:       wethToken,
+			lockReleasePool: lockReleasePool,
+			rebalancer:      rebalancer,
+			bridgeAdapter:   bridgeAdapter,
 		}
 	}
 	return
@@ -703,21 +695,21 @@ func transferBalances(
 		// move some weth to the bridge adapters
 		// so that they can transfer it to the rebalancer
 		// when it calls finalizeWithdrawal
-		_, err := uni.wethToken.Transfer(owner, uni.bridgeAdapterAddress, assets.Ether(5).ToInt())
+		_, err := uni.wethToken.Transfer(owner, uni.bridgeAdapter.Address(), assets.Ether(5).ToInt())
 		require.NoError(t, err, "failed to transfer weth to bridge adapter")
 		uni.backend.Commit()
 		// confirm balance
-		bal, err := uni.wethToken.BalanceOf(&bind.CallOpts{Context: testutils.Context(t)}, uni.bridgeAdapterAddress)
+		bal, err := uni.wethToken.BalanceOf(&bind.CallOpts{Context: testutils.Context(t)}, uni.bridgeAdapter.Address())
 		require.NoError(t, err)
 		require.Equal(t, assets.Ether(5).ToInt(), bal)
 
 		// move some weth to the lock/release pool
 		// the LM will pull from this pool in order to send cross-chain
-		_, err = uni.wethToken.Transfer(owner, uni.lockReleasePoolAddr, assets.Ether(5).ToInt())
+		_, err = uni.wethToken.Transfer(owner, uni.lockReleasePool.Address(), assets.Ether(5).ToInt())
 		require.NoError(t, err, "failed to transfer weth to lock/release pool")
 		uni.backend.Commit()
 		// confirm balance
-		bal, err = uni.wethToken.BalanceOf(&bind.CallOpts{Context: testutils.Context(t)}, uni.lockReleasePoolAddr)
+		bal, err = uni.wethToken.BalanceOf(&bind.CallOpts{Context: testutils.Context(t)}, uni.lockReleasePool.Address())
 		require.NoError(t, err)
 		require.Equal(t, assets.Ether(5).ToInt(), bal)
 
@@ -748,40 +740,40 @@ func createConnectedNetwork(
 		_, err := uni.rebalancer.SetCrossChainRebalancer(
 			owner,
 			rebalancer.IRebalancerCrossChainRebalancerArgs{
-				RemoteRebalancer:    universes[mainChainID].rebalancerAddress,
+				RemoteRebalancer:    universes[mainChainID].rebalancer.Address(),
 				RemoteChainSelector: uint64(mainChainID),
 				Enabled:             true,
-				LocalBridge:         uni.bridgeAdapterAddress,
-				RemoteToken:         universes[mainChainID].wethAddress,
+				LocalBridge:         uni.bridgeAdapter.Address(),
+				RemoteToken:         universes[mainChainID].wethToken.Address(),
 			})
 		require.NoError(t, err, "failed to SetCrossChainRebalancer from follower to main chain")
 		chains[chainID].Commit()
 
 		mgr, err := uni.rebalancer.GetCrossChainRebalancer(&bind.CallOpts{Context: testutils.Context(t)}, uint64(mainChainID))
 		require.NoError(t, err)
-		require.Equal(t, universes[mainChainID].rebalancerAddress, mgr.RemoteRebalancer)
-		require.Equal(t, uni.bridgeAdapterAddress, mgr.LocalBridge)
-		require.Equal(t, universes[mainChainID].wethAddress, mgr.RemoteToken)
+		require.Equal(t, universes[mainChainID].rebalancer.Address(), mgr.RemoteRebalancer)
+		require.Equal(t, uni.bridgeAdapter.Address(), mgr.LocalBridge)
+		require.Equal(t, universes[mainChainID].wethToken.Address(), mgr.RemoteToken)
 		require.True(t, mgr.Enabled)
 
 		// main -> follower connection
 		_, err = universes[mainChainID].rebalancer.SetCrossChainRebalancer(
 			owner,
 			rebalancer.IRebalancerCrossChainRebalancerArgs{
-				RemoteRebalancer:    uni.rebalancerAddress,
+				RemoteRebalancer:    uni.rebalancer.Address(),
 				RemoteChainSelector: uint64(chainID),
 				Enabled:             true,
-				LocalBridge:         universes[mainChainID].bridgeAdapterAddress,
-				RemoteToken:         uni.wethAddress,
+				LocalBridge:         universes[mainChainID].bridgeAdapter.Address(),
+				RemoteToken:         uni.wethToken.Address(),
 			})
 		require.NoError(t, err, "failed to add neighbor from main to follower chain")
 		chains[mainChainID].Commit()
 
 		mgr, err = universes[mainChainID].rebalancer.GetCrossChainRebalancer(&bind.CallOpts{Context: testutils.Context(t)}, uint64(chainID))
 		require.NoError(t, err)
-		require.Equal(t, uni.rebalancerAddress, mgr.RemoteRebalancer)
-		require.Equal(t, universes[mainChainID].bridgeAdapterAddress, mgr.LocalBridge)
-		require.Equal(t, uni.wethAddress, mgr.RemoteToken)
+		require.Equal(t, uni.rebalancer.Address(), mgr.RemoteRebalancer)
+		require.Equal(t, universes[mainChainID].bridgeAdapter.Address(), mgr.LocalBridge)
+		require.Equal(t, uni.wethToken.Address(), mgr.RemoteToken)
 		require.True(t, mgr.Enabled)
 	}
 
