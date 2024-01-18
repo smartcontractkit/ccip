@@ -10,12 +10,6 @@ interface IBridgeAdapter {
   function sendERC20(address l1Token, address l2Token, address recipient, uint256 amount) external payable;
 
   function getBridgeFeeInNative() external view returns (uint256);
-}
 
-interface IL1BridgeAdapter is IBridgeAdapter {
-  function finalizeWithdrawERC20FromL2(
-    address l2Sender,
-    address l1Receiver,
-    bytes calldata bridgeSpecificPayload
-  ) external;
+  function finalizeWithdrawERC20(address l2Sender, address l1Receiver, bytes calldata bridgeSpecificPayload) external;
 }

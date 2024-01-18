@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IBridgeAdapter, IL1BridgeAdapter} from "../interfaces/IBridge.sol";
+import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 import {IRebalancer} from "../interfaces/IRebalancer.sol";
 
 import {LockReleaseTokenPool} from "../../ccip/pools/LockReleaseTokenPool.sol";

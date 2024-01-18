@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IL1BridgeAdapter} from "../interfaces/IBridge.sol";
+import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 
 import {IL1GatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -39,7 +39,7 @@ interface IOutbox {
 
 /// @notice Arbitrum L1 Bridge adapter
 /// @dev Auto unwraps and re-wraps wrapped eth in the bridge.
-contract ArbitrumL1BridgeAdapter is IL1BridgeAdapter {
+contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
   using SafeERC20 for IERC20;
 
   IL1GatewayRouter internal immutable i_l1GatewayRouter;
@@ -109,7 +109,7 @@ contract ArbitrumL1BridgeAdapter is IL1BridgeAdapter {
 
   /// @param l2Sender sender if original message (i.e., caller of ArbSys.sendTxToL1)
   /// @param l1Receiver destination address for L1 contract call
-  function finalizeWithdrawERC20FromL2(
+  function finalizeWithdrawERC20(
     address l2Sender,
     address l1Receiver,
     bytes calldata arbitrumFinalizationPayload

@@ -29,8 +29,8 @@ var (
 )
 
 var MockL2BridgeAdapterMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"name\":\"BridgeAddressCannotBeZero\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"wanted\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"got\",\"type\":\"uint256\"}],\"name\":\"InsufficientEthValue\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"MsgShouldNotContainValue\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"msgValue\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"MsgValueDoesNotMatchAmount\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"getBridgeFeeInNative\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"l2token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"sendERC20\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b506101b2806100206000396000f3fe6080604052600436106100295760003560e01c80632e4b1fc91461002e57806379a35b4b1461004f575b600080fd5b34801561003a57600080fd5b50600060405190815260200160405180910390f35b61006261005d366004610131565b610064565b005b6040517f23b872dd0000000000000000000000000000000000000000000000000000000081523360048201523060248201526044810182905273ffffffffffffffffffffffffffffffffffffffff8416906323b872dd906064016020604051808303816000875af11580156100dd573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610101919061017c565b5050505050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461012c57600080fd5b919050565b6000806000806080858703121561014757600080fd5b61015085610108565b935061015e60208601610108565b925061016c60408601610108565b9396929550929360600135925050565b60006020828403121561018e57600080fd5b8151801515811461019e57600080fd5b939250505056fea164736f6c6343000813000a",
+	ABI: "[{\"inputs\":[],\"name\":\"BridgeAddressCannotBeZero\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"wanted\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"got\",\"type\":\"uint256\"}],\"name\":\"InsufficientEthValue\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"value\",\"type\":\"uint256\"}],\"name\":\"MsgShouldNotContainValue\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"msgValue\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"MsgValueDoesNotMatchAmount\",\"type\":\"error\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\"}],\"name\":\"finalizeWithdrawERC20\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getBridgeFeeInNative\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"l2token\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"name\":\"sendERC20\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b50610267806100206000396000f3fe6080604052600436106100345760003560e01c80632e4b1fc91461003957806338314bb21461005a57806379a35b4b1461007d575b600080fd5b34801561004557600080fd5b50600060405190815260200160405180910390f35b34801561006657600080fd5b5061007b610075366004610158565b50505050565b005b61007b61008b3660046101e6565b6040517f23b872dd0000000000000000000000000000000000000000000000000000000081523360048201523060248201526044810182905273ffffffffffffffffffffffffffffffffffffffff8416906323b872dd906064016020604051808303816000875af1158015610104573d6000803e3d6000fd5b505050506040513d601f19601f820116820180604052508101906101289190610231565b5050505050565b803573ffffffffffffffffffffffffffffffffffffffff8116811461015357600080fd5b919050565b6000806000806060858703121561016e57600080fd5b6101778561012f565b93506101856020860161012f565b9250604085013567ffffffffffffffff808211156101a257600080fd5b818701915087601f8301126101b657600080fd5b8135818111156101c557600080fd5b8860208285010111156101d757600080fd5b95989497505060200194505050565b600080600080608085870312156101fc57600080fd5b6102058561012f565b93506102136020860161012f565b92506102216040860161012f565b9396929550929360600135925050565b60006020828403121561024357600080fd5b8151801515811461025357600080fd5b939250505056fea164736f6c6343000813000a",
 }
 
 var MockL2BridgeAdapterABI = MockL2BridgeAdapterMetaData.ABI
@@ -191,6 +191,18 @@ func (_MockL2BridgeAdapter *MockL2BridgeAdapterCallerSession) GetBridgeFeeInNati
 	return _MockL2BridgeAdapter.Contract.GetBridgeFeeInNative(&_MockL2BridgeAdapter.CallOpts)
 }
 
+func (_MockL2BridgeAdapter *MockL2BridgeAdapterTransactor) FinalizeWithdrawERC20(opts *bind.TransactOpts, arg0 common.Address, arg1 common.Address, arg2 []byte) (*types.Transaction, error) {
+	return _MockL2BridgeAdapter.contract.Transact(opts, "finalizeWithdrawERC20", arg0, arg1, arg2)
+}
+
+func (_MockL2BridgeAdapter *MockL2BridgeAdapterSession) FinalizeWithdrawERC20(arg0 common.Address, arg1 common.Address, arg2 []byte) (*types.Transaction, error) {
+	return _MockL2BridgeAdapter.Contract.FinalizeWithdrawERC20(&_MockL2BridgeAdapter.TransactOpts, arg0, arg1, arg2)
+}
+
+func (_MockL2BridgeAdapter *MockL2BridgeAdapterTransactorSession) FinalizeWithdrawERC20(arg0 common.Address, arg1 common.Address, arg2 []byte) (*types.Transaction, error) {
+	return _MockL2BridgeAdapter.Contract.FinalizeWithdrawERC20(&_MockL2BridgeAdapter.TransactOpts, arg0, arg1, arg2)
+}
+
 func (_MockL2BridgeAdapter *MockL2BridgeAdapterTransactor) SendERC20(opts *bind.TransactOpts, arg0 common.Address, l2token common.Address, arg2 common.Address, amount *big.Int) (*types.Transaction, error) {
 	return _MockL2BridgeAdapter.contract.Transact(opts, "sendERC20", arg0, l2token, arg2, amount)
 }
@@ -209,6 +221,8 @@ func (_MockL2BridgeAdapter *MockL2BridgeAdapter) Address() common.Address {
 
 type MockL2BridgeAdapterInterface interface {
 	GetBridgeFeeInNative(opts *bind.CallOpts) (*big.Int, error)
+
+	FinalizeWithdrawERC20(opts *bind.TransactOpts, arg0 common.Address, arg1 common.Address, arg2 []byte) (*types.Transaction, error)
 
 	SendERC20(opts *bind.TransactOpts, arg0 common.Address, l2token common.Address, arg2 common.Address, amount *big.Int) (*types.Transaction, error)
 

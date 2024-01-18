@@ -43,6 +43,9 @@ contract OptimismL2BridgeAdapter is IBridgeAdapter {
     i_L2Bridge.withdrawTo(l2Token, recipient, amount, 0, abi.encode(s_nonce++));
   }
 
+  // No-op
+  function finalizeWithdrawERC20(address, address, bytes calldata) external {}
+
   /// @notice There are no fees to bridge back to L1
   function getBridgeFeeInNative() external pure returns (uint256) {
     return 0;

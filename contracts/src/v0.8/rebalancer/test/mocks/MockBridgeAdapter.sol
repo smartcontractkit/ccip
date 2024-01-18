@@ -2,7 +2,7 @@
 // solhint-disable one-contract-per-file
 pragma solidity ^0.8.0;
 
-import {IBridgeAdapter, IL1BridgeAdapter} from "../../interfaces/IBridge.sol";
+import {IBridgeAdapter} from "../../interfaces/IBridge.sol";
 import {ILiquidityContainer} from "../../interfaces/ILiquidityContainer.sol";
 
 import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -10,7 +10,7 @@ import {SafeERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/
 
 /// @notice Mock L1 Bridge adapter
 /// @dev Sends the L1 tokens from the msg sender to address(this)
-contract MockL1BridgeAdapter is IL1BridgeAdapter, ILiquidityContainer {
+contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   using SafeERC20 for IERC20;
 
   error InsufficientLiquidity();
@@ -47,6 +47,9 @@ contract MockL1BridgeAdapter is IL1BridgeAdapter, ILiquidityContainer {
     i_token.safeTransfer(msg.sender, amount);
     emit LiquidityRemoved(msg.sender, amount);
   }
+
+  // No-op
+  function finalizeWithdrawERC20(address, address, bytes calldata) external {}
 }
 
 /// @notice Mock L2 Bridge adapter
@@ -59,4 +62,7 @@ contract MockL2BridgeAdapter is IBridgeAdapter {
   function getBridgeFeeInNative() external pure returns (uint256) {
     return 0;
   }
+
+  // No-op
+  function finalizeWithdrawERC20(address, address, bytes calldata) external {}
 }

@@ -46,6 +46,9 @@ contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
     i_l2GatewayRouter.outboundTransfer(l1Token, recipient, amount, bytes(""));
   }
 
+  // No-op
+  function finalizeWithdrawERC20(address, address, bytes calldata) external {}
+
   /// @notice There are no fees to bridge back to L1
   function getBridgeFeeInNative() external pure returns (uint256) {
     return 0;
