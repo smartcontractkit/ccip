@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
@@ -30,22 +31,52 @@ func TestIntegration_CCIP(t *testing.T) {
 	//defer ethUSD.Close()
 	srcLinkAddr := ccipTH.Source.LinkToken.Address()
 	dstLinkAddr := ccipTH.Dest.LinkToken.Address()
+
+	// Set up the aggregators here to avoid modifying ccipTH.
+	aggSrcNatAddr, _, aggSrcNat, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(ccipTH.Source.User, ccipTH.Source.Chain, 18, big.NewInt(2e18))
+	require.NoError(t, err)
+	_, err = aggSrcNat.UpdateRoundData(ccipTH.Source.User, big.NewInt(50), big.NewInt(17000000), big.NewInt(1000), big.NewInt(1000))
+	require.NoError(t, err)
+	ccipTH.Source.Chain.Commit()
+
+	aggSrcLnkAddr, _, aggSrcLnk, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(ccipTH.Source.User, ccipTH.Source.Chain, 18, big.NewInt(3e18))
+	require.NoError(t, err)
+	ccipTH.Dest.Chain.Commit()
+	_, err = aggSrcLnk.UpdateRoundData(ccipTH.Source.User, big.NewInt(50), big.NewInt(8000000), big.NewInt(1000), big.NewInt(1000))
+	require.NoError(t, err)
+	ccipTH.Source.Chain.Commit()
+
+	aggDstLnkAddr, _, aggDstLnk, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(ccipTH.Dest.User, ccipTH.Dest.Chain, 18, big.NewInt(3e18))
+	require.NoError(t, err)
+	ccipTH.Dest.Chain.Commit()
+	_, err = aggDstLnk.UpdateRoundData(ccipTH.Dest.User, big.NewInt(50), big.NewInt(8000000), big.NewInt(1000), big.NewInt(1000))
+	require.NoError(t, err)
+	ccipTH.Dest.Chain.Commit()
+
 	tokenPricesConfig := pricegetter.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
 			srcLinkAddr: {
-				ChainID:         101,
-				ContractAddress: ccipTH.Source.PriceRegistry.Address(), // aggregator contract
+				ChainID:         ccipTH.Source.ChainID,
+				ContractAddress: aggSrcLnkAddr,
+			},
+			ccipTH.Source.WrappedNative.Address(): {
+				ChainID:         ccipTH.Source.ChainID,
+				ContractAddress: aggSrcNatAddr,
 			},
 			dstLinkAddr: {
-				ChainID:         102,
-				ContractAddress: ccipTH.Dest.PriceRegistry.Address(), // aggregator contract
+				ChainID:         ccipTH.Dest.ChainID,
+				ContractAddress: aggDstLnkAddr,
 			},
+			//ccipTH.Dest.WrappedNative.Address(): {
+			//	ChainID:         ccipTH.Dest.ChainID,
+			//	ContractAddress: aggDstNat,
+			//},
 		},
 		StaticPrices: map[common.Address]pricegetter.StaticPriceConfig{},
 		//StaticPrices: map[common.Address]pricegetter.StaticPriceConfig{
-		//	"tkaddr": {
-		//		ChainID: 103,
-		//		Price:   1_000_000_000,
+		//	dstLinkAddr: {
+		//		ChainID: ccipTH.Dest.ChainID,
+		//		Price:   8000000000000000000,
 		//	},
 		//},
 	}

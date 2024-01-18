@@ -42,7 +42,7 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	fmt.Printf("=> src LINK at: %s\n", srcLinkAddr)
 	fmt.Printf("=> dst LINK at: %s\n", dstLinkAddr)
 
-	// Setup the aggregator here to avoid modifying ccipTH.
+	// Set up the aggregators here to avoid modifying ccipTH.
 	aggSrcNatAddr, _, aggSrcNat, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(ccipTH.Source.User, ccipTH.Source.Chain, 18, big.NewInt(2e18))
 	require.NoError(t, err)
 	_, err = aggSrcNat.UpdateRoundData(ccipTH.Source.User, big.NewInt(50), big.NewInt(17000000), big.NewInt(1000), big.NewInt(1000))
