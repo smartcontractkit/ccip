@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -23,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 var (
@@ -101,9 +101,9 @@ type JSONExecOffchainConfig struct {
 	// DestMaxGasPrice is the max gas price in the native currency (e.g., wei/gas) that a node will pay for executing a transaction on the destination chain.
 	DestMaxGasPrice uint64
 	// See [ccipdata.ExecOffchainConfig.InflightCacheExpiry]
-	InflightCacheExpiry models.Duration
+	InflightCacheExpiry config.Duration
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
-	RootSnoozeTime models.Duration
+	RootSnoozeTime config.Duration
 }
 
 func (c JSONExecOffchainConfig) ComputeDestMaxGasPrice() uint64 {

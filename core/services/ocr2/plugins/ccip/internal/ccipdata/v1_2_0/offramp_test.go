@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 func modifyCopy[T any](c T, f func(c *T)) T {
@@ -24,8 +24,8 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 		BatchGasLimit:               5_000_000,
 		RelativeBoostPerWaitHour:    0.07,
 		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
-		RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
+		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
+		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
 	}
 
 	tests := []struct {
@@ -90,14 +90,14 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 		{
 			name: "must set InflightCacheExpiry",
 			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
-				c.InflightCacheExpiry = models.MustMakeDuration(0)
+				c.InflightCacheExpiry = *config.MustNewDuration(0)
 			}),
 			errPattern: "InflightCacheExpiry",
 		},
 		{
 			name: "must set RootSnoozeTime",
 			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
-				c.RootSnoozeTime = models.MustMakeDuration(0)
+				c.RootSnoozeTime = *config.MustNewDuration(0)
 			}),
 			errPattern: "RootSnoozeTime",
 		},
@@ -127,8 +127,8 @@ func TestExecOffchainConfig120_MaxGasPrice(t *testing.T) {
 		BatchGasLimit:               5_000_000,
 		RelativeBoostPerWaitHour:    0.07,
 		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
-		RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
+		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
+		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
 	}
 	require.NoError(t, config.Validate())
 	require.Equal(t, uint64(200e9), config.ComputeDestMaxGasPrice())
@@ -155,7 +155,7 @@ func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
 		BatchGasLimit:               5_000_000,
 		RelativeBoostPerWaitHour:    0.07,
 		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
-		RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
+		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
+		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
 	}, decoded)
 }

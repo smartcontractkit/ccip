@@ -7,8 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 func TestExecOffchainConfig100_Encoding(t *testing.T) {
@@ -26,8 +26,8 @@ func TestExecOffchainConfig100_Encoding(t *testing.T) {
 				BatchGasLimit:               5_000_000,
 				RelativeBoostPerWaitHour:    0.07,
 				MaxGasPrice:                 200e9,
-				InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
-				RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
+				InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
+				RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
 			},
 		},
 		{
@@ -39,8 +39,8 @@ func TestExecOffchainConfig100_Encoding(t *testing.T) {
 				BatchGasLimit:               0,
 				RelativeBoostPerWaitHour:    0,
 				MaxGasPrice:                 0,
-				InflightCacheExpiry:         models.MustMakeDuration(0),
-				RootSnoozeTime:              models.MustMakeDuration(0),
+				InflightCacheExpiry:         *config.MustNewDuration(0),
+				RootSnoozeTime:              *config.MustNewDuration(0),
 			},
 			expectErr: true,
 		},
@@ -53,7 +53,7 @@ func TestExecOffchainConfig100_Encoding(t *testing.T) {
 			name: "fails decoding when some fields are missing",
 			want: ExecOffchainConfig{
 				SourceFinalityDepth: 99999999,
-				InflightCacheExpiry: models.MustMakeDuration(64 * time.Second),
+				InflightCacheExpiry: *config.MustNewDuration(64 * time.Second),
 			},
 			expectErr: true,
 		},
@@ -83,8 +83,8 @@ func TestExecOffchainConfig100_AllFieldsRequired(t *testing.T) {
 		BatchGasLimit:               5_000_000,
 		RelativeBoostPerWaitHour:    0.07,
 		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         models.MustMakeDuration(64 * time.Second),
-		RootSnoozeTime:              models.MustMakeDuration(128 * time.Minute),
+		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
+		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
 	}
 	encoded, err := ccipconfig.EncodeOffchainConfig(&config)
 	require.NoError(t, err)

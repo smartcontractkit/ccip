@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 func TestCommitReportEncoding(t *testing.T) {
@@ -62,12 +62,12 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 		SourceFinalityDepth:      3,
 		DestFinalityDepth:        4,
 		MaxGasPrice:              200e9,
-		GasPriceHeartBeat:        models.MustMakeDuration(1 * time.Minute),
+		GasPriceHeartBeat:        *config.MustNewDuration(1 * time.Minute),
 		DAGasPriceDeviationPPB:   10,
 		ExecGasPriceDeviationPPB: 11,
-		TokenPriceHeartBeat:      models.MustMakeDuration(2 * time.Minute),
+		TokenPriceHeartBeat:      *config.MustNewDuration(2 * time.Minute),
 		TokenPriceDeviationPPB:   12,
-		InflightCacheExpiry:      models.MustMakeDuration(3 * time.Minute),
+		InflightCacheExpiry:      *config.MustNewDuration(3 * time.Minute),
 	}
 
 	require.NoError(t, validConfig.Validate())
@@ -113,7 +113,7 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 		{
 			name: "must set GasPriceHeartBeat",
 			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
-				c.GasPriceHeartBeat = models.MustMakeDuration(0)
+				c.GasPriceHeartBeat = *config.MustNewDuration(0)
 			}),
 			errPattern: "GasPriceHeartBeat",
 		},
@@ -127,7 +127,7 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 		{
 			name: "must set TokenPriceHeartBeat",
 			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
-				c.TokenPriceHeartBeat = models.MustMakeDuration(0)
+				c.TokenPriceHeartBeat = *config.MustNewDuration(0)
 			}),
 			errPattern: "TokenPriceHeartBeat",
 		},
@@ -141,7 +141,7 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 		{
 			name: "must set InflightCacheExpiry",
 			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
-				c.InflightCacheExpiry = models.MustMakeDuration(0)
+				c.InflightCacheExpiry = *config.MustNewDuration(0)
 			}),
 			errPattern: "InflightCacheExpiry",
 		},
@@ -168,12 +168,12 @@ func TestCommitStoreV120ComputesGasPrice(t *testing.T) {
 		SourceFinalityDepth:      3,
 		DestFinalityDepth:        4,
 		MaxGasPrice:              200e9,
-		GasPriceHeartBeat:        models.MustMakeDuration(1 * time.Minute),
+		GasPriceHeartBeat:        *config.MustNewDuration(1 * time.Minute),
 		DAGasPriceDeviationPPB:   10,
 		ExecGasPriceDeviationPPB: 11,
-		TokenPriceHeartBeat:      models.MustMakeDuration(2 * time.Minute),
+		TokenPriceHeartBeat:      *config.MustNewDuration(2 * time.Minute),
 		TokenPriceDeviationPPB:   12,
-		InflightCacheExpiry:      models.MustMakeDuration(3 * time.Minute),
+		InflightCacheExpiry:      *config.MustNewDuration(3 * time.Minute),
 	}
 
 	require.NoError(t, validConfig.Validate())

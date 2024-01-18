@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 var PermissionLessExecutionThresholdSeconds = uint32(FirstBlockAge.Seconds())
@@ -30,13 +30,13 @@ func (c *CCIPContracts) CreateDefaultCommitOffchainConfig(t *testing.T) []byte {
 
 func (c *CCIPContracts) createCommitOffchainConfig(t *testing.T, feeUpdateHearBeat time.Duration, inflightCacheExpiry time.Duration) []byte {
 	config, err := NewCommitOffchainConfig(
-		models.MustMakeDuration(feeUpdateHearBeat),
+		*config.MustNewDuration(feeUpdateHearBeat),
 		1,
 		1,
-		models.MustMakeDuration(feeUpdateHearBeat),
+		*config.MustNewDuration(feeUpdateHearBeat),
 		1,
 		200e9,
-		models.MustMakeDuration(inflightCacheExpiry),
+		*config.MustNewDuration(inflightCacheExpiry),
 	).Encode()
 	require.NoError(t, err)
 	return config
@@ -65,8 +65,8 @@ func (c *CCIPContracts) createExecOffchainConfig(t *testing.T, inflightCacheExpi
 		5_000_000,
 		0.07,
 		200e9,
-		models.MustMakeDuration(inflightCacheExpiry),
-		models.MustMakeDuration(rootSnoozeTime),
+		*config.MustNewDuration(inflightCacheExpiry),
+		*config.MustNewDuration(rootSnoozeTime),
 	).Encode()
 	require.NoError(t, err)
 	return config
