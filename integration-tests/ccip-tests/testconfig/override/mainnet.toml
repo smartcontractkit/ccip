@@ -36,7 +36,8 @@ Data = """
         }
       },
       "Avalanche Mainnet": {
-          "fee_token": "0x5947BB275c521040051D82396192181b413227A3",
+          "is_native_fee_token": true,
+          "fee_token": "",
           "bridge_tokens": [],
           "bridge_tokens_pools": [],
           "arm": "0xdFD6C0dc67666DE3bB36b31eec5c7B1542A82C1E",
@@ -126,7 +127,8 @@ Data = """
             }
       },
       "BSC Mainnet": {
-        "fee_token": "0x404460C6A5EdE2D891e8297795264fDe62ADBB75",
+        "is_native_fee_token": true,
+        "fee_token": "",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
         "arm": "0x3DB43b96B2625F4232e9Df900d464dd2c64C0021",
@@ -275,6 +277,7 @@ Data = """
         }
       },
       "Optimism Mainnet": {
+        "is_native_fee_token": true,
         "fee_token": "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
@@ -315,6 +318,7 @@ Data = """
         }
       },
       "Polygon Mainnet": {
+        "is_native_fee_token": true,
         "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
         "bridge_tokens": ["0xb0897686c545045aFc77CF20eC7A532E3120E0F1"],
         "bridge_tokens_pools": ["0x086892015567fb8764d02c6845C85C25C8FcA389"],
@@ -364,7 +368,8 @@ Data = """
         }
       },
       "WeMix Mainnet": {
-          "fee_token": "0x80f1FcdC96B55e459BF52b998aBBE2c364935d69",
+          "is_native_fee_token": true,
+          "fee_token": "",
           "bridge_tokens": [],
           "bridge_tokens_pools": [],
           "arm" : "0x07aaC8B69A62dB5bd3d244091916EbF2fac17b76",
@@ -421,7 +426,7 @@ MsgType = 'WithoutToken'
 DestGasLimit = 0
 BiDirectionalLane = true
 PhaseTimeout = '50m'
-TestDuration = '96h'
+TestDuration = '168h'
 ExistingDeployment = true
 RequestPerUnitTime = [1]
 TimeUnit = '1h'
@@ -431,9 +436,26 @@ AmountPerToken = 1
 ExistingEnv = 'mainnet-2.7-ccip1.2'
 
 [CCIP.Groups.smoke]
-MsgType = 'WithToken'
-NetworkPairs = ['ETHEREUM_MAINNET,BASE_MAINNET']
-BiDirectionalLane = false
+MsgType = 'WithoutToken'
+NetworkPairs = [
+  'ETHEREUM_MAINNET,BASE_MAINNET',
+  'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
+  'ETHEREUM_MAINNET,WEMIX_MAINNET',
+  'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
+  'ETHEREUM_MAINNET,POLYGON_MAINNET',
+  'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
+  'ETHEREUM_MAINNET,BSC_MAINNET',
+  'BASE_MAINNET,ARBITRUM_MAINNET',
+  'WEMIX_MAINNET,KROMA_MAINNET',
+  'OPTIMISM_MAINNET,POLYGON_MAINNET',
+  'AVALANCHE_MAINNET,POLYGON_MAINNET',
+  'BSC_MAINNET,POLYGON_MAINNET',
+  'BASE_MAINNET,OPTIMISM_MAINNET',
+  'AVALANCHE_MAINNET,BSC_MAINNET',
+  'BASE_MAINNET,BSC_MAINNET',
+]
+BiDirectionalLane = true
+DestGasLimit = 0
 PhaseTimeout = '50m'
 LocalCluster = false
 ExistingDeployment = true
