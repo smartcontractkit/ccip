@@ -39,4 +39,5 @@ compileContract rebalancer/bridge-adapters/ArbitrumL2BridgeAdapter.sol
 compileContract rebalancer/bridge-adapters/OptimismL1BridgeAdapter.sol
 compileContract rebalancer/bridge-adapters/OptimismL2BridgeAdapter.sol
 compileContract rebalancer/test/mocks/NoOpOCR3.sol
-
+compileContract rebalancer/test/mocks/MockBridgeAdapter.sol
+compileContract rebalancer/test/helpers/RebalancerReportEncoder.sol
