@@ -2194,12 +2194,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("getting current block should be successful in destination chain %w", err)
 	}
 
-	var tokenAddresses []string
-
-	for _, token := range lane.Dest.Common.BridgeTokens {
-		tokenAddresses = append(tokenAddresses, token.Address())
-	}
-	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
+	//var tokenAddresses []string
+	//
+	//for _, token := range lane.Dest.Common.BridgeTokens {
+	//	tokenAddresses = append(tokenAddresses, token.Address())
+	//}
+	//tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
 
 	//var killgrave *ctftestenv.Killgrave
 	//if env.LocalCluster != nil {

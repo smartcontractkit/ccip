@@ -26,11 +26,6 @@ import (
 
 func TestIntegration_CCIP(t *testing.T) {
 	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
-	//tokenPricesUSDPipeline, linkUSD, ethUSD := ccipTH.CreatePricesPipeline(t)
-	//defer linkUSD.Close()
-	//defer ethUSD.Close()
-	srcLinkAddr := ccipTH.Source.LinkToken.Address()
-	dstLinkAddr := ccipTH.Dest.LinkToken.Address()
 
 	// Set up the aggregators here to avoid modifying ccipTH.
 	aggSrcNatAddr, _, aggSrcNat, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(ccipTH.Source.User, ccipTH.Source.Chain, 18, big.NewInt(2e18))
@@ -55,7 +50,7 @@ func TestIntegration_CCIP(t *testing.T) {
 
 	tokenPricesConfig := pricegetter.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
-			srcLinkAddr: {
+			ccipTH.Source.LinkToken.Address(): {
 				ChainID:         ccipTH.Source.ChainID,
 				ContractAddress: aggSrcLnkAddr,
 			},
@@ -63,7 +58,7 @@ func TestIntegration_CCIP(t *testing.T) {
 				ChainID:         ccipTH.Source.ChainID,
 				ContractAddress: aggSrcNatAddr,
 			},
-			dstLinkAddr: {
+			ccipTH.Dest.LinkToken.Address(): {
 				ChainID:         ccipTH.Dest.ChainID,
 				ContractAddress: aggDstLnkAddr,
 			},
