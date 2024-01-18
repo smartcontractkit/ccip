@@ -97,7 +97,7 @@ func (e *CCIPContractsDeployer) DeployTokenMessenger(tokenTransmitter common.Add
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err := mock_usdc_token_messenger.DeployMockUSDCTokenMessenger(auth, backend, 0, tokenTransmitter)
+		address, tx, contract, err := mock_usdc_token_messenger.DeployMockE2EUSDCTokenMessenger(auth, backend, 0, tokenTransmitter)
 		if err != nil {
 			return common.Address{}, nil, nil, err
 		}
@@ -108,7 +108,7 @@ func (e *CCIPContractsDeployer) DeployTokenMessenger(tokenTransmitter common.Add
 }
 
 func (e *CCIPContractsDeployer) NewTokenTransmitter(addr common.Address) (*TokenTransmitter, error) {
-	transmitter, err := mock_usdc_token_transmitter.NewMockUSDCTransmitter(addr, e.evmClient.Backend())
+	transmitter, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(addr, e.evmClient.Backend())
 
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (e *CCIPContractsDeployer) DeployTokenTransmitter(domain uint32) (*TokenTra
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		address, tx, contract, err := mock_usdc_token_transmitter.DeployMockUSDCTransmitter(auth, backend, 0, domain)
+		address, tx, contract, err := mock_usdc_token_transmitter.DeployMockE2EUSDCTransmitter(auth, backend, 0, domain)
 		if err != nil {
 			return common.Address{}, nil, nil, err
 		}
@@ -140,7 +140,7 @@ func (e *CCIPContractsDeployer) DeployTokenTransmitter(domain uint32) (*TokenTra
 
 	return &TokenTransmitter{
 		client:          e.evmClient,
-		instance:        instance.(*mock_usdc_token_transmitter.MockUSDCTransmitter),
+		instance:        instance.(*mock_usdc_token_transmitter.MockE2EUSDCTransmitter),
 		ContractAddress: *address,
 	}, err
 }

@@ -46,7 +46,7 @@ type ARMConfig struct {
 
 type TokenTransmitter struct {
 	client          blockchain.EVMClient
-	instance        *mock_usdc_token_transmitter.MockUSDCTransmitter
+	instance        *mock_usdc_token_transmitter.MockE2EUSDCTransmitter
 	ContractAddress common.Address
 }
 
@@ -266,7 +266,7 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 
 	var allowedCallerBytes [32]byte
 	copy(allowedCallerBytes[12:], destPoolAddr.Bytes())
-	destTokenTransmitterIns, err := mock_usdc_token_transmitter.NewMockUSDCTransmitter(destTokenTransmitter.ContractAddress, destTokenTransmitter.client.Backend())
+	destTokenTransmitterIns, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(destTokenTransmitter.ContractAddress, destTokenTransmitter.client.Backend())
 	if err != nil {
 		return err
 	}
