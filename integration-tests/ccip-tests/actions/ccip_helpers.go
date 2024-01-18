@@ -2215,7 +2215,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		SourceStartBlock: lane.Source.SrcStartBlock,
 		// FIXME
 		//TokenPricesUSDPipeline: TokenFeeForMultipleTokenAddr(tokensUSDUrl),
-		TokenPricesConfig: "",
+		TokenPricesConfig: "{}",
 		DestStartBlock:    currentBlockOnDest,
 	}
 
