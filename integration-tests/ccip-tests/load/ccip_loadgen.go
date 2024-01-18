@@ -180,9 +180,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		res.Failed = true
 		return res
 	}
-	if !sourceCCIP.Common.ExistingDeployment && sourceCCIP.Common.USDCDeployment {
-		sourceCCIP.MsgChan <- sendTx.Hash().Hex()
-	}
+
 	err = sourceCCIP.Common.ChainClient.MarkTxAsSentOnL2(sendTx)
 
 	if err != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
@@ -799,6 +800,23 @@ func CCIPDefaultTestSetUp(
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
 
+	// set up mock server for price pipeline and usdc attestation if not using existing deployment
+	if !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
+		var killgrave *ctftestenv.Killgrave
+		if setUpArgs.Env.LocalCluster != nil {
+			killgrave = setUpArgs.Env.LocalCluster.MockAdapter
+		}
+		// set up mock server for price pipeline. need to set it once for all the lanes as the price pipeline path uses
+		// regex to match the path for all tokens across all lanes
+		actions.SetMockserverWithTokenPriceValue(killgrave, setUpArgs.Env.MockServer)
+		if pointer.GetBool(setUpArgs.Cfg.TestGroupInput.USDCDeployment) {
+			// if it's a new USDC deployment, set up mock server for attestation,
+			// we need to set it only once for all the lanes as the attestation path uses regex to match the path for
+			// all messages across all lanes
+			err = actions.SetMockServerWithUSDCAttestation(killgrave, setUpArgs.Env.MockServer)
+			require.NoError(t, err, "failed to set up mock server for attestation")
+		}
+	}
 	// deploy all lane specific contracts
 	lggr.Info().Msg("Deploying chain specific contracts")
 	laneAddGrp, _ := errgroup.WithContext(parent)

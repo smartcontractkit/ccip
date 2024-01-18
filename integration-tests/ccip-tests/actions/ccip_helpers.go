@@ -770,7 +770,6 @@ type SourceCCIPModule struct {
 	CCIPSendRequestedWatcher   *sync.Map // map[string]*evm_2_evm_onramp.EVM2EVMOnRampCCIPSendRequested
 	NewFinalizedBlockNum       atomic.Uint64
 	NewFinalizedBlockTimestamp atomic.Time
-	MsgChan                    chan string
 }
 
 func (sourceCCIP *SourceCCIPModule) PayCCIPFeeToOwnerAddress() error {
@@ -1183,9 +1182,7 @@ func (sourceCCIP *SourceCCIPModule) SendRequest(
 			return common.Hash{}, time.Since(timeNow), nil, fmt.Errorf("failed initiating the transfer ccip-send: %w", err)
 		}
 	}
-	if !sourceCCIP.Common.ExistingDeployment && sourceCCIP.Common.USDCDeployment {
-		sourceCCIP.MsgChan <- sendTx.Hash().Hex()
-	}
+
 	log.Info().
 		Str("Network", sourceCCIP.Common.ChainClient.GetNetworkName()).
 		Str("Send token transaction", sendTx.Hash().String()).
@@ -1212,9 +1209,7 @@ func DefaultSourceCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMCl
 		Sender:                   common.HexToAddress(chainClient.GetDefaultWallet().Address()),
 		CCIPSendRequestedWatcher: &sync.Map{},
 	}
-	if !cmn.ExistingDeployment && cmn.USDCDeployment {
-		source.MsgChan = make(chan string)
-	}
+
 	return source, nil
 }
 
@@ -2397,7 +2392,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if env.LocalCluster != nil {
 		killgrave = env.LocalCluster.MockAdapter
 	}
-	tokensUSDUrl := SetMockServerWithSameTokenFeeConversionValue(tokenAddresses, killgrave, env.MockServer)
+	tokensUSDUrl := TokenPricePipelineURLs(tokenAddresses, killgrave, env.MockServer)
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
 		OffRamp:                lane.Dest.OffRamp.EthAddress,
 		CommitStore:            lane.Dest.CommitStore.EthAddress,
@@ -2409,8 +2404,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		DestStartBlock:         currentBlockOnDest,
 	}
 	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.USDCDeployment {
-		// if it's a new USDC deployment, set up mock server for attestation
-		go SetMockServerWithMsgHashAttestation(lane.Source.MsgChan, killgrave, env.MockServer)
 		api := ""
 		if killgrave != nil {
 			api = killgrave.InternalEndpoint
@@ -2967,101 +2960,99 @@ func NewBalanceSheet() *BalanceSheet {
 
 // SetMockServerWithMsgHashAttestation continuously listens for message hashes
 // on the msgHash channel and responds with a mock attestation for that msgHash on the mockserver
-func SetMockServerWithMsgHashAttestation(
-	msgHash <-chan string,
+func SetMockServerWithUSDCAttestation(
+	killGrave *ctftestenv.Killgrave,
+	mockserver *ctfClient.MockserverClient,
+) error {
+	path := "/v1/attestations"
+	response := struct {
+		Status      string `json:"status"`
+		Attestation string `json:"attestation"`
+		Error       string `json:"error"`
+	}{
+		Status:      "complete",
+		Attestation: "0x9049623e91719ef2aa63c55f357be2529b0e7122ae552c18aff8db58b4633c4d3920ff03d3a6d1ddf11f06bf64d7fd60d45447ac81f527ba628877dc5ca759651b08ffae25a6d3b1411749765244f0a1c131cbfe04430d687a2e12fd9d2e6dc08e118ad95d94ad832332cf3c4f7a4f3da0baa803b7be024b02db81951c0f0714de1b",
+	}
+	if killGrave == nil && mockserver == nil {
+		return fmt.Errorf("both killgrave and mockserver are nil")
+	}
+	log.Info().Str("path", path).Msg("setting attestation-api response for any msgHash")
+	if killGrave != nil {
+		err := killGrave.SetAnyValueResponse(fmt.Sprintf("%s/{_hash:.*}", path), []string{http.MethodGet}, response)
+		if err != nil {
+			return fmt.Errorf("failed to set killgrave server value: %w", err)
+		}
+	}
+	if mockserver != nil {
+		err := mockserver.SetAnyValueResponse(fmt.Sprintf("%s/.*", path), response)
+		if err != nil {
+			return fmt.Errorf("failed to set mockserver value: %w", err)
+		}
+	}
+	return nil
+}
+
+// SetMockserverWithTokenPriceValue sets the mock responses in mockserver that are read by chainlink nodes
+// to simulate different price feed value.
+// it keeps updating the response every 15 seconds to simulate price feed updates
+func SetMockserverWithTokenPriceValue(
 	killGrave *ctftestenv.Killgrave,
 	mockserver *ctfClient.MockserverClient,
 ) {
-	for {
-		select {
-		case msg := <-msgHash:
-			path := "/v1/attestations"
-			response := struct {
-				Status      string `json:"status"`
-				Attestation string `json:"attestation"`
-				Error       string `json:"error"`
-			}{
-				Status:      "complete",
-				Attestation: "0x9049623e91719ef2aa63c55f357be2529b0e7122ae552c18aff8db58b4633c4d3920ff03d3a6d1ddf11f06bf64d7fd60d45447ac81f527ba628877dc5ca759651b08ffae25a6d3b1411749765244f0a1c131cbfe04430d687a2e12fd9d2e6dc08e118ad95d94ad832332cf3c4f7a4f3da0baa803b7be024b02db81951c0f0714de1b",
-			}
+	wg := &sync.WaitGroup{}
+	path := "token_contract_"
+	wg.Add(1)
+	go func() {
+		set := true
+		// keep updating token value every 15 second
+		for {
 			if killGrave == nil && mockserver == nil {
 				log.Fatal().Msg("both killgrave and mockserver are nil")
 				return
 			}
-			log.Info().Str("msgHash", msg).Str("path", path).Msg("setting attestation-api response for msgHash")
+			tokenValue := big.NewInt(time.Now().UnixNano()).String()
 			if killGrave != nil {
-				err := killGrave.SetAnyValueResponse(fmt.Sprintf("%s/{_hash:.*}", path), []string{http.MethodGet}, response)
+				err := killGrave.SetAdapterBasedAnyValuePath(fmt.Sprintf("%s{.*}", path), []string{http.MethodGet}, tokenValue)
 				if err != nil {
 					log.Fatal().Err(err).Msg("failed to set killgrave server value")
 					return
 				}
 			}
 			if mockserver != nil {
-				err := mockserver.SetAnyValueResponse(fmt.Sprintf("%s/.*", path), response)
+				err := mockserver.SetAnyValuePath(fmt.Sprintf("/%s.*", path), tokenValue)
 				if err != nil {
 					log.Fatal().Err(err).Msg("failed to set mockserver value")
 					return
 				}
 			}
+			if set {
+				set = false
+				wg.Done()
+			}
+			time.Sleep(15 * time.Second)
 		}
-	}
+	}()
+	// wait for the first value to be set
+	wg.Wait()
 }
 
-// SetMockServerWithSameTokenFeeConversionValue sets the mock responses in mockserver that are read by chainlink nodes
-// to simulate different price feed value.
-func SetMockServerWithSameTokenFeeConversionValue(
+// TokenPricePipelineURLs returns the mockserver urls for the token price pipeline
+func TokenPricePipelineURLs(
 	tokenAddresses []string,
 	killGrave *ctftestenv.Killgrave,
 	mockserver *ctfClient.MockserverClient,
 ) map[string]string {
-	wg := &sync.WaitGroup{}
 	mapTokenURL := make(map[string]string)
-	syncMapTokenURL := &sync.Map{}
+
 	for _, tokenAddr := range tokenAddresses {
 		path := fmt.Sprintf("token_contract_%s", tokenAddr[2:12])
-		wg.Add(1)
-		tokenAddr := tokenAddr
-		go func() {
-			// keep updating token value every 15 second
-			for {
-				if killGrave == nil && mockserver == nil {
-					log.Fatal().Msg("both killgrave and mockserver are nil")
-					return
-				}
-				tokenValue := big.NewInt(time.Now().UnixNano()).String()
-				if killGrave != nil {
-					err := killGrave.SetAdapterBasedAnyValuePath(path, []string{http.MethodGet}, tokenValue)
-					if err != nil {
-						log.Fatal().Err(err).Msg("failed to set killgrave server value")
-						return
-					}
-					if _, ok := syncMapTokenURL.Load(tokenAddr); !ok {
-						syncMapTokenURL.Store(tokenAddr, fmt.Sprintf("%s/%s", killGrave.InternalEndpoint, path))
-						// call Done after setting the value for the first time
-						wg.Done()
-					}
-				}
-				if mockserver != nil {
-					err := mockserver.SetAnyValuePath(fmt.Sprintf("/%s", path), tokenValue)
-					if err != nil {
-						log.Fatal().Err(err).Msg("failed to set mockserver value")
-						return
-					}
-					if _, ok := syncMapTokenURL.Load(tokenAddr); !ok {
-						syncMapTokenURL.Store(tokenAddr, fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL, path))
-						// call Done after setting the value for the first time
-						wg.Done()
-					}
-				}
-				time.Sleep(15 * time.Second)
-			}
-		}()
+		if mockserver != nil {
+			mapTokenURL[tokenAddr] = fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL, path)
+		}
+		if killGrave != nil {
+			mapTokenURL[tokenAddr] = fmt.Sprintf("%s/%s", killGrave.InternalEndpoint, path)
+		}
 	}
-	// wait for all token value to be set at least once
-	wg.Wait()
-	syncMapTokenURL.Range(func(key, value interface{}) bool {
-		mapTokenURL[key.(string)] = value.(string)
-		return true
-	})
+
 	return mapTokenURL
 }
