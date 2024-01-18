@@ -31,6 +31,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
+var HundredCoins = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
+
 type RateLimiterConfig struct {
 	Rate     *big.Int
 	Capacity *big.Int
@@ -342,7 +344,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	if err != nil {
 		return err
 	}
-	_, err = pool.Instance.SetRebalancer(opts, opts.From)
+	_, err = pool.LockReleasePool.SetRebalancer(opts, opts.From)
 	if err != nil {
 		return err
 	}

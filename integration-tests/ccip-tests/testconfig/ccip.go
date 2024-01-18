@@ -125,6 +125,10 @@ func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
 		c.NoOfSendsInMulticall = fromCfg.NoOfSendsInMulticall
 	}
 
+	if fromCfg.USDCDeployment != nil {
+		c.USDCDeployment = fromCfg.USDCDeployment
+	}
+
 	return nil
 }
 
