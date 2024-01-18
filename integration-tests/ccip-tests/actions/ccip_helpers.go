@@ -19,11 +19,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 
 	config2 "github.com/smartcontractkit/chainlink-common/pkg/config"
 	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
@@ -2320,7 +2321,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	err = lane.Source.Common.SyncUSDCDomain(lane.Dest.Common.TokenTransmitter, destPools, lane.Source.DestinationChainId)
 	if err != nil {
-		return nil, nil, errors.WithStack(fmt.Errorf("failed to sync USDC domain: %v", err))
+		return nil, nil, fmt.Errorf("failed to sync USDC domain: %w", err)
 	}
 
 	lane.UpdateLaneConfig()
