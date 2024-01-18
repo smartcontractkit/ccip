@@ -11,7 +11,6 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
@@ -28,7 +27,6 @@ type Plugin struct {
 	liquidityGraph          liquiditygraph.LiquidityGraph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	pendingTransfers        *PendingTransfersCache
-	bridgeContainer         *bridge.Container
 	lggr                    logger.Logger
 }
 
@@ -40,7 +38,6 @@ func NewPlugin(
 	liquidityManagerFactory liquiditymanager.Factory,
 	liquidityGraph liquiditygraph.LiquidityGraph,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
-	bridgeContainer *bridge.Container,
 	lggr logger.Logger,
 ) *Plugin {
 
@@ -57,7 +54,6 @@ func NewPlugin(
 		liquidityGraph:          liquidityGraph,
 		liquidityRebalancer:     liquidityRebalancer,
 		pendingTransfers:        NewPendingTransfersCache(),
-		bridgeContainer:         bridgeContainer,
 		lggr:                    lggr,
 	}
 }
@@ -286,7 +282,7 @@ func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidi
 func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
 	p.lggr.Infow("loading pending transfers")
 
-	transfers := make([]models.Transfer, 0)
+	transfersWithStatus := make([]models.PendingTransfer, 0)
 	for networkID, lmAddress := range p.liquidityManagers.GetAll() {
 		lm, err := p.liquidityManagerFactory.NewLiquidityManager(networkID, lmAddress)
 		if err != nil {
@@ -305,26 +301,10 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 			return nil, fmt.Errorf("get pending %v transfers: %w", networkID, err)
 		}
 
-		transfers = append(transfers, networkTransfers...)
+		transfersWithStatus = append(transfersWithStatus, networkTransfers...)
 	}
 
-	pendingTransfers := make([]models.PendingTransfer, 0, len(transfers))
-	for _, tr := range transfers {
-		transferBridge, exists := p.bridgeContainer.GetBridge(tr.From, tr.To)
-		if !exists {
-			return nil, fmt.Errorf("bridge %d->%d not found", tr.From, tr.To)
-		}
-
-		transferWithStatus, err := transferBridge.PopulateStatusOfTransfers([]models.Transfer{tr}) // todo: batch
-		if err != nil {
-			return nil, fmt.Errorf("get transfer %s status: %w", tr, err)
-		}
-
-		pendingTransfers = append(pendingTransfers, transferWithStatus...)
-	}
-
-	p.pendingTransfers.Add(pendingTransfers)
-	return pendingTransfers, nil
+	return transfersWithStatus, nil
 }
 
 func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observation) []models.NetworkLiquidity {

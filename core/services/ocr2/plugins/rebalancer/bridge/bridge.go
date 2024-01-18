@@ -1,11 +1,19 @@
 package bridge
 
-import "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
+import (
+	"context"
+
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
+)
 
 type Bridge interface {
 	// PopulateStatusOfTransfers determines the transfer status and returns the transfers
 	// with all the statuses being set.
-	PopulateStatusOfTransfers(transfers []models.Transfer) ([]models.PendingTransfer, error)
+	PopulateStatusOfTransfers(ctx context.Context, token, sender common.Address, transfers []models.Transfer) ([]models.PendingTransfer, error)
+
+	Close(ctx context.Context) error
 }
 
 type Container struct {

@@ -69,11 +69,11 @@ func (n NetworkSelector) MarshalJSON() ([]byte, error) {
 type NetworkType string
 
 type Transfer struct {
+	ID     uint64
 	From   NetworkSelector
 	To     NetworkSelector
 	Amount *big.Int
 	Date   time.Time
-	// todo: consider adding some unique id field
 }
 
 func NewTransfer(from, to NetworkSelector, amount *big.Int, date time.Time) Transfer {

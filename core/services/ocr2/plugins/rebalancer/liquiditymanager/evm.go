@@ -13,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager/liquidity_manager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
@@ -20,13 +21,15 @@ import (
 )
 
 type EvmLiquidityManager struct {
-	client      OnchainLiquidityManager
-	lp          logpoller.LogPoller
-	lmAbi       abi.ABI
-	addr        common.Address
-	networkSel  models.NetworkSelector
-	ec          client.Client
-	cleanupFunc func() error
+	client          OnchainLiquidityManager
+	lp              logpoller.LogPoller
+	lmAbi           abi.ABI
+	addr            common.Address
+	networkSel      models.NetworkSelector
+	ec              client.Client
+	cleanupFunc     func() error
+	bridgeContainer *bridge.Container
+	token           common.Address
 }
 
 func NewEvmLiquidityManager(address models.Address, net models.NetworkSelector, ec client.Client, lp logpoller.LogPoller) (*EvmLiquidityManager, error) {
@@ -78,7 +81,7 @@ func (e *EvmLiquidityManager) GetBalance(ctx context.Context) (*big.Int, error) 
 	return e.client.GetLiquidity(ctx)
 }
 
-func (e *EvmLiquidityManager) GetTransfers(ctx context.Context, since time.Time) ([]models.Transfer, error) {
+func (e *EvmLiquidityManager) GetTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error) {
 	logs, err := e.lp.LogsCreatedAfter(
 		e.lmAbi.Events["LiquidityTransferred"].ID,
 		e.addr,
@@ -106,7 +109,21 @@ func (e *EvmLiquidityManager) GetTransfers(ctx context.Context, since time.Time)
 		))
 	}
 
-	return transfers, nil
+	transfersWithStatus := make([]models.PendingTransfer, 0, len(transfers))
+	for _, tr := range transfers {
+		br, exists := e.bridgeContainer.GetBridge(tr.From, tr.To)
+		if !exists {
+			return nil, fmt.Errorf("bridge not found") // todo
+		}
+
+		withStatus, err := br.PopulateStatusOfTransfers(ctx, e.token, e.addr, []models.Transfer{tr})
+		if err != nil {
+			return nil, fmt.Errorf("populate status of transfers: %w", err)
+		}
+		transfersWithStatus = append(transfersWithStatus, withStatus...)
+	}
+
+	return transfersWithStatus, nil
 }
 
 func (e EvmLiquidityManager) Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error) {

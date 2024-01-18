@@ -20,7 +20,7 @@ type LiquidityManager interface {
 	GetBalance(ctx context.Context) (*big.Int, error)
 
 	// GetTransfers returns the liquidity transfers.
-	GetTransfers(ctx context.Context, since time.Time) ([]models.Transfer, error)
+	GetTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error)
 
 	// Discover discovers other liquidity managers
 	Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error)
