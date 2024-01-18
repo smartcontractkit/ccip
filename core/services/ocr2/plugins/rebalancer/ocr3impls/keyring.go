@@ -31,7 +31,7 @@ func (w *onchainKeyringV3Wrapper[RI]) MaxSignatureLength() int {
 	return w.core.MaxSignatureLength()
 }
 
-func (w *onchainKeyringV3Wrapper[RI]) Sign(digest types.ConfigDigest, seqNr uint64, r ocr3types.ReportWithInfo[RI]) (signature []byte, err error) {
+func (w *onchainKeyringV3Wrapper[RI]) Sign(_ types.ConfigDigest, seqNr uint64, r ocr3types.ReportWithInfo[RI]) (signature []byte, err error) {
 	// the provided config digest is from the master chain
 	// we need to sign with the config digest for the chain that we are transmitting to
 	// which may be any chain.
@@ -51,7 +51,7 @@ func (w *onchainKeyringV3Wrapper[RI]) Sign(digest types.ConfigDigest, seqNr uint
 	return w.core.Sign(rCtx, r.Report)
 }
 
-func (w *onchainKeyringV3Wrapper[RI]) Verify(key types.OnchainPublicKey, digest types.ConfigDigest, seqNr uint64, r ocr3types.ReportWithInfo[RI], signature []byte) bool {
+func (w *onchainKeyringV3Wrapper[RI]) Verify(key types.OnchainPublicKey, _ types.ConfigDigest, seqNr uint64, r ocr3types.ReportWithInfo[RI], signature []byte) bool {
 	// the provided config digest is from the master chain
 	// we need to sign with the config digest for the chain that we are transmitting to
 	// which may be any chain.

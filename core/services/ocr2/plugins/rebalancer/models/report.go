@@ -9,12 +9,12 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer_report_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
 var (
-	rebalancerABI          = evmtypes.MustGetABI(rebalancer.RebalancerMetaData.ABI)
+	rebalancerABI          = evmtypes.MustGetABI(rebalancer_report_encoder.RebalancerReportEncoderABI)
 	onchainReportArguments abi.Arguments
 )
 
@@ -105,27 +105,27 @@ func (r ReportMetadata) OnchainEncode() ([]byte, error) {
 	return encoded, nil
 }
 
-func (r ReportMetadata) ToLiquidityInstructions() (rebalancer.IRebalancerLiquidityInstructions, error) {
-	var sendInstructions []rebalancer.IRebalancerSendLiquidityParams
-	var receiveInstructions []rebalancer.IRebalancerReceiveLiquidityParams
+func (r ReportMetadata) ToLiquidityInstructions() (rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) {
+	var sendInstructions []rebalancer_report_encoder.IRebalancerSendLiquidityParams
+	var receiveInstructions []rebalancer_report_encoder.IRebalancerReceiveLiquidityParams
 	for _, tr := range r.Transfers {
 		if r.NetworkID == tr.From {
-			sendInstructions = append(sendInstructions, rebalancer.IRebalancerSendLiquidityParams{
+			sendInstructions = append(sendInstructions, rebalancer_report_encoder.IRebalancerSendLiquidityParams{
 				Amount:              tr.Amount,
 				RemoteChainSelector: uint64(tr.To),
 			})
 		} else if r.NetworkID == tr.To {
-			receiveInstructions = append(receiveInstructions, rebalancer.IRebalancerReceiveLiquidityParams{
+			receiveInstructions = append(receiveInstructions, rebalancer_report_encoder.IRebalancerReceiveLiquidityParams{
 				Amount:              tr.Amount,
 				RemoteChainSelector: uint64(tr.From),
 				BridgeData:          tr.BridgeData,
 			})
 		} else {
-			return rebalancer.IRebalancerLiquidityInstructions{},
+			return rebalancer_report_encoder.IRebalancerLiquidityInstructions{},
 				fmt.Errorf("transfer %+v is not related to network %d", tr, r.NetworkID)
 		}
 	}
-	return rebalancer.IRebalancerLiquidityInstructions{
+	return rebalancer_report_encoder.IRebalancerLiquidityInstructions{
 		SendLiquidityParams:    sendInstructions,
 		ReceiveLiquidityParams: receiveInstructions,
 	}, nil
@@ -149,16 +149,16 @@ func DecodeReportMetadata(b []byte) (ReportMetadata, error) {
 	return meta, err
 }
 
-func DecodeReport(networkID NetworkSelector, rebalancerAddress Address, binaryReport []byte) (ReportMetadata, rebalancer.IRebalancerLiquidityInstructions, error) {
+func DecodeReport(networkID NetworkSelector, rebalancerAddress Address, binaryReport []byte) (ReportMetadata, rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) {
 	unpacked, err := onchainReportArguments.Unpack(binaryReport)
 	if err != nil {
-		return ReportMetadata{}, rebalancer.IRebalancerLiquidityInstructions{}, fmt.Errorf("failed to unpack report: %w", err)
+		return ReportMetadata{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, fmt.Errorf("failed to unpack report: %w", err)
 	}
 	if len(unpacked) != 1 {
-		return ReportMetadata{}, rebalancer.IRebalancerLiquidityInstructions{}, fmt.Errorf("unexpected number of arguments: %d", len(unpacked))
+		return ReportMetadata{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, fmt.Errorf("unexpected number of arguments: %d", len(unpacked))
 	}
 
-	instructions := *abi.ConvertType(unpacked[0], new(rebalancer.IRebalancerLiquidityInstructions)).(*rebalancer.IRebalancerLiquidityInstructions)
+	instructions := *abi.ConvertType(unpacked[0], new(rebalancer_report_encoder.IRebalancerLiquidityInstructions)).(*rebalancer_report_encoder.IRebalancerLiquidityInstructions)
 
 	var out ReportMetadata
 	out.NetworkID = networkID
