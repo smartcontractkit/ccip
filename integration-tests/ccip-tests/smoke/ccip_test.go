@@ -39,7 +39,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	t.Cleanup(func() {
 		// if we are running a test that is a token transfer, we need to verify the balance
 		// For USDC deployment, the mock contracts cannot mint the token in destination, therefore skip the balance check
-		if TestCfg.TestGroupInput.MsgType == actions.TokenTransfer && !pointer.GetBool(TestCfg.TestGroupInput.USDCDeployment) {
+		if TestCfg.TestGroupInput.MsgType == actions.TokenTransfer && !pointer.GetBool(TestCfg.TestGroupInput.USDCMockDeployment) {
 			setUpOutput.Balance.Verify(t)
 		}
 		require.NoError(t, setUpOutput.TearDown())

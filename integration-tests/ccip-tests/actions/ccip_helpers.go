@@ -2958,8 +2958,8 @@ func NewBalanceSheet() *BalanceSheet {
 	}
 }
 
-// SetMockServerWithMsgHashAttestation continuously listens for message hashes
-// on the msgHash channel and responds with a mock attestation for that msgHash on the mockserver
+// SetMockServerWithUSDCAttestation responds with a mock attestation for any msgHash
+// The path is set with regex to match any path that starts with /v1/attestations
 func SetMockServerWithUSDCAttestation(
 	killGrave *ctftestenv.Killgrave,
 	mockserver *ctfClient.MockserverClient,

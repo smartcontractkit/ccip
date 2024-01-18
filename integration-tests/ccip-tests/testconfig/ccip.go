@@ -35,7 +35,7 @@ type CCIPTestConfig struct {
 	AmountPerToken             int64              `toml:",omitempty"`
 	MaxNoOfLanes               int                `toml:",omitempty"`
 	ChaosDuration              *config.Duration   `toml:",omitempty"`
-	USDCDeployment             *bool              `toml:",omitempty"`
+	USDCMockDeployment         *bool              `toml:",omitempty"`
 }
 
 func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
@@ -125,8 +125,8 @@ func (c *CCIPTestConfig) ApplyOverrides(fromCfg *CCIPTestConfig) error {
 		c.NoOfSendsInMulticall = fromCfg.NoOfSendsInMulticall
 	}
 
-	if fromCfg.USDCDeployment != nil {
-		c.USDCDeployment = fromCfg.USDCDeployment
+	if fromCfg.USDCMockDeployment != nil {
+		c.USDCMockDeployment = fromCfg.USDCMockDeployment
 	}
 
 	return nil
