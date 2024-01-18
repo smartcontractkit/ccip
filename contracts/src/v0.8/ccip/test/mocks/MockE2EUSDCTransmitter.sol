@@ -12,9 +12,9 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   uint64 public nextAvailableNonce;
 
   /**
-     * @notice Emitted when a new message is dispatched
-     * @param message Raw bytes of message
-     */
+   * @notice Emitted when a new message is dispatched
+   * @param message Raw bytes of message
+   */
   event MessageSent(bytes message);
 
   constructor(uint32 _version, uint32 _localDomain) {
@@ -40,13 +40,13 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   }
 
   /**
- * @notice Send the message to the destination domain and recipient
-     * @dev Increment nonce, format the message, and emit `MessageSent` event with message information.
-     * @param destinationDomain Domain of destination chain
-     * @param recipient Address of message recipient on destination chain as bytes32
-     * @param messageBody Raw bytes content of message
-     * @return nonce reserved by message
-     */
+   * @notice Send the message to the destination domain and recipient
+   * @dev Increment nonce, format the message, and emit `MessageSent` event with message information.
+   * @param destinationDomain Domain of destination chain
+   * @param recipient Address of message recipient on destination chain as bytes32
+   * @param messageBody Raw bytes content of message
+   * @return nonce reserved by message
+   */
   function sendMessage(
     uint32 destinationDomain,
     bytes32 recipient,
@@ -56,61 +56,44 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
     uint64 _nonce = _reserveAndIncrementNonce();
     bytes32 _messageSender = bytes32(uint256(uint160((msg.sender))));
 
-    _sendMessage(
-      destinationDomain,
-      recipient,
-      _emptyDestinationCaller,
-      _messageSender,
-      _nonce,
-      messageBody
-    );
+    _sendMessage(destinationDomain, recipient, _emptyDestinationCaller, _messageSender, _nonce, messageBody);
 
     return _nonce;
   }
 
   /**
-     * @notice Send the message to the destination domain and recipient, for a specified `destinationCaller` on the
-     * destination domain.
-     * @dev Increment nonce, format the message, and emit `MessageSent` event with message information.
-     * WARNING: if the `destinationCaller` does not represent a valid address, then it will not be possible
-     * to broadcast the message on the destination domain. This is an advanced feature, and the standard
-     * sendMessage() should be preferred for use cases where a specific destination caller is not required.
-     * @param destinationDomain Domain of destination chain
-     * @param recipient Address of message recipient on destination domain as bytes32
-     * @param destinationCaller caller on the destination domain, as bytes32
-     * @param messageBody Raw bytes content of message
-     * @return nonce reserved by message
-     */
+   * @notice Send the message to the destination domain and recipient, for a specified `destinationCaller` on the
+   * destination domain.
+   * @dev Increment nonce, format the message, and emit `MessageSent` event with message information.
+   * WARNING: if the `destinationCaller` does not represent a valid address, then it will not be possible
+   * to broadcast the message on the destination domain. This is an advanced feature, and the standard
+   * sendMessage() should be preferred for use cases where a specific destination caller is not required.
+   * @param destinationDomain Domain of destination chain
+   * @param recipient Address of message recipient on destination domain as bytes32
+   * @param destinationCaller caller on the destination domain, as bytes32
+   * @param messageBody Raw bytes content of message
+   * @return nonce reserved by message
+   */
   function sendMessageWithCaller(
     uint32 destinationDomain,
     bytes32 recipient,
     bytes32 destinationCaller,
     bytes calldata messageBody
   ) external returns (uint64) {
-    require(
-      destinationCaller != bytes32(0),
-      "Destination caller must be nonzero"
-    );
+    require(destinationCaller != bytes32(0), "Destination caller must be nonzero");
 
     uint64 _nonce = _reserveAndIncrementNonce();
     bytes32 _messageSender = bytes32(uint256(uint160((msg.sender))));
 
-    _sendMessage(
-      destinationDomain,
-      recipient,
-      destinationCaller,
-      _messageSender,
-      _nonce,
-      messageBody
-    );
+    _sendMessage(destinationDomain, recipient, destinationCaller, _messageSender, _nonce, messageBody);
 
     return _nonce;
   }
 
   /**
-    * Reserve and increment next available nonce
-    * @return nonce reserved
-     */
+   * Reserve and increment next available nonce
+   * @return nonce reserved
+   */
   function _reserveAndIncrementNonce() internal returns (uint64) {
     uint64 _nonceReserved = nextAvailableNonce;
     nextAvailableNonce = nextAvailableNonce + 1;
@@ -118,16 +101,16 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   }
 
   /**
-     * @notice Send the message to the destination domain and recipient. If `_destinationCaller` is not equal to bytes32(0),
-     * the message can only be received on the destination chain when called by `_destinationCaller`.
-     * @dev Format the message and emit `MessageSent` event with message information.
-     * @param _destinationDomain Domain of destination chain
-     * @param _recipient Address of message recipient on destination domain as bytes32
-     * @param _destinationCaller caller on the destination domain, as bytes32
-     * @param _sender message sender, as bytes32
-     * @param _nonce nonce reserved for message
-     * @param _messageBody Raw bytes content of message
-     */
+   * @notice Send the message to the destination domain and recipient. If `_destinationCaller` is not equal to bytes32(0),
+   * the message can only be received on the destination chain when called by `_destinationCaller`.
+   * @dev Format the message and emit `MessageSent` event with message information.
+   * @param _destinationDomain Domain of destination chain
+   * @param _recipient Address of message recipient on destination domain as bytes32
+   * @param _destinationCaller caller on the destination domain, as bytes32
+   * @param _sender message sender, as bytes32
+   * @param _nonce nonce reserved for message
+   * @param _messageBody Raw bytes content of message
+   */
   function _sendMessage(
     uint32 _destinationDomain,
     bytes32 _recipient,
@@ -138,7 +121,7 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
   ) internal {
     require(_recipient != bytes32(0), "Recipient must be nonzero");
     // serialize message
-    bytes memory _message =  abi.encodePacked(
+    bytes memory _message = abi.encodePacked(
       i_version,
       i_localDomain,
       _destinationDomain,

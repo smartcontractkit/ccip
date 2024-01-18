@@ -68,16 +68,16 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
   }
 
   /**
-  * @notice Sends a BurnMessage through the local message transmitter
-     * @dev calls local message transmitter's sendMessage() function if `_destinationCaller` == bytes32(0),
-     * or else calls sendMessageWithCaller().
-     * @param _destinationDomain destination domain
-     * @param _destinationTokenMessenger address of registered TokenMessenger contract on destination domain, as bytes32
-     * @param _destinationCaller caller on the destination domain, as bytes32. If `_destinationCaller` == bytes32(0),
-     * any address can call receiveMessage() on destination domain.
-     * @param _burnMessage formatted BurnMessage bytes (message body)
-     * @return nonce unique nonce reserved by message
-     */
+   * @notice Sends a BurnMessage through the local message transmitter
+   * @dev calls local message transmitter's sendMessage() function if `_destinationCaller` == bytes32(0),
+   * or else calls sendMessageWithCaller().
+   * @param _destinationDomain destination domain
+   * @param _destinationTokenMessenger address of registered TokenMessenger contract on destination domain, as bytes32
+   * @param _destinationCaller caller on the destination domain, as bytes32. If `_destinationCaller` == bytes32(0),
+   * any address can call receiveMessage() on destination domain.
+   * @param _burnMessage formatted BurnMessage bytes (message body)
+   * @return nonce unique nonce reserved by message
+   */
   function _sendDepositForBurnMessage(
     uint32 _destinationDomain,
     bytes32 _destinationTokenMessenger,
@@ -85,20 +85,15 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
     bytes memory _burnMessage
   ) internal returns (uint64 nonce) {
     if (_destinationCaller == bytes32(0)) {
-      return
-      localMessageTransmitterWithRelay.sendMessage(
-        _destinationDomain,
-        _destinationTokenMessenger,
-        _burnMessage
-      );
+      return localMessageTransmitterWithRelay.sendMessage(_destinationDomain, _destinationTokenMessenger, _burnMessage);
     } else {
       return
-      localMessageTransmitterWithRelay.sendMessageWithCaller(
-        _destinationDomain,
-        _destinationTokenMessenger,
-        _destinationCaller,
-        _burnMessage
-      );
+        localMessageTransmitterWithRelay.sendMessageWithCaller(
+          _destinationDomain,
+          _destinationTokenMessenger,
+          _destinationCaller,
+          _burnMessage
+        );
     }
   }
 }
