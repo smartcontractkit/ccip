@@ -31,17 +31,19 @@ type DynamicPriceGetterConfig struct {
 }
 
 type DynamicPriceGetter struct {
-	cfg        DynamicPriceGetterConfig
-	evmClients map[uint64]rpclib.EvmBatchCaller
+	cfg           DynamicPriceGetterConfig
+	evmClients    map[uint64]rpclib.EvmBatchCaller
+	aggregatorAbi abi.ABI
 }
 
 // NewDynamicPriceGetter build a DynamicPriceGetter from a configuration and a map of chain ID to batch callers.
 // A batch caller should be provided for all retrieved prices.
-func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]rpclib.EvmBatchCaller) *DynamicPriceGetter {
-	return &DynamicPriceGetter{
-		cfg:        cfg,
-		evmClients: evmClients,
+func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]rpclib.EvmBatchCaller) (*DynamicPriceGetter, error) {
+	aggregatorAbi, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
+	if err != nil {
+		return nil, err
 	}
+	return &DynamicPriceGetter{cfg, evmClients, aggregatorAbi}, nil
 }
 
 // TokenPricesUSD implements the PriceGetter interface.
@@ -53,16 +55,11 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 
 	fmt.Printf("=> querying token prices for %d tokens: %s\n", len(tokens), tokens)
 
-	aggregatorAbi, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
-	if err != nil {
-		return nil, err
-	}
-
 	for _, tk := range tokens {
 		// group aggregator-based tokens to make batch call (one per chain)
 		if aggCfg, exists := d.cfg.AggregatorPrices[tk]; exists {
 			batchCallsPerChain[aggCfg.ChainID] = append(batchCallsPerChain[aggCfg.ChainID], rpclib.NewEvmCall(
-				aggregatorAbi,
+				d.aggregatorAbi,
 				"latestRoundData",
 				aggCfg.ContractAddress,
 			))

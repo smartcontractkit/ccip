@@ -147,7 +147,10 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, err
 	}
-	priceGetter := pricegetter.NewDynamicPriceGetter(priceGetterConfig, evmClients)
+	priceGetter, err := pricegetter.NewDynamicPriceGetter(priceGetterConfig, evmClients)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Load all the readers relevant for this plugin.
 	onRampReader, err := factory.NewOnRampReader(commitLggr, versionFinder, params.commitStoreStaticCfg.SourceChainSelector, params.commitStoreStaticCfg.ChainSelector, params.commitStoreStaticCfg.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client(), qopts...)

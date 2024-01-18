@@ -97,7 +97,8 @@ func TestDynamicPriceGetter(t *testing.T) {
 		uint64(102): caller2,
 	}
 
-	pg := NewDynamicPriceGetter(cfg, evmClients)
+	pg, err := NewDynamicPriceGetter(cfg, evmClients)
+	require.NoError(t, err)
 	prices, err := pg.TokenPricesUSD(ctx, []common.Address{tk1, tk2, tk3})
 	require.NoError(t, err)
 	assert.Len(t, prices, 3)
