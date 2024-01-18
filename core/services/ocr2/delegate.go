@@ -37,6 +37,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer"
+	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -121,7 +124,6 @@ type Delegate struct {
 	RelayGetter
 	isNewlyCreatedJob bool // Set to true if this is a new job freshly added, false if job was present already on node boot.
 	mailMon           *mailbox.Monitor
-	eventBroadcaster  pg.EventBroadcaster
 	legacyChains      legacyevm.LegacyChainContainer // legacy: use relayers instead
 }
 
@@ -194,6 +196,7 @@ type jobPipelineConfig interface {
 type mercuryConfig interface {
 	Credentials(credName string) *models.MercuryCredentials
 	Cache() coreconfig.MercuryCache
+	TLS() coreconfig.MercuryTLS
 }
 
 type thresholdConfig interface {
@@ -231,7 +234,6 @@ func NewDelegate(
 	ethKs keystore.Eth,
 	relayers RelayGetter,
 	mailMon *mailbox.Monitor,
-	eventBroadcaster pg.EventBroadcaster,
 ) *Delegate {
 	return &Delegate{
 		db:                    db,
@@ -251,7 +253,6 @@ func NewDelegate(
 		RelayGetter:           relayers,
 		isNewlyCreatedJob:     false,
 		mailMon:               mailMon,
-		eventBroadcaster:      eventBroadcaster,
 	}
 }
 
@@ -315,7 +316,7 @@ func (d *Delegate) cleanupEVM(jb job.Job, q pg.Queryer, relayID relay.ID) error 
 			d.lggr.Errorw("failed to derive ocr2keeper filter names from spec", "err", err, "spec", spec)
 		}
 	case types.CCIPCommit:
-		err = ccipcommit.UnregisterCommitPluginLpFilters(context.Background(), d.lggr, jb, d.pipelineRunner, d.legacyChains, pg.WithQueryer(q))
+		err = ccipcommit.UnregisterCommitPluginLpFilters(context.Background(), d.lggr, jb, d.legacyChains, pg.WithQueryer(q))
 		if err != nil {
 			d.lggr.Errorw("failed to unregister ccip commit plugin filters", "err", err, "spec", spec)
 		}
@@ -477,6 +478,8 @@ func (d *Delegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) ([]job.ServiceC
 		return d.newServicesCCIPCommit(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
 	case types.CCIPExecution:
 		return d.newServicesCCIPExecution(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
+	case "rebalancer": // TODO: add constant to chainlink-common
+		return d.newServicesRebalancer(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, qopts...)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}
@@ -1519,7 +1522,6 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		},
 		transmitterID,
 		d.ethKs,
-		d.eventBroadcaster,
 	)
 	if err2 != nil {
 		return nil, err2
@@ -1572,7 +1574,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		},
 		transmitterID,
 		d.ethKs,
-		d.eventBroadcaster,
 	)
 	if err2 != nil {
 		return nil, err2
@@ -1598,6 +1599,67 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
 	return ccipexec.NewExecutionServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError, qopts...)
+}
+
+func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+	spec := jb.OCR2OracleSpec
+	if spec.Relay != relay.EVM {
+		return nil, errors.New("Non evm chains are not supported for rebalancer execution")
+	}
+	// the relay ID specified in the spec will be that of the main/master chain
+	rid, err := spec.RelayID()
+	if err != nil {
+		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
+	}
+	relayer := evmrelay.NewRebalancerRelayer(
+		d.legacyChains,
+		d.lggr,
+		d.ethKs,
+	)
+	rebalancerProvider, err := relayer.NewRebalancerProvider(types.RelayArgs{
+		ExternalJobID: jb.ExternalJobID,
+		JobID:         jb.ID,
+		ContractID:    spec.ContractID,
+		New:           d.isNewlyCreatedJob,
+		RelayConfig:   spec.RelayConfig.Bytes(),
+		ProviderType:  string(spec.PluginType),
+	}, types.PluginArgs{
+		TransmitterID: spec.TransmitterID.String,
+		PluginConfig:  spec.PluginConfig.Bytes(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rebalancer provider: %w", err)
+	}
+	factory, err := rebalancer.NewPluginFactory(lggr, spec.PluginConfig.Bytes(), rebalancerProvider.LiquidityManagerFactory())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rebalancer plugin factory: %w", err)
+	}
+	oracleArgsNoPlugin := libocr2.OCR3OracleArgs[rebalancermodels.ReportMetadata]{
+		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
+		V2Bootstrappers:              bootstrapPeers,
+		ContractTransmitter:          rebalancerProvider.ContractTransmitterOCR3(),
+		ContractConfigTracker:        rebalancerProvider.ContractConfigTracker(),
+		Database:                     ocrDB,
+		LocalConfig:                  lc,
+		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
+			rid.Network,
+			rid.ChainID,
+			spec.ContractID,
+			synchronization.OCR3Rebalancer,
+		),
+		OffchainConfigDigester: rebalancerProvider.OffchainConfigDigester(),
+		OffchainKeyring:        kb,
+		OnchainKeyring:         ocr3impls.NewOnchainKeyring[rebalancermodels.ReportMetadata](kb, lggr),
+		ReportingPluginFactory: factory,
+		Logger: commonlogger.NewOCRWrapper(lggr.Named("RebalancerOracle"), d.cfg.OCR2().TraceLogging(), func(msg string) {
+			lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
+		}),
+	}
+	oracle, err := libocr2.NewOracle(oracleArgsNoPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create oracle: %w", err)
+	}
+	return []job.ServiceCtx{rebalancerProvider, job.NewServiceAdapter(oracle)}, nil
 }
 
 // errorLog implements [loop.ErrorLog]

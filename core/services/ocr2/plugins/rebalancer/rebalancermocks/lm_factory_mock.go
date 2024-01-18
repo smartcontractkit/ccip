@@ -14,28 +14,28 @@ type Factory struct {
 	mock.Mock
 }
 
-// NewLiquidityManager provides a mock function with given fields: networkID, address
-func (_m *Factory) NewLiquidityManager(networkID models.NetworkID, address models.Address) (liquiditymanager.LiquidityManager, error) {
+// NewRebalancer provides a mock function with given fields: networkID, address
+func (_m *Factory) NewRebalancer(networkID models.NetworkSelector, address models.Address) (liquiditymanager.Rebalancer, error) {
 	ret := _m.Called(networkID, address)
 
 	if len(ret) == 0 {
-		panic("no return value specified for NewLiquidityManager")
+		panic("no return value specified for NewRebalancer")
 	}
 
-	var r0 liquiditymanager.LiquidityManager
+	var r0 liquiditymanager.Rebalancer
 	var r1 error
-	if rf, ok := ret.Get(0).(func(models.NetworkID, models.Address) (liquiditymanager.LiquidityManager, error)); ok {
+	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) (liquiditymanager.Rebalancer, error)); ok {
 		return rf(networkID, address)
 	}
-	if rf, ok := ret.Get(0).(func(models.NetworkID, models.Address) liquiditymanager.LiquidityManager); ok {
+	if rf, ok := ret.Get(0).(func(models.NetworkSelector, models.Address) liquiditymanager.Rebalancer); ok {
 		r0 = rf(networkID, address)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(liquiditymanager.LiquidityManager)
+			r0 = ret.Get(0).(liquiditymanager.Rebalancer)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(models.NetworkID, models.Address) error); ok {
+	if rf, ok := ret.Get(1).(func(models.NetworkSelector, models.Address) error); ok {
 		r1 = rf(networkID, address)
 	} else {
 		r1 = ret.Error(1)
