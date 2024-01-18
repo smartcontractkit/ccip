@@ -14,7 +14,9 @@ import (
 	"go.uber.org/multierr"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
@@ -118,10 +120,34 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
-	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	//pipelinePriceGetter, err := pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesConfig, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	//if err != nil {
+	//	return nil, nil, err
+	//}
+
+	// Build evmClients for price getter.
+	srcCaller := rpclib.NewDynamicLimitedBatchCaller(
+		lggr,
+		params.sourceChain.Client(),
+		rpclib.DefaultRpcBatchSizeLimit,
+		rpclib.DefaultRpcBatchBackOffMultiplier,
+	)
+	dstCaller := rpclib.NewDynamicLimitedBatchCaller(
+		lggr,
+		params.destChain.Client(),
+		rpclib.DefaultRpcBatchSizeLimit,
+		rpclib.DefaultRpcBatchBackOffMultiplier,
+	)
+	evmClients := map[uint64]rpclib.EvmBatchCaller{
+		params.sourceChain.ID().Uint64(): srcCaller,
+		params.destChain.ID().Uint64():   dstCaller,
+	}
+	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{}
+	err = json.Unmarshal([]byte(params.pluginConfig.TokenPricesConfig), &priceGetterConfig)
 	if err != nil {
 		return nil, nil, err
 	}
+	priceGetter := pricegetter.NewDynamicPriceGetter(priceGetterConfig, evmClients)
 
 	// Load all the readers relevant for this plugin.
 	onRampReader, err := factory.NewOnRampReader(commitLggr, versionFinder, params.commitStoreStaticCfg.SourceChainSelector, params.commitStoreStaticCfg.ChainSelector, params.commitStoreStaticCfg.OnRamp, params.sourceChain.LogPoller(), params.sourceChain.Client(), qopts...)
@@ -161,7 +187,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			lggr:                  commitLggr,
 			onRampReader:          onRampReader,
 			offRamp:               offRampReader,
-			priceGetter:           pipelinePriceGetter,
+			priceGetter:           priceGetter,
 			sourceNative:          sourceNative,
 			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
 			destChainSelector:     params.commitStoreStaticCfg.ChainSelector,

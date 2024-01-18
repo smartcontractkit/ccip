@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -122,7 +121,9 @@ const (
 		[pluginConfig]
 		destStartBlock = 50
 		offRamp = "%s"
-		tokenPricesConfig = '%s'
+		tokenPricesConfig = """
+		%s
+		"""
 	`
 )
 
@@ -517,30 +518,30 @@ func SetupCCIPIntegrationTH(t *testing.T, sourceChainID, sourceChainSelector, de
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) CreatePricesPipeline(t *testing.T) (string, *httptest.Server, *httptest.Server) {
-	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
-		require.NoError(t, err)
-	}))
-	ethUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, err := w.Write([]byte(`{"UsdPerETH": "1700000000000000000000"}`))
-		require.NoError(t, err)
-	}))
-	wrapped, err1 := c.Source.Router.GetWrappedNative(nil)
-	require.NoError(t, err1)
-	tokenPricesUSDPipeline := fmt.Sprintf(`
-// Price 1
-link [type=http method=GET url="%s"];
-link_parse [type=jsonparse path="UsdPerLink"];
-link->link_parse;
-eth [type=http method=GET url="%s"];
-eth_parse [type=jsonparse path="UsdPerETH"];
-eth->eth_parse;
-merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse)}"];`,
-		linkUSD.URL, ethUSD.URL, c.Dest.LinkToken.Address(), wrapped)
-
-	return tokenPricesUSDPipeline, linkUSD, ethUSD
-}
+//func (c *CCIPIntegrationTestHarness) CreatePricesPipeline(t *testing.T) (string, *httptest.Server, *httptest.Server) {
+//	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+//		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
+//		require.NoError(t, err)
+//	}))
+//	ethUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+//		_, err := w.Write([]byte(`{"UsdPerETH": "1700000000000000000000"}`))
+//		require.NoError(t, err)
+//	}))
+//	wrapped, err1 := c.Source.Router.GetWrappedNative(nil)
+//	require.NoError(t, err1)
+//	tokenPricesUSDPipeline := fmt.Sprintf(`
+//// Price 1
+//link [type=http method=GET url="%s"];
+//link_parse [type=jsonparse path="UsdPerLink"];
+//link->link_parse;
+//eth [type=http method=GET url="%s"];
+//eth_parse [type=jsonparse path="UsdPerETH"];
+//eth->eth_parse;
+//merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse)}"];`,
+//		linkUSD.URL, ethUSD.URL, c.Dest.LinkToken.Address(), wrapped)
+//
+//	return tokenPricesUSDPipeline, linkUSD, ethUSD
+//}
 
 func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams) {
 	jobParams.OffRamp = c.Dest.OffRamp.Address()
