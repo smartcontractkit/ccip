@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
@@ -687,15 +688,15 @@ chainID = 1337
 SourceStartBlock = 1
 DestStartBlock = 2
 offRamp = "0x1234567890123456789012345678901234567890"
-tokenPricesUSDPipeline = "merge [type=merge left=\"{}\" right=\"{\\\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\\\":\\\"1000000000000000000\\\"}\"];"
+tokenPricesConfig = "{}"
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.NoError(t, err)
 				expected := config.CommitPluginJobSpecConfig{
-					SourceStartBlock:       1,
-					DestStartBlock:         2,
-					OffRamp:                common.HexToAddress("0x1234567890123456789012345678901234567890"),
-					TokenPricesUSDPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
+					SourceStartBlock:  1,
+					DestStartBlock:    2,
+					OffRamp:           common.HexToAddress("0x1234567890123456789012345678901234567890"),
+					TokenPricesConfig: "{}",
 				}
 				var cfg config.CommitPluginJobSpecConfig
 				err = json.Unmarshal(os.OCR2OracleSpec.PluginConfig.Bytes(), &cfg)
@@ -704,7 +705,7 @@ tokenPricesUSDPipeline = "merge [type=merge left=\"{}\" right=\"{\\\"0xC79b96044
 			},
 		},
 		{
-			name: "ccip-commit invalid pipeline",
+			name: "ccip-commit invalid dynamic token prices config",
 			toml: `
 type = "offchainreporting2"
 schemaVersion = 1
@@ -719,11 +720,11 @@ chainID = 1337
 SourceStartBlock = 1
 DestStartBlock = 2
 offRamp = "0x1234567890123456789012345678901234567890"
-tokenPricesUSDPipeline = "this is not a pipeline"
+tokenPricesConfig = "this is not a proper dynamic price config"
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.Error(t, err)
-				require.ErrorContains(t, err, "invalid token prices pipeline")
+				require.ErrorContains(t, err, "invalid token prices config")
 			},
 		},
 		{

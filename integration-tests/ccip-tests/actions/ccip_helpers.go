@@ -2201,20 +2201,22 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
 
-	var killgrave *ctftestenv.Killgrave
-	if env.LocalCluster != nil {
-		killgrave = env.LocalCluster.MockAdapter
-	}
-	tokensUSDUrl := SetMockServerWithSameTokenFeeConversionValue(tokenAddresses, killgrave, env.MockServer)
+	//var killgrave *ctftestenv.Killgrave
+	//if env.LocalCluster != nil {
+	//	killgrave = env.LocalCluster.MockAdapter
+	//}
+	//tokensUSDUrl := SetMockServerWithSameTokenFeeConversionValue(tokenAddresses, killgrave, env.MockServer)
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
-		OffRamp:                lane.Dest.OffRamp.EthAddress,
-		CommitStore:            lane.Dest.CommitStore.EthAddress,
-		SourceChainName:        sourceChainClient.GetNetworkName(),
-		DestChainName:          destChainClient.GetNetworkName(),
-		DestEvmChainId:         destChainClient.GetChainID().Uint64(),
-		SourceStartBlock:       lane.Source.SrcStartBlock,
-		TokenPricesUSDPipeline: TokenFeeForMultipleTokenAddr(tokensUSDUrl),
-		DestStartBlock:         currentBlockOnDest,
+		OffRamp:          lane.Dest.OffRamp.EthAddress,
+		CommitStore:      lane.Dest.CommitStore.EthAddress,
+		SourceChainName:  sourceChainClient.GetNetworkName(),
+		DestChainName:    destChainClient.GetNetworkName(),
+		DestEvmChainId:   destChainClient.GetChainID().Uint64(),
+		SourceStartBlock: lane.Source.SrcStartBlock,
+		// FIXME
+		//TokenPricesUSDPipeline: TokenFeeForMultipleTokenAddr(tokensUSDUrl),
+		TokenPricesConfig: "",
+		DestStartBlock:    currentBlockOnDest,
 	}
 
 	if !bootstrapAdded.Load() {
