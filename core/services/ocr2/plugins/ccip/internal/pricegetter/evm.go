@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/gethwrappers2/generated/offchainaggregator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 )
@@ -52,6 +51,8 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 	batchCallsPerChain := make(map[uint64][]rpclib.EvmCall)
 	batchCallsTokensOrder := make(map[uint64][]common.Address)
 
+	fmt.Printf("=> querying token prices for %d tokens: %s\n", len(tokens), tokens)
+
 	aggregatorAbi, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
 	if err != nil {
 		return nil, err
@@ -59,13 +60,13 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 
 	for _, tk := range tokens {
 		// group aggregator-based tokens to make batch call (one per chain)
-		if dynCfg, exists := d.cfg.AggregatorPrices[tk]; exists {
-			batchCallsPerChain[dynCfg.ChainID] = append(batchCallsPerChain[dynCfg.ChainID], rpclib.NewEvmCall(
+		if aggCfg, exists := d.cfg.AggregatorPrices[tk]; exists {
+			batchCallsPerChain[aggCfg.ChainID] = append(batchCallsPerChain[aggCfg.ChainID], rpclib.NewEvmCall(
 				aggregatorAbi,
 				"latestRoundData",
-				dynCfg.ContractAddress,
+				aggCfg.ContractAddress,
 			))
-			batchCallsTokensOrder[dynCfg.ChainID] = append(batchCallsTokensOrder[dynCfg.ChainID], tk)
+			batchCallsTokensOrder[aggCfg.ChainID] = append(batchCallsTokensOrder[aggCfg.ChainID], tk)
 			continue
 		}
 
@@ -83,21 +84,23 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 		}
 
 		tokensOrder := batchCallsTokensOrder[chainID]
-		results, err := evmCaller.BatchCall(ctx, 0, batchCalls)
+		resultsPerChain, err := evmCaller.BatchCall(ctx, 50, batchCalls)
 		if err != nil {
 			return nil, fmt.Errorf("batch call: %w", err)
 		}
 
-		latestRounds, err := rpclib.ParseOutputs[aggregator_v3_interface.LatestRoundData](results, func(d rpclib.DataAndErr) (aggregator_v3_interface.LatestRoundData, error) {
-			return rpclib.ParseOutput[aggregator_v3_interface.LatestRoundData](d, 0)
+		// latestRoundData returns an array of integers (not a proper struct), therefore we get the answer at position 1.
+		latestRounds, err := rpclib.ParseOutputs[*big.Int](resultsPerChain, func(d rpclib.DataAndErr) (*big.Int, error) {
+			return rpclib.ParseOutput[*big.Int](d, 1)
 		})
 		if err != nil {
 			return nil, fmt.Errorf("parse outputs: %w", err)
 		}
 
 		for i := range tokensOrder {
-			// Convert prices to wei (10e18).
-			prices[tokensOrder[i]] = big.NewInt(0).Mul(latestRounds[i].Answer, big.NewInt(10_000_000_000))
+			// Convert prices to wei (10e18) -> already in wei when coming from aggregator.
+			//prices[tokensOrder[i]] = big.NewInt(0).Mul(latestRounds[i].Answer, big.NewInt(10_000_000_000))
+			prices[tokensOrder[i]] = latestRounds[i]
 		}
 	}
 

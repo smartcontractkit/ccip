@@ -2,6 +2,7 @@ package ccip_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sync"
@@ -17,17 +18,42 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
 
 func TestIntegration_CCIP(t *testing.T) {
 	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
-	tokenPricesUSDPipeline, linkUSD, ethUSD := ccipTH.CreatePricesPipeline(t)
-	defer linkUSD.Close()
-	defer ethUSD.Close()
+	//tokenPricesUSDPipeline, linkUSD, ethUSD := ccipTH.CreatePricesPipeline(t)
+	//defer linkUSD.Close()
+	//defer ethUSD.Close()
+	srcLinkAddr := ccipTH.Source.LinkToken.Address()
+	dstLinkAddr := ccipTH.Dest.LinkToken.Address()
+	tokenPricesConfig := pricegetter.DynamicPriceGetterConfig{
+		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
+			srcLinkAddr: {
+				ChainID:         101,
+				ContractAddress: ccipTH.Source.PriceRegistry.Address(), // aggregator contract
+			},
+			dstLinkAddr: {
+				ChainID:         102,
+				ContractAddress: ccipTH.Dest.PriceRegistry.Address(), // aggregator contract
+			},
+		},
+		StaticPrices: map[common.Address]pricegetter.StaticPriceConfig{},
+		//StaticPrices: map[common.Address]pricegetter.StaticPriceConfig{
+		//	"tkaddr": {
+		//		ChainID: 103,
+		//		Price:   1_000_000_000,
+		//	},
+		//},
+	}
+	tokenPricesConfigBytes, err := json.MarshalIndent(tokenPricesConfig, "", " ")
+	require.NoError(t, err)
+	tokenPricesConfigJson := string(tokenPricesConfigBytes)
 
-	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, "")
+	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesConfigJson, "")
 
 	currentSeqNum := 1
 
@@ -264,7 +290,7 @@ func TestIntegration_CCIP(t *testing.T) {
 		ccipTH.Dest.Chain.Commit()
 
 		// create new jobs
-		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesUSDPipeline, newConfigBlock, "")
+		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesConfigJson, newConfigBlock, "")
 		jobParams.Version = "v2"
 		jobParams.SourceStartBlock = srcStartBlock
 		ccipTH.AddAllJobs(t, jobParams)

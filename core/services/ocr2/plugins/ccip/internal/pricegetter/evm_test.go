@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
@@ -65,19 +66,27 @@ func TestDynamicPriceGetter(t *testing.T) {
 		AnsweredInRound: big.NewInt(2000),
 	}
 
-	caller1.On("BatchCall", mock.Anything, uint64(0), mock.Anything).Return(
+	//round3 := aggregator_v3_interface.LatestRoundData{
+	//	RoundId:         big.NewInt(3000),
+	//	Answer:          big.NewInt(238879815124),
+	//	StartedAt:       big.NewInt(1704897198),
+	//	UpdatedAt:       big.NewInt(1704897198),
+	//	AnsweredInRound: big.NewInt(3000),
+	//}
+
+	caller1.On("BatchCall", mock.Anything, uint64(50), mock.Anything).Return(
 		[]rpclib.DataAndErr{
 			{
-				Outputs: []any{round1},
+				Outputs: []any{round1.RoundId, round1.Answer, round1.StartedAt, round1.UpdatedAt, round1.AnsweredInRound},
 			},
 		},
 		nil,
 	).Maybe()
 
-	caller2.On("BatchCall", mock.Anything, uint64(0), mock.Anything).Return(
+	caller2.On("BatchCall", mock.Anything, uint64(50), mock.Anything).Return(
 		[]rpclib.DataAndErr{
 			{
-				Outputs: []any{round2},
+				Outputs: []any{round2.RoundId, round2.Answer, round2.StartedAt, round2.UpdatedAt, round2.AnsweredInRound},
 			},
 		},
 		nil,
@@ -90,10 +99,10 @@ func TestDynamicPriceGetter(t *testing.T) {
 
 	pg := NewDynamicPriceGetter(cfg, evmClients)
 	prices, err := pg.TokenPricesUSD(ctx, []common.Address{tk1, tk2, tk3})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, prices, 3)
-	assert.Equal(t, big.NewInt(0).Mul(big.NewInt(1396818990), big.NewInt(10_000_000_000)), prices[tk1])
-	assert.Equal(t, big.NewInt(0).Mul(big.NewInt(238879815123), big.NewInt(10_000_000_000)), prices[tk2])
+	assert.Equal(t, big.NewInt(1396818990), prices[tk1])
+	assert.Equal(t, big.NewInt(238879815123), prices[tk2])
 	assert.Equal(t, cfg.StaticPrices[tk3].Price, prices[tk3].Uint64())
 
 }

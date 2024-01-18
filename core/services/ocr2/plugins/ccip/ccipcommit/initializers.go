@@ -73,23 +73,29 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	//	return nil, nil, err
 	//}
 
-	// TODO build evmClients, from the list of chain selectors.
-	// TODO e.g.: chain, chainID, err := ccipconfig.GetChainByChainSelector(chainSet, chainSelector)
-	sourceChain.Client()
-	destChain.Client()
-	sourceCaller := rpclib.NewDynamicLimitedBatchCaller(
+	// Build evmClients.
+	srcCaller := rpclib.NewDynamicLimitedBatchCaller(
 		lggr,
 		sourceChain.Client(),
 		rpclib.DefaultRpcBatchSizeLimit,
 		rpclib.DefaultRpcBatchBackOffMultiplier,
 	)
-	evmClients := map[uint64]rpclib.EvmBatchCaller{sourceChain.ID().Uint64(): sourceCaller}
-	cfg := pricegetter.DynamicPriceGetterConfig{}
-	err = json.Unmarshal([]byte(pluginConfig.TokenPricesConfig), &cfg)
+	dstCaller := rpclib.NewDynamicLimitedBatchCaller(
+		lggr,
+		destChain.Client(),
+		rpclib.DefaultRpcBatchSizeLimit,
+		rpclib.DefaultRpcBatchBackOffMultiplier,
+	)
+	evmClients := map[uint64]rpclib.EvmBatchCaller{
+		sourceChain.ID().Uint64(): srcCaller,
+		destChain.ID().Uint64():   dstCaller,
+	}
+	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{}
+	err = json.Unmarshal([]byte(pluginConfig.TokenPricesConfig), &priceGetterConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	priceGetter := pricegetter.NewDynamicPriceGetter(cfg, evmClients)
+	priceGetter := pricegetter.NewDynamicPriceGetter(priceGetterConfig, evmClients)
 
 	// Load all the readers relevant for this plugin.
 	onRampReader, err := factory.NewOnRampReader(commitLggr, staticConfig.SourceChainSelector, staticConfig.ChainSelector, staticConfig.OnRamp, sourceChain.LogPoller(), sourceChain.Client())
