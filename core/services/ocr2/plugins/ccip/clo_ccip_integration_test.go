@@ -46,7 +46,6 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	aggSrcNatAddr, _, aggSrcNat, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(ccipTH.Source.User, ccipTH.Source.Chain, 18, big.NewInt(2e18))
 	require.NoError(t, err)
 	_, err = aggSrcNat.UpdateRoundData(ccipTH.Source.User, big.NewInt(50), big.NewInt(17000000), big.NewInt(1000), big.NewInt(1000))
-	ccipTH.Source.Chain.Commit()
 	require.NoError(t, err)
 	ccipTH.Source.Chain.Commit()
 
@@ -73,8 +72,7 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	tokenPricesConfig := pricegetter.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
 			srcLinkAddr: {
-				ChainID: ccipTH.Source.ChainID,
-				//ContractAddress: ccipTH.Source.Aggregator, // aggregator contract
+				ChainID:         ccipTH.Source.ChainID,
 				ContractAddress: aggSrcLnkAddr,
 			},
 			srcNativeAddr: {
@@ -82,8 +80,7 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 				ContractAddress: aggSrcNatAddr,
 			},
 			dstLinkAddr: {
-				ChainID: ccipTH.Dest.ChainID,
-				//ContractAddress: ccipTH.Dest.Aggregator, // aggregator contract
+				ChainID:         ccipTH.Dest.ChainID,
 				ContractAddress: aggDstLnkAddr,
 			},
 			//ccipTH.Dest.WrappedNative.Address(): {
