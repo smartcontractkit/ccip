@@ -31,6 +31,9 @@ func TestMarshalReportMetadata(t *testing.T) {
 			},
 			LiquidityManagerAddress: models.Address(testutils.NewAddress()),
 			NetworkID:               1,
+			ConfigDigest: models.ConfigDigest{
+				ConfigDigest: testutils.Random32Byte(),
+			},
 		}
 		b, err = json.Marshal(rm)
 		require.NoError(t, err, "failed to marshal ReportMetadata")

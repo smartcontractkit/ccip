@@ -195,7 +195,7 @@ func (ks *eth) Add(address common.Address, chainID *big.Int, qopts ...pg.QOpt) e
 func (ks *eth) addKey(address common.Address, chainID *big.Int, qopts ...pg.QOpt) error {
 	state := new(ethkey.State)
 	sql := `INSERT INTO evm.key_states (address, disabled, evm_chain_id, created_at, updated_at)
-			VALUES ($1, false, $2, NOW(), NOW())
+			VALUES ($1, false, $2, NOW(), NOW()) 
 			RETURNING *;`
 	q := ks.q.WithOpts(qopts...)
 	if err := q.Get(state, sql, address, chainID.String()); err != nil {
@@ -311,7 +311,6 @@ func (ks *eth) SignTx(address common.Address, tx *types.Transaction, chainID *bi
 	if ks.isLocked() {
 		return nil, ErrLocked
 	}
-	fmt.Println("SignTx: signing tx", tx.Hash(), "from:", address.Hex(), "chain id:", chainID.String())
 	key, err := ks.getByID(address.String())
 	if err != nil {
 		return nil, err

@@ -157,6 +157,8 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	lggr.Infow("finished computing transfers to reach balance", "transfersBySourceNet", transfersBySourceNet)
 
 	var reports []ocr3types.ReportWithInfo[models.ReportMetadata]
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 	for sourceNet, transfers := range transfersBySourceNet {
 		lmAddress, exists := p.liquidityManagers.Get(sourceNet)
 		if !exists {
@@ -168,8 +170,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 			return nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
+		// TODO: consider caching the config digest or including it in the outcome?
 		configDigest, err := rebalancer.ConfigDigest(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("get config digest: %w", err)

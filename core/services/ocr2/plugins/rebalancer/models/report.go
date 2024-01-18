@@ -1,14 +1,16 @@
 package models
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 var (
@@ -24,6 +26,39 @@ func init() {
 	onchainReportArguments = exposeForEncoding.Inputs
 }
 
+// ConfigDigest wraps ocrtypes.ConfigDigest and adds json encoding support
+type ConfigDigest struct {
+	ocrtypes.ConfigDigest
+}
+
+func (c *ConfigDigest) UnmarshalJSON(b []byte) error {
+	var hexStr string
+	if err := json.Unmarshal(b, &hexStr); err != nil {
+		return err
+	}
+	b, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return fmt.Errorf("decoding config digest hex string: %w", err)
+	}
+	if len(b) != 32 {
+		return fmt.Errorf("config digest must be 32 bytes, got %d bytes", len(b))
+	}
+	var digestBytes [32]byte
+	copy(digestBytes[:], b)
+	*c = ConfigDigest{
+		ConfigDigest: ocrtypes.ConfigDigest(digestBytes),
+	}
+	return nil
+}
+
+func (c ConfigDigest) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(c.ConfigDigest[:]))
+}
+
+func (c ConfigDigest) ToOCRConfigDigest() ocrtypes.ConfigDigest {
+	return c.ConfigDigest
+}
+
 type ReportMetadata struct {
 	Transfers               []Transfer
 	LiquidityManagerAddress Address
@@ -32,7 +67,7 @@ type ReportMetadata struct {
 	NetworkID NetworkSelector
 	// ConfigDigest is the latest config digest of the contract that the report
 	// is going to be posted to.
-	ConfigDigest ocrtypes.ConfigDigest
+	ConfigDigest ConfigDigest
 }
 
 func NewReportMetadata(transfers []Transfer, lmAddr Address, networkID NetworkSelector, configDigest ocrtypes.ConfigDigest) ReportMetadata {
@@ -40,7 +75,9 @@ func NewReportMetadata(transfers []Transfer, lmAddr Address, networkID NetworkSe
 		Transfers:               transfers,
 		LiquidityManagerAddress: lmAddr,
 		NetworkID:               networkID,
-		ConfigDigest:            configDigest,
+		ConfigDigest: ConfigDigest{
+			ConfigDigest: configDigest,
+		},
 	}
 }
 
@@ -99,7 +136,7 @@ func (r ReportMetadata) GetDestinationChain() relay.ID {
 }
 
 func (r ReportMetadata) GetDestinationConfigDigest() ocrtypes.ConfigDigest {
-	return r.ConfigDigest
+	return r.ConfigDigest.ToOCRConfigDigest()
 }
 
 func (r ReportMetadata) String() string {

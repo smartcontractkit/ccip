@@ -40,7 +40,9 @@ func TestKeyring(t *testing.T) {
 		report := testutils.Random32Byte()
 		sig, err := keyring.Sign(digest, seqNr, ocr3types.ReportWithInfo[models.ReportMetadata]{
 			Info: models.ReportMetadata{
-				ConfigDigest: digest,
+				ConfigDigest: models.ConfigDigest{
+					ConfigDigest: digest,
+				},
 			},
 			Report: report[:],
 		})
@@ -51,7 +53,9 @@ func TestKeyring(t *testing.T) {
 			seqNr,
 			ocr3types.ReportWithInfo[models.ReportMetadata]{
 				Info: models.ReportMetadata{
-					ConfigDigest: digest,
+					ConfigDigest: models.ConfigDigest{
+						ConfigDigest: digest,
+					},
 				},
 				Report: report[:],
 			},
@@ -67,7 +71,9 @@ func TestKeyring(t *testing.T) {
 			seqNr,
 			ocr3types.ReportWithInfo[models.ReportMetadata]{
 				Info: models.ReportMetadata{
-					ConfigDigest: digest,
+					ConfigDigest: models.ConfigDigest{
+						ConfigDigest: digest,
+					},
 				},
 				Report: report[:],
 			},
@@ -83,7 +89,9 @@ func TestKeyring(t *testing.T) {
 			seqNr,
 			ocr3types.ReportWithInfo[models.ReportMetadata]{
 				Info: models.ReportMetadata{
-					ConfigDigest: digest,
+					ConfigDigest: models.ConfigDigest{
+						ConfigDigest: digest,
+					},
 				},
 				Report: report[:],
 			},
@@ -98,7 +106,9 @@ func TestKeyring(t *testing.T) {
 			seqNr,
 			ocr3types.ReportWithInfo[models.ReportMetadata]{
 				Info: models.ReportMetadata{
-					ConfigDigest: digest,
+					ConfigDigest: models.ConfigDigest{
+						ConfigDigest: digest,
+					},
 				},
 				Report: report[:],
 			},

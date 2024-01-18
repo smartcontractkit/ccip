@@ -336,11 +336,9 @@ func (c *SimulatedBackendClient) SendTransactionReturnCode(ctx context.Context, 
 	c.t.Log("SendTransactionReturnCode: ", tx.Hash().Hex(), " from ", fromAddress.Hex())
 	err := c.SendTransaction(ctx, tx)
 	if err == nil {
-		c.t.Log("SendTransactionReturnCode: successful, tx hash:", tx.Hash().Hex(), " from ", fromAddress.Hex())
 		return commonclient.Successful, nil
 	}
 	if strings.Contains(err.Error(), "could not fetch parent") || strings.Contains(err.Error(), "invalid transaction") {
-		c.t.Log("SendTransactionReturnCode: fatal, tx hash:", tx.Hash().Hex(), " from ", fromAddress.Hex(), "err:", err.Error())
 		return commonclient.Fatal, err
 	}
 	// All remaining error messages returned from SendTransaction are considered Unknown.
@@ -357,10 +355,8 @@ func (c *SimulatedBackendClient) SendTransaction(ctx context.Context, tx *types.
 	// first. if that fails, try again with the simulated chain id (1337)
 	sender, err = types.Sender(types.NewLondonSigner(c.chainId), tx)
 	if err != nil {
-		c.t.Log("SendTransaction: error creating london signer with chain id ", c.chainId.String(), ":", err)
 		sender, err = types.Sender(types.NewLondonSigner(big.NewInt(1337)), tx)
 		if err != nil {
-			c.t.Log("SendTransaction: error creating london signer with chain id 1337:", err)
 			logger.Test(c.t).Panic(fmt.Errorf("invalid transaction: %v (tx: %#v)", err, tx))
 		}
 	}
@@ -376,9 +372,6 @@ func (c *SimulatedBackendClient) SendTransaction(ctx context.Context, tx *types.
 	}
 
 	err = c.b.SendTransaction(ctx, tx)
-	if err != nil {
-		c.t.Log("SendTransaction: error sending transaction: ", err)
-	}
 	return err
 }
 
