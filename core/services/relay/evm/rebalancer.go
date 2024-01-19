@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
@@ -34,6 +35,7 @@ type RebalancerProvider interface {
 	commontypes.Plugin
 	ContractTransmitterOCR3() ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata]
 	LiquidityManagerFactory() liquiditymanager.Factory
+	BridgeContainer() *bridge.Container
 }
 
 type RebalancerRelayer interface {
@@ -110,11 +112,56 @@ func (r *rebalancerRelayer) NewRebalancerProvider(rargs commontypes.RelayArgs, p
 	if err != nil {
 		return nil, fmt.Errorf("failed to create multichain transmitter: %w", err)
 	}
+
+	bridgeContainer, err := r.initBridgeContainer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to init bridge container: %w", err)
+	}
+
 	return &rebalancerProvider{
 		configWatcher:       configWatcher,
 		contractTransmitter: multichainTransmitter,
 		lmFactory:           lmFactory,
+		bridgeContainer:     bridgeContainer,
 	}, nil
+}
+
+func (r *rebalancerRelayer) initBridgeContainer() (*bridge.Container, error) {
+	const (
+		ethSelector = 5009297550715157269
+		opSelector  = 3734403246176062136
+	)
+
+	bridgeContainer := bridge.NewContainer()
+
+	if ethToOptimismBridge, err := r.initEthereumToOptimismBridge(); err != nil {
+		r.lggr.Errorf("init ethereum to optimism bridge: %s", err)
+	} else {
+		bridgeContainer.AddBridge(
+			ethToOptimismBridge,
+			rebalancermodels.NetworkSelector(ethSelector),
+			rebalancermodels.NetworkSelector(opSelector),
+		)
+	}
+
+	return bridgeContainer, nil
+}
+
+func (r *rebalancerRelayer) initEthereumToOptimismBridge() (*bridge.EthereumToOptimism, error) {
+	const (
+		opL2Bridge = "0x4200000000000000000000000000000000000010"
+		opChainID  = "10"
+	)
+
+	opChain, err := r.chains.Get(opChainID)
+	if err != nil {
+		return nil, fmt.Errorf("get optimism chain: %w", err)
+	}
+
+	return bridge.NewEthereumToOptimism(
+		opChain.LogPoller(),
+		common.HexToAddress(opL2Bridge),
+	)
 }
 
 var _ RebalancerProvider = (*rebalancerProvider)(nil)
@@ -123,6 +170,7 @@ type rebalancerProvider struct {
 	*configWatcher
 	contractTransmitter ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata]
 	lmFactory           liquiditymanager.Factory
+	bridgeContainer     *bridge.Container
 }
 
 // ChainReader implements RebalancerProvider.
@@ -141,6 +189,10 @@ func (r *rebalancerProvider) ContractTransmitterOCR3() ocr3types.ContractTransmi
 
 func (r *rebalancerProvider) LiquidityManagerFactory() liquiditymanager.Factory {
 	return r.lmFactory
+}
+
+func (r *rebalancerProvider) BridgeContainer() *bridge.Container {
+	return r.bridgeContainer
 }
 
 func newRebalancerConfigProvider(
