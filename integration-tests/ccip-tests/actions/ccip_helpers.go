@@ -2194,6 +2194,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("getting current block should be successful in destination chain %w", err)
 	}
 
+	// TODO create a prices config (static and/or dynamic) for the tokens
 	//var tokenAddresses []string
 	//
 	//for _, token := range lane.Dest.Common.BridgeTokens {
