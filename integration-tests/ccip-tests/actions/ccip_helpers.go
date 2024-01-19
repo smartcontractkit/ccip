@@ -585,8 +585,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	}
 	log.Info().Msg("finished deploying common contracts")
 	// approve router to spend fee token
-	ccipModule.ApproveTokens()
-	return nil
+	return ccipModule.ApproveTokens()
 }
 
 func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, existingDeployment, multiCall bool) (*CCIPCommon, error) {
