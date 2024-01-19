@@ -2209,13 +2209,14 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	// Build a dynamic price getter configuration (only with static prices for now).
 	var sb strings.Builder
-	sb.WriteString("{aggregatorPrices: {},")
-	sb.WriteString("staticPrices: {")
+	sb.WriteString("{\n")
+	sb.WriteString("\"aggregatorPrices\": {},")
+	sb.WriteString("\"staticPrices\": {")
 
 	// add bridge token prices.
 	for _, tk := range lane.Dest.Common.BridgeTokens {
 		sb.WriteString(fmt.Sprintf(`
-				%s: {
+				"%s": {
 					"chainID": %d,
 					"price": %s
 			 	},`,
