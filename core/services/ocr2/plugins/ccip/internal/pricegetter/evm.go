@@ -53,8 +53,6 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 	batchCallsPerChain := make(map[uint64][]rpclib.EvmCall)
 	batchCallsTokensOrder := make(map[uint64][]common.Address)
 
-	fmt.Printf("=> querying token prices for %d tokens: %s\n", len(tokens), tokens)
-
 	for _, tk := range tokens {
 		// group aggregator-based tokens to make batch call (one per chain)
 		if aggCfg, exists := d.cfg.AggregatorPrices[tk]; exists {
@@ -81,7 +79,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 		}
 
 		tokensOrder := batchCallsTokensOrder[chainID]
-		resultsPerChain, err := evmCaller.BatchCall(ctx, 50, batchCalls)
+		resultsPerChain, err := evmCaller.BatchCall(ctx, 0, batchCalls)
 		if err != nil {
 			return nil, fmt.Errorf("batch call: %w", err)
 		}
@@ -95,8 +93,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 		}
 
 		for i := range tokensOrder {
-			// Convert prices to wei (10e18) -> already in wei when coming from aggregator.
-			//prices[tokensOrder[i]] = big.NewInt(0).Mul(latestRounds[i].Answer, big.NewInt(10_000_000_000))
+			// Prices are already in wei (10e18) when coming from aggregator, no conversion needed.
 			prices[tokensOrder[i]] = latestRounds[i]
 		}
 	}

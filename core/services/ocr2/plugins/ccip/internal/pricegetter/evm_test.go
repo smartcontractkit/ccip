@@ -74,7 +74,7 @@ func TestDynamicPriceGetter(t *testing.T) {
 	//	AnsweredInRound: big.NewInt(3000),
 	//}
 
-	caller1.On("BatchCall", mock.Anything, uint64(50), mock.Anything).Return(
+	caller1.On("BatchCall", mock.Anything, uint64(0), mock.Anything).Return(
 		[]rpclib.DataAndErr{
 			{
 				Outputs: []any{round1.RoundId, round1.Answer, round1.StartedAt, round1.UpdatedAt, round1.AnsweredInRound},
@@ -83,7 +83,7 @@ func TestDynamicPriceGetter(t *testing.T) {
 		nil,
 	).Maybe()
 
-	caller2.On("BatchCall", mock.Anything, uint64(50), mock.Anything).Return(
+	caller2.On("BatchCall", mock.Anything, uint64(0), mock.Anything).Return(
 		[]rpclib.DataAndErr{
 			{
 				Outputs: []any{round2.RoundId, round2.Answer, round2.StartedAt, round2.UpdatedAt, round2.AnsweredInRound},
