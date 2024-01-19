@@ -32,23 +32,30 @@ contract OptimismL1BridgeAdapter is IBridgeAdapter {
     i_wrappedNative = wrappedNative;
   }
 
-  function sendERC20(address l1Token, address l2Token, address recipient, uint256 amount) external payable {
-    IERC20(l1Token).safeTransferFrom(msg.sender, address(this), amount);
+  /// @inheritdoc IBridgeAdapter
+  function sendERC20(
+    address localToken,
+    address remoteToken,
+    address recipient,
+    uint256 amount
+  ) external payable override returns (bytes memory) {
+    IERC20(localToken).safeTransferFrom(msg.sender, address(this), amount);
 
     if (msg.value != 0) {
       revert MsgShouldNotContainValue(msg.value);
     }
 
     // If the token is the wrapped native, we unwrap it and deposit native
-    if (l1Token == address(i_wrappedNative)) {
+    if (localToken == address(i_wrappedNative)) {
       i_wrappedNative.withdraw(amount);
       _depositNativeToL2(recipient, amount);
-      return;
+      return "";
     }
 
     // Token is normal ERC20
-    IERC20(l1Token).approve(address(i_L1Bridge), amount);
-    i_L1Bridge.depositERC20To(l1Token, l2Token, recipient, amount, 0, abi.encode(s_nonce++));
+    IERC20(localToken).approve(address(i_L1Bridge), amount);
+    i_L1Bridge.depositERC20To(localToken, remoteToken, recipient, amount, 0, abi.encode(s_nonce++));
+    return "";
   }
 
   /// @notice Bridging to Optimism is paid for with gas
@@ -77,9 +84,16 @@ contract OptimismL1BridgeAdapter is IBridgeAdapter {
     uint256 amount;
   }
 
-  function finalizeWithdrawERC20(address from, address to, bytes calldata data) external {
+  function finalizeWithdrawERC20(address remoteSender, address localReceiver, bytes calldata data) external override {
     OptimismFinalizationPayload memory payload = abi.decode(data, (OptimismFinalizationPayload));
-    i_L1Bridge.finalizeERC20Withdrawal(payload.l1Token, payload.l2Token, from, to, payload.amount, data);
+    i_L1Bridge.finalizeERC20Withdrawal(
+      payload.l1Token,
+      payload.l2Token,
+      remoteSender,
+      localReceiver,
+      payload.amount,
+      data
+    );
   }
 
   function finalizeWithdrawNativeFromL2(address from, address to, uint256 amount, bytes calldata data) external {

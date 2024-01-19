@@ -159,7 +159,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
       amount
     );
   }
-  
+
   function _receiveLiquidity(
     uint64 remoteChainSelector,
     uint256 amount,

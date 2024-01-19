@@ -65,25 +65,33 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
     i_l1ERC20Gateway = l1ERC20Gateway;
   }
 
-  function sendERC20(address l1Token, address, address recipient, uint256 amount) external payable {
-    IERC20(l1Token).safeTransferFrom(msg.sender, address(this), amount);
+  /// @inheritdoc IBridgeAdapter
+  function sendERC20(
+    address localToken,
+    address /* remoteToken */,
+    address recipient,
+    uint256 amount
+  ) external payable override returns (bytes memory) {
+    IERC20(localToken).safeTransferFrom(msg.sender, address(this), amount);
 
-    IERC20(l1Token).approve(i_l1ERC20Gateway, amount);
+    IERC20(localToken).approve(i_l1ERC20Gateway, amount);
 
     uint256 wantedNativeFeeCoin = getBridgeFeeInNative();
     if (msg.value < wantedNativeFeeCoin) {
       revert InsufficientEthValue(wantedNativeFeeCoin, msg.value);
     }
 
-    i_l1GatewayRouter.outboundTransferCustomRefund{value: msg.value}(
-      l1Token,
-      recipient,
-      recipient,
-      amount,
-      MAX_GAS,
-      GAS_PRICE_BID,
-      abi.encode(MAX_SUBMISSION_COST, bytes(""))
-    );
+    // TODO: return data bombs?
+    return
+      i_l1GatewayRouter.outboundTransferCustomRefund{value: msg.value}(
+        localToken,
+        recipient,
+        recipient,
+        amount,
+        MAX_GAS,
+        GAS_PRICE_BID,
+        abi.encode(MAX_SUBMISSION_COST, bytes(""))
+      );
   }
 
   function getBridgeFeeInNative() public pure returns (uint256) {
@@ -107,19 +115,20 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
     bytes data;
   }
 
-  /// @param l2Sender sender if original message (i.e., caller of ArbSys.sendTxToL1)
-  /// @param l1Receiver destination address for L1 contract call
+  /// @notice Finalize an L2 -> L1 transfer.
+  /// @param remoteSender sender if original message (i.e., caller of ArbSys.sendTxToL1)
+  /// @param localReceiver destination address for L1 contract call
   function finalizeWithdrawERC20(
-    address l2Sender,
-    address l1Receiver,
+    address remoteSender,
+    address localReceiver,
     bytes calldata arbitrumFinalizationPayload
   ) external {
     ArbitrumFinalizationPayload memory payload = abi.decode(arbitrumFinalizationPayload, (ArbitrumFinalizationPayload));
     i_l1Outbox.executeTransaction(
       payload.proof,
       payload.index,
-      l2Sender,
-      l1Receiver,
+      remoteSender,
+      localReceiver,
       payload.l2Block,
       payload.l1Block,
       payload.l2Timestamp,
