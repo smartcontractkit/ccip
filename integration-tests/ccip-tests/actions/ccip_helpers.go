@@ -2195,11 +2195,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	// TODO create a prices config (static and/or dynamic) for the tokens
-	var tokenAddresses []string
-	for _, token := range lane.Dest.Common.BridgeTokens {
-		tokenAddresses = append(tokenAddresses, token.Address())
-	}
-	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
+	//var tokenAddresses []string
+	//for _, token := range lane.Dest.Common.BridgeTokens {
+	//	tokenAddresses = append(tokenAddresses, token.Address())
+	//}
+	//tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
 
 	//var killgrave *ctftestenv.Killgrave
 	//if env.LocalCluster != nil {
@@ -2242,32 +2242,32 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		lane.Dest.Common.WrappedNative.Hex(), lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
 	sb.WriteString("}")
 
-	tokenPricesConfigJson := `
-		{
-			"aggregatorPrices": {
-			 "0x0820c05e1fba1244763a494a52272170c321cad3": {
-			  "chainID": 1000,
-			  "contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
-			 },
-			 "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
-			  "chainID": 1337,
-			  "contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
-			 },
-			 "0xec8c353470ccaa4f43067fcde40558e084a12927": {
-			  "chainID": 1000,
-			  "contractAddress": "0x277517e2127a09bda109217c9cf901bc7a9f9b9a"
-			 }
-			},
-			"staticPrices": {
-				"0xec8c353470ccaa4f43067fcde40558e084a12927": {
-					"chainID": 1057,
-					"price": "1000000000000000000"
-			 	}
-			}
-		}
-		`
+	//tokenPricesConfigJson := `
+	//	{
+	//		"aggregatorPrices": {
+	//		 "0x0820c05e1fba1244763a494a52272170c321cad3": {
+	//		  "chainID": 1000,
+	//		  "contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
+	//		 },
+	//		 "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
+	//		  "chainID": 1337,
+	//		  "contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
+	//		 },
+	//		 "0xec8c353470ccaa4f43067fcde40558e084a12927": {
+	//		  "chainID": 1000,
+	//		  "contractAddress": "0x277517e2127a09bda109217c9cf901bc7a9f9b9a"
+	//		 }
+	//		},
+	//		"staticPrices": {
+	//			"0xec8c353470ccaa4f43067fcde40558e084a12927": {
+	//				"chainID": 1057,
+	//				"price": "1000000000000000000"
+	//		 	}
+	//		}
+	//	}
+	//	`
 
-	tokenPricesConfigJson = sb.String()
+	tokenPricesConfigJson := sb.String()
 	fmt.Printf("Price getter config:\n%s\n", tokenPricesConfigJson)
 
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
