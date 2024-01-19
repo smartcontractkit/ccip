@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -308,7 +307,7 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 		if allowance.Cmp(ApprovedAmountToRouter) < 0 {
 			err := token.Approve(ccipModule.Router.Address(), ApprovedAmountToRouter)
 			if err != nil {
-				return errors.WithStack(err)
+				return fmt.Errorf("failed to approve token %s: %w", token.ContractAddress.Hex(), err)
 			}
 		}
 		if token.ContractAddress == ccipModule.FeeToken.EthAddress {
@@ -2782,7 +2781,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		log.Info().Str("chain id", chain.GetChainID().String()).Msg("creating node keys for chain")
 		_, clNodes, err := client.CreateNodeKeysBundle(chainlinkNodes, "evm", chain.GetChainID().String())
 		if err != nil {
-			return errors.WithStack(err)
+			return fmt.Errorf("failed to create node keys for chain %s: %w", chain.GetChainID().String(), err)
 		}
 		if len(clNodes) == 0 {
 			return fmt.Errorf("no CL node with keys found for chain %s", chain.GetNetworkName())
