@@ -215,9 +215,9 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*OCR2TaskJobSpec, error) {
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
 			"offRamp": fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
-			"tokenPricesConfig": fmt.Sprintf(`
+			"tokenPricesConfig": fmt.Sprintf(`"""
 %s
-`, params.TokenPricesConfig),
+"""`, params.TokenPricesConfig),
 		},
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestEvmChainId,
