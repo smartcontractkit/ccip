@@ -69,7 +69,6 @@ func (n NetworkSelector) MarshalJSON() ([]byte, error) {
 type NetworkType string
 
 type Transfer struct {
-	ID     uint64
 	From   NetworkSelector
 	To     NetworkSelector
 	Amount *big.Int

@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -21,14 +22,16 @@ type evmDep struct {
 }
 
 type BaseLiquidityManagerFactory struct {
-	evmDeps map[models.NetworkSelector]evmDep
+	evmDeps         map[models.NetworkSelector]evmDep
+	bridgeContainer *bridge.Container
 }
 
 type Opt func(f *BaseLiquidityManagerFactory)
 
-func NewBaseLiquidityManagerFactory(opts ...Opt) *BaseLiquidityManagerFactory {
+func NewBaseLiquidityManagerFactory(bridgeContainer *bridge.Container, opts ...Opt) *BaseLiquidityManagerFactory {
 	f := &BaseLiquidityManagerFactory{
-		evmDeps: make(map[models.NetworkSelector]evmDep),
+		evmDeps:         make(map[models.NetworkSelector]evmDep),
+		bridgeContainer: bridgeContainer,
 	}
 	for _, opt := range opts {
 		opt(f)
@@ -52,7 +55,7 @@ func (b *BaseLiquidityManagerFactory) NewLiquidityManager(networkID models.Netwo
 		if !exists {
 			return nil, fmt.Errorf("evm dependencies not found")
 		}
-		return NewEvmLiquidityManager(address, networkID, evmDeps.ethClient, evmDeps.lp)
+		return NewEvmLiquidityManager(address, networkID, b.bridgeContainer, evmDeps.ethClient, evmDeps.lp)
 	default:
 		return nil, fmt.Errorf("liquidity manager of type %v is not supported", typ)
 	}

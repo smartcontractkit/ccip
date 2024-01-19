@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
@@ -156,6 +157,22 @@ func newRebalancerConfigProvider(
 		return nil, nil, nil, fmt.Errorf("invalid contract address %s", rargs.ContractID)
 	}
 
+	logPollers := make(map[relay.ID]logpoller.LogPoller)
+	for _, chain := range chains.Slice() {
+		logPollers[relay.NewID(relay.EVM, chain.ID().String())] = chain.LogPoller()
+	}
+
+	bridgeContainer := bridge.NewContainer()
+	ethToOpBridge, err := bridge.NewEthereumToOptimism(
+		logPollers[relay.NewID("evm", "10")],
+		common.HexToAddress("0x4200000000000000000000000000000000000010"),
+	)
+	bridgeContainer.AddBridge(
+		ethToOpBridge,
+		rebalancermodels.NetworkSelector(5009297550715157269),
+		rebalancermodels.NetworkSelector(3734403246176062136),
+	)
+
 	var lmFactoryOpts []liquiditymanager.Opt
 	for _, chain := range chains.Slice() {
 		lmFactoryOpts = append(lmFactoryOpts, liquiditymanager.WithEvmDep(
@@ -164,16 +181,11 @@ func newRebalancerConfigProvider(
 			chain.Client(),
 		))
 	}
-	lmFactory := liquiditymanager.NewBaseLiquidityManagerFactory(lmFactoryOpts...)
+	lmFactory := liquiditymanager.NewBaseLiquidityManagerFactory(bridgeContainer, lmFactoryOpts...)
 
 	masterChain, err := chains.Get(relayConfig.ChainID.String())
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to get master chain %s: %w", relayConfig.ChainID, err)
-	}
-
-	logPollers := make(map[relay.ID]logpoller.LogPoller)
-	for _, chain := range chains.Slice() {
-		logPollers[relay.NewID(relay.EVM, chain.ID().String())] = chain.LogPoller()
 	}
 
 	// sanity check that all chains specified in RelayConfig.fromBlocks are present

@@ -32,7 +32,11 @@ type EvmLiquidityManager struct {
 	token           common.Address
 }
 
-func NewEvmLiquidityManager(address models.Address, net models.NetworkSelector, ec client.Client, lp logpoller.LogPoller) (*EvmLiquidityManager, error) {
+func NewEvmLiquidityManager(
+	address models.Address,
+	net models.NetworkSelector,
+	bridgeContainer *bridge.Container,
+	ec client.Client, lp logpoller.LogPoller) (*EvmLiquidityManager, error) {
 	// uncomment when we implement the concrete lm
 	// client, err := NewConcreteLiquidityManager(common.Address(address), ec)
 	// if err != nil {
@@ -61,12 +65,13 @@ func NewEvmLiquidityManager(address models.Address, net models.NetworkSelector, 
 	}
 
 	return &EvmLiquidityManager{
-		client:     dummyClient,
-		lp:         lp,
-		lmAbi:      lmAbi,
-		ec:         ec,
-		addr:       common.Address(address),
-		networkSel: net,
+		client:          dummyClient,
+		lp:              lp,
+		lmAbi:           lmAbi,
+		ec:              ec,
+		addr:            common.Address(address),
+		networkSel:      net,
+		bridgeContainer: bridgeContainer,
 		cleanupFunc: func() error {
 			return lp.UnregisterFilter(lpFilter.Name)
 		},
@@ -116,7 +121,8 @@ func (e *EvmLiquidityManager) GetTransfers(ctx context.Context, since time.Time)
 			return nil, fmt.Errorf("bridge not found") // todo
 		}
 
-		withStatus, err := br.PopulateStatusOfTransfers(ctx, e.token, e.addr, []models.Transfer{tr})
+		withStatus, err := br.PopulateStatusOfTransfers(
+			ctx, models.Address(e.token), models.Address(e.addr), []models.Transfer{tr})
 		if err != nil {
 			return nil, fmt.Errorf("populate status of transfers: %w", err)
 		}
