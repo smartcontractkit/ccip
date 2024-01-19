@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -366,7 +367,7 @@ func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.
 	if err != nil {
 		return nil, fmt.Errorf("get latest block: %w", err)
 	}
-
+	o.Logger.Infof(">>> about to make batch call: %#v", evmCalls)
 	results, err := o.evmBatchCaller.BatchCall(ctx, uint64(latestBlock.FinalizedBlockNumber), evmCalls)
 	if err != nil {
 		return nil, fmt.Errorf("batch call limit: %w", err)
