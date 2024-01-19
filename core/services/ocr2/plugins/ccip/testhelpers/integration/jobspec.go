@@ -184,6 +184,7 @@ func (params CCIPJobSpecParams) ValidateCommitJobSpec() error {
 	if params.OffRamp == common.HexToAddress("0x0") {
 		return fmt.Errorf("OffRamp cannot be empty for execution job")
 	}
+	// TODO validate token prices config
 	return nil
 }
 
@@ -214,9 +215,9 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*OCR2TaskJobSpec, error) {
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
 			"offRamp": fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
-			"tokenPricesConfig": fmt.Sprintf(`"""
+			"tokenPricesConfig": fmt.Sprintf(`
 %s
-"""`, params.TokenPricesConfig),
+`, params.TokenPricesConfig),
 		},
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestEvmChainId,
