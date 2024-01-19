@@ -63,7 +63,12 @@ func NewRebalancerRelayer(
 
 // NewRebalancerProvider implements RebalancerRelayer.
 func (r *rebalancerRelayer) NewRebalancerProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (RebalancerProvider, error) {
-	configWatcher, lmContracts, lmFactory, err := newRebalancerConfigProvider(r.lggr, r.chains, rargs)
+	var pluginConfig rebalancermodels.PluginConfig
+	if err := json.Unmarshal(pargs.PluginConfig, &pluginConfig); err != nil {
+		return nil, fmt.Errorf("parse plugin config: %w", err)
+	}
+
+	configWatcher, lmContracts, lmFactory, err := newRebalancerConfigProvider(r.lggr, r.chains, pluginConfig.TokenAddresses, rargs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config watcher: %w", err)
 	}
@@ -198,6 +203,7 @@ func (r *rebalancerProvider) BridgeContainer() *bridge.Container {
 func newRebalancerConfigProvider(
 	lggr logger.Logger,
 	chains legacyevm.LegacyChainContainer,
+	tokenAddresses map[rebalancermodels.NetworkSelector]rebalancermodels.Address,
 	rargs commontypes.RelayArgs) (*configWatcher, map[relay.ID]common.Address, liquiditymanager.Factory, error) {
 	var relayConfig types.RelayConfig
 	err := json.Unmarshal(rargs.RelayConfig, &relayConfig)
@@ -208,8 +214,6 @@ func newRebalancerConfigProvider(
 		return nil, nil, nil, fmt.Errorf("invalid contract address %s", rargs.ContractID)
 	}
 
-	tokenAddr := rebalancermodels.Address(common.HexToAddress("0")) // ????
-
 	var lmFactoryOpts []liquiditymanager.Opt
 	for _, chain := range chains.Slice() {
 		lmFactoryOpts = append(lmFactoryOpts, liquiditymanager.WithEvmDep(
@@ -218,7 +222,7 @@ func newRebalancerConfigProvider(
 			chain.Client(),
 		))
 	}
-	lmFactory := liquiditymanager.NewBaseRebalancerFactory(tokenAddr, lmFactoryOpts...)
+	lmFactory := liquiditymanager.NewBaseRebalancerFactory(tokenAddresses, lmFactoryOpts...)
 
 	masterChain, err := chains.Get(relayConfig.ChainID.String())
 	if err != nil {

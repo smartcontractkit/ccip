@@ -369,6 +369,10 @@ fromBlock               = %d
 liquidityManagerAddress = "%s"
 liquidityManagerNetwork = %d
 closePluginTimeoutSec = 10
+[pluginConfig.tokenAddresses]
+1337="0x0000000000000000000000000000000000000000"
+1338="0x0000000000000000000000000000000000000000"
+1339="0x0000000000000000000000000000000000000000"
 [pluginConfig.rebalancerConfig]
 type = "random"
 [pluginConfig.rebalancerConfig.randomRebalancerConfig]

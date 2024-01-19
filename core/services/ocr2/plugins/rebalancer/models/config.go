@@ -9,12 +9,12 @@ import (
 const PluginName = "liquidityRebalancer"
 
 type PluginConfig struct {
-	LiquidityManagerAddress Address          `json:"liquidityManagerAddress"`
-	LiquidityManagerNetwork NetworkSelector  `json:"liquidityManagerNetwork"`
-	ClosePluginTimeoutSec   int              `json:"closePluginTimeoutSec"`
-	RebalancerConfig        RebalancerConfig `json:"rebalancerConfig"`
-	TokenAddress            Address          `json:"tokenAddress"`
-	BridgeConfig            BridgeConfig     `json:"bridgeConfig"`
+	LiquidityManagerAddress Address                     `json:"liquidityManagerAddress"`
+	LiquidityManagerNetwork NetworkSelector             `json:"liquidityManagerNetwork"`
+	ClosePluginTimeoutSec   int                         `json:"closePluginTimeoutSec"`
+	RebalancerConfig        RebalancerConfig            `json:"rebalancerConfig"`
+	TokenAddresses          map[NetworkSelector]Address `json:"tokenAddresses"`
+	BridgeConfig            BridgeConfig                `json:"bridgeConfig"`
 }
 
 type RebalancerConfig struct {
