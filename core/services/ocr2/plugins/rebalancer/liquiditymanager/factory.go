@@ -22,13 +22,15 @@ type evmDep struct {
 
 type BaseRebalancerFactory struct {
 	evmDeps map[models.NetworkSelector]evmDep
+	token   models.Address
 }
 
 type Opt func(f *BaseRebalancerFactory)
 
-func NewBaseRebalancerFactory(opts ...Opt) *BaseRebalancerFactory {
+func NewBaseRebalancerFactory(token models.Address, opts ...Opt) *BaseRebalancerFactory {
 	f := &BaseRebalancerFactory{
 		evmDeps: make(map[models.NetworkSelector]evmDep),
+		token:   token,
 	}
 	for _, opt := range opts {
 		opt(f)
@@ -52,7 +54,7 @@ func (b *BaseRebalancerFactory) NewRebalancer(networkID models.NetworkSelector, 
 		if !exists {
 			return nil, fmt.Errorf("evm dependencies not found")
 		}
-		return NewEvmRebalancer(address, networkID, evmDeps.ethClient, evmDeps.lp)
+		return NewEvmRebalancer(address, networkID, evmDeps.ethClient, evmDeps.lp, b.token)
 	default:
 		return nil, fmt.Errorf("liquidity manager of type %v is not supported", typ)
 	}

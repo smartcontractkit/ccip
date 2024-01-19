@@ -12,6 +12,7 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
@@ -28,6 +29,7 @@ type Plugin struct {
 	liquidityGraph          liquiditygraph.LiquidityGraph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	pendingTransfers        *PendingTransfersCache
+	bridgeContainer         *bridge.Container
 	lggr                    logger.Logger
 }
 
@@ -39,6 +41,7 @@ func NewPlugin(
 	liquidityManagerFactory liquiditymanager.Factory,
 	liquidityGraph liquiditygraph.LiquidityGraph,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
+	bridgeContainer *bridge.Container,
 	lggr logger.Logger,
 ) *Plugin {
 
@@ -55,6 +58,7 @@ func NewPlugin(
 		liquidityGraph:          liquidityGraph,
 		liquidityRebalancer:     liquidityRebalancer,
 		pendingTransfers:        NewPendingTransfersCache(),
+		bridgeContainer:         bridgeContainer,
 		lggr:                    lggr,
 	}
 }
@@ -313,7 +317,7 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 			dateToStartLookingFrom = mostRecentTransfer.Date
 		}
 
-		netPendingTransfers, err := lm.GetPendingTransfers(ctx, dateToStartLookingFrom)
+		netPendingTransfers, err := lm.GetPendingTransfers(ctx, p.bridgeContainer, dateToStartLookingFrom)
 		if err != nil {
 			return nil, fmt.Errorf("get pending %v transfers: %w", networkID, err)
 		}

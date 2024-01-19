@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -31,9 +32,10 @@ type EvmRebalancer struct {
 	networkSel  models.NetworkSelector
 	ec          client.Client
 	cleanupFunc func() error
+	token       models.Address
 }
 
-func NewEvmRebalancer(address models.Address, net models.NetworkSelector, ec client.Client, lp logpoller.LogPoller) (*EvmRebalancer, error) {
+func NewEvmRebalancer(address models.Address, net models.NetworkSelector, ec client.Client, lp logpoller.LogPoller, token models.Address) (*EvmRebalancer, error) {
 	client, err := NewConcreteRebalancer(common.Address(address), ec)
 	if err != nil {
 		return nil, fmt.Errorf("new concrete rebalancer: %w", err)
@@ -66,6 +68,7 @@ func NewEvmRebalancer(address models.Address, net models.NetworkSelector, ec cli
 		cleanupFunc: func() error {
 			return lp.UnregisterFilter(lpFilter.Name)
 		},
+		token: token,
 	}, nil
 }
 
@@ -77,7 +80,7 @@ func (e *EvmRebalancer) GetBalance(ctx context.Context) (*big.Int, error) {
 	return e.client.GetLiquidity(ctx)
 }
 
-func (e *EvmRebalancer) GetPendingTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error) {
+func (e *EvmRebalancer) GetPendingTransfers(ctx context.Context, bridgeContainer *bridge.Container, since time.Time) ([]models.PendingTransfer, error) {
 	logs, err := e.lp.LogsCreatedAfter(
 		e.lmAbi.Events["LiquidityTransferred"].ID,
 		e.addr,
@@ -97,15 +100,23 @@ func (e *EvmRebalancer) GetPendingTransfers(ctx context.Context, since time.Time
 			return nil, fmt.Errorf("invalid log: %w", err2)
 		}
 
-		tr := models.NewPendingTransfer(models.NewTransfer(
+		tr := models.NewTransfer(
 			models.NetworkSelector(liqTransferred.FromChainSelector()),
 			models.NetworkSelector(liqTransferred.ToChainSelector()),
 			liqTransferred.Amount(),
 			log.BlockTimestamp,
 			[]byte{}, // TODO: fill in bridge data
-		))
-		// tr.Status = models.TransferStatusExecuted // todo: determine the status
-		pendingTransfers = append(pendingTransfers, tr)
+		)
+
+		br, exists := bridgeContainer.GetBridge(tr.From, tr.To)
+		if !exists {
+			return nil, fmt.Errorf("bridge %d->%d not found", tr.From, tr.To)
+		}
+		withStatus, err := br.PopulateStatusOfTransfers(ctx, e.token, models.Address(e.addr), []models.Transfer{tr})
+		if err != nil {
+			return nil, fmt.Errorf("populate status of transfers: %w", err)
+		}
+		pendingTransfers = append(pendingTransfers, withStatus...)
 	}
 
 	return pendingTransfers, nil

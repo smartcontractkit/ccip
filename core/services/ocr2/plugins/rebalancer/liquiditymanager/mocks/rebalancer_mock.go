@@ -6,7 +6,10 @@ import (
 	context "context"
 	big "math/big"
 
+	bridge "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
+
 	liquiditygraph "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
+
 	liquiditymanager "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 
 	mock "github.com/stretchr/testify/mock"
@@ -140,9 +143,9 @@ func (_m *Rebalancer) GetBalance(ctx context.Context) (*big.Int, error) {
 	return r0, r1
 }
 
-// GetPendingTransfers provides a mock function with given fields: ctx, since
-func (_m *Rebalancer) GetPendingTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error) {
-	ret := _m.Called(ctx, since)
+// GetPendingTransfers provides a mock function with given fields: ctx, bridgeContainer, since
+func (_m *Rebalancer) GetPendingTransfers(ctx context.Context, bridgeContainer *bridge.Container, since time.Time) ([]models.PendingTransfer, error) {
+	ret := _m.Called(ctx, bridgeContainer, since)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPendingTransfers")
@@ -150,19 +153,19 @@ func (_m *Rebalancer) GetPendingTransfers(ctx context.Context, since time.Time) 
 
 	var r0 []models.PendingTransfer
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time) ([]models.PendingTransfer, error)); ok {
-		return rf(ctx, since)
+	if rf, ok := ret.Get(0).(func(context.Context, *bridge.Container, time.Time) ([]models.PendingTransfer, error)); ok {
+		return rf(ctx, bridgeContainer, since)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time) []models.PendingTransfer); ok {
-		r0 = rf(ctx, since)
+	if rf, ok := ret.Get(0).(func(context.Context, *bridge.Container, time.Time) []models.PendingTransfer); ok {
+		r0 = rf(ctx, bridgeContainer, since)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.PendingTransfer)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, time.Time) error); ok {
-		r1 = rf(ctx, since)
+	if rf, ok := ret.Get(1).(func(context.Context, *bridge.Container, time.Time) error); ok {
+		r1 = rf(ctx, bridgeContainer, since)
 	} else {
 		r1 = ret.Error(1)
 	}

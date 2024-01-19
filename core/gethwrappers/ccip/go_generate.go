@@ -23,6 +23,10 @@ package ccip
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/SelfFundedPingPong/SelfFundedPingPong.abi ../../../contracts/solc/v0.8.19/SelfFundedPingPong/SelfFundedPingPong.bin SelfFundedPingPong self_funded_ping_pong
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/WETH9/WETH9.abi ../../../contracts/solc/v0.8.19/WETH9/WETH9.bin WETH9 weth9
 
+// bridges
+//go:generate go run ../generation/generate/wrap.go ../../../core/services/ocr2/plugins/rebalancer/bridge/bindings/opl1.abi ../../../core/services/ocr2/plugins/rebalancer/bridge/bindings/opl1.bin OptimismL1 optimism_l1
+//go:generate go run ../generation/generate/wrap.go ../../../core/services/ocr2/plugins/rebalancer/bridge/bindings/opl2.abi ../../../core/services/ocr2/plugins/rebalancer/bridge/bindings/opl2.bin OptimismL2 optimism_l2
+
 // Customer contracts
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/USDCTokenPool/USDCTokenPool.abi ../../../contracts/solc/v0.8.19/USDCTokenPool/USDCTokenPool.bin USDCTokenPool usdc_token_pool
 

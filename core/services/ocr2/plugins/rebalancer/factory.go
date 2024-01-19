@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
@@ -19,20 +20,23 @@ const (
 )
 
 type PluginFactory struct {
-	lggr      logger.Logger
-	config    models.PluginConfig
-	lmFactory liquiditymanager.Factory
+	lggr            logger.Logger
+	config          models.PluginConfig
+	lmFactory       liquiditymanager.Factory
+	bridgeContainer *bridge.Container
 }
 
-func NewPluginFactory(lggr logger.Logger, pluginConfigBytes []byte, lmFactory liquiditymanager.Factory) (*PluginFactory, error) {
+func NewPluginFactory(lggr logger.Logger, pluginConfigBytes []byte,
+	lmFactory liquiditymanager.Factory, bridgeContainer *bridge.Container) (*PluginFactory, error) {
 	var pluginConfig models.PluginConfig
 	if err := json.Unmarshal(pluginConfigBytes, &pluginConfig); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal plugin config: %w", err)
 	}
 	return &PluginFactory{
-		lggr:      lggr.Named(PluginName),
-		config:    pluginConfig,
-		lmFactory: lmFactory,
+		lggr:            lggr.Named(PluginName),
+		config:          pluginConfig,
+		lmFactory:       lmFactory,
+		bridgeContainer: bridgeContainer,
 	}, nil
 }
 
@@ -71,6 +75,7 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 			p.lmFactory,
 			liquidityGraph,
 			liquidityRebalancer,
+			p.bridgeContainer,
 			p.lggr,
 		),
 		ocr3types.ReportingPluginInfo{

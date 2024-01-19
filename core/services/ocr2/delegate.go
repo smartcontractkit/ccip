@@ -25,6 +25,7 @@ import (
 	ocr2keepers20runner "github.com/smartcontractkit/chainlink-automation/pkg/v2/runner"
 	ocr2keepers21config "github.com/smartcontractkit/chainlink-automation/pkg/v3/config"
 	ocr2keepers21 "github.com/smartcontractkit/chainlink-automation/pkg/v3/plugin"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 
 	"github.com/smartcontractkit/chainlink-vrf/altbn_128"
 	dkgpkg "github.com/smartcontractkit/chainlink-vrf/dkg"
@@ -1630,7 +1631,11 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer provider: %w", err)
 	}
-	factory, err := rebalancer.NewPluginFactory(lggr, spec.PluginConfig.Bytes(), rebalancerProvider.LiquidityManagerFactory())
+
+	bridgeContainer := bridge.NewContainer() // todo: init
+
+	factory, err := rebalancer.NewPluginFactory(
+		lggr, spec.PluginConfig.Bytes(), rebalancerProvider.LiquidityManagerFactory(), bridgeContainer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer plugin factory: %w", err)
 	}

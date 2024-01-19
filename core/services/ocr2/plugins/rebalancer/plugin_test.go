@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	mocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager/mocks"
@@ -36,10 +37,11 @@ func newPlugin(t *testing.T) (*Plugin, mockDeps) {
 	lmGraph := liquiditygraph.NewGraph()
 	lmFactory := rebalancer_mocks.NewFactory(t)
 	rb := rebalancer_mocks.NewRebalancer(t)
-	return NewPlugin(f, closeTimeout, rootNetwork, rootAddr, lmFactory, lmGraph, rb, logger.TestLogger(t)), mockDeps{
-		mockFactory:    lmFactory,
-		mockRebalancer: rb,
-	}
+	return NewPlugin(f, closeTimeout, rootNetwork, rootAddr,
+			lmFactory, lmGraph, rb, bridge.NewContainer(), logger.TestLogger(t)), mockDeps{
+			mockFactory:    lmFactory,
+			mockRebalancer: rb,
+		}
 }
 
 func TestPluginQuery(t *testing.T) {
@@ -67,7 +69,7 @@ func TestPluginObservation(t *testing.T) {
 	reg.Add(net, addr)
 	mockLM.On("Discover", ctx, deps.mockFactory).Return(reg, g, nil)
 	mockLM.On("GetBalance", ctx).Return(big.NewInt(1234), nil)
-	mockLM.On("GetPendingTransfers", ctx, mock.Anything).Return([]models.PendingTransfer{}, nil)
+	mockLM.On("GetPendingTransfers", ctx, mock.Anything, mock.Anything).Return([]models.PendingTransfer{}, nil)
 
 	obs, err := p.Observation(ctx, ocr3types.OutcomeContext{}, ocrtypes.Query{})
 	assert.NoError(t, err)

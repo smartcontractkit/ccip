@@ -10,7 +10,6 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-
 	"github.com/smartcontractkit/chainlink/v2/common/txmgr"
 	txmgrtypes "github.com/smartcontractkit/chainlink/v2/common/txmgr/types"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -157,6 +156,8 @@ func newRebalancerConfigProvider(
 		return nil, nil, nil, fmt.Errorf("invalid contract address %s", rargs.ContractID)
 	}
 
+	tokenAddr := rebalancermodels.Address(common.HexToAddress("0")) // ????
+
 	var lmFactoryOpts []liquiditymanager.Opt
 	for _, chain := range chains.Slice() {
 		lmFactoryOpts = append(lmFactoryOpts, liquiditymanager.WithEvmDep(
@@ -165,7 +166,7 @@ func newRebalancerConfigProvider(
 			chain.Client(),
 		))
 	}
-	lmFactory := liquiditymanager.NewBaseRebalancerFactory(lmFactoryOpts...)
+	lmFactory := liquiditymanager.NewBaseRebalancerFactory(tokenAddr, lmFactoryOpts...)
 
 	masterChain, err := chains.Get(relayConfig.ChainID.String())
 	if err != nil {
