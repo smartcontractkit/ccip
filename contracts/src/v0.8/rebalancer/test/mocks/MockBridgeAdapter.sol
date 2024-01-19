@@ -21,8 +21,15 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     i_token = token;
   }
 
-  function sendERC20(address l1Token, address, address, uint256 amount) external payable {
-    IERC20(l1Token).transferFrom(msg.sender, address(this), amount);
+  /// @notice Simply transferFrom msg.sender the tokens that are to be bridged.
+  function sendERC20(
+    address localToken,
+    address /* remoteToken */,
+    address /* receiver */,
+    uint256 amount
+  ) external payable override returns (bytes memory) {
+    IERC20(localToken).transferFrom(msg.sender, address(this), amount);
+    return "";
   }
 
   /// @notice Mock function to finalize a withdrawal from L2
@@ -49,14 +56,25 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   }
 
   // No-op
-  function finalizeWithdrawERC20(address, address, bytes calldata) external {}
+  function finalizeWithdrawERC20(
+    address /* remoteSender */,
+    address /* localReceiver */,
+    bytes calldata /* bridgeSpecificData */
+  ) external {}
 }
 
 /// @notice Mock L2 Bridge adapter
 /// @dev Sends the L2 tokens from the msg sender to address(this)
 contract MockL2BridgeAdapter is IBridgeAdapter {
-  function sendERC20(address, address l2token, address, uint256 amount) external payable {
-    IERC20(l2token).transferFrom(msg.sender, address(this), amount);
+  /// @notice Simply transferFrom msg.sender the tokens that are to be bridged.
+  function sendERC20(
+    address localToken,
+    address /* remoteToken */,
+    address /* recipient */,
+    uint256 amount
+  ) external payable override returns (bytes memory) {
+    IERC20(localToken).transferFrom(msg.sender, address(this), amount);
+    return "";
   }
 
   function getBridgeFeeInNative() external pure returns (uint256) {
@@ -64,5 +82,9 @@ contract MockL2BridgeAdapter is IBridgeAdapter {
   }
 
   // No-op
-  function finalizeWithdrawERC20(address, address, bytes calldata) external {}
+  function finalizeWithdrawERC20(
+    address /* remoteSender */,
+    address /* localReceiver */,
+    bytes calldata /* bridgeSpecificData */
+  ) external override {}
 }
