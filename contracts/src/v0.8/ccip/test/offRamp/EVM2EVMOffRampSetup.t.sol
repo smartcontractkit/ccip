@@ -79,15 +79,15 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: address(prevOffRamp)});
     s_destRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
-    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({
+    TokenPool.ChainUpdate[] memory offRamps = new TokenPool.ChainUpdate[](1);
+    offRamps[0] = TokenPool.ChainUpdate({
       ramp: address(s_offRamp),
       allowed: true,
       rateLimiterConfig: rateLimiterConfig()
     });
 
-    LockReleaseTokenPool(address(s_destPools[0])).applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
-    LockReleaseTokenPool(address(s_destPools[1])).applyRampUpdates(new TokenPool.RampUpdate[](0), offRamps);
+    LockReleaseTokenPool(address(s_destPools[0])).applyChainUpdates(new TokenPool.ChainUpdate[](0), offRamps);
+    LockReleaseTokenPool(address(s_destPools[1])).applyChainUpdates(new TokenPool.ChainUpdate[](0), offRamps);
   }
 
   function _convertToGeneralMessage(

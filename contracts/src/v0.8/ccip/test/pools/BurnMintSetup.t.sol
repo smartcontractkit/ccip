@@ -22,15 +22,15 @@ contract BurnMintSetup is BaseTest {
   }
 
   function applyRampUpdates(address pool) internal {
-    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({
+    TokenPool.ChainUpdate[] memory offRamps = new TokenPool.ChainUpdate[](1);
+    offRamps[0] = TokenPool.ChainUpdate({
       ramp: s_burnMintOffRamp,
       allowed: true,
       rateLimiterConfig: rateLimiterConfig()
     });
 
-    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({ramp: s_burnMintOnRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
-    BurnMintTokenPool(pool).applyRampUpdates(onRamps, offRamps);
+    TokenPool.ChainUpdate[] memory onRamps = new TokenPool.ChainUpdate[](1);
+    onRamps[0] = TokenPool.ChainUpdate({ramp: s_burnMintOnRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
+    BurnMintTokenPool(pool).applyChainUpdates(onRamps, offRamps);
   }
 }

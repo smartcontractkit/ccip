@@ -34,7 +34,7 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
   event OffRampAdded(address offRamp, RateLimiter.Config rateLimiterConfig);
   event OffRampRemoved(address offRamp);
 
-  function addressesFromUpdates(TokenPool.RampUpdate[] memory updates) public pure returns (address[] memory) {
+  function addressesFromUpdates(TokenPool.ChainUpdate[] memory updates) public pure returns (address[] memory) {
     address[] memory addresses = new address[](updates.length);
     for (uint256 i = 0; i < updates.length; i++) {
       addresses[i] = updates[i].ramp;
@@ -42,10 +42,10 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
     return addresses;
   }
 
-  function assertState(TokenPool.RampUpdate[] memory onRamps, TokenPool.RampUpdate[] memory offRamps) public {
+  function assertState(TokenPool.ChainUpdate[] memory onRamps, TokenPool.ChainUpdate[] memory offRamps) public {
     assertEq(s_tokenPool.getOnRamps(), addressesFromUpdates(onRamps));
     for (uint256 i = 0; i < onRamps.length; ++i) {
-      assertTrue(s_tokenPool.isOnRamp(onRamps[i].ramp));
+      assertTrue(s_tokenPool.isSupportedChain(onRamps[i].ramp));
       RateLimiter.TokenBucket memory bkt = s_tokenPool.currentOnRampRateLimiterState(onRamps[i].ramp);
       assertEq(bkt.capacity, onRamps[i].rateLimiterConfig.capacity);
       assertEq(bkt.rate, onRamps[i].rateLimiterConfig.rate);
@@ -65,12 +65,12 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
     // Create on and offramps.
     RateLimiter.Config memory rateLimit1 = RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e15});
     RateLimiter.Config memory rateLimit2 = RateLimiter.Config({isEnabled: true, capacity: 101e28, rate: 1e14});
-    TokenPool.RampUpdate[] memory onRampUpdates1 = new TokenPool.RampUpdate[](2);
-    onRampUpdates1[0] = TokenPool.RampUpdate({ramp: address(1), allowed: true, rateLimiterConfig: rateLimit1});
-    onRampUpdates1[1] = TokenPool.RampUpdate({ramp: address(2), allowed: true, rateLimiterConfig: rateLimit2});
-    TokenPool.RampUpdate[] memory offRampUpdates1 = new TokenPool.RampUpdate[](2);
-    offRampUpdates1[0] = TokenPool.RampUpdate({ramp: address(11), allowed: true, rateLimiterConfig: rateLimit2});
-    offRampUpdates1[1] = TokenPool.RampUpdate({ramp: address(12), allowed: true, rateLimiterConfig: rateLimit1});
+    TokenPool.ChainUpdate[] memory onRampUpdates1 = new TokenPool.ChainUpdate[](2);
+    onRampUpdates1[0] = TokenPool.ChainUpdate({ramp: address(1), allowed: true, rateLimiterConfig: rateLimit1});
+    onRampUpdates1[1] = TokenPool.ChainUpdate({ramp: address(2), allowed: true, rateLimiterConfig: rateLimit2});
+    TokenPool.ChainUpdate[] memory offRampUpdates1 = new TokenPool.ChainUpdate[](2);
+    offRampUpdates1[0] = TokenPool.ChainUpdate({ramp: address(11), allowed: true, rateLimiterConfig: rateLimit2});
+    offRampUpdates1[1] = TokenPool.ChainUpdate({ramp: address(12), allowed: true, rateLimiterConfig: rateLimit1});
 
     // Assert configuration is applied
     vm.expectEmit();
@@ -81,24 +81,24 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
     emit OffRampAdded(offRampUpdates1[0].ramp, offRampUpdates1[0].rateLimiterConfig);
     vm.expectEmit();
     emit OffRampAdded(offRampUpdates1[1].ramp, offRampUpdates1[1].rateLimiterConfig);
-    s_tokenPool.applyRampUpdates(onRampUpdates1, offRampUpdates1);
+    s_tokenPool.applyChainUpdates(onRampUpdates1, offRampUpdates1);
     // on1: rateLimit1, on2: rateLimit2, off1: rateLimit1, off2: rateLimit3
     assertState(onRampUpdates1, offRampUpdates1);
 
     // Removing an non-existent onRamp should revert
-    TokenPool.RampUpdate[] memory onRampRemoves = new TokenPool.RampUpdate[](1);
+    TokenPool.ChainUpdate[] memory onRampRemoves = new TokenPool.ChainUpdate[](1);
     address strangerOnRamp = address(120938);
-    onRampRemoves[0] = TokenPool.RampUpdate({ramp: strangerOnRamp, allowed: false, rateLimiterConfig: rateLimit1});
+    onRampRemoves[0] = TokenPool.ChainUpdate({ramp: strangerOnRamp, allowed: false, rateLimiterConfig: rateLimit1});
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentRamp.selector, strangerOnRamp));
-    s_tokenPool.applyRampUpdates(onRampRemoves, offRampUpdates1);
+    s_tokenPool.applyChainUpdates(onRampRemoves, offRampUpdates1);
     // State remains
     assertState(onRampUpdates1, offRampUpdates1);
 
     // Same with offramps
-    TokenPool.RampUpdate[] memory offRampRemoves = new TokenPool.RampUpdate[](1);
-    offRampRemoves[0] = TokenPool.RampUpdate({ramp: strangerOnRamp, allowed: false, rateLimiterConfig: rateLimit1});
+    TokenPool.ChainUpdate[] memory offRampRemoves = new TokenPool.ChainUpdate[](1);
+    offRampRemoves[0] = TokenPool.ChainUpdate({ramp: strangerOnRamp, allowed: false, rateLimiterConfig: rateLimit1});
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentRamp.selector, strangerOnRamp));
-    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRampRemoves);
+    s_tokenPool.applyChainUpdates(new TokenPool.ChainUpdate[](0), offRampRemoves);
     // State remains
     assertState(onRampUpdates1, offRampUpdates1);
 
@@ -106,9 +106,9 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
     onRampRemoves[0].ramp = address(1);
     vm.expectEmit();
     emit OnRampRemoved(onRampRemoves[0].ramp);
-    s_tokenPool.applyRampUpdates(onRampRemoves, new TokenPool.RampUpdate[](0));
+    s_tokenPool.applyChainUpdates(onRampRemoves, new TokenPool.ChainUpdate[](0));
     // State updated, only onRamp2 remains
-    TokenPool.RampUpdate[] memory onRampUpdates2 = new TokenPool.RampUpdate[](1);
+    TokenPool.ChainUpdate[] memory onRampUpdates2 = new TokenPool.ChainUpdate[](1);
     onRampUpdates2[0] = onRampUpdates1[1];
     assertState(onRampUpdates2, offRampUpdates1);
 
@@ -116,16 +116,16 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
     offRampRemoves[0].ramp = address(11);
     vm.expectEmit();
     emit OffRampRemoved(offRampRemoves[0].ramp);
-    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRampRemoves);
-    TokenPool.RampUpdate[] memory offRampUpdates2 = new TokenPool.RampUpdate[](1);
+    s_tokenPool.applyChainUpdates(new TokenPool.ChainUpdate[](0), offRampRemoves);
+    TokenPool.ChainUpdate[] memory offRampUpdates2 = new TokenPool.ChainUpdate[](1);
     offRampUpdates2[0] = offRampUpdates1[1];
     assertState(onRampUpdates2, offRampUpdates2);
 
     // Cannot reset already configured ramp
     vm.expectRevert(abi.encodeWithSelector(TokenPool.RampAlreadyExists.selector, address(2)));
-    s_tokenPool.applyRampUpdates(onRampUpdates2, new TokenPool.RampUpdate[](0));
+    s_tokenPool.applyChainUpdates(onRampUpdates2, new TokenPool.ChainUpdate[](0));
     vm.expectRevert(abi.encodeWithSelector(TokenPool.RampAlreadyExists.selector, address(12)));
-    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRampUpdates2);
+    s_tokenPool.applyChainUpdates(new TokenPool.ChainUpdate[](0), offRampUpdates2);
   }
 
   // Reverts
@@ -133,21 +133,22 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
   function testOnlyCallableByOwnerReverts() public {
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
-    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), new TokenPool.RampUpdate[](0));
+    s_tokenPool.applyChainUpdates(new TokenPool.ChainUpdate[](0), new TokenPool.ChainUpdate[](0));
   }
 }
 
 contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
   event ConfigChanged(RateLimiter.Config);
   event OnRampConfigured(address onRamp, RateLimiter.Config);
+
   address internal s_onRamp;
 
   function setUp() public virtual override {
     TokenPoolSetup.setUp();
-    TokenPool.RampUpdate[] memory onRampUpdates1 = new TokenPool.RampUpdate[](1);
+    TokenPool.ChainUpdate[] memory onRampUpdates1 = new TokenPool.ChainUpdate[](1);
     s_onRamp = address(1);
-    onRampUpdates1[0] = TokenPool.RampUpdate({ramp: s_onRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
-    s_tokenPool.applyRampUpdates(onRampUpdates1, new TokenPool.RampUpdate[](0));
+    onRampUpdates1[0] = TokenPool.ChainUpdate({ramp: s_onRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
+    s_tokenPool.applyChainUpdates(onRampUpdates1, new TokenPool.ChainUpdate[](0));
   }
 
   function testFuzz_SetRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
@@ -193,14 +194,19 @@ contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
 contract TokenPool_setOffRampRateLimiterConfig is TokenPoolSetup {
   event ConfigChanged(RateLimiter.Config);
   event OffRampConfigured(address onRamp, RateLimiter.Config);
+
   address internal s_offRamp;
 
   function setUp() public virtual override {
     TokenPoolSetup.setUp();
-    TokenPool.RampUpdate[] memory offRampUpdates1 = new TokenPool.RampUpdate[](1);
+    TokenPool.ChainUpdate[] memory offRampUpdates1 = new TokenPool.ChainUpdate[](1);
     s_offRamp = address(1);
-    offRampUpdates1[0] = TokenPool.RampUpdate({ramp: s_offRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
-    s_tokenPool.applyRampUpdates(new TokenPool.RampUpdate[](0), offRampUpdates1);
+    offRampUpdates1[0] = TokenPool.ChainUpdate({
+      ramp: s_offRamp,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(new TokenPool.ChainUpdate[](0), offRampUpdates1);
   }
 
   function testFuzz_SetRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {

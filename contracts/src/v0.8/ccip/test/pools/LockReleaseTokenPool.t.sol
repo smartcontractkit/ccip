@@ -29,13 +29,17 @@ contract LockReleaseTokenPoolSetup is BaseTest {
     s_allowedList.push(DUMMY_CONTRACT_ADDRESS);
     s_lockReleaseTokenPoolWithAllowList = new LockReleaseTokenPool(s_token, s_allowedList, address(s_mockARM), true);
 
-    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOnRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
-    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({ramp: s_allowedOffRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
+    TokenPool.ChainUpdate[] memory onRamps = new TokenPool.ChainUpdate[](1);
+    onRamps[0] = TokenPool.ChainUpdate({ramp: s_allowedOnRamp, allowed: true, rateLimiterConfig: rateLimiterConfig()});
+    TokenPool.ChainUpdate[] memory offRamps = new TokenPool.ChainUpdate[](1);
+    offRamps[0] = TokenPool.ChainUpdate({
+      ramp: s_allowedOffRamp,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
 
-    s_lockReleaseTokenPool.applyRampUpdates(onRamps, offRamps);
-    s_lockReleaseTokenPoolWithAllowList.applyRampUpdates(onRamps, offRamps);
+    s_lockReleaseTokenPool.applyChainUpdates(onRamps, offRamps);
+    s_lockReleaseTokenPoolWithAllowList.applyChainUpdates(onRamps, offRamps);
     s_lockReleaseTokenPool.setRebalancer(OWNER);
   }
 }

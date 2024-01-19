@@ -19,8 +19,9 @@ contract BurnMintTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   constructor(
     IBurnMintERC20 token,
     address[] memory allowlist,
-    address armProxy
-  ) TokenPool(token, allowlist, armProxy) {}
+    address armProxy,
+    address router
+  ) TokenPool(token, allowlist, armProxy, router) {}
 
   /// @inheritdoc BurnMintTokenPoolAbstract
   function _burn(uint256 amount) internal virtual override {

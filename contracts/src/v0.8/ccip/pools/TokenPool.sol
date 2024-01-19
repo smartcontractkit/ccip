@@ -10,37 +10,37 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
+import {Router} from "../Router.sol";
 
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
 /// that may execute as tokens move across the bridge.
 abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   using EnumerableSet for EnumerableSet.AddressSet;
+  using EnumerableSet for EnumerableSet.UintSet;
   using RateLimiter for RateLimiter.TokenBucket;
 
   error PermissionsError();
   error ZeroAddressNotAllowed();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
-  error NonExistentRamp(address ramp);
+  error NonExistentChain(uint64 chainSelector);
   error BadARMSignal();
-  error RampAlreadyExists(address ramp);
+  error ChainAlreadyExists(uint64 chainSelector);
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
   event Released(address indexed sender, address indexed recipient, uint256 amount);
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
-  event OnRampAdded(address onRamp, RateLimiter.Config rateLimiterConfig);
-  event OnRampConfigured(address onRamp, RateLimiter.Config rateLimiterConfig);
-  event OnRampRemoved(address onRamp);
-  event OffRampAdded(address offRamp, RateLimiter.Config rateLimiterConfig);
+  event ChainAdded(uint64 chainSelector, RateLimiter.Config rateLimiterConfig);
+  event ChainConfigured(uint64 chainSelector, RateLimiter.Config rateLimiterConfig);
+  event ChainRemoved(uint64 chainSelector);
   event OffRampConfigured(address offRamp, RateLimiter.Config rateLimiterConfig);
-  event OffRampRemoved(address offRamp);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
 
-  struct RampUpdate {
-    address ramp;
+  struct ChainUpdate {
+    uint64 chainSelector;
     bool allowed;
     RateLimiter.Config rateLimiterConfig;
   }
@@ -49,6 +49,9 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   IERC20 internal immutable i_token;
   /// @dev The address of the arm proxy
   address internal immutable i_armProxy;
+
+  // TODO: do we want this immutable?
+  Router internal immutable i_router;
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
@@ -59,21 +62,20 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   /// @dev A set of allowed onRamps. We want the whitelist to be enumerable to
   /// be able to quickly determine (without parsing logs) who can access the pool.
-  EnumerableSet.AddressSet internal s_onRamps;
+  EnumerableSet.UintSet internal s_remoteChains;
   /// @dev Inbound rate limits. This allows per destination chain
   /// token issuer specified rate limiting (e.g. issuers may trust chains to varying
   /// degrees and prefer different limits)
-  mapping(address => RateLimiter.TokenBucket) internal s_onRampRateLimits;
-  /// @dev A set of allowed offRamps.
-  EnumerableSet.AddressSet internal s_offRamps;
+  mapping(uint64 => RateLimiter.TokenBucket) internal s_inboundRateLimits;
   /// @dev Outbound rate limits. Corresponds to the inbound rate limit for the pool
   /// on the remote chain.
-  mapping(address => RateLimiter.TokenBucket) internal s_offRampRateLimits;
+  mapping(uint64 => RateLimiter.TokenBucket) internal s_outboundRateLimits;
 
-  constructor(IERC20 token, address[] memory allowlist, address armProxy) {
-    if (address(token) == address(0)) revert ZeroAddressNotAllowed();
+  constructor(IERC20 token, address[] memory allowlist, address armProxy, address router) {
+    if (address(token) == address(0) || router == address(0)) revert ZeroAddressNotAllowed();
     i_token = token;
     i_armProxy = armProxy;
+    i_router = Router(router);
 
     // Pool can be set as permissioned or permissionless at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;
@@ -99,90 +101,64 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   }
 
   // ================================================================
-  // │                      Ramp permissions                        │
+  // │                     Chain permissions                        │
   // ================================================================
 
-  /// @notice Checks whether something is a permissioned onRamp on this contract.
-  /// @return true if the given address is a permissioned onRamp.
-  function isOnRamp(address onRamp) public view returns (bool) {
-    return s_onRamps.contains(onRamp);
+  /// @notice Checks whether a chain selector is permissioned on this contract.
+  /// @return true if the given chain selector is a permissioned remote chain.
+  function isSupportedChain(uint64 remoteChainSelector) public view returns (bool) {
+    return s_remoteChains.contains(remoteChainSelector);
   }
 
-  /// @notice Checks whether something is a permissioned offRamp on this contract.
-  /// @return true if the given address is a permissioned offRamp.
-  function isOffRamp(address offRamp) public view returns (bool) {
-    return s_offRamps.contains(offRamp);
-  }
-
-  /// @notice Get onRamp whitelist
-  /// @return list of onRamps.
-  function getOnRamps() public view returns (address[] memory) {
-    return s_onRamps.values();
-  }
-
-  /// @notice Get offRamp whitelist
-  /// @return list of offramps
-  function getOffRamps() public view returns (address[] memory) {
-    return s_offRamps.values();
-  }
-
-  /// @notice Sets permissions for all on and offRamps.
-  /// @dev Only callable by the owner
-  /// @param onRamps A list of onRamps and their new permission status/rate limits
-  /// @param offRamps A list of offRamps and their new permission status/rate limits
-  function applyRampUpdates(RampUpdate[] calldata onRamps, RampUpdate[] calldata offRamps) external virtual onlyOwner {
-    _applyRampUpdates(onRamps, offRamps);
-  }
-
-  function _applyRampUpdates(RampUpdate[] calldata onRamps, RampUpdate[] calldata offRamps) internal onlyOwner {
-    for (uint256 i = 0; i < onRamps.length; ++i) {
-      RampUpdate memory update = onRamps[i];
-      if (update.allowed) {
-        if (s_onRamps.add(update.ramp)) {
-          s_onRampRateLimits[update.ramp] = RateLimiter.TokenBucket({
-            rate: update.rateLimiterConfig.rate,
-            capacity: update.rateLimiterConfig.capacity,
-            tokens: update.rateLimiterConfig.capacity,
-            lastUpdated: uint32(block.timestamp),
-            isEnabled: update.rateLimiterConfig.isEnabled
-          });
-          emit OnRampAdded(update.ramp, update.rateLimiterConfig);
-        } else {
-          revert RampAlreadyExists(update.ramp);
-        }
-      } else {
-        if (s_onRamps.remove(update.ramp)) {
-          delete s_onRampRateLimits[update.ramp];
-          emit OnRampRemoved(update.ramp);
-        } else {
-          // Cannot remove a non-existent onRamp.
-          revert NonExistentRamp(update.ramp);
-        }
-      }
+  /// @notice Get chain whitelist
+  /// @return list of chains.
+  function getSupportedChains() public view returns (uint64[] memory) {
+    uint256[] memory uint256ChainSelectors = s_remoteChains.values();
+    uint64[] memory chainSelectors = new uint64[](uint256ChainSelectors.length);
+    for (uint256 i = 0; i < uint256ChainSelectors.length; ++i) {
+      chainSelectors[i] = uint64(uint256ChainSelectors[i]);
     }
 
-    for (uint256 i = 0; i < offRamps.length; ++i) {
-      RampUpdate memory update = offRamps[i];
+    return chainSelectors;
+  }
+
+  /// @notice Sets permissions for all on and chains.
+  /// @dev Only callable by the owner
+  /// @param chains A list of chains and their new permission status/rate limits
+  function applyChainUpdates(ChainUpdate[] calldata chains) external virtual onlyOwner {
+    _applyChainUpdates(chains);
+  }
+
+  function _applyChainUpdates(ChainUpdate[] calldata chains) internal onlyOwner {
+    for (uint256 i = 0; i < chains.length; ++i) {
+      ChainUpdate memory update = chains[i];
       if (update.allowed) {
-        if (s_offRamps.add(update.ramp)) {
-          s_offRampRateLimits[update.ramp] = RateLimiter.TokenBucket({
+        if (s_remoteChains.add(update.chainSelector)) {
+          s_inboundRateLimits[update.chainSelector] = RateLimiter.TokenBucket({
             rate: update.rateLimiterConfig.rate,
             capacity: update.rateLimiterConfig.capacity,
             tokens: update.rateLimiterConfig.capacity,
             lastUpdated: uint32(block.timestamp),
             isEnabled: update.rateLimiterConfig.isEnabled
           });
-          emit OffRampAdded(update.ramp, update.rateLimiterConfig);
+          s_outboundRateLimits[update.chainSelector] = RateLimiter.TokenBucket({
+            rate: update.rateLimiterConfig.rate,
+            capacity: update.rateLimiterConfig.capacity,
+            tokens: update.rateLimiterConfig.capacity,
+            lastUpdated: uint32(block.timestamp),
+            isEnabled: update.rateLimiterConfig.isEnabled
+          });
+          emit ChainAdded(update.chainSelector, update.rateLimiterConfig);
         } else {
-          revert RampAlreadyExists(update.ramp);
+          revert ChainAlreadyExists(update.chainSelector);
         }
       } else {
-        if (s_offRamps.remove(update.ramp)) {
-          delete s_offRampRateLimits[update.ramp];
-          emit OffRampRemoved(update.ramp);
+        if (s_remoteChains.remove(update.chainSelector)) {
+          delete s_inboundRateLimits[update.chainSelector];
+          emit ChainRemoved(update.chainSelector);
         } else {
-          // Cannot remove a non-existent offRamp.
-          revert NonExistentRamp(update.ramp);
+          // Cannot remove a non-existent onRamp.
+          revert NonExistentChain(update.chainSelector);
         }
       }
     }
@@ -193,41 +169,38 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   // ================================================================
 
   /// @notice Consumes outbound rate limiting capacity in this pool
-  function _consumeOnRampRateLimit(uint256 amount) internal {
-    s_onRampRateLimits[msg.sender]._consume(amount, address(i_token));
+  function _consumeOnRampRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
+    s_inboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
-  function _consumeOffRampRateLimit(uint256 amount) internal {
-    s_offRampRateLimits[msg.sender]._consume(amount, address(i_token));
+  function _consumeOffRampRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
+    s_outboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentOnRampRateLimiterState(address onRamp) external view returns (RateLimiter.TokenBucket memory) {
-    return s_onRampRateLimits[onRamp]._currentTokenBucketState();
+  function currentOnRampRateLimiterState(
+    uint64 remoteChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory) {
+    return s_inboundRateLimits[remoteChainSelector]._currentTokenBucketState();
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentOffRampRateLimiterState(address offRamp) external view returns (RateLimiter.TokenBucket memory) {
-    return s_offRampRateLimits[offRamp]._currentTokenBucketState();
+  function currentOffRampRateLimiterState(
+    uint64 remoteChainSelector
+  ) external view returns (RateLimiter.TokenBucket memory) {
+    return s_outboundRateLimits[remoteChainSelector]._currentTokenBucketState();
   }
 
   /// @notice Sets the onramp rate limited config.
   /// @param config The new rate limiter config.
-  function setOnRampRateLimiterConfig(address onRamp, RateLimiter.Config memory config) external onlyOwner {
-    if (!isOnRamp(onRamp)) revert NonExistentRamp(onRamp);
-    s_onRampRateLimits[onRamp]._setTokenBucketConfig(config);
-    emit OnRampConfigured(onRamp, config);
-  }
-
-  /// @notice Sets the offramp rate limited config.
-  /// @param config The new rate limiter config.
-  function setOffRampRateLimiterConfig(address offRamp, RateLimiter.Config memory config) external onlyOwner {
-    if (!isOffRamp(offRamp)) revert NonExistentRamp(offRamp);
-    s_offRampRateLimits[offRamp]._setTokenBucketConfig(config);
-    emit OffRampConfigured(offRamp, config);
+  function setOnRampRateLimiterConfig(uint64 remoteChainSelector, RateLimiter.Config memory config) external onlyOwner {
+    if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+    s_inboundRateLimits[remoteChainSelector]._setTokenBucketConfig(config);
+    s_outboundRateLimits[remoteChainSelector]._setTokenBucketConfig(config);
+    emit ChainConfigured(remoteChainSelector, config);
   }
 
   // ================================================================
@@ -236,15 +209,15 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   /// @notice Checks whether the msg.sender is a permissioned onRamp on this contract
   /// @dev Reverts with a PermissionsError if check fails
-  modifier onlyOnRamp() {
-    if (!isOnRamp(msg.sender)) revert PermissionsError();
+  modifier onlyOnRamp(uint64 remoteChainSelector) {
+    if (!(msg.sender == i_router.getOnRamp(remoteChainSelector))) revert PermissionsError();
     _;
   }
 
   /// @notice Checks whether the msg.sender is a permissioned offRamp on this contract
   /// @dev Reverts with a PermissionsError if check fails
-  modifier onlyOffRamp() {
-    if (!isOffRamp(msg.sender)) revert PermissionsError();
+  modifier onlyOffRamp(uint64 remoteChainSelector) {
+    if (!i_router.isOffRamp(remoteChainSelector, msg.sender)) revert PermissionsError();
     _;
   }
 

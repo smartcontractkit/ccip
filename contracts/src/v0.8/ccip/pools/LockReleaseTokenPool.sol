@@ -38,8 +38,9 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     IERC20 token,
     address[] memory allowlist,
     address armProxy,
-    bool acceptLiquidity
-  ) TokenPool(token, allowlist, armProxy) {
+    bool acceptLiquidity,
+    address router
+  ) TokenPool(token, allowlist, armProxy, router) {
     i_acceptLiquidity = acceptLiquidity;
   }
 
@@ -51,10 +52,18 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     address originalSender,
     bytes calldata,
     uint256 amount,
-    uint64,
+    uint64 remoteChainSelector,
     bytes calldata
-  ) external virtual override onlyOnRamp checkAllowList(originalSender) whenHealthy returns (bytes memory) {
-    _consumeOnRampRateLimit(amount);
+  )
+    external
+    virtual
+    override
+    onlyOnRamp(remoteChainSelector)
+    checkAllowList(originalSender)
+    whenHealthy
+    returns (bytes memory)
+  {
+    _consumeOnRampRateLimit(remoteChainSelector, amount);
     emit Locked(msg.sender, amount);
     return "";
   }
@@ -68,10 +77,10 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     bytes memory,
     address receiver,
     uint256 amount,
-    uint64,
+    uint64 remoteChainSelector,
     bytes memory
-  ) external virtual override onlyOffRamp whenHealthy {
-    _consumeOffRampRateLimit(amount);
+  ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy {
+    _consumeOffRampRateLimit(remoteChainSelector, amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, amount);
   }

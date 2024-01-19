@@ -60,22 +60,22 @@ contract USDCTokenPoolSetup is BaseTest {
     s_allowedList.push(USER_1);
     s_usdcTokenPoolWithAllowList = new USDCTokenPoolHelper(s_mockUSDC, s_token, s_allowedList, address(s_mockARM));
 
-    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({
+    TokenPool.ChainUpdate[] memory onRamps = new TokenPool.ChainUpdate[](1);
+    onRamps[0] = TokenPool.ChainUpdate({
       ramp: s_routerAllowedOnRamp,
       allowed: true,
       rateLimiterConfig: rateLimiterConfig()
     });
 
-    TokenPool.RampUpdate[] memory offRamps = new TokenPool.RampUpdate[](1);
-    offRamps[0] = TokenPool.RampUpdate({
+    TokenPool.ChainUpdate[] memory offRamps = new TokenPool.ChainUpdate[](1);
+    offRamps[0] = TokenPool.ChainUpdate({
       ramp: s_routerAllowedOffRamp,
       allowed: true,
       rateLimiterConfig: rateLimiterConfig()
     });
 
-    s_usdcTokenPool.applyRampUpdates(onRamps, offRamps);
-    s_usdcTokenPoolWithAllowList.applyRampUpdates(onRamps, offRamps);
+    s_usdcTokenPool.applyChainUpdates(onRamps, offRamps);
+    s_usdcTokenPoolWithAllowList.applyChainUpdates(onRamps, offRamps);
 
     USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](1);
     domains[0] = USDCTokenPool.DomainUpdate({

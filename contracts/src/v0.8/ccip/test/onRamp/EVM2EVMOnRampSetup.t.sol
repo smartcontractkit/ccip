@@ -109,11 +109,15 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, address(s_onRamp))
     );
 
-    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({ramp: address(s_onRamp), allowed: true, rateLimiterConfig: rateLimiterConfig()});
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      chainSelector: DEST_CHAIN_ID,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
 
-    LockReleaseTokenPool(address(s_sourcePools[0])).applyRampUpdates(onRamps, new TokenPool.RampUpdate[](0));
-    LockReleaseTokenPool(address(s_sourcePools[1])).applyRampUpdates(onRamps, new TokenPool.RampUpdate[](0));
+    LockReleaseTokenPool(address(s_sourcePools[0])).applyChainUpdates(chainUpdates);
+    LockReleaseTokenPool(address(s_sourcePools[1])).applyChainUpdates(chainUpdates);
 
     s_offRamps = new address[](2);
     s_offRamps[0] = address(10);

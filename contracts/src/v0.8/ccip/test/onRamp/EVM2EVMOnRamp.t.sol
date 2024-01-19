@@ -591,9 +591,13 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     s_onRamp.applyPoolUpdates(removePool, addPool);
 
     // Whitelist OnRamp in TokenPool
-    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({ramp: address(s_onRamp), allowed: true, rateLimiterConfig: rateLimiterConfig()});
-    newPool.applyRampUpdates(onRamps, new TokenPool.RampUpdate[](0));
+    TokenPool.ChainUpdate[] memory onRamps = new TokenPool.ChainUpdate[](1);
+    onRamps[0] = TokenPool.ChainUpdate({
+      ramp: address(s_onRamp),
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+    newPool.applyChainUpdates(onRamps, new TokenPool.ChainUpdate[](0));
 
     Client.EVM2AnyMessage memory message = _generateSingleTokenMessage(address(sourceETH), 1000);
 
@@ -638,9 +642,13 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
       abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, address(s_onRamp))
     );
 
-    TokenPool.RampUpdate[] memory onRamps = new TokenPool.RampUpdate[](1);
-    onRamps[0] = TokenPool.RampUpdate({ramp: address(s_onRamp), allowed: true, rateLimiterConfig: rateLimiterConfig()});
-    LockReleaseTokenPool(address(s_sourcePools[0])).applyRampUpdates(onRamps, new TokenPool.RampUpdate[](0));
+    TokenPool.ChainUpdate[] memory onRamps = new TokenPool.ChainUpdate[](1);
+    onRamps[0] = TokenPool.ChainUpdate({
+      ramp: address(s_onRamp),
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+    LockReleaseTokenPool(address(s_sourcePools[0])).applyChainUpdates(onRamps, new TokenPool.ChainUpdate[](0));
 
     changePrank(address(s_sourceRouter));
   }
