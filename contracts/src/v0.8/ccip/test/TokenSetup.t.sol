@@ -51,7 +51,7 @@ contract TokenSetup is RouterSetup {
       deal(address(destLink), OWNER, type(uint256).max);
       s_destTokens.push(address(destLink));
       s_destPools.push(
-        address(new LockReleaseTokenPool(destLink, new address[](0), address(s_mockARM), true, address(s_sourceRouter)))
+        address(new LockReleaseTokenPool(destLink, new address[](0), address(s_mockARM), true, address(s_destRouter)))
       );
 
       BurnMintERC677 destEth = new BurnMintERC677("dETH", "dETH", 18, 0);
@@ -60,7 +60,7 @@ contract TokenSetup is RouterSetup {
 
       s_destPools.push(
         address(
-          new MaybeRevertingBurnMintTokenPool(destEth, new address[](0), address(s_mockARM), address(s_sourceRouter))
+          new MaybeRevertingBurnMintTokenPool(destEth, new address[](0), address(s_mockARM), address(s_destRouter))
         )
       );
       destEth.grantMintAndBurnRoles(s_destPools[1]);

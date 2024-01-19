@@ -196,7 +196,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   /// @notice Sets the onramp rate limited config.
   /// @param config The new rate limiter config.
-  function setOnRampRateLimiterConfig(uint64 remoteChainSelector, RateLimiter.Config memory config) external onlyOwner {
+  function setChainRateLimiterConfig(uint64 remoteChainSelector, RateLimiter.Config memory config) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
     s_inboundRateLimits[remoteChainSelector]._setTokenBucketConfig(config);
     s_outboundRateLimits[remoteChainSelector]._setTokenBucketConfig(config);
