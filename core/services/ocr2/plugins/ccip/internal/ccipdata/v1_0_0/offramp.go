@@ -367,7 +367,7 @@ func (o *OffRamp) getPoolsByDestTokens(ctx context.Context, tokenAddrs []common.
 	if err != nil {
 		return nil, fmt.Errorf("get latest block: %w", err)
 	}
-	o.Logger.Infof(">>> about to make batch call: %#v", evmCalls)
+
 	results, err := o.evmBatchCaller.BatchCall(ctx, uint64(latestBlock.FinalizedBlockNumber), evmCalls)
 	if err != nil {
 		return nil, fmt.Errorf("batch call limit: %w", err)

@@ -33,6 +33,10 @@ import (
 
 var HundredCoins = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
 
+const (
+	Network = "Network Name"
+)
+
 type RateLimiterConfig struct {
 	Rate     *big.Int
 	Capacity *big.Int
@@ -59,16 +63,16 @@ type ERC677Token struct {
 func (token *ERC677Token) GrantMintAndBurn(burnAndMinter common.Address) error {
 	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	log.Info().
-		Str("Network", token.client.GetNetworkName()).
+		Str(Network, token.client.GetNetworkName()).
 		Str("BurnAndMinter", burnAndMinter.Hex()).
 		Str("Token", token.ContractAddress.Hex()).
 		Msg("Granting mint and burn roles")
 	tx, err := token.instance.GrantMintAndBurnRoles(opts, burnAndMinter)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to grant mint and burn roles: %w", err)
 	}
 	return token.client.ProcessTransaction(tx)
 }
@@ -79,13 +83,13 @@ func (token *ERC677Token) GrantMintRole(minter common.Address) error {
 		return err
 	}
 	log.Info().
-		Str("Network", token.client.GetNetworkName()).
+		Str(Network, token.client.GetNetworkName()).
 		Str("Minter", minter.Hex()).
 		Str("Token", token.ContractAddress.Hex()).
 		Msg("Granting mint roles")
 	tx, err := token.instance.GrantMintRole(opts, minter)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to grant mint role: %w", err)
 	}
 	return token.client.ProcessTransaction(tx)
 }
@@ -96,14 +100,14 @@ func (token *ERC677Token) Mint(to common.Address, amount *big.Int) error {
 		return err
 	}
 	log.Info().
-		Str("Network", token.client.GetNetworkName()).
+		Str(Network, token.client.GetNetworkName()).
 		Str("To", to.Hex()).
 		Str("Token", token.ContractAddress.Hex()).
 		Str("Amount", amount.String()).
 		Msg("Minting tokens")
 	tx, err := token.instance.Mint(opts, to, amount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to mint tokens: %w", err)
 	}
 	return token.client.ProcessTransaction(tx)
 }
@@ -125,7 +129,7 @@ func (token *ERC20Token) BalanceOf(ctx context.Context, addr string) (*big.Int, 
 	}
 	balance, err := token.instance.BalanceOf(opts, common.HexToAddress(addr))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get balance: %w", err)
 	}
 	return balance, nil
 }
@@ -141,7 +145,7 @@ func (token *ERC20Token) Allowance(owner, spender string) (*big.Int, error) {
 func (token *ERC20Token) Approve(to string, amount *big.Int) error {
 	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction options: %w", err)
 	}
 	log.Info().
 		Str("From", token.client.GetDefaultWallet().Address()).
@@ -149,11 +153,11 @@ func (token *ERC20Token) Approve(to string, amount *big.Int) error {
 		Str("Token", token.Address()).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
-		Str("Network Name", token.client.GetNetworkConfig().Name).
+		Str(Network, token.client.GetNetworkConfig().Name).
 		Msg("Approving ERC20 Transfer")
 	tx, err := token.instance.Approve(opts, common.HexToAddress(to), amount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to approve ERC20: %w", err)
 	}
 	return token.client.ProcessTransaction(tx)
 }
@@ -161,18 +165,18 @@ func (token *ERC20Token) Approve(to string, amount *big.Int) error {
 func (token *ERC20Token) Transfer(to string, amount *big.Int) error {
 	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction options: %w", err)
 	}
 	log.Info().
 		Str("From", token.client.GetDefaultWallet().Address()).
 		Str("To", to).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
-		Str("Network Name", token.client.GetNetworkConfig().Name).
+		Str(Network, token.client.GetNetworkConfig().Name).
 		Msg("Transferring ERC20")
 	tx, err := token.instance.Transfer(opts, common.HexToAddress(to), amount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to transfer ERC20: %w", err)
 	}
 	return token.client.ProcessTransaction(tx)
 }
@@ -194,7 +198,7 @@ func (l *LinkToken) BalanceOf(ctx context.Context, addr string) (*big.Int, error
 	}
 	balance, err := l.instance.BalanceOf(opts, common.HexToAddress(addr))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get LINK balance: %w", err)
 	}
 	return balance, nil
 }
@@ -210,7 +214,7 @@ func (l *LinkToken) Allowance(owner, spender string) (*big.Int, error) {
 func (l *LinkToken) Approve(to string, amount *big.Int) error {
 	opts, err := l.client.TransactionOpts(l.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	log.Info().
 		Str("From", l.client.GetDefaultWallet().Address()).
@@ -218,11 +222,11 @@ func (l *LinkToken) Approve(to string, amount *big.Int) error {
 		Str("Token", l.Address()).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
-		Str("Network Name", l.client.GetNetworkConfig().Name).
+		Str(Network, l.client.GetNetworkConfig().Name).
 		Msg("Approving LINK Transfer")
 	tx, err := l.instance.Approve(opts, common.HexToAddress(to), amount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to approve LINK transfer: %w", err)
 	}
 	return l.client.ProcessTransaction(tx)
 }
@@ -230,18 +234,18 @@ func (l *LinkToken) Approve(to string, amount *big.Int) error {
 func (l *LinkToken) Transfer(to string, amount *big.Int) error {
 	opts, err := l.client.TransactionOpts(l.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	log.Info().
 		Str("From", l.client.GetDefaultWallet().Address()).
 		Str("To", to).
 		Str("Amount", amount.String()).
 		Uint64("Nonce", opts.Nonce.Uint64()).
-		Str("Network Name", l.client.GetNetworkConfig().Name).
+		Str(Network, l.client.GetNetworkConfig().Name).
 		Msg("Transferring LINK")
 	tx, err := l.instance.Transfer(opts, common.HexToAddress(to), amount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to transfer LINK: %w", err)
 	}
 	return l.client.ProcessTransaction(tx)
 }
@@ -268,18 +272,19 @@ func (pool *TokenPool) SyncUSDCDomain(destTokenTransmitter *TokenTransmitter, de
 	copy(allowedCallerBytes[12:], destPoolAddr.Bytes())
 	destTokenTransmitterIns, err := mock_usdc_token_transmitter.NewMockE2EUSDCTransmitter(destTokenTransmitter.ContractAddress, destTokenTransmitter.client.Backend())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create mock USDC token transmitter: %w", err)
 	}
 	domain, err := destTokenTransmitterIns.LocalDomain(nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get local domain: %w", err)
 	}
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
+		Str(Network, pool.client.GetNetworkName()).
 		Uint32("Domain", domain).
 		Str("Allowed Caller", destPoolAddr.Hex()).
 		Str("Dest Chain Selector", fmt.Sprintf("%d", destChainSelector)).
@@ -304,7 +309,7 @@ func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
 	}
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
@@ -312,12 +317,12 @@ func (pool *TokenPool) RemoveLiquidity(amount *big.Int) error {
 		Msg("Initiating removing funds from pool")
 	tx, err := pool.LockReleasePool.WithdrawLiquidity(opts, amount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to withdraw liquidity: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Str("Amount", amount.String()).
-		Str("Network Name", pool.client.GetNetworkConfig().Name).
+		Str(Network, pool.client.GetNetworkConfig().Name).
 		Msg("Liquidity removed")
 	return pool.client.ProcessTransaction(tx)
 }
@@ -334,35 +339,35 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 		Msg("Initiating transferring of token to token pool")
 	err := approveFn(pool.Address(), amount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to approve token transfer: %w", err)
 	}
 	err = pool.client.WaitForEvents()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to wait for events: %w", err)
 	}
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	_, err = pool.LockReleasePool.SetRebalancer(opts, opts.From)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set rebalancer: %w", err)
 	}
 	opts, err = pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Initiating adding Tokens in pool")
 	tx, err := pool.LockReleasePool.ProvideLiquidity(opts, amount)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to provide liquidity: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Str("Link Token", tokenAddr).
-		Str("Network Name", pool.client.GetNetworkConfig().Name).
+		Str(Network, pool.client.GetNetworkConfig().Name).
 		Msg("Liquidity added")
 	return pool.client.ProcessTransaction(tx)
 }
@@ -370,7 +375,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 func (pool *TokenPool) SetOnRamp(onRamp common.Address) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
@@ -385,13 +390,13 @@ func (pool *TokenPool) SetOnRamp(onRamp common.Address) error {
 			}}}, []token_pool.TokenPoolRampUpdate{})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set ramp updates: %w", err)
 	}
 
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Str("OnRamp", onRamp.Hex()).
-		Str("Network Name", pool.client.GetNetworkConfig().Name).
+		Str(Network, pool.client.GetNetworkConfig().Name).
 		Msg("OnRamp is set")
 	return pool.client.ProcessTransaction(tx)
 }
@@ -399,7 +404,7 @@ func (pool *TokenPool) SetOnRamp(onRamp common.Address) error {
 func (pool *TokenPool) SetOnRampRateLimit(onRamp common.Address, rl token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
@@ -410,7 +415,7 @@ func (pool *TokenPool) SetOnRampRateLimit(onRamp common.Address, rl token_pool.R
 	tx, err := pool.PoolInterface.SetOnRampRateLimiterConfig(opts, onRamp, rl)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("error setting rate limit onramp: %w", err)
 	}
 
 	log.Info().
@@ -424,7 +429,7 @@ func (pool *TokenPool) SetOnRampRateLimit(onRamp common.Address, rl token_pool.R
 func (pool *TokenPool) SetOffRampRateLimit(offRamp common.Address, rl token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
@@ -434,7 +439,7 @@ func (pool *TokenPool) SetOffRampRateLimit(offRamp common.Address, rl token_pool
 	tx, err := pool.PoolInterface.SetOffRampRateLimiterConfig(opts, offRamp, rl)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("error setting offramp rate limit: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
@@ -447,7 +452,7 @@ func (pool *TokenPool) SetOffRampRateLimit(offRamp common.Address, rl token_pool
 func (pool *TokenPool) SetOffRamp(offRamp common.Address) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
@@ -460,12 +465,12 @@ func (pool *TokenPool) SetOffRamp(offRamp common.Address) error {
 			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 		}}})
 	if err != nil {
-		return err
+		return fmt.Errorf("error setting off ramp: %w", err)
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Str("OffRamp", offRamp.Hex()).
-		Str("Network Name", pool.client.GetNetworkConfig().Name).
+		Str(Network, pool.client.GetNetworkConfig().Name).
 		Msg("OffRamp is set")
 	return pool.client.ProcessTransaction(tx)
 }
@@ -516,13 +521,13 @@ func (b *CommitStore) SetOCR2Config(
 	// Set Config
 	opts, err := b.client.TransactionOpts(b.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
 
 	log.Info().
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
-		Str("Network Name", b.client.GetNetworkConfig().Name).
+		Str(Network, b.client.GetNetworkConfig().Name).
 		Msg("Configuring CommitStore")
 	tx, err := b.Instance.SetOCR2Config(
 		opts,
@@ -535,7 +540,7 @@ func (b *CommitStore) SetOCR2Config(
 	)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("error setting OCR2 config: %w", err)
 	}
 	return b.client.ProcessTransaction(tx)
 }
@@ -553,17 +558,17 @@ func (rDapp *ReceiverDapp) Address() string {
 func (rDapp *ReceiverDapp) ToggleRevert(revert bool) error {
 	opts, err := rDapp.client.TransactionOpts(rDapp.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
 	tx, err := rDapp.instance.SetRevert(opts, revert)
 	if err != nil {
-		return err
+		return fmt.Errorf("error setting revert: %w", err)
 	}
 	log.Info().
 		Bool("revert", revert).
 		Str("tx", tx.Hash().String()).
 		Str("ReceiverDapp", rDapp.Address()).
-		Str("Network Name", rDapp.client.GetNetworkConfig().Name).
+		Str(Network, rDapp.client.GetNetworkConfig().Name).
 		Msg("ReceiverDapp revert set")
 	return rDapp.client.ProcessTransaction(tx)
 }
@@ -581,15 +586,15 @@ func (c *PriceRegistry) Address() string {
 func (c *PriceRegistry) AddPriceUpdater(addr common.Address) error {
 	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
 	tx, err := c.Instance.ApplyPriceUpdatersUpdates(opts, []common.Address{addr}, []common.Address{})
 	if err != nil {
-		return err
+		return fmt.Errorf("error adding price updater: %w", err)
 	}
 	log.Info().
 		Str("updaters", addr.Hex()).
-		Str("Network Name", c.client.GetNetworkConfig().Name).
+		Str(Network, c.client.GetNetworkConfig().Name).
 		Msg("PriceRegistry updater added")
 	return c.client.ProcessTransaction(tx)
 }
@@ -597,15 +602,15 @@ func (c *PriceRegistry) AddPriceUpdater(addr common.Address) error {
 func (c *PriceRegistry) AddFeeToken(addr common.Address) error {
 	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
 	tx, err := c.Instance.ApplyFeeTokensUpdates(opts, []common.Address{addr}, []common.Address{})
 	if err != nil {
-		return err
+		return fmt.Errorf("error adding fee token: %w", err)
 	}
 	log.Info().
 		Str("feeTokens", addr.Hex()).
-		Str("Network Name", c.client.GetNetworkConfig().Name).
+		Str(Network, c.client.GetNetworkConfig().Name).
 		Msg("PriceRegistry feeToken set")
 	return c.client.ProcessTransaction(tx)
 }
@@ -613,14 +618,14 @@ func (c *PriceRegistry) AddFeeToken(addr common.Address) error {
 func (c *PriceRegistry) UpdatePrices(priceUpdates price_registry.InternalPriceUpdates) error {
 	opts, err := c.client.TransactionOpts(c.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
 	tx, err := c.Instance.UpdatePrices(opts, priceUpdates)
 	if err != nil {
-		return err
+		return fmt.Errorf("error updating prices: %w", err)
 	}
 	log.Info().
-		Str("Network Name", c.client.GetNetworkConfig().Name).
+		Str(Network, c.client.GetNetworkConfig().Name).
 		Interface("PriceUpdates", priceUpdates).
 		Msg("Prices updated")
 	return c.client.ProcessTransaction(tx)
@@ -639,16 +644,18 @@ func (r *Router) Address() string {
 func (r *Router) SetOnRamp(chainSelector uint64, onRamp common.Address) error {
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting transaction opts: %w", err)
 	}
 	log.Info().
 		Str("Router", r.Address()).
+		Str("OnRamp", onRamp.Hex()).
+		Str(Network, r.client.GetNetworkName()).
 		Str("ChainSelector", strconv.FormatUint(chainSelector, 10)).
 		Msg("Setting on ramp for r")
 
 	tx, err := r.Instance.ApplyRampUpdates(opts, []router.RouterOnRamp{{DestChainSelector: chainSelector, OnRamp: onRamp}}, nil, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("error applying ramp updates: %w", err)
 	}
 	log.Info().
 		Str("onRamp", onRamp.Hex()).
@@ -660,14 +667,14 @@ func (r *Router) SetOnRamp(chainSelector uint64, onRamp common.Address) error {
 func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMessage, valueForNative *big.Int) (*types.Transaction, error) {
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting transaction opts: %w", err)
 	}
 	if valueForNative != nil {
 		opts.Value = valueForNative
 	}
 
 	log.Info().
-		Str("Network", r.client.GetNetworkName()).
+		Str(Network, r.client.GetNetworkName()).
 		Str("Router", r.Address()).
 		Interface("TokensAndAmounts", msg.TokenAmounts).
 		Str("FeeToken", msg.FeeToken.Hex()).
@@ -680,12 +687,12 @@ func (r *Router) CCIPSend(destChainSelector uint64, msg router.ClientEVM2AnyMess
 func (r *Router) CCIPSendAndProcessTx(destChainSelector uint64, msg router.ClientEVM2AnyMessage, valueForNative *big.Int) (*types.Transaction, error) {
 	tx, err := r.CCIPSend(destChainSelector, msg, valueForNative)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send msg: %w", err)
 	}
 	log.Info().
 		Str("router", r.Address()).
 		Str("txHash", tx.Hash().Hex()).
-		Str("Network Name", r.client.GetNetworkConfig().Name).
+		Str(Network, r.client.GetNetworkConfig().Name).
 		Str("chain selector", strconv.FormatUint(destChainSelector, 10)).
 		Msg("msg is sent")
 	return tx, r.client.ProcessTransaction(tx)
@@ -694,15 +701,15 @@ func (r *Router) CCIPSendAndProcessTx(destChainSelector uint64, msg router.Clien
 func (r *Router) AddOffRamp(offRamp common.Address, sourceChainId uint64) (*types.Transaction, error) {
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	tx, err := r.Instance.ApplyRampUpdates(opts, nil, nil, []router.RouterOffRamp{{SourceChainSelector: sourceChainId, OffRamp: offRamp}})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to add offRamp: %w", err)
 	}
 	log.Info().
 		Str("offRamp", offRamp.Hex()).
-		Str("Network Name", r.client.GetNetworkConfig().Name).
+		Str(Network, r.client.GetNetworkConfig().Name).
 		Msg("offRamp is added to Router")
 	return tx, r.client.ProcessTransaction(tx)
 }
@@ -710,16 +717,16 @@ func (r *Router) AddOffRamp(offRamp common.Address, sourceChainId uint64) (*type
 func (r *Router) SetWrappedNative(wNative common.Address) (*types.Transaction, error) {
 	opts, err := r.client.TransactionOpts(r.client.GetDefaultWallet())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	tx, err := r.Instance.SetWrappedNative(opts, wNative)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to set wrapped native: %w", err)
 	}
 	log.Info().
 		Str("wrapped native", wNative.Hex()).
 		Str("router", r.Address()).
-		Str("Network Name", r.client.GetNetworkConfig().Name).
+		Str(Network, r.client.GetNetworkConfig().Name).
 		Msg("wrapped native is added for Router")
 	return tx, r.client.ProcessTransaction(tx)
 }
@@ -741,7 +748,7 @@ func (onRamp *OnRamp) Address() string {
 func (onRamp *OnRamp) SetNops() error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	owner := common.HexToAddress(onRamp.client.GetDefaultWallet().Address())
 	// set the payee to the default wallet
@@ -750,7 +757,7 @@ func (onRamp *OnRamp) SetNops() error {
 		Weight: 1,
 	}})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set nops: %w", err)
 	}
 	return onRamp.client.ProcessTransaction(tx)
 }
@@ -758,16 +765,16 @@ func (onRamp *OnRamp) SetNops() error {
 func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_evm_onramp.EVM2EVMOnRampTokenTransferFeeConfigArgs) error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	tx, err := onRamp.Instance.SetTokenTransferFeeConfig(opts, tokenTransferFeeConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set token transfer fee config: %w", err)
 	}
 	log.Info().
 		Interface("tokenTransferFeeConfig", tokenTransferFeeConfig).
 		Str("onRamp", onRamp.Address()).
-		Str("Network Name", onRamp.client.GetNetworkConfig().Name).
+		Str(Network, onRamp.client.GetNetworkConfig().Name).
 		Msg("TokenTransferFeeConfig set in OnRamp")
 	return onRamp.client.ProcessTransaction(tx)
 }
@@ -775,16 +782,16 @@ func (onRamp *OnRamp) SetTokenTransferFeeConfig(tokenTransferFeeConfig []evm_2_e
 func (onRamp *OnRamp) ApplyPoolUpdates(poolUpdates []evm_2_evm_onramp.InternalPoolUpdate) error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	tx, err := onRamp.Instance.ApplyPoolUpdates(opts, []evm_2_evm_onramp.InternalPoolUpdate{}, poolUpdates)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to apply pool updates: %w", err)
 	}
 	log.Info().
 		Interface("poolUpdates", poolUpdates).
 		Str("onRamp", onRamp.Address()).
-		Str("Network Name", onRamp.client.GetNetworkConfig().Name).
+		Str(Network, onRamp.client.GetNetworkConfig().Name).
 		Msg("poolUpdates set in OnRamp")
 	return onRamp.client.ProcessTransaction(tx)
 }
@@ -792,11 +799,11 @@ func (onRamp *OnRamp) ApplyPoolUpdates(poolUpdates []evm_2_evm_onramp.InternalPo
 func (onRamp *OnRamp) PayNops() error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	tx, err := onRamp.Instance.PayNops(opts)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to pay nops: %w", err)
 	}
 	return onRamp.client.ProcessTransaction(tx)
 }
@@ -804,12 +811,12 @@ func (onRamp *OnRamp) PayNops() error {
 func (onRamp *OnRamp) WithdrawNonLinkFees(wrappedNative common.Address) error {
 	opts, err := onRamp.client.TransactionOpts(onRamp.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	owner := common.HexToAddress(onRamp.client.GetDefaultWallet().Address())
 	tx, err := onRamp.Instance.WithdrawNonLinkFees(opts, wrappedNative, owner)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to withdraw non link fees: %w", err)
 	}
 	return onRamp.client.ProcessTransaction(tx)
 }
@@ -821,14 +828,14 @@ func (onRamp *OnRamp) SetRateLimit(rlConfig evm_2_evm_onramp.RateLimiterConfig) 
 	}
 	tx, err := onRamp.Instance.SetRateLimiterConfig(opts, rlConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set rate limit: %w", err)
 	}
 	log.Info().
 		Bool("Enabled", rlConfig.IsEnabled).
 		Str("capacity", rlConfig.Capacity.String()).
 		Str("rate", rlConfig.Rate.String()).
 		Str("onRamp", onRamp.Address()).
-		Str("Network Name", onRamp.client.GetNetworkConfig().Name).
+		Str(Network, onRamp.client.GetNetworkConfig().Name).
 		Msg("Setting Rate limit in OnRamp")
 	return onRamp.client.ProcessTransaction(tx)
 }
@@ -856,12 +863,12 @@ func (offRamp *OffRamp) SetOCR2Config(
 	// Set Config
 	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction options: %w", err)
 	}
 	log.Info().
 		Interface("signerAddresses", signers).
 		Interface("transmitterAddresses", transmitters).
-		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
+		Str(Network, offRamp.client.GetNetworkConfig().Name).
 		Msg("Configuring OffRamp")
 	tx, err := offRamp.Instance.SetOCR2Config(
 		opts,
@@ -874,7 +881,7 @@ func (offRamp *OffRamp) SetOCR2Config(
 	)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to set OCR2 config: %w", err)
 	}
 	return offRamp.client.ProcessTransaction(tx)
 }
@@ -882,7 +889,7 @@ func (offRamp *OffRamp) SetOCR2Config(
 func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address) error {
 	opts, err := offRamp.client.TransactionOpts(offRamp.client.GetDefaultWallet())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
 	var tokenUpdates []evm_2_evm_offramp.InternalPoolUpdate
 	for i, srcToken := range sourceTokens {
@@ -893,12 +900,12 @@ func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address)
 	}
 	tx, err := offRamp.Instance.ApplyPoolUpdates(opts, []evm_2_evm_offramp.InternalPoolUpdate{}, tokenUpdates)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to apply pool updates: %w", err)
 	}
 	log.Info().
 		Interface("tokenUpdates", tokenUpdates).
 		Str("offRamp", offRamp.Address()).
-		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
+		Str(Network, offRamp.client.GetNetworkConfig().Name).
 		Msg("tokenUpdates set in OffRamp")
 	return offRamp.client.ProcessTransaction(tx)
 }

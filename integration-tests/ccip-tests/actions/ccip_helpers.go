@@ -327,7 +327,7 @@ func (ccipModule *CCIPCommon) ApproveTokens() error {
 		if allowance.Cmp(amount) < 0 {
 			err := ccipModule.FeeToken.Approve(ccipModule.Router.Address(), amount)
 			if err != nil {
-				return errors.WithStack(err)
+				return fmt.Errorf("failed to approve fee token %s: %w", ccipModule.FeeToken.EthAddress.String(), err)
 			}
 		}
 	}
@@ -454,7 +454,7 @@ func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTra
 	}
 	destChainSelector, err := chainselectors.SelectorFromChainId(destChainID)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("invalid chain id %w", err)
 	}
 	if len(destPoolAddr) != len(ccipModule.BridgeTokenPools) {
 		return fmt.Errorf("invalid pool address")
@@ -512,20 +512,20 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		if ccipModule.TokenTransmitter == nil {
 			domain, err := GetUSDCDomain(ccipModule.ChainClient.GetNetworkName(), ccipModule.ChainClient.NetworkSimulated())
 			if err != nil {
-				return errors.WithStack(err)
+				return fmt.Errorf("error in getting USDC domain %w", err)
 			}
 			ccipModule.TokenTransmitter, err = cd.DeployTokenTransmitter(domain)
 			if err != nil {
-				return errors.WithStack(err)
+				return fmt.Errorf("deploying token transmitter shouldn't fail %w", err)
 			}
 		}
 		if ccipModule.TokenMessenger == nil {
 			if ccipModule.TokenTransmitter == nil {
-				return errors.WithStack(fmt.Errorf("TokenTransmitter contract address is not provided"))
+				return fmt.Errorf("TokenTransmitter contract address is not provided")
 			}
 			ccipModule.TokenMessenger, err = cd.DeployTokenMessenger(ccipModule.TokenTransmitter.ContractAddress)
 			if err != nil {
-				return errors.WithStack(err)
+				return fmt.Errorf("deploying token messenger shouldn't fail %w", err)
 			}
 			err = ccipModule.ChainClient.WaitForEvents()
 			if err != nil {
@@ -628,10 +628,10 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 			if ccipModule.USDCDeployment {
 				// deploy usdc token pool in case of usdc deployment
 				if ccipModule.TokenMessenger == nil {
-					return errors.WithStack(fmt.Errorf("TokenMessenger contract address is not provided"))
+					return fmt.Errorf("TokenMessenger contract address is not provided")
 				}
 				if ccipModule.TokenTransmitter == nil {
-					return errors.WithStack(fmt.Errorf("TokenTransmitter contract address is not provided"))
+					return fmt.Errorf("TokenTransmitter contract address is not provided")
 				}
 				usdcPool, err := cd.DeployUSDCTokenPoolContract(token.Address(), *ccipModule.TokenMessenger, *ccipModule.ARMContract)
 				if err != nil {
@@ -730,7 +730,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 	if ccipModule.MulticallContract == (common.Address{}) && ccipModule.MulticallEnabled {
 		ccipModule.MulticallContract, err = cd.DeployMultiCallContract()
 		if err != nil {
-			return errors.WithStack(err)
+			return fmt.Errorf("deploying multicall contract shouldn't fail %w", err)
 		}
 	}
 
@@ -834,11 +834,11 @@ func (sourceCCIP *SourceCCIPModule) SyncPoolsAndTokens() error {
 	}
 	err := sourceCCIP.OnRamp.SetTokenTransferFeeConfig(tokenTransferFeeConfig)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("setting token transfer fee config shouldn't fail %w", err)
 	}
 	err = sourceCCIP.OnRamp.ApplyPoolUpdates(tokensAndPools)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("applying pool updates shouldn't fail %w", err)
 	}
 	return nil
 }
@@ -852,11 +852,11 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 	sourceCCIP.LoadContracts(lane)
 	sourceChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("getting chain selector shouldn't fail %w", err)
 	}
 	destChainSelector, err := chainselectors.SelectorFromChainId(sourceCCIP.DestinationChainId)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("getting chain selector shouldn't fail %w", err)
 	}
 
 	if sourceCCIP.OnRamp == nil {
@@ -1276,16 +1276,16 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	destCCIP.LoadContracts(lane)
 	sourceChainSelector, err := chainselectors.SelectorFromChainId(destCCIP.SourceChainId)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("failed to get chain selector for source chain id %d: %w", destCCIP.SourceChainId, err)
 	}
 	destChainSelector, err := chainselectors.SelectorFromChainId(destCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("failed to get chain selector for destination chain id %d: %w", destCCIP.Common.ChainClient.GetChainID().Uint64(), err)
 	}
 
 	if destCCIP.CommitStore == nil {
 		if destCCIP.Common.ExistingDeployment {
-			return errors.New("commit store address not provided in lane config")
+			return fmt.Errorf("commit store address not provided in lane config")
 		}
 		// commitStore responsible for validating the transfer message
 		destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
@@ -1318,7 +1318,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 
 	if destCCIP.OffRamp == nil {
 		if destCCIP.Common.ExistingDeployment {
-			return errors.New("offramp address not provided in lane config")
+			return fmt.Errorf("offramp address not provided in lane config")
 		}
 		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(
 			sourceChainSelector, destChainSelector,
@@ -2277,11 +2277,11 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	destChainClient := lane.DestChain
 
 	if sourceCommon == nil {
-		return nil, nil, errors.WithStack(fmt.Errorf("common contracts for source chain %s not found", sourceChainClient.GetChainID().String()))
+		return nil, nil, fmt.Errorf("common contracts for source chain %s not found", sourceChainClient.GetChainID().String())
 	}
 
 	if destCommon == nil {
-		return nil, nil, errors.WithStack(fmt.Errorf("common contracts for destination chain %s not found", destChainClient.GetChainID().String()))
+		return nil, nil, fmt.Errorf("common contracts for destination chain %s not found", destChainClient.GetChainID().String())
 	}
 
 	lane.Source, err = DefaultSourceCCIPModule(
@@ -2289,14 +2289,14 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		sourceChainClient, destChainClient.GetChainID().Uint64(),
 		destChainClient.GetNetworkName(), transferAmounts, sourceCommon)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, fmt.Errorf("failed to create source module: %w", err)
 	}
 	lane.Dest, err = DefaultDestinationCCIPModule(
 		lane.Logger,
 		destChainClient, sourceChainClient.GetChainID().Uint64(),
 		sourceChainClient.GetNetworkName(), destCommon)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, fmt.Errorf("failed to create destination module: %w", err)
 	}
 
 	srcConf := lane.SrcNetworkLaneCfg
@@ -2306,12 +2306,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// deploy all source contracts
 	err = lane.Source.DeployContracts(srcConf)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, fmt.Errorf("failed to deploy source contracts: %w", err)
 	}
 	// deploy all destination contracts
 	err = lane.Dest.DeployContracts(*lane.Source, destConf)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, nil, fmt.Errorf("failed to deploy destination contracts: %w", err)
 	}
 
 	// if it's a new USDC deployment, sync the USDC domain
@@ -2333,12 +2333,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 
 	if env == nil {
-		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(errors.New("test environment not set"))
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("test environment not set")
 	}
 	// wait for the CL nodes to be ready before moving ahead with job creation
 	err = env.CLNodeWithKeyReady.Wait()
 	if err != nil {
-		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("failed to wait for CL nodes to be ready: %w", err)
 	}
 	clNodesWithKeys := env.CLNodesWithKeys
 	// set up ocr2 jobs
@@ -2413,7 +2413,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 			api = env.MockServer.Config.ClusterURL
 		}
 		if lane.Source.Common.TokenTransmitter == nil {
-			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(fmt.Errorf("token transmitter address not set"))
+			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("token transmitter address not set")
 		}
 		jobParams.USDCConfig = &config.USDCConfig{
 			SourceTokenAddress:              common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
@@ -2426,7 +2426,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		bootstrapAdded.Store(true)
 		err := CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
 		if err != nil {
-			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
+			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("failed to create bootstrap job: %w", err)
 		}
 	}
 
@@ -2449,12 +2449,12 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// set up ocr2 config
 	err = SetOCR2Configs(commitNodes, execNodes, *lane.Dest)
 	if err != nil {
-		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("failed to set ocr2 config: %w", err)
 	}
 
 	err = CreateOCR2CCIPCommitJobs(lane.Logger, jobParams, commitNodes, env.nodeMutexes, jobErrGroup)
 	if err != nil {
-		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("failed to create ocr2 commit jobs: %w", err)
 	}
 	if p2pBootstrappersExec != nil {
 		jobParams.P2PV2Bootstrappers = []string{p2pBootstrappersExec.P2PV2Bootstrapper()}
@@ -2462,7 +2462,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 
 	err = CreateOCR2CCIPExecutionJobs(lane.Logger, jobParams, execNodes, env.nodeMutexes, jobErrGroup)
 	if err != nil {
-		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, errors.WithStack(err)
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("failed to create ocr2 execution jobs: %w", err)
 	}
 
 	lane.Dest.Common.ChainClient.ParallelTransactions(false)
@@ -2494,12 +2494,12 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 			destCCIP.Common.PriceRegistry.EthAddress,
 		), contracts.OCR2ParamsForCommit, 3*time.Minute)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("failed to create ocr2 config params for commit: %w", err)
 	}
 
 	err = destCCIP.CommitStore.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("failed to set ocr2 config for commit: %w", err)
 	}
 
 	nodes := commitNodes
@@ -2525,11 +2525,11 @@ func SetOCR2Configs(commitNodes, execNodes []*client.CLNodesWithKeys, destCCIP D
 				200_000,
 			), contracts.OCR2ParamsForExec, 3*time.Minute)
 		if err != nil {
-			return errors.WithStack(err)
+			return fmt.Errorf("failed to create ocr2 config params for exec: %w", err)
 		}
 		err = destCCIP.OffRamp.SetOCR2Config(signers, transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 		if err != nil {
-			return errors.WithStack(err)
+			return fmt.Errorf("failed to set ocr2 config for exec: %w", err)
 		}
 	}
 	return destCCIP.Common.ChainClient.WaitForEvents()
@@ -2562,7 +2562,7 @@ func CreateOCR2CCIPCommitJobs(
 ) error {
 	ocr2SpecCommit, err := jobParams.CommitJobSpec()
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("failed to create ocr2 commit job spec: %w", err)
 	}
 	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecCommit client.OCR2TaskJobSpec, mu *sync.Mutex) error {
 		mu.Lock()
@@ -2601,7 +2601,7 @@ func CreateOCR2CCIPExecutionJobs(
 ) error {
 	ocr2SpecExec, err := jobParams.ExecutionJobSpec()
 	if err != nil {
-		return errors.WithStack(err)
+		return fmt.Errorf("failed to create ocr2 execution job spec: %w", err)
 	}
 	createJob := func(index int, node *client.CLNodesWithKeys, ocr2SpecExec client.OCR2TaskJobSpec, mu *sync.Mutex) error {
 		mu.Lock()
@@ -2757,7 +2757,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		log.Info().Msg("Connecting to launched resources")
 		chainlinkK8sNodes, err := client.ConnectChainlinkNodes(c.K8Env)
 		if err != nil {
-			return errors.WithStack(err)
+			return fmt.Errorf("failed to connect to chainlink nodes: %w", err)
 		}
 		if len(chainlinkK8sNodes) == 0 {
 			return fmt.Errorf("no CL node found")
@@ -2770,7 +2770,7 @@ func (c *CCIPTestEnv) SetUpNodesAndKeys(
 		c.CLNodes = chainlinkK8sNodes
 		mockServer, err := ctfClient.ConnectMockServer(c.K8Env)
 		if err != nil {
-			return errors.WithStack(err)
+			return fmt.Errorf("failed to connect to mock server: %w", err)
 		}
 		c.MockServer = mockServer
 	}
