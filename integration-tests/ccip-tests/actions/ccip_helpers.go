@@ -2219,7 +2219,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 					"chainID": %d,
 					"price": %s
 			 	},`,
-			tk, lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
+			tk.ContractAddress, lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
 	}
 	// add fee token price.
 	sb.WriteString(fmt.Sprintf(`
