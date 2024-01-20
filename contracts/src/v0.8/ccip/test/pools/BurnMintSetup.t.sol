@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {BurnMintTokenPool} from "../../pools/BurnMintTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {Router} from "../../Router.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 
 contract BurnMintSetup is RouterSetup {
@@ -30,5 +31,11 @@ contract BurnMintSetup is RouterSetup {
     });
 
     BurnMintTokenPool(pool).applyChainUpdates(chains);
+
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_ID, onRamp: s_burnMintOnRamp});
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: DEST_CHAIN_ID, offRamp: s_burnMintOffRamp});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
   }
 }
