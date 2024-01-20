@@ -35,6 +35,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -535,6 +536,35 @@ func (e *CCIPContractsDeployer) DeployWrappedNative() (*common.Address, error) {
 		return nil, err
 	}
 	return address, err
+}
+
+func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns *big.Int) (*MockAggregator, error) {
+	address, _, instance, err := e.evmClient.DeployContract("MockAggregator", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return mock_v3_aggregator_contract.DeployMockV3AggregatorContract(auth, backend, decimals, initialAns)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("deploying mock aggregator: %w", err)
+	}
+	return &MockAggregator{
+		client:          e.evmClient,
+		instance:        instance.(*mock_v3_aggregator_contract.MockV3AggregatorContract),
+		ContractAddress: *address,
+	}, nil
+}
+
+func (e *CCIPContractsDeployer) NewMockAggregator(addr common.Address) (*MockAggregator, error) {
+	ins, err := mock_v3_aggregator_contract.NewMockV3AggregatorContract(addr, e.evmClient.Backend())
+	if err != nil {
+		return nil, fmt.Errorf("creating mock aggregator: %w", err)
+	}
+	return &MockAggregator{
+		client:          e.evmClient,
+		instance:        ins,
+		ContractAddress: addr,
+	}, nil
 }
 
 var OCR2ParamsForCommit = contracts.OffChainAggregatorV2Config{

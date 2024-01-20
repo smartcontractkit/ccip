@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
@@ -781,4 +783,54 @@ func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address)
 		Str("Network Name", offRamp.client.GetNetworkConfig().Name).
 		Msg("tokenUpdates set in OffRamp")
 	return offRamp.client.ProcessTransaction(tx)
+}
+
+type MockAggregator struct {
+	client          blockchain.EVMClient
+	instance        *mock_v3_aggregator_contract.MockV3AggregatorContract
+	ContractAddress common.Address
+}
+
+func (a *MockAggregator) ChainID() uint64 {
+	return a.client.GetChainID().Uint64()
+}
+
+func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
+	opts, err := a.client.TransactionOpts(a.client.GetDefaultWallet())
+	if err != nil {
+		return fmt.Errorf("unable to get transaction opts: %v", err)
+	}
+	log.Info().
+		Str("Contract Address", a.ContractAddress.Hex()).
+		Str("Network Name", a.client.GetNetworkConfig().Name).
+		Msg("Updating Round Data")
+	tx, err := a.instance.UpdateRoundData(opts, big.NewInt(50), answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
+	if err != nil {
+		return fmt.Errorf("unable to update round data: %v", err)
+	}
+	return a.client.ProcessTransaction(tx)
+}
+
+func (a *MockAggregator) WaitForTxConfirmations() error {
+	return a.client.WaitForEvents()
+}
+
+func (a *MockAggregator) LatestRoundData() (struct {
+	Answer          *big.Int
+	RoundId         *big.Int
+	StartedAt       *big.Int
+	UpdatedAt       *big.Int
+	AnsweredInRound *big.Int
+}, error) {
+	d, err := a.instance.LatestRoundData(nil)
+	if err != nil {
+		return struct {
+			Answer          *big.Int
+			RoundId         *big.Int
+			StartedAt       *big.Int
+			UpdatedAt       *big.Int
+			AnsweredInRound *big.Int
+		}{}, fmt.Errorf("unable to get latest round data: %v", err)
+	}
+	return d, nil
 }

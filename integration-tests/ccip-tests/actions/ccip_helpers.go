@@ -2,9 +2,9 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
-	"net/http"
 	"strings"
 	"sync"
 	"testing"
@@ -29,7 +29,6 @@ import (
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
-	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/environment"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
@@ -100,7 +99,7 @@ type CCIPCommon struct {
 	Deployer           *contracts.CCIPContractsDeployer
 	FeeToken           *contracts.LinkToken
 	BridgeTokens       []*contracts.ERC20Token // as of now considering the bridge token is same as link token
-	TokenPrices        []*big.Int
+	PriceAggregators   map[string]*contracts.MockAggregator
 	BridgeTokenPools   []*contracts.LockReleaseTokenPool
 	RateLimiterConfig  contracts.RateLimiterConfig
 	ARMContract        *common.Address
@@ -151,11 +150,19 @@ func (ccipModule *CCIPCommon) Copy(logger zerolog.Logger, chainClient blockchain
 		}
 		tokens = append(tokens, token)
 	}
+	priceAggregators := make(map[string]*contracts.MockAggregator)
+	for k, v := range ccipModule.PriceAggregators {
+		aggregator, err := newCD.NewMockAggregator(v.ContractAddress)
+		if err != nil {
+			return nil, err
+		}
+		priceAggregators[k] = aggregator
+	}
 	newCommon := &CCIPCommon{
 		ChainClient:        chainClient,
 		Deployer:           newCD,
 		BridgeTokens:       tokens,
-		TokenPrices:        ccipModule.TokenPrices,
+		PriceAggregators:   priceAggregators,
 		BridgeTokenPools:   pools,
 		RateLimiterConfig:  ccipModule.RateLimiterConfig,
 		ARMContract:        ccipModule.ARMContract,
@@ -432,6 +439,11 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		}
 
 		ccipModule.FeeToken = token
+		aggregator, err := cd.DeployMockAggregator(18, LinkToUSD)
+		if err != nil {
+			return fmt.Errorf("deploying mock aggregator contract shouldn't fail %w", err)
+		}
+		ccipModule.PriceAggregators[ccipModule.FeeToken.Address()] = aggregator
 		err = ccipModule.ChainClient.WaitForEvents()
 		if err != nil {
 			return fmt.Errorf("error in waiting for feetoken deployment %w", err)
@@ -462,11 +474,21 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 					if err != nil {
 						return fmt.Errorf("getting new bridge token contract shouldn't fail %w", err)
 					}
+					aggregator, err := cd.DeployMockAggregator(18, LinkToUSD)
+					if err != nil {
+						return fmt.Errorf("deploying mock aggregator contract shouldn't fail %w", err)
+					}
+					ccipModule.PriceAggregators[linkToken.Address()] = aggregator
 				} else {
 					token, err = cd.DeployERC20TokenContract(tokenDeployerFns[i])
 					if err != nil {
 						return fmt.Errorf("deploying bridge token contract shouldn't fail %w", err)
 					}
+					aggregator, err := cd.DeployMockAggregator(18, LinkToUSD)
+					if err != nil {
+						return fmt.Errorf("deploying mock aggregator contract shouldn't fail %w", err)
+					}
+					ccipModule.PriceAggregators[token.Address()] = aggregator
 				}
 				ccipModule.BridgeTokens = append(ccipModule.BridgeTokens, token)
 			}
@@ -514,11 +536,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		}
 		ccipModule.BridgeTokenPools = pools
 	}
-	// Set price of the bridge tokens to 1
-	ccipModule.TokenPrices = []*big.Int{}
-	for range ccipModule.BridgeTokens {
-		ccipModule.TokenPrices = append(ccipModule.TokenPrices, big.NewInt(6e18))
-	}
 
 	if ccipModule.WrappedNative == common.HexToAddress("0x0") {
 		if ccipModule.ExistingDeployment {
@@ -528,7 +545,11 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		if err != nil {
 			return fmt.Errorf("deploying wrapped native shouldn't fail %w", err)
 		}
-
+		aggregator, err := cd.DeployMockAggregator(18, WrappedNativeToUSD)
+		if err != nil {
+			return fmt.Errorf("deploying mock aggregator contract shouldn't fail %w", err)
+		}
+		ccipModule.PriceAggregators[weth9addr.Hex()] = aggregator
 		err = ccipModule.ChainClient.WaitForEvents()
 		if err != nil {
 			return fmt.Errorf("waiting for deploying wrapped native shouldn't fail %w", err)
@@ -583,9 +604,61 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 			return errors.WithStack(err)
 		}
 	}
+
 	log.Info().Msg("finished deploying common contracts")
 	// approve router to spend fee token
 	return ccipModule.ApproveTokens()
+}
+
+// DynamicPriceGetterConfig specifies the configuration for the price getter in price pipeline.
+// This should match pricegetter.DynamicPriceGetterConfig in core/services/ocr2/plugins/ccip/internal/pricegetter
+type DynamicPriceGetterConfig struct {
+	AggregatorPrices map[common.Address]AggregatorPriceConfig `json:"aggregatorPrices"`
+	StaticPrices     map[common.Address]StaticPriceConfig     `json:"staticPrices"`
+}
+
+func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMap map[string]*contracts.MockAggregator, staticPrice *big.Int) error {
+	aggregatorContract := aggregatorMap[tokenAddr]
+	// update round Data
+	err := aggregatorContract.UpdateRoundData(staticPrice)
+	if err != nil {
+		return fmt.Errorf("error in updating round data %w", err)
+	}
+	err = aggregatorContract.WaitForTxConfirmations()
+	if err != nil {
+		return fmt.Errorf("error in waiting for tx confirmations %w", err)
+	}
+	d.AggregatorPrices[common.HexToAddress(tokenAddr)] = AggregatorPriceConfig{
+		ChainID:         aggregatorContract.ChainID(),
+		ContractAddress: aggregatorContract.ContractAddress,
+	}
+	d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
+		ChainID: aggregatorContract.ChainID(),
+		Price:   staticPrice.Uint64(),
+	}
+	return nil
+}
+
+func (d *DynamicPriceGetterConfig) String() (string, error) {
+	tokenPricesConfigBytes, err := json.MarshalIndent(d, "", " ")
+	if err != nil {
+		return "", fmt.Errorf("error in marshalling token prices config %w", err)
+	}
+	return string(tokenPricesConfigBytes), nil
+}
+
+// AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
+// This should match pricegetter.AggregatorPriceConfig in core/services/ocr2/plugins/ccip/internal/pricegetter
+type AggregatorPriceConfig struct {
+	ChainID         uint64         `json:"chainID"`
+	ContractAddress common.Address `json:"contractAddress"`
+}
+
+// StaticPriceConfig specifies a price defined statically.
+// This should match pricegetter.StaticPriceConfig in core/services/ocr2/plugins/ccip/internal/pricegetter
+type StaticPriceConfig struct {
+	ChainID uint64 `json:"chainID"`
+	Price   uint64 `json:"price,string"`
 }
 
 func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, existingDeployment, multiCall bool) (*CCIPCommon, error) {
@@ -605,6 +678,7 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 		poolFunds:          testhelpers.Link(5),
 		gasUpdateWatcherMu: &sync.Mutex{},
 		gasUpdateWatcher:   make(map[uint64]*big.Int),
+		PriceAggregators:   make(map[string]*contracts.MockAggregator),
 	}, nil
 }
 
@@ -1573,6 +1647,29 @@ type CCIPLane struct {
 	Subscriptions           []event.Subscription
 }
 
+func (lane *CCIPLane) TokenPricesConfig() (string, error) {
+	d := DynamicPriceGetterConfig{
+		AggregatorPrices: make(map[common.Address]AggregatorPriceConfig),
+		StaticPrices:     make(map[common.Address]StaticPriceConfig),
+	}
+	for _, token := range lane.Dest.Common.BridgeTokens {
+		err := d.AddPriceConfig(token.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD)
+		if err != nil {
+			return "", fmt.Errorf("error %w in AddPriceConfig for token %s", err, token.Address())
+		}
+	}
+	if err := d.AddPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD); err != nil {
+		return "", fmt.Errorf("error %w in AddPriceConfig for fee token %s", err, lane.Dest.Common.FeeToken.Address())
+	}
+	if err := d.AddPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
+		return "", fmt.Errorf("error %w in AddPriceConfig for wrapped native %s", err, lane.Dest.Common.WrappedNative.Hex())
+	}
+	if err := d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
+		return "", fmt.Errorf("error %w in AddPriceConfig for wrapped native %s", err, lane.Source.Common.WrappedNative.Hex())
+	}
+	return d.String()
+}
+
 func (lane *CCIPLane) UpdateLaneConfig() {
 	var btAddresses, btpAddresses []string
 
@@ -2199,93 +2296,20 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("getting current block should be successful in destination chain %w", err)
 	}
 
-	// TODO create a prices config (static and/or dynamic) for the tokens
-	//var tokenAddresses []string
-	//for _, token := range lane.Dest.Common.BridgeTokens {
-	//	tokenAddresses = append(tokenAddresses, token.Address())
-	//}
-	//tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
-
-	//var killgrave *ctftestenv.Killgrave
-	//if env.LocalCluster != nil {
-	//	killgrave = env.LocalCluster.MockAdapter
-	//}
-	//tokensUSDUrl := SetMockServerWithSameTokenFeeConversionValue(tokenAddresses, killgrave, env.MockServer)
-
-	// Build a dynamic price getter configuration (only with static prices for now).
-	var sb strings.Builder
-	sb.WriteString("{\n")
-	sb.WriteString("\"aggregatorPrices\": {},\n")
-	sb.WriteString("\"staticPrices\": {")
-
-	// add bridge token prices.
-	for _, tk := range lane.Dest.Common.BridgeTokens {
-		sb.WriteString(fmt.Sprintf(`
-				"%s": {
-					"chainID": %d,
-					"price": "%s"
-			 	},`,
-			tk.ContractAddress, lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
+	tokenPricesConfigJson, err := lane.TokenPricesConfig()
+	if err != nil {
+		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("error getting token prices config %w", err)
 	}
-	// add fee token price.
-	sb.WriteString(fmt.Sprintf(`
-				"%s": {
-					"chainID": %d,
-					"price": "%s"
-			 	},`,
-		lane.Dest.Common.FeeToken.Address(), lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
-	sb.WriteString(fmt.Sprintf(`
-				"%s": {
-					"chainID": %d,
-					"price": "%s"
-			 	},`,
-		lane.Source.Common.WrappedNative.Hex(), lane.SourceChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
-	sb.WriteString(fmt.Sprintf(`
-				"%s": {
-					"chainID": %d,
-					"price": "%s"
-			 	}`,
-		lane.Dest.Common.WrappedNative.Hex(), lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
-	sb.WriteString("\t\n}\n}")
-
-	//priceGetterConfigJson := `
-	//	{
-	//		"aggregatorPrices": {
-	//		 "0x0820c05e1fba1244763a494a52272170c321cad3": {
-	//		  "chainID": 1000,
-	//		  "contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
-	//		 },
-	//		 "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
-	//		  "chainID": 1337,
-	//		  "contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
-	//		 },
-	//		 "0xec8c353470ccaa4f43067fcde40558e084a12927": {
-	//		  "chainID": 1000,
-	//		  "contractAddress": "0x277517e2127a09bda109217c9cf901bc7a9f9b9a"
-	//		 }
-	//		},
-	//		"staticPrices": {
-	//			"0xec8c353470ccaa4f43067fcde40558e084a12927": {
-	//				"chainID": 1057,
-	//				"price": "1000000000000000000"
-	//		 	}
-	//		}
-	//	}
-	//	`
-
-	priceGetterConfig := sb.String()
-	fmt.Printf("Price getter config:\n%s\n", priceGetterConfig)
+	lane.Logger.Info().Str("tokenPricesConfigJson", tokenPricesConfigJson).Msg("Price getter config")
 
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
-		OffRamp:          lane.Dest.OffRamp.EthAddress,
-		CommitStore:      lane.Dest.CommitStore.EthAddress,
-		SourceChainName:  sourceChainClient.GetNetworkName(),
-		DestChainName:    destChainClient.GetNetworkName(),
-		DestEvmChainId:   destChainClient.GetChainID().Uint64(),
-		SourceStartBlock: lane.Source.SrcStartBlock,
-		// FIXME
-		//TokenPricesUSDPipeline: TokenFeeForMultipleTokenAddr(tokensUSDUrl),
-		PriceGetterConfig: priceGetterConfig,
+		OffRamp:           lane.Dest.OffRamp.EthAddress,
+		CommitStore:       lane.Dest.CommitStore.EthAddress,
+		SourceChainName:   sourceChainClient.GetNetworkName(),
+		DestChainName:     destChainClient.GetNetworkName(),
+		DestEvmChainId:    destChainClient.GetChainID().Uint64(),
+		SourceStartBlock:  lane.Source.SrcStartBlock,
+		PriceGetterConfig: tokenPricesConfigJson,
 		DestStartBlock:    currentBlockOnDest,
 	}
 
@@ -2824,63 +2848,4 @@ func NewBalanceSheet() *BalanceSheet {
 		Items:       make(map[string]BalanceItem),
 		PrevBalance: make(map[string]*big.Int),
 	}
-}
-
-// SetMockServerWithSameTokenFeeConversionValue sets the mock responses in mockserver that are read by chainlink nodes
-// to simulate different price feed value.
-func SetMockServerWithSameTokenFeeConversionValue(
-	tokenAddresses []string,
-	killGrave *ctftestenv.Killgrave,
-	mockserver *ctfClient.MockserverClient,
-) map[string]string {
-	wg := &sync.WaitGroup{}
-	mapTokenURL := make(map[string]string)
-	syncMapTokenURL := &sync.Map{}
-	for _, tokenAddr := range tokenAddresses {
-		path := fmt.Sprintf("token_contract_%s", tokenAddr[2:12])
-		wg.Add(1)
-		tokenAddr := tokenAddr
-		go func() {
-			// keep updating token value every 15 second
-			for {
-				if killGrave == nil && mockserver == nil {
-					log.Fatal().Msg("both killgrave and mockserver are nil")
-					return
-				}
-				tokenValue := big.NewInt(time.Now().UnixNano()).String()
-				if killGrave != nil {
-					err := killGrave.SetAdapterBasedAnyValuePath(path, []string{http.MethodGet}, tokenValue)
-					if err != nil {
-						log.Fatal().Err(err).Msg("failed to set killgrave server value")
-						return
-					}
-					if _, ok := syncMapTokenURL.Load(tokenAddr); !ok {
-						syncMapTokenURL.Store(tokenAddr, fmt.Sprintf("%s/%s", killGrave.InternalEndpoint, path))
-						// call Done after setting the value for the first time
-						wg.Done()
-					}
-				}
-				if mockserver != nil {
-					err := mockserver.SetAnyValuePath(fmt.Sprintf("/%s", path), tokenValue)
-					if err != nil {
-						log.Fatal().Err(err).Msg("failed to set mockserver value")
-						return
-					}
-					if _, ok := syncMapTokenURL.Load(tokenAddr); !ok {
-						syncMapTokenURL.Store(tokenAddr, fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL, path))
-						// call Done after setting the value for the first time
-						wg.Done()
-					}
-				}
-				time.Sleep(15 * time.Second)
-			}
-		}()
-	}
-	// wait for all token value to be set at least once
-	wg.Wait()
-	syncMapTokenURL.Range(func(key, value interface{}) bool {
-		mapTokenURL[key.(string)] = value.(string)
-		return true
-	})
-	return mapTokenURL
 }
