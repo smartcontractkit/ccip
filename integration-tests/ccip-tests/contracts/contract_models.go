@@ -787,7 +787,7 @@ func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address)
 
 type MockAggregator struct {
 	client          blockchain.EVMClient
-	instance        *mock_v3_aggregator_contract.MockV3AggregatorContract
+	Instance        *mock_v3_aggregator_contract.MockV3AggregatorContract
 	ContractAddress common.Address
 }
 
@@ -804,7 +804,7 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 		Str("Contract Address", a.ContractAddress.Hex()).
 		Str("Network Name", a.client.GetNetworkConfig().Name).
 		Msg("Updating Round Data")
-	tx, err := a.instance.UpdateRoundData(opts, big.NewInt(50), answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
+	tx, err := a.Instance.UpdateRoundData(opts, big.NewInt(50), answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 	if err != nil {
 		return fmt.Errorf("unable to update round data: %v", err)
 	}
@@ -813,24 +813,4 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 
 func (a *MockAggregator) WaitForTxConfirmations() error {
 	return a.client.WaitForEvents()
-}
-
-func (a *MockAggregator) LatestRoundData() (struct {
-	Answer          *big.Int
-	RoundId         *big.Int
-	StartedAt       *big.Int
-	UpdatedAt       *big.Int
-	AnsweredInRound *big.Int
-}, error) {
-	d, err := a.instance.LatestRoundData(nil)
-	if err != nil {
-		return struct {
-			Answer          *big.Int
-			RoundId         *big.Int
-			StartedAt       *big.Int
-			UpdatedAt       *big.Int
-			AnsweredInRound *big.Int
-		}{}, fmt.Errorf("unable to get latest round data: %v", err)
-	}
-	return d, nil
 }

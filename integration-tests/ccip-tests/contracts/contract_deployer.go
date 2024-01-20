@@ -550,7 +550,7 @@ func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns 
 	}
 	return &MockAggregator{
 		client:          e.evmClient,
-		instance:        instance.(*mock_v3_aggregator_contract.MockV3AggregatorContract),
+		Instance:        instance.(*mock_v3_aggregator_contract.MockV3AggregatorContract),
 		ContractAddress: *address,
 	}, nil
 }
@@ -562,7 +562,7 @@ func (e *CCIPContractsDeployer) NewMockAggregator(addr common.Address) (*MockAgg
 	}
 	return &MockAggregator{
 		client:          e.evmClient,
-		instance:        ins,
+		Instance:        ins,
 		ContractAddress: addr,
 	}, nil
 }
