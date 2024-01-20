@@ -6,6 +6,7 @@ import {TokenPoolHelper} from "../helpers/TokenPoolHelper.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
+import {Router} from "../../Router.sol";
 
 contract TokenPoolSetup is RouterSetup {
   IERC20 internal s_token;
@@ -178,6 +179,174 @@ contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));
     s_tokenPool.setChainRateLimiterConfig(wrongChainSelector, rateLimiterConfig());
+  }
+}
+
+contract TokenPool_onlyOnRamp is TokenPoolSetup {
+  function test_onlyOnRampSuccess() public {
+    uint64 chainSelector = 13377;
+    address onRamp = makeAddr("onRamp");
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      chainSelector: chainSelector,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdate);
+
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: onRamp});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+
+    vm.startPrank(onRamp);
+
+    s_tokenPool.onlyOnRampModifier(chainSelector);
+  }
+
+  function test_ChainNotAllowedReverts() public {
+    uint64 chainSelector = 13377;
+    address onRamp = makeAddr("onRamp");
+
+    vm.startPrank(onRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, chainSelector));
+    s_tokenPool.onlyOnRampModifier(chainSelector);
+
+    vm.startPrank(OWNER);
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      chainSelector: chainSelector,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdate);
+
+    Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: chainSelector, onRamp: onRamp});
+    s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), new Router.OffRamp[](0));
+
+    vm.startPrank(onRamp);
+    // Should succeed now that we've added the chain
+    s_tokenPool.onlyOnRampModifier(chainSelector);
+
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      chainSelector: chainSelector,
+      allowed: false,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+
+    vm.startPrank(OWNER);
+    s_tokenPool.applyChainUpdates(chainUpdate);
+
+    vm.startPrank(onRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, chainSelector));
+    s_tokenPool.onlyOffRampModifier(chainSelector);
+  }
+
+  function test_CallerIsNotARampOnRouterReverts() public {
+    uint64 chainSelector = 13377;
+    address onRamp = makeAddr("onRamp");
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      chainSelector: chainSelector,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdate);
+
+    vm.startPrank(onRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, onRamp));
+
+    s_tokenPool.onlyOnRampModifier(chainSelector);
+  }
+}
+
+contract TokenPool_onlyOffRamp is TokenPoolSetup {
+  function test_onlyOffRampSuccess() public {
+    uint64 chainSelector = 13377;
+    address offRamp = makeAddr("onRamp");
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      chainSelector: chainSelector,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdate);
+
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: chainSelector, offRamp: offRamp});
+    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+
+    vm.startPrank(offRamp);
+
+    s_tokenPool.onlyOffRampModifier(chainSelector);
+  }
+
+  function test_ChainNotAllowedReverts() public {
+    uint64 chainSelector = 13377;
+    address offRamp = makeAddr("onRamp");
+
+    vm.startPrank(offRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, chainSelector));
+    s_tokenPool.onlyOffRampModifier(chainSelector);
+
+    vm.startPrank(OWNER);
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      chainSelector: chainSelector,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdate);
+
+    Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: chainSelector, offRamp: offRamp});
+    s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRampUpdates);
+
+    vm.startPrank(offRamp);
+    // Should succeed now that we've added the chain
+    s_tokenPool.onlyOffRampModifier(chainSelector);
+
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      chainSelector: chainSelector,
+      allowed: false,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+
+    vm.startPrank(OWNER);
+    s_tokenPool.applyChainUpdates(chainUpdate);
+
+    vm.startPrank(offRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, chainSelector));
+    s_tokenPool.onlyOffRampModifier(chainSelector);
+  }
+
+  function test_CallerIsNotARampOnRouterReverts() public {
+    uint64 chainSelector = 13377;
+    address offRamp = makeAddr("offRamp");
+
+    TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
+    chainUpdate[0] = TokenPool.ChainUpdate({
+      chainSelector: chainSelector,
+      allowed: true,
+      rateLimiterConfig: rateLimiterConfig()
+    });
+    s_tokenPool.applyChainUpdates(chainUpdate);
+
+    vm.startPrank(offRamp);
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, offRamp));
+
+    s_tokenPool.onlyOffRampModifier(chainSelector);
   }
 }
 

@@ -29,4 +29,8 @@ contract TokenPoolHelper is TokenPool {
   function releaseOrMint(bytes memory, address receiver, uint256 amount, uint64, bytes memory) external override {
     emit ReleaseOrMint(receiver, amount);
   }
+
+  function onlyOnRampModifier(uint64 remoteChainSelector) external onlyOnRamp(remoteChainSelector) {}
+
+  function onlyOffRampModifier(uint64 remoteChainSelector) external onlyOffRamp(remoteChainSelector) {}
 }

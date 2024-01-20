@@ -20,11 +20,12 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   using EnumerableSet for EnumerableSet.UintSet;
   using RateLimiter for RateLimiter.TokenBucket;
 
-  error PermissionsError();
+  error CallerIsNotARampOnRouter(address caller);
   error ZeroAddressNotAllowed();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
   error NonExistentChain(uint64 chainSelector);
+  error ChainNotAllowed(uint64 chainSelector);
   error BadARMSignal();
   error ChainAlreadyExists(uint64 chainSelector);
 
@@ -170,12 +171,12 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   /// @notice Consumes outbound rate limiting capacity in this pool
   function _consumeOnRampRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
-    s_inboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
+    s_outboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
   function _consumeOffRampRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
-    s_outboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
+    s_inboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
@@ -183,7 +184,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   function currentOnRampRateLimiterState(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_inboundRateLimits[remoteChainSelector]._currentTokenBucketState();
+    return s_outboundRateLimits[remoteChainSelector]._currentTokenBucketState();
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
@@ -191,7 +192,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   function currentOffRampRateLimiterState(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory) {
-    return s_outboundRateLimits[remoteChainSelector]._currentTokenBucketState();
+    return s_inboundRateLimits[remoteChainSelector]._currentTokenBucketState();
   }
 
   /// @notice Sets the onramp rate limited config.
@@ -210,14 +211,16 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @notice Checks whether the msg.sender is a permissioned onRamp on this contract
   /// @dev Reverts with a PermissionsError if check fails
   modifier onlyOnRamp(uint64 remoteChainSelector) {
-    if (!(msg.sender == i_router.getOnRamp(remoteChainSelector))) revert PermissionsError();
+    if (!s_remoteChains.contains(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+    if (!(msg.sender == i_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
     _;
   }
 
   /// @notice Checks whether the msg.sender is a permissioned offRamp on this contract
   /// @dev Reverts with a PermissionsError if check fails
   modifier onlyOffRamp(uint64 remoteChainSelector) {
-    if (!i_router.isOffRamp(remoteChainSelector, msg.sender)) revert PermissionsError();
+    if (!s_remoteChains.contains(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+    if (!i_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
     _;
   }
 
