@@ -7,11 +7,9 @@ import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/tok
 
 contract MockTokenPool is IPool {
   address public immutable i_token;
-  address public immutable i_router;
 
-  constructor(address token, address router) {
+  constructor(address token) {
     i_token = token;
-    i_router = router;
   }
 
   function lockOrBurn(
@@ -28,9 +26,5 @@ contract MockTokenPool is IPool {
 
   function getToken() public view override returns (IERC20 token) {
     return IERC20(i_token);
-  }
-
-  function getRouter() public view override returns (address router) {
-    return i_router;
   }
 }

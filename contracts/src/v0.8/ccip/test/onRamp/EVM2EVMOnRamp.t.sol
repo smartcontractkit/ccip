@@ -1714,7 +1714,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
   function testApplyPoolUpdatesSuccess() public {
     address token = address(1);
-    MockTokenPool mockPool = new MockTokenPool(token, address(s_sourceRouter));
+    MockTokenPool mockPool = new MockTokenPool(token);
 
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
@@ -1737,7 +1737,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
   function testAtomicPoolReplacementSuccess() public {
     address token = address(1);
-    MockTokenPool mockPool = new MockTokenPool(token, address(s_sourceRouter));
+    MockTokenPool mockPool = new MockTokenPool(token);
 
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
@@ -1749,7 +1749,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
     assertEq(adds[0].pool, address(s_onRamp.getPoolBySourceToken(DEST_CHAIN_ID, IERC20(token))));
 
-    MockTokenPool newMockPool = new MockTokenPool(token, address(s_sourceRouter));
+    MockTokenPool newMockPool = new MockTokenPool(token);
 
     Internal.PoolUpdate[] memory updates = new Internal.PoolUpdate[](1);
     updates[0] = Internal.PoolUpdate({token: token, pool: address(newMockPool)});
@@ -1776,7 +1776,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
   function testPoolAlreadyExistsReverts() public {
     address token = address(1);
-    MockTokenPool mockPool = new MockTokenPool(token, address(s_sourceRouter));
+    MockTokenPool mockPool = new MockTokenPool(token);
 
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](2);
     adds[0] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
@@ -1804,7 +1804,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
   function testPoolDoesNotExistReverts() public {
     address token = address(1);
-    MockTokenPool mockPool = new MockTokenPool(token, address(s_sourceRouter));
+    MockTokenPool mockPool = new MockTokenPool(token);
 
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](1);
     removes[0] = Internal.PoolUpdate({token: token, pool: address(mockPool)});
@@ -1817,8 +1817,8 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
   function testRemoveTokenPoolMismatchReverts() public {
     address token = address(1);
     MockTokenPool[] memory mockPools = new MockTokenPool[](2);
-    mockPools[0] = new MockTokenPool(token, address(s_sourceRouter));
-    mockPools[1] = new MockTokenPool(token, address(s_sourceRouter));
+    mockPools[0] = new MockTokenPool(token);
+    mockPools[1] = new MockTokenPool(token);
 
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);
     adds[0] = Internal.PoolUpdate({token: token, pool: address(mockPools[0])});
@@ -1834,7 +1834,7 @@ contract EVM2EVMOnRamp_applyPoolUpdates is EVM2EVMOnRampSetup {
 
   function testAddTokenPoolMismatchReverts() public {
     address token = address(1);
-    MockTokenPool mockPool = new MockTokenPool(address(2), address(s_sourceRouter));
+    MockTokenPool mockPool = new MockTokenPool(address(2));
 
     Internal.PoolUpdate[] memory removes = new Internal.PoolUpdate[](0);
     Internal.PoolUpdate[] memory adds = new Internal.PoolUpdate[](1);

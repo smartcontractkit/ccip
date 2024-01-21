@@ -43,8 +43,4 @@ interface IPool {
   /// @notice Gets the IERC20 token that this pool can lock or burn.
   /// @return token The IERC20 token representation.
   function getToken() external view returns (IERC20 token);
-
-  /// @notice Gets the pool's Router
-  /// @return router The pool's Router
-  function getRouter() external view returns (address router);
 }

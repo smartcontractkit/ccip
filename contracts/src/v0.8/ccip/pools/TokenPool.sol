@@ -94,8 +94,9 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     return i_token;
   }
 
-  /// @inheritdoc IPool
-  function getRouter() public view override returns (address router) {
+  /// @notice Gets the pool's Router
+  /// @return router The pool's Router
+  function getRouter() public view returns (address router) {
     return address(i_router);
   }
 
