@@ -51,12 +51,12 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
     //assertEq(s_tokenPool.getSupportedChains(), chainSelectorsFromUpdates(chainUpdates));
     for (uint256 i = 0; i < chainUpdates.length; ++i) {
       assertTrue(s_tokenPool.isSupportedChain(chainUpdates[i].chainSelector));
-      RateLimiter.TokenBucket memory bkt = s_tokenPool.currentOnRampRateLimiterState(chainUpdates[i].chainSelector);
+      RateLimiter.TokenBucket memory bkt = s_tokenPool.currentOutboundRateLimiterState(chainUpdates[i].chainSelector);
       assertEq(bkt.capacity, chainUpdates[i].rateLimiterConfig.capacity);
       assertEq(bkt.rate, chainUpdates[i].rateLimiterConfig.rate);
       assertEq(bkt.isEnabled, chainUpdates[i].rateLimiterConfig.isEnabled);
 
-      bkt = s_tokenPool.currentOffRampRateLimiterState(chainUpdates[i].chainSelector);
+      bkt = s_tokenPool.currentInboundRateLimiterState(chainUpdates[i].chainSelector);
       assertEq(bkt.capacity, chainUpdates[i].rateLimiterConfig.capacity);
       assertEq(bkt.rate, chainUpdates[i].rateLimiterConfig.rate);
       assertEq(bkt.isEnabled, chainUpdates[i].rateLimiterConfig.isEnabled);
@@ -145,7 +145,7 @@ contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
     vm.assume(newTime >= block.timestamp);
     vm.warp(newTime);
 
-    uint256 oldTokens = s_tokenPool.currentOnRampRateLimiterState(s_remoteChainSelector).tokens;
+    uint256 oldTokens = s_tokenPool.currentOutboundRateLimiterState(s_remoteChainSelector).tokens;
 
     RateLimiter.Config memory newConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
 
@@ -158,7 +158,7 @@ contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
 
     uint256 expectedTokens = RateLimiter._min(newConfig.capacity, oldTokens);
 
-    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentOnRampRateLimiterState(s_remoteChainSelector);
+    RateLimiter.TokenBucket memory bucket = s_tokenPool.currentOutboundRateLimiterState(s_remoteChainSelector);
     assertEq(bucket.capacity, newConfig.capacity);
     assertEq(bucket.rate, newConfig.rate);
     assertEq(bucket.tokens, expectedTokens);

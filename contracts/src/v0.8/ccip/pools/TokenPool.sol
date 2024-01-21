@@ -36,7 +36,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   event ChainAdded(uint64 chainSelector, RateLimiter.Config rateLimiterConfig);
   event ChainConfigured(uint64 chainSelector, RateLimiter.Config rateLimiterConfig);
   event ChainRemoved(uint64 chainSelector);
-  event OffRampConfigured(address offRamp, RateLimiter.Config rateLimiterConfig);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
 
@@ -50,8 +49,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   IERC20 internal immutable i_token;
   /// @dev The address of the arm proxy
   address internal immutable i_armProxy;
-
-  // TODO: do we want this immutable?
+  /// @dev The address of the router
   Router internal immutable i_router;
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
@@ -61,7 +59,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// move tokens.
   EnumerableSet.AddressSet internal s_allowList;
 
-  /// @dev A set of allowed onRamps. We want the whitelist to be enumerable to
+  /// @dev A set of allowed chains. We want the allowlist to be enumerable to
   /// be able to quickly determine (without parsing logs) who can access the pool.
   EnumerableSet.UintSet internal s_remoteChains;
   /// @dev Inbound rate limits. This allows per destination chain
@@ -96,6 +94,11 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     return i_token;
   }
 
+  /// @inheritdoc IPool
+  function getRouter() public view override returns (address router) {
+    return address(i_router);
+  }
+
   /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
     return interfaceId == type(IPool).interfaceId || interfaceId == type(IERC165).interfaceId;
@@ -111,7 +114,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     return s_remoteChains.contains(remoteChainSelector);
   }
 
-  /// @notice Get chain whitelist
+  /// @notice Get list of allowed chains
   /// @return list of chains.
   function getSupportedChains() public view returns (uint64[] memory) {
     uint256[] memory uint256ChainSelectors = s_remoteChains.values();
@@ -127,10 +130,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @dev Only callable by the owner
   /// @param chains A list of chains and their new permission status/rate limits
   function applyChainUpdates(ChainUpdate[] calldata chains) external virtual onlyOwner {
-    _applyChainUpdates(chains);
-  }
-
-  function _applyChainUpdates(ChainUpdate[] calldata chains) internal onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
       ChainUpdate memory update = chains[i];
       if (update.allowed) {
@@ -159,7 +158,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
           delete s_outboundRateLimits[update.chainSelector];
           emit ChainRemoved(update.chainSelector);
         } else {
-          // Cannot remove a non-existent onRamp.
+          // Cannot remove a non-existent chain.
           revert NonExistentChain(update.chainSelector);
         }
       }
@@ -171,18 +170,18 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   // ================================================================
 
   /// @notice Consumes outbound rate limiting capacity in this pool
-  function _consumeOnRampRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
+  function _consumeOutboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
     s_outboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
   }
 
   /// @notice Consumes inbound rate limiting capacity in this pool
-  function _consumeOffRampRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
+  function _consumeInboundRateLimit(uint64 remoteChainSelector, uint256 amount) internal {
     s_inboundRateLimits[remoteChainSelector]._consume(amount, address(i_token));
   }
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentOnRampRateLimiterState(
+  function currentOutboundRateLimiterState(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory) {
     return s_outboundRateLimits[remoteChainSelector]._currentTokenBucketState();
@@ -190,13 +189,13 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   /// @notice Gets the token bucket with its values for the block it was requested at.
   /// @return The token bucket.
-  function currentOffRampRateLimiterState(
+  function currentInboundRateLimiterState(
     uint64 remoteChainSelector
   ) external view returns (RateLimiter.TokenBucket memory) {
     return s_inboundRateLimits[remoteChainSelector]._currentTokenBucketState();
   }
 
-  /// @notice Sets the onramp rate limited config.
+  /// @notice Sets the chain rate limited config.
   /// @param config The new rate limiter config.
   function setChainRateLimiterConfig(uint64 remoteChainSelector, RateLimiter.Config memory config) external onlyOwner {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
@@ -209,16 +208,16 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   // │                           Access                             │
   // ================================================================
 
-  /// @notice Checks whether the msg.sender is a permissioned onRamp on this contract
-  /// @dev Reverts with a PermissionsError if check fails
+  /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
+  /// is a permissioned onRamp for the given chain on the Router.
   modifier onlyOnRamp(uint64 remoteChainSelector) {
     if (!s_remoteChains.contains(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!(msg.sender == i_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
     _;
   }
 
-  /// @notice Checks whether the msg.sender is a permissioned offRamp on this contract
-  /// @dev Reverts with a PermissionsError if check fails
+  /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
+  /// is a permissioned offRamp for the given chain on the Router.
   modifier onlyOffRamp(uint64 remoteChainSelector) {
     if (!s_remoteChains.contains(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!i_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);

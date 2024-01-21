@@ -63,7 +63,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     whenHealthy
     returns (bytes memory)
   {
-    _consumeOnRampRateLimit(remoteChainSelector, amount);
+    _consumeOutboundRateLimit(remoteChainSelector, amount);
     emit Locked(msg.sender, amount);
     return "";
   }
@@ -80,7 +80,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
     uint64 remoteChainSelector,
     bytes memory
   ) external virtual override onlyOffRamp(remoteChainSelector) whenHealthy {
-    _consumeOffRampRateLimit(remoteChainSelector, amount);
+    _consumeInboundRateLimit(remoteChainSelector, amount);
     getToken().safeTransfer(receiver, amount);
     emit Released(msg.sender, receiver, amount);
   }

@@ -44,7 +44,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
         revert(add(32, revertReason), mload(revertReason))
       }
     }
-    _consumeOnRampRateLimit(remoteChainSelector, amount);
+    _consumeOutboundRateLimit(remoteChainSelector, amount);
     IBurnMintERC20(address(i_token)).burn(amount);
     emit Burned(msg.sender, amount);
     return s_sourceTokenData;
@@ -64,7 +64,7 @@ contract MaybeRevertingBurnMintTokenPool is BurnMintTokenPool {
         revert(add(32, revertReason), mload(revertReason))
       }
     }
-    _consumeOffRampRateLimit(remoteChainSelector, amount);
+    _consumeInboundRateLimit(remoteChainSelector, amount);
     IBurnMintERC20(address(i_token)).mint(receiver, amount);
     emit Minted(msg.sender, receiver, amount);
   }

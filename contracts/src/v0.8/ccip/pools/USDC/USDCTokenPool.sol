@@ -121,7 +121,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   ) external override onlyOnRamp(remoteChainSelector) checkAllowList(originalSender) returns (bytes memory) {
     Domain memory domain = s_chainToDomain[remoteChainSelector];
     if (!domain.enabled) revert UnknownDomain(remoteChainSelector);
-    _consumeOnRampRateLimit(remoteChainSelector, amount);
+    _consumeOutboundRateLimit(remoteChainSelector, amount);
     bytes32 receiver = bytes32(destinationReceiver[0:32]);
     // Since this pool is the msg sender of the CCTP transaction, only this contract
     // is able to call replaceDepositForBurn. Since this contract does not implement
@@ -158,7 +158,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
     uint64 remoteChainSelector,
     bytes memory extraData
   ) external override onlyOffRamp(remoteChainSelector) {
-    _consumeOffRampRateLimit(remoteChainSelector, amount);
+    _consumeInboundRateLimit(remoteChainSelector, amount);
     (bytes memory sourceData, bytes memory offchainTokenData) = abi.decode(extraData, (bytes, bytes));
     SourceTokenDataPayload memory sourceTokenData = abi.decode(sourceData, (SourceTokenDataPayload));
     MessageAndAttestation memory msgAndAttestation = abi.decode(offchainTokenData, (MessageAndAttestation));
