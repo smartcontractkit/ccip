@@ -67,10 +67,10 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @dev Inbound rate limits. This allows per destination chain
   /// token issuer specified rate limiting (e.g. issuers may trust chains to varying
   /// degrees and prefer different limits)
-  mapping(uint64 => RateLimiter.TokenBucket) internal s_inboundRateLimits;
+  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket) internal s_inboundRateLimits;
   /// @dev Outbound rate limits. Corresponds to the inbound rate limit for the pool
   /// on the remote chain.
-  mapping(uint64 => RateLimiter.TokenBucket) internal s_outboundRateLimits;
+  mapping(uint64 remoteChainSelector => RateLimiter.TokenBucket) internal s_outboundRateLimits;
 
   constructor(IERC20 token, address[] memory allowlist, address armProxy, address router) {
     if (address(token) == address(0) || router == address(0)) revert ZeroAddressNotAllowed();
@@ -156,6 +156,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
       } else {
         if (s_remoteChains.remove(update.chainSelector)) {
           delete s_inboundRateLimits[update.chainSelector];
+          delete s_outboundRateLimits[update.chainSelector];
           emit ChainRemoved(update.chainSelector);
         } else {
           // Cannot remove a non-existent onRamp.
