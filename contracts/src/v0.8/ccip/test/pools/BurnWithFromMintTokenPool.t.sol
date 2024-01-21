@@ -20,7 +20,7 @@ contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
     );
     s_burnMintERC677.grantMintAndBurnRoles(address(s_pool));
 
-    applyRampUpdates(address(s_pool));
+    _applyRampUpdates(address(s_pool));
   }
 }
 

@@ -62,6 +62,21 @@ contract LockReleaseTokenPoolSetup is RouterSetup {
   }
 }
 
+contract LockReleaseTokenPool_setRebalancer is LockReleaseTokenPoolSetup {
+  function testSetRebalancerSuccess() public {
+    assertEq(address(s_lockReleaseTokenPool.getRebalancer()), OWNER);
+    s_lockReleaseTokenPool.setRebalancer(STRANGER);
+    assertEq(address(s_lockReleaseTokenPool.getRebalancer()), STRANGER);
+  }
+
+  function testSetRebalancerReverts() public {
+    vm.startPrank(STRANGER);
+
+    vm.expectRevert("Only callable by owner");
+    s_lockReleaseTokenPool.setRebalancer(STRANGER);
+  }
+}
+
 contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
   error SenderNotAllowed(address sender);
 
@@ -235,6 +250,13 @@ contract LockReleaseTokenPool_provideLiquidity is LockReleaseTokenPoolSetup {
 
   // Reverts
 
+  function test_UnauthorizedReverts() public {
+    vm.startPrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.Unauthorized.selector, STRANGER));
+
+    s_lockReleaseTokenPool.provideLiquidity(1);
+  }
+
   function testFuzz_ExceedsAllowance(uint256 amount) public {
     vm.assume(amount > 0);
     vm.expectRevert("ERC20: insufficient allowance");
@@ -267,6 +289,14 @@ contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
   }
 
   // Reverts
+
+  function test_UnauthorizedReverts() public {
+    vm.startPrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.Unauthorized.selector, STRANGER));
+
+    s_lockReleaseTokenPool.withdrawLiquidity(1);
+  }
+
   function testInsufficientLiquidityReverts() public {
     uint256 maxUint256 = 2 ** 256 - 1;
     s_token.approve(address(s_lockReleaseTokenPool), maxUint256);

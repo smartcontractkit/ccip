@@ -22,6 +22,13 @@ contract TokenPoolSetup is RouterSetup {
 }
 
 contract TokenPool_constructor is TokenPoolSetup {
+  function test_immutableFieldsSuccess() public {
+    assertEq(address(s_token), address(s_tokenPool.getToken()));
+    assertEq(address(s_mockARM), s_tokenPool.getArmProxy());
+    assertEq(false, s_tokenPool.getAllowListEnabled());
+    assertEq(address(s_sourceRouter), s_tokenPool.getRouter());
+  }
+
   // Reverts
   function testZeroAddressNotAllowedReverts() public {
     vm.expectRevert(TokenPool.ZeroAddressNotAllowed.selector);
@@ -39,16 +46,12 @@ contract TokenPool_applyRampUpdates is TokenPoolSetup {
   event ChainAdded(uint64 chainSelector, RateLimiter.Config rateLimiterConfig);
   event ChainRemoved(uint64 chainSelector);
 
-  function chainSelectorsFromUpdates(TokenPool.ChainUpdate[] memory updates) public pure returns (uint64[] memory) {
-    uint64[] memory chainSelectors = new uint64[](updates.length);
-    for (uint256 i = 0; i < updates.length; i++) {
-      chainSelectors[i] = updates[i].chainSelector;
-    }
-    return chainSelectors;
-  }
-
   function assertState(TokenPool.ChainUpdate[] memory chainUpdates) public {
-    //assertEq(s_tokenPool.getSupportedChains(), chainSelectorsFromUpdates(chainUpdates));
+    uint64[] memory chainSelectors = s_tokenPool.getSupportedChains();
+    for (uint256 i = 0; i < chainUpdates.length; i++) {
+      assertEq(chainUpdates[i].chainSelector, chainSelectors[i]);
+    }
+
     for (uint256 i = 0; i < chainUpdates.length; ++i) {
       assertTrue(s_tokenPool.isSupportedChain(chainUpdates[i].chainSelector));
       RateLimiter.TokenBucket memory bkt = s_tokenPool.currentOutboundRateLimiterState(chainUpdates[i].chainSelector);

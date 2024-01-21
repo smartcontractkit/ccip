@@ -22,7 +22,7 @@ contract BurnMintSetup is RouterSetup {
     s_burnMintERC677 = new BurnMintERC677("Chainlink Token", "LINK", 18, 0);
   }
 
-  function applyRampUpdates(address pool) internal {
+  function _applyRampUpdates(address pool) internal {
     TokenPool.ChainUpdate[] memory chains = new TokenPool.ChainUpdate[](1);
     chains[0] = TokenPool.ChainUpdate({
       chainSelector: DEST_CHAIN_ID,

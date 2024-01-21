@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 import {Internal} from "../../libraries/Internal.sol";
 import {TokenSetup} from "../TokenSetup.t.sol";
-import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 
 contract PriceRegistrySetup is TokenSetup {
