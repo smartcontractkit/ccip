@@ -460,4 +460,12 @@ contract TokenPoolWithAllowList_applyAllowListUpdates is TokenPoolWithAllowListS
     address[] memory newAddresses = new address[](2);
     s_tokenPool.applyAllowListUpdates(new address[](0), newAddresses);
   }
+
+  function test_AllowListNotEnabledReverts() public {
+    s_tokenPool = new TokenPoolHelper(s_token, new address[](0), address(s_mockARM), address(s_sourceRouter));
+
+    vm.expectRevert(TokenPool.AllowListNotEnabled.selector);
+
+    s_tokenPool.applyAllowListUpdates(new address[](0), new address[](2));
+  }
 }
