@@ -724,7 +724,7 @@ tokenPricesConfig = "this is not a proper dynamic price config"
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.Error(t, err)
-				require.ErrorContains(t, err, "invalid token prices config")
+				require.ErrorContains(t, err, "invalid JSON formatting of token prices config")
 			},
 		},
 		{
