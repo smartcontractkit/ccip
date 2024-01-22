@@ -2,6 +2,7 @@ package ccipexec
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -36,7 +37,6 @@ func getProofData(
 
 func buildExecutionReportForMessages(
 	msgsInRoot []ccipdata.Event[internal.EVM2EVMMessage],
-	leaves [][32]byte,
 	tree *merklemulti.Tree[[32]byte],
 	commitInterval ccipdata.CommitStoreInterval,
 	observedMessages []ccip.ObservedMessage,
@@ -50,6 +50,11 @@ func buildExecutionReportForMessages(
 			continue
 		}
 		innerIdx := int(observedMessage.SeqNr - commitInterval.Min)
+		if innerIdx >= len(msgsInRoot) || innerIdx < 0 {
+			return ccipdata.ExecReport{}, fmt.Errorf("invalid inneridx SeqNr=%d IntervalMin=%d msgsInRoot=%d",
+				observedMessage.SeqNr, commitInterval.Min, len(msgsInRoot))
+		}
+
 		messages = append(messages, msgsInRoot[innerIdx].Data)
 		offchainTokenData = append(offchainTokenData, observedMessage.TokenData)
 		innerIdxs = append(innerIdxs, innerIdx)
