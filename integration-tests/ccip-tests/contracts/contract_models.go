@@ -61,6 +61,14 @@ func (token *ERC20Token) BalanceOf(ctx context.Context, addr string) (*big.Int, 
 	return balance, nil
 }
 
+func (token *ERC20Token) Allowance(owner, spender string) (*big.Int, error) {
+	allowance, err := token.instance.Allowance(nil, common.HexToAddress(owner), common.HexToAddress(spender))
+	if err != nil {
+		return nil, err
+	}
+	return allowance, nil
+}
+
 func (token *ERC20Token) Approve(to string, amount *big.Int) error {
 	opts, err := token.client.TransactionOpts(token.client.GetDefaultWallet())
 	if err != nil {
@@ -120,6 +128,14 @@ func (l *LinkToken) BalanceOf(ctx context.Context, addr string) (*big.Int, error
 		return nil, err
 	}
 	return balance, nil
+}
+
+func (l *LinkToken) Allowance(owner, spender string) (*big.Int, error) {
+	allowance, err := l.instance.Allowance(nil, common.HexToAddress(owner), common.HexToAddress(spender))
+	if err != nil {
+		return nil, err
+	}
+	return allowance, nil
 }
 
 func (l *LinkToken) Approve(to string, amount *big.Int) error {
@@ -212,7 +228,7 @@ func (pool *LockReleaseTokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAd
 	if err != nil {
 		return err
 	}
-	_, err = pool.Instance.SetLiquidityManager(opts, opts.From)
+	_, err = pool.Instance.SetRebalancer(opts, opts.From)
 	if err != nil {
 		return err
 	}
