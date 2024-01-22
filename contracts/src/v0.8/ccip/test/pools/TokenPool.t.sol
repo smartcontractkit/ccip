@@ -151,9 +151,13 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
   }
 }
 
-contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
+contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
   event ConfigChanged(RateLimiter.Config);
-  event ChainConfigured(uint64 chainSelector, RateLimiter.Config);
+  event ChainConfigured(
+    uint64 chainSelector,
+    RateLimiter.Config outboundRateLimiterConfig,
+    RateLimiter.Config inboundRateLimiterConfig
+  );
 
   uint64 internal s_remoteChainSelector;
 
@@ -172,25 +176,41 @@ contract TokenPool_setOnRampRateLimiterConfig is TokenPoolSetup {
 
   function testFuzz_SetRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
     // Bucket updates only work on increasing time
-    vm.assume(newTime >= block.timestamp);
+    newTime = uint32(bound(newTime, block.timestamp + 1, type(uint32).max));
     vm.warp(newTime);
 
-    uint256 oldTokens = s_tokenPool.getCurrentOutboundRateLimiterState(s_remoteChainSelector).tokens;
+    uint256 oldOutboundTokens = s_tokenPool.getCurrentOutboundRateLimiterState(s_remoteChainSelector).tokens;
+    uint256 oldInboundTokens = s_tokenPool.getCurrentInboundRateLimiterState(s_remoteChainSelector).tokens;
 
-    RateLimiter.Config memory newConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
+    RateLimiter.Config memory newOutboundConfig = RateLimiter.Config({isEnabled: true, capacity: capacity, rate: rate});
+    RateLimiter.Config memory newInboundConfig = RateLimiter.Config({
+      isEnabled: true,
+      capacity: capacity / 2,
+      rate: rate / 2
+    });
 
     vm.expectEmit();
-    emit ConfigChanged(newConfig);
+    emit ConfigChanged(newOutboundConfig);
     vm.expectEmit();
-    emit ChainConfigured(s_remoteChainSelector, newConfig);
+    emit ConfigChanged(newInboundConfig);
+    vm.expectEmit();
+    emit ChainConfigured(s_remoteChainSelector, newOutboundConfig, newInboundConfig);
 
-    s_tokenPool.setChainRateLimiterConfig(s_remoteChainSelector, newConfig, newConfig);
+    s_tokenPool.setChainRateLimiterConfig(s_remoteChainSelector, newOutboundConfig, newInboundConfig);
 
-    uint256 expectedTokens = RateLimiter._min(newConfig.capacity, oldTokens);
+    uint256 expectedTokens = RateLimiter._min(newOutboundConfig.capacity, oldOutboundTokens);
 
     RateLimiter.TokenBucket memory bucket = s_tokenPool.getCurrentOutboundRateLimiterState(s_remoteChainSelector);
-    assertEq(bucket.capacity, newConfig.capacity);
-    assertEq(bucket.rate, newConfig.rate);
+    assertEq(bucket.capacity, newOutboundConfig.capacity);
+    assertEq(bucket.rate, newOutboundConfig.rate);
+    assertEq(bucket.tokens, expectedTokens);
+    assertEq(bucket.lastUpdated, newTime);
+
+    expectedTokens = RateLimiter._min(newInboundConfig.capacity, oldInboundTokens);
+
+    bucket = s_tokenPool.getCurrentInboundRateLimiterState(s_remoteChainSelector);
+    assertEq(bucket.capacity, newInboundConfig.capacity);
+    assertEq(bucket.rate, newInboundConfig.rate);
     assertEq(bucket.tokens, expectedTokens);
     assertEq(bucket.lastUpdated, newTime);
   }

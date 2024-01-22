@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import {IPool} from "../interfaces/pools/IPool.sol";
 import {IARM} from "../interfaces/IARM.sol";
+import {IRouter} from "../interfaces/IRouter.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
@@ -10,7 +11,6 @@ import {RateLimiter} from "../libraries/RateLimiter.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/structs/EnumerableSet.sol";
-import {Router} from "../Router.sol";
 
 /// @notice Base abstract class with common functions for all token pools.
 /// A token pool serves as isolated place for holding tokens and token specific logic
@@ -59,7 +59,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @dev The address of the arm proxy
   address internal immutable i_armProxy;
   /// @dev The address of the router
-  Router internal immutable i_router;
+  IRouter internal immutable i_router;
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
@@ -84,7 +84,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     if (address(token) == address(0) || router == address(0)) revert ZeroAddressNotAllowed();
     i_token = token;
     i_armProxy = armProxy;
-    i_router = Router(router);
+    i_router = IRouter(router);
 
     // Pool can be set as permissioned or permissionless at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;
