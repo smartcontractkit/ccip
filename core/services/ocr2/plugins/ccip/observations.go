@@ -2,8 +2,9 @@ package ccip
 
 import (
 	"encoding/json"
-	"github.com/smartcontractkit/libocr/commontypes"
 	"math/big"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
