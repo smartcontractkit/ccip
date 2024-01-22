@@ -2241,7 +2241,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 					"price": "%s"
 			 	}`,
 		lane.Dest.Common.WrappedNative.Hex(), lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
-	sb.WriteString("\n}")
+	sb.WriteString("\t\n}\n}")
 
 	//tokenPricesConfigJson := `
 	//	{
