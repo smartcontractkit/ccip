@@ -29,7 +29,7 @@ type Plugin struct {
 	liquidityGraph          liquiditygraph.LiquidityGraph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	pendingTransfers        *PendingTransfersCache
-	bridgeContainer         *bridge.Container
+	bridgeContainer         bridge.Container
 	lggr                    logger.Logger
 }
 
@@ -41,7 +41,7 @@ func NewPlugin(
 	liquidityManagerFactory liquiditymanager.Factory,
 	liquidityGraph liquiditygraph.LiquidityGraph,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
-	bridgeContainer *bridge.Container,
+	bridgeContainer bridge.Container,
 	lggr logger.Logger,
 ) *Plugin {
 

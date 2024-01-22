@@ -35,7 +35,7 @@ type RebalancerProvider interface {
 	commontypes.Plugin
 	ContractTransmitterOCR3() ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata]
 	LiquidityManagerFactory() liquiditymanager.Factory
-	BridgeContainer() *bridge.Container
+	BridgeContainer() bridge.Container
 }
 
 type RebalancerRelayer interface {
@@ -131,8 +131,9 @@ func (r *rebalancerRelayer) NewRebalancerProvider(rargs commontypes.RelayArgs, p
 	}, nil
 }
 
-func (r *rebalancerRelayer) initBridgeContainer() (*bridge.Container, error) {
+func (r *rebalancerRelayer) initBridgeContainer() (*bridge.BaseContainer, error) {
 	const (
+		// todo: use chain-selectors
 		ethSelector = 5009297550715157269
 		opSelector  = 3734403246176062136
 	)
@@ -153,20 +154,14 @@ func (r *rebalancerRelayer) initBridgeContainer() (*bridge.Container, error) {
 }
 
 func (r *rebalancerRelayer) initEthereumToOptimismBridge() (*bridge.EthereumToOptimism, error) {
-	const (
-		opL2Bridge = "0x4200000000000000000000000000000000000010"
-		opChainID  = "10"
-	)
+	const optimismChainID = "10" // todo: get from chain selectors
 
-	opChain, err := r.chains.Get(opChainID)
+	opChain, err := r.chains.Get(optimismChainID)
 	if err != nil {
 		return nil, fmt.Errorf("get optimism chain: %w", err)
 	}
 
-	return bridge.NewEthereumToOptimism(
-		opChain.LogPoller(),
-		common.HexToAddress(opL2Bridge),
-	)
+	return bridge.NewEthereumToOptimism(opChain.LogPoller(), bridge.OptimismL2Address)
 }
 
 var _ RebalancerProvider = (*rebalancerProvider)(nil)
@@ -175,7 +170,7 @@ type rebalancerProvider struct {
 	*configWatcher
 	contractTransmitter ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata]
 	lmFactory           liquiditymanager.Factory
-	bridgeContainer     *bridge.Container
+	bridgeContainer     bridge.Container
 }
 
 // ChainReader implements RebalancerProvider.
@@ -196,7 +191,7 @@ func (r *rebalancerProvider) LiquidityManagerFactory() liquiditymanager.Factory 
 	return r.lmFactory
 }
 
-func (r *rebalancerProvider) BridgeContainer() *bridge.Container {
+func (r *rebalancerProvider) BridgeContainer() bridge.Container {
 	return r.bridgeContainer
 }
 

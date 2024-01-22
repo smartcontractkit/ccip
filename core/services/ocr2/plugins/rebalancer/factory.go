@@ -23,11 +23,11 @@ type PluginFactory struct {
 	lggr            logger.Logger
 	config          models.PluginConfig
 	lmFactory       liquiditymanager.Factory
-	bridgeContainer *bridge.Container
+	bridgeContainer bridge.Container
 }
 
 func NewPluginFactory(lggr logger.Logger, pluginConfigBytes []byte,
-	lmFactory liquiditymanager.Factory, bridgeContainer *bridge.Container) (*PluginFactory, error) {
+	lmFactory liquiditymanager.Factory, bridgeContainer bridge.Container) (*PluginFactory, error) {
 	var pluginConfig models.PluginConfig
 	if err := json.Unmarshal(pluginConfigBytes, &pluginConfig); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal plugin config: %w", err)

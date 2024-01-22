@@ -144,7 +144,7 @@ func (_m *Rebalancer) GetBalance(ctx context.Context) (*big.Int, error) {
 }
 
 // GetPendingTransfers provides a mock function with given fields: ctx, bridgeContainer, since
-func (_m *Rebalancer) GetPendingTransfers(ctx context.Context, bridgeContainer *bridge.Container, since time.Time) ([]models.PendingTransfer, error) {
+func (_m *Rebalancer) GetPendingTransfers(ctx context.Context, bridgeContainer bridge.Container, since time.Time) ([]models.PendingTransfer, error) {
 	ret := _m.Called(ctx, bridgeContainer, since)
 
 	if len(ret) == 0 {
@@ -153,10 +153,10 @@ func (_m *Rebalancer) GetPendingTransfers(ctx context.Context, bridgeContainer *
 
 	var r0 []models.PendingTransfer
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *bridge.Container, time.Time) ([]models.PendingTransfer, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, bridge.Container, time.Time) ([]models.PendingTransfer, error)); ok {
 		return rf(ctx, bridgeContainer, since)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *bridge.Container, time.Time) []models.PendingTransfer); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, bridge.Container, time.Time) []models.PendingTransfer); ok {
 		r0 = rf(ctx, bridgeContainer, since)
 	} else {
 		if ret.Get(0) != nil {
@@ -164,7 +164,7 @@ func (_m *Rebalancer) GetPendingTransfers(ctx context.Context, bridgeContainer *
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *bridge.Container, time.Time) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, bridge.Container, time.Time) error); ok {
 		r1 = rf(ctx, bridgeContainer, since)
 	} else {
 		r1 = ret.Error(1)

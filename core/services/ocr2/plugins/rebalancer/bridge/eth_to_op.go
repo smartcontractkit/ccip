@@ -23,6 +23,7 @@ const (
 var (
 	OptimismL2Abi                abi.ABI
 	ERC20BridgeFinalizedEventSig common.Hash
+	OptimismL2Address            = common.HexToAddress("0x4200000000000000000000000000000000000010")
 )
 
 func init() {

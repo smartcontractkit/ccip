@@ -80,7 +80,7 @@ func (e *EvmRebalancer) GetBalance(ctx context.Context) (*big.Int, error) {
 	return e.client.GetLiquidity(ctx)
 }
 
-func (e *EvmRebalancer) GetPendingTransfers(ctx context.Context, bridgeContainer *bridge.Container, since time.Time) ([]models.PendingTransfer, error) {
+func (e *EvmRebalancer) GetPendingTransfers(ctx context.Context, bridgeContainer bridge.Container, since time.Time) ([]models.PendingTransfer, error) {
 	logs, err := e.lp.LogsCreatedAfter(
 		e.lmAbi.Events["LiquidityTransferred"].ID,
 		e.addr,

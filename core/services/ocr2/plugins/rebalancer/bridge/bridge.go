@@ -16,24 +16,28 @@ type Bridge interface {
 	// todo: figure out where to call Close()
 }
 
-type Container struct {
+type Container interface {
+	GetBridge(source, dest models.NetworkSelector) (Bridge, bool)
+}
+
+type BaseContainer struct {
 	bridges map[models.NetworkSelector]map[models.NetworkSelector]Bridge
 }
 
-func NewContainer() *Container {
-	return &Container{
+func NewContainer() *BaseContainer {
+	return &BaseContainer{
 		bridges: make(map[models.NetworkSelector]map[models.NetworkSelector]Bridge),
 	}
 }
 
-func (c *Container) AddBridge(b Bridge, source, dest models.NetworkSelector) {
+func (c *BaseContainer) AddBridge(b Bridge, source, dest models.NetworkSelector) {
 	if _, exists := c.bridges[source]; !exists {
 		c.bridges[source] = make(map[models.NetworkSelector]Bridge)
 	}
 	c.bridges[source][dest] = b
 }
 
-func (c *Container) GetBridge(source, dest models.NetworkSelector) (Bridge, bool) {
+func (c *BaseContainer) GetBridge(source, dest models.NetworkSelector) (Bridge, bool) {
 	if _, exists := c.bridges[source]; !exists {
 		return nil, false
 	}

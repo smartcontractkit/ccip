@@ -23,7 +23,7 @@ type Rebalancer interface {
 	GetBalance(ctx context.Context) (*big.Int, error)
 
 	// GetPendingTransfers returns the pending liquidity transfers.
-	GetPendingTransfers(ctx context.Context, bridgeContainer *bridge.Container, since time.Time) ([]models.PendingTransfer, error)
+	GetPendingTransfers(ctx context.Context, bridgeContainer bridge.Container, since time.Time) ([]models.PendingTransfer, error)
 
 	// Discover discovers other rebalancers
 	Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error)
