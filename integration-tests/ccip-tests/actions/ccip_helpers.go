@@ -2210,7 +2210,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	// Build a dynamic price getter configuration (only with static prices for now).
 	var sb strings.Builder
 	sb.WriteString("{\n")
-	sb.WriteString("\"aggregatorPrices\": {},")
+	sb.WriteString("\"aggregatorPrices\": {},\n")
 	sb.WriteString("\"staticPrices\": {")
 
 	// add bridge token prices.
@@ -2218,7 +2218,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		sb.WriteString(fmt.Sprintf(`
 				"%s": {
 					"chainID": %d,
-					"price": %s
+					"price": "%s"
 			 	},`,
 			tk.ContractAddress, lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
 	}
@@ -2226,22 +2226,22 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	sb.WriteString(fmt.Sprintf(`
 				"%s": {
 					"chainID": %d,
-					"price": %s
+					"price": "%s"
 			 	},`,
 		lane.Dest.Common.FeeToken.Address(), lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
 	sb.WriteString(fmt.Sprintf(`
 				"%s": {
 					"chainID": %d,
-					"price": %s
+					"price": "%s"
 			 	},`,
 		lane.Source.Common.WrappedNative.Hex(), lane.SourceChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
 	sb.WriteString(fmt.Sprintf(`
 				"%s": {
 					"chainID": %d,
-					"price": %s
+					"price": "%s"
 			 	}`,
 		lane.Dest.Common.WrappedNative.Hex(), lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
-	sb.WriteString("}")
+	sb.WriteString("\n}")
 
 	//tokenPricesConfigJson := `
 	//	{

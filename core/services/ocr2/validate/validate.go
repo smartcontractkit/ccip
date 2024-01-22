@@ -316,7 +316,7 @@ func validateOCR2CCIPCommitSpec(jsonConfig job.JSONConfig) error {
 		return pkgerrors.New("tokenPricesConfig is empty")
 	}
 	if !json.Valid([]byte(cfg.TokenPricesConfig)) {
-		return pkgerrors.New("invalid token prices config")
+		return pkgerrors.New("invalid JSON formatting of token prices config")
 	}
 	// TODO proper validation of the JSON struct.
 	//_, err = pipeline.Parse(cfg.TokenPricesConfigUSDPipeline)
