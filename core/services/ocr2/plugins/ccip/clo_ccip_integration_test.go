@@ -62,7 +62,7 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	fmt.Printf("=> CHECK round: %s\n", tmp.RoundId.String())
 	fmt.Printf("=> CHECK answer: %s\n", tmp.Answer.String())
 
-	tokenPricesConfig := pricegetter.DynamicPriceGetterConfig{
+	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
 			srcLinkAddr: {
 				ChainID:         ccipTH.Source.ChainID,
@@ -89,17 +89,16 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 		//	},
 		//},
 	}
-	tokenPricesConfigBytes, err := json.MarshalIndent(tokenPricesConfig, "", " ")
-	//tokenPricesConfigBytes, err := json.Marshal(tokenPricesConfig)
+	priceGetterConfigBytes, err := json.MarshalIndent(priceGetterConfig, "", " ")
 	require.NoError(t, err)
-	tokenPricesConfigJson := string(tokenPricesConfigBytes)
-	fmt.Printf("Token prices config:\n%s\n", tokenPricesConfigJson)
+	priceGetterConfigJson := string(priceGetterConfigBytes)
+	fmt.Printf("Price getter config:\n%s\n", priceGetterConfigJson)
 
-	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesConfigJson, "http://blah.com")
+	jobParams := ccipTH.SetUpNodesAndJobs(t, priceGetterConfigJson, "http://blah.com")
 	ccipTH.SetupFeedsManager(t)
 
 	// Propose and approve new specs
-	ccipTH.ApproveJobSpecs(t, jobParams, tokenPricesConfigJson)
+	ccipTH.ApproveJobSpecs(t, jobParams, priceGetterConfigJson)
 	// TODO generate one more run with propose & approve
 	// ccipTH.ApproveJobSpecs(t, jobParams)
 

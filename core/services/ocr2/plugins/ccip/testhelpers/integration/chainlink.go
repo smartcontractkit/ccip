@@ -121,7 +121,7 @@ const (
 		[pluginConfig]
 		destStartBlock = 50
 		offRamp = "%s"
-		tokenPricesConfig = """
+		priceGetterConfig = """
 		%s
 		"""
 	`
@@ -605,7 +605,7 @@ func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams, tokenPricesConfigJson string) {
+func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams, priceGetterConfigJson string) {
 	ctx := testutils.Context(t)
 
 	for _, node := range c.Nodes {
@@ -640,7 +640,7 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 			node.KeyBundle.ID(),
 			node.Transmitter.Hex(),
 			jobParams.OffRamp.String(),
-			tokenPricesConfigJson,
+			priceGetterConfigJson,
 		)
 
 		commitId, err := f.ProposeJob(ctx, &commitSpec)
@@ -886,13 +886,13 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 	return bootstrapNode, nodes, configBlock
 }
 
-func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, tokenPricesConfig string, usdcAttestationAPI string) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, priceGetterConfig string, usdcAttestationAPI string) CCIPJobSpecParams {
 	// setup Jobs
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
 	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, int64(freeport.GetOne(t)))
 
-	jobParams := c.NewCCIPJobSpecParams(tokenPricesConfig, configBlock, usdcAttestationAPI)
+	jobParams := c.NewCCIPJobSpecParams(priceGetterConfig, configBlock, usdcAttestationAPI)
 
 	// Add the bootstrap job
 	c.Bootstrap.AddBootstrapJob(t, jobParams.BootstrapJob(c.Dest.CommitStore.Address().Hex()))

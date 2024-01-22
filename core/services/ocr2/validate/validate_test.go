@@ -688,7 +688,7 @@ chainID = 1337
 SourceStartBlock = 1
 DestStartBlock = 2
 offRamp = "0x1234567890123456789012345678901234567890"
-tokenPricesConfig = "{}"
+priceGetterConfig = "{}"
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.NoError(t, err)
@@ -696,7 +696,7 @@ tokenPricesConfig = "{}"
 					SourceStartBlock:  1,
 					DestStartBlock:    2,
 					OffRamp:           common.HexToAddress("0x1234567890123456789012345678901234567890"),
-					TokenPricesConfig: "{}",
+					PriceGetterConfig: "{}",
 				}
 				var cfg config.CommitPluginJobSpecConfig
 				err = json.Unmarshal(os.OCR2OracleSpec.PluginConfig.Bytes(), &cfg)
@@ -720,11 +720,11 @@ chainID = 1337
 SourceStartBlock = 1
 DestStartBlock = 2
 offRamp = "0x1234567890123456789012345678901234567890"
-tokenPricesConfig = "this is not a proper dynamic price config"
+priceGetterConfig = "this is not a proper dynamic price config"
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.Error(t, err)
-				require.ErrorContains(t, err, "invalid JSON formatting of token prices config")
+				require.ErrorContains(t, err, "invalid JSON formatting of priceGetterConfig")
 			},
 		},
 		{

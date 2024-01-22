@@ -48,7 +48,7 @@ func TestIntegration_CCIP(t *testing.T) {
 	require.NoError(t, err)
 	ccipTH.Dest.Chain.Commit()
 
-	tokenPricesConfig := pricegetter.DynamicPriceGetterConfig{
+	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
 			ccipTH.Source.LinkToken.Address(): {
 				ChainID:         ccipTH.Source.ChainID,
@@ -75,11 +75,11 @@ func TestIntegration_CCIP(t *testing.T) {
 		//	},
 		//},
 	}
-	tokenPricesConfigBytes, err := json.MarshalIndent(tokenPricesConfig, "", " ")
+	priceGetterConfigBytes, err := json.MarshalIndent(priceGetterConfig, "", " ")
 	require.NoError(t, err)
-	tokenPricesConfigJson := string(tokenPricesConfigBytes)
+	priceGetterConfigJson := string(priceGetterConfigBytes)
 
-	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesConfigJson, "")
+	jobParams := ccipTH.SetUpNodesAndJobs(t, priceGetterConfigJson, "")
 
 	currentSeqNum := 1
 
@@ -316,7 +316,7 @@ func TestIntegration_CCIP(t *testing.T) {
 		ccipTH.Dest.Chain.Commit()
 
 		// create new jobs
-		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesConfigJson, newConfigBlock, "")
+		jobParams = ccipTH.NewCCIPJobSpecParams(priceGetterConfigJson, newConfigBlock, "")
 		jobParams.Version = "v2"
 		jobParams.SourceStartBlock = srcStartBlock
 		ccipTH.AddAllJobs(t, jobParams)

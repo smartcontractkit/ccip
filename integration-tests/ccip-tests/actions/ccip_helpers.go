@@ -2248,7 +2248,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		lane.Dest.Common.WrappedNative.Hex(), lane.DestChain.GetChainID(), big.NewInt(time.Now().UnixNano()).String()))
 	sb.WriteString("\t\n}\n}")
 
-	//tokenPricesConfigJson := `
+	//priceGetterConfigJson := `
 	//	{
 	//		"aggregatorPrices": {
 	//		 "0x0820c05e1fba1244763a494a52272170c321cad3": {
@@ -2273,8 +2273,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	//	}
 	//	`
 
-	tokenPricesConfigJson := sb.String()
-	fmt.Printf("Price getter config:\n%s\n", tokenPricesConfigJson)
+	priceGetterConfig := sb.String()
+	fmt.Printf("Price getter config:\n%s\n", priceGetterConfig)
 
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
 		OffRamp:          lane.Dest.OffRamp.EthAddress,
@@ -2285,7 +2285,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		SourceStartBlock: lane.Source.SrcStartBlock,
 		// FIXME
 		//TokenPricesUSDPipeline: TokenFeeForMultipleTokenAddr(tokensUSDUrl),
-		TokenPricesConfig: tokenPricesConfigJson,
+		PriceGetterConfig: priceGetterConfig,
 		DestStartBlock:    currentBlockOnDest,
 	}
 

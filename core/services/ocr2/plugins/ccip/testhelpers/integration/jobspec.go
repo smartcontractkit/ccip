@@ -162,7 +162,7 @@ type CCIPJobSpecParams struct {
 	SourceChainName    string
 	DestChainName      string
 	DestEvmChainId     uint64
-	TokenPricesConfig  string
+	PriceGetterConfig  string
 	SourceStartBlock   uint64
 	DestStartBlock     uint64
 	USDCAttestationAPI string
@@ -215,9 +215,9 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*OCR2TaskJobSpec, error) {
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
 			"offRamp": fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
-			"tokenPricesConfig": fmt.Sprintf(`"""
+			"priceGetterConfig": fmt.Sprintf(`"""
 %s
-"""`, params.TokenPricesConfig),
+"""`, params.PriceGetterConfig),
 		},
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestEvmChainId,
@@ -292,14 +292,14 @@ func (params CCIPJobSpecParams) BootstrapJob(contractID string) *OCR2TaskJobSpec
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesConfig string, configBlock int64, usdcAttestationAPI string) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(priceGetterConfig string, configBlock int64, usdcAttestationAPI string) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
 		CommitStore:        c.Dest.CommitStore.Address(),
 		OffRamp:            c.Dest.OffRamp.Address(),
 		DestEvmChainId:     c.Dest.ChainID,
 		SourceChainName:    "SimulatedSource",
 		DestChainName:      "SimulatedDest",
-		TokenPricesConfig:  tokenPricesConfig,
+		PriceGetterConfig:  priceGetterConfig,
 		DestStartBlock:     uint64(configBlock),
 		USDCAttestationAPI: usdcAttestationAPI,
 	}

@@ -120,7 +120,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
-	//pipelinePriceGetter, err := pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesConfig, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+	//pipelinePriceGetter, err := pricegetter.NewPipelineGetter(params.pluginConfig.PriceGetterConfig, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 	//if err != nil {
 	//	return nil, nil, err
 	//}
@@ -143,7 +143,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		params.destChain.ID().Uint64():   dstCaller,
 	}
 	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{}
-	err = json.Unmarshal([]byte(params.pluginConfig.TokenPricesConfig), &priceGetterConfig)
+	err = json.Unmarshal([]byte(params.pluginConfig.PriceGetterConfig), &priceGetterConfig)
 	if err != nil {
 		return nil, nil, err
 	}

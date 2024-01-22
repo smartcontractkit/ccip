@@ -312,11 +312,11 @@ func validateOCR2CCIPCommitSpec(jsonConfig job.JSONConfig) error {
 		return pkgerrors.Wrap(err, "error while unmarshalling plugin config")
 	}
 	// Validate prices config (like it was done for the pipeline).
-	if cfg.TokenPricesConfig == "" {
-		return pkgerrors.New("tokenPricesConfig is empty")
+	if cfg.PriceGetterConfig == "" {
+		return pkgerrors.New("priceGetterConfig is empty")
 	}
-	if !json.Valid([]byte(cfg.TokenPricesConfig)) {
-		return pkgerrors.New("invalid JSON formatting of token prices config")
+	if !json.Valid([]byte(cfg.PriceGetterConfig)) {
+		return pkgerrors.New("invalid JSON formatting of priceGetterConfig")
 	}
 	// TODO proper validation of the JSON struct.
 	//_, err = pipeline.Parse(cfg.TokenPricesConfigUSDPipeline)

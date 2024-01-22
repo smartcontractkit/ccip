@@ -17,7 +17,7 @@ func TestCommitConfig(t *testing.T) {
 		SourceStartBlock: 222,
 		DestStartBlock:   333,
 		OffRamp:          common.HexToAddress("0x123"),
-		TokenPricesConfig: `
+		PriceGetterConfig: `
 		{
 			"aggregatorPrices": {
 			 "0x0820c05e1fba1244763a494a52272170c321cad3": {
@@ -52,10 +52,9 @@ func TestCommitConfig(t *testing.T) {
 	require.Equal(t, exampleConfig, parsedConfig)
 
 	// Also ensure correctness of price getter configuration.
-	jsonPriceGetterConfig := []byte(exampleConfig.TokenPricesConfig)
+	jsonPriceGetterConfig := []byte(exampleConfig.PriceGetterConfig)
 	require.True(t, json.Valid(jsonPriceGetterConfig))
 	parsedPriceGetterConfig := pricegetter.DynamicPriceGetterConfig{}
-	//fmt.Printf("jsonPriceGetterConfig:\n%s\n", jsonPriceGetterConfig)
 	require.NoError(t, json.Unmarshal(jsonPriceGetterConfig, &parsedPriceGetterConfig))
 }
 
