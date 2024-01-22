@@ -11,3 +11,6 @@ package rebalancer
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/NoOpOCR3/NoOpOCR3.abi ../../../contracts/solc/v0.8.19/NoOpOCR3/NoOpOCR3.bin NoOpOCR3 no_op_ocr3
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/MockBridgeAdapter/MockL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/MockBridgeAdapter/MockL2BridgeAdapter.bin MockL2BridgeAdapter mock_l2_bridge_adapter
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/RebalancerReportEncoder/RebalancerReportEncoder.abi ../../../contracts/solc/v0.8.19/RebalancerReportEncoder/RebalancerReportEncoder.bin RebalancerReportEncoder rebalancer_report_encoder
+
+// Bridge helper gethwrappers
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/OpL2StandardBridge/OpL2StandardBridge.abi ../../../contracts/solc/v0.8.19/OpL2StandardBridge/OpL2StandardBridge.bin OpL2StandardBridge op_l2_standard_bridge

@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/optimism_l2"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/op_l2_standard_bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -26,7 +26,7 @@ var (
 )
 
 func init() {
-	abiL2, err := abi.JSON(strings.NewReader(optimism_l2.OptimismL2ABI))
+	abiL2, err := abi.JSON(strings.NewReader(op_l2_standard_bridge.OpL2StandardBridgeABI))
 	if err != nil {
 		panic(fmt.Errorf("parse op l2 bridge abi: %w", err))
 	}
@@ -89,13 +89,13 @@ func (e *EthereumToOptimism) PopulateStatusOfTransfers(
 		return nil, fmt.Errorf("get lp logs: %w", err)
 	}
 
-	opL2Filterer, err := optimism_l2.NewOptimismL2Filterer(e.bridgeAddr, nil)
+	opL2Filterer, err := op_l2_standard_bridge.NewOpL2StandardBridgeFilterer(e.bridgeAddr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new optimism l2 filterer: %w", err)
 	}
 
-	events, err := parseLogs[optimism_l2.OptimismL2ERC20BridgeFinalized](logs,
-		func(log types.Log) (*optimism_l2.OptimismL2ERC20BridgeFinalized, error) {
+	events, err := parseLogs[op_l2_standard_bridge.OpL2StandardBridgeERC20BridgeFinalized](logs,
+		func(log types.Log) (*op_l2_standard_bridge.OpL2StandardBridgeERC20BridgeFinalized, error) {
 			return opL2Filterer.ParseERC20BridgeFinalized(log)
 		})
 	if err != nil {

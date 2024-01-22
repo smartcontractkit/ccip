@@ -41,3 +41,6 @@ compileContract rebalancer/bridge-adapters/OptimismL2BridgeAdapter.sol
 compileContract rebalancer/test/mocks/NoOpOCR3.sol
 compileContract rebalancer/test/mocks/MockBridgeAdapter.sol
 compileContract rebalancer/test/helpers/RebalancerReportEncoder.sol
+
+# Gethwrapper helpers
+compileContract rebalancer/bridgewrappers/optimism/OpL2StandardBridge.sol
