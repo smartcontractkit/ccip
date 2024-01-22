@@ -13,8 +13,7 @@ type PluginConfig struct {
 	LiquidityManagerNetwork NetworkSelector             `json:"liquidityManagerNetwork"`
 	ClosePluginTimeoutSec   int                         `json:"closePluginTimeoutSec"`
 	RebalancerConfig        RebalancerConfig            `json:"rebalancerConfig"`
-	TokenAddresses          map[NetworkSelector]Address `json:"tokenAddresses"`
-	BridgeConfig            BridgeConfig                `json:"bridgeConfig"`
+	TokenAddresses          map[NetworkSelector]Address `json:"tokenAddresses"` // todo: fetch during discovery
 }
 
 type RebalancerConfig struct {
@@ -25,12 +24,6 @@ type RebalancerConfig struct {
 type RandomRebalancerConfig struct {
 	MaxNumTransfers      int  `json:"maxNumTransfers"`
 	CheckSourceDestEqual bool `json:"checkSourceDestEqual"`
-}
-
-type BridgeConfig struct {
-	OptimismStandard struct {
-		L2Address Address `json:"l2Address"`
-	} `json:"optimismStandard"`
 }
 
 func ValidateRebalancerConfig(config RebalancerConfig) error {
