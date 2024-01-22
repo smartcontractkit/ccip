@@ -98,7 +98,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       }),
       generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
-      rateLimiterConfig(),
+      getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
       getNopsAndWeights()
@@ -113,7 +113,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       chainSelector: DEST_CHAIN_ID,
       allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     LockReleaseTokenPool(address(s_sourcePools[0])).applyChainUpdates(chainUpdates);

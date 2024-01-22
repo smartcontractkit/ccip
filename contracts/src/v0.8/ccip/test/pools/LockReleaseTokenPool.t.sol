@@ -47,7 +47,8 @@ contract LockReleaseTokenPoolSetup is RouterSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       chainSelector: DEST_CHAIN_ID,
       allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     s_lockReleaseTokenPool.applyChainUpdates(chainUpdate);
@@ -84,7 +85,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
   event TokensConsumed(uint256 tokens);
 
   function testFuzz_LockOrBurnNoAllowListSuccess(uint256 amount) public {
-    amount = bound(amount, 1, rateLimiterConfig().capacity);
+    amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     changePrank(s_allowedOnRamp);
 
     vm.expectEmit();
@@ -144,7 +145,8 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       chainSelector: SOURCE_CHAIN_ID,
       allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     s_lockReleaseTokenPool.applyChainUpdates(chainUpdate);
@@ -175,7 +177,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     deal(address(s_token), address(s_lockReleaseTokenPool), amount);
     vm.startPrank(s_allowedOffRamp);
 
-    uint256 capacity = rateLimiterConfig().capacity;
+    uint256 capacity = getInboundRateLimiterConfig().capacity;
     // Determine if we hit the rate limit or the txs should succeed.
     if (amount > capacity) {
       vm.expectRevert(
@@ -200,7 +202,8 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       chainSelector: SOURCE_CHAIN_ID,
       allowed: false,
-      rateLimiterConfig: rateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     s_lockReleaseTokenPool.applyChainUpdates(chainUpdate);

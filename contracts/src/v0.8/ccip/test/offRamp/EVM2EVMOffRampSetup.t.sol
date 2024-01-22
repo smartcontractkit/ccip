@@ -52,7 +52,8 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     offRamps[0] = TokenPool.ChainUpdate({
       chainSelector: SOURCE_CHAIN_ID,
       allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     LockReleaseTokenPool(address(s_destPools[0])).applyChainUpdates(offRamps);
@@ -71,7 +72,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
       }),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
-      rateLimiterConfig()
+      getInboundRateLimiterConfig()
     );
     s_offRamp.setOCR2Config(
       s_valid_signers,

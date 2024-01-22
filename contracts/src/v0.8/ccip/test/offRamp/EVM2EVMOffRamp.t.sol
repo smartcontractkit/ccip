@@ -39,7 +39,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       emit PoolAdded(address(sourceTokens[i]), address(castedPools[i]));
     }
 
-    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, sourceTokens, castedPools, rateLimiterConfig());
+    s_offRamp = new EVM2EVMOffRampHelper(staticConfig, sourceTokens, castedPools, getInboundRateLimiterConfig());
 
     s_offRamp.setOCR2Config(
       s_valid_signers,
@@ -96,7 +96,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       }),
       wrongTokens,
       pools,
-      rateLimiterConfig()
+      getInboundRateLimiterConfig()
     );
   }
 
@@ -146,7 +146,7 @@ contract EVM2EVMOffRamp_constructor is EVM2EVMOffRampSetup {
       }),
       getCastedSourceTokens(),
       getCastedDestinationPools(),
-      rateLimiterConfig()
+      getInboundRateLimiterConfig()
     );
   }
 }

@@ -15,7 +15,7 @@ contract BurnMintTokenPoolSetup is BurnMintSetup {
     s_pool = new BurnMintTokenPool(s_burnMintERC677, new address[](0), address(s_mockARM), address(s_sourceRouter));
     s_burnMintERC677.grantMintAndBurnRoles(address(s_pool));
 
-    _applyRampUpdates(address(s_pool));
+    _applyChainUpdates(address(s_pool));
   }
 }
 

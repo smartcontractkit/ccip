@@ -76,12 +76,14 @@ contract USDCTokenPoolSetup is BaseTest {
     chainUpdates[0] = TokenPool.ChainUpdate({
       chainSelector: SOURCE_CHAIN_ID,
       allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
       chainSelector: DEST_CHAIN_ID,
       allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     s_usdcTokenPool.applyChainUpdates(chainUpdates);
@@ -183,7 +185,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
   function testFuzz_LockOrBurnSuccess(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
-    amount = bound(amount, 1, rateLimiterConfig().capacity);
+    amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPool), amount);
     changePrank(s_routerAllowedOnRamp);
 
@@ -220,7 +222,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
   function testFuzz_LockOrBurnWithAllowListSuccess(bytes32 destinationReceiver, uint256 amount) public {
     vm.assume(destinationReceiver != bytes32(0));
-    amount = bound(amount, 1, rateLimiterConfig().capacity);
+    amount = bound(amount, 1, getOutboundRateLimiterConfig().capacity);
     s_token.transfer(address(s_usdcTokenPoolWithAllowList), amount);
     changePrank(s_routerAllowedOnRamp);
 
@@ -265,7 +267,8 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       chainSelector: wrongDomain,
       allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
 
     s_usdcTokenPool.applyChainUpdates(chainUpdates);
@@ -299,7 +302,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
 
   function testFuzz_ReleaseOrMintSuccess(address recipient, uint256 amount) public {
-    amount = bound(amount, 0, rateLimiterConfig().capacity);
+    amount = bound(amount, 0, getInboundRateLimiterConfig().capacity);
 
     USDCMessage memory usdcMessage = USDCMessage({
       version: 0,
@@ -390,7 +393,7 @@ contract USDCTokenPool_releaseOrMint is USDCTokenPoolSetup {
   }
 
   function testTokenMaxCapacityExceededReverts() public {
-    uint256 capacity = rateLimiterConfig().capacity;
+    uint256 capacity = getInboundRateLimiterConfig().capacity;
     uint256 amount = 10 * capacity;
     address recipient = address(1);
     changePrank(s_routerAllowedOffRamp);

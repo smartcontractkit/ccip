@@ -37,7 +37,7 @@ contract EVM2EVMOnRamp_constructor is EVM2EVMOnRampSetup {
       staticConfig,
       dynamicConfig,
       tokensAndPools,
-      rateLimiterConfig(),
+      getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
       getNopsAndWeights()
@@ -478,7 +478,7 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     vm.expectRevert(
       abi.encodeWithSelector(
         RateLimiter.AggregateValueMaxCapacityExceeded.selector,
-        rateLimiterConfig().capacity,
+        getOutboundRateLimiterConfig().capacity,
         (message.tokenAmounts[0].amount * s_sourceTokenPrices[0]) / 1e18
       )
     );
@@ -596,7 +596,8 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
     chainUpdates[0] = TokenPool.ChainUpdate({
       chainSelector: DEST_CHAIN_ID,
       allowed: true,
-      rateLimiterConfig: rateLimiterConfig()
+      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
+      inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     newPool.applyChainUpdates(chainUpdates);
 
@@ -632,7 +633,7 @@ contract EVM2EVMOnRamp_forwardFromRouter_upgrade is EVM2EVMOnRampSetup {
       }),
       generateDynamicOnRampConfig(address(s_sourceRouter), address(s_priceRegistry)),
       getTokensAndPools(s_sourceTokens, getCastedSourcePools()),
-      rateLimiterConfig(),
+      getOutboundRateLimiterConfig(),
       s_feeTokenConfigArgs,
       s_tokenTransferFeeConfigArgs,
       getNopsAndWeights()
