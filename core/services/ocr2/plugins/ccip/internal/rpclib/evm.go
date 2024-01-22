@@ -124,7 +124,7 @@ func (c *defaultEvmBatchCaller) batchCall(ctx context.Context, blockNumber uint6
 		if err != nil {
 			return nil, err
 		}
-
+		c.lggr.Warnf("batch call result %s(%+v): decodedPackedOutputs=%s packedOutputs=%s", call.methodName, call.args, string(b), packedOutputs[i])
 		unpackedOutputs, err := call.abi.Unpack(call.methodName, b)
 		if err != nil {
 			return nil, fmt.Errorf("unpack result %s(%+v): %w", call.methodName, call.args, err)
