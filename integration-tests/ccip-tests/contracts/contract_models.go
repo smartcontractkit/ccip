@@ -798,7 +798,7 @@ func (a *MockAggregator) ChainID() uint64 {
 func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 	opts, err := a.client.TransactionOpts(a.client.GetDefaultWallet())
 	if err != nil {
-		return fmt.Errorf("unable to get transaction opts: %v", err)
+		return fmt.Errorf("unable to get transaction opts: %w", err)
 	}
 	log.Info().
 		Str("Contract Address", a.ContractAddress.Hex()).
@@ -806,7 +806,7 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 		Msg("Updating Round Data")
 	tx, err := a.Instance.UpdateRoundData(opts, big.NewInt(50), answer, big.NewInt(time.Now().UTC().UnixNano()), big.NewInt(time.Now().UTC().UnixNano()))
 	if err != nil {
-		return fmt.Errorf("unable to update round data: %v", err)
+		return fmt.Errorf("unable to update round data: %w", err)
 	}
 	return a.client.ProcessTransaction(tx)
 }

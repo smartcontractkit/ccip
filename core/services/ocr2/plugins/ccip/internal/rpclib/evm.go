@@ -93,7 +93,7 @@ func (c *defaultEvmBatchCaller) batchCall(ctx context.Context, blockNumber uint6
 		}
 
 		bn := big.NewInt(0).SetUint64(blockNumber)
-
+		c.lggr.Warnf("eth_call to %s data %s", call.contractAddress.Hex(), hexutil.Encode(packedInputs))
 		rpcBatchCalls[i] = rpc.BatchElem{
 			Method: "eth_call",
 			Args: []any{
