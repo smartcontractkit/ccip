@@ -618,7 +618,10 @@ type DynamicPriceGetterConfig struct {
 }
 
 func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMap map[string]*contracts.MockAggregator, staticPrice *big.Int) error {
-	aggregatorContract := aggregatorMap[tokenAddr]
+	aggregatorContract, ok := aggregatorMap[tokenAddr]
+	if !ok {
+		return fmt.Errorf("aggregator contract not found for token %s", tokenAddr)
+	}
 	// update round Data
 	err := aggregatorContract.UpdateRoundData(staticPrice)
 	if err != nil {
@@ -633,6 +636,11 @@ func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMa
 	if err != nil {
 		return fmt.Errorf("error in getting latest round data %w", err)
 	}
+	log.Info().
+		Str("token", tokenAddr).
+		Interface("latestRoundData", latestRoundData).
+		Str("aggregator", aggregatorContract.ContractAddress.Hex()).
+		Msg("latest round data")
 	if latestRoundData.Answer == nil {
 		return fmt.Errorf("latest round data is not populated for token %s and aggregator %s", tokenAddr, aggregatorContract.ContractAddress.Hex())
 	}
