@@ -721,9 +721,6 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		}
 		return len(encoded) > MaxExecutionReportLength
 	})
-	if err != nil {
-		return nil, err
-	}
 
 	execReport, err := buildExecutionReportForMessages(sendReqsInRoot, tree, commitReport.Interval, observedMessages[:capped])
 	if err != nil {
