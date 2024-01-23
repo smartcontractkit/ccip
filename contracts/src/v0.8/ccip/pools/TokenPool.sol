@@ -59,7 +59,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @dev The address of the arm proxy
   address internal immutable i_armProxy;
   /// @dev The address of the router
-  IRouter internal immutable i_router;
+  IRouter internal s_router;
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
@@ -84,7 +84,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     if (address(token) == address(0) || router == address(0)) revert ZeroAddressNotAllowed();
     i_token = token;
     i_armProxy = armProxy;
-    i_router = IRouter(router);
+    s_router = IRouter(router);
 
     // Pool can be set as permissioned or permissionless at deployment time only to save hot-path gas.
     i_allowlistEnabled = allowlist.length > 0;
@@ -107,7 +107,14 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @notice Gets the pool's Router
   /// @return router The pool's Router
   function getRouter() public view returns (address router) {
-    return address(i_router);
+    return address(s_router);
+  }
+
+  /// @notice Sets the pool's Router
+  /// @param router The new Router
+  function setRouter(address router) public onlyOwner {
+    if (router == address(0)) revert ZeroAddressNotAllowed();
+    s_router = IRouter(router);
   }
 
   /// @inheritdoc IERC165
@@ -228,7 +235,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// is a permissioned onRamp for the given chain on the Router.
   modifier onlyOnRamp(uint64 remoteChainSelector) {
     if (!s_remoteChainSelectors.contains(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    if (!(msg.sender == i_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
+    if (!(msg.sender == s_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
     _;
   }
 
@@ -236,7 +243,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// is a permissioned offRamp for the given chain on the Router.
   modifier onlyOffRamp(uint64 remoteChainSelector) {
     if (!s_remoteChainSelectors.contains(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
-    if (!i_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
+    if (!s_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
     _;
   }
 
