@@ -442,6 +442,9 @@ func (ccipModule *CCIPCommon) WatchForPriceUpdates() error {
 	return nil
 }
 
+// SyncUSDCDomain makes domain updates to Source usdc pool domain with -
+// 1. USDC domain from destination chain's token transmitter contract
+// 2. Destination pool address as allowed caller
 func (ccipModule *CCIPCommon) SyncUSDCDomain(destTransmitter *contracts.TokenTransmitter, destPoolAddr []common.Address, destChainID uint64) error {
 	// if not USDC new deployment, return
 	// if existing deployment, consider that no syncing is required and return
