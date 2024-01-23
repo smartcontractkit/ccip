@@ -2547,24 +2547,24 @@ func CreateOCR2CCIPExecutionJobs(
 	return nil
 }
 
-func TokenFeeForMultipleTokenAddr(tokenAddrToURL map[string]string) string {
-	source := ""
-	right := ""
-	i := 1
-	for addr, url := range tokenAddrToURL {
-		source = source + fmt.Sprintf(`
-token%d [type=http method=GET url="%s"];
-token%d_parse [type=jsonparse path="data,result"];
-token%d->token%d_parse;`, i, url, i, i, i)
-		right = right + fmt.Sprintf(` \\\"%s\\\":$(token%d_parse),`, addr, i)
-		i++
-	}
-	right = right[:len(right)-1]
-	source = fmt.Sprintf(`%s
-merge [type=merge left="{}" right="{%s}"];`, source, right)
-
-	return source
-}
+//func TokenFeeForMultipleTokenAddr(tokenAddrToURL map[string]string) string {
+//	source := ""
+//	right := ""
+//	i := 1
+//	for addr, url := range tokenAddrToURL {
+//		source = source + fmt.Sprintf(`
+//token%d [type=http method=GET url="%s"];
+//token%d_parse [type=jsonparse path="data,result"];
+//token%d->token%d_parse;`, i, url, i, i, i)
+//		right = right + fmt.Sprintf(` \\\"%s\\\":$(token%d_parse),`, addr, i)
+//		i++
+//	}
+//	right = right[:len(right)-1]
+//	source = fmt.Sprintf(`%s
+//merge [type=merge left="{}" right="{%s}"];`, source, right)
+//
+//	return source
+//}
 
 type CCIPTestEnv struct {
 	MockServer               *ctfClient.MockserverClient
