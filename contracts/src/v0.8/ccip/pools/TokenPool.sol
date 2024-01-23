@@ -206,7 +206,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     return s_inboundRateLimits[remoteChainSelector]._currentTokenBucketState();
   }
 
-  /// @notice Sets the chain rate limited config.
+  /// @notice Sets the chain rate limiter config.
   /// @param outboundConfig The new outbound rate limiter config.
   /// @param inboundConfig The new inbound rate limiter config.
   function setChainRateLimiterConfig(
