@@ -637,10 +637,6 @@ func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMa
 	if err != nil {
 		return fmt.Errorf("error in getting latest round data %w", err)
 	}
-	err = aggregatorContract.LatestRoundData()
-	if err != nil {
-		return err
-	}
 	log.Info().
 		Str("token", tokenAddr).
 		Interface("latestRoundData", latestRoundData).
