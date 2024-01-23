@@ -5,6 +5,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -22,13 +23,15 @@ type evmDep struct {
 
 type BaseRebalancerFactory struct {
 	evmDeps map[models.NetworkSelector]evmDep
+	lggr    logger.Logger
 }
 
 type Opt func(f *BaseRebalancerFactory)
 
-func NewBaseRebalancerFactory(opts ...Opt) *BaseRebalancerFactory {
+func NewBaseRebalancerFactory(lggr logger.Logger, opts ...Opt) *BaseRebalancerFactory {
 	f := &BaseRebalancerFactory{
 		evmDeps: make(map[models.NetworkSelector]evmDep),
+		lggr:    lggr,
 	}
 	for _, opt := range opts {
 		opt(f)
@@ -52,7 +55,7 @@ func (b *BaseRebalancerFactory) NewRebalancer(networkID models.NetworkSelector, 
 		if !exists {
 			return nil, fmt.Errorf("evm dependencies not found")
 		}
-		return NewEvmRebalancer(address, networkID, evmDeps.ethClient, evmDeps.lp)
+		return NewEvmRebalancer(address, networkID, evmDeps.ethClient, evmDeps.lp, b.lggr)
 	default:
 		return nil, fmt.Errorf("liquidity manager of type %v is not supported", typ)
 	}

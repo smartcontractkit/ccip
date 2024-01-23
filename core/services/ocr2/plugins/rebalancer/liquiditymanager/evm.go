@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -31,9 +32,15 @@ type EvmRebalancer struct {
 	networkSel  models.NetworkSelector
 	ec          client.Client
 	cleanupFunc func() error
+	lggr        logger.Logger
 }
 
-func NewEvmRebalancer(address models.Address, net models.NetworkSelector, ec client.Client, lp logpoller.LogPoller) (*EvmRebalancer, error) {
+func NewEvmRebalancer(
+	address models.Address,
+	net models.NetworkSelector,
+	ec client.Client,
+	lp logpoller.LogPoller,
+	lggr logger.Logger) (*EvmRebalancer, error) {
 	client, err := NewConcreteRebalancer(common.Address(address), ec)
 	if err != nil {
 		return nil, fmt.Errorf("new concrete rebalancer: %w", err)
@@ -66,6 +73,7 @@ func NewEvmRebalancer(address models.Address, net models.NetworkSelector, ec cli
 		cleanupFunc: func() error {
 			return lp.UnregisterFilter(lpFilter.Name)
 		},
+		lggr: lggr.Named("EvmRebalancer"),
 	}, nil
 }
 
@@ -110,14 +118,22 @@ func (e *EvmRebalancer) GetPendingTransfers(ctx context.Context, since time.Time
 
 	return pendingTransfers, nil
 }
+
+type qItem struct {
+	networkID models.NetworkSelector
+	lmAddress common.Address
+}
+
+func (q qItem) String() string {
+	return fmt.Sprintf("(NetworkID:%v,LMAddress:%v)", q.networkID, q.lmAddress)
+}
+
 func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error) {
+	lggr := e.lggr.With("func", "Discover", "rebalancer", e.addr)
+	lggr.Debugw("Starting discovery")
+
 	g := liquiditygraph.NewGraph()
 	lms := NewRegistry()
-
-	type qItem struct {
-		networkID models.NetworkSelector
-		lmAddress common.Address
-	}
 
 	seen := mapset.NewSet[qItem]()
 	queue := mapset.NewSet[qItem]()
@@ -126,42 +142,67 @@ func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Regist
 	queue.Add(elem)
 	seen.Add(elem)
 
+	lggr.Debugw("Starting BFS", "queue", queue, "seen", seen)
 	for queue.Cardinality() > 0 {
 		elem, ok := queue.Pop()
 		if !ok {
 			return nil, nil, fmt.Errorf("unexpected internal error, there is a bug in the algorithm")
 		}
 
+		lggr.Debugw("Popped element from queue", "elem", elem)
 		// TODO: investigate fetching the balance here.
 		g.AddNetwork(elem.networkID, big.NewInt(0))
+		lggr.Debugw("Added elem to network", "elem", elem)
 
+		lggr.Debugw("Creating new rebalancer object", "elem", elem)
 		lm, err := lmFactory.NewRebalancer(elem.networkID, models.Address(elem.lmAddress))
 		if err != nil {
+			lggr.Errorw("Failed to create new rebalancer", "err", err)
 			return nil, nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
 
+		lggr.Debugw("Adding rebalancer to registry", "elem", elem)
 		lms.Add(elem.networkID, models.Address(elem.lmAddress))
 
+		lggr.Debugw("Getting destination liquidity managers", "elem", elem)
 		destinationLMs, err := lm.GetRebalancers(ctx)
 		if err != nil {
+			lggr.Errorw("Failed to get destination liquidity managers", "err", err)
 			return nil, nil, fmt.Errorf("get %v destination liquidity managers: %w", elem.networkID, err)
 		}
 
+		lggr.Debugw("Got destination liquidity managers", "destinationLMs", destinationLMs, "elem", elem)
 		if destinationLMs == nil {
+			lggr.Debugw("No destination liquidity managers found", "destinationLMs", destinationLMs, "elem", elem)
 			continue
 		}
 
+		lggr.Debugw("Adding connections", "elem", elem, "destinationLMs", destinationLMs)
 		for destNetworkID, lmAddr := range destinationLMs {
+			if !g.HasNetwork(destNetworkID) {
+				lggr.Debugw("Adding new network to graph not yet seen", "destNetworkID", destNetworkID)
+				g.AddNetwork(destNetworkID, big.NewInt(0))
+			} else {
+				lggr.Debugw("Network already seen, not adding", "destNetworkID", destNetworkID)
+			}
+			lggr.Debugw("Adding connection", "elem", elem, "destNetworkID", destNetworkID, "sourceNetworkID", elem.networkID)
 			g.AddConnection(elem.networkID, destNetworkID)
 
 			newElem := qItem{networkID: destNetworkID, lmAddress: common.Address(lmAddr)}
+			lggr.Debugw("Deciding whether to add new element to queue", "newElem", newElem)
 			if !seen.Contains(newElem) {
+				lggr.Debugw("Not seen before, adding to queue", "newElem", newElem)
 				queue.Add(newElem)
 				seen.Add(newElem)
 
 				if _, exists := lms.Get(destNetworkID); !exists {
+					lggr.Debugw("Not seen before, adding to registry", "newElem", newElem)
 					lms.Add(destNetworkID, lmAddr)
+				} else {
+					lggr.Debugw("Already seen, not adding to registry", "newElem", newElem)
 				}
+			} else {
+				lggr.Debugw("Already seen, not adding to queue", "newElem", newElem)
 			}
 		}
 	}

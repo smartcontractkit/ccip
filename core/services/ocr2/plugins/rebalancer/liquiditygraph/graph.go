@@ -18,6 +18,9 @@ type LiquidityGraph interface {
 	// GetNetworks returns the list of all the networks that appear on the graph.
 	GetNetworks() []models.NetworkSelector
 
+	// GetNeighbors returns the list of all the networks that are neighbors of the provided network.
+	GetNeighbors(n models.NetworkSelector) []models.NetworkSelector
+
 	// HasNetwork returns true when the provided network exists on the graph.
 	HasNetwork(n models.NetworkSelector) bool
 
@@ -79,6 +82,22 @@ func (g *Graph) GetNetworks() []models.NetworkSelector {
 	// sort the results for deterministic output
 	sort.Slice(networks, func(i, j int) bool { return networks[i] < networks[j] })
 	return networks
+}
+
+func (g *Graph) GetNeighbors(n models.NetworkSelector) []models.NetworkSelector {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	neighbors, exists := g.networksGraph[n]
+	if !exists {
+		return nil
+	}
+	var neighborsCopy []models.NetworkSelector
+	neighborsCopy = append(neighborsCopy, neighbors...)
+
+	// sort the results for deterministic output
+	sort.Slice(neighborsCopy, func(i, j int) bool { return neighborsCopy[i] < neighborsCopy[j] })
+	return neighborsCopy
 }
 
 func (g *Graph) HasNetwork(n models.NetworkSelector) bool {

@@ -1,6 +1,7 @@
 package liquiditymanager
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
@@ -40,4 +41,16 @@ func (r *Registry) GetAll() map[models.NetworkSelector]models.Address {
 		cp[k] = v
 	}
 	return cp
+}
+
+func (r *Registry) String() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	cp := make(map[models.NetworkSelector]models.Address, len(r.rebalancers))
+	for k, v := range r.rebalancers {
+		cp[k] = v
+	}
+
+	return fmt.Sprintf("%+v", cp)
 }

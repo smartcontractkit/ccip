@@ -1,0 +1,469 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"math/big"
+	"os"
+	"strings"
+
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/shopspring/decimal"
+	"github.com/urfave/cli"
+
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/arb"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/bridgeutil"
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
+	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/v2/core/cmd"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
+)
+
+var tomlConfigTemplate = `
+# Arbitrum Sepolia
+[[EVM]]
+ChainID = "421614"
+FinalityDepth = 1
+LogPollInterval = "1s"
+GasEstimator.LimitDefault = 3_500_000
+
+[[EVM.Nodes]]
+HTTPURL = "%s"
+Name = "arbitrum_sepolia_1"
+WSURL = "%s"
+
+# Sepolia
+[[EVM]]
+ChainID = "11155111"
+FinalityDepth = 2
+LogPollInterval = "12s"
+GasEstimator.LimitDefault = 3_500_000
+
+[[EVM.Nodes]]
+HTTPURL = "%s"
+Name = "sepolia_1"
+WSURL = "%s"
+
+[EVM.Transactions]
+ForwardersEnabled = false
+
+[Feature]
+LogPoller = true
+
+[OCR2]
+Enabled = true
+ContractPollInterval = "15s"
+
+[OCR]
+Enabled = false
+
+[P2P.V2]
+ListenAddresses = ["127.0.0.1:8000"]
+`
+
+func setupRebalancerNodes(e multienv.Env) {
+	fs := flag.NewFlagSet("setup-rebalancer-nodes", flag.ExitOnError)
+	l1ChainID := fs.Uint64("l1-chain-id", bridgeutil.SepoliaChainID, "L1 chain ID")
+	l2ChainID := fs.Uint64("l2-chain-id", bridgeutil.ArbitrumSepoliaChainID, "L2 chain ID")
+	l1TokenAddress := fs.String("l1-token-address",
+		arb.ArbitrumContracts[bridgeutil.SepoliaChainID]["WETH"].Hex(),
+		"L1 token address")
+	l2TokenAddress := fs.String("l2-token-address",
+		arb.ArbitrumContracts[bridgeutil.ArbitrumSepoliaChainID]["WETH"].Hex(),
+		"L2 token address")
+	apiFile := fs.String("api",
+		"../../../../tools/secrets/apicredentials", "api credentials file")
+	passwordFile := fs.String("password",
+		"../../../../tools/secrets/password.txt", "password file")
+	databasePrefix := fs.String("database-prefix",
+		"postgres://postgres:postgres_password_padded_for_security@localhost:5432/rebalancer-test", "database prefix")
+	databaseSuffixes := fs.String("database-suffixes",
+		"sslmode=disable", "database parameters to be added")
+	nodeCount := fs.Int("node-count", 5, "number of nodes")
+	fundingAmount := fs.String("funding-amount", "100000000000000000", "amount to fund nodes") // .1 ETH
+	resetDatabase := fs.Bool("reset-database", true, "boolean to reset database")
+
+	helpers.ParseArgs(fs, os.Args[1:])
+
+	doChecks(e, *l1ChainID, *l2ChainID, true)
+
+	transmitterFunding := decimal.RequireFromString(*fundingAmount).BigInt()
+
+	uni := deployUniverse(e,
+		*l1ChainID,
+		*l2ChainID,
+		common.HexToAddress(*l1TokenAddress),
+		common.HexToAddress(*l2TokenAddress))
+
+	fmt.Println("Configuring nodes with rebalancer jobs...")
+	var (
+		onChainPublicKeys  []string
+		offChainPublicKeys []string
+		configPublicKeys   []string
+		peerIDs            []string
+		transmitters       = make(map[string][]string)
+	)
+	for i := 0; i < *nodeCount; i++ {
+		flagSet := flag.NewFlagSet("run-rebalancer-job-creation", flag.ExitOnError)
+		flagSet.String("api", *apiFile, "api file")
+		flagSet.String("password", *passwordFile, "password file")
+		flagSet.String("vrfpassword", *passwordFile, "vrf password file")
+		flagSet.String("bootstrapPort", fmt.Sprintf("%d", 8000), "port of bootstrap")
+		flagSet.Int64("l1ChainID", int64(*l1ChainID), "the L1 chain ID")
+		flagSet.Int64("l2ChainID", int64(*l2ChainID), "the L2 chain ID")
+		flagSet.Bool("applyInitServerConfig", true, "override for using initServerConfig in App.Before")
+
+		flagSet.String("job-type", "rebalancer", "the job type")
+		flagSet.String("job-name", fmt.Sprintf("rebalancer-%d", i+1), "the job name")
+
+		flagSet.String("liquidityManagerAddress", uni.L1.Rebalancer.Hex(), "the liquidity manager address")
+		flagSet.Uint64("liquidityManagerNetwork", *l1ChainID, "the liquidity manager network")
+		flagSet.Int64("maxNumTransfers", 4, "the max number of transfers")
+
+		// used by bootstrap template instantiation
+		flagSet.String("contractID", uni.L1.Rebalancer.Hex(), "the contract to get peers from")
+
+		flagSet.Bool("dangerWillRobinson", *resetDatabase, "for resetting databases")
+		flagSet.Bool("isBootstrapper", i == 0, "is first node")
+		bootstrapperPeerID := ""
+		if len(peerIDs) != 0 {
+			bootstrapperPeerID = peerIDs[0]
+		}
+		flagSet.String("bootstrapperPeerID", bootstrapperPeerID, "peerID of first node")
+
+		payload := SetupNode(e, *l1ChainID, *l2ChainID, flagSet, i, *databasePrefix, *databaseSuffixes, *resetDatabase)
+
+		onChainPublicKeys = append(onChainPublicKeys, payload.OnChainPublicKey)
+		offChainPublicKeys = append(offChainPublicKeys, payload.OffChainPublicKey)
+		configPublicKeys = append(configPublicKeys, payload.ConfigPublicKey)
+		peerIDs = append(peerIDs, payload.PeerID)
+		for chainIDStr, transmitter := range payload.Transmitters {
+			transmitters[chainIDStr] = append(transmitters[chainIDStr], transmitter)
+		}
+	}
+
+	printStandardCommands(uni,
+		fmt.Sprintf("%d", *l1ChainID),
+		fmt.Sprintf("%d", *l2ChainID),
+		*l1TokenAddress,
+		*l2TokenAddress,
+		onChainPublicKeys,
+		offChainPublicKeys,
+		configPublicKeys,
+		peerIDs,
+		transmitters)
+
+	fmt.Println("Funding transmitters on L1...")
+	FundNodes(e, *l1ChainID, transmitters[fmt.Sprintf("%d", *l1ChainID)], transmitterFunding)
+	fmt.Println()
+
+	fmt.Println("Funding transmitters on L2...")
+	FundNodes(e, *l2ChainID, transmitters[fmt.Sprintf("%d", *l2ChainID)], transmitterFunding)
+	fmt.Println()
+}
+
+func fundContracts(
+	e multienv.Env,
+	l1ChainID,
+	l2ChainID uint64,
+	l1TokenAddress,
+	l2TokenAddress common.Address,
+	uni universe,
+	tokenPoolFunding,
+	rebalancerFunding *big.Int) {
+
+	fmt.Println("Funding contracts on L1...")
+	fundPoolAndRebalancer(
+		e,
+		l1ChainID,
+		l1TokenAddress,
+		uni.L1.TokenPool,
+		uni.L1.Rebalancer,
+		tokenPoolFunding,
+		rebalancerFunding)
+	fmt.Println("Done funding contracts on L1")
+	fmt.Println()
+
+	fmt.Println("Funding contracts on L2...")
+	fundPoolAndRebalancer(
+		e,
+		l2ChainID,
+		l2TokenAddress,
+		uni.L2.TokenPool,
+		uni.L2.Rebalancer,
+		tokenPoolFunding,
+		rebalancerFunding)
+	fmt.Println("Done funding contracts on L2")
+	fmt.Println()
+}
+
+func fundPoolAndRebalancer(
+	e multienv.Env,
+	chainID uint64,
+	tokenAddress,
+	tokenPoolAddress,
+	rebalancerAddress common.Address,
+	tokenPoolFunding *big.Int,
+	rebalancerFunding *big.Int) {
+	token, err := erc20.NewERC20(tokenAddress, e.Clients[chainID])
+	helpers.PanicErr(err)
+
+	// check if we have enough balance to transfer
+	// try to deposit if token is WETH
+	balance, err := token.BalanceOf(nil, e.Transactors[chainID].From)
+	helpers.PanicErr(err)
+	if balance.Cmp(tokenPoolFunding) < 0 {
+		symbol, err := token.Symbol(nil)
+		helpers.PanicErr(err)
+		if symbol == "WETH" {
+			l1Weth, err := weth9.NewWETH9(tokenAddress, e.Clients[chainID])
+			helpers.PanicErr(err)
+
+			nativeBalance, err := e.Clients[chainID].BalanceAt(
+				context.Background(),
+				e.Transactors[chainID].From,
+				nil)
+			helpers.PanicErr(err)
+			if nativeBalance.Cmp(tokenPoolFunding) < 0 {
+				helpers.PanicErr(fmt.Errorf("not enough balance to deposit WETH"))
+			}
+
+			fmt.Println("Depositing", tokenPoolFunding.String(), "to WETH...")
+			tx, err := l1Weth.Deposit(&bind.TransactOpts{
+				From:   e.Transactors[chainID].From,
+				Signer: e.Transactors[chainID].Signer,
+				Value:  tokenPoolFunding,
+			})
+			helpers.PanicErr(err)
+			helpers.ConfirmTXMined(
+				context.Background(),
+				e.Clients[chainID],
+				tx,
+				int64(chainID),
+				"Depositing", tokenPoolFunding.String(), "to WETH token at", tokenAddress.Hex())
+		} else {
+
+			helpers.PanicErr(
+				fmt.Errorf("not enough balance to fund token pool, please get more tokens (address: %s)",
+					tokenAddress.Hex()))
+		}
+	}
+
+	fmt.Println("Funding token pool on", chainID, "with", tokenPoolFunding, "...")
+	tx, err := token.Transfer(e.Transactors[chainID], tokenPoolAddress, tokenPoolFunding)
+	helpers.PanicErr(err)
+	helpers.ConfirmTXMined(
+		context.Background(),
+		e.Clients[chainID],
+		tx,
+		int64(chainID),
+		"Transferring", tokenPoolFunding.String(), "to token pool at", tokenPoolAddress.Hex())
+
+	fmt.Println("Funding rebalancer on", chainID, "with", rebalancerFunding, "wei...")
+	if err := FundNode(e, chainID, rebalancerAddress, rebalancerFunding); err != nil {
+		fmt.Println("Failed to fund rebalancer on", chainID, "with", rebalancerFunding, "wei:", err)
+	}
+}
+
+func printStandardCommands(
+	uni universe,
+	l1ChainID,
+	l2ChainID string,
+	l1TokenAddress, l2TokenAddress string,
+	onChainPublicKeys,
+	offchainPublicKeys,
+	configPublicKeys,
+	peerIDs []string,
+	transmitters map[string][]string,
+) {
+	fmt.Println("Contract Deployments complete\n",
+		"L1 Arm:", uni.L1.Arm.Hex(), "\n",
+		"L1 Arm Proxy:", uni.L1.ArmProxy.Hex(), "\n",
+		"L1 Token Pool:", uni.L1.TokenPool.Hex(), "\n",
+		"L1 Rebalancer:", uni.L1.Rebalancer.Hex(), "\n",
+		"L1 Bridge Adapter:", uni.L1.BridgeAdapterAddress.Hex(), "\n",
+		"L2 Arm:", uni.L2.Arm.Hex(), "\n",
+		"L2 Arm Proxy:", uni.L2.ArmProxy.Hex(), "\n",
+		"L2 Token Pool:", uni.L2.TokenPool.Hex(), "\n",
+		"L2 Rebalancer:", uni.L2.Rebalancer.Hex(), "\n",
+		"L2 Bridge Adapter:", uni.L2.BridgeAdapterAddress.Hex(), "\n",
+		"Node launches complete\n",
+		"OnChainPublicKeys:", strings.Join(onChainPublicKeys, ","), "\n",
+		"OffChainPublicKeys:", strings.Join(offchainPublicKeys, ","), "\n",
+		"ConfigPublicKeys:", strings.Join(configPublicKeys, ","), "\n",
+		"PeerIDs:", strings.Join(peerIDs, ","), "\n",
+		"Transmitters L1:", strings.Join(transmitters[l1ChainID], ","), "\n",
+		"Transmitters L2:", strings.Join(transmitters[l2ChainID], ","),
+	)
+	fmt.Println()
+	fmt.Println("Set config command:", "\n",
+		"go run . set-config -l1-chain-id", l1ChainID,
+		"-l2-chain-id", l2ChainID,
+		"-l1-rebalancer-address", uni.L1.Rebalancer.Hex(),
+		"-l2-rebalancer-address", uni.L2.Rebalancer.Hex(),
+		"-signers", strings.Join(onChainPublicKeys, ","),
+		"-offchain-pubkeys", strings.Join(offchainPublicKeys, ","),
+		"-config-pubkeys", strings.Join(configPublicKeys, ","),
+		"-peer-ids", strings.Join(peerIDs, ","),
+		"-l1-transmitters", strings.Join(transmitters[l1ChainID], ","),
+		"-l2-transmitters", strings.Join(transmitters[l2ChainID], ","),
+	)
+	fmt.Println()
+	fmt.Println("Funding command:", "\n",
+		"go run . fund-contracts -l1-chain-id", l1ChainID,
+		"-l2-chain-id", l2ChainID,
+		"-l1-rebalancer-address", uni.L1.Rebalancer.Hex(),
+		"-l2-rebalancer-address", uni.L2.Rebalancer.Hex(),
+		"-l1-token-address", l1TokenAddress,
+		"-l2-token-address", l2TokenAddress,
+		"-l1-token-pool-address", uni.L1.TokenPool.Hex(),
+		"-l2-token-pool-address", uni.L2.TokenPool.Hex(),
+	)
+}
+
+func SetupNode(
+	e multienv.Env,
+	l1ChainID, l2ChainID uint64,
+	flagSet *flag.FlagSet,
+	nodeIdx int,
+	databasePrefix,
+	databaseSuffixes string,
+	resetDB bool,
+) *cmd.SetupRebalancerNodePayload {
+	configureEnvironmentVariables(e, l1ChainID, l2ChainID, nodeIdx, databasePrefix, databaseSuffixes)
+
+	client := newSetupClient()
+	app := cmd.NewApp(client)
+	ctx := cli.NewContext(app, flagSet, nil)
+
+	defer func() {
+		err := app.After(ctx)
+		helpers.PanicErr(err)
+	}()
+
+	err := app.Before(ctx)
+	helpers.PanicErr(err)
+
+	if resetDB {
+		resetDatabase(client, ctx)
+	}
+
+	return setupRebalancerNodeFromClient(client, ctx, e)
+}
+
+func configureEnvironmentVariables(
+	e multienv.Env,
+	l1ChainID, l2ChainID uint64,
+	index int,
+	databasePrefix string,
+	databaseSuffixes string,
+) {
+	// Set permitted envars for v2.
+	helpers.PanicErr(os.Setenv("CL_DATABASE_URL", fmt.Sprintf("%s-%d?%s", databasePrefix, index, databaseSuffixes)))
+	helpers.PanicErr(os.Setenv("CL_CONFIG", fmt.Sprintf(
+		tomlConfigTemplate,
+		e.HTTPURLs[l2ChainID],
+		e.WSURLs[l2ChainID],
+		e.HTTPURLs[l1ChainID],
+		e.WSURLs[l1ChainID],
+	)))
+
+	// Unset prohibited envars for v2.
+	helpers.PanicErr(os.Unsetenv("ETH_URL"))
+	helpers.PanicErr(os.Unsetenv("ETH_HTTP_URL"))
+	helpers.PanicErr(os.Unsetenv("ETH_CHAIN_ID"))
+}
+
+func newSetupClient() *cmd.Shell {
+	prompter := cmd.NewTerminalPrompter()
+	return &cmd.Shell{
+		Renderer:                       cmd.RendererTable{Writer: os.Stdout},
+		AppFactory:                     cmd.ChainlinkAppFactory{},
+		KeyStoreAuthenticator:          cmd.TerminalKeyStoreAuthenticator{Prompter: prompter},
+		FallbackAPIInitializer:         cmd.NewPromptingAPIInitializer(prompter),
+		Runner:                         cmd.ChainlinkRunner{},
+		PromptingSessionRequestBuilder: cmd.NewPromptingSessionRequestBuilder(prompter),
+		ChangePasswordPrompter:         cmd.NewChangePasswordPrompter(),
+		PasswordPrompter:               cmd.NewPasswordPrompter(),
+	}
+}
+
+func resetDatabase(client *cmd.Shell, context *cli.Context) {
+	helpers.PanicErr(client.ResetDatabase(context))
+}
+
+func setupRebalancerNodeFromClient(
+	client *cmd.Shell,
+	context *cli.Context,
+	e multienv.Env) *cmd.SetupRebalancerNodePayload {
+	payload, err := client.ConfigureRebalancerNode(context)
+	helpers.PanicErr(err)
+
+	return payload
+}
+
+func FundNodes(e multienv.Env, chainID uint64, transmitters []string, fundingAmount *big.Int) {
+	for _, transmitter := range transmitters {
+		FundNode(e, chainID, common.HexToAddress(transmitter), fundingAmount)
+	}
+}
+
+func FundNode(
+	e multienv.Env,
+	chainID uint64,
+	toAddress common.Address,
+	fundingAmount *big.Int,
+) error {
+	client, transactor := e.Clients[chainID], e.Transactors[chainID]
+
+	nonce, err := client.PendingNonceAt(context.Background(), transactor.From)
+	if err != nil {
+		return err
+	}
+
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return err
+	}
+
+	// Special case for Arbitrum since gas estimation there is different.
+	var gasLimit uint64
+	if helpers.IsArbitrumChainID(int64(chainID)) {
+		estimated, err2 := client.EstimateGas(context.Background(), ethereum.CallMsg{
+			From:  transactor.From,
+			To:    &toAddress,
+			Value: fundingAmount,
+		})
+		if err2 != nil {
+			return err2
+		}
+		gasLimit = estimated
+	} else {
+		gasLimit = uint64(21_000)
+	}
+
+	tx := types.NewTx(
+		&types.LegacyTx{
+			Nonce:    nonce,
+			GasPrice: gasPrice,
+			Gas:      gasLimit,
+			To:       &toAddress,
+			Value:    fundingAmount,
+		},
+	)
+	signedTx, err := transactor.Signer(transactor.From, tx)
+	if err != nil {
+		return err
+	}
+	err = client.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		return err
+	}
+	helpers.ConfirmTXMined(context.Background(), client, signedTx, int64(chainID), "Sending", fundingAmount.String(), "to", toAddress.Hex())
+	return nil
+}
