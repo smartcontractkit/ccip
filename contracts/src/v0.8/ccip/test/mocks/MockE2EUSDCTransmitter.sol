@@ -39,7 +39,6 @@ contract MockE2EUSDCTransmitter is IMessageTransmitterWithRelay {
     return i_localDomain;
   }
 
-
   /**
    * This is based on similar function in https://github.com/circlefin/evm-cctp-contracts/blob/master/src/MessageTransmitter.sol
    * @notice Send the message to the destination domain and recipient
