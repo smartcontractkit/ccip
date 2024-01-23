@@ -46,6 +46,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   event ChainRemoved(uint64 chainSelector);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
+  event RouterUpdated(address oldRouter, address newRouter);
 
   struct ChainUpdate {
     uint64 chainSelector;
@@ -58,8 +59,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   IERC20 internal immutable i_token;
   /// @dev The address of the arm proxy
   address internal immutable i_armProxy;
-  /// @dev The address of the router
-  IRouter internal s_router;
   /// @dev The immutable flag that indicates if the pool is access-controlled.
   bool internal immutable i_allowlistEnabled;
   /// @dev A set of addresses allowed to trigger lockOrBurn as original senders.
@@ -67,7 +66,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// This can be used to ensure only token-issuer specified addresses can
   /// move tokens.
   EnumerableSet.AddressSet internal s_allowList;
-
+  /// @dev The address of the router
+  IRouter internal s_router;
   /// @dev A set of allowed chain selectors. We want the allowlist to be enumerable to
   /// be able to quickly determine (without parsing logs) who can access the pool.
   /// @dev The chain selectors are in uin256 format because of the EnumerableSet implementation.
@@ -111,10 +111,13 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   }
 
   /// @notice Sets the pool's Router
-  /// @param router The new Router
-  function setRouter(address router) public onlyOwner {
-    if (router == address(0)) revert ZeroAddressNotAllowed();
-    s_router = IRouter(router);
+  /// @param newRouter The new Router
+  function setRouter(address newRouter) public onlyOwner {
+    if (newRouter == address(0)) revert ZeroAddressNotAllowed();
+    address oldRouter = address(s_router);
+    s_router = IRouter(newRouter);
+
+    emit RouterUpdated(oldRouter, newRouter);
   }
 
   /// @inheritdoc IERC165

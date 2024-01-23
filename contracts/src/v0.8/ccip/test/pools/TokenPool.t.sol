@@ -436,6 +436,23 @@ contract TokenPoolWithAllowList_getAllowListEnabled is TokenPoolWithAllowListSet
   }
 }
 
+contract TokenPoolWithAllowList_setRouter is TokenPoolWithAllowListSetup {
+  event RouterUpdated(address oldRouter, address newRouter);
+
+  function testSetRouterSuccess() public {
+    assertEq(address(s_sourceRouter), s_tokenPool.getRouter());
+
+    address newRouter = makeAddr("newRouter");
+
+    vm.expectEmit();
+    emit RouterUpdated(address(s_sourceRouter), newRouter);
+
+    s_tokenPool.setRouter(newRouter);
+
+    assertEq(newRouter, s_tokenPool.getRouter());
+  }
+}
+
 /// @notice #getAllowList
 contract TokenPoolWithAllowList_getAllowList is TokenPoolWithAllowListSetup {
   function testGetAllowListSuccess() public {
