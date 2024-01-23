@@ -3,7 +3,9 @@ package ocr3impls
 import (
 	"context"
 	"fmt"
+	"strconv"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -50,7 +52,19 @@ func (m *multichainTransmitterOCR3[RI]) FromAccount() (types.Account, error) {
 // Transmit implements ocr3types.ContractTransmitter.
 func (m *multichainTransmitterOCR3[RI]) Transmit(ctx context.Context, configDigest types.ConfigDigest, seqNr uint64, rwi ocr3types.ReportWithInfo[RI], sigs []types.AttributedOnchainSignature) error {
 	destChain := rwi.Info.GetDestinationChain()
+
+	// get transmitter by evm chain id
 	transmitter, ok := m.transmitters[destChain]
+
+	// get transmitter by chain selector
+	chainSel, err := strconv.ParseUint(destChain.ChainID, 10, 64)
+	if err == nil {
+		ch, exists := chainsel.ChainBySelector(chainSel)
+		if exists {
+			transmitter, ok = m.transmitters[relay.NewID(relay.EVM, strconv.FormatUint(ch.EvmChainID, 10))]
+		}
+	}
+
 	if !ok {
 		return fmt.Errorf("no transmitter for chain %s", destChain)
 	}

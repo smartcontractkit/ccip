@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 )
 
 type Address common.Address
@@ -40,28 +41,18 @@ const (
 )
 
 func (n NetworkSelector) Type() NetworkType {
-	switch n {
-	case 1, 2, 3, 1337, 1338, 1339, 1340: // todo: use some lib
-		return NetworkTypeEvm
-	case 4:
-		return NetworkTypeSolana
-	default:
-		return NetworkTypeUnknown
-	}
-}
+	isEvm, err := chainsel.IsEvm(uint64(n))
 
-func (n *NetworkSelector) UnmarshalJSON(input []byte) error {
-	var i uint64
-	err := json.Unmarshal(input, &i)
+	// todo: rm
 	if err != nil {
-		return err
+		fmt.Println("gotcha")
 	}
-	*n = NetworkSelector(i)
-	return nil
-}
 
-func (n NetworkSelector) MarshalJSON() ([]byte, error) {
-	return json.Marshal(uint64(n))
+	if err == nil && isEvm {
+		return NetworkTypeEvm
+	}
+
+	return NetworkTypeUnknown
 }
 
 type NetworkType string

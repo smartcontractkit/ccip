@@ -17,6 +17,7 @@ import (
 	gethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/hashicorp/consul/sdk/freeport"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	confighelper2 "github.com/smartcontractkit/libocr/offchainreporting2plus/confighelper"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3confighelper"
@@ -54,8 +55,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/plugins"
 )
 
-const (
-	mainChainID = int64(1337)
+var (
+	mainChainID = int64(chainsel.GETH_TESTNET.EvmChainID)
 )
 
 func TestRebalancer_Integration(t *testing.T) {
@@ -343,6 +344,9 @@ fromBlock = %d
 			require.NoError(t, tapp.Stop())
 		})
 
+		rootChain, exists := chainsel.ChainByEvmChainID(testutils.SimulatedChainID.Uint64())
+		require.True(t, exists)
+
 		jobSpec := fmt.Sprintf(
 			`
 type                 	= "offchainreporting2"
@@ -367,7 +371,7 @@ fromBlock               = %d
 
 [pluginConfig]
 liquidityManagerAddress = "%s"
-liquidityManagerNetwork = %d
+liquidityManagerNetwork = "%d"
 closePluginTimeoutSec = 10
 [pluginConfig.rebalancerConfig]
 type = "random"
@@ -381,7 +385,7 @@ checkSourceDestEqual = false
 			mainFromBlock,
 			buildFollowerChainsFromBlocksToml(blocksBeforeConfig),
 			mainContract.Hex(),
-			testutils.SimulatedChainID)
+			rootChain.Selector)
 		t.Log("Creating rebalancer job with spec:\n", jobSpec)
 		ocrJob2, err2 := validate.ValidatedOracleSpecToml(
 			apps[i].GetConfig().OCR2(),
@@ -589,14 +593,23 @@ func fundAddress(t *testing.T, from *bind.TransactOpts, to common.Address, amoun
 func createChains(t *testing.T, numChains int) (owner *bind.TransactOpts, chains map[int64]*backends.SimulatedBackend) {
 	owner = testutils.MustNewSimTransactor(t)
 	chains = make(map[int64]*backends.SimulatedBackend)
-	for i := 0; i < numChains; i++ {
-		chainID := mainChainID + int64(i)
-		backend := backends.NewSimulatedBackend(core.GenesisAlloc{
+
+	chains[mainChainID] = backends.NewSimulatedBackend(core.GenesisAlloc{
+		owner.From: core.GenesisAccount{
+			Balance: assets.Ether(10000).ToInt(),
+		},
+	}, 30e6)
+
+	for chainID := int64(chainsel.TEST_90000001.EvmChainID); chainID < int64(chainsel.TEST_90000020.EvmChainID); chainID++ {
+		chains[chainID] = backends.NewSimulatedBackend(core.GenesisAlloc{
 			owner.From: core.GenesisAccount{
 				Balance: assets.Ether(10000).ToInt(),
 			},
 		}, 30e6)
-		chains[chainID] = backend
+
+		if len(chains) == numChains {
+			break
+		}
 	}
 	return
 }
