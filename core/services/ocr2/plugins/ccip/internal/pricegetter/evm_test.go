@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -48,6 +50,9 @@ func TestDynamicPriceGetter(t *testing.T) {
 	caller1 := rpclibmocks.NewEvmBatchCaller(t)
 	caller2 := rpclibmocks.NewEvmBatchCaller(t)
 
+	lp1 := lpmocks.NewLogPoller(t)
+	lp2 := lpmocks.NewLogPoller(t)
+
 	// Real LINK/USD example from OP.
 	round1 := aggregator_v3_interface.LatestRoundData{
 		RoundId:         big.NewInt(1000),
@@ -74,7 +79,7 @@ func TestDynamicPriceGetter(t *testing.T) {
 	//	AnsweredInRound: big.NewInt(3000),
 	//}
 
-	caller1.On("BatchCall", mock.Anything, uint64(0), mock.Anything).Return(
+	caller1.On("BatchCall", mock.Anything, uint64(1000), mock.Anything).Return(
 		[]rpclib.DataAndErr{
 			{
 				Outputs: []any{round1.RoundId, round1.Answer, round1.StartedAt, round1.UpdatedAt, round1.AnsweredInRound},
@@ -83,7 +88,7 @@ func TestDynamicPriceGetter(t *testing.T) {
 		nil,
 	).Maybe()
 
-	caller2.On("BatchCall", mock.Anything, uint64(0), mock.Anything).Return(
+	caller2.On("BatchCall", mock.Anything, uint64(2000), mock.Anything).Return(
 		[]rpclib.DataAndErr{
 			{
 				Outputs: []any{round2.RoundId, round2.Answer, round2.StartedAt, round2.UpdatedAt, round2.AnsweredInRound},
@@ -91,10 +96,23 @@ func TestDynamicPriceGetter(t *testing.T) {
 		},
 		nil,
 	).Maybe()
+	lp1.On("LatestBlock", mock.Anything).Return(
+		logpoller.LogPollerBlock{
+			BlockNumber: int64(1000),
+		}, nil).Maybe()
+	lp2.On("LatestBlock", mock.Anything).Return(logpoller.LogPollerBlock{
+		BlockNumber: int64(2000),
+	}, nil).Maybe()
 
-	evmClients := map[uint64]rpclib.EvmBatchCaller{
-		uint64(101): caller1,
-		uint64(102): caller2,
+	evmClients := map[uint64]DynamicPriceGetterClient{
+		uint64(101): {
+			BatchCaller: caller1,
+			LP:          lp1,
+		},
+		uint64(102): {
+			BatchCaller: caller2,
+			LP:          lp2,
+		},
 	}
 
 	pg, err := NewDynamicPriceGetter(cfg, evmClients)
@@ -105,5 +123,4 @@ func TestDynamicPriceGetter(t *testing.T) {
 	assert.Equal(t, big.NewInt(1396818990), prices[tk1])
 	assert.Equal(t, big.NewInt(238879815123), prices[tk2])
 	assert.Equal(t, cfg.StaticPrices[tk3].Price, prices[tk3].Uint64())
-
 }
