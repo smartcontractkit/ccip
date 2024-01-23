@@ -23,6 +23,7 @@ contract MockE2EUSDCTokenMessenger is ITokenMessenger {
     localMessageTransmitterWithRelay = IMessageTransmitterWithRelay(transmitter);
   }
 
+ // The mock function is based on the same function in https://github.com/circlefin/evm-cctp-contracts/blob/master/src/TokenMessenger.sol
   function depositForBurnWithCaller(
     uint256 amount,
     uint32 destinationDomain,
