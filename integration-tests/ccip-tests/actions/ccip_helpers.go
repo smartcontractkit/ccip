@@ -644,16 +644,18 @@ func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMa
 	if latestRoundData.Answer == nil {
 		return fmt.Errorf("latest round data is not populated for token %s and aggregator %s", tokenAddr, aggregatorContract.ContractAddress.Hex())
 	}
+
+	d.AggregatorPrices[common.HexToAddress(tokenAddr)] = AggregatorPriceConfig{
+		ChainID:         aggregatorContract.ChainID(),
+		ContractAddress: aggregatorContract.ContractAddress,
+	}
+
 	/*
-		d.AggregatorPrices[common.HexToAddress(tokenAddr)] = AggregatorPriceConfig{
-			ChainID:         aggregatorContract.ChainID(),
-			ContractAddress: aggregatorContract.ContractAddress,
+		d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
+			ChainID: aggregatorContract.ChainID(),
+			Price:   staticPrice.Uint64(),
 		}
 	*/
-	d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
-		ChainID: aggregatorContract.ChainID(),
-		Price:   staticPrice.Uint64(),
-	}
 
 	return nil
 }
