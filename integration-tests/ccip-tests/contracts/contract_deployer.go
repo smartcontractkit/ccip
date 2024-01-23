@@ -548,6 +548,12 @@ func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns 
 	if err != nil {
 		return nil, fmt.Errorf("deploying mock aggregator: %w", err)
 	}
+	log.Info().
+		Str("Contract Address", address.Hex()).
+		Str("Contract Name", "MockAggregator").
+		Str("From", e.evmClient.GetDefaultWallet().Address()).
+		Str("Network Name", e.evmClient.GetNetworkConfig().Name).
+		Msg("New contract")
 	return &MockAggregator{
 		client:          e.evmClient,
 		Instance:        instance.(*mock_v3_aggregator_contract.MockV3AggregatorContract),
