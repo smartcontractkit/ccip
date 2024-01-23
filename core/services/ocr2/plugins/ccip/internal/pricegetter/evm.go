@@ -9,8 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/gethwrappers2/generated/offchainaggregator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 // AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
@@ -30,15 +32,20 @@ type DynamicPriceGetterConfig struct {
 	StaticPrices     map[common.Address]StaticPriceConfig     `json:"staticPrices"`
 }
 
+type DynamicPriceGetterClient struct {
+	BatchCaller rpclib.EvmBatchCaller
+	LP          logpoller.LogPoller
+}
+
 type DynamicPriceGetter struct {
 	cfg           DynamicPriceGetterConfig
-	evmClients    map[uint64]rpclib.EvmBatchCaller
+	evmClients    map[uint64]DynamicPriceGetterClient
 	aggregatorAbi abi.ABI
 }
 
 // NewDynamicPriceGetter build a DynamicPriceGetter from a configuration and a map of chain ID to batch callers.
 // A batch caller should be provided for all retrieved prices.
-func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]rpclib.EvmBatchCaller) (*DynamicPriceGetter, error) {
+func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient) (*DynamicPriceGetter, error) {
 	aggregatorAbi, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
 	if err != nil {
 		return nil, err
@@ -73,13 +80,20 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 	}
 
 	for chainID, batchCalls := range batchCallsPerChain {
-		evmCaller, exists := d.evmClients[chainID]
+		client, exists := d.evmClients[chainID]
+		evmCaller := client.BatchCaller
+		lp := client.LP
 		if !exists {
 			return nil, fmt.Errorf("evm caller for chain %d not found", chainID)
 		}
 
 		tokensOrder := batchCallsTokensOrder[chainID]
-		resultsPerChain, err := evmCaller.BatchCall(ctx, 0, batchCalls)
+		latestBlock, err := lp.LatestBlock(pg.WithParentCtx(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("get latest block: %w", err)
+		}
+
+		resultsPerChain, err := evmCaller.BatchCall(ctx, uint64(latestBlock.BlockNumber), batchCalls)
 		if err != nil {
 			return nil, fmt.Errorf("batch call: %w", err)
 		}

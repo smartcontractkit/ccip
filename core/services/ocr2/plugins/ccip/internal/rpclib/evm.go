@@ -93,7 +93,7 @@ func (c *defaultEvmBatchCaller) batchCall(ctx context.Context, blockNumber uint6
 		}
 
 		bn := big.NewInt(0).SetUint64(blockNumber)
-		c.lggr.Warnf("eth_call method %s to %s data %s", call.methodName, call.contractAddress.Hex(), hexutil.Encode(packedInputs))
+
 		rpcBatchCalls[i] = rpc.BatchElem{
 			Method: "eth_call",
 			Args: []any{
@@ -124,7 +124,7 @@ func (c *defaultEvmBatchCaller) batchCall(ctx context.Context, blockNumber uint6
 		if err != nil {
 			return nil, err
 		}
-		c.lggr.Warnf("batch call result %s(%+v): decodedPackedOutputs=%s packedOutputs=%s", call.methodName, call.args, string(b), packedOutputs[i])
+
 		unpackedOutputs, err := call.abi.Unpack(call.methodName, b)
 		if err != nil {
 			return nil, fmt.Errorf("unpack result %s(%+v): %w", call.methodName, call.args, err)

@@ -138,16 +138,22 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		rpclib.DefaultRpcBatchSizeLimit,
 		rpclib.DefaultRpcBatchBackOffMultiplier,
 	)
-	evmClients := map[uint64]rpclib.EvmBatchCaller{
-		params.sourceChain.ID().Uint64(): srcCaller,
-		params.destChain.ID().Uint64():   dstCaller,
+	pricegetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{
+		params.sourceChain.ID().Uint64(): {
+			BatchCaller: srcCaller,
+			LP:          params.sourceChain.LogPoller(),
+		},
+		params.destChain.ID().Uint64(): {
+			BatchCaller: dstCaller,
+			LP:          params.destChain.LogPoller(),
+		},
 	}
 	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{}
 	err = json.Unmarshal([]byte(params.pluginConfig.PriceGetterConfig), &priceGetterConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	priceGetter, err := pricegetter.NewDynamicPriceGetter(priceGetterConfig, evmClients)
+	priceGetter, err := pricegetter.NewDynamicPriceGetter(priceGetterConfig, pricegetterClients)
 	if err != nil {
 		return nil, nil, err
 	}

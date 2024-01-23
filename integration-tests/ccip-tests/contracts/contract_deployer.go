@@ -31,11 +31,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
@@ -543,7 +543,7 @@ func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns 
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return mock_v3_aggregator_contract.DeployMockV3AggregatorContract(auth, backend, decimals, initialAns)
+		return mock_v3_aggregator_contract.DeployMockV3Aggregator(auth, backend, decimals, initialAns)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("deploying mock aggregator: %w", err)
@@ -556,13 +556,13 @@ func (e *CCIPContractsDeployer) DeployMockAggregator(decimals uint8, initialAns 
 		Msg("New contract")
 	return &MockAggregator{
 		client:          e.evmClient,
-		Instance:        instance.(*mock_v3_aggregator_contract.MockV3AggregatorContract),
+		Instance:        instance.(*mock_v3_aggregator_contract.MockV3Aggregator),
 		ContractAddress: *address,
 	}, nil
 }
 
 func (e *CCIPContractsDeployer) NewMockAggregator(addr common.Address) (*MockAggregator, error) {
-	ins, err := mock_v3_aggregator_contract.NewMockV3AggregatorContract(addr, e.evmClient.Backend())
+	ins, err := mock_v3_aggregator_contract.NewMockV3Aggregator(addr, e.evmClient.Backend())
 	if err != nil {
 		return nil, fmt.Errorf("creating mock aggregator: %w", err)
 	}

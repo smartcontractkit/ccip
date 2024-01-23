@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog/log"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -21,10 +25,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
@@ -787,7 +791,7 @@ func (offRamp *OffRamp) SyncTokensAndPools(sourceTokens, pools []common.Address)
 
 type MockAggregator struct {
 	client          blockchain.EVMClient
-	Instance        *mock_v3_aggregator_contract.MockV3AggregatorContract
+	Instance        *mock_v3_aggregator_contract.MockV3Aggregator
 	ContractAddress common.Address
 }
 
@@ -809,6 +813,47 @@ func (a *MockAggregator) UpdateRoundData(answer *big.Int) error {
 		return fmt.Errorf("unable to update round data: %w", err)
 	}
 	return a.client.ProcessTransaction(tx)
+}
+
+func (a *MockAggregator) LatestRoundData() error {
+	client, err := rpc.Dial(a.client.GetNetworkConfig().URL)
+	if err != nil {
+		return err
+	}
+	abi, err := abi.JSON(strings.NewReader(mock_v3_aggregator_contract.MockV3AggregatorABI))
+	if err != nil {
+		return err
+	}
+	packedInputs, err := abi.Pack("latestRoundData")
+	var packedOutputs string
+	err = client.BatchCallContext(context.Background(), []rpc.BatchElem{
+		{
+			Method: "eth_call",
+			Args: []interface{}{
+				map[string]interface{}{
+					"to":   a.ContractAddress.Hex(),
+					"data": hexutil.Bytes(packedInputs),
+					"from": common.Address{},
+				},
+				"latest",
+			},
+			Result: &packedOutputs,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	b, err := hexutil.Decode(packedOutputs)
+	if err != nil {
+		return err
+	}
+	unpackedOutputs, err := abi.Unpack("latestRoundData", b)
+	if err != nil {
+		return err
+	}
+	fmt.Println(unpackedOutputs)
+	return nil
 }
 
 func (a *MockAggregator) WaitForTxConfirmations() error {

@@ -627,6 +627,7 @@ func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMa
 	if err != nil {
 		return fmt.Errorf("error in updating round data %w", err)
 	}
+
 	err = aggregatorContract.WaitForTxConfirmations()
 	if err != nil {
 		return fmt.Errorf("error in waiting for tx confirmations %w", err)
@@ -636,6 +637,10 @@ func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMa
 	if err != nil {
 		return fmt.Errorf("error in getting latest round data %w", err)
 	}
+	err = aggregatorContract.LatestRoundData()
+	if err != nil {
+		return err
+	}
 	log.Info().
 		Str("token", tokenAddr).
 		Interface("latestRoundData", latestRoundData).
@@ -644,12 +649,12 @@ func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMa
 	if latestRoundData.Answer == nil {
 		return fmt.Errorf("latest round data is not populated for token %s and aggregator %s", tokenAddr, aggregatorContract.ContractAddress.Hex())
 	}
-	/*
-		d.AggregatorPrices[common.HexToAddress(tokenAddr)] = AggregatorPriceConfig{
-			ChainID:         aggregatorContract.ChainID(),
-			ContractAddress: aggregatorContract.ContractAddress,
-		}
-	*/
+
+	d.AggregatorPrices[common.HexToAddress(tokenAddr)] = AggregatorPriceConfig{
+		ChainID:         aggregatorContract.ChainID(),
+		ContractAddress: aggregatorContract.ContractAddress,
+	}
+
 	d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
 		ChainID: aggregatorContract.ChainID(),
 		Price:   staticPrice.Uint64(),
