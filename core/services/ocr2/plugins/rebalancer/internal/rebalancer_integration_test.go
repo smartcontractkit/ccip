@@ -60,7 +60,7 @@ var (
 )
 
 func TestRebalancer_Integration(t *testing.T) {
-	newTestUniverse(t, 3)
+	newTestUniverse(t, 8)
 }
 
 type ocr3Node struct {
