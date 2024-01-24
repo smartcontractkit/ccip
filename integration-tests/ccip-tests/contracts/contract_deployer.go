@@ -276,7 +276,34 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr string, armProxy common.Address, router common.Address) (
+func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, tokenMessenger, armProxy common.Address, router common.Address) (
+	*TokenPool,
+	error,
+) {
+	log.Debug().Str("token", tokenAddr).Msg("Deploying usdc token pool")
+	token := common.HexToAddress(tokenAddr)
+	address, _, _, err := e.evmClient.DeployContract("USDC Token Pool", func(
+		auth *bind.TransactOpts,
+		backend bind.ContractBackend,
+	) (common.Address, *types.Transaction, interface{}, error) {
+		return usdc_token_pool.DeployUSDCTokenPool(
+			auth,
+			backend,
+			tokenMessenger,
+			token,
+			[]common.Address{},
+			armProxy,
+			router,
+		)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return e.NewUSDCTokenPoolContract(*address)
+}
+
+func (e *CCIPContractsDeployer) NewUSDCTokenPoolContract(addr common.Address) (
 	*TokenPool,
 	error,
 ) {
@@ -303,32 +330,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployUSDCTokenPoolContract(tokenAddr string, tokenMessenger, armProxy common.Address) (
-	*TokenPool,
-	error,
-) {
-	log.Debug().Str("token", tokenAddr).Msg("Deploying usdc token pool")
-	token := common.HexToAddress(tokenAddr)
-	address, _, _, err := e.evmClient.DeployContract("USDC Token Pool", func(
-		auth *bind.TransactOpts,
-		backend bind.ContractBackend,
-	) (common.Address, *types.Transaction, interface{}, error) {
-		return usdc_token_pool.DeployUSDCTokenPool(
-			auth,
-			backend,
-			tokenMessenger,
-			token,
-			[]common.Address{},
-			armProxy)
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	return e.NewUSDCTokenPoolContract(*address)
-}
-
-func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr string, armProxy common.Address) (
+func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(tokenAddr string, armProxy common.Address, router common.Address) (
 	*TokenPool,
 	error,
 ) {

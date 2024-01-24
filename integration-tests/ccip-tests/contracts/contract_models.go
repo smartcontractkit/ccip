@@ -13,17 +13,17 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_usdc_token_transmitter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/link_token_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
@@ -379,16 +379,16 @@ func (pool *TokenPool) SetOnRamp(remoteChainSelector uint64) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting on ramp for onramp router")
-	tx, err := pool.Instance.ApplyChainUpdates(opts, []lock_release_token_pool.TokenPoolChainUpdate{
+	tx, err := pool.PoolInterface.ApplyChainUpdates(opts, []token_pool.TokenPoolChainUpdate{
 		{
 			ChainSelector: remoteChainSelector,
 			Allowed:       true,
-			InboundRateLimiterConfig: TokenPool.RateLimiterConfig{
+			InboundRateLimiterConfig: token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
 			},
-			OutboundRateLimiterConfig: TokenPool.RateLimiterConfig{
+			OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
