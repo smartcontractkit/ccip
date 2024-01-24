@@ -6,8 +6,8 @@ Data = """
       "Arbitrum Mainnet": {
         "is_native_fee_token": true,
         "fee_token": "",
-        "bridge_tokens": ["0xaf88d065e77c8cC2239327C5EDb3A432268e5831"],
-        "bridge_tokens_pools": ["0x69Ee2fC63B9Ff218EEcEDD2F2375D11da229BdA9"],
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
         "arm": "0xe06b0e8c4bd455153e8794ad7Ea8Ff5A14B64E4b",
         "router": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
         "price_registry": "0x13015e4E6f839E1Aa1016DF521ea458ecA20438c",
@@ -79,8 +79,8 @@ Data = """
       "Base Mainnet": {
           "is_native_fee_token": true,
           "fee_token": "",
-          "bridge_tokens": ["0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196"],
-          "bridge_tokens_pools": ["0x1568A4131760231712E59778DAB9EFE67911f4ff"],
+          "bridge_tokens": [],
+          "bridge_tokens_pools": [],
           "arm": "0x38660c8CC222c0192b635c2ac09687B4F25cCE5F",
           "router": "0x881e3A65B4d4a04dD529061dd0071cf975F58bCD",
           "price_registry": "0x6337a58D4BD7Ba691B66341779e8f87d4679923a",
@@ -179,8 +179,8 @@ Data = """
       "Ethereum Mainnet": {
         "is_native_fee_token": true,
         "fee_token": "",
-        "bridge_tokens": ["0x514910771AF9Ca656af840dff83E8264EcF986CA"],
-        "bridge_tokens_pools": ["0xC2291992A08eBFDfedfE248F2CCD34Da63570DF4"],
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
         "arm" : "0x8B63b3DE93431C0f756A493644d128134291fA1b",
         "router": "0x80226fc0Ee2b096224EeAc085Bb9a8cba1146f7D",
         "price_registry": "0x8c9b2Efb7c64C394119270bfecE7f54763b958Ad",
@@ -255,7 +255,7 @@ Data = """
       },
       "Kroma Mainnet": {
         "is_native_fee_token": true,
-        "fee_token": "0xC1F6f7622ad37C3f46cDF6F8AA0344ADE80BF450",
+        "fee_token": "",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
         "arm" : "0xB59779d3364BC6d71168245f9ebb96469E5a5a98",
@@ -278,7 +278,7 @@ Data = """
       },
       "Optimism Mainnet": {
         "is_native_fee_token": true,
-        "fee_token": "0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6",
+        "fee_token": "",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
         "arm": "0x8C7C2C3362a42308BB5c368677Ad321D11693b81",
@@ -319,9 +319,9 @@ Data = """
       },
       "Polygon Mainnet": {
         "is_native_fee_token": true,
-        "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
-        "bridge_tokens": ["0xb0897686c545045aFc77CF20eC7A532E3120E0F1"],
-        "bridge_tokens_pools": ["0x086892015567fb8764d02c6845C85C25C8FcA389"],
+        "fee_token": "",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
         "arm": "0xD7AcF65dA1E1f34b663aB199a474F209bF2b0523",
         "router": "0x849c5ED5a80F5B408Dd4969b78c2C8fdf0565Bfe",
         "price_registry": "0x30D873664Ba766C983984C7AF9A921ccE36D34e1",
@@ -426,7 +426,7 @@ MsgType = 'WithoutToken'
 DestGasLimit = 0
 BiDirectionalLane = true
 PhaseTimeout = '50m'
-TestDuration = '168h'
+TestDuration = '144h'
 ExistingDeployment = true
 RequestPerUnitTime = [1]
 TimeUnit = '1h'
