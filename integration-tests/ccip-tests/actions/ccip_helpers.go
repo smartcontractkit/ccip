@@ -767,6 +767,7 @@ type SourceCCIPModule struct {
 	Sender                     common.Address
 	TransferAmount             []*big.Int
 	DestinationChainId         uint64
+	DestChainSelector          uint64
 	DestNetworkName            string
 	OnRamp                     *contracts.OnRamp
 	SrcStartBlock              uint64
@@ -928,7 +929,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 
 		// update native pool with onRamp address
 		for _, pool := range sourceCCIP.Common.BridgeTokenPools {
-			err = pool.SetOnRamp(sourceCCIP.DestinationChainId)
+			err = pool.SetOnRamp(sourceCCIP.DestChainSelector)
 			if err != nil {
 				return fmt.Errorf("setting OnRamp on the bridge token pool shouldn't fail %w", err)
 			}
@@ -1204,10 +1205,16 @@ func DefaultSourceCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMCl
 	if len(transferAmount) > 0 && len(transferAmount) > len(cmn.BridgeTokens) {
 		transferAmount = transferAmount[:len(cmn.BridgeTokens)]
 	}
+
+	destChainSelector, err := chainselectors.SelectorFromChainId(destChainId)
+	if err != nil {
+		return nil, fmt.Errorf("failed getting the chain selector: %w", err)
+	}
 	source := &SourceCCIPModule{
 		Common:                   cmn,
 		TransferAmount:           transferAmount,
 		DestinationChainId:       destChainId,
+		DestChainSelector:        destChainSelector,
 		DestNetworkName:          destChain,
 		Sender:                   common.HexToAddress(chainClient.GetDefaultWallet().Address()),
 		CCIPSendRequestedWatcher: &sync.Map{},
@@ -1219,6 +1226,7 @@ func DefaultSourceCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMCl
 type DestCCIPModule struct {
 	Common                  *CCIPCommon
 	SourceChainId           uint64
+	SourceChainSelector     uint64
 	SourceNetworkName       string
 	CommitStore             *contracts.CommitStore
 	ReceiverDapp            *contracts.ReceiverDapp
@@ -1276,10 +1284,6 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 	contractDeployer := destCCIP.Common.Deployer
 	log.Info().Msg("Deploying destination chain specific contracts")
 	destCCIP.LoadContracts(lane)
-	sourceChainSelector, err := chainselectors.SelectorFromChainId(destCCIP.SourceChainId)
-	if err != nil {
-		return fmt.Errorf("failed to get chain selector for source chain id %d: %w", destCCIP.SourceChainId, err)
-	}
 	destChainSelector, err := chainselectors.SelectorFromChainId(destCCIP.Common.ChainClient.GetChainID().Uint64())
 	if err != nil {
 		return fmt.Errorf("failed to get chain selector for destination chain id %d: %w", destCCIP.Common.ChainClient.GetChainID().Uint64(), err)
@@ -1291,7 +1295,9 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		}
 		// commitStore responsible for validating the transfer message
 		destCCIP.CommitStore, err = contractDeployer.DeployCommitStore(
-			sourceChainSelector, destChainSelector, sourceCCIP.OnRamp.EthAddress,
+			destCCIP.SourceChainSelector,
+			destChainSelector,
+			sourceCCIP.OnRamp.EthAddress,
 			*destCCIP.Common.ARMContract,
 		)
 		if err != nil {
@@ -1323,8 +1329,10 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 			return fmt.Errorf("offramp address not provided in lane config")
 		}
 		destCCIP.OffRamp, err = contractDeployer.DeployOffRamp(
-			sourceChainSelector, destChainSelector,
-			destCCIP.CommitStore.EthAddress, sourceCCIP.OnRamp.EthAddress,
+			sourceCCIP.DestChainSelector,
+			destChainSelector,
+			destCCIP.CommitStore.EthAddress,
+			sourceCCIP.OnRamp.EthAddress,
 			[]common.Address{}, []common.Address{}, destCCIP.Common.RateLimiterConfig, *destCCIP.Common.ARMContract)
 		if err != nil {
 			return fmt.Errorf("deploying offramp shouldn't fail %w", err)
@@ -1335,7 +1343,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		}
 
 		// apply offramp updates
-		_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, sourceChainSelector)
+		_, err = destCCIP.Common.Router.AddOffRamp(destCCIP.OffRamp.EthAddress, destCCIP.SourceChainSelector)
 		if err != nil {
 			return fmt.Errorf("setting offramp as fee updater shouldn't fail %w", err)
 		}
@@ -1351,7 +1359,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 
 		// update pools with offRamp id
 		for _, pool := range destCCIP.Common.BridgeTokenPools {
-			err = pool.SetOffRamp(destCCIP.SourceChainId)
+			err = pool.SetOffRamp(destCCIP.SourceChainSelector)
 			if err != nil {
 				return fmt.Errorf("setting offramp on the bridge token pool shouldn't fail %w", err)
 			}
@@ -1675,9 +1683,15 @@ func DefaultDestinationCCIPModule(logger zerolog.Logger, chainClient blockchain.
 	if err != nil {
 		return nil, err
 	}
+
+	sourceChainSelector, err := chainselectors.SelectorFromChainId(sourceChainId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain selector for source chain id %d: %w", sourceChainId, err)
+	}
 	return &DestCCIPModule{
 		Common:                  cmn,
 		SourceChainId:           sourceChainId,
+		SourceChainSelector:     sourceChainSelector,
 		SourceNetworkName:       sourceChain,
 		NextSeqNumToCommit:      atomic.NewUint64(1),
 		ReportBlessedWatcher:    &sync.Map{},
