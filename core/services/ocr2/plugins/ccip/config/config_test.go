@@ -27,10 +27,6 @@ func TestCommitConfig(t *testing.T) {
 			 "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
 			  "chainID": 1337,
 			  "contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
-			 },
-			 "0xec8c353470ccaa4f43067fcde40558e084a12927": {
-			  "chainID": 1000,
-			  "contractAddress": "0x277517e2127a09bda109217c9cf901bc7a9f9b9a"
 			 }
 			},
 			"staticPrices": {
@@ -56,6 +52,8 @@ func TestCommitConfig(t *testing.T) {
 	require.True(t, json.Valid(jsonPriceGetterConfig))
 	parsedPriceGetterConfig := pricegetter.DynamicPriceGetterConfig{}
 	require.NoError(t, json.Unmarshal(jsonPriceGetterConfig, &parsedPriceGetterConfig))
+	_, err = pricegetter.NewDynamicPriceGetter(parsedPriceGetterConfig, nil)
+	require.NoError(t, err)
 }
 
 func TestExecutionConfig(t *testing.T) {

@@ -651,10 +651,10 @@ func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMa
 		ContractAddress: aggregatorContract.ContractAddress,
 	}
 
-	d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
-		ChainID: aggregatorContract.ChainID(),
-		Price:   staticPrice.Uint64(),
-	}
+	//d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
+	//	ChainID: aggregatorContract.ChainID(),
+	//	Price:   staticPrice.Uint64(),
+	//}
 
 	return nil
 }
