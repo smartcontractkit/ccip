@@ -2,6 +2,7 @@ package pricegetter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -43,30 +44,43 @@ type DynamicPriceGetter struct {
 	aggregatorAbi abi.ABI
 }
 
-// NewDynamicPriceGetter build a DynamicPriceGetter from a configuration and a map of chain ID to batch callers.
-// A batch caller should be provided for all retrieved prices.
-func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient) (*DynamicPriceGetter, error) {
-	aggregatorAbi, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
+func NewDynamicPriceGetterConfig(configJson string) (DynamicPriceGetterConfig, error) {
+	priceGetterConfig := DynamicPriceGetterConfig{}
+	err := json.Unmarshal([]byte(configJson), &priceGetterConfig)
 	if err != nil {
-		return nil, err
+		return DynamicPriceGetterConfig{}, err
 	}
-	priceGetter := DynamicPriceGetter{cfg, evmClients, aggregatorAbi}
-	if err = priceGetter.Validate(); err != nil {
-		return nil, err
+	err = priceGetterConfig.Validate()
+	if err != nil {
+		return DynamicPriceGetterConfig{}, err
 	}
-	return &priceGetter, nil
+	return priceGetterConfig, nil
 }
 
-func (d *DynamicPriceGetter) Validate() error {
+func (c *DynamicPriceGetterConfig) Validate() error {
 	// Ensure no duplication in token price resolution rules.
-	if d.cfg.AggregatorPrices != nil && d.cfg.StaticPrices != nil {
-		for tk := range d.cfg.AggregatorPrices {
-			if _, exists := d.cfg.StaticPrices[tk]; exists {
+	if c.AggregatorPrices != nil && c.StaticPrices != nil {
+		for tk := range c.AggregatorPrices {
+			if _, exists := c.StaticPrices[tk]; exists {
 				return fmt.Errorf("token %s defined in both aggregator and static price rules", tk.Hex())
 			}
 		}
 	}
 	return nil
+}
+
+// NewDynamicPriceGetter build a DynamicPriceGetter from a configuration and a map of chain ID to batch callers.
+// A batch caller should be provided for all retrieved prices.
+func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient) (*DynamicPriceGetter, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	aggregatorAbi, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
+	if err != nil {
+		return nil, err
+	}
+	priceGetter := DynamicPriceGetter{cfg, evmClients, aggregatorAbi}
+	return &priceGetter, nil
 }
 
 // TokenPricesUSD implements the PriceGetter interface.
@@ -77,21 +91,19 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 	batchCallsTokensOrder := make(map[uint64][]common.Address)
 
 	for _, tk := range tokens {
-		// group aggregator-based tokens to make batch call (one per chain)
-		if aggCfg, exists := d.cfg.AggregatorPrices[tk]; exists {
+		if aggCfg, isAgg := d.cfg.AggregatorPrices[tk]; isAgg {
+			// Batch calls for aggregator-based tokens (one per chain).
 			batchCallsPerChain[aggCfg.ChainID] = append(batchCallsPerChain[aggCfg.ChainID], rpclib.NewEvmCall(
 				d.aggregatorAbi,
 				"latestRoundData",
 				aggCfg.AggregatorContractAddress,
 			))
 			batchCallsTokensOrder[aggCfg.ChainID] = append(batchCallsTokensOrder[aggCfg.ChainID], tk)
-			continue
-		}
-
-		// fill static prices
-		if staticCfg, exists := d.cfg.StaticPrices[tk]; exists {
+		} else if staticCfg, isStatic := d.cfg.StaticPrices[tk]; isStatic {
+			// Fill static prices.
 			prices[tk] = big.NewInt(0).SetUint64(staticCfg.Price)
-			continue
+		} else {
+			return nil, fmt.Errorf("no price resolution rule for token %s", tk.Hex())
 		}
 	}
 

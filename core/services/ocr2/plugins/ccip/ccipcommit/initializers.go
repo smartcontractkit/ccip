@@ -144,8 +144,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			LP:          params.destChain.LogPoller(),
 		},
 	}
-	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{}
-	err = json.Unmarshal([]byte(params.pluginConfig.PriceGetterConfig), &priceGetterConfig)
+	priceGetterConfig, err := pricegetter.NewDynamicPriceGetterConfig(params.pluginConfig.PriceGetterConfig)
 	if err != nil {
 		return nil, nil, err
 	}

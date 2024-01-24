@@ -13,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
@@ -184,7 +185,10 @@ func (params CCIPJobSpecParams) ValidateCommitJobSpec() error {
 	if params.OffRamp == common.HexToAddress("0x0") {
 		return fmt.Errorf("OffRamp cannot be empty for execution job")
 	}
-	// TODO validate token prices config
+	// Validate token prices config
+	if _, err := pricegetter.NewDynamicPriceGetterConfig(params.PriceGetterConfig); err != nil {
+		return err
+	}
 	return nil
 }
 
