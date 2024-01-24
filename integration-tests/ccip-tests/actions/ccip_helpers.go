@@ -1184,7 +1184,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 
 		// update pools with offRamp id
 		for _, pool := range destCCIP.Common.BridgeTokenPools {
-			err = pool.SetOffRamp(destCCIP.OffRamp.EthAddress)
+			err = pool.SetOffRamp(destCCIP.SourceChainId)
 			if err != nil {
 				return fmt.Errorf("setting offramp on the bridge token pool shouldn't fail %w", err)
 			}

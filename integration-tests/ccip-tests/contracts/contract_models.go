@@ -266,59 +266,59 @@ func (pool *LockReleaseTokenPool) SetOnRamp(remoteChainSelector uint64) error {
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
-		Str("OnRamp", onRamp.Hex()).
+		Str("OnRamp", strconv.FormatUint(remoteChainSelector, 10)).
 		Str("Network Name", pool.client.GetNetworkConfig().Name).
 		Msg("OnRamp is set")
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *LockReleaseTokenPool) SetOnRampRateLimit(onRamp common.Address, rl lock_release_token_pool.RateLimiterConfig) error {
+func (pool *LockReleaseTokenPool) SetOnRampRateLimit(remoteChainSelector uint64, rl lock_release_token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
-		Str("OnRamp", onRamp.Hex()).
+		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
 		Interface("RateLimiterConfig", rl).
 		Msg("Setting Rate Limit on token pool")
-	tx, err := pool.Instance.SetOnRampRateLimiterConfig(opts, onRamp, rl)
+	tx, err := pool.Instance.SetChainRateLimiterConfig(opts, remoteChainSelector, rl, rl)
 
 	if err != nil {
 		return err
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
-		Str("OnRamp", onRamp.Hex()).
+		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
 		Interface("RateLimiterConfig", rl).
 		Msg("Rate Limit on ramp is set")
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *LockReleaseTokenPool) SetOffRampRateLimit(offRamp common.Address, rl lock_release_token_pool.RateLimiterConfig) error {
+func (pool *LockReleaseTokenPool) SetOffRampRateLimit(remoteChainSelector uint64, rl lock_release_token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
-		Str("OffRamp", offRamp.Hex()).
+		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
 		Interface("RateLimiterConfig", rl).
 		Msg("Setting Rate Limit offramp")
-	tx, err := pool.Instance.SetOffRampRateLimiterConfig(opts, offRamp, rl)
+	tx, err := pool.Instance.SetChainRateLimiterConfig(opts, remoteChainSelector, rl, rl)
 
 	if err != nil {
 		return err
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
-		Str("OffRamp", offRamp.Hex()).
+		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
 		Interface("RateLimiterConfig", rl).
 		Msg("Rate Limit offRamp is set")
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
+func (pool *LockReleaseTokenPool) SetOffRamp(remoteChainSelector uint64) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
@@ -327,18 +327,27 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 		Str("Token Pool", pool.Address()).
 		Msg("Setting off ramp for Token Pool")
 
-	tx, err := pool.Instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{
-		{Ramp: offRamp, Allowed: true, RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
-			IsEnabled: true,
-			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-		}}})
+	tx, err := pool.Instance.ApplyChainUpdates(opts, []lock_release_token_pool.TokenPoolChainUpdate{
+		{
+			ChainSelector: remoteChainSelector,
+			Allowed:       true,
+			InboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			},
+			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
+				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
+			},
+		}})
 	if err != nil {
 		return err
 	}
 	log.Info().
 		Str("Token Pool", pool.Address()).
-		Str("OffRamp", offRamp.Hex()).
+		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
 		Str("Network Name", pool.client.GetNetworkConfig().Name).
 		Msg("OffRamp is set")
 	return pool.client.ProcessTransaction(tx)
