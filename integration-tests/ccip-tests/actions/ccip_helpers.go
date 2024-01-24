@@ -1685,7 +1685,7 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 	if err := d.AddPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD, false); err != nil {
 		return "", fmt.Errorf("error %w in AddPriceConfig for wrapped native %s", err, lane.Dest.Common.WrappedNative.Hex())
 	}
-	if err := d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD, true); err != nil {
+	if err := d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD, false); err != nil {
 		return "", fmt.Errorf("error %w in AddPriceConfig for wrapped native %s", err, lane.Source.Common.WrappedNative.Hex())
 	}
 	return d.String()
