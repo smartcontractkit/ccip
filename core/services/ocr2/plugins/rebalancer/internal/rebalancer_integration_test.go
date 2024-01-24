@@ -660,7 +660,9 @@ func deployContracts(
 		require.NoError(t, err)
 
 		// deploy the rebalancer and set the liquidity container to be the lock release pool
-		rebalancerAddr, _, _, err := rebalancer.DeployRebalancer(owner, backend, wethAddress, uint64(chainID), lockReleasePoolAddress)
+		ch, exists := chainsel.ChainByEvmChainID(uint64(chainID))
+		require.True(t, exists)
+		rebalancerAddr, _, _, err := rebalancer.DeployRebalancer(owner, backend, wethAddress, ch.Selector, lockReleasePoolAddress)
 		require.NoError(t, err, "failed to deploy Rebalancer contract")
 		rebalancer, err := rebalancer.NewRebalancer(rebalancerAddr, backend)
 		require.NoError(t, err, "failed to create Rebalancer wrapper")
@@ -754,11 +756,14 @@ func createConnectedNetwork(
 			continue
 		}
 		// follower -> main connection
+		remoteChain, exists := chainsel.ChainByEvmChainID(uint64(mainChainID))
+		require.True(t, exists)
+
 		_, err := uni.rebalancer.SetCrossChainRebalancer(
 			owner,
 			rebalancer.IRebalancerCrossChainRebalancerArgs{
 				RemoteRebalancer:    universes[mainChainID].rebalancer.Address(),
-				RemoteChainSelector: uint64(mainChainID),
+				RemoteChainSelector: remoteChain.Selector,
 				Enabled:             true,
 				LocalBridge:         uni.bridgeAdapter.Address(),
 				RemoteToken:         universes[mainChainID].wethToken.Address(),
@@ -766,7 +771,7 @@ func createConnectedNetwork(
 		require.NoError(t, err, "failed to SetCrossChainRebalancer from follower to main chain")
 		chains[chainID].Commit()
 
-		mgr, err := uni.rebalancer.GetCrossChainRebalancer(&bind.CallOpts{Context: testutils.Context(t)}, uint64(mainChainID))
+		mgr, err := uni.rebalancer.GetCrossChainRebalancer(&bind.CallOpts{Context: testutils.Context(t)}, remoteChain.Selector)
 		require.NoError(t, err)
 		require.Equal(t, universes[mainChainID].rebalancer.Address(), mgr.RemoteRebalancer)
 		require.Equal(t, uni.bridgeAdapter.Address(), mgr.LocalBridge)
@@ -774,11 +779,14 @@ func createConnectedNetwork(
 		require.True(t, mgr.Enabled)
 
 		// main -> follower connection
+		remoteChain, exists = chainsel.ChainByEvmChainID(uint64(chainID))
+		require.True(t, exists)
+
 		_, err = universes[mainChainID].rebalancer.SetCrossChainRebalancer(
 			owner,
 			rebalancer.IRebalancerCrossChainRebalancerArgs{
 				RemoteRebalancer:    uni.rebalancer.Address(),
-				RemoteChainSelector: uint64(chainID),
+				RemoteChainSelector: remoteChain.Selector,
 				Enabled:             true,
 				LocalBridge:         universes[mainChainID].bridgeAdapter.Address(),
 				RemoteToken:         uni.wethToken.Address(),
@@ -786,7 +794,8 @@ func createConnectedNetwork(
 		require.NoError(t, err, "failed to add neighbor from main to follower chain")
 		chains[mainChainID].Commit()
 
-		mgr, err = universes[mainChainID].rebalancer.GetCrossChainRebalancer(&bind.CallOpts{Context: testutils.Context(t)}, uint64(chainID))
+		mgr, err = universes[mainChainID].rebalancer.GetCrossChainRebalancer(
+			&bind.CallOpts{Context: testutils.Context(t)}, remoteChain.Selector)
 		require.NoError(t, err)
 		require.Equal(t, uni.rebalancer.Address(), mgr.RemoteRebalancer)
 		require.Equal(t, universes[mainChainID].bridgeAdapter.Address(), mgr.LocalBridge)
