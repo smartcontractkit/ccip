@@ -4,6 +4,10 @@ package mocks
 
 import (
 	common "github.com/ethereum/go-ethereum/common"
+	ccipdata "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+
+	context "context"
+
 	mock "github.com/stretchr/testify/mock"
 
 	rpclib "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
@@ -55,6 +59,36 @@ func (_m *TokenPoolReader) GetInboundTokenPoolRateLimitCall() (rpclib.EvmCall, e
 
 	if rf, ok := ret.Get(1).(func() error); ok {
 		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetInboundTokenPoolRateLimits provides a mock function with given fields: ctx, pools
+func (_m *TokenPoolReader) GetInboundTokenPoolRateLimits(ctx context.Context, pools []ccipdata.TokenPoolReader) ([]ccipdata.TokenBucketRateLimit, error) {
+	ret := _m.Called(ctx, pools)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInboundTokenPoolRateLimits")
+	}
+
+	var r0 []ccipdata.TokenBucketRateLimit
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipdata.TokenPoolReader) ([]ccipdata.TokenBucketRateLimit, error)); ok {
+		return rf(ctx, pools)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipdata.TokenPoolReader) []ccipdata.TokenBucketRateLimit); ok {
+		r0 = rf(ctx, pools)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ccipdata.TokenBucketRateLimit)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []ccipdata.TokenPoolReader) error); ok {
+		r1 = rf(ctx, pools)
 	} else {
 		r1 = ret.Error(1)
 	}

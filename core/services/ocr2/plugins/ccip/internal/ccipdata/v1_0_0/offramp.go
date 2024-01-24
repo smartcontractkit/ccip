@@ -271,40 +271,6 @@ func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, toke
 	return destTokens, nil
 }
 
-func (o *OffRamp) GetTokenPoolsRateLimits(ctx context.Context, tokenPoolReaders []ccipdata.TokenPoolReader) ([]ccipdata.TokenBucketRateLimit, error) {
-	if len(tokenPoolReaders) == 0 {
-		return nil, nil
-	}
-
-	evmCalls := make([]rpclib.EvmCall, 0, len(tokenPoolReaders))
-	for _, poolReader := range tokenPoolReaders {
-		call, err := poolReader.GetInboundTokenPoolRateLimitCall()
-		if err != nil {
-			return nil, fmt.Errorf("get inbound token pool rate limit call: %w", err)
-		}
-		evmCalls = append(evmCalls, call)
-	}
-
-	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
-	if err != nil {
-		return nil, fmt.Errorf("get latest block: %w", err)
-	}
-
-	results, err := o.evmBatchCaller.BatchCall(ctx, uint64(latestBlock.BlockNumber), evmCalls)
-	if err != nil {
-		return nil, fmt.Errorf("batch call limit: %w", err)
-	}
-
-	rateLimits, err := rpclib.ParseOutputs[ccipdata.TokenBucketRateLimit](results, func(d rpclib.DataAndErr) (ccipdata.TokenBucketRateLimit, error) {
-		return rpclib.ParseOutput[ccipdata.TokenBucketRateLimit](d, 0)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("parse outputs: %w", err)
-	}
-
-	return rateLimits, nil
-}
-
 func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[common.Address]common.Address, error) {
 	tokens, err := o.GetTokens(ctx)
 	if err != nil {

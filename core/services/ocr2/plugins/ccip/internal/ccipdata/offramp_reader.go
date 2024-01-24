@@ -89,7 +89,6 @@ type OffRampReader interface {
 	DecodeExecutionReport(report []byte) (ExecReport, error)
 	// GetExecutionStateChangesBetweenSeqNums returns all the execution state change events for the provided message sequence numbers (inclusive).
 	GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]Event[ExecutionStateChanged], error)
-	GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []TokenPoolReader) ([]TokenBucketRateLimit, error)
 	Address() common.Address
 	// ChangeConfig notifies the reader that the config has changed onchain
 	ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error)

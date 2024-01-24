@@ -32,6 +32,13 @@ type TokenPoolFactory struct {
 	evmBatchCaller      rpclib.EvmBatchCaller
 }
 
+//go:generate mockery --quiet --name TokenPoolFactoryInterface --filename token_pool_factory_mock.go --case=underscor
+type TokenPoolFactoryInterface interface {
+	NewTokenPools(ctx context.Context, tokenPoolAddresses []common.Address) ([]ccipdata.TokenPoolReader, error)
+}
+
+var _ TokenPoolFactoryInterface = (*TokenPoolFactory)(nil)
+
 func NewTokenPoolFactory(lggr logger.Logger, remoteChainSelector uint64, offRampAddress common.Address, ec client.Client, lp logpoller.LogPoller) TokenPoolFactory {
 	return TokenPoolFactory{
 		lggr:                lggr,
@@ -43,18 +50,14 @@ func NewTokenPoolFactory(lggr logger.Logger, remoteChainSelector uint64, offRamp
 	}
 }
 
-func (f *TokenPoolFactory) NewTokenPools(ctx context.Context, tokenPoolAddresses []common.Address) ([]ccipdata.TokenPoolReader, error) {
-	return getTokenPoolReader(ctx, tokenPoolAddresses, f.remoteChainSelector, f.offRampAddress, f.lp, f.evmBatchCaller)
-}
-
-// getTokenPoolReader returns a slice of token pool readers for the given token pool addresses.
-func getTokenPoolReader(ctx context.Context, tokenPoolAddresses []common.Address, remoteChainSelector uint64, offRampAddress common.Address, lp logpoller.LogPoller, evmBatchCaller rpclib.EvmBatchCaller) ([]ccipdata.TokenPoolReader, error) {
+// NewTokenPools returns a slice of token pool readers for the given token pool addresses.
+func (f TokenPoolFactory) NewTokenPools(ctx context.Context, tokenPoolAddresses []common.Address) ([]ccipdata.TokenPoolReader, error) {
 	// Return early to avoid the logPoller call
 	if len(tokenPoolAddresses) == 0 {
 		return []ccipdata.TokenPoolReader{}, nil
 	}
 
-	evmCalls := make([]rpclib.EvmCall, 0, len(tokenPoolAddresses))
+	var evmCalls []rpclib.EvmCall
 	for _, poolAddress := range tokenPoolAddresses {
 		evmCalls = append(evmCalls, rpclib.NewEvmCall(
 			typeAndVersionABI,
@@ -63,12 +66,12 @@ func getTokenPoolReader(ctx context.Context, tokenPoolAddresses []common.Address
 		))
 	}
 
-	latestBlock, err := lp.LatestBlock(pg.WithParentCtx(ctx))
+	latestBlock, err := f.lp.LatestBlock(pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("get latest block: %w", err)
 	}
 
-	results, err := evmBatchCaller.BatchCall(ctx, uint64(latestBlock.FinalizedBlockNumber), evmCalls)
+	results, err := f.evmBatchCaller.BatchCall(ctx, uint64(latestBlock.FinalizedBlockNumber), evmCalls)
 	if err != nil {
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
@@ -77,7 +80,7 @@ func getTokenPoolReader(ctx context.Context, tokenPoolAddresses []common.Address
 		return rpclib.ParseOutput[string](d, 0)
 	})
 
-	tokenPoolReaders := make([]ccipdata.TokenPoolReader, len(tokenPoolAddresses))
+	var tokenPoolReaders []ccipdata.TokenPoolReader
 
 	for i, tokenPoolAddress := range tokenPoolAddresses {
 		typeAndVersion := typeAndVersions[i]
@@ -87,9 +90,9 @@ func getTokenPoolReader(ctx context.Context, tokenPoolAddresses []common.Address
 		}
 		switch version {
 		case ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0:
-			tokenPoolReaders = append(tokenPoolReaders, v1_2_0.NewTokenPool(poolType, tokenPoolAddress, offRampAddress))
+			tokenPoolReaders = append(tokenPoolReaders, v1_2_0.NewTokenPool(poolType, tokenPoolAddress, f.offRampAddress, f.ec, f.lp, f.evmBatchCaller))
 		case ccipdata.V1_3_0:
-			tokenPoolReaders = append(tokenPoolReaders, v1_3_0.NewTokenPool(poolType, tokenPoolAddress, remoteChainSelector))
+			tokenPoolReaders = append(tokenPoolReaders, v1_3_0.NewTokenPool(poolType, tokenPoolAddress, f.remoteChainSelector, f.ec, f.lp, f.evmBatchCaller))
 		default:
 			return nil, fmt.Errorf("unsupported token pool version %v", version)
 		}

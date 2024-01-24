@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
+	factorymocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory/mocks"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
@@ -882,10 +883,19 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			mockOffRampReader.On("GetTokens", ctx).Return(ccipdata.OffRampTokens{
 				DestinationPool: poolsMapping,
 			}, tc.destPoolsCacheErr).Maybe()
-			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, tc.destPools).
-				Return(tc.poolRateLimits, nil).
-				Maybe()
 			p.offRampReader = mockOffRampReader
+
+			mockTokenPoolReader1 := ccipdatamocks.NewTokenPoolReader(t)
+			mockTokenPoolReader1.On("Address").Return(tk1pool, nil).Maybe()
+			mockTokenPoolReader1.On("GetInboundTokenPoolRateLimits", mock.Anything, mock.Anything).Return(tc.poolRateLimits, nil).Maybe()
+
+			mockTokenPoolReader2 := ccipdatamocks.NewTokenPoolReader(t)
+			mockTokenPoolReader2.On("Address").Return(tk2pool, nil).Maybe()
+			mockTokenPoolReader2.On("GetInboundTokenPoolRateLimits", mock.Anything, mock.Anything).Return(tc.poolRateLimits, nil).Maybe()
+
+			tokenPoolFactoryMock := factorymocks.NewTokenPoolFactoryInterface(t)
+			tokenPoolFactoryMock.On("NewTokenPools", mock.Anything, mock.Anything).Return([]ccipdata.TokenPoolReader{mockTokenPoolReader1, mockTokenPoolReader2}, nil).Maybe()
+			p.destTokenPoolFactory = tokenPoolFactoryMock
 
 			rateLimits, err := p.destPoolRateLimits(ctx, []commitReportWithSendRequests{
 				{
