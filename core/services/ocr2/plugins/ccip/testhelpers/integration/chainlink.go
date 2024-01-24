@@ -605,7 +605,7 @@ func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams, priceGetterConfigJson string) {
+func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams) {
 	ctx := testutils.Context(t)
 
 	for _, node := range c.Nodes {
@@ -640,7 +640,7 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 			node.KeyBundle.ID(),
 			node.Transmitter.Hex(),
 			jobParams.OffRamp.String(),
-			priceGetterConfigJson,
+			jobParams.PriceGetterConfig,
 		)
 
 		commitId, err := f.ProposeJob(ctx, &commitSpec)

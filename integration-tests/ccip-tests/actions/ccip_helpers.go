@@ -617,13 +617,13 @@ type DynamicPriceGetterConfig struct {
 	StaticPrices     map[common.Address]StaticPriceConfig     `json:"staticPrices"`
 }
 
-func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMap map[string]*contracts.MockAggregator, staticPrice *big.Int) error {
+func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMap map[string]*contracts.MockAggregator, price *big.Int, static bool) error {
 	aggregatorContract, ok := aggregatorMap[tokenAddr]
 	if !ok || aggregatorContract == nil {
 		return fmt.Errorf("aggregator contract not found for token %s", tokenAddr)
 	}
 	// update round Data
-	err := aggregatorContract.UpdateRoundData(staticPrice)
+	err := aggregatorContract.UpdateRoundData(price)
 	if err != nil {
 		return fmt.Errorf("error in updating round data %w", err)
 	}
@@ -646,16 +646,17 @@ func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMa
 		return fmt.Errorf("latest round data is not populated for token %s and aggregator %s", tokenAddr, aggregatorContract.ContractAddress.Hex())
 	}
 
-	d.AggregatorPrices[common.HexToAddress(tokenAddr)] = AggregatorPriceConfig{
-		ChainID:         aggregatorContract.ChainID(),
-		ContractAddress: aggregatorContract.ContractAddress,
+	if static {
+		d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
+			ChainID: aggregatorContract.ChainID(),
+			Price:   price.Uint64(),
+		}
+	} else {
+		d.AggregatorPrices[common.HexToAddress(tokenAddr)] = AggregatorPriceConfig{
+			ChainID:                   aggregatorContract.ChainID(),
+			AggregatorContractAddress: aggregatorContract.ContractAddress,
+		}
 	}
-
-	//d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
-	//	ChainID: aggregatorContract.ChainID(),
-	//	Price:   staticPrice.Uint64(),
-	//}
-
 	return nil
 }
 
@@ -670,8 +671,8 @@ func (d *DynamicPriceGetterConfig) String() (string, error) {
 // AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
 // This should match pricegetter.AggregatorPriceConfig in core/services/ocr2/plugins/ccip/internal/pricegetter
 type AggregatorPriceConfig struct {
-	ChainID         uint64         `json:"chainID"`
-	ContractAddress common.Address `json:"contractAddress"`
+	ChainID                   uint64         `json:"chainID"`
+	AggregatorContractAddress common.Address `json:"contractAddress"`
 }
 
 // StaticPriceConfig specifies a price defined statically.
@@ -1673,18 +1674,18 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 		StaticPrices:     make(map[common.Address]StaticPriceConfig),
 	}
 	for _, token := range lane.Dest.Common.BridgeTokens {
-		err := d.AddPriceConfig(token.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD)
+		err := d.AddPriceConfig(token.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD, false)
 		if err != nil {
 			return "", fmt.Errorf("error %w in AddPriceConfig for token %s", err, token.Address())
 		}
 	}
-	if err := d.AddPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD); err != nil {
+	if err := d.AddPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD, false); err != nil {
 		return "", fmt.Errorf("error %w in AddPriceConfig for fee token %s", err, lane.Dest.Common.FeeToken.Address())
 	}
-	if err := d.AddPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
+	if err := d.AddPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD, false); err != nil {
 		return "", fmt.Errorf("error %w in AddPriceConfig for wrapped native %s", err, lane.Dest.Common.WrappedNative.Hex())
 	}
-	if err := d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
+	if err := d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD, true); err != nil {
 		return "", fmt.Errorf("error %w in AddPriceConfig for wrapped native %s", err, lane.Source.Common.WrappedNative.Hex())
 	}
 	return d.String()

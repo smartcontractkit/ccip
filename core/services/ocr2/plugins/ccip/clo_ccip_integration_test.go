@@ -2,7 +2,6 @@ package ccip_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -25,16 +24,8 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	// Set up the aggregators here to avoid modifying ccipTH.
 	srcLinkAddr := ccipTH.Source.LinkToken.Address()
 	dstLinkAddr := ccipTH.Dest.LinkToken.Address()
-
 	srcNativeAddr, err := ccipTH.Source.Router.GetWrappedNative(nil)
 	require.NoError(t, err)
-	dstNativeAddr := ccipTH.Dest.WrappedNative.Address()
-
-	fmt.Printf("=> src native at: %s\n", srcNativeAddr)
-	fmt.Printf("=> dst native at: %s\n", dstNativeAddr)
-
-	fmt.Printf("=> src LINK at: %s\n", srcLinkAddr)
-	fmt.Printf("=> dst LINK at: %s\n", dstLinkAddr)
 
 	aggSrcNatAddr, _, aggSrcNat, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(ccipTH.Source.User, ccipTH.Source.Chain, 18, big.NewInt(2e18))
 	require.NoError(t, err)
@@ -59,8 +50,8 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	// Check content is ok on aggregator.
 	tmp, err := aggDstLnk.LatestRoundData(&bind.CallOpts{})
 	require.NoError(t, err)
-	fmt.Printf("=> CHECK round: %s\n", tmp.RoundId.String())
-	fmt.Printf("=> CHECK answer: %s\n", tmp.Answer.String())
+	require.Equal(t, big.NewInt(50), tmp.RoundId)
+	require.Equal(t, big.NewInt(8000000), tmp.Answer)
 
 	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
@@ -82,15 +73,11 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	priceGetterConfigBytes, err := json.MarshalIndent(priceGetterConfig, "", " ")
 	require.NoError(t, err)
 	priceGetterConfigJson := string(priceGetterConfigBytes)
-	fmt.Printf("Price getter config:\n%s\n", priceGetterConfigJson)
-
 	jobParams := ccipTH.SetUpNodesAndJobs(t, priceGetterConfigJson, "http://blah.com")
 	ccipTH.SetupFeedsManager(t)
 
 	// Propose and approve new specs
-	ccipTH.ApproveJobSpecs(t, jobParams, priceGetterConfigJson)
-	// TODO generate one more run with propose & approve
-	// ccipTH.ApproveJobSpecs(t, jobParams)
+	ccipTH.ApproveJobSpecs(t, jobParams)
 
 	// Sanity check that CCIP works after CLO flow
 	currentSeqNum := 1
