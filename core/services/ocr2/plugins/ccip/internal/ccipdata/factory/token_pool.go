@@ -79,6 +79,9 @@ func (f TokenPoolFactory) NewTokenPools(ctx context.Context, tokenPoolAddresses 
 	typeAndVersions, err := rpclib.ParseOutputs[string](results, func(d rpclib.DataAndErr) (string, error) {
 		return rpclib.ParseOutput[string](d, 0)
 	})
+	if err != nil {
+		return nil, fmt.Errorf("parse outputs: %w", err)
+	}
 
 	var tokenPoolReaders []ccipdata.TokenPoolReader
 

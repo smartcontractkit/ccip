@@ -484,7 +484,7 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		// deploy native token pool
 		for i := len(ccipModule.BridgeTokenPools); i < len(ccipModule.BridgeTokens); i++ {
 			token := ccipModule.BridgeTokens[i]
-			btp, err := cd.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.ARMContract)
+			btp, err := cd.DeployLockReleaseTokenPoolContract(token.Address(), *ccipModule.ARMContract, ccipModule.Router.Instance.Address())
 			if err != nil {
 				return fmt.Errorf("deploying bridge Token pool shouldn't fail %w", err)
 			}
@@ -763,7 +763,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 
 		// update native pool with onRamp address
 		for _, pool := range sourceCCIP.Common.BridgeTokenPools {
-			err = pool.SetOnRamp(sourceCCIP.OnRamp.EthAddress)
+			err = pool.SetOnRamp(sourceCCIP.DestinationChainId)
 			if err != nil {
 				return fmt.Errorf("setting OnRamp on the bridge token pool shouldn't fail %w", err)
 			}

@@ -22,7 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
@@ -160,7 +160,7 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 	*LockReleaseTokenPool,
 	error,
 ) {
-	pool, err := lock_release_token_pool_1_2_0.NewLockReleaseTokenPool(addr, e.evmClient.Backend())
+	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, e.evmClient.Backend())
 
 	if err != nil {
 		return nil, err
@@ -178,7 +178,7 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 	}, err
 }
 
-func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr string, armProxy common.Address) (
+func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr string, armProxy common.Address, router common.Address) (
 	*LockReleaseTokenPool,
 	error,
 ) {
@@ -188,13 +188,14 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return lock_release_token_pool_1_2_0.DeployLockReleaseTokenPool(
+		return lock_release_token_pool.DeployLockReleaseTokenPool(
 			auth,
 			backend,
 			token,
 			[]common.Address{},
 			armProxy,
-			true)
+			true,
+			router)
 	})
 
 	if err != nil {
@@ -202,7 +203,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 	}
 	return &LockReleaseTokenPool{
 		client:     e.evmClient,
-		Instance:   instance.(*lock_release_token_pool_1_2_0.LockReleaseTokenPool),
+		Instance:   instance.(*lock_release_token_pool.LockReleaseTokenPool),
 		EthAddress: *address,
 	}, err
 }
