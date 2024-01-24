@@ -371,7 +371,7 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SetOnRamp(remoteChainSelector uint64) error {
+func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
@@ -408,7 +408,7 @@ func (pool *TokenPool) SetOnRamp(remoteChainSelector uint64) error {
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *TokenPool) SetOnRampRateLimit(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
+func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("error getting transaction opts: %w", err)
@@ -429,64 +429,6 @@ func (pool *TokenPool) SetOnRampRateLimit(remoteChainSelector uint64, rl token_p
 		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
 		Interface("RateLimiterConfig", rl).
 		Msg("Rate Limit on ramp is set")
-	return pool.client.ProcessTransaction(tx)
-}
-
-func (pool *TokenPool) SetOffRampRateLimit(remoteChainSelector uint64, rl token_pool.RateLimiterConfig) error {
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("error getting transaction opts: %w", err)
-	}
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
-		Interface("RateLimiterConfig", rl).
-		Msg("Setting Rate Limit offramp")
-	tx, err := pool.PoolInterface.SetChainRateLimiterConfig(opts, remoteChainSelector, rl, rl)
-
-	if err != nil {
-		return fmt.Errorf("error setting offramp rate limit: %w", err)
-	}
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
-		Interface("RateLimiterConfig", rl).
-		Msg("Rate Limit offRamp is set")
-	return pool.client.ProcessTransaction(tx)
-}
-
-func (pool *TokenPool) SetOffRamp(remoteChainSelector uint64) error {
-	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
-	if err != nil {
-		return fmt.Errorf("error getting transaction opts: %w", err)
-	}
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Msg("Setting off ramp for Token Pool")
-
-	tx, err := pool.PoolInterface.ApplyChainUpdates(opts, []token_pool.TokenPoolChainUpdate{
-		{
-			ChainSelector: remoteChainSelector,
-			Allowed:       true,
-			InboundRateLimiterConfig: token_pool.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			},
-			OutboundRateLimiterConfig: token_pool.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
-				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			},
-		}})
-	if err != nil {
-		return fmt.Errorf("error setting off ramp: %w", err)
-	}
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
-		Str(Network, pool.client.GetNetworkConfig().Name).
-		Msg("OffRamp is set")
 	return pool.client.ProcessTransaction(tx)
 }
 

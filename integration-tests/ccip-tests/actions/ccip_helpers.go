@@ -929,7 +929,7 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 
 		// update native pool with onRamp address
 		for _, pool := range sourceCCIP.Common.BridgeTokenPools {
-			err = pool.SetOnRamp(sourceCCIP.DestChainSelector)
+			err = pool.SetRemoteChainOnPool(sourceCCIP.DestChainSelector)
 			if err != nil {
 				return fmt.Errorf("setting OnRamp on the bridge token pool shouldn't fail %w", err)
 			}
@@ -1359,7 +1359,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 
 		// update pools with offRamp id
 		for _, pool := range destCCIP.Common.BridgeTokenPools {
-			err = pool.SetOffRamp(destCCIP.SourceChainSelector)
+			err = pool.SetRemoteChainOnPool(destCCIP.SourceChainSelector)
 			if err != nil {
 				return fmt.Errorf("setting offramp on the bridge token pool shouldn't fail %w", err)
 			}

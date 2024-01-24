@@ -182,7 +182,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 					require.NoError(t, src.Common.ChainClient.WaitForEvents(), "waiting for events")
 				}
 				if TokenPoolRateLimitChanged {
-					require.NoError(t, src.Common.BridgeTokenPools[0].SetOnRampRateLimit(src.DestChainSelector,
+					require.NoError(t, src.Common.BridgeTokenPools[0].SetRemoteChainRateLimits(src.DestChainSelector,
 						token_pool.RateLimiterConfig{
 							Capacity:  prevOnRampRLTokenPool.Capacity,
 							IsEnabled: prevOnRampRLTokenPool.IsEnabled,
@@ -288,7 +288,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				if prevOnRampRLTokenPool.Capacity.Cmp(TokenPoolRateLimitCapacity) != 0 ||
 					prevOnRampRLTokenPool.Rate.Cmp(TokenPoolRateLimitRate) != 0 ||
 					!prevOnRampRLTokenPool.IsEnabled {
-					require.NoError(t, src.Common.BridgeTokenPools[0].SetOnRampRateLimit(
+					require.NoError(t, src.Common.BridgeTokenPools[0].SetRemoteChainRateLimits(
 						src.DestChainSelector,
 						token_pool.RateLimiterConfig{
 							IsEnabled: true,
