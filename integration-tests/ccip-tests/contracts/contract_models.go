@@ -13,11 +13,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_2_0"
+
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
@@ -164,7 +165,7 @@ func (l *LinkToken) Transfer(to string, amount *big.Int) error {
 // LockReleaseTokenPool represents a LockReleaseTokenPool address
 type LockReleaseTokenPool struct {
 	client     blockchain.EVMClient
-	Instance   *lock_release_token_pool.LockReleaseTokenPool
+	Instance   *lock_release_token_pool_1_2_0.LockReleaseTokenPool
 	EthAddress common.Address
 }
 
@@ -243,13 +244,13 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Msg("Setting on ramp for onramp router")
-	tx, err := pool.Instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{
+	tx, err := pool.Instance.ApplyRampUpdates(opts, []lock_release_token_pool_1_2_0.TokenPoolRampUpdate{
 		{Ramp: onRamp, Allowed: true,
-			RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+			RateLimiterConfig: lock_release_token_pool_1_2_0.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 				Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),
-			}}}, []lock_release_token_pool.TokenPoolRampUpdate{})
+			}}}, []lock_release_token_pool_1_2_0.TokenPoolRampUpdate{})
 
 	if err != nil {
 		return err
@@ -262,7 +263,7 @@ func (pool *LockReleaseTokenPool) SetOnRamp(onRamp common.Address) error {
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *LockReleaseTokenPool) SetOnRampRateLimit(onRamp common.Address, rl lock_release_token_pool.RateLimiterConfig) error {
+func (pool *LockReleaseTokenPool) SetOnRampRateLimit(onRamp common.Address, rl lock_release_token_pool_1_2_0.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
@@ -285,7 +286,7 @@ func (pool *LockReleaseTokenPool) SetOnRampRateLimit(onRamp common.Address, rl l
 	return pool.client.ProcessTransaction(tx)
 }
 
-func (pool *LockReleaseTokenPool) SetOffRampRateLimit(offRamp common.Address, rl lock_release_token_pool.RateLimiterConfig) error {
+func (pool *LockReleaseTokenPool) SetOffRampRateLimit(offRamp common.Address, rl lock_release_token_pool_1_2_0.RateLimiterConfig) error {
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return err
@@ -317,8 +318,8 @@ func (pool *LockReleaseTokenPool) SetOffRamp(offRamp common.Address) error {
 		Str("Token Pool", pool.Address()).
 		Msg("Setting off ramp for Token Pool")
 
-	tx, err := pool.Instance.ApplyRampUpdates(opts, []lock_release_token_pool.TokenPoolRampUpdate{}, []lock_release_token_pool.TokenPoolRampUpdate{
-		{Ramp: offRamp, Allowed: true, RateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+	tx, err := pool.Instance.ApplyRampUpdates(opts, []lock_release_token_pool_1_2_0.TokenPoolRampUpdate{}, []lock_release_token_pool_1_2_0.TokenPoolRampUpdate{
+		{Ramp: offRamp, Allowed: true, RateLimiterConfig: lock_release_token_pool_1_2_0.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),
 			Rate:      new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e5)),

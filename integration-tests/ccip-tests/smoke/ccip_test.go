@@ -12,11 +12,12 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
 	"github.com/smartcontractkit/chainlink-testing-framework/utils/ptr"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_2_0"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 )
 
 func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
@@ -181,7 +182,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				}
 				if TokenPoolRateLimitChanged {
 					require.NoError(t, src.Common.BridgeTokenPools[0].SetOnRampRateLimit(src.OnRamp.EthAddress,
-						lock_release_token_pool.RateLimiterConfig{
+						lock_release_token_pool_1_2_0.RateLimiterConfig{
 							Capacity:  prevOnRampRLTokenPool.Capacity,
 							IsEnabled: prevOnRampRLTokenPool.IsEnabled,
 							Rate:      prevOnRampRLTokenPool.Rate,
@@ -288,7 +289,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 					!prevOnRampRLTokenPool.IsEnabled {
 					require.NoError(t, src.Common.BridgeTokenPools[0].SetOnRampRateLimit(
 						src.OnRamp.EthAddress,
-						lock_release_token_pool.RateLimiterConfig{
+						lock_release_token_pool_1_2_0.RateLimiterConfig{
 							IsEnabled: true,
 							Capacity:  TokenPoolRateLimitCapacity,
 							Rate:      TokenPoolRateLimitRate,
@@ -322,7 +323,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
-			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool.LockReleaseTokenPoolABI)
+			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool_1_2_0.LockReleaseTokenPoolABI)
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Str("Revert Reason", errReason).
@@ -356,7 +357,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.Error(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
-			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool.LockReleaseTokenPoolABI)
+			errReason, v, err = tc.lane.Source.Common.ChainClient.RevertReasonFromTx(failedTx, lock_release_token_pool_1_2_0.LockReleaseTokenPoolABI)
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Str("Revert Reason", errReason).

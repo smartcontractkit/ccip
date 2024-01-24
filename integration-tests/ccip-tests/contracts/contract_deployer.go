@@ -22,13 +22,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_2_0"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/contracts"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
@@ -159,7 +160,7 @@ func (e *CCIPContractsDeployer) NewLockReleaseTokenPoolContract(addr common.Addr
 	*LockReleaseTokenPool,
 	error,
 ) {
-	pool, err := lock_release_token_pool.NewLockReleaseTokenPool(addr, e.evmClient.Backend())
+	pool, err := lock_release_token_pool_1_2_0.NewLockReleaseTokenPool(addr, e.evmClient.Backend())
 
 	if err != nil {
 		return nil, err
@@ -187,7 +188,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 		auth *bind.TransactOpts,
 		backend bind.ContractBackend,
 	) (common.Address, *types.Transaction, interface{}, error) {
-		return lock_release_token_pool.DeployLockReleaseTokenPool(
+		return lock_release_token_pool_1_2_0.DeployLockReleaseTokenPool(
 			auth,
 			backend,
 			token,
@@ -201,7 +202,7 @@ func (e *CCIPContractsDeployer) DeployLockReleaseTokenPoolContract(linkAddr stri
 	}
 	return &LockReleaseTokenPool{
 		client:     e.evmClient,
-		Instance:   instance.(*lock_release_token_pool.LockReleaseTokenPool),
+		Instance:   instance.(*lock_release_token_pool_1_2_0.LockReleaseTokenPool),
 		EthAddress: *address,
 	}, err
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
@@ -58,6 +59,7 @@ type ExecutionPluginStaticConfig struct {
 	tokenDataWorker          tokendata.Worker
 	destChainSelector        uint64
 	priceRegistryProvider    ccipdataprovider.PriceRegistry
+	destTokenPoolFactory     factory.TokenPoolFactory
 	metricsCollector         ccip.PluginMetricsCollector
 }
 
@@ -74,11 +76,12 @@ type ExecutionReportingPlugin struct {
 	sourceWrappedNativeToken common.Address
 	onRampReader             ccipdata.OnRampReader
 	// Dest
-	commitStoreReader ccipdata.CommitStoreReader
-	destPriceRegistry ccipdata.PriceRegistryReader
-	destWrappedNative common.Address
-	onchainConfig     ccipdata.ExecOnchainConfig
-	offRampReader     ccipdata.OffRampReader
+	commitStoreReader    ccipdata.CommitStoreReader
+	destPriceRegistry    ccipdata.PriceRegistryReader
+	destWrappedNative    common.Address
+	onchainConfig        ccipdata.ExecOnchainConfig
+	offRampReader        ccipdata.OffRampReader
+	destTokenPoolFactory factory.TokenPoolFactory
 	// State
 	inflightReports *inflightExecReportsContainer
 	snoozedRoots    cache.SnoozedRoots
@@ -240,7 +243,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 
 	dstTokenToPool := make(map[common.Address]common.Address)
 	dstPoolToToken := make(map[common.Address]common.Address)
-	dstPools := make([]common.Address, 0)
+	dstPoolAddresses := make([]common.Address, 0)
 
 	for _, msg := range commitReports {
 		for _, req := range msg.sendRequestsWithMeta {
@@ -257,23 +260,29 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 					continue
 				}
 
-				poolAddress, exists := tokens.DestinationPool[dstToken]
+				poolReader, exists := tokens.DestinationPool[dstToken]
 				if !exists {
 					return nil, fmt.Errorf("pool for token '%s' does not exist", dstToken)
 				}
 
-				if tokenAddr, seen := dstPoolToToken[poolAddress]; seen {
+				if tokenAddr, seen := dstPoolToToken[poolReader]; seen {
 					return nil, fmt.Errorf("pool is already seen for token %s", tokenAddr)
 				}
 
-				dstTokenToPool[dstToken] = poolAddress
-				dstPoolToToken[poolAddress] = dstToken
-				dstPools = append(dstPools, poolAddress)
+				dstTokenToPool[dstToken] = poolReader
+				dstPoolToToken[poolReader] = dstToken
+				dstPoolAddresses = append(dstPoolAddresses, poolReader)
 			}
 		}
 	}
 
-	rateLimits, err := r.offRampReader.GetTokenPoolsRateLimits(ctx, dstPools)
+	// TODO Not cached :/
+	poolReaders, err := r.destTokenPoolFactory.NewTokenPools(ctx, dstPoolAddresses)
+	if err != nil {
+		return nil, err
+	}
+
+	rateLimits, err := r.offRampReader.GetTokenPoolsRateLimits(ctx, poolReaders)
 	if err != nil {
 		return nil, fmt.Errorf("fetch pool rate limits: %w", err)
 	}
@@ -285,9 +294,9 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 			continue
 		}
 
-		tokenAddr, exists := dstPoolToToken[dstPools[i]]
+		tokenAddr, exists := dstPoolToToken[poolReaders[i].Address()]
 		if !exists {
-			return nil, fmt.Errorf("pool to token mapping does not contain %s", dstPools[i])
+			return nil, fmt.Errorf("pool to token mapping does not contain %s", dstPoolAddresses[i])
 		}
 		res[tokenAddr] = rateLimit.Tokens
 	}

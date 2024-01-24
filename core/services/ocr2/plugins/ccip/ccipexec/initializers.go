@@ -208,6 +208,10 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 	if err != nil {
 		return nil, nil, fmt.Errorf("get chain %d selector: %w", destChainID, err)
 	}
+	sourceChainSelector, err := chainselectors.SelectorFromChainId(uint64(sourceChainID))
+	if err != nil {
+		return nil, nil, fmt.Errorf("get chain %d selector: %w", sourceChainID, err)
+	}
 
 	execLggr.Infow("Initialized exec plugin",
 		"pluginConfig", params.pluginConfig,
@@ -226,6 +230,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 			sourceWrappedNativeToken: sourceWrappedNative,
 			destChainSelector:        destChainSelector,
 			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
+			destTokenPoolFactory:     factory.NewTokenPoolFactory(execLggr, sourceChainSelector, offRampReader.Address(), params.destChain.Client(), params.destChain.LogPoller()),
 			tokenDataWorker: tokendata.NewBackgroundWorker(
 				ctx,
 				tokenDataProviders,

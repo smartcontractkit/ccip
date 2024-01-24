@@ -328,7 +328,7 @@ func (_m *OffRampReader) GetStaticConfig(ctx context.Context) (ccipdata.OffRampS
 }
 
 // GetTokenPoolsRateLimits provides a mock function with given fields: ctx, poolAddresses
-func (_m *OffRampReader) GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []common.Address) ([]ccipdata.TokenBucketRateLimit, error) {
+func (_m *OffRampReader) GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []ccipdata.TokenPoolReader) ([]ccipdata.TokenBucketRateLimit, error) {
 	ret := _m.Called(ctx, poolAddresses)
 
 	if len(ret) == 0 {
@@ -337,10 +337,10 @@ func (_m *OffRampReader) GetTokenPoolsRateLimits(ctx context.Context, poolAddres
 
 	var r0 []ccipdata.TokenBucketRateLimit
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) ([]ccipdata.TokenBucketRateLimit, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipdata.TokenPoolReader) ([]ccipdata.TokenBucketRateLimit, error)); ok {
 		return rf(ctx, poolAddresses)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) []ccipdata.TokenBucketRateLimit); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipdata.TokenPoolReader) []ccipdata.TokenBucketRateLimit); ok {
 		r0 = rf(ctx, poolAddresses)
 	} else {
 		if ret.Get(0) != nil {
@@ -348,7 +348,7 @@ func (_m *OffRampReader) GetTokenPoolsRateLimits(ctx context.Context, poolAddres
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []common.Address) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, []ccipdata.TokenPoolReader) error); ok {
 		r1 = rf(ctx, poolAddresses)
 	} else {
 		r1 = ret.Error(1)
