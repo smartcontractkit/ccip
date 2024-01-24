@@ -42,12 +42,6 @@ const (
 
 func (n NetworkSelector) Type() NetworkType {
 	isEvm, err := chainsel.IsEvm(uint64(n))
-
-	// todo: rm
-	if err != nil {
-		fmt.Println("gotcha")
-	}
-
 	if err == nil && isEvm {
 		return NetworkTypeEvm
 	}
