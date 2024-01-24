@@ -81,11 +81,11 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 		AggregatorPrices: map[common.Address]AggregatorPriceConfig{
 			tk1: {
 				ChainID:                   101,
-				AggregatorContractAddress: utils.RandomAddress(), // aggregator contract
+				AggregatorContractAddress: utils.RandomAddress(),
 			},
 			tk2: {
 				ChainID:                   102,
-				AggregatorContractAddress: utils.RandomAddress(), // aggregator contract
+				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
 		StaticPrices: map[common.Address]StaticPriceConfig{},
@@ -166,11 +166,11 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 		AggregatorPrices: map[common.Address]AggregatorPriceConfig{
 			tk1: {
 				ChainID:                   101,
-				AggregatorContractAddress: utils.RandomAddress(), // aggregator contract
+				AggregatorContractAddress: utils.RandomAddress(),
 			},
 			tk2: {
 				ChainID:                   102,
-				AggregatorContractAddress: utils.RandomAddress(), // aggregator contract
+				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
 		StaticPrices: map[common.Address]StaticPriceConfig{
@@ -221,15 +221,15 @@ func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
 		AggregatorPrices: map[common.Address]AggregatorPriceConfig{
 			tk1: {
 				ChainID:                   101,
-				AggregatorContractAddress: utils.RandomAddress(), // aggregator contract
+				AggregatorContractAddress: utils.RandomAddress(),
 			},
 			tk2: {
 				ChainID:                   102,
-				AggregatorContractAddress: utils.RandomAddress(), // aggregator contract
+				AggregatorContractAddress: utils.RandomAddress(),
 			},
 			tk3: {
 				ChainID:                   103,
-				AggregatorContractAddress: utils.RandomAddress(), // aggregator contract
+				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
 		StaticPrices: map[common.Address]StaticPriceConfig{

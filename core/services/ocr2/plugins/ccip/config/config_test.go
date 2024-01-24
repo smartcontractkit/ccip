@@ -47,12 +47,8 @@ func TestCommitConfig(t *testing.T) {
 
 	require.Equal(t, exampleConfig, parsedConfig)
 
-	// Also ensure correctness of price getter configuration.
-	jsonPriceGetterConfig := []byte(exampleConfig.PriceGetterConfig)
-	require.True(t, json.Valid(jsonPriceGetterConfig))
-	parsedPriceGetterConfig := pricegetter.DynamicPriceGetterConfig{}
-	require.NoError(t, json.Unmarshal(jsonPriceGetterConfig, &parsedPriceGetterConfig))
-	_, err = pricegetter.NewDynamicPriceGetter(parsedPriceGetterConfig, nil)
+	// Ensure correctness of price getter configuration.
+	_, err = pricegetter.NewDynamicPriceGetterConfig(exampleConfig.PriceGetterConfig)
 	require.NoError(t, err)
 }
 

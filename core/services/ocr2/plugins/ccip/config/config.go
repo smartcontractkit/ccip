@@ -11,7 +11,7 @@ import (
 type CommitPluginJobSpecConfig struct {
 	SourceStartBlock, DestStartBlock uint64         // Only for first time job add.
 	OffRamp                          common.Address `json:"offRamp"`
-	// PriceGetterConfig defines where to get the token prices from (i.e. static or dynamic config).
+	// PriceGetterConfig defines where to get the token prices from (i.e. static or aggregator source).
 	PriceGetterConfig string `json:"priceGetterConfig"`
 }
 
