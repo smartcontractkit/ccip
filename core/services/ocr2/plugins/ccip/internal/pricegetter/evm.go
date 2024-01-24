@@ -17,8 +17,8 @@ import (
 
 // AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
 type AggregatorPriceConfig struct {
-	ChainID         uint64         `json:"chainID"`
-	ContractAddress common.Address `json:"contractAddress"`
+	ChainID                   uint64         `json:"chainID"`
+	AggregatorContractAddress common.Address `json:"contractAddress"`
 }
 
 // StaticPriceConfig specifies a price defined statically.
@@ -50,7 +50,23 @@ func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]D
 	if err != nil {
 		return nil, err
 	}
-	return &DynamicPriceGetter{cfg, evmClients, aggregatorAbi}, nil
+	priceGetter := DynamicPriceGetter{cfg, evmClients, aggregatorAbi}
+	if err = priceGetter.Validate(); err != nil {
+		return nil, err
+	}
+	return &priceGetter, nil
+}
+
+func (d *DynamicPriceGetter) Validate() error {
+	// Ensure no duplication in token price resolution rules.
+	if d.cfg.AggregatorPrices != nil && d.cfg.StaticPrices != nil {
+		for tk := range d.cfg.AggregatorPrices {
+			if _, exists := d.cfg.StaticPrices[tk]; exists {
+				return fmt.Errorf("token %s defined in both aggregator and static price rules", tk.Hex())
+			}
+		}
+	}
+	return nil
 }
 
 // TokenPricesUSD implements the PriceGetter interface.
@@ -66,7 +82,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 			batchCallsPerChain[aggCfg.ChainID] = append(batchCallsPerChain[aggCfg.ChainID], rpclib.NewEvmCall(
 				d.aggregatorAbi,
 				"latestRoundData",
-				aggCfg.ContractAddress,
+				aggCfg.AggregatorContractAddress,
 			))
 			batchCallsTokensOrder[aggCfg.ChainID] = append(batchCallsTokensOrder[aggCfg.ChainID], tk)
 			continue

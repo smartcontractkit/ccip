@@ -51,29 +51,19 @@ func TestIntegration_CCIP(t *testing.T) {
 	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
 			ccipTH.Source.LinkToken.Address(): {
-				ChainID:         ccipTH.Source.ChainID,
-				ContractAddress: aggSrcLnkAddr,
+				ChainID:                   ccipTH.Source.ChainID,
+				AggregatorContractAddress: aggSrcLnkAddr,
 			},
 			ccipTH.Source.WrappedNative.Address(): {
-				ChainID:         ccipTH.Source.ChainID,
-				ContractAddress: aggSrcNatAddr,
+				ChainID:                   ccipTH.Source.ChainID,
+				AggregatorContractAddress: aggSrcNatAddr,
 			},
 			ccipTH.Dest.LinkToken.Address(): {
-				ChainID:         ccipTH.Dest.ChainID,
-				ContractAddress: aggDstLnkAddr,
+				ChainID:                   ccipTH.Dest.ChainID,
+				AggregatorContractAddress: aggDstLnkAddr,
 			},
-			//ccipTH.Dest.WrappedNative.Address(): {
-			//	ChainID:         ccipTH.Dest.ChainID,
-			//	ContractAddress: aggDstNat,
-			//},
 		},
 		StaticPrices: map[common.Address]pricegetter.StaticPriceConfig{},
-		//StaticPrices: map[common.Address]pricegetter.StaticPriceConfig{
-		//	dstLinkAddr: {
-		//		ChainID: ccipTH.Dest.ChainID,
-		//		Price:   8000000000000000000,
-		//	},
-		//},
 	}
 	priceGetterConfigBytes, err := json.MarshalIndent(priceGetterConfig, "", " ")
 	require.NoError(t, err)

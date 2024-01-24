@@ -65,16 +65,16 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{
 		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
 			srcLinkAddr: {
-				ChainID:         ccipTH.Source.ChainID,
-				ContractAddress: aggSrcLnkAddr,
+				ChainID:                   ccipTH.Source.ChainID,
+				AggregatorContractAddress: aggSrcLnkAddr,
 			},
 			srcNativeAddr: {
-				ChainID:         ccipTH.Source.ChainID,
-				ContractAddress: aggSrcNatAddr,
+				ChainID:                   ccipTH.Source.ChainID,
+				AggregatorContractAddress: aggSrcNatAddr,
 			},
 			dstLinkAddr: {
-				ChainID:         ccipTH.Dest.ChainID,
-				ContractAddress: aggDstLnkAddr,
+				ChainID:                   ccipTH.Dest.ChainID,
+				AggregatorContractAddress: aggDstLnkAddr,
 			},
 			//ccipTH.Dest.WrappedNative.Address(): {
 			//	ChainID:         ccipTH.Dest.ChainID,
