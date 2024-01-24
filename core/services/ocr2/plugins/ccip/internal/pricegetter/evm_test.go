@@ -67,7 +67,7 @@ func TestDynamicPriceGetter(t *testing.T) {
 				assert.True(t, len(prices) >= len(test.param.expectedTokenPrices))
 				// Check prices are matching expected result.
 				for tk, expectedPrice := range test.param.expectedTokenPrices {
-					assert.Equal(t, &expectedPrice, prices[tk])
+					assert.Equal(t, expectedPrice, *prices[tk])
 				}
 			}
 		})
