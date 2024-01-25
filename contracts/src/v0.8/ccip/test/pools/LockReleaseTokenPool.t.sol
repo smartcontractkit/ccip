@@ -319,6 +319,12 @@ contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
     s_lockReleaseTokenPool.withdrawLiquidity(1, STRANGER);
   }
 
+  function test_CannotSendToZeroAddressReverts() public {
+    vm.expectRevert(LockReleaseTokenPool.CannotSendToZeroAddress.selector);
+
+    s_lockReleaseTokenPool.withdrawLiquidity(1, address(0));
+  }
+
   function testInsufficientLiquidityReverts() public {
     uint256 maxUint256 = 2 ** 256 - 1;
     s_token.approve(address(s_lockReleaseTokenPool), maxUint256);

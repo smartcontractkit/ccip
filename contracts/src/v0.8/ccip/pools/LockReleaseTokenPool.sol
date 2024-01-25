@@ -19,6 +19,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   error InsufficientLiquidity();
   error LiquidityNotAccepted();
   error Unauthorized(address caller);
+  error CannotSendToZeroAddress();
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.3.0-dev";
@@ -143,6 +144,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   /// @dev internal helper for withdrawLiquidity.
   function _withdrawLiquidity(uint256 amount, address receiver) internal {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
+    if (receiver == address(0)) revert CannotSendToZeroAddress();
 
     if (i_token.balanceOf(address(this)) < amount) revert InsufficientLiquidity();
     i_token.safeTransfer(receiver, amount);
