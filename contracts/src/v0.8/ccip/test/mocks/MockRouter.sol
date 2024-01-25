@@ -71,7 +71,7 @@ contract MockCCIPRouter is IRouter, IRouterClient {
 
     Client.Any2EVMMessage memory executableMsg = Client.Any2EVMMessage({
       messageId: mockMsgId,
-      sourceChainSelector: 0,
+      sourceChainSelector: 16015286601757825753, // Sepolia
       sender: abi.encode(msg.sender),
       data: message.data,
       destTokenAmounts: message.tokenAmounts
@@ -94,14 +94,17 @@ contract MockCCIPRouter is IRouter, IRouterClient {
     return abi.decode(extraArgs[4:], (Client.EVMExtraArgsV1));
   }
 
+  /// @notice Always returns true to make sure this check can be performed on any chain.
   function isChainSupported(uint64) external pure returns (bool supported) {
     return true;
   }
 
+  /// @notice Returns an empty array.
   function getSupportedTokens(uint64) external pure returns (address[] memory tokens) {
     return new address[](0);
   }
 
+  /// @notice Returns 0 as the fee is not suppoprted in this mock contract.
   function getFee(uint64, Client.EVM2AnyMessage memory) external pure returns (uint256 fee) {
     return 0;
   }
