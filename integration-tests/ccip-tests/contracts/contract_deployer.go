@@ -652,7 +652,7 @@ func (e *CCIPContractsDeployer) DeployOffRamp(sourceChainSelector, destChainSele
 				ChainSelector:       destChainSelector,
 				SourceChainSelector: sourceChainSelector,
 				OnRamp:              onRamp,
-				PrevOffRamp:         common.HexToAddress(""),
+				PrevOffRamp:         common.Address{},
 				ArmProxy:            armProxy,
 			},
 			sourceToken,
