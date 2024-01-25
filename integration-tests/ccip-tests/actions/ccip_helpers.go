@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -47,7 +48,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 	bigmath "github.com/smartcontractkit/chainlink/v2/core/utils/big_math"
@@ -3083,36 +3083,36 @@ func NewBalanceSheet() *BalanceSheet {
 	}
 }
 
-//// SetMockServerWithUSDCAttestation responds with a mock attestation for any msgHash
-//// The path is set with regex to match any path that starts with /v1/attestations
-//func SetMockServerWithUSDCAttestation(
-//	killGrave *ctftestenv.Killgrave,
-//	mockserver *ctfClient.MockserverClient,
-//) error {
-//	path := "/v1/attestations"
-//	response := struct {
-//		Status      string `json:"status"`
-//		Attestation string `json:"attestation"`
-//		Error       string `json:"error"`
-//	}{
-//		Status:      "complete",
-//		Attestation: "0x9049623e91719ef2aa63c55f357be2529b0e7122ae552c18aff8db58b4633c4d3920ff03d3a6d1ddf11f06bf64d7fd60d45447ac81f527ba628877dc5ca759651b08ffae25a6d3b1411749765244f0a1c131cbfe04430d687a2e12fd9d2e6dc08e118ad95d94ad832332cf3c4f7a4f3da0baa803b7be024b02db81951c0f0714de1b",
-//	}
-//	if killGrave == nil && mockserver == nil {
-//		return fmt.Errorf("both killgrave and mockserver are nil")
-//	}
-//	log.Info().Str("path", path).Msg("setting attestation-api response for any msgHash")
-//	if killGrave != nil {
-//		err := killGrave.SetAnyValueResponse(fmt.Sprintf("%s/{_hash:.*}", path), []string{http.MethodGet}, response)
-//		if err != nil {
-//			return fmt.Errorf("failed to set killgrave server value: %w", err)
-//		}
-//	}
-//	if mockserver != nil {
-//		err := mockserver.SetAnyValueResponse(fmt.Sprintf("%s/.*", path), response)
-//		if err != nil {
-//			return fmt.Errorf("failed to set mockserver value: %w", err)
-//		}
-//	}
-//	return nil
-//}
+// SetMockServerWithUSDCAttestation responds with a mock attestation for any msgHash
+// The path is set with regex to match any path that starts with /v1/attestations
+func SetMockServerWithUSDCAttestation(
+	killGrave *ctftestenv.Killgrave,
+	mockserver *ctfClient.MockserverClient,
+) error {
+	path := "/v1/attestations"
+	response := struct {
+		Status      string `json:"status"`
+		Attestation string `json:"attestation"`
+		Error       string `json:"error"`
+	}{
+		Status:      "complete",
+		Attestation: "0x9049623e91719ef2aa63c55f357be2529b0e7122ae552c18aff8db58b4633c4d3920ff03d3a6d1ddf11f06bf64d7fd60d45447ac81f527ba628877dc5ca759651b08ffae25a6d3b1411749765244f0a1c131cbfe04430d687a2e12fd9d2e6dc08e118ad95d94ad832332cf3c4f7a4f3da0baa803b7be024b02db81951c0f0714de1b",
+	}
+	if killGrave == nil && mockserver == nil {
+		return fmt.Errorf("both killgrave and mockserver are nil")
+	}
+	log.Info().Str("path", path).Msg("setting attestation-api response for any msgHash")
+	if killGrave != nil {
+		err := killGrave.SetAnyValueResponse(fmt.Sprintf("%s/{_hash:.*}", path), []string{http.MethodGet}, response)
+		if err != nil {
+			return fmt.Errorf("failed to set killgrave server value: %w", err)
+		}
+	}
+	if mockserver != nil {
+		err := mockserver.SetAnyValueResponse(fmt.Sprintf("%s/.*", path), response)
+		if err != nil {
+			return fmt.Errorf("failed to set mockserver value: %w", err)
+		}
+	}
+	return nil
+}

@@ -13,8 +13,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
@@ -157,19 +157,19 @@ func JobName(jobType JobType, source string, destination, version string) string
 }
 
 type CCIPJobSpecParams struct {
-	Name                   string
-	Version                string
-	OffRamp                common.Address
-	CommitStore            common.Address
-	SourceChainName        string
-	DestChainName          string
-	DestEvmChainId         uint64
+	Name               string
+	Version            string
+	OffRamp            common.Address
+	CommitStore        common.Address
+	SourceChainName    string
+	DestChainName      string
+	DestEvmChainId     uint64
 	PriceGetterConfig  string
-	SourceStartBlock       uint64
-	DestStartBlock         uint64
-	USDCAttestationAPI     string
-	USDCConfig             *config.USDCConfig
-	P2PV2Bootstrappers     pq.StringArray
+	SourceStartBlock   uint64
+	DestStartBlock     uint64
+	USDCAttestationAPI string
+	USDCConfig         *config.USDCConfig
+	P2PV2Bootstrappers pq.StringArray
 }
 
 func (params CCIPJobSpecParams) Validate() error {
