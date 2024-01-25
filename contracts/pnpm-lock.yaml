@@ -1,9 +1,5 @@
 lockfileVersion: '6.0'
 
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false
-
 overrides:
   '@ethersproject/logger': 5.0.6
 
@@ -14,6 +10,9 @@ dependencies:
   '@eth-optimism/contracts':
     specifier: 0.6.0
     version: 0.6.0(ethers@5.7.2)
+  '@eth-optimism/contracts-bedrock':
+    specifier: 0.16.2
+    version: 0.16.2
   '@openzeppelin/contracts':
     specifier: 4.9.3
     version: 4.9.3
@@ -406,6 +405,11 @@ packages:
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
     dev: true
 
+  /@eth-optimism/contracts-bedrock@0.16.2:
+    resolution: {integrity: sha512-a2+f7soDbrd6jV74U02EpyMwQt2iZeDZ4c2ZwgkObcxXUZLZQ2ELt/VRFBf8TIL3wYcBOGpUa1aXAE2oHQ7oRA==}
+    requiresBuild: true
+    dev: false
+
   /@eth-optimism/contracts@0.6.0(ethers@5.7.2):
     resolution: {integrity: sha512-vQ04wfG9kMf1Fwy3FEMqH2QZbgS0gldKhcBeBUPfO8zu68L61VI97UDXmsMQXzTsEAxK8HnokW3/gosl4/NW3w==}
     peerDependencies:
@@ -437,7 +441,7 @@ packages:
       '@ethersproject/rlp': 5.7.0
       '@ethersproject/transactions': 5.7.0
       '@ethersproject/web': 5.7.1
-      bufio: 1.0.7
+      bufio: 1.2.1
       chai: 4.3.10
     transitivePeerDependencies:
       - bufferutil
@@ -3438,9 +3442,9 @@ packages:
       node-gyp-build: 4.5.0
     dev: true
 
-  /bufio@1.0.7:
-    resolution: {integrity: sha512-bd1dDQhiC+bEbEfg56IdBv7faWa6OipMs/AFFFvtFnB3wAYjlwQpQRZ0pm6ZkgtfL0pILRXhKxOiQj6UzoMR7A==}
-    engines: {node: '>=8.0.0'}
+  /bufio@1.2.1:
+    resolution: {integrity: sha512-9oR3zNdupcg/Ge2sSHQF3GX+kmvL/fTPvD0nd5AGLq8SjUYnTz+SlFjK/GXidndbZtIj+pVKXiWeR9w6e9wKCA==}
+    engines: {node: '>=14.0.0'}
     dev: false
 
   /bundle-name@3.0.0:
@@ -12639,3 +12643,7 @@ packages:
     name: '@chainlink/solhint-plugin-chainlink-solidity'
     version: 1.2.0
     dev: true
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
