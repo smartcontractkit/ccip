@@ -94,5 +94,5 @@ func runGraphOperations(t *testing.T, numNetworks int, g liquiditygraph.Liquidit
 	g.SetLiquidity(newNetID, big.NewInt(1234))
 	_, err = g.GetLiquidity(newNetID)
 	assert.NoError(t, err)
-	g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(2))
+	_ = g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(2))
 }
