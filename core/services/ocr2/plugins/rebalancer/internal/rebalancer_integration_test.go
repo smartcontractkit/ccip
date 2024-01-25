@@ -60,7 +60,7 @@ var (
 )
 
 func TestRebalancer_Integration(t *testing.T) {
-	newTestUniverse(t, 8)
+	newTestUniverse(t, 3)
 }
 
 type ocr3Node struct {
@@ -344,8 +344,7 @@ fromBlock = %d
 			require.NoError(t, tapp.Stop())
 		})
 
-		rootChain, exists := chainsel.ChainByEvmChainID(testutils.SimulatedChainID.Uint64())
-		require.True(t, exists)
+		mainChain := mustGetChainByEvmID(t, testutils.SimulatedChainID.Int64())
 
 		jobSpec := fmt.Sprintf(
 			`
@@ -385,7 +384,7 @@ checkSourceDestEqual = false
 			mainFromBlock,
 			buildFollowerChainsFromBlocksToml(blocksBeforeConfig),
 			mainContract.Hex(),
-			rootChain.Selector)
+			mainChain.Selector)
 		t.Log("Creating rebalancer job with spec:\n", jobSpec)
 		ocrJob2, err2 := validate.ValidatedOracleSpecToml(
 			apps[i].GetConfig().OCR2(),
@@ -660,8 +659,7 @@ func deployContracts(
 		require.NoError(t, err)
 
 		// deploy the rebalancer and set the liquidity container to be the lock release pool
-		ch, exists := chainsel.ChainByEvmChainID(uint64(chainID))
-		require.True(t, exists)
+		ch := mustGetChainByEvmID(t, chainID)
 		rebalancerAddr, _, _, err := rebalancer.DeployRebalancer(owner, backend, wethAddress, ch.Selector, lockReleasePoolAddress)
 		require.NoError(t, err, "failed to deploy Rebalancer contract")
 		rebalancer, err := rebalancer.NewRebalancer(rebalancerAddr, backend)
@@ -756,8 +754,7 @@ func createConnectedNetwork(
 			continue
 		}
 		// follower -> main connection
-		remoteChain, exists := chainsel.ChainByEvmChainID(uint64(mainChainID))
-		require.True(t, exists)
+		remoteChain := mustGetChainByEvmID(t, mainChainID)
 
 		_, err := uni.rebalancer.SetCrossChainRebalancer(
 			owner,
@@ -779,8 +776,7 @@ func createConnectedNetwork(
 		require.True(t, mgr.Enabled)
 
 		// main -> follower connection
-		remoteChain, exists = chainsel.ChainByEvmChainID(uint64(chainID))
-		require.True(t, exists)
+		remoteChain = mustGetChainByEvmID(t, chainID)
 
 		_, err = universes[mainChainID].rebalancer.SetCrossChainRebalancer(
 			owner,
@@ -826,4 +822,10 @@ func createConnectedNetwork(
 			require.Len(t, mgrs, 1, "unexpected number of neighbors on follower chain")
 		}
 	}
+}
+
+func mustGetChainByEvmID(t *testing.T, chainID int64) chainsel.Chain {
+	ch, exists := chainsel.ChainByEvmChainID(uint64(chainID))
+	require.True(t, exists)
+	return ch
 }

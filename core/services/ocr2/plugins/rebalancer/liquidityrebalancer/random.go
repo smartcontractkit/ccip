@@ -65,13 +65,11 @@ func (r *randomRebalancer) ComputeTransfersToBalance(
 		amount := rng.Int63n(liqSource.Int64())
 		r.lggr.Infow("RandomRebalancer: generated random transfer amount", "amount", amount)
 
-		if g.HasConnection(randSourceChain, randDestChain) {
-			transfers = append(transfers, models.Transfer{
-				From:   randSourceChain,
-				To:     randDestChain,
-				Amount: big.NewInt(amount),
-			})
-		}
+		transfers = append(transfers, models.Transfer{
+			From:   randSourceChain,
+			To:     randDestChain,
+			Amount: big.NewInt(amount),
+		})
 	}
 	r.lggr.Info("RandomRebalancer: generated random transfers", "transfers", transfers)
 	return transfers, nil

@@ -10,8 +10,6 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	chainsel "github.com/smartcontractkit/chain-selectors"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -154,11 +152,6 @@ func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Regist
 
 		for destNetworkID, lmAddr := range destinationLMs {
 			netSel := destNetworkID
-
-			ch, exists := chainsel.ChainByEvmChainID(uint64(destNetworkID))
-			if exists {
-				netSel = models.NetworkSelector(ch.Selector)
-			}
 
 			g.AddConnection(elem.networkSel, netSel)
 
