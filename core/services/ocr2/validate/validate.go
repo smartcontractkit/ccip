@@ -318,10 +318,5 @@ func validateOCR2CCIPCommitSpec(jsonConfig job.JSONConfig) error {
 	if !json.Valid([]byte(cfg.PriceGetterConfig)) {
 		return pkgerrors.New("invalid JSON formatting of priceGetterConfig")
 	}
-	// TODO proper validation of the JSON struct.
-	//_, err = pipeline.Parse(cfg.TokenPricesConfigUSDPipeline)
-	//if err != nil {
-	//	return pkgerrors.Wrap(err, "invalid token prices pipeline")
-	//}
 	return nil
 }

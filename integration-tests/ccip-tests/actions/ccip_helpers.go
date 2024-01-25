@@ -772,8 +772,7 @@ type DynamicPriceGetterConfig struct {
 	StaticPrices     map[common.Address]StaticPriceConfig     `json:"staticPrices"`
 }
 
-// TODO rename to AddAggregatorPriceConfig
-func (d *DynamicPriceGetterConfig) AddPriceConfig(tokenAddr string, aggregatorMap map[string]*contracts.MockAggregator, price *big.Int) error {
+func (d *DynamicPriceGetterConfig) AddAggregatorPriceConfig(tokenAddr string, aggregatorMap map[string]*contracts.MockAggregator, price *big.Int) error {
 	aggregatorContract, ok := aggregatorMap[tokenAddr]
 	if !ok || aggregatorContract == nil {
 		return fmt.Errorf("aggregator contract not found for token %s", tokenAddr)
@@ -1848,17 +1847,17 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 	for _, token := range lane.Dest.Common.BridgeTokens {
 		err := d.AddStaticPriceConfig(token.Address(), lane.DestChain.GetChainID().Uint64(), LinkToUSD)
 		if err != nil {
-			return "", fmt.Errorf("error in AddPriceConfig for bridge token %s: %w", token.Address(), err)
+			return "", fmt.Errorf("error in AddStaticPriceConfig for bridge token %s: %w", token.Address(), err)
 		}
 	}
-	if err := d.AddPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD); err != nil {
-		return "", fmt.Errorf("error in AddPriceConfig for fee token %s: %w", lane.Dest.Common.FeeToken.Address(), err)
+	if err := d.AddAggregatorPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD); err != nil {
+		return "", fmt.Errorf("error in AddAggregatorPriceConfig for fee token %s: %w", lane.Dest.Common.FeeToken.Address(), err)
 	}
-	if err := d.AddPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
-		return "", fmt.Errorf("error in AddPriceConfig for wrapped native %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
+	if err := d.AddAggregatorPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
+		return "", fmt.Errorf("error in AddAggregatorPriceConfig for wrapped native %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
 	}
-	if err := d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
-		return "", fmt.Errorf("error in AddPriceConfig for wrapped native %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
+	if err := d.AddAggregatorPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
+		return "", fmt.Errorf("error in AddAggregatorPriceConfig for wrapped native %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
 	}
 	return d.String()
 }

@@ -38,6 +38,13 @@ type DynamicPriceGetterClient struct {
 	LP          logpoller.LogPoller
 }
 
+func NewDynamicPriceGetterClient(batchCaller rpclib.EvmBatchCaller, lp logpoller.LogPoller) DynamicPriceGetterClient {
+	return DynamicPriceGetterClient{
+		BatchCaller: batchCaller,
+		LP:          lp,
+	}
+}
+
 type DynamicPriceGetter struct {
 	cfg           DynamicPriceGetterConfig
 	evmClients    map[uint64]DynamicPriceGetterClient

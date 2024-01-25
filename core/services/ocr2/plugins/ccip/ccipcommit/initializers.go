@@ -134,23 +134,17 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		rpclib.DefaultRpcBatchSizeLimit,
 		rpclib.DefaultRpcBatchBackOffMultiplier,
 	)
-	pricegetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{
-		params.sourceChain.ID().Uint64(): {
-			BatchCaller: srcCaller,
-			LP:          params.sourceChain.LogPoller(),
-		},
-		params.destChain.ID().Uint64(): {
-			BatchCaller: dstCaller,
-			LP:          params.destChain.LogPoller(),
-		},
+	priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{
+		params.sourceChain.ID().Uint64(): pricegetter.NewDynamicPriceGetterClient(srcCaller, params.sourceChain.LogPoller()),
+		params.destChain.ID().Uint64():   pricegetter.NewDynamicPriceGetterClient(dstCaller, params.destChain.LogPoller()),
 	}
 	priceGetterConfig, err := pricegetter.NewDynamicPriceGetterConfig(params.pluginConfig.PriceGetterConfig)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("creating dynamic price getter config: %w", err)
 	}
-	priceGetter, err := pricegetter.NewDynamicPriceGetter(priceGetterConfig, pricegetterClients)
+	priceGetter, err := pricegetter.NewDynamicPriceGetter(priceGetterConfig, priceGetterClients)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("creating dynamic price getter: %w", err)
 	}
 
 	// Load all the readers relevant for this plugin.

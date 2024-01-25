@@ -19,10 +19,11 @@ import (
 )
 
 type testParameters struct {
-	cfg                        DynamicPriceGetterConfig
-	evmClients                 map[uint64]DynamicPriceGetterClient
-	invalidConfigErrorExpected bool
-	expectedTokenPrices        map[common.Address]big.Int
+	cfg                          DynamicPriceGetterConfig
+	evmClients                   map[uint64]DynamicPriceGetterClient
+	expectedTokenPrices          map[common.Address]big.Int
+	invalidConfigErrorExpected   bool
+	priceResolutionErrorExpected bool
 }
 
 func TestDynamicPriceGetter(t *testing.T) {
@@ -46,6 +47,10 @@ func TestDynamicPriceGetter(t *testing.T) {
 			name:  "aggregator_and_static_token_collision",
 			param: testParamAggregatorAndStaticTokenCollision(t),
 		},
+		{
+			name:  "no_aggregator_for_token",
+			param: testParamNoAggregatorForToken(t),
+		},
 	}
 
 	for _, test := range tests {
@@ -53,22 +58,26 @@ func TestDynamicPriceGetter(t *testing.T) {
 			pg, err := NewDynamicPriceGetter(test.param.cfg, test.param.evmClients)
 			if test.param.invalidConfigErrorExpected {
 				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				ctx := testutils.Context(t)
-				// Build list of tokens to query.
-				tokens := make([]common.Address, 0, len(test.param.expectedTokenPrices))
-				for tk := range test.param.expectedTokenPrices {
-					tokens = append(tokens, tk)
-				}
-				prices, err := pg.TokenPricesUSD(ctx, tokens)
-				require.NoError(t, err)
-				// we expect prices for at least all queried tokens (it is possible that additional tokens are returned).
-				assert.True(t, len(prices) >= len(test.param.expectedTokenPrices))
-				// Check prices are matching expected result.
-				for tk, expectedPrice := range test.param.expectedTokenPrices {
-					assert.Equal(t, expectedPrice, *prices[tk])
-				}
+				return
+			}
+			require.NoError(t, err)
+			ctx := testutils.Context(t)
+			// Build list of tokens to query.
+			tokens := make([]common.Address, 0, len(test.param.expectedTokenPrices))
+			for tk := range test.param.expectedTokenPrices {
+				tokens = append(tokens, tk)
+			}
+			prices, err := pg.TokenPricesUSD(ctx, tokens)
+			if test.param.priceResolutionErrorExpected {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			// we expect prices for at least all queried tokens (it is possible that additional tokens are returned).
+			assert.True(t, len(prices) >= len(test.param.expectedTokenPrices))
+			// Check prices are matching expected result.
+			for tk, expectedPrice := range test.param.expectedTokenPrices {
+				assert.Equal(t, expectedPrice, *prices[tk])
 			}
 		})
 	}
@@ -151,10 +160,9 @@ func testParamStaticOnly() testParameters {
 		tk3: *big.NewInt(int64(cfg.StaticPrices[tk3].Price)),
 	}
 	return testParameters{
-		cfg:                        cfg,
-		evmClients:                 evmClients,
-		invalidConfigErrorExpected: false,
-		expectedTokenPrices:        expectedTokenPrices,
+		cfg:                 cfg,
+		evmClients:          evmClients,
+		expectedTokenPrices: expectedTokenPrices,
 	}
 }
 
@@ -206,10 +214,9 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 		tk3: *big.NewInt(int64(cfg.StaticPrices[tk3].Price)),
 	}
 	return testParameters{
-		cfg:                        cfg,
-		evmClients:                 evmClients,
-		invalidConfigErrorExpected: false,
-		expectedTokenPrices:        expectedTokenPrices,
+		cfg:                 cfg,
+		evmClients:          evmClients,
+		expectedTokenPrices: expectedTokenPrices,
 	}
 }
 
@@ -271,7 +278,63 @@ func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
 		cfg:                        cfg,
 		evmClients:                 evmClients,
 		invalidConfigErrorExpected: true,
-		expectedTokenPrices:        nil,
+	}
+}
+
+func testParamNoAggregatorForToken(t *testing.T) testParameters {
+	tk1 := utils.RandomAddress()
+	tk2 := utils.RandomAddress()
+	tk3 := utils.RandomAddress()
+	tk4 := utils.RandomAddress()
+	cfg := DynamicPriceGetterConfig{
+		AggregatorPrices: map[common.Address]AggregatorPriceConfig{
+			tk1: {
+				ChainID:                   101,
+				AggregatorContractAddress: utils.RandomAddress(),
+			},
+			tk2: {
+				ChainID:                   102,
+				AggregatorContractAddress: utils.RandomAddress(),
+			},
+		},
+		StaticPrices: map[common.Address]StaticPriceConfig{
+			tk3: {
+				ChainID: 103,
+				Price:   1_234_000,
+			},
+		},
+	}
+	// Real LINK/USD example from OP.
+	round1 := aggregator_v3_interface.LatestRoundData{
+		RoundId:         big.NewInt(1000),
+		Answer:          big.NewInt(1396818990),
+		StartedAt:       big.NewInt(1704896575),
+		UpdatedAt:       big.NewInt(1704896575),
+		AnsweredInRound: big.NewInt(1000),
+	}
+	// Real ETH/USD example from OP.
+	round2 := aggregator_v3_interface.LatestRoundData{
+		RoundId:         big.NewInt(2000),
+		Answer:          big.NewInt(238879815123),
+		StartedAt:       big.NewInt(1704897197),
+		UpdatedAt:       big.NewInt(1704897197),
+		AnsweredInRound: big.NewInt(2000),
+	}
+	evmClients := map[uint64]DynamicPriceGetterClient{
+		uint64(101): mockClientFromRound(t, round1),
+		uint64(102): mockClientFromRound(t, round2),
+	}
+	expectedTokenPrices := map[common.Address]big.Int{
+		tk1: *round1.Answer,
+		tk2: *round2.Answer,
+		tk3: *big.NewInt(int64(cfg.StaticPrices[tk3].Price)),
+		tk4: *big.NewInt(0),
+	}
+	return testParameters{
+		cfg:                          cfg,
+		evmClients:                   evmClients,
+		expectedTokenPrices:          expectedTokenPrices,
+		priceResolutionErrorExpected: true,
 	}
 }
 
