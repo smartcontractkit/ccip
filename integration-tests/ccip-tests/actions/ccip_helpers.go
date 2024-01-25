@@ -928,11 +928,11 @@ func (sourceCCIP *SourceCCIPModule) DeployContracts(lane *laneconfig.LaneConfig)
 			return fmt.Errorf("waiting for events shouldn't fail %w", err)
 		}
 
-		// update native pool with onRamp address
+		// set remote chain on the pools
 		for _, pool := range sourceCCIP.Common.BridgeTokenPools {
 			err = pool.SetRemoteChainOnPool(sourceCCIP.DestChainSelector)
 			if err != nil {
-				return fmt.Errorf("setting OnRamp on the bridge token pool shouldn't fail %w", err)
+				return fmt.Errorf("setting remote chain on the bridge token pool shouldn't fail %w", err)
 			}
 		}
 
@@ -1362,7 +1362,7 @@ func (destCCIP *DestCCIPModule) DeployContracts(
 		for _, pool := range destCCIP.Common.BridgeTokenPools {
 			err = pool.SetRemoteChainOnPool(destCCIP.SourceChainSelector)
 			if err != nil {
-				return fmt.Errorf("setting offramp on the bridge token pool shouldn't fail %w", err)
+				return fmt.Errorf("setting remote chain on the bridge token pool shouldn't fail %w", err)
 			}
 		}
 

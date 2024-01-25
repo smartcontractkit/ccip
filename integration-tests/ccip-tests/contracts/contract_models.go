@@ -372,13 +372,27 @@ func (pool *TokenPool) AddLiquidity(approveFn tokenApproveFn, tokenAddr string, 
 }
 
 func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64) error {
+	log.Info().
+		Str("Token Pool", pool.Address()).
+		Msg("Setting remote chain on pool")
+	isSupported, err := pool.PoolInterface.IsSupportedChain(nil, remoteChainSelector)
+	if err != nil {
+		return fmt.Errorf("failed to get if chain is supported: %w", err)
+	}
+	// Check if remote chain is already supported , if yes return
+	if isSupported {
+		log.Info().
+			Str("Token Pool", pool.Address()).
+			Str(Network, pool.client.GetNetworkName()).
+			Uint64("Remote Chain Selector", remoteChainSelector).
+			Msg("Remote chain is already supported")
+		return nil
+	}
+	// If remote chain is not supported , add it
 	opts, err := pool.client.TransactionOpts(pool.client.GetDefaultWallet())
 	if err != nil {
 		return fmt.Errorf("failed to get transaction opts: %w", err)
 	}
-	log.Info().
-		Str("Token Pool", pool.Address()).
-		Msg("Setting on ramp for onramp router")
 	tx, err := pool.PoolInterface.ApplyChainUpdates(opts, []token_pool.TokenPoolChainUpdate{
 		{
 			ChainSelector: remoteChainSelector,
@@ -397,14 +411,14 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64) error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to set ramp updates: %w", err)
+		return fmt.Errorf("failed to set chain updates on token pool: %w", err)
 	}
 
 	log.Info().
 		Str("Token Pool", pool.Address()).
-		Str("OnRamp", strconv.FormatUint(remoteChainSelector, 10)).
+		Str("Chain selector", strconv.FormatUint(remoteChainSelector, 10)).
 		Str(Network, pool.client.GetNetworkConfig().Name).
-		Msg("OnRamp is set")
+		Msg("Remote chain set on token pool")
 	return pool.client.ProcessTransaction(tx)
 }
 
@@ -421,14 +435,14 @@ func (pool *TokenPool) SetRemoteChainRateLimits(remoteChainSelector uint64, rl t
 	tx, err := pool.PoolInterface.SetChainRateLimiterConfig(opts, remoteChainSelector, rl, rl)
 
 	if err != nil {
-		return fmt.Errorf("error setting rate limit onramp: %w", err)
+		return fmt.Errorf("error setting rate limit token pool: %w", err)
 	}
 
 	log.Info().
 		Str("Token Pool", pool.Address()).
 		Str("Remote chain selector", strconv.FormatUint(remoteChainSelector, 10)).
 		Interface("RateLimiterConfig", rl).
-		Msg("Rate Limit on ramp is set")
+		Msg("Rate Limit on token pool is set")
 	return pool.client.ProcessTransaction(tx)
 }
 
