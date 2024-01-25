@@ -47,6 +47,12 @@ contract MockL1BridgeAdapter is IL1BridgeAdapter, ILiquidityContainer {
     i_token.safeTransfer(msg.sender, amount);
     emit LiquidityRemoved(msg.sender, amount);
   }
+
+  function withdrawLiquidity(uint256 amount, address receiver) external {
+    if (i_token.balanceOf(address(this)) < amount) revert InsufficientLiquidity();
+    i_token.safeTransfer(receiver, amount);
+    emit LiquidityRemoved(receiver, amount);
+  }
 }
 
 /// @notice Mock L2 Bridge adapter

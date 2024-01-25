@@ -291,6 +291,20 @@ contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
     assertEq(s_token.balanceOf(OWNER), balancePre);
   }
 
+  function testFuzz_WithdrawalLiquidityWithReceiverSuccess(uint256 amount, address receiver) public {
+    vm.assume(receiver != address(0));
+    vm.assume(receiver != address(s_token));
+    vm.assume(receiver != address(OWNER));
+
+    uint256 balancePre = s_token.balanceOf(receiver);
+    s_token.approve(address(s_lockReleaseTokenPool), amount);
+    s_lockReleaseTokenPool.provideLiquidity(amount);
+
+    s_lockReleaseTokenPool.withdrawLiquidity(amount, receiver);
+
+    assertEq(s_token.balanceOf(receiver), balancePre + amount);
+  }
+
   // Reverts
 
   function test_UnauthorizedReverts() public {
@@ -298,6 +312,11 @@ contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
     vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.Unauthorized.selector, STRANGER));
 
     s_lockReleaseTokenPool.withdrawLiquidity(1);
+
+    vm.startPrank(STRANGER);
+    vm.expectRevert(abi.encodeWithSelector(LockReleaseTokenPool.Unauthorized.selector, STRANGER));
+
+    s_lockReleaseTokenPool.withdrawLiquidity(1, STRANGER);
   }
 
   function testInsufficientLiquidityReverts() public {
@@ -311,6 +330,9 @@ contract LockReleaseTokenPool_withdrawalLiquidity is LockReleaseTokenPoolSetup {
 
     vm.expectRevert(LockReleaseTokenPool.InsufficientLiquidity.selector);
     s_lockReleaseTokenPool.withdrawLiquidity(1);
+
+    vm.expectRevert(LockReleaseTokenPool.InsufficientLiquidity.selector);
+    s_lockReleaseTokenPool.withdrawLiquidity(1, STRANGER);
   }
 }
 
