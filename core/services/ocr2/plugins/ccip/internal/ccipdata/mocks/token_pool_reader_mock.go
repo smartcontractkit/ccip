@@ -96,6 +96,24 @@ func (_m *TokenPoolReader) GetInboundTokenPoolRateLimits(ctx context.Context, po
 	return r0, r1
 }
 
+// Type provides a mock function with given fields:
+func (_m *TokenPoolReader) Type() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Type")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
 // NewTokenPoolReader creates a new instance of TokenPoolReader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewTokenPoolReader(t interface {

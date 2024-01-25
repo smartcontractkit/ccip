@@ -33,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/promwrapper"
@@ -221,6 +222,8 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		"sourceNative", sourceWrappedNative,
 		"sourceRouter", sourceRouter.Address())
 
+	batchCaller := rpclib.NewDynamicLimitedBatchCaller(lggr, params.destChain.Client(), rpclib.DefaultRpcBatchSizeLimit, rpclib.DefaultRpcBatchBackOffMultiplier)
+
 	return &ExecutionPluginStaticConfig{
 			lggr:                     execLggr,
 			onRampReader:             onRampReader,
@@ -230,7 +233,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 			sourceWrappedNativeToken: sourceWrappedNative,
 			destChainSelector:        destChainSelector,
 			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
-			destTokenPoolFactory:     factory.NewTokenPoolFactory(execLggr, sourceChainSelector, offRampReader.Address(), params.destChain.Client(), params.destChain.LogPoller()),
+			destTokenPoolFactory:     factory.NewTokenPoolFactory(execLggr, sourceChainSelector, offRampReader.Address(), batchCaller, params.destChain.LogPoller()),
 			tokenDataWorker: tokendata.NewBackgroundWorker(
 				ctx,
 				tokenDataProviders,

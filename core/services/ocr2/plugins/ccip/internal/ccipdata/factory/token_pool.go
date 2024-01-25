@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -27,7 +26,6 @@ type TokenPoolFactory struct {
 	lggr                logger.Logger
 	remoteChainSelector uint64
 	offRampAddress      common.Address
-	ec                  client.Client
 	lp                  logpoller.LogPoller
 	evmBatchCaller      rpclib.EvmBatchCaller
 }
@@ -39,14 +37,13 @@ type TokenPoolFactoryInterface interface {
 
 var _ TokenPoolFactoryInterface = (*TokenPoolFactory)(nil)
 
-func NewTokenPoolFactory(lggr logger.Logger, remoteChainSelector uint64, offRampAddress common.Address, ec client.Client, lp logpoller.LogPoller) TokenPoolFactory {
+func NewTokenPoolFactory(lggr logger.Logger, remoteChainSelector uint64, offRampAddress common.Address, evmBatchCaller rpclib.EvmBatchCaller, lp logpoller.LogPoller) TokenPoolFactory {
 	return TokenPoolFactory{
 		lggr:                lggr,
 		remoteChainSelector: remoteChainSelector,
 		offRampAddress:      offRampAddress,
-		ec:                  ec,
 		lp:                  lp,
-		evmBatchCaller:      rpclib.NewDynamicLimitedBatchCaller(lggr, ec, rpclib.DefaultRpcBatchSizeLimit, rpclib.DefaultRpcBatchBackOffMultiplier),
+		evmBatchCaller:      evmBatchCaller,
 	}
 }
 
@@ -93,9 +90,9 @@ func (f TokenPoolFactory) NewTokenPools(ctx context.Context, tokenPoolAddresses 
 		}
 		switch version {
 		case ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0:
-			tokenPoolReaders = append(tokenPoolReaders, v1_2_0.NewTokenPool(poolType, tokenPoolAddress, f.offRampAddress, f.ec, f.lp, f.evmBatchCaller))
+			tokenPoolReaders = append(tokenPoolReaders, v1_2_0.NewTokenPool(poolType, tokenPoolAddress, f.offRampAddress, f.lp, f.evmBatchCaller))
 		case ccipdata.V1_3_0:
-			tokenPoolReaders = append(tokenPoolReaders, v1_3_0.NewTokenPool(poolType, tokenPoolAddress, f.remoteChainSelector, f.ec, f.lp, f.evmBatchCaller))
+			tokenPoolReaders = append(tokenPoolReaders, v1_3_0.NewTokenPool(poolType, tokenPoolAddress, f.remoteChainSelector, f.lp, f.evmBatchCaller))
 		default:
 			return nil, fmt.Errorf("unsupported token pool version %v", version)
 		}

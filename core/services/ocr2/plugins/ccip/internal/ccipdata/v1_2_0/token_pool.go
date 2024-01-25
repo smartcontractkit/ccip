@@ -6,7 +6,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -25,17 +24,15 @@ type TokenPool struct {
 	addr           common.Address
 	offRampAddress common.Address
 	poolType       string
-	ec             client.Client
 	lp             logpoller.LogPoller
 	evmBatchCaller rpclib.EvmBatchCaller
 }
 
-func NewTokenPool(poolType string, addr common.Address, offRampAddress common.Address, ec client.Client, lp logpoller.LogPoller, evmBatchCaller rpclib.EvmBatchCaller) *TokenPool {
+func NewTokenPool(poolType string, addr common.Address, offRampAddress common.Address, lp logpoller.LogPoller, evmBatchCaller rpclib.EvmBatchCaller) *TokenPool {
 	return &TokenPool{
 		addr:           addr,
 		offRampAddress: offRampAddress,
 		poolType:       poolType,
-		ec:             ec,
 		lp:             lp,
 		evmBatchCaller: evmBatchCaller,
 	}
@@ -43,6 +40,10 @@ func NewTokenPool(poolType string, addr common.Address, offRampAddress common.Ad
 
 func (p *TokenPool) Address() common.Address {
 	return p.addr
+}
+
+func (p *TokenPool) Type() string {
+	return p.poolType
 }
 
 func (p *TokenPool) GetInboundTokenPoolRateLimits(ctx context.Context, tokenPoolReaders []ccipdata.TokenPoolReader) ([]ccipdata.TokenBucketRateLimit, error) {

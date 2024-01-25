@@ -13,4 +13,5 @@ type TokenPoolReader interface {
 	GetInboundTokenPoolRateLimitCall() (rpclib.EvmCall, error)
 	GetInboundTokenPoolRateLimits(ctx context.Context, pools []TokenPoolReader) ([]TokenBucketRateLimit, error)
 	Address() common.Address
+	Type() string
 }
