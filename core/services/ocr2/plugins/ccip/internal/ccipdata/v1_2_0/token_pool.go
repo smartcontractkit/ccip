@@ -77,6 +77,10 @@ func (p *TokenPool) GetInboundTokenPoolRateLimits(ctx context.Context, tokenPool
 		return nil, fmt.Errorf("parse outputs: %w", err)
 	}
 
+	if len(rateLimits) != len(tokenPoolReaders) {
+		return nil, fmt.Errorf("expected %d rate limits, got %d", len(tokenPoolReaders), len(rateLimits))
+	}
+
 	return rateLimits, nil
 }
 
