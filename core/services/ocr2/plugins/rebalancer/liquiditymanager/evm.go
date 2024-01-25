@@ -155,8 +155,7 @@ func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Regist
 
 			_ = g.AddNetwork(netSel, big.NewInt(0))
 
-			_, err := g.AddConnection(elem.networkSel, netSel)
-			if err != nil {
+			if err := g.AddConnection(elem.networkSel, netSel); err != nil {
 				return nil, nil, fmt.Errorf("add connection: %w", err)
 			}
 
