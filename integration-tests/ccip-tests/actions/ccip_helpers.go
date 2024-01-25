@@ -1840,17 +1840,17 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 	for _, token := range lane.Dest.Common.BridgeTokens {
 		err := d.AddPriceConfig(token.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD, false)
 		if err != nil {
-			return "", fmt.Errorf("error %w in AddPriceConfig for token %s", err, token.Address())
+			return "", fmt.Errorf("error in AddPriceConfig for bridge token %s: %w", token.Address(), err)
 		}
 	}
 	if err := d.AddPriceConfig(lane.Dest.Common.FeeToken.Address(), lane.Dest.Common.PriceAggregators, LinkToUSD, false); err != nil {
-		return "", fmt.Errorf("error %w in AddPriceConfig for fee token %s", err, lane.Dest.Common.FeeToken.Address())
+		return "", fmt.Errorf("error in AddPriceConfig for fee token %s: %w", lane.Dest.Common.FeeToken.Address(), err)
 	}
 	if err := d.AddPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD, false); err != nil {
-		return "", fmt.Errorf("error %w in AddPriceConfig for wrapped native %s", err, lane.Dest.Common.WrappedNative.Hex())
+		return "", fmt.Errorf("error in AddPriceConfig for wrapped native %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
 	}
 	if err := d.AddPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD, false); err != nil {
-		return "", fmt.Errorf("error %w in AddPriceConfig for wrapped native %s", err, lane.Source.Common.WrappedNative.Hex())
+		return "", fmt.Errorf("error in AddPriceConfig for wrapped native %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
 	}
 	return d.String()
 }
