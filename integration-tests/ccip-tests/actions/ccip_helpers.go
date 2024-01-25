@@ -19,11 +19,12 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
+
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/networks"
 
