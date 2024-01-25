@@ -48,6 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 	bigmath "github.com/smartcontractkit/chainlink/v2/core/utils/big_math"
@@ -2508,16 +2509,10 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	lane.Logger.Info().Str("tokenPricesConfigJson", tokenPricesConfigJson).Msg("Price getter config")
 
-	var tokenAddresses []string
-	for _, token := range lane.Dest.Common.BridgeTokens {
-		tokenAddresses = append(tokenAddresses, token.Address())
+	var killgrave *ctftestenv.Killgrave
+	if env.LocalCluster != nil {
+		killgrave = env.LocalCluster.MockAdapter
 	}
-	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
-
-	//var killgrave *ctftestenv.Killgrave
-	//if env.LocalCluster != nil {
-	//	killgrave = env.LocalCluster.MockAdapter
-	//}
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
 		OffRamp:           lane.Dest.OffRamp.EthAddress,
 		CommitStore:       lane.Dest.CommitStore.EthAddress,
@@ -2528,24 +2523,24 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		PriceGetterConfig: tokenPricesConfigJson,
 		DestStartBlock:    currentBlockOnDest,
 	}
-	//if !lane.Source.Common.ExistingDeployment && lane.Source.Common.USDCDeployment {
-	//	api := ""
-	//	if killgrave != nil {
-	//		api = killgrave.InternalEndpoint
-	//	}
-	//	if env.MockServer != nil {
-	//		api = env.MockServer.Config.ClusterURL
-	//	}
-	//	if lane.Source.Common.TokenTransmitter == nil {
-	//		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("token transmitter address not set")
-	//	}
-	//	jobParams.USDCConfig = &config.USDCConfig{
-	//		SourceTokenAddress:              common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
-	//		SourceMessageTransmitterAddress: lane.Source.Common.TokenTransmitter.ContractAddress,
-	//		AttestationAPI:                  api,
-	//		AttestationAPITimeoutSeconds:    5,
-	//	}
-	//}
+	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.USDCDeployment {
+		api := ""
+		if killgrave != nil {
+			api = killgrave.InternalEndpoint
+		}
+		if env.MockServer != nil {
+			api = env.MockServer.Config.ClusterURL
+		}
+		if lane.Source.Common.TokenTransmitter == nil {
+			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("token transmitter address not set")
+		}
+		jobParams.USDCConfig = &config.USDCConfig{
+			SourceTokenAddress:              common.HexToAddress(lane.Source.Common.BridgeTokens[0].Address()),
+			SourceMessageTransmitterAddress: lane.Source.Common.TokenTransmitter.ContractAddress,
+			AttestationAPI:                  api,
+			AttestationAPITimeoutSeconds:    5,
+		}
+	}
 	if !bootstrapAdded.Load() {
 		bootstrapAdded.Store(true)
 		err := CreateBootstrapJob(jobParams, bootstrapCommit, bootstrapExec)
