@@ -37,7 +37,7 @@ BumpMin = '5 gwei'
 BumpPercent = 20
 BumpThreshold = 3
 EIP1559DynamicFees = false
-FeeCapDefaFeeCapDefaultult = '100 gwei'
+FeeCapDefault = '100 gwei'
 TipCapDefault = '1'
 TipCapMin = '1'
 
