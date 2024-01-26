@@ -72,7 +72,7 @@ chainID              	= %d
 
 [pluginConfig]
 liquidityManagerAddress = "%s"
-liquidityManagerNetwork = %d
+liquidityManagerNetwork = "%d"
 closePluginTimeoutSec = 10
 [pluginConfig.rebalancerConfig]
 type = "random"

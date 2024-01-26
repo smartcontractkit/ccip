@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/shopspring/decimal"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/urfave/cli"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/arb"
@@ -122,7 +123,7 @@ func setupRebalancerNodes(e multienv.Env) {
 		flagSet.String("job-name", fmt.Sprintf("rebalancer-%d", i+1), "the job name")
 
 		flagSet.String("liquidityManagerAddress", uni.L1.Rebalancer.Hex(), "the liquidity manager address")
-		flagSet.Uint64("liquidityManagerNetwork", *l1ChainID, "the liquidity manager network")
+		flagSet.Uint64("liquidityManagerNetwork", mustGetChainByEvmID(*l1ChainID).Selector, "the liquidity manager network")
 		flagSet.Int64("maxNumTransfers", 4, "the max number of transfers")
 
 		// used by bootstrap template instantiation
@@ -466,4 +467,12 @@ func FundNode(
 	}
 	helpers.ConfirmTXMined(context.Background(), client, signedTx, int64(chainID), "Sending", fundingAmount.String(), "to", toAddress.Hex())
 	return nil
+}
+
+func mustGetChainByEvmID(evmChainID uint64) chainsel.Chain {
+	ch, exists := chainsel.ChainByEvmChainID(uint64(evmChainID))
+	if !exists {
+		helpers.PanicErr(fmt.Errorf("chain id %d doesn't exist in chain-selectors - forgot to add?", evmChainID))
+	}
+	return ch
 }

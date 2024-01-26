@@ -49,6 +49,7 @@ func deployUniverse(
 
 	l1Client, l2Client := env.Clients[l1ChainID], env.Clients[l2ChainID]
 	l1Transactor, l2Transactor := env.Transactors[l1ChainID], env.Transactors[l2ChainID]
+	l1ChainSelector, l2ChainSelector := mustGetChainByEvmID(l1ChainID).Selector, mustGetChainByEvmID(l2ChainID).Selector
 
 	// L1 deploys
 	// deploy arm and arm proxy.
@@ -90,13 +91,13 @@ func deployUniverse(
 		RemoteRebalancer:    l2Rebalancer.Address(),
 		LocalBridge:         l1BridgeAdapterAddress,
 		RemoteToken:         l2TokenAddress,
-		RemoteChainSelector: l2ChainID,
+		RemoteChainSelector: l2ChainSelector,
 		Enabled:             true,
 	})
 	helpers.PanicErr(err)
 	helpers.ConfirmTXMined(context.Background(), l1Client, tx, int64(l1ChainID), "setting cross chain rebalancer on L1 rebalancer")
 	// assertion
-	onchainRebalancer, err := l1Rebalancer.GetCrossChainRebalancer(nil, l2ChainID)
+	onchainRebalancer, err := l1Rebalancer.GetCrossChainRebalancer(nil, l2ChainSelector)
 	helpers.PanicErr(err)
 	if onchainRebalancer.RemoteRebalancer != l2Rebalancer.Address() ||
 		onchainRebalancer.LocalBridge != l1BridgeAdapterAddress {
@@ -111,13 +112,13 @@ func deployUniverse(
 		RemoteRebalancer:    l1Rebalancer.Address(),
 		LocalBridge:         l2BridgeAdapterAddress,
 		RemoteToken:         l1TokenAddress,
-		RemoteChainSelector: l1ChainID,
+		RemoteChainSelector: l1ChainSelector,
 		Enabled:             true,
 	})
 	helpers.PanicErr(err)
 	helpers.ConfirmTXMined(context.Background(), l2Client, tx, int64(l2ChainID), "setting cross chain rebalancer on L2 rebalancer")
 	// assertion
-	onchainRebalancer, err = l2Rebalancer.GetCrossChainRebalancer(nil, l1ChainID)
+	onchainRebalancer, err = l2Rebalancer.GetCrossChainRebalancer(nil, l1ChainSelector)
 	helpers.PanicErr(err)
 	if onchainRebalancer.RemoteRebalancer != l1Rebalancer.Address() ||
 		onchainRebalancer.LocalBridge != l2BridgeAdapterAddress {
