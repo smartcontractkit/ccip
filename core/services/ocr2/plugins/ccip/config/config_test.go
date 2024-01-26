@@ -21,17 +21,17 @@ func TestCommitConfig(t *testing.T) {
 		{
 			"aggregatorPrices": {
 			 "0x0820c05e1fba1244763a494a52272170c321cad3": {
-			  "chainID": 1000,
+			  "chainID": "1000",
 			  "contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
 			 },
 			 "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
-			  "chainID": 1337,
+			  "chainID": "1337",
 			  "contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
 			 }
 			},
 			"staticPrices": {
 				"0xec8c353470ccaa4f43067fcde40558e084a12927": {
-					"chainID": 1057,
+					"chainID": "1057",
 					"price": "1000000000000000000"
 			 	}
 			}
@@ -48,8 +48,11 @@ func TestCommitConfig(t *testing.T) {
 	require.Equal(t, exampleConfig, parsedConfig)
 
 	// Ensure correctness of price getter configuration.
-	_, err = pricegetter.NewDynamicPriceGetterConfig(exampleConfig.PriceGetterConfig)
+	pgc, err := pricegetter.NewDynamicPriceGetterConfig(exampleConfig.PriceGetterConfig)
 	require.NoError(t, err)
+	require.Equal(t, uint64(1000), pgc.AggregatorPrices[common.HexToAddress("0x0820c05e1fba1244763a494a52272170c321cad3")].ChainID)
+	require.Equal(t, uint64(1337), pgc.AggregatorPrices[common.HexToAddress("0x4a98bb4d65347016a7ab6f85bea24b129c9a1272")].ChainID)
+	require.Equal(t, uint64(1057), pgc.StaticPrices[common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927")].ChainID)
 }
 
 func TestExecutionConfig(t *testing.T) {

@@ -801,12 +801,6 @@ func (d *DynamicPriceGetterConfig) AddAggregatorPriceConfig(tokenAddr string, ag
 		return fmt.Errorf("latest round data is not populated for token %s and aggregator %s", tokenAddr, aggregatorContract.ContractAddress.Hex())
 	}
 
-	//if static {
-	//	d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
-	//		ChainID: aggregatorContract.ChainID(),
-	//		Price:   price.Uint64(),
-	//	}
-	//} else {
 	d.AggregatorPrices[common.HexToAddress(tokenAddr)] = AggregatorPriceConfig{
 		ChainID:                   aggregatorContract.ChainID(),
 		AggregatorContractAddress: aggregatorContract.ContractAddress,
@@ -833,14 +827,14 @@ func (d *DynamicPriceGetterConfig) String() (string, error) {
 // AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
 // This should match pricegetter.AggregatorPriceConfig in core/services/ocr2/plugins/ccip/internal/pricegetter
 type AggregatorPriceConfig struct {
-	ChainID                   uint64         `json:"chainID"`
+	ChainID                   uint64         `json:"chainID,string"`
 	AggregatorContractAddress common.Address `json:"contractAddress"`
 }
 
 // StaticPriceConfig specifies a price defined statically.
 // This should match pricegetter.StaticPriceConfig in core/services/ocr2/plugins/ccip/internal/pricegetter
 type StaticPriceConfig struct {
-	ChainID uint64 `json:"chainID"`
+	ChainID uint64 `json:"chainID,string"`
 	Price   uint64 `json:"price,string"`
 }
 
