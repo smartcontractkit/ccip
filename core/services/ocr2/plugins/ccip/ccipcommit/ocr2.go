@@ -64,8 +64,9 @@ type CommitPluginStaticConfig struct {
 	destChainSelector     uint64
 	priceRegistryProvider ccipdataprovider.PriceRegistry
 	// Offchain
-	priceGetter      pricegetter.PriceGetter
-	metricsCollector ccip.PluginMetricsCollector
+	priceGetter        pricegetter.PriceGetter
+	dynamicPriceGetter pricegetter.PriceGetter
+	metricsCollector   ccip.PluginMetricsCollector
 }
 
 type CommitReportingPlugin struct {

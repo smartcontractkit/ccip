@@ -25,7 +25,12 @@ import (
 )
 
 func TestIntegration_CCIP(t *testing.T) {
+
 	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
+
+	tokenPricesUSDPipeline, linkUSD, ethUSD := ccipTH.CreatePricesPipeline(t)
+	defer linkUSD.Close()
+	defer ethUSD.Close()
 
 	// Set up the aggregators here to avoid modifying ccipTH.
 	aggSrcNatAddr, _, aggSrcNat, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(ccipTH.Source.User, ccipTH.Source.Chain, 18, big.NewInt(2e18))
@@ -69,7 +74,7 @@ func TestIntegration_CCIP(t *testing.T) {
 	require.NoError(t, err)
 	priceGetterConfigJson := string(priceGetterConfigBytes)
 
-	jobParams := ccipTH.SetUpNodesAndJobs(t, priceGetterConfigJson, "")
+	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, priceGetterConfigJson, "")
 
 	currentSeqNum := 1
 

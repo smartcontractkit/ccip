@@ -21,6 +21,7 @@ import (
 	ocr2vrfconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ocr2vrf/config"
 	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
 
@@ -310,6 +311,10 @@ func validateOCR2CCIPCommitSpec(jsonConfig job.JSONConfig) error {
 	err := json.Unmarshal(jsonConfig.Bytes(), &cfg)
 	if err != nil {
 		return pkgerrors.Wrap(err, "error while unmarshalling plugin config")
+	}
+	_, err = pipeline.Parse(cfg.TokenPricesUSDPipeline)
+	if err != nil {
+		return pkgerrors.Wrap(err, "invalid token prices pipeline")
 	}
 	// Validate prices config (like it was done for the pipeline).
 	if cfg.PriceGetterConfig == "" {

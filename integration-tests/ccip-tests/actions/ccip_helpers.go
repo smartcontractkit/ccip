@@ -2515,15 +2515,21 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if env.LocalCluster != nil {
 		killgrave = env.LocalCluster.MockAdapter
 	}
+	var tokenAddresses []string
+	for _, token := range lane.Dest.Common.BridgeTokens {
+		tokenAddresses = append(tokenAddresses, token.Address())
+	}
+	tokensUSDUrl := TokenPricePipelineURLs(tokenAddresses, killgrave, env.MockServer)
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
-		OffRamp:           lane.Dest.OffRamp.EthAddress,
-		CommitStore:       lane.Dest.CommitStore.EthAddress,
-		SourceChainName:   sourceChainClient.GetNetworkName(),
-		DestChainName:     destChainClient.GetNetworkName(),
-		DestEvmChainId:    destChainClient.GetChainID().Uint64(),
-		SourceStartBlock:  lane.Source.SrcStartBlock,
-		PriceGetterConfig: tokenPricesConfigJson,
-		DestStartBlock:    currentBlockOnDest,
+		OffRamp:                lane.Dest.OffRamp.EthAddress,
+		CommitStore:            lane.Dest.CommitStore.EthAddress,
+		SourceChainName:        sourceChainClient.GetNetworkName(),
+		DestChainName:          destChainClient.GetNetworkName(),
+		DestEvmChainId:         destChainClient.GetChainID().Uint64(),
+		SourceStartBlock:       lane.Source.SrcStartBlock,
+		TokenPricesUSDPipeline: TokenFeeForMultipleTokenAddr(tokensUSDUrl),
+		PriceGetterConfig:      tokenPricesConfigJson,
+		DestStartBlock:         currentBlockOnDest,
 	}
 	if !lane.Source.Common.ExistingDeployment && lane.Source.Common.USDCDeployment {
 		api := ""
@@ -3112,4 +3118,69 @@ func SetMockServerWithUSDCAttestation(
 		}
 	}
 	return nil
+}
+
+// SetMockserverWithTokenPriceValue sets the mock responses in mockserver that are read by chainlink nodes
+// to simulate different price feed value.
+// it keeps updating the response every 15 seconds to simulate price feed updates
+func SetMockserverWithTokenPriceValue(
+	killGrave *ctftestenv.Killgrave,
+	mockserver *ctfClient.MockserverClient,
+) {
+	wg := &sync.WaitGroup{}
+	path := "token_contract_"
+	wg.Add(1)
+	go func() {
+		set := true
+		// keep updating token value every 15 second
+		for {
+			if killGrave == nil && mockserver == nil {
+				log.Fatal().Msg("both killgrave and mockserver are nil")
+				return
+			}
+			tokenValue := big.NewInt(time.Now().UnixNano()).String()
+			if killGrave != nil {
+				err := killGrave.SetAdapterBasedAnyValuePath(fmt.Sprintf("%s{.*}", path), []string{http.MethodGet}, tokenValue)
+				if err != nil {
+					log.Fatal().Err(err).Msg("failed to set killgrave server value")
+					return
+				}
+			}
+			if mockserver != nil {
+				err := mockserver.SetAnyValuePath(fmt.Sprintf("/%s.*", path), tokenValue)
+				if err != nil {
+					log.Fatal().Err(err).Msg("failed to set mockserver value")
+					return
+				}
+			}
+			if set {
+				set = false
+				wg.Done()
+			}
+			time.Sleep(15 * time.Second)
+		}
+	}()
+	// wait for the first value to be set
+	wg.Wait()
+}
+
+// TokenPricePipelineURLs returns the mockserver urls for the token price pipeline
+func TokenPricePipelineURLs(
+	tokenAddresses []string,
+	killGrave *ctftestenv.Killgrave,
+	mockserver *ctfClient.MockserverClient,
+) map[string]string {
+	mapTokenURL := make(map[string]string)
+
+	for _, tokenAddr := range tokenAddresses {
+		path := fmt.Sprintf("token_contract_%s", tokenAddr[2:12])
+		if mockserver != nil {
+			mapTokenURL[tokenAddr] = fmt.Sprintf("%s/%s", mockserver.Config.ClusterURL, path)
+		}
+		if killGrave != nil {
+			mapTokenURL[tokenAddr] = fmt.Sprintf("%s/%s", killGrave.InternalEndpoint, path)
+		}
+	}
+
+	return mapTokenURL
 }

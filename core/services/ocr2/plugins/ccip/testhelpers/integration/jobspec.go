@@ -157,19 +157,20 @@ func JobName(jobType JobType, source string, destination, version string) string
 }
 
 type CCIPJobSpecParams struct {
-	Name               string
-	Version            string
-	OffRamp            common.Address
-	CommitStore        common.Address
-	SourceChainName    string
-	DestChainName      string
-	DestEvmChainId     uint64
-	PriceGetterConfig  string
-	SourceStartBlock   uint64
-	DestStartBlock     uint64
-	USDCAttestationAPI string
-	USDCConfig         *config.USDCConfig
-	P2PV2Bootstrappers pq.StringArray
+	Name                   string
+	Version                string
+	OffRamp                common.Address
+	CommitStore            common.Address
+	SourceChainName        string
+	DestChainName          string
+	DestEvmChainId         uint64
+	TokenPricesUSDPipeline string
+	PriceGetterConfig      string
+	SourceStartBlock       uint64
+	DestStartBlock         uint64
+	USDCAttestationAPI     string
+	USDCConfig             *config.USDCConfig
+	P2PV2Bootstrappers     pq.StringArray
 }
 
 func (params CCIPJobSpecParams) Validate() error {
@@ -221,6 +222,9 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*OCR2TaskJobSpec, error) {
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
 		PluginConfig: map[string]interface{}{
 			"offRamp": fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
+			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
+%s
+"""`, params.TokenPricesUSDPipeline),
 			"priceGetterConfig": fmt.Sprintf(`"""
 %s
 """`, params.PriceGetterConfig),
@@ -304,15 +308,16 @@ func (params CCIPJobSpecParams) BootstrapJob(contractID string) *OCR2TaskJobSpec
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(priceGetterConfig string, configBlock int64, usdcAttestationAPI string) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(pricePipeline string, priceGetterConfig string, configBlock int64, usdcAttestationAPI string) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
-		CommitStore:        c.Dest.CommitStore.Address(),
-		OffRamp:            c.Dest.OffRamp.Address(),
-		DestEvmChainId:     c.Dest.ChainID,
-		SourceChainName:    "SimulatedSource",
-		DestChainName:      "SimulatedDest",
-		PriceGetterConfig:  priceGetterConfig,
-		DestStartBlock:     uint64(configBlock),
-		USDCAttestationAPI: usdcAttestationAPI,
+		CommitStore:            c.Dest.CommitStore.Address(),
+		OffRamp:                c.Dest.OffRamp.Address(),
+		DestEvmChainId:         c.Dest.ChainID,
+		SourceChainName:        "SimulatedSource",
+		DestChainName:          "SimulatedDest",
+		TokenPricesUSDPipeline: pricePipeline,
+		PriceGetterConfig:      priceGetterConfig,
+		DestStartBlock:         uint64(configBlock),
+		USDCAttestationAPI:     usdcAttestationAPI,
 	}
 }

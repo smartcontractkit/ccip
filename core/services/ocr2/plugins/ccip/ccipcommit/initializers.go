@@ -120,6 +120,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
+	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 
 	// Build evmClients for price getter.
 	srcCaller := rpclib.NewDynamicLimitedBatchCaller(
@@ -186,7 +187,8 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			lggr:                  commitLggr,
 			onRampReader:          onRampReader,
 			offRamp:               offRampReader,
-			priceGetter:           priceGetter,
+			priceGetter:           pipelinePriceGetter,
+			dynamicPriceGetter:    priceGetter,
 			sourceNative:          sourceNative,
 			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
 			destChainSelector:     params.commitStoreStaticCfg.ChainSelector,

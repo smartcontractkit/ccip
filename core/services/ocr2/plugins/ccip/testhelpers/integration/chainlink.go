@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -121,6 +122,9 @@ const (
 		[pluginConfig]
 		destStartBlock = 50
 		offRamp = "%s"
+		tokenPricesUSDPipeline = """
+		%s
+		"""
 		priceGetterConfig = """
 		%s
 		"""
@@ -518,6 +522,31 @@ func SetupCCIPIntegrationTH(t *testing.T, sourceChainID, sourceChainSelector, de
 	}
 }
 
+func (c *CCIPIntegrationTestHarness) CreatePricesPipeline(t *testing.T) (string, *httptest.Server, *httptest.Server) {
+	linkUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(`{"UsdPerLink": "8000000000000000000"}`))
+		require.NoError(t, err)
+	}))
+	ethUSD := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(`{"UsdPerETH": "1700000000000000000000"}`))
+		require.NoError(t, err)
+	}))
+	wrapped, err1 := c.Source.Router.GetWrappedNative(nil)
+	require.NoError(t, err1)
+	tokenPricesUSDPipeline := fmt.Sprintf(`
+// Price 1
+link [type=http method=GET url="%s"];
+link_parse [type=jsonparse path="UsdPerLink"];
+link->link_parse;
+eth [type=http method=GET url="%s"];
+eth_parse [type=jsonparse path="UsdPerETH"];
+eth->eth_parse;
+merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse)}"];`,
+		linkUSD.URL, ethUSD.URL, c.Dest.LinkToken.Address(), wrapped)
+
+	return tokenPricesUSDPipeline, linkUSD, ethUSD
+}
+
 func (c *CCIPIntegrationTestHarness) AddAllJobs(t *testing.T, jobParams CCIPJobSpecParams) {
 	jobParams.OffRamp = c.Dest.OffRamp.Address()
 
@@ -580,7 +609,7 @@ func (c *CCIPIntegrationTestHarness) SetupFeedsManager(t *testing.T) {
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams) {
+func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCIPJobSpecParams, pipeline string) {
 	ctx := testutils.Context(t)
 
 	for _, node := range c.Nodes {
@@ -615,6 +644,7 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 			node.KeyBundle.ID(),
 			node.Transmitter.Hex(),
 			jobParams.OffRamp.String(),
+			pipeline,
 			jobParams.PriceGetterConfig,
 		)
 
@@ -861,13 +891,13 @@ func (c *CCIPIntegrationTestHarness) SetupAndStartNodes(ctx context.Context, t *
 	return bootstrapNode, nodes, configBlock
 }
 
-func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, priceGetterConfig string, usdcAttestationAPI string) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) SetUpNodesAndJobs(t *testing.T, pricePipeline string, priceGetterConfig string, usdcAttestationAPI string) CCIPJobSpecParams {
 	// setup Jobs
 	ctx := context.Background()
 	// Starts nodes and configures them in the OCR contracts.
 	bootstrapNode, _, configBlock := c.SetupAndStartNodes(ctx, t, int64(freeport.GetOne(t)))
 
-	jobParams := c.NewCCIPJobSpecParams(priceGetterConfig, configBlock, usdcAttestationAPI)
+	jobParams := c.NewCCIPJobSpecParams(pricePipeline, priceGetterConfig, configBlock, usdcAttestationAPI)
 
 	// Add the bootstrap job
 	c.Bootstrap.AddBootstrapJob(t, jobParams.BootstrapJob(c.Dest.CommitStore.Address().Hex()))

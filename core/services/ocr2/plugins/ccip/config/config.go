@@ -11,6 +11,10 @@ import (
 type CommitPluginJobSpecConfig struct {
 	SourceStartBlock, DestStartBlock uint64         // Only for first time job add.
 	OffRamp                          common.Address `json:"offRamp"`
+	// TokenPricesUSDPipeline should contain a token price pipeline for the following tokens:
+	//		The SOURCE chain wrapped native
+	// 		The DESTINATION supported tokens (including fee tokens) as defined in destination OffRamp and PriceRegistry.
+	TokenPricesUSDPipeline string `json:"tokenPricesUSDPipeline"`
 	// PriceGetterConfig defines where to get the token prices from (i.e. static or aggregator source).
 	PriceGetterConfig string `json:"priceGetterConfig"`
 }

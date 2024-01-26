@@ -19,7 +19,12 @@ import (
 )
 
 func Test_CLOSpecApprovalFlow(t *testing.T) {
+
 	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
+
+	tokenPricesUSDPipeline, linkUSD, ethUSD := ccipTH.CreatePricesPipeline(t)
+	defer linkUSD.Close()
+	defer ethUSD.Close()
 
 	// Set up the aggregators here to avoid modifying ccipTH.
 	srcLinkAddr := ccipTH.Source.LinkToken.Address()
@@ -73,7 +78,7 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	priceGetterConfigBytes, err := json.MarshalIndent(priceGetterConfig, "", " ")
 	require.NoError(t, err)
 	priceGetterConfigJson := string(priceGetterConfigBytes)
-	jobParams := ccipTH.SetUpNodesAndJobs(t, priceGetterConfigJson, "http://blah.com")
+	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, priceGetterConfigJson, "http://blah.com")
 	ccipTH.SetupFeedsManager(t)
 
 	// Propose and approve new specs
