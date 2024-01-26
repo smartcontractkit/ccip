@@ -82,7 +82,7 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	ccipTH.SetupFeedsManager(t)
 
 	// Propose and approve new specs
-	ccipTH.ApproveJobSpecs(t, jobParams)
+	ccipTH.ApproveJobSpecs(t, jobParams, tokenPricesUSDPipeline)
 
 	// Sanity check that CCIP works after CLO flow
 	currentSeqNum := 1

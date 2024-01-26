@@ -311,7 +311,7 @@ func TestIntegration_CCIP(t *testing.T) {
 		ccipTH.Dest.Chain.Commit()
 
 		// create new jobs
-		jobParams = ccipTH.NewCCIPJobSpecParams(priceGetterConfigJson, newConfigBlock, "")
+		jobParams = ccipTH.NewCCIPJobSpecParams(tokenPricesUSDPipeline, priceGetterConfigJson, newConfigBlock, "")
 		jobParams.Version = "v2"
 		jobParams.SourceStartBlock = srcStartBlock
 		ccipTH.AddAllJobs(t, jobParams)
