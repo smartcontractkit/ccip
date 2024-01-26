@@ -57,6 +57,6 @@ func (b *BaseRebalancerFactory) NewRebalancer(networkSel models.NetworkSelector,
 		}
 		return NewEvmRebalancer(address, networkSel, evmDeps.ethClient, evmDeps.lp, b.lggr)
 	default:
-		return nil, fmt.Errorf("liquidity manager of type %v is not supported", typ)
+		return nil, fmt.Errorf("liquidity manager of type %v (network selector: %d) is not supported", typ, networkSel)
 	}
 }

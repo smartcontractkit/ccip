@@ -39,47 +39,11 @@ type rebalancerTemplateArgs struct {
 	FromBlock               int64
 	FromBlocks              string
 	LiquidityManagerAddress string
-	LiquidityManagerNetwork int64
+	LiquidityManagerNetwork uint64
 	MaxNumTransfers         int64
 	P2PV2BootstrapperPeerID string
 	P2PV2BootstrapperPort   string
 }
-
-const RebalancerTemplate = `
-# Rebalancer Spec
-type                 	= "offchainreporting2"
-schemaVersion        	= 1
-name                 	= "%s"
-maxTaskDuration      	= "30s"
-contractID           	= "%s"
-ocrKeyBundleID       	= "%s"
-relay                	= "evm"
-pluginType           	= "rebalancer"
-transmitterID        	= "%s"
-forwardingAllowed       = false
-contractConfigTrackerPollInterval = "15s"
-%s
-
-[relayConfig]
-chainID              	= %d
-# This is the fromBlock for the main chain
-# We set config after we launch the nodes, so this is not needed
-# fromBlock               = blah
-[relayConfig.fromBlocks]
-# these are the fromBlock values for the follower chains
-# blah
-# We set config after we launch the nodes, so this is not needed
-
-[pluginConfig]
-liquidityManagerAddress = "%s"
-liquidityManagerNetwork = "%d"
-closePluginTimeoutSec = 10
-[pluginConfig.rebalancerConfig]
-type = "random"
-[pluginConfig.rebalancerConfig.randomRebalancerConfig]
-maxNumTransfers = %d
-checkSourceDestEqual = false
-`
 
 func (s *Shell) ConfigureRebalancerNode(
 	c *cli.Context,
@@ -200,7 +164,7 @@ func (s *Shell) ConfigureRebalancerNode(
 			FromBlock:               c.Int64("fromBlock"),   // TODO: not needed?
 			FromBlocks:              c.String("fromBlocks"), // TODO: not needed?
 			LiquidityManagerAddress: c.String("liquidityManagerAddress"),
-			LiquidityManagerNetwork: c.Int64("liquidityManagerNetwork"),
+			LiquidityManagerNetwork: c.Uint64("liquidityManagerNetwork"),
 			MaxNumTransfers:         c.Int64("maxNumTransfers"),
 			P2PV2BootstrapperPeerID: peerID,
 			P2PV2BootstrapperPort:   c.String("bootstrapPort"),
@@ -227,6 +191,43 @@ func createRebalancerJob(
 	lggr logger.Logger,
 	app chainlink.Application,
 	args rebalancerTemplateArgs) error {
+	const RebalancerTemplate = `
+# Rebalancer Spec
+type                 	= "offchainreporting2"
+schemaVersion        	= 1
+name                 	= "%s"
+maxTaskDuration      	= "30s"
+contractID           	= "%s"
+ocrKeyBundleID       	= "%s"
+relay                	= "evm"
+pluginType           	= "rebalancer"
+transmitterID        	= "%s"
+forwardingAllowed       = false
+contractConfigTrackerPollInterval = "15s"
+# p2pv2Bootstrappers below
+%s
+
+[relayConfig]
+chainID              	= %d
+# This is the fromBlock for the main chain
+# We set config after we launch the nodes, so this is not needed
+# fromBlock               = blah
+[relayConfig.fromBlocks]
+# these are the fromBlock values for the follower chains
+# blah
+# We set config after we launch the nodes, so this is not needed
+
+[pluginConfig]
+liquidityManagerAddress = "%s"
+liquidityManagerNetwork = "%d"
+closePluginTimeoutSec = 10
+[pluginConfig.rebalancerConfig]
+type = "random"
+[pluginConfig.rebalancerConfig.randomRebalancerConfig]
+maxNumTransfers = %d
+checkSourceDestEqual = false
+`
+	fmt.Println("Liquidity manager network:", args.LiquidityManagerNetwork)
 	sp := fmt.Sprintf(RebalancerTemplate,
 		args.Name,
 		args.ContractID,
