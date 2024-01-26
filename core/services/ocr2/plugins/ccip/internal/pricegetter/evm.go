@@ -16,6 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
+const latestRoundDataMethodName = "latestRoundData"
+
 // AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
 type AggregatorPriceConfig struct {
 	ChainID                   uint64         `json:"chainID,string"`
@@ -103,7 +105,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 			// Batch calls for aggregator-based token prices (one per chain).
 			batchCallsPerChain[aggCfg.ChainID] = append(batchCallsPerChain[aggCfg.ChainID], rpclib.NewEvmCall(
 				d.aggregatorAbi,
-				"latestRoundData",
+				latestRoundDataMethodName,
 				aggCfg.AggregatorContractAddress,
 			))
 			batchCallsTokensOrder[aggCfg.ChainID] = append(batchCallsTokensOrder[aggCfg.ChainID], tk)
