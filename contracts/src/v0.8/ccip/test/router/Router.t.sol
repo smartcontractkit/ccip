@@ -411,6 +411,8 @@ contract Router_applyRampUpdates is RouterSetup {
     );
   }
 
+  /// forge-config: default.fuzz.runs = 32
+  /// forge-config: ccip.fuzz.runs = 32
   function testFuzz_OffRampUpdates(Router.OffRamp[] memory offRamps) public {
     // Test adding offRamps
     s_sourceRouter.applyRampUpdates(new Router.OnRamp[](0), new Router.OffRamp[](0), offRamps);
