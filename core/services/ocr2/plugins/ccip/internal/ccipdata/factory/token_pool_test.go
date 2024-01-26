@@ -40,7 +40,7 @@ func TestTokenPoolFactory(t *testing.T) {
 
 	poolTypes := []string{"BurnMint", "LockRelease"}
 
-	for _, versionStr := range []string{ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0, ccipdata.V1_3_0} {
+	for _, versionStr := range []string{ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0, ccipdata.V1_4_0} {
 		pools, err := factory.NewTokenPools(ctx, []common.Address{})
 		require.NoError(t, err)
 		assert.Empty(t, pools)

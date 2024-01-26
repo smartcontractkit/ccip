@@ -22,7 +22,7 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   error CannotSendToZeroAddress();
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
-  string public constant override typeAndVersion = "LockReleaseTokenPool 1.3.0-dev";
+  string public constant override typeAndVersion = "LockReleaseTokenPool 1.4.0-dev";
 
   /// @dev The unique lock release pool flag to signal through EIP 165.
   bytes4 private constant LOCK_RELEASE_INTERFACE_ID = bytes4(keccak256("LockReleaseTokenPool"));

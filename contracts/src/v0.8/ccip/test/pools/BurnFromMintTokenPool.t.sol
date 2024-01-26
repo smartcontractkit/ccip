@@ -4,33 +4,28 @@ pragma solidity 0.8.19;
 import "../BaseTest.t.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BurnMintSetup} from "./BurnMintSetup.t.sol";
-import {BurnWithFromMintTokenPool} from "../../pools/BurnWithFromMintTokenPool.sol";
+import {BurnFromMintTokenPool} from "../../pools/BurnFromMintTokenPool.sol";
 
-contract BurnWithFromMintTokenPoolSetup is BurnMintSetup {
-  BurnWithFromMintTokenPool internal s_pool;
+contract BurnFromMintTokenPoolSetup is BurnMintSetup {
+  BurnFromMintTokenPool internal s_pool;
 
   function setUp() public virtual override {
     BurnMintSetup.setUp();
 
-    s_pool = new BurnWithFromMintTokenPool(
-      s_burnMintERC677,
-      new address[](0),
-      address(s_mockARM),
-      address(s_sourceRouter)
-    );
+    s_pool = new BurnFromMintTokenPool(s_burnMintERC677, new address[](0), address(s_mockARM), address(s_sourceRouter));
     s_burnMintERC677.grantMintAndBurnRoles(address(s_pool));
 
     _applyChainUpdates(address(s_pool));
   }
 }
 
-contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup {
+contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
   function testSetupSuccess() public {
     assertEq(address(s_burnMintERC677), address(s_pool.getToken()));
     assertEq(address(s_mockARM), s_pool.getArmProxy());
     assertEq(false, s_pool.getAllowListEnabled());
     assertEq(type(uint256).max, s_burnMintERC677.allowance(address(s_pool), address(s_pool)));
-    assertEq("BurnWithFromMintTokenPool 1.4.0-dev", s_pool.typeAndVersion());
+    assertEq("BurnFromMintTokenPool 1.4.0-dev", s_pool.typeAndVersion());
   }
 
   function testPoolBurnSuccess() public {
@@ -50,7 +45,7 @@ contract BurnWithFromMintTokenPool_lockOrBurn is BurnWithFromMintTokenPoolSetup 
     vm.expectEmit();
     emit Burned(address(s_burnMintOnRamp), burnAmount);
 
-    bytes4 expectedSignature = bytes4(keccak256("burn(address,uint256)"));
+    bytes4 expectedSignature = bytes4(keccak256("burnFrom(address,uint256)"));
     vm.expectCall(address(s_burnMintERC677), abi.encodeWithSelector(expectedSignature, address(s_pool), burnAmount));
 
     s_pool.lockOrBurn(OWNER, bytes(""), burnAmount, DEST_CHAIN_ID, bytes(""));

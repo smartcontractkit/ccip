@@ -13,7 +13,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_3_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_4_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -91,8 +91,8 @@ func (f TokenPoolFactory) NewTokenPools(ctx context.Context, tokenPoolAddresses 
 		switch version {
 		case ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0:
 			tokenPoolReaders = append(tokenPoolReaders, v1_2_0.NewTokenPool(poolType, tokenPoolAddress, f.offRampAddress, f.lp, f.evmBatchCaller))
-		case ccipdata.V1_3_0:
-			tokenPoolReaders = append(tokenPoolReaders, v1_3_0.NewTokenPool(poolType, tokenPoolAddress, f.remoteChainSelector, f.lp, f.evmBatchCaller))
+		case ccipdata.V1_4_0:
+			tokenPoolReaders = append(tokenPoolReaders, v1_4_0.NewTokenPool(poolType, tokenPoolAddress, f.remoteChainSelector, f.lp, f.evmBatchCaller))
 		default:
 			return nil, fmt.Errorf("unsupported token pool version %v", version)
 		}

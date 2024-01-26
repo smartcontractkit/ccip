@@ -1,4 +1,4 @@
-package v1_3_0
+package v1_4_0
 
 import (
 	"context"
@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 )
 
-func TestHasherV1_3_0(t *testing.T) {
+func TestHasherV1_4_0(t *testing.T) {
 	sourceChainSelector, destChainSelector := uint64(1), uint64(4)
 	onRampAddress := common.HexToAddress("0x5550000000000000000000000000000000000001")
 	onRampABI := abihelpers.MustParseABI(evm_2_evm_onramp.EVM2EVMOnRampABI)
@@ -83,7 +83,7 @@ func TestHasherV1_3_0(t *testing.T) {
 	require.Equal(t, "4362a13a42e52ff5ce4324e7184dc7aa41704c3146bc842d35d95b94b32a78b6", hex.EncodeToString(hash[:]))
 }
 
-func TestLogPollerClient_GetSendRequestsBetweenSeqNums1_3_0(t *testing.T) {
+func TestLogPollerClient_GetSendRequestsBetweenSeqNums1_4_0(t *testing.T) {
 	onRampAddr := utils.RandomAddress()
 	seqNum := uint64(100)
 	limit := uint64(10)
