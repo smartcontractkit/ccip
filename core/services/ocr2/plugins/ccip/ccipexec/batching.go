@@ -24,6 +24,26 @@ func getProofData(
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	if len(sendReqs) > 0 {
+		gotInterval := ccipdata.CommitStoreInterval{
+			Min: sendReqs[0].Data.SequenceNumber,
+			Max: sendReqs[0].Data.SequenceNumber,
+		}
+		for _, req := range sendReqs[1:] {
+			if req.Data.SequenceNumber < gotInterval.Min {
+				gotInterval.Min = req.Data.SequenceNumber
+			}
+			if req.Data.SequenceNumber > gotInterval.Max {
+				gotInterval.Max = req.Data.SequenceNumber
+			}
+		}
+		if (gotInterval.Min != interval.Min) || (gotInterval.Max != interval.Max) {
+			return nil, nil, nil, fmt.Errorf(
+				"interval %v is not the expected %v", gotInterval, interval)
+		}
+	}
+
 	leaves = make([][32]byte, 0, len(sendReqs))
 	for _, req := range sendReqs {
 		leaves = append(leaves, req.Data.Hash)
