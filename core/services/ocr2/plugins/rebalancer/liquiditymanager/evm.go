@@ -10,7 +10,6 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -120,12 +119,12 @@ func (e *EvmRebalancer) GetPendingTransfers(ctx context.Context, since time.Time
 }
 
 type qItem struct {
-	networkID models.NetworkSelector
-	lmAddress common.Address
+	networkSel models.NetworkSelector
+	lmAddress  common.Address
 }
 
 func (q qItem) String() string {
-	return fmt.Sprintf("(NetworkID:%v,LMAddress:%v)", q.networkID, q.lmAddress)
+	return fmt.Sprintf("(NetworkSelector:%v,LMAddress:%v)", q.networkSel, q.lmAddress)
 }
 
 func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error) {
@@ -138,7 +137,7 @@ func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Regist
 	seen := mapset.NewSet[qItem]()
 	queue := mapset.NewSet[qItem]()
 
-	elem := qItem{networkID: e.networkSel, lmAddress: e.addr}
+	elem := qItem{networkSel: e.networkSel, lmAddress: e.addr}
 	queue.Add(elem)
 	seen.Add(elem)
 
@@ -151,24 +150,25 @@ func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Regist
 
 		lggr.Debugw("Popped element from queue", "elem", elem)
 		// TODO: investigate fetching the balance here.
-		g.AddNetwork(elem.networkID, big.NewInt(0))
+		// TODO: make use of returned value?
+		g.AddNetwork(elem.networkSel, big.NewInt(0))
 		lggr.Debugw("Added elem to network", "elem", elem)
 
 		lggr.Debugw("Creating new rebalancer object", "elem", elem)
-		lm, err := lmFactory.NewRebalancer(elem.networkID, models.Address(elem.lmAddress))
+		lm, err := lmFactory.NewRebalancer(elem.networkSel, models.Address(elem.lmAddress))
 		if err != nil {
 			lggr.Errorw("Failed to create new rebalancer", "err", err)
 			return nil, nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
 
 		lggr.Debugw("Adding rebalancer to registry", "elem", elem)
-		lms.Add(elem.networkID, models.Address(elem.lmAddress))
+		lms.Add(elem.networkSel, models.Address(elem.lmAddress))
 
 		lggr.Debugw("Getting destination liquidity managers", "elem", elem)
 		destinationLMs, err := lm.GetRebalancers(ctx)
 		if err != nil {
 			lggr.Errorw("Failed to get destination liquidity managers", "err", err)
-			return nil, nil, fmt.Errorf("get %v destination liquidity managers: %w", elem.networkID, err)
+			return nil, nil, fmt.Errorf("get %v destination liquidity managers: %w", elem.networkSel, err)
 		}
 
 		lggr.Debugw("Got destination liquidity managers", "destinationLMs", destinationLMs, "elem", elem)
@@ -178,26 +178,28 @@ func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Regist
 		}
 
 		lggr.Debugw("Adding connections", "elem", elem, "destinationLMs", destinationLMs)
-		for destNetworkID, lmAddr := range destinationLMs {
-			if !g.HasNetwork(destNetworkID) {
-				lggr.Debugw("Adding new network to graph not yet seen", "destNetworkID", destNetworkID)
-				g.AddNetwork(destNetworkID, big.NewInt(0))
+		for destNetworkSel, lmAddr := range destinationLMs {
+			if !g.HasNetwork(destNetworkSel) {
+				lggr.Debugw("Adding new network to graph not yet seen", "destNetworkSel", destNetworkSel)
+				g.AddNetwork(destNetworkSel, big.NewInt(0))
 			} else {
-				lggr.Debugw("Network already seen, not adding", "destNetworkID", destNetworkID)
+				lggr.Debugw("Network already seen, not adding", "destNetworkSel", destNetworkSel)
 			}
-			lggr.Debugw("Adding connection", "elem", elem, "destNetworkID", destNetworkID, "sourceNetworkID", elem.networkID)
-			g.AddConnection(elem.networkID, destNetworkID)
+			lggr.Debugw("Adding connection", "elem", elem, "destNetworkSel", destNetworkSel, "sourceNetworkID", elem.networkSel)
+			if err := g.AddConnection(elem.networkSel, destNetworkSel); err != nil {
+				return nil, nil, fmt.Errorf("add connection: %w", err)
+			}
 
-			newElem := qItem{networkID: destNetworkID, lmAddress: common.Address(lmAddr)}
+			newElem := qItem{networkSel: destNetworkSel, lmAddress: common.Address(lmAddr)}
 			lggr.Debugw("Deciding whether to add new element to queue", "newElem", newElem)
 			if !seen.Contains(newElem) {
 				lggr.Debugw("Not seen before, adding to queue", "newElem", newElem)
 				queue.Add(newElem)
 				seen.Add(newElem)
 
-				if _, exists := lms.Get(destNetworkID); !exists {
+				if _, exists := lms.Get(destNetworkSel); !exists {
 					lggr.Debugw("Not seen before, adding to registry", "newElem", newElem)
-					lms.Add(destNetworkID, lmAddr)
+					lms.Add(destNetworkSel, lmAddr)
 				} else {
 					lggr.Debugw("Already seen, not adding to registry", "newElem", newElem)
 				}
