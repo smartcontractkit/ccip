@@ -9,6 +9,8 @@ import (
 
 	"github.com/pelletier/go-toml"
 	"github.com/pkg/errors"
+	"github.com/urfave/cli"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -17,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 	"github.com/smartcontractkit/chainlink/v2/core/static"
 	"github.com/smartcontractkit/chainlink/v2/core/utils"
-	"github.com/urfave/cli"
 )
 
 type SetupRebalancerNodePayload struct {
@@ -144,9 +145,9 @@ func (s *Shell) ConfigureRebalancerNode(
 		return nil, s.errorOut(err)
 	}
 	for _, chain := range chains {
-		ethKeys, err := app.GetKeyStore().Eth().EnabledKeysForChain(chain.ID())
-		if err != nil {
-			return nil, s.errorOut(err)
+		ethKeys, err2 := app.GetKeyStore().Eth().EnabledKeysForChain(chain.ID())
+		if err2 != nil {
+			return nil, s.errorOut(err2)
 		}
 		if len(ethKeys) == 0 {
 			return nil, s.errorOut(errors.New("no eth keys found"))
