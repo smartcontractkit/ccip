@@ -2519,6 +2519,8 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	for _, token := range lane.Dest.Common.BridgeTokens {
 		tokenAddresses = append(tokenAddresses, token.Address())
 	}
+	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
+
 	tokensUSDUrl := TokenPricePipelineURLs(tokenAddresses, killgrave, env.MockServer)
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
 		OffRamp:                lane.Dest.OffRamp.EthAddress,

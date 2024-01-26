@@ -308,14 +308,14 @@ func (params CCIPJobSpecParams) BootstrapJob(contractID string) *OCR2TaskJobSpec
 	}
 }
 
-func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(pricePipeline string, priceGetterConfig string, configBlock int64, usdcAttestationAPI string) CCIPJobSpecParams {
+func (c *CCIPIntegrationTestHarness) NewCCIPJobSpecParams(tokenPricesUSDPipeline string, priceGetterConfig string, configBlock int64, usdcAttestationAPI string) CCIPJobSpecParams {
 	return CCIPJobSpecParams{
 		CommitStore:            c.Dest.CommitStore.Address(),
 		OffRamp:                c.Dest.OffRamp.Address(),
 		DestEvmChainId:         c.Dest.ChainID,
 		SourceChainName:        "SimulatedSource",
 		DestChainName:          "SimulatedDest",
-		TokenPricesUSDPipeline: pricePipeline,
+		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
 		PriceGetterConfig:      priceGetterConfig,
 		DestStartBlock:         uint64(configBlock),
 		USDCAttestationAPI:     usdcAttestationAPI,
