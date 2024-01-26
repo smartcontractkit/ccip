@@ -433,7 +433,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
       );
     }
     if (
-      message.receiver.code.length == 0 || !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
+      message.receiver.code.length == 0 ||
+      !message.receiver.supportsInterface(type(IAny2EVMMessageReceiver).interfaceId)
     ) return;
 
     (bool success, bytes memory returnData, ) = IRouter(s_dynamicConfig.router).routeMessage(
