@@ -130,24 +130,11 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   /// @notice Removed liquidity to the pool. The tokens will be sent to msg.sender.
   /// @param amount The amount of liquidity to remove.
   function withdrawLiquidity(uint256 amount) external {
-    _withdrawLiquidity(amount, msg.sender);
-  }
-
-  /// @notice Removed liquidity to the pool. The tokens will be sent to receiver argument.
-  /// @param amount The amount of liquidity to remove.
-  /// @param receiver The address to send the tokens to.
-  function withdrawLiquidity(uint256 amount, address receiver) external {
-    _withdrawLiquidity(amount, receiver);
-  }
-
-  /// @notice Removes liquidity from the pool.
-  /// @dev internal helper for withdrawLiquidity.
-  function _withdrawLiquidity(uint256 amount, address receiver) internal {
     if (s_rebalancer != msg.sender) revert Unauthorized(msg.sender);
-    if (receiver == address(0)) revert CannotSendToZeroAddress();
+    if (msg.sender == address(0)) revert CannotSendToZeroAddress();
 
     if (i_token.balanceOf(address(this)) < amount) revert InsufficientLiquidity();
-    i_token.safeTransfer(receiver, amount);
-    emit LiquidityRemoved(receiver, amount);
+    i_token.safeTransfer(msg.sender, amount);
+    emit LiquidityRemoved(msg.sender, amount);
   }
 }
