@@ -432,27 +432,20 @@ func FundNode(
 		return err
 	}
 
-	// Special case for Arbitrum since gas estimation there is different.
-	var gasLimit uint64
-	if helpers.IsArbitrumChainID(int64(chainID)) {
-		estimated, err2 := client.EstimateGas(context.Background(), ethereum.CallMsg{
-			From:  transactor.From,
-			To:    &toAddress,
-			Value: fundingAmount,
-		})
-		if err2 != nil {
-			return err2
-		}
-		gasLimit = estimated
-	} else {
-		gasLimit = uint64(21_000)
+	gasEstimate, err := client.EstimateGas(context.Background(), ethereum.CallMsg{
+		From:  transactor.From,
+		To:    &toAddress,
+		Value: fundingAmount,
+	})
+	if err != nil {
+		return err
 	}
 
 	tx := types.NewTx(
 		&types.LegacyTx{
 			Nonce:    nonce,
 			GasPrice: gasPrice,
-			Gas:      gasLimit,
+			Gas:      gasEstimate,
 			To:       &toAddress,
 			Value:    fundingAmount,
 		},
