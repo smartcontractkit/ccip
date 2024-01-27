@@ -1,6 +1,3 @@
-[CCIP]
-[CCIP.Deployments]
-Data = """
 {
     "lane_configs": {
       "Arbitrum Mainnet": {
@@ -37,7 +34,7 @@ Data = """
       },
       "Avalanche Mainnet": {
           "is_native_fee_token": true,
-          "fee_token": "",
+          "fee_token": "0x5947BB275c521040051D82396192181b413227A3",
           "bridge_tokens": [],
           "bridge_tokens_pools": [],
           "arm": "0xdFD6C0dc67666DE3bB36b31eec5c7B1542A82C1E",
@@ -319,7 +316,7 @@ Data = """
       },
       "Polygon Mainnet": {
         "is_native_fee_token": true,
-        "fee_token": "",
+        "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
         "arm": "0xD7AcF65dA1E1f34b663aB199a474F209bF2b0523",
@@ -401,64 +398,3 @@ Data = """
       }
     }
 }
-"""
-
-[CCIP.Groups.load]
-NetworkPairs = [
-  'ETHEREUM_MAINNET,BASE_MAINNET',
-  'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
-  'ETHEREUM_MAINNET,WEMIX_MAINNET',
-  'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
-  'ETHEREUM_MAINNET,POLYGON_MAINNET',
-  'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
-  'ETHEREUM_MAINNET,BSC_MAINNET',
-  'BASE_MAINNET,ARBITRUM_MAINNET',
-  'WEMIX_MAINNET,KROMA_MAINNET',
-  'OPTIMISM_MAINNET,POLYGON_MAINNET',
-  'AVALANCHE_MAINNET,POLYGON_MAINNET',
-  'BSC_MAINNET,POLYGON_MAINNET',
-  'BASE_MAINNET,OPTIMISM_MAINNET',
-  'AVALANCHE_MAINNET,BSC_MAINNET',
-  'BASE_MAINNET,BSC_MAINNET',
-]
-MsgType = 'WithoutToken'
-DestGasLimit = 0
-BiDirectionalLane = true
-PhaseTimeout = '50m'
-TestDuration = '120h'
-ExistingDeployment = true
-RequestPerUnitTime = [1]
-TimeUnit = '1h'
-NoOfTokensPerChain = 1
-NoOfTokensInMsg = 1
-AmountPerToken = 1
-ExistingEnv = 'mainnet-2.7-ccip1.2'
-
-[CCIP.Groups.smoke]
-MsgType = 'WithoutToken'
-NetworkPairs = [
-  'ETHEREUM_MAINNET,BASE_MAINNET',
-  'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
-  'ETHEREUM_MAINNET,WEMIX_MAINNET',
-  'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
-  'ETHEREUM_MAINNET,POLYGON_MAINNET',
-  'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
-  'ETHEREUM_MAINNET,BSC_MAINNET',
-  'BASE_MAINNET,ARBITRUM_MAINNET',
-  'WEMIX_MAINNET,KROMA_MAINNET',
-  'OPTIMISM_MAINNET,POLYGON_MAINNET',
-  'AVALANCHE_MAINNET,POLYGON_MAINNET',
-  'BSC_MAINNET,POLYGON_MAINNET',
-  'BASE_MAINNET,OPTIMISM_MAINNET',
-  'AVALANCHE_MAINNET,BSC_MAINNET',
-  'BASE_MAINNET,BSC_MAINNET',
-]
-BiDirectionalLane = true
-DestGasLimit = 0
-PhaseTimeout = '50m'
-LocalCluster = false
-ExistingDeployment = true
-ReuseContracts = true
-NoOfTokensPerChain = 1
-NoOfTokensInMsg = 1
-AmountPerToken = 1

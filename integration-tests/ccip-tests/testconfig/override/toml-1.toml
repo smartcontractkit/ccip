@@ -1,0 +1,120 @@
+[CCIP]
+[CCIP.Deployments]
+Data = """
+{
+    "lane_configs": {
+      "Optimism Sepolia": {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
+        "arm": "0xf06ff5d2084295909119ca541e93635e7d582ffc",
+        "router": "0x114a20a10b43d4115e5aeef7345a1a71d2a60c57",
+        "price_registry": "0x782a7ba95215f2f7c3dd4c153cbb2ae3ec2d3215",
+        "wrapped_native": "0x4200000000000000000000000000000000000006",
+        "multicall": "",
+        "src_contracts": {
+          "Sepolia Testnet": {
+            "on_ramp": "0xc8b93b46bf682c39b3f65aa1c135bc8a95a5e43a",
+            "deployed_at": 1111111
+          },
+            "Arbitrum Sepolia": {
+                "on_ramp": "0x1a86b29364d1b3fa3386329a361aa98a104b2742",
+                "deployed_at": 1111111
+            }
+        },
+        "dest_contracts": {
+          "Sepolia Testnet": {
+            "off_ramp": "0x260af9b83e0d2bb6c9015fc9f0bff8858a0cce68",
+            "commit_store": "0x7a0bb92bc8663abe6296d0162a9b41a2cb2e0358",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+            "Arbitrum Sepolia": {
+                "off_ramp": "0xdc2c7a3d8068c6f09f0f3648d24c84e372f6014d",
+                "commit_store": "0xb1afb5cbe3c29b5db71f21442ba9efd450bc23c3",
+                "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+            }
+        }
+      },
+      "Arbitrum Sepolia" : {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
+        "arm": "0x5ef7a726fd21fd9d77d34e3c56cfdd8691f7f0ac",
+        "router": "0x2a9c5afb0d0e4bab2bcdae109ec4b0c4be15a165",
+        "price_registry": "0x89d5b13908b9063abcc6791dc724bf7b7c93634c",
+        "wrapped_native": "0xE591bf0A0CF924A0674d7792db046B23CEbF5f34",
+        "multicall": "",
+        "src_contracts": {
+          "Optimism Sepolia": {
+            "on_ramp": "0x701fe16916dd21efe2f535ca59611d818b017877",
+            "deployed_at": 1111111
+          }
+        },
+        "dest_contracts": {
+          "Optimism Sepolia": {
+            "off_ramp": "0xfd404a89e1d195f0c65be1a9042c77745197659e",
+            "commit_store": "0x84b7b012c95f8a152b44ab3e952f2dee424fa8e1",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          }
+        }
+      },
+      "Sepolia Testnet": {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": [],
+        "bridge_tokens_pools": [],
+        "arm": "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
+        "router": "0x0bf3de8c5d3e8a2b34d2beeb17abfcebaf363a59",
+        "price_registry": "0x9ef7d57a4ea30b9e37794e55b0c75f2a70275dcc",
+        "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+        "multicall": "",
+        "src_contracts": {
+          "Optimism Sepolia": {
+            "on_ramp": "0x69cab5a0a08a12bafd8f5b195989d709e396ed4d",
+            "deployed_at": 1111111
+          }
+        },
+        "dest_contracts": {
+          "Optimism Sepolia": {
+            "off_ramp": "0xd50590d4438411ede47029b0fd7901a7145e5df6",
+            "commit_store": "0xe85eee9fd434a7b8a586ee086e828abf41839479",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          }
+        }
+      }
+    }
+  }
+"""
+
+[CCIP.Groups.load]
+NetworkPairs = ['SEPOLIA,OPTIMISM_SEPOLIA']
+MsgType = 'WithoutToken'
+DestGasLimit = 0
+BiDirectionalLane = false
+PhaseTimeout = '20m'
+TestDuration = '5m'
+ExistingDeployment = true
+RequestPerUnitTime = [4]
+TimeUnit = '10s'
+NoOfTokensPerChain = 1
+NoOfTokensInMsg = 1
+AmountPerToken = 1
+ExistingEnv = 'OpGasLimit Testing 1.2'
+
+[CCIP.Groups.smoke]
+MsgType = 'WithoutToken'
+NetworkPairs = [
+  'OPTIMISM_SEPOLIA,SEPOLIA',
+  'OPTIMISM_SEPOLIA,ARBITRUM_SEPOLIA',
+]
+BiDirectionalLane = true
+DestGasLimit = 0
+PhaseTimeout = '50m'
+LocalCluster = false
+ExistingDeployment = true
+ReuseContracts = true
+NoOfTokensPerChain = 1
+NoOfTokensInMsg = 1
+AmountPerToken = 1
