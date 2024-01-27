@@ -172,8 +172,8 @@ ExistingEnv = 'OpGasLimit Testing 1.2'
 [CCIP.Groups.smoke]
 MsgType = 'WithoutToken'
 NetworkPairs = [
-  'OPTIMISM_SEPOLIA,SEPOLIA',
-  'OPTIMISM_SEPOLIA,ARBITRUM_SEPOLIA',
+  'OPTIMISM_SEPOLIA,AVALANCHE_FUJI',
+  'OPTIMISM_SEPOLIA,POLYGON_MUMBAI'
 ]
 BiDirectionalLane = true
 DestGasLimit = 0
