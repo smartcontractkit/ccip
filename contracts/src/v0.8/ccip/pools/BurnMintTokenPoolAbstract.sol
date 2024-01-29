@@ -11,6 +11,13 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
   /// without duplicating the underlying logic.
   function _burn(uint256 amount) internal virtual;
 
+  /// @notice Contains the specific mint call for a pool.
+  /// @dev overriding this method allows us to create pools with different mint signatures
+  /// without duplicating the underlying logic.
+  function _mint(address receiver, uint256 amount) internal virtual {
+    IBurnMintERC20(address(i_token)).mint(receiver, amount);
+  }
+
   /// @notice Burn the token in the pool
   /// @param amount Amount to burn
   /// @dev The whenHealthy check is important to ensure that even if a ramp is compromised
@@ -41,7 +48,7 @@ abstract contract BurnMintTokenPoolAbstract is TokenPool {
     bytes memory
   ) external virtual override whenHealthy onlyOffRamp {
     _consumeOffRampRateLimit(amount);
-    IBurnMintERC20(address(i_token)).mint(receiver, amount);
+    _mint(receiver, amount);
     emit Minted(msg.sender, receiver, amount);
   }
 }
