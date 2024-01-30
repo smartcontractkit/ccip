@@ -15,9 +15,9 @@
             "on_ramp": "0xc8b93b46bf682c39b3f65aa1c135bc8a95a5e43a",
             "deployed_at": 1111111
           },
-            "Arbitrum Sepolia": {
-                "on_ramp": "0x1a86b29364d1b3fa3386329a361aa98a104b2742",
-                "deployed_at": 1111111
+          "Arbitrum Sepolia": {
+            "on_ramp": "0x1a86b29364d1b3fa3386329a361aa98a104b2742",
+            "deployed_at": 1111111
           },
           "Avalanche Fuji" : {
             "on_ramp": "0x6b38cc6fa938d5ab09bdf0cfe580e226fdd793ce",
@@ -65,6 +65,14 @@
           "Optimism Sepolia": {
             "on_ramp": "0xc334de5b020e056d0fe766de46e8d9f306ffa1e2",
             "deployed_at": 1111111
+          },
+          "Sepolia Testnet": {
+            "on_ramp": "0x5724b4cc39a9690135f7273b44dfd3ba6c0c69ad",
+            "deployed_at": 1111111
+          },
+          "Polygon Mumbai" : {
+            "on_ramp": "0xca2c3196047fe0e31547b7214e5b7c49413fe9a8",
+            "deployed_at": 1111111
           }
         },
         "dest_contracts": {
@@ -72,13 +80,23 @@
             "off_ramp": "0x3d7cbc95dcc33257f14d6eb780c88bd56c6335bb",
             "commit_store": "0x1fcdc02eddfb405f378ba53cf9e6104febcb7542",
             "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Sepolia Testnet": {
+            "off_ramp": "0x9e5e4324f8608d54a50a317832d456a392e4f8c2",
+            "commit_store": "0x92a51ed3f041b39ebd1e464c1f7cb1e8f8a8c63f",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Polygon Mumbai" : {
+            "off_ramp": "0x299e1dafc6758aaa1930301966daf3562e2002d3",
+            "commit_store": "0xc381a0c3e52fa85601b032c90dfe83105989006b",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
           }
         }
       },
       "Arbitrum Sepolia" : {
         "is_native_fee_token": true,
         "fee_token": "",
-        "bridge_tokens": ["0x7a4d8f8c18762d362e64b411d7490fba112811cd"],
+        "bridge_tokens": ["0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"],
         "bridge_tokens_pools": ["0xb6a7cd4e7a519f4cba792c774b625fd931826f9a"],
         "arm": "0x5ef7a726fd21fd9d77d34e3c56cfdd8691f7f0ac",
         "router": "0x2a9c5afb0d0e4bab2bcdae109ec4b0c4be15a165",
@@ -89,12 +107,21 @@
           "Optimism Sepolia": {
             "on_ramp": "0x701fe16916dd21efe2f535ca59611d818b017877",
             "deployed_at": 1111111
+          },
+          "Sepolia Testnet": {
+            "on_ramp": "0x4205e1ca0202a248a5d42f5975a8fe56f3e302e9",
+            "deployed_at": 1111111
           }
         },
         "dest_contracts": {
           "Optimism Sepolia": {
             "off_ramp": "0xfd404a89e1d195f0c65be1a9042c77745197659e",
             "commit_store": "0x84b7b012c95f8a152b44ab3e952f2dee424fa8e1",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Sepolia Testnet": {
+            "off_ramp": "0x1c71f141b4630ebe52d6af4894812960abe207eb",
+            "commit_store": "0xab0c8ba51e7fa3e5693a4fbb39473520fd85d173",
             "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
           }
         }
@@ -113,12 +140,39 @@
           "Optimism Sepolia": {
             "on_ramp": "0x69cab5a0a08a12bafd8f5b195989d709e396ed4d",
             "deployed_at": 1111111
+          },
+          "Arbitrum Sepolia": {
+            "on_ramp": "0xe4dd3b16e09c016402585a8adfdb4a18f772a07e",
+            "deployed_at": 1111111
+          },
+          "Avalanche Fuji" : {
+            "on_ramp": "0x0477ca0a35ee05d3f9f424d88bc0977cecf339d4",
+             "deployed_at": 1111111
+          },
+          "Polygon Mumbai" : {
+            "on_ramp": "0x81660dc846f0528a7ce003c1f7774d7c4135f344",
+            "deployed_at": 1111111
           }
         },
         "dest_contracts": {
           "Optimism Sepolia": {
             "off_ramp": "0xd50590d4438411ede47029b0fd7901a7145e5df6",
             "commit_store": "0xe85eee9fd434a7b8a586ee086e828abf41839479",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Arbitrum Sepolia": {
+            "off_ramp": "0xf18896ab20a09a29e64fdeba99fdb8ec328f43b1",
+            "commit_store": "0x93ff9dd39dc01eac1fc4d2c9211d95ee458cab94",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Avalanche Fuji": {
+            "off_ramp": "0x000b26f604eaadc3d874a4404bde6d64a97d95ca",
+            "commit_store": "0x2dd9273f8208b8393350508131270a6574a69784",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Polygon Mumbai": {
+            "off_ramp": "0x86c5a8a7fb5ecf30cf2b42e2d1d74d0e9ce2f9a1",
+            "commit_store": "0x8fbcabe31f6aad1010634e1dcf8bb0a254ccd3a4",
             "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
           }
         }
@@ -137,12 +191,30 @@
           "Optimism Sepolia": {
             "on_ramp": "0xf3f1a5714f0c95c302a22ee7bf7b5b866d162818",
             "deployed_at": 1111111
+          },
+          "Sepolia Testnet": {
+            "on_ramp": "0x70c04331fd35fc21db54f64e0e77a5e423619e04",
+            "deployed_at": 1111111
+          },
+          "Avalanche Fuji" : {
+            "on_ramp": "0x5e0ad6d742983ca464fef0c28fd2d788a320b1c3",
+            "deployed_at": 1111111
           }
         },
         "dest_contracts": {
           "Optimism Sepolia": {
             "off_ramp": "0x76bbc8f8016b2c7150dbab1c333d0c3cb29fe4dd",
             "commit_store": "0x67e2e6cdf7bcc69ce9209149821c1883b6ebd005",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Sepolia Testnet": {
+            "off_ramp": "0xac1456bafcc3403eb6e34f08fd2945cd7b3c8f0a",
+            "commit_store": "0x5ba71ccd924c91f58216ba633f7966f3ab2113ae",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Avalanche Fuji": {
+            "off_ramp": "0x557da53fdae16b76142584516f3944ff9c9e299a",
+            "commit_store": "0xf2f6864f281e21d713f51cb7cf3fb97384383c83",
             "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
           }
         }
