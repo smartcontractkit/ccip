@@ -1,0 +1,151 @@
+{
+    "lane_configs": {
+      "Optimism Sepolia": {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": ["0x5fd84259d66Cd46123540766Be93DFE6D43130D7"],
+        "bridge_tokens_pools": ["0x88e492127709447a5abefdab8788a15b4567589e"],
+        "arm": "0xf06ff5d2084295909119ca541e93635e7d582ffc",
+        "router": "0x114a20a10b43d4115e5aeef7345a1a71d2a60c57",
+        "price_registry": "0x782a7ba95215f2f7c3dd4c153cbb2ae3ec2d3215",
+        "wrapped_native": "0x4200000000000000000000000000000000000006",
+        "multicall": "",
+        "src_contracts": {
+          "Sepolia Testnet": {
+            "on_ramp": "0xc8b93b46bf682c39b3f65aa1c135bc8a95a5e43a",
+            "deployed_at": 1111111
+          },
+            "Arbitrum Sepolia": {
+                "on_ramp": "0x1a86b29364d1b3fa3386329a361aa98a104b2742",
+                "deployed_at": 1111111
+          },
+          "Avalanche Fuji" : {
+            "on_ramp": "0x6b38cc6fa938d5ab09bdf0cfe580e226fdd793ce",
+            "deployed_at": 1111111
+          },
+          "Polygon Mumbai" : {
+            "on_ramp": "0xde8d0f47a71ea3fdfbd3162271652f2847939097",
+            "deployed_at": 1111111
+          }
+        },
+        "dest_contracts": {
+          "Sepolia Testnet": {
+            "off_ramp": "0x260af9b83e0d2bb6c9015fc9f0bff8858a0cce68",
+            "commit_store": "0x7a0bb92bc8663abe6296d0162a9b41a2cb2e0358",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+            "Arbitrum Sepolia": {
+                "off_ramp": "0xdc2c7a3d8068c6f09f0f3648d24c84e372f6014d",
+                "commit_store": "0xb1afb5cbe3c29b5db71f21442ba9efd450bc23c3",
+                "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Avalanche Fuji" : {
+            "off_ramp": "0x1f350718e015eb20e5065c09f4a7a3f66888aeed",
+            "commit_store": "0x98650a8eb59f75d93563ab34fcf603b1a30e4cbf",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          },
+          "Polygon Mumbai" : {
+            "off_ramp": "0xbd4106fbe4699fe212a34cc21b10bff22b02d959",
+            "commit_store": "0x50f11f3bc26cd544d5b9313ead3e752ff95ca252",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          }
+        }
+      },
+      "Avalanche Fuji" : {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": ["0x5425890298aed601595a70AB815c96711a31Bc65"],
+        "bridge_tokens_pools": ["0x7a4d8f8c18762d362e64b411d7490fba112811cd"],
+        "arm": "0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f",
+        "router": "0xf694e193200268f9a4868e4aa017a0118c9a8177",
+        "price_registry": "0x19e157e5fb1daec1ae4bab113fdf077f980704aa",
+        "wrapped_native": "0xd00ae08403B9bbb9124bB305C09058E32C39A48c",
+        "multicall": "",
+        "src_contracts": {
+          "Optimism Sepolia": {
+            "on_ramp": "0xc334de5b020e056d0fe766de46e8d9f306ffa1e2",
+            "deployed_at": 1111111
+          }
+        },
+        "dest_contracts": {
+          "Optimism Sepolia": {
+            "off_ramp": "0x3d7cbc95dcc33257f14d6eb780c88bd56c6335bb",
+            "commit_store": "0x1fcdc02eddfb405f378ba53cf9e6104febcb7542",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          }
+        }
+      },
+      "Arbitrum Sepolia" : {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": ["0x7a4d8f8c18762d362e64b411d7490fba112811cd"],
+        "bridge_tokens_pools": ["0xb6a7cd4e7a519f4cba792c774b625fd931826f9a"],
+        "arm": "0x5ef7a726fd21fd9d77d34e3c56cfdd8691f7f0ac",
+        "router": "0x2a9c5afb0d0e4bab2bcdae109ec4b0c4be15a165",
+        "price_registry": "0x89d5b13908b9063abcc6791dc724bf7b7c93634c",
+        "wrapped_native": "0xE591bf0A0CF924A0674d7792db046B23CEbF5f34",
+        "multicall": "",
+        "src_contracts": {
+          "Optimism Sepolia": {
+            "on_ramp": "0x701fe16916dd21efe2f535ca59611d818b017877",
+            "deployed_at": 1111111
+          }
+        },
+        "dest_contracts": {
+          "Optimism Sepolia": {
+            "off_ramp": "0xfd404a89e1d195f0c65be1a9042c77745197659e",
+            "commit_store": "0x84b7b012c95f8a152b44ab3e952f2dee424fa8e1",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          }
+        }
+      },
+      "Sepolia Testnet": {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": ["0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"],
+        "bridge_tokens_pools": ["0x3ff675b880ac9f67ac6f4342ffd9e99b80469bad"],
+        "arm": "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
+        "router": "0x0bf3de8c5d3e8a2b34d2beeb17abfcebaf363a59",
+        "price_registry": "0x9ef7d57a4ea30b9e37794e55b0c75f2a70275dcc",
+        "wrapped_native": "0x097D90c9d3E0B50Ca60e1ae45F6A81010f9FB534",
+        "multicall": "",
+        "src_contracts": {
+          "Optimism Sepolia": {
+            "on_ramp": "0x69cab5a0a08a12bafd8f5b195989d709e396ed4d",
+            "deployed_at": 1111111
+          }
+        },
+        "dest_contracts": {
+          "Optimism Sepolia": {
+            "off_ramp": "0xd50590d4438411ede47029b0fd7901a7145e5df6",
+            "commit_store": "0xe85eee9fd434a7b8a586ee086e828abf41839479",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          }
+        }
+      },
+      "Polygon Mumbai" : {
+        "is_native_fee_token": true,
+        "fee_token": "",
+        "bridge_tokens": ["0x9999f7Fea5938fD3b1E26A12c3f2fb024e194f97"],
+        "bridge_tokens_pools": ["0x51F128F5A3c1e4CB474bcE5d7CF7ea43114ac407"],
+        "arm": "0x917a6913f785094f8b06785aa8a884f922a650d8",
+        "router": "0x1035cabc275068e0f4b745a29cedf38e13af41b1",
+        "price_registry": "0x6322b0ad5467c12fc11393d479b0452c7a55ad81",
+        "wrapped_native": "0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889",
+        "multicall": "",
+        "src_contracts": {
+          "Optimism Sepolia": {
+            "on_ramp": "0xf3f1a5714f0c95c302a22ee7bf7b5b866d162818",
+            "deployed_at": 1111111
+          }
+        },
+        "dest_contracts": {
+          "Optimism Sepolia": {
+            "off_ramp": "0x76bbc8f8016b2c7150dbab1c333d0c3cb29fe4dd",
+            "commit_store": "0x67e2e6cdf7bcc69ce9209149821c1883b6ebd005",
+            "receiver_dapp": "0x8Ed27Ab67aea9BC50628fba25ab52D23ae8d0eae"
+          }
+        }
+      }
+    }
+  }
