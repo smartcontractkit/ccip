@@ -16,7 +16,11 @@ contract BurnMintWhitelistedTokenPoolSetup is BurnMintSetup {
     BurnMintSetup.setUp();
 
     s_token = new GravitaDebtToken(makeAddr("lz"));
-    s_pool = new BurnMintWhitelistedTokenPool(IBurnMintWhitelisted(address(s_token)), new address[](0), address(s_mockARM));
+    s_pool = new BurnMintWhitelistedTokenPool(
+      IBurnMintWhitelisted(address(s_token)),
+      new address[](0),
+      address(s_mockARM)
+    );
     s_token.addWhitelist(address(s_pool));
 
     applyRampUpdates(address(s_pool));
