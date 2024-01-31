@@ -217,13 +217,22 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   }
 
   /// @notice Sets the chain rate limiter config.
+  /// @param remoteChainSelector The remote chain selector for which the rate limits apply.
   /// @param outboundConfig The new outbound rate limiter config.
   /// @param inboundConfig The new inbound rate limiter config.
   function setChainRateLimiterConfig(
     uint64 remoteChainSelector,
     RateLimiter.Config memory outboundConfig,
     RateLimiter.Config memory inboundConfig
-  ) external onlyOwner {
+  ) external virtual onlyOwner {
+    _setRateLimitConfig(remoteChainSelector, outboundConfig, inboundConfig);
+  }
+
+  function _setRateLimitConfig(
+    uint64 remoteChainSelector,
+    RateLimiter.Config memory outboundConfig,
+    RateLimiter.Config memory inboundConfig
+  ) internal {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
     s_outboundRateLimits[remoteChainSelector]._setTokenBucketConfig(outboundConfig);
     s_inboundRateLimits[remoteChainSelector]._setTokenBucketConfig(inboundConfig);

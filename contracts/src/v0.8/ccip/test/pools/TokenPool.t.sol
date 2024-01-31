@@ -174,7 +174,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
 
-  function testFuzz_SetRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
+  function testFuzz_SetChainRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
     // Bucket updates only work on increasing time
     newTime = uint32(bound(newTime, block.timestamp + 1, type(uint32).max));
     vm.warp(newTime);
