@@ -55,8 +55,7 @@ Data = """
         }
       },
       "Avalanche Fuji" : {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
         "arm": "0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f",
@@ -79,8 +78,7 @@ Data = """
         }
       },
       "Arbitrum Sepolia" : {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "fee_token": "0xb1D4538B4571d411F07960EF2838Ce337FE1E80E",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
         "arm": "0x5ef7a726fd21fd9d77d34e3c56cfdd8691f7f0ac",
@@ -103,10 +101,9 @@ Data = """
         }
       },
       "Sepolia Testnet": {
-        "is_native_fee_token": true,
-        "fee_token": "",
-        "bridge_tokens": [],
-        "bridge_tokens_pools": [],
+        "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
+        "bridge_tokens": ["0x779877A7B0D9E8603169DdbD7836e478b4624789"],
+        "bridge_tokens_pools": ["0x5344b4bf5ae39038a591866d2853b2b1db622911"],
         "arm": "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
         "router": "0x0bf3de8c5d3e8a2b34d2beeb17abfcebaf363a59",
         "price_registry": "0x9ef7d57a4ea30b9e37794e55b0c75f2a70275dcc",
@@ -127,7 +124,6 @@ Data = """
         }
       },
       "Polygon Mumbai" : {
-        "is_native_fee_token": true,
         "fee_token": "",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],

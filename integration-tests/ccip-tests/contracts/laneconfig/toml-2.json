@@ -1,11 +1,8 @@
-[CCIP]
-[CCIP.Deployments]
-Data = """
 {
     "lane_configs": {
       "Optimism Sepolia": {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "is_native_fee_token": false,
+        "fee_token": "0xE4aB69C077896252FAFBD49EFD26B5D171A32410",
         "bridge_tokens": ["0x5fd84259d66Cd46123540766Be93DFE6D43130D7"],
         "bridge_tokens_pools": ["0x88e492127709447a5abefdab8788a15b4567589e"],
         "arm": "0xf06ff5d2084295909119ca541e93635e7d582ffc",
@@ -55,8 +52,8 @@ Data = """
         }
       },
       "Avalanche Fuji" : {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "is_native_fee_token": false,
+        "fee_token": "0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846",
         "bridge_tokens": ["0x5425890298aed601595a70AB815c96711a31Bc65"],
         "bridge_tokens_pools": ["0x7a4d8f8c18762d362e64b411d7490fba112811cd"],
         "arm": "0x0ea0d7b2b78dd3a926fc76d6875a287f0aeb158f",
@@ -97,8 +94,8 @@ Data = """
         }
       },
       "Arbitrum Sepolia" : {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "is_native_fee_token": false,
+        "fee_token": "0xb1D4538B4571d411F07960EF2838Ce337FE1E80E",
         "bridge_tokens": ["0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d"],
         "bridge_tokens_pools": ["0xb6a7cd4e7a519f4cba792c774b625fd931826f9a"],
         "arm": "0x5ef7a726fd21fd9d77d34e3c56cfdd8691f7f0ac",
@@ -130,8 +127,8 @@ Data = """
         }
       },
       "Sepolia Testnet": {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "is_native_fee_token": false,
+        "fee_token": "0x779877A7B0D9E8603169DdbD7836e478b4624789",
         "bridge_tokens": ["0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"],
         "bridge_tokens_pools": ["0x3ff675b880ac9f67ac6f4342ffd9e99b80469bad"],
         "arm": "0xb4d360459f32dd641ef5a6985ffbac5c4e5521aa",
@@ -181,8 +178,8 @@ Data = """
         }
       },
       "Polygon Mumbai" : {
-        "is_native_fee_token": true,
-        "fee_token": "",
+        "is_native_fee_token": false,
+        "fee_token": "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
         "bridge_tokens": ["0x9999f7Fea5938fD3b1E26A12c3f2fb024e194f97"],
         "bridge_tokens_pools": ["0x51F128F5A3c1e4CB474bcE5d7CF7ea43114ac407"],
         "arm": "0x917a6913f785094f8b06785aa8a884f922a650d8",
@@ -224,42 +221,3 @@ Data = """
       }
     }
   }
-"""
-
-[CCIP.Groups.load]
-NetworkPairs = [
-  'OPTIMISM_SEPOLIA,SEPOLIA',
-  'OPTIMISM_SEPOLIA,ARBITRUM_SEPOLIA',
-  'OPTIMISM_SEPOLIA,AVALANCHE_FUJI',
-  'OPTIMISM_SEPOLIA,POLYGON_MUMBAI'
-]
-MsgType = 'WithoutToken'
-DestGasLimit = 0
-BiDirectionalLane = true
-PhaseTimeout = '20m'
-TestDuration = '5m'
-ExistingDeployment = true
-RequestPerUnitTime = [1]
-TimeUnit = '10s'
-NoOfTokensPerChain = 1
-NoOfTokensInMsg = 1
-AmountPerToken = 1
-ExistingEnv = 'OptimismMigration-Load-Testnet'
-
-[CCIP.Groups.smoke]
-MsgType = 'WithToken'
-NetworkPairs = [
-  'OPTIMISM_SEPOLIA,SEPOLIA',
-  'OPTIMISM_SEPOLIA,ARBITRUM_SEPOLIA',
-  'OPTIMISM_SEPOLIA,AVALANCHE_FUJI',
-  'OPTIMISM_SEPOLIA,POLYGON_MUMBAI'
-]
-BiDirectionalLane = true
-DestGasLimit = 0
-PhaseTimeout = '50m'
-LocalCluster = false
-ExistingDeployment = true
-ReuseContracts = true
-NoOfTokensPerChain = 1
-NoOfTokensInMsg = 1
-AmountPerToken = 1
