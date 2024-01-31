@@ -9,6 +9,7 @@ import {TokenPool} from "../../pools/TokenPool.sol";
 contract BurnMintSetup is BaseTest {
   event Transfer(address indexed from, address indexed to, uint256 value);
   event TokensConsumed(uint256 tokens);
+  event Minted(address indexed sender, address indexed receiver, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
 
   BurnMintERC677 internal s_burnMintERC677;

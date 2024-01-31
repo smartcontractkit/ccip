@@ -9,7 +9,7 @@ import {BurnMintTokenPoolAbstract} from "./BurnMintTokenPoolAbstract.sol";
 
 contract BurnMintWhitelistedTokenPool is BurnMintTokenPoolAbstract, ITypeAndVersion {
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
-  string public constant override typeAndVersion = "BurnMintTokenPool 1.2.0";
+  string public constant override typeAndVersion = "BurnMintTokenPool 1.4.0-dev";
 
   constructor(
     IBurnMintWhitelisted token,
