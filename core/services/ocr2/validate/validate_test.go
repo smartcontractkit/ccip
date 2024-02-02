@@ -689,7 +689,7 @@ SourceStartBlock = 1
 DestStartBlock = 2
 offRamp = "0x1234567890123456789012345678901234567890"
 tokenPricesUSDPipeline = "merge [type=merge left=\"{}\" right=\"{\\\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\\\":\\\"1000000000000000000\\\"}\"];"
-priceGetterConfig = "{}"
+priceGetterConfig = ""
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.NoError(t, err)
@@ -698,7 +698,7 @@ priceGetterConfig = "{}"
 					DestStartBlock:         2,
 					OffRamp:                common.HexToAddress("0x1234567890123456789012345678901234567890"),
 					TokenPricesUSDPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
-					PriceGetterConfig:      "{}",
+					PriceGetterConfig:      "",
 				}
 				var cfg config.CommitPluginJobSpecConfig
 				err = json.Unmarshal(os.OCR2OracleSpec.PluginConfig.Bytes(), &cfg)
@@ -723,7 +723,7 @@ SourceStartBlock = 1
 DestStartBlock = 2
 offRamp = "0x1234567890123456789012345678901234567890"
 tokenPricesUSDPipeline = "this is not a pipeline"
-priceGetterConfig = "{}"
+priceGetterConfig = ""
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.Error(t, err)
@@ -746,7 +746,7 @@ chainID = 1337
 SourceStartBlock = 1
 DestStartBlock = 2
 offRamp = "0x1234567890123456789012345678901234567890"
-tokenPricesUSDPipeline = "merge [type=merge left=\"{}\" right=\"{\\\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\\\":\\\"1000000000000000000\\\"}\"];"
+tokenPricesUSDPipeline = ""
 priceGetterConfig = "this is not a proper dynamic price config"
 `,
 			assertion: func(t *testing.T, os job.Job, err error) {

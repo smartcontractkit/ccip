@@ -313,16 +313,29 @@ func validateOCR2CCIPCommitSpec(jsonConfig job.JSONConfig) error {
 	if err != nil {
 		return pkgerrors.Wrap(err, "error while unmarshalling plugin config")
 	}
-	_, err = pipeline.Parse(cfg.TokenPricesUSDPipeline)
-	if err != nil {
-		return pkgerrors.Wrap(err, "invalid token prices pipeline")
+
+	// Ensure that either the tokenPricesUSDPipeline or the priceGetterConfig is set, but not both.
+	if cfg.TokenPricesUSDPipeline == "" && cfg.PriceGetterConfig == "" {
+		return errors.New("either tokenPricesUSDPipeline or priceGetterConfig must be set")
 	}
-	// Validate prices config (like it was done for the pipeline).
-	if cfg.PriceGetterConfig == "" {
-		return pkgerrors.New("priceGetterConfig is empty")
+	if cfg.TokenPricesUSDPipeline != "" && cfg.PriceGetterConfig != "" {
+		return errors.New("only one of tokenPricesUSDPipeline or priceGetterConfig must be set")
 	}
-	if !json.Valid([]byte(cfg.PriceGetterConfig)) {
-		return pkgerrors.New("invalid JSON formatting of priceGetterConfig")
+
+	if cfg.TokenPricesUSDPipeline != "" {
+		_, err = pipeline.Parse(cfg.TokenPricesUSDPipeline)
+		if err != nil {
+			return pkgerrors.Wrap(err, "invalid token prices pipeline")
+		}
+	} else {
+		// Validate prices config (like it was done for the pipeline).
+		if cfg.PriceGetterConfig == "" {
+			return pkgerrors.New("priceGetterConfig is empty")
+		}
+		if !json.Valid([]byte(cfg.PriceGetterConfig)) {
+			return pkgerrors.New("invalid JSON formatting of priceGetterConfig")
+		}
 	}
+
 	return nil
 }
