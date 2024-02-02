@@ -16,10 +16,9 @@ import (
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
-
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -120,35 +119,39 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
-	pipelinePriceGetter, err := pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating pipeline price getter: %w", err)
-	}
 
-	// Build evmClients for price getter.
-	srcCaller := rpclib.NewDynamicLimitedBatchCaller(
-		lggr,
-		params.sourceChain.Client(),
-		rpclib.DefaultRpcBatchSizeLimit,
-		rpclib.DefaultRpcBatchBackOffMultiplier,
-	)
-	dstCaller := rpclib.NewDynamicLimitedBatchCaller(
-		lggr,
-		params.destChain.Client(),
-		rpclib.DefaultRpcBatchSizeLimit,
-		rpclib.DefaultRpcBatchBackOffMultiplier,
-	)
-	priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{
-		params.sourceChain.ID().Uint64(): pricegetter.NewDynamicPriceGetterClient(srcCaller, params.sourceChain.LogPoller()),
-		params.destChain.ID().Uint64():   pricegetter.NewDynamicPriceGetterClient(dstCaller, params.destChain.LogPoller()),
-	}
-	priceGetterConfig, err := pricegetter.NewDynamicPriceGetterConfig(params.pluginConfig.PriceGetterConfig)
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating dynamic price getter config: %w", err)
-	}
-	priceGetter, err := pricegetter.NewDynamicPriceGetter(priceGetterConfig, priceGetterClients)
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating dynamic price getter: %w", err)
+	var priceGetter pricegetter.PriceGetter
+	if params.pluginConfig.TokenPricesUSDPipeline != "" {
+		priceGetter, err = pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating pipeline price getter: %w", err)
+		}
+	} else {
+		// Build evmClients for price getter.
+		srcCaller := rpclib.NewDynamicLimitedBatchCaller(
+			lggr,
+			params.sourceChain.Client(),
+			rpclib.DefaultRpcBatchSizeLimit,
+			rpclib.DefaultRpcBatchBackOffMultiplier,
+		)
+		dstCaller := rpclib.NewDynamicLimitedBatchCaller(
+			lggr,
+			params.destChain.Client(),
+			rpclib.DefaultRpcBatchSizeLimit,
+			rpclib.DefaultRpcBatchBackOffMultiplier,
+		)
+		priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{
+			params.sourceChain.ID().Uint64(): pricegetter.NewDynamicPriceGetterClient(srcCaller, params.sourceChain.LogPoller()),
+			params.destChain.ID().Uint64():   pricegetter.NewDynamicPriceGetterClient(dstCaller, params.destChain.LogPoller()),
+		}
+		priceGetterConfig, err2 := pricegetter.NewDynamicPriceGetterConfig(params.pluginConfig.PriceGetterConfig)
+		if err2 != nil {
+			return nil, nil, fmt.Errorf("creating dynamic price getter config: %w", err2)
+		}
+		priceGetter, err2 = pricegetter.NewDynamicPriceGetter(priceGetterConfig, priceGetterClients)
+		if err2 != nil {
+			return nil, nil, fmt.Errorf("creating dynamic price getter: %w", err2)
+		}
 	}
 
 	// Load all the readers relevant for this plugin.
@@ -190,8 +193,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			lggr:                  commitLggr,
 			onRampReader:          onRampReader,
 			offRamp:               offRampReader,
-			priceGetter:           pipelinePriceGetter,
-			dynamicPriceGetter:    priceGetter,
+			priceGetter:           priceGetter,
 			sourceNative:          sourceNative,
 			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
 			destChainSelector:     params.commitStoreStaticCfg.ChainSelector,
