@@ -189,8 +189,12 @@ func (params CCIPJobSpecParams) ValidateCommitJobSpec() error {
 		return fmt.Errorf("OffRamp cannot be empty for execution job")
 	}
 	// Validate token prices config
-	if _, err := pricegetter.NewDynamicPriceGetterConfig(params.PriceGetterConfig); err != nil {
-		return err
+	// NB: only validate the dynamic price getter config if present since we could also be using the pipeline instead.
+	// NB: make this test mandatory once we switch to dynamic price getter only.
+	if params.PriceGetterConfig != "" {
+		if _, err := pricegetter.NewDynamicPriceGetterConfig(params.PriceGetterConfig); err != nil {
+			return fmt.Errorf("invalid price getter config: %w", err)
+		}
 	}
 	return nil
 }
@@ -211,7 +215,7 @@ func (params CCIPJobSpecParams) ValidateExecJobSpec() error {
 func (params CCIPJobSpecParams) CommitJobSpec() (*OCR2TaskJobSpec, error) {
 	err := params.ValidateCommitJobSpec()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid job spec params: %w", err)
 	}
 	ocrSpec := job.OCR2OracleSpec{
 		Relay:                             relay.EVM,

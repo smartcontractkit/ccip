@@ -18,15 +18,20 @@ import (
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
 
-func Test_CLOSpecApprovalFlow(t *testing.T) {
-
+func Test_CLOSpecApprovalFlow_pipeline(t *testing.T) {
 	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
 
 	tokenPricesUSDPipeline, linkUSD, ethUSD := ccipTH.CreatePricesPipeline(t)
 	defer linkUSD.Close()
 	defer ethUSD.Close()
 
-	// Set up the aggregators here to avoid modifying ccipTH.
+	test_CLOSpecApprovalFlow(t, ccipTH, tokenPricesUSDPipeline, "")
+}
+
+func Test_CLOSpecApprovalFlow_dynamicPriceGetter(t *testing.T) {
+	ccipTH := integrationtesthelpers.SetupCCIPIntegrationTH(t, testhelpers.SourceChainID, testhelpers.SourceChainSelector, testhelpers.DestChainID, testhelpers.DestChainSelector)
+
+	//Set up the aggregators here to avoid modifying ccipTH.
 	srcLinkAddr := ccipTH.Source.LinkToken.Address()
 	dstLinkAddr := ccipTH.Dest.LinkToken.Address()
 	srcNativeAddr, err := ccipTH.Source.Router.GetWrappedNative(nil)
@@ -78,11 +83,17 @@ func Test_CLOSpecApprovalFlow(t *testing.T) {
 	priceGetterConfigBytes, err := json.MarshalIndent(priceGetterConfig, "", " ")
 	require.NoError(t, err)
 	priceGetterConfigJson := string(priceGetterConfigBytes)
-	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, priceGetterConfigJson, "http://blah.com")
+
+	test_CLOSpecApprovalFlow(t, ccipTH, "", priceGetterConfigJson)
+}
+
+func test_CLOSpecApprovalFlow(t *testing.T, ccipTH integrationtesthelpers.CCIPIntegrationTestHarness, tokenPricesUSDPipeline string, priceGetterConfiguration string) {
+
+	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, priceGetterConfiguration, "http://blah.com")
 	ccipTH.SetupFeedsManager(t)
 
 	// Propose and approve new specs
-	ccipTH.ApproveJobSpecs(t, jobParams, tokenPricesUSDPipeline)
+	ccipTH.ApproveJobSpecs(t, jobParams)
 
 	// Sanity check that CCIP works after CLO flow
 	currentSeqNum := 1

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -121,7 +122,8 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
 
 	var priceGetter pricegetter.PriceGetter
-	if params.pluginConfig.TokenPricesUSDPipeline != "" {
+	emptyPipeline := strings.Trim(params.pluginConfig.TokenPricesUSDPipeline, "\n\t ") == ""
+	if !emptyPipeline {
 		priceGetter, err = pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("creating pipeline price getter: %w", err)

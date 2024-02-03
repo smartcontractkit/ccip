@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/lib/pq"
 	"github.com/pelletier/go-toml"
@@ -315,21 +316,23 @@ func validateOCR2CCIPCommitSpec(jsonConfig job.JSONConfig) error {
 	}
 
 	// Ensure that either the tokenPricesUSDPipeline or the priceGetterConfig is set, but not both.
-	if cfg.TokenPricesUSDPipeline == "" && cfg.PriceGetterConfig == "" {
-		return errors.New("either tokenPricesUSDPipeline or priceGetterConfig must be set")
+	emptyPipeline := strings.Trim(cfg.TokenPricesUSDPipeline, "\n\t ") == ""
+	emptyPriceGetter := strings.Trim(cfg.PriceGetterConfig, "\n\t ") == ""
+	if emptyPipeline && emptyPriceGetter {
+		return fmt.Errorf("either tokenPricesUSDPipeline or priceGetterConfig must be set")
 	}
-	if cfg.TokenPricesUSDPipeline != "" && cfg.PriceGetterConfig != "" {
-		return errors.New("only one of tokenPricesUSDPipeline or priceGetterConfig must be set")
+	if !emptyPipeline && !emptyPriceGetter {
+		return fmt.Errorf("only one of tokenPricesUSDPipeline or priceGetterConfig must be set: %s and %s", cfg.TokenPricesUSDPipeline, cfg.PriceGetterConfig)
 	}
 
-	if cfg.TokenPricesUSDPipeline != "" {
+	if !emptyPipeline {
 		_, err = pipeline.Parse(cfg.TokenPricesUSDPipeline)
 		if err != nil {
 			return pkgerrors.Wrap(err, "invalid token prices pipeline")
 		}
 	} else {
 		// Validate prices config (like it was done for the pipeline).
-		if cfg.PriceGetterConfig == "" {
+		if emptyPriceGetter {
 			return pkgerrors.New("priceGetterConfig is empty")
 		}
 		if !json.Valid([]byte(cfg.PriceGetterConfig)) {
