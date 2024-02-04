@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/gethwrappers2/generated/offchainaggregator"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -57,16 +58,37 @@ func NewDynamicPriceGetterConfig(configJson string) (DynamicPriceGetterConfig, e
 	priceGetterConfig := DynamicPriceGetterConfig{}
 	err := json.Unmarshal([]byte(configJson), &priceGetterConfig)
 	if err != nil {
-		return DynamicPriceGetterConfig{}, err
+		return DynamicPriceGetterConfig{}, fmt.Errorf("parse dynamic price getter config: %w", err)
 	}
 	err = priceGetterConfig.Validate()
 	if err != nil {
-		return DynamicPriceGetterConfig{}, err
+		return DynamicPriceGetterConfig{}, fmt.Errorf("validate price getter config: %w", err)
 	}
 	return priceGetterConfig, nil
 }
 
 func (c *DynamicPriceGetterConfig) Validate() error {
+	for addr, v := range c.AggregatorPrices {
+		if addr == utils.ZeroAddress {
+			return fmt.Errorf("token address is zero")
+		}
+		if v.AggregatorContractAddress == utils.ZeroAddress {
+			return fmt.Errorf("aggregator contract address is zero")
+		}
+		if v.ChainID == 0 {
+			return fmt.Errorf("chain id is zero")
+		}
+	}
+
+	for addr, v := range c.StaticPrices {
+		if addr == utils.ZeroAddress {
+			return fmt.Errorf("token address is zero")
+		}
+		if v.ChainID == 0 {
+			return fmt.Errorf("chain id is zero")
+		}
+	}
+
 	// Ensure no duplication in token price resolution rules.
 	if c.AggregatorPrices != nil && c.StaticPrices != nil {
 		for tk := range c.AggregatorPrices {
@@ -86,7 +108,7 @@ func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]D
 	}
 	aggregatorAbi, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse offchainaggregator abi: %w", err)
 	}
 	priceGetter := DynamicPriceGetter{cfg, evmClients, aggregatorAbi}
 	return &priceGetter, nil
@@ -98,6 +120,8 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 	prices := make(map[common.Address]*big.Int, len(tokens))
 
 	batchCallsPerChain := make(map[uint64][]rpclib.EvmCall)
+
+	// required to maintain the order of the batched rpc calls for mapping the results
 	batchCallsTokensOrder := make(map[uint64][]common.Address)
 
 	for _, tk := range tokens {
@@ -119,11 +143,12 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 
 	for chainID, batchCalls := range batchCallsPerChain {
 		client, exists := d.evmClients[chainID]
-		evmCaller := client.BatchCaller
-		lp := client.LP
 		if !exists {
 			return nil, fmt.Errorf("evm caller for chain %d not found", chainID)
 		}
+
+		evmCaller := client.BatchCaller
+		lp := client.LP
 
 		tokensOrder := batchCallsTokensOrder[chainID]
 		latestBlock, err := lp.LatestBlock(pg.WithParentCtx(ctx))
@@ -136,7 +161,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 			return nil, fmt.Errorf("batch call: %w", err)
 		}
 
-		// latestRoundData returns an array of integers (not a proper struct), therefore we get the answer at position 1.
+		// latestRoundData function has multiple outputs, we want the second one (idx=1)
 		latestRounds, err := rpclib.ParseOutputs[*big.Int](resultsPerChain, func(d rpclib.DataAndErr) (*big.Int, error) {
 			return rpclib.ParseOutput[*big.Int](d, 1)
 		})
