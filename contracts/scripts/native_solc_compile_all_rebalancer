@@ -41,3 +41,7 @@ compileContract rebalancer/bridge-adapters/OptimismL2BridgeAdapter.sol
 compileContract rebalancer/test/mocks/NoOpOCR3.sol
 compileContract rebalancer/test/mocks/MockBridgeAdapter.sol
 compileContract rebalancer/test/helpers/RebalancerReportEncoder.sol
+
+# Arbitrum helpers
+compileContract rebalancer/interfaces/IArbSys.sol
+compileContract rebalancer/interfaces/INodeInterface.sol

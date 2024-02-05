@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 
@@ -14,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 )
 
@@ -143,6 +146,54 @@ func main() {
 			)
 			fmt.Println()
 		}
+	case "arb-finalize-l1":
+		cmd := flag.NewFlagSet("arb-finalize-l1", flag.ExitOnError)
+		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
+		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
+		l2TxHash := cmd.String("l2-tx-hash", "", "L2 Tx Hash")
+
+		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l2-chain-id", "l2-tx-hash")
+
+		env := multienv.New(false, false)
+
+		arbFinalizeL1(
+			env,
+			*l1ChainID,
+			*l2ChainID,
+			common.HexToHash(*l2TxHash))
+	case "deposit-weth":
+		cmd := flag.NewFlagSet("deposit-weth", flag.ExitOnError)
+		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
+		amount := cmd.String("amount", "1000000000000000000", "Amount")
+		wethAddress := cmd.String("weth-address", "", "WETH Address")
+		helpers.ParseArgs(cmd, os.Args[2:], "chain-id")
+
+		env := multienv.New(false, false)
+		weth, err := weth9.NewWETH9(common.HexToAddress(*wethAddress), env.Clients[*chainID])
+		helpers.PanicErr(err)
+
+		tx, err := weth.Deposit(&bind.TransactOpts{
+			From:   env.Transactors[*chainID].From,
+			Signer: env.Transactors[*chainID].Signer,
+			Value:  decimal.RequireFromString(*amount).BigInt(),
+		})
+		helpers.PanicErr(err)
+		helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], tx, int64(*chainID))
+	case "transfer-weth":
+		cmd := flag.NewFlagSet("transfer-weth", flag.ExitOnError)
+		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
+		amount := cmd.String("amount", "1000000000000000000", "Amount")
+		wethAddress := cmd.String("weth-address", "", "WETH Address")
+		toAddress := cmd.String("to-address", "", "To Address")
+		helpers.ParseArgs(cmd, os.Args[2:], "chain-id", "weth-address", "to-address")
+
+		env := multienv.New(false, false)
+		weth, err := weth9.NewWETH9(common.HexToAddress(*wethAddress), env.Clients[*chainID])
+		helpers.PanicErr(err)
+
+		tx, err := weth.Transfer(env.Transactors[*chainID], common.HexToAddress(*toAddress), decimal.RequireFromString(*amount).BigInt())
+		helpers.PanicErr(err)
+		helpers.ConfirmTXMined(context.Background(), env.Clients[*chainID], tx, int64(*chainID))
 	}
 }
 
