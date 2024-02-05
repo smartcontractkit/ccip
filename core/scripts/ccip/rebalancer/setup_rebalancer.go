@@ -15,6 +15,7 @@ import (
 	"github.com/shopspring/decimal"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/urfave/cli"
+	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/arb"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/bridgeutil"
@@ -168,41 +169,6 @@ func setupRebalancerNodes(e multienv.Env) {
 	fmt.Println()
 }
 
-func fundContracts(
-	e multienv.Env,
-	l1ChainID,
-	l2ChainID uint64,
-	l1TokenAddress,
-	l2TokenAddress common.Address,
-	uni universe,
-	tokenPoolFunding,
-	rebalancerFunding *big.Int) {
-
-	fmt.Println("Funding contracts on L1...")
-	fundPoolAndRebalancer(
-		e,
-		l1ChainID,
-		l1TokenAddress,
-		uni.L1.TokenPool,
-		uni.L1.Rebalancer,
-		tokenPoolFunding,
-		rebalancerFunding)
-	fmt.Println("Done funding contracts on L1")
-	fmt.Println()
-
-	fmt.Println("Funding contracts on L2...")
-	fundPoolAndRebalancer(
-		e,
-		l2ChainID,
-		l2TokenAddress,
-		uni.L2.TokenPool,
-		uni.L2.Rebalancer,
-		tokenPoolFunding,
-		rebalancerFunding)
-	fmt.Println("Done funding contracts on L2")
-	fmt.Println()
-}
-
 func fundPoolAndRebalancer(
 	e multienv.Env,
 	chainID uint64,
@@ -219,28 +185,28 @@ func fundPoolAndRebalancer(
 	balance, err := token.BalanceOf(nil, e.Transactors[chainID].From)
 	helpers.PanicErr(err)
 	if balance.Cmp(tokenPoolFunding) < 0 {
-		symbol, err := token.Symbol(nil)
-		helpers.PanicErr(err)
+		symbol, err2 := token.Symbol(nil)
+		helpers.PanicErr(err2)
 		if symbol == "WETH" {
-			l1Weth, err := weth9.NewWETH9(tokenAddress, e.Clients[chainID])
-			helpers.PanicErr(err)
+			l1Weth, err3 := weth9.NewWETH9(tokenAddress, e.Clients[chainID])
+			helpers.PanicErr(err3)
 
-			nativeBalance, err := e.Clients[chainID].BalanceAt(
+			nativeBalance, err3 := e.Clients[chainID].BalanceAt(
 				context.Background(),
 				e.Transactors[chainID].From,
 				nil)
-			helpers.PanicErr(err)
+			helpers.PanicErr(err3)
 			if nativeBalance.Cmp(tokenPoolFunding) < 0 {
 				helpers.PanicErr(fmt.Errorf("not enough balance to deposit WETH"))
 			}
 
 			fmt.Println("Depositing", tokenPoolFunding.String(), "to WETH...")
-			tx, err := l1Weth.Deposit(&bind.TransactOpts{
+			tx, err3 := l1Weth.Deposit(&bind.TransactOpts{
 				From:   e.Transactors[chainID].From,
 				Signer: e.Transactors[chainID].Signer,
 				Value:  tokenPoolFunding,
 			})
-			helpers.PanicErr(err)
+			helpers.PanicErr(err3)
 			helpers.ConfirmTXMined(
 				context.Background(),
 				e.Clients[chainID],
@@ -409,8 +375,12 @@ func setupRebalancerNodeFromClient(
 }
 
 func FundNodes(e multienv.Env, chainID uint64, transmitters []string, fundingAmount *big.Int) {
+	var errs error
 	for _, transmitter := range transmitters {
-		FundNode(e, chainID, common.HexToAddress(transmitter), fundingAmount)
+		errs = multierr.Append(errs, FundNode(e, chainID, common.HexToAddress(transmitter), fundingAmount))
+	}
+	if errs != nil {
+		fmt.Println("Encountered errors funding nodes: ", errs)
 	}
 }
 
