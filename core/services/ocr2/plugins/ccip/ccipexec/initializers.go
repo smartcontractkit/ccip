@@ -39,6 +39,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
+type ServiceProvider interface {
+	NewOnRampReader(ctx context.Context, addr common.Address) (ccipdata.OnRampReader, error)
+	NewOffRampReader(ctx context.Context, addr common.Address) (ccipdata.OffRampReader, error)
+	NewCommitStoreReader(ctx context.Context, addr common.Address) (ccipdata.CommitStoreReader, error)
+	NewPriceRegistryReader(ctx context.Context, addr common.Address) (ccipdata.PriceRegistryReader, error)
+	NewUSDCReader(ctx context.Context) (ccipdata.USDCReader, error)
+	SourceNativeToken(ctx context.Context) (common.Address, error)
+}
+
 const numTokenDataWorkers = 5
 
 func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {

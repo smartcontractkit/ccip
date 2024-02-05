@@ -37,6 +37,15 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
+type ServiceProvider interface {
+	NewOnRampReader(ctx context.Context, addr common.Address) (ccipdata.OnRampReader, error)
+	NewOffRampReader(ctx context.Context, addr common.Address) (ccipdata.OffRampReader, error)
+	NewCommitStoreReader(ctx context.Context, addr common.Address) (ccipdata.CommitStoreReader, error)
+	NewPriceRegistryReader(ctx context.Context, addr common.Address) (ccipdata.PriceRegistryReader, error)
+	NewPriceGetter(ctx context.Context) (pricegetter.PriceGetter, error)
+	SourceNativeToken(ctx context.Context) (common.Address, error)
+}
+
 func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
 	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
 	if err != nil {
