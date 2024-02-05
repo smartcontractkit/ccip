@@ -44,7 +44,7 @@ func NewEvmRebalancer(address models.Address, net models.NetworkSelector, ec cli
 	}
 
 	lpFilter := logpoller.Filter{
-		Name: fmt.Sprintf("lm-liquidity-transferred-%s", common.Address(address)),
+		Name: fmt.Sprintf("%d-lm-liquidity-transferred-%s", time.Now().UnixNano(), common.Address(address)),
 		EventSigs: []common.Hash{
 			lmAbi.Events["LiquidityTransferred"].ID,
 		},
