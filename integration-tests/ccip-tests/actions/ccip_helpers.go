@@ -2393,6 +2393,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	bootstrapAdded *atomic.Bool,
 	configureCLNodes bool,
 	jobErrGroup *errgroup.Group,
+	withPipeline bool,
 ) (*laneconfig.LaneConfig, *laneconfig.LaneConfig, error) {
 	var err error
 	env := lane.TestEnv
@@ -2505,12 +2506,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("getting current block should be successful in destination chain %w", err)
 	}
 
-	tokenPricesConfigJson, err := lane.TokenPricesConfig()
-	if err != nil {
-		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("error getting token prices config %w", err)
-	}
-	lane.Logger.Info().Str("tokenPricesConfigJson", tokenPricesConfigJson).Msg("Price getter config")
-
 	var killgrave *ctftestenv.Killgrave
 	if env.LocalCluster != nil {
 		killgrave = env.LocalCluster.MockAdapter
@@ -2521,7 +2516,20 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
 
-	tokensUSDUrl := TokenPricePipelineURLs(tokenAddresses, killgrave, env.MockServer)
+	// TODO only one off pipeline or price getter to be set.
+	tokenPricesUSDPipeline := ""
+	tokenPricesConfigJson := ""
+	if withPipeline {
+		tokensUSDUrl := TokenPricePipelineURLs(tokenAddresses, killgrave, env.MockServer)
+		tokenPricesUSDPipeline = TokenFeeForMultipleTokenAddr(tokensUSDUrl)
+	} else {
+		tokenPricesConfigJson, err = lane.TokenPricesConfig()
+		if err != nil {
+			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("error getting token prices config %w", err)
+		}
+		lane.Logger.Info().Str("tokenPricesConfigJson", tokenPricesConfigJson).Msg("Price getter config")
+	}
+
 	jobParams := integrationtesthelpers.CCIPJobSpecParams{
 		OffRamp:                lane.Dest.OffRamp.EthAddress,
 		CommitStore:            lane.Dest.CommitStore.EthAddress,
@@ -2529,7 +2537,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 		DestChainName:          destChainClient.GetNetworkName(),
 		DestEvmChainId:         destChainClient.GetChainID().Uint64(),
 		SourceStartBlock:       lane.Source.SrcStartBlock,
-		TokenPricesUSDPipeline: TokenFeeForMultipleTokenAddr(tokensUSDUrl),
+		TokenPricesUSDPipeline: tokenPricesUSDPipeline,
 		PriceGetterConfig:      tokenPricesConfigJson,
 		DestStartBlock:         currentBlockOnDest,
 	}
