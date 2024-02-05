@@ -433,7 +433,7 @@ func FundNode(
 }
 
 func mustGetChainByEvmID(evmChainID uint64) chainsel.Chain {
-	ch, exists := chainsel.ChainByEvmChainID(uint64(evmChainID))
+	ch, exists := chainsel.ChainByEvmChainID(evmChainID)
 	if !exists {
 		helpers.PanicErr(fmt.Errorf("chain id %d doesn't exist in chain-selectors - forgot to add?", evmChainID))
 	}
