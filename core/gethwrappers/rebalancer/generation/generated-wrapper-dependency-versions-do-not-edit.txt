@@ -1,6 +1,8 @@
 GETH_VERSION: 1.13.8
-arbitrum_l1_bridge_adapter: ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.abi ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.bin e9bb45c4dcf326361c896eda07a7ea85e1c36915b71ea6185d15db917221d9c3
+arb_node_interface: ../../../contracts/solc/v0.8.19/INodeInterface/INodeInterface.abi ../../../contracts/solc/v0.8.19/INodeInterface/INodeInterface.bin c72f9e9d1e9b9c371c42817590a490a327e743775f423d9417982914d6136ff7
+arbitrum_l1_bridge_adapter: ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.abi ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdapter/ArbitrumL1BridgeAdapter.bin 7e2eecf520f39518d8f44ae3107211bae51e091a90ef3a0b2de1bde71c17b8b6
 arbitrum_l2_bridge_adapter: ../../../contracts/solc/v0.8.19/ArbitrumL2BridgeAdapter/ArbitrumL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/ArbitrumL2BridgeAdapter/ArbitrumL2BridgeAdapter.bin c84764c7ba0b3db99dd12df2e3f5dfe668f921d9f27e7d10a95334618b2128b1
+arbsys: ../../../contracts/solc/v0.8.19/IArbSys/IArbSys.abi ../../../contracts/solc/v0.8.19/IArbSys/IArbSys.bin 70adb49f157d8e077485d1a5c87ddf64b214822aef736bb68e122a77bab78a16
 mock_l2_bridge_adapter: ../../../contracts/solc/v0.8.19/MockBridgeAdapter/MockL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/MockBridgeAdapter/MockL2BridgeAdapter.bin a2e93e04c96f1f893decc90b283dbb5a14f1dcce2dc1c4ff07f1e8ba564f7b43
 no_op_ocr3: ../../../contracts/solc/v0.8.19/NoOpOCR3/NoOpOCR3.abi ../../../contracts/solc/v0.8.19/NoOpOCR3/NoOpOCR3.bin 3a5ef6a7a6502339d7965b44debb5536ee9b6d2181985e52d905307315c0a853
 optimism_l1_bridge_adapter: ../../../contracts/solc/v0.8.19/OptimismL1BridgeAdapter/OptimismL1BridgeAdapter.abi ../../../contracts/solc/v0.8.19/OptimismL1BridgeAdapter/OptimismL1BridgeAdapter.bin 31696d6ec856d07c7f5c02d3a9ca33f76d563112e3667197cedb446150d07258
