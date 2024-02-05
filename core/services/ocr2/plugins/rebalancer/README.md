@@ -99,7 +99,7 @@ getAllCrossChainRebalancers()
 // And several more that we will see later.
 ```
 
-Let's assume that are looking at this contract, the rebalancer contract on `Chain A` (our example above).
+Let's assume that we are looking at the rebalancer contract on `Chain A` (our example above).
 
 The `getAllCrossChainRebalancers()` will return something like this:
 
@@ -112,7 +112,7 @@ The `getAllCrossChainRebalancers()` will return something like this:
 
 Using this methods, when the rebalancer plugin boots or when there is a change, it discovers all the chain connections and the token balances on each chain.
 
-It starts from a root chain (which is the chain where the plugin transmits reports to), fetches the balance and the destination chains and then moves to the next chain, until all chains and balances are discovered ([BFS](https://en.wikipedia.org/wiki/Breadth-first_search)).
+It starts from a root chain that is defined on the plugin config, fetches the balance and the destination chains and then moves to the next chain, until all chains and balances are discovered ([BFS](https://en.wikipedia.org/wiki/Breadth-first_search)).
 
 Eventually it generates a graph data structure similar to the ones we've seen above, that contains all the information we need.
 
@@ -153,8 +153,8 @@ And will send an observation that looks like this:
 
 "transfers": [
     "[executed] transfer from chain A to chain B 10 tokens"
-    "[pending] transfer from chain A to chain C 1 token"
-    ...
+    "[pending] transfer from chain A to chain C 1 token",
+    "..."
 ]
 ```
 
@@ -172,7 +172,7 @@ It looks similar to the observation but contains data that all nodes agreed on.
 
 Finally during the `Reports` phase, based on the agreed balances and pending transfers the transfers that need to be made for reaching balance are calculated. This transfers are calculated according to an algorithm that is specified in the plugin's jobspec, we call it *the rebalancing algorithm*.
 
-The transfers are grouped by chain and eventually one report is generated and transmitted to each chain using a multichain ocr3 transmitter implementation.
+The transfers are grouped by chain and eventually one report per chain is generated and transmitted using a multichain ocr3 transmitter implementation.
 
 ---
 
