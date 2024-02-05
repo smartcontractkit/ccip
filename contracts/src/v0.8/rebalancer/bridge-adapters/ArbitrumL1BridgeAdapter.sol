@@ -3,8 +3,8 @@ pragma solidity 0.8.19;
 
 import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 
-import {IL1GatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
-import {IGatewayRouter} from "@arbitrum/token-bridge-contracts/contracts/tokenbridge/libraries/gateway/IGatewayRouter.sol";
+import {IL1GatewayRouter} from "../../vendor/@arbitrum/token-bridge-contracts/contracts/tokenbridge/ethereum/gateway/IL1GatewayRouter.sol";
+import {IGatewayRouter} from "../../vendor/@arbitrum/token-bridge-contracts/contracts/tokenbridge/libraries/gateway/IGatewayRouter.sol";
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -118,6 +118,8 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
   struct ArbitrumFinalizationPayload {
     bytes32[] proof;
     uint256 index;
+    address l2Sender;
+    address to;
     uint256 l2Block;
     uint256 l1Block;
     uint256 l2Timestamp;
@@ -125,20 +127,22 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
     bytes data;
   }
 
+  function exposeForEncoding(ArbitrumFinalizationPayload memory payload) public pure returns (bytes memory) {
+    return abi.encode(payload);
+  }
+
   /// @notice Finalize an L2 -> L1 transfer.
-  /// @param remoteSender sender if original message (i.e., caller of ArbSys.sendTxToL1)
-  /// @param localReceiver destination address for L1 contract call
   function finalizeWithdrawERC20(
-    address remoteSender,
-    address localReceiver,
+    address /* remoteSender */,
+    address /* localReceiver */,
     bytes calldata arbitrumFinalizationPayload
   ) external {
     ArbitrumFinalizationPayload memory payload = abi.decode(arbitrumFinalizationPayload, (ArbitrumFinalizationPayload));
     i_l1Outbox.executeTransaction(
       payload.proof,
       payload.index,
-      remoteSender,
-      localReceiver,
+      payload.l2Sender,
+      payload.to,
       payload.l2Block,
       payload.l1Block,
       payload.l2Timestamp,

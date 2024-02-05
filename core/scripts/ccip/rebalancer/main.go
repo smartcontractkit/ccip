@@ -14,9 +14,11 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/arb"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 )
 
@@ -151,8 +153,9 @@ func main() {
 		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
 		l2TxHash := cmd.String("l2-tx-hash", "", "L2 Tx Hash")
+		l1BridgeAdapterAddress := cmd.String("l1-bridge-adapter-address", "", "L1 Bridge Adapter Address")
 
-		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l2-chain-id", "l2-tx-hash")
+		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id", "l2-chain-id", "l2-tx-hash", "l1-bridge-adapter-address")
 
 		env := multienv.New(false, false)
 
@@ -160,7 +163,20 @@ func main() {
 			env,
 			*l1ChainID,
 			*l2ChainID,
+			common.HexToAddress(*l1BridgeAdapterAddress),
 			common.HexToHash(*l2TxHash))
+	case "deploy-arb-l1-adapter":
+		cmd := flag.NewFlagSet("deploy-arb-l1-adapter", flag.ExitOnError)
+		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
+		helpers.ParseArgs(cmd, os.Args[2:], "l1-chain-id")
+
+		env := multienv.New(false, false)
+		l1GatewayRouter := arb.ArbitrumContracts[*l1ChainID]["L1GatewayRouter"]
+		l1Outbox := arb.ArbitrumContracts[*l1ChainID]["L1Outbox"]
+		l2Client := env.Clients[*l1ChainID]
+		_, tx, _, err := arbitrum_l1_bridge_adapter.DeployArbitrumL1BridgeAdapter(env.Transactors[*l1ChainID], l2Client, l1GatewayRouter, l1Outbox)
+		helpers.PanicErr(err)
+		helpers.ConfirmContractDeployed(context.Background(), l2Client, tx, int64(*l1ChainID))
 	case "deposit-weth":
 		cmd := flag.NewFlagSet("deposit-weth", flag.ExitOnError)
 		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
