@@ -30,7 +30,7 @@ func (p *PingPong) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph, in
 				balance = big.NewInt(0).Sub(balance, tr.Amount)
 			}
 		}
-		if balance.BitLen() == 0 {
+		if balance.Cmp(big.NewInt(0)) <= 0 {
 			continue
 		}
 
@@ -42,7 +42,7 @@ func (p *PingPong) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph, in
 		// Equally distribute the balance to each eligible neighbor.
 		// If balance is not enough for everyone then start skipping neighbors.
 		amountToSend := big.NewInt(0).Div(balance, big.NewInt(int64(len(neighbors))))
-		for amountToSend.BitLen() == 0 && len(neighbors) > 1 {
+		for amountToSend.Cmp(big.NewInt(0)) <= 0 && len(neighbors) > 1 {
 			neighbors = neighbors[:len(neighbors)-1]
 			amountToSend = big.NewInt(0).Div(balance, big.NewInt(int64(len(neighbors))))
 		}
