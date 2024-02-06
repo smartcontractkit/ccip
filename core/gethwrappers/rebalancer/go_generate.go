@@ -15,3 +15,6 @@ package rebalancer
 // Arbitrum helpers
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IArbSys/IArbSys.abi ../../../contracts/solc/v0.8.19/IArbSys/IArbSys.bin ArbSys arbsys
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/INodeInterface/INodeInterface.abi ../../../contracts/solc/v0.8.19/INodeInterface/INodeInterface.bin NodeInterface arb_node_interface
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IL2ArbitrumGateway/IL2ArbitrumGateway.abi ../../../contracts/solc/v0.8.19/IL2ArbitrumGateway/IL2ArbitrumGateway.bin L2ArbitrumGateway l2_arbitrum_gateway
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IL2ArbitrumMessenger/IL2ArbitrumMessenger.abi ../../../contracts/solc/v0.8.19/IL2ArbitrumMessenger/IL2ArbitrumMessenger.bin L2ArbitrumMessenger l2_arbitrum_messenger
+//go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IArbRollupCore/IArbRollupCore.abi ../../../contracts/solc/v0.8.19/IArbRollupCore/IArbRollupCore.bin ArbRollupCore arbitrum_rollup_core

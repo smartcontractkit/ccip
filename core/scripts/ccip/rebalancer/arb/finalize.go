@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -17,22 +15,24 @@ import (
 	utilsbig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arb_node_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_rollup_core"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbsys"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_gateway"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_messenger"
 )
 
 var (
 	// Events emitted on L2
-	TxToL1Topic              = common.HexToHash("0x2b986d32a0536b7e19baa48ab949fec7b903b7fad7730820b20632d100cc3a68")
-	WithdrawalInitiatedTopic = common.HexToHash("0x3073a74ecb728d10be779fe19a74a1428e20468f5b4d167bf9c73d9067847d73")
-	L2ToL1TxTopic            = common.HexToHash("0x3e7aafa77dbf186b7fd488006beff893744caa3c4f6f299e8a709fa2087374fc")
-	TransferRoutedTopic      = common.HexToHash("0x85291dff2161a93c2f12c819d31889c96c63042116f5bc5a205aa701c2c429f5")
+	TxToL1Topic              = l2_arbitrum_messenger.L2ArbitrumMessengerTxToL1{}.Topic()
+	WithdrawalInitiatedTopic = l2_arbitrum_gateway.L2ArbitrumGatewayWithdrawalInitiated{}.Topic()
+	L2ToL1TxTopic            = arbsys.ArbSysL2ToL1Tx{}.Topic()
 
 	// Important addresses on L2
 	NodeInterfaceAddress = common.HexToAddress("0x00000000000000000000000000000000000000c8")
 	ArbSysAddress        = common.HexToAddress("0x0000000000000000000000000000000000000064")
 
 	// Events emitted on L1
-	NodeConfirmedTopic = common.HexToHash("0x22ef0479a7ff660660d1c2fe35f1b632cf31675c2d9378db8cec95b00d8ffa3c")
+	NodeConfirmedTopic = arbitrum_rollup_core.ArbRollupCoreNodeConfirmed{}.Topic()
 )
 
 // function executeTransaction(
@@ -98,8 +98,8 @@ func FinalizeL1(
 	// parse logs
 	l2ToL1Tx, err := arbSys.ParseL2ToL1Tx(*l2ToL1TxLog)
 	helpers.PanicErr(err)
-	withdrawalInitiated := parseWithdrawalInitiated(withdrawalInitiatedABI(), withdrawalInitiatedLog)
-	txToL1 := parseTxToL1(txToL1ABI(), txToL1Log)
+	withdrawalInitiated := parseWithdrawalInitiated(env, l2ChainID, withdrawalInitiatedLog)
+	txToL1 := parseTxToL1(env, l2ChainID, txToL1Log)
 	// get the proof
 	arg0Proof := getProof(env, l1ChainID, l2ChainID, withdrawalInitiated.L2ToL1Id)
 	// argument 1: index
@@ -200,8 +200,8 @@ func getProof(env multienv.Env, l1ChainID, l2ChainID uint64, l2ToL1Id *big.Int) 
 		helpers.PanicErr(fmt.Errorf("no node confirmed event found"))
 	}
 	// parse latest nodeconfirmed event
-	nodeConfirmed := parseNodeConfirmed(nodeConfirmedABI(), latestNodeConfirmed)
-	fmt.Println("latest node confirmed:", nodeConfirmed)
+	nodeConfirmed := parseNodeConfirmed(env, l1ChainID, latestNodeConfirmed)
+	fmt.Println("latest node confirmed:", nodeConfirmedToString(nodeConfirmed))
 	type Response struct {
 		SendCount *utilsbig.Big `json:"sendCount"`
 	}
@@ -217,6 +217,14 @@ func getProof(env multienv.Env, l1ChainID, l2ChainID uint64, l2ToL1Id *big.Int) 
 	return outboxProof.Proof
 }
 
+func nodeConfirmedToString(nodeConfirmed *arbitrum_rollup_core.ArbRollupCoreNodeConfirmed) string {
+	return fmt.Sprintf("NodeConfirmed{BlockHash: %s, SendRoot: %s, NodeNum: %d}",
+		hexutil.Encode(nodeConfirmed.BlockHash[:]),
+		hexutil.Encode(nodeConfirmed.SendRoot[:]),
+		nodeConfirmed.NodeNum,
+	)
+}
+
 func getL1BlockFromRPC(env multienv.Env, l2ChainID uint64, l2TxHash common.Hash) *big.Int {
 	l1Rpc := env.JRPCs[l2ChainID]
 	type Response struct {
@@ -228,93 +236,29 @@ func getL1BlockFromRPC(env multienv.Env, l2ChainID uint64, l2TxHash common.Hash)
 	return response.L1BlockNumber.ToInt()
 }
 
-func withdrawalInitiatedABI() abi.ABI {
-	jsonABI := `[{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"l1Token","type":"address"},{"indexed":true,"internalType":"address","name":"_from","type":"address"},{"indexed":true,"internalType":"address","name":"_to","type":"address"},{"indexed":true,"internalType":"uint256","name":"_l2ToL1Id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"_exitNum","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"_amount","type":"uint256"}],"name":"WithdrawalInitiated","type":"event"}]`
-	abi, err := abi.JSON(strings.NewReader(jsonABI))
+func parseWithdrawalInitiated(env multienv.Env, l2ChainID uint64, lg *types.Log) *l2_arbitrum_gateway.L2ArbitrumGatewayWithdrawalInitiated {
+	// Address provided doesn't matter, we're just going to parse the log
+	l2ArbGateway, err := l2_arbitrum_gateway.NewL2ArbitrumGateway(common.HexToAddress("0x0"), env.Clients[l2ChainID])
 	helpers.PanicErr(err)
-	return abi
-}
-
-type WithdrawalInitiated struct {
-	L1Token  common.Address
-	From     common.Address
-	To       common.Address
-	L2ToL1Id *big.Int
-	ExitNum  *big.Int
-	Amount   *big.Int
-}
-
-func parseWithdrawalInitiated(tabi abi.ABI, lg *types.Log) *WithdrawalInitiated {
-	event := new(WithdrawalInitiated)
-	if err := UnpackLog(tabi, event, "WithdrawalInitiated", *lg); err != nil {
-		helpers.PanicErr(err)
-	}
-	return event
-}
-
-func txToL1ABI() abi.ABI {
-	jsonABI := `[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"_from","type":"address"},{"indexed":true,"internalType":"address","name":"_to","type":"address"},{"indexed":true,"internalType":"uint256","name":"_id","type":"uint256"},{"indexed":false,"internalType":"bytes","name":"_data","type":"bytes"}],"name":"TxToL1","type":"event"}]`
-	abi, err := abi.JSON(strings.NewReader(jsonABI))
+	parsed, err := l2ArbGateway.ParseWithdrawalInitiated(*lg)
 	helpers.PanicErr(err)
-	return abi
+	return parsed
 }
 
-type TxToL1 struct {
-	From, To common.Address
-	Id       *big.Int
-	Data     []byte
-}
-
-func parseTxToL1(tabi abi.ABI, lg *types.Log) *TxToL1 {
-	event := new(TxToL1)
-	if err := UnpackLog(tabi, event, "TxToL1", *lg); err != nil {
-		helpers.PanicErr(err)
-	}
-	return event
-}
-
-func nodeConfirmedABI() abi.ABI {
-	jsonABI := `[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint64","name":"nodeNum","type":"uint64"},{"indexed":false,"internalType":"bytes32","name":"blockHash","type":"bytes32"},{"indexed":false,"internalType":"bytes32","name":"sendRoot","type":"bytes32"}],"name":"NodeConfirmed","type":"event"}]`
-	abi, err := abi.JSON(strings.NewReader(jsonABI))
+func parseTxToL1(env multienv.Env, l2ChainID uint64, lg *types.Log) *l2_arbitrum_messenger.L2ArbitrumMessengerTxToL1 {
+	// Address provided doesn't matter, we're just going to parse the log
+	l2ArbMessenger, err := l2_arbitrum_messenger.NewL2ArbitrumMessenger(common.HexToAddress("0x0"), env.Clients[l2ChainID])
 	helpers.PanicErr(err)
-	return abi
+	parsed, err := l2ArbMessenger.ParseTxToL1(*lg)
+	helpers.PanicErr(err)
+	return parsed
 }
 
-type NodeConfirmed struct {
-	NodeNum             uint64
-	BlockHash, SendRoot [32]byte
-}
-
-func (n NodeConfirmed) String() string {
-	return fmt.Sprintf("{NodeNum: %d, BlockHash: %s, SendRoot: %s}", n.NodeNum, hexutil.Encode(n.BlockHash[:]), hexutil.Encode(n.SendRoot[:]))
-}
-
-func parseNodeConfirmed(tabi abi.ABI, lg *types.Log) *NodeConfirmed {
-	event := new(NodeConfirmed)
-	if err := UnpackLog(tabi, event, "NodeConfirmed", *lg); err != nil {
-		helpers.PanicErr(err)
-	}
-	return event
-}
-
-func UnpackLog(tabi abi.ABI, out interface{}, event string, log types.Log) error {
-	// Anonymous events are not supported.
-	if len(log.Topics) == 0 {
-		return fmt.Errorf("no event signature")
-	}
-	if log.Topics[0] != tabi.Events[event].ID {
-		return fmt.Errorf("event signature mismatch")
-	}
-	if len(log.Data) > 0 {
-		if err := tabi.UnpackIntoInterface(out, event, log.Data); err != nil {
-			return err
-		}
-	}
-	var indexed abi.Arguments
-	for _, arg := range tabi.Events[event].Inputs {
-		if arg.Indexed {
-			indexed = append(indexed, arg)
-		}
-	}
-	return abi.ParseTopics(out, indexed, log.Topics[1:])
+func parseNodeConfirmed(env multienv.Env, l1ChainID uint64, lg *types.Log) *arbitrum_rollup_core.ArbRollupCoreNodeConfirmed {
+	// Address provided doesn't matter, we're just going to parse the log
+	rollupCore, err := arbitrum_rollup_core.NewArbRollupCore(common.HexToAddress("0x0"), env.Clients[l1ChainID])
+	helpers.PanicErr(err)
+	parsed, err := rollupCore.ParseNodeConfirmed(*lg)
+	helpers.PanicErr(err)
+	return parsed
 }
