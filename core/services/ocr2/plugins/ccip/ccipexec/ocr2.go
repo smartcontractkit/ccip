@@ -276,17 +276,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 		}
 	}
 
-	// TODO Not cached yet!
-	poolReaders, err := r.destTokenPoolFactory.NewTokenPools(ctx, dstPoolAddresses)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(poolReaders) == 0 {
-		return map[common.Address]*big.Int{}, nil
-	}
-
-	rateLimits, err := poolReaders[0].GetInboundTokenPoolRateLimits(ctx, poolReaders)
+	rateLimits, err := r.destTokenPoolFactory.GetInboundTokenPoolRateLimits(ctx, dstPoolAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("fetch pool rate limits: %w", err)
 	}
@@ -298,7 +288,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 			continue
 		}
 
-		tokenAddr, exists := dstPoolToToken[poolReaders[i].Address()]
+		tokenAddr, exists := dstPoolToToken[dstPoolAddresses[i]]
 		if !exists {
 			return nil, fmt.Errorf("pool to token mapping does not contain %s", dstPoolAddresses[i])
 		}

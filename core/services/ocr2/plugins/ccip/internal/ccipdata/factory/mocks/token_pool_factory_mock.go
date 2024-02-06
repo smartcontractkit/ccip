@@ -21,7 +21,7 @@ func (_m *TokenPoolFactoryInterface) NewTokenPools(ctx context.Context, tokenPoo
 	ret := _m.Called(ctx, tokenPoolAddresses)
 
 	if len(ret) == 0 {
-		panic("no return value specified for NewTokenPools")
+		panic("no return value specified for loadTokenPools")
 	}
 
 	var r0 []ccipdata.TokenPoolReader

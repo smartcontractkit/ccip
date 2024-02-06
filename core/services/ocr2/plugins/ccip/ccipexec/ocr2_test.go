@@ -894,7 +894,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			mockTokenPoolReader2.On("GetInboundTokenPoolRateLimits", mock.Anything, mock.Anything).Return(tc.poolRateLimits, nil).Maybe()
 
 			tokenPoolFactoryMock := factorymocks.NewTokenPoolFactoryInterface(t)
-			tokenPoolFactoryMock.On("NewTokenPools", mock.Anything, mock.Anything).Return([]ccipdata.TokenPoolReader{mockTokenPoolReader1, mockTokenPoolReader2}, nil).Maybe()
+			tokenPoolFactoryMock.On("loadTokenPools", mock.Anything, mock.Anything).Return([]ccipdata.TokenPoolReader{mockTokenPoolReader1, mockTokenPoolReader2}, nil).Maybe()
 			p.destTokenPoolFactory = tokenPoolFactoryMock
 
 			rateLimits, err := p.destPoolRateLimits(ctx, []commitReportWithSendRequests{

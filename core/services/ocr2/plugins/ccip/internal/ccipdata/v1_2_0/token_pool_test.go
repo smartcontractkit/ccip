@@ -37,7 +37,7 @@ func TestTokenPool(t *testing.T) {
 
 	for _, tokenPoolType := range poolTypes {
 		poolAddress := utils.RandomAddress()
-		pool := NewTokenPool(tokenPoolType, poolAddress, offRamp, lp, batchCallerMock)
+		pool := NewTokenPool(tokenPoolType, poolAddress, offRamp)
 
 		assert.Equal(t, tokenPoolType, pool.Type())
 		assert.Equal(t, poolAddress, pool.Address())
@@ -74,7 +74,7 @@ func TestTokenPool(t *testing.T) {
 			Err:     nil,
 		}}, nil).Once()
 
-		pool2 := NewTokenPool(tokenPoolType, poolAddress, offRamp, lp, batchCallerMock)
+		pool2 := NewTokenPool(tokenPoolType, poolAddress, offRamp)
 
 		gotRateLimits, err = pool.GetInboundTokenPoolRateLimits(ctx, []ccipdata.TokenPoolReader{pool, pool2})
 		require.NoError(t, err)
