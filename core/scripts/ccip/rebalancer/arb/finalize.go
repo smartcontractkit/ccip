@@ -193,7 +193,7 @@ func getProof(env multienv.Env, l1ChainID, l2ChainID uint64, l2ToL1Id *big.Int) 
 	var latestNodeConfirmed *types.Log
 	for _, lg := range lgs {
 		if latestNodeConfirmed == nil || lg.BlockNumber > latestNodeConfirmed.BlockNumber {
-			latestNodeConfirmed = &lg
+			latestNodeConfirmed = &lg //nolint:gosec
 		}
 	}
 	if latestNodeConfirmed == nil {
