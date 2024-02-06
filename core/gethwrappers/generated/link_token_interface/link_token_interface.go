@@ -40,6 +40,7 @@ var LinkTokenABI = LinkTokenMetaData.ABI
 var LinkTokenBin = LinkTokenMetaData.Bin
 
 func DeployLinkToken(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *LinkToken, error) {
+	fmt.Println("-----")
 	parsed, err := LinkTokenMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -47,9 +48,10 @@ func DeployLinkToken(auth *bind.TransactOpts, backend bind.ContractBackend) (com
 	if parsed == nil {
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
-
+	
 	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(LinkTokenBin), backend)
 	if err != nil {
+		fmt.Println("its here", address, tx, contract)
 		return common.Address{}, nil, nil, err
 	}
 	return address, tx, &LinkToken{address: address, abi: *parsed, LinkTokenCaller: LinkTokenCaller{contract: contract}, LinkTokenTransactor: LinkTokenTransactor{contract: contract}, LinkTokenFilterer: LinkTokenFilterer{contract: contract}}, nil
