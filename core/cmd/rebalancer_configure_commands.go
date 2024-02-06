@@ -36,8 +36,6 @@ type rebalancerTemplateArgs struct {
 	OCRKeyBundleID          string
 	TransmitterID           string
 	ChainID                 int64
-	FromBlock               int64
-	FromBlocks              string
 	LiquidityManagerAddress string
 	LiquidityManagerNetwork uint64
 	MaxNumTransfers         int64
@@ -48,20 +46,34 @@ type rebalancerTemplateArgs struct {
 func (s *Shell) ConfigureRebalancerNode(
 	c *cli.Context,
 ) (*SetupRebalancerNodePayload, error) {
+	const (
+		passwordArg                = "password"
+		vrfPasswordArg             = "vrfpassword"
+		l1ChainIDArg               = "l1ChainID"
+		isBootstrapperArg          = "isBootstrapper"
+		bootstrapperPeerIDArg      = "bootstrapperPeerID"
+		jobTypeArg                 = "job-type"
+		jobNameArg                 = "job-name"
+		contractIDArg              = "contractID"
+		liquidityManagerAddressArg = "liquidityManagerAddress"
+		liquidityManagerNetworkArg = "liquidityManagerNetwork"
+		maxNumTransfersArg         = "maxNumTransfers"
+		bootstrapPortArg           = "bootstrapPort"
+	)
 	ctx := s.ctx()
 	lggr := logger.Sugared(s.Logger.Named("ConfigureRebalancerNode"))
 	lggr.Infow(
 		fmt.Sprintf("Configuring Chainlink node for job type %s %s at commit %s", c.String("job-type"), static.Version, static.Sha),
 		"Version", static.Version, "SHA", static.Sha)
 	var pwd, vrfpwd *string
-	if passwordFile := c.String("password"); passwordFile != "" {
+	if passwordFile := c.String(passwordArg); passwordFile != "" {
 		p, err := utils.PasswordFromFile(passwordFile)
 		if err != nil {
 			return nil, errors.Wrap(err, "error reading password from file")
 		}
 		pwd = &p
 	}
-	if vrfPasswordFile := c.String("vrfpassword"); len(vrfPasswordFile) != 0 {
+	if vrfPasswordFile := c.String(vrfPasswordArg); len(vrfPasswordFile) != 0 {
 		p, err := utils.PasswordFromFile(vrfPasswordFile)
 		if err != nil {
 			return nil, errors.Wrapf(err, "error reading VRF password from vrfpassword file \"%s\"", vrfPasswordFile)
@@ -85,7 +97,7 @@ func (s *Shell) ConfigureRebalancerNode(
 		return nil, s.errorOut(errors.Wrap(err, "fatal error instantiating application"))
 	}
 
-	chainID := c.Int64("l1ChainID")
+	chainID := c.Int64(l1ChainIDArg)
 	// Initialize keystore and generate keys.
 	keyStore := app.GetKeyStore()
 	err = setupKeystore(s, app, keyStore)
@@ -133,8 +145,8 @@ func (s *Shell) ConfigureRebalancerNode(
 	p2p, _ := app.GetKeyStore().P2P().GetAll()
 	ocr2List, _ := app.GetKeyStore().OCR2().GetAll()
 	peerID := p2p[0].PeerID().Raw()
-	if !c.Bool("isBootstrapper") {
-		peerID = c.String("bootstrapperPeerID")
+	if !c.Bool(isBootstrapperArg) {
+		peerID = c.String(bootstrapperPeerIDArg)
 	}
 
 	// Find the EVM OCR2 bundle.
@@ -150,27 +162,25 @@ func (s *Shell) ConfigureRebalancerNode(
 	offChainPublicKey := ocr2.OffchainPublicKey()
 	configPublicKey := ocr2.ConfigEncryptionPublicKey()
 
-	if c.Bool("isBootstrapper") {
+	if c.Bool(isBootstrapperArg) {
 		// Set up bootstrapper job if bootstrapper.
-		err = createRebalancerBootstrapperJob(ctx, lggr, c, app)
-	} else if c.String("job-type") == "rebalancer" {
+		err = createRebalancerBootstrapperJob(ctx, lggr, chainID, c.String(contractIDArg), app)
+	} else if c.String(jobTypeArg) == "rebalancer" {
 		// Set up rebalancer job.
 		err = createRebalancerJob(ctx, lggr, app, rebalancerTemplateArgs{
-			Name:                    c.String("job-name"),
-			ContractID:              c.String("contractID"),
+			Name:                    c.String(jobNameArg),
+			ContractID:              c.String(contractIDArg),
 			OCRKeyBundleID:          ocr2.ID(),
 			TransmitterID:           transmitterID,
 			ChainID:                 chainID,
-			FromBlock:               c.Int64("fromBlock"),   // TODO: not needed?
-			FromBlocks:              c.String("fromBlocks"), // TODO: not needed?
-			LiquidityManagerAddress: c.String("liquidityManagerAddress"),
-			LiquidityManagerNetwork: c.Uint64("liquidityManagerNetwork"),
-			MaxNumTransfers:         c.Int64("maxNumTransfers"),
+			LiquidityManagerAddress: c.String(liquidityManagerAddressArg),
+			LiquidityManagerNetwork: c.Uint64(liquidityManagerNetworkArg),
+			MaxNumTransfers:         c.Int64(maxNumTransfersArg),
 			P2PV2BootstrapperPeerID: peerID,
-			P2PV2BootstrapperPort:   c.String("bootstrapPort"),
+			P2PV2BootstrapperPort:   c.String(bootstrapPortArg),
 		})
 	} else {
-		err = fmt.Errorf("unknown job type: %s", c.String("job-type"))
+		err = fmt.Errorf("unknown job type: %s", c.String(jobTypeArg))
 	}
 
 	if err != nil {
@@ -214,7 +224,6 @@ chainID              	= %d
 # fromBlock               = blah
 [relayConfig.fromBlocks]
 # these are the fromBlock values for the follower chains
-# blah
 # We set config after we launch the nodes, so this is not needed
 
 [pluginConfig]
@@ -227,7 +236,7 @@ type = "random"
 maxNumTransfers = %d
 checkSourceDestEqual = false
 `
-	fmt.Println("Liquidity manager network:", args.LiquidityManagerNetwork)
+	lggr.Info("Liquidity manager network:", args.LiquidityManagerNetwork)
 	sp := fmt.Sprintf(RebalancerTemplate,
 		args.Name,
 		args.ContractID,
@@ -256,16 +265,22 @@ checkSourceDestEqual = false
 	if err != nil {
 		return errors.Wrap(err, "failed to add job")
 	}
-	lggr.Info("ocr2vrf spec:", sp)
+	lggr.Info("rebalancer spec:", sp)
 
 	return nil
 }
 
-func createRebalancerBootstrapperJob(ctx context.Context, lggr logger.Logger, c *cli.Context, app chainlink.Application) error {
+func createRebalancerBootstrapperJob(
+	ctx context.Context,
+	lggr logger.Logger,
+	l1ChainID int64,
+	contractID string,
+	app chainlink.Application,
+) error {
 	sp := fmt.Sprintf(BootstrapTemplate,
-		c.Int64("l1ChainID"),
-		c.String("contractID"),
-		c.Int64("l1ChainID"),
+		l1ChainID,
+		contractID,
+		l1ChainID,
 	)
 	var jb job.Job
 	err := toml.Unmarshal([]byte(sp), &jb)
@@ -283,7 +298,7 @@ func createRebalancerBootstrapperJob(ctx context.Context, lggr logger.Logger, c 
 	if err != nil {
 		return errors.Wrap(err, "failed to add job")
 	}
-	lggr.Info("bootstrap spec:", sp)
+	lggr.Info("rebalancer bootstrap spec:", sp)
 
 	// Give a cooldown
 	time.Sleep(time.Second)

@@ -239,32 +239,23 @@ func deployArm(
 // sum of MaxDurationQuery/MaxDurationObservation/DeltaGrace must be less than DeltaProgress
 func setConfig(
 	e multienv.Env,
-	l1ChainID,
-	l2ChainID uint64,
-	l1RebalancerAddress,
-	l2RebalancerAddress common.Address,
-	signers []common.Address,
-	offchainPubKeys []types.OffchainPublicKey,
-	configPubKeys []types.ConfigEncryptionPublicKey,
-	peerIDs []string,
-	l1Transmitters,
-	l2Transmitters []common.Address,
+	args setConfigArgs,
 ) {
-	doChecks(e, l1ChainID, l2ChainID, false)
+	doChecks(e, args.l1ChainID, args.l2ChainID, false)
 
-	l1Transactor, l2Transactor := e.Transactors[l1ChainID], e.Transactors[l2ChainID]
+	l1Transactor, l2Transactor := e.Transactors[args.l1ChainID], e.Transactors[args.l2ChainID]
 
 	// lengths of all the arrays must be equal
-	if len(signers) != len(offchainPubKeys) ||
-		len(signers) != len(configPubKeys) ||
-		len(signers) != len(l1Transmitters) ||
-		len(signers) != len(l2Transmitters) {
+	if len(args.signers) != len(args.offchainPubKeys) ||
+		len(args.signers) != len(args.configPubKeys) ||
+		len(args.signers) != len(args.l1Transmitters) ||
+		len(args.signers) != len(args.l2Transmitters) {
 		panic("lengths of all the arrays must be equal")
 	}
 
-	l1Rebalancer, err := rebalancer.NewRebalancer(l1RebalancerAddress, e.Clients[l1ChainID])
+	l1Rebalancer, err := rebalancer.NewRebalancer(args.l1RebalancerAddress, e.Clients[args.l1ChainID])
 	helpers.PanicErr(err)
-	l2Rebalancer, err := rebalancer.NewRebalancer(l2RebalancerAddress, e.Clients[l2ChainID])
+	l2Rebalancer, err := rebalancer.NewRebalancer(args.l2RebalancerAddress, e.Clients[args.l2ChainID])
 	helpers.PanicErr(err)
 
 	// set config on L2 first then L1
@@ -272,24 +263,24 @@ func setConfig(
 		l1Oracles []confighelper2.OracleIdentityExtra
 		l2Oracles []confighelper2.OracleIdentityExtra
 	)
-	for i := 0; i < len(signers); i++ {
+	for i := 0; i < len(args.signers); i++ {
 		l1Oracles = append(l1Oracles, confighelper2.OracleIdentityExtra{
 			OracleIdentity: confighelper2.OracleIdentity{
-				OffchainPublicKey: offchainPubKeys[i],
-				OnchainPublicKey:  signers[i].Bytes(),
-				PeerID:            peerIDs[i],
-				TransmitAccount:   types.Account(l1Transmitters[i].Hex()),
+				OffchainPublicKey: args.offchainPubKeys[i],
+				OnchainPublicKey:  args.signers[i].Bytes(),
+				PeerID:            args.peerIDs[i],
+				TransmitAccount:   types.Account(args.l1Transmitters[i].Hex()),
 			},
-			ConfigEncryptionPublicKey: configPubKeys[i],
+			ConfigEncryptionPublicKey: args.configPubKeys[i],
 		})
 		l2Oracles = append(l2Oracles, confighelper2.OracleIdentityExtra{
 			OracleIdentity: confighelper2.OracleIdentity{
-				OffchainPublicKey: offchainPubKeys[i],
-				OnchainPublicKey:  signers[i].Bytes(),
-				PeerID:            peerIDs[i],
-				TransmitAccount:   types.Account(l2Transmitters[i].Hex()),
+				OffchainPublicKey: args.offchainPubKeys[i],
+				OnchainPublicKey:  args.signers[i].Bytes(),
+				PeerID:            args.peerIDs[i],
+				TransmitAccount:   types.Account(args.l2Transmitters[i].Hex()),
 			},
-			ConfigEncryptionPublicKey: configPubKeys[i],
+			ConfigEncryptionPublicKey: args.configPubKeys[i],
 		})
 	}
 	var schedule []int
@@ -299,27 +290,27 @@ func setConfig(
 	offchainConfig, onchainConfig := []byte{}, []byte{}
 	f := uint8(1)
 	_, _, f, onchainConfig, offchainConfigVersion, offchainConfig, err := ocr3confighelper.ContractSetConfigArgsForTests(
-		2*time.Minute,  // deltaProgress
-		10*time.Second, // deltaResend
-		20*time.Second, // deltaInitial
-		2*time.Second,  // deltaRound
-		20*time.Second, // deltaGrace
-		10*time.Second, // deltaCertifiedCommitRequest
-		10*time.Second, // deltaStage
-		3,              // rmax
+		args.deltaProgress,
+		args.deltaResend,
+		args.deltaInitial,
+		args.deltaRound,
+		args.deltaGrace,
+		args.deltaCertifiedCommitRequest,
+		args.deltaStage,
+		args.rMax,
 		schedule,
 		l2Oracles,
 		offchainConfig,
-		50*time.Millisecond, // maxDurationQuery
-		1*time.Minute,       // maxDurationObservation
-		1*time.Minute,       // maxDurationShouldAcceptAttestedReport
-		1*time.Second,       // maxDurationShouldTransmitAcceptedReport
+		args.maxDurationQuery,
+		args.maxDurationObservation,
+		args.maxDurationShouldAcceptAttestedReport,
+		args.maxDurationShouldTransmitAcceptedReport,
 		int(f),
 		onchainConfig)
 	helpers.PanicErr(err)
-	tx, err := l2Rebalancer.SetOCR3Config(l2Transactor, signers, l2Transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
+	tx, err := l2Rebalancer.SetOCR3Config(l2Transactor, args.signers, args.l2Transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	helpers.PanicErr(err)
-	helpers.ConfirmTXMined(context.Background(), e.Clients[l2ChainID], tx, int64(l2ChainID), "setting OCR3 config on L2 rebalancer")
+	helpers.ConfirmTXMined(context.Background(), e.Clients[args.l2ChainID], tx, int64(args.l2ChainID), "setting OCR3 config on L2 rebalancer")
 
 	fmt.Println("sleeping a bit before setting config on L1")
 	time.Sleep(1 * time.Minute)
@@ -327,27 +318,27 @@ func setConfig(
 	// set config on L1
 	offchainConfig, onchainConfig = []byte{}, []byte{}
 	_, _, f, onchainConfig, offchainConfigVersion, offchainConfig, err = ocr3confighelper.ContractSetConfigArgsForTests(
-		2*time.Minute,  // deltaProgress
-		10*time.Second, // deltaResend
-		20*time.Second, // deltaInitial
-		2*time.Second,  // deltaRound
-		20*time.Second, // deltaGrace
-		10*time.Second, // deltaCertifiedCommitRequest
-		10*time.Second, // deltaStage
-		3,              // rmax
+		args.deltaProgress,
+		args.deltaResend,
+		args.deltaInitial,
+		args.deltaRound,
+		args.deltaGrace,
+		args.deltaCertifiedCommitRequest,
+		args.deltaStage,
+		args.rMax,
 		schedule,
 		l1Oracles,
 		offchainConfig,
-		50*time.Millisecond, // maxDurationQuery
-		1*time.Minute,       // maxDurationObservation
-		1*time.Minute,       // maxDurationShouldAcceptAttestedReport
-		1*time.Minute,       // maxDurationShouldTransmitAcceptedReport
+		args.maxDurationQuery,
+		args.maxDurationObservation,
+		args.maxDurationShouldAcceptAttestedReport,
+		args.maxDurationShouldTransmitAcceptedReport,
 		int(f),
 		onchainConfig)
 	helpers.PanicErr(err)
-	tx, err = l1Rebalancer.SetOCR3Config(l1Transactor, signers, l1Transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
+	tx, err = l1Rebalancer.SetOCR3Config(l1Transactor, args.signers, args.l1Transmitters, f, onchainConfig, offchainConfigVersion, offchainConfig)
 	helpers.PanicErr(err)
-	helpers.ConfirmTXMined(context.Background(), e.Clients[l1ChainID], tx, int64(l1ChainID), "setting OCR3 config on L1 rebalancer")
+	helpers.ConfirmTXMined(context.Background(), e.Clients[args.l1ChainID], tx, int64(args.l1ChainID), "setting OCR3 config on L1 rebalancer")
 }
 
 func doChecks(env multienv.Env, l1ChainID, l2ChainID uint64, websocket bool) {
