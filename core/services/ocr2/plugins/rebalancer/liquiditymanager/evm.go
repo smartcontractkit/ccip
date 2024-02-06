@@ -118,12 +118,13 @@ func (e *EvmRebalancer) GetPendingTransfers(ctx context.Context, since time.Time
 	return pendingTransfers, nil
 }
 
-type qItem struct {
+// bfsItem is an item in the BFS queue.
+type bfsItem struct {
 	networkSel models.NetworkSelector
 	lmAddress  common.Address
 }
 
-func (q qItem) String() string {
+func (q bfsItem) String() string {
 	return fmt.Sprintf("(NetworkSelector:%v,LMAddress:%v)", q.networkSel, q.lmAddress)
 }
 
@@ -134,10 +135,10 @@ func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Regist
 	g := liquiditygraph.NewGraph()
 	lms := NewRegistry()
 
-	seen := mapset.NewSet[qItem]()
-	queue := mapset.NewSet[qItem]()
+	seen := mapset.NewSet[bfsItem]()
+	queue := mapset.NewSet[bfsItem]()
 
-	elem := qItem{networkSel: e.networkSel, lmAddress: e.addr}
+	elem := bfsItem{networkSel: e.networkSel, lmAddress: e.addr}
 	queue.Add(elem)
 	seen.Add(elem)
 
@@ -190,7 +191,7 @@ func (e EvmRebalancer) Discover(ctx context.Context, lmFactory Factory) (*Regist
 				return nil, nil, fmt.Errorf("add connection: %w", err)
 			}
 
-			newElem := qItem{networkSel: destNetworkSel, lmAddress: common.Address(lmAddr)}
+			newElem := bfsItem{networkSel: destNetworkSel, lmAddress: common.Address(lmAddr)}
 			lggr.Debugw("Deciding whether to add new element to queue", "newElem", newElem)
 			if !seen.Contains(newElem) {
 				lggr.Debugw("Not seen before, adding to queue", "newElem", newElem)
