@@ -1,3 +1,14 @@
+<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
+
+- [Running the Rebalancer DON Locally](#running-the-rebalancer-don-locally)
+- [Running Bridge Transfers Through the Adapter Contracts](#running-bridge-transfers-through-the-adapter-contracts)
+   * [Arbitrum](#arbitrum)
+      + [L2 -> L1](#l2-l1)
+      + [Finalize Withdrawal on L1](#finalize-withdrawal-on-l1)
+
+<!-- TOC end -->
+
+<!-- TOC --><a name="running-the-rebalancer-don-locally"></a>
 ## Running the Rebalancer DON Locally
 
 Start by cloning the chainlink CCIP repo and checking out the branch with the scripts:
@@ -263,3 +274,63 @@ Seeing the logs below:
 Indicates that the node has picked up the new configuration, and will switch to the new configuration.
 
 Shortly thereafter, you should start seeing transmissions.
+
+<!-- TOC --><a name="running-bridge-transfers-through-the-adapter-contracts"></a>
+## Running Bridge Transfers Through the Adapter Contracts
+
+<!-- TOC --><a name="arbitrum"></a>
+### Arbitrum
+
+First, deploy the L1 and L2 bridge adapters:
+
+```shell
+# Switch into the rebalancer scripts dir
+cd core/scripts/ccip/rebalancer
+# Uses sepolia chain id, switch to 1 for mainnet
+go run . deploy-arb-l1-adapter -l1-chain-id 11155111
+# Uses sepolia chain id, switch to 42161 for arb mainnet
+go run . deploy-arb-l2-adapter -l2-chain-id 421614
+```
+
+<!-- TOC --><a name="l2-l1"></a>
+#### L2 -> L1
+
+In order to withdraw from L2 to L1, pick a token (WETH is probably the easiest) and make sure you have enough balance.
+Then invoke the following function:
+
+```shell
+# Uses sepolia chain id, switch to 42161 for arb mainnet
+# All values are in the lowest denomination (i.e wei)
+go run . arb-withdraw-from-l2 -l2-chain-id 421614 -l2-bridge-adapter-address <adapter-address-from-deploy-cmd> \
+    -amount 1 -l1-to-address <receiver-address-on-L1> \
+    -l2-token-address 0x980B62Da83eFf3D4576C647993b0c1D7faf17c73 \ # This is the L2 WETH token
+    -l1-token-address 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9   # This is the L1 WETH token
+```
+
+If you're using WETH, you can get some WETH from native this way:
+
+```shell
+# Uses sepolia chain id, switch to 42161 for arb mainnet
+# All values are in the lowest denomination (i.e wei)
+go run . deposit-weth -amount 1 -weth-address 0x980B62Da83eFf3D4576C647993b0c1D7faf17c73 -chain-id 421614
+```
+
+Once the `arb-withdraw-from-l2` command executes successfully, you will have to wait some time until you can claim the funds on L1.
+
+<!-- TOC --><a name="finalize-withdrawal-on-l1"></a>
+#### Finalize Withdrawal on L1
+
+In order to finalize an L2 withdrawal on L1, you will need to first have a transaction on L2 that is not yet finalized.
+
+See the previous section for doing a withdrawal and then come back when you have a successful transaction on L2.
+
+Save that transaction hash and use it in the following command:
+
+```shell
+# Uses sepolia and arb sepolia!
+go run . arb-finalize-l1 -l1-chain-id 11155111 -l2-chain-id 421614 -l2-tx-hash <tx-hash-here> -l1-bridge-adapter-address <l1-adapter-address>
+```
+
+This will print some execution information and then finalize the transaction.
+
+[!NOTE] Finalization WILL FAIL if the batch that the withdrawal tx was in was not successfully submitted to L1! This command can be used as an indicator if a tx is ready to finalize.
