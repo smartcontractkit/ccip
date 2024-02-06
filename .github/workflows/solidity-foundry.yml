@@ -39,10 +39,11 @@ jobs:
       - name: Collect Metrics
         if: ${{ needs.changes.outputs.changes == 'true' }}
         id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@8163dcea2f01a0a8fec84b284406ff7af1d2e1c0
+        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
         with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: Coverage
         continue-on-error: true
 
@@ -95,7 +96,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        product: [vrf, automation, llo-feeds, functions, shared, ccip, rebalancer]
+        product: [vrf, automation, llo-feeds, l2ep, functions, shared, ccip, rebalancer]
     needs: [changes]
     name: Foundry Tests ${{ matrix.product }}
     # See https://github.com/foundry-rs/foundry/issues/3827
@@ -154,9 +155,10 @@ jobs:
       - name: Collect Metrics
         if: needs.changes.outputs.changes == 'true'
         id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@d1618b772a97fd87e6505de97b872ee0b1f1729a # v2.0.2
+        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
         with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: Foundry Tests ${{ matrix.product }}
         continue-on-error: true
