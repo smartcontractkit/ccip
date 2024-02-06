@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -38,7 +39,7 @@ func TestCommitConfig(t *testing.T) {
 					StaticPrices: map[common.Address]StaticPriceConfig{
 						common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"): {
 							ChainID: 1057,
-							Price:   1000000000000000000,
+							Price:   big.NewInt(1000000000000000000),
 						},
 					},
 				},
@@ -66,7 +67,7 @@ func TestCommitConfig(t *testing.T) {
 					StaticPrices: map[common.Address]StaticPriceConfig{
 						common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"): {
 							ChainID: 1057,
-							Price:   1000000000000000000,
+							Price:   big.NewInt(1000000000000000000),
 						},
 					},
 				},
@@ -94,7 +95,7 @@ func TestCommitConfig(t *testing.T) {
 					StaticPrices: map[common.Address]StaticPriceConfig{
 						common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"): {
 							ChainID: 0,
-							Price:   1000000000000000000,
+							Price:   big.NewInt(1000000000000000000),
 						},
 					},
 				},
@@ -231,7 +232,7 @@ func TestUnmarshallDynamicPriceConfig(t *testing.T) {
 	"staticPrices": {
 		"0xec8c353470ccaa4f43067fcde40558e084a12927": {
 			"chainID": "1057",
-			"price": "1000000000000000000"
+			"price": 1000000000000000000
 		}
 	}
 }

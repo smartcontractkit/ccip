@@ -141,24 +141,24 @@ func testParamStaticOnly() testParameters {
 		StaticPrices: map[common.Address]config.StaticPriceConfig{
 			tk1: {
 				ChainID: 101,
-				Price:   1_234_000,
+				Price:   big.NewInt(1_234_000),
 			},
 			tk2: {
 				ChainID: 102,
-				Price:   2_234_000,
+				Price:   big.NewInt(2_234_000),
 			},
 			tk3: {
 				ChainID: 103,
-				Price:   3_234_000,
+				Price:   big.NewInt(3_234_000),
 			},
 		},
 	}
 	// Real LINK/USD example from OP.
 	evmClients := map[uint64]DynamicPriceGetterClient{}
 	expectedTokenPrices := map[common.Address]big.Int{
-		tk1: *big.NewInt(int64(cfg.StaticPrices[tk1].Price)),
-		tk2: *big.NewInt(int64(cfg.StaticPrices[tk2].Price)),
-		tk3: *big.NewInt(int64(cfg.StaticPrices[tk3].Price)),
+		tk1: *cfg.StaticPrices[tk1].Price,
+		tk2: *cfg.StaticPrices[tk2].Price,
+		tk3: *cfg.StaticPrices[tk3].Price,
 	}
 	return testParameters{
 		cfg:                 cfg,
@@ -185,7 +185,7 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 		StaticPrices: map[common.Address]config.StaticPriceConfig{
 			tk3: {
 				ChainID: 103,
-				Price:   1_234_000,
+				Price:   big.NewInt(1_234_000),
 			},
 		},
 	}
@@ -212,7 +212,7 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 	expectedTokenPrices := map[common.Address]big.Int{
 		tk1: *round1.Answer,
 		tk2: *round2.Answer,
-		tk3: *big.NewInt(int64(cfg.StaticPrices[tk3].Price)),
+		tk3: *cfg.StaticPrices[tk3].Price,
 	}
 	return testParameters{
 		cfg:                 cfg,
@@ -243,7 +243,7 @@ func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
 		StaticPrices: map[common.Address]config.StaticPriceConfig{
 			tk3: {
 				ChainID: 103,
-				Price:   1_234_000,
+				Price:   big.NewInt(1_234_000),
 			},
 		},
 	}
@@ -301,7 +301,7 @@ func testParamNoAggregatorForToken(t *testing.T) testParameters {
 		StaticPrices: map[common.Address]config.StaticPriceConfig{
 			tk3: {
 				ChainID: 103,
-				Price:   1_234_000,
+				Price:   big.NewInt(1_234_000),
 			},
 		},
 	}
@@ -328,7 +328,7 @@ func testParamNoAggregatorForToken(t *testing.T) testParameters {
 	expectedTokenPrices := map[common.Address]big.Int{
 		tk1: *round1.Answer,
 		tk2: *round2.Answer,
-		tk3: *big.NewInt(int64(cfg.StaticPrices[tk3].Price)),
+		tk3: *cfg.StaticPrices[tk3].Price,
 		tk4: *big.NewInt(0),
 	}
 	return testParameters{

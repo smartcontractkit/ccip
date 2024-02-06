@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -37,8 +38,8 @@ type AggregatorPriceConfig struct {
 
 // StaticPriceConfig specifies a price defined statically.
 type StaticPriceConfig struct {
-	ChainID uint64 `json:"chainID,string"`
-	Price   uint64 `json:"price,string"`
+	ChainID uint64   `json:"chainID,string"`
+	Price   *big.Int `json:"price"`
 }
 
 // UnmarshalJSON provides a custom un-marshaller to handle JSON embedded in Toml content.

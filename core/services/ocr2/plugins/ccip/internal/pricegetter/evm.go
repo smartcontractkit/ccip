@@ -96,7 +96,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []common
 			batchCallsTokensOrder[aggCfg.ChainID] = append(batchCallsTokensOrder[aggCfg.ChainID], tk)
 		} else if staticCfg, isStatic := d.cfg.StaticPrices[tk]; isStatic {
 			// Fill static prices.
-			prices[tk] = big.NewInt(0).SetUint64(staticCfg.Price)
+			prices[tk] = staticCfg.Price
 		} else {
 			return nil, fmt.Errorf("no price resolution rule for token %s", tk.Hex())
 		}

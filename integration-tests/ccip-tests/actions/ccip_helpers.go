@@ -811,7 +811,7 @@ func (d *DynamicPriceGetterConfig) AddAggregatorPriceConfig(tokenAddr string, ag
 func (d *DynamicPriceGetterConfig) AddStaticPriceConfig(tokenAddr string, chainID uint64, price *big.Int) error {
 	d.StaticPrices[common.HexToAddress(tokenAddr)] = StaticPriceConfig{
 		ChainID: chainID,
-		Price:   price.Uint64(),
+		Price:   price,
 	}
 	return nil
 }
@@ -834,8 +834,8 @@ type AggregatorPriceConfig struct {
 // StaticPriceConfig specifies a price defined statically.
 // This should match pricegetter.StaticPriceConfig in core/services/ocr2/plugins/ccip/internal/pricegetter
 type StaticPriceConfig struct {
-	ChainID uint64 `json:"chainID,string"`
-	Price   uint64 `json:"price,string"`
+	ChainID uint64   `json:"chainID,string"`
+	Price   *big.Int `json:"price"`
 }
 
 func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, existingDeployment, multiCall, usdc bool) (*CCIPCommon, error) {
@@ -1848,10 +1848,10 @@ func (lane *CCIPLane) TokenPricesConfig() (string, error) {
 		return "", fmt.Errorf("error in AddAggregatorPriceConfig for fee token %s: %w", lane.Dest.Common.FeeToken.Address(), err)
 	}
 	if err := d.AddAggregatorPriceConfig(lane.Dest.Common.WrappedNative.Hex(), lane.Dest.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
-		return "", fmt.Errorf("error in AddAggregatorPriceConfig for wrapped native %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
+		return "", fmt.Errorf("error in AddAggregatorPriceConfig for wrapped native on dest %s: %w", lane.Dest.Common.WrappedNative.Hex(), err)
 	}
 	if err := d.AddAggregatorPriceConfig(lane.Source.Common.WrappedNative.Hex(), lane.Source.Common.PriceAggregators, WrappedNativeToUSD); err != nil {
-		return "", fmt.Errorf("error in AddAggregatorPriceConfig for wrapped native %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
+		return "", fmt.Errorf("error in AddAggregatorPriceConfig for wrapped native on source %s: %w", lane.Source.Common.WrappedNative.Hex(), err)
 	}
 	return d.String()
 }

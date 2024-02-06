@@ -2,6 +2,7 @@ package validate_test
 
 import (
 	"encoding/json"
+	"math/big"
 	"testing"
 	"time"
 
@@ -736,7 +737,7 @@ priceGetterConfig = """
 	"staticPrices": {
 		"0xec8c353470ccaa4f43067fcde40558e084a12927": {
 			"chainID": "1057",
-			"price": "1000000000000000000"
+			"price": 1000000000000000000
 		}
 	}
 }
@@ -763,7 +764,7 @@ priceGetterConfig = """
 						StaticPrices: map[common.Address]config.StaticPriceConfig{
 							common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"): {
 								ChainID: 1057,
-								Price:   1000000000000000000,
+								Price:   big.NewInt(1000000000000000000),
 							},
 						},
 					},
@@ -806,7 +807,7 @@ priceGetterConfig = """
 	"staticPrices": {
 		"0xec8c353470ccaa4f43067fcde40558e084a12927": {
 			"chainID": "1057",
-			"price": "1000000000000000000"
+			"price": 1000000000000000000
 		}
 	}
 }
