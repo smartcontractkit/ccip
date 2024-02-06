@@ -47,10 +47,5 @@ func (r *Registry) String() string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	cp := make(map[models.NetworkSelector]models.Address, len(r.rebalancers))
-	for k, v := range r.rebalancers {
-		cp[k] = v
-	}
-
-	return fmt.Sprintf("%+v", cp)
+	return fmt.Sprintf("%+v", r.rebalancers)
 }
