@@ -49,24 +49,6 @@ func New(websocket bool, overrideNonce bool) Env {
 			if websocket {
 				env.WSURLs[chainID], _ = GetWS(chainID)
 			}
-			// if overrideNonce {
-			// 	blockNumber, err := client.BlockNumber(context.Background())
-			// 	if err != nil {
-			// 		panic(err)
-			// 	}
-
-			// 	nonce, err := client.NonceAt(context.Background(), env.Transactors[chainID].From, big.NewInt(int64(blockNumber)))
-			// 	if err != nil {
-			// 		panic(err)
-			// 	}
-
-			// 	gasPrice, err := client.SuggestGasPrice(context.Background())
-			// 	if err != nil {
-			// 		panic(err)
-			// 	}
-			// 	env.Transactors[chainID].Nonce = big.NewInt(int64(nonce))
-			// 	env.Transactors[chainID].GasPrice = new(big.Int).Mul(gasPrice, big.NewInt(2))
-			// }
 		}
 	}
 	return env

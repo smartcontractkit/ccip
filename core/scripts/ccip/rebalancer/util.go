@@ -46,7 +46,7 @@ func deployUniverse(
 	l1ChainID, l2ChainID uint64,
 	l1TokenAddress, l2TokenAddress common.Address,
 ) universe {
-	doChecks(env, l1ChainID, l2ChainID, false)
+	validateEnv(env, l1ChainID, l2ChainID, false)
 
 	l1Client, l2Client := env.Clients[l1ChainID], env.Clients[l2ChainID]
 	l1Transactor, l2Transactor := env.Transactors[l1ChainID], env.Transactors[l2ChainID]
@@ -241,7 +241,7 @@ func setConfig(
 	e multienv.Env,
 	args setConfigArgs,
 ) {
-	doChecks(e, args.l1ChainID, args.l2ChainID, false)
+	validateEnv(e, args.l1ChainID, args.l2ChainID, false)
 
 	l1Transactor, l2Transactor := e.Transactors[args.l1ChainID], e.Transactors[args.l2ChainID]
 
@@ -341,7 +341,7 @@ func setConfig(
 	helpers.ConfirmTXMined(context.Background(), e.Clients[args.l1ChainID], tx, int64(args.l1ChainID), "setting OCR3 config on L1 rebalancer")
 }
 
-func doChecks(env multienv.Env, l1ChainID, l2ChainID uint64, websocket bool) {
+func validateEnv(env multienv.Env, l1ChainID, l2ChainID uint64, websocket bool) {
 	_, ok := env.Clients[l1ChainID]
 	if !ok {
 		panic("L1 client not found")

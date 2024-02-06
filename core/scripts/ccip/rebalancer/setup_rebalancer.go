@@ -92,7 +92,7 @@ func setupRebalancerNodes(e multienv.Env) {
 
 	helpers.ParseArgs(fs, os.Args[1:])
 
-	doChecks(e, *l1ChainID, *l2ChainID, true)
+	validateEnv(e, *l1ChainID, *l2ChainID, true)
 
 	transmitterFunding := decimal.RequireFromString(*fundingAmount).BigInt()
 
