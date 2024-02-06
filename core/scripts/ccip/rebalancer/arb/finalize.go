@@ -49,8 +49,8 @@ var (
 //	) external;
 //
 // Arg 0: proof. This takes multiple steps:
-// 1. Get the latest L2 block
-// 2. Call eth_getBlockByHash specifying the latest L2 block hash.
+// 1. Get the latest NodeConfirmed event on L1, which indicates the latest node that was confirmed by the rollup.
+// 2. Call eth_getBlockByHash on L2 specifying the L2 block hash in the NodeConfirmed event.
 // 3. Get the `sendCount` field from the response.
 // 4. Get the `l2ToL1Id` field from the `WithdrawalInitiated` log from the L2 withdrawal tx.
 // 5. Call `constructOutboxProof` on the L2 node interface contract with the `sendCount` as the first argument and `l2ToL1Id` as the second argument.
@@ -154,27 +154,6 @@ func FinalizeL1(
 	// trim first four bytes (function signature)
 	finalizationPayload = finalizationPayload[4:]
 
-	// packed, err := adapterABI.Pack("finalizeWithdrawERC20", common.HexToAddress("0x0"), common.HexToAddress("0x0"), finalizationPayload)
-	// helpers.PanicErr(err)
-
-	// nonce, err := env.Clients[l1ChainID].PendingNonceAt(context.Background(), env.Transactors[l1ChainID].From)
-	// helpers.PanicErr(err)
-
-	// gasPrice, err := env.Clients[l1ChainID].SuggestGasPrice(context.Background())
-	// helpers.PanicErr(err)
-
-	// rawTx := types.NewTx(&types.LegacyTx{
-	// 	Nonce:    nonce,
-	// 	To:       &l1BridgeAdapterAddress,
-	// 	Value:    big.NewInt(0),
-	// 	GasPrice: gasPrice,
-	// 	Gas:      1e6,
-	// 	Data:     packed,
-	// })
-	// signedTx, err := env.Transactors[l1ChainID].Signer(env.Transactors[l1ChainID].From, rawTx)
-	// helpers.PanicErr(err)
-
-	// err = env.Clients[l1ChainID].SendTransaction(context.Background(), signedTx)
 	tx, err := adapter.FinalizeWithdrawERC20(env.Transactors[l1ChainID], common.HexToAddress("0x0"), common.HexToAddress("0x0"), finalizationPayload)
 	helpers.PanicErr(err)
 	helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], tx, int64(l1ChainID))
@@ -194,8 +173,8 @@ func encodeProofToHex(proof [][32]byte) []string {
 // 3. Get the `sendCount` field from the response.
 // 4. Get the `l2ToL1Id` field from the `WithdrawalInitiated` log from the L2 withdrawal tx.
 // 5. Call `constructOutboxProof` on the L2 node interface contract with the `sendCount` as the first argument and `l2ToL1Id` as the second argument.
-// Note that the proof seems to change as the rollup accumulates more blocks, which makes sense. All that matters is that the root is committed
-// to the rollup prior to posting the proof to L1.
+// Note that this may fail, specifically, ConstructOutboxProof. If it does, that means that the L2 batch that has the bridge tx
+// has not yet been committed to L1, and that we should wait and try again.
 func getProof(env multienv.Env, l1ChainID, l2ChainID uint64, l2ToL1Id *big.Int) [][32]byte {
 	l1Client := env.Clients[l1ChainID]
 	latestHeader, err := l1Client.HeaderByNumber(context.Background(), nil)
