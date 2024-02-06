@@ -6,8 +6,8 @@ Data = """
       "Arbitrum Mainnet": {
         "is_native_fee_token": true,
         "fee_token": "0xf97f4df75117a78c1A5a0DBb814Af92458539FB4",
-        "bridge_tokens": [],
-        "bridge_tokens_pools": [],
+        "bridge_tokens": [""],
+        "bridge_tokens_pools": [""],
         "arm": "0xe06b0e8c4bd455153e8794ad7Ea8Ff5A14B64E4b",
         "router": "0x141fa059441E0ca23ce184B6A78bafD2A517DdE8",
         "price_registry": "0x13015e4E6f839E1Aa1016DF521ea458ecA20438c",
@@ -65,8 +65,8 @@ Data = """
       "Avalanche Mainnet": {
           "is_native_fee_token": true,
           "fee_token": "",
-          "bridge_tokens": [],
-          "bridge_tokens_pools": [],
+          "bridge_tokens": [""],
+          "bridge_tokens_pools": [""],
           "arm": "0xdFD6C0dc67666DE3bB36b31eec5c7B1542A82C1E",
           "router": "0xF4c7E640EdA248ef95972845a62bdC74237805dB",
           "price_registry": "0xfA4edD04eaAcDB07c8D73621bc1790eC50D8c489",
@@ -156,8 +156,8 @@ Data = """
       "BSC Mainnet": {
         "is_native_fee_token": true,
         "fee_token": "",
-        "bridge_tokens": [],
-        "bridge_tokens_pools": [],
+        "bridge_tokens": [""],
+        "bridge_tokens_pools": [""],
         "arm": "0x3DB43b96B2625F4232e9Df900d464dd2c64C0021",
         "router": "0x34B03Cb9086d7D758AC55af71584F81A598759FE",
         "price_registry": "0xd64aAbD70A71d9f0A00B99F6EFc1626aA2dD43C7",
@@ -292,8 +292,8 @@ Data = """
       "Kroma Mainnet": {
         "is_native_fee_token": true,
         "fee_token": "0xC1F6f7622ad37C3f46cDF6F8AA0344ADE80BF450",
-        "bridge_tokens": [],
-        "bridge_tokens_pools": [],
+        "bridge_tokens": [""],
+        "bridge_tokens_pools": [""],
         "arm" : "0xB59779d3364BC6d71168245f9ebb96469E5a5a98",
         "router": "0xE93E8B0d1b1CEB44350C8758ed1E2799CCee31aB",
         "price_registry": "0x8155B4710e7bbC90924E957104F94Afd4f95Eca2",
@@ -315,8 +315,8 @@ Data = """
       "Optimism Mainnet": {
         "is_native_fee_token": true,
         "fee_token": "",
-        "bridge_tokens": [],
-        "bridge_tokens_pools": [],
+        "bridge_tokens": [""],
+        "bridge_tokens_pools": [""],
         "arm": "0x8C7C2C3362a42308BB5c368677Ad321D11693b81",
         "router": "0x3206695CaE29952f4b0c22a169725a865bc8Ce0f",
         "price_registry": "0xb52545aECE8C73A97E52a146757EC15b90Ed8488",
@@ -364,9 +364,15 @@ Data = """
       },
       "Polygon Mainnet": {
         "is_native_fee_token": true,
-        "fee_token": "",
-        "bridge_tokens": [],
-        "bridge_tokens_pools": [],
+        "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
+        "bridge_tokens": [
+          "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+          "0xb0897686c545045aFc77CF20eC7A532E3120E0F1"
+        ],
+        "bridge_tokens_pools": [
+          "0x1D40FDe9Ed1F48429e8Ff8a61037075FfCA61739",
+          "0x086892015567fb8764d02c6845C85C25C8FcA389"
+        ],
         "arm": "0xD7AcF65dA1E1f34b663aB199a474F209bF2b0523",
         "router": "0x849c5ED5a80F5B408Dd4969b78c2C8fdf0565Bfe",
         "price_registry": "0x30D873664Ba766C983984C7AF9A921ccE36D34e1",
@@ -374,6 +380,10 @@ Data = """
         "src_contracts": {
           "Avalanche Mainnet": {
             "on_ramp": "0x5FA30697e90eB30954895c45b028F7C0dDD39b12",
+            "deployed_at": 11111111
+          },
+          "Arbitrum Mainnet": {
+            "on_ramp": "0xD16D025330Edb91259EEA8ed499daCd39087c295",
             "deployed_at": 11111111
           },
           "BSC Mainnet": {
@@ -393,6 +403,11 @@ Data = """
           "Avalanche Mainnet": {
             "off_ramp": "0xB9e3680639c9F0C4e0b02FD81C445094426244Ae",
             "commit_store": "0x8c63d4e67f7c4af6FEd2f56A34fB4e01CB807CFF",
+            "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
+          },
+          "Arbitrum Mainnet": {
+            "off_ramp": "0xa8a9eDa2867c2E0CE0d5ECe273961F1EcC3CC25B",
+            "commit_store": "0xbD4480658dca8496a65046dfD1BDD44EF897Bdb5",
             "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
           },
           "BSC Mainnet": {
@@ -457,7 +472,6 @@ NetworkPairs = [
   'OPTIMISM_MAINNET,POLYGON_MAINNET',
   'POLYGON_MAINNET,AVALANCHE_MAINNET'
 ]
-
 MsgType = 'WithoutToken'
 DestGasLimit = 0
 BiDirectionalLane = true
@@ -474,14 +488,14 @@ ExistingEnv = 'mainnet-2.7-ccip1.2'
 [CCIP.Groups.smoke]
 MsgType = 'WithoutToken'
 NetworkPairs = [
-  'POLYGON_MAINNET,ARBITRUM_MAINNET',
-  'ARBITRUM_MAINNET,BSC_MAINNET',
-  'ARBITRUM_MAINNET,OPTIMISM_MAINNET',
+  'POLYGON_MAINNET,ARBITRUM_MAINNET'
+  #'ARBITRUM_MAINNET,BSC_MAINNET',
+  #'ARBITRUM_MAINNET,OPTIMISM_MAINNET'
   #'ETHEREUM_MAINNET,POLYGON_MAINNET',
   #'OPTIMISM_MAINNET,POLYGON_MAINNET',
   #'POLYGON_MAINNET,AVALANCHE_MAINNET'
 ]
-BiDirectionalLane = true
+BiDirectionalLane = false
 DestGasLimit = 0
 PhaseTimeout = '50m'
 LocalCluster = false
