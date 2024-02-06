@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -21,6 +22,32 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 )
+
+type setConfigArgs struct {
+	l1ChainID                               uint64
+	l2ChainID                               uint64
+	l1RebalancerAddress                     common.Address
+	l2RebalancerAddress                     common.Address
+	signers                                 []common.Address
+	offchainPubKeys                         []types.OffchainPublicKey
+	configPubKeys                           []types.ConfigEncryptionPublicKey
+	peerIDs                                 []string
+	l1Transmitters                          []common.Address
+	l2Transmitters                          []common.Address
+	deltaProgress                           time.Duration
+	deltaResend                             time.Duration
+	deltaInitial                            time.Duration
+	deltaRound                              time.Duration
+	deltaGrace                              time.Duration
+	deltaCertifiedCommitRequest             time.Duration
+	deltaStage                              time.Duration
+	rMax                                    uint64
+	maxDurationQuery                        time.Duration
+	maxDurationObservation                  time.Duration
+	maxDurationShouldAcceptAttestedReport   time.Duration
+	maxDurationShouldTransmitAcceptedReport time.Duration
+	f                                       int
+}
 
 func main() {
 	switch os.Args[1] {
@@ -52,6 +79,19 @@ func main() {
 		peerIDs := cmd.String("peer-ids", "", "comma separated list of OCR3 peer IDs")
 		l1Transmitters := cmd.String("l1-transmitters", "", "comma separated list of l1 transmitters")
 		l2Transmitters := cmd.String("l2-transmitters", "", "comma separated list of l2 transmitters")
+		deltaProgress := cmd.Duration("delta-progress", 2*time.Minute, "delta progress")
+		deltaResend := cmd.Duration("delta-resend", 2*time.Minute, "delta resend")
+		deltaInitial := cmd.Duration("delta-initial", 20*time.Second, "delta initial")
+		deltaRound := cmd.Duration("delta-round", 2*time.Second, "delta round")
+		deltaGrace := cmd.Duration("delta-grace", 20*time.Second, "delta grace")
+		deltaCertifiedCommitRequest := cmd.Duration("delta-certified-commit-request", 10*time.Second, "delta certified commit request")
+		deltaStage := cmd.Duration("delta-stage", 10*time.Second, "delta stage")
+		rMax := cmd.Uint64("r-max", 3, "r max")
+		maxDurationQuery := cmd.Duration("max-duration-query", 50*time.Millisecond, "max duration query")
+		maxDurationObservation := cmd.Duration("max-duration-observation", 1*time.Minute, "max duration observation")
+		maxDurationShouldAcceptAttestedReport := cmd.Duration("max-duration-should-accept-attested-report", 1*time.Minute, "max duration should accept attested report")
+		maxDurationShouldTransmitAcceptedReport := cmd.Duration("max-duration-should-transmit-accepted-report", 1*time.Second, "max duration should transmit accepted report")
+		f := cmd.Int("f", 1, "f")
 
 		helpers.ParseArgs(cmd, os.Args[2:],
 			"l1-chain-id",
@@ -65,18 +105,35 @@ func main() {
 			"l2-transmitters",
 		)
 
+		args := setConfigArgs{
+			l1ChainID:                               *l1ChainID,
+			l2ChainID:                               *l2ChainID,
+			l1RebalancerAddress:                     common.HexToAddress(*l1RebalancerAddress),
+			l2RebalancerAddress:                     common.HexToAddress(*l2RebalancerAddress),
+			signers:                                 parseOnchainPubKeys(*signers),
+			offchainPubKeys:                         parseOffchainPubKeys(*offchainPubKeys),
+			configPubKeys:                           parseConfigPubKeys(*configPubKeys),
+			peerIDs:                                 strings.Split(*peerIDs, ","),
+			l1Transmitters:                          helpers.ParseAddressSlice(*l1Transmitters),
+			l2Transmitters:                          helpers.ParseAddressSlice(*l2Transmitters),
+			deltaProgress:                           *deltaProgress,
+			deltaResend:                             *deltaResend,
+			deltaInitial:                            *deltaInitial,
+			deltaRound:                              *deltaRound,
+			deltaGrace:                              *deltaGrace,
+			deltaCertifiedCommitRequest:             *deltaCertifiedCommitRequest,
+			deltaStage:                              *deltaStage,
+			rMax:                                    *rMax,
+			maxDurationQuery:                        *maxDurationQuery,
+			maxDurationObservation:                  *maxDurationObservation,
+			maxDurationShouldAcceptAttestedReport:   *maxDurationShouldAcceptAttestedReport,
+			maxDurationShouldTransmitAcceptedReport: *maxDurationShouldTransmitAcceptedReport,
+			f:                                       *f,
+		}
+
 		setConfig(
 			multienv.New(false, false),
-			*l1ChainID,
-			*l2ChainID,
-			common.HexToAddress(*l1RebalancerAddress),
-			common.HexToAddress(*l2RebalancerAddress),
-			parseOnchainPubKeys(*signers),
-			parseOffchainPubKeys(*offchainPubKeys),
-			parseConfigPubKeys(*configPubKeys),
-			strings.Split(*peerIDs, ","),
-			helpers.ParseAddressSlice(*l1Transmitters),
-			helpers.ParseAddressSlice(*l2Transmitters),
+			args,
 		)
 	case "setup-rebalancer-nodes":
 		setupRebalancerNodes(multienv.New(true, true))

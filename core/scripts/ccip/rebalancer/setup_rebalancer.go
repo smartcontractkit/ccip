@@ -18,7 +18,6 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/arb"
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/bridgeutil"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/cmd"
@@ -70,13 +69,13 @@ ListenAddresses = ["127.0.0.1:8000"]
 
 func setupRebalancerNodes(e multienv.Env) {
 	fs := flag.NewFlagSet("setup-rebalancer-nodes", flag.ExitOnError)
-	l1ChainID := fs.Uint64("l1-chain-id", bridgeutil.SepoliaChainID, "L1 chain ID")
-	l2ChainID := fs.Uint64("l2-chain-id", bridgeutil.ArbitrumSepoliaChainID, "L2 chain ID")
+	l1ChainID := fs.Uint64("l1-chain-id", chainsel.ETHEREUM_TESTNET_SEPOLIA.EvmChainID, "L1 chain ID")
+	l2ChainID := fs.Uint64("l2-chain-id", chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.EvmChainID, "L2 chain ID")
 	l1TokenAddress := fs.String("l1-token-address",
-		arb.ArbitrumContracts[bridgeutil.SepoliaChainID]["WETH"].Hex(),
+		arb.ArbitrumContracts[chainsel.ETHEREUM_TESTNET_SEPOLIA.EvmChainID]["WETH"].Hex(),
 		"L1 token address")
 	l2TokenAddress := fs.String("l2-token-address",
-		arb.ArbitrumContracts[bridgeutil.ArbitrumSepoliaChainID]["WETH"].Hex(),
+		arb.ArbitrumContracts[chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.EvmChainID]["WETH"].Hex(),
 		"L2 token address")
 	apiFile := fs.String("api",
 		"../../../../tools/secrets/apicredentials", "api credentials file")
@@ -92,7 +91,7 @@ func setupRebalancerNodes(e multienv.Env) {
 
 	helpers.ParseArgs(fs, os.Args[1:])
 
-	doChecks(e, *l1ChainID, *l2ChainID, true)
+	validateEnv(e, *l1ChainID, *l2ChainID, true)
 
 	transmitterFunding := decimal.RequireFromString(*fundingAmount).BigInt()
 

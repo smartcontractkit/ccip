@@ -13,8 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
-
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/bridgeutil"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 )
 
 type Env struct {
@@ -34,9 +33,8 @@ func New(websocket bool, overrideNonce bool) Env {
 		WSURLs:      make(map[uint64]string),
 	}
 	for _, chainID := range []uint64{
-		bridgeutil.SepoliaChainID,
-		bridgeutil.ArbitrumSepoliaChainID,
-		bridgeutil.OptimismSepoliaChainID,
+		chainsel.ETHEREUM_TESTNET_SEPOLIA.EvmChainID,
+		chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.EvmChainID,
 	} {
 		client, rpcClient, err := GetClient(chainID, websocket)
 		if err != nil {
@@ -49,24 +47,6 @@ func New(websocket bool, overrideNonce bool) Env {
 			if websocket {
 				env.WSURLs[chainID], _ = GetWS(chainID)
 			}
-			// if overrideNonce {
-			// 	blockNumber, err := client.BlockNumber(context.Background())
-			// 	if err != nil {
-			// 		panic(err)
-			// 	}
-
-			// 	nonce, err := client.NonceAt(context.Background(), env.Transactors[chainID].From, big.NewInt(int64(blockNumber)))
-			// 	if err != nil {
-			// 		panic(err)
-			// 	}
-
-			// 	gasPrice, err := client.SuggestGasPrice(context.Background())
-			// 	if err != nil {
-			// 		panic(err)
-			// 	}
-			// 	env.Transactors[chainID].Nonce = big.NewInt(int64(nonce))
-			// 	env.Transactors[chainID].GasPrice = new(big.Int).Mul(gasPrice, big.NewInt(2))
-			// }
 		}
 	}
 	return env
