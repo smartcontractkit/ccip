@@ -283,7 +283,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
     s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(address(0)), amount, wrongDomain, bytes(""));
   }
 
-  function testPermissionsErrorReverts() public {
+  function testCallerIsNotARampOnRouterReverts() public {
     vm.expectRevert(abi.encodeWithSelector(TokenPool.CallerIsNotARampOnRouter.selector, OWNER));
 
     s_usdcTokenPool.lockOrBurn(OWNER, abi.encodePacked(address(0)), 0, DEST_CHAIN_ID, bytes(""));

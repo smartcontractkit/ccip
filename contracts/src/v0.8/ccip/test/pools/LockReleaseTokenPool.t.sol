@@ -202,8 +202,8 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       chainSelector: SOURCE_CHAIN_ID,
       allowed: false,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
     });
 
     s_lockReleaseTokenPool.applyChainUpdates(chainUpdate);
@@ -423,7 +423,7 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
     );
   }
 
-  function testNonExistentRampReverts() public {
+  function testNonExistentChainReverts() public {
     uint64 wrongChainSelector = 9084102894;
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));

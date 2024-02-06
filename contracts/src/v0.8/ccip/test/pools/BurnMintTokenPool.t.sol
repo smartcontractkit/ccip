@@ -91,7 +91,7 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
     assertEq(s_burnMintERC677.balanceOf(OWNER), before);
   }
 
-  function testPermissionsErrorReverts() public {
+  function testChainNotAllowedReverts() public {
     uint64 wrongChainId = 8838833;
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainId));
     s_pool.releaseOrMint(bytes(""), OWNER, 1, wrongChainId, bytes(""));

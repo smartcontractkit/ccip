@@ -20,7 +20,6 @@ contract LockReleaseTokenPool is TokenPool, ILiquidityContainer, ITypeAndVersion
   error InsufficientLiquidity();
   error LiquidityNotAccepted();
   error Unauthorized(address caller);
-  error CannotSendToZeroAddress();
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "LockReleaseTokenPool 1.4.0-dev";

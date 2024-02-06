@@ -65,7 +65,7 @@ contract BurnFromMintTokenPool_lockOrBurn is BurnFromMintTokenPoolSetup {
     assertEq(s_burnMintERC677.balanceOf(address(s_pool)), before);
   }
 
-  function testPermissionsErrorReverts() public {
+  function testChainNotAllowedReverts() public {
     uint64 wrongChainId = 8838833;
     vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainId));
     s_pool.releaseOrMint(bytes(""), OWNER, 1, wrongChainId, bytes(""));

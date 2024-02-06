@@ -28,6 +28,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   error ChainNotAllowed(uint64 chainSelector);
   error BadARMSignal();
   error ChainAlreadyExists(uint64 chainSelector);
+  error DisabledNonZeroRateLimit(RateLimiter.Config outboundConfig, RateLimiter.Config inboundConfig);
+  error InvalidRatelimitRate(RateLimiter.Config rateLimiterConfig);
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
@@ -147,41 +149,67 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     return chainSelectors;
   }
 
-  /// @notice Sets permissions for all on and chains.
+  /// @notice Sets the permissions for a list of chains selectors. Actual senders for these chains
+  /// need to be allowed on the Router to interact with this pool.
   /// @dev Only callable by the owner
-  /// @param chains A list of chains and their new permission status/rate limits
+  /// @param chains A list of chains and their new permission status & rate limits. Rate limits
+  /// are only used when the chain is being added through `allowed` being true.
   function applyChainUpdates(ChainUpdate[] calldata chains) external virtual onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
       ChainUpdate memory update = chains[i];
       if (update.allowed) {
-        if (s_remoteChainSelectors.add(update.chainSelector)) {
-          s_outboundRateLimits[update.chainSelector] = RateLimiter.TokenBucket({
-            rate: update.outboundRateLimiterConfig.rate,
-            capacity: update.outboundRateLimiterConfig.capacity,
-            tokens: update.outboundRateLimiterConfig.capacity,
-            lastUpdated: uint32(block.timestamp),
-            isEnabled: update.outboundRateLimiterConfig.isEnabled
-          });
-          s_inboundRateLimits[update.chainSelector] = RateLimiter.TokenBucket({
-            rate: update.inboundRateLimiterConfig.rate,
-            capacity: update.inboundRateLimiterConfig.capacity,
-            tokens: update.inboundRateLimiterConfig.capacity,
-            lastUpdated: uint32(block.timestamp),
-            isEnabled: update.inboundRateLimiterConfig.isEnabled
-          });
-          emit ChainAdded(update.chainSelector, update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
-        } else {
+        // If the chain already exists, revert
+        if (!s_remoteChainSelectors.add(update.chainSelector)) {
           revert ChainAlreadyExists(update.chainSelector);
         }
+
+        if (
+          update.outboundRateLimiterConfig.rate >= update.outboundRateLimiterConfig.capacity ||
+          update.outboundRateLimiterConfig.rate == 0
+        ) {
+          revert InvalidRatelimitRate(update.outboundRateLimiterConfig);
+        }
+        s_outboundRateLimits[update.chainSelector] = RateLimiter.TokenBucket({
+          rate: update.outboundRateLimiterConfig.rate,
+          capacity: update.outboundRateLimiterConfig.capacity,
+          tokens: update.outboundRateLimiterConfig.capacity,
+          lastUpdated: uint32(block.timestamp),
+          isEnabled: update.outboundRateLimiterConfig.isEnabled
+        });
+        if (
+          update.inboundRateLimiterConfig.rate >= update.inboundRateLimiterConfig.capacity ||
+          update.inboundRateLimiterConfig.rate == 0
+        ) {
+          revert InvalidRatelimitRate(update.inboundRateLimiterConfig);
+        }
+
+        s_inboundRateLimits[update.chainSelector] = RateLimiter.TokenBucket({
+          rate: update.inboundRateLimiterConfig.rate,
+          capacity: update.inboundRateLimiterConfig.capacity,
+          tokens: update.inboundRateLimiterConfig.capacity,
+          lastUpdated: uint32(block.timestamp),
+          isEnabled: update.inboundRateLimiterConfig.isEnabled
+        });
+        emit ChainAdded(update.chainSelector, update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
       } else {
-        if (s_remoteChainSelectors.remove(update.chainSelector)) {
-          delete s_inboundRateLimits[update.chainSelector];
-          delete s_outboundRateLimits[update.chainSelector];
-          emit ChainRemoved(update.chainSelector);
-        } else {
-          // Cannot remove a non-existent chain.
+        // If the chain doesn't exist, revert
+        if (!s_remoteChainSelectors.remove(update.chainSelector)) {
           revert NonExistentChain(update.chainSelector);
         }
+
+        // Make sure that the rate limits are zero for the chain to be removed.
+        if (
+          update.inboundRateLimiterConfig.rate > 0 ||
+          update.inboundRateLimiterConfig.capacity > 0 ||
+          update.outboundRateLimiterConfig.rate > 0 ||
+          update.outboundRateLimiterConfig.capacity > 0
+        ) {
+          revert DisabledNonZeroRateLimit(update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
+        }
+
+        delete s_inboundRateLimits[update.chainSelector];
+        delete s_outboundRateLimits[update.chainSelector];
+        emit ChainRemoved(update.chainSelector);
       }
     }
   }
@@ -246,7 +274,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned onRamp for the given chain on the Router.
   modifier onlyOnRamp(uint64 remoteChainSelector) {
-    if (!s_remoteChainSelectors.contains(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!(msg.sender == s_router.getOnRamp(remoteChainSelector))) revert CallerIsNotARampOnRouter(msg.sender);
     _;
   }
@@ -254,7 +282,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @notice Checks whether remote chain selector is configured on this contract, and if the msg.sender
   /// is a permissioned offRamp for the given chain on the Router.
   modifier onlyOffRamp(uint64 remoteChainSelector) {
-    if (!s_remoteChainSelectors.contains(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
+    if (!isSupportedChain(remoteChainSelector)) revert ChainNotAllowed(remoteChainSelector);
     if (!s_router.isOffRamp(remoteChainSelector, msg.sender)) revert CallerIsNotARampOnRouter(msg.sender);
     _;
   }

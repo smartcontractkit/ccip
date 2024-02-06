@@ -114,8 +114,8 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     chainRemoves[0] = TokenPool.ChainUpdate({
       chainSelector: strangerChainSelector,
       allowed: false,
-      outboundRateLimiterConfig: outboundRateLimit1,
-      inboundRateLimiterConfig: inboundRateLimit1
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
     });
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, strangerChainSelector));
     s_tokenPool.applyChainUpdates(chainRemoves);
@@ -148,6 +148,108 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     changePrank(STRANGER);
     vm.expectRevert("Only callable by owner");
     s_tokenPool.applyChainUpdates(new TokenPool.ChainUpdate[](0));
+  }
+
+  function testDisabledNonZeroRateLimitReverts() public {
+    RateLimiter.Config memory outboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18});
+    RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12});
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      chainSelector: 1,
+      allowed: true,
+      outboundRateLimiterConfig: outboundRateLimit,
+      inboundRateLimiterConfig: inboundRateLimit
+    });
+
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    chainUpdates[0].allowed = false;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(TokenPool.DisabledNonZeroRateLimit.selector, outboundRateLimit, inboundRateLimit)
+    );
+    s_tokenPool.applyChainUpdates(chainUpdates);
+  }
+
+  function testNonExistentChainReverts() public {
+    RateLimiter.Config memory outboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18});
+    RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12});
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      chainSelector: 1,
+      allowed: false,
+      outboundRateLimiterConfig: outboundRateLimit,
+      inboundRateLimiterConfig: inboundRateLimit
+    });
+
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, chainUpdates[0].chainSelector));
+    s_tokenPool.applyChainUpdates(chainUpdates);
+  }
+
+  function testInvalidRatelimitRateReverts() public {
+    TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
+    chainUpdates[0] = TokenPool.ChainUpdate({
+      chainSelector: 1,
+      allowed: true,
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12})
+    });
+
+    // Outbound
+
+    vm.expectRevert(
+      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
+    );
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    chainUpdates[0].outboundRateLimiterConfig.rate = 100;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
+    );
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    chainUpdates[0].outboundRateLimiterConfig.capacity = 100;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
+    );
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    chainUpdates[0].outboundRateLimiterConfig.capacity = 101;
+
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    // Change the chain selector as adding the same one would revert
+    chainUpdates[0].chainSelector = 2;
+
+    // Inbound
+
+    chainUpdates[0].inboundRateLimiterConfig.capacity = 0;
+    chainUpdates[0].inboundRateLimiterConfig.rate = 0;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
+    );
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    chainUpdates[0].inboundRateLimiterConfig.rate = 100;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
+    );
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    chainUpdates[0].inboundRateLimiterConfig.capacity = 100;
+
+    vm.expectRevert(
+      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
+    );
+    s_tokenPool.applyChainUpdates(chainUpdates);
+
+    chainUpdates[0].inboundRateLimiterConfig.capacity = 101;
+
+    s_tokenPool.applyChainUpdates(chainUpdates);
   }
 }
 
@@ -228,7 +330,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     );
   }
 
-  function testNonExistentRampReverts() public {
+  function testNonExistentChainReverts() public {
     uint64 wrongChainSelector = 9084102894;
 
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, wrongChainSelector));
@@ -294,8 +396,8 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       chainSelector: chainSelector,
       allowed: false,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
     });
 
     vm.startPrank(OWNER);
@@ -382,8 +484,8 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       chainSelector: chainSelector,
       allowed: false,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
     });
 
     vm.startPrank(OWNER);
