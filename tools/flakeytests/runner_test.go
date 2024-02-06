@@ -29,15 +29,15 @@ func newMockReporter() *mockReporter {
 
 func TestParser(t *testing.T) {
 	tableTests := []struct {
-		name          string
-		output        string
-		reportAsserts func(ts map[string]map[string]int)
-		err           error
+		name    string
+		output  string
+		asserts func(ts map[string]map[string]int)
+		err     error
 	}{
 		{
 			name:   "testParser- 01",
 			output: `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
-			reportAsserts: func(ts map[string]map[string]int) {
+			asserts: func(ts map[string]map[string]int) {
 				assert.Len(t, ts, 1)
 				assert.Len(t, ts["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"], 1)
 				assert.Equal(t, ts["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestLink"], 1)
@@ -50,7 +50,7 @@ func TestParser(t *testing.T) {
 -------
 {"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}
 `,
-			reportAsserts: func(ts map[string]map[string]int) {
+			asserts: func(ts map[string]map[string]int) {
 				assert.Len(t, ts, 1)
 				assert.Len(t, ts["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"], 1)
 				assert.Equal(t, ts["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestLink"], 1)
@@ -62,7 +62,7 @@ func TestParser(t *testing.T) {
 			output: `
 {"Time":"2023-09-07T16:01:40.649849+01:00","Action":"output","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestAssets_LinkScanValue","Output":"panic: foo\n"}
 `,
-			reportAsserts: func(ts map[string]map[string]int) {
+			asserts: func(ts map[string]map[string]int) {
 				assert.Len(t, ts, 1)
 				assert.Len(t, ts["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"], 1)
 				assert.Equal(t, ts["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestAssets_LinkScanValue"], 1)
@@ -85,7 +85,7 @@ func TestParser(t *testing.T) {
 {"Time":"2023-09-07T16:22:52.762955+01:00","Action":"output","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Output":"ok  \tgithub.com/smartcontractkit/chainlink/v2/core/assets\t0.206s\n"}
 {"Time":"2023-09-07T16:22:52.765598+01:00","Action":"pass","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Elapsed":0.209}
 `,
-			reportAsserts: func(ts map[string]map[string]int) {
+			asserts: func(ts map[string]map[string]int) {
 				assert.Len(t, ts, 0)
 			},
 			err: nil,
@@ -98,7 +98,7 @@ func TestParser(t *testing.T) {
 			pr, err := parseOutput(r)
 			require.Equal(t, tt.err, err)
 			ts := pr.tests
-			tt.reportAsserts(ts)
+			tt.asserts(ts)
 		})
 	}
 }
@@ -220,49 +220,53 @@ func TestRunner(t *testing.T) {
 }
 
 func TestRunner_AllFailures(t *testing.T) {
-	output := `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`
-
-	rerunOutput := `
+	tableTests := []struct {
+		name        string
+		output      string
+		rerunOutput string
+		asserts     func(m *mockReporter)
+	}{
+		{
+			name:   "all failures",
+			output: `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
+			rerunOutput: `
 	{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}
 	{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}
-	`
-	m := newMockReporter()
-	r := &Runner{
-		numReruns: 2,
-		readers:   []io.Reader{strings.NewReader(output)},
-		testCommand: testAdapter(func(pkg string, testNames []string, w io.Writer) error {
-			_, err := w.Write([]byte(rerunOutput))
-			return err
-		}),
-		parse:    parseOutput,
-		reporter: m,
+	`,
+			asserts: func(m *mockReporter) {
+				assert.Len(t, m.report.tests, 1)
+			},
+		},
+		{
+			name:        "root level test",
+			output:      `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/","Test":"TestConfigDocs","Elapsed":0}`,
+			rerunOutput: ``,
+			asserts: func(m *mockReporter) {
+				_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/"]["TestConfigDocs"]
+				assert.True(t, ok)
+			},
+		},
 	}
 
-	err := r.Run(tests.Context(t))
-	require.NoError(t, err)
-	assert.Len(t, m.report.tests, 0)
-}
+	for _, tt := range tableTests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newMockReporter()
+			r := &Runner{
+				numReruns: 2,
+				readers:   []io.Reader{strings.NewReader(tt.output)},
+				testCommand: testAdapter(func(pkg string, testNames []string, w io.Writer) error {
+					_, err := w.Write([]byte(tt.rerunOutput))
+					return err
+				}),
+				parse:    parseOutput,
+				reporter: m,
+			}
 
-func TestRunner_RootLevelTest(t *testing.T) {
-	output := `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/","Test":"TestConfigDocs","Elapsed":0}`
-
-	rerunOutput := ``
-	m := newMockReporter()
-	r := &Runner{
-		numReruns: 2,
-		readers:   []io.Reader{strings.NewReader(output)},
-		testCommand: testAdapter(func(pkg string, testNames []string, w io.Writer) error {
-			_, err := w.Write([]byte(rerunOutput))
-			return err
-		}),
-		parse:    parseOutput,
-		reporter: m,
+			err := r.Run(tests.Context(t))
+			require.NoError(t, err)
+			tt.asserts(m)
+		})
 	}
-
-	err := r.Run(tests.Context(t))
-	require.NoError(t, err)
-	_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/"]["TestConfigDocs"]
-	assert.True(t, ok)
 }
 
 // Used for integration tests
@@ -366,6 +370,7 @@ func TestIntegration_DealsWithSubtests(t *testing.T) {
 
 			err := r.Run(tests.Context(t))
 			require.NoError(t, err)
+			tt.asserts(m)
 		})
 	}
 }
