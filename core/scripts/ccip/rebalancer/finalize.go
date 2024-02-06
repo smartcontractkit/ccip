@@ -137,7 +137,10 @@ func arbFinalizeL1(
 	adapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(l1BridgeAdapterAddress, env.Clients[l1ChainID])
 	helpers.PanicErr(err)
 
-	finalizationPayload, err := adapter.ExposeForEncoding(nil, arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumFinalizationPayload{
+	adapterABI, err := arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.GetAbi()
+	helpers.PanicErr(err)
+
+	finalizationPayload, err := adapterABI.Pack("exposeForEncoding", arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumFinalizationPayload{
 		Proof:       arg0Proof,
 		Index:       arg1Index,
 		L2Sender:    arg2L2Sender,
@@ -150,32 +153,30 @@ func arbFinalizeL1(
 	})
 	helpers.PanicErr(err)
 
-	adapterABI, err := arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.GetAbi()
-	helpers.PanicErr(err)
+	// packed, err := adapterABI.Pack("finalizeWithdrawERC20", common.HexToAddress("0x0"), common.HexToAddress("0x0"), finalizationPayload)
+	// helpers.PanicErr(err)
 
-	packed, err := adapterABI.Pack("finalizeWithdrawERC20", common.HexToAddress("0x0"), common.HexToAddress("0x0"), finalizationPayload)
-	helpers.PanicErr(err)
+	// nonce, err := env.Clients[l1ChainID].PendingNonceAt(context.Background(), env.Transactors[l1ChainID].From)
+	// helpers.PanicErr(err)
 
-	nonce, err := env.Clients[l1ChainID].PendingNonceAt(context.Background(), env.Transactors[l1ChainID].From)
-	helpers.PanicErr(err)
+	// gasPrice, err := env.Clients[l1ChainID].SuggestGasPrice(context.Background())
+	// helpers.PanicErr(err)
 
-	gasPrice, err := env.Clients[l1ChainID].SuggestGasPrice(context.Background())
-	helpers.PanicErr(err)
+	// rawTx := types.NewTx(&types.LegacyTx{
+	// 	Nonce:    nonce,
+	// 	To:       &l1BridgeAdapterAddress,
+	// 	Value:    big.NewInt(0),
+	// 	GasPrice: gasPrice,
+	// 	Gas:      1e6,
+	// 	Data:     packed,
+	// })
+	// signedTx, err := env.Transactors[l1ChainID].Signer(env.Transactors[l1ChainID].From, rawTx)
+	// helpers.PanicErr(err)
 
-	rawTx := types.NewTx(&types.LegacyTx{
-		Nonce:    nonce,
-		To:       &l1BridgeAdapterAddress,
-		Value:    big.NewInt(0),
-		GasPrice: gasPrice,
-		Gas:      1e6,
-		Data:     packed,
-	})
-	signedTx, err := env.Transactors[l1ChainID].Signer(env.Transactors[l1ChainID].From, rawTx)
+	// err = env.Clients[l1ChainID].SendTransaction(context.Background(), signedTx)
+	tx, err := adapter.FinalizeWithdrawERC20(env.Transactors[l1ChainID], common.HexToAddress("0x0"), common.HexToAddress("0x0"), finalizationPayload)
 	helpers.PanicErr(err)
-
-	err = env.Clients[l1ChainID].SendTransaction(context.Background(), signedTx)
-	helpers.PanicErr(err)
-	helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], signedTx, int64(l1ChainID))
+	helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], tx, int64(l1ChainID))
 }
 
 func encodeProofToHex(proof [][32]byte) []string {

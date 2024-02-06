@@ -127,9 +127,7 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
     bytes data;
   }
 
-  function exposeForEncoding(ArbitrumFinalizationPayload memory payload) public pure returns (bytes memory) {
-    return abi.encode(payload);
-  }
+  function exposeForEncoding(ArbitrumFinalizationPayload memory payload) public pure {}
 
   /// @notice Finalize an L2 -> L1 transfer.
   function finalizeWithdrawERC20(
