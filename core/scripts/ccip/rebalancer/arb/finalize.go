@@ -1,4 +1,4 @@
-package main
+package arb
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/arb"
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	utilsbig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
@@ -64,7 +63,7 @@ var (
 // Arg 6: l2Timestamp. Get the `timestamp` field from the L2ToL1Tx event emitted by ArbSys (0x64).
 // Arg 7: value. Fetch the `value` field from the WithdrawalInitiated log in the L2 tx.
 // Arg 8: data. Fetch the `data` field from the TxToL1 log in the L2 tx.
-func arbFinalizeL1(
+func FinalizeL1(
 	env multienv.Env,
 	l1ChainID uint64,
 	l2ChainID uint64,
@@ -152,6 +151,8 @@ func arbFinalizeL1(
 		Data:        arg8Data,
 	})
 	helpers.PanicErr(err)
+	// trim first four bytes (function signature)
+	finalizationPayload = finalizationPayload[4:]
 
 	// packed, err := adapterABI.Pack("finalizeWithdrawERC20", common.HexToAddress("0x0"), common.HexToAddress("0x0"), finalizationPayload)
 	// helpers.PanicErr(err)
@@ -203,7 +204,7 @@ func getProof(env multienv.Env, l1ChainID, l2ChainID uint64, l2ToL1Id *big.Int) 
 	// 12 seconds per block => 5 * 120 = 600 blocks
 	startBlock := big.NewInt(0).Sub(latestHeader.Number, big.NewInt(600))
 	lgs, err := l1Client.FilterLogs(context.Background(), ethereum.FilterQuery{
-		Addresses: []common.Address{arb.ArbitrumContracts[l1ChainID]["Rollup"]},
+		Addresses: []common.Address{ArbitrumContracts[l1ChainID]["Rollup"]},
 		Topics: [][]common.Hash{{
 			NodeConfirmedTopic,
 		}},

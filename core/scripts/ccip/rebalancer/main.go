@@ -20,6 +20,7 @@ import (
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l2_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 )
 
@@ -216,7 +217,7 @@ func main() {
 
 		env := multienv.New(false, false)
 
-		arbFinalizeL1(
+		arb.FinalizeL1(
 			env,
 			*l1ChainID,
 			*l2ChainID,
@@ -234,6 +235,39 @@ func main() {
 		_, tx, _, err := arbitrum_l1_bridge_adapter.DeployArbitrumL1BridgeAdapter(env.Transactors[*l1ChainID], l2Client, l1GatewayRouter, l1Outbox)
 		helpers.PanicErr(err)
 		helpers.ConfirmContractDeployed(context.Background(), l2Client, tx, int64(*l1ChainID))
+	case "deploy-arb-l2-adapter":
+		cmd := flag.NewFlagSet("deploy-arb-l2-adapter", flag.ExitOnError)
+		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
+		helpers.ParseArgs(cmd, os.Args[2:], "l2-chain-id")
+
+		env := multienv.New(false, false)
+		l2GatewayRouter := arb.ArbitrumContracts[*l2ChainID]["L2GatewayRouter"]
+		l2Client := env.Clients[*l2ChainID]
+		_, tx, _, err := arbitrum_l2_bridge_adapter.DeployArbitrumL2BridgeAdapter(env.Transactors[*l2ChainID], l2Client, l2GatewayRouter)
+		helpers.PanicErr(err)
+		helpers.ConfirmContractDeployed(context.Background(), l2Client, tx, int64(*l2ChainID))
+	case "arb-withdraw-from-l2":
+		cmd := flag.NewFlagSet("arb-withdraw-from-l2", flag.ExitOnError)
+		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
+		l2BridgeAdapterAddress := cmd.String("l2-bridge-adapter-address", "", "L2 Bridge Adapter Address")
+		amount := cmd.String("amount", "1000000000000000000", "Amount")
+		l1ToAddress := cmd.String("l1-to-address", "", "L1 Address")
+		l2TokenAddress := cmd.String("l2-token-address", "", "Token Address")
+		l1TokenAddress := cmd.String("l1-token-address", "", "L1 Token Address")
+
+		helpers.ParseArgs(cmd, os.Args[2:],
+			"l2-chain-id", "l2-bridge-adapter-address", "l1-to-address", "l2-token-address", "l1-token-address")
+
+		env := multienv.New(false, false)
+		arb.WithdrawFromL2(
+			env,
+			*l2ChainID,
+			common.HexToAddress(*l2BridgeAdapterAddress),
+			decimal.RequireFromString(*amount).BigInt(),
+			common.HexToAddress(*l1ToAddress),
+			common.HexToAddress(*l2TokenAddress),
+			common.HexToAddress(*l1TokenAddress),
+		)
 	case "deposit-weth":
 		cmd := flag.NewFlagSet("deposit-weth", flag.ExitOnError)
 		chainID := cmd.Uint64("chain-id", 0, "Chain ID")
