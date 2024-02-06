@@ -238,7 +238,7 @@ func (p *Plugin) Close() error {
 		}
 
 		if err := rb.Close(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("close rebalancer: %w", err))
+			errs = append(errs, fmt.Errorf("close rebalancer (%d, %v): %w", networkID, lmAddr, err))
 			continue
 		}
 	}
