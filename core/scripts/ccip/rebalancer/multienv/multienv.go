@@ -13,8 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
-
-	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/bridgeutil"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 )
 
 type Env struct {
@@ -34,9 +33,8 @@ func New(websocket bool, overrideNonce bool) Env {
 		WSURLs:      make(map[uint64]string),
 	}
 	for _, chainID := range []uint64{
-		bridgeutil.SepoliaChainID,
-		bridgeutil.ArbitrumSepoliaChainID,
-		bridgeutil.OptimismSepoliaChainID,
+		chainsel.ETHEREUM_TESTNET_SEPOLIA.EvmChainID,
+		chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.EvmChainID,
 	} {
 		client, rpcClient, err := GetClient(chainID, websocket)
 		if err != nil {
