@@ -217,6 +217,21 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*OCR2TaskJobSpec, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid job spec params: %w", err)
 	}
+
+	pluginConfig := map[string]interface{}{
+		"offRamp": fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
+	}
+	if params.TokenPricesUSDPipeline != "" {
+		pluginConfig["tokenPricesUSDPipeline"] = fmt.Sprintf(`"""
+%s
+"""`, params.TokenPricesUSDPipeline)
+	}
+	if params.PriceGetterConfig != "" {
+		pluginConfig["priceGetterConfig"] = fmt.Sprintf(`"""
+%s
+"""`, params.PriceGetterConfig)
+	}
+
 	ocrSpec := job.OCR2OracleSpec{
 		Relay:                             relay.EVM,
 		PluginType:                        types.CCIPCommit,
@@ -224,15 +239,7 @@ func (params CCIPJobSpecParams) CommitJobSpec() (*OCR2TaskJobSpec, error) {
 		ContractConfigConfirmations:       1,
 		ContractConfigTrackerPollInterval: models.Interval(20 * time.Second),
 		P2PV2Bootstrappers:                params.P2PV2Bootstrappers,
-		PluginConfig: map[string]interface{}{
-			"offRamp": fmt.Sprintf(`"%s"`, params.OffRamp.Hex()),
-			"tokenPricesUSDPipeline": fmt.Sprintf(`"""
-%s
-"""`, params.TokenPricesUSDPipeline),
-			"priceGetterConfig": fmt.Sprintf(`"""
-%s
-"""`, params.PriceGetterConfig),
-		},
+		PluginConfig:                      pluginConfig,
 		RelayConfig: map[string]interface{}{
 			"chainID": params.DestEvmChainId,
 		},

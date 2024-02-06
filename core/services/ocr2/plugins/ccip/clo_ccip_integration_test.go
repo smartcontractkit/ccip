@@ -2,6 +2,7 @@ package ccip_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
@@ -63,8 +64,8 @@ func Test_CLOSpecApprovalFlow_dynamicPriceGetter(t *testing.T) {
 	require.Equal(t, big.NewInt(50), tmp.RoundId)
 	require.Equal(t, big.NewInt(8000000), tmp.Answer)
 
-	priceGetterConfig := pricegetter.DynamicPriceGetterConfig{
-		AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
+	priceGetterConfig := config.DynamicPriceGetterConfig{
+		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
 			srcLinkAddr: {
 				ChainID:                   ccipTH.Source.ChainID,
 				AggregatorContractAddress: aggSrcLnkAddr,
@@ -78,7 +79,7 @@ func Test_CLOSpecApprovalFlow_dynamicPriceGetter(t *testing.T) {
 				AggregatorContractAddress: aggDstLnkAddr,
 			},
 		},
-		StaticPrices: map[common.Address]pricegetter.StaticPriceConfig{},
+		StaticPrices: map[common.Address]config.StaticPriceConfig{},
 	}
 	priceGetterConfigBytes, err := json.MarshalIndent(priceGetterConfig, "", " ")
 	require.NoError(t, err)
@@ -88,6 +89,8 @@ func Test_CLOSpecApprovalFlow_dynamicPriceGetter(t *testing.T) {
 }
 
 func test_CLOSpecApprovalFlow(t *testing.T, ccipTH integrationtesthelpers.CCIPIntegrationTestHarness, tokenPricesUSDPipeline string, priceGetterConfiguration string) {
+
+	fmt.Printf("===>Running CLO flow with pipeline:\n%v\n===>price getter:\n'%v'\n===>chain ID: %v\n", tokenPricesUSDPipeline, priceGetterConfiguration, ccipTH.Source.ChainID)
 
 	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, priceGetterConfiguration, "http://blah.com")
 	ccipTH.SetupFeedsManager(t)

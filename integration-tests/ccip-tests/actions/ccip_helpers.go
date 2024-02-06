@@ -2516,7 +2516,7 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	}
 	tokenAddresses = append(tokenAddresses, lane.Dest.Common.FeeToken.Address(), lane.Source.Common.WrappedNative.Hex(), lane.Dest.Common.WrappedNative.Hex())
 
-	// TODO only one off pipeline or price getter to be set.
+	// Only one off pipeline or price getter to be set.
 	tokenPricesUSDPipeline := ""
 	tokenPricesConfigJson := ""
 	if withPipeline {

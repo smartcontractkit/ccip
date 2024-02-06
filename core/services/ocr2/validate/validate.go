@@ -301,7 +301,6 @@ func validateOCR2CCIPExecutionSpec(jsonConfig job.JSONConfig) error {
 	if cfg.USDCConfig != (config.USDCConfig{}) {
 		return cfg.USDCConfig.ValidateUSDCConfig()
 	}
-
 	return nil
 }
 
@@ -317,12 +316,12 @@ func validateOCR2CCIPCommitSpec(jsonConfig job.JSONConfig) error {
 
 	// Ensure that either the tokenPricesUSDPipeline or the priceGetterConfig is set, but not both.
 	emptyPipeline := strings.Trim(cfg.TokenPricesUSDPipeline, "\n\t ") == ""
-	emptyPriceGetter := strings.Trim(cfg.PriceGetterConfig, "\n\t ") == ""
+	emptyPriceGetter := cfg.PriceGetterConfig == nil
 	if emptyPipeline && emptyPriceGetter {
 		return fmt.Errorf("either tokenPricesUSDPipeline or priceGetterConfig must be set")
 	}
 	if !emptyPipeline && !emptyPriceGetter {
-		return fmt.Errorf("only one of tokenPricesUSDPipeline or priceGetterConfig must be set: %s and %s", cfg.TokenPricesUSDPipeline, cfg.PriceGetterConfig)
+		return fmt.Errorf("only one of tokenPricesUSDPipeline or priceGetterConfig must be set: %s and %v", cfg.TokenPricesUSDPipeline, cfg.PriceGetterConfig)
 	}
 
 	if !emptyPipeline {
@@ -334,9 +333,6 @@ func validateOCR2CCIPCommitSpec(jsonConfig job.JSONConfig) error {
 		// Validate prices config (like it was done for the pipeline).
 		if emptyPriceGetter {
 			return pkgerrors.New("priceGetterConfig is empty")
-		}
-		if !json.Valid([]byte(cfg.PriceGetterConfig)) {
-			return pkgerrors.New("invalid JSON formatting of priceGetterConfig")
 		}
 	}
 

@@ -122,8 +122,8 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	commitLggr := lggr.Named("CCIPCommit").With("sourceChain", sourceChainName, "destChain", destChainName)
 
 	var priceGetter pricegetter.PriceGetter
-	emptyPipeline := strings.Trim(params.pluginConfig.TokenPricesUSDPipeline, "\n\t ") == ""
-	if !emptyPipeline {
+	withPipeline := strings.Trim(params.pluginConfig.TokenPricesUSDPipeline, "\n\t ") != ""
+	if withPipeline {
 		priceGetter, err = pricegetter.NewPipelineGetter(params.pluginConfig.TokenPricesUSDPipeline, pr, jb.ID, jb.ExternalJobID, jb.Name.ValueOrZero(), lggr)
 		if err != nil {
 			return nil, nil, fmt.Errorf("creating pipeline price getter: %w", err)
@@ -146,13 +146,12 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			params.sourceChain.ID().Uint64(): pricegetter.NewDynamicPriceGetterClient(srcCaller, params.sourceChain.LogPoller()),
 			params.destChain.ID().Uint64():   pricegetter.NewDynamicPriceGetterClient(dstCaller, params.destChain.LogPoller()),
 		}
-		priceGetterConfig, err2 := pricegetter.NewDynamicPriceGetterConfig(params.pluginConfig.PriceGetterConfig)
-		if err2 != nil {
-			return nil, nil, fmt.Errorf("creating dynamic price getter config: %w", err2)
+		if params.pluginConfig.PriceGetterConfig == nil {
+			return nil, nil, fmt.Errorf("priceGetterConfig is nil")
 		}
-		priceGetter, err2 = pricegetter.NewDynamicPriceGetter(priceGetterConfig, priceGetterClients)
-		if err2 != nil {
-			return nil, nil, fmt.Errorf("creating dynamic price getter: %w", err2)
+		priceGetter, err = pricegetter.NewDynamicPriceGetter(*params.pluginConfig.PriceGetterConfig, priceGetterClients)
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating dynamic price getter: %w", err)
 		}
 	}
 

@@ -14,12 +14,13 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
 )
 
 type testParameters struct {
-	cfg                          DynamicPriceGetterConfig
+	cfg                          config.DynamicPriceGetterConfig
 	evmClients                   map[uint64]DynamicPriceGetterClient
 	expectedTokenPrices          map[common.Address]big.Int
 	invalidConfigErrorExpected   bool
@@ -86,8 +87,8 @@ func TestDynamicPriceGetter(t *testing.T) {
 func testParamAggregatorOnly(t *testing.T) testParameters {
 	tk1 := utils.RandomAddress()
 	tk2 := utils.RandomAddress()
-	cfg := DynamicPriceGetterConfig{
-		AggregatorPrices: map[common.Address]AggregatorPriceConfig{
+	cfg := config.DynamicPriceGetterConfig{
+		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
 			tk1: {
 				ChainID:                   101,
 				AggregatorContractAddress: utils.RandomAddress(),
@@ -97,7 +98,7 @@ func testParamAggregatorOnly(t *testing.T) testParameters {
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
-		StaticPrices: map[common.Address]StaticPriceConfig{},
+		StaticPrices: map[common.Address]config.StaticPriceConfig{},
 	}
 	// Real LINK/USD example from OP.
 	round1 := aggregator_v3_interface.LatestRoundData{
@@ -135,9 +136,9 @@ func testParamStaticOnly() testParameters {
 	tk1 := utils.RandomAddress()
 	tk2 := utils.RandomAddress()
 	tk3 := utils.RandomAddress()
-	cfg := DynamicPriceGetterConfig{
-		AggregatorPrices: map[common.Address]AggregatorPriceConfig{},
-		StaticPrices: map[common.Address]StaticPriceConfig{
+	cfg := config.DynamicPriceGetterConfig{
+		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{},
+		StaticPrices: map[common.Address]config.StaticPriceConfig{
 			tk1: {
 				ChainID: 101,
 				Price:   1_234_000,
@@ -170,8 +171,8 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 	tk1 := utils.RandomAddress()
 	tk2 := utils.RandomAddress()
 	tk3 := utils.RandomAddress()
-	cfg := DynamicPriceGetterConfig{
-		AggregatorPrices: map[common.Address]AggregatorPriceConfig{
+	cfg := config.DynamicPriceGetterConfig{
+		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
 			tk1: {
 				ChainID:                   101,
 				AggregatorContractAddress: utils.RandomAddress(),
@@ -181,7 +182,7 @@ func testParamAggregatorAndStaticValid(t *testing.T) testParameters {
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
-		StaticPrices: map[common.Address]StaticPriceConfig{
+		StaticPrices: map[common.Address]config.StaticPriceConfig{
 			tk3: {
 				ChainID: 103,
 				Price:   1_234_000,
@@ -224,8 +225,8 @@ func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
 	tk1 := utils.RandomAddress()
 	tk2 := utils.RandomAddress()
 	tk3 := utils.RandomAddress()
-	cfg := DynamicPriceGetterConfig{
-		AggregatorPrices: map[common.Address]AggregatorPriceConfig{
+	cfg := config.DynamicPriceGetterConfig{
+		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
 			tk1: {
 				ChainID:                   101,
 				AggregatorContractAddress: utils.RandomAddress(),
@@ -239,7 +240,7 @@ func testParamAggregatorAndStaticTokenCollision(t *testing.T) testParameters {
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
-		StaticPrices: map[common.Address]StaticPriceConfig{
+		StaticPrices: map[common.Address]config.StaticPriceConfig{
 			tk3: {
 				ChainID: 103,
 				Price:   1_234_000,
@@ -286,8 +287,8 @@ func testParamNoAggregatorForToken(t *testing.T) testParameters {
 	tk2 := utils.RandomAddress()
 	tk3 := utils.RandomAddress()
 	tk4 := utils.RandomAddress()
-	cfg := DynamicPriceGetterConfig{
-		AggregatorPrices: map[common.Address]AggregatorPriceConfig{
+	cfg := config.DynamicPriceGetterConfig{
+		AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
 			tk1: {
 				ChainID:                   101,
 				AggregatorContractAddress: utils.RandomAddress(),
@@ -297,7 +298,7 @@ func testParamNoAggregatorForToken(t *testing.T) testParameters {
 				AggregatorContractAddress: utils.RandomAddress(),
 			},
 		},
-		StaticPrices: map[common.Address]StaticPriceConfig{
+		StaticPrices: map[common.Address]config.StaticPriceConfig{
 			tk3: {
 				ChainID: 103,
 				Price:   1_234_000,

@@ -9,11 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 )
 
 func TestCommitConfig(t *testing.T) {
-
 	tests := []struct {
 		name                    string
 		cfg                     CommitPluginJobSpecConfig
@@ -26,58 +24,26 @@ func TestCommitConfig(t *testing.T) {
 				DestStartBlock:         333,
 				OffRamp:                common.HexToAddress("0x123"),
 				TokenPricesUSDPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
-				PriceGetterConfig: `
-				{
-					"aggregatorPrices": {
-					 "0x0820c05e1fba1244763a494a52272170c321cad3": {
-					  "chainID": "1000",
-					  "contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
-					 },
-					 "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
-					  "chainID": "1337",
-					  "contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
-					 }
+				PriceGetterConfig: &DynamicPriceGetterConfig{
+					AggregatorPrices: map[common.Address]AggregatorPriceConfig{
+						common.HexToAddress("0x0820c05e1fba1244763a494a52272170c321cad3"): {
+							ChainID:                   1000,
+							AggregatorContractAddress: common.HexToAddress("0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"),
+						},
+						common.HexToAddress("0x4a98bb4d65347016a7ab6f85bea24b129c9a1272"): {
+							ChainID:                   1337,
+							AggregatorContractAddress: common.HexToAddress("0xb80244cc8b0bb18db071c150b36e9bcb8310b236"),
+						},
 					},
-					"staticPrices": {
-						"0xec8c353470ccaa4f43067fcde40558e084a12927": {
-							"chainID": "1057",
-							"price": "1000000000000000000"
-						}
-					}
-				}
-				`,
+					StaticPrices: map[common.Address]StaticPriceConfig{
+						common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"): {
+							ChainID: 1057,
+							Price:   1000000000000000000,
+						},
+					},
+				},
 			},
 			expectedValidationError: nil,
-		},
-		{
-			name: "invalid chainID format",
-			cfg: CommitPluginJobSpecConfig{
-				SourceStartBlock:       222,
-				DestStartBlock:         333,
-				OffRamp:                common.HexToAddress("0x123"),
-				TokenPricesUSDPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
-				PriceGetterConfig: `
-				{
-					"aggregatorPrices": {
-					 "0x0820c05e1fba1244763a494a52272170c321cad3": {
-					  "chainID": "1000",
-					  "contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
-					 },
-					 "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
-					  "chainID": "1337",
-					  "contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
-					 }
-					},
-					"staticPrices": {
-						"0xec8c353470ccaa4f43067fcde40558e084a12927": {
-							"chainID": 1057,
-							"price": "1000000000000000000"
-						}
-					}
-				}
-				`,
-			},
-			expectedValidationError: fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal unquoted value into uint64"),
 		},
 		{
 			name: "missing dynamic aggregator contract address",
@@ -86,71 +52,72 @@ func TestCommitConfig(t *testing.T) {
 				DestStartBlock:         333,
 				OffRamp:                common.HexToAddress("0x123"),
 				TokenPricesUSDPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
-				PriceGetterConfig: `
-				{
-					"aggregatorPrices": {
-					 "0x0820c05e1fba1244763a494a52272170c321cad3": {
-					  "chainID": "1000",
-					  "contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
-					 },
-					 "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
-					  "chainID": "1337",
-					  "contractAddress": ""
-					 }
+				PriceGetterConfig: &DynamicPriceGetterConfig{
+					AggregatorPrices: map[common.Address]AggregatorPriceConfig{
+						common.HexToAddress("0x0820c05e1fba1244763a494a52272170c321cad3"): {
+							ChainID:                   1000,
+							AggregatorContractAddress: common.HexToAddress("0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"),
+						},
+						common.HexToAddress("0x4a98bb4d65347016a7ab6f85bea24b129c9a1272"): {
+							ChainID:                   1337,
+							AggregatorContractAddress: common.HexToAddress(""),
+						},
 					},
-					"staticPrices": {
-						"0xec8c353470ccaa4f43067fcde40558e084a12927": {
-							"chainID": "1057",
-							"price": "1000000000000000000"
-						}
-					}
-				}
-				`,
+					StaticPrices: map[common.Address]StaticPriceConfig{
+						common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"): {
+							ChainID: 1057,
+							Price:   1000000000000000000,
+						},
+					},
+				},
 			},
-			expectedValidationError: fmt.Errorf("hex string has length 0, want 40 for common.Address"),
+			expectedValidationError: fmt.Errorf("aggregator contract address is zero"),
 		},
 		{
-			name: "missing static price",
+			name: "missing chain ID",
 			cfg: CommitPluginJobSpecConfig{
 				SourceStartBlock:       222,
 				DestStartBlock:         333,
 				OffRamp:                common.HexToAddress("0x123"),
 				TokenPricesUSDPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
-				PriceGetterConfig: `
-				{
-					"aggregatorPrices": {
-					 "0x0820c05e1fba1244763a494a52272170c321cad3": {
-					  "chainID": "1000",
-					  "contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
-					 },
-					 "0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
-					  "chainID": "1337",
-					  "contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
-					 }
+				PriceGetterConfig: &DynamicPriceGetterConfig{
+					AggregatorPrices: map[common.Address]AggregatorPriceConfig{
+						common.HexToAddress("0x0820c05e1fba1244763a494a52272170c321cad3"): {
+							ChainID:                   1000,
+							AggregatorContractAddress: common.HexToAddress("0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"),
+						},
+						common.HexToAddress("0x4a98bb4d65347016a7ab6f85bea24b129c9a1272"): {
+							ChainID:                   1337,
+							AggregatorContractAddress: common.HexToAddress("0xb80244cc8b0bb18db071c150b36e9bcb8310b236"),
+						},
 					},
-					"staticPrices": {
-						"0xec8c353470ccaa4f43067fcde40558e084a12927": {
-							"chainID": "1057",
-							"price": ""
-						}
-					}
-				}
-				`,
+					StaticPrices: map[common.Address]StaticPriceConfig{
+						common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"): {
+							ChainID: 0,
+							Price:   1000000000000000000,
+						},
+					},
+				},
 			},
-			expectedValidationError: fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal \"\" into uint64"),
+			expectedValidationError: fmt.Errorf("chain id is zero"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			// Verify proper marshall/unmarshalling of the config.
 			bts, err := json.Marshal(test.cfg)
 			require.NoError(t, err)
 			parsedConfig := CommitPluginJobSpecConfig{}
 			require.NoError(t, json.Unmarshal(bts, &parsedConfig))
 			require.Equal(t, test.cfg, parsedConfig)
 
+			// FIXME TMP display json formatted config
+			fmt.Println(string(bts))
+
 			// Ensure correctness of price getter configuration.
-			pgc, err := pricegetter.NewDynamicPriceGetterConfig(test.cfg.PriceGetterConfig)
+			pgc := test.cfg.PriceGetterConfig
+			err = pgc.Validate()
 			if test.expectedValidationError != nil {
 				require.ErrorContains(t, err, test.expectedValidationError.Error())
 			} else {
@@ -246,4 +213,32 @@ func TestUSDCValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnmarshallDynamicPriceConfig(t *testing.T) {
+	jsonCfg := `
+{
+	"aggregatorPrices": {
+		"0x0820c05e1fba1244763a494a52272170c321cad3": {
+			"chainID": "1000",
+			"contractAddress": "0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"
+		},
+		"0x4a98bb4d65347016a7ab6f85bea24b129c9a1272": {
+			"chainID": "1337",
+			"contractAddress": "0xb80244cc8b0bb18db071c150b36e9bcb8310b236"
+		}
+	},
+	"staticPrices": {
+		"0xec8c353470ccaa4f43067fcde40558e084a12927": {
+			"chainID": "1057",
+			"price": "1000000000000000000"
+		}
+	}
+}
+`
+	var cfg DynamicPriceGetterConfig
+	err := json.Unmarshal([]byte(jsonCfg), &cfg)
+	require.NoError(t, err)
+	err = cfg.Validate()
+	require.NoError(t, err)
 }

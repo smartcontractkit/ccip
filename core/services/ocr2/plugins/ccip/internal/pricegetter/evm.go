@@ -11,29 +11,23 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/gethwrappers2/generated/offchainaggregator"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const latestRoundDataMethodName = "latestRoundData"
 
-// AggregatorPriceConfig specifies a price retrieved from an aggregator contract.
-type AggregatorPriceConfig struct {
-	ChainID                   uint64         `json:"chainID,string"`
-	AggregatorContractAddress common.Address `json:"contractAddress"`
-}
-
-// StaticPriceConfig specifies a price defined statically.
-type StaticPriceConfig struct {
-	ChainID uint64 `json:"chainID,string"`
-	Price   uint64 `json:"price,string"`
-}
-
-type DynamicPriceGetterConfig struct {
-	AggregatorPrices map[common.Address]AggregatorPriceConfig `json:"aggregatorPrices"`
-	StaticPrices     map[common.Address]StaticPriceConfig     `json:"staticPrices"`
+func init() {
+	// Ensure existence of latestRoundData method on the Aggregator contract.
+	aggregatorABI, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
+	if err != nil {
+		panic(err)
+	}
+	if _, ok := aggregatorABI.Methods[latestRoundDataMethodName]; !ok {
+		panic(fmt.Errorf("%s method not found on abi: %+v", latestRoundDataMethodName, aggregatorABI.Methods))
+	}
 }
 
 type DynamicPriceGetterClient struct {
@@ -49,62 +43,29 @@ func NewDynamicPriceGetterClient(batchCaller rpclib.EvmBatchCaller, lp logpoller
 }
 
 type DynamicPriceGetter struct {
-	cfg           DynamicPriceGetterConfig
+	cfg           config.DynamicPriceGetterConfig
 	evmClients    map[uint64]DynamicPriceGetterClient
 	aggregatorAbi abi.ABI
 }
 
-func NewDynamicPriceGetterConfig(configJson string) (DynamicPriceGetterConfig, error) {
-	priceGetterConfig := DynamicPriceGetterConfig{}
+func NewDynamicPriceGetterConfig(configJson string) (config.DynamicPriceGetterConfig, error) {
+	priceGetterConfig := config.DynamicPriceGetterConfig{}
 	err := json.Unmarshal([]byte(configJson), &priceGetterConfig)
 	if err != nil {
-		return DynamicPriceGetterConfig{}, fmt.Errorf("parse dynamic price getter config: %w", err)
+		return config.DynamicPriceGetterConfig{}, fmt.Errorf("parse dynamic price getter config: %w", err)
 	}
 	err = priceGetterConfig.Validate()
 	if err != nil {
-		return DynamicPriceGetterConfig{}, fmt.Errorf("validate price getter config: %w", err)
+		return config.DynamicPriceGetterConfig{}, fmt.Errorf("validate price getter config: %w", err)
 	}
 	return priceGetterConfig, nil
 }
 
-func (c *DynamicPriceGetterConfig) Validate() error {
-	for addr, v := range c.AggregatorPrices {
-		if addr == utils.ZeroAddress {
-			return fmt.Errorf("token address is zero")
-		}
-		if v.AggregatorContractAddress == utils.ZeroAddress {
-			return fmt.Errorf("aggregator contract address is zero")
-		}
-		if v.ChainID == 0 {
-			return fmt.Errorf("chain id is zero")
-		}
-	}
-
-	for addr, v := range c.StaticPrices {
-		if addr == utils.ZeroAddress {
-			return fmt.Errorf("token address is zero")
-		}
-		if v.ChainID == 0 {
-			return fmt.Errorf("chain id is zero")
-		}
-	}
-
-	// Ensure no duplication in token price resolution rules.
-	if c.AggregatorPrices != nil && c.StaticPrices != nil {
-		for tk := range c.AggregatorPrices {
-			if _, exists := c.StaticPrices[tk]; exists {
-				return fmt.Errorf("token %s defined in both aggregator and static price rules", tk.Hex())
-			}
-		}
-	}
-	return nil
-}
-
 // NewDynamicPriceGetter build a DynamicPriceGetter from a configuration and a map of chain ID to batch callers.
 // A batch caller should be provided for all retrieved prices.
-func NewDynamicPriceGetter(cfg DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient) (*DynamicPriceGetter, error) {
+func NewDynamicPriceGetter(cfg config.DynamicPriceGetterConfig, evmClients map[uint64]DynamicPriceGetterClient) (*DynamicPriceGetter, error) {
 	if err := cfg.Validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validating dynamic price getter config: %w", err)
 	}
 	aggregatorAbi, err := abi.JSON(strings.NewReader(offchainaggregator.OffchainAggregatorABI))
 	if err != nil {

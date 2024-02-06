@@ -17,9 +17,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/mock_v3_aggregator_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	integrationtesthelpers "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers/integration"
 )
@@ -80,8 +80,8 @@ func TestIntegration_CCIP(t *testing.T) {
 				require.NoError(t, err)
 				ccipTH.Dest.Chain.Commit()
 
-				priceGetterConfig := pricegetter.DynamicPriceGetterConfig{
-					AggregatorPrices: map[common.Address]pricegetter.AggregatorPriceConfig{
+				priceGetterConfig := config.DynamicPriceGetterConfig{
+					AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
 						ccipTH.Source.LinkToken.Address(): {
 							ChainID:                   ccipTH.Source.ChainID,
 							AggregatorContractAddress: aggSrcLnkAddr,
@@ -95,7 +95,7 @@ func TestIntegration_CCIP(t *testing.T) {
 							AggregatorContractAddress: aggDstLnkAddr,
 						},
 					},
-					StaticPrices: map[common.Address]pricegetter.StaticPriceConfig{},
+					StaticPrices: map[common.Address]config.StaticPriceConfig{},
 				}
 				priceGetterConfigBytes, err := json.MarshalIndent(priceGetterConfig, "", " ")
 				require.NoError(t, err)

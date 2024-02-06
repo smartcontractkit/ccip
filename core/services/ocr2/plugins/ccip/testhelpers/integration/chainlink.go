@@ -101,7 +101,7 @@ const (
 	    SourceTokenAddress = "%s"
 		AttestationAPITimeoutSeconds = 10
 	`
-	commitSpecTemplate = `
+	commitSpecTemplatePipeline = `
 		type = "offchainreporting2"
 		schemaVersion = 1
 		name = "ccip-commit-1"
@@ -125,6 +125,28 @@ const (
 		tokenPricesUSDPipeline = """
 		%s
 		"""
+	`
+	commitSpecTemplateDynamicPriceGetter = `
+		type = "offchainreporting2"
+		schemaVersion = 1
+		name = "ccip-commit-1"
+		externalJobID = "13c997cf-1a14-4ab7-9068-07ee6d2afa55"
+		forwardingAllowed = false
+		maxTaskDuration = "0s"
+		contractID = "%s"
+		contractConfigConfirmations = 1
+		contractConfigTrackerPollInterval = "20s"
+		ocrKeyBundleID = "%s"
+		relay = "evm"
+		pluginType = "ccip-commit"
+		transmitterID = "%s"
+
+		[relayConfig]
+		chainID = 1_337
+
+		[pluginConfig]
+		destStartBlock = 50
+		offRamp = "%s"
 		priceGetterConfig = """
 		%s
 		"""
@@ -635,18 +657,32 @@ func (c *CCIPIntegrationTestHarness) ApproveJobSpecs(t *testing.T, jobParams CCI
 		err = f.ApproveSpec(ctx, execId, true)
 		require.NoError(t, err)
 
-		commitSpec := c.jobSpecProposal(
-			t,
-			commitSpecTemplate,
-			jobParams.CommitJobSpec,
-			managers[0].ID,
-			2,
-			node.KeyBundle.ID(),
-			node.Transmitter.Hex(),
-			jobParams.OffRamp.String(),
-			jobParams.TokenPricesUSDPipeline,
-			jobParams.PriceGetterConfig,
-		)
+		var commitSpec feeds2.ProposeJobArgs
+		if jobParams.TokenPricesUSDPipeline != "" {
+			commitSpec = c.jobSpecProposal(
+				t,
+				commitSpecTemplatePipeline,
+				jobParams.CommitJobSpec,
+				managers[0].ID,
+				2,
+				node.KeyBundle.ID(),
+				node.Transmitter.Hex(),
+				jobParams.OffRamp.String(),
+				jobParams.TokenPricesUSDPipeline,
+			)
+		} else {
+			commitSpec = c.jobSpecProposal(
+				t,
+				commitSpecTemplateDynamicPriceGetter,
+				jobParams.CommitJobSpec,
+				managers[0].ID,
+				2,
+				node.KeyBundle.ID(),
+				node.Transmitter.Hex(),
+				jobParams.OffRamp.String(),
+				jobParams.PriceGetterConfig,
+			)
+		}
 
 		commitId, err := f.ProposeJob(ctx, &commitSpec)
 		require.NoError(t, err)
