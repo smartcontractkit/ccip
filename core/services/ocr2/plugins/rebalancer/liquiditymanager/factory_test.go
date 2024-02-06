@@ -7,11 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
 func TestNewBaseLiquidityManagerFactory(t *testing.T) {
+	lggr := logger.TestLogger(t)
 	net1 := models.NetworkSelector(1)
 	addr1 := models.Address(utils.RandomAddress())
 	net2 := models.NetworkSelector(2)
@@ -19,19 +22,19 @@ func TestNewBaseLiquidityManagerFactory(t *testing.T) {
 	t.Run("base constructor test", func(t *testing.T) {
 		lp1 := mocks.NewLogPoller(t)
 		lp2 := mocks.NewLogPoller(t)
-		lmf := NewBaseRebalancerFactory(WithEvmDep(net1, lp1, nil), WithEvmDep(net2, lp2, nil))
+		lmf := NewBaseRebalancerFactory(lggr, WithEvmDep(net1, lp1, nil), WithEvmDep(net2, lp2, nil))
 		assert.Len(t, lmf.evmDeps, 2)
 	})
 
 	t.Run("wrong cached type", func(t *testing.T) {
-		lmf := NewBaseRebalancerFactory()
+		lmf := NewBaseRebalancerFactory(lggr)
 		lmf.cachedRebalancers.Store(lmf.cacheKey(net1, addr1), 1234)
 		_, err := lmf.GetRebalancer(net1, addr1)
 		assert.Equal(t, ErrInternalCacheIssue, err)
 	})
 
 	t.Run("get from cache", func(t *testing.T) {
-		lmf := NewBaseRebalancerFactory()
+		lmf := NewBaseRebalancerFactory(lggr)
 		evmRb := &EvmRebalancer{}
 		var rb Rebalancer = evmRb
 		lmf.cachedRebalancers.Store(lmf.cacheKey(net1, addr1), rb)
@@ -40,7 +43,7 @@ func TestNewBaseLiquidityManagerFactory(t *testing.T) {
 	})
 
 	t.Run("cache key", func(t *testing.T) {
-		lmf := NewBaseRebalancerFactory()
+		lmf := NewBaseRebalancerFactory(lggr)
 		net1 := models.NetworkSelector(1)
 		addr1 := models.Address(common.HexToAddress("0x000000000000000000000000000000000000dEaD"))
 		assert.Equal(t, "rebalancer-1-0x000000000000000000000000000000000000dEaD", lmf.cacheKey(net1, addr1))
