@@ -109,12 +109,12 @@ func (t testAdapter) test(pkg string, tests []string, out io.Writer) error {
 	return t(pkg, tests, out)
 }
 
-func TestRunner_WithFlake(t *testing.T) {
+func TestRunner(t *testing.T) {
 	tableTests := []struct {
 		name          string
 		initialOutput []string
 		outputs       []string
-		asserts       func(m *mockReporter)
+		asserts       func(m *mockReporter, j int)
 	}{
 		{
 			name:          "testRunner with flake",
@@ -123,7 +123,7 @@ func TestRunner_WithFlake(t *testing.T) {
 				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
 				``,
 			},
-			asserts: func(m *mockReporter) {
+			asserts: func(m *mockReporter, j int) {
 				assert.Len(t, m.report.tests, 1)
 				_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestLink"]
 				assert.True(t, ok)
@@ -141,7 +141,7 @@ func TestRunner_WithFlake(t *testing.T) {
 `,
 				``,
 			},
-			asserts: func(m *mockReporter) {
+			asserts: func(m *mockReporter, j int) {
 				assert.Len(t, m.report.tests, 1)
 				_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestLink"]
 				assert.True(t, ok)
@@ -154,21 +154,39 @@ func TestRunner_WithFlake(t *testing.T) {
 				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
 				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"pass","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
 			},
-			asserts: func(m *mockReporter) {
+			asserts: func(m *mockReporter, j int) {
 				_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestLink"]
 				assert.True(t, ok)
 			},
 		},
 		{
-			name:          "testRunner root level test",
+			name:          "testRunner rerun fails with non zero exit code",
 			initialOutput: []string{`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`},
 			outputs: []string{
 				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
 				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"pass","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
 			},
-			asserts: func(m *mockReporter) {
+			asserts: func(m *mockReporter, j int) {
 				_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestLink"]
 				assert.True(t, ok)
+			},
+		},
+		{
+			name: "testRunner rerun with non zero exit code does not stop command",
+			initialOutput: []string{
+				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
+				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/services/vrf/v2","Test":"TestMaybeReservedLinkV2","Elapsed":0}`,
+			},
+			outputs: []string{
+				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
+				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"pass","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
+				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/services/vrf/v2","Test":"TestMaybeReservedLinkV2","Elapsed":0}`,
+				`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/services/vrf/v2","Test":"TestMaybeReservedLinkV2","Elapsed":0}`,
+			},
+			asserts: func(m *mockReporter, j int) {
+				_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestLink"]
+				assert.True(t, ok)
+				assert.Equal(t, 4, j)
 			},
 		},
 	}
@@ -196,7 +214,7 @@ func TestRunner_WithFlake(t *testing.T) {
 			// to only report one failure (not two as expected).
 			err := r.Run(tests.Context(t))
 			require.NoError(t, err)
-			tt.asserts(m)
+			tt.asserts(m, j)
 		})
 	}
 }
@@ -247,73 +265,6 @@ func TestRunner_RootLevelTest(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func TestRunner_RerunFailsWithNonzeroExitCode(t *testing.T) {
-	output := `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`
-
-	rerunOutputs := []string{
-		`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
-		`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"pass","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
-	}
-	m := newMockReporter()
-	i := 0
-	r := &Runner{
-		numReruns: 2,
-		readers:   []io.Reader{strings.NewReader(output)},
-		testCommand: testAdapter(func(pkg string, testNames []string, w io.Writer) error {
-			_, err := w.Write([]byte(rerunOutputs[i]))
-			i++
-			return err
-		}),
-		parse:    parseOutput,
-		reporter: m,
-	}
-
-	err := r.Run(tests.Context(t))
-	require.NoError(t, err)
-	_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestLink"]
-	assert.True(t, ok)
-}
-
-func TestRunner_RerunWithNonZeroExitCodeDoesntStopCommand(t *testing.T) {
-	outputs := []io.Reader{
-		strings.NewReader(`
-{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}
-`),
-		strings.NewReader(`
-{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/services/vrf/v2","Test":"TestMaybeReservedLinkV2","Elapsed":0}
-`),
-	}
-
-	rerunOutputs := []string{
-		`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
-		`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"pass","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
-		`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/services/vrf/v2","Test":"TestMaybeReservedLinkV2","Elapsed":0}`,
-		`{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/services/vrf/v2","Test":"TestMaybeReservedLinkV2","Elapsed":0}`,
-	}
-
-	index := 0
-	m := newMockReporter()
-	r := &Runner{
-		numReruns: 2,
-		readers:   outputs,
-		testCommand: testAdapter(func(pkg string, testNames []string, w io.Writer) error {
-			_, err := w.Write([]byte(rerunOutputs[index]))
-			index++
-			return err
-		}),
-		parse:    parseOutput,
-		reporter: m,
-	}
-
-	err := r.Run(tests.Context(t))
-	require.NoError(t, err)
-	calls := index
-	assert.Equal(t, 4, calls)
-
-	_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"]["TestLink"]
-	assert.True(t, ok)
-}
-
 // Used for integration tests
 func TestSkippedForTests_Subtests(t *testing.T) {
 	if os.Getenv("FLAKEY_TEST_RUNNER_RUN_FIXTURE_TEST") != "1" {
@@ -353,100 +304,68 @@ func TestIntegration_DealsWithSubtests(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-
-	output := `
+	tableTests := []struct {
+		name    string
+		output  string
+		asserts func(m *mockReporter)
+	}{
+		{
+			name: "deals with subtests",
+			output: `
 {"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/tools/flakeytests/","Test":"TestSkippedForTests_Subtests/1:_should_fail","Elapsed":0}
 {"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/tools/flakeytests/","Test":"TestSkippedForTests_Subtests","Elapsed":0}
 {"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/tools/flakeytests/","Test":"TestSkippedForTests_Subtests/2:_should_fail","Elapsed":0}
-`
-
-	m := newMockReporter()
-	tc := &testCommand{
-		repo:    "github.com/smartcontractkit/chainlink/v2/tools/flakeytests",
-		command: "../bin/go_core_tests",
-		overrides: func(cmd *exec.Cmd) {
-			cmd.Env = append(cmd.Env, "FLAKEY_TESTRUNNER_RUN_FIXTURE_TEST=1")
-			cmd.Stdout = io.Discard
-			cmd.Stderr = io.Discard
+`,
+			asserts: func(m *mockReporter) {
+				expectedTests := map[string]map[string]int{
+					"github.com/smartcontractkit/chainlink/v2/tools/flakeytests/": {
+						"TestSkippedForTests_Subtests/1:_should_fail": 1,
+						"TestSkippedForTests_Subtests/2:_should_fail": 1,
+					},
+				}
+				assert.Equal(t, expectedTests, m.report.tests)
+			},
+		},
+		{
+			name:   "parse panics",
+			output: `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/tools/flakeytests/","Test":"TestSkippedForTests","Elapsed":0}`,
+			asserts: func(m *mockReporter) {
+				_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/tools/flakeytests"]["TestSkippedForTests"]
+				assert.False(t, ok)
+			},
+		},
+		{
+			name:   "test integration",
+			output: `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/tools/flakeytests/","Test":"TestSkippedForTests_Success","Elapsed":0}`,
+			asserts: func(m *mockReporter) {
+				_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/tools/flakeytests"]["TestSkippedForTests_Success"]
+				assert.False(t, ok)
+			},
 		},
 	}
-	r := &Runner{
-		numReruns:   2,
-		readers:     []io.Reader{strings.NewReader(output)},
-		testCommand: tc,
-		parse:       parseOutput,
-		reporter:    m,
+
+	for _, tt := range tableTests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newMockReporter()
+			tc := &testCommand{
+				repo:    "github.com/smartcontractkit/chainlink/v2/tools/flakeytests",
+				command: "../bin/go_core_tests",
+				overrides: func(cmd *exec.Cmd) {
+					cmd.Env = append(cmd.Env, "FLAKEY_TESTRUNNER_RUN_FIXTURE_TEST=1")
+					cmd.Stdout = io.Discard
+					cmd.Stderr = io.Discard
+				},
+			}
+			r := &Runner{
+				numReruns:   2,
+				readers:     []io.Reader{strings.NewReader(tt.output)},
+				testCommand: tc,
+				parse:       parseOutput,
+				reporter:    m,
+			}
+
+			err := r.Run(tests.Context(t))
+			require.NoError(t, err)
+		})
 	}
-
-	err := r.Run(tests.Context(t))
-	require.NoError(t, err)
-	expectedTests := map[string]map[string]int{
-		"github.com/smartcontractkit/chainlink/v2/tools/flakeytests/": {
-			"TestSkippedForTests_Subtests/1:_should_fail": 1,
-			"TestSkippedForTests_Subtests/2:_should_fail": 1,
-		},
-	}
-	assert.Equal(t, expectedTests, m.report.tests)
-}
-
-func TestIntegration_ParsesPanics(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
-	output := `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/tools/flakeytests/","Test":"TestSkippedForTests","Elapsed":0}`
-
-	m := newMockReporter()
-	tc := &testCommand{
-		repo:    "github.com/smartcontractkit/chainlink/v2/tools/flakeytests",
-		command: "../bin/go_core_tests",
-		overrides: func(cmd *exec.Cmd) {
-			cmd.Env = append(cmd.Env, "FLAKEY_TESTRUNNER_RUN_FIXTURE_TEST=1")
-			cmd.Stdout = io.Discard
-			cmd.Stderr = io.Discard
-		},
-	}
-	r := &Runner{
-		numReruns:   2,
-		readers:     []io.Reader{strings.NewReader(output)},
-		testCommand: tc,
-		parse:       parseOutput,
-		reporter:    m,
-	}
-
-	err := r.Run(tests.Context(t))
-	require.NoError(t, err)
-	_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/tools/flakeytests"]["TestSkippedForTests"]
-	assert.False(t, ok)
-}
-
-func TestIntegration(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
-	output := `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/tools/flakeytests/","Test":"TestSkippedForTests_Success","Elapsed":0}`
-
-	m := newMockReporter()
-	tc := &testCommand{
-		repo:    "github.com/smartcontractkit/chainlink/v2/tools/flakeytests",
-		command: "../bin/go_core_tests",
-		overrides: func(cmd *exec.Cmd) {
-			cmd.Env = append(cmd.Env, "FLAKEY_TESTRUNNER_RUN_FIXTURE_TEST=1")
-			cmd.Stdout = io.Discard
-			cmd.Stderr = io.Discard
-		},
-	}
-	r := &Runner{
-		numReruns:   2,
-		readers:     []io.Reader{strings.NewReader(output)},
-		testCommand: tc,
-		parse:       parseOutput,
-		reporter:    m,
-	}
-
-	err := r.Run(tests.Context(t))
-	require.NoError(t, err)
-	_, ok := m.report.tests["github.com/smartcontractkit/chainlink/v2/tools/flakeytests"]["TestSkippedForTests_Success"]
-	assert.False(t, ok)
 }
