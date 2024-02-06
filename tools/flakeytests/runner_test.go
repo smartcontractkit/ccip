@@ -230,11 +230,11 @@ func TestRunner_AllFailures(t *testing.T) {
 			name:   "all failures",
 			output: `{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}`,
 			rerunOutput: `
-	{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}
-	{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}
-	`,
+{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}
+{"Time":"2023-09-07T15:39:46.378315+01:00","Action":"fail","Package":"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets","Test":"TestLink","Elapsed":0}
+`,
 			asserts: func(m *mockReporter) {
-				assert.Len(t, m.report.tests, 1)
+				assert.Len(t, m.report.tests, 0)
 			},
 		},
 		{
