@@ -334,10 +334,7 @@ Data = """
             "on_ramp": "0x6B57145e322c877E7D91Ed8E31266eB5c02F7EfC",
             "deployed_at": 11111111
           },
-          "Arbitrum Mainnet": {
-            "on_ramp": "0x0C9BE7Cfd12c735E5aaE047C1dCB845d54E518C3",
-            "deployed_at": 11111111
-          }
+
         },
         "dest_contracts": {
           "Base Mainnet": {
