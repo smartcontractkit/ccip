@@ -139,7 +139,7 @@ func FinalizeL1(
 	adapterABI, err := arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.GetAbi()
 	helpers.PanicErr(err)
 
-	finalizationPayload, err := adapterABI.Pack("exposeForEncoding", arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumFinalizationPayload{
+	finalizationPayload, err := adapterABI.Pack("exposeArbitrumFinalizationPayload", arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumFinalizationPayload{
 		Proof:       arg0Proof,
 		Index:       arg1Index,
 		L2Sender:    arg2L2Sender,

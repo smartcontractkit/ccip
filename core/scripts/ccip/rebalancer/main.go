@@ -250,7 +250,7 @@ func main() {
 		cmd := flag.NewFlagSet("arb-withdraw-from-l2", flag.ExitOnError)
 		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
 		l2BridgeAdapterAddress := cmd.String("l2-bridge-adapter-address", "", "L2 Bridge Adapter Address")
-		amount := cmd.String("amount", "1000000000000000000", "Amount")
+		amount := cmd.String("amount", "1", "Amount")
 		l1ToAddress := cmd.String("l1-to-address", "", "L1 Address")
 		l2TokenAddress := cmd.String("l2-token-address", "", "Token Address")
 		l1TokenAddress := cmd.String("l1-token-address", "", "L1 Token Address")
@@ -267,6 +267,28 @@ func main() {
 			common.HexToAddress(*l1ToAddress),
 			common.HexToAddress(*l2TokenAddress),
 			common.HexToAddress(*l1TokenAddress),
+		)
+	case "arb-send-to-l2":
+		cmd := flag.NewFlagSet("arb-send-to-l2", flag.ExitOnError)
+		l1ChainID := cmd.Uint64("l1-chain-id", 0, "L1 Chain ID")
+		l2ChainID := cmd.Uint64("l2-chain-id", 0, "L2 Chain ID")
+		l1BridgeAdapterAddress := cmd.String("l1-bridge-adapter-address", "", "L1 Bridge Adapter Address")
+		amount := cmd.String("amount", "1", "Amount")
+		l2ToAddress := cmd.String("l2-to-address", "", "L2 Address")
+		l1TokenAddress := cmd.String("l1-token-address", "", "L1 Token Address")
+
+		helpers.ParseArgs(cmd, os.Args[2:],
+			"l1-chain-id", "l2-chain-id", "l1-bridge-adapter-address", "l2-to-address", "l1-token-address")
+
+		env := multienv.New(false, false)
+		arb.SendToL2(
+			env,
+			*l1ChainID,
+			*l2ChainID,
+			common.HexToAddress(*l1BridgeAdapterAddress),
+			common.HexToAddress(*l1TokenAddress),
+			common.HexToAddress(*l2ToAddress),
+			decimal.RequireFromString(*amount).BigInt(),
 		)
 	case "deposit-weth":
 		cmd := flag.NewFlagSet("deposit-weth", flag.ExitOnError)

@@ -48,7 +48,13 @@ func WithdrawFromL2(
 	}
 
 	// at this point we should be able to withdraw the tokens to L1
-	tx, err = l2Adapter.SendERC20(env.Transactors[l2ChainID], l2TokenAddress, l1TokenAddress, l1ToAddress, amount)
+	tx, err = l2Adapter.SendERC20(env.Transactors[l2ChainID],
+		l2TokenAddress,
+		l1TokenAddress,
+		l1ToAddress,
+		amount,
+		[]byte{}, /* bridgeSpecificData, unused for arbitrum L2 adapter */
+	)
 	helpers.PanicErr(err)
 	helpers.ConfirmTXMined(context.Background(), env.Clients[l2ChainID], tx, int64(l2ChainID))
 }
