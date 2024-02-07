@@ -8,11 +8,7 @@ import (
 
 	context "context"
 
-	evm_2_evm_offramp "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
-
 	mock "github.com/stretchr/testify/mock"
-
-	pg "github.com/smartcontractkit/chainlink/v2/core/services/pg"
 
 	prices "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 )
@@ -81,47 +77,23 @@ func (_m *OffRampReader) ChangeConfig(onchainConfig []byte, offchainConfig []byt
 	return r0, r1, r2
 }
 
-// Close provides a mock function with given fields: qopts
-func (_m *OffRampReader) Close(qopts ...pg.QOpt) error {
-	_va := make([]interface{}, len(qopts))
-	for _i := range qopts {
-		_va[_i] = qopts[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Close")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(...pg.QOpt) error); ok {
-		r0 = rf(qopts...)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // CurrentRateLimiterState provides a mock function with given fields: ctx
-func (_m *OffRampReader) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+func (_m *OffRampReader) CurrentRateLimiterState(ctx context.Context) (ccipdata.TokenBucketRateLimit, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CurrentRateLimiterState")
 	}
 
-	var r0 evm_2_evm_offramp.RateLimiterTokenBucket
+	var r0 ccipdata.TokenBucketRateLimit
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (ccipdata.TokenBucketRateLimit, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) evm_2_evm_offramp.RateLimiterTokenBucket); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) ccipdata.TokenBucketRateLimit); ok {
 		r0 = rf(ctx)
 	} else {
-		r0 = ret.Get(0).(evm_2_evm_offramp.RateLimiterTokenBucket)
+		r0 = ret.Get(0).(ccipdata.TokenBucketRateLimit)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
@@ -444,30 +416,6 @@ func (_m *OffRampReader) OnchainConfig() ccipdata.ExecOnchainConfig {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(ccipdata.ExecOnchainConfig)
-	}
-
-	return r0
-}
-
-// RegisterFilters provides a mock function with given fields: qopts
-func (_m *OffRampReader) RegisterFilters(qopts ...pg.QOpt) error {
-	_va := make([]interface{}, len(qopts))
-	for _i := range qopts {
-		_va[_i] = qopts[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RegisterFilters")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(...pg.QOpt) error); ok {
-		r0 = rf(qopts...)
-	} else {
-		r0 = ret.Error(0)
 	}
 
 	return r0

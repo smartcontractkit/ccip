@@ -9,30 +9,34 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
+	mocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
-	mocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/rebalancermocks"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
+	rebalancer_mocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/rebalancermocks"
 )
 
 type mockDeps struct {
-	mockFactory    *mocks.Factory
-	mockRebalancer *mocks.Rebalancer
+	mockFactory    *rebalancer_mocks.Factory
+	mockRebalancer *rebalancer_mocks.Rebalancer
 }
 
 func newPlugin(t *testing.T) (*Plugin, mockDeps) {
 	f := 10
 	closeTimeout := 5 * time.Second
-	rootNetwork := models.NetworkID(1)
+	rootNetwork := models.NetworkSelector(1)
 	rootAddr := models.Address(utils.RandomAddress())
 
 	lmGraph := liquiditygraph.NewGraph()
-	lmFactory := mocks.NewFactory(t)
-	rb := mocks.NewRebalancer(t)
-	return NewPlugin(f, closeTimeout, rootNetwork, rootAddr, lmFactory, lmGraph, rb), mockDeps{
+	lmFactory := rebalancer_mocks.NewFactory(t)
+	rb := rebalancer_mocks.NewRebalancer(t)
+	return NewPlugin(f, closeTimeout, rootNetwork, rootAddr, lmFactory, lmGraph, rb, logger.TestLogger(t)), mockDeps{
 		mockFactory:    lmFactory,
 		mockRebalancer: rb,
 	}
@@ -54,12 +58,16 @@ func TestPluginObservation(t *testing.T) {
 	net := maps.Keys(lms)[0]
 	addr := maps.Values(lms)[0]
 
-	mockLM := mocks.NewLiquidityManager(t)
-	deps.mockFactory.On("NewLiquidityManager", net, addr).Return(mockLM, nil)
+	mockLM := mocks.NewRebalancer(t)
+	deps.mockFactory.On("NewRebalancer", net, addr).Return(mockLM, nil)
 
-	mockLM.On("GetLiquidityManagers", ctx).Return(map[models.NetworkID]models.Address{}, nil)
+	g := liquiditygraph.NewGraph()
+	g.AddNetwork(net, big.NewInt(1234))
+	reg := liquiditymanager.NewRegistry()
+	reg.Add(net, addr)
+	mockLM.On("Discover", ctx, deps.mockFactory).Return(reg, g, nil)
 	mockLM.On("GetBalance", ctx).Return(big.NewInt(1234), nil)
-	mockLM.On("GetPendingTransfers", ctx).Return([]models.PendingTransfer{}, nil)
+	mockLM.On("GetPendingTransfers", ctx, mock.Anything).Return([]models.PendingTransfer{}, nil)
 
 	obs, err := p.Observation(ctx, ocr3types.OutcomeContext{}, ocrtypes.Query{})
 	assert.NoError(t, err)

@@ -18,10 +18,20 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
+	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator) (ccipdata.OffRampReader, error) {
-	contractType, version, err := ccipconfig.TypeAndVersion(addr, destClient)
+func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
+	return initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, false, registerFilters, pgOpts...)
+}
+
+func CloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) error {
+	_, err := initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, true, false, pgOpts...)
+	return err
+}
+
+func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, closeReader bool, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
+	contractType, version, err := versionFinder.TypeAndVersion(addr, destClient)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read type and version")
 	}
@@ -30,9 +40,23 @@ func NewOffRampReader(lggr logger.Logger, addr common.Address, destClient client
 	}
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
-		return v1_0_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
-	case ccipdata.V1_2_0, ccipdata.V1_3_0:
-		return v1_2_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
+		offRamp, err := v1_0_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
+		if err != nil {
+			return nil, err
+		}
+		if closeReader {
+			return nil, offRamp.Close(pgOpts...)
+		}
+		return offRamp, offRamp.RegisterFilters(pgOpts...)
+	case ccipdata.V1_2_0, ccipdata.V1_4_0:
+		offRamp, err := v1_2_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
+		if err != nil {
+			return nil, err
+		}
+		if closeReader {
+			return nil, offRamp.Close(pgOpts...)
+		}
+		return offRamp, offRamp.RegisterFilters(pgOpts...)
 	default:
 		return nil, errors.Errorf("unsupported offramp version %v", version.String())
 	}
@@ -53,7 +77,7 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 			}
 			return execReportToEthTxMeta(execReport)
 		}, nil
-	case ccipdata.V1_2_0, ccipdata.V1_3_0:
+	case ccipdata.V1_2_0, ccipdata.V1_4_0:
 		offRampABI := abihelpers.MustParseABI(evm_2_evm_offramp.EVM2EVMOffRampABI)
 		return func(report []byte) (*txmgr.TxMeta, error) {
 			execReport, err := v1_2_0.DecodeExecReport(abihelpers.MustGetMethodInputs(ccipdata.ManuallyExecute, offRampABI)[:1], report)

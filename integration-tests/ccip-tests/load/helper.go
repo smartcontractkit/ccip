@@ -97,7 +97,7 @@ func (l *LoadArgs) TriggerLoadByLane() {
 			Msg("Starting load for lane")
 
 		ccipLoad := NewCCIPLoad(l.TestCfg.Test, lane, l.TestCfg.TestGroupInput.PhaseTimeout.Duration(), 100000)
-		ccipLoad.BeforeAllCall(l.TestCfg.TestGroupInput.MsgType)
+		ccipLoad.BeforeAllCall(l.TestCfg.TestGroupInput.MsgType, big.NewInt(*l.TestCfg.TestGroupInput.DestGasLimit))
 		if lane.TestEnv != nil && lane.TestEnv.K8Env != nil && lane.TestEnv.K8Env.Cfg != nil {
 			namespace = lane.TestEnv.K8Env.Cfg.Namespace
 		}
@@ -122,6 +122,7 @@ func (l *LoadArgs) TriggerLoadByLane() {
 				"source_chain": lane.SourceNetworkName,
 				"dest_chain":   lane.DestNetworkName,
 			},
+			FailOnErr: true,
 		})
 		require.NoError(l.TestCfg.Test, err, "initiating loadgen for lane %s --> %s",
 			lane.SourceNetworkName, lane.DestNetworkName)
@@ -255,6 +256,7 @@ func (l *LoadArgs) TriggerLoadBySource() {
 				Logger:                multiCallGen.logger,
 				LokiConfig:            wasp.NewEnvLokiConfig(),
 				Labels:                allLabels,
+				FailOnErr:             true,
 			})
 			require.NoError(l.TestCfg.Test, err, "initiating loadgen for source %s", source)
 			loadRunner.Run(false)

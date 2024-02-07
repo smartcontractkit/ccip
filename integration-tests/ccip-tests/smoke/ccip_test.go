@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testsetups"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/token_pool"
 )
 
 func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
@@ -27,6 +28,8 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	}
 	l := logging.GetTestLogger(t)
 	TestCfg := testsetups.NewCCIPTestConfig(t, l, testconfig.Smoke)
+	require.NotNil(t, TestCfg.TestGroupInput.DestGasLimit)
+	gasLimit := big.NewInt(*TestCfg.TestGroupInput.DestGasLimit)
 	setUpOutput := testsetups.CCIPDefaultTestSetUp(t, l, "smoke-ccip", nil, TestCfg)
 	var tcs []subtestInput
 	if len(setUpOutput.Lanes) == 0 {
@@ -34,7 +37,9 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		if TestCfg.TestGroupInput.MsgType == actions.TokenTransfer {
+		// if we are running a test that is a token transfer, we need to verify the balance
+		// For USDC deployment, the mock contracts cannot mint the token in destination, therefore skip the balance check
+		if TestCfg.TestGroupInput.MsgType == actions.TokenTransfer && !pointer.GetBool(TestCfg.TestGroupInput.USDCMockDeployment) {
 			setUpOutput.Balance.Verify(t)
 		}
 		require.NoError(t, setUpOutput.TearDown())
@@ -65,7 +70,7 @@ func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
 				Msgf("Starting lane %s -> %s", tc.lane.SourceNetworkName, tc.lane.DestNetworkName)
 
 			tc.lane.RecordStateBeforeTransfer()
-			err := tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, big.NewInt(600_000))
+			err := tc.lane.SendRequests(1, TestCfg.TestGroupInput.MsgType, gasLimit)
 			require.NoError(t, err)
 			tc.lane.ValidateRequests(true)
 		})
@@ -136,7 +141,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			require.NoError(t, err)
 			tc.lane.Logger.Info().Interface("rate limit", prevRLOnRamp).Msg("Initial OnRamp rate limiter state")
 
-			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].Instance.CurrentOnRampRateLimiterState(nil,
+			prevOnRampRLTokenPool, err := src.Common.BridgeTokenPools[0].PoolInterface.CurrentOnRampRateLimiterState(nil,
 				src.OnRamp.EthAddress)
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
@@ -153,7 +158,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				require.GreaterOrEqual(t, rlOffRamp.Capacity.Cmp(prevRLOnRamp.Capacity), 0, "OffRamp Aggregated capacity should be greater than or equal to OnRamp Aggregated capacity")
 			}
 
-			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].Instance.CurrentOffRampRateLimiterState(nil, tc.lane.Dest.OffRamp.EthAddress)
+			prevOffRampRLTokenPool, err := tc.lane.Dest.Common.BridgeTokenPools[0].PoolInterface.CurrentOffRampRateLimiterState(nil, tc.lane.Dest.OffRamp.EthAddress)
 			require.NoError(t, err)
 			tc.lane.Logger.Info().
 				Interface("rate limit", prevOffRampRLTokenPool).
@@ -179,7 +184,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				}
 				if TokenPoolRateLimitChanged {
 					require.NoError(t, src.Common.BridgeTokenPools[0].SetOnRampRateLimit(src.OnRamp.EthAddress,
-						lock_release_token_pool.RateLimiterConfig{
+						token_pool.RateLimiterConfig{
 							Capacity:  prevOnRampRLTokenPool.Capacity,
 							IsEnabled: prevOnRampRLTokenPool.IsEnabled,
 							Rate:      prevOnRampRLTokenPool.Rate,
@@ -224,6 +229,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			// current tokens are equal to the full capacity  - should fail
 			src.TransferAmount[0] = rlOnRamp.Tokens
 			tc.lane.Logger.Info().Str("tokensTobeSent", rlOnRamp.Tokens.String()).Msg("Aggregated Capacity")
+			// approve the tokens
+			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.Router.Address(), src.TransferAmount[0]))
+			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err := tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
 				actions.TokenTransfer, "msg with token more than aggregated capacity",
@@ -283,7 +291,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 					!prevOnRampRLTokenPool.IsEnabled {
 					require.NoError(t, src.Common.BridgeTokenPools[0].SetOnRampRateLimit(
 						src.OnRamp.EthAddress,
-						lock_release_token_pool.RateLimiterConfig{
+						token_pool.RateLimiterConfig{
 							IsEnabled: true,
 							Capacity:  TokenPoolRateLimitCapacity,
 							Rate:      TokenPoolRateLimitRate,
@@ -297,7 +305,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 				TokenPoolRateLimitRate = prevOnRampRLTokenPool.Rate
 			}
 
-			rlOnPool, err := src.Common.BridgeTokenPools[0].Instance.CurrentOnRampRateLimiterState(nil,
+			rlOnPool, err := src.Common.BridgeTokenPools[0].PoolInterface.CurrentOnRampRateLimiterState(nil,
 				src.OnRamp.EthAddress)
 			require.NoError(t, err)
 			require.True(t, rlOnPool.IsEnabled, "Token Pool rate limiter should be enabled")
@@ -309,6 +317,7 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			tokensTobeSent = new(big.Int).Add(TokenPoolRateLimitCapacity, big.NewInt(2))
 			src.TransferAmount[0] = tokensTobeSent
 			tc.lane.Logger.Info().Str("tokensTobeSent", tokensTobeSent.String()).Msg("More than Token Pool Capacity")
+
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
 				actions.TokenTransfer, "msg with token more than token pool capacity",
@@ -340,6 +349,9 @@ func TestSmokeCCIPRateLimit(t *testing.T) {
 			tokensTobeSent = new(big.Int).Mul(TokenPoolRateLimitRate, big.NewInt(50))
 			tc.lane.Logger.Info().Str("tokensTobeSent", tokensTobeSent.String()).Msg("More than TokenPool Rate")
 			src.TransferAmount[0] = tokensTobeSent
+			// approve the tokens
+			require.NoError(t, src.Common.BridgeTokens[0].Approve(src.Common.Router.Address(), src.TransferAmount[0]))
+			require.NoError(t, tc.lane.Source.Common.ChainClient.WaitForEvents())
 			failedTx, _, _, err = tc.lane.Source.SendRequest(
 				tc.lane.Dest.ReceiverDapp.EthAddress,
 				actions.TokenTransfer, "msg with token more than token pool rate",

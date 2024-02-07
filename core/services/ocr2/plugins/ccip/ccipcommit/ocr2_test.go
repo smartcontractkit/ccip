@@ -23,8 +23,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas/mocks"
 	mocks2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -43,8 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 func TestCommitReportingPlugin_Observation(t *testing.T) {
@@ -155,6 +155,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 			p.priceGetter = priceGet
 			p.sourceNative = sourceNativeTokenAddr
 			p.gasPriceEstimator = gasPriceEstimator
+			p.metricsCollector = ccip.NoopMetricsCollector
 
 			obs, err := p.Observation(ctx, tc.epochAndRound, types.Query{})
 
@@ -175,7 +176,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 	ctx := testutils.Context(t)
 	sourceChainSelector := uint64(rand.Int())
 	var gasPrice prices.GasPrice = big.NewInt(1)
-	gasPriceHeartBeat := models.MustMakeDuration(time.Hour)
+	gasPriceHeartBeat := *config.MustNewDuration(time.Hour)
 
 	t.Run("not enough observations", func(t *testing.T) {
 		p := &CommitReportingPlugin{}
@@ -327,6 +328,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 			p.offchainConfig.GasPriceHeartBeat = gasPriceHeartBeat.Duration()
 			p.commitStoreReader = commitStoreReader
 			p.F = tc.f
+			p.metricsCollector = ccip.NoopMetricsCollector
 
 			aos := make([]types.AttributedObservation, 0, len(tc.observations))
 			for _, o := range tc.observations {
@@ -360,6 +362,7 @@ func TestCommitReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		p := &CommitReportingPlugin{}
 		p.lggr = logger.TestLogger(t)
 		p.inflightReports = newInflightCommitReportsContainer(time.Minute)
+		p.metricsCollector = ccip.NoopMetricsCollector
 		return p
 	}
 
@@ -697,10 +700,10 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 		f                        int
 		latestGasPrice           update
 		latestTokenPrices        map[common.Address]update
-		gasPriceHeartBeat        models.Duration
+		gasPriceHeartBeat        config.Duration
 		daGasPriceDeviationPPB   int64
 		execGasPriceDeviationPPB int64
-		tokenPriceHeartBeat      models.Duration
+		tokenPriceHeartBeat      config.Duration
 		tokenPriceDeviationPPB   uint32
 		expTokenUpdates          []ccipdata.TokenPrice
 		expGasUpdates            []ccipdata.GasPrice
@@ -726,10 +729,10 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{SourceGasPriceUSD: val1e18(10)},
 				{SourceGasPriceUSD: val1e18(11)},
 			},
-			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			gasPriceHeartBeat:        *config.MustNewDuration(time.Hour),
 			daGasPriceDeviationPPB:   20e7,
 			execGasPriceDeviationPPB: 20e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceHeartBeat:      *config.MustNewDuration(time.Hour),
 			tokenPriceDeviationPPB:   20e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-30 * time.Minute), // recent
@@ -744,10 +747,10 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{SourceGasPriceUSD: val1e18(10)},
 				{SourceGasPriceUSD: val1e18(11)},
 			},
-			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			gasPriceHeartBeat:        *config.MustNewDuration(time.Hour),
 			daGasPriceDeviationPPB:   20e7,
 			execGasPriceDeviationPPB: 20e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceHeartBeat:      *config.MustNewDuration(time.Hour),
 			tokenPriceDeviationPPB:   20e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-90 * time.Minute), // recent
@@ -763,10 +766,10 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{SourceGasPriceUSD: val1e18(20)},
 				{SourceGasPriceUSD: val1e18(20)},
 			},
-			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			gasPriceHeartBeat:        *config.MustNewDuration(time.Hour),
 			daGasPriceDeviationPPB:   20e7,
 			execGasPriceDeviationPPB: 20e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceHeartBeat:      *config.MustNewDuration(time.Hour),
 			tokenPriceDeviationPPB:   20e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-30 * time.Minute), // recent
@@ -809,10 +812,10 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(11)}, SourceGasPriceUSD: val1e18(0)},
 			},
 			f:                        1,
-			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			gasPriceHeartBeat:        *config.MustNewDuration(time.Hour),
 			daGasPriceDeviationPPB:   20e7,
 			execGasPriceDeviationPPB: 20e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceHeartBeat:      *config.MustNewDuration(time.Hour),
 			tokenPriceDeviationPPB:   20e7,
 			latestTokenPrices: map[common.Address]update{
 				feeToken1: {
@@ -830,10 +833,10 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21)}, SourceGasPriceUSD: val1e18(11)},
 			},
 			f:                        1,
-			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			gasPriceHeartBeat:        *config.MustNewDuration(time.Hour),
 			daGasPriceDeviationPPB:   10e7,
 			execGasPriceDeviationPPB: 10e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(time.Hour),
+			tokenPriceHeartBeat:      *config.MustNewDuration(time.Hour),
 			tokenPriceDeviationPPB:   20e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-30 * time.Minute),
@@ -857,10 +860,10 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21)}, SourceGasPriceUSD: val1e18(11)},
 			},
 			f:                        1,
-			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			gasPriceHeartBeat:        *config.MustNewDuration(time.Hour),
 			daGasPriceDeviationPPB:   10e7,
 			execGasPriceDeviationPPB: 10e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(2 * time.Hour),
+			tokenPriceHeartBeat:      *config.MustNewDuration(2 * time.Hour),
 			tokenPriceDeviationPPB:   20e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-90 * time.Minute),
@@ -884,10 +887,10 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21)}, SourceGasPriceUSD: val1e18(11)},
 			},
 			f:                        1,
-			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			gasPriceHeartBeat:        *config.MustNewDuration(time.Hour),
 			daGasPriceDeviationPPB:   10e7,
 			execGasPriceDeviationPPB: 10e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(2 * time.Hour),
+			tokenPriceHeartBeat:      *config.MustNewDuration(2 * time.Hour),
 			tokenPriceDeviationPPB:   200e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-30 * time.Minute),
@@ -908,10 +911,10 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 				{TokenPricesUSD: map[common.Address]*big.Int{feeToken1: val1e18(21)}, SourceGasPriceUSD: val1e18(11)},
 			},
 			f:                        1,
-			gasPriceHeartBeat:        models.MustMakeDuration(time.Hour),
+			gasPriceHeartBeat:        *config.MustNewDuration(time.Hour),
 			daGasPriceDeviationPPB:   10e7,
 			execGasPriceDeviationPPB: 10e7,
-			tokenPriceHeartBeat:      models.MustMakeDuration(2 * time.Hour),
+			tokenPriceHeartBeat:      *config.MustNewDuration(2 * time.Hour),
 			tokenPriceDeviationPPB:   20e7,
 			latestGasPrice: update{
 				timestamp: time.Now().Add(-30 * time.Minute),

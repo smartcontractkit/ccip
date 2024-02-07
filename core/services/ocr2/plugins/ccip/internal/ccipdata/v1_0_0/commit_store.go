@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -23,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 const (
@@ -177,10 +177,10 @@ func (c *CommitStore) GasPriceEstimator() prices.GasPriceEstimatorCommit {
 type CommitOffchainConfig struct {
 	SourceFinalityDepth   uint32
 	DestFinalityDepth     uint32
-	FeeUpdateHeartBeat    models.Duration
+	FeeUpdateHeartBeat    config.Duration
 	FeeUpdateDeviationPPB uint32
 	MaxGasPrice           uint64
-	InflightCacheExpiry   models.Duration
+	InflightCacheExpiry   config.Duration
 }
 
 func (c CommitOffchainConfig) Validate() error {
@@ -222,13 +222,11 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 		big.NewInt(int64(offchainConfigV1.MaxGasPrice)),
 		int64(offchainConfigV1.FeeUpdateDeviationPPB))
 	c.offchainConfig = ccipdata.NewCommitOffchainConfig(
-		offchainConfigV1.SourceFinalityDepth,
 		offchainConfigV1.FeeUpdateDeviationPPB,
 		offchainConfigV1.FeeUpdateHeartBeat.Duration(),
 		offchainConfigV1.FeeUpdateDeviationPPB,
 		offchainConfigV1.FeeUpdateHeartBeat.Duration(),
-		offchainConfigV1.InflightCacheExpiry.Duration(),
-		offchainConfigV1.DestFinalityDepth)
+		offchainConfigV1.InflightCacheExpiry.Duration())
 	c.configMu.Unlock()
 	c.lggr.Infow("ChangeConfig",
 		"offchainConfig", offchainConfigV1,
@@ -262,13 +260,13 @@ func (c *CommitStore) parseReport(log types.Log) (*ccipdata.CommitStoreReport, e
 	}, nil
 }
 
-func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]ccipdata.Event[ccipdata.CommitStoreReport], error) {
+func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNr uint64, confs int) ([]ccipdata.Event[ccipdata.CommitStoreReport], error) {
 	logs, err := c.lp.LogsDataWordBetween(
 		c.reportAcceptedSig,
 		c.address,
 		c.reportAcceptedMaxSeqIndex-1,
 		c.reportAcceptedMaxSeqIndex,
-		logpoller.EvmWord(seqNum),
+		logpoller.EvmWord(seqNr),
 		logpoller.Confirmations(confs),
 		pg.WithParentCtx(ctx),
 	)
@@ -286,7 +284,7 @@ func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum 
 	}
 
 	if len(parsedLogs) > 1 {
-		c.lggr.Errorw("More than one report found for seqNum", "seqNum", seqNum, "commitReports", parsedLogs)
+		c.lggr.Errorw("More than one report found for seqNr", "seqNr", seqNr, "commitReports", parsedLogs)
 		return parsedLogs[:1], nil
 	}
 	return parsedLogs, nil

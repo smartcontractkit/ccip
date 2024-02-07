@@ -15,6 +15,7 @@ import (
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_1_0"
@@ -25,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type onRampReaderTH struct {
@@ -35,7 +35,7 @@ type onRampReaderTH struct {
 
 func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 	_, bc := ccipdata.NewSimulation(t)
-	_, err := factory.NewOnRampReader(logger.TestLogger(t), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), common.Address{}, lpmocks.NewLogPoller(t), bc)
+	_, err := factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), common.Address{}, lpmocks.NewLogPoller(t), bc)
 	assert.EqualError(t, err, "unable to read type and version: no contract code at given address")
 }
 
@@ -58,8 +58,8 @@ func TestOnRampReaderInit(t *testing.T) {
 			version: ccipdata.V1_2_0,
 		},
 		{
-			name:    "OnRampReader_V1_3_0",
-			version: ccipdata.V1_3_0,
+			name:    "OnRampReader_V1_4_0",
+			version: ccipdata.V1_4_0,
 		},
 	}
 
@@ -90,14 +90,14 @@ func setupOnRampReaderTH(t *testing.T, version string) onRampReaderTH {
 		onRampAddress = setupOnRampV1_1_0(t, user, bc)
 	case ccipdata.V1_2_0:
 		onRampAddress = setupOnRampV1_2_0(t, user, bc)
-	case ccipdata.V1_3_0:
-		onRampAddress = setupOnRampV1_3_0(t, user, bc)
+	case ccipdata.V1_4_0:
+		onRampAddress = setupOnRampV1_4_0(t, user, bc)
 	default:
 		require.Fail(t, "Unknown version: ", version)
 	}
 
 	// Create the version-specific reader.
-	reader, err := factory.NewOnRampReader(log, testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc)
+	reader, err := factory.NewOnRampReader(log, factory.NewEvmVersionFinder(), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), onRampAddress, lp, bc)
 	require.NoError(t, err)
 
 	return onRampReaderTH{
@@ -311,7 +311,7 @@ func setupOnRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simulat
 	return onRampAddress
 }
 
-func setupOnRampV1_3_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
+func setupOnRampV1_4_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
 	linkTokenAddress := common.HexToAddress("0x000011")
 	staticConfig := evm_2_evm_onramp.EVM2EVMOnRampStaticConfig{
 		LinkToken:         linkTokenAddress,
@@ -390,7 +390,7 @@ func testVersionSpecificOnRampReader(t *testing.T, th onRampReaderTH, version st
 		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000110"))
 	case ccipdata.V1_2_0:
 		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000120"))
-	case ccipdata.V1_3_0:
+	case ccipdata.V1_4_0:
 		testOnRampReader(t, th, common.HexToAddress("0x0000000000000000000000000000000000000130"))
 	default:
 		require.Fail(t, "Unknown version: ", version)
@@ -446,7 +446,7 @@ func TestNewOnRampReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewOnRampReader(logger.TestLogger(t), 1, 2, common.Address{}, lpmocks.NewLogPoller(t), c)
+			_, err = factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), 1, 2, common.Address{}, lpmocks.NewLogPoller(t), c)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

@@ -25,6 +25,7 @@ import (
 	ocr2keepers20runner "github.com/smartcontractkit/chainlink-automation/pkg/v2/runner"
 	ocr2keepers21config "github.com/smartcontractkit/chainlink-automation/pkg/v3/config"
 	ocr2keepers21 "github.com/smartcontractkit/chainlink-automation/pkg/v3/plugin"
+	"github.com/smartcontractkit/chainlink/v2/core/config/env"
 
 	"github.com/smartcontractkit/chainlink-vrf/altbn_128"
 	dkgpkg "github.com/smartcontractkit/chainlink-vrf/dkg"
@@ -37,6 +38,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer"
+	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
 
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -45,7 +49,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/dkg"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/dkg/persistence"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/functions"
@@ -121,7 +124,6 @@ type Delegate struct {
 	RelayGetter
 	isNewlyCreatedJob bool // Set to true if this is a new job freshly added, false if job was present already on node boot.
 	mailMon           *mailbox.Monitor
-	eventBroadcaster  pg.EventBroadcaster
 	legacyChains      legacyevm.LegacyChainContainer // legacy: use relayers instead
 }
 
@@ -192,8 +194,9 @@ type jobPipelineConfig interface {
 }
 
 type mercuryConfig interface {
-	Credentials(credName string) *models.MercuryCredentials
+	Credentials(credName string) *types.MercuryCredentials
 	Cache() coreconfig.MercuryCache
+	TLS() coreconfig.MercuryTLS
 }
 
 type thresholdConfig interface {
@@ -231,7 +234,6 @@ func NewDelegate(
 	ethKs keystore.Eth,
 	relayers RelayGetter,
 	mailMon *mailbox.Monitor,
-	eventBroadcaster pg.EventBroadcaster,
 ) *Delegate {
 	return &Delegate{
 		db:                    db,
@@ -251,7 +253,6 @@ func NewDelegate(
 		RelayGetter:           relayers,
 		isNewlyCreatedJob:     false,
 		mailMon:               mailMon,
-		eventBroadcaster:      eventBroadcaster,
 	}
 }
 
@@ -315,7 +316,7 @@ func (d *Delegate) cleanupEVM(jb job.Job, q pg.Queryer, relayID relay.ID) error 
 			d.lggr.Errorw("failed to derive ocr2keeper filter names from spec", "err", err, "spec", spec)
 		}
 	case types.CCIPCommit:
-		err = ccipcommit.UnregisterCommitPluginLpFilters(context.Background(), d.lggr, jb, d.pipelineRunner, d.legacyChains, pg.WithQueryer(q))
+		err = ccipcommit.UnregisterCommitPluginLpFilters(context.Background(), d.lggr, jb, d.legacyChains, pg.WithQueryer(q))
 		if err != nil {
 			d.lggr.Errorw("failed to unregister ccip commit plugin filters", "err", err, "spec", spec)
 		}
@@ -477,6 +478,8 @@ func (d *Delegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) ([]job.ServiceC
 		return d.newServicesCCIPCommit(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
 	case types.CCIPExecution:
 		return d.newServicesCCIPExecution(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
+	case "rebalancer": // TODO: add constant to chainlink-common
+		return d.newServicesRebalancer(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, qopts...)
 	default:
 		return nil, errors.Errorf("plugin type %s not supported", spec.PluginType)
 	}
@@ -526,12 +529,6 @@ type connProvider interface {
 	ClientConn() grpc.ClientConnInterface
 }
 
-func defaultPathFromPluginName(pluginName string) string {
-	// By default we install the command on the system path, in the
-	// form: `chainlink-<plugin name>`
-	return fmt.Sprintf("chainlink-%s", pluginName)
-}
-
 func (d *Delegate) newServicesGenericPlugin(
 	ctx context.Context,
 	lggr logger.SugaredLogger,
@@ -552,9 +549,11 @@ func (d *Delegate) newServicesGenericPlugin(
 		return nil, err
 	}
 
+	plugEnv := env.NewPlugin(p.PluginName)
+
 	command := p.Command
 	if command == "" {
-		command = defaultPathFromPluginName(p.PluginName)
+		command = plugEnv.Cmd.Get()
 	}
 
 	// Add the default pipeline to the pluginConfig
@@ -609,8 +608,22 @@ func (d *Delegate) newServicesGenericPlugin(
 		OffchainConfigDigester:       provider.OffchainConfigDigester(),
 	}
 
+	envVars, err := plugins.ParseEnvFile(plugEnv.Env.Get())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse median env file: %w", err)
+	}
+	if len(p.EnvVars) > 0 {
+		for k, v := range p.EnvVars {
+			envVars = append(envVars, k+"="+v)
+		}
+	}
+
 	pluginLggr := lggr.Named(p.PluginName).Named(spec.ContractID).Named(spec.GetID())
-	cmdFn, grpcOpts, err := d.cfg.RegisterLOOP(fmt.Sprintf("%s-%s-%s", p.PluginName, spec.ContractID, spec.GetID()), command)
+	cmdFn, grpcOpts, err := d.cfg.RegisterLOOP(plugins.CmdConfig{
+		ID:  fmt.Sprintf("%s-%s-%s", p.PluginName, spec.ContractID, spec.GetID()),
+		Cmd: command,
+		Env: envVars,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to register loop: %w", err)
 	}
@@ -1110,12 +1123,13 @@ func (d *Delegate) newServicesOCR2Keepers21(
 
 	provider, err := relayer.NewPluginProvider(ctx,
 		types.RelayArgs{
-			ExternalJobID: jb.ExternalJobID,
-			JobID:         jb.ID,
-			ContractID:    spec.ContractID,
-			New:           d.isNewlyCreatedJob,
-			RelayConfig:   spec.RelayConfig.Bytes(),
-			ProviderType:  string(spec.PluginType),
+			ExternalJobID:      jb.ExternalJobID,
+			JobID:              jb.ID,
+			ContractID:         spec.ContractID,
+			New:                d.isNewlyCreatedJob,
+			RelayConfig:        spec.RelayConfig.Bytes(),
+			ProviderType:       string(spec.PluginType),
+			MercuryCredentials: mc,
 		}, types.PluginArgs{
 			TransmitterID: transmitterID,
 			PluginConfig:  spec.PluginConfig.Bytes(),
@@ -1129,12 +1143,7 @@ func (d *Delegate) newServicesOCR2Keepers21(
 		return nil, errors.New("could not coerce PluginProvider to AutomationProvider")
 	}
 
-	chain, err := d.legacyChains.Get(rid.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("keeper2 services: failed to get chain %s: %w", rid.ChainID, err)
-	}
-
-	services, err := ocr2keeper.EVMDependencies21(jb, d.db, lggr, chain, mc, kb, d.cfg.Database())
+	services, err := ocr2keeper.EVMDependencies21(kb)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not build dependencies for ocr2 keepers")
 	}
@@ -1175,15 +1184,15 @@ func (d *Delegate) newServicesOCR2Keepers21(
 		OffchainKeyring:              kb,
 		OnchainKeyring:               services.Keyring(),
 		LocalConfig:                  lc,
-		LogProvider:                  services.LogEventProvider(),
-		EventProvider:                services.TransmitEventProvider(),
-		Runnable:                     services.Registry(),
-		Encoder:                      services.Encoder(),
-		BlockSubscriber:              services.BlockSubscriber(),
-		RecoverableProvider:          services.LogRecoverer(),
-		PayloadBuilder:               services.PayloadBuilder(),
-		UpkeepProvider:               services.UpkeepProvider(),
-		UpkeepStateUpdater:           services.UpkeepStateStore(),
+		LogProvider:                  keeperProvider.LogEventProvider(),
+		EventProvider:                keeperProvider.TransmitEventProvider(),
+		Runnable:                     keeperProvider.Registry(),
+		Encoder:                      keeperProvider.Encoder(),
+		BlockSubscriber:              keeperProvider.BlockSubscriber(),
+		RecoverableProvider:          keeperProvider.LogRecoverer(),
+		PayloadBuilder:               keeperProvider.PayloadBuilder(),
+		UpkeepProvider:               keeperProvider.UpkeepProvider(),
+		UpkeepStateUpdater:           keeperProvider.UpkeepStateStore(),
 		UpkeepTypeGetter:             ocr2keeper21core.GetUpkeepType,
 		WorkIDGenerator:              ocr2keeper21core.UpkeepWorkID,
 		// TODO: Clean up the config
@@ -1200,12 +1209,12 @@ func (d *Delegate) newServicesOCR2Keepers21(
 
 	automationServices := []job.ServiceCtx{
 		keeperProvider,
-		services.Registry(),
-		services.BlockSubscriber(),
-		services.LogEventProvider(),
-		services.LogRecoverer(),
-		services.UpkeepStateStore(),
-		services.TransmitEventProvider(),
+		keeperProvider.Registry(),
+		keeperProvider.BlockSubscriber(),
+		keeperProvider.LogEventProvider(),
+		keeperProvider.LogRecoverer(),
+		keeperProvider.UpkeepStateStore(),
+		keeperProvider.TransmitEventProvider(),
 		pluginService,
 	}
 
@@ -1215,7 +1224,7 @@ func (d *Delegate) newServicesOCR2Keepers21(
 		customTelemService, custErr := autotelemetry21.NewAutomationCustomTelemetryService(
 			endpoint,
 			lggr,
-			services.BlockSubscriber(),
+			keeperProvider.BlockSubscriber(),
 			keeperProvider.ContractConfigTracker(),
 		)
 		if custErr != nil {
@@ -1251,7 +1260,7 @@ func (d *Delegate) newServicesOCR2Keepers20(
 		return nil, fmt.Errorf("keepers2.0 services: failed to get chain (%s): %w", rid.ChainID, err2)
 	}
 
-	keeperProvider, rgstry, encoder, logProvider, err2 := ocr2keeper.EVMDependencies20(jb, d.db, lggr, chain, d.ethKs)
+	keeperProvider, rgstry, encoder, logProvider, err2 := ocr2keeper.EVMDependencies20(jb, d.db, lggr, chain, d.ethKs, d.cfg.Database())
 	if err2 != nil {
 		return nil, errors.Wrap(err2, "could not build dependencies for ocr2 keepers")
 	}
@@ -1519,7 +1528,6 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		},
 		transmitterID,
 		d.ethKs,
-		d.eventBroadcaster,
 	)
 	if err2 != nil {
 		return nil, err2
@@ -1572,7 +1580,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		},
 		transmitterID,
 		d.ethKs,
-		d.eventBroadcaster,
 	)
 	if err2 != nil {
 		return nil, err2
@@ -1598,6 +1605,67 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
 	return ccipexec.NewExecutionServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError, qopts...)
+}
+
+func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+	spec := jb.OCR2OracleSpec
+	if spec.Relay != relay.EVM {
+		return nil, errors.New("Non evm chains are not supported for rebalancer execution")
+	}
+	// the relay ID specified in the spec will be that of the main/master chain
+	rid, err := spec.RelayID()
+	if err != nil {
+		return nil, ErrJobSpecNoRelayer{Err: err, PluginName: string(spec.PluginType)}
+	}
+	relayer := evmrelay.NewRebalancerRelayer(
+		d.legacyChains,
+		d.lggr,
+		d.ethKs,
+	)
+	rebalancerProvider, err := relayer.NewRebalancerProvider(types.RelayArgs{
+		ExternalJobID: jb.ExternalJobID,
+		JobID:         jb.ID,
+		ContractID:    spec.ContractID,
+		New:           d.isNewlyCreatedJob,
+		RelayConfig:   spec.RelayConfig.Bytes(),
+		ProviderType:  string(spec.PluginType),
+	}, types.PluginArgs{
+		TransmitterID: spec.TransmitterID.String,
+		PluginConfig:  spec.PluginConfig.Bytes(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rebalancer provider: %w", err)
+	}
+	factory, err := rebalancer.NewPluginFactory(lggr, spec.PluginConfig.Bytes(), rebalancerProvider.LiquidityManagerFactory())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create rebalancer plugin factory: %w", err)
+	}
+	oracleArgsNoPlugin := libocr2.OCR3OracleArgs[rebalancermodels.ReportMetadata]{
+		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
+		V2Bootstrappers:              bootstrapPeers,
+		ContractTransmitter:          rebalancerProvider.ContractTransmitterOCR3(),
+		ContractConfigTracker:        rebalancerProvider.ContractConfigTracker(),
+		Database:                     ocrDB,
+		LocalConfig:                  lc,
+		MonitoringEndpoint: d.monitoringEndpointGen.GenMonitoringEndpoint(
+			rid.Network,
+			rid.ChainID,
+			spec.ContractID,
+			synchronization.OCR3Rebalancer,
+		),
+		OffchainConfigDigester: rebalancerProvider.OffchainConfigDigester(),
+		OffchainKeyring:        kb,
+		OnchainKeyring:         ocr3impls.NewOnchainKeyring[rebalancermodels.ReportMetadata](kb, lggr),
+		ReportingPluginFactory: factory,
+		Logger: commonlogger.NewOCRWrapper(lggr.Named("RebalancerOracle"), d.cfg.OCR2().TraceLogging(), func(msg string) {
+			lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
+		}),
+	}
+	oracle, err := libocr2.NewOracle(oracleArgsNoPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create oracle: %w", err)
+	}
+	return []job.ServiceCtx{rebalancerProvider, job.NewServiceAdapter(oracle)}, nil
 }
 
 // errorLog implements [loop.ErrorLog]

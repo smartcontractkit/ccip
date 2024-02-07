@@ -19,9 +19,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
@@ -54,7 +54,7 @@ func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, no
 // BeforeAllCall funds subscription, approves the token transfer amount.
 // Needs to be called before load sequence is started.
 // Needs to approve and fund for the entire sequence.
-func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
+func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 	sourceCCIP := c.Lane.Source
 	destCCIP := c.Lane.Dest
 	var tokenAndAmounts []router.ClientEVMTokenAmount
@@ -68,7 +68,7 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string) {
 	err := sourceCCIP.Common.ChainClient.WaitForEvents()
 	require.NoError(c.t, err, "Failed to wait for events")
 
-	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(big.NewInt(100_000), false)
+	extraArgsV1, err := testhelpers.GetEVMExtraArgsV1(gasLimit, false)
 	require.NoError(c.t, err, "Failed encoding the options field")
 
 	receiver, err := utils.ABIEncode(`[{"type":"address"}]`, destCCIP.ReceiverDapp.EthAddress)
@@ -180,6 +180,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 		res.Failed = true
 		return res
 	}
+
 	err = sourceCCIP.Common.ChainClient.MarkTxAsSentOnL2(sendTx)
 
 	if err != nil {

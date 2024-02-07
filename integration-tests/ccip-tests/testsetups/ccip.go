@@ -22,6 +22,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
+	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
+
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
@@ -105,39 +107,45 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 
 func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	var allError error
-
+	var err error
+	p.SelectedNetworks, err = p.EnvInput.EVMNetworks()
+	if err != nil {
+		allError = multierr.Append(allError, fmt.Errorf("failed to get networks: %w", err))
+		return allError
+	}
+	networkByChainID := make(map[string]blockchain.EVMNetwork)
+	for _, net := range p.SelectedNetworks {
+		networkByChainID[net.Name] = net
+	}
 	// if network pairs are provided, then use them
 	if p.TestGroupInput.NetworkPairs != nil {
 		networkPairs := p.TestGroupInput.NetworkPairs
-		networkByChainID := make(map[int64]blockchain.EVMNetwork)
+
 		for _, pair := range networkPairs {
 			networkNames := strings.Split(pair, ",")
 			if len(networkNames) != 2 {
 				allError = multierr.Append(allError, fmt.Errorf("invalid network pair"))
 			}
-			nets := networks.SetNetworks(networkNames)
-			if _, ok := networkByChainID[nets[0].ChainID]; !ok {
-				networkByChainID[nets[0].ChainID] = nets[0]
+			network1, ok := networkByChainID[networkNames[0]]
+			if !ok {
+				allError = multierr.Append(allError, fmt.Errorf("network %s not found in network config", networkNames[0]))
 			}
-			if _, ok := networkByChainID[nets[1].ChainID]; !ok {
-				networkByChainID[nets[1].ChainID] = nets[1]
+			network2, ok := networkByChainID[networkNames[1]]
+			if !ok {
+				allError = multierr.Append(allError, fmt.Errorf("network %s not found in network config", networkNames[1]))
 			}
-			p.AddPairToNetworkList(nets[0], nets[1])
+			p.AddPairToNetworkList(network1, network2)
 		}
-
-		for _, net := range networkByChainID {
-			p.SelectedNetworks = append(p.SelectedNetworks, net)
-		}
+		lggr.Info().Int("Pairs", len(p.NetworkPairs)).Msg("No Of Lanes")
 		return allError
 	}
 
-	p.SelectedNetworks = p.EnvInput.EVMNetworks()
 	if p.TestGroupInput.NoOfNetworks == 0 {
 		p.TestGroupInput.NoOfNetworks = len(p.SelectedNetworks)
 	}
 	// TODO remove this when CTF network timeout is fixed
 	for i := range p.SelectedNetworks {
-		p.SelectedNetworks[i].Timeout = blockchain.JSONStrDuration{
+		p.SelectedNetworks[i].Timeout = blockchain.StrDuration{
 			Duration: 3 * time.Minute,
 		}
 	}
@@ -305,7 +313,11 @@ func (o *CCIPTestSetUpOutputs) DeployChainContracts(
 
 	chain.ParallelTransactions(true)
 	defer chain.Close()
-	ccipCommon, err := actions.DefaultCCIPModule(lggr, chain, pointer.GetBool(o.Cfg.TestGroupInput.ExistingDeployment), pointer.GetBool(o.Cfg.TestGroupInput.MulticallInOneTx))
+	ccipCommon, err := actions.DefaultCCIPModule(
+		lggr, chain,
+		pointer.GetBool(o.Cfg.TestGroupInput.ExistingDeployment),
+		pointer.GetBool(o.Cfg.TestGroupInput.MulticallInOneTx),
+		pointer.GetBool(o.Cfg.TestGroupInput.USDCMockDeployment))
 	if err != nil {
 		return errors.WithStack(fmt.Errorf("failed to create ccip common module for %s: %w", networkCfg.Name, err))
 	}
@@ -458,18 +470,18 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 		srcConfig, destConfig, err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkACmn, networkBCmn,
 			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp)
 		if err != nil {
-			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err - %w", networkA.Name, networkB.Name, err)))
+			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err - %w", networkA.Name, networkB.Name, errors.WithStack(err))))
 			return err
 		}
 		err = o.LaneConfig.WriteLaneConfig(networkA.Name, srcConfig)
 		if err != nil {
 			lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkA.Name, networkB.Name)
-			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkA.Name, err)))
+			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkA.Name, errors.WithStack(err))))
 			return err
 		}
 		err = o.LaneConfig.WriteLaneConfig(networkB.Name, destConfig)
 		if err != nil {
-			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, err)))
+			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, errors.WithStack(err))))
 			return err
 		}
 		lggr.Info().Msgf("done setting up lane %s to %s", networkA.Name, networkB.Name)
@@ -483,18 +495,18 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp)
 			if err != nil {
 				lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkB.Name, networkA.Name)
-				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err -  %w", networkB.Name, networkA.Name, err)))
+				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err -  %w", networkB.Name, networkA.Name, errors.WithStack(err))))
 				return err
 			}
 
 			err = o.LaneConfig.WriteLaneConfig(networkB.Name, srcConfig)
 			if err != nil {
-				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkA.Name, err)))
+				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkA.Name, errors.WithStack(err))))
 				return err
 			}
 			err = o.LaneConfig.WriteLaneConfig(networkA.Name, destConfig)
 			if err != nil {
-				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, err)))
+				allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("writing lane config for %s; err - %w", networkB.Name, errors.WithStack(err))))
 				return err
 			}
 			lggr.Info().Msgf("done setting up lane %s to %s", networkB.Name, networkA.Name)
@@ -742,7 +754,7 @@ func CCIPDefaultTestSetUp(
 			}
 			lggr.Info().Msg("Tearing down the environment")
 			err = integrationactions.TeardownSuite(t, ccipEnv.K8Env, ccipEnv.CLNodes, setUpArgs.Reporter,
-				zapcore.ErrorLevel, chains...)
+				zapcore.ErrorLevel, setUpArgs.Cfg.EnvInput, chains...)
 			require.NoError(t, err, "Environment teardown shouldn't fail")
 		} else {
 			//just print
@@ -795,6 +807,23 @@ func CCIPDefaultTestSetUp(
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
 
+	// set up mock server for price pipeline and usdc attestation if not using existing deployment
+	if !pointer.GetBool(setUpArgs.Cfg.TestGroupInput.ExistingDeployment) {
+		var killgrave *ctftestenv.Killgrave
+		if setUpArgs.Env.LocalCluster != nil {
+			killgrave = setUpArgs.Env.LocalCluster.MockAdapter
+		}
+		// set up mock server for price pipeline. need to set it once for all the lanes as the price pipeline path uses
+		// regex to match the path for all tokens across all lanes
+		actions.SetMockserverWithTokenPriceValue(killgrave, setUpArgs.Env.MockServer)
+		if pointer.GetBool(setUpArgs.Cfg.TestGroupInput.USDCMockDeployment) {
+			// if it's a new USDC deployment, set up mock server for attestation,
+			// we need to set it only once for all the lanes as the attestation path uses regex to match the path for
+			// all messages across all lanes
+			err = actions.SetMockServerWithUSDCAttestation(killgrave, setUpArgs.Env.MockServer)
+			require.NoError(t, err, "failed to set up mock server for attestation")
+		}
+	}
 	// deploy all lane specific contracts
 	lggr.Info().Msg("Deploying chain specific contracts")
 	laneAddGrp, _ := errgroup.WithContext(parent)

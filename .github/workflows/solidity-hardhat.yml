@@ -27,7 +27,7 @@ jobs:
         with:
           filters: |
             src:
-              - 'contracts/src/!(v0.8/(llo-feeds|ccip)/**)/**/*'
+              - 'contracts/src/!(v0.8/(llo-feeds|ccip|rebalancer)/**)/**/*'
               - 'contracts/test/**/*'
               - 'contracts/package.json'
               - 'contracts/pnpm-lock.yaml'
@@ -50,10 +50,11 @@ jobs:
           config: ./contracts/ci.json
       - name: Collect Metrics
         id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@d1618b772a97fd87e6505de97b872ee0b1f1729a # v2.0.2
+        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
         with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: Split Solidity Tests
         continue-on-error: true
 
@@ -65,7 +66,7 @@ jobs:
       fail-fast: false
       matrix:
         split: ${{ fromJson(needs.split-tests.outputs.splits) }}
-    runs-on: ubuntu20.04-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
@@ -86,16 +87,17 @@ jobs:
       - name: Rename coverage
         run: mv ./contracts/coverage.json ./contracts/coverage-${{ matrix.split.idx }}.json
       - name: Upload coverage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
         with:
           name: solidity-coverage-${{ matrix.split.idx }}
           path: ./contracts/coverage-${{ matrix.split.idx }}.json
       - name: Collect Metrics
         id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@d1618b772a97fd87e6505de97b872ee0b1f1729a # v2.0.2
+        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
         with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: Solidity Coverage ${{ matrix.split.id }}
         continue-on-error: true
 
@@ -112,7 +114,7 @@ jobs:
       - name: Make coverage directory
         run: mkdir ./contracts/coverage-reports
       - name: Download coverage
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           path: ./contracts/coverage-reports
       - name: Display structure of downloaded files
@@ -130,7 +132,7 @@ jobs:
       fail-fast: false
       matrix:
         split: ${{ fromJson(needs.split-tests.outputs.splits) }}
-    runs-on: ubuntu20.04-4cores-16GB
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
@@ -147,10 +149,11 @@ jobs:
         run: pnpm test -- $SPLIT
       - name: Collect Metrics
         id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@d1618b772a97fd87e6505de97b872ee0b1f1729a # v2.0.2
+        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
         with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: Solidity ${{ matrix.split.id }}
         continue-on-error: true
 
@@ -172,9 +175,10 @@ jobs:
       - name: Collect Metrics
         if: always()
         id: collect-gha-metrics
-        uses: smartcontractkit/push-gha-metrics-action@d1618b772a97fd87e6505de97b872ee0b1f1729a # v2.0.2
+        uses: smartcontractkit/push-gha-metrics-action@0281b09807758be1dcc41651e44e62b353808c47 # v2.1.0
         with:
-          basic-auth: ${{ secrets.GRAFANA_CLOUD_BASIC_AUTH }}
-          hostname: ${{ secrets.GRAFANA_CLOUD_HOST }}
+          org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           this-job-name: Solidity
         continue-on-error: true

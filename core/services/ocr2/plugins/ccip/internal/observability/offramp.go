@@ -5,7 +5,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
@@ -27,18 +26,6 @@ func NewObservedOffRampReader(origin ccipdata.OffRampReader, chainID int64, plug
 	}
 }
 
-func (o *ObservedOffRampReader) EncodeExecutionReport(report ccipdata.ExecReport) ([]byte, error) {
-	return withObservedInteraction(o.metric, "EncodeExecutionReport", func() ([]byte, error) {
-		return o.OffRampReader.EncodeExecutionReport(report)
-	})
-}
-
-func (o *ObservedOffRampReader) DecodeExecutionReport(report []byte) (ccipdata.ExecReport, error) {
-	return withObservedInteraction(o.metric, "DecodeExecutionReport", func() (ccipdata.ExecReport, error) {
-		return o.OffRampReader.DecodeExecutionReport(report)
-	})
-}
-
 func (o *ObservedOffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]ccipdata.Event[ccipdata.ExecutionStateChanged], error) {
 	return withObservedInteraction(o.metric, "GetExecutionStateChangesBetweenSeqNums", func() ([]ccipdata.Event[ccipdata.ExecutionStateChanged], error) {
 		return o.OffRampReader.GetExecutionStateChangesBetweenSeqNums(ctx, seqNumMin, seqNumMax, confs)
@@ -51,8 +38,8 @@ func (o *ObservedOffRampReader) GetSenderNonce(ctx context.Context, sender commo
 	})
 }
 
-func (o *ObservedOffRampReader) CurrentRateLimiterState(ctx context.Context) (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
-	return withObservedInteraction(o.metric, "CurrentRateLimiterState", func() (evm_2_evm_offramp.RateLimiterTokenBucket, error) {
+func (o *ObservedOffRampReader) CurrentRateLimiterState(ctx context.Context) (ccipdata.TokenBucketRateLimit, error) {
+	return withObservedInteraction(o.metric, "CurrentRateLimiterState", func() (ccipdata.TokenBucketRateLimit, error) {
 		return o.OffRampReader.CurrentRateLimiterState(ctx)
 	})
 }

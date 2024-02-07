@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_helper"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
@@ -30,27 +30,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 type offRampReaderTH struct {
 	user   *bind.TransactOpts
 	reader ccipdata.OffRampReader
-}
-
-func TestOffRampFilters(t *testing.T) {
-	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_0_0.NewOffRamp(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
-		require.NoError(t, err)
-		require.NoError(t, c.RegisterFilters())
-		return c
-	}, 3)
-	ccipdata.AssertFilterRegistration(t, new(lpmocks.LogPoller), func(lp *lpmocks.LogPoller, addr common.Address) ccipdata.Closer {
-		c, err := v1_2_0.NewOffRamp(logger.TestLogger(t), addr, new(mocks.Client), lp, nil)
-		require.NoError(t, err)
-		require.NoError(t, c.RegisterFilters())
-		return c
-	}, 3)
 }
 
 func TestExecOnchainConfig100(t *testing.T) {
@@ -155,8 +139,8 @@ func TestOffRampReaderInit(t *testing.T) {
 			version: ccipdata.V1_2_0,
 		},
 		{
-			name:    "OffRampReader_V1_3_0-dev",
-			version: ccipdata.V1_3_0,
+			name:    "OffRampReader_V1_4_0-dev",
+			version: ccipdata.V1_4_0,
 		},
 	}
 
@@ -188,14 +172,14 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 		offRampAddress = setupOffRampV1_0_0(t, user, bc)
 	case ccipdata.V1_2_0:
 		offRampAddress = setupOffRampV1_2_0(t, user, bc)
-	case ccipdata.V1_3_0:
-		offRampAddress = setupOffRampV1_3_0(t, user, bc)
+	case ccipdata.V1_4_0:
+		offRampAddress = setupOffRampV1_4_0(t, user, bc)
 	default:
 		require.Fail(t, "Unknown version: ", version)
 	}
 
 	// Create the version-specific reader.
-	reader, err := factory.NewOffRampReader(log, offRampAddress, bc, lp, nil)
+	reader, err := factory.NewOffRampReader(log, factory.NewEvmVersionFinder(), offRampAddress, bc, lp, nil, true)
 	require.NoError(t, err)
 	require.Equal(t, offRampAddress, reader.Address())
 
@@ -278,7 +262,7 @@ func setupOffRampV1_2_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 	return offRampAddr
 }
 
-func setupOffRampV1_3_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
+func setupOffRampV1_4_0(t *testing.T, user *bind.TransactOpts, bc *client.SimulatedBackendClient) common.Address {
 
 	onRampAddr := utils.RandomAddress()
 	armAddr := deployMockArm(t, user, bc)
@@ -311,7 +295,7 @@ func setupOffRampV1_3_0(t *testing.T, user *bind.TransactOpts, bc *client.Simula
 		Context: testutils.Context(t),
 	})
 	require.NoError(t, err)
-	require.Equal(t, "EVM2EVMOffRamp 1.3.0-dev", tav)
+	require.Equal(t, "EVM2EVMOffRamp 1.4.0-dev", tav)
 	return offRampAddr
 }
 
@@ -407,7 +391,7 @@ func TestNewOffRampReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewOffRampReader(logger.TestLogger(t), common.Address{}, c, lpmocks.NewLogPoller(t), nil)
+			_, err = factory.NewOffRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), common.Address{}, c, lpmocks.NewLogPoller(t), nil, true)
 			if tc.expectedErr != "" {
 				assert.EqualError(t, err, tc.expectedErr)
 			} else {

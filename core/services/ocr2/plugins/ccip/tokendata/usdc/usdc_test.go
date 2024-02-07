@@ -15,12 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 var (
@@ -33,8 +33,7 @@ func TestUSDCReader_callAttestationApi(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI("https://iris-api-sandbox.circle.com")
 	require.NoError(t, err)
 	lggr := logger.TestLogger(t)
-	usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, nil)
-	require.NoError(t, err)
+	usdcReader := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, nil)
 	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0)
 
 	attestation, err := usdcService.callAttestationApi(context.Background(), [32]byte(common.FromHex(usdcMessageHash)))
@@ -57,8 +56,7 @@ func TestUSDCReader_callAttestationApiMock(t *testing.T) {
 
 	lggr := logger.TestLogger(t)
 	lp := mocks.NewLogPoller(t)
-	usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
-	require.NoError(t, err)
+	usdcReader := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
 	usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, 0)
 	attestation, err := usdcService.callAttestationApi(context.Background(), utils.RandomBytes32())
 	require.NoError(t, err)
@@ -120,11 +118,45 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 					_, err := w.Write(responseBytes)
 					require.NoError(t, err)
 				}))
-
 			},
 			parentTimeoutSeconds: 60,
 			customTimeoutSeconds: 2,
 			expectedError:        tokendata.ErrTimeout,
+		},
+		{
+			name: "error response",
+			getTs: func() *httptest.Server {
+				response := attestationResponse{
+					Error: "some error",
+				}
+				responseBytes, _ := json.Marshal(response)
+
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, err := w.Write(responseBytes)
+					require.NoError(t, err)
+				}))
+
+			},
+			parentTimeoutSeconds: 60,
+			expectedError:        nil,
+		},
+		{
+			name: "invalid status",
+			getTs: func() *httptest.Server {
+				response := attestationResponse{
+					Status:      "",
+					Attestation: "720502893578a89a8a87982982ef781c18b193",
+				}
+				responseBytes, _ := json.Marshal(response)
+
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, err := w.Write(responseBytes)
+					require.NoError(t, err)
+				}))
+
+			},
+			parentTimeoutSeconds: 60,
+			expectedError:        nil,
 		},
 		{
 			name: "rate limit",
@@ -159,8 +191,7 @@ func TestUSDCReader_callAttestationApiMockError(t *testing.T) {
 
 			lggr := logger.TestLogger(t)
 			lp := mocks.NewLogPoller(t)
-			usdcReader, err := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
-			require.NoError(t, err)
+			usdcReader := ccipdata.NewUSDCReader(lggr, mockMsgTransmitter, lp)
 			usdcService := NewUSDCTokenDataReader(lggr, usdcReader, attestationURI, test.customTimeoutSeconds)
 			lp.On("RegisterFilter", mock.Anything).Return(nil)
 			require.NoError(t, usdcReader.RegisterFilters())

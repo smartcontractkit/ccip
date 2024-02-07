@@ -13,45 +13,54 @@ import (
 // Graph operations of the implementations should be thread-safe.
 type LiquidityGraph interface {
 	// AddNetwork adds a new network to the graph by initializing it as a node and setting the initial liquidity.
-	AddNetwork(n models.NetworkID, v *big.Int) bool
+	AddNetwork(n models.NetworkSelector, v *big.Int) bool
 
 	// GetNetworks returns the list of all the networks that appear on the graph.
-	GetNetworks() []models.NetworkID
+	GetNetworks() []models.NetworkSelector
 
 	// HasNetwork returns true when the provided network exists on the graph.
-	HasNetwork(n models.NetworkID) bool
+	HasNetwork(n models.NetworkSelector) bool
 
 	// SetLiquidity sets the liquidity of the provided network.
-	SetLiquidity(n models.NetworkID, v *big.Int) bool
+	SetLiquidity(n models.NetworkSelector, v *big.Int) bool
 
 	// GetLiquidity returns the liquidity of the provided network.
-	GetLiquidity(n models.NetworkID) (*big.Int, error)
+	GetLiquidity(n models.NetworkSelector) (*big.Int, error)
 
 	// AddConnection adds a new directed graph edge.
-	AddConnection(from, to models.NetworkID) bool
+	AddConnection(from, to models.NetworkSelector) error
+
+	// HasConnection returns true if a connection from/to the provided network exist.
+	HasConnection(from, to models.NetworkSelector) bool
+
+	// GetNeighbors returns the neighboring network selectors.
+	GetNeighbors(from models.NetworkSelector) ([]models.NetworkSelector, bool)
 
 	// IsEmpty returns true when the graph does not contain any network.
 	IsEmpty() bool
 
 	// Reset resets the graph to it's empty state.
 	Reset()
+
+	// String returns the string representation of the graph.
+	String() string
 }
 
 type Graph struct {
-	networksGraph  map[models.NetworkID][]models.NetworkID
-	networkBalance map[models.NetworkID]*big.Int
+	networksGraph  map[models.NetworkSelector][]models.NetworkSelector
+	networkBalance map[models.NetworkSelector]*big.Int
 	mu             *sync.RWMutex
 }
 
 func NewGraph() *Graph {
 	return &Graph{
-		networksGraph:  make(map[models.NetworkID][]models.NetworkID),
-		networkBalance: make(map[models.NetworkID]*big.Int),
+		networksGraph:  make(map[models.NetworkSelector][]models.NetworkSelector),
+		networkBalance: make(map[models.NetworkSelector]*big.Int),
 		mu:             &sync.RWMutex{},
 	}
 }
 
-func (g *Graph) AddNetwork(n models.NetworkID, liq *big.Int) bool {
+func (g *Graph) AddNetwork(n models.NetworkSelector, liq *big.Int) bool {
 	if g.HasNetwork(n) {
 		return false
 	}
@@ -59,16 +68,16 @@ func (g *Graph) AddNetwork(n models.NetworkID, liq *big.Int) bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	g.networksGraph[n] = make([]models.NetworkID, 0)
+	g.networksGraph[n] = make([]models.NetworkSelector, 0)
 	g.networkBalance[n] = liq
 	return true
 }
 
-func (g *Graph) GetNetworks() []models.NetworkID {
+func (g *Graph) GetNetworks() []models.NetworkSelector {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
-	networks := make([]models.NetworkID, 0, len(g.networksGraph))
+	networks := make([]models.NetworkSelector, 0, len(g.networksGraph))
 	for networkID := range g.networksGraph {
 		networks = append(networks, networkID)
 	}
@@ -78,7 +87,7 @@ func (g *Graph) GetNetworks() []models.NetworkID {
 	return networks
 }
 
-func (g *Graph) HasNetwork(n models.NetworkID) bool {
+func (g *Graph) HasNetwork(n models.NetworkSelector) bool {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -86,7 +95,7 @@ func (g *Graph) HasNetwork(n models.NetworkID) bool {
 	return exists
 }
 
-func (g *Graph) SetLiquidity(n models.NetworkID, v *big.Int) bool {
+func (g *Graph) SetLiquidity(n models.NetworkSelector, v *big.Int) bool {
 	if !g.HasNetwork(n) {
 		return false
 	}
@@ -98,7 +107,7 @@ func (g *Graph) SetLiquidity(n models.NetworkID, v *big.Int) bool {
 	return true
 }
 
-func (g *Graph) GetLiquidity(n models.NetworkID) (*big.Int, error) {
+func (g *Graph) GetLiquidity(n models.NetworkSelector) (*big.Int, error) {
 	if !g.HasNetwork(n) {
 		return nil, fmt.Errorf("network not found")
 	}
@@ -114,16 +123,57 @@ func (g *Graph) GetLiquidity(n models.NetworkID) (*big.Int, error) {
 	return w, nil
 }
 
-func (g *Graph) AddConnection(from, to models.NetworkID) bool {
-	if !g.HasNetwork(from) || !g.HasNetwork(to) {
-		return false
+func (g *Graph) AddConnection(from, to models.NetworkSelector) error {
+	if !g.HasNetwork(from) {
+		return fmt.Errorf("network %d not found", from)
+	}
+	if !g.HasNetwork(to) {
+		return fmt.Errorf("network %d not found", to)
 	}
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	g.networksGraph[from] = append(g.networksGraph[from], to)
-	return true
+	return nil
+}
+
+func (g *Graph) HasConnection(from, to models.NetworkSelector) bool {
+	if !g.HasNetwork(from) || !g.HasNetwork(to) {
+		return false
+	}
+
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	neibs, exist := g.networksGraph[from]
+	if !exist {
+		return false
+	}
+
+	for _, net := range neibs {
+		if net == to {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Graph) GetNeighbors(from models.NetworkSelector) ([]models.NetworkSelector, bool) {
+	if !g.HasNetwork(from) {
+		return nil, false
+	}
+
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	neibs, exist := g.networksGraph[from]
+	if !exist {
+		return nil, false
+	}
+
+	sort.Slice(neibs, func(i, j int) bool { return neibs[i] < neibs[j] })
+	return neibs, exist
 }
 
 func (g *Graph) IsEmpty() bool {
@@ -137,6 +187,13 @@ func (g *Graph) Reset() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	g.networksGraph = make(map[models.NetworkID][]models.NetworkID)
-	g.networkBalance = make(map[models.NetworkID]*big.Int)
+	g.networksGraph = make(map[models.NetworkSelector][]models.NetworkSelector)
+	g.networkBalance = make(map[models.NetworkSelector]*big.Int)
+}
+
+func (g *Graph) String() string {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	return fmt.Sprintf("Graph{networksGraph: %+v, networkBalance: %+v}", g.networksGraph, g.networkBalance)
 }

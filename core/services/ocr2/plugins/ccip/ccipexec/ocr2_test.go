@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
@@ -34,11 +35,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
 )
 
 func TestExecutionReportingPlugin_Observation(t *testing.T) {
@@ -52,7 +50,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		tokenPoolsMapping map[common.Address]common.Address
 		blessedRoots      map[[32]byte]bool
 		senderNonce       uint64
-		rateLimiterState  evm_2_evm_offramp.RateLimiterTokenBucket
+		rateLimiterState  ccipdata.TokenBucketRateLimit
 		expErr            bool
 	}{
 		{
@@ -73,9 +71,9 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				},
 			},
 			blessedRoots: map[[32]byte]bool{
-				[32]byte{123}: true,
+				{123}: true,
 			},
-			rateLimiterState: evm_2_evm_offramp.RateLimiterTokenBucket{
+			rateLimiterState: ccipdata.TokenBucketRateLimit{
 				IsEnabled: false,
 			},
 			tokenPoolsMapping: map[common.Address]common.Address{},
@@ -103,6 +101,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.lggr = logger.TestLogger(t)
 			p.tokenDataWorker = tokendata.NewBackgroundWorker(
 				ctx, make(map[common.Address]tokendata.Reader), 10, 5*time.Second, time.Hour)
+			p.metricsCollector = ccip.NoopMetricsCollector
 
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 			commitStoreReader.On("IsDown", mock.Anything).Return(tc.commitStorePaused, nil)
@@ -260,7 +259,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	plugin := ExecutionReportingPlugin{
 		offRampReader:   mockOffRampReader,
 		lggr:            logger.TestLogger(t),
-		inflightReports: newInflightExecReportsContainer(models.MustMakeDuration(1 * time.Hour).Duration()),
+		inflightReports: newInflightExecReportsContainer(1 * time.Hour),
 	}
 
 	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(ccipdata.ExecutionStateUntouched), nil).Once()
@@ -307,7 +306,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 		commitStoreReader: mockCommitStoreReader,
 		offRampReader:     mockOffRampReader,
 		lggr:              logger.TestLogger(t),
-		inflightReports:   newInflightExecReportsContainer(models.MustMakeDuration(1 * time.Hour).Duration()),
+		inflightReports:   newInflightExecReportsContainer(1 * time.Hour),
 	}
 
 	should, err := plugin.ShouldTransmitAcceptedReport(testutils.Context(t), ocrtypes.ReportTimestamp{}, encodedReport)
@@ -356,6 +355,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 				},
 			},
 		}, nil)
+	p.metricsCollector = ccip.NoopMetricsCollector
 	p.commitStoreReader = commitStore
 
 	lp := lpMocks.NewLogPoller(t)
@@ -1802,7 +1802,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 			destPriceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
 
-			offrampReader.On("CurrentRateLimiterState", ctx).Return(evm_2_evm_offramp.RateLimiterTokenBucket{}, nil).Maybe()
+			offrampReader.On("CurrentRateLimiterState", ctx).Return(ccipdata.TokenBucketRateLimit{}, nil).Maybe()
 			offrampReader.On("GetSourceToDestTokensMapping", ctx).Return(map[common.Address]common.Address{}, nil).Maybe()
 			gasPriceEstimator.On("GetGasPrice", ctx).Return(prices.GasPrice(big.NewInt(1e9)), nil).Maybe()
 

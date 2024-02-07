@@ -11,10 +11,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 // OCR2TaskJobSpec represents an OCR2 job that is given to other nodes, meant to communicate with the bootstrap node,
@@ -64,7 +65,7 @@ func (o *OCR2TaskJobSpec) String() (string, error) {
 		MaxTaskDuration:       o.MaxTaskDuration,
 		ContractID:            o.OCR2OracleSpec.ContractID,
 		FeedID:                feedID,
-		Relay:                 string(o.OCR2OracleSpec.Relay),
+		Relay:                 o.OCR2OracleSpec.Relay,
 		PluginType:            string(o.OCR2OracleSpec.PluginType),
 		RelayConfig:           o.OCR2OracleSpec.RelayConfig,
 		PluginConfig:          o.OCR2OracleSpec.PluginConfig,
@@ -166,6 +167,7 @@ type CCIPJobSpecParams struct {
 	SourceStartBlock       uint64
 	DestStartBlock         uint64
 	USDCAttestationAPI     string
+	USDCConfig             *config.USDCConfig
 	P2PV2Bootstrappers     pq.StringArray
 }
 
@@ -266,6 +268,12 @@ func (params CCIPJobSpecParams) ExecutionJobSpec() (*OCR2TaskJobSpec, error) {
 		ocrSpec.PluginConfig["USDCConfig.SourceTokenAddress"] = fmt.Sprintf("\"%s\"", utils.RandomAddress().String())
 		ocrSpec.PluginConfig["USDCConfig.SourceMessageTransmitterAddress"] = fmt.Sprintf("\"%s\"", utils.RandomAddress().String())
 		ocrSpec.PluginConfig["USDCConfig.AttestationAPITimeoutSeconds"] = 5
+	}
+	if params.USDCConfig != nil {
+		ocrSpec.PluginConfig["USDCConfig.AttestationAPI"] = fmt.Sprintf(`"%s"`, params.USDCConfig.AttestationAPI)
+		ocrSpec.PluginConfig["USDCConfig.SourceTokenAddress"] = fmt.Sprintf(`"%s"`, params.USDCConfig.SourceTokenAddress)
+		ocrSpec.PluginConfig["USDCConfig.SourceMessageTransmitterAddress"] = fmt.Sprintf(`"%s"`, params.USDCConfig.SourceMessageTransmitterAddress)
+		ocrSpec.PluginConfig["USDCConfig.AttestationAPITimeoutSeconds"] = params.USDCConfig.AttestationAPITimeoutSeconds
 	}
 	return &OCR2TaskJobSpec{
 		OCR2OracleSpec: ocrSpec,

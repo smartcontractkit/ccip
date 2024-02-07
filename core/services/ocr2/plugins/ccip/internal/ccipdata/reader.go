@@ -1,6 +1,7 @@
 package ccipdata
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -8,14 +9,13 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const (
 	V1_0_0 = "1.0.0"
 	V1_1_0 = "1.1.0"
 	V1_2_0 = "1.2.0"
-	V1_3_0 = "1.3.0-dev"
+	V1_4_0 = "1.4.0-dev"
 )
 
 type Event[T any] struct {
@@ -30,10 +30,6 @@ type Meta struct {
 	LogIndex       uint
 }
 
-type Closer interface {
-	Close(qopts ...pg.QOpt) error
-}
-
 func LogsConfirmations(finalized bool) logpoller.Confirmations {
 	if finalized {
 		return logpoller.Finalized
@@ -43,23 +39,26 @@ func LogsConfirmations(finalized bool) logpoller.Confirmations {
 
 func ParseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(log types.Log) (*T, error)) ([]Event[T], error) {
 	reqs := make([]Event[T], 0, len(logs))
+
 	for _, log := range logs {
 		data, err := parseFunc(log.ToGethLog())
-		if err == nil {
-			reqs = append(reqs, Event[T]{
-				Data: *data,
-				Meta: Meta{
-					BlockTimestamp: log.BlockTimestamp,
-					BlockNumber:    log.BlockNumber,
-					TxHash:         log.TxHash,
-					LogIndex:       uint(log.LogIndex),
-				},
-			})
+		if err != nil {
+			lggr.Errorw("Unable to parse log", "err", err)
+			continue
 		}
+		reqs = append(reqs, Event[T]{
+			Data: *data,
+			Meta: Meta{
+				BlockTimestamp: log.BlockTimestamp,
+				BlockNumber:    log.BlockNumber,
+				TxHash:         log.TxHash,
+				LogIndex:       uint(log.LogIndex),
+			},
+		})
 	}
 
 	if len(logs) != len(reqs) {
-		lggr.Warnw("Some logs were not parsed", "logs", len(logs), "requests", len(reqs))
+		return nil, fmt.Errorf("%d logs were not parsed", len(logs)-len(reqs))
 	}
 	return reqs, nil
 }

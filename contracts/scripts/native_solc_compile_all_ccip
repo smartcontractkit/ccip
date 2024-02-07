@@ -25,7 +25,7 @@ compileContract () {
 
   solc --overwrite --optimize --optimize-runs $OPTIMIZE_RUNS --metadata-hash none \
       -o "$ROOT"/contracts/solc/v$SOLC_VERSION/"$contract" \
-      --abi --bin --allow-paths "$ROOT"/contracts/src/v0.8 \
+     --abi --bin --allow-paths "$ROOT"/contracts/src/v0.8 \
       "$ROOT"/contracts/src/v0.8/"$1"
 }
 
@@ -52,6 +52,7 @@ compileContract ccip/pools/LockReleaseTokenPool.sol
 compileContract ccip/pools/BurnMintTokenPool.sol
 compileContract ccip/pools/BurnFromMintTokenPool.sol
 compileContract ccip/pools/BurnWithFromMintTokenPool.sol
+compileContract ccip/pools/TokenPool.sol
 compileContract shared/token/ERC677/BurnMintERC677.sol
 compileContract ccip/ARM.sol
 compileContract ccip/ARMProxy.sol
@@ -62,8 +63,9 @@ compileContract ccip/test/helpers/CommitStoreHelper.sol
 compileContract ccip/test/helpers/CustomTokenPool.sol
 compileContract ccip/test/helpers/receivers/MaybeRevertMessageReceiver.sol
 compileContract ccip/test/mocks/MockARM.sol
+compileContract ccip/test/mocks/MockE2EUSDCTokenMessenger.sol
+compileContract ccip/test/mocks/MockE2EUSDCTransmitter.sol
 compileContract ccip/test/WETH9.sol
 
 # Customer contracts
 compileContract ccip/pools/USDC/USDCTokenPool.sol
-

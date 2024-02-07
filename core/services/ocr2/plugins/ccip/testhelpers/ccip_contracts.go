@@ -20,7 +20,9 @@ import (
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
@@ -39,13 +41,11 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/burn_mint_erc677"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
-	"github.com/smartcontractkit/chainlink/v2/core/store/models"
-	"github.com/smartcontractkit/chainlink/v2/core/utils"
 )
 
 var (
@@ -80,27 +80,28 @@ var (
 
 type MessageExecutionState ccipdata.MessageExecutionState
 type CommitOffchainConfig struct {
-	v1_2_0.CommitOffchainConfig
+	v1_2_0.JSONCommitOffchainConfig
 }
 
-func NewCommitOffchainConfig(SourceFinalityDepth uint32,
-	DestFinalityDepth uint32,
-	GasPriceHeartBeat models.Duration,
+func (c CommitOffchainConfig) Encode() ([]byte, error) {
+	return ccipconfig.EncodeOffchainConfig(c.JSONCommitOffchainConfig)
+}
+
+func NewCommitOffchainConfig(
+	GasPriceHeartBeat config.Duration,
 	DAGasPriceDeviationPPB uint32,
 	ExecGasPriceDeviationPPB uint32,
-	TokenPriceHeartBeat models.Duration,
+	TokenPriceHeartBeat config.Duration,
 	TokenPriceDeviationPPB uint32,
 	MaxGasPrice uint64,
-	InflightCacheExpiry models.Duration) CommitOffchainConfig {
-	return CommitOffchainConfig{v1_2_0.CommitOffchainConfig{
-		SourceFinalityDepth:      SourceFinalityDepth,
-		DestFinalityDepth:        DestFinalityDepth,
+	InflightCacheExpiry config.Duration) CommitOffchainConfig {
+	return CommitOffchainConfig{v1_2_0.JSONCommitOffchainConfig{
 		GasPriceHeartBeat:        GasPriceHeartBeat,
 		DAGasPriceDeviationPPB:   DAGasPriceDeviationPPB,
 		ExecGasPriceDeviationPPB: ExecGasPriceDeviationPPB,
 		TokenPriceHeartBeat:      TokenPriceHeartBeat,
 		TokenPriceDeviationPPB:   TokenPriceDeviationPPB,
-		MaxGasPrice:              MaxGasPrice,
+		SourceMaxGasPrice:        MaxGasPrice,
 		InflightCacheExpiry:      InflightCacheExpiry,
 	}}
 }
@@ -140,26 +141,26 @@ func NewExecOnchainConfig(
 }
 
 type ExecOffchainConfig struct {
-	v1_0_0.ExecOffchainConfig
+	v1_2_0.JSONExecOffchainConfig
+}
+
+func (c ExecOffchainConfig) Encode() ([]byte, error) {
+	return ccipconfig.EncodeOffchainConfig(c.JSONExecOffchainConfig)
 }
 
 func NewExecOffchainConfig(
-	SourceFinalityDepth uint32,
 	DestOptimisticConfirmations uint32,
-	DestFinalityDepth uint32,
 	BatchGasLimit uint32,
 	RelativeBoostPerWaitHour float64,
 	MaxGasPrice uint64,
-	InflightCacheExpiry models.Duration,
-	RootSnoozeTime models.Duration,
+	InflightCacheExpiry config.Duration,
+	RootSnoozeTime config.Duration,
 ) ExecOffchainConfig {
-	return ExecOffchainConfig{v1_0_0.ExecOffchainConfig{
-		SourceFinalityDepth:         SourceFinalityDepth,
+	return ExecOffchainConfig{v1_2_0.JSONExecOffchainConfig{
 		DestOptimisticConfirmations: DestOptimisticConfirmations,
-		DestFinalityDepth:           DestFinalityDepth,
 		BatchGasLimit:               BatchGasLimit,
 		RelativeBoostPerWaitHour:    RelativeBoostPerWaitHour,
-		MaxGasPrice:                 MaxGasPrice,
+		DestMaxGasPrice:             MaxGasPrice,
 		InflightCacheExpiry:         InflightCacheExpiry,
 		RootSnoozeTime:              RootSnoozeTime,
 	}}
@@ -929,9 +930,11 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	o, err := destPool.Owner(nil)
 	require.NoError(t, err)
 	require.Equal(t, destUser.From.String(), o.String())
+	_, err = destPool.SetRebalancer(destUser, destUser.From)
+	require.NoError(t, err)
 	_, err = destLinkToken.Approve(destUser, destPoolAddress, Link(200))
 	require.NoError(t, err)
-	_, err = destPool.AddLiquidity(destUser, Link(200))
+	_, err = destPool.ProvideLiquidity(destUser, Link(200))
 	require.NoError(t, err)
 	destChain.Commit()
 

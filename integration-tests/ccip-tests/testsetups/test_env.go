@@ -7,10 +7,12 @@ import (
 	"testing"
 
 	"github.com/AlekSi/pointer"
-
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver"
+	mockservercfg "github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/mockserver-cfg"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 	ctftestenv "github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
@@ -20,6 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/chainlink"
 	"github.com/smartcontractkit/chainlink-testing-framework/k8s/pkg/helm/reorg"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/types/config/node"
 	integrationclient "github.com/smartcontractkit/chainlink/integration-tests/client"
@@ -27,7 +31,6 @@ import (
 	integrationnodes "github.com/smartcontractkit/chainlink/integration-tests/types/config/node"
 	evmcfg "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
 	corechainlink "github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
-	"github.com/smartcontractkit/chainlink/v2/core/utils/config"
 )
 
 func SetResourceProfile(cpu, mem string) map[string]interface{} {
@@ -108,8 +111,8 @@ func ChainlinkChart(
 	clProps["chainlink"] = map[string]interface{}{
 		"resources": SetResourceProfile(testInputs.EnvInput.Chainlink.NodeCPU, testInputs.EnvInput.Chainlink.NodeMemory),
 		"image": map[string]any{
-			"image":   testInputs.EnvInput.Chainlink.Common.Image,
-			"version": testInputs.EnvInput.Chainlink.Common.Tag,
+			"image":   pointer.GetString(testInputs.EnvInput.Chainlink.Common.ChainlinkImage.Image),
+			"version": pointer.GetString(testInputs.EnvInput.Chainlink.Common.ChainlinkImage.Version),
 		},
 	}
 
@@ -137,8 +140,8 @@ func ChainlinkChart(
 				"name": clNode.Name,
 				"chainlink": map[string]any{
 					"image": map[string]any{
-						"image":   clNode.Image,
-						"version": clNode.Tag,
+						"image":   pointer.GetString(clNode.ChainlinkImage.Image),
+						"version": pointer.GetString(clNode.ChainlinkImage.Version),
 					},
 				},
 				"db": map[string]any{
@@ -171,8 +174,10 @@ func DeployLocalCluster(
 ) (*test_env.CLClusterTestEnv, func() error) {
 	selectedNetworks := testInputs.SelectedNetworks
 	env, err := test_env.NewCLTestEnvBuilder().
+		WithTestConfig(testInputs.EnvInput).
 		WithTestInstance(t).
 		WithPrivateGethChains(selectedNetworks).
+		WithMockAdapter().
 		WithoutCleanup().
 		Build()
 	require.NoError(t, err)
@@ -191,6 +196,7 @@ func DeployLocalCluster(
 	// a func to start the CL nodes asynchronously
 	deployCL := func() error {
 		noOfNodes := pointer.GetInt(testInputs.EnvInput.Chainlink.NoOfNodes)
+		// if individual nodes are specified, then deploy them with specified configs
 		if len(testInputs.EnvInput.Chainlink.Nodes) > 0 {
 			for _, clNode := range testInputs.EnvInput.Chainlink.Nodes {
 				toml, _, err := setNodeConfig(
@@ -204,32 +210,48 @@ func DeployLocalCluster(
 				}
 				ccipNode, err := test_env.NewClNode(
 					[]string{env.Network.Name},
-					clNode.Image, clNode.Tag, toml, test_env.WithPgDBOptions(
+					pointer.GetString(clNode.ChainlinkImage.Image),
+					pointer.GetString(clNode.ChainlinkImage.Version), toml,
+					test_env.WithPgDBOptions(
 						ctftestenv.WithPostgresImageName(clNode.DBImage),
-						ctftestenv.WithPostgresImageVersion(clNode.DBTag)))
+						ctftestenv.WithPostgresImageVersion(clNode.DBTag)),
+					test_env.WithLogStream(env.LogStream),
+				)
 				if err != nil {
 					return err
 				}
 				ccipNode.SetTestLogger(t)
 				env.ClCluster.Nodes = append(env.ClCluster.Nodes, ccipNode)
 			}
-			return env.ClCluster.Start()
+		} else {
+			// if no individual nodes are specified, then deploy the number of nodes specified in the env input with common config
+			for i := 0; i < noOfNodes; i++ {
+				toml, _, err := setNodeConfig(
+					selectedNetworks,
+					testInputs.EnvInput.Chainlink.Common.BaseConfigTOML,
+					testInputs.EnvInput.Chainlink.Common.CommonChainConfigTOML,
+					testInputs.EnvInput.Chainlink.Common.ChainConfigTOMLByChain,
+				)
+				if err != nil {
+					return err
+				}
+				ccipNode, err := test_env.NewClNode(
+					[]string{env.Network.Name},
+					pointer.GetString(testInputs.EnvInput.Chainlink.Common.ChainlinkImage.Image),
+					pointer.GetString(testInputs.EnvInput.Chainlink.Common.ChainlinkImage.Version),
+					toml, test_env.WithPgDBOptions(
+						ctftestenv.WithPostgresImageName(testInputs.EnvInput.Chainlink.Common.DBImage),
+						ctftestenv.WithPostgresImageVersion(testInputs.EnvInput.Chainlink.Common.DBTag)),
+					test_env.WithLogStream(env.LogStream),
+				)
+				if err != nil {
+					return err
+				}
+				ccipNode.SetTestLogger(t)
+				env.ClCluster.Nodes = append(env.ClCluster.Nodes, ccipNode)
+			}
 		}
-		toml, _, err := setNodeConfig(
-			selectedNetworks,
-			testInputs.EnvInput.Chainlink.Common.BaseConfigTOML,
-			testInputs.EnvInput.Chainlink.Common.CommonChainConfigTOML,
-			testInputs.EnvInput.Chainlink.Common.ChainConfigTOMLByChain,
-		)
-		if err != nil {
-			return err
-		}
-		return env.StartClCluster(toml, noOfNodes, "",
-			test_env.WithImage(testInputs.EnvInput.Chainlink.Common.Image),
-			test_env.WithVersion(testInputs.EnvInput.Chainlink.Common.Tag),
-			test_env.WithPgDBOptions(
-				ctftestenv.WithPostgresImageName(testInputs.EnvInput.Chainlink.Common.DBImage),
-				ctftestenv.WithPostgresImageVersion(testInputs.EnvInput.Chainlink.Common.DBTag)))
+		return env.ClCluster.Start()
 	}
 	return env, deployCL
 }
@@ -252,13 +274,13 @@ func UpgradeNodes(
 		env := ccipEnv.LocalCluster
 		for i, clNode := range env.ClCluster.Nodes {
 			if i <= startIndex || i >= endIndex {
-				upgradeImage := testInputs.EnvInput.Chainlink.Common.UpgradeImage
-				upgradeTag := testInputs.EnvInput.Chainlink.Common.UpgradeTag
+				upgradeImage := pointer.GetString(testInputs.EnvInput.Chainlink.Common.ChainlinkUpgradeImage.Image)
+				upgradeTag := pointer.GetString(testInputs.EnvInput.Chainlink.Common.ChainlinkUpgradeImage.Version)
 				// if individual node upgrade image is provided, use that
 				if len(testInputs.EnvInput.Chainlink.Nodes) > 0 {
 					if i < len(testInputs.EnvInput.Chainlink.Nodes) {
-						upgradeImage = testInputs.EnvInput.Chainlink.Nodes[i].UpgradeImage
-						upgradeTag = testInputs.EnvInput.Chainlink.Nodes[i].UpgradeTag
+						upgradeImage = pointer.GetString(testInputs.EnvInput.Chainlink.Nodes[i].ChainlinkUpgradeImage.Image)
+						upgradeTag = pointer.GetString(testInputs.EnvInput.Chainlink.Nodes[i].ChainlinkUpgradeImage.Version)
 					}
 				}
 				err := clNode.UpgradeVersion(upgradeImage, upgradeTag)
@@ -280,17 +302,17 @@ func UpgradeNodes(
 		var clientsToUpgrade []*integrationclient.ChainlinkK8sClient
 		for i, clNode := range nodeClients {
 			if i <= startIndex || i >= endIndex {
-				upgradeImage := testInputs.EnvInput.Chainlink.Common.UpgradeImage
-				upgradeTag := testInputs.EnvInput.Chainlink.Common.UpgradeTag
+				upgradeImage := testInputs.EnvInput.Chainlink.Common.ChainlinkUpgradeImage.Image
+				upgradeTag := testInputs.EnvInput.Chainlink.Common.ChainlinkUpgradeImage.Version
 				// if individual node upgrade image is provided, use that
 				if len(testInputs.EnvInput.Chainlink.Nodes) > 0 {
 					if i < len(testInputs.EnvInput.Chainlink.Nodes) {
-						upgradeImage = testInputs.EnvInput.Chainlink.Nodes[i].UpgradeImage
-						upgradeTag = testInputs.EnvInput.Chainlink.Nodes[i].UpgradeTag
+						upgradeImage = testInputs.EnvInput.Chainlink.Nodes[i].ChainlinkUpgradeImage.Image
+						upgradeTag = testInputs.EnvInput.Chainlink.Nodes[i].ChainlinkUpgradeImage.Version
 					}
 				}
 				clientsToUpgrade = append(clientsToUpgrade, clNode)
-				err := clNode.UpgradeVersion(k8Env, upgradeImage, upgradeTag)
+				err := clNode.UpgradeVersion(k8Env, pointer.GetString(upgradeImage), pointer.GetString(upgradeTag))
 				if err != nil {
 					return err
 				}
@@ -346,7 +368,11 @@ func DeployEnvironments(
 				},
 			}))
 	}
-	err := testEnvironment.Run()
+
+	err := testEnvironment.
+		AddHelm(mockservercfg.New(nil)).
+		AddHelm(mockserver.New(nil)).
+		Run()
 	require.NoError(t, err)
 
 	if testEnvironment.WillUseRemoteRunner() {
