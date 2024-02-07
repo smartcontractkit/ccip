@@ -26,7 +26,7 @@ func init() {
 		panic(err)
 	}
 	if _, ok := aggregatorABI.Methods[latestRoundDataMethodName]; !ok {
-		panic(fmt.Errorf("%s method not found on abi: %+v", latestRoundDataMethodName, aggregatorABI.Methods))
+		panic(fmt.Errorf("method %s not found on ABI: %+v", latestRoundDataMethodName, aggregatorABI.Methods))
 	}
 }
 

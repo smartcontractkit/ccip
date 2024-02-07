@@ -26,6 +26,7 @@ type CommitPluginJobSpecConfig struct {
 	PriceGetterConfig *DynamicPriceGetterConfig `json:"priceGetterConfig,omitempty"`
 }
 
+// DynamicPriceGetterConfig specifies which configuration to use for getting the price of tokens (map keys).
 type DynamicPriceGetterConfig struct {
 	AggregatorPrices map[common.Address]AggregatorPriceConfig `json:"aggregatorPrices"`
 	StaticPrices     map[common.Address]StaticPriceConfig     `json:"staticPrices"`

@@ -129,26 +129,30 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			return nil, nil, fmt.Errorf("creating pipeline price getter: %w", err)
 		}
 	} else {
-		// Build evmClients for price getter.
-		srcCaller := rpclib.NewDynamicLimitedBatchCaller(
-			lggr,
-			params.sourceChain.Client(),
-			rpclib.DefaultRpcBatchSizeLimit,
-			rpclib.DefaultRpcBatchBackOffMultiplier,
-		)
-		dstCaller := rpclib.NewDynamicLimitedBatchCaller(
-			lggr,
-			params.destChain.Client(),
-			rpclib.DefaultRpcBatchSizeLimit,
-			rpclib.DefaultRpcBatchBackOffMultiplier,
-		)
-		priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{
-			params.sourceChain.ID().Uint64(): pricegetter.NewDynamicPriceGetterClient(srcCaller, params.sourceChain.LogPoller()),
-			params.destChain.ID().Uint64():   pricegetter.NewDynamicPriceGetterClient(dstCaller, params.destChain.LogPoller()),
-		}
+		// Use dynamic price getter.
 		if params.pluginConfig.PriceGetterConfig == nil {
 			return nil, nil, fmt.Errorf("priceGetterConfig is nil")
 		}
+
+		// Build price getter clients for all chains specified in the aggregator configurations.
+		// Some lanes (e.g. Wemix/Kroma) requires other clients than source and destination, since they use feeds from other chains.
+		priceGetterClients := map[uint64]pricegetter.DynamicPriceGetterClient{}
+		for _, aggCfg := range params.pluginConfig.PriceGetterConfig.AggregatorPrices {
+			chainID := aggCfg.ChainID
+			// Retrieve the chain.
+			chain, _, err2 := ccipconfig.GetChainByChainID(chainSet, chainID)
+			if err2 != nil {
+				return nil, nil, fmt.Errorf("retrieving chain for chainID %d: %w", chainID, err2)
+			}
+			caller := rpclib.NewDynamicLimitedBatchCaller(
+				lggr,
+				chain.Client(),
+				rpclib.DefaultRpcBatchSizeLimit,
+				rpclib.DefaultRpcBatchBackOffMultiplier,
+			)
+			priceGetterClients[chainID] = pricegetter.NewDynamicPriceGetterClient(caller, chain.LogPoller())
+		}
+
 		priceGetter, err = pricegetter.NewDynamicPriceGetter(*params.pluginConfig.PriceGetterConfig, priceGetterClients)
 		if err != nil {
 			return nil, nil, fmt.Errorf("creating dynamic price getter: %w", err)

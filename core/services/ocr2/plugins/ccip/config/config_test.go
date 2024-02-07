@@ -113,9 +113,6 @@ func TestCommitConfig(t *testing.T) {
 			require.NoError(t, json.Unmarshal(bts, &parsedConfig))
 			require.Equal(t, test.cfg, parsedConfig)
 
-			// FIXME TMP display json formatted config
-			fmt.Println(string(bts))
-
 			// Ensure correctness of price getter configuration.
 			pgc := test.cfg.PriceGetterConfig
 			err = pgc.Validate()
