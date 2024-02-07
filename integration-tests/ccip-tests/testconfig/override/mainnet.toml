@@ -282,11 +282,7 @@ Data = """
       },
       "Kroma Mainnet": {
         "is_native_fee_token": true,
-<<<<<<< HEAD
         "fee_token": "",
-=======
-        "fee_token": "0xC1F6f7622ad37C3f46cDF6F8AA0344ADE80BF450",
->>>>>>> origin
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
         "arm" : "0xB59779d3364BC6d71168245f9ebb96469E5a5a98",
@@ -358,16 +354,10 @@ Data = """
         }
       },
       "Polygon Mainnet": {
-<<<<<<< HEAD
-        "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
-        "bridge_tokens": ["0xb0897686c545045aFc77CF20eC7A532E3120E0F1"],
-        "bridge_tokens_pools": ["0x086892015567fb8764d02c6845C85C25C8FcA389"],
-=======
         "is_native_fee_token": true,
         "fee_token": "0xb0897686c545045aFc77CF20eC7A532E3120E0F1",
         "bridge_tokens": [],
         "bridge_tokens_pools": [],
->>>>>>> origin
         "arm": "0xD7AcF65dA1E1f34b663aB199a474F209bF2b0523",
         "router": "0x849c5ED5a80F5B408Dd4969b78c2C8fdf0565Bfe",
         "price_registry": "0x30D873664Ba766C983984C7AF9A921ccE36D34e1",
