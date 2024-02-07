@@ -1,14 +1,3 @@
-<!-- TOC start (generated with https://github.com/derlin/bitdowntoc) -->
-
-- [Running the Rebalancer DON Locally](#running-the-rebalancer-don-locally)
-- [Running Bridge Transfers Through the Adapter Contracts](#running-bridge-transfers-through-the-adapter-contracts)
-   * [Arbitrum](#arbitrum)
-      + [L2 -> L1](#l2-l1)
-      + [Finalize Withdrawal on L1](#finalize-withdrawal-on-l1)
-
-<!-- TOC end -->
-
-<!-- TOC --><a name="running-the-rebalancer-don-locally"></a>
 ## Running the Rebalancer DON Locally
 
 Start by cloning the chainlink CCIP repo and checking out the branch with the scripts:
@@ -275,13 +264,11 @@ Indicates that the node has picked up the new configuration, and will switch to 
 
 Shortly thereafter, you should start seeing transmissions.
 
-<!-- TOC --><a name="running-bridge-transfers-through-the-adapter-contracts"></a>
 ## Running Bridge Transfers Through the Adapter Contracts
 
-<!-- TOC --><a name="arbitrum"></a>
 ### Arbitrum
 
-First, deploy the L1 and L2 bridge adapters:
+First, you have to deploy the L1 and L2 bridge adapters:
 
 ```shell
 # Switch into the rebalancer scripts dir
@@ -292,7 +279,25 @@ go run . deploy-arb-l1-adapter -l1-chain-id 11155111
 go run . deploy-arb-l2-adapter -l2-chain-id 421614
 ```
 
-<!-- TOC --><a name="l2-l1"></a>
+Now you're ready to do some cross-chain transfers.
+
+#### L1 -> L2
+
+In order to send tokens from L1 to L2, pick a token (WETH is easiest) and make sure you have enough balance (the script will check).
+Then invoke the following function:
+
+```shell
+# Uses sepolia chain id, switch to 42161 for arb mainnet
+# All values are in the lowest denomination (i.e wei)
+go run . arb-send-to-l2 -l1-chain-id 11155111 -l2-chain-id 421614 \
+    -l1-bridge-adapter-address <l1-adapter-address> \
+    -amount 1 -l2-to-address <to-address-on-L2> \                # This is the address that will receive the funds - use an EOA you own to easily check status on Arbitrum's Bridge UI
+    -l1-token-address 0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9 # This is the L1 WETH token
+```
+
+You can go to the [Arbitrum Bridge](https://bridge.arbitrum.io) and connect with the receiver address on L2 (via MetaMask) to see the status of the transaction. It should
+be automatically deposited on L2 in around 10 minutes.
+
 #### L2 -> L1
 
 In order to withdraw from L2 to L1, pick a token (WETH is probably the easiest) and make sure you have enough balance.
@@ -315,9 +320,8 @@ If you're using WETH, you can get some WETH from native this way:
 go run . deposit-weth -amount 1 -weth-address 0x980B62Da83eFf3D4576C647993b0c1D7faf17c73 -chain-id 421614
 ```
 
-Once the `arb-withdraw-from-l2` command executes successfully, you will have to wait some time until you can claim the funds on L1.
+Once the `arb-withdraw-from-l2` command executes successfully, you will have to wait some time until you can claim the funds on L1 (see next section).
 
-<!-- TOC --><a name="finalize-withdrawal-on-l1"></a>
 #### Finalize Withdrawal on L1
 
 In order to finalize an L2 withdrawal on L1, you will need to first have a transaction on L2 that is not yet finalized.

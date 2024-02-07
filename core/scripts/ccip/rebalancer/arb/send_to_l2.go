@@ -63,14 +63,14 @@ func SendToL2(
 	allowance, err := token.Allowance(nil, env.Transactors[l1ChainID].From, l1BridgeAdapterAddress)
 	helpers.PanicErr(err)
 	if allowance.Cmp(amount) < 0 {
-		tx, err := token.Approve(env.Transactors[l1ChainID], l1BridgeAdapterAddress, amount)
-		helpers.PanicErr(err)
+		tx, err2 := token.Approve(env.Transactors[l1ChainID], l1BridgeAdapterAddress, amount)
+		helpers.PanicErr(err2)
 		helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], tx, int64(l1ChainID),
 			"Approve", amount.String(), "to", l1BridgeAdapterAddress.String())
 
 		// check allowance
-		allowance, err = token.Allowance(nil, env.Transactors[l1ChainID].From, l1BridgeAdapterAddress)
-		helpers.PanicErr(err)
+		allowance, err2 = token.Allowance(nil, env.Transactors[l1ChainID].From, l1BridgeAdapterAddress)
+		helpers.PanicErr(err2)
 		if allowance.Cmp(amount) < 0 {
 			panic(fmt.Sprintf("Allowance failed, expected %s, got %s", amount, allowance))
 		}
@@ -154,14 +154,14 @@ func populateFunctionParams(
 	allowance, err := l1Token.Allowance(nil, env.Transactors[l1ChainID].From, gatewayToApprove)
 	helpers.PanicErr(err)
 	if allowance.Cmp(value) < 0 {
-		tx, err := l1Token.Approve(env.Transactors[l1ChainID], gatewayToApprove, value)
-		helpers.PanicErr(err)
+		tx, err2 := l1Token.Approve(env.Transactors[l1ChainID], gatewayToApprove, value)
+		helpers.PanicErr(err2)
 		helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], tx, int64(l1ChainID),
 			"Approve", value.String(), "to gateway at", gatewayToApprove.String())
 
 		// check allowance
-		allowance, err = l1Token.Allowance(nil, env.Transactors[l1ChainID].From, gatewayToApprove)
-		helpers.PanicErr(err)
+		allowance, err2 = l1Token.Allowance(nil, env.Transactors[l1ChainID].From, gatewayToApprove)
+		helpers.PanicErr(err2)
 		if allowance.Cmp(value) < 0 {
 			panic(fmt.Sprintf("Allowance failed, expected %s, got %s", value, allowance))
 		}
@@ -240,7 +240,7 @@ func estimateRetryableGasLimit(env multienv.Env, l2Client *ethclient.Client, l2C
 
 	packed, err := nodeInterfaceABI.Pack("estimateRetryableTicket",
 		rd.From,
-		assets.Ether(1).ToInt(), // what is done in the SDK, not sure why
+		assets.Ether(1).ToInt(), // this is what is done in the SDK, not sure why yet
 		rd.To,
 		rd.L2CallValue,
 		rd.ExcessFeeRefundAddr,
@@ -263,12 +263,14 @@ func estimateRetryableGasLimit(env multienv.Env, l2Client *ethclient.Client, l2C
 	helpers.PanicErr(err)
 
 	// no percent increase on gas limit
+	// should be pretty accurate
 	return big.NewInt(int64(gasLimit))
 }
 
 func estimateMaxFeePerGas(l2Client *ethclient.Client) *big.Int {
 	l2BaseFee, err := l2Client.SuggestGasPrice(context.Background())
 	helpers.PanicErr(err)
+	// base fee on L2 is bumped by 200% by the arbitrum sdk (i.e 3x)
 	l2BaseFee = new(big.Int).Mul(l2BaseFee, big.NewInt(3))
 	return l2BaseFee
 }
@@ -280,7 +282,7 @@ func estimateSubmissionFee(l1Client *ethclient.Client, l1ChainID uint64, l1BaseF
 	submissionFee, err := inbox.CalculateRetryableSubmissionFee(nil, big.NewInt(int64(calldataSize)), l1BaseFee)
 	helpers.PanicErr(err)
 
-	// submission fee is bumped by 300% by the arbitrum sdk
+	// submission fee is bumped by 300% (i.e 4x) by the arbitrum sdk
 	// do the same here
 	submissionFee = submissionFee.Mul(submissionFee, big.NewInt(4))
 
@@ -301,21 +303,13 @@ type RetryableData struct {
 }
 
 func parseRetryableError(errData string) RetryableData {
-	// fmt.Println("errData:", errData)
-
 	dataBytes, err := hexutil.Decode(errData)
 	helpers.PanicErr(err)
-
-	// retryableABI, err := abi.JSON(strings.NewReader(`[{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"l2CallValue","type":"uint256"},{"internalType":"uint256","name":"deposit","type":"uint256"},{"internalType":"uint256","name":"maxSubmissionCost","type":"uint256"},{"internalType":"address","name":"excessFeeRefundAddress","type":"address"},{"internalType":"address","name":"callValueRefundAddress","type":"address"},{"internalType":"uint256","name":"gasLimit","type":"uint256"},{"internalType":"uint256","name":"maxFeePerGas","type":"uint256"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"RetryableData","type":"error"},{"inputs":[],"name":"blah","outputs":[],"stateMutability":"pure","type":"function"}]`))
-	// helpers.PanicErr(err)
 
 	retryableIfaces, err := utils.ABIDecode(
 		`[{"type":"address"},{"type":"address"},{"type":"uint256"},{"type":"uint256"},{"type":"uint256"},{"type":"address"},{"type":"address"},{"type":"uint256"},{"type":"uint256"},{"type":"bytes"}]`,
 		dataBytes[4:])
 	helpers.PanicErr(err)
-
-	// retryableIfaces, err := retryableABI.Errors["RetryableData"].Inputs.Unpack(dataBytes)
-	// helpers.PanicErr(err)
 
 	if len(retryableIfaces) != 10 {
 		panic(fmt.Sprintf("Expected 10 inputs, got %d", len(retryableIfaces)))

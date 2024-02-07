@@ -156,7 +156,8 @@ func FinalizeL1(
 
 	tx, err := adapter.FinalizeWithdrawERC20(env.Transactors[l1ChainID], common.HexToAddress("0x0"), common.HexToAddress("0x0"), finalizationPayload)
 	helpers.PanicErr(err)
-	helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], tx, int64(l1ChainID))
+	receipt = helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], tx, int64(l1ChainID))
+	fmt.Println("transaction mined:", receipt.TxHash.String(), "status:", receiptStatusToString(receipt.Status))
 }
 
 func encodeProofToHex(proof [][32]byte) []string {
@@ -179,9 +180,9 @@ func getProof(env multienv.Env, l1ChainID, l2ChainID uint64, l2ToL1Id *big.Int) 
 	l1Client := env.Clients[l1ChainID]
 	latestHeader, err := l1Client.HeaderByNumber(context.Background(), nil)
 	helpers.PanicErr(err)
-	// start two hours back in terms of blocks
-	// 12 seconds per block => 5 * 120 = 600 blocks
-	startBlock := big.NewInt(0).Sub(latestHeader.Number, big.NewInt(600))
+	// start four hours back in terms of blocks
+	// 12 seconds per block => 5 * 240 = 1200 blocks
+	startBlock := big.NewInt(0).Sub(latestHeader.Number, big.NewInt(1200))
 	lgs, err := l1Client.FilterLogs(context.Background(), ethereum.FilterQuery{
 		Addresses: []common.Address{ArbitrumContracts[l1ChainID]["Rollup"]},
 		Topics: [][]common.Hash{{
@@ -192,8 +193,9 @@ func getProof(env multienv.Env, l1ChainID, l2ChainID uint64, l2ToL1Id *big.Int) 
 	helpers.PanicErr(err)
 	var latestNodeConfirmed *types.Log
 	for _, lg := range lgs {
+		lg := lg // exportloopref
 		if latestNodeConfirmed == nil || lg.BlockNumber > latestNodeConfirmed.BlockNumber {
-			latestNodeConfirmed = &lg //nolint:gosec
+			latestNodeConfirmed = &lg
 		}
 	}
 	if latestNodeConfirmed == nil {
@@ -261,4 +263,11 @@ func parseNodeConfirmed(env multienv.Env, l1ChainID uint64, lg *types.Log) *arbi
 	parsed, err := rollupCore.ParseNodeConfirmed(*lg)
 	helpers.PanicErr(err)
 	return parsed
+}
+
+func receiptStatusToString(status uint64) string {
+	if status == 0 {
+		return "failed"
+	}
+	return "successful"
 }
