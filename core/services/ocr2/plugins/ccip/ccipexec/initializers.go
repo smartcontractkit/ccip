@@ -18,6 +18,8 @@ import (
 	"go.uber.org/multierr"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
@@ -115,8 +117,8 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 	return factory.ExecReportToEthTxMeta(typ, ver)
 }
 
-func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller, qopts ...pg.QOpt) (map[common.Address]tokendata.Reader, error) {
-	tokenDataProviders := make(map[common.Address]tokendata.Reader)
+func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller, qopts ...pg.QOpt) (map[cciptypes.Address]tokendata.Reader, error) {
+	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
 
 	// init usdc token data provider
 	if pluginConfig.USDCConfig.AttestationAPI != "" {
@@ -137,12 +139,13 @@ func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Executio
 			return nil, err
 		}
 
-		tokenDataProviders[pluginConfig.USDCConfig.SourceTokenAddress] = usdc.NewUSDCTokenDataReader(
-			lggr,
-			usdcReader,
-			attestationURI,
-			pluginConfig.USDCConfig.AttestationAPITimeoutSeconds,
-		)
+		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] =
+			usdc.NewUSDCTokenDataReader(
+				lggr,
+				usdcReader,
+				attestationURI,
+				pluginConfig.USDCConfig.AttestationAPITimeoutSeconds,
+			)
 	}
 
 	return tokenDataProviders, nil
@@ -172,7 +175,11 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, errors.Wrap(err, "get onramp dynamic config")
 	}
 
-	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, params.sourceChain.Client())
+	addrs, err := ccipcalc.GenericAddrsToEvm(dynamicOnRampConfig.Router)
+	if err != nil {
+		return nil, nil, err
+	}
+	sourceRouter, err := router.NewRouter(addrs[0], params.sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading source router")
 	}
@@ -223,7 +230,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 			commitStoreReader:        commitStoreReader,
 			offRampReader:            offRampReader,
 			sourcePriceRegistry:      sourcePriceRegistry,
-			sourceWrappedNativeToken: sourceWrappedNative,
+			sourceWrappedNativeToken: cciptypes.Address(sourceWrappedNative.String()),
 			destChainSelector:        destChainSelector,
 			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
 			tokenDataWorker: tokendata.NewBackgroundWorker(
@@ -244,7 +251,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 
 type jobSpecParams struct {
 	pluginConfig  ccipconfig.ExecutionPluginJobSpecConfig
-	offRampConfig ccipdata.OffRampStaticConfig
+	offRampConfig cciptypes.OffRampStaticConfig
 	offRampReader ccipdata.OffRampReader
 	sourceChain   legacyevm.Chain
 	destChain     legacyevm.Chain
@@ -267,7 +274,7 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 	}
 
 	versionFinder := factory.NewEvmVersionFinder()
-	offRampAddress := common.HexToAddress(spec.ContractID)
+	offRampAddress := cciptypes.Address(common.HexToAddress(spec.ContractID).String())
 	offRampReader, err := factory.NewOffRampReader(lggr, versionFinder, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), registerFilters, qopts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "create offRampReader")

@@ -216,12 +216,13 @@ func (o *OffRamp) GetDestinationToken(ctx context.Context, address common.Addres
 	return o.offRampV100.GetDestinationToken(&bind.CallOpts{Context: ctx}, address)
 }
 
-func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []common.Address) ([]common.Address, error) {
-	destTokens := make([]common.Address, len(tokenAddresses))
-	found := make(map[common.Address]bool)
+func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, tokenAddresses []cciptypes.Address) ([]cciptypes.Address, error) {
+	destTokens := make([]cciptypes.Address, len(tokenAddresses))
+	found := make(map[cciptypes.Address]bool)
+
 	for i, tokenAddress := range tokenAddresses {
 		if v, exists := o.sourceToDestTokensCache.Load(tokenAddress); exists {
-			if destToken, isAddr := v.(common.Address); isAddr {
+			if destToken, isAddr := v.(cciptypes.Address); isAddr {
 				destTokens[i] = destToken
 				found[tokenAddress] = true
 			} else {
@@ -234,10 +235,15 @@ func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, toke
 		return destTokens, nil
 	}
 
+	evmAddrs, err := ccipcalc.GenericAddrsToEvm(tokenAddresses...)
+	if err != nil {
+		return nil, err
+	}
+
 	evmCalls := make([]rpclib.EvmCall, 0, len(tokenAddresses))
-	for _, sourceTk := range tokenAddresses {
+	for i, sourceTk := range tokenAddresses {
 		if !found[sourceTk] {
-			evmCalls = append(evmCalls, rpclib.NewEvmCall(abiOffRamp, "getDestinationToken", o.addr, sourceTk))
+			evmCalls = append(evmCalls, rpclib.NewEvmCall(abiOffRamp, "getDestinationToken", o.addr, evmAddrs[i]))
 		}
 	}
 
@@ -261,13 +267,13 @@ func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, toke
 	j := 0
 	for i, sourceToken := range tokenAddresses {
 		if !found[sourceToken] {
-			destTokens[i] = destTokensFromRpc[j]
+			destTokens[i] = cciptypes.Address(destTokensFromRpc[j].String())
 			o.sourceToDestTokensCache.Store(sourceToken, destTokens[i])
 			j++
 		}
 	}
 
-	seenDestTokens := mapset.NewSet[common.Address]()
+	seenDestTokens := mapset.NewSet[cciptypes.Address]()
 	for _, destToken := range destTokens {
 		if seenDestTokens.Contains(destToken) {
 			return nil, fmt.Errorf("offRamp misconfig, destination token %s already exists", destToken)
@@ -324,19 +330,14 @@ func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[cciptyp
 		return nil, err
 	}
 
-	sourceTokensEvmAddrs, err := ccipcalc.GenericAddrsToEvm(tokens.SourceTokens...)
-	if err != nil {
-		return nil, err
-	}
-
-	destTokens, err := o.getDestinationTokensFromSourceTokens(ctx, sourceTokensEvmAddrs)
+	destTokens, err := o.getDestinationTokensFromSourceTokens(ctx, tokens.SourceTokens)
 	if err != nil {
 		return nil, fmt.Errorf("get destination tokens from source tokens: %w", err)
 	}
 
-	srcToDstTokenMapping := make(map[cciptypes.Address]cciptypes.Address, len(sourceTokensEvmAddrs))
-	for i, sourceToken := range sourceTokensEvmAddrs {
-		srcToDstTokenMapping[cciptypes.Address(sourceToken.String())] = cciptypes.Address(destTokens[i].String())
+	srcToDstTokenMapping := make(map[cciptypes.Address]cciptypes.Address, len(tokens.SourceTokens))
+	for i, sourceToken := range tokens.SourceTokens {
+		srcToDstTokenMapping[sourceToken] = destTokens[i]
 	}
 	return srcToDstTokenMapping, nil
 }

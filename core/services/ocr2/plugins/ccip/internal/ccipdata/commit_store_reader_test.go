@@ -347,7 +347,7 @@ func TestCommitStoreReaders(t *testing.T) {
 			assert.Equal(t, cr.OffchainConfig(), cciptypes.CommitOffchainConfig{})
 			newPr, err := cr.ChangeConfig(configs[v][0], configs[v][1])
 			require.NoError(t, err)
-			assert.Equal(t, newPr, prs[v])
+			assert.Equal(t, cciptypes.Address(prs[v].String()), newPr)
 			assert.Equal(t, commonOffchain, cr.OffchainConfig())
 			// We should be able to query for gas prices now.
 			gp, err := cr.GasPriceEstimator().GetGasPrice(context.Background())

@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -21,7 +20,9 @@ const (
 
 //go:generate mockery --quiet --name USDCReader --filename usdc_reader_mock.go --case=underscore
 type USDCReader interface {
-	cciptypes.USDCReader
+	// GetLastUSDCMessagePriorToLogIndexInTx returns the last USDC message that was sent
+	// before the provided log index in the given transaction.
+	GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash string) ([]byte, error)
 }
 
 type USDCReaderImpl struct {
@@ -62,11 +63,11 @@ func parseUSDCMessageSent(logData []byte) ([]byte, error) {
 	return decodeAbiStruct, nil
 }
 
-func (u *USDCReaderImpl) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
+func (u *USDCReaderImpl) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash string) ([]byte, error) {
 	logs, err := u.lp.IndexedLogsByTxHash(
 		u.usdcMessageSent,
 		u.transmitterAddress,
-		txHash,
+		common.HexToHash(txHash),
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
@@ -80,7 +81,7 @@ func (u *USDCReaderImpl) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Conte
 			return parseUSDCMessageSent(current.Data)
 		}
 	}
-	return nil, errors.Errorf("no USDC message found prior to log index %d in tx %s", logIndex, txHash.Hex())
+	return nil, errors.Errorf("no USDC message found prior to log index %d in tx %s", logIndex, txHash)
 }
 
 func NewUSDCReader(lggr logger.Logger, transmitter common.Address, lp logpoller.LogPoller) *USDCReaderImpl {

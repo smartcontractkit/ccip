@@ -8,16 +8,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
 type FakeOffRamp struct {
 	*mock_contracts.EVM2EVMOffRampInterface
 
-	rateLimiterState   ccipdata.TokenBucketRateLimit
+	rateLimiterState   cciptypes.TokenBucketRateLimit
 	senderNonces       map[common.Address]uint64
 	tokenToPool        map[common.Address]common.Address
 	dynamicConfig      evm_2_evm_offramp.EVM2EVMOffRampDynamicConfig
@@ -35,11 +35,11 @@ func NewFakeOffRamp(t *testing.T) (*FakeOffRamp, common.Address) {
 	return offRamp, addr
 }
 
-func (o *FakeOffRamp) CurrentRateLimiterState(opts *bind.CallOpts) (ccipdata.TokenBucketRateLimit, error) {
-	return getOffRampVal(o, func(o *FakeOffRamp) (ccipdata.TokenBucketRateLimit, error) { return o.rateLimiterState, nil })
+func (o *FakeOffRamp) CurrentRateLimiterState(opts *bind.CallOpts) (cciptypes.TokenBucketRateLimit, error) {
+	return getOffRampVal(o, func(o *FakeOffRamp) (cciptypes.TokenBucketRateLimit, error) { return o.rateLimiterState, nil })
 }
 
-func (o *FakeOffRamp) SetRateLimiterState(state ccipdata.TokenBucketRateLimit) {
+func (o *FakeOffRamp) SetRateLimiterState(state cciptypes.TokenBucketRateLimit) {
 	setOffRampVal(o, func(o *FakeOffRamp) { o.rateLimiterState = state })
 }
 

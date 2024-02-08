@@ -2,7 +2,6 @@ package factory
 
 import (
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
@@ -16,22 +15,23 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
+func NewOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr cciptypes.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
 	return initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, false, registerFilters, pgOpts...)
 }
 
-func CloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) error {
+func CloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr cciptypes.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, pgOpts ...pg.QOpt) error {
 	_, err := initOrCloseOffRampReader(lggr, versionFinder, addr, destClient, lp, estimator, true, false, pgOpts...)
 	return err
 }
 
-func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr common.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, closeReader bool, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
+func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, addr cciptypes.Address, destClient client.Client, lp logpoller.LogPoller, estimator gas.EvmFeeEstimator, closeReader bool, registerFilters bool, pgOpts ...pg.QOpt) (ccipdata.OffRampReader, error) {
 	contractType, version, err := versionFinder.TypeAndVersion(addr, destClient)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read type and version")
@@ -41,7 +41,11 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 	}
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
-		offRamp, err := v1_0_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
+		evmAddrs, err := ccipcalc.GenericAddrsToEvm(addr)
+		if err != nil {
+			return nil, err
+		}
+		offRamp, err := v1_0_0.NewOffRamp(lggr, evmAddrs[0], destClient, lp, estimator)
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +54,11 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 		}
 		return offRamp, offRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_2_0, ccipdata.V1_4_0:
-		offRamp, err := v1_2_0.NewOffRamp(lggr, addr, destClient, lp, estimator)
+		evmAddrs, err := ccipcalc.GenericAddrsToEvm(addr)
+		if err != nil {
+			return nil, err
+		}
+		offRamp, err := v1_2_0.NewOffRamp(lggr, evmAddrs[0], destClient, lp, estimator)
 		if err != nil {
 			return nil, err
 		}

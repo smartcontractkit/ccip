@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
@@ -74,11 +75,11 @@ var (
 // Backwards compat, in principle these statuses are version dependent
 // TODO: Adjust integration tests to be version agnostic using readers
 var (
-	ExecutionStateSuccess = MessageExecutionState(ccipdata.ExecutionStateSuccess)
-	ExecutionStateFailure = MessageExecutionState(ccipdata.ExecutionStateFailure)
+	ExecutionStateSuccess = MessageExecutionState(cciptypes.ExecutionStateSuccess)
+	ExecutionStateFailure = MessageExecutionState(cciptypes.ExecutionStateFailure)
 )
 
-type MessageExecutionState ccipdata.MessageExecutionState
+type MessageExecutionState cciptypes.MessageExecutionState
 type CommitOffchainConfig struct {
 	v1_2_0.JSONCommitOffchainConfig
 }

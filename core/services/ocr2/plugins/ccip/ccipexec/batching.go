@@ -5,9 +5,9 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
@@ -16,8 +16,8 @@ import (
 func getProofData(
 	ctx context.Context,
 	sourceReader ccipdata.OnRampReader,
-	interval ccipdata.CommitStoreInterval,
-) (sendReqsInRoot []ccipdata.Event[internal.EVM2EVMMessage], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
+	interval cciptypes.CommitStoreInterval,
+) (sendReqsInRoot []cciptypes.EVM2EVMMessageWithBlockMeta, leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
 	// We don't need to double-check if logs are finalized because we already checked that in the Commit phase.
 	sendReqs, err := sourceReader.GetSendRequestsBetweenSeqNums(ctx, interval.Min, interval.Max, false)
 	if err != nil {
@@ -25,7 +25,7 @@ func getProofData(
 	}
 	leaves = make([][32]byte, 0, len(sendReqs))
 	for _, req := range sendReqs {
-		leaves = append(leaves, req.Data.Hash)
+		leaves = append(leaves, req.Hash)
 	}
 	tree, err = merklemulti.NewTree(hashlib.NewKeccakCtx(), leaves)
 	if err != nil {
@@ -35,14 +35,14 @@ func getProofData(
 }
 
 func buildExecutionReportForMessages(
-	msgsInRoot []ccipdata.Event[internal.EVM2EVMMessage],
+	msgsInRoot []cciptypes.EVM2EVMMessageWithBlockMeta,
 	leaves [][32]byte,
 	tree *merklemulti.Tree[[32]byte],
-	commitInterval ccipdata.CommitStoreInterval,
+	commitInterval cciptypes.CommitStoreInterval,
 	observedMessages []ccip.ObservedMessage,
-) (ccipdata.ExecReport, error) {
+) (cciptypes.ExecReport, error) {
 	innerIdxs := make([]int, 0, len(observedMessages))
-	var messages []internal.EVM2EVMMessage
+	var messages []cciptypes.EVM2EVMMessage
 	var offchainTokenData [][][]byte
 	for _, observedMessage := range observedMessages {
 		if observedMessage.SeqNr < commitInterval.Min || observedMessage.SeqNr > commitInterval.Max {
@@ -50,18 +50,18 @@ func buildExecutionReportForMessages(
 			continue
 		}
 		innerIdx := int(observedMessage.SeqNr - commitInterval.Min)
-		messages = append(messages, msgsInRoot[innerIdx].Data)
+		messages = append(messages, msgsInRoot[innerIdx].EVM2EVMMessage)
 		offchainTokenData = append(offchainTokenData, observedMessage.TokenData)
 		innerIdxs = append(innerIdxs, innerIdx)
 	}
 
 	merkleProof, err := tree.Prove(innerIdxs)
 	if err != nil {
-		return ccipdata.ExecReport{}, err
+		return cciptypes.ExecReport{}, err
 	}
 
 	// any capped proof will have length <= this one, so we reuse it to avoid proving inside loop, and update later if changed
-	return ccipdata.ExecReport{
+	return cciptypes.ExecReport{
 		Messages:          messages,
 		Proofs:            merkleProof.Hashes,
 		ProofFlagBits:     abihelpers.ProofFlagsToBits(merkleProof.SourceFlags),
@@ -86,15 +86,15 @@ func validateSeqNumbers(serviceCtx context.Context, commitStore ccipdata.CommitS
 }
 
 // Gets the commit report from the saved logs for a given sequence number.
-func getCommitReportForSeqNum(ctx context.Context, commitStoreReader ccipdata.CommitStoreReader, seqNum uint64) (ccipdata.CommitStoreReport, error) {
+func getCommitReportForSeqNum(ctx context.Context, commitStoreReader ccipdata.CommitStoreReader, seqNum uint64) (cciptypes.CommitStoreReport, error) {
 	acceptedReports, err := commitStoreReader.GetCommitReportMatchingSeqNum(ctx, seqNum, 0)
 	if err != nil {
-		return ccipdata.CommitStoreReport{}, err
+		return cciptypes.CommitStoreReport{}, err
 	}
 
 	if len(acceptedReports) == 0 {
-		return ccipdata.CommitStoreReport{}, errors.Errorf("seq number not committed")
+		return cciptypes.CommitStoreReport{}, errors.Errorf("seq number not committed")
 	}
 
-	return acceptedReports[0].Data, nil
+	return acceptedReports[0].CommitStoreReport, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	evmclimocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
@@ -18,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
 )
@@ -119,7 +119,7 @@ func TestCachedOffRampTokens(t *testing.T) {
 		Logger:         logger.TestLogger(t),
 		Client:         ec,
 		evmBatchCaller: batchCaller,
-		cachedOffRampTokens: cache.NewLogpollerEventsBased[ccipdata.OffRampTokens](
+		cachedOffRampTokens: cache.NewLogpollerEventsBased[cciptypes.OffRampTokens](
 			lp,
 			offRamp_poolAddedPoolRemovedEvents,
 			mockOffRamp.Address(),
@@ -131,24 +131,24 @@ func TestCachedOffRampTokens(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify data is properly loaded in the cache.
-	expectedPools := make(map[common.Address]common.Address)
+	expectedPools := make(map[cciptypes.Address]cciptypes.Address)
 	for i := range dstTks {
 		expectedPools[dstTks[i]] = dstTks[i]
 	}
-	require.Equal(t, ccipdata.OffRampTokens{
+	require.Equal(t, cciptypes.OffRampTokens{
 		DestinationTokens: dstTks,
 		SourceTokens:      srcTks,
 		DestinationPool:   expectedPools,
 	}, tokens)
 }
 
-func generateTokensAndOutputs(nbTokens uint) ([]common.Address, []common.Address, []rpclib.DataAndErr) {
-	srcTks := make([]common.Address, nbTokens)
-	dstTks := make([]common.Address, nbTokens)
+func generateTokensAndOutputs(nbTokens uint) ([]cciptypes.Address, []cciptypes.Address, []rpclib.DataAndErr) {
+	srcTks := make([]cciptypes.Address, nbTokens)
+	dstTks := make([]cciptypes.Address, nbTokens)
 	outputs := make([]rpclib.DataAndErr, nbTokens)
 	for i := range srcTks {
-		srcTks[i] = utils.RandomAddress()
-		dstTks[i] = utils.RandomAddress()
+		srcTks[i] = cciptypes.Address(utils.RandomAddress().String())
+		dstTks[i] = cciptypes.Address(utils.RandomAddress().String())
 		outputs[i] = rpclib.DataAndErr{
 			Outputs: []any{dstTks[i]}, Err: nil,
 		}
