@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
@@ -25,6 +27,7 @@ type Plugin struct {
 	closePluginTimeout      time.Duration
 	liquidityManagers       *liquiditymanager.Registry
 	liquidityManagerFactory liquiditymanager.Factory
+	mu                      sync.RWMutex
 	liquidityGraph          liquiditygraph.LiquidityGraph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	pendingTransfers        *PendingTransfersCache
@@ -56,6 +59,7 @@ func NewPlugin(
 		liquidityRebalancer:     liquidityRebalancer,
 		pendingTransfers:        NewPendingTransfersCache(),
 		lggr:                    lggr,
+		mu:                      sync.RWMutex{},
 	}
 }
 
@@ -129,6 +133,9 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.ReportMetadata], error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
 	lggr := p.lggr.With("seqNr", seqNr)
 	lggr.Infow("in reports", "seqNr", seqNr)
 
@@ -142,8 +149,16 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		"liquidityGraph", p.liquidityGraph,
 		"liquidityPerChain", obs.LiquidityPerChain)
 
-	transfersToReachBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(
-		p.liquidityGraph, obs.PendingTransfers, obs.LiquidityPerChain)
+	// compute a new graph with the median liquidities.
+	g, err := p.computeMedianGraph(obs.LiquidityPerChain)
+	if err != nil {
+		return nil, fmt.Errorf("compute median graph: %w", err)
+	}
+	if g.IsEmpty() {
+		return nil, fmt.Errorf("liquidity graph is empty, can't generate reports")
+	}
+
+	transfersToReachBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, obs.PendingTransfers)
 	if err != nil {
 		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
 	}
@@ -228,51 +243,68 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), p.closePluginTimeout)
 	defer cf()
 
+	var errs []error
 	for networkID, lmAddr := range p.liquidityManagers.GetAll() {
-		// todo: lmCloser := liquidityManagerFactory.NewLiquidityManagerCloser(); lmCloser.Close()
-		lm, err := p.liquidityManagerFactory.NewRebalancer(networkID, lmAddr)
+		rb, err := p.liquidityManagerFactory.GetRebalancer(networkID, lmAddr)
 		if err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("get rebalancer (%d, %v): %w", networkID, lmAddr, err))
+			continue
 		}
 
-		if err := lm.Close(ctx); err != nil {
-			return err
+		if err := rb.Close(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("close rebalancer (%d, %v): %w", networkID, lmAddr, err))
+			continue
 		}
 	}
 
-	return nil
+	return multierr.Combine(errs...)
 }
 
 // todo: consider placing the graph exploration logic under graph package to keep the plugin logic cleaner
 func (p *Plugin) syncGraphEdges(ctx context.Context) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	// todo: if there wasn't any change to the graph stop earlier
 	p.lggr.Infow("syncing graph edges")
 
+	p.lggr.Infow("getting root LM", "rootNetwork", p.rootNetwork)
 	rootLM, exists := p.liquidityManagers.Get(p.rootNetwork)
 	if !exists {
+		p.lggr.Infow("failed to get root LM")
 		return fmt.Errorf("root lm %v not found", p.rootNetwork)
 	}
 
+	p.lggr.Infow("init root LM", "rootLMAddress", rootLM)
 	lm, err := p.liquidityManagerFactory.NewRebalancer(p.rootNetwork, rootLM)
 	if err != nil {
+		p.lggr.Infow("failed to init root LM", "rootLMAddress", rootLM)
 		return fmt.Errorf("init liquidity manager: %w", err)
 	}
 
+	p.lggr.Infow("discovering LMs")
 	lms, g, err := lm.Discover(ctx, p.liquidityManagerFactory)
 	if err != nil {
+		p.lggr.Infow("Failed to discover LMs")
 		return fmt.Errorf("discover lms: %w", err)
 	}
 
-	p.liquidityGraph = g      // todo: thread safe
-	p.liquidityManagers = lms // todo: thread safe
+	p.liquidityGraph = g
+	p.liquidityManagers = lms
+
+	p.lggr.Infow("finished syncing graph edges", "graph", g.String(), "lms", lms.String())
 
 	return nil
 }
 
 func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidity, error) {
-	networks := p.liquidityGraph.GetNetworks()
-	networkLiquidities := make([]models.NetworkLiquidity, 0, len(networks))
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
+	networks := p.liquidityGraph.GetNetworks()
+	p.lggr.Infow("syncing graph balances", "networks", networks)
+
+	networkLiquidities := make([]models.NetworkLiquidity, 0, len(networks))
 	for _, networkID := range networks {
 		lmAddr, exists := p.liquidityManagers.Get(networkID)
 		if !exists {
@@ -370,6 +402,48 @@ func (p *Plugin) computePendingTransfersConsensus(observations []models.Observat
 	}
 
 	return quorumEvents, nil
+}
+
+// computeMedianGraph computes a graph with the provided median liquidities per chain.
+// The nodes in the resulting graph are copied from the plugin node. Meaning that different
+// plugin instances might have different graph.
+func (p *Plugin) computeMedianGraph(medianLiquidities []models.NetworkLiquidity) (liquiditygraph.LiquidityGraph, error) {
+	g := liquiditygraph.NewGraph()
+
+	for _, medianLiq := range medianLiquidities {
+		sourceNetwork := medianLiq.Network
+
+		neighbors, exists := p.liquidityGraph.GetNeighbors(sourceNetwork)
+		if !exists {
+			p.lggr.Warnw("neighbors not found for network", "network", sourceNetwork)
+			continue
+		}
+
+		switch g.HasNetwork(sourceNetwork) {
+		case true: // was already added to the graph, as a neighbor of another network that was processed first.
+			if !g.SetLiquidity(sourceNetwork, medianLiq.Liquidity) {
+				return nil, fmt.Errorf("graph set liquidity %s network %d", medianLiq.Liquidity, sourceNetwork)
+			}
+		case false: // seen for first time
+			if !g.AddNetwork(sourceNetwork, medianLiq.Liquidity) {
+				return nil, fmt.Errorf("graph add network liquidity %s network %d", medianLiq.Liquidity, sourceNetwork)
+			}
+		}
+
+		for _, destNetwork := range neighbors {
+			if !g.HasNetwork(destNetwork) {
+				if !g.AddNetwork(destNetwork, big.NewInt(0)) {
+					return nil, fmt.Errorf("graph add dest network %d unexpectedly returned false", destNetwork)
+				}
+			}
+
+			if err := g.AddConnection(sourceNetwork, destNetwork); err != nil {
+				return nil, fmt.Errorf("graph add connection %d->%d: %w", sourceNetwork, destNetwork, err)
+			}
+		}
+	}
+
+	return g, nil
 }
 
 // bigIntSortedMiddle returns the middle number after sorting the provided numbers. nil is returned if the provided slice is empty.
