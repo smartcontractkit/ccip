@@ -260,18 +260,18 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 					continue
 				}
 
-				poolReader, exists := tokens.DestinationPool[dstToken]
+				poolAddress, exists := tokens.DestinationPool[dstToken]
 				if !exists {
 					return nil, fmt.Errorf("pool for token '%s' does not exist", dstToken)
 				}
 
-				if tokenAddr, seen := dstPoolToToken[poolReader]; seen {
+				if tokenAddr, seen := dstPoolToToken[poolAddress]; seen {
 					return nil, fmt.Errorf("pool is already seen for token %s", tokenAddr)
 				}
 
-				dstTokenToPool[dstToken] = poolReader
-				dstPoolToToken[poolReader] = dstToken
-				dstPoolAddresses = append(dstPoolAddresses, poolReader)
+				dstTokenToPool[dstToken] = poolAddress
+				dstPoolToToken[poolAddress] = dstToken
+				dstPoolAddresses = append(dstPoolAddresses, poolAddress)
 			}
 		}
 	}

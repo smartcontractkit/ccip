@@ -270,28 +270,28 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 	c.Source.Chain.Commit()
 }
 
-func (c *CCIPContracts) EnableOffRamp(t *testing.T) {
-	//_, err := c.Dest.Pool.ApplyChainUpdates(c.Dest.User,
-	//	[]lock_release_token_pool.TokenPoolChainUpdate{{
-	//		ChainSelector: c.Source.ChainSelector,
-	//		Allowed:       true,
-	//		OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
-	//			IsEnabled: true,
-	//			Capacity:  HundredLink,
-	//			Rate:      big.NewInt(1e18),
-	//		},
-	//		InboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
-	//			IsEnabled: true,
-	//			Capacity:  HundredLink,
-	//			Rate:      big.NewInt(1e18),
-	//		},
-	//	}},
-	//)
-	//
-	//require.NoError(t, err)
-	//c.Dest.Chain.Commit()
+func (c *CCIPContracts) EnableSourceChainOnPool(t *testing.T) {
+	_, err := c.Dest.Pool.ApplyChainUpdates(c.Dest.User,
+		[]lock_release_token_pool.TokenPoolChainUpdate{{
+			ChainSelector: c.Source.ChainSelector,
+			Allowed:       true,
+			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  HundredLink,
+				Rate:      big.NewInt(1e18),
+			},
+			InboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  HundredLink,
+				Rate:      big.NewInt(1e18),
+			},
+		}},
+	)
 
-	_, err := c.Dest.Router.ApplyRampUpdates(c.Dest.User, nil, nil, []router.RouterOffRamp{{SourceChainSelector: SourceChainSelector, OffRamp: c.Dest.OffRamp.Address()}})
+	require.NoError(t, err)
+	c.Dest.Chain.Commit()
+
+	_, err = c.Dest.Router.ApplyRampUpdates(c.Dest.User, nil, nil, []router.RouterOffRamp{{SourceChainSelector: SourceChainSelector, OffRamp: c.Dest.OffRamp.Address()}})
 	require.NoError(t, err)
 	c.Dest.Chain.Commit()
 
@@ -392,33 +392,33 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 	c.Dest.Chain.Commit()
 }
 
-func (c *CCIPContracts) EnableOnRamp(t *testing.T) {
-	//t.Log("Setting onRamp on source pool")
-	//_, err := c.Source.Pool.ApplyChainUpdates(
-	//	c.Source.User,
-	//	[]lock_release_token_pool.TokenPoolChainUpdate{
-	//		{
-	//			ChainSelector: c.Dest.ChainSelector,
-	//			Allowed:       true,
-	//			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
-	//				IsEnabled: true,
-	//				Capacity:  HundredLink,
-	//				Rate:      big.NewInt(1e18),
-	//			},
-	//			InboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
-	//				IsEnabled: true,
-	//				Capacity:  HundredLink,
-	//				Rate:      big.NewInt(1e18),
-	//			},
-	//		},
-	//	},
-	//)
-	//
-	//require.NoError(t, err)
-	//c.Source.Chain.Commit()
+func (c *CCIPContracts) EnableDestChainOnPool(t *testing.T) {
+	t.Log("Setting dest chain on source pool")
+	_, err := c.Source.Pool.ApplyChainUpdates(
+		c.Source.User,
+		[]lock_release_token_pool.TokenPoolChainUpdate{
+			{
+				ChainSelector: c.Dest.ChainSelector,
+				Allowed:       true,
+				OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+					IsEnabled: true,
+					Capacity:  HundredLink,
+					Rate:      big.NewInt(1e18),
+				},
+				InboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+					IsEnabled: true,
+					Capacity:  HundredLink,
+					Rate:      big.NewInt(1e18),
+				},
+			},
+		},
+	)
 
-	t.Log("Setting onRamp on source router")
-	_, err := c.Source.Router.ApplyRampUpdates(c.Source.User, []router.RouterOnRamp{{DestChainSelector: c.Dest.ChainSelector, OnRamp: c.Source.OnRamp.Address()}}, nil, nil)
+	require.NoError(t, err)
+	c.Source.Chain.Commit()
+
+	t.Log("Setting dest chain on source router")
+	_, err = c.Source.Router.ApplyRampUpdates(c.Source.User, []router.RouterOnRamp{{DestChainSelector: c.Dest.ChainSelector, OnRamp: c.Source.OnRamp.Address()}}, nil, nil)
 	require.NoError(t, err)
 	c.Source.Chain.Commit()
 	c.Dest.Chain.Commit()
