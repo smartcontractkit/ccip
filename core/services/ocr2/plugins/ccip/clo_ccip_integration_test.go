@@ -2,7 +2,6 @@ package ccip_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -89,8 +88,6 @@ func Test_CLOSpecApprovalFlow_dynamicPriceGetter(t *testing.T) {
 }
 
 func test_CLOSpecApprovalFlow(t *testing.T, ccipTH integrationtesthelpers.CCIPIntegrationTestHarness, tokenPricesUSDPipeline string, priceGetterConfiguration string) {
-
-	fmt.Printf("===>Running CLO flow with pipeline:\n%v\n===>price getter:\n'%v'\n===>chain ID: %v\n", tokenPricesUSDPipeline, priceGetterConfiguration, ccipTH.Source.ChainID)
 
 	jobParams := ccipTH.SetUpNodesAndJobs(t, tokenPricesUSDPipeline, priceGetterConfiguration, "http://blah.com")
 	ccipTH.SetupFeedsManager(t)
