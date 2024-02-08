@@ -22,8 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
@@ -59,7 +59,7 @@ type ExecutionPluginStaticConfig struct {
 	tokenDataWorker          tokendata.Worker
 	destChainSelector        uint64
 	priceRegistryProvider    ccipdataprovider.PriceRegistry
-	destTokenPoolFactory     factory.TokenPoolFactoryInterface
+	destTokenPoolFactory     *batchreader.TokenPoolBatchedReaderInterface
 	metricsCollector         ccip.PluginMetricsCollector
 }
 
@@ -81,7 +81,7 @@ type ExecutionReportingPlugin struct {
 	destWrappedNative    common.Address
 	onchainConfig        ccipdata.ExecOnchainConfig
 	offRampReader        ccipdata.OffRampReader
-	destTokenPoolFactory factory.TokenPoolFactoryInterface
+	destTokenPoolFactory batchreader.TokenPoolBatchedReaderInterface
 	// State
 	inflightReports *inflightExecReportsContainer
 	snoozedRoots    cache.SnoozedRoots

@@ -16,29 +16,29 @@ type TokenPoolFactoryInterface struct {
 	mock.Mock
 }
 
-// NewTokenPools provides a mock function with given fields: ctx, tokenPoolAddresses
-func (_m *TokenPoolFactoryInterface) NewTokenPools(ctx context.Context, tokenPoolAddresses []common.Address) ([]ccipdata.TokenPoolReader, error) {
-	ret := _m.Called(ctx, tokenPoolAddresses)
+// GetInboundTokenPoolRateLimits provides a mock function with given fields: ctx, tokenPoolReaders
+func (_m *TokenPoolFactoryInterface) GetInboundTokenPoolRateLimits(ctx context.Context, tokenPoolReaders []common.Address) ([]ccipdata.TokenBucketRateLimit, error) {
+	ret := _m.Called(ctx, tokenPoolReaders)
 
 	if len(ret) == 0 {
-		panic("no return value specified for loadTokenPools")
+		panic("no return value specified for GetInboundTokenPoolRateLimits")
 	}
 
-	var r0 []ccipdata.TokenPoolReader
+	var r0 []ccipdata.TokenBucketRateLimit
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) ([]ccipdata.TokenPoolReader, error)); ok {
-		return rf(ctx, tokenPoolAddresses)
+	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) ([]ccipdata.TokenBucketRateLimit, error)); ok {
+		return rf(ctx, tokenPoolReaders)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) []ccipdata.TokenPoolReader); ok {
-		r0 = rf(ctx, tokenPoolAddresses)
+	if rf, ok := ret.Get(0).(func(context.Context, []common.Address) []ccipdata.TokenBucketRateLimit); ok {
+		r0 = rf(ctx, tokenPoolReaders)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ccipdata.TokenPoolReader)
+			r0 = ret.Get(0).([]ccipdata.TokenBucketRateLimit)
 		}
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, []common.Address) error); ok {
-		r1 = rf(ctx, tokenPoolAddresses)
+		r1 = rf(ctx, tokenPoolReaders)
 	} else {
 		r1 = ret.Error(1)
 	}

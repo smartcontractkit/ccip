@@ -37,11 +37,11 @@ func (p *TokenPool) Type() string {
 	return p.poolType
 }
 
-func GetInboundTokenPoolRateLimitCall(tokenPoolAddress common.Address, offRampAddress common.Address) (rpclib.EvmCall, error) {
+func GetInboundTokenPoolRateLimitCall(tokenPoolAddress common.Address, offRampAddress common.Address) rpclib.EvmCall {
 	return rpclib.NewEvmCall(
 		poolABI,
 		"currentOffRampRateLimiterState",
 		tokenPoolAddress,
 		offRampAddress,
-	), nil
+	)
 }

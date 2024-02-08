@@ -29,7 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
 	factorymocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory/mocks"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
@@ -125,7 +125,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			offRamp, _ := testhelpers.NewFakeOffRamp(t)
 			offRamp.SetRateLimiterState(tc.rateLimiterState)
 
-			p.destTokenPoolFactory = factory.NewTokenPoolFactory(p.lggr, 0, offRamp.Address(), nil, nil)
+			p.destTokenPoolFactory = batchreader.NewTokenPoolBatchedReader(p.lggr, 0, offRamp.Address(), nil, nil)
 
 			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
 			mockOffRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).

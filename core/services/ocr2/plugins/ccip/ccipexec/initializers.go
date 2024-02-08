@@ -29,6 +29,7 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
@@ -233,7 +234,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 			sourceWrappedNativeToken: sourceWrappedNative,
 			destChainSelector:        destChainSelector,
 			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
-			destTokenPoolFactory:     factory.NewTokenPoolFactory(execLggr, sourceChainSelector, offRampReader.Address(), batchCaller, params.destChain.LogPoller()),
+			destTokenPoolFactory:     batchreader.NewTokenPoolBatchedReader(execLggr, sourceChainSelector, offRampReader.Address(), batchCaller, params.destChain.LogPoller()),
 			tokenDataWorker: tokendata.NewBackgroundWorker(
 				ctx,
 				tokenDataProviders,

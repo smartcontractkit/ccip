@@ -1,7 +1,8 @@
-package factory
+package batchreader
 
 import (
 	"context"
+	"math/big"
 	"testing"
 	"time"
 
@@ -36,14 +37,22 @@ func TestTokenPoolFactory(t *testing.T) {
 	remoteChainSelector := uint64(2000)
 	batchCallerMock := rpclibmocks.NewEvmBatchCaller(t)
 
-	factory := NewTokenPoolFactory(lggr, remoteChainSelector, offRamp, batchCallerMock, lp)
+	tokenPoolBatchReader := NewTokenPoolBatchedReader(lggr, remoteChainSelector, offRamp, batchCallerMock, lp)
 
 	poolTypes := []string{"BurnMint", "LockRelease"}
 
+	rateLimits := ccipdata.TokenBucketRateLimit{
+		Tokens:      big.NewInt(333333),
+		LastUpdated: 33,
+		IsEnabled:   true,
+		Capacity:    big.NewInt(666666),
+		Rate:        big.NewInt(444444),
+	}
+
 	for _, versionStr := range []string{ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0, ccipdata.V1_4_0} {
-		pools, err := factory.loadTokenPools(ctx, []common.Address{})
+		gotRateLimits, err := tokenPoolBatchReader.GetInboundTokenPoolRateLimits(ctx, []common.Address{})
 		require.NoError(t, err)
-		assert.Empty(t, pools)
+		assert.Empty(t, gotRateLimits)
 
 		var batchCallResult []rpclib.DataAndErr
 		for _, poolType := range poolTypes {
@@ -53,7 +62,16 @@ func TestTokenPoolFactory(t *testing.T) {
 			})
 		}
 
+		// TypeAndVersion uses finalized block number
 		batchCallerMock.On("BatchCall", mock.Anything, uint64(latestBlock.FinalizedBlockNumber), mock.Anything).Return(batchCallResult, nil)
+		// Rate limits use latest block number
+		batchCallerMock.On("BatchCall", mock.Anything, uint64(latestBlock.BlockNumber), mock.Anything).Return([]rpclib.DataAndErr{{
+			Outputs: []any{rateLimits},
+			Err:     nil,
+		}, {
+			Outputs: []any{rateLimits},
+			Err:     nil,
+		}}, nil).Once()
 
 		var poolAddresses []common.Address
 
@@ -61,14 +79,12 @@ func TestTokenPoolFactory(t *testing.T) {
 			poolAddresses = append(poolAddresses, utils.RandomAddress())
 		}
 
-		pools, err = factory.loadTokenPools(ctx, poolAddresses)
+		gotRateLimits, err = tokenPoolBatchReader.GetInboundTokenPoolRateLimits(ctx, poolAddresses)
 		require.NoError(t, err)
+		assert.Len(t, gotRateLimits, len(poolTypes))
 
-		assert.Len(t, pools, len(poolTypes))
-
-		for i, pool := range pools {
-			assert.Equal(t, poolTypes[i], pool.Type())
-			assert.Equal(t, poolAddresses[i], pools[i].Address())
+		for _, gotRateLimit := range gotRateLimits {
+			assert.Equal(t, rateLimits, gotRateLimit)
 		}
 	}
 }
