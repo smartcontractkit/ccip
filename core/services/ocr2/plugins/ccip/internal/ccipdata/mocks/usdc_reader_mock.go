@@ -5,7 +5,7 @@ package mocks
 import (
 	context "context"
 
-	common "github.com/ethereum/go-ethereum/common"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -16,7 +16,7 @@ type USDCReader struct {
 }
 
 // GetLastUSDCMessagePriorToLogIndexInTx provides a mock function with given fields: ctx, logIndex, txHash
-func (_m *USDCReader) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
+func (_m *USDCReader) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash cciptypes.Hash) ([]byte, error) {
 	ret := _m.Called(ctx, logIndex, txHash)
 
 	if len(ret) == 0 {
@@ -25,10 +25,10 @@ func (_m *USDCReader) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context,
 
 	var r0 []byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int64, common.Hash) ([]byte, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, int64, cciptypes.Hash) ([]byte, error)); ok {
 		return rf(ctx, logIndex, txHash)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int64, common.Hash) []byte); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, int64, cciptypes.Hash) []byte); ok {
 		r0 = rf(ctx, logIndex, txHash)
 	} else {
 		if ret.Get(0) != nil {
@@ -36,7 +36,7 @@ func (_m *USDCReader) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context,
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int64, common.Hash) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, int64, cciptypes.Hash) error); ok {
 		r1 = rf(ctx, logIndex, txHash)
 	} else {
 		r1 = ret.Error(1)
