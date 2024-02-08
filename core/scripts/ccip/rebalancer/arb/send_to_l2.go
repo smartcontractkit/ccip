@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -15,43 +14,19 @@ import (
 	"github.com/smartcontractkit/chainlink/core/scripts/ccip/rebalancer/multienv"
 	helpers "github.com/smartcontractkit/chainlink/core/scripts/common"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/erc20"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/abstract_arbitrum_token_gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arb_node_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_gateway_router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_inbox"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_gateway_router"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_token_gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 )
 
 var (
 	l1AdapterABI     = abihelpers.MustParseABI(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.ABI)
 	nodeInterfaceABI = abihelpers.MustParseABI(arb_node_interface.NodeInterfaceMetaData.ABI)
-)
-
-const (
-	// from nitro-contracts/src/libraries/Error.sol
-	// error RetryableData(
-	//   address from,
-	//   address to,
-	//   uint256 l2CallValue,
-	//   uint256 deposit,
-	//   uint256 maxSubmissionCost,
-	//   address excessFeeRefundAddress,
-	//   address callValueRefundAddress,
-	//   uint256 gasLimit,
-	//   uint256 maxFeePerGas,
-	//   bytes data
-	// );
-	retryableErrorABI = `[{"type":"address"},{"type":"address"},{"type":"uint256"},{"type":"uint256"},{"type":"uint256"},{"type":"address"},{"type":"address"},{"type":"uint256"},{"type":"uint256"},{"type":"bytes"}]`
-	// from the arbitrum sdk:
-	//   const innerData = defaultAbiCoder.encode(
-	//     ['uint256', 'bytes'],
-	//     [depositParams.maxSubmissionCost, '0x']
-	//   )
-	innerDataABI = `[{"type":"uint256"}, {"type": "bytes"}]`
 )
 
 func SendToL2(
@@ -64,42 +39,47 @@ func SendToL2(
 	amount *big.Int,
 ) {
 	// do some basic checks before proceeding
-	token, err := erc20.NewERC20(l1TokenAddress, env.Clients[l1ChainID])
+	l1Token, err := erc20.NewERC20(l1TokenAddress, env.Clients[l1ChainID])
 	helpers.PanicErr(err)
 
 	// check if we have enough balance otherwise approve will fail
-	balance, err := token.BalanceOf(nil, env.Transactors[l1ChainID].From)
+	balance, err := l1Token.BalanceOf(nil, env.Transactors[l1ChainID].From)
 	helpers.PanicErr(err)
 	if balance.Cmp(amount) < 0 {
 		panic(fmt.Sprintf("Insufficient balance, get more tokens or specify smaller amount: %s < %s", balance, amount))
 	}
 
-	gatewayRouter, err := arbitrum_gateway_router.NewArbitrumGatewayRouter(ArbitrumContracts[l1ChainID]["L1GatewayRouter"], env.Clients[l1ChainID])
+	l1GatewayRouter, err := arbitrum_gateway_router.NewArbitrumGatewayRouter(ArbitrumContracts[l1ChainID]["L1GatewayRouter"], env.Clients[l1ChainID])
 	helpers.PanicErr(err)
 
-	depositFunc := createDepositFunc(
-		env.Transactors[l1ChainID].From,
-		ArbitrumContracts[l1ChainID]["L1GatewayRouter"],
-		l1TokenAddress,
+	l2GatewayRouter, err := arbitrum_gateway_router.NewArbitrumGatewayRouter(ArbitrumContracts[l2ChainID]["L2GatewayRouter"], env.Clients[l2ChainID])
+	helpers.PanicErr(err)
+
+	params := populateFunctionParams(
+		env,
+		l1ChainID,
+		l2ChainID,
+		l1GatewayRouter,
+		l2GatewayRouter,
+		l1Token.Address(),
 		l2Recipient,
+		l1BridgeAdapterAddress,
 		amount,
 	)
-
-	params, _, _, _, _, value := populateFunctionParams(env, l1ChainID, l2ChainID, gatewayRouter, token, depositFunc)
 
 	// call the L1 adapter to send the funds to L2
 	// first approve the L1 adapter to spend the tokens
 	// check allowance so we don't approve unnecessarily
-	allowance, err := token.Allowance(nil, env.Transactors[l1ChainID].From, l1BridgeAdapterAddress)
+	allowance, err := l1Token.Allowance(nil, env.Transactors[l1ChainID].From, l1BridgeAdapterAddress)
 	helpers.PanicErr(err)
 	if allowance.Cmp(amount) < 0 {
-		tx, err2 := token.Approve(env.Transactors[l1ChainID], l1BridgeAdapterAddress, amount)
+		tx, err2 := l1Token.Approve(env.Transactors[l1ChainID], l1BridgeAdapterAddress, amount)
 		helpers.PanicErr(err2)
 		helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], tx, int64(l1ChainID),
 			"Approve", amount.String(), "to", l1BridgeAdapterAddress.String())
 
 		// check allowance
-		allowance, err2 = token.Allowance(nil, env.Transactors[l1ChainID].From, l1BridgeAdapterAddress)
+		allowance, err2 = l1Token.Allowance(nil, env.Transactors[l1ChainID].From, l1BridgeAdapterAddress)
 		helpers.PanicErr(err2)
 		if allowance.Cmp(amount) < 0 {
 			panic(fmt.Sprintf("Allowance failed, expected %s, got %s", amount, allowance))
@@ -124,7 +104,7 @@ func SendToL2(
 		"l2Recipient:", l2Recipient.String(), "\n",
 		"amount:", amount, "\n",
 		"calldata:", hexutil.Encode(bridgeCalldata), "\n",
-		"value:", value)
+		"value:", params.Deposit)
 
 	gasPrice, err := env.Clients[l1ChainID].SuggestGasPrice(context.Background())
 	helpers.PanicErr(err)
@@ -135,7 +115,7 @@ func SendToL2(
 		To:       &l1BridgeAdapterAddress,
 		GasPrice: gasPrice,
 		Gas:      1e6,
-		Value:    value,
+		Value:    params.Deposit,
 		Data:     sendERC20Calldata,
 	})
 	signedTx, err := env.Transactors[l1ChainID].Signer(env.Transactors[l1ChainID].From, rawTx)
@@ -157,107 +137,93 @@ func populateFunctionParams(
 	env multienv.Env,
 	l1ChainID,
 	l2ChainID uint64,
-	gatewayRouter *arbitrum_gateway_router.ArbitrumGatewayRouter,
-	l1Token *erc20.ERC20,
-	f dataFunc,
-) (
-	L1ToL2MessageGasParams,
-	RetryableData,
-	[]byte,
-	common.Address,
-	common.Address,
-	*big.Int,
-) {
-	// call initially with the dummy values to trigger the revert
-	data, to, from, value := f(big.NewInt(1), big.NewInt(1), big.NewInt(1))
-
+	l1GatewayRouter,
+	l2GatewayRouter *arbitrum_gateway_router.ArbitrumGatewayRouter,
+	l1TokenAddress,
+	l2RecipientAddress,
+	l1BridgeAdapterAddress common.Address,
+	amount *big.Int,
+) L1ToL2MessageGasParams {
 	l1Client := env.Clients[l1ChainID]
-	gasPrice, err := l1Client.SuggestGasPrice(context.Background())
+
+	gatewayToApprove, err := l1GatewayRouter.GetGateway(nil, l1TokenAddress)
 	helpers.PanicErr(err)
 
-	gatewayToApprove, err := gatewayRouter.GetGateway(nil, l1Token.Address())
+	// get the counterpart gateway on L2 from the L1 gateway
+	// unfortunately we need to instantiate a new wrapper because the counterpartGateway field,
+	// although it is public, is not accessible via a getter function on the token gateway interface
+	abstractGateway, err := abstract_arbitrum_token_gateway.NewAbstractArbitrumTokenGateway(gatewayToApprove, l1Client)
+	helpers.PanicErr(err)
+	l2Gateway, err := abstractGateway.CounterpartGateway(nil)
 	helpers.PanicErr(err)
 
-	// check allowance so we don't approve unnecessarily
-	allowance, err := l1Token.Allowance(nil, env.Transactors[l1ChainID].From, gatewayToApprove)
+	l1TokenGateway, err := arbitrum_token_gateway.NewArbitrumTokenGateway(gatewayToApprove, l1Client)
 	helpers.PanicErr(err)
-	if allowance.Cmp(value) < 0 {
-		tx, err2 := l1Token.Approve(env.Transactors[l1ChainID], gatewayToApprove, value)
-		helpers.PanicErr(err2)
-		helpers.ConfirmTXMined(context.Background(), env.Clients[l1ChainID], tx, int64(l1ChainID),
-			"Approve", value.String(), "to gateway at", gatewayToApprove.String())
 
-		// check allowance
-		allowance, err2 = l1Token.Allowance(nil, env.Transactors[l1ChainID].From, gatewayToApprove)
-		helpers.PanicErr(err2)
-		if allowance.Cmp(value) < 0 {
-			panic(fmt.Sprintf("Allowance failed, expected %s, got %s", value, allowance))
-		}
-	} else {
-		fmt.Println("Allowance already set to", allowance)
+	retryableData := RetryableData{
+		From:                gatewayToApprove,
+		To:                  l2Gateway,
+		ExcessFeeRefundAddr: l2RecipientAddress,
+		CallValueRefundAddr: env.Transactors[l1ChainID].From,
+		// typically just one
+		L2CallValue: big.NewInt(1),
+		// 3 seems to work, but not sure if it's the best value
+		// you definitely need a non-nil deposit for the NodeInterface call to succeed
+		Deposit: big.NewInt(3),
+		// MaxSubmissionCost: , // To be filled in
+		// GasLimit: , // To be filled in
+		// MaxFeePerGas: , // To be filled in
+		// Data: , // To be filled in
 	}
 
-	fmt.Println("Making eth_call to trigger revert with data:", hexutil.Encode(data),
-		"value:", value.String(), "to:", to.String(), "from:", from.String())
-	_, err = l1Client.CallContract(context.Background(), ethereum.CallMsg{
-		To:       &to,
-		Data:     data,
-		From:     from,
-		Value:    value,
-		GasPrice: new(big.Int).Mul(gasPrice, big.NewInt(2)),
-	}, nil)
-	if err == nil {
-		panic(fmt.Sprintf("Expected an error when calling with dummy values: %v", err))
-	}
-	jErr, err := client.ExtractRPCError(err)
+	// determine the finalizeInboundTransfer calldata
+	finalizeInboundTransferCalldata, err := l1TokenGateway.GetOutboundCalldata(
+		nil,
+		l1TokenAddress,         // L1 token address
+		l1BridgeAdapterAddress, // L1 sender address
+		l2RecipientAddress,     // L2 recipient address
+		amount,                 // token amount
+		[]byte{},               // extra data (unused here)
+	)
 	helpers.PanicErr(err)
-	if jErr == nil {
-		panic(fmt.Sprintf("Expected an error with a JSON-RPC error code: %+v", err))
-	}
+	retryableData.Data = finalizeInboundTransferCalldata
 
-	fmt.Println("Got JSON-RPC error, code:", jErr.Code, "message:", jErr.Message, "data:", jErr.Data)
+	fmt.Println("Constructed RetryableData", "\n",
+		"From:", retryableData.From.String(), "\n",
+		"To:", retryableData.To.String(), "\n",
+		"L2CallValue:", retryableData.L2CallValue, "\n",
+		"ExcessFeeRefundAddr:", retryableData.ExcessFeeRefundAddr.String(), "\n",
+		"CallValueRefundAddr:", retryableData.CallValueRefundAddr.String(), "\n",
+		"Data (finalizeInboundTransfer call):", hexutil.Encode(retryableData.Data))
 
-	errData, ok := jErr.Data.(string)
-	if !ok {
-		panic(fmt.Sprintf("Expected error data to be a string: %+v", jErr.Data))
-	}
-
-	baseFee, err := l1Client.SuggestGasPrice(context.Background())
+	l1BaseFee, err := l1Client.SuggestGasPrice(context.Background())
 	helpers.PanicErr(err)
+	estimates := estimateAll(env, l1ChainID, l2ChainID, retryableData, l1BaseFee)
 
-	rd := parseRetryableError(errData)
-	estimates := estimateAll(env, l1ChainID, l2ChainID, rd, baseFee)
-
-	// form real data for the transaction
-	data, to, from, value = f(estimates.GasLimit, estimates.MaxFeePerGas, estimates.MaxSubmissionCost)
-
-	return estimates, rd, data, to, from, value
+	return estimates
 }
 
 func estimateAll(env multienv.Env, l1ChainID, l2ChainID uint64, rd RetryableData, l1BaseFee *big.Int) L1ToL2MessageGasParams {
-	data := rd.Data
-
-	// NOTE: this is the L2 base fee, not L1
 	l2Client := env.Clients[l2ChainID]
-	maxFeePerGas := estimateMaxFeePerGas(l2Client)
+	l2MaxFeePerGas := estimateMaxFeePerGasOnL2(l2Client)
 
-	maxSubmissionFee := estimateSubmissionFee(env.Clients[l1ChainID], l1ChainID, l1BaseFee, uint64(len(data)))
+	maxSubmissionFee := estimateSubmissionFee(env.Clients[l1ChainID], l1ChainID, l1BaseFee, uint64(len(rd.Data)))
 
 	gasLimit := estimateRetryableGasLimit(env, l2Client, l2ChainID, rd)
 
-	deposit := new(big.Int).Mul(gasLimit, maxFeePerGas)
+	deposit := new(big.Int).Mul(gasLimit, l2MaxFeePerGas)
 	deposit = deposit.Add(deposit, maxSubmissionFee)
 
 	fmt.Println("estimated L1 -> L2 fees:", "\n",
 		"gasLimit:", gasLimit, "\n",
 		"maxSubmissionFee:", maxSubmissionFee, "\n",
-		"maxFeePerGas:", maxFeePerGas, "\n",
+		"maxFeePerGas (on L2):", l2MaxFeePerGas, "\n",
 		"deposit:", deposit)
 
 	return L1ToL2MessageGasParams{
 		GasLimit:          gasLimit,
 		MaxSubmissionCost: maxSubmissionFee,
-		MaxFeePerGas:      maxFeePerGas,
+		MaxFeePerGas:      l2MaxFeePerGas,
 		Deposit:           deposit,
 	}
 }
@@ -273,12 +239,6 @@ func estimateRetryableGasLimit(env multienv.Env, l2Client *ethclient.Client, l2C
 		rd.Data)
 	helpers.PanicErr(err)
 
-	l2Balance, err := l2Client.BalanceAt(context.Background(), env.Transactors[l2ChainID].From, nil)
-	helpers.PanicErr(err)
-	if l2Balance.Cmp(rd.Deposit) < 0 {
-		panic(fmt.Sprintf("Insufficient balance on L2: %s < %s", l2Balance, rd.Deposit))
-	}
-
 	fmt.Println("calling node interface with calldata:", hexutil.Encode(packed), "value:", rd.Deposit)
 	nodeInterfaceAddr := ArbitrumContracts[l2ChainID]["NodeInterface"]
 	gasLimit, err := l2Client.EstimateGas(context.Background(), ethereum.CallMsg{
@@ -292,7 +252,7 @@ func estimateRetryableGasLimit(env multienv.Env, l2Client *ethclient.Client, l2C
 	return big.NewInt(int64(gasLimit))
 }
 
-func estimateMaxFeePerGas(l2Client *ethclient.Client) *big.Int {
+func estimateMaxFeePerGasOnL2(l2Client *ethclient.Client) *big.Int {
 	l2BaseFee, err := l2Client.SuggestGasPrice(context.Background())
 	helpers.PanicErr(err)
 	// base fee on L2 is bumped by 200% by the arbitrum sdk (i.e 3x)
@@ -315,93 +275,21 @@ func estimateSubmissionFee(l1Client *ethclient.Client, l1ChainID uint64, l1BaseF
 }
 
 type RetryableData struct {
-	From                common.Address
-	To                  common.Address
-	L2CallValue         *big.Int
-	Deposit             *big.Int
-	MaxSubmissionCost   *big.Int
+	// From is the gateway on L1 that will be sending the funds to the L2 gateway.
+	From common.Address
+	// To is the gateway on L2 that will be receiving the funds and eventually
+	// sending them to the final recipient.
+	To                common.Address
+	L2CallValue       *big.Int
+	Deposit           *big.Int
+	MaxSubmissionCost *big.Int
+	// ExcessFeeRefundAddr is an address on L2 that will be receiving excess fees
 	ExcessFeeRefundAddr common.Address
+	// CallValueRefundAddr is an address on L1 that will be receiving excess fees
 	CallValueRefundAddr common.Address
 	GasLimit            *big.Int
 	MaxFeePerGas        *big.Int
-	Data                []byte
-}
-
-func parseRetryableError(errData string) RetryableData {
-	dataBytes, err := hexutil.Decode(errData)
-	helpers.PanicErr(err)
-
-	retryableIfaces, err := utils.ABIDecode(
-		retryableErrorABI,
-		dataBytes[4:], // trim error signature
-	)
-	helpers.PanicErr(err)
-
-	if len(retryableIfaces) != 10 {
-		panic(fmt.Sprintf("Expected 10 inputs, got %d", len(retryableIfaces)))
-	}
-
-	from := *abi.ConvertType(retryableIfaces[0], new(common.Address)).(*common.Address)
-	to := *abi.ConvertType(retryableIfaces[1], new(common.Address)).(*common.Address)
-	l2CallValue := *abi.ConvertType(retryableIfaces[2], new(*big.Int)).(**big.Int)
-	deposit := *abi.ConvertType(retryableIfaces[3], new(*big.Int)).(**big.Int)
-	maxSubmissionCost := *abi.ConvertType(retryableIfaces[4], new(*big.Int)).(**big.Int)
-	excessFeeRefundAddress := *abi.ConvertType(retryableIfaces[5], new(common.Address)).(*common.Address)
-	callValueRefundAddress := *abi.ConvertType(retryableIfaces[6], new(common.Address)).(*common.Address)
-	gasLimit := *abi.ConvertType(retryableIfaces[7], new(*big.Int)).(**big.Int)
-	maxFeePerGas := *abi.ConvertType(retryableIfaces[8], new(*big.Int)).(**big.Int)
-	data := *abi.ConvertType(retryableIfaces[9], new([]byte)).(*[]byte)
-
-	fmt.Println("Successfully parsed retryable error:", "\n",
-		"from:", from, "\n",
-		"to:", to, "\n",
-		"l2CallValue:", l2CallValue, "\n",
-		"deposit:", deposit, "\n",
-		"maxSubmissionCost:", maxSubmissionCost, "\n",
-		"excessFeeRefundAddress:", excessFeeRefundAddress, "\n",
-		"callValueRefundAddress:", callValueRefundAddress, "\n",
-		"gasLimit:", gasLimit, "\n",
-		"maxFeePerGas:", maxFeePerGas, "\n",
-		"data:", hexutil.Encode(data))
-
-	return RetryableData{
-		From:                from,
-		To:                  to,
-		L2CallValue:         l2CallValue,
-		Deposit:             deposit,
-		MaxSubmissionCost:   maxSubmissionCost,
-		ExcessFeeRefundAddr: excessFeeRefundAddress,
-		CallValueRefundAddr: callValueRefundAddress,
-		GasLimit:            gasLimit,
-		MaxFeePerGas:        maxFeePerGas,
-		Data:                data,
-	}
-}
-
-/**
-* Function that will internally make an L1->L2 transaction
-* Will initially be called with dummy values to trigger a special revert containing
-* the real params. Then called again with the real params to form the final data to be submitted
- */
-type dataFunc func(gasLimit, maxFeePerGas, maxSubmissionCost *big.Int) (data []byte, to, from common.Address, value *big.Int)
-
-func createDepositFunc(fromAddress, l1GatewayRouter, l1TokenAddress, l2Recipient common.Address, amount *big.Int) dataFunc {
-	return func(gasLimit, maxFeePerGas, maxSubmissionCost *big.Int) (calldata []byte, to, from common.Address, value *big.Int) {
-		innerData, err := utils.ABIEncode(innerDataABI, maxSubmissionCost, []byte(""))
-		helpers.PanicErr(err)
-
-		grABI, err := arbitrum_l1_gateway_router.ArbitrumL1GatewayRouterMetaData.GetAbi()
-		helpers.PanicErr(err)
-
-		calldata, err = grABI.Pack("outboundTransferCustomRefund", l1TokenAddress, l2Recipient, l2Recipient, amount, gasLimit, maxFeePerGas, innerData)
-		helpers.PanicErr(err)
-
-		to = l1GatewayRouter
-		from = fromAddress
-
-		value = new(big.Int).Mul(gasLimit, maxFeePerGas)
-		value = value.Add(value, maxSubmissionCost)
-
-		return
-	}
+	// Data is the calldata for the L2 gateway's `finalizeInboundTransfer` method.
+	// The final recipient on L2 is specified in this calldata.
+	Data []byte
 }

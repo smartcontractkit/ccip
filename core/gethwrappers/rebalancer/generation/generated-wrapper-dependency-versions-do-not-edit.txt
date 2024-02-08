@@ -1,4 +1,5 @@
 GETH_VERSION: 1.13.8
+abstract_arbitrum_token_gateway: ../../../contracts/solc/v0.8.19/IAbstractArbitrumTokenGateway/IAbstractArbitrumTokenGateway.abi ../../../contracts/solc/v0.8.19/IAbstractArbitrumTokenGateway/IAbstractArbitrumTokenGateway.bin 779e05d8fb797d4fcfa565174c071ad9f0161d103d6a322f6d0e1e42be568fa0
 arb_node_interface: ../../../contracts/solc/v0.8.19/INodeInterface/INodeInterface.abi ../../../contracts/solc/v0.8.19/INodeInterface/INodeInterface.bin c72f9e9d1e9b9c371c42817590a490a327e743775f423d9417982914d6136ff7
 arbitrum_gateway_router: ../../../contracts/solc/v0.8.19/IArbitrumGatewayRouter/IArbitrumGatewayRouter.abi ../../../contracts/solc/v0.8.19/IArbitrumGatewayRouter/IArbitrumGatewayRouter.bin d02c8ed0b4bfe50630e0fce452f9aef23d394bd28110314356954185a6544cb8
 arbitrum_inbox: ../../../contracts/solc/v0.8.19/IArbitrumInbox/IArbitrumInbox.abi ../../../contracts/solc/v0.8.19/IArbitrumInbox/IArbitrumInbox.bin 815c2ba12fadd3a6961330d746645dd1920a06253ce9555b46b4c8526065dbaf
@@ -6,6 +7,7 @@ arbitrum_l1_bridge_adapter: ../../../contracts/solc/v0.8.19/ArbitrumL1BridgeAdap
 arbitrum_l1_gateway_router: ../../../contracts/solc/v0.8.19/IArbitrumL1GatewayRouter/IArbitrumL1GatewayRouter.abi ../../../contracts/solc/v0.8.19/IArbitrumL1GatewayRouter/IArbitrumL1GatewayRouter.bin 48b098f0667521be7c4a31f2c361a2898536c5ab5406c18c2cedf8c8238909ad
 arbitrum_l2_bridge_adapter: ../../../contracts/solc/v0.8.19/ArbitrumL2BridgeAdapter/ArbitrumL2BridgeAdapter.abi ../../../contracts/solc/v0.8.19/ArbitrumL2BridgeAdapter/ArbitrumL2BridgeAdapter.bin f5932dc605bbc9181025595219435aa58b5f66c391772a07e0f6d6799174118f
 arbitrum_rollup_core: ../../../contracts/solc/v0.8.19/IArbRollupCore/IArbRollupCore.abi ../../../contracts/solc/v0.8.19/IArbRollupCore/IArbRollupCore.bin 18ebdef208265cde0cde8671214840afdffaf57b5d82627d18604727b6210fa6
+arbitrum_token_gateway: ../../../contracts/solc/v0.8.19/IArbitrumTokenGateway/IArbitrumTokenGateway.abi ../../../contracts/solc/v0.8.19/IArbitrumTokenGateway/IArbitrumTokenGateway.bin c3d42c4f174317fe06f96435952ebe7ca8b042c787a61bf3f69060c00c396eae
 arbsys: ../../../contracts/solc/v0.8.19/IArbSys/IArbSys.abi ../../../contracts/solc/v0.8.19/IArbSys/IArbSys.bin 70adb49f157d8e077485d1a5c87ddf64b214822aef736bb68e122a77bab78a16
 l2_arbitrum_gateway: ../../../contracts/solc/v0.8.19/IL2ArbitrumGateway/IL2ArbitrumGateway.abi ../../../contracts/solc/v0.8.19/IL2ArbitrumGateway/IL2ArbitrumGateway.bin 4d1af2bdb0aeb0b15e3cbc4ed2158f9bcba4925f68ed3669e0ecfde14115c893
 l2_arbitrum_messenger: ../../../contracts/solc/v0.8.19/IL2ArbitrumMessenger/IL2ArbitrumMessenger.abi ../../../contracts/solc/v0.8.19/IL2ArbitrumMessenger/IL2ArbitrumMessenger.bin 84d4bfedf16e92e3fb15880832fa54a3a21808dffea8a7c0946cde3b5e17a0c3

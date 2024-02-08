@@ -51,3 +51,5 @@ compileContract rebalancer/interfaces/arbitrum/IArbRollupCore.sol
 compileContract rebalancer/interfaces/arbitrum/IArbitrumL1GatewayRouter.sol
 compileContract rebalancer/interfaces/arbitrum/IArbitrumInbox.sol
 compileContract rebalancer/interfaces/arbitrum/IArbitrumGatewayRouter.sol
+compileContract rebalancer/interfaces/arbitrum/IArbitrumTokenGateway.sol
+compileContract rebalancer/interfaces/arbitrum/IAbstractArbitrumTokenGateway.sol
