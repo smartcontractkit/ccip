@@ -302,8 +302,6 @@ func TestIntegration_CCIP(t *testing.T) {
 
 				// enable the newly deployed contracts
 				newConfigBlock := ccipTH.Dest.Chain.Blockchain().CurrentBlock().Number.Int64()
-				ccipTH.EnableDestChainOnPool(t)
-				ccipTH.EnableSourceChainOnPool(t)
 				ccipTH.EnableCommitStore(t)
 				srcStartBlock := ccipTH.Source.Chain.Blockchain().CurrentBlock().Number.Uint64()
 
