@@ -415,30 +415,30 @@ func (p *Plugin) computeMedianGraph(medianLiquidities []models.NetworkLiquidity)
 
 		neighbors, exists := p.liquidityGraph.GetNeighbors(sourceNetwork)
 		if !exists {
-			// this node is not aware of the network
+			p.lggr.Warnw("neighbors not found for network", "network", sourceNetwork)
 			continue
 		}
 
 		switch g.HasNetwork(sourceNetwork) {
-		case true: // was added while processing a source network
+		case true: // was already added to the graph, as a neighbor of another network that was processed first.
 			if !g.SetLiquidity(sourceNetwork, medianLiq.Liquidity) {
-				return nil, fmt.Errorf("internal graph error while setting liquidity")
+				return nil, fmt.Errorf("graph set liquidity %s network %d", medianLiq.Liquidity, sourceNetwork)
 			}
 		case false: // seen for first time
 			if !g.AddNetwork(sourceNetwork, medianLiq.Liquidity) {
-				return nil, fmt.Errorf("internal graph error while adding network")
+				return nil, fmt.Errorf("graph add network liquidity %s network %d", medianLiq.Liquidity, sourceNetwork)
 			}
 		}
 
 		for _, destNetwork := range neighbors {
 			if !g.HasNetwork(destNetwork) {
 				if !g.AddNetwork(destNetwork, big.NewInt(0)) {
-					return nil, fmt.Errorf("internal graph error while adding dest network")
+					return nil, fmt.Errorf("graph add dest network %d unexpectedly returned false", destNetwork)
 				}
 			}
 
 			if err := g.AddConnection(sourceNetwork, destNetwork); err != nil {
-				return nil, fmt.Errorf("add connection in graph with consensus: %w", err)
+				return nil, fmt.Errorf("graph add connection %d->%d: %w", sourceNetwork, destNetwork, err)
 			}
 		}
 	}
