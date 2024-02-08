@@ -31,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/lazyinitservice"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/observability"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/oraclelib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
@@ -42,41 +43,42 @@ import (
 const numTokenDataWorkers = 5
 
 func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
-	if err != nil {
-		return nil, err
-	}
-	wrappedPluginFactory := NewExecutionReportingPluginFactory(*execPluginConfig)
-	destChainID, err := chainselectors.ChainIdFromSelector(execPluginConfig.destChainSelector)
-	if err != nil {
-		return nil, err
-	}
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
-	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(execPluginConfig.lggr, true, logError)
-	oracle, err := libocr2.NewOracle(argsNoPlugin)
-	if err != nil {
-		return nil, err
-	}
-	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
-	if new {
-		return []job.ServiceCtx{
-			oraclelib.NewBackfilledOracle(
+	return []job.ServiceCtx{lazyinitservice.New(func(ctx context.Context) (job.ServiceCtx, error) {
+		execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
+		if err != nil {
+			return nil, err
+		}
+		wrappedPluginFactory := NewExecutionReportingPluginFactory(*execPluginConfig)
+		destChainID, err := chainselectors.ChainIdFromSelector(execPluginConfig.destChainSelector)
+		if err != nil {
+			return nil, lazyinitservice.Unrecoverable(err)
+		}
+		argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
+		argsNoPlugin.Logger = commonlogger.NewOCRWrapper(execPluginConfig.lggr, true, logError)
+		oracle, err := libocr2.NewOracle(argsNoPlugin)
+		if err != nil {
+			return nil, lazyinitservice.Unrecoverable(err)
+		}
+		// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+		if new {
+			return oraclelib.NewBackfilledOracle(
 				execPluginConfig.lggr,
 				backfillArgs.SourceLP,
 				backfillArgs.DestLP,
 				backfillArgs.SourceStartBlock,
 				backfillArgs.DestStartBlock,
-				job.NewServiceAdapter(oracle)),
-		}, nil
-	}
-	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+				job.NewServiceAdapter(oracle),
+			), nil
+		}
+		return job.NewServiceAdapter(oracle), nil
+	}, lazyinitservice.WithLogErrorFunc(logError))}, nil
 }
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
 // See comment in UnregisterCommitPluginLpFilters
 // It MUST mirror the filters registered in NewExecutionServices.
 func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) error {
-	params, err := extractJobSpecParams(lggr, jb, chainSet, false, qopts...)
+	params, err := extractJobSpecParams(ctx, lggr, jb, chainSet, false, qopts...)
 	if err != nil {
 		return err
 	}
@@ -149,7 +151,7 @@ func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Executio
 }
 
 func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, qopts ...pg.QOpt) (*ExecutionPluginStaticConfig, *ccipcommon.BackfillArgs, error) {
-	params, err := extractJobSpecParams(lggr, jb, chainSet, true, qopts...)
+	params, err := extractJobSpecParams(ctx, lggr, jb, chainSet, true, qopts...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -250,7 +252,7 @@ type jobSpecParams struct {
 	destChain     legacyevm.Chain
 }
 
-func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, registerFilters bool, qopts ...pg.QOpt) (*jobSpecParams, error) {
+func extractJobSpecParams(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, registerFilters bool, qopts ...pg.QOpt) (*jobSpecParams, error) {
 	if jb.OCR2OracleSpec == nil {
 		return nil, errors.New("spec is nil")
 	}
@@ -273,7 +275,7 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 		return nil, errors.Wrap(err, "create offRampReader")
 	}
 
-	offRampConfig, err := offRampReader.GetStaticConfig(context.Background())
+	offRampConfig, err := offRampReader.GetStaticConfig(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "get offRamp static config")
 	}

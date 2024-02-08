@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/lazyinitservice"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/legacyevm"
@@ -38,33 +39,36 @@ import (
 )
 
 func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
-	if err != nil {
-		return nil, err
-	}
-	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
-	destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.destChainSelector)
-	if err != nil {
-		return nil, err
-	}
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
-	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
-	oracle, err := libocr2.NewOracle(argsNoPlugin)
-	if err != nil {
-		return nil, err
-	}
-	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
-	if new {
-		return []job.ServiceCtx{oraclelib.NewBackfilledOracle(
-			pluginConfig.lggr,
-			backfillArgs.SourceLP,
-			backfillArgs.DestLP,
-			backfillArgs.SourceStartBlock,
-			backfillArgs.DestStartBlock,
-			job.NewServiceAdapter(oracle)),
-		}, nil
-	}
-	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+	return []job.ServiceCtx{lazyinitservice.New(func(ctx context.Context) (job.ServiceCtx, error) {
+		pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
+		if err != nil {
+			return nil, err
+		}
+		wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
+		destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.destChainSelector)
+		if err != nil {
+			return nil, lazyinitservice.Unrecoverable(err)
+		}
+		argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
+		argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
+		oracle, err := libocr2.NewOracle(argsNoPlugin)
+		if err != nil {
+			return nil, lazyinitservice.Unrecoverable(err)
+		}
+		// If this is a brand-new job, then we make use of the start blocks.
+		// If not then we're rebooting and log poller will pick up where we left off.
+		if new {
+			return oraclelib.NewBackfilledOracle(
+				pluginConfig.lggr,
+				backfillArgs.SourceLP,
+				backfillArgs.DestLP,
+				backfillArgs.SourceStartBlock,
+				backfillArgs.DestStartBlock,
+				job.NewServiceAdapter(oracle),
+			), nil
+		}
+		return job.NewServiceAdapter(oracle), nil
+	}, lazyinitservice.WithLogErrorFunc(logError))}, nil
 }
 
 func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {
