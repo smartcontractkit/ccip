@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -349,9 +350,9 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 
 	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(ctx, 0, 10, 0)
 	require.NoError(t, err)
-	require.Equal(t, []ccipdata.Event[ccipdata.ExecutionStateChanged]{}, events)
+	require.Equal(t, []ccipdata.Event[cciptypes.ExecutionStateChanged]{}, events)
 
-	rateLimits, err := th.reader.GetTokenPoolsRateLimits(ctx, []common.Address{})
+	rateLimits, err := th.reader.GetTokenPoolsRateLimits(ctx, []cciptypes.Address{})
 	require.NoError(t, err)
 	require.Empty(t, rateLimits)
 
