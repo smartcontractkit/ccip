@@ -111,7 +111,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 
 	// Will return 0,0 if no messages are found. This is a valid case as the report could
 	// still contain fee updates.
-	minSeqNr, maxSeqNr, messageIds, err := r.calculateMinMaxSequenceNumbers(ctx, lggr)
+	minSeqNr, maxSeqNr, messageIDs, err := r.calculateMinMaxSequenceNumbers(ctx, lggr)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (r *CommitReportingPlugin) Observation(ctx context.Context, epochAndRound t
 		"sourceGasPriceUSD", sourceGasPriceUSD,
 		"tokenPricesUSD", tokenPricesUSD,
 		"epochAndRound", epochAndRound,
-		"messageIds", messageIds,
+		"messageIDs", messageIDs,
 	)
 	r.metricsCollector.NumberOfMessagesBasedOnInterval(ccip.Observation, minSeqNr, maxSeqNr)
 
@@ -164,11 +164,11 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 		return 0, 0, []common.Hash{}, nil
 	}
 
-	messageIds := make([]common.Hash, 0, len(msgRequests))
+	messageIDs := make([]common.Hash, 0, len(msgRequests))
 	seqNrs := make([]uint64, 0, len(msgRequests))
 	for _, msgReq := range msgRequests {
 		seqNrs = append(seqNrs, msgReq.Data.SequenceNumber)
-		messageIds = append(messageIds, common.Hash(msgReq.Data.MessageId))
+		messageIDs = append(messageIDs, common.Hash(msgReq.Data.MessageId))
 	}
 
 	minSeqNr := seqNrs[0]
@@ -181,7 +181,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	if !ccipcalc.ContiguousReqs(lggr, minSeqNr, maxSeqNr, seqNrs) {
 		return 0, 0, []common.Hash{}, errors.New("unexpected gap in seq nums")
 	}
-	return minSeqNr, maxSeqNr, messageIds, nil
+	return minSeqNr, maxSeqNr, messageIDs, nil
 }
 
 func (r *CommitReportingPlugin) nextMinSeqNum(ctx context.Context, lggr logger.Logger) (inflightMin, onChainMin uint64, err error) {
