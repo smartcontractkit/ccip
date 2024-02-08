@@ -62,10 +62,8 @@ func TestTokenPoolFactory(t *testing.T) {
 			})
 		}
 
-		// TypeAndVersion uses finalized block number
-		batchCallerMock.On("BatchCall", mock.Anything, uint64(latestBlock.FinalizedBlockNumber), mock.Anything).Return(batchCallResult, nil)
-		// Rate limits use latest block number
-		batchCallerMock.On("BatchCall", mock.Anything, uint64(latestBlock.BlockNumber), mock.Anything).Return([]rpclib.DataAndErr{{
+		batchCallerMock.On("BatchCall", ctx, uint64(latestBlock.BlockNumber), mock.Anything).Return(batchCallResult, nil).Once()
+		batchCallerMock.On("BatchCall", ctx, uint64(latestBlock.BlockNumber), mock.Anything).Return([]rpclib.DataAndErr{{
 			Outputs: []any{rateLimits},
 			Err:     nil,
 		}, {

@@ -52,21 +52,21 @@ func NewTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64, o
 	}
 }
 
-func (f *TokenPoolBatchedReader) GetInboundTokenPoolRateLimits(ctx context.Context, tokenPools []common.Address) ([]ccipdata.TokenBucketRateLimit, error) {
+func (br *TokenPoolBatchedReader) GetInboundTokenPoolRateLimits(ctx context.Context, tokenPools []common.Address) ([]ccipdata.TokenBucketRateLimit, error) {
 	if len(tokenPools) == 0 {
 		return []ccipdata.TokenBucketRateLimit{}, nil
 	}
 
-	err := f.loadTokenPoolReaders(ctx, tokenPools)
+	err := br.loadTokenPoolReaders(ctx, tokenPools)
 	if err != nil {
 		return nil, err
 	}
 
 	tokenPoolReaders := make([]ccipdata.TokenPoolReader, 0, len(tokenPools))
 	for _, poolAddress := range tokenPools {
-		f.tokenPoolReaderMu.RLock()
-		tokenPoolReader, exists := f.tokenPoolReaders[poolAddress]
-		f.tokenPoolReaderMu.RUnlock()
+		br.tokenPoolReaderMu.RLock()
+		tokenPoolReader, exists := br.tokenPoolReaders[poolAddress]
+		br.tokenPoolReaderMu.RUnlock()
 		if !exists {
 			return nil, fmt.Errorf("token pool %s not found", poolAddress.Hex())
 		}
@@ -83,38 +83,33 @@ func (f *TokenPoolBatchedReader) GetInboundTokenPoolRateLimits(ctx context.Conte
 		}
 	}
 
-	latestBlock, err := f.lp.LatestBlock(pg.WithParentCtx(ctx))
-	if err != nil {
-		return nil, fmt.Errorf("get latest block: %w", err)
-	}
-
-	return batchCall[ccipdata.TokenBucketRateLimit](ctx, uint64(latestBlock.BlockNumber), f.evmBatchCaller, evmCalls)
+	return batchCallLatestBlockNumber[ccipdata.TokenBucketRateLimit](ctx, br.lp, br.evmBatchCaller, evmCalls)
 }
 
 // loadTokenPoolReaders loads the token pools into the factory's cache
-func (f *TokenPoolBatchedReader) loadTokenPoolReaders(ctx context.Context, tokenPoolAddresses []common.Address) error {
+func (br *TokenPoolBatchedReader) loadTokenPoolReaders(ctx context.Context, tokenPoolAddresses []common.Address) error {
 	var missingTokens []common.Address
 
-	f.tokenPoolReaderMu.RLock()
+	br.tokenPoolReaderMu.RLock()
 	for _, poolAddress := range tokenPoolAddresses {
-		if _, exists := f.tokenPoolReaders[poolAddress]; !exists {
+		if _, exists := br.tokenPoolReaders[poolAddress]; !exists {
 			missingTokens = append(missingTokens, poolAddress)
 		}
 	}
-	f.tokenPoolReaderMu.RUnlock()
+	br.tokenPoolReaderMu.RUnlock()
 
 	// Only continue if there are missing tokens
 	if len(missingTokens) == 0 {
 		return nil
 	}
 
-	typeAndVersions, err := getBatchedTypeAndVersion(ctx, f.lp, f.evmBatchCaller, missingTokens)
+	typeAndVersions, err := getBatchedTypeAndVersion(ctx, br.lp, br.evmBatchCaller, missingTokens)
 	if err != nil {
 		return err
 	}
 
-	f.tokenPoolReaderMu.Lock()
-	defer f.tokenPoolReaderMu.Unlock()
+	br.tokenPoolReaderMu.Lock()
+	defer br.tokenPoolReaderMu.Unlock()
 	for i, tokenPoolAddress := range missingTokens {
 		typeAndVersion := typeAndVersions[i]
 		poolType, version, err := ccipconfig.ParseTypeAndVersion(typeAndVersion)
@@ -123,9 +118,9 @@ func (f *TokenPoolBatchedReader) loadTokenPoolReaders(ctx context.Context, token
 		}
 		switch version {
 		case ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0:
-			f.tokenPoolReaders[tokenPoolAddress] = v1_2_0.NewTokenPool(poolType, tokenPoolAddress, f.offRampAddress)
+			br.tokenPoolReaders[tokenPoolAddress] = v1_2_0.NewTokenPool(poolType, tokenPoolAddress, br.offRampAddress)
 		case ccipdata.V1_4_0:
-			f.tokenPoolReaders[tokenPoolAddress] = v1_4_0.NewTokenPool(poolType, tokenPoolAddress, f.remoteChainSelector)
+			br.tokenPoolReaders[tokenPoolAddress] = v1_4_0.NewTokenPool(poolType, tokenPoolAddress, br.remoteChainSelector)
 		default:
 			return fmt.Errorf("unsupported token pool version %v", version)
 		}
@@ -145,16 +140,16 @@ func getBatchedTypeAndVersion(ctx context.Context, lp logpoller.LogPoller, evmBa
 		))
 	}
 
+	return batchCallLatestBlockNumber[string](ctx, lp, evmBatchCaller, evmCalls)
+}
+
+func batchCallLatestBlockNumber[T any](ctx context.Context, lp logpoller.LogPoller, evmBatchCaller rpclib.EvmBatchCaller, evmCalls []rpclib.EvmCall) ([]T, error) {
 	latestBlock, err := lp.LatestBlock(pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("get latest block: %w", err)
 	}
 
-	return batchCall[string](ctx, uint64(latestBlock.FinalizedBlockNumber), evmBatchCaller, evmCalls)
-}
-
-func batchCall[T any](ctx context.Context, blockNumber uint64, evmBatchCaller rpclib.EvmBatchCaller, evmCalls []rpclib.EvmCall) ([]T, error) {
-	results, err := evmBatchCaller.BatchCall(ctx, blockNumber, evmCalls)
+	results, err := evmBatchCaller.BatchCall(ctx, uint64(latestBlock.BlockNumber), evmCalls)
 	if err != nil {
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
