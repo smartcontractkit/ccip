@@ -34,7 +34,7 @@ type TokenPoolBatchedReader struct {
 	tokenPoolReaderMu sync.RWMutex
 }
 
-//go:generate mockery --quiet --name TokenPoolFactoryInterface --filename token_pool_factory_mock.go --case=underscor
+//go:generate mockery --quiet --name TokenPoolBatchedReaderInterface --filename token_pool_batched_reader_mock.go --case=underscor
 type TokenPoolBatchedReaderInterface interface {
 	GetInboundTokenPoolRateLimits(ctx context.Context, tokenPoolReaders []common.Address) ([]ccipdata.TokenBucketRateLimit, error)
 }
@@ -88,23 +88,7 @@ func (f *TokenPoolBatchedReader) GetInboundTokenPoolRateLimits(ctx context.Conte
 		return nil, fmt.Errorf("get latest block: %w", err)
 	}
 
-	results, err := f.evmBatchCaller.BatchCall(ctx, uint64(latestBlock.BlockNumber), evmCalls)
-	if err != nil {
-		return nil, fmt.Errorf("batch call limit: %w", err)
-	}
-
-	rateLimits, err := rpclib.ParseOutputs[ccipdata.TokenBucketRateLimit](results, func(d rpclib.DataAndErr) (ccipdata.TokenBucketRateLimit, error) {
-		return rpclib.ParseOutput[ccipdata.TokenBucketRateLimit](d, 0)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("parse outputs: %w", err)
-	}
-
-	if len(rateLimits) != len(tokenPoolReaders) {
-		return nil, fmt.Errorf("expected %d rate limits, got %d", len(tokenPoolReaders), len(rateLimits))
-	}
-
-	return rateLimits, nil
+	return batchCall[ccipdata.TokenBucketRateLimit](ctx, uint64(latestBlock.BlockNumber), f.evmBatchCaller, evmCalls)
 }
 
 // loadTokenPoolReaders loads the token pools into the factory's cache
@@ -166,16 +150,20 @@ func getBatchedTypeAndVersion(ctx context.Context, lp logpoller.LogPoller, evmBa
 		return nil, fmt.Errorf("get latest block: %w", err)
 	}
 
-	results, err := evmBatchCaller.BatchCall(ctx, uint64(latestBlock.FinalizedBlockNumber), evmCalls)
+	return batchCall[string](ctx, uint64(latestBlock.FinalizedBlockNumber), evmBatchCaller, evmCalls)
+}
+
+func batchCall[T any](ctx context.Context, blockNumber uint64, evmBatchCaller rpclib.EvmBatchCaller, evmCalls []rpclib.EvmCall) ([]T, error) {
+	results, err := evmBatchCaller.BatchCall(ctx, blockNumber, evmCalls)
 	if err != nil {
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
 
-	typeAndVersions, err := rpclib.ParseOutputs[string](results, func(d rpclib.DataAndErr) (string, error) {
-		return rpclib.ParseOutput[string](d, 0)
+	result, err := rpclib.ParseOutputs[T](results, func(d rpclib.DataAndErr) (T, error) {
+		return rpclib.ParseOutput[T](d, 0)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("parse outputs: %w", err)
 	}
-	return typeAndVersions, nil
+	return result, nil
 }
