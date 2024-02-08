@@ -23,6 +23,35 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_inbox"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_gateway_router"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
+)
+
+var (
+	l1AdapterABI     = abihelpers.MustParseABI(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.ABI)
+	nodeInterfaceABI = abihelpers.MustParseABI(arb_node_interface.NodeInterfaceMetaData.ABI)
+)
+
+const (
+	// from nitro-contracts/src/libraries/Error.sol
+	// error RetryableData(
+	//   address from,
+	//   address to,
+	//   uint256 l2CallValue,
+	//   uint256 deposit,
+	//   uint256 maxSubmissionCost,
+	//   address excessFeeRefundAddress,
+	//   address callValueRefundAddress,
+	//   uint256 gasLimit,
+	//   uint256 maxFeePerGas,
+	//   bytes data
+	// );
+	retryableErrorABI = `[{"type":"address"},{"type":"address"},{"type":"uint256"},{"type":"uint256"},{"type":"uint256"},{"type":"address"},{"type":"address"},{"type":"uint256"},{"type":"uint256"},{"type":"bytes"}]`
+	// from the arbitrum sdk:
+	//   const innerData = defaultAbiCoder.encode(
+	//     ['uint256', 'bytes'],
+	//     [depositParams.maxSubmissionCost, '0x']
+	//   )
+	innerDataABI = `[{"type":"uint256"}, {"type": "bytes"}]`
 )
 
 func SendToL2(
@@ -80,8 +109,6 @@ func SendToL2(
 	}
 
 	// transact with the bridge adapter to send funds cross-chain
-	l1AdapterABI, err := arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.GetAbi()
-	helpers.PanicErr(err)
 	bridgeCalldata, err := l1AdapterABI.Pack("exposeSendERC20Params", arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterSendERC20Params{
 		GasLimit:          params.GasLimit,
 		MaxSubmissionCost: params.MaxSubmissionCost,
@@ -236,9 +263,6 @@ func estimateAll(env multienv.Env, l1ChainID, l2ChainID uint64, rd RetryableData
 }
 
 func estimateRetryableGasLimit(env multienv.Env, l2Client *ethclient.Client, l2ChainID uint64, rd RetryableData) *big.Int {
-	nodeInterfaceABI, err := arb_node_interface.NodeInterfaceMetaData.GetAbi()
-	helpers.PanicErr(err)
-
 	packed, err := nodeInterfaceABI.Pack("estimateRetryableTicket",
 		rd.From,
 		assets.Ether(1).ToInt(), // this is what is done in the SDK, not sure why yet
@@ -308,8 +332,9 @@ func parseRetryableError(errData string) RetryableData {
 	helpers.PanicErr(err)
 
 	retryableIfaces, err := utils.ABIDecode(
-		`[{"type":"address"},{"type":"address"},{"type":"uint256"},{"type":"uint256"},{"type":"uint256"},{"type":"address"},{"type":"address"},{"type":"uint256"},{"type":"uint256"},{"type":"bytes"}]`,
-		dataBytes[4:])
+		retryableErrorABI,
+		dataBytes[4:], // trim error signature
+	)
 	helpers.PanicErr(err)
 
 	if len(retryableIfaces) != 10 {
@@ -362,7 +387,7 @@ type dataFunc func(gasLimit, maxFeePerGas, maxSubmissionCost *big.Int) (data []b
 
 func createDepositFunc(fromAddress, l1GatewayRouter, l1TokenAddress, l2Recipient common.Address, amount *big.Int) dataFunc {
 	return func(gasLimit, maxFeePerGas, maxSubmissionCost *big.Int) (calldata []byte, to, from common.Address, value *big.Int) {
-		innerData, err := utils.ABIEncode(`[{"type":"uint256"}, {"type": "bytes"}]`, maxSubmissionCost, []byte(""))
+		innerData, err := utils.ABIEncode(innerDataABI, maxSubmissionCost, []byte(""))
 		helpers.PanicErr(err)
 
 		grABI, err := arbitrum_l1_gateway_router.ArbitrumL1GatewayRouterMetaData.GetAbi()
