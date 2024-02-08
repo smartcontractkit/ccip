@@ -59,7 +59,7 @@ type ExecutionPluginStaticConfig struct {
 	tokenDataWorker          tokendata.Worker
 	destChainSelector        uint64
 	priceRegistryProvider    ccipdataprovider.PriceRegistry
-	destTokenPoolFactory     *batchreader.TokenPoolBatchedReaderInterface
+	destTokenPoolFactory     batchreader.TokenPoolBatchedReaderInterface
 	metricsCollector         ccip.PluginMetricsCollector
 }
 
