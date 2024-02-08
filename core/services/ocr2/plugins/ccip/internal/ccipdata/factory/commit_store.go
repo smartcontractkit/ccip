@@ -5,6 +5,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -91,7 +92,7 @@ func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (f
 
 // CommitReportToEthTxMeta generates a txmgr.EthTxMeta from the given commit report.
 // sequence numbers of the committed messages will be added to tx metadata
-func commitReportToEthTxMeta(commitReport ccipdata.CommitStoreReport) (*txmgr.TxMeta, error) {
+func commitReportToEthTxMeta(commitReport cciptypes.CommitStoreReport) (*txmgr.TxMeta, error) {
 	n := (commitReport.Interval.Max - commitReport.Interval.Min) + 1
 	seqRange := make([]uint64, n)
 	for i := uint64(0); i < n; i++ {

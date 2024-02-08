@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -41,8 +42,8 @@ type priceRegReaderTH struct {
 	// Expected state
 	blockTs              []uint64
 	expectedFeeTokens    []common.Address
-	expectedGasUpdates   map[uint64][]ccipdata.GasPrice
-	expectedTokenUpdates map[uint64][]ccipdata.TokenPrice
+	expectedGasUpdates   map[uint64][]cciptypes.GasPrice
+	expectedTokenUpdates map[uint64][]cciptypes.TokenPrice
 	dest                 uint64
 }
 
@@ -73,27 +74,27 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 
 	feeTokens := []common.Address{utils.RandomAddress(), utils.RandomAddress()}
 	dest := uint64(10)
-	gasPriceUpdatesBlock1 := []ccipdata.GasPrice{
+	gasPriceUpdatesBlock1 := []cciptypes.GasPrice{
 		{
 			DestChainSelector: dest,
 			Value:             big.NewInt(11),
 		},
 	}
-	gasPriceUpdatesBlock2 := []ccipdata.GasPrice{
+	gasPriceUpdatesBlock2 := []cciptypes.GasPrice{
 		{
 			DestChainSelector: dest,           // Reset same gas price
 			Value:             big.NewInt(12), // Intentionally different from block1
 		},
 	}
-	token1 := utils.RandomAddress()
-	token2 := utils.RandomAddress()
-	tokenPriceUpdatesBlock1 := []ccipdata.TokenPrice{
+	token1 := cciptypes.Address(utils.RandomAddress().String())
+	token2 := cciptypes.Address(utils.RandomAddress().String())
+	tokenPriceUpdatesBlock1 := []cciptypes.TokenPrice{
 		{
 			Token: token1,
 			Value: big.NewInt(12),
 		},
 	}
-	tokenPriceUpdatesBlock2 := []ccipdata.TokenPrice{
+	tokenPriceUpdatesBlock2 := []cciptypes.TokenPrice{
 		{
 			Token: token1,
 			Value: big.NewInt(13), // Intentionally change token1 value
@@ -135,11 +136,11 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 			ccipdata.V1_0_0: pr10r, ccipdata.V1_2_0: pr12r,
 		},
 		expectedFeeTokens: feeTokens,
-		expectedGasUpdates: map[uint64][]ccipdata.GasPrice{
+		expectedGasUpdates: map[uint64][]cciptypes.GasPrice{
 			b1: gasPriceUpdatesBlock1,
 			b2: gasPriceUpdatesBlock2,
 		},
-		expectedTokenUpdates: map[uint64][]ccipdata.TokenPrice{
+		expectedTokenUpdates: map[uint64][]cciptypes.TokenPrice{
 			b1: tokenPriceUpdatesBlock1,
 			b2: tokenPriceUpdatesBlock2,
 		},
@@ -161,8 +162,8 @@ func testPriceRegistryReader(t *testing.T, th priceRegReaderTH, pr ccipdata.Pric
 
 	for i, ts := range th.blockTs {
 		// Should see all updates >= ts.
-		var expectedGas []ccipdata.GasPrice
-		var expectedToken []ccipdata.TokenPrice
+		var expectedGas []cciptypes.GasPrice
+		var expectedToken []cciptypes.TokenPrice
 		for j := i; j < len(th.blockTs); j++ {
 			expectedGas = append(expectedGas, th.expectedGasUpdates[th.blockTs[j]]...)
 			expectedToken = append(expectedToken, th.expectedTokenUpdates[th.blockTs[j]]...)
@@ -177,7 +178,7 @@ func testPriceRegistryReader(t *testing.T, th priceRegReaderTH, pr ccipdata.Pric
 	}
 
 	// Empty token set should return empty set no error.
-	gotEmpty, err := pr.GetTokenPrices(context.Background(), []common.Address{})
+	gotEmpty, err := pr.GetTokenPrices(context.Background(), []cciptypes.Address{})
 	require.NoError(t, err)
 	assert.Len(t, gotEmpty, 0)
 
@@ -185,16 +186,17 @@ func testPriceRegistryReader(t *testing.T, th priceRegReaderTH, pr ccipdata.Pric
 	allTokenUpdates, err := pr.GetTokenPriceUpdatesCreatedAfter(context.Background(), time.Unix(0, 0), 0)
 	require.NoError(t, err)
 	// Build latest map
-	latest := make(map[common.Address]*big.Int)
+	latest := make(map[cciptypes.Address]*big.Int)
 	// Comes back in ascending order (oldest first)
-	var allTokens []common.Address
+	var allTokens []cciptypes.Address
 	for i := len(allTokenUpdates) - 1; i >= 0; i-- {
-		_, have := latest[allTokenUpdates[i].Data.Token]
+		assert.NoError(t, err)
+		_, have := latest[allTokenUpdates[i].Token]
 		if have {
 			continue
 		}
-		latest[allTokenUpdates[i].Data.Token] = allTokenUpdates[i].Data.Value
-		allTokens = append(allTokens, allTokenUpdates[i].Data.Token)
+		latest[allTokenUpdates[i].Token] = allTokenUpdates[i].Value
+		allTokens = append(allTokens, allTokenUpdates[i].Token)
 	}
 	tokenPrices, err := pr.GetTokenPrices(context.Background(), allTokens)
 	require.NoError(t, err)

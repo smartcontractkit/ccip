@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -91,7 +92,7 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 	}
 }
 
-func execReportToEthTxMeta(execReport ccipdata.ExecReport) (*txmgr.TxMeta, error) {
+func execReportToEthTxMeta(execReport cciptypes.ExecReport) (*txmgr.TxMeta, error) {
 	msgIDs := make([]string, len(execReport.Messages))
 	for i, msg := range execReport.Messages {
 		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
