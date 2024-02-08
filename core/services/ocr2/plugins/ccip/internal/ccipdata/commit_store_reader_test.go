@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -147,10 +148,10 @@ func TestCommitStoreReaders(t *testing.T) {
 	onramp1 := utils.RandomAddress()
 	onramp2 := utils.RandomAddress()
 	// Report
-	rep := ccipdata.CommitStoreReport{
-		TokenPrices: []ccipdata.TokenPrice{{Token: utils.RandomAddress(), Value: big.NewInt(1)}},
-		GasPrices:   []ccipdata.GasPrice{{DestChainSelector: 1, Value: big.NewInt(1)}},
-		Interval:    ccipdata.CommitStoreInterval{Min: 1, Max: 10},
+	rep := cciptypes.CommitStoreReport{
+		TokenPrices: []cciptypes.TokenPrice{{Token: cciptypes.Address(utils.RandomAddress().String()), Value: big.NewInt(1)}},
+		GasPrices:   []cciptypes.GasPrice{{DestChainSelector: 1, Value: big.NewInt(1)}},
+		Interval:    cciptypes.CommitStoreInterval{Min: 1, Max: 10},
 		MerkleRoot:  common.HexToHash("0x1"),
 	}
 	er := big.NewInt(1)
@@ -194,7 +195,7 @@ func TestCommitStoreReaders(t *testing.T) {
 
 	sourceFinalityDepth := uint32(1)
 	destFinalityDepth := uint32(2)
-	commonOffchain := ccipdata.CommitOffchainConfig{
+	commonOffchain := cciptypes.CommitOffchainConfig{
 		GasPriceDeviationPPB:   1e6,
 		GasPriceHeartBeat:      1 * time.Hour,
 		TokenPriceDeviationPPB: 1e6,
@@ -316,12 +317,18 @@ func TestCommitStoreReaders(t *testing.T) {
 			reps, err = cr.GetCommitReportMatchingSeqNum(context.Background(), rep.Interval.Max, 0)
 			require.NoError(t, err)
 			require.Len(t, reps, 1)
-			assert.Equal(t, reps[0].Data, rep)
+			assert.Equal(t, reps[0].Interval, rep.Interval)
+			assert.Equal(t, reps[0].MerkleRoot, rep.MerkleRoot)
+			assert.Equal(t, reps[0].GasPrices, rep.GasPrices)
+			assert.Equal(t, reps[0].TokenPrices, rep.TokenPrices)
 
 			reps, err = cr.GetCommitReportMatchingSeqNum(context.Background(), rep.Interval.Min, 0)
 			require.NoError(t, err)
 			require.Len(t, reps, 1)
-			assert.Equal(t, reps[0].Data, rep)
+			assert.Equal(t, reps[0].Interval, rep.Interval)
+			assert.Equal(t, reps[0].MerkleRoot, rep.MerkleRoot)
+			assert.Equal(t, reps[0].GasPrices, rep.GasPrices)
+			assert.Equal(t, reps[0].TokenPrices, rep.TokenPrices)
 
 			reps, err = cr.GetCommitReportMatchingSeqNum(context.Background(), rep.Interval.Min-1, 0)
 			require.NoError(t, err)
@@ -331,10 +338,13 @@ func TestCommitStoreReaders(t *testing.T) {
 			reps, err = cr.GetAcceptedCommitReportsGteTimestamp(context.Background(), time.Unix(0, 0), 0)
 			require.NoError(t, err)
 			require.Len(t, reps, 1)
-			assert.Equal(t, reps[0].Data, rep)
+			assert.Equal(t, reps[0].Interval, rep.Interval)
+			assert.Equal(t, reps[0].MerkleRoot, rep.MerkleRoot)
+			assert.Equal(t, reps[0].GasPrices, rep.GasPrices)
+			assert.Equal(t, reps[0].TokenPrices, rep.TokenPrices)
 
 			// Until we detect the config, we'll have empty offchain config
-			assert.Equal(t, cr.OffchainConfig(), ccipdata.CommitOffchainConfig{})
+			assert.Equal(t, cr.OffchainConfig(), cciptypes.CommitOffchainConfig{})
 			newPr, err := cr.ChangeConfig(configs[v][0], configs[v][1])
 			require.NoError(t, err)
 			assert.Equal(t, newPr, prs[v])

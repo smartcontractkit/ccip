@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -23,7 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 )
@@ -406,7 +406,7 @@ func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress com
 	msg, err := th.reader.GetSendRequestsBetweenSeqNums(ctx, 0, 10, true)
 	require.NoError(t, err)
 	require.NotNil(t, msg)
-	require.Equal(t, []ccipdata.Event[internal.EVM2EVMMessage]{}, msg)
+	require.Equal(t, []ccipdata.Event[cciptypes.EVM2EVMMessage]{}, msg)
 
 	address, err := th.reader.Address()
 	require.NoError(t, err)

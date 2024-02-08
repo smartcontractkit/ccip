@@ -2,11 +2,10 @@ package ccipdata
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
@@ -20,14 +19,7 @@ const (
 
 type Event[T any] struct {
 	Data T
-	Meta
-}
-
-type Meta struct {
-	BlockTimestamp time.Time
-	BlockNumber    int64
-	TxHash         common.Hash
-	LogIndex       uint
+	cciptypes.BlockMeta
 }
 
 func LogsConfirmations(finalized bool) logpoller.Confirmations {
@@ -48,10 +40,10 @@ func ParseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(l
 		}
 		reqs = append(reqs, Event[T]{
 			Data: *data,
-			Meta: Meta{
+			BlockMeta: cciptypes.BlockMeta{
 				BlockTimestamp: log.BlockTimestamp,
 				BlockNumber:    log.BlockNumber,
-				TxHash:         log.TxHash,
+				TxHash:         log.TxHash.String(),
 				LogIndex:       uint(log.LogIndex),
 			},
 		})
