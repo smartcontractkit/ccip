@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 )
@@ -91,7 +92,7 @@ type OffRampReader interface {
 	GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []common.Address) ([]TokenBucketRateLimit, error)
 	Address() common.Address
 	// ChangeConfig notifies the reader that the config has changed onchain
-	ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error)
+	ChangeConfig(onchainConfig []byte, offchainConfig []byte, chainSelector uint64) (common.Address, common.Address, error)
 	OffchainConfig() ExecOffchainConfig
 	OnchainConfig() ExecOnchainConfig
 	GasPriceEstimator() prices.GasPriceEstimatorExec

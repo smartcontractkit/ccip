@@ -25,6 +25,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
@@ -413,7 +414,7 @@ func (o *OffRamp) UpdateDynamicConfig(onchainConfig ccipdata.ExecOnchainConfig, 
 	o.configMu.Unlock()
 }
 
-func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []byte) (common.Address, common.Address, error) {
+func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []byte, chainSelector uint64) (common.Address, common.Address, error) {
 	onchainConfigParsed, err := abihelpers.DecodeAbiStruct[ExecOnchainConfig](onchainConfigBytes)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
@@ -422,6 +423,9 @@ func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []
 	offchainConfigParsed, err := ccipconfig.DecodeOffchainConfig[ExecOffchainConfig](offchainConfigBytes)
 	if err != nil {
 		return common.Address{}, common.Address{}, err
+	}
+	if offchainConfigParsed.BatchGasLimit+evm.DefaultExecTxGasOverhead > evm.GetDefaultExecTransactionGasLimit(chainSelector) {
+		return common.Address{}, common.Address{}, fmt.Errorf("offchainConfig.BatchGasLimit + DEFAULT_GAS_OVERHEAD must be less than the tx gas limit of the chain")
 	}
 	destRouter, err := router.NewRouter(onchainConfigParsed.Router, o.Client)
 	if err != nil {

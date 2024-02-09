@@ -2,6 +2,7 @@ package evm
 
 import (
 	"github.com/ethereum/go-ethereum/common"
+	chainselectors "github.com/smartcontractkit/chain-selectors"
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2/types"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipcommit"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/ccipexec"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/evm"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay/evm/types"
 )
 
@@ -46,7 +48,14 @@ func NewCCIPCommitProvider(lggr logger.Logger, chainSet legacyevm.Chain, rargs c
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{}, fn)
+	destChainSelector, err := chainselectors.SelectorFromChainId(chainSet.ID().Uint64())
+	if err != nil {
+		return nil, err
+	}
+	txGasLimit := evm.GetDefaultCommitTransactionGasLimit(destChainSelector)
+	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
+		pluginGasLimit: &txGasLimit,
+	}, fn)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +100,14 @@ func NewCCIPExecutionProvider(lggr logger.Logger, chainSet legacyevm.Chain, rarg
 	if err != nil {
 		return nil, err
 	}
-	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{}, fn)
+	destChainSelector, err := chainselectors.SelectorFromChainId(chainSet.ID().Uint64())
+	if err != nil {
+		return nil, err
+	}
+	txGasLimit := evm.GetDefaultExecTransactionGasLimit(destChainSelector)
+	contractTransmitter, err := newContractTransmitter(lggr, rargs, transmitterID, ks, configWatcher, configTransmitterOpts{
+		pluginGasLimit: &txGasLimit,
+	}, fn)
 	if err != nil {
 		return nil, err
 	}

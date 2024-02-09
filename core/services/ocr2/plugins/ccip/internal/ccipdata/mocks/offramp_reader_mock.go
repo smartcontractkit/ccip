@@ -38,9 +38,9 @@ func (_m *OffRampReader) Address() common.Address {
 	return r0
 }
 
-// ChangeConfig provides a mock function with given fields: onchainConfig, offchainConfig
-func (_m *OffRampReader) ChangeConfig(onchainConfig []byte, offchainConfig []byte) (common.Address, common.Address, error) {
-	ret := _m.Called(onchainConfig, offchainConfig)
+// ChangeConfig provides a mock function with given fields: onchainConfig, offchainConfig, chainSelector
+func (_m *OffRampReader) ChangeConfig(onchainConfig []byte, offchainConfig []byte, chainSelector uint64) (common.Address, common.Address, error) {
+	ret := _m.Called(onchainConfig, offchainConfig, chainSelector)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ChangeConfig")
@@ -49,27 +49,27 @@ func (_m *OffRampReader) ChangeConfig(onchainConfig []byte, offchainConfig []byt
 	var r0 common.Address
 	var r1 common.Address
 	var r2 error
-	if rf, ok := ret.Get(0).(func([]byte, []byte) (common.Address, common.Address, error)); ok {
-		return rf(onchainConfig, offchainConfig)
+	if rf, ok := ret.Get(0).(func([]byte, []byte, uint64) (common.Address, common.Address, error)); ok {
+		return rf(onchainConfig, offchainConfig, chainSelector)
 	}
-	if rf, ok := ret.Get(0).(func([]byte, []byte) common.Address); ok {
-		r0 = rf(onchainConfig, offchainConfig)
+	if rf, ok := ret.Get(0).(func([]byte, []byte, uint64) common.Address); ok {
+		r0 = rf(onchainConfig, offchainConfig, chainSelector)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(common.Address)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func([]byte, []byte) common.Address); ok {
-		r1 = rf(onchainConfig, offchainConfig)
+	if rf, ok := ret.Get(1).(func([]byte, []byte, uint64) common.Address); ok {
+		r1 = rf(onchainConfig, offchainConfig, chainSelector)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(common.Address)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func([]byte, []byte) error); ok {
-		r2 = rf(onchainConfig, offchainConfig)
+	if rf, ok := ret.Get(2).(func([]byte, []byte, uint64) error); ok {
+		r2 = rf(onchainConfig, offchainConfig, chainSelector)
 	} else {
 		r2 = ret.Error(2)
 	}
