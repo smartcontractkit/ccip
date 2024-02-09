@@ -59,7 +59,7 @@ type ExecutionPluginStaticConfig struct {
 	tokenDataWorker          tokendata.Worker
 	destChainSelector        uint64
 	priceRegistryProvider    ccipdataprovider.PriceRegistry
-	destTokenPoolFactory     batchreader.TokenPoolBatchedReaderInterface
+	tokenPoolBatchedReader   batchreader.TokenPoolBatchedReader
 	metricsCollector         ccip.PluginMetricsCollector
 }
 
@@ -76,12 +76,12 @@ type ExecutionReportingPlugin struct {
 	sourceWrappedNativeToken common.Address
 	onRampReader             ccipdata.OnRampReader
 	// Dest
-	commitStoreReader    ccipdata.CommitStoreReader
-	destPriceRegistry    ccipdata.PriceRegistryReader
-	destWrappedNative    common.Address
-	onchainConfig        ccipdata.ExecOnchainConfig
-	offRampReader        ccipdata.OffRampReader
-	destTokenPoolFactory batchreader.TokenPoolBatchedReaderInterface
+	commitStoreReader      ccipdata.CommitStoreReader
+	destPriceRegistry      ccipdata.PriceRegistryReader
+	destWrappedNative      common.Address
+	onchainConfig          ccipdata.ExecOnchainConfig
+	offRampReader          ccipdata.OffRampReader
+	tokenPoolBatchedReader batchreader.TokenPoolBatchedReader
 	// State
 	inflightReports *inflightExecReportsContainer
 	snoozedRoots    cache.SnoozedRoots
@@ -276,7 +276,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 		}
 	}
 
-	rateLimits, err := r.destTokenPoolFactory.GetInboundTokenPoolRateLimits(ctx, dstPoolAddresses)
+	rateLimits, err := r.tokenPoolBatchedReader.GetInboundTokenPoolRateLimits(ctx, dstPoolAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("fetch pool rate limits: %w", err)
 	}

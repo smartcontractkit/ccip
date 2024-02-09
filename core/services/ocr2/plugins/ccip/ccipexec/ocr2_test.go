@@ -125,7 +125,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			offRamp, _ := testhelpers.NewFakeOffRamp(t)
 			offRamp.SetRateLimiterState(tc.rateLimiterState)
 
-			p.destTokenPoolFactory = batchreader.NewTokenPoolBatchedReader(p.lggr, 0, offRamp.Address(), nil, nil)
+			p.tokenPoolBatchedReader = batchreader.NewTokenPoolBatchedReader(p.lggr, 0, offRamp.Address(), nil, nil)
 
 			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
 			mockOffRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
@@ -887,7 +887,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 
 			tokenPoolFactoryMock := tokenpoolbatchedmocks.NewTokenPoolBatchedReaderInterface(t)
 			tokenPoolFactoryMock.On("GetInboundTokenPoolRateLimits", mock.Anything, mock.Anything).Return(tc.poolRateLimits, nil).Maybe()
-			p.destTokenPoolFactory = tokenPoolFactoryMock
+			p.tokenPoolBatchedReader = tokenPoolFactoryMock
 
 			rateLimits, err := p.destPoolRateLimits(ctx, []commitReportWithSendRequests{
 				{

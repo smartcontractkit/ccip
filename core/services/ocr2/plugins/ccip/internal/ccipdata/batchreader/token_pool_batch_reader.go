@@ -23,7 +23,7 @@ var (
 	typeAndVersionABI = abihelpers.MustParseABI(type_and_version.TypeAndVersionInterfaceABI)
 )
 
-type TokenPoolBatchedReader struct {
+type EVMTokenPoolBatchedReader struct {
 	lggr                logger.Logger
 	remoteChainSelector uint64
 	offRampAddress      common.Address
@@ -35,14 +35,14 @@ type TokenPoolBatchedReader struct {
 }
 
 //go:generate mockery --quiet --name TokenPoolBatchedReaderInterface --filename token_pool_batched_reader_mock.go --case=underscor
-type TokenPoolBatchedReaderInterface interface {
+type TokenPoolBatchedReader interface {
 	GetInboundTokenPoolRateLimits(ctx context.Context, tokenPoolReaders []common.Address) ([]ccipdata.TokenBucketRateLimit, error)
 }
 
-var _ TokenPoolBatchedReaderInterface = (*TokenPoolBatchedReader)(nil)
+var _ TokenPoolBatchedReader = (*EVMTokenPoolBatchedReader)(nil)
 
-func NewTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64, offRampAddress common.Address, evmBatchCaller rpclib.EvmBatchCaller, lp logpoller.LogPoller) *TokenPoolBatchedReader {
-	return &TokenPoolBatchedReader{
+func NewTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64, offRampAddress common.Address, evmBatchCaller rpclib.EvmBatchCaller, lp logpoller.LogPoller) *EVMTokenPoolBatchedReader {
+	return &EVMTokenPoolBatchedReader{
 		lggr:                lggr,
 		remoteChainSelector: remoteChainSelector,
 		offRampAddress:      offRampAddress,
@@ -52,7 +52,7 @@ func NewTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64, o
 	}
 }
 
-func (br *TokenPoolBatchedReader) GetInboundTokenPoolRateLimits(ctx context.Context, tokenPools []common.Address) ([]ccipdata.TokenBucketRateLimit, error) {
+func (br *EVMTokenPoolBatchedReader) GetInboundTokenPoolRateLimits(ctx context.Context, tokenPools []common.Address) ([]ccipdata.TokenBucketRateLimit, error) {
 	if len(tokenPools) == 0 {
 		return []ccipdata.TokenBucketRateLimit{}, nil
 	}
@@ -80,6 +80,8 @@ func (br *TokenPoolBatchedReader) GetInboundTokenPoolRateLimits(ctx context.Cont
 			evmCalls = append(evmCalls, v1_2_0.GetInboundTokenPoolRateLimitCall(v.Address(), v.OffRampAddress))
 		case *v1_4_0.TokenPool:
 			evmCalls = append(evmCalls, v1_4_0.GetInboundTokenPoolRateLimitCall(v.Address(), v.RemoteChainSelector))
+		default:
+			return nil, fmt.Errorf("unsupported token pool version %T", v)
 		}
 	}
 
@@ -87,7 +89,7 @@ func (br *TokenPoolBatchedReader) GetInboundTokenPoolRateLimits(ctx context.Cont
 }
 
 // loadTokenPoolReaders loads the token pools into the factory's cache
-func (br *TokenPoolBatchedReader) loadTokenPoolReaders(ctx context.Context, tokenPoolAddresses []common.Address) error {
+func (br *EVMTokenPoolBatchedReader) loadTokenPoolReaders(ctx context.Context, tokenPoolAddresses []common.Address) error {
 	var missingTokens []common.Address
 
 	br.tokenPoolReaderMu.RLock()
