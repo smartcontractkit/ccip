@@ -25,7 +25,7 @@ contract BurnMintSetup is RouterSetup {
   function _applyChainUpdates(address pool) internal {
     TokenPool.ChainUpdate[] memory chains = new TokenPool.ChainUpdate[](1);
     chains[0] = TokenPool.ChainUpdate({
-      chainSelector: DEST_CHAIN_ID,
+      remoteChainSelector: DEST_CHAIN_ID,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

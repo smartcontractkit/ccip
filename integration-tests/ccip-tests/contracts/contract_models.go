@@ -397,8 +397,8 @@ func (pool *TokenPool) SetRemoteChainOnPool(remoteChainSelector uint64) error {
 	}
 	tx, err := pool.PoolInterface.ApplyChainUpdates(opts, []token_pool.TokenPoolChainUpdate{
 		{
-			ChainSelector: remoteChainSelector,
-			Allowed:       true,
+			RemoteChainSelector: remoteChainSelector,
+			Allowed:             true,
 			InboundRateLimiterConfig: token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  new(big.Int).Mul(big.NewInt(1e18), big.NewInt(1e9)),

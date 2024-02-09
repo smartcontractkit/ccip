@@ -45,7 +45,7 @@ contract LockReleaseTokenPoolSetup is RouterSetup {
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: DEST_CHAIN_ID,
+      remoteChainSelector: DEST_CHAIN_ID,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -143,7 +143,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     LockReleaseTokenPoolSetup.setUp();
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: SOURCE_CHAIN_ID,
+      remoteChainSelector: SOURCE_CHAIN_ID,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -200,7 +200,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
   function testChainNotAllowedReverts() public {
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: SOURCE_CHAIN_ID,
+      remoteChainSelector: SOURCE_CHAIN_ID,
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
@@ -337,7 +337,7 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     s_remoteChainSelector = 123124;
     chainUpdates[0] = TokenPool.ChainUpdate({
-      chainSelector: s_remoteChainSelector,
+      remoteChainSelector: s_remoteChainSelector,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

@@ -111,7 +111,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
 
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
-      chainSelector: DEST_CHAIN_ID,
+      remoteChainSelector: DEST_CHAIN_ID,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

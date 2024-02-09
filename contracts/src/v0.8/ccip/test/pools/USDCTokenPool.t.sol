@@ -74,13 +74,13 @@ contract USDCTokenPoolSetup is BaseTest {
 
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](2);
     chainUpdates[0] = TokenPool.ChainUpdate({
-      chainSelector: SOURCE_CHAIN_ID,
+      remoteChainSelector: SOURCE_CHAIN_ID,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
-      chainSelector: DEST_CHAIN_ID,
+      remoteChainSelector: DEST_CHAIN_ID,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -265,7 +265,7 @@ contract USDCTokenPool_lockOrBurn is USDCTokenPoolSetup {
 
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
-      chainSelector: wrongDomain,
+      remoteChainSelector: wrongDomain,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

@@ -53,19 +53,19 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
   function assertState(TokenPool.ChainUpdate[] memory chainUpdates) public {
     uint64[] memory chainSelectors = s_tokenPool.getSupportedChains();
     for (uint256 i = 0; i < chainUpdates.length; i++) {
-      assertEq(chainUpdates[i].chainSelector, chainSelectors[i]);
+      assertEq(chainUpdates[i].remoteChainSelector, chainSelectors[i]);
     }
 
     for (uint256 i = 0; i < chainUpdates.length; ++i) {
-      assertTrue(s_tokenPool.isSupportedChain(chainUpdates[i].chainSelector));
+      assertTrue(s_tokenPool.isSupportedChain(chainUpdates[i].remoteChainSelector));
       RateLimiter.TokenBucket memory bkt = s_tokenPool.getCurrentOutboundRateLimiterState(
-        chainUpdates[i].chainSelector
+        chainUpdates[i].remoteChainSelector
       );
       assertEq(bkt.capacity, chainUpdates[i].outboundRateLimiterConfig.capacity);
       assertEq(bkt.rate, chainUpdates[i].outboundRateLimiterConfig.rate);
       assertEq(bkt.isEnabled, chainUpdates[i].outboundRateLimiterConfig.isEnabled);
 
-      bkt = s_tokenPool.getCurrentInboundRateLimiterState(chainUpdates[i].chainSelector);
+      bkt = s_tokenPool.getCurrentInboundRateLimiterState(chainUpdates[i].remoteChainSelector);
       assertEq(bkt.capacity, chainUpdates[i].inboundRateLimiterConfig.capacity);
       assertEq(bkt.rate, chainUpdates[i].inboundRateLimiterConfig.rate);
       assertEq(bkt.isEnabled, chainUpdates[i].inboundRateLimiterConfig.isEnabled);
@@ -79,13 +79,13 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     RateLimiter.Config memory inboundRateLimit2 = RateLimiter.Config({isEnabled: true, capacity: 100e27, rate: 1e17});
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](2);
     chainUpdates[0] = TokenPool.ChainUpdate({
-      chainSelector: 1,
+      remoteChainSelector: 1,
       allowed: true,
       outboundRateLimiterConfig: outboundRateLimit1,
       inboundRateLimiterConfig: inboundRateLimit1
     });
     chainUpdates[1] = TokenPool.ChainUpdate({
-      chainSelector: 2,
+      remoteChainSelector: 2,
       allowed: true,
       outboundRateLimiterConfig: outboundRateLimit2,
       inboundRateLimiterConfig: inboundRateLimit2
@@ -94,13 +94,13 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     // Assert configuration is applied
     vm.expectEmit();
     emit ChainAdded(
-      chainUpdates[0].chainSelector,
+      chainUpdates[0].remoteChainSelector,
       chainUpdates[0].outboundRateLimiterConfig,
       chainUpdates[0].inboundRateLimiterConfig
     );
     vm.expectEmit();
     emit ChainAdded(
-      chainUpdates[1].chainSelector,
+      chainUpdates[1].remoteChainSelector,
       chainUpdates[1].outboundRateLimiterConfig,
       chainUpdates[1].inboundRateLimiterConfig
     );
@@ -112,7 +112,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     TokenPool.ChainUpdate[] memory chainRemoves = new TokenPool.ChainUpdate[](1);
     uint64 strangerChainSelector = 120938;
     chainRemoves[0] = TokenPool.ChainUpdate({
-      chainSelector: strangerChainSelector,
+      remoteChainSelector: strangerChainSelector,
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
@@ -123,10 +123,10 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     assertState(chainUpdates);
 
     // Can remove a chain
-    chainRemoves[0].chainSelector = 1;
+    chainRemoves[0].remoteChainSelector = 1;
 
     vm.expectEmit();
-    emit ChainRemoved(chainRemoves[0].chainSelector);
+    emit ChainRemoved(chainRemoves[0].remoteChainSelector);
 
     s_tokenPool.applyChainUpdates(chainRemoves);
 
@@ -137,7 +137,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
 
     // Cannot reset already configured ramp
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.ChainAlreadyExists.selector, singleChainConfigured[0].chainSelector)
+      abi.encodeWithSelector(TokenPool.ChainAlreadyExists.selector, singleChainConfigured[0].remoteChainSelector)
     );
     s_tokenPool.applyChainUpdates(singleChainConfigured);
   }
@@ -155,7 +155,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12});
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
-      chainSelector: 1,
+      remoteChainSelector: 1,
       allowed: true,
       outboundRateLimiterConfig: outboundRateLimit,
       inboundRateLimiterConfig: inboundRateLimit
@@ -176,20 +176,20 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12});
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
-      chainSelector: 1,
+      remoteChainSelector: 1,
       allowed: false,
       outboundRateLimiterConfig: outboundRateLimit,
       inboundRateLimiterConfig: inboundRateLimit
     });
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, chainUpdates[0].chainSelector));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, chainUpdates[0].remoteChainSelector));
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
 
   function testInvalidRatelimitRateReverts() public {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
-      chainSelector: 1,
+      remoteChainSelector: 1,
       allowed: true,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12})
@@ -221,7 +221,7 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(chainUpdates);
 
     // Change the chain selector as adding the same one would revert
-    chainUpdates[0].chainSelector = 2;
+    chainUpdates[0].remoteChainSelector = 2;
 
     // Inbound
 
@@ -268,7 +268,7 @@ contract TokenPool_setChainRateLimiterConfig is TokenPoolSetup {
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     s_remoteChainSelector = 123124;
     chainUpdates[0] = TokenPool.ChainUpdate({
-      chainSelector: s_remoteChainSelector,
+      remoteChainSelector: s_remoteChainSelector,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -349,7 +349,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: chainSelector,
+      remoteChainSelector: chainSelector,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -378,7 +378,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: chainSelector,
+      remoteChainSelector: chainSelector,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -394,7 +394,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     s_tokenPool.onlyOnRampModifier(chainSelector);
 
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: chainSelector,
+      remoteChainSelector: chainSelector,
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
@@ -415,7 +415,7 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: chainSelector,
+      remoteChainSelector: chainSelector,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -437,7 +437,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: chainSelector,
+      remoteChainSelector: chainSelector,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -466,7 +466,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: chainSelector,
+      remoteChainSelector: chainSelector,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -482,7 +482,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     s_tokenPool.onlyOffRampModifier(chainSelector);
 
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: chainSelector,
+      remoteChainSelector: chainSelector,
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
@@ -503,7 +503,7 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      chainSelector: chainSelector,
+      remoteChainSelector: chainSelector,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()

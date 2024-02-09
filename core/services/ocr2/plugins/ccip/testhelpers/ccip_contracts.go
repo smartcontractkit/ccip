@@ -611,8 +611,8 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	_, err = destPool.ApplyChainUpdates(c.Dest.User,
 		[]burn_mint_token_pool.TokenPoolChainUpdate{
 			{
-				ChainSelector: c.Source.ChainSelector,
-				Allowed:       true,
+				RemoteChainSelector: c.Source.ChainSelector,
+				Allowed:             true,
 				OutboundRateLimiterConfig: burn_mint_token_pool.RateLimiterConfig{
 					IsEnabled: true,
 					Capacity:  HundredLink,
@@ -647,8 +647,8 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 	// set onRamp as valid caller for source pool
 	_, err = sourcePool.ApplyChainUpdates(c.Source.User, []lock_release_token_pool.TokenPoolChainUpdate{
 		{
-			ChainSelector: c.Dest.ChainSelector,
-			Allowed:       true,
+			RemoteChainSelector: c.Dest.ChainSelector,
+			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -1020,8 +1020,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	_, err = sourcePool.ApplyChainUpdates(
 		sourceUser,
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
-			ChainSelector: DestChainSelector,
-			Allowed:       true,
+			RemoteChainSelector: DestChainSelector,
+			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -1037,8 +1037,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = sourceWeth9Pool.ApplyChainUpdates(sourceUser,
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
-			ChainSelector: destChainSelector,
-			Allowed:       true,
+			RemoteChainSelector: destChainSelector,
+			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
@@ -1186,8 +1186,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	_, err = destPool.ApplyChainUpdates(destUser,
 		[]lock_release_token_pool.TokenPoolChainUpdate{{
-			ChainSelector: sourceChainSelector,
-			Allowed:       true,
+			RemoteChainSelector: sourceChainSelector,
+			Allowed:             true,
 			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,

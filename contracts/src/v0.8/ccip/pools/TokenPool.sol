@@ -24,8 +24,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   error ZeroAddressNotAllowed();
   error SenderNotAllowed(address sender);
   error AllowListNotEnabled();
-  error NonExistentChain(uint64 chainSelector);
-  error ChainNotAllowed(uint64 chainSelector);
+  error NonExistentChain(uint64 remoteChainSelector);
+  error ChainNotAllowed(uint64 remoteChainSelector);
   error BadARMSignal();
   error ChainAlreadyExists(uint64 chainSelector);
   error DisabledNonZeroRateLimit(RateLimiter.Config outboundConfig, RateLimiter.Config inboundConfig);
@@ -36,25 +36,25 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   event Released(address indexed sender, address indexed recipient, uint256 amount);
   event Minted(address indexed sender, address indexed recipient, uint256 amount);
   event ChainAdded(
-    uint64 chainSelector,
+    uint64 remoteChainSelector,
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
   event ChainConfigured(
-    uint64 chainSelector,
+    uint64 remoteChainSelector,
     RateLimiter.Config outboundRateLimiterConfig,
     RateLimiter.Config inboundRateLimiterConfig
   );
-  event ChainRemoved(uint64 chainSelector);
+  event ChainRemoved(uint64 remoteChainSelector);
   event AllowListAdd(address sender);
   event AllowListRemove(address sender);
   event RouterUpdated(address oldRouter, address newRouter);
 
   struct ChainUpdate {
-    uint64 chainSelector;
-    bool allowed;
-    RateLimiter.Config outboundRateLimiterConfig;
-    RateLimiter.Config inboundRateLimiterConfig;
+    uint64 remoteChainSelector; // ──╮ Remote chain selector
+    bool allowed; // ────────────────╯ Whether the chain is allowed
+    RateLimiter.Config outboundRateLimiterConfig; // Outbound rate limited config, meaning the rate limits for all of the onRamps for the given chain
+    RateLimiter.Config inboundRateLimiterConfig; // Inbound rate limited config, meaning the rate limits for all of the offRamps for the given chain
   }
 
   /// @dev The bridgeable token that is managed by this pool.
@@ -159,8 +159,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
       ChainUpdate memory update = chains[i];
       if (update.allowed) {
         // If the chain already exists, revert
-        if (!s_remoteChainSelectors.add(update.chainSelector)) {
-          revert ChainAlreadyExists(update.chainSelector);
+        if (!s_remoteChainSelectors.add(update.remoteChainSelector)) {
+          revert ChainAlreadyExists(update.remoteChainSelector);
         }
 
         if (
@@ -169,7 +169,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
         ) {
           revert InvalidRatelimitRate(update.outboundRateLimiterConfig);
         }
-        s_outboundRateLimits[update.chainSelector] = RateLimiter.TokenBucket({
+        s_outboundRateLimits[update.remoteChainSelector] = RateLimiter.TokenBucket({
           rate: update.outboundRateLimiterConfig.rate,
           capacity: update.outboundRateLimiterConfig.capacity,
           tokens: update.outboundRateLimiterConfig.capacity,
@@ -183,18 +183,18 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
           revert InvalidRatelimitRate(update.inboundRateLimiterConfig);
         }
 
-        s_inboundRateLimits[update.chainSelector] = RateLimiter.TokenBucket({
+        s_inboundRateLimits[update.remoteChainSelector] = RateLimiter.TokenBucket({
           rate: update.inboundRateLimiterConfig.rate,
           capacity: update.inboundRateLimiterConfig.capacity,
           tokens: update.inboundRateLimiterConfig.capacity,
           lastUpdated: uint32(block.timestamp),
           isEnabled: update.inboundRateLimiterConfig.isEnabled
         });
-        emit ChainAdded(update.chainSelector, update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
+        emit ChainAdded(update.remoteChainSelector, update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
       } else {
         // If the chain doesn't exist, revert
-        if (!s_remoteChainSelectors.remove(update.chainSelector)) {
-          revert NonExistentChain(update.chainSelector);
+        if (!s_remoteChainSelectors.remove(update.remoteChainSelector)) {
+          revert NonExistentChain(update.remoteChainSelector);
         }
 
         // Make sure that the rate limits are zero for the chain to be removed.
@@ -207,9 +207,9 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
           revert DisabledNonZeroRateLimit(update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
         }
 
-        delete s_inboundRateLimits[update.chainSelector];
-        delete s_outboundRateLimits[update.chainSelector];
-        emit ChainRemoved(update.chainSelector);
+        delete s_inboundRateLimits[update.remoteChainSelector];
+        delete s_outboundRateLimits[update.remoteChainSelector];
+        emit ChainRemoved(update.remoteChainSelector);
       }
     }
   }
@@ -246,8 +246,8 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
 
   /// @notice Sets the chain rate limiter config.
   /// @param remoteChainSelector The remote chain selector for which the rate limits apply.
-  /// @param outboundConfig The new outbound rate limiter config.
-  /// @param inboundConfig The new inbound rate limiter config.
+  /// @param outboundConfig The new outbound rate limiter config, meaning the onRamp rate limits for the given chain.
+  /// @param inboundConfig The new inbound rate limiter config, meaning the offRamp rate limits for the given chain.
   function setChainRateLimiterConfig(
     uint64 remoteChainSelector,
     RateLimiter.Config memory outboundConfig,

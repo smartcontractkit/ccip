@@ -50,7 +50,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
 
     TokenPool.ChainUpdate[] memory offRamps = new TokenPool.ChainUpdate[](1);
     offRamps[0] = TokenPool.ChainUpdate({
-      chainSelector: SOURCE_CHAIN_ID,
+      remoteChainSelector: SOURCE_CHAIN_ID,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
