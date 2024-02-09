@@ -70,9 +70,17 @@ type CCIPTestConfig struct {
 	GethResourceProfile map[string]interface{}
 }
 
-func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMNetwork) {
-	if p.AllNetworks == nil {
-		p.AllNetworks = make(map[string]blockchain.EVMNetwork)
+func (c *CCIPTestConfig) useExistingDeployment() bool {
+	return pointer.GetBool(c.TestGroupInput.ExistingDeployment)
+}
+
+func (c *CCIPTestConfig) localCluster() bool {
+	return pointer.GetBool(c.TestGroupInput.LocalCluster)
+}
+
+func (c *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMNetwork) {
+	if c.AllNetworks == nil {
+		c.AllNetworks = make(map[string]blockchain.EVMNetwork)
 	}
 	firstOfPairs := []blockchain.EVMNetwork{networkA}
 	secondOfPairs := []blockchain.EVMNetwork{networkB}
@@ -82,10 +90,10 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 	//	the network will be added as "testnetA-1", testnetA-2","testnetB-1", testnetB-2"
 	// to deploy 4 lanes between same network pair "testnetA", "testnetB".
 	// lanes - testnetA-1<->testnetB-1, testnetA-1<-->testnetB-2 , testnetA-2<--> testnetB-1, testnetA-2<--> testnetB-2
-	if p.TestGroupInput.NoOfRoutersPerPair > 1 {
+	if c.TestGroupInput.NoOfRoutersPerPair > 1 {
 		firstOfPairs[0].Name = fmt.Sprintf("%s-%d", firstOfPairs[0].Name, 1)
 		secondOfPairs[0].Name = fmt.Sprintf("%s-%d", secondOfPairs[0].Name, 1)
-		for i := 1; i < p.TestGroupInput.NoOfRoutersPerPair; i++ {
+		for i := 1; i < c.TestGroupInput.NoOfRoutersPerPair; i++ {
 			netsA := networkA
 			netsA.Name = fmt.Sprintf("%s-%d", netsA.Name, i+1)
 			netsB := networkB
@@ -96,30 +104,30 @@ func (p *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 	}
 
 	for i := range firstOfPairs {
-		p.AllNetworks[firstOfPairs[i].Name] = firstOfPairs[i]
-		p.AllNetworks[secondOfPairs[i].Name] = secondOfPairs[i]
-		p.NetworkPairs = append(p.NetworkPairs, NetworkPair{
+		c.AllNetworks[firstOfPairs[i].Name] = firstOfPairs[i]
+		c.AllNetworks[secondOfPairs[i].Name] = secondOfPairs[i]
+		c.NetworkPairs = append(c.NetworkPairs, NetworkPair{
 			NetworkA: firstOfPairs[i],
 			NetworkB: secondOfPairs[i],
 		})
 	}
 }
 
-func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
+func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	var allError error
 	var err error
-	p.SelectedNetworks, err = p.EnvInput.EVMNetworks()
+	c.SelectedNetworks, err = c.EnvInput.EVMNetworks()
 	if err != nil {
 		allError = multierr.Append(allError, fmt.Errorf("failed to get networks: %w", err))
 		return allError
 	}
 	networkByChainID := make(map[string]blockchain.EVMNetwork)
-	for _, net := range p.SelectedNetworks {
+	for _, net := range c.SelectedNetworks {
 		networkByChainID[net.Name] = net
 	}
 	// if network pairs are provided, then use them
-	if p.TestGroupInput.NetworkPairs != nil {
-		networkPairs := p.TestGroupInput.NetworkPairs
+	if c.TestGroupInput.NetworkPairs != nil {
+		networkPairs := c.TestGroupInput.NetworkPairs
 
 		for _, pair := range networkPairs {
 			networkNames := strings.Split(pair, ",")
@@ -134,43 +142,43 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 			if !ok {
 				allError = multierr.Append(allError, fmt.Errorf("network %s not found in network config", networkNames[1]))
 			}
-			p.AddPairToNetworkList(network1, network2)
+			c.AddPairToNetworkList(network1, network2)
 		}
-		lggr.Info().Int("Pairs", len(p.NetworkPairs)).Msg("No Of Lanes")
+		lggr.Info().Int("Pairs", len(c.NetworkPairs)).Msg("No Of Lanes")
 		return allError
 	}
 
-	if p.TestGroupInput.NoOfNetworks == 0 {
-		p.TestGroupInput.NoOfNetworks = len(p.SelectedNetworks)
+	if c.TestGroupInput.NoOfNetworks == 0 {
+		c.TestGroupInput.NoOfNetworks = len(c.SelectedNetworks)
 	}
 	// TODO remove this when CTF network timeout is fixed
-	for i := range p.SelectedNetworks {
-		p.SelectedNetworks[i].Timeout = blockchain.StrDuration{
+	for i := range c.SelectedNetworks {
+		c.SelectedNetworks[i].Timeout = blockchain.StrDuration{
 			Duration: 3 * time.Minute,
 		}
 	}
-	simulated := p.SelectedNetworks[0].Simulated
-	for i := 1; i < len(p.SelectedNetworks); i++ {
-		if p.SelectedNetworks[i].Simulated != simulated {
+	simulated := c.SelectedNetworks[0].Simulated
+	for i := 1; i < len(c.SelectedNetworks); i++ {
+		if c.SelectedNetworks[i].Simulated != simulated {
 			lggr.Fatal().Msg("networks must be of the same type either simulated or real")
 		}
 	}
 
 	// if the networks are not simulated use the first p.NoOfNetworks networks from the selected networks
-	if !simulated && len(p.SelectedNetworks) != p.TestGroupInput.NoOfNetworks {
-		if len(p.SelectedNetworks) < p.TestGroupInput.NoOfNetworks {
+	if !simulated && len(c.SelectedNetworks) != c.TestGroupInput.NoOfNetworks {
+		if len(c.SelectedNetworks) < c.TestGroupInput.NoOfNetworks {
 			allError = multierr.Append(allError, fmt.Errorf("not enough networks provided"))
 		} else {
-			p.SelectedNetworks = p.SelectedNetworks[:p.TestGroupInput.NoOfNetworks]
+			c.SelectedNetworks = c.SelectedNetworks[:c.TestGroupInput.NoOfNetworks]
 		}
 	}
 	// If provided networks is lesser than the required number of networks
 	// and the provided networks are simulated network, create replicas of the provided networks with
 	// different chain ids
-	if len(p.SelectedNetworks) < p.TestGroupInput.NoOfNetworks {
+	if len(c.SelectedNetworks) < c.TestGroupInput.NoOfNetworks {
 		if simulated {
-			actualNoOfNetworks := len(p.SelectedNetworks)
-			n := p.SelectedNetworks[0]
+			actualNoOfNetworks := len(c.SelectedNetworks)
+			n := c.SelectedNetworks[0]
 			var chainIDs []int64
 			for _, id := range chainselectors.TestChainIds() {
 				if id == 2337 {
@@ -178,10 +186,10 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 				}
 				chainIDs = append(chainIDs, int64(id))
 			}
-			for i := 0; i < p.TestGroupInput.NoOfNetworks-actualNoOfNetworks; i++ {
+			for i := 0; i < c.TestGroupInput.NoOfNetworks-actualNoOfNetworks; i++ {
 				chainID := chainIDs[i]
-				p.SelectedNetworks = append(p.SelectedNetworks, blockchain.EVMNetwork{
-					Name:                      fmt.Sprintf("simulated-non-dev%d", len(p.SelectedNetworks)+1),
+				c.SelectedNetworks = append(c.SelectedNetworks, blockchain.EVMNetwork{
+					Name:                      fmt.Sprintf("simulated-non-dev%d", len(c.SelectedNetworks)+1),
 					ChainID:                   chainID,
 					Simulated:                 true,
 					PrivateKeys:               []string{networks.AdditionalSimulatedPvtKeys[i]},
@@ -196,63 +204,53 @@ func (p *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		}
 	}
 
-	if p.TestGroupInput.NoOfNetworks > 2 {
-		p.FormNetworkPairCombinations()
+	if c.TestGroupInput.NoOfNetworks > 2 {
+		c.FormNetworkPairCombinations()
 	} else {
-		p.AddPairToNetworkList(p.SelectedNetworks[0], p.SelectedNetworks[1])
+		c.AddPairToNetworkList(c.SelectedNetworks[0], c.SelectedNetworks[1])
 	}
 
 	// if the number of lanes is lesser than the number of network pairs, choose a random subset of network pairs
-	if p.TestGroupInput.MaxNoOfLanes > 0 && p.TestGroupInput.MaxNoOfLanes < len(p.NetworkPairs) {
-		rand.Shuffle(len(p.NetworkPairs), func(i, j int) {
-			p.NetworkPairs[i], p.NetworkPairs[j] = p.NetworkPairs[j], p.NetworkPairs[i]
+	if c.TestGroupInput.MaxNoOfLanes > 0 && c.TestGroupInput.MaxNoOfLanes < len(c.NetworkPairs) {
+		rand.Shuffle(len(c.NetworkPairs), func(i, j int) {
+			c.NetworkPairs[i], c.NetworkPairs[j] = c.NetworkPairs[j], c.NetworkPairs[i]
 		})
-		p.NetworkPairs = p.NetworkPairs[:p.TestGroupInput.MaxNoOfLanes]
+		c.NetworkPairs = c.NetworkPairs[:c.TestGroupInput.MaxNoOfLanes]
 	}
 
-	for _, n := range p.NetworkPairs {
+	for _, n := range c.NetworkPairs {
 		lggr.Info().Str("NetworkA", n.NetworkA.Name).Str("NetworkB", n.NetworkB.Name).Msg("Network Pairs")
 	}
-	lggr.Info().Int("Pairs", len(p.NetworkPairs)).Msg("No Of Lanes")
+	lggr.Info().Int("Pairs", len(c.NetworkPairs)).Msg("No Of Lanes")
 
 	return allError
 }
 
-func (p *CCIPTestConfig) FormNetworkPairCombinations() {
-	for i := 0; i < p.TestGroupInput.NoOfNetworks; i++ {
-		for j := i + 1; j < p.TestGroupInput.NoOfNetworks; j++ {
-			p.AddPairToNetworkList(p.SelectedNetworks[i], p.SelectedNetworks[j])
+func (c *CCIPTestConfig) FormNetworkPairCombinations() {
+	for i := 0; i < c.TestGroupInput.NoOfNetworks; i++ {
+		for j := i + 1; j < c.TestGroupInput.NoOfNetworks; j++ {
+			c.AddPairToNetworkList(c.SelectedNetworks[i], c.SelectedNetworks[j])
 		}
 	}
 }
 
 func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
-	var allError error
-	if allError != nil {
-		t.Fatal(allError)
-	}
-	ccipCfg := testconfig.GlobalTestConfig().CCIP.Env
-	contractCfg := testconfig.GlobalTestConfig().CCIP.Deployments
 	groupCfg, exists := testconfig.GlobalTestConfig().CCIP.Groups[tType]
 	if !exists {
 		t.Fatalf("group config for %s does not exist", tType)
 	}
-
-	p := &CCIPTestConfig{
+	ccipTestConfig := &CCIPTestConfig{
 		Test:                t,
-		EnvInput:            ccipCfg,
-		ContractsInput:      contractCfg,
+		EnvInput:            testconfig.GlobalTestConfig().CCIP.Env,
+		ContractsInput:      testconfig.GlobalTestConfig().CCIP.Deployments,
 		TestGroupInput:      groupCfg,
 		GethResourceProfile: GethResourceProfile,
 	}
-
-	allError = multierr.Append(allError, p.SetNetworkPairs(lggr))
-
-	if allError != nil {
-		t.Fatal(allError)
+	err := ccipTestConfig.SetNetworkPairs(lggr)
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	return p
+	return ccipTestConfig
 }
 
 type BiDirectionalLaneConfig struct {
@@ -654,9 +652,9 @@ func CCIPDefaultTestSetUp(
 	var local *test_env.CLClusterTestEnv
 	envConfig := createEnvironmentConfig(t, envName, testConfig)
 
-	configureCLNode := !pointer.GetBool(testConfig.TestGroupInput.ExistingDeployment)
+	configureCLNode := !testConfig.useExistingDeployment()
 	if configureCLNode {
-		if pointer.GetBool(testConfig.TestGroupInput.LocalCluster) {
+		if testConfig.localCluster() {
 			local, deployCL = DeployLocalCluster(t, testConfig)
 			ccipEnv = &actions.CCIPTestEnv{
 				LocalCluster: local,
