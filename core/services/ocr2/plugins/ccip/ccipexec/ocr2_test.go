@@ -885,7 +885,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			}, tc.destPoolsCacheErr).Maybe()
 			p.offRampReader = mockOffRampReader
 
-			tokenPoolFactoryMock := tokenpoolbatchedmocks.NewTokenPoolBatchedReaderInterface(t)
+			tokenPoolFactoryMock := tokenpoolbatchedmocks.NewTokenPoolBatchedReader(t)
 			tokenPoolFactoryMock.On("GetInboundTokenPoolRateLimits", mock.Anything, mock.Anything).Return(tc.poolRateLimits, nil).Maybe()
 			p.tokenPoolBatchedReader = tokenPoolFactoryMock
 

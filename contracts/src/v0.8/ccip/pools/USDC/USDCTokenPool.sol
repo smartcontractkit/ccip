@@ -50,7 +50,7 @@ contract USDCTokenPool is TokenPool, ITypeAndVersion {
   }
 
   // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
-  string public constant override typeAndVersion = "USDCTokenPool 1.3.0-dev";
+  string public constant override typeAndVersion = "USDCTokenPool 1.4.0-dev";
 
   // We restrict to the first version. New pool may be required for subsequent versions.
   uint32 public constant SUPPORTED_USDC_VERSION = 0;
