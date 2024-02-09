@@ -15,15 +15,17 @@ import (
 type Bridge interface {
 	// GetTransfers returns all of the pending transfers from the source chain to the destination chain
 	// for the given local and remote token addresses.
+	// Pending transfers that are ready to finalize have the appropriate bridge data set.
 	GetTransfers(ctx context.Context, localToken, remoteToken models.Address) ([]models.PendingTransfer, error)
 
 	// GetBridgeSpecificPayload returns the bridge specific payload for the given transfer.
-	// This payload must always correctly ABI-encoded.
+	// This payload must always be correctly ABI-encoded.
 	// Note that this payload is not directly provided to the bridge but the bridge adapter
 	// contracts. The bridge adapter may slightly alter the payload before sending it to the bridge.
 	// For example, for an L1 to L2 transfer using Arbitrum's bridge, this will return the
 	// fees required for the transfer to succeed reliably.
-	// For an L2 -> L1 finalization transaction, this will return the finalization payload.
+	// This should only be called when we want to trigger a transfer (i.e, there is no transfer in flight)
+	// Bridge specific payloads for pending transfers are returned by GetTransfers.
 	GetBridgeSpecificPayload(ctx context.Context, transfer models.Transfer) ([]byte, error)
 
 	Close(ctx context.Context) error

@@ -53,6 +53,9 @@ var (
 
 	arbitrumTokenGatewayABI = abihelpers.MustParseABI(arbitrum_token_gateway.ArbitrumTokenGatewayMetaData.ABI)
 	l1AdapterABI            = abihelpers.MustParseABI(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.ABI)
+
+	// type assertion
+	_ bridge.Bridge = &l2ToL1Bridge{}
 )
 
 func init() {
@@ -121,6 +124,8 @@ func (l *l2ToL1Bridge) RemoteChainSelector() models.NetworkSelector {
 // GetTransfers implements bridge.Bridge.
 func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address, l1Token models.Address) ([]models.PendingTransfer, error) {
 	// get all the L2 -> L1 transfers in the past 14 days for the given l2Token
+	// that should be enough time to catch all the transfers
+	// that were potentially not finalized.
 	l2ToL1Transfers, err := l.l2LogPoller.IndexedLogsCreatedAfter(
 		L2ToL1ERC20SentTopic,
 		l.l2BridgeAdapter.Address(),
@@ -571,7 +576,7 @@ func NewL2ToL1Bridge(
 	l1LogPoller logpoller.LogPoller,
 	l2Client,
 	l1Client client.Client,
-) (bridge.Bridge, error) {
+) (*l2ToL1Bridge, error) {
 	localChain, ok := chainsel.ChainBySelector(uint64(localSelector))
 	if !ok {
 		return nil, fmt.Errorf("unknown chain selector for local chain: %d", localSelector)
@@ -593,16 +598,16 @@ func NewL2ToL1Bridge(
 		return nil, fmt.Errorf("failed to register filter for Arbitrum L2 to L1 bridge: %w", err)
 	}
 
-	l1FilterName := fmt.Sprintf("ArbitrumL1ToL2Bridge-L1-%s-%s", remoteChain.Name, localChain.Name)
+	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-%s-%s", remoteChain.Name, localChain.Name)
 	err = l1LogPoller.RegisterFilter(logpoller.Filter{
 		Name: l1FilterName,
 		EventSigs: []common.Hash{
-			L2toL1ERC20FinalizedTopic,
-			NodeConfirmedTopic,
+			L2toL1ERC20FinalizedTopic, // emitted by l1 bridge adapter
+			NodeConfirmedTopic,        // emitted by rollup
 		},
 		Addresses: []common.Address{
-			l1BridgeAdapterAddress,
-			l1RollupAddress,
+			l1BridgeAdapterAddress, // to get erc20 finalized logs
+			l1RollupAddress,        // to get node confirmed logs
 		},
 		Retention: DurationMonth,
 	})
@@ -697,7 +702,12 @@ type finalizeInboundTransferParams struct {
 }
 
 func unpackFinalizeInboundTransfer(calldata []byte) (finalizeInboundTransferParams, error) {
-	ifaces, err := arbitrumTokenGatewayABI.Unpack("finalizeInboundTransfer", calldata)
+	method, ok := arbitrumTokenGatewayABI.Methods["finalizeInboundTransfer"]
+	if !ok {
+		return finalizeInboundTransferParams{}, fmt.Errorf("finalizeInboundTransfer not found in ArbitrumTokenGateway ABI")
+	}
+	// trim first 4 bytes (function signature)
+	ifaces, err := method.Inputs.Unpack(calldata[4:])
 	if err != nil {
 		return finalizeInboundTransferParams{}, fmt.Errorf("failed to unpack finalizeInboundTransfer: %w", err)
 	}
