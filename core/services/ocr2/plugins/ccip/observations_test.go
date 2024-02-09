@@ -14,14 +14,14 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 )
 
 func TestObservationFilter(t *testing.T) {
 	lggr := logger.TestLogger(t)
-	obs1 := CommitObservation{Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 10}}
+	obs1 := CommitObservation{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 10}}
 	b1, err := obs1.Marshal()
 	require.NoError(t, err)
 	nonEmpty := GetParsableObservations[CommitObservation](lggr, []types.AttributedObservation{{Observation: b1}, {Observation: []byte{}}})
@@ -48,11 +48,11 @@ func TestObservationCompat100_120(t *testing.T) {
 	b10, err := json.Marshal(v10)
 	require.NoError(t, err)
 	v12 := CommitObservation{
-		Interval: ccipdata.CommitStoreInterval{
+		Interval: cciptypes.CommitStoreInterval{
 			Min: 1,
 			Max: 12,
 		},
-		TokenPricesUSD:    map[common.Address]*big.Int{common.HexToAddress("0x1"): big.NewInt(1)},
+		TokenPricesUSD:    map[cciptypes.Address]*big.Int{cciptypes.Address(common.HexToAddress("0x1").String()): big.NewInt(1)},
 		SourceGasPriceUSD: big.NewInt(3),
 	}
 	b12, err := json.Marshal(v12)
@@ -63,11 +63,12 @@ func TestObservationCompat100_120(t *testing.T) {
 
 func TestCommitObservationJsonDeserialization(t *testing.T) {
 	expectedObservation := CommitObservation{
-		Interval: ccipdata.CommitStoreInterval{
+		Interval: cciptypes.CommitStoreInterval{
 			Min: 1,
 			Max: 12,
 		},
-		TokenPricesUSD:    map[common.Address]*big.Int{common.HexToAddress("0x1"): big.NewInt(1)},
+		TokenPricesUSD: map[cciptypes.Address]*big.Int{
+			cciptypes.Address(common.HexToAddress("0x1").String()): big.NewInt(1)},
 		SourceGasPriceUSD: big.NewInt(3),
 	}
 

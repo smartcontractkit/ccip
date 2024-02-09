@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	mocks2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -18,13 +19,13 @@ import (
 func TestPriceRegistry(t *testing.T) {
 	for _, versionStr := range []string{ccipdata.V1_0_0, ccipdata.V1_2_0} {
 		lggr := logger.TestLogger(t)
-		addr := utils.RandomAddress()
+		addr := cciptypes.Address(utils.RandomAddress().String())
 		lp := mocks2.NewLogPoller(t)
 
 		expFilterNames := []string{
-			logpoller.FilterName(ccipdata.COMMIT_PRICE_UPDATES, addr.String()),
-			logpoller.FilterName(ccipdata.FEE_TOKEN_ADDED, addr.String()),
-			logpoller.FilterName(ccipdata.FEE_TOKEN_REMOVED, addr.String()),
+			logpoller.FilterName(ccipdata.COMMIT_PRICE_UPDATES, addr),
+			logpoller.FilterName(ccipdata.FEE_TOKEN_ADDED, addr),
+			logpoller.FilterName(ccipdata.FEE_TOKEN_REMOVED, addr),
 		}
 		versionFinder := newMockVersionFinder(ccipconfig.PriceRegistry, *semver.MustParse(versionStr), nil)
 

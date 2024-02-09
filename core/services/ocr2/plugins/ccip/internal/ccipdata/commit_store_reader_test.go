@@ -178,10 +178,10 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
-	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), addr, ec, lp, ge)
+	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), cciptypes.Address(addr.String()), ec, lp, ge)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
-	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), addr2, ec, lp, ge)
+	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), cciptypes.Address(addr2.String()), ec, lp, ge)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStore{}).String())
 
@@ -386,7 +386,7 @@ func TestNewCommitStoreReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), common.Address{}, c, lpmocks.NewLogPoller(t), nil)
+			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), "", c, lpmocks.NewLogPoller(t), nil)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

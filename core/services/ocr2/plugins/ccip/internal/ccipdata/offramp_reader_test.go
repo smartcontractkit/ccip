@@ -180,7 +180,7 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 	}
 
 	// Create the version-specific reader.
-	reader, err := factory.NewOffRampReader(log, factory.NewEvmVersionFinder(), offRampAddress, bc, lp, nil, true)
+	reader, err := factory.NewOffRampReader(log, factory.NewEvmVersionFinder(), cciptypes.Address(offRampAddress.String()), bc, lp, nil, true)
 	require.NoError(t, err)
 	require.Equal(t, offRampAddress, reader.Address())
 
@@ -392,7 +392,7 @@ func TestNewOffRampReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewOffRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), common.Address{}, c, lpmocks.NewLogPoller(t), nil, true)
+			_, err = factory.NewOffRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), "", c, lpmocks.NewLogPoller(t), nil, true)
 			if tc.expectedErr != "" {
 				assert.EqualError(t, err, tc.expectedErr)
 			} else {

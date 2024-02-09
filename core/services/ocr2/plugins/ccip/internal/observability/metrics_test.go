@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 )
 
@@ -49,7 +49,7 @@ func TestMetricsSendFromContractDirectly(t *testing.T) {
 	chainId := int64(420)
 
 	mockedOfframp := ccipdatamocks.NewOffRampReader(t)
-	mockedOfframp.On("GetTokens", ctx).Return(ccipdata.OffRampTokens{}, fmt.Errorf("execution error"))
+	mockedOfframp.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{}, fmt.Errorf("execution error"))
 
 	observedOfframp := NewObservedOffRampReader(mockedOfframp, chainId, "plugin")
 

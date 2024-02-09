@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
@@ -95,12 +95,12 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 			require.NoError(t, err)
 
 			usdcService := usdc.NewUSDCTokenDataReader(lggr, &usdcReader, attestationURI, 0)
-			msgAndAttestation, err := usdcService.ReadTokenData(context.Background(), internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				EVM2EVMMessage: internal.EVM2EVMMessage{
+			msgAndAttestation, err := usdcService.ReadTokenData(context.Background(), cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 					SequenceNumber: seqNum,
-					TokenAmounts:   []internal.TokenAmount{{Token: utils.RandomAddress(), Amount: nil}},
+					TokenAmounts:   []cciptypes.TokenAmount{{Token: cciptypes.Address(utils.RandomAddress().String()), Amount: nil}},
 				},
-				TxHash:   txHash,
+				TxHash:   cciptypes.Hash(txHash).String(),
 				LogIndex: uint(logIndex),
 			}, 0)
 			if test.expectedError != nil {
