@@ -149,9 +149,19 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 		return nil, fmt.Errorf("failed to get L2 -> L1 finalizations from log poller (on L1): %w", err)
 	}
 
+	parsedL2toL1Transfers, parsedToLP, err := l.parseL2ToL1Transfers(l2ToL1Transfers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse L2 -> L1 transfers: %w", err)
+	}
+
+	parsedL2ToL1Finalizations, err := l.parseL2ToL1Finalizations(l2ToL1Finalizations)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse L2 -> L1 finalizations: %w", err)
+	}
+
 	// filter out the L2 -> L1 transfers that have been finalized onchain already
 	// all the transfers in unfinalizedTransfers are either in the "not-ready" or "ready" state
-	unfinalizedTransfers, err := l.filterOutFinalizedTransfers(l2ToL1Transfers, l2ToL1Finalizations)
+	unfinalizedTransfers, err := l.filterOutFinalizedTransfers(parsedL2toL1Transfers, parsedL2ToL1Finalizations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to filter finalized transfers: %w", err)
 	}
@@ -163,13 +173,14 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 		return nil, fmt.Errorf("failed to partition ready transfers: %w", err)
 	}
 
-	return l.toPendingTransfers(ready, readyData, notReady)
+	return l.toPendingTransfers(ready, readyData, notReady, parsedToLP)
 }
 
 func (l *l2ToL1Bridge) toPendingTransfers(
 	ready []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
 	readyData [][]byte,
 	notReady []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
+	parsedToLP map[logKey]logpoller.Log,
 ) ([]models.PendingTransfer, error) {
 	if len(ready) != len(readyData) {
 		return nil, fmt.Errorf("length of ready and readyData should be the same: len(ready) = %d, len(readyData) = %d",
@@ -179,10 +190,13 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 	for i, transfer := range ready {
 		transfers = append(transfers, models.PendingTransfer{
 			Transfer: models.Transfer{
-				From:       l.localSelector,
-				To:         l.remoteSelector,
-				Amount:     transfer.Amount,
-				Date:       time.Time{},  // TODO: get correct timestamp from logpoller.Log object
+				From:   l.localSelector,
+				To:     l.remoteSelector,
+				Amount: transfer.Amount,
+				Date: parsedToLP[logKey{
+					txHash:   transfer.Raw.TxHash,
+					logIndex: int64(transfer.Raw.Index),
+				}].BlockTimestamp,
 				BridgeData: readyData[i], // finalization data for withdrawals that are ready
 			},
 			Status: models.TransferStatusReady,
@@ -191,11 +205,14 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 	for _, transfer := range notReady {
 		transfers = append(transfers, models.PendingTransfer{
 			Transfer: models.Transfer{
-				From:       l.localSelector,
-				To:         l.remoteSelector,
-				Amount:     transfer.Amount,
-				Date:       time.Time{}, // TODO: get correct timestamp from logpoller.Log object
-				BridgeData: []byte{},    // No data since its not ready
+				From:   l.localSelector,
+				To:     l.remoteSelector,
+				Amount: transfer.Amount,
+				Date: parsedToLP[logKey{
+					txHash:   transfer.Raw.TxHash,
+					logIndex: int64(transfer.Raw.Index),
+				}].BlockTimestamp,
+				BridgeData: []byte{}, // No data since its not ready
 			},
 			Status: models.TransferStatusNotReady,
 		})
@@ -356,8 +373,15 @@ func (l *l2ToL1Bridge) getFinalizationData(
 }
 
 func (l *l2ToL1Bridge) getL1BlockFromRPC(ctx context.Context, txHash common.Hash) (*big.Int, error) {
-	// TODO: implement
-	panic("not implemented")
+	type Response struct {
+		L1BlockNumber hexutil.Big `json:"l1BlockNumber"`
+	}
+	response := new(Response)
+	err := l.l2Client.CallContext(ctx, response, "eth_getTransactionReceipt", txHash.Hex())
+	if err != nil {
+		return nil, fmt.Errorf("failed to call eth_getTransactionReceipt with tx hash %s: %w", txHash, err)
+	}
+	return response.L1BlockNumber.ToInt(), nil
 }
 
 func (l *l2ToL1Bridge) getProof(ctx context.Context, l2ToL1Id *big.Int) ([][32]byte, error) {
@@ -388,8 +412,16 @@ func (l *l2ToL1Bridge) getProof(ctx context.Context, l2ToL1Id *big.Int) ([][32]b
 }
 
 func (l *l2ToL1Bridge) getSendCountForBlock(ctx context.Context, blockHash [32]byte) (uint64, error) {
-	// TODO: implement
-	panic("not implemented")
+	type Response struct {
+		SendCount hexutil.Big `json:"sendCount"`
+	}
+	response := new(Response)
+	bhHex := hexutil.Encode(blockHash[:])
+	err := l.l2Client.CallContext(ctx, response, "eth_getBlockByHash", bhHex, false)
+	if err != nil {
+		return 0, fmt.Errorf("failed to call eth_getBlockByHash with blockhash %s: %w", bhHex, err)
+	}
+	return response.SendCount.ToInt().Uint64(), nil
 }
 
 func (l *l2ToL1Bridge) getLatestNodeConfirmed(ctx context.Context) (*arbitrum_rollup_core.ArbRollupCoreNodeConfirmed, error) {
@@ -412,22 +444,12 @@ func (l *l2ToL1Bridge) getLatestNodeConfirmed(ctx context.Context) (*arbitrum_ro
 }
 
 func (l *l2ToL1Bridge) filterOutFinalizedTransfers(
-	transfers []logpoller.Log,
-	finalizations []logpoller.Log,
+	l2ToL1Transfers []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
+	l2ToL1Finalizations []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized,
 ) (
 	[]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
 	error,
 ) {
-	l2ToL1Transfers, err := l.parseL2ToL1Transfers(transfers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse L2 -> L1 transfers: %w", err)
-	}
-
-	l2ToL1Finalizations, err := l.parseL2ToL1Finalizations(finalizations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse L2 -> L1 finalizations: %w", err)
-	}
-
 	var unfinalized []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent
 	for _, l2ToL1Transfer := range l2ToL1Transfers {
 		// We only care about transfers where the recipient is the l1 rebalancer contract
@@ -503,17 +525,33 @@ func (l *l2ToL1Bridge) parseL2ToL1Finalizations(logs []logpoller.Log) ([]*arbitr
 	return finalizations, nil
 }
 
-func (l *l2ToL1Bridge) parseL2ToL1Transfers(logs []logpoller.Log) ([]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent, error) {
+type logKey struct {
+	txHash   common.Hash
+	logIndex int64
+}
+
+func (l *l2ToL1Bridge) parseL2ToL1Transfers(
+	logs []logpoller.Log,
+) (
+	[]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
+	map[logKey]logpoller.Log,
+	error,
+) {
 	transfers := make([]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent, len(logs))
+	parsedToLPLog := make(map[logKey]logpoller.Log)
 	for i, log := range logs {
 		parsed, err := l.l2BridgeAdapter.ParseArbitrumL2ToL1ERC20Sent(log.ToGethLog())
 		if err != nil {
 			// should never happen
-			return nil, fmt.Errorf("failed to parse L2 -> L1 transfer log: %w", err)
+			return nil, nil, fmt.Errorf("failed to parse L2 -> L1 transfer log: %w", err)
 		}
 		transfers[i] = parsed
+		parsedToLPLog[logKey{
+			txHash:   log.TxHash,
+			logIndex: log.LogIndex,
+		}] = log
 	}
-	return transfers, nil
+	return transfers, parsedToLPLog, nil
 }
 
 // LocalChainSelector implements bridge.Bridge.
