@@ -515,6 +515,25 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 			}
 		}
 	}
+	if ccipModule.WrappedNative == common.HexToAddress("0x0") {
+		if ccipModule.ExistingDeployment {
+			return fmt.Errorf("wrapped native contract address is not provided in lane config")
+		}
+		weth9addr, err := cd.DeployWrappedNative()
+		if err != nil {
+			return fmt.Errorf("deploying wrapped native shouldn't fail %w", err)
+		}
+		aggregator, err := cd.DeployMockAggregator(18, WrappedNativeToUSD)
+		if err != nil {
+			return fmt.Errorf("deploying mock aggregator contract shouldn't fail %w", err)
+		}
+		ccipModule.PriceAggregators[weth9addr.Hex()] = aggregator
+		err = ccipModule.ChainClient.WaitForEvents()
+		if err != nil {
+			return fmt.Errorf("waiting for deploying wrapped native shouldn't fail %w", err)
+		}
+		ccipModule.WrappedNative = *weth9addr
+	}
 
 	if ccipModule.Router == nil {
 		if ccipModule.ExistingDeployment {
@@ -712,25 +731,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		ccipModule.BridgeTokenPools = pools
 	}
 
-	if ccipModule.WrappedNative == common.HexToAddress("0x0") {
-		if ccipModule.ExistingDeployment {
-			return fmt.Errorf("wrapped native contract address is not provided in lane config")
-		}
-		weth9addr, err := cd.DeployWrappedNative()
-		if err != nil {
-			return fmt.Errorf("deploying wrapped native shouldn't fail %w", err)
-		}
-		aggregator, err := cd.DeployMockAggregator(18, WrappedNativeToUSD)
-		if err != nil {
-			return fmt.Errorf("deploying mock aggregator contract shouldn't fail %w", err)
-		}
-		ccipModule.PriceAggregators[weth9addr.Hex()] = aggregator
-		err = ccipModule.ChainClient.WaitForEvents()
-		if err != nil {
-			return fmt.Errorf("waiting for deploying wrapped native shouldn't fail %w", err)
-		}
-		ccipModule.WrappedNative = *weth9addr
-	}
 	if ccipModule.PriceRegistry == nil {
 		if ccipModule.ExistingDeployment {
 			return fmt.Errorf("price registry contract address is not provided in lane config")
