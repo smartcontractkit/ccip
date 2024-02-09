@@ -84,8 +84,6 @@ const (
 type l2ToL1Bridge struct {
 	localSelector       models.NetworkSelector
 	remoteSelector      models.NetworkSelector
-	localChainID        *big.Int
-	remoteChainID       *big.Int
 	l1RebalancerAddress common.Address
 	l2BridgeAdapter     *arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapter
 	l1BridgeAdapter     *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapter
@@ -100,6 +98,133 @@ type l2ToL1Bridge struct {
 	l2ArbMessenger      *l2_arbitrum_messenger.L2ArbitrumMessenger
 	rollupCore          *arbitrum_rollup_core.ArbRollupCore
 	nodeInterface       *arb_node_interface.NodeInterface
+}
+
+func NewL2ToL1Bridge(
+	lggr logger.Logger,
+	localSelector,
+	remoteSelector models.NetworkSelector,
+	l1RollupAddress,
+	l1RebalancerAddress,
+	l2BridgeAdapterAddress,
+	l1BridgeAdapterAddress common.Address,
+	l2LogPoller,
+	l1LogPoller logpoller.LogPoller,
+	l2Client,
+	l1Client client.Client,
+) (*l2ToL1Bridge, error) {
+	localChain, ok := chainsel.ChainBySelector(uint64(localSelector))
+	if !ok {
+		return nil, fmt.Errorf("unknown chain selector for local chain: %d", localSelector)
+	}
+	remoteChain, ok := chainsel.ChainBySelector(uint64(remoteSelector))
+	if !ok {
+		return nil, fmt.Errorf("unknown chain selector for remote chain: %d", remoteSelector)
+	}
+	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2-%s-%s", localChain.Name, remoteChain.Name)
+	err := l2LogPoller.RegisterFilter(logpoller.Filter{
+		Name: l2FilterName,
+		EventSigs: []common.Hash{
+			L2ToL1ERC20SentTopic,
+		},
+		Addresses: []common.Address{l2BridgeAdapterAddress},
+		Retention: DurationMonth,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register filter for Arbitrum L2 to L1 bridge: %w", err)
+	}
+
+	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-%s-%s", remoteChain.Name, localChain.Name)
+	err = l1LogPoller.RegisterFilter(logpoller.Filter{
+		Name: l1FilterName,
+		EventSigs: []common.Hash{
+			L2toL1ERC20FinalizedTopic, // emitted by l1 bridge adapter
+			NodeConfirmedTopic,        // emitted by rollup
+		},
+		Addresses: []common.Address{
+			l1BridgeAdapterAddress, // to get erc20 finalized logs
+			l1RollupAddress,        // to get node confirmed logs
+		},
+		Retention: DurationMonth,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to register filter for Arbitrum L1 to L2 bridge: %w", err)
+	}
+
+	l2BridgeAdapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(l2BridgeAdapterAddress, l2Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate Arbitrum L2 bridge adapter: %w", err)
+	}
+
+	l1BridgeAdapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(l1BridgeAdapterAddress, l1Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate Arbitrum L1 bridge adapter: %w", err)
+	}
+
+	arbSys, err := arbsys.NewArbSys(ArbSysAddress, l2Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate ArbSys contract: %w", err)
+	}
+
+	// Addresses provided to the below wrappers don't matter,
+	// we're just using them to parse the needed logs easily.
+	l2ArbGateway, err := l2_arbitrum_gateway.NewL2ArbitrumGateway(
+		common.HexToAddress("0x0"),
+		l2Client,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate L2ArbitrumGateway contract: %w", err)
+	}
+
+	l2ArbMessenger, err := l2_arbitrum_messenger.NewL2ArbitrumMessenger(
+		common.HexToAddress("0x0"),
+		l2Client,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate L2ArbitrumMessenger contract: %w", err)
+	}
+
+	// have to use the correct address here
+	rollupCore, err := arbitrum_rollup_core.NewArbRollupCore(l1RollupAddress, l1Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate ArbRollupCore contract: %w", err)
+	}
+
+	// and here
+	nodeInterface, err := arb_node_interface.NewNodeInterface(NodeInterfaceAddress, l2Client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate NodeInterface contract: %w", err)
+	}
+
+	lggr = lggr.Named("ArbitrumL2ToL1Bridge").With(
+		"localSelector", localSelector,
+		"remoteSelector", remoteSelector,
+		"localChainID", localChain.EvmChainID,
+		"remoteChainID", remoteChain.EvmChainID,
+		"l1BridgeAdapter", l1BridgeAdapterAddress,
+		"l2BridgeAdapter", l2BridgeAdapterAddress,
+		"l1RebalancerAddress", l1RebalancerAddress,
+	)
+
+	// TODO: replay log poller for any missed logs?
+	return &l2ToL1Bridge{
+		localSelector:       localSelector,
+		remoteSelector:      remoteSelector,
+		l2BridgeAdapter:     l2BridgeAdapter,
+		l1BridgeAdapter:     l1BridgeAdapter,
+		l2LogPoller:         l2LogPoller,
+		l1LogPoller:         l1LogPoller,
+		l2FilterName:        l2FilterName,
+		l1FilterName:        l1FilterName,
+		l1RebalancerAddress: l1RebalancerAddress,
+		lggr:                lggr,
+		l2Client:            l2Client,
+		arbSys:              arbSys,
+		l2ArbGateway:        l2ArbGateway,
+		l2ArbMessenger:      l2ArbMessenger,
+		rollupCore:          rollupCore,
+		nodeInterface:       nodeInterface,
+	}, nil
 }
 
 // GetBridgeSpecificPayload implements bridge.Bridge.
@@ -566,135 +691,6 @@ func (l *l2ToL1Bridge) parseL2ToL1Transfers(
 // LocalChainSelector implements bridge.Bridge.
 func (l *l2ToL1Bridge) LocalChainSelector() models.NetworkSelector {
 	return l.localSelector
-}
-
-func NewL2ToL1Bridge(
-	lggr logger.Logger,
-	localSelector,
-	remoteSelector models.NetworkSelector,
-	l1RollupAddress,
-	l1RebalancerAddress,
-	l2BridgeAdapterAddress,
-	l1BridgeAdapterAddress common.Address,
-	l2LogPoller,
-	l1LogPoller logpoller.LogPoller,
-	l2Client,
-	l1Client client.Client,
-) (*l2ToL1Bridge, error) {
-	localChain, ok := chainsel.ChainBySelector(uint64(localSelector))
-	if !ok {
-		return nil, fmt.Errorf("unknown chain selector for local chain: %d", localSelector)
-	}
-	remoteChain, ok := chainsel.ChainBySelector(uint64(remoteSelector))
-	if !ok {
-		return nil, fmt.Errorf("unknown chain selector for remote chain: %d", remoteSelector)
-	}
-	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2-%s-%s", localChain.Name, remoteChain.Name)
-	err := l2LogPoller.RegisterFilter(logpoller.Filter{
-		Name: l2FilterName,
-		EventSigs: []common.Hash{
-			L2ToL1ERC20SentTopic,
-		},
-		Addresses: []common.Address{l2BridgeAdapterAddress},
-		Retention: DurationMonth,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to register filter for Arbitrum L2 to L1 bridge: %w", err)
-	}
-
-	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-%s-%s", remoteChain.Name, localChain.Name)
-	err = l1LogPoller.RegisterFilter(logpoller.Filter{
-		Name: l1FilterName,
-		EventSigs: []common.Hash{
-			L2toL1ERC20FinalizedTopic, // emitted by l1 bridge adapter
-			NodeConfirmedTopic,        // emitted by rollup
-		},
-		Addresses: []common.Address{
-			l1BridgeAdapterAddress, // to get erc20 finalized logs
-			l1RollupAddress,        // to get node confirmed logs
-		},
-		Retention: DurationMonth,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to register filter for Arbitrum L1 to L2 bridge: %w", err)
-	}
-
-	l2BridgeAdapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(l2BridgeAdapterAddress, l2Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate Arbitrum L2 bridge adapter: %w", err)
-	}
-
-	l1BridgeAdapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(l1BridgeAdapterAddress, l1Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate Arbitrum L1 bridge adapter: %w", err)
-	}
-
-	arbSys, err := arbsys.NewArbSys(ArbSysAddress, l2Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate ArbSys contract: %w", err)
-	}
-
-	// Addresses provided to the below wrappers don't matter,
-	// we're just using them to parse the needed logs easily.
-	l2ArbGateway, err := l2_arbitrum_gateway.NewL2ArbitrumGateway(
-		common.HexToAddress("0x0"),
-		l2Client,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate L2ArbitrumGateway contract: %w", err)
-	}
-
-	l2ArbMessenger, err := l2_arbitrum_messenger.NewL2ArbitrumMessenger(
-		common.HexToAddress("0x0"),
-		l2Client,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate L2ArbitrumMessenger contract: %w", err)
-	}
-
-	// have to use the correct address here
-	rollupCore, err := arbitrum_rollup_core.NewArbRollupCore(l1RollupAddress, l1Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate ArbRollupCore contract: %w", err)
-	}
-
-	// and here
-	nodeInterface, err := arb_node_interface.NewNodeInterface(NodeInterfaceAddress, l2Client)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate NodeInterface contract: %w", err)
-	}
-
-	lggr = lggr.Named("ArbitrumL2ToL1Bridge").With(
-		"localSelector", localSelector,
-		"remoteSelector", remoteSelector,
-		"localChainID", localChain.EvmChainID,
-		"remoteChainID", remoteChain.EvmChainID,
-		"l1BridgeAdapter", l1BridgeAdapterAddress,
-		"l2BridgeAdapter", l2BridgeAdapterAddress,
-		"l1RebalancerAddress", l1RebalancerAddress,
-	)
-
-	// TODO: replay log poller for any missed logs?
-	return &l2ToL1Bridge{
-		localSelector:       localSelector,
-		remoteSelector:      remoteSelector,
-		localChainID:        big.NewInt(int64(localChain.EvmChainID)),
-		remoteChainID:       big.NewInt(int64(remoteChain.EvmChainID)),
-		l2BridgeAdapter:     l2BridgeAdapter,
-		l1BridgeAdapter:     l1BridgeAdapter,
-		l2LogPoller:         l2LogPoller,
-		l1LogPoller:         l1LogPoller,
-		l2FilterName:        l2FilterName,
-		l1FilterName:        l1FilterName,
-		l1RebalancerAddress: l1RebalancerAddress,
-		lggr:                lggr,
-		l2Client:            l2Client,
-		arbSys:              arbSys,
-		l2ArbGateway:        l2ArbGateway,
-		l2ArbMessenger:      l2ArbMessenger,
-		rollupCore:          rollupCore,
-		nodeInterface:       nodeInterface,
-	}, nil
 }
 
 type finalizeInboundTransferParams struct {

@@ -52,10 +52,26 @@ func (n NetworkSelector) Type() NetworkType {
 type NetworkType string
 
 type Transfer struct {
-	From       NetworkSelector
-	To         NetworkSelector
-	Amount     *big.Int
-	Date       time.Time
+	// From identifies the network where the tokens are originating from.
+	From NetworkSelector
+	// To identifies the network where the tokens are headed to.
+	To NetworkSelector
+	// Sender is an address on the From network that is sending the tokens.
+	// Typically this will be the bridge adapter on the From network.
+	Sender Address
+	// Receiver is an address on the To network that will be receiving the tokens.
+	// Typically this will be the rebalancer contract on the To network.
+	Receiver Address
+	// LocalTokenAddress is the address of the token on the From network.
+	LocalTokenAddress Address
+	// RemoteTokenAddress is the address of the token on the To network.
+	RemoteTokenAddress Address
+	// Amount is the amount of tokens being transferred.
+	Amount *big.Int
+	// Date is the date when the transfer was initiated.
+	Date time.Time
+	// BridgeData is any additional data that needs to be sent to the bridge
+	// in order to make the transfer succeed.
 	BridgeData []byte
 	// todo: consider adding some unique id field
 }
@@ -73,9 +89,16 @@ func NewTransfer(from, to NetworkSelector, amount *big.Int, date time.Time, brid
 func (t Transfer) Equals(other Transfer) bool {
 	return t.From == other.From &&
 		t.To == other.To &&
+		t.Receiver == other.Receiver &&
+		t.LocalTokenAddress == other.LocalTokenAddress &&
+		t.RemoteTokenAddress == other.RemoteTokenAddress &&
 		t.Amount.Cmp(other.Amount) == 0 &&
 		t.Date.Equal(other.Date) &&
 		bytes.Equal(t.BridgeData, other.BridgeData)
+}
+
+func (t Transfer) String() string {
+	return fmt.Sprintf("%v->%v %s", t.From, t.To, t.Amount.String())
 }
 
 type PendingTransfer struct {
@@ -110,7 +133,3 @@ const (
 	TransferStatusFinalized = "finalized"
 	TransferStatusExecuted  = "executed"
 )
-
-func (t Transfer) String() string {
-	return fmt.Sprintf("%v->%v %s", t.From, t.To, t.Amount.String())
-}
