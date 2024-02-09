@@ -34,14 +34,14 @@ type EVMTokenPoolBatchedReader struct {
 	tokenPoolReaderMu sync.RWMutex
 }
 
-//go:generate mockery --quiet --name TokenPoolBatchedReaderInterface --filename token_pool_batched_reader_mock.go --case=underscor
+//go:generate mockery --quiet --name TokenPoolBatchedReader --filename token_pool_batched_reader_mock.go --case=underscor
 type TokenPoolBatchedReader interface {
 	GetInboundTokenPoolRateLimits(ctx context.Context, tokenPoolReaders []common.Address) ([]ccipdata.TokenBucketRateLimit, error)
 }
 
 var _ TokenPoolBatchedReader = (*EVMTokenPoolBatchedReader)(nil)
 
-func NewTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64, offRampAddress common.Address, evmBatchCaller rpclib.EvmBatchCaller, lp logpoller.LogPoller) *EVMTokenPoolBatchedReader {
+func NewEVMTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64, offRampAddress common.Address, evmBatchCaller rpclib.EvmBatchCaller, lp logpoller.LogPoller) *EVMTokenPoolBatchedReader {
 	return &EVMTokenPoolBatchedReader{
 		lggr:                lggr,
 		remoteChainSelector: remoteChainSelector,

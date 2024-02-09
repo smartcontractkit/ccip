@@ -37,7 +37,7 @@ func TestTokenPoolFactory(t *testing.T) {
 	remoteChainSelector := uint64(2000)
 	batchCallerMock := rpclibmocks.NewEvmBatchCaller(t)
 
-	tokenPoolBatchReader := NewTokenPoolBatchedReader(lggr, remoteChainSelector, offRamp, batchCallerMock, lp)
+	tokenPoolBatchReader := NewEVMTokenPoolBatchedReader(lggr, remoteChainSelector, offRamp, batchCallerMock, lp)
 
 	poolTypes := []string{"BurnMint", "LockRelease"}
 
