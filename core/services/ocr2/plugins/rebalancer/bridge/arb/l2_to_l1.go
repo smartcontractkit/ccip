@@ -462,12 +462,14 @@ func (l *l2ToL1Bridge) filterOutFinalizedTransfers(
 			l.lggr.Debugw("Ignoring L2 -> L1 transfer not destined for rebalancer", "transfer", l2ToL1Transfer.Raw.TxHash)
 			continue
 		}
-		foundFinalized, err := l.findMatchingFinalization(l2ToL1Transfer, l2ToL1Finalizations)
+		foundFinalized, finalizedIdx, err := l.findMatchingFinalization(l2ToL1Transfer, l2ToL1Finalizations)
 		if err != nil {
 			return nil, fmt.Errorf("unable to find matching finalization (withdrawal tx: %s): %w", l2ToL1Transfer.Raw.TxHash, err)
 		}
 		if foundFinalized {
-			l.lggr.Debugw("Ignoring L2 -> L1 transfer that has been finalized", "transfer", l2ToL1Transfer.Raw.TxHash)
+			l.lggr.Debugw("Ignoring L2 -> L1 transfer that has been finalized",
+				"transfer", l2ToL1Transfer.Raw.TxHash,
+				"finalization", l2ToL1Finalizations[finalizedIdx].Raw.TxHash)
 			continue
 		}
 		unfinalized = append(unfinalized, l2ToL1Transfer)
@@ -479,14 +481,15 @@ func (l *l2ToL1Bridge) filterOutFinalizedTransfers(
 func (l *l2ToL1Bridge) findMatchingFinalization(
 	withdrawal *arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
 	finalizations []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized,
-) (foundFinalized bool, err error) {
-	for _, l2ToL1Finalization := range finalizations {
+) (foundFinalized bool, idx int, err error) {
+	idx = -1
+	for i, l2ToL1Finalization := range finalizations {
 		// the destination address is in the payload data, need to unpack it to figure out
 		// who it went to.
 		finalizeInboundTransferData, err := unpackFinalizeInboundTransfer(l2ToL1Finalization.Payload.Data)
 		if err != nil {
 			// should never happen
-			return false, fmt.Errorf("failed to unpack finalizeInboundTransfer: %w, raw: %s",
+			return false, -1, fmt.Errorf("failed to unpack finalizeInboundTransfer: %w, raw: %s",
 				err, hexutil.Encode(l2ToL1Finalization.Payload.Data))
 		}
 		// We only care about finalizations destined for the rebalancer contract
@@ -501,7 +504,7 @@ func (l *l2ToL1Bridge) findMatchingFinalization(
 		l2ToL1Id, err := unpackUint256(withdrawal.OutboundTransferResult)
 		if err != nil {
 			// should never happen
-			return false, fmt.Errorf("failed to unpack l2 to l1 id from l2 -> l1 transfer event: %w, raw: %s",
+			return false, -1, fmt.Errorf("failed to unpack l2 to l1 id from l2 -> l1 transfer event: %w, raw: %s",
 				err, hexutil.Encode(withdrawal.OutboundTransferResult))
 		}
 
@@ -512,9 +515,10 @@ func (l *l2ToL1Bridge) findMatchingFinalization(
 
 		// finalization is for this transfer
 		foundFinalized = true
+		idx = i
 		break
 	}
-	return foundFinalized, nil
+	return foundFinalized, idx, nil
 }
 
 func (l *l2ToL1Bridge) parseL2ToL1Finalizations(logs []logpoller.Log) ([]*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, error) {
@@ -727,10 +731,13 @@ func unpackFinalizeInboundTransfer(calldata []byte) (finalizeInboundTransferPara
 }
 
 func unpackUint256(data []byte) (*big.Int, error) {
-	iface, err := utils.ABIDecode(`[{"type": "uint256"}]`, data)
+	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}]`, data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode uint256: %w", err)
 	}
-	ret := *abi.ConvertType(iface, new(*big.Int)).(**big.Int)
+	if len(ifaces) != 1 {
+		return nil, fmt.Errorf("expected 1 argument, got %d", len(ifaces))
+	}
+	ret := *abi.ConvertType(ifaces[0], new(*big.Int)).(**big.Int)
 	return ret, nil
 }
