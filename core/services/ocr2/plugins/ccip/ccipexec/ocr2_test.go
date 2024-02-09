@@ -22,11 +22,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	lpMocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
@@ -44,13 +44,13 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		name              string
 		commitStorePaused bool
 		inflightReports   []InflightInternalExecutionReport
-		unexpiredReports  []ccipdata.Event[ccipdata.CommitStoreReport]
-		sendRequests      []ccipdata.Event[internal.EVM2EVMMessage]
+		unexpiredReports  []ccipdata.Event[cciptypes.CommitStoreReport]
+		sendRequests      []ccipdata.Event[cciptypes.EVM2EVMMessage]
 		executedSeqNums   []uint64
 		tokenPoolsMapping map[common.Address]common.Address
 		blessedRoots      map[[32]byte]bool
 		senderNonce       uint64
-		rateLimiterState  ccipdata.TokenBucketRateLimit
+		rateLimiterState  cciptypes.TokenBucketRateLimit
 		expErr            bool
 	}{
 		{
@@ -62,10 +62,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			name:              "happy flow",
 			commitStorePaused: false,
 			inflightReports:   []InflightInternalExecutionReport{},
-			unexpiredReports: []ccipdata.Event[ccipdata.CommitStoreReport]{
+			unexpiredReports: []ccipdata.Event[cciptypes.CommitStoreReport]{
 				{
-					Data: ccipdata.CommitStoreReport{
-						Interval:   ccipdata.CommitStoreInterval{Min: 10, Max: 12},
+					Data: cciptypes.CommitStoreReport{
+						Interval:   cciptypes.CommitStoreInterval{Min: 10, Max: 12},
 						MerkleRoot: [32]byte{123},
 					},
 				},
@@ -73,20 +73,20 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			blessedRoots: map[[32]byte]bool{
 				{123}: true,
 			},
-			rateLimiterState: ccipdata.TokenBucketRateLimit{
+			rateLimiterState: cciptypes.TokenBucketRateLimit{
 				IsEnabled: false,
 			},
 			tokenPoolsMapping: map[common.Address]common.Address{},
 			senderNonce:       9,
-			sendRequests: []ccipdata.Event[internal.EVM2EVMMessage]{
+			sendRequests: []ccipdata.Event[cciptypes.EVM2EVMMessage]{
 				{
-					Data: internal.EVM2EVMMessage{SequenceNumber: 10},
+					Data: cciptypes.EVM2EVMMessage{SequenceNumber: 10},
 				},
 				{
-					Data: internal.EVM2EVMMessage{SequenceNumber: 11},
+					Data: cciptypes.EVM2EVMMessage{SequenceNumber: 11},
 				},
 				{
-					Data: internal.EVM2EVMMessage{SequenceNumber: 12},
+					Data: cciptypes.EVM2EVMMessage{SequenceNumber: 12},
 				},
 			},
 		},
@@ -100,7 +100,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.inflightReports.reports = tc.inflightReports
 			p.lggr = logger.TestLogger(t)
 			p.tokenDataWorker = tokendata.NewBackgroundWorker(
-				ctx, make(map[common.Address]tokendata.Reader), 10, 5*time.Second, time.Hour)
+				ctx, make(map[cciptypes.Address]tokendata.Reader), 10, 5*time.Second, time.Hour)
 			p.metricsCollector = ccip.NoopMetricsCollector
 
 			commitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
@@ -113,10 +113,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				Return(tc.unexpiredReports, nil).Maybe()
 			p.commitStoreReader = commitStoreReader
 
-			var executionEvents []ccipdata.Event[ccipdata.ExecutionStateChanged]
+			var executionEvents []ccipdata.Event[cciptypes.ExecutionStateChanged]
 			for _, seqNum := range tc.executedSeqNums {
-				executionEvents = append(executionEvents, ccipdata.Event[ccipdata.ExecutionStateChanged]{
-					Data: ccipdata.ExecutionStateChanged{SequenceNumber: seqNum},
+				executionEvents = append(executionEvents, ccipdata.Event[cciptypes.ExecutionStateChanged]{
+					Data: cciptypes.ExecutionStateChanged{SequenceNumber: seqNum},
 				})
 			}
 
@@ -130,11 +130,11 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			mockOffRampReader.On("Address").Return(offRamp.Address()).Maybe()
 			mockOffRampReader.On("GetSenderNonce", mock.Anything, mock.Anything).Return(offRamp.GetSenderNonce(nil, utils.RandomAddress())).Maybe()
 			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, []common.Address{}).
-				Return([]ccipdata.TokenBucketRateLimit{}, nil).Maybe()
+				Return([]cciptypes.TokenBucketRateLimit{}, nil).Maybe()
 			mockOffRampReader.On("GetSourceToDestTokensMapping", ctx).Return(nil, nil).Maybe()
-			mockOffRampReader.On("GetTokens", ctx).Return(ccipdata.OffRampTokens{
-				DestinationTokens: []common.Address{},
-				SourceTokens:      []common.Address{},
+			mockOffRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
+				DestinationTokens: []cciptypes.Address{},
+				SourceTokens:      []cciptypes.Address{},
 			}, nil).Maybe()
 			p.offRampReader = mockOffRampReader
 
@@ -144,19 +144,19 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			p.onRampReader = mockOnRampReader
 
 			mockGasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
-			mockGasPriceEstimator.On("GetGasPrice", ctx).Return(prices.GasPrice(big.NewInt(1)), nil).Maybe()
+			mockGasPriceEstimator.On("GetGasPrice", ctx).Return(big.NewInt(1), nil).Maybe()
 			p.gasPriceEstimator = mockGasPriceEstimator
 
 			destPriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
-				[]ccipdata.TokenPriceUpdate{{TokenPrice: ccipdata.TokenPrice{Token: common.HexToAddress("0x1"), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
+				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: cciptypes.Address(common.HexToAddress("0x1").String()), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
 			destPriceRegReader.On("Address").Return(utils.RandomAddress()).Maybe()
 			destPriceRegReader.On("GetFeeTokens", ctx).Return([]common.Address{}, nil).Maybe()
 			sourcePriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
 			sourcePriceRegReader.On("Address").Return(utils.RandomAddress()).Maybe()
 			sourcePriceRegReader.On("GetFeeTokens", ctx).Return([]common.Address{}, nil).Maybe()
 			sourcePriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
-				[]ccipdata.TokenPriceUpdate{{TokenPrice: ccipdata.TokenPrice{Token: common.HexToAddress("0x1"), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
+				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: cciptypes.Address(common.HexToAddress("0x1").String()), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
 			p.destPriceRegistry = destPriceRegReader
 			p.sourcePriceRegistry = sourcePriceRegReader
 
@@ -180,7 +180,7 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 		observations    []ccip.ExecutionObservation
 
 		expectingSomeReport bool
-		expectedReport      ccipdata.ExecReport
+		expectedReport      cciptypes.ExecReport
 		expectingSomeErr    bool
 	}{
 		{
@@ -232,21 +232,21 @@ func TestExecutionReportingPlugin_Report(t *testing.T) {
 }
 
 func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
-	msg := internal.EVM2EVMMessage{
+	msg := cciptypes.EVM2EVMMessage{
 		SequenceNumber: 12,
 		FeeTokenAmount: big.NewInt(1e9),
-		Sender:         common.Address{},
+		Sender:         "",
 		Nonce:          1,
 		GasLimit:       big.NewInt(1),
 		Strict:         false,
-		Receiver:       common.Address{},
+		Receiver:       "",
 		Data:           nil,
 		TokenAmounts:   nil,
-		FeeToken:       common.Address{},
+		FeeToken:       "",
 		MessageId:      [32]byte{},
 	}
-	report := ccipdata.ExecReport{
-		Messages:          []internal.EVM2EVMMessage{msg},
+	report := cciptypes.ExecReport{
+		Messages:          []cciptypes.EVM2EVMMessage{msg},
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
@@ -262,13 +262,13 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		inflightReports: newInflightExecReportsContainer(1 * time.Hour),
 	}
 
-	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(ccipdata.ExecutionStateUntouched), nil).Once()
+	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(cciptypes.ExecutionStateUntouched), nil).Once()
 
 	should, err := plugin.ShouldAcceptFinalizedReport(testutils.Context(t), ocrtypes.ReportTimestamp{}, encodedReport)
 	require.NoError(t, err)
 	assert.Equal(t, true, should)
 
-	mockedExecState.Return(uint8(ccipdata.ExecutionStateSuccess), nil).Once()
+	mockedExecState.Return(uint8(cciptypes.ExecutionStateSuccess), nil).Once()
 
 	should, err = plugin.ShouldAcceptFinalizedReport(testutils.Context(t), ocrtypes.ReportTimestamp{}, encodedReport)
 	require.NoError(t, err)
@@ -276,21 +276,21 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 }
 
 func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
-	msg := internal.EVM2EVMMessage{
+	msg := cciptypes.EVM2EVMMessage{
 		SequenceNumber: 12,
 		FeeTokenAmount: big.NewInt(1e9),
-		Sender:         common.Address{},
+		Sender:         "",
 		Nonce:          1,
 		GasLimit:       big.NewInt(1),
 		Strict:         false,
-		Receiver:       common.Address{},
+		Receiver:       "",
 		Data:           nil,
 		TokenAmounts:   nil,
-		FeeToken:       common.Address{},
+		FeeToken:       "",
 		MessageId:      [32]byte{},
 	}
-	report := ccipdata.ExecReport{
-		Messages:          []internal.EVM2EVMMessage{msg},
+	report := cciptypes.ExecReport{
+		Messages:          []cciptypes.EVM2EVMMessage{msg},
 		OffchainTokenData: [][][]byte{{}},
 		Proofs:            [][32]byte{{}},
 		ProofFlagBits:     big.NewInt(1),
@@ -300,7 +300,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	mockCommitStoreReader := ccipdatamocks.NewCommitStoreReader(t)
 	mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
 	mockOffRampReader.On("DecodeExecutionReport", encodedReport).Return(report, nil)
-	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(ccipdata.ExecutionStateUntouched), nil).Once()
+	mockedExecState := mockOffRampReader.On("GetExecutionState", mock.Anything, uint64(12)).Return(uint8(cciptypes.ExecutionStateUntouched), nil).Once()
 
 	plugin := ExecutionReportingPlugin{
 		commitStoreReader: mockCommitStoreReader,
@@ -313,7 +313,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, true, should)
 
-	mockedExecState.Return(uint8(ccipdata.ExecutionStateFailure), nil).Once()
+	mockedExecState.Return(uint8(cciptypes.ExecutionStateFailure), nil).Once()
 	should, err = plugin.ShouldTransmitAcceptedReport(testutils.Context(t), ocrtypes.ReportTimestamp{}, encodedReport)
 	require.NoError(t, err)
 	assert.Equal(t, false, should)
@@ -345,10 +345,10 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
 		Return(executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1, nil)
 	commitStore.On("GetCommitReportMatchingSeqNum", ctx, observations[0].SeqNr, 0).
-		Return([]ccipdata.Event[ccipdata.CommitStoreReport]{
+		Return([]ccipdata.Event[cciptypes.CommitStoreReport]{
 			{
-				Data: ccipdata.CommitStoreReport{
-					Interval: ccipdata.CommitStoreInterval{
+				Data: cciptypes.CommitStoreReport{
+					Interval: cciptypes.CommitStoreInterval{
 						Min: observations[0].SeqNr,
 						Max: observations[len(observations)-1].SeqNr,
 					},
@@ -363,24 +363,24 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	assert.NoError(t, err)
 	p.offRampReader = offRampReader
 
-	sendReqs := make([]ccipdata.Event[internal.EVM2EVMMessage], len(observations))
+	sendReqs := make([]ccipdata.Event[cciptypes.EVM2EVMMessage], len(observations))
 	sourceReader := ccipdatamocks.NewOnRampReader(t)
 	for i := range observations {
-		msg := internal.EVM2EVMMessage{
+		msg := cciptypes.EVM2EVMMessage{
 			SourceChainSelector: math.MaxUint64,
 			SequenceNumber:      uint64(i + 1),
 			FeeTokenAmount:      big.NewInt(math.MaxInt64),
-			Sender:              utils.RandomAddress(),
+			Sender:              cciptypes.Address(utils.RandomAddress().String()),
 			Nonce:               math.MaxUint64,
 			GasLimit:            big.NewInt(math.MaxInt64),
 			Strict:              false,
-			Receiver:            utils.RandomAddress(),
+			Receiver:            cciptypes.Address(utils.RandomAddress().String()),
 			Data:                bytes.Repeat([]byte{0}, bytesPerMessage),
 			TokenAmounts:        nil,
-			FeeToken:            utils.RandomAddress(),
+			FeeToken:            cciptypes.Address(utils.RandomAddress().String()),
 			MessageId:           [32]byte{12},
 		}
-		sendReqs[i] = ccipdata.Event[internal.EVM2EVMMessage]{Data: msg}
+		sendReqs[i] = ccipdata.Event[cciptypes.EVM2EVMMessage]{Data: msg}
 	}
 	sourceReader.On("GetSendRequestsBetweenSeqNums",
 		ctx, observations[0].SeqNr, observations[len(observations)-1].SeqNr, false).Return(sendReqs, nil)
@@ -399,19 +399,19 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	//require.NoError(t, err)
 	lggr := logger.TestLogger(t)
 
-	sender1 := common.HexToAddress("0xa")
-	destNative := common.HexToAddress("0xb")
-	srcNative := common.HexToAddress("0xc")
+	sender1 := cciptypes.Address(common.HexToAddress("0xa").String())
+	destNative := cciptypes.Address(common.HexToAddress("0xb").String())
+	srcNative := cciptypes.Address(common.HexToAddress("0xc").String())
 
-	msg1 := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-		EVM2EVMMessage: internal.EVM2EVMMessage{
+	msg1 := cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+		EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 			SequenceNumber: 1,
 			FeeTokenAmount: big.NewInt(1e9),
 			Sender:         sender1,
 			Nonce:          1,
 			GasLimit:       big.NewInt(1),
 			Strict:         false,
-			Receiver:       common.Address{},
+			Receiver:       "",
 			Data:           nil,
 			TokenAmounts:   nil,
 			FeeToken:       srcNative,
@@ -428,7 +428,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	msg3.Finalized = true
 
 	msg4 := msg1
-	msg4.TokenAmounts = []internal.TokenAmount{
+	msg4.TokenAmounts = []cciptypes.TokenAmount{
 		{Token: srcNative, Amount: big.NewInt(100)},
 	}
 
@@ -438,124 +438,124 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 
 	var tt = []struct {
 		name                     string
-		reqs                     []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
+		reqs                     []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta
 		inflight                 []InflightInternalExecutionReport
 		tokenLimit, destGasPrice *big.Int
-		srcPrices, dstPrices     map[common.Address]*big.Int
-		offRampNoncesBySender    map[common.Address]uint64
-		destRateLimits           map[common.Address]*big.Int
-		srcToDestTokens          map[common.Address]common.Address
+		srcPrices, dstPrices     map[cciptypes.Address]*big.Int
+		offRampNoncesBySender    map[cciptypes.Address]uint64
+		destRateLimits           map[cciptypes.Address]*big.Int
+		srcToDestTokens          map[cciptypes.Address]cciptypes.Address
 		expectedSeqNrs           []ccip.ObservedMessage
 	}{
 		{
 			name:                  "single message no tokens",
-			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg1},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
-			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
-			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
-			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(1)}},
 		},
 		{
 			name:                  "executed non finalized messages should be skipped",
-			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
-			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
-			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
-			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        nil,
 		},
 		{
 			name:                  "finalized executed log",
-			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg3},
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg3},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
-			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
-			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
-			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        nil,
 		},
 		{
 			name:                  "dst token price does not exist",
-			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
-			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
-			dstPrices:             map[common.Address]*big.Int{},
-			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        nil,
 		},
 		{
 			name:                  "src token price does not exist",
-			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg2},
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
-			srcPrices:             map[common.Address]*big.Int{},
-			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
-			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			srcPrices:             map[cciptypes.Address]*big.Int{},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        nil,
 		},
 		{
 			name:                  "rate limit hit",
-			reqs:                  []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg4},
+			reqs:                  []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg4},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
-			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
-			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
-			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
-			destRateLimits: map[common.Address]*big.Int{
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
+			destRateLimits: map[cciptypes.Address]*big.Int{
 				destNative: big.NewInt(99),
 			},
-			srcToDestTokens: map[common.Address]common.Address{
+			srcToDestTokens: map[cciptypes.Address]cciptypes.Address{
 				srcNative: destNative,
 			},
 			expectedSeqNrs: nil,
 		},
 		{
 			name:         "message with tokens is not executed if limit is reached",
-			reqs:         []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg4},
+			reqs:         []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg4},
 			inflight:     []InflightInternalExecutionReport{},
 			tokenLimit:   big.NewInt(2),
 			destGasPrice: big.NewInt(10),
-			srcPrices:    map[common.Address]*big.Int{srcNative: big.NewInt(1e18)},
-			dstPrices:    map[common.Address]*big.Int{destNative: big.NewInt(1e18)},
-			srcToDestTokens: map[common.Address]common.Address{
+			srcPrices:    map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1e18)},
+			dstPrices:    map[cciptypes.Address]*big.Int{destNative: big.NewInt(1e18)},
+			srcToDestTokens: map[cciptypes.Address]cciptypes.Address{
 				srcNative: destNative,
 			},
-			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        nil,
 		},
 		{
 			name: "message with tokens is not executed if limit is reached when inflight is full",
-			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg5},
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{msg5},
 			inflight: []InflightInternalExecutionReport{
 				{
 					createdAt: time.Now(),
-					messages:  []internal.EVM2EVMMessage{msg4.EVM2EVMMessage},
+					messages:  []cciptypes.EVM2EVMMessage{msg4.EVM2EVMMessage},
 				},
 			},
 			tokenLimit:   big.NewInt(19),
 			destGasPrice: big.NewInt(10),
-			srcPrices:    map[common.Address]*big.Int{srcNative: big.NewInt(1e18)},
-			dstPrices:    map[common.Address]*big.Int{destNative: big.NewInt(1e18)},
-			srcToDestTokens: map[common.Address]common.Address{
+			srcPrices:    map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1e18)},
+			dstPrices:    map[cciptypes.Address]*big.Int{destNative: big.NewInt(1e18)},
+			srcToDestTokens: map[cciptypes.Address]cciptypes.Address{
 				srcNative: destNative,
 			},
-			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        nil,
 		},
 		{
 			name: "some messages skipped after hitting max batch data len",
-			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				{
-					EVM2EVMMessage: internal.EVM2EVMMessage{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 						SequenceNumber: 10,
 						FeeTokenAmount: big.NewInt(1e9),
 						Sender:         sender1,
@@ -568,7 +568,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 				{
-					EVM2EVMMessage: internal.EVM2EVMMessage{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 						SequenceNumber: 11,
 						FeeTokenAmount: big.NewInt(1e9),
 						Sender:         sender1,
@@ -581,7 +581,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
 				{
-					EVM2EVMMessage: internal.EVM2EVMMessage{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 						SequenceNumber: 12,
 						FeeTokenAmount: big.NewInt(1e9),
 						Sender:         sender1,
@@ -597,9 +597,9 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			inflight:              []InflightInternalExecutionReport{},
 			tokenLimit:            big.NewInt(0),
 			destGasPrice:          big.NewInt(10),
-			srcPrices:             map[common.Address]*big.Int{srcNative: big.NewInt(1)},
-			dstPrices:             map[common.Address]*big.Int{destNative: big.NewInt(1)},
-			offRampNoncesBySender: map[common.Address]uint64{sender1: 0},
+			srcPrices:             map[cciptypes.Address]*big.Int{srcNative: big.NewInt(1)},
+			dstPrices:             map[cciptypes.Address]*big.Int{destNative: big.NewInt(1)},
+			offRampNoncesBySender: map[cciptypes.Address]uint64{sender1: 0},
 			expectedSeqNrs:        []ccip.ObservedMessage{{SeqNr: uint64(10)}, {SeqNr: uint64(12)}},
 		},
 	}
@@ -621,10 +621,10 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			mockOffRampReader.On("GetSenderNonce", mock.Anything, sender1).Return(uint64(0), nil).Maybe()
 
 			plugin := ExecutionReportingPlugin{
-				tokenDataWorker:   tokendata.NewBackgroundWorker(ctx, map[common.Address]tokendata.Reader{}, 10, 5*time.Second, time.Hour),
+				tokenDataWorker:   tokendata.NewBackgroundWorker(ctx, map[cciptypes.Address]tokendata.Reader{}, 10, 5*time.Second, time.Hour),
 				offRampReader:     mockOffRampReader,
 				destWrappedNative: destNative,
-				offchainConfig: ccipdata.ExecOffchainConfig{
+				offchainConfig: cciptypes.ExecOffchainConfig{
 					DestOptimisticConfirmations: 1,
 					BatchGasLimit:               300_000,
 					RelativeBoostPerWaitHour:    1,
@@ -653,81 +653,81 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 func TestExecutionReportingPlugin_isRateLimitEnoughForTokenPool(t *testing.T) {
 	testCases := []struct {
 		name                    string
-		destTokenPoolRateLimits map[common.Address]*big.Int
-		tokenAmounts            []internal.TokenAmount
-		inflightTokenAmounts    map[common.Address]*big.Int
-		srcToDestToken          map[common.Address]common.Address
+		destTokenPoolRateLimits map[cciptypes.Address]*big.Int
+		tokenAmounts            []cciptypes.TokenAmount
+		inflightTokenAmounts    map[cciptypes.Address]*big.Int
+		srcToDestToken          map[cciptypes.Address]cciptypes.Address
 		exp                     bool
 	}{
 		{
 			name: "base",
-			destTokenPoolRateLimits: map[common.Address]*big.Int{
-				common.HexToAddress("10"): big.NewInt(100),
-				common.HexToAddress("20"): big.NewInt(50),
+			destTokenPoolRateLimits: map[cciptypes.Address]*big.Int{
+				cciptypes.Address("10"): big.NewInt(100),
+				cciptypes.Address("20"): big.NewInt(50),
 			},
-			tokenAmounts: []internal.TokenAmount{
-				{Token: common.HexToAddress("1"), Amount: big.NewInt(50)},
-				{Token: common.HexToAddress("2"), Amount: big.NewInt(20)},
+			tokenAmounts: []cciptypes.TokenAmount{
+				{Token: cciptypes.Address(common.HexToAddress("1").String()), Amount: big.NewInt(50)},
+				{Token: cciptypes.Address(common.HexToAddress("2").String()), Amount: big.NewInt(20)},
 			},
-			srcToDestToken: map[common.Address]common.Address{
-				common.HexToAddress("1"): common.HexToAddress("10"),
-				common.HexToAddress("2"): common.HexToAddress("20"),
+			srcToDestToken: map[cciptypes.Address]cciptypes.Address{
+				cciptypes.Address("1"): cciptypes.Address("10"),
+				cciptypes.Address("2"): cciptypes.Address("20"),
 			},
-			inflightTokenAmounts: map[common.Address]*big.Int{
-				common.HexToAddress("1"): big.NewInt(20),
-				common.HexToAddress("2"): big.NewInt(30),
+			inflightTokenAmounts: map[cciptypes.Address]*big.Int{
+				cciptypes.Address("1"): big.NewInt(20),
+				cciptypes.Address("2"): big.NewInt(30),
 			},
 			exp: true,
 		},
 		{
 			name: "rate limit hit",
-			destTokenPoolRateLimits: map[common.Address]*big.Int{
-				common.HexToAddress("10"): big.NewInt(100),
-				common.HexToAddress("20"): big.NewInt(50),
+			destTokenPoolRateLimits: map[cciptypes.Address]*big.Int{
+				cciptypes.Address("10"): big.NewInt(100),
+				cciptypes.Address("20"): big.NewInt(50),
 			},
-			srcToDestToken: map[common.Address]common.Address{
-				common.HexToAddress("1"): common.HexToAddress("10"),
-				common.HexToAddress("2"): common.HexToAddress("20"),
+			srcToDestToken: map[cciptypes.Address]cciptypes.Address{
+				cciptypes.Address("1"): cciptypes.Address("10"),
+				cciptypes.Address("2"): cciptypes.Address("20"),
 			},
-			tokenAmounts: []internal.TokenAmount{
-				{Token: common.HexToAddress("1"), Amount: big.NewInt(50)},
-				{Token: common.HexToAddress("2"), Amount: big.NewInt(51)},
+			tokenAmounts: []cciptypes.TokenAmount{
+				{Token: cciptypes.Address("1"), Amount: big.NewInt(50)},
+				{Token: cciptypes.Address("2"), Amount: big.NewInt(51)},
 			},
 			exp: true,
 		},
 		{
 			name: "rate limit hit, inflight included",
-			destTokenPoolRateLimits: map[common.Address]*big.Int{
-				common.HexToAddress("10"): big.NewInt(100),
-				common.HexToAddress("20"): big.NewInt(50),
+			destTokenPoolRateLimits: map[cciptypes.Address]*big.Int{
+				cciptypes.Address("10"): big.NewInt(100),
+				cciptypes.Address("20"): big.NewInt(50),
 			},
-			srcToDestToken: map[common.Address]common.Address{
-				common.HexToAddress("1"): common.HexToAddress("10"),
-				common.HexToAddress("2"): common.HexToAddress("20"),
+			srcToDestToken: map[cciptypes.Address]cciptypes.Address{
+				cciptypes.Address("1"): cciptypes.Address("10"),
+				cciptypes.Address("2"): cciptypes.Address("20"),
 			},
-			tokenAmounts: []internal.TokenAmount{
-				{Token: common.HexToAddress("1"), Amount: big.NewInt(50)},
-				{Token: common.HexToAddress("2"), Amount: big.NewInt(20)},
+			tokenAmounts: []cciptypes.TokenAmount{
+				{Token: cciptypes.Address("1"), Amount: big.NewInt(50)},
+				{Token: cciptypes.Address("2"), Amount: big.NewInt(20)},
 			},
-			inflightTokenAmounts: map[common.Address]*big.Int{
-				common.HexToAddress("1"): big.NewInt(51),
-				common.HexToAddress("2"): big.NewInt(30),
+			inflightTokenAmounts: map[cciptypes.Address]*big.Int{
+				cciptypes.Address("1"): big.NewInt(51),
+				cciptypes.Address("2"): big.NewInt(30),
 			},
 			exp: true,
 		},
 		{
-			destTokenPoolRateLimits: map[common.Address]*big.Int{},
-			tokenAmounts: []internal.TokenAmount{
-				{Token: common.HexToAddress("1"), Amount: big.NewInt(50)},
-				{Token: common.HexToAddress("2"), Amount: big.NewInt(20)},
+			destTokenPoolRateLimits: map[cciptypes.Address]*big.Int{},
+			tokenAmounts: []cciptypes.TokenAmount{
+				{Token: cciptypes.Address("1"), Amount: big.NewInt(50)},
+				{Token: cciptypes.Address("2"), Amount: big.NewInt(20)},
 			},
-			srcToDestToken: map[common.Address]common.Address{
-				common.HexToAddress("1"): common.HexToAddress("10"),
-				common.HexToAddress("2"): common.HexToAddress("20"),
+			srcToDestToken: map[cciptypes.Address]cciptypes.Address{
+				cciptypes.Address("1"): cciptypes.Address("10"),
+				cciptypes.Address("2"): cciptypes.Address("20"),
 			},
-			inflightTokenAmounts: map[common.Address]*big.Int{
-				common.HexToAddress("1"): big.NewInt(20),
-				common.HexToAddress("2"): big.NewInt(30),
+			inflightTokenAmounts: map[cciptypes.Address]*big.Int{
+				cciptypes.Address("1"): big.NewInt(20),
+				cciptypes.Address("2"): big.NewInt(30),
 			},
 			name: "rate limit not applied to token",
 			exp:  false,
@@ -743,44 +743,47 @@ func TestExecutionReportingPlugin_isRateLimitEnoughForTokenPool(t *testing.T) {
 }
 
 func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
-	tk1 := utils.RandomAddress()
-	tk1dest := utils.RandomAddress()
-	tk1pool := utils.RandomAddress()
+	randAddr := func() cciptypes.Address {
+		return cciptypes.Address(utils.RandomAddress().String())
+	}
+	tk1 := randAddr()
+	tk1dest := randAddr()
+	tk1pool := randAddr()
 
-	tk2 := utils.RandomAddress()
-	tk2dest := utils.RandomAddress()
-	tk2pool := utils.RandomAddress()
+	tk2 := randAddr()
+	tk2dest := randAddr()
+	tk2pool := randAddr()
 
 	testCases := []struct {
 		name         string
-		tokenAmounts []internal.TokenAmount
+		tokenAmounts []cciptypes.TokenAmount
 		// the order of the following fields: sourceTokens, destTokens and poolRateLimits
 		// should follow the order of the tokenAmounts
-		sourceTokens      []common.Address
-		destTokens        []common.Address
-		destPools         []common.Address
-		poolRateLimits    []ccipdata.TokenBucketRateLimit
+		sourceTokens      []cciptypes.Address
+		destTokens        []cciptypes.Address
+		destPools         []cciptypes.Address
+		poolRateLimits    []cciptypes.TokenBucketRateLimit
 		destPoolsCacheErr error
 
-		expRateLimits map[common.Address]*big.Int
+		expRateLimits map[cciptypes.Address]*big.Int
 		expErr        bool
 	}{
 		{
 			name: "happy flow",
-			tokenAmounts: []internal.TokenAmount{
+			tokenAmounts: []cciptypes.TokenAmount{
 				{Token: tk1},
 				{Token: tk2},
 				{Token: tk1},
 				{Token: tk1},
 			},
-			sourceTokens: []common.Address{tk1, tk2},
-			destTokens:   []common.Address{tk1dest, tk2dest},
-			destPools:    []common.Address{tk1pool, tk2pool},
-			poolRateLimits: []ccipdata.TokenBucketRateLimit{
+			sourceTokens: []cciptypes.Address{tk1, tk2},
+			destTokens:   []cciptypes.Address{tk1dest, tk2dest},
+			destPools:    []cciptypes.Address{tk1pool, tk2pool},
+			poolRateLimits: []cciptypes.TokenBucketRateLimit{
 				{Tokens: big.NewInt(1000), IsEnabled: true},
 				{Tokens: big.NewInt(2000), IsEnabled: true},
 			},
-			expRateLimits: map[common.Address]*big.Int{
+			expRateLimits: map[cciptypes.Address]*big.Int{
 				tk1dest: big.NewInt(1000),
 				tk2dest: big.NewInt(2000),
 			},
@@ -788,51 +791,51 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 		},
 		{
 			name: "missing from source to dest mapping should not return error",
-			tokenAmounts: []internal.TokenAmount{
+			tokenAmounts: []cciptypes.TokenAmount{
 				{Token: tk1},
 				{Token: tk2}, // <- missing
 			},
-			sourceTokens: []common.Address{tk1},
-			destTokens:   []common.Address{tk1dest},
-			destPools:    []common.Address{tk1pool},
-			poolRateLimits: []ccipdata.TokenBucketRateLimit{
+			sourceTokens: []cciptypes.Address{tk1},
+			destTokens:   []cciptypes.Address{tk1dest},
+			destPools:    []cciptypes.Address{tk1pool},
+			poolRateLimits: []cciptypes.TokenBucketRateLimit{
 				{Tokens: big.NewInt(1000), IsEnabled: true},
 			},
-			expRateLimits: map[common.Address]*big.Int{
+			expRateLimits: map[cciptypes.Address]*big.Int{
 				tk1dest: big.NewInt(1000),
 			},
 			expErr: false,
 		},
 		{
 			name: "pool is disabled",
-			tokenAmounts: []internal.TokenAmount{
+			tokenAmounts: []cciptypes.TokenAmount{
 				{Token: tk1},
 				{Token: tk2},
 			},
-			sourceTokens: []common.Address{tk1, tk2},
-			destTokens:   []common.Address{tk1dest, tk2dest},
-			destPools:    []common.Address{tk1pool, tk2pool},
-			poolRateLimits: []ccipdata.TokenBucketRateLimit{
+			sourceTokens: []cciptypes.Address{tk1, tk2},
+			destTokens:   []cciptypes.Address{tk1dest, tk2dest},
+			destPools:    []cciptypes.Address{tk1pool, tk2pool},
+			poolRateLimits: []cciptypes.TokenBucketRateLimit{
 				{Tokens: big.NewInt(1000), IsEnabled: true},
 				{Tokens: big.NewInt(2000), IsEnabled: false},
 			},
-			expRateLimits: map[common.Address]*big.Int{
+			expRateLimits: map[cciptypes.Address]*big.Int{
 				tk1dest: big.NewInt(1000),
 			},
 			expErr: false,
 		},
 		{
 			name: "dest pool cache error",
-			tokenAmounts: []internal.TokenAmount{
+			tokenAmounts: []cciptypes.TokenAmount{
 				{Token: tk1},
 			},
-			sourceTokens: []common.Address{tk1},
-			destTokens:   []common.Address{tk1dest},
-			destPools:    []common.Address{tk1pool},
-			poolRateLimits: []ccipdata.TokenBucketRateLimit{
+			sourceTokens: []cciptypes.Address{tk1},
+			destTokens:   []cciptypes.Address{tk1dest},
+			destPools:    []cciptypes.Address{tk1pool},
+			poolRateLimits: []cciptypes.TokenBucketRateLimit{
 				{Tokens: big.NewInt(1000), IsEnabled: true},
 			},
-			expRateLimits: map[common.Address]*big.Int{
+			expRateLimits: map[cciptypes.Address]*big.Int{
 				tk1dest: big.NewInt(1000),
 			},
 			destPoolsCacheErr: errors.New("some err"),
@@ -840,16 +843,16 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 		},
 		{
 			name: "pool for token not found",
-			tokenAmounts: []internal.TokenAmount{
+			tokenAmounts: []cciptypes.TokenAmount{
 				{Token: tk1}, {Token: tk2}, {Token: tk1}, {Token: tk2},
 			},
-			sourceTokens: []common.Address{tk1, tk2},
-			destTokens:   []common.Address{tk1dest, tk2dest},
-			destPools:    []common.Address{tk1pool}, // <-- pool2 not found
-			poolRateLimits: []ccipdata.TokenBucketRateLimit{
+			sourceTokens: []cciptypes.Address{tk1, tk2},
+			destTokens:   []cciptypes.Address{tk1dest, tk2dest},
+			destPools:    []cciptypes.Address{tk1pool}, // <-- pool2 not found
+			poolRateLimits: []cciptypes.TokenBucketRateLimit{
 				{Tokens: big.NewInt(1000), IsEnabled: true},
 			},
-			expRateLimits: map[common.Address]*big.Int{
+			expRateLimits: map[cciptypes.Address]*big.Int{
 				tk1dest: big.NewInt(1000),
 			},
 			expErr: true,
@@ -860,12 +863,12 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sourceToDestMapping := make(map[common.Address]common.Address)
+			sourceToDestMapping := make(map[cciptypes.Address]cciptypes.Address)
 			for i, srcTk := range tc.sourceTokens {
 				sourceToDestMapping[srcTk] = tc.destTokens[i]
 			}
 
-			poolsMapping := make(map[common.Address]common.Address)
+			poolsMapping := make(map[cciptypes.Address]cciptypes.Address)
 			for i, poolAddr := range tc.destPools {
 				poolsMapping[tc.destTokens[i]] = poolAddr
 			}
@@ -876,7 +879,7 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			offRampAddr := utils.RandomAddress()
 			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
 			mockOffRampReader.On("Address").Return(offRampAddr, nil).Maybe()
-			mockOffRampReader.On("GetTokens", ctx).Return(ccipdata.OffRampTokens{
+			mockOffRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
 				DestinationPool: poolsMapping,
 			}, tc.destPoolsCacheErr).Maybe()
 			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, tc.destPools).
@@ -886,9 +889,9 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 
 			rateLimits, err := p.destPoolRateLimits(ctx, []commitReportWithSendRequests{
 				{
-					sendRequestsWithMeta: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+					sendRequestsWithMeta: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 						{
-							EVM2EVMMessage: internal.EVM2EVMMessage{
+							EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 								TokenAmounts: tc.tokenAmounts,
 							},
 						},
@@ -909,10 +912,10 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 	testCases := []struct {
 		name                string
-		reports             []ccipdata.CommitStoreReport
+		reports             []cciptypes.CommitStoreReport
 		expQueryMin         uint64 // expected min/max used in the query to get ccipevents
 		expQueryMax         uint64
-		onchainEvents       []ccipdata.Event[internal.EVM2EVMMessage]
+		onchainEvents       []ccipdata.Event[cciptypes.EVM2EVMMessage]
 		destExecutedSeqNums []uint64
 
 		expReports []commitReportWithSendRequests
@@ -926,51 +929,51 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 		},
 		{
 			name: "two reports happy flow",
-			reports: []ccipdata.CommitStoreReport{
+			reports: []cciptypes.CommitStoreReport{
 				{
-					Interval:   ccipdata.CommitStoreInterval{Min: 1, Max: 2},
+					Interval:   cciptypes.CommitStoreInterval{Min: 1, Max: 2},
 					MerkleRoot: [32]byte{100},
 				},
 				{
-					Interval:   ccipdata.CommitStoreInterval{Min: 3, Max: 3},
+					Interval:   cciptypes.CommitStoreInterval{Min: 3, Max: 3},
 					MerkleRoot: [32]byte{200},
 				},
 			},
 			expQueryMin: 1,
 			expQueryMax: 3,
-			onchainEvents: []ccipdata.Event[internal.EVM2EVMMessage]{
-				{Data: internal.EVM2EVMMessage{SequenceNumber: 1}},
-				{Data: internal.EVM2EVMMessage{SequenceNumber: 2}},
-				{Data: internal.EVM2EVMMessage{SequenceNumber: 3}},
+			onchainEvents: []ccipdata.Event[cciptypes.EVM2EVMMessage]{
+				{Data: cciptypes.EVM2EVMMessage{SequenceNumber: 1}},
+				{Data: cciptypes.EVM2EVMMessage{SequenceNumber: 2}},
+				{Data: cciptypes.EVM2EVMMessage{SequenceNumber: 3}},
 			},
 			destExecutedSeqNums: []uint64{1},
 			expReports: []commitReportWithSendRequests{
 				{
-					commitReport: ccipdata.CommitStoreReport{
-						Interval:   ccipdata.CommitStoreInterval{Min: 1, Max: 2},
+					commitReport: cciptypes.CommitStoreReport{
+						Interval:   cciptypes.CommitStoreInterval{Min: 1, Max: 2},
 						MerkleRoot: [32]byte{100},
 					},
-					sendRequestsWithMeta: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+					sendRequestsWithMeta: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 						{
-							EVM2EVMMessage: internal.EVM2EVMMessage{SequenceNumber: 1},
+							EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 1},
 							Executed:       true,
 							Finalized:      true,
 						},
 						{
-							EVM2EVMMessage: internal.EVM2EVMMessage{SequenceNumber: 2},
+							EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 2},
 							Executed:       false,
 							Finalized:      false,
 						},
 					},
 				},
 				{
-					commitReport: ccipdata.CommitStoreReport{
-						Interval:   ccipdata.CommitStoreInterval{Min: 3, Max: 3},
+					commitReport: cciptypes.CommitStoreReport{
+						Interval:   cciptypes.CommitStoreInterval{Min: 3, Max: 3},
 						MerkleRoot: [32]byte{200},
 					},
-					sendRequestsWithMeta: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+					sendRequestsWithMeta: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 						{
-							EVM2EVMMessage: internal.EVM2EVMMessage{SequenceNumber: 3},
+							EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 3},
 							Executed:       false,
 							Finalized:      false,
 						},
@@ -1003,10 +1006,10 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 				}
 			}
 
-			var executedEvents []ccipdata.Event[ccipdata.ExecutionStateChanged]
+			var executedEvents []ccipdata.Event[cciptypes.ExecutionStateChanged]
 			for _, executedSeqNum := range tc.destExecutedSeqNums {
-				executedEvents = append(executedEvents, ccipdata.Event[ccipdata.ExecutionStateChanged]{
-					Data: ccipdata.ExecutionStateChanged{
+				executedEvents = append(executedEvents, ccipdata.Event[cciptypes.ExecutionStateChanged]{
+					Data: cciptypes.ExecutionStateChanged{
 						SequenceNumber: executedSeqNum,
 						Finalized:      finalized[executedSeqNum],
 					},
@@ -1038,7 +1041,7 @@ type delayedTokenDataWorker struct {
 	tokendata.Worker
 }
 
-func (m delayedTokenDataWorker) GetMsgTokenData(ctx context.Context, msg internal.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([][]byte, error) {
+func (m delayedTokenDataWorker) GetMsgTokenData(ctx context.Context, msg cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta) ([][]byte, error) {
 	time.Sleep(m.delay)
 	return nil, ctx.Err()
 }
@@ -1071,8 +1074,8 @@ func TestExecutionReportingPlugin_getTokenDataWithCappedLatency(t *testing.T) {
 			p := &ExecutionReportingPlugin{}
 			p.tokenDataWorker = delayedTokenDataWorker{delay: tc.workerLatency}
 
-			msg := internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				EVM2EVMMessage: internal.EVM2EVMMessage{TokenAmounts: make([]internal.TokenAmount, 1)},
+			msg := cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				EVM2EVMMessage: cciptypes.EVM2EVMMessage{TokenAmounts: make([]cciptypes.TokenAmount, 1)},
 			}
 
 			_, _, err := p.getTokenDataWithTimeout(ctx, msg, tc.allowedWaitingTime)
@@ -1195,28 +1198,28 @@ func Test_calculateObservedMessagesConsensus(t *testing.T) {
 }
 
 func Test_getTokensPrices(t *testing.T) {
-	tk1 := common.HexToAddress("1")
-	tk2 := common.HexToAddress("2")
-	tk3 := common.HexToAddress("3")
+	tk1 := cciptypes.Address(common.HexToAddress("1").String())
+	tk2 := cciptypes.Address(common.HexToAddress("2").String())
+	tk3 := cciptypes.Address(common.HexToAddress("3").String())
 
 	testCases := []struct {
 		name      string
-		feeTokens []common.Address
-		tokens    []common.Address
-		retPrices []ccipdata.TokenPriceUpdate
-		expPrices map[common.Address]*big.Int
+		feeTokens []cciptypes.Address
+		tokens    []cciptypes.Address
+		retPrices []cciptypes.TokenPriceUpdate
+		expPrices map[cciptypes.Address]*big.Int
 		expErr    bool
 	}{
 		{
 			name:      "base",
-			feeTokens: []common.Address{tk1, tk2},
-			tokens:    []common.Address{tk3},
-			retPrices: []ccipdata.TokenPriceUpdate{
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(20)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(30)}},
+			feeTokens: []cciptypes.Address{tk1, tk2},
+			tokens:    []cciptypes.Address{tk3},
+			retPrices: []cciptypes.TokenPriceUpdate{
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(20)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(30)}},
 			},
-			expPrices: map[common.Address]*big.Int{
+			expPrices: map[cciptypes.Address]*big.Int{
 				tk1: big.NewInt(10),
 				tk2: big.NewInt(20),
 				tk3: big.NewInt(30),
@@ -1225,15 +1228,15 @@ func Test_getTokensPrices(t *testing.T) {
 		},
 		{
 			name:      "token is both fee token and normal token",
-			feeTokens: []common.Address{tk1, tk2},
-			tokens:    []common.Address{tk3, tk1},
-			retPrices: []ccipdata.TokenPriceUpdate{
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(20)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(30)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
+			feeTokens: []cciptypes.Address{tk1, tk2},
+			tokens:    []cciptypes.Address{tk3, tk1},
+			retPrices: []cciptypes.TokenPriceUpdate{
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(20)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(30)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(10)}},
 			},
-			expPrices: map[common.Address]*big.Int{
+			expPrices: map[cciptypes.Address]*big.Int{
 				tk1: big.NewInt(10),
 				tk2: big.NewInt(20),
 				tk3: big.NewInt(30),
@@ -1242,34 +1245,34 @@ func Test_getTokensPrices(t *testing.T) {
 		},
 		{
 			name:      "token is both fee token and normal token and price registry gave different price",
-			feeTokens: []common.Address{tk1, tk2},
-			tokens:    []common.Address{tk3, tk1},
-			retPrices: []ccipdata.TokenPriceUpdate{
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(20)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(30)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(1000)}},
+			feeTokens: []cciptypes.Address{tk1, tk2},
+			tokens:    []cciptypes.Address{tk3, tk1},
+			retPrices: []cciptypes.TokenPriceUpdate{
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(20)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(30)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(1000)}},
 			},
 			expErr: true,
 		},
 		{
 			name:      "zero price should lead to an error",
-			feeTokens: []common.Address{tk1, tk2},
-			tokens:    []common.Address{tk3},
-			retPrices: []ccipdata.TokenPriceUpdate{
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(0)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(30)}},
+			feeTokens: []cciptypes.Address{tk1, tk2},
+			tokens:    []cciptypes.Address{tk3},
+			retPrices: []cciptypes.TokenPriceUpdate{
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(0)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(30)}},
 			},
 			expErr: true,
 		},
 		{
 			name:      "contract returns less prices than requested",
-			feeTokens: []common.Address{tk1, tk2},
-			tokens:    []common.Address{tk3},
-			retPrices: []ccipdata.TokenPriceUpdate{
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(10)}},
-				{TokenPrice: ccipdata.TokenPrice{Value: big.NewInt(20)}},
+			feeTokens: []cciptypes.Address{tk1, tk2},
+			tokens:    []cciptypes.Address{tk3},
+			retPrices: []cciptypes.TokenPriceUpdate{
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(10)}},
+				{TokenPrice: cciptypes.TokenPrice{Value: big.NewInt(20)}},
 			},
 			expErr: true,
 		},
@@ -1343,35 +1346,35 @@ func Test_calculateMessageMaxGas(t *testing.T) {
 
 func Test_inflightAggregates(t *testing.T) {
 	const n = 10
-	addrs := make([]common.Address, n)
-	tokenAddrs := make([]common.Address, n)
+	addrs := make([]cciptypes.Address, n)
+	tokenAddrs := make([]cciptypes.Address, n)
 	for i := range addrs {
-		addrs[i] = utils.RandomAddress()
-		tokenAddrs[i] = utils.RandomAddress()
+		addrs[i] = cciptypes.Address(utils.RandomAddress().String())
+		tokenAddrs[i] = cciptypes.Address(utils.RandomAddress().String())
 	}
 
 	testCases := []struct {
 		name            string
 		inflight        []InflightInternalExecutionReport
-		destTokenPrices map[common.Address]*big.Int
-		sourceToDest    map[common.Address]common.Address
+		destTokenPrices map[cciptypes.Address]*big.Int
+		sourceToDest    map[cciptypes.Address]cciptypes.Address
 
 		expInflightSeqNrs          mapset.Set[uint64]
 		expInflightAggrVal         *big.Int
-		expMaxInflightSenderNonces map[common.Address]uint64
-		expInflightTokenAmounts    map[common.Address]*big.Int
+		expMaxInflightSenderNonces map[cciptypes.Address]uint64
+		expInflightTokenAmounts    map[cciptypes.Address]*big.Int
 		expErr                     bool
 	}{
 		{
 			name: "base",
 			inflight: []InflightInternalExecutionReport{
 				{
-					messages: []internal.EVM2EVMMessage{
+					messages: []cciptypes.EVM2EVMMessage{
 						{
 							Sender:         addrs[0],
 							SequenceNumber: 100,
 							Nonce:          2,
-							TokenAmounts: []internal.TokenAmount{
+							TokenAmounts: []cciptypes.TokenAmount{
 								{Token: tokenAddrs[0], Amount: big.NewInt(1e18)},
 								{Token: tokenAddrs[0], Amount: big.NewInt(2e18)},
 							},
@@ -1380,7 +1383,7 @@ func Test_inflightAggregates(t *testing.T) {
 							Sender:         addrs[0],
 							SequenceNumber: 106,
 							Nonce:          4,
-							TokenAmounts: []internal.TokenAmount{
+							TokenAmounts: []cciptypes.TokenAmount{
 								{Token: tokenAddrs[0], Amount: big.NewInt(1e18)},
 								{Token: tokenAddrs[0], Amount: big.NewInt(5e18)},
 								{Token: tokenAddrs[2], Amount: big.NewInt(5e18)},
@@ -1389,20 +1392,20 @@ func Test_inflightAggregates(t *testing.T) {
 					},
 				},
 			},
-			destTokenPrices: map[common.Address]*big.Int{
+			destTokenPrices: map[cciptypes.Address]*big.Int{
 				tokenAddrs[1]: big.NewInt(1000),
 				tokenAddrs[3]: big.NewInt(500),
 			},
-			sourceToDest: map[common.Address]common.Address{
+			sourceToDest: map[cciptypes.Address]cciptypes.Address{
 				tokenAddrs[0]: tokenAddrs[1],
 				tokenAddrs[2]: tokenAddrs[3],
 			},
 			expInflightSeqNrs:  mapset.NewSet[uint64](100, 106),
 			expInflightAggrVal: big.NewInt(9*1000 + 5*500),
-			expMaxInflightSenderNonces: map[common.Address]uint64{
+			expMaxInflightSenderNonces: map[cciptypes.Address]uint64{
 				addrs[0]: 4,
 			},
-			expInflightTokenAmounts: map[common.Address]*big.Int{
+			expInflightTokenAmounts: map[cciptypes.Address]*big.Int{
 				tokenAddrs[0]: big.NewInt(9e18),
 				tokenAddrs[2]: big.NewInt(5e18),
 			},
@@ -1412,22 +1415,22 @@ func Test_inflightAggregates(t *testing.T) {
 			name: "missing price",
 			inflight: []InflightInternalExecutionReport{
 				{
-					messages: []internal.EVM2EVMMessage{
+					messages: []cciptypes.EVM2EVMMessage{
 						{
 							Sender:         addrs[0],
 							SequenceNumber: 100,
 							Nonce:          2,
-							TokenAmounts: []internal.TokenAmount{
+							TokenAmounts: []cciptypes.TokenAmount{
 								{Token: tokenAddrs[0], Amount: big.NewInt(1e18)},
 							},
 						},
 					},
 				},
 			},
-			destTokenPrices: map[common.Address]*big.Int{
+			destTokenPrices: map[cciptypes.Address]*big.Int{
 				tokenAddrs[3]: big.NewInt(500),
 			},
-			sourceToDest: map[common.Address]common.Address{
+			sourceToDest: map[cciptypes.Address]cciptypes.Address{
 				tokenAddrs[2]: tokenAddrs[3],
 			},
 			expErr: true,
@@ -1437,8 +1440,8 @@ func Test_inflightAggregates(t *testing.T) {
 			inflight:                   []InflightInternalExecutionReport{},
 			expInflightSeqNrs:          mapset.NewSet[uint64](),
 			expInflightAggrVal:         big.NewInt(0),
-			expMaxInflightSenderNonces: map[common.Address]uint64{},
-			expInflightTokenAmounts:    map[common.Address]*big.Int{},
+			expMaxInflightSenderNonces: map[cciptypes.Address]uint64{},
+			expInflightTokenAmounts:    map[cciptypes.Address]*big.Int{},
 			expErr:                     false,
 		},
 	}
@@ -1464,31 +1467,31 @@ func Test_inflightAggregates(t *testing.T) {
 func Test_commitReportWithSendRequests_validate(t *testing.T) {
 	testCases := []struct {
 		name           string
-		reportInterval ccipdata.CommitStoreInterval
+		reportInterval cciptypes.CommitStoreInterval
 		numReqs        int
 		expValid       bool
 	}{
 		{
 			name:           "valid report",
-			reportInterval: ccipdata.CommitStoreInterval{Min: 10, Max: 20},
+			reportInterval: cciptypes.CommitStoreInterval{Min: 10, Max: 20},
 			numReqs:        11,
 			expValid:       true,
 		},
 		{
 			name:           "report with one request",
-			reportInterval: ccipdata.CommitStoreInterval{Min: 1234, Max: 1234},
+			reportInterval: cciptypes.CommitStoreInterval{Min: 1234, Max: 1234},
 			numReqs:        1,
 			expValid:       true,
 		},
 		{
 			name:           "request is missing",
-			reportInterval: ccipdata.CommitStoreInterval{Min: 1234, Max: 1234},
+			reportInterval: cciptypes.CommitStoreInterval{Min: 1234, Max: 1234},
 			numReqs:        0,
 			expValid:       false,
 		},
 		{
 			name:           "requests are missing",
-			reportInterval: ccipdata.CommitStoreInterval{Min: 1, Max: 10},
+			reportInterval: cciptypes.CommitStoreInterval{Min: 1, Max: 10},
 			numReqs:        5,
 			expValid:       false,
 		},
@@ -1497,10 +1500,10 @@ func Test_commitReportWithSendRequests_validate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			rep := commitReportWithSendRequests{
-				commitReport: ccipdata.CommitStoreReport{
+				commitReport: cciptypes.CommitStoreReport{
 					Interval: tc.reportInterval,
 				},
-				sendRequestsWithMeta: make([]internal.EVM2EVMOnRampCCIPSendRequestedWithMeta, tc.numReqs),
+				sendRequestsWithMeta: make([]cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta, tc.numReqs),
 			}
 			err := rep.validate()
 			isValid := err == nil
@@ -1512,12 +1515,12 @@ func Test_commitReportWithSendRequests_validate(t *testing.T) {
 func Test_commitReportWithSendRequests_allRequestsAreExecutedAndFinalized(t *testing.T) {
 	testCases := []struct {
 		name   string
-		reqs   []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
+		reqs   []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta
 		expRes bool
 	}{
 		{
 			name: "all requests executed and finalized",
-			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				{Executed: true, Finalized: true},
 				{Executed: true, Finalized: true},
 				{Executed: true, Finalized: true},
@@ -1526,12 +1529,12 @@ func Test_commitReportWithSendRequests_allRequestsAreExecutedAndFinalized(t *tes
 		},
 		{
 			name:   "true when there are zero requests",
-			reqs:   []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{},
+			reqs:   []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{},
 			expRes: true,
 		},
 		{
 			name: "some request not executed",
-			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				{Executed: true, Finalized: true},
 				{Executed: true, Finalized: true},
 				{Executed: false, Finalized: true},
@@ -1540,7 +1543,7 @@ func Test_commitReportWithSendRequests_allRequestsAreExecutedAndFinalized(t *tes
 		},
 		{
 			name: "some request not finalized",
-			reqs: []internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+			reqs: []cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				{Executed: true, Finalized: true},
 				{Executed: true, Finalized: true},
 				{Executed: true, Finalized: false},
@@ -1561,47 +1564,47 @@ func Test_commitReportWithSendRequests_allRequestsAreExecutedAndFinalized(t *tes
 func Test_commitReportWithSendRequests_sendReqFits(t *testing.T) {
 	testCases := []struct {
 		name   string
-		req    internal.EVM2EVMOnRampCCIPSendRequestedWithMeta
-		report ccipdata.CommitStoreReport
+		req    cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta
+		report cciptypes.CommitStoreReport
 		expRes bool
 	}{
 		{
 			name: "all requests executed and finalized",
-			req: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				EVM2EVMMessage: internal.EVM2EVMMessage{SequenceNumber: 1},
+			req: cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 1},
 			},
-			report: ccipdata.CommitStoreReport{
-				Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 10},
-			},
-			expRes: true,
-		},
-		{
-			name: "all requests executed and finalized",
-			req: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				EVM2EVMMessage: internal.EVM2EVMMessage{SequenceNumber: 10},
-			},
-			report: ccipdata.CommitStoreReport{
-				Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 10},
+			report: cciptypes.CommitStoreReport{
+				Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 10},
 			},
 			expRes: true,
 		},
 		{
 			name: "all requests executed and finalized",
-			req: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				EVM2EVMMessage: internal.EVM2EVMMessage{SequenceNumber: 11},
+			req: cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 10},
 			},
-			report: ccipdata.CommitStoreReport{
-				Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 10},
+			report: cciptypes.CommitStoreReport{
+				Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 10},
+			},
+			expRes: true,
+		},
+		{
+			name: "all requests executed and finalized",
+			req: cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 11},
+			},
+			report: cciptypes.CommitStoreReport{
+				Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 10},
 			},
 			expRes: false,
 		},
 		{
 			name: "all requests executed and finalized",
-			req: internal.EVM2EVMOnRampCCIPSendRequestedWithMeta{
-				EVM2EVMMessage: internal.EVM2EVMMessage{SequenceNumber: 10},
+			req: cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
+				EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 10},
 			},
-			report: ccipdata.CommitStoreReport{
-				Interval: ccipdata.CommitStoreInterval{Min: 10, Max: 10},
+			report: cciptypes.CommitStoreReport{
+				Interval: cciptypes.CommitStoreInterval{Min: 10, Max: 10},
 			},
 			expRes: true,
 		},
@@ -1616,31 +1619,35 @@ func Test_commitReportWithSendRequests_sendReqFits(t *testing.T) {
 }
 
 // generateExecutionReport generates an execution report that can be used in tests
-func generateExecutionReport(t *testing.T, numMsgs, tokensPerMsg, bytesPerMsg int) ccipdata.ExecReport {
-	messages := make([]internal.EVM2EVMMessage, numMsgs)
+func generateExecutionReport(t *testing.T, numMsgs, tokensPerMsg, bytesPerMsg int) cciptypes.ExecReport {
+	messages := make([]cciptypes.EVM2EVMMessage, numMsgs)
+
+	randAddr := func() cciptypes.Address {
+		return cciptypes.Address(utils.RandomAddress().String())
+	}
 
 	offChainTokenData := make([][][]byte, numMsgs)
 	for i := range messages {
-		tokenAmounts := make([]internal.TokenAmount, tokensPerMsg)
+		tokenAmounts := make([]cciptypes.TokenAmount, tokensPerMsg)
 		for j := range tokenAmounts {
-			tokenAmounts[j] = internal.TokenAmount{
-				Token:  utils.RandomAddress(),
+			tokenAmounts[j] = cciptypes.TokenAmount{
+				Token:  randAddr(),
 				Amount: big.NewInt(math.MaxInt64),
 			}
 		}
 
-		messages[i] = internal.EVM2EVMMessage{
+		messages[i] = cciptypes.EVM2EVMMessage{
 			SourceChainSelector: rand.Uint64(),
 			SequenceNumber:      uint64(i + 1),
 			FeeTokenAmount:      big.NewInt(rand.Int64()),
-			Sender:              utils.RandomAddress(),
+			Sender:              randAddr(),
 			Nonce:               rand.Uint64(),
 			GasLimit:            big.NewInt(rand.Int64()),
 			Strict:              false,
-			Receiver:            utils.RandomAddress(),
+			Receiver:            randAddr(),
 			Data:                bytes.Repeat([]byte{1}, bytesPerMsg),
 			TokenAmounts:        tokenAmounts,
-			FeeToken:            utils.RandomAddress(),
+			FeeToken:            randAddr(),
 			MessageId:           utils.RandomBytes32(),
 		}
 
@@ -1648,7 +1655,7 @@ func generateExecutionReport(t *testing.T, numMsgs, tokensPerMsg, bytesPerMsg in
 		offChainTokenData[i] = [][]byte{data, data, data}
 	}
 
-	return ccipdata.ExecReport{
+	return cciptypes.ExecReport{
 		Messages:          messages,
 		OffchainTokenData: offChainTokenData,
 		Proofs:            make([][32]byte, numMsgs),
@@ -1657,11 +1664,11 @@ func generateExecutionReport(t *testing.T, numMsgs, tokensPerMsg, bytesPerMsg in
 }
 
 func Test_selectReportsToFillBatch(t *testing.T) {
-	reports := []ccipdata.CommitStoreReport{
-		{Interval: ccipdata.CommitStoreInterval{Min: 1, Max: 10}},
-		{Interval: ccipdata.CommitStoreInterval{Min: 11, Max: 20}},
-		{Interval: ccipdata.CommitStoreInterval{Min: 21, Max: 25}},
-		{Interval: ccipdata.CommitStoreInterval{Min: 26, Max: math.MaxUint64}},
+	reports := []cciptypes.CommitStoreReport{
+		{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 10}},
+		{Interval: cciptypes.CommitStoreInterval{Min: 11, Max: 20}},
+		{Interval: cciptypes.CommitStoreInterval{Min: 21, Max: 25}},
+		{Interval: cciptypes.CommitStoreInterval{Min: 26, Max: math.MaxUint64}},
 	}
 
 	tests := []struct {
@@ -1698,7 +1705,7 @@ func Test_selectReportsToFillBatch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var unexpiredReportsBatches [][]ccipdata.CommitStoreReport
+			var unexpiredReportsBatches [][]cciptypes.CommitStoreReport
 			for i := 0; i < len(reports); {
 				unexpiredReports, step := selectReportsToFillBatch(reports[i:], tt.step)
 				unexpiredReportsBatches = append(unexpiredReportsBatches, unexpiredReports)
@@ -1706,7 +1713,7 @@ func Test_selectReportsToFillBatch(t *testing.T) {
 			}
 			assert.Len(t, unexpiredReportsBatches, tt.numberOfBatches)
 
-			var flatten []ccipdata.CommitStoreReport
+			var flatten []cciptypes.CommitStoreReport
 			for _, r := range unexpiredReportsBatches {
 				flatten = append(flatten, r...)
 			}
@@ -1719,67 +1726,67 @@ func Test_selectReportsToFillBatch(t *testing.T) {
 func Test_prepareTokenExecData(t *testing.T) {
 	ctx := testutils.Context(t)
 
-	weth := utils.RandomAddress()
-	wavax := utils.RandomAddress()
-	link := utils.RandomAddress()
-	usdc := utils.RandomAddress()
+	weth := cciptypes.Address(utils.RandomAddress().String())
+	wavax := cciptypes.Address(utils.RandomAddress().String())
+	link := cciptypes.Address(utils.RandomAddress().String())
+	usdc := cciptypes.Address(utils.RandomAddress().String())
 
-	wethPriceUpdate := ccipdata.TokenPriceUpdate{TokenPrice: ccipdata.TokenPrice{Token: weth, Value: big.NewInt(2e18)}}
-	wavaxPriceUpdate := ccipdata.TokenPriceUpdate{TokenPrice: ccipdata.TokenPrice{Token: wavax, Value: big.NewInt(3e18)}}
-	linkPriceUpdate := ccipdata.TokenPriceUpdate{TokenPrice: ccipdata.TokenPrice{Token: link, Value: big.NewInt(4e18)}}
-	usdcPriceUpdate := ccipdata.TokenPriceUpdate{TokenPrice: ccipdata.TokenPrice{Token: usdc, Value: big.NewInt(5e18)}}
+	wethPriceUpdate := cciptypes.TokenPriceUpdate{TokenPrice: cciptypes.TokenPrice{Token: weth, Value: big.NewInt(2e18)}}
+	wavaxPriceUpdate := cciptypes.TokenPriceUpdate{TokenPrice: cciptypes.TokenPrice{Token: wavax, Value: big.NewInt(3e18)}}
+	linkPriceUpdate := cciptypes.TokenPriceUpdate{TokenPrice: cciptypes.TokenPrice{Token: link, Value: big.NewInt(4e18)}}
+	usdcPriceUpdate := cciptypes.TokenPriceUpdate{TokenPrice: cciptypes.TokenPrice{Token: usdc, Value: big.NewInt(5e18)}}
 
-	tokenPrices := map[common.Address]ccipdata.TokenPriceUpdate{weth: wethPriceUpdate, wavax: wavaxPriceUpdate, link: linkPriceUpdate, usdc: usdcPriceUpdate}
+	tokenPrices := map[cciptypes.Address]cciptypes.TokenPriceUpdate{weth: wethPriceUpdate, wavax: wavaxPriceUpdate, link: linkPriceUpdate, usdc: usdcPriceUpdate}
 
 	tests := []struct {
 		name               string
-		sourceFeeTokens    []common.Address
+		sourceFeeTokens    []cciptypes.Address
 		sourceFeeTokensErr error
-		destTokens         []common.Address
+		destTokens         []cciptypes.Address
 		destTokensErr      error
-		destFeeTokens      []common.Address
+		destFeeTokens      []cciptypes.Address
 		destFeeTokensErr   error
-		sourcePrices       []ccipdata.TokenPriceUpdate
-		destPrices         []ccipdata.TokenPriceUpdate
+		sourcePrices       []cciptypes.TokenPriceUpdate
+		destPrices         []cciptypes.TokenPriceUpdate
 	}{
 		{
 			name:         "only native token",
-			sourcePrices: []ccipdata.TokenPriceUpdate{wethPriceUpdate},
-			destPrices:   []ccipdata.TokenPriceUpdate{wavaxPriceUpdate},
+			sourcePrices: []cciptypes.TokenPriceUpdate{wethPriceUpdate},
+			destPrices:   []cciptypes.TokenPriceUpdate{wavaxPriceUpdate},
 		},
 		{
 			name:          "additional dest fee token",
-			destFeeTokens: []common.Address{link},
-			sourcePrices:  []ccipdata.TokenPriceUpdate{wethPriceUpdate},
-			destPrices:    []ccipdata.TokenPriceUpdate{linkPriceUpdate, wavaxPriceUpdate},
+			destFeeTokens: []cciptypes.Address{link},
+			sourcePrices:  []cciptypes.TokenPriceUpdate{wethPriceUpdate},
+			destPrices:    []cciptypes.TokenPriceUpdate{linkPriceUpdate, wavaxPriceUpdate},
 		},
 		{
 			name:         "dest tokens",
-			destTokens:   []common.Address{link, usdc},
-			sourcePrices: []ccipdata.TokenPriceUpdate{wethPriceUpdate},
-			destPrices:   []ccipdata.TokenPriceUpdate{linkPriceUpdate, usdcPriceUpdate, wavaxPriceUpdate},
+			destTokens:   []cciptypes.Address{link, usdc},
+			sourcePrices: []cciptypes.TokenPriceUpdate{wethPriceUpdate},
+			destPrices:   []cciptypes.TokenPriceUpdate{linkPriceUpdate, usdcPriceUpdate, wavaxPriceUpdate},
 		},
 		{
 			name:            "source fee tokens",
-			sourceFeeTokens: []common.Address{usdc},
-			sourcePrices:    []ccipdata.TokenPriceUpdate{usdcPriceUpdate, wethPriceUpdate},
-			destPrices:      []ccipdata.TokenPriceUpdate{wavaxPriceUpdate},
+			sourceFeeTokens: []cciptypes.Address{usdc},
+			sourcePrices:    []cciptypes.TokenPriceUpdate{usdcPriceUpdate, wethPriceUpdate},
+			destPrices:      []cciptypes.TokenPriceUpdate{wavaxPriceUpdate},
 		},
 		{
 			name:            "source, dest and fee tokens",
-			sourceFeeTokens: []common.Address{usdc},
-			destTokens:      []common.Address{link},
-			destFeeTokens:   []common.Address{usdc},
-			sourcePrices:    []ccipdata.TokenPriceUpdate{usdcPriceUpdate, wethPriceUpdate},
-			destPrices:      []ccipdata.TokenPriceUpdate{usdcPriceUpdate, linkPriceUpdate, wavaxPriceUpdate},
+			sourceFeeTokens: []cciptypes.Address{usdc},
+			destTokens:      []cciptypes.Address{link},
+			destFeeTokens:   []cciptypes.Address{usdc},
+			sourcePrices:    []cciptypes.TokenPriceUpdate{usdcPriceUpdate, wethPriceUpdate},
+			destPrices:      []cciptypes.TokenPriceUpdate{usdcPriceUpdate, linkPriceUpdate, wavaxPriceUpdate},
 		},
 		{
 			name:            "source, dest and fee tokens with duplicates",
-			sourceFeeTokens: []common.Address{link, weth},
-			destTokens:      []common.Address{link, wavax},
-			destFeeTokens:   []common.Address{link, wavax},
-			sourcePrices:    []ccipdata.TokenPriceUpdate{linkPriceUpdate, wethPriceUpdate},
-			destPrices:      []ccipdata.TokenPriceUpdate{linkPriceUpdate, wavaxPriceUpdate},
+			sourceFeeTokens: []cciptypes.Address{link, weth},
+			destTokens:      []cciptypes.Address{link, wavax},
+			destFeeTokens:   []cciptypes.Address{link, wavax},
+			sourcePrices:    []cciptypes.TokenPriceUpdate{linkPriceUpdate, wethPriceUpdate},
+			destPrices:      []cciptypes.TokenPriceUpdate{linkPriceUpdate, wavaxPriceUpdate},
 		},
 		{
 			name:               "everything fails when source fails",
@@ -1802,11 +1809,11 @@ func Test_prepareTokenExecData(t *testing.T) {
 			destPriceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
 
-			offrampReader.On("CurrentRateLimiterState", ctx).Return(ccipdata.TokenBucketRateLimit{}, nil).Maybe()
+			offrampReader.On("CurrentRateLimiterState", ctx).Return(cciptypes.TokenBucketRateLimit{}, nil).Maybe()
 			offrampReader.On("GetSourceToDestTokensMapping", ctx).Return(map[common.Address]common.Address{}, nil).Maybe()
-			gasPriceEstimator.On("GetGasPrice", ctx).Return(prices.GasPrice(big.NewInt(1e9)), nil).Maybe()
+			gasPriceEstimator.On("GetGasPrice", ctx).Return(big.NewInt(1e9), nil).Maybe()
 
-			offrampReader.On("GetTokens", ctx).Return(ccipdata.OffRampTokens{DestinationTokens: tt.destTokens}, tt.destTokensErr).Maybe()
+			offrampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{DestinationTokens: tt.destTokens}, tt.destTokensErr).Maybe()
 			sourcePriceRegistry.On("GetFeeTokens", ctx).Return(tt.sourceFeeTokens, tt.sourceFeeTokensErr).Maybe()
 			sourcePriceRegistry.On("GetTokenPrices", ctx, mock.Anything).Return(tt.sourcePrices, nil).Maybe()
 			destPriceRegistry.On("GetFeeTokens", ctx).Return(tt.destFeeTokens, tt.destFeeTokensErr).Maybe()
@@ -1842,7 +1849,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 	}
 }
 
-func encodeExecutionReport(t *testing.T, report ccipdata.ExecReport) []byte {
+func encodeExecutionReport(t *testing.T, report cciptypes.ExecReport) []byte {
 	reader, err := v1_2_0.NewOffRamp(logger.TestLogger(t), utils.RandomAddress(), nil, nil, nil)
 	require.NoError(t, err)
 	encodedReport, err := reader.EncodeExecutionReport(report)

@@ -6,19 +6,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
 )
 
 func TestInflightReportsContainer_add(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	container := newInflightExecReportsContainer(time.Second)
 
-	err := container.add(lggr, []internal.EVM2EVMMessage{
+	err := container.add(lggr, []cciptypes.EVM2EVMMessage{
 		{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3},
 	})
 	require.NoError(t, err)
-	err = container.add(lggr, []internal.EVM2EVMMessage{
+	err = container.add(lggr, []cciptypes.EVM2EVMMessage{
 		{SequenceNumber: 1},
 	})
 	require.Error(t, err)
@@ -30,7 +30,7 @@ func TestInflightReportsContainer_expire(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	container := newInflightExecReportsContainer(time.Second)
 
-	err := container.add(lggr, []internal.EVM2EVMMessage{
+	err := container.add(lggr, []cciptypes.EVM2EVMMessage{
 		{SequenceNumber: 1}, {SequenceNumber: 2}, {SequenceNumber: 3},
 	})
 	require.NoError(t, err)

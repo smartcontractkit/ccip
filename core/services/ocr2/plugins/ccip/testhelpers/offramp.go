@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
 
 type FakeOffRamp struct {
@@ -47,8 +48,14 @@ func (o *FakeOffRamp) GetSenderNonce(opts *bind.CallOpts, sender common.Address)
 	return getOffRampVal(o, func(o *FakeOffRamp) (uint64, error) { return o.senderNonces[sender], nil })
 }
 
-func (o *FakeOffRamp) SetSenderNonces(senderNonces map[common.Address]uint64) {
-	setOffRampVal(o, func(o *FakeOffRamp) { o.senderNonces = senderNonces })
+func (o *FakeOffRamp) SetSenderNonces(senderNonces map[cciptypes.Address]uint64) {
+	evmSenderNonces := make(map[common.Address]uint64)
+	for k, v := range senderNonces {
+		addrs, _ := ccipcalc.GenericAddrsToEvm(k)
+		evmSenderNonces[addrs[0]] = v
+	}
+
+	setOffRampVal(o, func(o *FakeOffRamp) { o.senderNonces = evmSenderNonces })
 }
 
 func (o *FakeOffRamp) GetPoolByDestToken(opts *bind.CallOpts, destToken common.Address) (common.Address, error) {
