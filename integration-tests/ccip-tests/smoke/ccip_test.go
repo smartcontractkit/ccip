@@ -460,8 +460,8 @@ func TestSmokeCCIPManuallyExecuteAfterExecutionFailingDueToInsufficientGas(t *te
 	}
 
 	log.Info().Int("Total Lanes", len(tests)).Msg("Starting CCIP test")
-	for _, test2 := range tests {
-		tc := test2
+	for _, test := range tests {
+		tc := test
 		t.Run(tc.testName, func(t *testing.T) {
 			t.Parallel()
 			tc.lane.Test = t

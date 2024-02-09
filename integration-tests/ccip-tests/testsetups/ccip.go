@@ -819,19 +819,18 @@ func CCIPDefaultTestSetUp(
 	// deploy all lane specific contracts
 	lggr.Info().Msg("Deploying chain specific contracts")
 	laneAddGrp, _ := errgroup.WithContext(parent)
-	for i, n := range testConfig.NetworkPairs {
-		i := i
-		n := n
+	for _, networkPair := range testConfig.NetworkPairs {
+		n := networkPair
 		var ok bool
-		testConfig.NetworkPairs[i].ChainClientA, ok = chainByChainID[n.NetworkA.ChainID]
+		n.ChainClientA, ok = chainByChainID[n.NetworkA.ChainID]
 		require.True(t, ok, "Chain client for chainID %d not found", n.NetworkA.ChainID)
-		testConfig.NetworkPairs[i].ChainClientB, ok = chainByChainID[n.NetworkB.ChainID]
+		n.ChainClientB, ok = chainByChainID[n.NetworkB.ChainID]
 		require.True(t, ok, "Chain client for chainID %d not found", n.NetworkB.ChainID)
 
-		n.NetworkA.HTTPURLs = testConfig.NetworkPairs[i].ChainClientA.GetNetworkConfig().HTTPURLs
-		n.NetworkA.URLs = testConfig.NetworkPairs[i].ChainClientA.GetNetworkConfig().URLs
-		n.NetworkB.HTTPURLs = testConfig.NetworkPairs[i].ChainClientB.GetNetworkConfig().HTTPURLs
-		n.NetworkB.URLs = testConfig.NetworkPairs[i].ChainClientB.GetNetworkConfig().URLs
+		n.NetworkA.HTTPURLs = n.ChainClientA.GetNetworkConfig().HTTPURLs
+		n.NetworkA.URLs = n.ChainClientA.GetNetworkConfig().URLs
+		n.NetworkB.HTTPURLs = n.ChainClientB.GetNetworkConfig().HTTPURLs
+		n.NetworkB.URLs = n.ChainClientB.GetNetworkConfig().URLs
 
 		laneAddGrp.Go(func() error {
 			return setUpArgs.AddLanesForNetworkPair(
