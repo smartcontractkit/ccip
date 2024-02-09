@@ -516,22 +516,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 		}
 	}
 
-	if ccipModule.WrappedNative == common.HexToAddress("0x0") {
-		if ccipModule.ExistingDeployment {
-			return fmt.Errorf("wrapped native contract address is not provided in lane config")
-		}
-		weth9addr, err := cd.DeployWrappedNative()
-		if err != nil {
-			return fmt.Errorf("deploying wrapped native shouldn't fail %w", err)
-		}
-
-		err = ccipModule.ChainClient.WaitForEvents()
-		if err != nil {
-			return fmt.Errorf("waiting for deploying wrapped native shouldn't fail %w", err)
-		}
-		ccipModule.WrappedNative = *weth9addr
-	}
-
 	if ccipModule.Router == nil {
 		if ccipModule.ExistingDeployment {
 			return fmt.Errorf("router contract address is not provided in lane config")
@@ -746,26 +730,6 @@ func (ccipModule *CCIPCommon) DeployContracts(noOfTokens int,
 			return fmt.Errorf("waiting for deploying wrapped native shouldn't fail %w", err)
 		}
 		ccipModule.WrappedNative = *weth9addr
-	}
-
-	if ccipModule.Router == nil {
-		if ccipModule.ExistingDeployment {
-			return fmt.Errorf("router contract address is not provided in lane config")
-		}
-		ccipModule.Router, err = cd.DeployRouter(ccipModule.WrappedNative, *ccipModule.ARMContract)
-		if err != nil {
-			return fmt.Errorf("deploying router shouldn't fail %w", err)
-		}
-		err = ccipModule.ChainClient.WaitForEvents()
-		if err != nil {
-			return fmt.Errorf("error in waiting for router deployment %w", err)
-		}
-	} else {
-		r, err := cd.NewRouter(ccipModule.Router.EthAddress)
-		if err != nil {
-			return fmt.Errorf("getting new router contract shouldn't fail %w", err)
-		}
-		ccipModule.Router = r
 	}
 	if ccipModule.PriceRegistry == nil {
 		if ccipModule.ExistingDeployment {
