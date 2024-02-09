@@ -630,7 +630,7 @@ func CCIPDefaultTestSetUp(
 		chains  []blockchain.EVMClient
 	)
 	filename := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
-	testConfig.Test = t
+	testConfig.Test = t // FIXME already set in NewCCIPTestConfig
 	var transferAmounts []*big.Int
 	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
 		for i := 0; i < testConfig.TestGroupInput.NoOfTokensInMsg; i++ {
@@ -652,19 +652,7 @@ func CCIPDefaultTestSetUp(
 
 	var deployCL func() error
 	var local *test_env.CLClusterTestEnv
-	envConfig := &environment.Config{
-		NamespacePrefix: envName,
-		Test:            t,
-	}
-	if testConfig.EnvInput.TTL != nil {
-		envConfig.TTL = testConfig.EnvInput.TTL.Duration()
-	}
-	if testConfig.TestGroupInput.TestDuration != nil {
-		approxDur := testConfig.TestGroupInput.TestDuration.Duration() + 3*time.Hour
-		if envConfig.TTL < approxDur {
-			envConfig.TTL = approxDur
-		}
-	}
+	envConfig := createEnvironmentConfig(t, envName, testConfig)
 
 	configureCLNode := !pointer.GetBool(testConfig.TestGroupInput.ExistingDeployment)
 	if configureCLNode {
@@ -892,4 +880,21 @@ func CCIPDefaultTestSetUp(
 	}
 	lggr.Info().Msg("Test setup completed")
 	return setUpArgs
+}
+
+func createEnvironmentConfig(t *testing.T, envName string, testConfig *CCIPTestConfig) *environment.Config {
+	envConfig := &environment.Config{
+		NamespacePrefix: envName,
+		Test:            t,
+	}
+	if testConfig.EnvInput.TTL != nil {
+		envConfig.TTL = testConfig.EnvInput.TTL.Duration()
+	}
+	if testConfig.TestGroupInput.TestDuration != nil {
+		approxDur := testConfig.TestGroupInput.TestDuration.Duration() + 3*time.Hour
+		if envConfig.TTL < approxDur {
+			envConfig.TTL = approxDur
+		}
+	}
+	return envConfig
 }
