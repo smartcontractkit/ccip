@@ -53,6 +53,34 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
   error NoGatewayForToken(address token);
   error Unimplemented();
 
+  /// @notice event to track the finalization of the L2 to L1 transfer offchain
+  /// @dev while this bridge adapter is trustless and anyone can use it,
+  /// @dev its highly unlikely that anyone would prefer it over the official bridge
+  /// @dev contracts. And since the official bridge contracts probably have lots of
+  /// @dev events and logs, we can use this event to track the L2 to L1 transfers
+  /// @dev with less load on the rebalancer oracles.
+  event ArbitrumL2ToL1ERC20Finalized(
+    address indexed remoteSender,
+    address indexed localReceiver,
+    uint256 amount,
+    ArbitrumFinalizationPayload payload
+  );
+  /// @notice event to track the an L1 to L2 transfer offchain
+  /// @param localToken the token address on L1
+  /// @param remoteToken the token address on L2
+  /// @param recipient the recipient of the tokens on L1
+  /// @param nonce the nonce of the transfer
+  /// @param amount the amount of tokens transferred
+  /// @param outboundTransferResult the result of the outbound transfer, which is the unique id used to identify the L1 to L2 tx
+  event ArbitrumL1ToL2ERC20Sent(
+    address indexed localToken,
+    address indexed remoteToken,
+    address indexed recipient,
+    uint256 nonce,
+    uint256 amount,
+    bytes outboundTransferResult
+  );
+
   constructor(IL1GatewayRouter l1GatewayRouter, IOutbox l1Outbox) {
     if (address(l1GatewayRouter) == address(0) || address(l1Outbox) == address(0)) {
       revert BridgeAddressCannotBeZero();
@@ -97,20 +125,25 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
       revert MsgValueDoesNotMatchAmount(msg.value, expectedMsgValue);
     }
 
-    // TODO: return data bombs?
-    // TODO: increment nonce and emit event
     // The router will route the call to the gateway that we approved
     // above. The gateway will then transfer the tokens to the L2.
-    return
-      i_l1GatewayRouter.outboundTransferCustomRefund{value: msg.value}(
-        localToken,
-        recipient,
-        recipient,
-        amount,
-        params.gasLimit,
-        params.maxFeePerGas,
-        abi.encode(params.maxSubmissionCost, bytes(""))
-      );
+    // outboundTransferCustomRefund will return the abi encoded inbox sequence number
+    // which is 256 bits, so we can cap the return data to 256 bits, e.g using https://github.com/nomad-xyz/ExcessivelySafeCall
+    // TODO: return data bombs?
+    // TODO: decode the return data here or offchain?
+    bytes memory res = i_l1GatewayRouter.outboundTransferCustomRefund{value: msg.value}(
+      localToken,
+      recipient,
+      recipient,
+      amount,
+      params.gasLimit,
+      params.maxFeePerGas,
+      abi.encode(params.maxSubmissionCost, bytes(""))
+    );
+
+    emit ArbitrumL1ToL2ERC20Sent(localToken, localToken, recipient, ++s_nonce, amount, res);
+
+    return res;
   }
 
   /// @dev This function is so that we can easily abi-encode the arbitrum-specific
@@ -125,6 +158,8 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
 
   /// @param proof Merkle proof of message inclusion in send root
   /// @param index Merkle path to message
+  /// @param l2Sender sender if original message (i.e., caller of ArbSys.sendTxToL1)
+  /// @param to destination address for L1 contract call
   /// @param l2Block l2 block number at which sendTxToL1 call was made
   /// @param l1Block l1 block number at which sendTxToL1 call was made
   /// @param l2Timestamp l2 Timestamp at which sendTxToL1 call was made
@@ -164,6 +199,7 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
       payload.value,
       payload.data
     );
+    emit ArbitrumL2ToL1ERC20Finalized(payload.l2Sender, payload.to, payload.value, payload);
   }
 
   function getL2Token(address l1Token) external view returns (address) {
