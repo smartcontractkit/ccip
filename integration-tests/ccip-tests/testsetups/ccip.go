@@ -621,7 +621,7 @@ func CCIPDefaultTestSetUp(
 	lggr zerolog.Logger,
 	envName string,
 	tokenDeployerFns []blockchain.ContractDeployer,
-	inputs *CCIPTestConfig,
+	testConfig *CCIPTestConfig,
 ) *CCIPTestSetUpOutputs {
 	var (
 		ccipEnv *actions.CCIPTestEnv
@@ -630,15 +630,15 @@ func CCIPDefaultTestSetUp(
 		chains  []blockchain.EVMClient
 	)
 	filename := fmt.Sprintf("./tmp_%s.json", strings.ReplaceAll(t.Name(), "/", "_"))
-	inputs.Test = t
+	testConfig.Test = t
 	var transferAmounts []*big.Int
-	if inputs.TestGroupInput.MsgType == actions.TokenTransfer {
-		for i := 0; i < inputs.TestGroupInput.NoOfTokensInMsg; i++ {
-			transferAmounts = append(transferAmounts, big.NewInt(inputs.TestGroupInput.AmountPerToken))
+	if testConfig.TestGroupInput.MsgType == actions.TokenTransfer {
+		for i := 0; i < testConfig.TestGroupInput.NoOfTokensInMsg; i++ {
+			transferAmounts = append(transferAmounts, big.NewInt(testConfig.TestGroupInput.AmountPerToken))
 		}
 	}
 	setUpArgs := &CCIPTestSetUpOutputs{
-		Cfg:            inputs,
+		Cfg:            testConfig,
 		Reporter:       testreporters.NewCCIPTestReporter(t, lggr),
 		LaneConfigFile: filename,
 		Balance:        actions.NewBalanceSheet(),
@@ -650,33 +650,33 @@ func CCIPDefaultTestSetUp(
 	parent, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	configureCLNode := !pointer.GetBool(inputs.TestGroupInput.ExistingDeployment)
 	var deployCL func() error
 	var local *test_env.CLClusterTestEnv
 	envConfig := &environment.Config{
 		NamespacePrefix: envName,
 		Test:            t,
 	}
-	if inputs.EnvInput.TTL != nil {
-		envConfig.TTL = inputs.EnvInput.TTL.Duration()
+	if testConfig.EnvInput.TTL != nil {
+		envConfig.TTL = testConfig.EnvInput.TTL.Duration()
 	}
-	if inputs.TestGroupInput.TestDuration != nil {
-		approxDur := inputs.TestGroupInput.TestDuration.Duration() + 3*time.Hour
+	if testConfig.TestGroupInput.TestDuration != nil {
+		approxDur := testConfig.TestGroupInput.TestDuration.Duration() + 3*time.Hour
 		if envConfig.TTL < approxDur {
 			envConfig.TTL = approxDur
 		}
 	}
 
+	configureCLNode := !pointer.GetBool(testConfig.TestGroupInput.ExistingDeployment)
 	if configureCLNode {
-		if pointer.GetBool(inputs.TestGroupInput.LocalCluster) {
-			local, deployCL = DeployLocalCluster(t, inputs)
+		if pointer.GetBool(testConfig.TestGroupInput.LocalCluster) {
+			local, deployCL = DeployLocalCluster(t, testConfig)
 			ccipEnv = &actions.CCIPTestEnv{
 				LocalCluster: local,
 			}
 		} else {
 			lggr.Info().Msg("Deploying test environment")
 			// deploy the env if configureCLNode is true
-			k8Env = DeployEnvironments(t, envConfig, inputs)
+			k8Env = DeployEnvironments(t, envConfig, testConfig)
 			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
 		}
 
@@ -713,7 +713,7 @@ func CCIPDefaultTestSetUp(
 	}
 
 	chainByChainID := make(map[int64]blockchain.EVMClient)
-	if pointer.GetBool(inputs.TestGroupInput.LocalCluster) {
+	if pointer.GetBool(testConfig.TestGroupInput.LocalCluster) {
 		require.NotNil(t, ccipEnv.LocalCluster, "Local cluster shouldn't be nil")
 		for _, n := range ccipEnv.LocalCluster.PrivateChain {
 			primaryNode := n.GetPrimaryNode()
@@ -722,7 +722,7 @@ func CCIPDefaultTestSetUp(
 			chains = append(chains, primaryNode.GetEVMClient())
 		}
 	} else {
-		for _, n := range inputs.SelectedNetworks {
+		for _, n := range testConfig.SelectedNetworks {
 			if _, ok := chainByChainID[n.ChainID]; ok {
 				continue
 			}
@@ -752,7 +752,7 @@ func CCIPDefaultTestSetUp(
 				}
 				return
 			}
-			if pointer.GetBool(inputs.TestGroupInput.KeepEnvAlive) {
+			if pointer.GetBool(testConfig.TestGroupInput.KeepEnvAlive) {
 				printStats()
 				return
 			}
@@ -774,39 +774,39 @@ func CCIPDefaultTestSetUp(
 					return err
 				}
 			}
-			return ccipEnv.SetUpNodesAndKeys(big.NewFloat(inputs.TestGroupInput.NodeFunding), chains, lggr)
+			return ccipEnv.SetUpNodesAndKeys(big.NewFloat(testConfig.TestGroupInput.NodeFunding), chains, lggr)
 		})
 	}
 
 	// if no of lanes per pair is greater than 1, copy common contracts from the same network
-	// if no of lanes per pair is more than 1, the networks are added into the inputs.AllNetworks with a suffix of -<lane number>
+	// if no of lanes per pair is more than 1, the networks are added into the testConfig.AllNetworks with a suffix of -<lane number>
 	// for example, if no of lanes per pair is 2, and the network pairs are called "testnetA", "testnetB",
 	//	the network will be added as "testnetA-1", testnetA-2","testnetB-1", testnetB-2"
 	// to deploy 2 lanes between same network pair "testnetA", "testnetB".
 	// In the following the common contracts will be copied from "testnetA" to "testnetA-1" and "testnetA-2" and
 	// from "testnetB" to "testnetB-1" and "testnetB-2"
-	for n := range inputs.AllNetworks {
+	for n := range testConfig.AllNetworks {
 		if setUpArgs.Cfg.TestGroupInput.NoOfRoutersPerPair > 1 {
 			regex := regexp.MustCompile(`-(\d+)$`)
 			networkNameToReadCfg := regex.ReplaceAllString(n, "")
-			reuse := pointer.GetBool(inputs.TestGroupInput.ReuseContracts)
+			reuse := pointer.GetBool(testConfig.TestGroupInput.ReuseContracts)
 			// if reuse contracts is true, copy common contracts from the same network except the router contract
 			setUpArgs.LaneConfig.CopyCommonContracts(
 				networkNameToReadCfg, n,
-				reuse, inputs.TestGroupInput.MsgType == actions.TokenTransfer)
+				reuse, testConfig.TestGroupInput.MsgType == actions.TokenTransfer)
 		}
 	}
 
 	// deploy all chain specific common contracts
 	chainAddGrp, _ := errgroup.WithContext(parent)
 	lggr.Info().Msg("Deploying common contracts")
-	for _, net := range inputs.AllNetworks {
+	for _, net := range testConfig.AllNetworks {
 		chain := chainByChainID[net.ChainID]
 		net := net
 		net.HTTPURLs = chain.GetNetworkConfig().HTTPURLs
 		net.URLs = chain.GetNetworkConfig().URLs
 		chainAddGrp.Go(func() error {
-			return setUpArgs.DeployChainContracts(chain, net, inputs.TestGroupInput.NoOfTokensPerChain, tokenDeployerFns, lggr)
+			return setUpArgs.DeployChainContracts(chain, net, testConfig.TestGroupInput.NoOfTokensPerChain, tokenDeployerFns, lggr)
 		})
 	}
 	require.NoError(t, chainAddGrp.Wait(), "Deploying common contracts shouldn't fail")
@@ -831,34 +831,34 @@ func CCIPDefaultTestSetUp(
 	// deploy all lane specific contracts
 	lggr.Info().Msg("Deploying chain specific contracts")
 	laneAddGrp, _ := errgroup.WithContext(parent)
-	for i, n := range inputs.NetworkPairs {
+	for i, n := range testConfig.NetworkPairs {
 		i := i
 		n := n
 		var ok bool
-		inputs.NetworkPairs[i].ChainClientA, ok = chainByChainID[n.NetworkA.ChainID]
+		testConfig.NetworkPairs[i].ChainClientA, ok = chainByChainID[n.NetworkA.ChainID]
 		require.True(t, ok, "Chain client for chainID %d not found", n.NetworkA.ChainID)
-		inputs.NetworkPairs[i].ChainClientB, ok = chainByChainID[n.NetworkB.ChainID]
+		testConfig.NetworkPairs[i].ChainClientB, ok = chainByChainID[n.NetworkB.ChainID]
 		require.True(t, ok, "Chain client for chainID %d not found", n.NetworkB.ChainID)
 
-		n.NetworkA.HTTPURLs = inputs.NetworkPairs[i].ChainClientA.GetNetworkConfig().HTTPURLs
-		n.NetworkA.URLs = inputs.NetworkPairs[i].ChainClientA.GetNetworkConfig().URLs
-		n.NetworkB.HTTPURLs = inputs.NetworkPairs[i].ChainClientB.GetNetworkConfig().HTTPURLs
-		n.NetworkB.URLs = inputs.NetworkPairs[i].ChainClientB.GetNetworkConfig().URLs
+		n.NetworkA.HTTPURLs = testConfig.NetworkPairs[i].ChainClientA.GetNetworkConfig().HTTPURLs
+		n.NetworkA.URLs = testConfig.NetworkPairs[i].ChainClientA.GetNetworkConfig().URLs
+		n.NetworkB.HTTPURLs = testConfig.NetworkPairs[i].ChainClientB.GetNetworkConfig().HTTPURLs
+		n.NetworkB.URLs = testConfig.NetworkPairs[i].ChainClientB.GetNetworkConfig().URLs
 
 		laneAddGrp.Go(func() error {
 			return setUpArgs.AddLanesForNetworkPair(
 				lggr, n.NetworkA, n.NetworkB,
 				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID], transferAmounts,
-				inputs.TestGroupInput.NoOfCommitNodes,
-				pointer.GetBool(inputs.TestGroupInput.CommitAndExecuteOnSameDON),
-				pointer.GetBool(inputs.TestGroupInput.BiDirectionalLane),
+				testConfig.TestGroupInput.NoOfCommitNodes,
+				pointer.GetBool(testConfig.TestGroupInput.CommitAndExecuteOnSameDON),
+				pointer.GetBool(testConfig.TestGroupInput.BiDirectionalLane),
 			)
 		})
 	}
 	require.NoError(t, laneAddGrp.Wait())
 	err = laneconfig.WriteLanesToJSON(setUpArgs.LaneConfigFile, setUpArgs.LaneConfig)
 	require.NoError(t, err)
-	require.Equal(t, len(setUpArgs.Lanes), len(inputs.NetworkPairs),
+	require.Equal(t, len(setUpArgs.Lanes), len(testConfig.NetworkPairs),
 		"Number of bi-directional lanes should be equal to number of network pairs")
 
 	if configureCLNode {
