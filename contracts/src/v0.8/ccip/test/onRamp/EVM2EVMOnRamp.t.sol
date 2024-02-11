@@ -549,10 +549,10 @@ contract EVM2EVMOnRamp_forwardFromRouter is EVM2EVMOnRampSetup {
   function testInvalidChainSelectorReverts() public {
     Client.EVM2AnyMessage memory message = _generateEmptyMessage();
 
-    uint64 wrongChainId = DEST_CHAIN_ID + 1;
-    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidChainSelector.selector, wrongChainId));
+    uint64 wrongChainSelector = DEST_CHAIN_ID + 1;
+    vm.expectRevert(abi.encodeWithSelector(EVM2EVMOnRamp.InvalidChainSelector.selector, wrongChainSelector));
 
-    s_onRamp.forwardFromRouter(wrongChainId, message, 1, OWNER);
+    s_onRamp.forwardFromRouter(wrongChainSelector, message, 1, OWNER);
   }
 
   function testSourceTokenDataTooLargeReverts() public {

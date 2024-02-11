@@ -65,9 +65,9 @@ contract BurnMintTokenPool_lockOrBurn is BurnMintTokenPoolSetup {
   }
 
   function testChainNotAllowedReverts() public {
-    uint64 wrongChainId = 8838833;
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainId));
-    s_pool.lockOrBurn(OWNER, bytes(""), 1, wrongChainId, bytes(""));
+    uint64 wrongChainSelector = 8838833;
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
+    s_pool.lockOrBurn(OWNER, bytes(""), 1, wrongChainSelector, bytes(""));
   }
 }
 
@@ -92,8 +92,8 @@ contract BurnMintTokenPool_releaseOrMint is BurnMintTokenPoolSetup {
   }
 
   function testChainNotAllowedReverts() public {
-    uint64 wrongChainId = 8838833;
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainId));
-    s_pool.releaseOrMint(bytes(""), OWNER, 1, wrongChainId, bytes(""));
+    uint64 wrongChainSelector = 8838833;
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, wrongChainSelector));
+    s_pool.releaseOrMint(bytes(""), OWNER, 1, wrongChainSelector, bytes(""));
   }
 }
