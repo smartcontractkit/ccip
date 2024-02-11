@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/pgtest"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
@@ -153,7 +154,9 @@ func testPriceRegistryReader(t *testing.T, th priceRegReaderTH, pr ccipdata.Pric
 	// Assert have expected fee tokens.
 	gotFeeTokens, err := pr.GetFeeTokens(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, th.expectedFeeTokens, gotFeeTokens)
+	evmAddrs, err := ccipcalc.GenericAddrsToEvm(gotFeeTokens...)
+	require.NoError(t, err)
+	assert.Equal(t, th.expectedFeeTokens, evmAddrs)
 
 	// Note unsupported chain selector simply returns an empty set not an error
 	gasUpdates, err := pr.GetGasPriceUpdatesCreatedAfter(context.Background(), 1e6, time.Unix(0, 0), 0)
@@ -245,7 +248,10 @@ func TestNewPriceRegistryReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewPriceRegistryReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), "", lpmocks.NewLogPoller(t), c)
+			addr := cciptypes.Address(utils.RandomAddress().String())
+			lp := lpmocks.NewLogPoller(t)
+			lp.On("RegisterFilter", mock.Anything).Return(nil).Maybe()
+			_, err = factory.NewPriceRegistryReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, lp, c)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

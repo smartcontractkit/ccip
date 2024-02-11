@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
 )
@@ -56,7 +57,7 @@ func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 		{
 			name: "different compatible type",
 			outputChangeFn: func(outputs []rpclib.DataAndErr) []rpclib.DataAndErr {
-				outputs[0].Outputs = []any{outputs[0].Outputs[0].(common.Address).String()}
+				outputs[0].Outputs = []any{outputs[0].Outputs[0].(common.Address)}
 				return outputs
 			},
 			expErr: false,
@@ -80,9 +81,9 @@ func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 			o := &OffRamp{evmBatchCaller: batchCaller, lp: lp}
 			srcTks, dstTks, outputs := generateTokensAndOutputs(numSrcTokens)
 			outputs = tc.outputChangeFn(outputs)
-			batchCaller.On("BatchCall", mock.Anything, mock.Anything, mock.Anything).
-				Return(outputs, nil)
-			actualDstTokens, err := o.getDestinationTokensFromSourceTokens(ctx, srcTks)
+			batchCaller.On("BatchCall", mock.Anything, mock.Anything, mock.Anything).Return(outputs, nil)
+			genericAddrs := ccipcalc.EvmAddrsToGeneric(srcTks...)
+			actualDstTokens, err := o.getDestinationTokensFromSourceTokens(ctx, genericAddrs)
 
 			if tc.expErr {
 				assert.Error(t, err)
@@ -90,7 +91,7 @@ func TestOffRampGetDestinationTokensFromSourceTokens(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, dstTks, actualDstTokens)
+			assert.Equal(t, ccipcalc.EvmAddrsToGeneric(dstTks...), actualDstTokens)
 		})
 	}
 }
@@ -133,22 +134,22 @@ func TestCachedOffRampTokens(t *testing.T) {
 	// Verify data is properly loaded in the cache.
 	expectedPools := make(map[cciptypes.Address]cciptypes.Address)
 	for i := range dstTks {
-		expectedPools[dstTks[i]] = dstTks[i]
+		expectedPools[cciptypes.Address(dstTks[i].String())] = cciptypes.Address(dstTks[i].String())
 	}
 	require.Equal(t, cciptypes.OffRampTokens{
-		DestinationTokens: dstTks,
-		SourceTokens:      srcTks,
+		DestinationTokens: ccipcalc.EvmAddrsToGeneric(dstTks...),
+		SourceTokens:      ccipcalc.EvmAddrsToGeneric(srcTks...),
 		DestinationPool:   expectedPools,
 	}, tokens)
 }
 
-func generateTokensAndOutputs(nbTokens uint) ([]cciptypes.Address, []cciptypes.Address, []rpclib.DataAndErr) {
-	srcTks := make([]cciptypes.Address, nbTokens)
-	dstTks := make([]cciptypes.Address, nbTokens)
+func generateTokensAndOutputs(nbTokens uint) ([]common.Address, []common.Address, []rpclib.DataAndErr) {
+	srcTks := make([]common.Address, nbTokens)
+	dstTks := make([]common.Address, nbTokens)
 	outputs := make([]rpclib.DataAndErr, nbTokens)
 	for i := range srcTks {
-		srcTks[i] = cciptypes.Address(utils.RandomAddress().String())
-		dstTks[i] = cciptypes.Address(utils.RandomAddress().String())
+		srcTks[i] = utils.RandomAddress()
+		dstTks[i] = utils.RandomAddress()
 		outputs[i] = rpclib.DataAndErr{
 			Outputs: []any{dstTks[i]}, Err: nil,
 		}

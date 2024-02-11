@@ -115,8 +115,8 @@ func DecodeCommitReport(commitReportArgs abi.Arguments, report []byte) (cciptype
 	commitReport, ok := unpacked[0].(struct {
 		PriceUpdates struct {
 			TokenPriceUpdates []struct {
-				SourceToken cciptypes.Address `json:"sourceToken"`
-				UsdPerToken *big.Int          `json:"usdPerToken"`
+				SourceToken common.Address `json:"sourceToken"`
+				UsdPerToken *big.Int       `json:"usdPerToken"`
 			} `json:"tokenPriceUpdates"`
 			DestChainSelector uint64   `json:"destChainSelector"`
 			UsdPerUnitGas     *big.Int `json:"usdPerUnitGas"`
@@ -134,7 +134,7 @@ func DecodeCommitReport(commitReportArgs abi.Arguments, report []byte) (cciptype
 	var tokenPriceUpdates []cciptypes.TokenPrice
 	for _, u := range commitReport.PriceUpdates.TokenPriceUpdates {
 		tokenPriceUpdates = append(tokenPriceUpdates, cciptypes.TokenPrice{
-			Token: u.SourceToken,
+			Token: cciptypes.Address(u.SourceToken.String()),
 			Value: u.UsdPerToken,
 		})
 	}

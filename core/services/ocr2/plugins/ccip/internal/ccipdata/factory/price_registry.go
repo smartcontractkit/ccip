@@ -28,19 +28,20 @@ func ClosePriceRegistryReader(lggr logger.Logger, versionFinder VersionFinder, p
 
 func initOrClosePriceRegistryReader(lggr logger.Logger, versionFinder VersionFinder, priceRegistryAddress cciptypes.Address, lp logpoller.LogPoller, cl client.Client, closeReader bool) (ccipdata.PriceRegistryReader, error) {
 	registerFilters := !closeReader
-	contractType, version, err := versionFinder.TypeAndVersion(priceRegistryAddress, cl)
 
 	evmAddrs, err := ccipcalc.GenericAddrsToEvm(priceRegistryAddress)
 	if err != nil {
 		return nil, err
 	}
+	priceRegistryEvmAddr := evmAddrs[0]
 
+	contractType, version, err := versionFinder.TypeAndVersion(priceRegistryAddress, cl)
 	isV1_0_0 := (err != nil && strings.Contains(err.Error(), "execution reverted")) ||
 		(contractType == ccipconfig.PriceRegistry && version.String() == ccipdata.V1_0_0)
 	if isV1_0_0 {
-		lggr.Infof("Assuming %v is 1.0.0 price registry, got %v", evmAddrs[0], err)
+		lggr.Infof("Assuming %v is 1.0.0 price registry, got %v", priceRegistryEvmAddr, err)
 		// Unfortunately the v1 price registry doesn't have a method to get the version so assume if it reverts its v1.
-		pr, err2 := v1_0_0.NewPriceRegistry(lggr, evmAddrs[0], lp, cl, registerFilters)
+		pr, err2 := v1_0_0.NewPriceRegistry(lggr, priceRegistryEvmAddr, lp, cl, registerFilters)
 		if err2 != nil {
 			return nil, err2
 		}

@@ -44,8 +44,8 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		name              string
 		commitStorePaused bool
 		inflightReports   []InflightInternalExecutionReport
-		unexpiredReports  []ccipdata.Event[cciptypes.CommitStoreReport]
-		sendRequests      []ccipdata.Event[cciptypes.EVM2EVMMessage]
+		unexpiredReports  []cciptypes.CommitStoreReportWithBlockMeta
+		sendRequests      []cciptypes.EVM2EVMMessageWithBlockMeta
 		executedSeqNums   []uint64
 		tokenPoolsMapping map[common.Address]common.Address
 		blessedRoots      map[[32]byte]bool
@@ -62,9 +62,9 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			name:              "happy flow",
 			commitStorePaused: false,
 			inflightReports:   []InflightInternalExecutionReport{},
-			unexpiredReports: []ccipdata.Event[cciptypes.CommitStoreReport]{
+			unexpiredReports: []cciptypes.CommitStoreReportWithBlockMeta{
 				{
-					Data: cciptypes.CommitStoreReport{
+					CommitStoreReport: cciptypes.CommitStoreReport{
 						Interval:   cciptypes.CommitStoreInterval{Min: 10, Max: 12},
 						MerkleRoot: [32]byte{123},
 					},
@@ -78,15 +78,15 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			},
 			tokenPoolsMapping: map[common.Address]common.Address{},
 			senderNonce:       9,
-			sendRequests: []ccipdata.Event[cciptypes.EVM2EVMMessage]{
+			sendRequests: []cciptypes.EVM2EVMMessageWithBlockMeta{
 				{
-					Data: cciptypes.EVM2EVMMessage{SequenceNumber: 10},
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 10},
 				},
 				{
-					Data: cciptypes.EVM2EVMMessage{SequenceNumber: 11},
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 11},
 				},
 				{
-					Data: cciptypes.EVM2EVMMessage{SequenceNumber: 12},
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 12},
 				},
 			},
 		},
@@ -113,10 +113,10 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				Return(tc.unexpiredReports, nil).Maybe()
 			p.commitStoreReader = commitStoreReader
 
-			var executionEvents []ccipdata.Event[cciptypes.ExecutionStateChanged]
+			var executionEvents []cciptypes.ExecutionStateChangedWithBlockMeta
 			for _, seqNum := range tc.executedSeqNums {
-				executionEvents = append(executionEvents, ccipdata.Event[cciptypes.ExecutionStateChanged]{
-					Data: cciptypes.ExecutionStateChanged{SequenceNumber: seqNum},
+				executionEvents = append(executionEvents, cciptypes.ExecutionStateChangedWithBlockMeta{
+					ExecutionStateChanged: cciptypes.ExecutionStateChanged{SequenceNumber: seqNum},
 				})
 			}
 
@@ -127,9 +127,9 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			mockOffRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
 				Return(executionEvents, nil).Maybe()
 			mockOffRampReader.On("CurrentRateLimiterState", mock.Anything).Return(tc.rateLimiterState, nil).Maybe()
-			mockOffRampReader.On("Address").Return(offRamp.Address()).Maybe()
+			mockOffRampReader.On("Address").Return(cciptypes.Address(offRamp.Address().String())).Maybe()
 			mockOffRampReader.On("GetSenderNonce", mock.Anything, mock.Anything).Return(offRamp.GetSenderNonce(nil, utils.RandomAddress())).Maybe()
-			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, []common.Address{}).
+			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, []cciptypes.Address{}).
 				Return([]cciptypes.TokenBucketRateLimit{}, nil).Maybe()
 			mockOffRampReader.On("GetSourceToDestTokensMapping", ctx).Return(nil, nil).Maybe()
 			mockOffRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
@@ -150,11 +150,11 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			destPriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
 				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: cciptypes.Address(common.HexToAddress("0x1").String()), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
-			destPriceRegReader.On("Address").Return(utils.RandomAddress()).Maybe()
-			destPriceRegReader.On("GetFeeTokens", ctx).Return([]common.Address{}, nil).Maybe()
+			destPriceRegReader.On("Address").Return(cciptypes.Address(utils.RandomAddress().String())).Maybe()
+			destPriceRegReader.On("GetFeeTokens", ctx).Return([]cciptypes.Address{}, nil).Maybe()
 			sourcePriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
-			sourcePriceRegReader.On("Address").Return(utils.RandomAddress()).Maybe()
-			sourcePriceRegReader.On("GetFeeTokens", ctx).Return([]common.Address{}, nil).Maybe()
+			sourcePriceRegReader.On("Address").Return(cciptypes.Address(utils.RandomAddress().String())).Maybe()
+			sourcePriceRegReader.On("GetFeeTokens", ctx).Return([]cciptypes.Address{}, nil).Maybe()
 			sourcePriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
 				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: cciptypes.Address(common.HexToAddress("0x1").String()), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
 			p.destPriceRegistry = destPriceRegReader
@@ -235,14 +235,14 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 	msg := cciptypes.EVM2EVMMessage{
 		SequenceNumber: 12,
 		FeeTokenAmount: big.NewInt(1e9),
-		Sender:         "",
+		Sender:         cciptypes.Address(utils.RandomAddress().String()),
 		Nonce:          1,
 		GasLimit:       big.NewInt(1),
 		Strict:         false,
-		Receiver:       "",
+		Receiver:       cciptypes.Address(utils.RandomAddress().String()),
 		Data:           nil,
 		TokenAmounts:   nil,
-		FeeToken:       "",
+		FeeToken:       cciptypes.Address(utils.RandomAddress().String()),
 		MessageId:      [32]byte{},
 	}
 	report := cciptypes.ExecReport{
@@ -279,14 +279,14 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	msg := cciptypes.EVM2EVMMessage{
 		SequenceNumber: 12,
 		FeeTokenAmount: big.NewInt(1e9),
-		Sender:         "",
+		Sender:         cciptypes.Address(utils.RandomAddress().String()),
 		Nonce:          1,
 		GasLimit:       big.NewInt(1),
 		Strict:         false,
-		Receiver:       "",
+		Receiver:       cciptypes.Address(utils.RandomAddress().String()),
 		Data:           nil,
 		TokenAmounts:   nil,
-		FeeToken:       "",
+		FeeToken:       cciptypes.Address(utils.RandomAddress().String()),
 		MessageId:      [32]byte{},
 	}
 	report := cciptypes.ExecReport{
@@ -345,9 +345,9 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
 		Return(executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1, nil)
 	commitStore.On("GetCommitReportMatchingSeqNum", ctx, observations[0].SeqNr, 0).
-		Return([]ccipdata.Event[cciptypes.CommitStoreReport]{
+		Return([]cciptypes.CommitStoreReportWithBlockMeta{
 			{
-				Data: cciptypes.CommitStoreReport{
+				CommitStoreReport: cciptypes.CommitStoreReport{
 					Interval: cciptypes.CommitStoreInterval{
 						Min: observations[0].SeqNr,
 						Max: observations[len(observations)-1].SeqNr,
@@ -363,7 +363,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	assert.NoError(t, err)
 	p.offRampReader = offRampReader
 
-	sendReqs := make([]ccipdata.Event[cciptypes.EVM2EVMMessage], len(observations))
+	sendReqs := make([]cciptypes.EVM2EVMMessageWithBlockMeta, len(observations))
 	sourceReader := ccipdatamocks.NewOnRampReader(t)
 	for i := range observations {
 		msg := cciptypes.EVM2EVMMessage{
@@ -380,7 +380,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 			FeeToken:            cciptypes.Address(utils.RandomAddress().String()),
 			MessageId:           [32]byte{12},
 		}
-		sendReqs[i] = ccipdata.Event[cciptypes.EVM2EVMMessage]{Data: msg}
+		sendReqs[i] = cciptypes.EVM2EVMMessageWithBlockMeta{EVM2EVMMessage: msg}
 	}
 	sourceReader.On("GetSendRequestsBetweenSeqNums",
 		ctx, observations[0].SeqNr, observations[len(observations)-1].SeqNr, false).Return(sendReqs, nil)

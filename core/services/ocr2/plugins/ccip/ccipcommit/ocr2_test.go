@@ -36,7 +36,6 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
@@ -57,7 +56,7 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 		commitStoreIsPaused bool
 		commitStoreSeqNum   uint64
 		tokenPrices         map[cciptypes.Address]*big.Int
-		sendReqs            []ccipdata.Event[cciptypes.EVM2EVMMessage]
+		sendReqs            []cciptypes.EVM2EVMMessageWithBlockMeta
 		tokenDecimals       map[cciptypes.Address]uint8
 		fee                 *big.Int
 
@@ -71,9 +70,9 @@ func TestCommitReportingPlugin_Observation(t *testing.T) {
 				someTokenAddr:         big.NewInt(2),
 				sourceNativeTokenAddr: big.NewInt(2),
 			},
-			sendReqs: []ccipdata.Event[cciptypes.EVM2EVMMessage]{
-				{Data: cciptypes.EVM2EVMMessage{SequenceNumber: 54}},
-				{Data: cciptypes.EVM2EVMMessage{SequenceNumber: 55}},
+			sendReqs: []cciptypes.EVM2EVMMessageWithBlockMeta{
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 54}},
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 55}},
 			},
 			fee: big.NewInt(100),
 			tokenDecimals: map[cciptypes.Address]uint8{
@@ -206,10 +205,10 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 		name              string
 		observations      []ccip.CommitObservation
 		f                 int
-		gasPriceUpdates   []ccipdata.Event[cciptypes.GasPriceUpdate]
+		gasPriceUpdates   []cciptypes.GasPriceUpdateWithBlockMeta
 		tokenDecimals     map[cciptypes.Address]uint8
-		tokenPriceUpdates []ccipdata.Event[cciptypes.TokenPriceUpdate]
-		sendRequests      []ccipdata.Event[cciptypes.EVM2EVMMessage]
+		tokenPriceUpdates []cciptypes.TokenPriceUpdateWithBlockMeta
+		sendRequests      []cciptypes.EVM2EVMMessageWithBlockMeta
 		expCommitReport   *cciptypes.CommitStoreReport
 		expSeqNumRange    cciptypes.CommitStoreInterval
 		expErr            bool
@@ -221,16 +220,16 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				{Interval: cciptypes.CommitStoreInterval{Min: 1, Max: 1}, SourceGasPriceUSD: gasPrice},
 			},
 			f: 1,
-			sendRequests: []ccipdata.Event[cciptypes.EVM2EVMMessage]{
+			sendRequests: []cciptypes.EVM2EVMMessageWithBlockMeta{
 				{
-					Data: cciptypes.EVM2EVMMessage{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 						SequenceNumber: 1,
 					},
 				},
 			},
-			gasPriceUpdates: []ccipdata.Event[cciptypes.GasPriceUpdate]{
+			gasPriceUpdates: []cciptypes.GasPriceUpdateWithBlockMeta{
 				{
-					Data: cciptypes.GasPriceUpdate{
+					GasPriceUpdate: cciptypes.GasPriceUpdate{
 						GasPrice: cciptypes.GasPrice{
 							DestChainSelector: sourceChainSelector,
 							Value:             big.NewInt(1),
@@ -254,9 +253,9 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				{Interval: cciptypes.CommitStoreInterval{Min: 0, Max: 0}, SourceGasPriceUSD: big.NewInt(0)},
 				{Interval: cciptypes.CommitStoreInterval{Min: 0, Max: 0}, SourceGasPriceUSD: big.NewInt(0)},
 			},
-			gasPriceUpdates: []ccipdata.Event[cciptypes.GasPriceUpdate]{
+			gasPriceUpdates: []cciptypes.GasPriceUpdateWithBlockMeta{
 				{
-					Data: cciptypes.GasPriceUpdate{
+					GasPriceUpdate: cciptypes.GasPriceUpdate{
 						GasPrice: cciptypes.GasPrice{
 							DestChainSelector: sourceChainSelector,
 							Value:             big.NewInt(1),
@@ -275,7 +274,7 @@ func TestCommitReportingPlugin_Report(t *testing.T) {
 				{Interval: cciptypes.CommitStoreInterval{Min: 2, Max: 2}, SourceGasPriceUSD: big.NewInt(0)},
 			},
 			f:              1,
-			sendRequests:   []ccipdata.Event[cciptypes.EVM2EVMMessage]{{}},
+			sendRequests:   []cciptypes.EVM2EVMMessageWithBlockMeta{{}},
 			expSeqNumRange: cciptypes.CommitStoreInterval{Min: 2, Max: 2},
 			expErr:         true,
 		},
@@ -1355,10 +1354,10 @@ func TestCommitReportingPlugin_calculateMinMaxSequenceNumbers(t *testing.T) {
 			}
 
 			onRampReader := ccipdatamocks.NewOnRampReader(t)
-			var sendReqs []ccipdata.Event[cciptypes.EVM2EVMMessage]
+			var sendReqs []cciptypes.EVM2EVMMessageWithBlockMeta
 			for _, seqNum := range tc.msgSeqNums {
-				sendReqs = append(sendReqs, ccipdata.Event[cciptypes.EVM2EVMMessage]{
-					Data: cciptypes.EVM2EVMMessage{
+				sendReqs = append(sendReqs, cciptypes.EVM2EVMMessageWithBlockMeta{
+					EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 						SequenceNumber: seqNum,
 					},
 				})
@@ -1446,10 +1445,10 @@ func TestCommitReportingPlugin_getLatestGasPriceUpdate(t *testing.T) {
 			}
 
 			if len(tc.destGasPriceUpdates) > 0 {
-				var events []ccipdata.Event[cciptypes.GasPriceUpdate]
+				var events []cciptypes.GasPriceUpdateWithBlockMeta
 				for _, u := range tc.destGasPriceUpdates {
-					events = append(events, ccipdata.Event[cciptypes.GasPriceUpdate]{
-						Data: cciptypes.GasPriceUpdate{
+					events = append(events, cciptypes.GasPriceUpdateWithBlockMeta{
+						GasPriceUpdate: cciptypes.GasPriceUpdate{
 							GasPrice:         cciptypes.GasPrice{Value: u.value},
 							TimestampUnixSec: big.NewInt(u.timestamp.Unix()),
 						},
@@ -1552,10 +1551,10 @@ func TestCommitReportingPlugin_getLatestTokenPriceUpdates(t *testing.T) {
 			p.destPriceRegistryReader = priceReg
 
 			//destReader := ccipdata.NewMockReader(t)
-			var events []ccipdata.Event[cciptypes.TokenPriceUpdate]
+			var events []cciptypes.TokenPriceUpdateWithBlockMeta
 			for _, up := range tc.priceRegistryUpdates {
-				events = append(events, ccipdata.Event[cciptypes.TokenPriceUpdate]{
-					Data: up,
+				events = append(events, cciptypes.TokenPriceUpdateWithBlockMeta{
+					TokenPriceUpdate: up,
 				})
 			}
 			//destReader.On("GetTokenPriceUpdatesCreatedAfter", ctx, priceRegAddr, mock.Anything, 0).Return(events, nil)

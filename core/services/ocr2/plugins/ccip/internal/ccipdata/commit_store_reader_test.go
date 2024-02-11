@@ -386,7 +386,12 @@ func TestNewCommitStoreReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), "", c, lpmocks.NewLogPoller(t), nil)
+			addr := cciptypes.Address(utils.RandomAddress().String())
+			lp := lpmocks.NewLogPoller(t)
+			if tc.expectedErr == "" {
+				lp.On("RegisterFilter", mock.Anything).Return(nil)
+			}
+			_, err = factory.NewCommitStoreReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, nil)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

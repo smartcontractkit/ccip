@@ -35,7 +35,8 @@ type onRampReaderTH struct {
 
 func TestNewOnRampReader_noContractAtAddress(t *testing.T) {
 	_, bc := ccipdata.NewSimulation(t)
-	_, err := factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), "", lpmocks.NewLogPoller(t), bc)
+	addr := cciptypes.Address(utils.RandomAddress().String())
+	_, err := factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), testutils.SimulatedChainID.Uint64(), testutils.SimulatedChainID.Uint64(), addr, lpmocks.NewLogPoller(t), bc)
 	assert.EqualError(t, err, "unable to read type and version: no contract code at given address")
 }
 
@@ -401,12 +402,12 @@ func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress com
 	ctx := th.user.Context
 	res, err := th.reader.RouterAddress()
 	require.NoError(t, err)
-	require.Equal(t, expectedRouterAddress, res)
+	require.Equal(t, cciptypes.Address(expectedRouterAddress.String()), res)
 
 	msg, err := th.reader.GetSendRequestsBetweenSeqNums(ctx, 0, 10, true)
 	require.NoError(t, err)
 	require.NotNil(t, msg)
-	require.Equal(t, []ccipdata.Event[cciptypes.EVM2EVMMessage]{}, msg)
+	require.Equal(t, []cciptypes.EVM2EVMMessageWithBlockMeta{}, msg)
 
 	address, err := th.reader.Address()
 	require.NoError(t, err)
@@ -415,7 +416,7 @@ func testOnRampReader(t *testing.T, th onRampReaderTH, expectedRouterAddress com
 	cfg, err := th.reader.GetDynamicConfig()
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
-	require.Equal(t, expectedRouterAddress, cfg.Router)
+	require.Equal(t, cciptypes.Address(expectedRouterAddress.String()), cfg.Router)
 }
 
 func TestNewOnRampReader(t *testing.T) {
@@ -446,7 +447,10 @@ func TestNewOnRampReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), 1, 2, "", lpmocks.NewLogPoller(t), c)
+			addr := cciptypes.Address(utils.RandomAddress().String())
+			lp := lpmocks.NewLogPoller(t)
+			lp.On("RegisterFilter", mock.Anything).Return(nil).Maybe()
+			_, err = factory.NewOnRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), 1, 2, addr, lp, c)
 			if tc.expectedErr != "" {
 				require.EqualError(t, err, tc.expectedErr)
 			} else {

@@ -182,7 +182,7 @@ func setupOffRampReaderTH(t *testing.T, version string) offRampReaderTH {
 	// Create the version-specific reader.
 	reader, err := factory.NewOffRampReader(log, factory.NewEvmVersionFinder(), cciptypes.Address(offRampAddress.String()), bc, lp, nil, true)
 	require.NoError(t, err)
-	require.Equal(t, offRampAddress, reader.Address())
+	require.Equal(t, cciptypes.Address(offRampAddress.String()), reader.Address())
 
 	return offRampReaderTH{
 		user:   user,
@@ -346,11 +346,11 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	ctx := th.user.Context
 	tokens, err := th.reader.GetTokens(ctx)
 	require.NoError(t, err)
-	require.Equal(t, []common.Address{}, tokens.DestinationTokens)
+	require.Equal(t, []cciptypes.Address{}, tokens.DestinationTokens)
 
 	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(ctx, 0, 10, 0)
 	require.NoError(t, err)
-	require.Equal(t, []ccipdata.Event[cciptypes.ExecutionStateChanged]{}, events)
+	require.Equal(t, []cciptypes.ExecutionStateChangedWithBlockMeta{}, events)
 
 	rateLimits, err := th.reader.GetTokenPoolsRateLimits(ctx, []cciptypes.Address{})
 	require.NoError(t, err)
@@ -392,7 +392,10 @@ func TestNewOffRampReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			_, err = factory.NewOffRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), "", c, lpmocks.NewLogPoller(t), nil, true)
+			addr := cciptypes.Address(utils.RandomAddress().String())
+			lp := lpmocks.NewLogPoller(t)
+			lp.On("RegisterFilter", mock.Anything).Return(nil).Maybe()
+			_, err = factory.NewOffRampReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, c, lp, nil, true)
 			if tc.expectedErr != "" {
 				assert.EqualError(t, err, tc.expectedErr)
 			} else {
