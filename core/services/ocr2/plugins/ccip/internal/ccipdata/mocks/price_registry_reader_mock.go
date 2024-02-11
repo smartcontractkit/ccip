@@ -5,7 +5,7 @@ package mocks
 import (
 	context "context"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
+	cciptypes "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 
 	mock "github.com/stretchr/testify/mock"
 

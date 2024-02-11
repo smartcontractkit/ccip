@@ -1,6 +1,6 @@
 package ccipdata
 
-import "github.com/smartcontractkit/chainlink-common/pkg/types/cciptypes"
+import "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 
 const (
 	COMMIT_PRICE_UPDATES = "Commit price updates"
