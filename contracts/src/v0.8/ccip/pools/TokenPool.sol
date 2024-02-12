@@ -241,7 +241,9 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
     RateLimiter.Config memory inboundConfig
   ) internal {
     if (!isSupportedChain(remoteChainSelector)) revert NonExistentChain(remoteChainSelector);
+    RateLimiter._validateTokenBucketConfig(outboundConfig, false);
     s_outboundRateLimits[remoteChainSelector]._setTokenBucketConfig(outboundConfig);
+    RateLimiter._validateTokenBucketConfig(inboundConfig, false);
     s_inboundRateLimits[remoteChainSelector]._setTokenBucketConfig(inboundConfig);
     emit ChainConfigured(remoteChainSelector, outboundConfig, inboundConfig);
   }

@@ -346,6 +346,10 @@ contract LockReleaseTokenPool_setChainRateLimiterConfig is LockReleaseTokenPoolS
   }
 
   function testFuzz_SetChainRateLimiterConfigSuccess(uint128 capacity, uint128 rate, uint32 newTime) public {
+    // Cap the lower bound to 4 so 4/2 is still >= 2
+    vm.assume(capacity >= 4);
+    // Cap the lower bound to 2 so 2/2 is still >= 1
+    rate = uint128(bound(rate, 2, capacity - 2));
     // Bucket updates only work on increasing time
     newTime = uint32(bound(newTime, block.timestamp + 1, type(uint32).max));
     vm.warp(newTime);
