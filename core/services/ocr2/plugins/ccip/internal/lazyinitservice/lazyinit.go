@@ -66,7 +66,7 @@ func (s *LazyInitService) Start(ctx context.Context) (err error) {
 
 	s.initComplete.Add(1)
 
-	ctx, s.cancelFunc = context.WithCancel(ctx)
+	ctx, s.cancelFunc = context.WithCancel(context.Background())
 	go s.initAndRun(ctx)
 	return nil
 }
