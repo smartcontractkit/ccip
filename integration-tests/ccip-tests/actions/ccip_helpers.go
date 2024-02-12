@@ -847,7 +847,7 @@ func DefaultCCIPModule(logger zerolog.Logger, chainClient blockchain.EVMClient, 
 		ChainClient: chainClient,
 		Deployer:    cd,
 		RateLimiterConfig: contracts.RateLimiterConfig{
-			Rate:     contracts.HundredCoins,
+			Rate:     contracts.FiftyCoins,
 			Capacity: contracts.HundredCoins,
 		},
 		ExistingDeployment: existingDeployment,

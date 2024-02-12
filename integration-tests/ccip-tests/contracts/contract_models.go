@@ -32,7 +32,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/shared/generated/erc20"
 )
 
-var HundredCoins = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
+var (
+	FiftyCoins   = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(50))
+	HundredCoins = new(big.Int).Mul(big.NewInt(1e18), big.NewInt(100))
+)
 
 const (
 	Network = "Network Name"
