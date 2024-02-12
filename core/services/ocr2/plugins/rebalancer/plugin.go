@@ -111,6 +111,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 	lggr := p.lggr.With("seqNr", outctx.SeqNr)
 	lggr.Infow("in outcome", "seqNr", outctx.SeqNr, "numObs", len(aos))
 
+	// Gather all the observations.
 	observations := make([]models.Observation, 0, len(aos))
 	for _, encodedObs := range aos {
 		obs, err := models.DecodeObservation(encodedObs.Observation)
@@ -120,16 +121,32 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		observations = append(observations, obs)
 	}
 
+	// Come to a consensus based on the observations of all the different nodes.
 	medianLiquidityPerChain := p.computeMedianLiquidityPerChain(observations)
-
 	pendingTransfers, err := p.computePendingTransfersConsensus(observations)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("compute pending transfers consensus: %w", err)
 	}
 
-	lggr.Infow("finished computing outcome", "medianLiquidityPerChain", medianLiquidityPerChain, "pendingTransfers", pendingTransfers)
+	// Compute a new graph with the median liquidities.
+	g, err := p.computeMedianGraph(medianLiquidityPerChain)
+	if err != nil {
+		return nil, fmt.Errorf("compute median graph: %w", err)
+	}
 
-	return models.NewObservation(medianLiquidityPerChain, pendingTransfers).Encode(), nil
+	lggr.Infow("computing transfers to reach balance",
+		"pendingTransfers", pendingTransfers,
+		"liquidityGraph", p.liquidityGraph,
+		"liquidityPerChain", medianLiquidityPerChain)
+
+	transfersToReachBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, pendingTransfers)
+	if err != nil {
+		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
+	}
+
+	lggr.Infow("finished computing outcome", "medianLiquidityPerChain",
+		medianLiquidityPerChain, "pendingTransfers", pendingTransfers)
+	return models.NewOutcome(transfersToReachBalance, pendingTransfers).Encode(), nil
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.ReportMetadata], error) {
@@ -139,33 +156,14 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	lggr := p.lggr.With("seqNr", seqNr)
 	lggr.Infow("in reports", "seqNr", seqNr)
 
-	obs, err := models.DecodeObservation(outcome)
+	outCome, err := models.DecodeOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
-	lggr.Infow("computing transfers to reach balance",
-		"pendingTransfers", obs.PendingTransfers,
-		"liquidityGraph", p.liquidityGraph,
-		"liquidityPerChain", obs.LiquidityPerChain)
-
-	// compute a new graph with the median liquidities.
-	g, err := p.computeMedianGraph(obs.LiquidityPerChain)
-	if err != nil {
-		return nil, fmt.Errorf("compute median graph: %w", err)
-	}
-	if g.IsEmpty() {
-		return nil, fmt.Errorf("liquidity graph is empty, can't generate reports")
-	}
-
-	transfersToReachBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, obs.PendingTransfers)
-	if err != nil {
-		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
-	}
-
 	// group transfers by source chain
 	transfersBySourceNet := make(map[models.NetworkSelector][]models.Transfer)
-	for _, tr := range transfersToReachBalance {
+	for _, tr := range outCome.TransfersToReachBalance {
 		transfersBySourceNet[tr.From] = append(transfersBySourceNet[tr.From], tr)
 	}
 

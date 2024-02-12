@@ -47,3 +47,29 @@ func DecodeObservation(b []byte) (Observation, error) {
 	err := json.Unmarshal(b, &obs)
 	return obs, err
 }
+
+type Outcome struct {
+	TransfersToReachBalance []Transfer
+	PendingTransfers        []PendingTransfer
+}
+
+func NewOutcome(transfersToReachBalance []Transfer, pendingTransfers []PendingTransfer) Outcome {
+	return Outcome{
+		TransfersToReachBalance: transfersToReachBalance,
+		PendingTransfers:        pendingTransfers,
+	}
+}
+
+func (o Outcome) Encode() []byte {
+	b, err := json.Marshal(o)
+	if err != nil {
+		panic(fmt.Errorf("outcome %#v encoding unexpected internal error: %w", o, err))
+	}
+	return b
+}
+
+func DecodeOutcome(b []byte) (Outcome, error) {
+	var outCome Outcome
+	err := json.Unmarshal(b, &outCome)
+	return outCome, err
+}
