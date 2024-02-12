@@ -141,8 +141,8 @@ func NewMultichainConfigTracker(
 			return nil, fmt.Errorf("chain %d not found", nid)
 		}
 
-		address, err := grph.GetRebalancerAddress(models.NetworkSelector(ch.Selector))
-		if err != nil {
+		address, err2 := grph.GetRebalancerAddress(models.NetworkSelector(ch.Selector))
+		if err2 != nil {
 			return nil, fmt.Errorf("no rebalancer found for network selector %d", ch.Selector)
 		}
 		fName := configTrackerFilterName(id, common.Address(address))

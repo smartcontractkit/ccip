@@ -258,24 +258,24 @@ func newRebalancerConfigProvider(
 		if !ok {
 			return nil, nil, nil, nil, nil, fmt.Errorf("chain selector for network %d not found", networkID)
 		}
-		legacyChain, err := chains.Get(strconv.FormatUint(chain.EvmChainID, 10))
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get legacy chain chain %d: %w", chain.EvmChainID, err)
+		legacyChain, err2 := chains.Get(strconv.FormatUint(chain.EvmChainID, 10))
+		if err2 != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get legacy chain chain %d: %w", chain.EvmChainID, err2)
 		}
-		rebalancerAddress, err := rebalancerGraph.GetRebalancerAddress(networkID)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get rebalancer address for network %d: %w", networkID, err)
+		rebalancerAddress, err2 := rebalancerGraph.GetRebalancerAddress(networkID)
+		if err2 != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get rebalancer address for network %d: %w", networkID, err2)
 		}
-		xchainRebalData, err := rebalancerGraph.GetXChainRebalancerData(networkID)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get xchain rebalancer data for network %d: %w", networkID, err)
+		xchainRebalData, err2 := rebalancerGraph.GetXChainRebalancerData(networkID)
+		if err2 != nil {
+			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get xchain rebalancer data for network %d: %w", networkID, err2)
 		}
 		bridgeAdapters := make(map[models.NetworkSelector]models.Address)
 		for remoteNetworkID, data := range xchainRebalData {
 			bridgeAdapters[remoteNetworkID] = data.LocalBridgeAdapterAddress
 		}
 		bridgeOpts = append(bridgeOpts, bridge.WithEvmDep(
-			models.NetworkSelector(networkID),
+			networkID,
 			legacyChain.LogPoller(),
 			legacyChain.Client(),
 			rebalancerAddress,
