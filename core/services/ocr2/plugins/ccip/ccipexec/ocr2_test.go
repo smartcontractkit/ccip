@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
@@ -915,7 +914,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 		reports             []cciptypes.CommitStoreReport
 		expQueryMin         uint64 // expected min/max used in the query to get ccipevents
 		expQueryMax         uint64
-		onchainEvents       []ccipdata.Event[cciptypes.EVM2EVMMessage]
+		onchainEvents       []cciptypes.EVM2EVMMessageWithBlockMeta
 		destExecutedSeqNums []uint64
 
 		expReports []commitReportWithSendRequests
@@ -941,10 +940,10 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			},
 			expQueryMin: 1,
 			expQueryMax: 3,
-			onchainEvents: []ccipdata.Event[cciptypes.EVM2EVMMessage]{
-				{Data: cciptypes.EVM2EVMMessage{SequenceNumber: 1}},
-				{Data: cciptypes.EVM2EVMMessage{SequenceNumber: 2}},
-				{Data: cciptypes.EVM2EVMMessage{SequenceNumber: 3}},
+			onchainEvents: []cciptypes.EVM2EVMMessageWithBlockMeta{
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 1}},
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 2}},
+				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 3}},
 			},
 			destExecutedSeqNums: []uint64{1},
 			expReports: []commitReportWithSendRequests{
@@ -1006,10 +1005,10 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 				}
 			}
 
-			var executedEvents []ccipdata.Event[cciptypes.ExecutionStateChanged]
+			var executedEvents []cciptypes.ExecutionStateChangedWithBlockMeta
 			for _, executedSeqNum := range tc.destExecutedSeqNums {
-				executedEvents = append(executedEvents, ccipdata.Event[cciptypes.ExecutionStateChanged]{
-					Data: cciptypes.ExecutionStateChanged{
+				executedEvents = append(executedEvents, cciptypes.ExecutionStateChangedWithBlockMeta{
+					ExecutionStateChanged: cciptypes.ExecutionStateChanged{
 						SequenceNumber: executedSeqNum,
 						Finalized:      finalized[executedSeqNum],
 					},
@@ -1282,7 +1281,7 @@ func Test_getTokensPrices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			priceReg := ccipdatamocks.NewPriceRegistryReader(t)
 			priceReg.On("GetTokenPrices", mock.Anything, mock.Anything).Return(tc.retPrices, nil)
-			priceReg.On("Address").Return(utils.RandomAddress(), nil).Maybe()
+			priceReg.On("Address").Return(cciptypes.Address(utils.RandomAddress().String()), nil).Maybe()
 
 			tokenPrices, err := getTokensPrices(context.Background(), priceReg, append(tc.feeTokens, tc.tokens...))
 			if tc.expErr {
@@ -1810,7 +1809,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
 
 			offrampReader.On("CurrentRateLimiterState", ctx).Return(cciptypes.TokenBucketRateLimit{}, nil).Maybe()
-			offrampReader.On("GetSourceToDestTokensMapping", ctx).Return(map[common.Address]common.Address{}, nil).Maybe()
+			offrampReader.On("GetSourceToDestTokensMapping", ctx).Return(map[cciptypes.Address]cciptypes.Address{}, nil).Maybe()
 			gasPriceEstimator.On("GetGasPrice", ctx).Return(big.NewInt(1e9), nil).Maybe()
 
 			offrampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{DestinationTokens: tt.destTokens}, tt.destTokensErr).Maybe()
