@@ -31,9 +31,20 @@ Please refer to [default.toml](./testconfig/tomls/default.toml) for the list of 
     ```
 
 3. Secrets - You also need to set some secrets. This is a mandatory step needed to run the tests. Please refer to [sample-secrets.toml](./testconfig/tomls/sample-secrets.toml) for the list of secrets that are mandatory to run the tests.
-   1. The chainlink image and tag are required secrets for all the tests. 
-   2. If you are running tests in live networks like testnet and mainnet, you need to set the secrets for the respective networks. If you are running tests in simulated networks no network specific secrets are required. 
-   3. Rest of the secrets are required only for specific tests.
+   - The chainlink image and tag are required secrets for all the tests. 
+   - If you are running tests in live networks like testnet and mainnet, you need to set the secrets(rpc urls and private keys) for the respective networks.
+   - If you are running tests in simulated networks no network specific secrets are required.
+   here is a sample secrets.toml file, for running the tests in simulated networks, with the chainlink image and tag set as secrets:
+   ```toml
+   [CCIP]
+   [CCIP.Env]
+   # ChainlinkImage is mandatory for all tests.
+   [CCIP.Env.Chainlink]
+   [CCIP.Env.Chainlink.Common]
+   [CCIP.Env.Chainlink.Common.ChainlinkImage]
+   image = "chainlink-ccip"
+   version = "latest"
+   ```
 
    We consider secrets similar to test input overrides and encode them using `base64` command.
    Once you have the secrets.toml file, you can encode it using `base64` command (similar to step 2) and set the env var `BASE64_SECRETS_CONFIG` with the encoded content.
@@ -71,7 +82,7 @@ For running the smoke tests -
 1. Set the test input [Setting up test inputs](#setting-up-test-inputs)
     1. If required create override toml with the required test inputs. If you want to run the tests with default parameters, you can skip this step.
     2. Create a TOML file with the secrets.
-2. Run the following command to run the smoke tests
+2. Run the following command to run the smoke tests with your custom override toml and secrets.
 ```bash
 # mark the testimage as empty for running the tests in local docker containers
 make test_smoke_ccip testimage="" testname=TestSmokeCCIPForBidirectionalLane override_toml="<the toml file with overridden config string>" secret_toml="<the toml file with secrets string>"
