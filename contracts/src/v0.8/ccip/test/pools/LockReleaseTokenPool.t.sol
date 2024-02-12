@@ -202,8 +202,8 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: SOURCE_CHAIN_ID,
       allowed: false,
-      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
-      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
     });
 
     s_lockReleaseTokenPool.applyChainUpdates(chainUpdate);

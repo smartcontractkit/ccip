@@ -28,8 +28,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   error ChainNotAllowed(uint64 remoteChainSelector);
   error BadARMSignal();
   error ChainAlreadyExists(uint64 chainSelector);
-  error DisabledNonZeroRateLimit(RateLimiter.Config outboundConfig, RateLimiter.Config inboundConfig);
-  error InvalidRatelimitRate(RateLimiter.Config rateLimiterConfig);
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
@@ -157,18 +155,15 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   function applyChainUpdates(ChainUpdate[] calldata chains) external virtual onlyOwner {
     for (uint256 i = 0; i < chains.length; ++i) {
       ChainUpdate memory update = chains[i];
+      RateLimiter._validateTokenBucketConfig(update.outboundRateLimiterConfig, !update.allowed);
+      RateLimiter._validateTokenBucketConfig(update.inboundRateLimiterConfig, !update.allowed);
+
       if (update.allowed) {
         // If the chain already exists, revert
         if (!s_remoteChainSelectors.add(update.remoteChainSelector)) {
           revert ChainAlreadyExists(update.remoteChainSelector);
         }
 
-        if (
-          update.outboundRateLimiterConfig.rate >= update.outboundRateLimiterConfig.capacity ||
-          update.outboundRateLimiterConfig.rate == 0
-        ) {
-          revert InvalidRatelimitRate(update.outboundRateLimiterConfig);
-        }
         s_outboundRateLimits[update.remoteChainSelector] = RateLimiter.TokenBucket({
           rate: update.outboundRateLimiterConfig.rate,
           capacity: update.outboundRateLimiterConfig.capacity,
@@ -176,12 +171,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
           lastUpdated: uint32(block.timestamp),
           isEnabled: update.outboundRateLimiterConfig.isEnabled
         });
-        if (
-          update.inboundRateLimiterConfig.rate >= update.inboundRateLimiterConfig.capacity ||
-          update.inboundRateLimiterConfig.rate == 0
-        ) {
-          revert InvalidRatelimitRate(update.inboundRateLimiterConfig);
-        }
 
         s_inboundRateLimits[update.remoteChainSelector] = RateLimiter.TokenBucket({
           rate: update.inboundRateLimiterConfig.rate,
@@ -195,16 +184,6 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
         // If the chain doesn't exist, revert
         if (!s_remoteChainSelectors.remove(update.remoteChainSelector)) {
           revert NonExistentChain(update.remoteChainSelector);
-        }
-
-        // Make sure that the rate limits are zero for the chain to be removed.
-        if (
-          update.inboundRateLimiterConfig.rate > 0 ||
-          update.inboundRateLimiterConfig.capacity > 0 ||
-          update.outboundRateLimiterConfig.rate > 0 ||
-          update.outboundRateLimiterConfig.capacity > 0
-        ) {
-          revert DisabledNonZeroRateLimit(update.outboundRateLimiterConfig, update.inboundRateLimiterConfig);
         }
 
         delete s_inboundRateLimits[update.remoteChainSelector];

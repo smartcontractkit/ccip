@@ -114,8 +114,8 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     chainRemoves[0] = TokenPool.ChainUpdate({
       remoteChainSelector: strangerChainSelector,
       allowed: false,
-      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
-      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
     });
     vm.expectRevert(abi.encodeWithSelector(TokenPool.NonExistentChain.selector, strangerChainSelector));
     s_tokenPool.applyChainUpdates(chainRemoves);
@@ -164,16 +164,18 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     s_tokenPool.applyChainUpdates(chainUpdates);
 
     chainUpdates[0].allowed = false;
+    chainUpdates[0].outboundRateLimiterConfig = RateLimiter.Config({isEnabled: false, capacity: 10, rate: 1});
+    chainUpdates[0].inboundRateLimiterConfig = RateLimiter.Config({isEnabled: false, capacity: 10, rate: 1});
 
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.DisabledNonZeroRateLimit.selector, outboundRateLimit, inboundRateLimit)
+      abi.encodeWithSelector(RateLimiter.DisabledNonZeroRateLimit.selector, chainUpdates[0].outboundRateLimiterConfig)
     );
     s_tokenPool.applyChainUpdates(chainUpdates);
   }
 
   function testNonExistentChainReverts() public {
-    RateLimiter.Config memory outboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e28, rate: 1e18});
-    RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: true, capacity: 100e22, rate: 1e12});
+    RateLimiter.Config memory outboundRateLimit = RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0});
+    RateLimiter.Config memory inboundRateLimit = RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0});
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
       remoteChainSelector: 1,
@@ -198,21 +200,21 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     // Outbound
 
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
+      abi.encodeWithSelector(RateLimiter.InvalidRatelimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
     );
     s_tokenPool.applyChainUpdates(chainUpdates);
 
     chainUpdates[0].outboundRateLimiterConfig.rate = 100;
 
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
+      abi.encodeWithSelector(RateLimiter.InvalidRatelimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
     );
     s_tokenPool.applyChainUpdates(chainUpdates);
 
     chainUpdates[0].outboundRateLimiterConfig.capacity = 100;
 
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
+      abi.encodeWithSelector(RateLimiter.InvalidRatelimitRate.selector, chainUpdates[0].outboundRateLimiterConfig)
     );
     s_tokenPool.applyChainUpdates(chainUpdates);
 
@@ -229,21 +231,21 @@ contract TokenPool_applyChainUpdates is TokenPoolSetup {
     chainUpdates[0].inboundRateLimiterConfig.rate = 0;
 
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
+      abi.encodeWithSelector(RateLimiter.InvalidRatelimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
     );
     s_tokenPool.applyChainUpdates(chainUpdates);
 
     chainUpdates[0].inboundRateLimiterConfig.rate = 100;
 
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
+      abi.encodeWithSelector(RateLimiter.InvalidRatelimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
     );
     s_tokenPool.applyChainUpdates(chainUpdates);
 
     chainUpdates[0].inboundRateLimiterConfig.capacity = 100;
 
     vm.expectRevert(
-      abi.encodeWithSelector(TokenPool.InvalidRatelimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
+      abi.encodeWithSelector(RateLimiter.InvalidRatelimitRate.selector, chainUpdates[0].inboundRateLimiterConfig)
     );
     s_tokenPool.applyChainUpdates(chainUpdates);
 
@@ -396,8 +398,8 @@ contract TokenPool_onlyOnRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       allowed: false,
-      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
-      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
     });
 
     vm.startPrank(OWNER);
@@ -484,8 +486,8 @@ contract TokenPool_onlyOffRamp is TokenPoolSetup {
     chainUpdate[0] = TokenPool.ChainUpdate({
       remoteChainSelector: chainSelector,
       allowed: false,
-      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0}),
-      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: true, capacity: 0, rate: 0})
+      outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
+      inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
     });
 
     vm.startPrank(OWNER);
