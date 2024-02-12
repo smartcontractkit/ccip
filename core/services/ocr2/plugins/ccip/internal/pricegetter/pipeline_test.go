@@ -38,8 +38,8 @@ func TestDataSource(t *testing.T) {
 		require.NoError(t, err)
 	}))
 	defer usdcEth.Close()
-	linkTokenAddress := common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e05")
-	usdcTokenAddress := common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e10")
+	linkTokenAddress := cciptypes.Address(common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e05").String())
+	usdcTokenAddress := cciptypes.Address(common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e10").String())
 	source := fmt.Sprintf(`
 	// Price 1
 	link [type=http method=GET url="%s"];
@@ -55,11 +55,11 @@ func TestDataSource(t *testing.T) {
 	priceGetter := newTestPipelineGetter(t, source)
 	// Ask for all prices present in spec.
 	prices, err := priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{
-		cciptypes.Address(linkTokenAddress.String()),
-		cciptypes.Address(usdcTokenAddress.String()),
+		linkTokenAddress,
+		usdcTokenAddress,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, prices, map[common.Address]*big.Int{
+	assert.Equal(t, prices, map[cciptypes.Address]*big.Int{
 		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
 		usdcTokenAddress: big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(1000000000000000000)),
 	})
@@ -71,9 +71,9 @@ func TestDataSource(t *testing.T) {
 	require.Error(t, err)
 
 	// Ask only one price
-	prices, err = priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{cciptypes.Address(linkTokenAddress.String())})
+	prices, err = priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{linkTokenAddress})
 	require.NoError(t, err)
-	assert.Equal(t, prices, map[common.Address]*big.Int{
+	assert.Equal(t, prices, map[cciptypes.Address]*big.Int{
 		linkTokenAddress: big.NewInt(0).Mul(big.NewInt(200), big.NewInt(1000000000000000000)),
 	})
 
