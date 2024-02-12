@@ -18,7 +18,8 @@ contract RebalancerSetup is RebalancerBaseTest {
     uint64 indexed fromChainSelector,
     uint64 indexed toChainSelector,
     address to,
-    uint256 amount
+    uint256 amount,
+    bytes bridgeSpecificPayload
   );
 
   Rebalancer internal s_rebalancer;
