@@ -27,7 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_messenger"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
@@ -53,9 +52,6 @@ var (
 
 	arbitrumTokenGatewayABI = abihelpers.MustParseABI(arbitrum_token_gateway.ArbitrumTokenGatewayMetaData.ABI)
 	l1AdapterABI            = abihelpers.MustParseABI(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.ABI)
-
-	// type assertion
-	_ bridge.Bridge = &l2ToL1Bridge{}
 )
 
 func init() {
@@ -140,10 +136,12 @@ func NewL2ToL1Bridge(
 		EventSigs: []common.Hash{
 			L2toL1ERC20FinalizedTopic, // emitted by l1 bridge adapter
 			NodeConfirmedTopic,        // emitted by rollup
+			LiquidityTransferredTopic, // emitted by rebalancer
 		},
 		Addresses: []common.Address{
 			l1BridgeAdapterAddress, // to get erc20 finalized logs
 			l1RollupAddress,        // to get node confirmed logs
+			l1RebalancerAddress,    // to get LiquidityTransferred logs
 		},
 		Retention: DurationMonth,
 	})
@@ -205,6 +203,7 @@ func NewL2ToL1Bridge(
 		"l2BridgeAdapter", l2BridgeAdapterAddress,
 		"l1RebalancerAddress", l1RebalancerAddress,
 	)
+	lggr.Infow("successfully initialized arbitrum L2 -> L1 bridge")
 
 	// TODO: replay log poller for any missed logs?
 	return &l2ToL1Bridge{
@@ -262,6 +261,7 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
+	// TODO: check if err is sql.ErrNoRows
 	if err != nil {
 		return nil, fmt.Errorf("failed to get L2 -> L1 transfers from log poller (on L2): %w", err)
 	}
@@ -275,6 +275,7 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
+	// TODO: check if err is sql.ErrNoRows
 	if err != nil {
 		return nil, fmt.Errorf("failed to get L2 -> L1 finalizations from log poller (on L1): %w", err)
 	}
@@ -298,6 +299,7 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 
 	// for the remaining as-of-yet unfinalized transfers, determine if they
 	// are ready to finalize
+	// TODO: edge case: determine finalized but not executed by checking rebalancer's LiquidityTransferred logs
 	ready, readyData, notReady, err := l.partitionReadyTransfers(ctx, unfinalizedTransfers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to partition ready transfers: %w", err)

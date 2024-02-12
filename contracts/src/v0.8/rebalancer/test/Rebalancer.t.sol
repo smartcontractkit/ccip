@@ -66,7 +66,8 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       i_localChainSelector,
       i_remoteChainSelector,
       address(s_rebalancer),
-      amount
+      amount,
+      bytes("")
     );
 
     s_rebalancer.rebalanceLiquidity(i_remoteChainSelector, amount, bytes(""));

@@ -2,9 +2,22 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge/arb"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
+)
+
+var (
+	ErrBridgeNotFound = errors.New("bridge not found")
 )
 
 // Bridge provides a way to get pending transfers from one chain to another
@@ -39,49 +52,164 @@ type Bridge interface {
 	RemoteChainSelector() models.NetworkSelector
 }
 
-type Container interface {
-	GetBridge(source, dest models.NetworkSelector) (Bridge, error)
+type Factory interface {
+	NewBridge(source, dest models.NetworkSelector) (Bridge, error)
 }
 
-type container struct {
-	bridges map[models.NetworkSelector]map[models.NetworkSelector]Bridge
+type Opt func(c *factory)
+
+type mapKey struct {
+	from, to models.NetworkSelector
 }
 
-func NewContainer() Container {
-	return &container{
-		bridges: make(map[models.NetworkSelector]map[models.NetworkSelector]Bridge),
+type evmDep struct {
+	lp                   logpoller.LogPoller
+	ethClient            client.Client
+	rebalancerAddress    models.Address
+	bridgeAdapterAddress models.Address
+}
+
+type factory struct {
+	evmDeps       map[models.NetworkSelector]evmDep
+	cachedBridges sync.Map
+	lggr          logger.Logger
+}
+
+func NewFactory(lggr logger.Logger, opts ...Opt) Factory {
+	c := &factory{
+		evmDeps: make(map[models.NetworkSelector]evmDep),
+		lggr:    lggr,
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
+func WithEvmDep(
+	networkID models.NetworkSelector,
+	lp logpoller.LogPoller,
+	ethClient client.Client,
+	rebalancerAddress,
+	bridgeAdapterAddress models.Address,
+) Opt {
+	return func(f *factory) {
+		f.evmDeps[networkID] = evmDep{
+			lp:                   lp,
+			ethClient:            ethClient,
+			rebalancerAddress:    rebalancerAddress,
+			bridgeAdapterAddress: bridgeAdapterAddress,
+		}
 	}
 }
 
-func (c *container) GetBridge(source, dest models.NetworkSelector) (Bridge, error) {
+func (f *factory) NewBridge(source, dest models.NetworkSelector) (Bridge, error) {
 	if source == dest {
 		return nil, fmt.Errorf("no bridge between the same network and itself: %d", source)
 	}
 
-	bridgesFromSource, ok := c.bridges[dest]
-	if !ok {
-		return nil, nil
+	bridge, err := f.GetBridge(source, dest)
+	if errors.Is(err, ErrBridgeNotFound) {
+		return f.initBridge(source, dest)
 	}
-
-	bridgeToDest, ok := bridgesFromSource[dest]
-	if !ok {
-		return nil, nil
-	}
-
-	return bridgeToDest, nil
+	return bridge, err
 }
 
-func (c *container) AddBridge(from, to models.NetworkSelector, bridge Bridge) error {
-	_, ok := c.bridges[from]
+func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error) {
+	var bridge Bridge
+	var err error
+
+	switch source {
+	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector):
+	case models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector):
+		// arbitrum l1 -> l2
+		// only dest that is supported is eth mainnet if source == arb mainnet
+		// only dest that is supported is eth sepolia if source == arb sepolia
+		if source == models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector) &&
+			dest != models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector) {
+			return nil, fmt.Errorf("unsupported destination for arbitrum mainnet l1 -> l2 bridge: %d, must be eth mainnet", dest)
+		}
+		if source == models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector) &&
+			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector) {
+			return nil, fmt.Errorf("unsupported destination for arbitrum sepolia l1 -> l2 bridge: %d, must be eth sepolia", dest)
+		}
+		sourceDeps, ok := f.evmDeps[source]
+		if !ok {
+			return nil, fmt.Errorf("evm dependencies not found for source selector %d", source)
+		}
+		destDeps, ok := f.evmDeps[dest]
+		if !ok {
+			return nil, fmt.Errorf("evm dependencies not found for dest selector %d", dest)
+		}
+		bridge, err = arb.NewL2ToL1Bridge(
+			f.lggr,
+			source,
+			dest,
+			arb.AllContracts[uint64(source)].L1.RollupAddress,
+			common.Address(destDeps.rebalancerAddress),      // l1 rebalancer address
+			common.Address(sourceDeps.bridgeAdapterAddress), // l2 bridge adapter address
+			common.Address(destDeps.bridgeAdapterAddress),   // l1 bridge adapter address
+			sourceDeps.lp,        // l2 log poller
+			destDeps.lp,          // l1 log poller
+			sourceDeps.ethClient, // l2 eth client
+			destDeps.ethClient,   // l1 eth client
+		)
+	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector):
+	case models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector):
+		// L1 -> L2
+		// only dest that is supported is arbitrum mainnet if source == eth mainnet
+		// only dest that is supported is arbitrum sepolia if source == eth sepolia
+		if source == models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector) &&
+			dest != models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector) {
+			return nil, fmt.Errorf("unsupported destination for eth mainnet l1 -> l2 bridge: %d, must be arb mainnet", dest)
+		}
+		if source == models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector) &&
+			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector) {
+			return nil, fmt.Errorf("unsupported destination for eth sepolia l1 -> l2 bridge: %d, must be arb sepolia", dest)
+		}
+		sourceDeps, ok := f.evmDeps[source]
+		if !ok {
+			return nil, fmt.Errorf("evm dependencies not found for source selector %d", source)
+		}
+		destDeps, ok := f.evmDeps[dest]
+		if !ok {
+			return nil, fmt.Errorf("evm dependencies not found for dest selector %d", dest)
+		}
+		bridge, err = arb.NewL1ToL2Bridge(
+			f.lggr,
+			source,
+			dest,
+			common.Address(sourceDeps.rebalancerAddress),             // l1 rebalancer address
+			common.Address(destDeps.rebalancerAddress),               // l2 rebalancer address
+			common.Address(sourceDeps.bridgeAdapterAddress),          // l1 bridge adapter address
+			arb.AllContracts[uint64(source)].L1.GatewayRouterAddress, // l1 gateway router address
+			arb.AllContracts[uint64(source)].L1.InboxAddress,         // l1 inbox address
+			sourceDeps.ethClient,                                     // l1 eth client
+			destDeps.ethClient,                                       // l2 eth client
+			sourceDeps.lp,                                            // l1 log poller
+			destDeps.lp,                                              // l2 log poller
+		)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	key := mapKey{from: source, to: dest}
+	f.cachedBridges.Store(key, bridge)
+	return bridge, nil
+}
+
+func (f *factory) GetBridge(source, dest models.NetworkSelector) (Bridge, error) {
+	key := mapKey{from: source, to: dest}
+	bridge, exists := f.cachedBridges.Load(key)
+	if !exists {
+		return nil, ErrBridgeNotFound
+	}
+
+	b, ok := bridge.(Bridge)
 	if !ok {
-		c.bridges[from] = make(map[models.NetworkSelector]Bridge)
+		return nil, fmt.Errorf("cached bridge has wrong type: %T", bridge)
 	}
-
-	// check if bridge is already set
-	if _, ok := c.bridges[from][to]; ok {
-		return fmt.Errorf("bridge already set from %d to %d", from, to)
-	}
-
-	c.bridges[from][to] = bridge
-	return nil
+	return b, nil
 }

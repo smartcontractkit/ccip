@@ -52,15 +52,11 @@ func SendToL2(
 	l1GatewayRouter, err := arbitrum_gateway_router.NewArbitrumGatewayRouter(ArbitrumContracts[l1ChainID]["L1GatewayRouter"], env.Clients[l1ChainID])
 	helpers.PanicErr(err)
 
-	l2GatewayRouter, err := arbitrum_gateway_router.NewArbitrumGatewayRouter(ArbitrumContracts[l2ChainID]["L2GatewayRouter"], env.Clients[l2ChainID])
-	helpers.PanicErr(err)
-
 	params := populateFunctionParams(
 		env,
 		l1ChainID,
 		l2ChainID,
 		l1GatewayRouter,
-		l2GatewayRouter,
 		l1Token.Address(),
 		l2Recipient,
 		l1BridgeAdapterAddress,
@@ -137,8 +133,7 @@ func populateFunctionParams(
 	env multienv.Env,
 	l1ChainID,
 	l2ChainID uint64,
-	l1GatewayRouter,
-	l2GatewayRouter *arbitrum_gateway_router.ArbitrumGatewayRouter,
+	l1GatewayRouter *arbitrum_gateway_router.ArbitrumGatewayRouter,
 	l1TokenAddress,
 	l2RecipientAddress,
 	l1BridgeAdapterAddress common.Address,
