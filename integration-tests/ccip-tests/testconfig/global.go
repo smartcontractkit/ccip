@@ -123,6 +123,7 @@ func NewConfig() (*Config, error) {
 		// load config from env var if specified for secrets
 		secretRawConfig, _ := osutil.GetEnv(SECRETSCONFIG)
 		if secretRawConfig != "" {
+			log.Info().Msgf("Found %s env var, applying secrets", SECRETSCONFIG)
 			err = secrets.Decode(secretRawConfig)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode secrets config: %w", err)
@@ -303,6 +304,9 @@ func (c *Chainlink) ApplyOverrides(from *Chainlink) {
 func (c *Chainlink) Validate() error {
 	if c.Common == nil {
 		return errors.New("common config can't be empty")
+	}
+	if c.Common.ChainlinkImage == nil {
+		return errors.New("chainlink image can't be empty")
 	}
 	if err := c.Common.ChainlinkImage.Validate(); err != nil {
 		return err
