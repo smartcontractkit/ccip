@@ -194,13 +194,17 @@ func (p *Common) Validate() error {
 	return p.Chainlink.Validate()
 }
 
-func (p *Common) EVMNetworks() ([]blockchain.EVMNetwork, error) {
+func (p *Common) EVMNetworks() ([]blockchain.EVMNetwork, []string, error) {
 	p.Network.UpperCaseNetworkNames()
 	err := p.Network.Default()
 	if err != nil {
-		return nil, fmt.Errorf("error reading default network config %w", err)
+		return nil, p.Network.SelectedNetworks, fmt.Errorf("error reading default network config %w", err)
 	}
-	return networks.MustSetNetworks(*p.Network), nil
+	evmNetworks := networks.MustSetNetworks(*p.Network)
+	if len(p.Network.SelectedNetworks) != len(evmNetworks) {
+		return nil, p.Network.SelectedNetworks, fmt.Errorf("selected networks %v do not match evm networks %v", p.Network.SelectedNetworks, evmNetworks)
+	}
+	return evmNetworks, p.Network.SelectedNetworks, nil
 }
 
 func (p *Common) GetLoggingConfig() *ctfconfig.LoggingConfig {

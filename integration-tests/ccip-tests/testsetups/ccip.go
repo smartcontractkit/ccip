@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
@@ -116,14 +117,17 @@ func (c *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMN
 func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 	var allError error
 	var err error
-	c.SelectedNetworks, err = c.EnvInput.EVMNetworks()
+	var inputNetworks []string
+	c.SelectedNetworks, inputNetworks, err = c.EnvInput.EVMNetworks()
 	if err != nil {
 		allError = multierr.Append(allError, fmt.Errorf("failed to get networks: %w", err))
 		return allError
 	}
-	networkByChainID := make(map[string]blockchain.EVMNetwork)
-	for _, net := range c.SelectedNetworks {
-		networkByChainID[net.Name] = net
+	log.Info().Msgf("Selected networks: %v", c.SelectedNetworks)
+	log.Info().Msgf("Input networks: %v", inputNetworks)
+	networkByChainName := make(map[string]blockchain.EVMNetwork)
+	for i, net := range c.SelectedNetworks {
+		networkByChainName[inputNetworks[i]] = net
 	}
 	// if network pairs are provided, then use them
 	if c.TestGroupInput.NetworkPairs != nil {
@@ -134,11 +138,12 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 			if len(networkNames) != 2 {
 				allError = multierr.Append(allError, fmt.Errorf("invalid network pair"))
 			}
-			network1, ok := networkByChainID[networkNames[0]]
+			// check if the network names are valid
+			network1, ok := networkByChainName[networkNames[0]]
 			if !ok {
 				allError = multierr.Append(allError, fmt.Errorf("network %s not found in network config", networkNames[0]))
 			}
-			network2, ok := networkByChainID[networkNames[1]]
+			network2, ok := networkByChainName[networkNames[1]]
 			if !ok {
 				allError = multierr.Append(allError, fmt.Errorf("network %s not found in network config", networkNames[1]))
 			}
