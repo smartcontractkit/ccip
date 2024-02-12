@@ -20,6 +20,7 @@ type OnchainRebalancer interface {
 	GetLiquidity(ctx context.Context) (*big.Int, error)
 	ParseLiquidityTransferred(log gethtypes.Log) (LiquidityTransferredEvent, error)
 	GetConfigDigest(ctx context.Context) (ocrtypes.ConfigDigest, error)
+	GetTokenAddress(ctx context.Context) (models.Address, error)
 }
 
 type LiquidityTransferredEvent interface {
@@ -35,6 +36,14 @@ var _ OnchainRebalancer = &concreteRebalancer{}
 // i.e, business model is in full effect here.
 type concreteRebalancer struct {
 	client rebalancer.RebalancerInterface
+}
+
+// GetTokenAddress implements OnchainRebalancer.
+func (c *concreteRebalancer) GetTokenAddress(ctx context.Context) (models.Address, error) {
+	tokenAddress, err := c.client.ILocalToken(&bind.CallOpts{
+		Context: ctx,
+	})
+	return models.Address(tokenAddress), err
 }
 
 // GetConfigDigest implements OnchainRebalancer.

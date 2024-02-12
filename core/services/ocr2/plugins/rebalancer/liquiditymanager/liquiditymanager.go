@@ -7,7 +7,6 @@ import (
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -24,12 +23,11 @@ type Rebalancer interface {
 	// GetPendingTransfers returns the pending liquidity transfers.
 	GetPendingTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error)
 
-	// Discover discovers other rebalancers
-	Discover(ctx context.Context, lmFactory Factory) (*Registry, liquiditygraph.LiquidityGraph, error)
-
 	// Close releases any resources.
 	Close(ctx context.Context) error
 
 	// ConfigDigest returns the OCR config digest for the rebalancer.
 	ConfigDigest(ctx context.Context) (ocrtypes.ConfigDigest, error)
+
+	GetTokenAddress(ctx context.Context) (models.Address, error)
 }

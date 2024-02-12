@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	liquiditygraph "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
+	graph "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -16,7 +16,7 @@ type Rebalancer struct {
 }
 
 // ComputeTransfersToBalance provides a mock function with given fields: g, inflightTransfers, medianLiquidityPerChain
-func (_m *Rebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph, inflightTransfers []models.PendingTransfer, medianLiquidityPerChain []models.NetworkLiquidity) ([]models.Transfer, error) {
+func (_m *Rebalancer) ComputeTransfersToBalance(g graph.Graph, inflightTransfers []models.PendingTransfer, medianLiquidityPerChain []models.NetworkLiquidity) ([]models.Transfer, error) {
 	ret := _m.Called(g, inflightTransfers, medianLiquidityPerChain)
 
 	if len(ret) == 0 {
@@ -25,10 +25,10 @@ func (_m *Rebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph,
 
 	var r0 []models.Transfer
 	var r1 error
-	if rf, ok := ret.Get(0).(func(liquiditygraph.LiquidityGraph, []models.PendingTransfer, []models.NetworkLiquidity) ([]models.Transfer, error)); ok {
+	if rf, ok := ret.Get(0).(func(graph.Graph, []models.PendingTransfer, []models.NetworkLiquidity) ([]models.Transfer, error)); ok {
 		return rf(g, inflightTransfers, medianLiquidityPerChain)
 	}
-	if rf, ok := ret.Get(0).(func(liquiditygraph.LiquidityGraph, []models.PendingTransfer, []models.NetworkLiquidity) []models.Transfer); ok {
+	if rf, ok := ret.Get(0).(func(graph.Graph, []models.PendingTransfer, []models.NetworkLiquidity) []models.Transfer); ok {
 		r0 = rf(g, inflightTransfers, medianLiquidityPerChain)
 	} else {
 		if ret.Get(0) != nil {
@@ -36,7 +36,7 @@ func (_m *Rebalancer) ComputeTransfersToBalance(g liquiditygraph.LiquidityGraph,
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(liquiditygraph.LiquidityGraph, []models.PendingTransfer, []models.NetworkLiquidity) error); ok {
+	if rf, ok := ret.Get(1).(func(graph.Graph, []models.PendingTransfer, []models.NetworkLiquidity) error); ok {
 		r1 = rf(g, inflightTransfers, medianLiquidityPerChain)
 	} else {
 		r1 = ret.Error(1)

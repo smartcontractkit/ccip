@@ -6,7 +6,7 @@ import (
 	mathrand "math/rand"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -28,7 +28,7 @@ func NewRandomRebalancer(maxNumTransfers int, checkSourceDestEqual bool, lggr lo
 
 // ComputeTransfersToBalance implements Rebalancer.
 func (r *randomRebalancer) ComputeTransfersToBalance(
-	g liquiditygraph.LiquidityGraph,
+	g graph.Graph,
 	inflightTransfers []models.PendingTransfer,
 	medianLiquidities []models.NetworkLiquidity,
 ) ([]models.Transfer, error) {

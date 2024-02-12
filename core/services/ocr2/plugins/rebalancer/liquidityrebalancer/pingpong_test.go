@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -245,10 +245,12 @@ func runPingPongInfinitySimulation(t *testing.T, rounds, maxNets, maxLanes int) 
 }
 
 // Generates a graph from the provided lanes and balances.
-func genGraph(t testing.TB, balances map[models.NetworkSelector]int64, lanes [][2]models.NetworkSelector) *liquiditygraph.Graph {
-	g := liquiditygraph.NewGraph()
+func genGraph(t testing.TB, balances map[models.NetworkSelector]int64, lanes [][2]models.NetworkSelector) graph.Graph {
+	g := graph.NewGraph()
 	for netSel, balance := range balances {
-		g.AddNetwork(netSel, big.NewInt(balance))
+		g.AddNetwork(netSel, graph.Data{
+			Liquidity: big.NewInt(balance),
+		})
 	}
 
 	for _, lane := range lanes {

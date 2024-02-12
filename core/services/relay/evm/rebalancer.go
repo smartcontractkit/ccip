@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/no_op_ocr3"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/discoverer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
@@ -36,6 +37,7 @@ type RebalancerProvider interface {
 	commontypes.Plugin
 	ContractTransmitterOCR3() ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata]
 	LiquidityManagerFactory() liquiditymanager.Factory
+	DiscovererFactory() discoverer.Factory
 }
 
 type RebalancerRelayer interface {
@@ -63,7 +65,7 @@ func NewRebalancerRelayer(
 
 // NewRebalancerProvider implements RebalancerRelayer.
 func (r *rebalancerRelayer) NewRebalancerProvider(rargs commontypes.RelayArgs, pargs commontypes.PluginArgs) (RebalancerProvider, error) {
-	configWatcher, lmContracts, lmFactory, err := newRebalancerConfigProvider(r.lggr, r.chains, rargs)
+	configWatcher, lmContracts, lmFactory, discovererFactory, err := newRebalancerConfigProvider(r.lggr, r.chains, rargs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config watcher: %w", err)
 	}
@@ -116,6 +118,7 @@ func (r *rebalancerRelayer) NewRebalancerProvider(rargs commontypes.RelayArgs, p
 		configWatcher:       configWatcher,
 		contractTransmitter: multichainTransmitter,
 		lmFactory:           lmFactory,
+		discovererFactory:   discovererFactory,
 	}, nil
 }
 
@@ -125,6 +128,7 @@ type rebalancerProvider struct {
 	*configWatcher
 	contractTransmitter ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata]
 	lmFactory           liquiditymanager.Factory
+	discovererFactory   discoverer.Factory
 }
 
 func (r *rebalancerProvider) Codec() commontypes.Codec {
@@ -149,24 +153,36 @@ func (r *rebalancerProvider) LiquidityManagerFactory() liquiditymanager.Factory 
 	return r.lmFactory
 }
 
+func (r *rebalancerProvider) DiscovererFactory() discoverer.Factory {
+	return r.discovererFactory
+}
+
 func newRebalancerConfigProvider(
 	lggr logger.Logger,
 	chains legacyevm.LegacyChainContainer,
-	rargs commontypes.RelayArgs) (*configWatcher, map[relay.ID]common.Address, liquiditymanager.Factory, error) {
+	rargs commontypes.RelayArgs,
+) (
+	*configWatcher,
+	map[relay.ID]common.Address,
+	liquiditymanager.Factory,
+	discoverer.Factory,
+	error,
+) {
 	var relayConfig types.RelayConfig
 	err := json.Unmarshal(rargs.RelayConfig, &relayConfig)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to unmarshal relay config (%s): %w", string(rargs.RelayConfig), err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to unmarshal relay config (%s): %w", string(rargs.RelayConfig), err)
 	}
 	if !common.IsHexAddress(rargs.ContractID) {
-		return nil, nil, nil, fmt.Errorf("invalid contract address %s", rargs.ContractID)
+		return nil, nil, nil, nil, fmt.Errorf("invalid contract address %s", rargs.ContractID)
 	}
 
 	var lmFactoryOpts []liquiditymanager.Opt
+	var discovererOpts []discoverer.Opt
 	for _, chain := range chains.Slice() {
 		ch, exists := chainsel.ChainByEvmChainID(chain.ID().Uint64())
 		if !exists {
-			return nil, nil, nil, fmt.Errorf("chain %d not found", chain.ID().Uint64())
+			return nil, nil, nil, nil, fmt.Errorf("chain %d not found", chain.ID().Uint64())
 		}
 
 		lmFactoryOpts = append(lmFactoryOpts, liquiditymanager.WithEvmDep(
@@ -174,12 +190,17 @@ func newRebalancerConfigProvider(
 			chain.LogPoller(),
 			chain.Client(),
 		))
+		discovererOpts = append(discovererOpts, discoverer.WithEvmDep(
+			rebalancermodels.NetworkSelector(ch.Selector),
+			chain.Client(),
+		))
 	}
 	lmFactory := liquiditymanager.NewBaseRebalancerFactory(lggr, lmFactoryOpts...)
+	discovererFactory := discoverer.NewFactory(lggr, discovererOpts...)
 
 	masterChain, err := chains.Get(relayConfig.ChainID.String())
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to get master chain %s: %w", relayConfig.ChainID, err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to get master chain %s: %w", relayConfig.ChainID, err)
 	}
 
 	logPollers := make(map[relay.ID]logpoller.LogPoller)
@@ -191,7 +212,7 @@ func newRebalancerConfigProvider(
 	for chainID := range relayConfig.FromBlocks {
 		_, err2 := chains.Get(chainID)
 		if err2 != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get chain %s specified in RelayConfig.fromBlocks: %w", chainID, err2)
+			return nil, nil, nil, nil, fmt.Errorf("failed to get chain %s specified in RelayConfig.fromBlocks: %w", chainID, err2)
 		}
 	}
 
@@ -203,12 +224,12 @@ func newRebalancerConfigProvider(
 		logPollers,
 		masterChain.Client(),
 		contractAddress,
-		lmFactory,
+		discovererFactory,
 		ocr3impls.TransmitterCombiner,
 		relayConfig.FromBlocks,
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create multichain config tracker: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to create multichain config tracker: %w", err)
 	}
 
 	digester := ocr3impls.MultichainConfigDigester{
@@ -227,5 +248,5 @@ func newRebalancerConfigProvider(
 		masterChain,
 		relayConfig.FromBlock,
 		rargs.New,
-	), mcct.GetContractAddresses(), lmFactory, nil
+	), mcct.GetContractAddresses(), lmFactory, discovererFactory, nil
 }

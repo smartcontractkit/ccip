@@ -14,7 +14,8 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/discoverer"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
@@ -25,10 +26,10 @@ type Plugin struct {
 	rootNetwork             models.NetworkSelector
 	rootAddress             models.Address
 	closePluginTimeout      time.Duration
-	liquidityManagers       *liquiditymanager.Registry
 	liquidityManagerFactory liquiditymanager.Factory
+	discovererFactory       discoverer.Factory
 	mu                      sync.RWMutex
-	liquidityGraph          liquiditygraph.LiquidityGraph
+	rebalancerGraph         graph.Graph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	pendingTransfers        *PendingTransfersCache
 	lggr                    logger.Logger
@@ -37,25 +38,20 @@ type Plugin struct {
 func NewPlugin(
 	f int,
 	closePluginTimeout time.Duration,
-	liquidityManagerNetwork models.NetworkSelector,
-	liquidityManagerAddress models.Address,
+	rootNetwork models.NetworkSelector,
+	rootAddress models.Address,
 	liquidityManagerFactory liquiditymanager.Factory,
-	liquidityGraph liquiditygraph.LiquidityGraph,
+	discovererFactory discoverer.Factory,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
 	lggr logger.Logger,
 ) *Plugin {
-
-	liquidityManagers := liquiditymanager.NewRegistry()
-	liquidityManagers.Add(liquidityManagerNetwork, liquidityManagerAddress)
-
 	return &Plugin{
 		f:                       f,
-		rootNetwork:             liquidityManagerNetwork,
-		rootAddress:             liquidityManagerAddress,
+		rootNetwork:             rootNetwork,
+		rootAddress:             rootAddress,
 		closePluginTimeout:      closePluginTimeout,
-		liquidityManagers:       liquidityManagers,
 		liquidityManagerFactory: liquidityManagerFactory,
-		liquidityGraph:          liquidityGraph,
+		rebalancerGraph:         graph.NewGraph(),
 		liquidityRebalancer:     liquidityRebalancer,
 		pendingTransfers:        NewPendingTransfersCache(),
 		lggr:                    lggr,
@@ -146,15 +142,15 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 
 	lggr.Infow("computing transfers to reach balance",
 		"pendingTransfers", obs.PendingTransfers,
-		"liquidityGraph", p.liquidityGraph,
+		"liquidityGraph", p.rebalancerGraph,
 		"liquidityPerChain", obs.LiquidityPerChain)
 
-	if p.liquidityGraph.IsEmpty() {
+	if p.rebalancerGraph.IsEmpty() {
 		return nil, fmt.Errorf("liquidity graph is empty, can't generate reports")
 	}
 
 	transfersToReachBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(
-		p.liquidityGraph, obs.PendingTransfers, obs.LiquidityPerChain)
+		p.rebalancerGraph, obs.PendingTransfers, obs.LiquidityPerChain)
 	if err != nil {
 		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
 	}
@@ -171,8 +167,8 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	for sourceNet, transfers := range transfersBySourceNet {
-		lmAddress, exists := p.liquidityManagers.Get(sourceNet)
-		if !exists {
+		lmAddress, err := p.rebalancerGraph.GetRebalancerAddress(sourceNet)
+		if err != nil {
 			return nil, fmt.Errorf("liquidity manager for %v does not exist", sourceNet)
 		}
 
@@ -240,15 +236,21 @@ func (p *Plugin) Close() error {
 	defer cf()
 
 	var errs []error
-	for networkID, lmAddr := range p.liquidityManagers.GetAll() {
-		rb, err := p.liquidityManagerFactory.GetRebalancer(networkID, lmAddr)
+	for _, networkID := range p.rebalancerGraph.GetNetworks() {
+		rebalancerAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("get rebalancer (%d, %v): %w", networkID, lmAddr, err))
+			errs = append(errs, fmt.Errorf("get rebalancer address for %v: %w", networkID, err))
+			continue
+		}
+
+		rb, err := p.liquidityManagerFactory.GetRebalancer(networkID, rebalancerAddress)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("get rebalancer (%d, %v): %w", networkID, rebalancerAddress, err))
 			continue
 		}
 
 		if err := rb.Close(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("close rebalancer (%d, %v): %w", networkID, lmAddr, err))
+			errs = append(errs, fmt.Errorf("close rebalancer (%d, %v): %w", networkID, rebalancerAddress, err))
 			continue
 		}
 	}
@@ -264,31 +266,20 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 	// todo: if there wasn't any change to the graph stop earlier
 	p.lggr.Infow("syncing graph edges")
 
-	p.lggr.Infow("getting root LM", "rootNetwork", p.rootNetwork)
-	rootLM, exists := p.liquidityManagers.Get(p.rootNetwork)
-	if !exists {
-		p.lggr.Infow("failed to get root LM")
-		return fmt.Errorf("root lm %v not found", p.rootNetwork)
-	}
-
-	p.lggr.Infow("init root LM", "rootLMAddress", rootLM)
-	lm, err := p.liquidityManagerFactory.NewRebalancer(p.rootNetwork, rootLM)
+	p.lggr.Infow("discovering rebalancers")
+	discoverer, err := p.discovererFactory.NewDiscoverer(p.rootNetwork, p.rootAddress)
 	if err != nil {
-		p.lggr.Infow("failed to init root LM", "rootLMAddress", rootLM)
-		return fmt.Errorf("init liquidity manager: %w", err)
+		return fmt.Errorf("init discoverer: %w", err)
 	}
 
-	p.lggr.Infow("discovering LMs")
-	lms, g, err := lm.Discover(ctx, p.liquidityManagerFactory)
+	g, err := discoverer.Discover(ctx)
 	if err != nil {
-		p.lggr.Infow("Failed to discover LMs")
-		return fmt.Errorf("discover lms: %w", err)
+		return fmt.Errorf("discovering rebalancers: %w", err)
 	}
 
-	p.liquidityGraph = g
-	p.liquidityManagers = lms
+	p.rebalancerGraph = g
 
-	p.lggr.Infow("finished syncing graph edges", "graph", g.String(), "lms", lms.String())
+	p.lggr.Infow("finished syncing graph edges", "graph", g.String())
 
 	return nil
 }
@@ -297,13 +288,13 @@ func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidi
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	networks := p.liquidityGraph.GetNetworks()
+	networks := p.rebalancerGraph.GetNetworks()
 	p.lggr.Infow("syncing graph balances", "networks", networks)
 
 	networkLiquidities := make([]models.NetworkLiquidity, 0, len(networks))
 	for _, networkID := range networks {
-		lmAddr, exists := p.liquidityManagers.Get(networkID)
-		if !exists {
+		lmAddr, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
+		if err != nil {
 			return nil, fmt.Errorf("liquidity manager for network %v was not found", networkID)
 		}
 
@@ -317,7 +308,7 @@ func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidi
 			return nil, fmt.Errorf("get %v balance: %w", networkID, err)
 		}
 
-		p.liquidityGraph.SetLiquidity(networkID, balance)
+		p.rebalancerGraph.SetLiquidity(networkID, balance)
 		networkLiquidities = append(networkLiquidities, models.NewNetworkLiquidity(networkID, balance))
 	}
 
@@ -328,8 +319,13 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 	p.lggr.Infow("loading pending transfers")
 
 	pendingTransfers := make([]models.PendingTransfer, 0)
-	for networkID, lmAddress := range p.liquidityManagers.GetAll() {
-		lm, err := p.liquidityManagerFactory.NewRebalancer(networkID, lmAddress)
+	for _, networkID := range p.rebalancerGraph.GetNetworks() {
+		rebalancerAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
+		if err != nil {
+			return nil, fmt.Errorf("get rebalancer address for %v: %w", networkID, err)
+		}
+
+		lm, err := p.liquidityManagerFactory.NewRebalancer(networkID, rebalancerAddress)
 		if err != nil {
 			return nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
