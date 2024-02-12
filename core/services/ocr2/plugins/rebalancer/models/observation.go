@@ -71,7 +71,7 @@ func (o Outcome) Encode() []byte {
 }
 
 func DecodeOutcome(b []byte) (Outcome, error) {
-	var outCome Outcome
-	err := json.Unmarshal(b, &outCome)
-	return outCome, err
+	var decodedOutcome Outcome
+	err := json.Unmarshal(b, &decodedOutcome)
+	return decodedOutcome, err
 }

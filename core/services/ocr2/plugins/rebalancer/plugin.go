@@ -161,14 +161,14 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	lggr := p.lggr.With("seqNr", seqNr)
 	lggr.Infow("in reports", "seqNr", seqNr)
 
-	outCome, err := models.DecodeOutcome(outcome)
+	decodedOutcome, err := models.DecodeOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
 	// group transfers by source chain
 	transfersBySourceNet := make(map[models.NetworkSelector][]models.Transfer)
-	for _, tr := range outCome.TransfersToReachBalance {
+	for _, tr := range decodedOutcome.TransfersToReachBalance {
 		transfersBySourceNet[tr.From] = append(transfersBySourceNet[tr.From], tr)
 	}
 
@@ -436,7 +436,7 @@ func (p *Plugin) computeMedianGraph(
 
 	for _, medianLiq := range medianLiquidities {
 		if !g.SetLiquidity(medianLiq.Network, medianLiq.Liquidity) {
-			p.lggr.Infow("median liquidity on network not found on lanes quorum", "net", medianLiq.Network)
+			p.lggr.Errorw("median liquidity on network not found on lanes quorum", "net", medianLiq.Network)
 		}
 	}
 
