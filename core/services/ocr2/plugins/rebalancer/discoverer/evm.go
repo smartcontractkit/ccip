@@ -25,7 +25,7 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 		if !ok {
 			return graph.Data{}, nil, fmt.Errorf("no client for master chain %+v", selector)
 		}
-		rebal, err := rebalancer.NewRebalancer(common.Address(e.masterRebalancer), dep.ethClient)
+		rebal, err := rebalancer.NewRebalancer(common.Address(rebalancerAddress), dep.ethClient)
 		if err != nil {
 			return graph.Data{}, nil, fmt.Errorf("new rebalancer: %w", err)
 		}
