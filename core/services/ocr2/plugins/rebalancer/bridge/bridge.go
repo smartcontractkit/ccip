@@ -63,10 +63,10 @@ type mapKey struct {
 }
 
 type evmDep struct {
-	lp                   logpoller.LogPoller
-	ethClient            client.Client
-	rebalancerAddress    models.Address
-	bridgeAdapterAddress models.Address
+	lp                logpoller.LogPoller
+	ethClient         client.Client
+	rebalancerAddress models.Address
+	bridgeAdapters    map[models.NetworkSelector]models.Address
 }
 
 type factory struct {
@@ -90,15 +90,15 @@ func WithEvmDep(
 	networkID models.NetworkSelector,
 	lp logpoller.LogPoller,
 	ethClient client.Client,
-	rebalancerAddress,
-	bridgeAdapterAddress models.Address,
+	rebalancerAddress models.Address,
+	bridgeAdapters map[models.NetworkSelector]models.Address,
 ) Opt {
 	return func(f *factory) {
 		f.evmDeps[networkID] = evmDep{
-			lp:                   lp,
-			ethClient:            ethClient,
-			rebalancerAddress:    rebalancerAddress,
-			bridgeAdapterAddress: bridgeAdapterAddress,
+			lp:                lp,
+			ethClient:         ethClient,
+			rebalancerAddress: rebalancerAddress,
+			bridgeAdapters:    bridgeAdapters,
 		}
 	}
 }
@@ -122,7 +122,7 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 	switch source {
 	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector):
 	case models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector):
-		// arbitrum l1 -> l2
+		// source: arbitrum l2 -> dest: ethereum l1
 		// only dest that is supported is eth mainnet if source == arb mainnet
 		// only dest that is supported is eth sepolia if source == arb sepolia
 		if source == models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector) &&
@@ -133,26 +133,34 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector) {
 			return nil, fmt.Errorf("unsupported destination for arbitrum sepolia l1 -> l2 bridge: %d, must be eth sepolia", dest)
 		}
-		sourceDeps, ok := f.evmDeps[source]
+		l2Deps, ok := f.evmDeps[source]
 		if !ok {
 			return nil, fmt.Errorf("evm dependencies not found for source selector %d", source)
 		}
-		destDeps, ok := f.evmDeps[dest]
+		l1Deps, ok := f.evmDeps[dest]
 		if !ok {
 			return nil, fmt.Errorf("evm dependencies not found for dest selector %d", dest)
+		}
+		l1BridgeAdapter, ok := l1Deps.bridgeAdapters[source]
+		if !ok {
+			return nil, fmt.Errorf("bridge adapter not found for source selector %d in deps for dest selector %d", dest, source)
+		}
+		l2BridgeAdapter, ok := l2Deps.bridgeAdapters[dest]
+		if !ok {
+			return nil, fmt.Errorf("bridge adapter not found for dest selector %d in deps for source selector %d", source, dest)
 		}
 		bridge, err = arb.NewL2ToL1Bridge(
 			f.lggr,
 			source,
 			dest,
 			arb.AllContracts[uint64(source)].L1.RollupAddress,
-			common.Address(destDeps.rebalancerAddress),      // l1 rebalancer address
-			common.Address(sourceDeps.bridgeAdapterAddress), // l2 bridge adapter address
-			common.Address(destDeps.bridgeAdapterAddress),   // l1 bridge adapter address
-			sourceDeps.lp,        // l2 log poller
-			destDeps.lp,          // l1 log poller
-			sourceDeps.ethClient, // l2 eth client
-			destDeps.ethClient,   // l1 eth client
+			common.Address(l1Deps.rebalancerAddress), // l1 rebalancer address
+			common.Address(l2BridgeAdapter),          // l2 bridge adapter address
+			common.Address(l1BridgeAdapter),          // l1 bridge adapter address
+			l2Deps.lp,                                // l2 log poller
+			l1Deps.lp,                                // l1 log poller
+			l2Deps.ethClient,                         // l2 eth client
+			l1Deps.ethClient,                         // l1 eth client
 		)
 	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector):
 	case models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector):
@@ -175,13 +183,17 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		if !ok {
 			return nil, fmt.Errorf("evm dependencies not found for dest selector %d", dest)
 		}
+		l1BridgeAdapter, ok := sourceDeps.bridgeAdapters[dest]
+		if !ok {
+			return nil, fmt.Errorf("bridge adapter not found for source selector %d in deps for selector %d", source, dest)
+		}
 		bridge, err = arb.NewL1ToL2Bridge(
 			f.lggr,
 			source,
 			dest,
 			common.Address(sourceDeps.rebalancerAddress),             // l1 rebalancer address
 			common.Address(destDeps.rebalancerAddress),               // l2 rebalancer address
-			common.Address(sourceDeps.bridgeAdapterAddress),          // l1 bridge adapter address
+			common.Address(l1BridgeAdapter),                          // l1 bridge adapter address
 			arb.AllContracts[uint64(source)].L1.GatewayRouterAddress, // l1 gateway router address
 			arb.AllContracts[uint64(source)].L1.InboxAddress,         // l1 inbox address
 			sourceDeps.ethClient,                                     // l1 eth client

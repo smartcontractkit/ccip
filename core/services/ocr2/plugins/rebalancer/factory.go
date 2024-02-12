@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/discoverer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
@@ -23,17 +24,26 @@ type PluginFactory struct {
 	config            models.PluginConfig
 	lmFactory         liquiditymanager.Factory
 	discovererFactory discoverer.Factory
+	bridgeFactory     bridge.Factory
 }
 
-func NewPluginFactory(lggr logger.Logger, pluginConfigBytes []byte, lmFactory liquiditymanager.Factory) (*PluginFactory, error) {
+func NewPluginFactory(
+	lggr logger.Logger,
+	pluginConfigBytes []byte,
+	lmFactory liquiditymanager.Factory,
+	discovererFactory discoverer.Factory,
+	bridgeFactory bridge.Factory,
+) (*PluginFactory, error) {
 	var pluginConfig models.PluginConfig
 	if err := json.Unmarshal(pluginConfigBytes, &pluginConfig); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal plugin config: %w", err)
 	}
 	return &PluginFactory{
-		lggr:      lggr.Named(PluginName),
-		config:    pluginConfig,
-		lmFactory: lmFactory,
+		lggr:              lggr.Named(PluginName),
+		config:            pluginConfig,
+		lmFactory:         lmFactory,
+		discovererFactory: discovererFactory,
+		bridgeFactory:     bridgeFactory,
 	}, nil
 }
 

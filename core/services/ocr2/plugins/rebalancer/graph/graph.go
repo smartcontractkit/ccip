@@ -32,6 +32,8 @@ type Graph interface {
 
 	GetRebalancerAddress(n models.NetworkSelector) (models.Address, error)
 
+	GetXChainRebalancerData(n models.NetworkSelector) (map[models.NetworkSelector]XChainRebalancerData, error)
+
 	// AddConnection adds a new directed graph edge.
 	AddConnection(from, to models.NetworkSelector) error
 
@@ -53,10 +55,17 @@ type Graph interface {
 	Len() int
 }
 
+type XChainRebalancerData struct {
+	RemoteRebalancerAddress   models.Address
+	LocalBridgeAdapterAddress models.Address
+	RemoteTokenAddress        models.Address
+}
+
 type Data struct {
 	Liquidity         *big.Int
 	TokenAddress      models.Address
 	RebalancerAddress models.Address
+	XChainRebalancers map[models.NetworkSelector]XChainRebalancerData
 }
 
 type gph struct {
@@ -253,4 +262,21 @@ func (g *gph) Len() int {
 	defer g.mu.RUnlock()
 
 	return len(g.adj)
+}
+
+// GetXChainRebalancerData implements Graph.
+func (g *gph) GetXChainRebalancerData(n models.NetworkSelector) (map[models.NetworkSelector]XChainRebalancerData, error) {
+	if !g.HasNetwork(n) {
+		return nil, fmt.Errorf("network not found")
+	}
+
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	w, exists := g.data[n]
+	if !exists {
+		return nil, fmt.Errorf("graph internal error, network balance not found")
+	}
+
+	return w.XChainRebalancers, nil
 }

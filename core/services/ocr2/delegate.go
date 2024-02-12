@@ -1636,7 +1636,13 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer provider: %w", err)
 	}
-	factory, err := rebalancer.NewPluginFactory(lggr, spec.PluginConfig.Bytes(), rebalancerProvider.LiquidityManagerFactory())
+	factory, err := rebalancer.NewPluginFactory(
+		lggr,
+		spec.PluginConfig.Bytes(),
+		rebalancerProvider.LiquidityManagerFactory(),
+		rebalancerProvider.DiscovererFactory(),
+		rebalancerProvider.BridgeFactory(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer plugin factory: %w", err)
 	}

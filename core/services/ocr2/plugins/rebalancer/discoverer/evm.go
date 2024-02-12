@@ -20,60 +20,57 @@ type evmDiscoverer struct {
 }
 
 func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
-	getData := func(ctx context.Context, selector models.NetworkSelector, rebalancerAddress models.Address) (graph.Data, error) {
+	getVertexInfo := func(ctx context.Context, selector models.NetworkSelector, rebalancerAddress models.Address) (graph.Data, []dataItem, error) {
 		dep, ok := e.evmClients[selector]
 		if !ok {
-			return graph.Data{}, fmt.Errorf("no client for master chain %+v", selector)
+			return graph.Data{}, nil, fmt.Errorf("no client for master chain %+v", selector)
 		}
 		rebal, err := rebalancer.NewRebalancer(common.Address(e.masterRebalancer), dep.ethClient)
 		if err != nil {
-			return graph.Data{}, fmt.Errorf("new rebalancer: %w", err)
+			return graph.Data{}, nil, fmt.Errorf("new rebalancer: %w", err)
 		}
 		liquidity, err := rebal.GetLiquidity(&bind.CallOpts{
 			Context: ctx,
 		})
 		if err != nil {
-			return graph.Data{}, fmt.Errorf("get liquidity: %w", err)
+			return graph.Data{}, nil, fmt.Errorf("get liquidity: %w", err)
 		}
 		token, err := rebal.ILocalToken(&bind.CallOpts{
 			Context: ctx,
 		})
 		if err != nil {
-			return graph.Data{}, fmt.Errorf("get token: %w", err)
-		}
-		return graph.Data{
-			Liquidity:         liquidity,
-			TokenAddress:      models.Address(token),
-			RebalancerAddress: rebalancerAddress,
-		}, nil
-	}
-
-	getNeighbors := func(ctx context.Context, selector models.NetworkSelector, rebalancerAddress models.Address) ([]dataItem, error) {
-		dep, ok := e.evmClients[selector]
-		if !ok {
-			return []dataItem{}, fmt.Errorf("no client for master chain %+v", selector)
-		}
-		rebal, err := rebalancer.NewRebalancer(common.Address(e.masterRebalancer), dep.ethClient)
-		if err != nil {
-			return []dataItem{}, fmt.Errorf("new rebalancer: %w", err)
+			return graph.Data{}, nil, fmt.Errorf("get token: %w", err)
 		}
 		xchainRebalancers, err := rebal.GetAllCrossChainRebalancers(&bind.CallOpts{
 			Context: ctx,
 		})
 		if err != nil {
-			return []dataItem{}, fmt.Errorf("get all cross chain rebalancers: %w", err)
+			return graph.Data{}, nil, fmt.Errorf("get all cross chain rebalancers: %w", err)
 		}
-		var neighbors []dataItem
+		var (
+			neighbors            []dataItem
+			xchainRebalancerData = make(map[models.NetworkSelector]graph.XChainRebalancerData)
+		)
 		for _, v := range xchainRebalancers {
 			neighbors = append(neighbors, dataItem{
 				networkSelector:   models.NetworkSelector(v.RemoteChainSelector),
 				rebalancerAddress: models.Address(v.RemoteRebalancer),
 			})
+			xchainRebalancerData[models.NetworkSelector(v.RemoteChainSelector)] = graph.XChainRebalancerData{
+				RemoteRebalancerAddress:   models.Address(v.RemoteRebalancer),
+				LocalBridgeAdapterAddress: models.Address(v.LocalBridge),
+				RemoteTokenAddress:        models.Address(v.RemoteToken),
+			}
 		}
-		return neighbors, nil
+		return graph.Data{
+			Liquidity:         liquidity,
+			TokenAddress:      models.Address(token),
+			RebalancerAddress: rebalancerAddress,
+			XChainRebalancers: xchainRebalancerData,
+		}, neighbors, nil
 	}
 
-	return discover(ctx, e.masterSelector, e.masterRebalancer, getNeighbors, getData)
+	return discover(ctx, e.masterSelector, e.masterRebalancer, getVertexInfo)
 }
 
 type dataItem struct {
@@ -85,8 +82,11 @@ func discover(
 	ctx context.Context,
 	startNetwork models.NetworkSelector,
 	startAddress models.Address,
-	getNeighbors func(ctx context.Context, network models.NetworkSelector, rebalancerAddress models.Address) ([]dataItem, error),
-	getData func(ctx context.Context, key models.NetworkSelector, rebalancerAddress models.Address) (graph.Data, error),
+	getVertexInfo func(
+		ctx context.Context,
+		network models.NetworkSelector,
+		rebalancerAddress models.Address,
+	) (graph.Data, []dataItem, error),
 ) (graph.Graph, error) {
 	g := graph.NewGraph()
 
@@ -105,20 +105,15 @@ func discover(
 			return nil, fmt.Errorf("unexpected internal error")
 		}
 
-		val, err := getData(ctx, elem.networkSelector, elem.rebalancerAddress)
+		val, neighbors, err := getVertexInfo(ctx, elem.networkSelector, elem.rebalancerAddress)
 		if err != nil {
 			return nil, fmt.Errorf("could not get value for vertex %+v: %w", elem, err)
 		}
 		g.AddNetwork(elem.networkSelector, val)
 
-		neighbors, err := getNeighbors(ctx, elem.networkSelector, elem.rebalancerAddress)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get neighbors on vertex %+v: %w", elem, err)
-		}
-
 		for _, neighbor := range neighbors {
 			if !g.HasNetwork(neighbor.networkSelector) {
-				val2, err := getData(ctx, neighbor.networkSelector, neighbor.rebalancerAddress)
+				val2, _, err := getVertexInfo(ctx, neighbor.networkSelector, neighbor.rebalancerAddress)
 				if err != nil {
 					return nil, fmt.Errorf("could not get value for vertex %+v: %w", elem, err)
 				}
