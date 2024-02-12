@@ -4,16 +4,16 @@
 set_config:
 	if [ -s "$(override_toml)" ]; then \
   			echo "Overriding config with $(override_toml)"; \
-			echo "export BASE64_TEST_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" > ./testconfig/override/.env; \
-        	echo "export TEST_BASE64_TEST_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" >> ./testconfig/override/.env; \
+			echo "export BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" > ./testconfig/override/.env; \
+        	echo "export TEST_BASE64_CCIP_CONFIG_OVERRIDE=$$(base64 -i $(override_toml))" >> ./testconfig/override/.env; \
     else \
       		echo "No override config found, using default config"; \
         	echo  > ./testconfig/override/.env; \
 	fi
 
 	@echo "setting secret config with $(secret_toml)"
-	@echo "export BASE64_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env
-	@echo "export TEST_BASE64_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env
+	@echo "export BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env
+	@echo "export TEST_BASE64_CCIP_SECRETS_CONFIG=$$(base64 -i $(secret_toml))" >> ./testconfig/override/.env
 
 
 # example usage: make test_load_ccip testimage=chainlink-ccip-tests:latest testname=TestLoadCCIPStableRequestTriggeringWithNetworkChaos override_toml=../testconfig/override/config.toml secret_toml=./testconfig/tomls/secrets.toml
@@ -47,8 +47,8 @@ test_smoke_ccip: set_config
 test_smoke_ccip_default: set_config
 	source ./testconfig/override/.env && \
 	DATABASE_URL=postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable	\
-	BASE64_TEST_CONFIG_OVERRIDE=""	\
-	TEST_BASE64_TEST_CONFIG_OVERRIDE=""	\
+	BASE64_CCIP_CONFIG_OVERRIDE=""	\
+	TEST_BASE64_CCIP_CONFIG_OVERRIDE=""	\
 	ENV_JOB_IMAGE=""  \
 	TEST_SUITE=smoke \
 	TEST_ARGS="-test.timeout 900h" \

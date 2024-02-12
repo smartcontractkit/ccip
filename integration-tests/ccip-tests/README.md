@@ -18,16 +18,16 @@ Please refer to [default.toml](./testconfig/tomls/default.toml) for the list of 
          [CCIP.Env.Network]
          selected_networks= ['AVALANCHE_FUJI', 'ARBITRUM_GOERLI']
    2. encode it using `base64` command 
-   3. set the env var `BASE64_TEST_CONFIG_OVERRIDE` with the encoded content.
+   3. set the env var `BASE64_CCIP_CONFIG_OVERRIDE` with the encoded content.
     ```bash
-    export BASE64_TEST_CONFIG_OVERRIDE=$(base64 -i <path-to-override-toml-file>)
+    export BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -i <path-to-override-toml-file>)
     ```
 
     [mainnet.toml](./testconfig/override/mainnet.toml), [override.toml](./testconfig/override/override.toml), [prod_testnet.toml](./testconfig/override/prod_testnet.toml) are some of the sample override TOML files. 
 
     For example - In order to run the smoke test (TestSmokeCCIPForBidirectionalLane) on mainnet, run the test with following env var set:
     ```bash
-      export BASE64_TEST_CONFIG_OVERRIDE=$(base64 -i ./testconfig/override/mainnet.toml)
+      export BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -i ./testconfig/override/mainnet.toml)
     ```
 
 3. Secrets - You also need to set some secrets. This is a mandatory step needed to run the tests. Please refer to [sample-secrets.toml](./testconfig/tomls/sample-secrets.toml) for the list of secrets that are mandatory to run the tests.
@@ -47,9 +47,9 @@ Please refer to [default.toml](./testconfig/tomls/default.toml) for the list of 
    ```
 
    We consider secrets similar to test input overrides and encode them using `base64` command.
-   Once you have the secrets.toml file, you can encode it using `base64` command (similar to step 2) and set the env var `BASE64_SECRETS_CONFIG` with the encoded content.
+   Once you have the secrets.toml file, you can encode it using `base64` command (similar to step 2) and set the env var `BASE64_CCIP_SECRETS_CONFIG` with the encoded content.
 ```bash
-    export BASE64_SECRETS_CONFIG=$(base64 -i ./testconfig/tomls/secrets.toml)
+    export BASE64_CCIP_SECRETS_CONFIG=$(base64 -i ./testconfig/tomls/secrets.toml)
 ```
 
 **Please note that the secrets should NOT be checked in to the repo and should be kept locally.**

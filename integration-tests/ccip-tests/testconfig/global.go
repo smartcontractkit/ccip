@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	OVERIDECONFIG = "BASE64_TEST_CONFIG_OVERRIDE"
+	OVERIDECONFIG = "BASE64_CCIP_CONFIG_OVERRIDE"
 
-	SECRETSCONFIG             = "BASE64_SECRETS_CONFIG"
+	SECRETSCONFIG             = "BASE64_CCIP_SECRETS_CONFIG"
 	ErrReadConfig             = "failed to read TOML config"
 	ErrUnmarshalConfig        = "failed to unmarshal TOML config"
 	Load               string = "load"
