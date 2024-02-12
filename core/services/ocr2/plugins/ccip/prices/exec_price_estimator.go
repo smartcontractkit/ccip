@@ -47,12 +47,7 @@ func (g ExecGasPriceEstimator) DenoteInUSD(p *big.Int, wrappedNativePrice *big.I
 }
 
 func (g ExecGasPriceEstimator) Median(gasPrices []*big.Int) (*big.Int, error) {
-	var prices []*big.Int
-	for _, p := range gasPrices {
-		prices = append(prices, p)
-	}
-
-	return ccipcalc.BigIntSortedMiddle(prices), nil
+	return ccipcalc.BigIntSortedMiddle(gasPrices), nil
 }
 
 func (g ExecGasPriceEstimator) Deviates(p1 *big.Int, p2 *big.Int) (bool, error) {
@@ -70,6 +65,6 @@ func (g ExecGasPriceEstimator) EstimateMsgCostUSD(p *big.Int, wrappedNativePrice
 }
 
 func (g ExecGasPriceEstimator) String(p *big.Int) string {
-	var pi *big.Int = p
+	var pi = p
 	return pi.String()
 }

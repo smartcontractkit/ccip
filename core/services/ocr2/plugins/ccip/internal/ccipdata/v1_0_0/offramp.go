@@ -494,9 +494,9 @@ func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, se
 		logs,
 		o.Logger,
 		func(log types.Log) (*cciptypes.ExecutionStateChanged, error) {
-			sc, err := o.offRampV100.ParseExecutionStateChanged(log)
-			if err != nil {
-				return nil, err
+			sc, err1 := o.offRampV100.ParseExecutionStateChanged(log)
+			if err1 != nil {
+				return nil, err1
 			}
 
 			return &cciptypes.ExecutionStateChanged{

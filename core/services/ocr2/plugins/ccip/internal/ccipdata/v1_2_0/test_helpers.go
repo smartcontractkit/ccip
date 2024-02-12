@@ -24,8 +24,8 @@ func ApplyPriceRegistryUpdate(t *testing.T, user *bind.TransactOpts, addr common
 	require.Equal(t, user.From, o)
 	var tps []price_registry.InternalTokenPriceUpdate
 	for _, tp := range tokenPrices {
-		evmAddrs, err := ccipcalc.GenericAddrsToEvm(tp.Token)
-		assert.NoError(t, err)
+		evmAddrs, err1 := ccipcalc.GenericAddrsToEvm(tp.Token)
+		assert.NoError(t, err1)
 		tps = append(tps, price_registry.InternalTokenPriceUpdate{
 			SourceToken: evmAddrs[0],
 			UsdPerToken: tp.Value,

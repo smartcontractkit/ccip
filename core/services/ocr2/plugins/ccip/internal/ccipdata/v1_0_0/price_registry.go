@@ -162,9 +162,9 @@ func (p *PriceRegistry) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts
 		logs,
 		p.lggr,
 		func(log types.Log) (*cciptypes.TokenPriceUpdate, error) {
-			tp, err := p.priceRegistry.ParseUsdPerTokenUpdated(log)
-			if err != nil {
-				return nil, err
+			tp, err1 := p.priceRegistry.ParseUsdPerTokenUpdated(log)
+			if err1 != nil {
+				return nil, err1
 			}
 			return &cciptypes.TokenPriceUpdate{
 				TokenPrice: cciptypes.TokenPrice{
@@ -207,9 +207,9 @@ func (p *PriceRegistry) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chai
 		logs,
 		p.lggr,
 		func(log types.Log) (*cciptypes.GasPriceUpdate, error) {
-			p, err := p.priceRegistry.ParseUsdPerUnitGasUpdated(log)
-			if err != nil {
-				return nil, err
+			p, err1 := p.priceRegistry.ParseUsdPerUnitGasUpdated(log)
+			if err1 != nil {
+				return nil, err1
 			}
 			return &cciptypes.GasPriceUpdate{
 				GasPrice: cciptypes.GasPrice{
