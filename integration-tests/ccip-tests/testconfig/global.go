@@ -72,22 +72,23 @@ func (c *Config) TOMLString() string {
 	return buf.String()
 }
 
-func (c *Config) Decode(rawConfig string) error {
+func DecodeConfig(rawConfig string) (*Config, error) {
+	c := &Config{}
 	d, err := base64.StdEncoding.DecodeString(rawConfig)
 	if err != nil {
-		return errors.Wrap(err, ErrReadConfig)
+		return nil, errors.Wrap(err, ErrReadConfig)
 	}
 	err = toml.Unmarshal(d, c)
 	if err != nil {
-		return errors.Wrap(err, ErrUnmarshalConfig)
+		return nil, errors.Wrap(err, ErrUnmarshalConfig)
 	}
-	return nil
+	return c, nil
 }
 
 func NewConfig() (*Config, error) {
 	cfg := &Config{}
-	override := &Config{}
-	secrets := &Config{}
+	var override *Config
+	var secrets *Config
 	// load config from default file
 	err := config.DecodeTOML(bytes.NewReader(DefaultConfig), cfg)
 	if err != nil {
@@ -98,7 +99,7 @@ func NewConfig() (*Config, error) {
 	rawConfig, _ := osutil.GetEnv(OVERIDECONFIG)
 	if rawConfig != "" {
 		log.Info().Msgf("Found %s env var, overriding default config", OVERIDECONFIG)
-		err = override.Decode(rawConfig)
+		override, err = DecodeConfig(rawConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode override config: %w", err)
 		}
@@ -124,7 +125,7 @@ func NewConfig() (*Config, error) {
 		secretRawConfig, _ := osutil.GetEnv(SECRETSCONFIG)
 		if secretRawConfig != "" {
 			log.Info().Msgf("Found %s env var, applying secrets", SECRETSCONFIG)
-			err = secrets.Decode(secretRawConfig)
+			secrets, err = DecodeConfig(secretRawConfig)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode secrets config: %w", err)
 			}
