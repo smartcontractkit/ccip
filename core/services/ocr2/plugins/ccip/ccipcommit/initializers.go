@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/avast/retry-go/v4"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
@@ -39,33 +40,37 @@ import (
 )
 
 func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
-	if err != nil {
-		return nil, err
-	}
-	wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
-	destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.destChainSelector)
-	if err != nil {
-		return nil, err
-	}
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
-	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
-	oracle, err := libocr2.NewOracle(argsNoPlugin)
-	if err != nil {
-		return nil, err
-	}
-	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
-	if new {
-		return []job.ServiceCtx{oraclelib.NewBackfilledOracle(
-			pluginConfig.lggr,
-			backfillArgs.SourceLP,
-			backfillArgs.DestLP,
-			backfillArgs.SourceStartBlock,
-			backfillArgs.DestStartBlock,
-			job.NewServiceAdapter(oracle)),
-		}, nil
-	}
-	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+	return retry.DoWithData(func() ([]job.ServiceCtx, error) {
+		pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, qopts...)
+		if err != nil {
+			return nil, err
+		}
+		wrappedPluginFactory := NewCommitReportingPluginFactory(*pluginConfig)
+		destChainID, err := chainselectors.ChainIdFromSelector(pluginConfig.destChainSelector)
+		if err != nil {
+			return nil, retry.Unrecoverable(err)
+		}
+		argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
+		argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
+		oracle, err := libocr2.NewOracle(argsNoPlugin)
+		if err != nil {
+			return nil, retry.Unrecoverable(err)
+		}
+		// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+		if new {
+			return []job.ServiceCtx{oraclelib.NewBackfilledOracle(
+				pluginConfig.lggr,
+				backfillArgs.SourceLP,
+				backfillArgs.DestLP,
+				backfillArgs.SourceStartBlock,
+				backfillArgs.DestStartBlock,
+				job.NewServiceAdapter(oracle)),
+			}, nil
+		}
+		return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+	}, retry.OnRetry(func(n uint, err error) {
+		logError(fmt.Sprintf("failed to initialize CCIP commit service (attempt %d): %v", n, err))
+	}))
 }
 
 func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {

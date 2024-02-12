@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/avast/retry-go/v4"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
@@ -42,34 +43,38 @@ import (
 const numTokenDataWorkers = 5
 
 func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string), qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
-	execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
-	if err != nil {
-		return nil, err
-	}
-	wrappedPluginFactory := NewExecutionReportingPluginFactory(*execPluginConfig)
-	destChainID, err := chainselectors.ChainIdFromSelector(execPluginConfig.destChainSelector)
-	if err != nil {
-		return nil, err
-	}
-	argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
-	argsNoPlugin.Logger = commonlogger.NewOCRWrapper(execPluginConfig.lggr, true, logError)
-	oracle, err := libocr2.NewOracle(argsNoPlugin)
-	if err != nil {
-		return nil, err
-	}
-	// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
-	if new {
-		return []job.ServiceCtx{
-			oraclelib.NewBackfilledOracle(
-				execPluginConfig.lggr,
-				backfillArgs.SourceLP,
-				backfillArgs.DestLP,
-				backfillArgs.SourceStartBlock,
-				backfillArgs.DestStartBlock,
-				job.NewServiceAdapter(oracle)),
-		}, nil
-	}
-	return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+	return retry.DoWithData(func() ([]job.ServiceCtx, error) {
+		execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, qopts...)
+		if err != nil {
+			return nil, err
+		}
+		wrappedPluginFactory := NewExecutionReportingPluginFactory(*execPluginConfig)
+		destChainID, err := chainselectors.ChainIdFromSelector(execPluginConfig.destChainSelector)
+		if err != nil {
+			return nil, retry.Unrecoverable(err)
+		}
+		argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
+		argsNoPlugin.Logger = commonlogger.NewOCRWrapper(execPluginConfig.lggr, true, logError)
+		oracle, err := libocr2.NewOracle(argsNoPlugin)
+		if err != nil {
+			return nil, retry.Unrecoverable(err)
+		}
+		// If this is a brand-new job, then we make use of the start blocks. If not then we're rebooting and log poller will pick up where we left off.
+		if new {
+			return []job.ServiceCtx{
+				oraclelib.NewBackfilledOracle(
+					execPluginConfig.lggr,
+					backfillArgs.SourceLP,
+					backfillArgs.DestLP,
+					backfillArgs.SourceStartBlock,
+					backfillArgs.DestStartBlock,
+					job.NewServiceAdapter(oracle)),
+			}, nil
+		}
+		return []job.ServiceCtx{job.NewServiceAdapter(oracle)}, nil
+	}, retry.OnRetry(func(n uint, err error) {
+		logError(fmt.Sprintf("failed to create CCIP execution service (attempt %d): %v", n, err))
+	}))
 }
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
