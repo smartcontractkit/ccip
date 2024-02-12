@@ -42,13 +42,10 @@ func Test_L2ToL1Bridge_New(t *testing.T) {
 			if f.EventSigs[0] != L2ToL1ERC20SentTopic {
 				return false
 			}
-			if len(f.Addresses) != 1 {
+			if f.Retention != DurationMonth {
 				return false
 			}
 			if f.Addresses[0] != l2BridgeAdapterAddress {
-				return false
-			}
-			if f.Retention != DurationMonth {
 				return false
 			}
 			return true
@@ -57,25 +54,16 @@ func Test_L2ToL1Bridge_New(t *testing.T) {
 
 		l1LogPoller := lpmocks.NewLogPoller(t)
 		l1LogPoller.On("RegisterFilter", mock.MatchedBy(func(f logpoller.Filter) bool {
-			if len(f.EventSigs) != 2 {
+			if len(f.EventSigs) != 3 {
 				return false
 			}
-			if !(f.EventSigs[0] == L2toL1ERC20FinalizedTopic || f.EventSigs[1] == NodeConfirmedTopic) {
-				return false
-			}
-			if !(f.EventSigs[1] == L2toL1ERC20FinalizedTopic || f.EventSigs[1] == NodeConfirmedTopic) {
-				return false
-			}
-			if len(f.Addresses) != 2 {
-				return false
-			}
-			if !(f.Addresses[0] == l1BridgeAdapterAddress || f.Addresses[1] == l1BridgeAdapterAddress) {
-				return false
-			}
-			if !(f.Addresses[0] == rollupAddress || f.Addresses[1] == rollupAddress) {
+			if f.EventSigs[0] != L2toL1ERC20FinalizedTopic || f.EventSigs[1] != NodeConfirmedTopic || f.EventSigs[2] != LiquidityTransferredTopic {
 				return false
 			}
 			if f.Retention != DurationMonth {
+				return false
+			}
+			if f.Addresses[0] != l1BridgeAdapterAddress || f.Addresses[1] != rollupAddress || f.Addresses[2] != l1RebalancerAddress {
 				return false
 			}
 			return true

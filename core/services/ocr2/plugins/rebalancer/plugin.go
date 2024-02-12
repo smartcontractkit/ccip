@@ -51,6 +51,7 @@ func NewPlugin(
 		rootAddress:             rootAddress,
 		closePluginTimeout:      closePluginTimeout,
 		liquidityManagerFactory: liquidityManagerFactory,
+		discovererFactory:       discovererFactory,
 		rebalancerGraph:         graph.NewGraph(),
 		liquidityRebalancer:     liquidityRebalancer,
 		pendingTransfers:        NewPendingTransfersCache(),
