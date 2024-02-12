@@ -114,3 +114,15 @@ const (
 func (t Transfer) String() string {
 	return fmt.Sprintf("%v->%v %s", t.From, t.To, t.Amount.String())
 }
+
+type Lane struct {
+	Source NetworkSelector
+	Dest   NetworkSelector
+}
+
+func NewLane(source, dest NetworkSelector) Lane {
+	return Lane{
+		Source: source,
+		Dest:   dest,
+	}
+}

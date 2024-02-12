@@ -36,6 +36,9 @@ type LiquidityGraph interface {
 	// GetNeighbors returns the neighboring network selectors.
 	GetNeighbors(from models.NetworkSelector) ([]models.NetworkSelector, bool)
 
+	// GetLanes returns all the graph edges as a list of source/dest pairs.
+	GetLanes() ([]models.Lane, error)
+
 	// IsEmpty returns true when the graph does not contain any network.
 	IsEmpty() bool
 
@@ -58,6 +61,18 @@ func NewGraph() *Graph {
 		networkBalance: make(map[models.NetworkSelector]*big.Int),
 		mu:             &sync.RWMutex{},
 	}
+}
+
+func NewGraphFromLanes(lanes []models.Lane) (*Graph, error) {
+	g := NewGraph()
+	for _, lane := range lanes {
+		g.AddNetwork(lane.Source, big.NewInt(0))
+		g.AddNetwork(lane.Dest, big.NewInt(0))
+		if err := g.AddConnection(lane.Source, lane.Dest); err != nil {
+			return nil, fmt.Errorf("add connection %d -> %d: %w", lane.Source, lane.Dest, err)
+		}
+	}
+	return g, nil
 }
 
 func (g *Graph) AddNetwork(n models.NetworkSelector, liq *big.Int) bool {
@@ -174,6 +189,20 @@ func (g *Graph) GetNeighbors(from models.NetworkSelector) ([]models.NetworkSelec
 
 	sort.Slice(neibs, func(i, j int) bool { return neibs[i] < neibs[j] })
 	return neibs, exist
+}
+
+func (g *Graph) GetLanes() ([]models.Lane, error) {
+	lanes := make([]models.Lane, 0)
+	for _, sourceNet := range g.GetNetworks() {
+		destNetworks, ok := g.GetNeighbors(sourceNet)
+		if !ok {
+			return nil, fmt.Errorf("internal graph error %d not found", sourceNet)
+		}
+		for _, destNet := range destNetworks {
+			lanes = append(lanes, models.NewLane(sourceNet, destNet))
+		}
+	}
+	return lanes, nil
 }
 
 func (g *Graph) IsEmpty() bool {

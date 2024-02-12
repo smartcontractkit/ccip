@@ -25,12 +25,14 @@ func NewNetworkLiquidity(chain NetworkSelector, liq *big.Int) NetworkLiquidity {
 type Observation struct {
 	LiquidityPerChain []NetworkLiquidity
 	PendingTransfers  []PendingTransfer
+	Lanes             []Lane
 }
 
-func NewObservation(liqPerChain []NetworkLiquidity, pendingTransfers []PendingTransfer) Observation {
+func NewObservation(liqPerChain []NetworkLiquidity, pendingTransfers []PendingTransfer, lanes []Lane) Observation {
 	return Observation{
 		LiquidityPerChain: liqPerChain,
 		PendingTransfers:  pendingTransfers,
+		Lanes:             lanes,
 	}
 }
 

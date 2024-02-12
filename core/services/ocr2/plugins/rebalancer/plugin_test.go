@@ -76,6 +76,7 @@ func TestPluginObservation(t *testing.T) {
 			{Network: net, Liquidity: big.NewInt(1234)},
 		},
 		[]models.PendingTransfer{},
+		[]models.Lane{},
 	).Encode()
 	assert.Equal(t, ocrtypes.Observation(expObs), obs)
 }
