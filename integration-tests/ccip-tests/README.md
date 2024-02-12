@@ -38,7 +38,7 @@ Please refer to [default.toml](./testconfig/tomls/default.toml) for the list of 
    We consider secrets similar to test input overrides and encode them using `base64` command.
    Once you have the secrets.toml file, you can encode it using `base64` command (similar to step 2) and set the env var `BASE64_SECRETS_CONFIG` with the encoded content.
 ```bash
-    export BASE64_TEST_CONFIG_OVERRIDE=$(base64 -i ./testconfig/tomls/secrets.toml)
+    export BASE64_SECRETS_CONFIG=$(base64 -i ./testconfig/tomls/secrets.toml)
 ```
 
 **Please note that the secrets should NOT be checked in to the repo and should be kept locally.**
