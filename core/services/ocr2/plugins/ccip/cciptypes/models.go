@@ -1,25 +1,20 @@
 package cciptypes
 
 import (
-	"fmt"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"encoding/hex"
+	"strings"
 )
 
 type Address string
 
-func (a Address) ToEVM() (common.Address, error) {
-	if !common.IsHexAddress(string(a)) {
-		return common.Address{}, fmt.Errorf("%s is not a hex evm address", a)
-	}
-	return common.HexToAddress(string(a)), nil
-}
-
 type Hash [32]byte
 
 func (h Hash) String() string {
-	return hexutil.Encode(h[:])
+	res := hex.EncodeToString(h[:])
+	if !strings.HasPrefix(res, "0x") {
+		return "0x" + res
+	}
+	return res
 }
 
 type TxMeta struct {

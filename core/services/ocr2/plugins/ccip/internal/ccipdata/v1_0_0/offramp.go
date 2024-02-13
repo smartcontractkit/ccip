@@ -524,7 +524,7 @@ func encodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]b
 	for _, msg := range report.Messages {
 		var ta []evm_2_evm_offramp_1_0_0.ClientEVMTokenAmount
 		for _, tokenAndAmount := range msg.TokenAmounts {
-			evmTokenAddr, err := tokenAndAmount.Token.ToEVM()
+			evmTokenAddr, err := ccipcalc.GenericAddrToEvm(tokenAndAmount.Token)
 			if err != nil {
 				return nil, err
 			}
@@ -535,17 +535,17 @@ func encodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]b
 			})
 		}
 
-		senderEvmAddr, err := msg.Sender.ToEVM()
+		senderEvmAddr, err := ccipcalc.GenericAddrToEvm(msg.Sender)
 		if err != nil {
 			return nil, fmt.Errorf("msg sender is not evm addr: %w", err)
 		}
 
-		receiverEvmAddr, err := msg.Sender.ToEVM()
+		receiverEvmAddr, err := ccipcalc.GenericAddrToEvm(msg.Receiver)
 		if err != nil {
-			return nil, fmt.Errorf("msg sender is not evm addr: %w", err)
+			return nil, fmt.Errorf("msg receiver is not evm addr: %w", err)
 		}
 
-		feeTokenEvmAddr, err := msg.FeeToken.ToEVM()
+		feeTokenEvmAddr, err := ccipcalc.GenericAddrToEvm(msg.FeeToken)
 		if err != nil {
 			return nil, fmt.Errorf("fee token is not evm addr: %w", err)
 		}

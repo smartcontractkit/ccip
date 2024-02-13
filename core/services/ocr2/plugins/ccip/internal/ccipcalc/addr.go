@@ -16,6 +16,10 @@ func EvmAddrsToGeneric(evmAddrs ...common.Address) []cciptypes.Address {
 	return res
 }
 
+func EvmAddrToGeneric(evmAddr common.Address) cciptypes.Address {
+	return cciptypes.Address(evmAddr.String())
+}
+
 func GenericAddrsToEvm(genericAddrs ...cciptypes.Address) ([]common.Address, error) {
 	evmAddrs := make([]common.Address, 0, len(genericAddrs))
 	for _, addr := range genericAddrs {
@@ -25,4 +29,12 @@ func GenericAddrsToEvm(genericAddrs ...cciptypes.Address) ([]common.Address, err
 		evmAddrs = append(evmAddrs, common.HexToAddress(string(addr)))
 	}
 	return evmAddrs, nil
+}
+
+func GenericAddrToEvm(genAddr cciptypes.Address) (common.Address, error) {
+	evmAddrs, err := GenericAddrsToEvm(genAddr)
+	if err != nil {
+		return common.Address{}, err
+	}
+	return evmAddrs[0], nil
 }

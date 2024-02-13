@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
@@ -69,7 +70,7 @@ func (c *CommitStore) EncodeCommitReport(report cciptypes.CommitStoreReport) ([]
 func EncodeCommitReport(commitReportArgs abi.Arguments, report cciptypes.CommitStoreReport) ([]byte, error) {
 	var tokenPriceUpdates []commit_store.InternalTokenPriceUpdate
 	for _, tokenPriceUpdate := range report.TokenPrices {
-		tokenAddressEvm, err := tokenPriceUpdate.Token.ToEVM()
+		tokenAddressEvm, err := ccipcalc.GenericAddrToEvm(tokenPriceUpdate.Token)
 		if err != nil {
 			return nil, fmt.Errorf("token price update address to evm: %w", err)
 		}
