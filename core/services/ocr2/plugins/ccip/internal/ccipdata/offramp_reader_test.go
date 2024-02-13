@@ -353,10 +353,6 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 	require.NoError(t, err)
 	require.Equal(t, []cciptypes.ExecutionStateChangedWithTxMeta{}, events)
 
-	rateLimits, err := th.reader.GetTokenPoolsRateLimits(ctx, []cciptypes.Address{})
-	require.NoError(t, err)
-	require.Empty(t, rateLimits)
-
 	sourceToDestTokens, err := th.reader.GetSourceToDestTokensMapping(ctx)
 	require.NoError(t, err)
 	require.Empty(t, sourceToDestTokens)

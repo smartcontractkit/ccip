@@ -29,6 +29,9 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
+	tokenpoolbatchedmocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader/mocks"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
@@ -123,14 +126,19 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			offRamp, _ := testhelpers.NewFakeOffRamp(t)
 			offRamp.SetRateLimiterState(tc.rateLimiterState)
 
+			tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(p.lggr, 0, ccipcalc.EvmAddrToGeneric(offRamp.Address()), nil, nil)
+			assert.NoError(t, err)
+			p.tokenPoolBatchedReader = tokenPoolBatchedReader
+
 			mockOffRampReader := ccipdatamocks.NewOffRampReader(t)
 			mockOffRampReader.On("GetExecutionStateChangesBetweenSeqNums", ctx, mock.Anything, mock.Anything, 0).
 				Return(executionEvents, nil).Maybe()
 			mockOffRampReader.On("CurrentRateLimiterState", mock.Anything).Return(tc.rateLimiterState, nil).Maybe()
 			mockOffRampReader.On("Address").Return(cciptypes.Address(offRamp.Address().String())).Maybe()
 			mockOffRampReader.On("GetSenderNonce", mock.Anything, mock.Anything).Return(offRamp.GetSenderNonce(nil, utils.RandomAddress())).Maybe()
-			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, []cciptypes.Address{}).
+			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, []ccipdata.TokenPoolReader{}).
 				Return([]cciptypes.TokenBucketRateLimit{}, nil).Maybe()
+
 			mockOffRampReader.On("GetSourceToDestTokensMapping", ctx).Return(nil, nil).Maybe()
 			mockOffRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
 				DestinationTokens: []cciptypes.Address{},
@@ -162,7 +170,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 
 			p.snoozedRoots = cache.NewSnoozedRoots(time.Minute, time.Minute)
 
-			_, err := p.Observation(ctx, types.ReportTimestamp{}, types.Query{})
+			_, err = p.Observation(ctx, types.ReportTimestamp{}, types.Query{})
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -882,10 +890,11 @@ func TestExecutionReportingPlugin_destPoolRateLimits(t *testing.T) {
 			mockOffRampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{
 				DestinationPool: poolsMapping,
 			}, tc.destPoolsCacheErr).Maybe()
-			mockOffRampReader.On("GetTokenPoolsRateLimits", ctx, tc.destPools).
-				Return(tc.poolRateLimits, nil).
-				Maybe()
 			p.offRampReader = mockOffRampReader
+
+			tokenPoolFactoryMock := tokenpoolbatchedmocks.NewTokenPoolBatchedReader(t)
+			tokenPoolFactoryMock.On("GetInboundTokenPoolRateLimits", mock.Anything, mock.Anything).Return(tc.poolRateLimits, nil).Maybe()
+			p.tokenPoolBatchedReader = tokenPoolFactoryMock
 
 			rateLimits, err := p.destPoolRateLimits(ctx, []commitReportWithSendRequests{
 				{

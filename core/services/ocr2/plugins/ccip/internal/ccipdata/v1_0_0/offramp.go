@@ -17,11 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/custom_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -29,7 +29,6 @@ import (
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
@@ -43,7 +42,6 @@ const (
 
 var (
 	abiOffRamp                                             = abihelpers.MustParseABI(evm_2_evm_offramp_1_0_0.EVM2EVMOffRampABI)
-	abiCustomTokenPool                                     = abihelpers.MustParseABI(custom_token_pool.CustomTokenPoolABI)
 	_                               ccipdata.OffRampReader = &OffRamp{}
 	ExecutionStateChangedEvent                             = abihelpers.MustGetEventID("ExecutionStateChanged", abiOffRamp)
 	PoolAddedEvent                                         = abihelpers.MustGetEventID("PoolAdded", abiOffRamp)
@@ -284,46 +282,6 @@ func (o *OffRamp) getDestinationTokensFromSourceTokens(ctx context.Context, toke
 	return destTokens, nil
 }
 
-func (o *OffRamp) GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []cciptypes.Address) ([]cciptypes.TokenBucketRateLimit, error) {
-	if len(poolAddresses) == 0 {
-		return nil, nil
-	}
-
-	evmAddrs, err := ccipcalc.GenericAddrsToEvm(poolAddresses...)
-	if err != nil {
-		return nil, err
-	}
-
-	evmCalls := make([]rpclib.EvmCall, 0, len(poolAddresses))
-	for _, poolAddress := range evmAddrs {
-		evmCalls = append(evmCalls, rpclib.NewEvmCall(
-			abiCustomTokenPool,
-			"currentOffRampRateLimiterState",
-			poolAddress,
-			o.addr,
-		))
-	}
-
-	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
-	if err != nil {
-		return nil, fmt.Errorf("get latest block: %w", err)
-	}
-
-	results, err := o.evmBatchCaller.BatchCall(ctx, uint64(latestBlock.BlockNumber), evmCalls)
-	if err != nil {
-		return nil, fmt.Errorf("batch call limit: %w", err)
-	}
-
-	rateLimits, err := rpclib.ParseOutputs[cciptypes.TokenBucketRateLimit](results, func(d rpclib.DataAndErr) (cciptypes.TokenBucketRateLimit, error) {
-		return rpclib.ParseOutput[cciptypes.TokenBucketRateLimit](d, 0)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("parse outputs: %w", err)
-	}
-
-	return rateLimits, nil
-}
-
 func (o *OffRamp) GetSourceToDestTokensMapping(ctx context.Context) (map[cciptypes.Address]cciptypes.Address, error) {
 	tokens, err := o.GetTokens(ctx)
 	if err != nil {
@@ -356,6 +314,7 @@ func (o *OffRamp) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error
 		if err != nil {
 			return cciptypes.OffRampTokens{}, fmt.Errorf("get pools by dest tokens: %w", err)
 		}
+
 		tokenToPool := make(map[cciptypes.Address]cciptypes.Address, len(destTokens))
 		for i := range destTokens {
 			tokenToPool[cciptypes.Address(destTokens[i].String())] = cciptypes.Address(destPools[i].String())
@@ -714,7 +673,6 @@ func NewOffRamp(lggr logger.Logger, addr common.Address, ec client.Client, lp lo
 			offRamp_poolAddedPoolRemovedEvents,
 			offRamp.Address(),
 		),
-
 		// values set on the fly after ChangeConfig is called
 		gasPriceEstimator: prices.ExecGasPriceEstimator{},
 		offchainConfig:    cciptypes.ExecOffchainConfig{},
