@@ -69,7 +69,10 @@ func NewCommitServices(ctx context.Context, lggr logger.Logger, jb job.Job, chai
 			), nil
 		}
 		return job.NewServiceAdapter(oracle), nil
-	}, lazyinitservice.WithLogErrorFunc(logError))}, nil
+	}, lazyinitservice.WithLogErrorFunc(func(err error) {
+		lggr.Warnw("CCIP commit service initialization failed", "err", err)
+		logError(err.Error())
+	}))}, nil
 }
 
 func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {

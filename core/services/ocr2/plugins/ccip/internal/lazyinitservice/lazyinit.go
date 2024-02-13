@@ -21,7 +21,7 @@ import (
 type InitFunc = func(context.Context) (job.ServiceCtx, error)
 
 // A LogErrorFunc is a callback for reporting background initialization and startup errors.
-type LogErrorFunc = func(string)
+type LogErrorFunc = func(error)
 
 type Option = func(*LazyInitService)
 
@@ -57,6 +57,9 @@ func New(f InitFunc, opts ...Option) *LazyInitService {
 }
 
 // Start initiates the underlying service initialization and starts it.
+//
+// Start ignores the given ctx cancellation if the service is not initialized yet.
+// Use Close to stop the initialization process and the service.
 func (s *LazyInitService) Start(ctx context.Context) (err error) {
 	s.initComplete.Wait()
 
@@ -99,7 +102,7 @@ func (s *LazyInitService) initAndRun(ctx context.Context) {
 // reportError records the given error using the service log error function.
 func (s *LazyInitService) reportError(err error) {
 	if s.logErrorFunc != nil {
-		s.logErrorFunc(err.Error())
+		s.logErrorFunc(err)
 	}
 }
 

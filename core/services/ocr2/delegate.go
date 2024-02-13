@@ -1550,7 +1550,6 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		OnchainKeyring:         kb,
 	}
 	logError := func(msg string) {
-		lggr.Errorw("Error in CCIP commit initialization", "err", msg)
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
 	return ccipcommit.NewCommitServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError, qopts...)
@@ -1603,7 +1602,6 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		OnchainKeyring:         kb,
 	}
 	logError := func(msg string) {
-		lggr.Errorw("Error in CCIP exec initialization", "err", msg)
 		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
 	}
 	return ccipexec.NewExecutionServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError, qopts...)

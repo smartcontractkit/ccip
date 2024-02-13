@@ -71,7 +71,10 @@ func NewExecutionServices(ctx context.Context, lggr logger.Logger, jb job.Job, c
 			), nil
 		}
 		return job.NewServiceAdapter(oracle), nil
-	}, lazyinitservice.WithLogErrorFunc(logError))}, nil
+	}, lazyinitservice.WithLogErrorFunc(func(err error) {
+		lggr.Warnw("CCIP execution service initialization failed", "err", err)
+		logError(err.Error())
+	}))}, nil
 }
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
