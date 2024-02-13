@@ -4,9 +4,12 @@ pragma solidity 0.8.19;
 import "../BaseTest.t.sol";
 import {TokenPoolHelper} from "../helpers/TokenPoolHelper.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
+import {RateLimiter} from "../../libraries/RateLimiter.sol";
 import {BurnMintERC677} from "../../../shared/token/ERC677/BurnMintERC677.sol";
 import {RouterSetup} from "../router/RouterSetup.t.sol";
 import {Router} from "../../Router.sol";
+
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract TokenPoolSetup is RouterSetup {
   IERC20 internal s_token;

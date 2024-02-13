@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
+import {IPool} from "../interfaces/pools/IPool.sol";
+
 import "../pools/BurnMintTokenPool.sol";
 import "../pools/LockReleaseTokenPool.sol";
 import "../libraries/Client.sol";

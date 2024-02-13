@@ -1,5 +1,7 @@
 pragma solidity ^0.8.0;
 
+import {IAny2EVMMessageReceiver} from "../../interfaces/IAny2EVMMessageReceiver.sol";
+
 import "../onRamp/EVM2EVMOnRampSetup.t.sol";
 import "../../applications/CCIPClientExample.sol";
 import {ERC165Checker} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/ERC165Checker.sol";
