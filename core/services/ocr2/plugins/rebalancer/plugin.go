@@ -14,6 +14,7 @@ import (
 	"go.uber.org/multierr"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/discoverer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
@@ -28,6 +29,7 @@ type Plugin struct {
 	closePluginTimeout      time.Duration
 	liquidityManagerFactory liquiditymanager.Factory
 	discovererFactory       discoverer.Factory
+	bridgeFactory           bridge.Factory
 	mu                      sync.RWMutex
 	rebalancerGraph         graph.Graph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
@@ -42,6 +44,7 @@ func NewPlugin(
 	rootAddress models.Address,
 	liquidityManagerFactory liquiditymanager.Factory,
 	discovererFactory discoverer.Factory,
+	bridgeFactory bridge.Factory,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
 	lggr logger.Logger,
 ) *Plugin {
@@ -52,6 +55,7 @@ func NewPlugin(
 		closePluginTimeout:      closePluginTimeout,
 		liquidityManagerFactory: liquidityManagerFactory,
 		discovererFactory:       discovererFactory,
+		bridgeFactory:           bridgeFactory,
 		rebalancerGraph:         graph.NewGraph(),
 		liquidityRebalancer:     liquidityRebalancer,
 		pendingTransfers:        NewPendingTransfersCache(),
@@ -321,29 +325,42 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 
 	pendingTransfers := make([]models.PendingTransfer, 0)
 	for _, networkID := range p.rebalancerGraph.GetNetworks() {
-		rebalancerAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
-		if err != nil {
-			return nil, fmt.Errorf("get rebalancer address for %v: %w", networkID, err)
+		neighbors, ok := p.rebalancerGraph.GetNeighbors(networkID)
+		if !ok {
+			p.lggr.Warnw("no neighbors found for network", "network", networkID)
+			continue
 		}
 
-		lm, err := p.liquidityManagerFactory.NewRebalancer(networkID, rebalancerAddress)
-		if err != nil {
-			return nil, fmt.Errorf("init liquidity manager: %w", err)
+		// todo: figure out what to do with this
+		// dateToStartLookingFrom := time.Now().Add(-10 * 24 * time.Hour)
+
+		// if mostRecentTransfer, exists := p.pendingTransfers.LatestNetworkTransfer(networkID); exists {
+		// 	dateToStartLookingFrom = mostRecentTransfer.Date
+		// }
+
+		for _, neighbor := range neighbors {
+			bridge, err := p.bridgeFactory.NewBridge(networkID, neighbor)
+			if err != nil {
+				return nil, fmt.Errorf("init bridge: %w", err)
+			}
+
+			localToken, err := p.rebalancerGraph.GetTokenAddress(networkID)
+			if err != nil {
+				return nil, fmt.Errorf("get local token address for %v: %w", networkID, err)
+			}
+			remoteToken, err := p.rebalancerGraph.GetTokenAddress(neighbor)
+			if err != nil {
+				return nil, fmt.Errorf("get remote token address for %v: %w", neighbor, err)
+			}
+
+			netPendingTransfers, err := bridge.GetTransfers(ctx, localToken, remoteToken)
+			if err != nil {
+				return nil, fmt.Errorf("get pending transfers: %w", err)
+			}
+
+			p.lggr.Infow("loaded pending transfers", "network", networkID, "pendingTransfers", netPendingTransfers)
+			pendingTransfers = append(pendingTransfers, netPendingTransfers...)
 		}
-
-		// todo: place in config and set a proper value
-		dateToStartLookingFrom := time.Now().Add(-10 * 24 * time.Hour)
-
-		if mostRecentTransfer, exists := p.pendingTransfers.LatestNetworkTransfer(networkID); exists {
-			dateToStartLookingFrom = mostRecentTransfer.Date
-		}
-
-		netPendingTransfers, err := lm.GetPendingTransfers(ctx, dateToStartLookingFrom)
-		if err != nil {
-			return nil, fmt.Errorf("get pending %v transfers: %w", networkID, err)
-		}
-
-		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
 	}
 
 	p.pendingTransfers.Add(pendingTransfers)

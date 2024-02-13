@@ -10,8 +10,6 @@ import (
 
 	models "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 
-	time "time"
-
 	types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
@@ -98,36 +96,6 @@ func (_m *Rebalancer) GetBalance(ctx context.Context) (*big.Int, error) {
 	return r0, r1
 }
 
-// GetPendingTransfers provides a mock function with given fields: ctx, since
-func (_m *Rebalancer) GetPendingTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error) {
-	ret := _m.Called(ctx, since)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetPendingTransfers")
-	}
-
-	var r0 []models.PendingTransfer
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time) ([]models.PendingTransfer, error)); ok {
-		return rf(ctx, since)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time) []models.PendingTransfer); ok {
-		r0 = rf(ctx, since)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]models.PendingTransfer)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, time.Time) error); ok {
-		r1 = rf(ctx, since)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetRebalancers provides a mock function with given fields: ctx
 func (_m *Rebalancer) GetRebalancers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
 	ret := _m.Called(ctx)
@@ -146,36 +114,6 @@ func (_m *Rebalancer) GetRebalancers(ctx context.Context) (map[models.NetworkSel
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[models.NetworkSelector]models.Address)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetTokenAddress provides a mock function with given fields: ctx
-func (_m *Rebalancer) GetTokenAddress(ctx context.Context) (models.Address, error) {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetTokenAddress")
-	}
-
-	var r0 models.Address
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (models.Address, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) models.Address); ok {
-		r0 = rf(ctx)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(models.Address)
 		}
 	}
 

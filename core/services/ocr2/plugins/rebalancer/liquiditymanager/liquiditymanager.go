@@ -3,7 +3,6 @@ package liquiditymanager
 import (
 	"context"
 	"math/big"
-	"time"
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -20,14 +19,12 @@ type Rebalancer interface {
 	// GetBalance returns the current token/liquidity balance.
 	GetBalance(ctx context.Context) (*big.Int, error)
 
-	// GetPendingTransfers returns the pending liquidity transfers.
-	GetPendingTransfers(ctx context.Context, since time.Time) ([]models.PendingTransfer, error)
-
 	// Close releases any resources.
 	Close(ctx context.Context) error
 
 	// ConfigDigest returns the OCR config digest for the rebalancer.
 	ConfigDigest(ctx context.Context) (ocrtypes.ConfigDigest, error)
 
+	// GetTokenAddress returns the token address of the rebalancer.
 	GetTokenAddress(ctx context.Context) (models.Address, error)
 }

@@ -52,6 +52,7 @@ type Bridge interface {
 	RemoteChainSelector() models.NetworkSelector
 }
 
+//go:generate mockery --name Factory --output ./mocks --filename bridge_factory_mock.go --case=underscore
 type Factory interface {
 	NewBridge(source, dest models.NetworkSelector) (Bridge, error)
 }

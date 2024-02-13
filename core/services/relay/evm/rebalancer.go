@@ -26,7 +26,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/discoverer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	rebalancermodels "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/ocr3impls"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrcommon"
@@ -200,7 +199,6 @@ func newRebalancerConfigProvider(
 
 		lmFactoryOpts = append(lmFactoryOpts, liquiditymanager.WithEvmDep(
 			rebalancermodels.NetworkSelector(ch.Selector),
-			chain.LogPoller(),
 			chain.Client(),
 		))
 		discovererOpts = append(discovererOpts, discoverer.WithEvmDep(
@@ -236,8 +234,8 @@ func newRebalancerConfigProvider(
 	}
 
 	discoverer, err := discovererFactory.NewDiscoverer(
-		models.NetworkSelector(masterSelector.Selector),
-		models.Address(contractAddress),
+		rebalancermodels.NetworkSelector(masterSelector.Selector),
+		rebalancermodels.Address(contractAddress),
 	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create initial discoverer for master chain %d (evm chain id: %d): %w",
@@ -270,7 +268,7 @@ func newRebalancerConfigProvider(
 		if err2 != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("failed to get xchain rebalancer data for network %d: %w", networkID, err2)
 		}
-		bridgeAdapters := make(map[models.NetworkSelector]models.Address)
+		bridgeAdapters := make(map[rebalancermodels.NetworkSelector]rebalancermodels.Address)
 		for remoteNetworkID, data := range xchainRebalData {
 			bridgeAdapters[remoteNetworkID] = data.LocalBridgeAdapterAddress
 		}

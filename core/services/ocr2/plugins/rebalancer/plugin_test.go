@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	bridgemocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge/mocks"
 	discoverermocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/discoverer/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	rebalancer_mocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/rebalancermocks"
@@ -19,6 +20,7 @@ type mockDeps struct {
 	mockFactory           *rebalancer_mocks.Factory
 	mockRebalancer        *rebalancer_mocks.Rebalancer
 	mockDiscovererFactory *discoverermocks.Factory
+	mockBridgeFactory     *bridgemocks.Factory
 }
 
 func newPlugin(t *testing.T) (*Plugin, mockDeps) {
@@ -30,7 +32,8 @@ func newPlugin(t *testing.T) (*Plugin, mockDeps) {
 	lmFactory := rebalancer_mocks.NewFactory(t)
 	rb := rebalancer_mocks.NewRebalancer(t)
 	discovererFactory := discoverermocks.NewFactory(t)
-	return NewPlugin(f, closeTimeout, rootNetwork, rootAddr, lmFactory, discovererFactory, rb, logger.TestLogger(t)), mockDeps{
+	bridgeFactory := bridgemocks.NewFactory(t)
+	return NewPlugin(f, closeTimeout, rootNetwork, rootAddr, lmFactory, discovererFactory, bridgeFactory, rb, logger.TestLogger(t)), mockDeps{
 		mockFactory:           lmFactory,
 		mockRebalancer:        rb,
 		mockDiscovererFactory: discovererFactory,

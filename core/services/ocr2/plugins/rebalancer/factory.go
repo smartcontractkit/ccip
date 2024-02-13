@@ -79,6 +79,7 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 			p.config.LiquidityManagerAddress,
 			p.lmFactory,
 			p.discovererFactory,
+			p.bridgeFactory,
 			liquidityRebalancer,
 			p.lggr,
 		),
