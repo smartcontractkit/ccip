@@ -89,8 +89,8 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_onRamp = new EVM2EVMOnRampHelper(
       EVM2EVMOnRamp.StaticConfig({
         linkToken: s_sourceTokens[0],
-        chainSelector: SOURCE_CHAIN_ID,
-        destChainSelector: DEST_CHAIN_ID,
+        chainSelector: SOURCE_CHAIN_SELECTOR,
+        destChainSelector: DEST_CHAIN_SELECTOR,
         defaultTxGasLimit: GAS_LIMIT,
         maxNopFeesJuels: MAX_NOP_FEES_JUELS,
         prevOnRamp: address(0),
@@ -106,12 +106,12 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_onRamp.setAdmin(ADMIN);
 
     s_metadataHash = keccak256(
-      abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_ID, DEST_CHAIN_ID, address(s_onRamp))
+      abi.encode(Internal.EVM_2_EVM_MESSAGE_HASH, SOURCE_CHAIN_SELECTOR, DEST_CHAIN_SELECTOR, address(s_onRamp))
     );
 
     TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](1);
     chainUpdates[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: DEST_CHAIN_ID,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -125,9 +125,9 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
     s_offRamps[1] = address(11);
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](2);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_ID, onRamp: address(s_onRamp)});
-    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: s_offRamps[0]});
-    offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: s_offRamps[1]});
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: address(s_onRamp)});
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: s_offRamps[0]});
+    offRampUpdates[1] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: s_offRamps[1]});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
 
     // Pre approve the first token so the gas estimates of the tests
@@ -198,7 +198,7 @@ contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
       nonce: nonce,
       gasLimit: extraArgs.gasLimit,
       strict: false,
-      sourceChainSelector: SOURCE_CHAIN_ID,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       receiver: abi.decode(message.receiver, (address)),
       data: message.data,
       tokenAmounts: message.tokenAmounts,

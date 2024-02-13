@@ -23,8 +23,8 @@ contract CommitStoreSetup is PriceRegistrySetup, OCR2BaseSetup {
 
     s_commitStore = new CommitStoreHelper(
       CommitStore.StaticConfig({
-        chainSelector: DEST_CHAIN_ID,
-        sourceChainSelector: SOURCE_CHAIN_ID,
+        chainSelector: DEST_CHAIN_SELECTOR,
+        sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ON_RAMP_ADDRESS,
         armProxy: address(s_mockARM)
       })
@@ -70,8 +70,8 @@ contract CommitStoreRealARMSetup is PriceRegistrySetup, OCR2BaseSetup {
     s_arm = new ARM(ARM.Config({voters: voters, blessWeightThreshold: 1, curseWeightThreshold: 1}));
     s_commitStore = new CommitStoreHelper(
       CommitStore.StaticConfig({
-        chainSelector: DEST_CHAIN_ID,
-        sourceChainSelector: SOURCE_CHAIN_ID,
+        chainSelector: DEST_CHAIN_SELECTOR,
+        sourceChainSelector: SOURCE_CHAIN_SELECTOR,
         onRamp: ON_RAMP_ADDRESS,
         armProxy: address(s_arm)
       })
@@ -101,8 +101,8 @@ contract CommitStore_constructor is PriceRegistrySetup, OCR2BaseSetup {
 
   function testConstructorSuccess() public {
     CommitStore.StaticConfig memory staticConfig = CommitStore.StaticConfig({
-      chainSelector: DEST_CHAIN_ID,
-      sourceChainSelector: SOURCE_CHAIN_ID,
+      chainSelector: DEST_CHAIN_SELECTOR,
+      sourceChainSelector: SOURCE_CHAIN_SELECTOR,
       onRamp: 0x2C44CDDdB6a900Fa2B585dd299E03D12Fa4293Bc,
       armProxy: address(s_mockARM)
     });

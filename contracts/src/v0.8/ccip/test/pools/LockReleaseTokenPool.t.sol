@@ -45,7 +45,7 @@ contract LockReleaseTokenPoolSetup is RouterSetup {
 
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: DEST_CHAIN_ID,
+      remoteChainSelector: DEST_CHAIN_SELECTOR,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -57,8 +57,8 @@ contract LockReleaseTokenPoolSetup is RouterSetup {
 
     Router.OnRamp[] memory onRampUpdates = new Router.OnRamp[](1);
     Router.OffRamp[] memory offRampUpdates = new Router.OffRamp[](1);
-    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_ID, onRamp: s_allowedOnRamp});
-    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_ID, offRamp: s_allowedOffRamp});
+    onRampUpdates[0] = Router.OnRamp({destChainSelector: DEST_CHAIN_SELECTOR, onRamp: s_allowedOnRamp});
+    offRampUpdates[0] = Router.OffRamp({sourceChainSelector: SOURCE_CHAIN_SELECTOR, offRamp: s_allowedOffRamp});
     s_sourceRouter.applyRampUpdates(onRampUpdates, new Router.OffRamp[](0), offRampUpdates);
   }
 }
@@ -93,7 +93,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPool.lockOrBurn(STRANGER, bytes(""), amount, DEST_CHAIN_ID, bytes(""));
+    s_lockReleaseTokenPool.lockOrBurn(STRANGER, bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
   }
 
   function testLockOrBurnWithAllowListSuccess() public {
@@ -105,12 +105,12 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), amount, DEST_CHAIN_ID, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
 
     vm.expectEmit();
     emit Locked(s_allowedOnRamp, amount);
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[1], bytes(""), amount, DEST_CHAIN_ID, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[1], bytes(""), amount, DEST_CHAIN_SELECTOR, bytes(""));
   }
 
   function testLockOrBurnWithAllowListReverts() public {
@@ -118,7 +118,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
 
     vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, STRANGER));
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(STRANGER, bytes(""), 100, DEST_CHAIN_ID, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(STRANGER, bytes(""), 100, DEST_CHAIN_SELECTOR, bytes(""));
   }
 
   function testPoolBurnRevertNotHealthyReverts() public {
@@ -129,7 +129,7 @@ contract LockReleaseTokenPool_lockOrBurn is LockReleaseTokenPoolSetup {
     changePrank(s_allowedOnRamp);
     vm.expectRevert(EVM2EVMOnRamp.BadARMSignal.selector);
 
-    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), 1e5, DEST_CHAIN_ID, bytes(""));
+    s_lockReleaseTokenPoolWithAllowList.lockOrBurn(s_allowedList[0], bytes(""), 1e5, DEST_CHAIN_SELECTOR, bytes(""));
 
     assertEq(s_token.balanceOf(address(s_lockReleaseTokenPoolWithAllowList)), before);
   }
@@ -143,7 +143,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     LockReleaseTokenPoolSetup.setUp();
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: SOURCE_CHAIN_ID,
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       allowed: true,
       outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
       inboundRateLimiterConfig: getInboundRateLimiterConfig()
@@ -164,7 +164,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     vm.expectEmit();
     emit Released(s_allowedOffRamp, OWNER, amount);
 
-    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, amount, SOURCE_CHAIN_ID, bytes(""));
+    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, amount, SOURCE_CHAIN_SELECTOR, bytes(""));
   }
 
   function testFuzz_ReleaseOrMintSuccess(address recipient, uint256 amount) public {
@@ -194,13 +194,13 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
       emit Released(s_allowedOffRamp, recipient, amount);
     }
 
-    s_lockReleaseTokenPool.releaseOrMint(bytes(""), recipient, amount, SOURCE_CHAIN_ID, bytes(""));
+    s_lockReleaseTokenPool.releaseOrMint(bytes(""), recipient, amount, SOURCE_CHAIN_SELECTOR, bytes(""));
   }
 
   function testChainNotAllowedReverts() public {
     TokenPool.ChainUpdate[] memory chainUpdate = new TokenPool.ChainUpdate[](1);
     chainUpdate[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: SOURCE_CHAIN_ID,
+      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
       allowed: false,
       outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
       inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
@@ -210,8 +210,8 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
 
     vm.startPrank(s_allowedOffRamp);
 
-    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, SOURCE_CHAIN_ID));
-    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, 1e5, SOURCE_CHAIN_ID, bytes(""));
+    vm.expectRevert(abi.encodeWithSelector(TokenPool.ChainNotAllowed.selector, SOURCE_CHAIN_SELECTOR));
+    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, 1e5, SOURCE_CHAIN_SELECTOR, bytes(""));
   }
 
   function testPoolMintNotHealthyReverts() public {
@@ -220,7 +220,7 @@ contract LockReleaseTokenPool_releaseOrMint is LockReleaseTokenPoolSetup {
     uint256 before = s_token.balanceOf(OWNER);
     vm.startPrank(s_allowedOffRamp);
     vm.expectRevert(EVM2EVMOffRamp.BadARMSignal.selector);
-    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, 1e5, SOURCE_CHAIN_ID, bytes(""));
+    s_lockReleaseTokenPool.releaseOrMint(bytes(""), OWNER, 1e5, SOURCE_CHAIN_SELECTOR, bytes(""));
     assertEq(s_token.balanceOf(OWNER), before);
   }
 }
