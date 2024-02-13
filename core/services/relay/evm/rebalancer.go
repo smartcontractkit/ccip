@@ -39,7 +39,7 @@ var (
 
 type RebalancerProvider interface {
 	commontypes.Plugin
-	ContractTransmitterOCR3() ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata]
+	ContractTransmitterOCR3() ocr3types.ContractTransmitter[rebalancermodels.Report]
 	LiquidityManagerFactory() liquiditymanager.Factory
 	DiscovererFactory() discoverer.Factory
 	BridgeFactory() bridge.Factory
@@ -76,7 +76,7 @@ func (r *rebalancerRelayer) NewRebalancerProvider(rargs commontypes.RelayArgs, p
 	}
 
 	var (
-		transmitters = make(map[relay.ID]ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata])
+		transmitters = make(map[relay.ID]ocr3types.ContractTransmitter[rebalancermodels.Report])
 	)
 	for _, chain := range r.chains.Slice() {
 		fromAddresses, err2 := r.ethKeystore.EnabledAddressesForChain(chain.ID())
@@ -100,7 +100,7 @@ func (r *rebalancerRelayer) NewRebalancerProvider(rargs commontypes.RelayArgs, p
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to create transmitter: %w", err2)
 		}
-		t, err2 := ocr3impls.NewOCR3ContractTransmitter[rebalancermodels.ReportMetadata](
+		t, err2 := ocr3impls.NewOCR3ContractTransmitter[rebalancermodels.Report](
 			lmContracts[relayID],
 			ocr3ABI,
 			tm,
@@ -112,7 +112,7 @@ func (r *rebalancerRelayer) NewRebalancerProvider(rargs commontypes.RelayArgs, p
 		}
 		transmitters[relayID] = t
 	}
-	multichainTransmitter, err := ocr3impls.NewMultichainTransmitterOCR3[rebalancermodels.ReportMetadata](
+	multichainTransmitter, err := ocr3impls.NewMultichainTransmitterOCR3[rebalancermodels.Report](
 		transmitters,
 		r.lggr.Named("MultichainTransmitterOCR3"),
 	)
@@ -132,7 +132,7 @@ var _ RebalancerProvider = (*rebalancerProvider)(nil)
 
 type rebalancerProvider struct {
 	*configWatcher
-	contractTransmitter ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata]
+	contractTransmitter ocr3types.ContractTransmitter[rebalancermodels.Report]
 	lmFactory           liquiditymanager.Factory
 	discovererFactory   discoverer.Factory
 	bridgeFactory       bridge.Factory
@@ -152,7 +152,7 @@ func (*rebalancerProvider) ContractTransmitter() ocrtypes.ContractTransmitter {
 	return nil
 }
 
-func (r *rebalancerProvider) ContractTransmitterOCR3() ocr3types.ContractTransmitter[rebalancermodels.ReportMetadata] {
+func (r *rebalancerProvider) ContractTransmitterOCR3() ocr3types.ContractTransmitter[rebalancermodels.Report] {
 	return r.contractTransmitter
 }
 

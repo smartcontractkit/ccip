@@ -16,23 +16,23 @@ type Rebalancer struct {
 }
 
 // ComputeTransfersToBalance provides a mock function with given fields: g, inflightTransfers
-func (_m *Rebalancer) ComputeTransfersToBalance(g graph.Graph, inflightTransfers []models.PendingTransfer) ([]models.Transfer, error) {
+func (_m *Rebalancer) ComputeTransfersToBalance(g graph.Graph, inflightTransfers []models.PendingTransfer) ([]models.ProposedTransfer, error) {
 	ret := _m.Called(g, inflightTransfers)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ComputeTransfersToBalance")
 	}
 
-	var r0 []models.Transfer
+	var r0 []models.ProposedTransfer
 	var r1 error
-	if rf, ok := ret.Get(0).(func(graph.Graph, []models.PendingTransfer) ([]models.Transfer, error)); ok {
+	if rf, ok := ret.Get(0).(func(graph.Graph, []models.PendingTransfer) ([]models.ProposedTransfer, error)); ok {
 		return rf(g, inflightTransfers)
 	}
-	if rf, ok := ret.Get(0).(func(graph.Graph, []models.PendingTransfer) []models.Transfer); ok {
+	if rf, ok := ret.Get(0).(func(graph.Graph, []models.PendingTransfer) []models.ProposedTransfer); ok {
 		r0 = rf(g, inflightTransfers)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]models.Transfer)
+			r0 = ret.Get(0).([]models.ProposedTransfer)
 		}
 	}
 

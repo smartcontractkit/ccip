@@ -148,11 +148,12 @@ func Test_L2ToL1Bridge_New(t *testing.T) {
 	})
 }
 
-func Test_L2ToL1Bridge_GetBridgeSpecificPayload(t *testing.T) {
+func Test_L2ToL1Bridge_GetBridgePayloadAndFee(t *testing.T) {
 	bridge := &l2ToL1Bridge{}
-	payload, err := bridge.GetBridgeSpecificPayload(testutils.Context(t), models.Transfer{})
+	payload, fee, err := bridge.GetBridgePayloadAndFee(testutils.Context(t), models.Transfer{})
 	require.NoError(t, err)
 	require.Empty(t, payload)
+	require.Equal(t, big.NewInt(0), fee)
 }
 
 func Test_L2ToL1Bridge_RemoteChainSelector(t *testing.T) {

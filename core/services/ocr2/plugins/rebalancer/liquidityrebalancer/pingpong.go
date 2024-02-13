@@ -16,7 +16,7 @@ func NewPingPong() *PingPong {
 	return &PingPong{}
 }
 
-func (p *PingPong) ComputeTransfersToBalance(g graph.Graph, inflightTransfers []models.PendingTransfer) ([]models.Transfer, error) {
+func (p *PingPong) ComputeTransfersToBalance(g graph.Graph, inflightTransfers []models.PendingTransfer) ([]models.ProposedTransfer, error) {
 	newTransfers := make([]models.PendingTransfer, 0)
 	for _, netSel := range g.GetNetworks() {
 		balance, err := g.GetLiquidity(netSel)
@@ -48,14 +48,19 @@ func (p *PingPong) ComputeTransfersToBalance(g graph.Graph, inflightTransfers []
 		}
 
 		for _, neighborNetSel := range neighbors {
-			newTransfer := models.NewTransfer(netSel, neighborNetSel, amountToSend, time.Now(), nil)
+			newTransfer := models.NewTransfer(netSel, neighborNetSel, amountToSend, time.Now().UTC(), nil)
 			newTransfers = append(newTransfers, models.NewPendingTransfer(newTransfer))
 		}
 	}
 
-	results := make([]models.Transfer, len(newTransfers))
+	results := make([]models.ProposedTransfer, len(newTransfers))
 	for i, tr := range newTransfers {
-		results[i] = tr.Transfer
+		results[i] = models.ProposedTransfer{
+			From:   tr.From,
+			To:     tr.To,
+			Amount: tr.Amount,
+			Date:   tr.Date,
+		}
 	}
 	return results, nil
 }

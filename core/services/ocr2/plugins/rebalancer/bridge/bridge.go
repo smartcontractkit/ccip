@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,7 +33,7 @@ type Bridge interface {
 	// Pending transfers that are ready to finalize have the appropriate bridge data set.
 	GetTransfers(ctx context.Context, localToken, remoteToken models.Address) ([]models.PendingTransfer, error)
 
-	// GetBridgeSpecificPayload returns the bridge specific payload for the given transfer.
+	// GetBridgePayloadAndFee returns the bridge specific payload for the given transfer.
 	// This payload must always be correctly ABI-encoded.
 	// Note that this payload is not directly provided to the bridge but the bridge adapter
 	// contracts. The bridge adapter may slightly alter the payload before sending it to the bridge.
@@ -40,7 +41,9 @@ type Bridge interface {
 	// fees required for the transfer to succeed reliably.
 	// This should only be called when we want to trigger a transfer (i.e, there is no transfer in flight)
 	// Bridge specific payloads for pending transfers are returned by GetTransfers.
-	GetBridgeSpecificPayload(ctx context.Context, transfer models.Transfer) ([]byte, error)
+	GetBridgePayloadAndFee(ctx context.Context, transfer models.Transfer) ([]byte, *big.Int, error)
+
+	QuorumizedBridgePayload(payloads [][]byte) ([]byte, error)
 
 	Close(ctx context.Context) error
 

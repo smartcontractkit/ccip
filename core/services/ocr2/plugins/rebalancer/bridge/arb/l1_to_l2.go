@@ -540,26 +540,31 @@ func (l *l1ToL2Bridge) parseLiquidityTransferred(lgs []logpoller.Log) ([]*rebala
 	return transferred, nil
 }
 
-// GetBridgeSpecificPayload implements bridge.Bridge
+func (l *l1ToL2Bridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) {
+	// TODO: decode and medianize gasLimit/maxSubmissionCost/maxFeePerGas
+	return payloads[0], nil
+}
+
+// GetBridgePayloadAndFee implements bridge.Bridge
 // For Arbitrum L1 -> L2 transfers, the bridge specific payload is a tuple of 3 numbers:
 // 1. gasLimit
 // 2. maxSubmissionCost
 // 3. maxFeePerGas
-func (l *l1ToL2Bridge) GetBridgeSpecificPayload(
+func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 	ctx context.Context,
 	transfer models.Transfer,
-) ([]byte, error) {
+) ([]byte, *big.Int, error) {
 	l1Gateway, err := l.l1GatewayRouter.GetGateway(&bind.CallOpts{
 		Context: ctx,
 	}, common.Address(transfer.LocalTokenAddress))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get L1 gateway for local token %s: %w",
+		return nil, nil, fmt.Errorf("failed to get L1 gateway for local token %s: %w",
 			transfer.LocalTokenAddress, err)
 	}
 
 	l1TokenGateway, err := arbitrum_token_gateway.NewArbitrumTokenGateway(l1Gateway, l.l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate L1 token gateway at %s: %w",
+		return nil, nil, fmt.Errorf("failed to instantiate L1 token gateway at %s: %w",
 			l1Gateway, err)
 	}
 
@@ -568,7 +573,7 @@ func (l *l1ToL2Bridge) GetBridgeSpecificPayload(
 	// although it is public, is not accessible via a getter function on the token gateway interface
 	abstractGateway, err := abstract_arbitrum_token_gateway.NewAbstractArbitrumTokenGateway(l1Gateway, l.l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate abstract gateway at %s: %w",
+		return nil, nil, fmt.Errorf("failed to instantiate abstract gateway at %s: %w",
 			l1Gateway, err)
 	}
 
@@ -576,7 +581,7 @@ func (l *l1ToL2Bridge) GetBridgeSpecificPayload(
 		Context: ctx,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get counterpart gateway for L1 gateway %s: %w",
+		return nil, nil, fmt.Errorf("failed to get counterpart gateway for L1 gateway %s: %w",
 			l1Gateway, err)
 	}
 
@@ -606,7 +611,7 @@ func (l *l1ToL2Bridge) GetBridgeSpecificPayload(
 		[]byte{},                                   // extra data (unused here)
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get finalizeInboundTransfer calldata: %w", err)
+		return nil, nil, fmt.Errorf("failed to get finalizeInboundTransfer calldata: %w", err)
 	}
 	retryableData.Data = finalizeInboundTransferCalldata
 
@@ -621,7 +626,7 @@ func (l *l1ToL2Bridge) GetBridgeSpecificPayload(
 
 	l1BaseFee, err := l.l1Client.SuggestGasPrice(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get L1 base fee: %w", err)
+		return nil, nil, fmt.Errorf("failed to get L1 base fee: %w", err)
 	}
 
 	return l.estimateAll(ctx, retryableData, l1BaseFee)
@@ -631,20 +636,20 @@ func (l *l1ToL2Bridge) estimateAll(
 	ctx context.Context,
 	retryableData RetryableData,
 	l1BaseFee *big.Int,
-) ([]byte, error) {
+) ([]byte, *big.Int, error) {
 	l2MaxFeePerGas, err := l.estimateMaxFeePerGasOnL2(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to estimate max fee per gas on L2: %w", err)
+		return nil, nil, fmt.Errorf("failed to estimate max fee per gas on L2: %w", err)
 	}
 
 	maxSubmissionFee, err := l.estimateMaxSubmissionFee(ctx, l1BaseFee, len(retryableData.Data))
 	if err != nil {
-		return nil, fmt.Errorf("failed to estimate max submission fee: %w", err)
+		return nil, nil, fmt.Errorf("failed to estimate max submission fee: %w", err)
 	}
 
 	gasLimit, err := l.estimateRetryableGasLimit(ctx, retryableData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to estimate retryable gas limit: %w", err)
+		return nil, nil, fmt.Errorf("failed to estimate retryable gas limit: %w", err)
 	}
 
 	deposit := new(big.Int).Mul(gasLimit, l2MaxFeePerGas)
@@ -662,10 +667,10 @@ func (l *l1ToL2Bridge) estimateAll(
 		MaxFeePerGas:      l2MaxFeePerGas,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to pack bridge calldata for bridge adapter: %w", err)
+		return nil, nil, fmt.Errorf("failed to pack bridge calldata for bridge adapter: %w", err)
 	}
 	bridgeCalldata = bridgeCalldata[4:] // remove method id
-	return bridgeCalldata, nil
+	return bridgeCalldata, deposit, nil
 }
 
 func (l *l1ToL2Bridge) estimateRetryableGasLimit(ctx context.Context, rd RetryableData) (*big.Int, error) {

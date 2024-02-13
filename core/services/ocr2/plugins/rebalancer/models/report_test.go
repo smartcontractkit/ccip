@@ -16,16 +16,16 @@ func TestMarshalReportMetadata(t *testing.T) {
 	t.Parallel()
 
 	t.Run("marshal json", func(t *testing.T) {
-		rm := models.ReportMetadata{}
+		rm := models.Report{}
 		b, err := json.Marshal(rm)
 		require.NoError(t, err, "failed to marshal empty ReportMetadata")
 
-		var unmarshalled models.ReportMetadata
+		var unmarshalled models.Report
 		err = json.Unmarshal(b, &unmarshalled)
 		require.NoError(t, err, "failed to unmarshal empty ReportMetadata")
 		require.Equal(t, rm, unmarshalled, "marshalled and unmarshalled ReportMetadata should be equal")
 
-		rm = models.ReportMetadata{
+		rm = models.Report{
 			Transfers: []models.Transfer{
 				models.NewTransfer(1, 2, big.NewInt(3), time.Now().UTC(), []byte{}),
 			},
@@ -44,7 +44,7 @@ func TestMarshalReportMetadata(t *testing.T) {
 	})
 
 	t.Run("marshal onchain", func(t *testing.T) {
-		rm := models.ReportMetadata{
+		rm := models.Report{
 			NetworkID:               1,
 			LiquidityManagerAddress: models.Address(testutils.NewAddress()),
 			Transfers: []models.Transfer{

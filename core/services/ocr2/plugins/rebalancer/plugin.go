@@ -91,12 +91,17 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		return ocrtypes.Observation{}, fmt.Errorf("get edges: %w", err)
 	}
 
+	resolvedTransfers, err := p.resolveProposedTransfers(ctx, outcomeCtx)
+	if err != nil {
+		return ocrtypes.Observation{}, fmt.Errorf("resolve proposed transfers: %w", err)
+	}
+
 	p.lggr.Infow("finished observing",
 		"networkLiquidities", networkLiquidities,
 		"pendingTransfers", pendingTransfers,
 		"edges", edges)
 
-	return models.NewObservation(networkLiquidities, pendingTransfers, edges).Encode(), nil
+	return models.NewObservation(networkLiquidities, resolvedTransfers, pendingTransfers, edges).Encode(), nil
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
@@ -142,8 +147,13 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		return nil, fmt.Errorf("compute median graph: %w", err)
 	}
 
+	resolvedTransfersQuorum, err := p.computeResolvedTransfersQuorum(observations)
+	if err != nil {
+		return nil, fmt.Errorf("compute resolved transfers quorum: %w", err)
+	}
+
 	lggr.Infow("computing transfers to reach balance", "pendingTransfers", pendingTransfers, "liquidityGraph", g)
-	transfersToReachBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, pendingTransfers)
+	proposedTransfers, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, pendingTransfers)
 	if err != nil {
 		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
 	}
@@ -151,13 +161,13 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 	lggr.Infow("finished computing outcome",
 		"medianLiquidityPerChain", medianLiquidityPerChain,
 		"pendingTransfers", pendingTransfers,
-		"transfersToReachBalance", transfersToReachBalance,
+		"proposedTransfers", proposedTransfers,
 	)
 
-	return models.NewOutcome(transfersToReachBalance, pendingTransfers).Encode(), nil
+	return models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers).Encode(), nil
 }
 
-func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.ReportMetadata], error) {
+func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.Report], error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -170,14 +180,21 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	}
 
 	// group transfers by source chain
+	// get both resolved and any pending transfers that are ready to finalize or execute onchain.
 	transfersBySourceNet := make(map[models.NetworkSelector][]models.Transfer)
-	for _, tr := range decodedOutcome.TransfersToReachBalance {
-		transfersBySourceNet[tr.From] = append(transfersBySourceNet[tr.From], tr)
+	for _, resolvedTransfer := range decodedOutcome.ResolvedTransfers {
+		transfersBySourceNet[resolvedTransfer.From] = append(transfersBySourceNet[resolvedTransfer.From], resolvedTransfer)
+	}
+	for _, pendingTransfer := range decodedOutcome.PendingTransfers {
+		if pendingTransfer.Status == models.TransferStatusReady || pendingTransfer.Status == models.TransferStatusFinalized {
+			transfersBySourceNet[pendingTransfer.From] = append(
+				transfersBySourceNet[pendingTransfer.From],
+				pendingTransfer.Transfer,
+			)
+		}
 	}
 
-	lggr.Infow("finished computing transfers to reach balance", "transfersBySourceNet", transfersBySourceNet)
-
-	var reports []ocr3types.ReportWithInfo[models.ReportMetadata]
+	var reports []ocr3types.ReportWithInfo[models.Report]
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	for sourceNet, transfers := range transfersBySourceNet {
@@ -197,12 +214,12 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 			return nil, fmt.Errorf("get config digest: %w", err)
 		}
 
-		reportMeta := models.NewReportMetadata(transfers, lmAddress, sourceNet, configDigest)
+		reportMeta := models.NewReport(transfers, lmAddress, sourceNet, configDigest)
 		encoded, err := reportMeta.OnchainEncode()
 		if err != nil {
 			return nil, fmt.Errorf("encode report metadata for onchain usage: %w", err)
 		}
-		reports = append(reports, ocr3types.ReportWithInfo[models.ReportMetadata]{
+		reports = append(reports, ocr3types.ReportWithInfo[models.Report]{
 			Report: encoded,
 			Info:   reportMeta,
 		})
@@ -212,7 +229,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	return reports, nil
 }
 
-func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
+func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.Report]) (bool, error) {
 	p.lggr.Infow("in should accept attested report", "seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report))
 
 	report, instructions, err := models.DecodeReport(p.rootNetwork, p.rootAddress, r.Report)
@@ -229,7 +246,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 	return true, nil
 }
 
-func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
+func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.Report]) (bool, error) {
 	p.lggr.Infow("in should transmit accepted report", "seqNr", seqNr, "reportMeta", r.Info)
 
 	newPendingTransfers := make([]models.PendingTransfer, 0, len(r.Info.Transfers))
@@ -457,6 +474,141 @@ func (p *Plugin) computeMedianGraph(
 	}
 
 	return g, nil
+}
+
+func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observation) ([]models.Transfer, error) {
+	// assumption: there shouldn't be more than 1 transfer for a (from, to) pair from a single oracle's observation.
+	// otherwise they can be collapsed into a single transfer.
+	type key struct {
+		from               models.NetworkSelector
+		to                 models.NetworkSelector
+		amountString       string
+		sender             models.Address
+		receiver           models.Address
+		localTokenAddress  models.Address
+		remoteTokenAddress models.Address
+	}
+	counts := make(map[key][]models.Transfer)
+	for _, obs := range observations {
+		for _, tr := range obs.ResolvedTransfers {
+			k := key{
+				from:               tr.From,
+				to:                 tr.To,
+				amountString:       tr.Amount.String(),
+				sender:             tr.Sender,
+				receiver:           tr.Receiver,
+				localTokenAddress:  tr.LocalTokenAddress,
+				remoteTokenAddress: tr.RemoteTokenAddress,
+			}
+			counts[k] = append(counts[k], tr)
+		}
+	}
+
+	var quorumTransfers []models.Transfer
+	for k, transfers := range counts {
+		if len(transfers) >= p.f+1 {
+			// need to compute the "medianized" bridge payload
+			// only the bridge knows how to do this so we need to delegate it to them
+			// the native bridge fee can also be medianized, no need for the bridge to do that
+			var (
+				bridgeFees     []*big.Int
+				bridgePayloads [][]byte
+				datesUnix      []*big.Int
+			)
+			for _, tr := range transfers {
+				bridgeFees = append(bridgeFees, tr.NativeBridgeFee)
+				bridgePayloads = append(bridgePayloads, tr.BridgeData)
+				datesUnix = append(datesUnix, big.NewInt(tr.Date.Unix()))
+			}
+			medianizedNativeFee := bigIntSortedMiddle(bridgeFees)
+			medianizedDateUnix := bigIntSortedMiddle(datesUnix)
+			bridge, err := p.bridgeFactory.NewBridge(k.from, k.to)
+			if err != nil {
+				return nil, fmt.Errorf("init bridge: %w", err)
+			}
+			quorumizedBridgePayload, err := bridge.QuorumizedBridgePayload(bridgePayloads)
+			if err != nil {
+				return nil, fmt.Errorf("quorumized bridge payload: %w", err)
+			}
+			quorumTransfer := models.Transfer{
+				From:               k.from,
+				To:                 k.to,
+				Amount:             transfers[0].Amount,
+				Date:               time.Unix(medianizedDateUnix.Int64(), 0), // medianized, not in the key
+				Sender:             transfers[0].Sender,
+				Receiver:           transfers[0].Receiver,
+				LocalTokenAddress:  transfers[0].LocalTokenAddress,
+				RemoteTokenAddress: transfers[0].RemoteTokenAddress,
+				BridgeData:         quorumizedBridgePayload, // "quorumized", not in the key
+				NativeBridgeFee:    medianizedNativeFee,     // medianized, not in the key
+			}
+			quorumTransfers = append(quorumTransfers, quorumTransfer)
+		} else {
+			p.lggr.Debugw("dropping transfer, not enough votes on it", "transfer", k, "votes", len(transfers))
+		}
+	}
+
+	return quorumTransfers, nil
+}
+
+func (p *Plugin) resolveProposedTransfers(ctx context.Context, outcomeCtx ocr3types.OutcomeContext) ([]models.Transfer, error) {
+	p.lggr.Infow("resolving proposed transfers", "seqNr", outcomeCtx.SeqNr, "prevSeqNr", outcomeCtx.SeqNr-1)
+
+	outcome, err := models.DecodeOutcome(outcomeCtx.PreviousOutcome)
+	if err != nil {
+		return nil, fmt.Errorf("decode previous outcome: %w", err)
+	}
+
+	var resolvedTransfers []models.Transfer
+	for _, proposedTransfer := range outcome.ProposedTransfers {
+		bridge, err := p.bridgeFactory.NewBridge(proposedTransfer.From, proposedTransfer.To)
+		if err != nil {
+			return nil, fmt.Errorf("init bridge: %w", err)
+		}
+
+		fromNetRebalancer, err := p.rebalancerGraph.GetRebalancerAddress(proposedTransfer.From)
+		if err != nil {
+			return nil, fmt.Errorf("get rebalancer address for %v: %w", proposedTransfer.From, err)
+		}
+
+		fromNetToken, err := p.rebalancerGraph.GetTokenAddress(proposedTransfer.From)
+		if err != nil {
+			return nil, fmt.Errorf("get token address for %v: %w", proposedTransfer.From, err)
+		}
+
+		toNetRebalancer, err := p.rebalancerGraph.GetRebalancerAddress(proposedTransfer.To)
+		if err != nil {
+			return nil, fmt.Errorf("get rebalancer address for %v: %w", proposedTransfer.To, err)
+		}
+
+		toNetToken, err := p.rebalancerGraph.GetTokenAddress(proposedTransfer.To)
+		if err != nil {
+			return nil, fmt.Errorf("get token address for %v: %w", proposedTransfer.To, err)
+		}
+
+		resolvedTransfer := models.Transfer{
+			From:               proposedTransfer.From,
+			To:                 proposedTransfer.To,
+			Amount:             proposedTransfer.Amount,
+			Date:               proposedTransfer.Date,
+			Sender:             fromNetRebalancer,
+			Receiver:           toNetRebalancer,
+			LocalTokenAddress:  fromNetToken,
+			RemoteTokenAddress: toNetToken,
+			// BridgeData: nil, // will be filled in below
+			// NativeBridgeFee: big.NewInt(0), // will be filled in below
+		}
+
+		bridgePayload, bridgeFee, err := bridge.GetBridgePayloadAndFee(ctx, resolvedTransfer)
+		if err != nil {
+			return nil, fmt.Errorf("get bridge payload and fee: %w", err)
+		}
+		resolvedTransfer.BridgeData = bridgePayload
+		resolvedTransfer.NativeBridgeFee = bridgeFee
+		resolvedTransfers = append(resolvedTransfers, resolvedTransfer)
+	}
+
+	return resolvedTransfers, nil
 }
 
 // bigIntSortedMiddle returns the middle number after sorting the provided numbers. nil is returned if the provided slice is empty.

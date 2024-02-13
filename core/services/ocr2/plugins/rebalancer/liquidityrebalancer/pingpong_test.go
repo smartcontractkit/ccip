@@ -212,7 +212,14 @@ func runPingPongInfinitySimulation(t *testing.T, rounds, maxNets, maxLanes int) 
 
 		pendingTransfers := make([]models.PendingTransfer, len(transfersToBalance))
 		for i, tr := range transfersToBalance {
-			pendingTransfers[i] = models.NewPendingTransfer(tr)
+			pendingTransfers[i] = models.PendingTransfer{
+				Transfer: models.Transfer{
+					From:   tr.From,
+					To:     tr.To,
+					Amount: tr.Amount,
+					Date:   tr.Date,
+				},
+			}
 		}
 
 		// Find some random inflight transfers and mark them as done by applying them to the graph.

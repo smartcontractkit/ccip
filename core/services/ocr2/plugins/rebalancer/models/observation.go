@@ -23,12 +23,17 @@ func NewNetworkLiquidity(chain NetworkSelector, liq *big.Int) NetworkLiquidity {
 }
 
 type Observation struct {
+	// LiquidityPerChain is the liquidity per chain that is known in the rebalancer graph.
 	LiquidityPerChain []NetworkLiquidity
-	PendingTransfers  []PendingTransfer
-	Edges             []Edge
+	// ResolvedTransfers are the resolved versions of the proposed transfers in the last outcome.
+	ResolvedTransfers []Transfer
+	// PendingTransfers are transfers that are in one of the TransferStatus states.
+	PendingTransfers []PendingTransfer
+	// Edges are the edges of the rebalancer graph.
+	Edges []Edge
 }
 
-func NewObservation(liqPerChain []NetworkLiquidity, pendingTransfers []PendingTransfer, edges []Edge) Observation {
+func NewObservation(liqPerChain []NetworkLiquidity, resolvedTransfers []Transfer, pendingTransfers []PendingTransfer, edges []Edge) Observation {
 	return Observation{
 		LiquidityPerChain: liqPerChain,
 		PendingTransfers:  pendingTransfers,
@@ -51,14 +56,30 @@ func DecodeObservation(b []byte) (Observation, error) {
 }
 
 type Outcome struct {
-	TransfersToReachBalance []Transfer
-	PendingTransfers        []PendingTransfer
+	// These are transfers proposed by the rebalancing algorithm to reach a balanced state
+	// in terms of liquidity.
+	// These are not yet ready to execute by the plugin because they have not been resolved.
+	// Proposed transfers are only resolved in the Observation stage of OCR3.
+	ProposedTransfers []ProposedTransfer
+
+	// These are transfers that have been proposed by the rebalancing algorithm and have been
+	// resolved in the last observation.
+	// Since these are "send" operations, they are ready to execute onchain.
+	ResolvedTransfers []Transfer
+
+	// These are transfers that are in one of the TransferStatus states.
+	// Depending on their state they may be ready to execute onchain.
+	PendingTransfers []PendingTransfer
 }
 
-func NewOutcome(transfersToReachBalance []Transfer, pendingTransfers []PendingTransfer) Outcome {
+func NewOutcome(
+	proposedTransfers []ProposedTransfer,
+	resolvedTransfers []Transfer,
+	pendingTransfers []PendingTransfer,
+) Outcome {
 	return Outcome{
-		TransfersToReachBalance: transfersToReachBalance,
-		PendingTransfers:        pendingTransfers,
+		ProposedTransfers: proposedTransfers,
+		PendingTransfers:  pendingTransfers,
 	}
 }
 

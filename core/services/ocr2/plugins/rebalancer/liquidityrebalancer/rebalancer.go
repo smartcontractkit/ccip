@@ -10,5 +10,5 @@ type Rebalancer interface {
 	ComputeTransfersToBalance(
 		g graph.Graph,
 		inflightTransfers []models.PendingTransfer,
-	) ([]models.Transfer, error)
+	) ([]models.ProposedTransfer, error)
 }

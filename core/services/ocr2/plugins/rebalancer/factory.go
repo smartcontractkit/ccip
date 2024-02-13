@@ -61,7 +61,7 @@ func (p PluginFactory) buildRebalancer() (liquidityrebalancer.Rebalancer, error)
 	}
 }
 
-func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig) (ocr3types.ReportingPlugin[models.ReportMetadata], ocr3types.ReportingPluginInfo, error) {
+func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig) (ocr3types.ReportingPlugin[models.Report], ocr3types.ReportingPluginInfo, error) {
 	liquidityRebalancer, err := p.buildRebalancer()
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to build rebalancer: %w", err)

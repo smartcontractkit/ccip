@@ -60,7 +60,7 @@ func (c ConfigDigest) ToOCRConfigDigest() ocrtypes.ConfigDigest {
 	return c.ConfigDigest
 }
 
-type ReportMetadata struct {
+type Report struct {
 	Transfers               []Transfer
 	LiquidityManagerAddress Address
 
@@ -71,8 +71,8 @@ type ReportMetadata struct {
 	ConfigDigest ConfigDigest
 }
 
-func NewReportMetadata(transfers []Transfer, lmAddr Address, networkID NetworkSelector, configDigest ocrtypes.ConfigDigest) ReportMetadata {
-	return ReportMetadata{
+func NewReport(transfers []Transfer, lmAddr Address, networkID NetworkSelector, configDigest ocrtypes.ConfigDigest) Report {
+	return Report{
 		Transfers:               transfers,
 		LiquidityManagerAddress: lmAddr,
 		NetworkID:               networkID,
@@ -82,7 +82,7 @@ func NewReportMetadata(transfers []Transfer, lmAddr Address, networkID NetworkSe
 	}
 }
 
-func (r ReportMetadata) Encode() []byte {
+func (r Report) Encode() []byte {
 	b, err := json.Marshal(r)
 	if err != nil {
 		panic(fmt.Errorf("report meta %#v encoding unexpected internal error: %w", r, err))
@@ -90,7 +90,7 @@ func (r ReportMetadata) Encode() []byte {
 	return b
 }
 
-func (r ReportMetadata) OnchainEncode() ([]byte, error) {
+func (r Report) OnchainEncode() ([]byte, error) {
 	instructions, err := r.ToLiquidityInstructions()
 	if err != nil {
 		return nil, fmt.Errorf("converting to liquidity instructions: %w", err)
@@ -106,7 +106,7 @@ func (r ReportMetadata) OnchainEncode() ([]byte, error) {
 	return encoded, nil
 }
 
-func (r ReportMetadata) ToLiquidityInstructions() (rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) {
+func (r Report) ToLiquidityInstructions() (rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) {
 	var sendInstructions []rebalancer_report_encoder.IRebalancerSendLiquidityParams
 	var receiveInstructions []rebalancer_report_encoder.IRebalancerReceiveLiquidityParams
 	for _, tr := range r.Transfers {
@@ -115,6 +115,7 @@ func (r ReportMetadata) ToLiquidityInstructions() (rebalancer_report_encoder.IRe
 				Amount:              tr.Amount,
 				RemoteChainSelector: uint64(tr.To),
 				BridgeData:          tr.BridgeData,
+				NativeBridgeFee:     tr.NativeBridgeFee,
 			})
 		} else if r.NetworkID == tr.To {
 			receiveInstructions = append(receiveInstructions, rebalancer_report_encoder.IRebalancerReceiveLiquidityParams{
@@ -133,7 +134,7 @@ func (r ReportMetadata) ToLiquidityInstructions() (rebalancer_report_encoder.IRe
 	}, nil
 }
 
-func (r ReportMetadata) GetDestinationChain() relay.ID {
+func (r Report) GetDestinationChain() relay.ID {
 	networkID := r.NetworkID
 
 	ch, exists := chainsel.ChainBySelector(uint64(r.NetworkID))
@@ -144,32 +145,32 @@ func (r ReportMetadata) GetDestinationChain() relay.ID {
 	return relay.NewID(relay.EVM, fmt.Sprintf("%d", networkID))
 }
 
-func (r ReportMetadata) GetDestinationConfigDigest() ocrtypes.ConfigDigest {
+func (r Report) GetDestinationConfigDigest() ocrtypes.ConfigDigest {
 	return r.ConfigDigest.ToOCRConfigDigest()
 }
 
-func (r ReportMetadata) String() string {
+func (r Report) String() string {
 	return fmt.Sprintf("ReportMetadata{Transfers: %v, LiquidityManagerAddress: %s, NetworkID: %d}", r.Transfers, r.LiquidityManagerAddress, r.NetworkID)
 }
 
-func DecodeReportMetadata(b []byte) (ReportMetadata, error) {
-	var meta ReportMetadata
+func DecodeReportMetadata(b []byte) (Report, error) {
+	var meta Report
 	err := json.Unmarshal(b, &meta)
 	return meta, err
 }
 
-func DecodeReport(networkID NetworkSelector, rebalancerAddress Address, binaryReport []byte) (ReportMetadata, rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) {
+func DecodeReport(networkID NetworkSelector, rebalancerAddress Address, binaryReport []byte) (Report, rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) {
 	unpacked, err := onchainReportArguments.Unpack(binaryReport)
 	if err != nil {
-		return ReportMetadata{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, fmt.Errorf("failed to unpack report: %w", err)
+		return Report{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, fmt.Errorf("failed to unpack report: %w", err)
 	}
 	if len(unpacked) != 1 {
-		return ReportMetadata{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, fmt.Errorf("unexpected number of arguments: %d", len(unpacked))
+		return Report{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, fmt.Errorf("unexpected number of arguments: %d", len(unpacked))
 	}
 
 	instructions := *abi.ConvertType(unpacked[0], new(rebalancer_report_encoder.IRebalancerLiquidityInstructions)).(*rebalancer_report_encoder.IRebalancerLiquidityInstructions)
 
-	var out ReportMetadata
+	var out Report
 	out.NetworkID = networkID
 	out.LiquidityManagerAddress = rebalancerAddress
 	for _, send := range instructions.SendLiquidityParams {

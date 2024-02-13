@@ -51,13 +51,22 @@ func (n NetworkSelector) Type() NetworkType {
 
 type NetworkType string
 
+// ProposedTransfer is a transfer that is proposed by the rebalancing algorithm.
+type ProposedTransfer struct {
+	From   NetworkSelector
+	To     NetworkSelector
+	Amount *big.Int
+	Date   time.Time
+}
+
+// Transfer is a ProposedTransfer that has had a lot of its information resolved.
 type Transfer struct {
 	// From identifies the network where the tokens are originating from.
 	From NetworkSelector
 	// To identifies the network where the tokens are headed to.
 	To NetworkSelector
 	// Sender is an address on the From network that is sending the tokens.
-	// Typically this will be the bridge adapter on the From network.
+	// Typically this will be the rebalancer contract on the From network.
 	Sender Address
 	// Receiver is an address on the To network that will be receiving the tokens.
 	// Typically this will be the rebalancer contract on the To network.
@@ -73,6 +82,8 @@ type Transfer struct {
 	// BridgeData is any additional data that needs to be sent to the bridge
 	// in order to make the transfer succeed.
 	BridgeData []byte
+	// NativeBridgeFee is the fee that the bridge charges for the transfer.
+	NativeBridgeFee *big.Int
 	// todo: consider adding some unique id field
 }
 
@@ -89,6 +100,7 @@ func NewTransfer(from, to NetworkSelector, amount *big.Int, date time.Time, brid
 func (t Transfer) Equals(other Transfer) bool {
 	return t.From == other.From &&
 		t.To == other.To &&
+		t.Sender == other.Sender &&
 		t.Receiver == other.Receiver &&
 		t.LocalTokenAddress == other.LocalTokenAddress &&
 		t.RemoteTokenAddress == other.RemoteTokenAddress &&
@@ -101,6 +113,7 @@ func (t Transfer) String() string {
 	return fmt.Sprintf("%v->%v %s", t.From, t.To, t.Amount.String())
 }
 
+// PendingTransfer is a Transfer whose status has been resolved.
 type PendingTransfer struct {
 	Transfer
 	Status TransferStatus
@@ -128,10 +141,15 @@ func NewPendingTransfer(tr Transfer) PendingTransfer {
 type TransferStatus string
 
 const (
-	TransferStatusNotReady  = "not-ready"
-	TransferStatusReady     = "ready"
+	// TransferStatusNotReady indicates that the transfer is in-flight, but has either not been auto-finalized (e.g L1 -> L2 transfers)
+	// or is not ready to finalize on-chain (e.g L2 -> L1 transfers).
+	TransferStatusNotReady = "not-ready"
+	// TransferStatusReady indicates that the transfer is in-flight but ready to be finalized on-chain.
+	TransferStatusReady = "ready"
+	// TransferStatusFinalized indicates that the transfer has been finalized on-chain, but not yet executed.
 	TransferStatusFinalized = "finalized"
-	TransferStatusExecuted  = "executed"
+	// TransferStatusExecuted indicates that the transfer has been finalized and executed. This is a terminal state.
+	TransferStatusExecuted = "executed"
 )
 
 type Edge struct {

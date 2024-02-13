@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	mathrand "math/rand"
+	"time"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
@@ -30,7 +31,7 @@ func NewRandomRebalancer(maxNumTransfers int, checkSourceDestEqual bool, lggr lo
 func (r *randomRebalancer) ComputeTransfersToBalance(
 	g graph.Graph,
 	inflightTransfers []models.PendingTransfer,
-) ([]models.Transfer, error) {
+) ([]models.ProposedTransfer, error) {
 	liquidities := make([]models.NetworkLiquidity, 0)
 	for _, net := range g.GetNetworks() {
 		liq, err := g.GetLiquidity(net)
@@ -51,7 +52,7 @@ func (r *randomRebalancer) ComputeTransfersToBalance(
 	rng := mathrand.New(source)                                    //nolint:gosec
 	numTransfers := rng.Int63n(int64(r.maxNumTransfers))
 	r.lggr.Infow("RandomRebalancer: generated random number of transfers", "numTransfers", numTransfers)
-	var transfers []models.Transfer
+	var transfers []models.ProposedTransfer
 	for i := 0; i < int(numTransfers); i++ {
 		randSourceChain := pickRandom(rng, g.GetNetworks())
 		neighbors, exist := g.GetNeighbors(randSourceChain)
@@ -77,10 +78,11 @@ func (r *randomRebalancer) ComputeTransfersToBalance(
 		amount := rng.Int63n(liqSource.Int64())
 		r.lggr.Infow("RandomRebalancer: generated random transfer amount", "amount", amount)
 
-		transfers = append(transfers, models.Transfer{
+		transfers = append(transfers, models.ProposedTransfer{
 			From:   randSourceChain,
 			To:     randDestChain,
 			Amount: big.NewInt(amount),
+			Date:   time.Now().UTC(),
 		})
 	}
 	r.lggr.Info("RandomRebalancer: generated random transfers", "transfers", transfers)

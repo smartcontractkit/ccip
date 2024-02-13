@@ -120,9 +120,19 @@ func (t *testBridge) Close(ctx context.Context) error {
 	return nil
 }
 
-// GetBridgeSpecificPayload implements bridge.Bridge.
-func (t *testBridge) GetBridgeSpecificPayload(ctx context.Context, transfer models.Transfer) ([]byte, error) {
-	return packUint256(transfer.Amount)
+// QuorumizedBridgePayload implements bridge.Bridge.
+func (t *testBridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) {
+	// TODO: implement, should just return Amount and they should all be the same
+	return payloads[0], nil
+}
+
+// GetBridgePayloadAndFee implements bridge.Bridge.
+func (t *testBridge) GetBridgePayloadAndFee(ctx context.Context, transfer models.Transfer) ([]byte, *big.Int, error) {
+	payload, err := packUint256(transfer.Amount)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to pack bridge data: %w", err)
+	}
+	return payload, big.NewInt(0), nil
 }
 
 // GetTransfers implements bridge.Bridge.
@@ -205,7 +215,7 @@ func (t *testBridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:               t.sourceSelector,
 				To:                 t.destSelector,
-				Sender:             t.sourceRebalancer,
+				Sender:             models.Address(t.sourceAdapter.Address()),
 				Receiver:           t.destRebalancer,
 				Amount:             send.Amount,
 				LocalTokenAddress:  models.Address(send.LocalToken),

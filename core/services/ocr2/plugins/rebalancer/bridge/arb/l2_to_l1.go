@@ -226,10 +226,15 @@ func NewL2ToL1Bridge(
 	}, nil
 }
 
-// GetBridgeSpecificPayload implements bridge.Bridge.
-// Arbitrum L2 to L1 transfers require no bridge specific payload.
-func (l *l2ToL1Bridge) GetBridgeSpecificPayload(ctx context.Context, transfer models.Transfer) ([]byte, error) {
+func (l *l2ToL1Bridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) {
+	// there's no payload for L2 -> L1 transfers
 	return []byte{}, nil
+}
+
+// GetBridgePayloadAndFee implements bridge.Bridge.
+// Arbitrum L2 to L1 transfers require no bridge specific payload.
+func (l *l2ToL1Bridge) GetBridgePayloadAndFee(ctx context.Context, transfer models.Transfer) ([]byte, *big.Int, error) {
+	return []byte{}, big.NewInt(0), nil
 }
 
 // Close implements bridge.Bridge.
