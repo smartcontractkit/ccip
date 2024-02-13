@@ -133,3 +133,15 @@ const (
 	TransferStatusFinalized = "finalized"
 	TransferStatusExecuted  = "executed"
 )
+
+type Edge struct {
+	Source NetworkSelector
+	Dest   NetworkSelector
+}
+
+func NewEdge(source, dest NetworkSelector) Edge {
+	return Edge{
+		Source: source,
+		Dest:   dest,
+	}
+}

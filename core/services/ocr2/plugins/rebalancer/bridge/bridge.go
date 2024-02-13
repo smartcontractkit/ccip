@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge/arb"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge/testonlybridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -201,6 +202,45 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			l2Deps.ethClient, // l2 eth client
 			l1Deps.lp,        // l1 log poller
 			l2Deps.lp,        // l2 log poller
+		)
+	case models.NetworkSelector(chainsel.GETH_TESTNET.Selector):
+	case models.NetworkSelector(chainsel.TEST_90000001.Selector):
+	case models.NetworkSelector(chainsel.TEST_90000002.Selector):
+	case models.NetworkSelector(chainsel.TEST_90000003.Selector):
+		// these chains are only ever used for tests
+		// in tests we only ever deploy the MockL1Bridge adapter
+		// so this is an "L1 to L1" bridge setup, but not really
+		if source == dest {
+			return nil, fmt.Errorf("no bridge between the same network and itself: %d", source)
+		}
+		sourceDeps, ok := f.evmDeps[source]
+		if !ok {
+			return nil, fmt.Errorf("evm dependencies not found for source selector %d", source)
+		}
+		destDeps, ok := f.evmDeps[dest]
+		if !ok {
+			return nil, fmt.Errorf("evm dependencies not found for dest selector %d", dest)
+		}
+		sourceAdapter, ok := sourceDeps.bridgeAdapters[dest]
+		if !ok {
+			return nil, fmt.Errorf("bridge adapter not found for source selector %d in deps for selector %d", source, dest)
+		}
+		destAdapter, ok := destDeps.bridgeAdapters[source]
+		if !ok {
+			return nil, fmt.Errorf("bridge adapter not found for dest selector %d in deps for selector %d", dest, source)
+		}
+		bridge, err = testonlybridge.New(
+			source,
+			dest,
+			sourceDeps.rebalancerAddress,
+			destDeps.rebalancerAddress,
+			sourceAdapter,
+			destAdapter,
+			sourceDeps.lp,
+			destDeps.lp,
+			sourceDeps.ethClient,
+			destDeps.ethClient,
+			f.lggr,
 		)
 	}
 

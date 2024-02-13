@@ -622,7 +622,6 @@ func deployContracts(
 ) {
 	universes = make(map[int64]onchainUniverse)
 	for chainID, backend := range chains {
-		// TODO @makram
 		// Deploy wrapped ether contract
 		// will act as the ERC-20 being bridged
 		wethAddress, _, _, err := weth9.DeployWETH9(owner, backend)
@@ -665,7 +664,7 @@ func deployContracts(
 		rebalancer, err := rebalancer.NewRebalancer(rebalancerAddr, backend)
 		require.NoError(t, err, "failed to create Rebalancer wrapper")
 
-		// set the rebalancer of the lock release pool to be the previously deployed rebalancer
+		// set the rebalancer of the lock release pool to be the just deployed rebalancer
 		_, err = lockReleasePool.SetRebalancer(owner, rebalancerAddr)
 		require.NoError(t, err, "failed to set rebalancer on lock/release pool")
 		backend.Commit()

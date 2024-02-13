@@ -21,25 +21,51 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     i_token = token;
   }
 
-  /// @notice Simply transferFrom msg.sender the tokens that are to be bridged.
+  /// @notice Mock event to emit when sendERC20 is called on this bridge adapter
+  /// @param caller The address that called sendERC20 (usually the rebalancer contract)
+  /// @param localToken The address of the token on the local chain
+  /// @param remoteToken The address of the token on the remote chain
+  /// @param remoteReceiver The address that will receive the tokens on the remote chain (usually the remote rebalancer)
+  /// @param amount The amount of tokens to be bridged
+  /// @param bridgeSpecificPayload The payload that was passed to sendERC20
+  event MockERC20Sent(
+    address indexed caller,
+    address indexed localToken,
+    address indexed remoteReceiver,
+    address remoteToken,
+    uint256 amount,
+    bytes bridgeSpecificPayload
+  );
+
+  /// @notice Mock event to emit when the rebalancer calls finalizeWithdrawERC20
+  /// @param remoteSender The address that initiated the send on the remote chain
+  /// @param localReceiver The address that will receive the tokens on the local chain (usually the local rebalancer)
+  /// @param localToken The address of the token on the local chain
+  /// @param amount The amount of tokens to being bridged
+  /// @param bridgeSpecificPayload The payload that was passed to finalizeWithdrawERC20,
+  ///        will be an abi-encoded amount determined offchain (uint256).
+  event MockERC20Finalized(
+    address indexed remoteSender,
+    address indexed localReceiver,
+    address indexed localToken,
+    uint256 amount,
+    bytes bridgeSpecificPayload
+  );
+
+  /// @notice Simply transferFrom msg.sender the tokens that are to be bridged to address(this).
   function sendERC20(
     address localToken,
-    address /* remoteToken */,
-    address /* receiver */,
+    address remoteToken,
+    address remoteReceiver,
     uint256 amount,
-    bytes calldata /* bridgeSpecificPayload */
+    bytes calldata bridgeSpecificPayload
   ) external payable override returns (bytes memory) {
     IERC20(localToken).transferFrom(msg.sender, address(this), amount);
+
+    emit MockERC20Sent(msg.sender, localToken, remoteReceiver, remoteToken, amount, bridgeSpecificPayload);
+
     return "";
   }
-
-  /// @notice Mock function to finalize a withdrawal from L2
-  /// @dev Does nothing as the indented action cannot be inferred from the inputs
-  function finalizeWithdrawERC20FromL2(
-    address l2Sender,
-    address l1Receiver,
-    bytes calldata bridgeSpecificPayload
-  ) external {}
 
   function getBridgeFeeInNative() external pure returns (uint256) {
     return 0;
@@ -56,12 +82,20 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     emit LiquidityRemoved(msg.sender, amount);
   }
 
-  // No-op
+  /// @dev Test setup is trusted, so just transfer the tokens to the localReceiver,
+  /// @dev which should be the local rebalancer.
+  /// @dev Infer the amount from the bridgeSpecificPayload
+  /// @dev Note that this means that this bridge adapter will need to have some tokens,
+  /// @dev however this is ok in a test environment since we will have infinite tokens.
   function finalizeWithdrawERC20(
-    address /* remoteSender */,
-    address /* localReceiver */,
-    bytes calldata /* bridgeSpecificData */
-  ) external {}
+    address remoteSender,
+    address localReceiver,
+    bytes calldata bridgeSpecificPayload
+  ) external {
+    uint256 amount = abi.decode(bridgeSpecificPayload, (uint256));
+    i_token.safeTransfer(localReceiver, amount);
+    emit MockERC20Finalized(remoteSender, localReceiver, address(i_token), amount, bridgeSpecificPayload);
+  }
 }
 
 /// @notice Mock L2 Bridge adapter

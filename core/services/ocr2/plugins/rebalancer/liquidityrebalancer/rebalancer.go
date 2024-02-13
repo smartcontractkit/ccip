@@ -10,6 +10,5 @@ type Rebalancer interface {
 	ComputeTransfersToBalance(
 		g graph.Graph,
 		inflightTransfers []models.PendingTransfer,
-		medianLiquidityPerChain []models.NetworkLiquidity,
 	) ([]models.Transfer, error)
 }
