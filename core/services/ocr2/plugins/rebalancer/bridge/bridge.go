@@ -164,7 +164,7 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		)
 	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector):
 	case models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector):
-		// L1 -> L2
+		// source: Ethereum L1 -> dest: Arbitrum L2
 		// only dest that is supported is arbitrum mainnet if source == eth mainnet
 		// only dest that is supported is arbitrum sepolia if source == eth sepolia
 		if source == models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector) &&
@@ -175,15 +175,15 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			dest != models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector) {
 			return nil, fmt.Errorf("unsupported destination for eth sepolia l1 -> l2 bridge: %d, must be arb sepolia", dest)
 		}
-		sourceDeps, ok := f.evmDeps[source]
+		l1Deps, ok := f.evmDeps[source]
 		if !ok {
 			return nil, fmt.Errorf("evm dependencies not found for source selector %d", source)
 		}
-		destDeps, ok := f.evmDeps[dest]
+		l2Deps, ok := f.evmDeps[dest]
 		if !ok {
 			return nil, fmt.Errorf("evm dependencies not found for dest selector %d", dest)
 		}
-		l1BridgeAdapter, ok := sourceDeps.bridgeAdapters[dest]
+		l1BridgeAdapter, ok := l1Deps.bridgeAdapters[dest]
 		if !ok {
 			return nil, fmt.Errorf("bridge adapter not found for source selector %d in deps for selector %d", source, dest)
 		}
@@ -191,15 +191,15 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			f.lggr,
 			source,
 			dest,
-			common.Address(sourceDeps.rebalancerAddress),             // l1 rebalancer address
-			common.Address(destDeps.rebalancerAddress),               // l2 rebalancer address
-			common.Address(l1BridgeAdapter),                          // l1 bridge adapter address
+			common.Address(l1Deps.rebalancerAddress), // l1 rebalancer address
+			common.Address(l2Deps.rebalancerAddress), // l2 rebalancer address
+			common.Address(l1BridgeAdapter),          // l1 bridge adapter address
 			arb.AllContracts[uint64(source)].L1.GatewayRouterAddress, // l1 gateway router address
 			arb.AllContracts[uint64(source)].L1.InboxAddress,         // l1 inbox address
-			sourceDeps.ethClient,                                     // l1 eth client
-			destDeps.ethClient,                                       // l2 eth client
-			sourceDeps.lp,                                            // l1 log poller
-			destDeps.lp,                                              // l2 log poller
+			l1Deps.ethClient, // l1 eth client
+			l2Deps.ethClient, // l2 eth client
+			l1Deps.lp,        // l1 log poller
+			l2Deps.lp,        // l2 log poller
 		)
 	}
 
