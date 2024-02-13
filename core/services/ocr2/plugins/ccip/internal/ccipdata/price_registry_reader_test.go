@@ -87,8 +87,8 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 			Value:             big.NewInt(12), // Intentionally different from block1
 		},
 	}
-	token1 := cciptypes.Address(utils.RandomAddress().String())
-	token2 := cciptypes.Address(utils.RandomAddress().String())
+	token1 := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
+	token2 := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
 	tokenPriceUpdatesBlock1 := []cciptypes.TokenPrice{
 		{
 			Token: token1,
@@ -110,10 +110,10 @@ func setupPriceRegistryReaderTH(t *testing.T) priceRegReaderTH {
 	addr2, _, _, err := price_registry.DeployPriceRegistry(user, ec, nil, feeTokens, 1000)
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
-	pr10r, err := factory.NewPriceRegistryReader(lggr, factory.NewEvmVersionFinder(), cciptypes.Address(addr.String()), lp, ec)
+	pr10r, err := factory.NewPriceRegistryReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), lp, ec)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(pr10r).String(), reflect.TypeOf(&v1_0_0.PriceRegistry{}).String())
-	pr12r, err := factory.NewPriceRegistryReader(lggr, factory.NewEvmVersionFinder(), cciptypes.Address(addr2.String()), lp, ec)
+	pr12r, err := factory.NewPriceRegistryReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), lp, ec)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(pr12r).String(), reflect.TypeOf(&v1_2_0.PriceRegistry{}).String())
 	// Apply block1.
@@ -248,7 +248,7 @@ func TestNewPriceRegistryReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			addr := cciptypes.Address(utils.RandomAddress().String())
+			addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
 			lp := lpmocks.NewLogPoller(t)
 			lp.On("RegisterFilter", mock.Anything).Return(nil).Maybe()
 			_, err = factory.NewPriceRegistryReader(logger.TestLogger(t), factory.NewEvmVersionFinder(), addr, lp, c)

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/leanovate/gopter"
 	"github.com/leanovate/gopter/gen"
@@ -48,8 +47,8 @@ import (
 )
 
 func TestCommitReportingPlugin_Observation(t *testing.T) {
-	sourceNativeTokenAddr := cciptypes.Address(common.HexToAddress("1000").String())
-	someTokenAddr := cciptypes.Address(common.HexToAddress("2000").String())
+	sourceNativeTokenAddr := ccipcalc.HexToAddress("1000")
+	someTokenAddr := ccipcalc.HexToAddress("2000")
 
 	testCases := []struct {
 		name                string
@@ -532,11 +531,11 @@ func TestCommitReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 	ctx := context.Background()
 
-	token1 := cciptypes.Address(common.HexToAddress("0xa").String())
-	token2 := cciptypes.Address(common.HexToAddress("0xb").String())
+	token1 := ccipcalc.HexToAddress("0xa")
+	token2 := ccipcalc.HexToAddress("0xb")
 	token1Price := big.NewInt(1)
 	token2Price := big.NewInt(2)
-	unsupportedToken := cciptypes.Address(common.HexToAddress("0xc").String())
+	unsupportedToken := ccipcalc.HexToAddress("0xc")
 	gasPrice := big.NewInt(100)
 
 	tokenDecimals := make(map[cciptypes.Address]uint8)
@@ -689,8 +688,8 @@ func TestCommitReportingPlugin_validateObservations(t *testing.T) {
 
 func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 	const defaultSourceChainSelector = 10 // we reuse this value across all test cases
-	feeToken1 := cciptypes.Address(common.HexToAddress("0xa").String())
-	feeToken2 := cciptypes.Address(common.HexToAddress("0xb").String())
+	feeToken1 := ccipcalc.HexToAddress("0xa")
+	feeToken2 := ccipcalc.HexToAddress("0xb")
 
 	val1e18 := func(val int64) *big.Int { return new(big.Int).Mul(big.NewInt(1e18), big.NewInt(val)) }
 

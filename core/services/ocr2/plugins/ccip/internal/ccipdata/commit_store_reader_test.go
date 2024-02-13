@@ -33,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/factory"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
@@ -149,7 +150,7 @@ func TestCommitStoreReaders(t *testing.T) {
 	onramp2 := utils.RandomAddress()
 	// Report
 	rep := cciptypes.CommitStoreReport{
-		TokenPrices: []cciptypes.TokenPrice{{Token: cciptypes.Address(utils.RandomAddress().String()), Value: big.NewInt(1)}},
+		TokenPrices: []cciptypes.TokenPrice{{Token: ccipcalc.EvmAddrToGeneric(utils.RandomAddress()), Value: big.NewInt(1)}},
 		GasPrices:   []cciptypes.GasPrice{{DestChainSelector: 1, Value: big.NewInt(1)}},
 		Interval:    cciptypes.CommitStoreInterval{Min: 1, Max: 10},
 		MerkleRoot:  common.HexToHash("0x1"),
@@ -178,10 +179,10 @@ func TestCommitStoreReaders(t *testing.T) {
 	require.NoError(t, err)
 	commitAndGetBlockTs(ec) // Deploy these
 	ge := new(gasmocks.EvmFeeEstimator)
-	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), cciptypes.Address(addr.String()), ec, lp, ge)
+	c10r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr), ec, lp, ge)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c10r).String(), reflect.TypeOf(&v1_0_0.CommitStore{}).String())
-	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), cciptypes.Address(addr2.String()), ec, lp, ge)
+	c12r, err := factory.NewCommitStoreReader(lggr, factory.NewEvmVersionFinder(), ccipcalc.EvmAddrToGeneric(addr2), ec, lp, ge)
 	require.NoError(t, err)
 	assert.Equal(t, reflect.TypeOf(c12r).String(), reflect.TypeOf(&v1_2_0.CommitStore{}).String())
 
@@ -347,7 +348,7 @@ func TestCommitStoreReaders(t *testing.T) {
 			assert.Equal(t, cr.OffchainConfig(), cciptypes.CommitOffchainConfig{})
 			newPr, err := cr.ChangeConfig(configs[v][0], configs[v][1])
 			require.NoError(t, err)
-			assert.Equal(t, cciptypes.Address(prs[v].String()), newPr)
+			assert.Equal(t, ccipcalc.EvmAddrToGeneric(prs[v]), newPr)
 			assert.Equal(t, commonOffchain, cr.OffchainConfig())
 			// We should be able to query for gas prices now.
 			gp, err := cr.GasPriceEstimator().GetGasPrice(context.Background())
@@ -386,7 +387,7 @@ func TestNewCommitStoreReader(t *testing.T) {
 			require.NoError(t, err)
 			c := evmclientmocks.NewClient(t)
 			c.On("CallContract", mock.Anything, mock.Anything, mock.Anything).Return(b, nil)
-			addr := cciptypes.Address(utils.RandomAddress().String())
+			addr := ccipcalc.EvmAddrToGeneric(utils.RandomAddress())
 			lp := lpmocks.NewLogPoller(t)
 			if tc.expectedErr == "" {
 				lp.On("RegisterFilter", mock.Anything).Return(nil)

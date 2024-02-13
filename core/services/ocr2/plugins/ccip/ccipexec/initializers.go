@@ -11,7 +11,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
@@ -274,7 +273,7 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 	}
 
 	versionFinder := factory.NewEvmVersionFinder()
-	offRampAddress := cciptypes.Address(common.HexToAddress(spec.ContractID).String())
+	offRampAddress := ccipcalc.HexToAddress(spec.ContractID)
 	offRampReader, err := factory.NewOffRampReader(lggr, versionFinder, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), registerFilters, qopts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "create offRampReader")

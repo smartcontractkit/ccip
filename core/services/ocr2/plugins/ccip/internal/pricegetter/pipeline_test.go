@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/bridges"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/pricegetter"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 
@@ -38,8 +39,8 @@ func TestDataSource(t *testing.T) {
 		require.NoError(t, err)
 	}))
 	defer usdcEth.Close()
-	linkTokenAddress := cciptypes.Address(common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e05").String())
-	usdcTokenAddress := cciptypes.Address(common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e10").String())
+	linkTokenAddress := ccipcalc.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e05")
+	usdcTokenAddress := ccipcalc.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e10")
 	source := fmt.Sprintf(`
 	// Price 1
 	link [type=http method=GET url="%s"];
@@ -66,7 +67,7 @@ func TestDataSource(t *testing.T) {
 
 	// Ask a non-existent price.
 	_, err = priceGetter.TokenPricesUSD(context.Background(), []cciptypes.Address{
-		cciptypes.Address(common.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e11").String()),
+		ccipcalc.HexToAddress("0x1591690b8638f5fb2dbec82ac741805ac5da8b45dc5263f4875b0496fdce4e11"),
 	})
 	require.Error(t, err)
 
@@ -140,13 +141,13 @@ func TestParsingDifferentFormats(t *testing.T) {
 			`, token.URL, address)
 
 			prices, err := newTestPipelineGetter(t, source).
-				TokenPricesUSD(context.Background(), []cciptypes.Address{cciptypes.Address(address.String())})
+				TokenPricesUSD(context.Background(), []cciptypes.Address{ccipcalc.EvmAddrToGeneric(address)})
 
 			if tt.expectedError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, prices[cciptypes.Address(address.String())], tt.expectedValue)
+				require.Equal(t, prices[ccipcalc.EvmAddrToGeneric(address)], tt.expectedValue)
 			}
 		})
 	}

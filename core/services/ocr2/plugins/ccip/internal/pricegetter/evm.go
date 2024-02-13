@@ -89,7 +89,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 
 	evmAddrs, err := ccipcalc.GenericAddrsToEvm(tokens...)
 	if err != nil {
-		return nil, fmt.Errorf("addresses are non-evm: %w", err)
+		return nil, err
 	}
 
 	for _, tk := range evmAddrs {

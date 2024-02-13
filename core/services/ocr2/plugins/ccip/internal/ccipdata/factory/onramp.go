@@ -35,13 +35,15 @@ func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, so
 	if contractType != ccipconfig.EVM2EVMOnRamp {
 		return nil, errors.Errorf("expected %v got %v", ccipconfig.EVM2EVMOnRamp, contractType)
 	}
+
+	onRampAddrEvm, err := ccipcalc.GenericAddrToEvm(onRampAddress)
+	if err != nil {
+		return nil, err
+	}
+
 	switch version.String() {
 	case ccipdata.V1_0_0:
-		evmAddrs, err := ccipcalc.GenericAddrsToEvm(onRampAddress)
-		if err != nil {
-			return nil, err
-		}
-		onRamp, err := v1_0_0.NewOnRamp(lggr, sourceSelector, destSelector, evmAddrs[0], sourceLP, source)
+		onRamp, err := v1_0_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
 		if err != nil {
 			return nil, err
 		}
@@ -50,11 +52,7 @@ func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, so
 		}
 		return onRamp, onRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_1_0:
-		evmAddrs, err := ccipcalc.GenericAddrsToEvm(onRampAddress)
-		if err != nil {
-			return nil, err
-		}
-		onRamp, err := v1_1_0.NewOnRamp(lggr, sourceSelector, destSelector, evmAddrs[0], sourceLP, source)
+		onRamp, err := v1_1_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
 		if err != nil {
 			return nil, err
 		}
@@ -63,11 +61,7 @@ func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, so
 		}
 		return onRamp, onRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_2_0:
-		evmAddrs, err := ccipcalc.GenericAddrsToEvm(onRampAddress)
-		if err != nil {
-			return nil, err
-		}
-		onRamp, err := v1_2_0.NewOnRamp(lggr, sourceSelector, destSelector, evmAddrs[0], sourceLP, source)
+		onRamp, err := v1_2_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
 		if err != nil {
 			return nil, err
 		}
@@ -76,11 +70,7 @@ func initOrCloseOnRampReader(lggr logger.Logger, versionFinder VersionFinder, so
 		}
 		return onRamp, onRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_4_0:
-		evmAddrs, err := ccipcalc.GenericAddrsToEvm(onRampAddress)
-		if err != nil {
-			return nil, err
-		}
-		onRamp, err := v1_4_0.NewOnRamp(lggr, sourceSelector, destSelector, evmAddrs[0], sourceLP, source)
+		onRamp, err := v1_4_0.NewOnRamp(lggr, sourceSelector, destSelector, onRampAddrEvm, sourceLP, source)
 		if err != nil {
 			return nil, err
 		}

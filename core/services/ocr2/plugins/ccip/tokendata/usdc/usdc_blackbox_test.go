@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/tokendata/usdc"
@@ -98,7 +99,7 @@ func TestUSDCReader_ReadTokenData(t *testing.T) {
 			msgAndAttestation, err := usdcService.ReadTokenData(context.Background(), cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 				EVM2EVMMessage: cciptypes.EVM2EVMMessage{
 					SequenceNumber: seqNum,
-					TokenAmounts:   []cciptypes.TokenAmount{{Token: cciptypes.Address(utils.RandomAddress().String()), Amount: nil}},
+					TokenAmounts:   []cciptypes.TokenAmount{{Token: ccipcalc.EvmAddrToGeneric(utils.RandomAddress()), Amount: nil}},
 				},
 				TxHash:   cciptypes.Hash(txHash).String(),
 				LogIndex: uint(logIndex),

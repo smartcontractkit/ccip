@@ -2,7 +2,6 @@ package validate_test
 
 import (
 	"encoding/json"
-	"math/big"
 	"testing"
 	"time"
 
@@ -14,8 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
-
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils/configtest"
 	"github.com/smartcontractkit/chainlink/v2/core/services/chainlink"
@@ -695,9 +692,9 @@ tokenPricesUSDPipeline = "merge [type=merge left=\"{}\" right=\"{\\\"0xC79b96044
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.NoError(t, err)
 				expected := config.CommitPluginJobSpecConfig{
-					SourceStartBlock:       1,
-					DestStartBlock:         2,
-					OffRamp:                cciptypes.Address(common.HexToAddress("0x1234567890123456789012345678901234567890").String()),
+					SourceStartBlock: 1,
+					DestStartBlock:   2,
+					OffRamp:          ccipcalc.HexToAddress("0x1234567890123456789012345678901234567890").String()),
 					TokenPricesUSDPipeline: `merge [type=merge left="{}" right="{\"0xC79b96044906550A5652BCf20a6EA02f139B9Ae5\":\"1000000000000000000\"}"];`,
 					PriceGetterConfig:      nil,
 				}
@@ -747,28 +744,28 @@ priceGetterConfig = """
 			assertion: func(t *testing.T, os job.Job, err error) {
 				require.NoError(t, err)
 				expected := config.CommitPluginJobSpecConfig{
-					SourceStartBlock:       1,
-					DestStartBlock:         2,
-					OffRamp:                cciptypes.Address(common.HexToAddress("0x1234567890123456789012345678901234567890").String()),
+					SourceStartBlock: 1,
+					DestStartBlock:   2,
+					OffRamp:          ccipcalc.HexToAddress("0x1234567890123456789012345678901234567890").String()),
 					TokenPricesUSDPipeline: "",
 					PriceGetterConfig: &config.DynamicPriceGetterConfig{
-						AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
-							common.HexToAddress("0x0820c05e1fba1244763a494a52272170c321cad3"): {
-								ChainID:                   1000,
-								AggregatorContractAddress: common.HexToAddress("0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"),
-							},
-							common.HexToAddress("0x4a98bb4d65347016a7ab6f85bea24b129c9a1272"): {
-								ChainID:                   1337,
-								AggregatorContractAddress: common.HexToAddress("0xb80244cc8b0bb18db071c150b36e9bcb8310b236"),
-							},
-						},
-						StaticPrices: map[common.Address]config.StaticPriceConfig{
-							common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"): {
-								ChainID: 1057,
-								Price:   big.NewInt(1000000000000000000),
-							},
-						},
-					},
+					AggregatorPrices: map[common.Address]config.AggregatorPriceConfig{
+					common.HexToAddress("0x0820c05e1fba1244763a494a52272170c321cad3"):{
+					ChainID:                   1000,
+					AggregatorContractAddress: common.HexToAddress("0xb8dabd288955d302d05ca6b011bb46dfa3ea7acf"),
+				},
+					common.HexToAddress("0x4a98bb4d65347016a7ab6f85bea24b129c9a1272"):{
+					ChainID:                   1337,
+					AggregatorContractAddress: common.HexToAddress("0xb80244cc8b0bb18db071c150b36e9bcb8310b236"),
+				},
+				},
+					StaticPrices: map[common.Address]config.StaticPriceConfig{
+					common.HexToAddress("0xec8c353470ccaa4f43067fcde40558e084a12927"):{
+					ChainID: 1057,
+					Price:   big.NewInt(1000000000000000000),
+				},
+				},
+				},
 				}
 				var cfg config.CommitPluginJobSpecConfig
 				err = json.Unmarshal(os.OCR2OracleSpec.PluginConfig.Bytes(), &cfg)

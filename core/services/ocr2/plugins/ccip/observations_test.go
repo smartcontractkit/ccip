@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 )
 
 func TestObservationFilter(t *testing.T) {
@@ -52,7 +53,7 @@ func TestObservationCompat100_120(t *testing.T) {
 			Min: 1,
 			Max: 12,
 		},
-		TokenPricesUSD:    map[cciptypes.Address]*big.Int{cciptypes.Address(common.HexToAddress("0x1").String()): big.NewInt(1)},
+		TokenPricesUSD:    map[cciptypes.Address]*big.Int{ccipcalc.HexToAddress("0x1"): big.NewInt(1)},
 		SourceGasPriceUSD: big.NewInt(3),
 	}
 	b12, err := json.Marshal(v12)
@@ -68,7 +69,7 @@ func TestCommitObservationJsonDeserialization(t *testing.T) {
 			Max: 12,
 		},
 		TokenPricesUSD: map[cciptypes.Address]*big.Int{
-			cciptypes.Address(common.HexToAddress("0x1").String()): big.NewInt(1)},
+			ccipcalc.HexToAddress("0x1"): big.NewInt(1)},
 		SourceGasPriceUSD: big.NewInt(3),
 	}
 

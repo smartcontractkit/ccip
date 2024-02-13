@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
@@ -148,14 +149,14 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 
 			destPriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
-				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: cciptypes.Address(common.HexToAddress("0x1").String()), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
+				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: ccipcalc.HexToAddress("0x1"), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
 			destPriceRegReader.On("Address").Return(cciptypes.Address(utils.RandomAddress().String())).Maybe()
 			destPriceRegReader.On("GetFeeTokens", ctx).Return([]cciptypes.Address{}, nil).Maybe()
 			sourcePriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
 			sourcePriceRegReader.On("Address").Return(cciptypes.Address(utils.RandomAddress().String())).Maybe()
 			sourcePriceRegReader.On("GetFeeTokens", ctx).Return([]cciptypes.Address{}, nil).Maybe()
 			sourcePriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
-				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: cciptypes.Address(common.HexToAddress("0x1").String()), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
+				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: ccipcalc.HexToAddress("0x1"), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
 			p.destPriceRegistry = destPriceRegReader
 			p.sourcePriceRegistry = sourcePriceRegReader
 
@@ -398,9 +399,9 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 	//require.NoError(t, err)
 	lggr := logger.TestLogger(t)
 
-	sender1 := cciptypes.Address(common.HexToAddress("0xa").String())
-	destNative := cciptypes.Address(common.HexToAddress("0xb").String())
-	srcNative := cciptypes.Address(common.HexToAddress("0xc").String())
+	sender1 := ccipcalc.HexToAddress("0xa")
+	destNative := ccipcalc.HexToAddress("0xb")
+	srcNative := ccipcalc.HexToAddress("0xc")
 
 	msg1 := cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 		EVM2EVMMessage: cciptypes.EVM2EVMMessage{
@@ -665,8 +666,8 @@ func TestExecutionReportingPlugin_isRateLimitEnoughForTokenPool(t *testing.T) {
 				cciptypes.Address("20"): big.NewInt(50),
 			},
 			tokenAmounts: []cciptypes.TokenAmount{
-				{Token: cciptypes.Address(common.HexToAddress("1").String()), Amount: big.NewInt(50)},
-				{Token: cciptypes.Address(common.HexToAddress("2").String()), Amount: big.NewInt(20)},
+				{Token: ccipcalc.HexToAddress("1"), Amount: big.NewInt(50)},
+				{Token: ccipcalc.HexToAddress("2"), Amount: big.NewInt(20)},
 			},
 			srcToDestToken: map[cciptypes.Address]cciptypes.Address{
 				cciptypes.Address("1"): cciptypes.Address("10"),
@@ -1197,9 +1198,9 @@ func Test_calculateObservedMessagesConsensus(t *testing.T) {
 }
 
 func Test_getTokensPrices(t *testing.T) {
-	tk1 := cciptypes.Address(common.HexToAddress("1").String())
-	tk2 := cciptypes.Address(common.HexToAddress("2").String())
-	tk3 := cciptypes.Address(common.HexToAddress("3").String())
+	tk1 := ccipcalc.HexToAddress("1")
+	tk2 := ccipcalc.HexToAddress("2")
+	tk3 := ccipcalc.HexToAddress("3")
 
 	testCases := []struct {
 		name      string

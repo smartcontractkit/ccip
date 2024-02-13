@@ -38,3 +38,7 @@ func GenericAddrToEvm(genAddr cciptypes.Address) (common.Address, error) {
 	}
 	return evmAddrs[0], nil
 }
+
+func HexToAddress(h string) cciptypes.Address {
+	return cciptypes.Address(common.HexToAddress(h).String())
+}
