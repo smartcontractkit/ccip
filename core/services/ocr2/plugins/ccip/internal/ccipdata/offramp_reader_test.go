@@ -350,7 +350,7 @@ func testOffRampReader(t *testing.T, th offRampReaderTH) {
 
 	events, err := th.reader.GetExecutionStateChangesBetweenSeqNums(ctx, 0, 10, 0)
 	require.NoError(t, err)
-	require.Equal(t, []cciptypes.ExecutionStateChangedWithBlockMeta{}, events)
+	require.Equal(t, []cciptypes.ExecutionStateChangedWithTxMeta{}, events)
 
 	rateLimits, err := th.reader.GetTokenPoolsRateLimits(ctx, []cciptypes.Address{})
 	require.NoError(t, err)

@@ -146,7 +146,7 @@ func (p *PriceRegistry) Close() error {
 	return logpollerutil.UnregisterLpFilters(p.lp, p.filters)
 }
 
-func (p *PriceRegistry) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]cciptypes.TokenPriceUpdateWithBlockMeta, error) {
+func (p *PriceRegistry) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]cciptypes.TokenPriceUpdateWithTxMeta, error) {
 	logs, err := p.lp.LogsCreatedAfter(
 		p.tokenUpdated,
 		p.address,
@@ -179,17 +179,17 @@ func (p *PriceRegistry) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts
 		return nil, err
 	}
 
-	res := make([]cciptypes.TokenPriceUpdateWithBlockMeta, 0, len(parsedLogs))
+	res := make([]cciptypes.TokenPriceUpdateWithTxMeta, 0, len(parsedLogs))
 	for _, log := range parsedLogs {
-		res = append(res, cciptypes.TokenPriceUpdateWithBlockMeta{
-			BlockMeta:        log.BlockMeta,
+		res = append(res, cciptypes.TokenPriceUpdateWithTxMeta{
+			TxMeta:           log.TxMeta,
 			TokenPriceUpdate: log.Data,
 		})
 	}
 	return res, nil
 }
 
-func (p *PriceRegistry) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]cciptypes.GasPriceUpdateWithBlockMeta, error) {
+func (p *PriceRegistry) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
 	logs, err := p.lp.IndexedLogsCreatedAfter(
 		p.gasUpdated,
 		p.address,
@@ -224,10 +224,10 @@ func (p *PriceRegistry) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chai
 		return nil, err
 	}
 
-	res := make([]cciptypes.GasPriceUpdateWithBlockMeta, 0, len(parsedLogs))
+	res := make([]cciptypes.GasPriceUpdateWithTxMeta, 0, len(parsedLogs))
 	for _, log := range parsedLogs {
-		res = append(res, cciptypes.GasPriceUpdateWithBlockMeta{
-			BlockMeta:      log.BlockMeta,
+		res = append(res, cciptypes.GasPriceUpdateWithTxMeta{
+			TxMeta:         log.TxMeta,
 			GasPriceUpdate: log.Data,
 		})
 	}

@@ -124,23 +124,23 @@ func (_m *CommitStoreReader) GasPriceEstimator() cciptypes.GasPriceEstimatorComm
 }
 
 // GetAcceptedCommitReportsGteTimestamp provides a mock function with given fields: ctx, ts, confirmations
-func (_m *CommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithBlockMeta, error) {
+func (_m *CommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	ret := _m.Called(ctx, ts, confirmations)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAcceptedCommitReportsGteTimestamp")
 	}
 
-	var r0 []cciptypes.CommitStoreReportWithBlockMeta
+	var r0 []cciptypes.CommitStoreReportWithTxMeta
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) ([]cciptypes.CommitStoreReportWithBlockMeta, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) ([]cciptypes.CommitStoreReportWithTxMeta, error)); ok {
 		return rf(ctx, ts, confirmations)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) []cciptypes.CommitStoreReportWithBlockMeta); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) []cciptypes.CommitStoreReportWithTxMeta); ok {
 		r0 = rf(ctx, ts, confirmations)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]cciptypes.CommitStoreReportWithBlockMeta)
+			r0 = ret.Get(0).([]cciptypes.CommitStoreReportWithTxMeta)
 		}
 	}
 
@@ -154,23 +154,23 @@ func (_m *CommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Co
 }
 
 // GetCommitReportMatchingSeqNum provides a mock function with given fields: ctx, seqNum, confirmations
-func (_m *CommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithBlockMeta, error) {
+func (_m *CommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confirmations int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	ret := _m.Called(ctx, seqNum, confirmations)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetCommitReportMatchingSeqNum")
 	}
 
-	var r0 []cciptypes.CommitStoreReportWithBlockMeta
+	var r0 []cciptypes.CommitStoreReportWithTxMeta
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) ([]cciptypes.CommitStoreReportWithBlockMeta, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) ([]cciptypes.CommitStoreReportWithTxMeta, error)); ok {
 		return rf(ctx, seqNum, confirmations)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) []cciptypes.CommitStoreReportWithBlockMeta); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, int) []cciptypes.CommitStoreReportWithTxMeta); ok {
 		r0 = rf(ctx, seqNum, confirmations)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]cciptypes.CommitStoreReportWithBlockMeta)
+			r0 = ret.Get(0).([]cciptypes.CommitStoreReportWithTxMeta)
 		}
 	}
 

@@ -39,8 +39,8 @@ type EVM2EVMMessage struct {
 	Hash Hash
 }
 
-type EVM2EVMMessageWithBlockMeta struct {
-	BlockMeta
+type EVM2EVMMessageWithTxMeta struct {
+	TxMeta
 	EVM2EVMMessage
 }
 
@@ -51,7 +51,7 @@ type TokenAmount struct {
 
 type OnRampReader interface {
 	// GetSendRequestsBetweenSeqNums returns all the finalized message send requests in the provided sequence numbers range (inclusive).
-	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]EVM2EVMMessageWithBlockMeta, error)
+	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]EVM2EVMMessageWithTxMeta, error)
 
 	// RouterAddress returns the router address that is configured on the onRamp
 	RouterAddress() (Address, error)

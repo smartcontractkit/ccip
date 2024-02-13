@@ -617,7 +617,7 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 	// use errgroup to fetch send request logs and executed sequence numbers in parallel
 	eg := &errgroup.Group{}
 
-	var sendRequests []cciptypes.EVM2EVMMessageWithBlockMeta
+	var sendRequests []cciptypes.EVM2EVMMessageWithTxMeta
 	eg.Go(func() error {
 		// We don't need to double-check if logs are finalized because we already checked that in the Commit phase.
 		sendReqs, err := r.onRampReader.GetSendRequestsBetweenSeqNums(ctx, intervalMin, intervalMax, false)
@@ -658,10 +658,10 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 
 		reqWithMeta := cciptypes.EVM2EVMOnRampCCIPSendRequestedWithMeta{
 			EVM2EVMMessage: sendReq.EVM2EVMMessage,
-			BlockTimestamp: sendReq.BlockTimestamp,
+			BlockTimestamp: time.UnixMilli(sendReq.BlockTimestampUnixMilli),
 			Executed:       executed,
 			Finalized:      finalized,
-			LogIndex:       sendReq.LogIndex,
+			LogIndex:       uint(sendReq.LogIndex),
 			TxHash:         sendReq.TxHash,
 		}
 

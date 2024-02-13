@@ -38,14 +38,14 @@ func (o *ObservedCommitStoreReader) GetLatestPriceEpochAndRound(context context.
 	})
 }
 
-func (o *ObservedCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]cciptypes.CommitStoreReportWithBlockMeta, error) {
-	return withObservedInteractionAndResults(o.metric, "GetCommitReportMatchingSeqNum", func() ([]cciptypes.CommitStoreReportWithBlockMeta, error) {
+func (o *ObservedCommitStoreReader) GetCommitReportMatchingSeqNum(ctx context.Context, seqNum uint64, confs int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	return withObservedInteractionAndResults(o.metric, "GetCommitReportMatchingSeqNum", func() ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 		return o.CommitStoreReader.GetCommitReportMatchingSeqNum(ctx, seqNum, confs)
 	})
 }
 
-func (o *ObservedCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]cciptypes.CommitStoreReportWithBlockMeta, error) {
-	return withObservedInteractionAndResults(o.metric, "GetAcceptedCommitReportsGteTimestamp", func() ([]cciptypes.CommitStoreReportWithBlockMeta, error) {
+func (o *ObservedCommitStoreReader) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
+	return withObservedInteractionAndResults(o.metric, "GetAcceptedCommitReportsGteTimestamp", func() ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 		return o.CommitStoreReader.GetAcceptedCommitReportsGteTimestamp(ctx, ts, confs)
 	})
 }

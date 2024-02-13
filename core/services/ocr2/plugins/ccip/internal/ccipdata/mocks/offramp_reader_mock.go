@@ -203,23 +203,23 @@ func (_m *OffRampReader) GetExecutionState(ctx context.Context, sequenceNumber u
 }
 
 // GetExecutionStateChangesBetweenSeqNums provides a mock function with given fields: ctx, seqNumMin, seqNumMax, confirmations
-func (_m *OffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin uint64, seqNumMax uint64, confirmations int) ([]cciptypes.ExecutionStateChangedWithBlockMeta, error) {
+func (_m *OffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin uint64, seqNumMax uint64, confirmations int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
 	ret := _m.Called(ctx, seqNumMin, seqNumMax, confirmations)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetExecutionStateChangesBetweenSeqNums")
 	}
 
-	var r0 []cciptypes.ExecutionStateChangedWithBlockMeta
+	var r0 []cciptypes.ExecutionStateChangedWithTxMeta
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, int) ([]cciptypes.ExecutionStateChangedWithBlockMeta, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error)); ok {
 		return rf(ctx, seqNumMin, seqNumMax, confirmations)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, int) []cciptypes.ExecutionStateChangedWithBlockMeta); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, int) []cciptypes.ExecutionStateChangedWithTxMeta); ok {
 		r0 = rf(ctx, seqNumMin, seqNumMax, confirmations)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]cciptypes.ExecutionStateChangedWithBlockMeta)
+			r0 = ret.Get(0).([]cciptypes.ExecutionStateChangedWithTxMeta)
 		}
 	}
 

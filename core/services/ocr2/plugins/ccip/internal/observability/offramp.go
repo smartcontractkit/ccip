@@ -25,8 +25,8 @@ func NewObservedOffRampReader(origin ccipdata.OffRampReader, chainID int64, plug
 	}
 }
 
-func (o *ObservedOffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithBlockMeta, error) {
-	return withObservedInteraction(o.metric, "GetExecutionStateChangesBetweenSeqNums", func() ([]cciptypes.ExecutionStateChangedWithBlockMeta, error) {
+func (o *ObservedOffRampReader) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
+	return withObservedInteraction(o.metric, "GetExecutionStateChangesBetweenSeqNums", func() ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
 		return o.OffRampReader.GetExecutionStateChangesBetweenSeqNums(ctx, seqNumMin, seqNumMax, confs)
 	})
 }

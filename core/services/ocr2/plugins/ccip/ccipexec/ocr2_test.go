@@ -43,8 +43,8 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 		name              string
 		commitStorePaused bool
 		inflightReports   []InflightInternalExecutionReport
-		unexpiredReports  []cciptypes.CommitStoreReportWithBlockMeta
-		sendRequests      []cciptypes.EVM2EVMMessageWithBlockMeta
+		unexpiredReports  []cciptypes.CommitStoreReportWithTxMeta
+		sendRequests      []cciptypes.EVM2EVMMessageWithTxMeta
 		executedSeqNums   []uint64
 		tokenPoolsMapping map[common.Address]common.Address
 		blessedRoots      map[[32]byte]bool
@@ -61,7 +61,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			name:              "happy flow",
 			commitStorePaused: false,
 			inflightReports:   []InflightInternalExecutionReport{},
-			unexpiredReports: []cciptypes.CommitStoreReportWithBlockMeta{
+			unexpiredReports: []cciptypes.CommitStoreReportWithTxMeta{
 				{
 					CommitStoreReport: cciptypes.CommitStoreReport{
 						Interval:   cciptypes.CommitStoreInterval{Min: 10, Max: 12},
@@ -77,7 +77,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			},
 			tokenPoolsMapping: map[common.Address]common.Address{},
 			senderNonce:       9,
-			sendRequests: []cciptypes.EVM2EVMMessageWithBlockMeta{
+			sendRequests: []cciptypes.EVM2EVMMessageWithTxMeta{
 				{
 					EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 10},
 				},
@@ -112,9 +112,9 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 				Return(tc.unexpiredReports, nil).Maybe()
 			p.commitStoreReader = commitStoreReader
 
-			var executionEvents []cciptypes.ExecutionStateChangedWithBlockMeta
+			var executionEvents []cciptypes.ExecutionStateChangedWithTxMeta
 			for _, seqNum := range tc.executedSeqNums {
-				executionEvents = append(executionEvents, cciptypes.ExecutionStateChangedWithBlockMeta{
+				executionEvents = append(executionEvents, cciptypes.ExecutionStateChangedWithTxMeta{
 					ExecutionStateChanged: cciptypes.ExecutionStateChanged{SequenceNumber: seqNum},
 				})
 			}
@@ -344,7 +344,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	commitStore.On("GetExpectedNextSequenceNumber", mock.Anything).
 		Return(executionReport.Messages[len(executionReport.Messages)-1].SequenceNumber+1, nil)
 	commitStore.On("GetCommitReportMatchingSeqNum", ctx, observations[0].SeqNr, 0).
-		Return([]cciptypes.CommitStoreReportWithBlockMeta{
+		Return([]cciptypes.CommitStoreReportWithTxMeta{
 			{
 				CommitStoreReport: cciptypes.CommitStoreReport{
 					Interval: cciptypes.CommitStoreInterval{
@@ -362,7 +362,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 	assert.NoError(t, err)
 	p.offRampReader = offRampReader
 
-	sendReqs := make([]cciptypes.EVM2EVMMessageWithBlockMeta, len(observations))
+	sendReqs := make([]cciptypes.EVM2EVMMessageWithTxMeta, len(observations))
 	sourceReader := ccipdatamocks.NewOnRampReader(t)
 	for i := range observations {
 		msg := cciptypes.EVM2EVMMessage{
@@ -379,7 +379,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 			FeeToken:            cciptypes.Address(utils.RandomAddress().String()),
 			MessageId:           [32]byte{12},
 		}
-		sendReqs[i] = cciptypes.EVM2EVMMessageWithBlockMeta{EVM2EVMMessage: msg}
+		sendReqs[i] = cciptypes.EVM2EVMMessageWithTxMeta{EVM2EVMMessage: msg}
 	}
 	sourceReader.On("GetSendRequestsBetweenSeqNums",
 		ctx, observations[0].SeqNr, observations[len(observations)-1].SeqNr, false).Return(sendReqs, nil)
@@ -914,7 +914,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 		reports             []cciptypes.CommitStoreReport
 		expQueryMin         uint64 // expected min/max used in the query to get ccipevents
 		expQueryMax         uint64
-		onchainEvents       []cciptypes.EVM2EVMMessageWithBlockMeta
+		onchainEvents       []cciptypes.EVM2EVMMessageWithTxMeta
 		destExecutedSeqNums []uint64
 
 		expReports []commitReportWithSendRequests
@@ -940,7 +940,7 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 			},
 			expQueryMin: 1,
 			expQueryMax: 3,
-			onchainEvents: []cciptypes.EVM2EVMMessageWithBlockMeta{
+			onchainEvents: []cciptypes.EVM2EVMMessageWithTxMeta{
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 1}},
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 2}},
 				{EVM2EVMMessage: cciptypes.EVM2EVMMessage{SequenceNumber: 3}},
@@ -1005,9 +1005,9 @@ func TestExecutionReportingPlugin_getReportsWithSendRequests(t *testing.T) {
 				}
 			}
 
-			var executedEvents []cciptypes.ExecutionStateChangedWithBlockMeta
+			var executedEvents []cciptypes.ExecutionStateChangedWithTxMeta
 			for _, executedSeqNum := range tc.destExecutedSeqNums {
-				executedEvents = append(executedEvents, cciptypes.ExecutionStateChangedWithBlockMeta{
+				executedEvents = append(executedEvents, cciptypes.ExecutionStateChangedWithTxMeta{
 					ExecutionStateChanged: cciptypes.ExecutionStateChanged{
 						SequenceNumber: executedSeqNum,
 						Finalized:      finalized[executedSeqNum],

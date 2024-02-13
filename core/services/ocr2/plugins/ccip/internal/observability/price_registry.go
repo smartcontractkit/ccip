@@ -26,14 +26,14 @@ func NewPriceRegistryReader(origin ccipdata.PriceRegistryReader, chainID int64, 
 	}
 }
 
-func (o *ObservedPriceRegistryReader) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]cciptypes.TokenPriceUpdateWithBlockMeta, error) {
-	return withObservedInteractionAndResults(o.metric, "GetTokenPriceUpdatesCreatedAfter", func() ([]cciptypes.TokenPriceUpdateWithBlockMeta, error) {
+func (o *ObservedPriceRegistryReader) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confs int) ([]cciptypes.TokenPriceUpdateWithTxMeta, error) {
+	return withObservedInteractionAndResults(o.metric, "GetTokenPriceUpdatesCreatedAfter", func() ([]cciptypes.TokenPriceUpdateWithTxMeta, error) {
 		return o.PriceRegistryReader.GetTokenPriceUpdatesCreatedAfter(ctx, ts, confs)
 	})
 }
 
-func (o *ObservedPriceRegistryReader) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]cciptypes.GasPriceUpdateWithBlockMeta, error) {
-	return withObservedInteractionAndResults(o.metric, "GetGasPriceUpdatesCreatedAfter", func() ([]cciptypes.GasPriceUpdateWithBlockMeta, error) {
+func (o *ObservedPriceRegistryReader) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confs int) ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
+	return withObservedInteractionAndResults(o.metric, "GetGasPriceUpdatesCreatedAfter", func() ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
 		return o.PriceRegistryReader.GetGasPriceUpdatesCreatedAfter(ctx, chainSelector, ts, confs)
 	})
 }

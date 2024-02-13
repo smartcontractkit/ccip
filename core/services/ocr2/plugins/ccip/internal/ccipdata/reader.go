@@ -19,7 +19,7 @@ const (
 
 type Event[T any] struct {
 	Data T
-	cciptypes.BlockMeta
+	cciptypes.TxMeta
 }
 
 func LogsConfirmations(finalized bool) logpoller.Confirmations {
@@ -40,11 +40,11 @@ func ParseLogs[T any](logs []logpoller.Log, lggr logger.Logger, parseFunc func(l
 		}
 		reqs = append(reqs, Event[T]{
 			Data: *data,
-			BlockMeta: cciptypes.BlockMeta{
-				BlockTimestamp: log.BlockTimestamp,
-				BlockNumber:    log.BlockNumber,
-				TxHash:         log.TxHash.String(),
-				LogIndex:       uint(log.LogIndex),
+			TxMeta: cciptypes.TxMeta{
+				BlockTimestampUnixMilli: log.BlockTimestamp.UnixMilli(),
+				BlockNumber:             uint64(log.BlockNumber),
+				TxHash:                  log.TxHash.String(),
+				LogIndex:                uint64(log.LogIndex),
 			},
 		})
 	}

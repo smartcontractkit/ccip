@@ -72,23 +72,23 @@ func (_m *OnRampReader) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error
 }
 
 // GetSendRequestsBetweenSeqNums provides a mock function with given fields: ctx, seqNumMin, seqNumMax, finalized
-func (_m *OnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin uint64, seqNumMax uint64, finalized bool) ([]cciptypes.EVM2EVMMessageWithBlockMeta, error) {
+func (_m *OnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin uint64, seqNumMax uint64, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
 	ret := _m.Called(ctx, seqNumMin, seqNumMax, finalized)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSendRequestsBetweenSeqNums")
 	}
 
-	var r0 []cciptypes.EVM2EVMMessageWithBlockMeta
+	var r0 []cciptypes.EVM2EVMMessageWithTxMeta
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, bool) ([]cciptypes.EVM2EVMMessageWithBlockMeta, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error)); ok {
 		return rf(ctx, seqNumMin, seqNumMax, finalized)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, bool) []cciptypes.EVM2EVMMessageWithBlockMeta); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, uint64, bool) []cciptypes.EVM2EVMMessageWithTxMeta); ok {
 		r0 = rf(ctx, seqNumMin, seqNumMax, finalized)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]cciptypes.EVM2EVMMessageWithBlockMeta)
+			r0 = ret.Get(0).([]cciptypes.EVM2EVMMessageWithTxMeta)
 		}
 	}
 

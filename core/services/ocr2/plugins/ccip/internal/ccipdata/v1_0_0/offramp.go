@@ -471,7 +471,7 @@ func (o *OffRamp) Close(qopts ...pg.QOpt) error {
 	return logpollerutil.UnregisterLpFilters(o.lp, o.filters, qopts...)
 }
 
-func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithBlockMeta, error) {
+func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confs int) ([]cciptypes.ExecutionStateChangedWithTxMeta, error) {
 	latestBlock, err := o.lp.LatestBlock(pg.WithParentCtx(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("get lp latest block: %w", err)
@@ -509,10 +509,10 @@ func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, se
 		return nil, fmt.Errorf("parse logs: %w", err)
 	}
 
-	res := make([]cciptypes.ExecutionStateChangedWithBlockMeta, 0, len(parsedLogs))
+	res := make([]cciptypes.ExecutionStateChangedWithTxMeta, 0, len(parsedLogs))
 	for _, log := range parsedLogs {
-		res = append(res, cciptypes.ExecutionStateChangedWithBlockMeta{
-			BlockMeta:             log.BlockMeta,
+		res = append(res, cciptypes.ExecutionStateChangedWithTxMeta{
+			TxMeta:                log.TxMeta,
 			ExecutionStateChanged: log.Data,
 		})
 	}

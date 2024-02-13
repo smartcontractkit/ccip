@@ -209,7 +209,7 @@ func (o *OnRamp) logToMessage(log types.Log) (*cciptypes.EVM2EVMMessage, error) 
 	}, nil
 }
 
-func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]cciptypes.EVM2EVMMessageWithBlockMeta, error) {
+func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
 	logs, err := o.lp.LogsDataWordRange(
 		o.sendRequestedEventSig,
 		o.address,
@@ -227,10 +227,10 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 		return nil, err
 	}
 
-	res := make([]cciptypes.EVM2EVMMessageWithBlockMeta, 0, len(parsedLogs))
+	res := make([]cciptypes.EVM2EVMMessageWithTxMeta, 0, len(parsedLogs))
 	for _, log := range parsedLogs {
-		res = append(res, cciptypes.EVM2EVMMessageWithBlockMeta{
-			BlockMeta:      log.BlockMeta,
+		res = append(res, cciptypes.EVM2EVMMessageWithTxMeta{
+			TxMeta:         log.TxMeta,
 			EVM2EVMMessage: log.Data,
 		})
 	}

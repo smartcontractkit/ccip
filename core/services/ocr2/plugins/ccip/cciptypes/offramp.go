@@ -18,7 +18,7 @@ type OffRampReader interface {
 	DecodeExecutionReport(report []byte) (ExecReport, error)
 
 	// GetExecutionStateChangesBetweenSeqNums returns all the execution state change events for the provided message sequence numbers (inclusive).
-	GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confirmations int) ([]ExecutionStateChangedWithBlockMeta, error)
+	GetExecutionStateChangesBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, confirmations int) ([]ExecutionStateChangedWithTxMeta, error)
 
 	GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []Address) ([]TokenBucketRateLimit, error)
 
@@ -53,8 +53,8 @@ type ExecReport struct {
 	ProofFlagBits     *big.Int
 }
 
-type ExecutionStateChangedWithBlockMeta struct {
-	BlockMeta
+type ExecutionStateChangedWithTxMeta struct {
+	TxMeta
 	ExecutionStateChanged
 }
 

@@ -266,7 +266,7 @@ func (c *CommitStore) parseReport(log types.Log) (*cciptypes.CommitStoreReport, 
 	}, nil
 }
 
-func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNr uint64, confs int) ([]cciptypes.CommitStoreReportWithBlockMeta, error) {
+func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNr uint64, confs int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	logs, err := c.lp.LogsDataWordBetween(
 		c.reportAcceptedSig,
 		c.address,
@@ -289,10 +289,10 @@ func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNr u
 		return nil, err
 	}
 
-	res := make([]cciptypes.CommitStoreReportWithBlockMeta, 0, len(parsedLogs))
+	res := make([]cciptypes.CommitStoreReportWithTxMeta, 0, len(parsedLogs))
 	for _, log := range parsedLogs {
-		res = append(res, cciptypes.CommitStoreReportWithBlockMeta{
-			BlockMeta:         log.BlockMeta,
+		res = append(res, cciptypes.CommitStoreReportWithTxMeta{
+			TxMeta:            log.TxMeta,
 			CommitStoreReport: log.Data,
 		})
 	}
@@ -304,7 +304,7 @@ func (c *CommitStore) GetCommitReportMatchingSeqNum(ctx context.Context, seqNr u
 	return res, nil
 }
 
-func (c *CommitStore) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]cciptypes.CommitStoreReportWithBlockMeta, error) {
+func (c *CommitStore) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, ts time.Time, confs int) ([]cciptypes.CommitStoreReportWithTxMeta, error) {
 	logs, err := c.lp.LogsCreatedAfter(
 		c.reportAcceptedSig,
 		c.address,
@@ -321,10 +321,10 @@ func (c *CommitStore) GetAcceptedCommitReportsGteTimestamp(ctx context.Context, 
 		return nil, fmt.Errorf("parse logs: %w", err)
 	}
 
-	parsedReports := make([]cciptypes.CommitStoreReportWithBlockMeta, 0, len(parsedLogs))
+	parsedReports := make([]cciptypes.CommitStoreReportWithTxMeta, 0, len(parsedLogs))
 	for _, log := range parsedLogs {
-		parsedReports = append(parsedReports, cciptypes.CommitStoreReportWithBlockMeta{
-			BlockMeta:         log.BlockMeta,
+		parsedReports = append(parsedReports, cciptypes.CommitStoreReportWithTxMeta{
+			TxMeta:            log.TxMeta,
 			CommitStoreReport: log.Data,
 		})
 	}

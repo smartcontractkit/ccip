@@ -84,23 +84,23 @@ func (_m *PriceRegistryReader) GetFeeTokens(ctx context.Context) ([]cciptypes.Ad
 }
 
 // GetGasPriceUpdatesCreatedAfter provides a mock function with given fields: ctx, chainSelector, ts, confirmations
-func (_m *PriceRegistryReader) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confirmations int) ([]cciptypes.GasPriceUpdateWithBlockMeta, error) {
+func (_m *PriceRegistryReader) GetGasPriceUpdatesCreatedAfter(ctx context.Context, chainSelector uint64, ts time.Time, confirmations int) ([]cciptypes.GasPriceUpdateWithTxMeta, error) {
 	ret := _m.Called(ctx, chainSelector, ts, confirmations)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetGasPriceUpdatesCreatedAfter")
 	}
 
-	var r0 []cciptypes.GasPriceUpdateWithBlockMeta
+	var r0 []cciptypes.GasPriceUpdateWithTxMeta
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, time.Time, int) ([]cciptypes.GasPriceUpdateWithBlockMeta, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, time.Time, int) ([]cciptypes.GasPriceUpdateWithTxMeta, error)); ok {
 		return rf(ctx, chainSelector, ts, confirmations)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint64, time.Time, int) []cciptypes.GasPriceUpdateWithBlockMeta); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint64, time.Time, int) []cciptypes.GasPriceUpdateWithTxMeta); ok {
 		r0 = rf(ctx, chainSelector, ts, confirmations)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]cciptypes.GasPriceUpdateWithBlockMeta)
+			r0 = ret.Get(0).([]cciptypes.GasPriceUpdateWithTxMeta)
 		}
 	}
 
@@ -114,23 +114,23 @@ func (_m *PriceRegistryReader) GetGasPriceUpdatesCreatedAfter(ctx context.Contex
 }
 
 // GetTokenPriceUpdatesCreatedAfter provides a mock function with given fields: ctx, ts, confirmations
-func (_m *PriceRegistryReader) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.TokenPriceUpdateWithBlockMeta, error) {
+func (_m *PriceRegistryReader) GetTokenPriceUpdatesCreatedAfter(ctx context.Context, ts time.Time, confirmations int) ([]cciptypes.TokenPriceUpdateWithTxMeta, error) {
 	ret := _m.Called(ctx, ts, confirmations)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTokenPriceUpdatesCreatedAfter")
 	}
 
-	var r0 []cciptypes.TokenPriceUpdateWithBlockMeta
+	var r0 []cciptypes.TokenPriceUpdateWithTxMeta
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) ([]cciptypes.TokenPriceUpdateWithBlockMeta, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) ([]cciptypes.TokenPriceUpdateWithTxMeta, error)); ok {
 		return rf(ctx, ts, confirmations)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) []cciptypes.TokenPriceUpdateWithBlockMeta); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, int) []cciptypes.TokenPriceUpdateWithTxMeta); ok {
 		r0 = rf(ctx, ts, confirmations)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]cciptypes.TokenPriceUpdateWithBlockMeta)
+			r0 = ret.Get(0).([]cciptypes.TokenPriceUpdateWithTxMeta)
 		}
 	}
 
