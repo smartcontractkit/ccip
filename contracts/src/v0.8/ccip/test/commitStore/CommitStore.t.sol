@@ -2,9 +2,10 @@
 pragma solidity 0.8.19;
 
 import {IARM} from "../../interfaces/IARM.sol";
+import {IPriceRegistry} from "../../interfaces/IPriceRegistry.sol";
 
 import {CommitStore} from "../../CommitStore.sol";
-import "../../PriceRegistry.sol";
+import {PriceRegistry} from "../../PriceRegistry.sol";
 import {ARM} from "../../ARM.sol";
 import {MerkleMultiProof} from "../../libraries/MerkleMultiProof.sol";
 
