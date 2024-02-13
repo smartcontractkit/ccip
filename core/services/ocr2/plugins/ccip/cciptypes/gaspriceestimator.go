@@ -34,8 +34,6 @@ type CommonGasPriceEstimator interface {
 	DenoteInUSD(p *big.Int, wrappedNativePrice *big.Int) (*big.Int, error)
 	// Median finds the median gas price in slice. If gas price has multiple components, median of each individual component should be taken. Input prices should not contain nil.
 	Median(gasPrices []*big.Int) (*big.Int, error)
-	// String converts the gas price to string.
-	String(p *big.Int) string
 }
 
 // EVM2EVMOnRampCCIPSendRequestedWithMeta helper struct to hold the send request and some metadata

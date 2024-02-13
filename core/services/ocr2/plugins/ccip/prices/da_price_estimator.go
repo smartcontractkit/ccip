@@ -147,14 +147,6 @@ func (g DAGasPriceEstimator) EstimateMsgCostUSD(p *big.Int, wrappedNativePrice *
 	return execCostUSD, nil
 }
 
-func (g DAGasPriceEstimator) String(p *big.Int) string {
-	daGasPrice, execGasPrice, err := g.parseEncodedGasPrice(p)
-	if err != nil {
-		return err.Error()
-	}
-	return fmt.Sprintf("DA Price: %s, Exec Price: %s", daGasPrice, execGasPrice)
-}
-
 func (g DAGasPriceEstimator) parseEncodedGasPrice(p *big.Int) (*big.Int, *big.Int, error) {
 	if p.BitLen() > int(g.priceEncodingLength*2) {
 		return nil, nil, fmt.Errorf("encoded gas price exceeded max range %+v", p)

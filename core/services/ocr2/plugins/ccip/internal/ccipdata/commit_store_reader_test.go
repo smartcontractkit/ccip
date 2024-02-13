@@ -2,7 +2,6 @@ package ccipdata_test
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -263,10 +262,6 @@ func TestCommitStoreReaders(t *testing.T) {
 	}
 	gasPrice := big.NewInt(10)
 	daPrice := big.NewInt(20)
-	expectedGas := map[string]string{
-		ccipdata.V1_0_0: gasPrice.String(),
-		ccipdata.V1_2_0: fmt.Sprintf("DA Price: %s, Exec Price: %s", daPrice, gasPrice),
-	}
 	ge.On("GetFee", mock.Anything, mock.Anything, mock.Anything, assets.NewWei(big.NewInt(int64(maxGas)))).Return(gas.EvmFee{Legacy: assets.NewWei(gasPrice)}, uint32(0), nil)
 	lm := new(rollupMocks.L1Oracle)
 	lm.On("GasPrice", mock.Anything).Return(assets.NewWei(daPrice), nil)
@@ -353,8 +348,7 @@ func TestCommitStoreReaders(t *testing.T) {
 			// We should be able to query for gas prices now.
 			gp, err := cr.GasPriceEstimator().GetGasPrice(context.Background())
 			require.NoError(t, err)
-			assert.Equal(t, expectedGas[v], cr.GasPriceEstimator().String(gp))
-
+			assert.True(t, gp.Cmp(big.NewInt(0)) > 0)
 		})
 	}
 }

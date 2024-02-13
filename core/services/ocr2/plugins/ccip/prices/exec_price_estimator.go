@@ -63,8 +63,3 @@ func (g ExecGasPriceEstimator) EstimateMsgCostUSD(p *big.Int, wrappedNativePrice
 
 	return ccipcalc.CalculateUsdPerUnitGas(execGasCost, wrappedNativePrice), nil
 }
-
-func (g ExecGasPriceEstimator) String(p *big.Int) string {
-	var pi = p
-	return pi.String()
-}

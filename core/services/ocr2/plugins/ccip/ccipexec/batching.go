@@ -2,6 +2,7 @@ package ccipexec
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -23,6 +24,11 @@ func getProofData(
 	if err != nil {
 		return nil, nil, nil, err
 	}
+
+	if err1 := validateSendRequests(sendReqs, interval); err1 != nil {
+		return nil, nil, nil, err1
+	}
+
 	leaves = make([][32]byte, 0, len(sendReqs))
 	for _, req := range sendReqs {
 		leaves = append(leaves, req.Hash)
@@ -34,9 +40,33 @@ func getProofData(
 	return sendReqs, leaves, tree, nil
 }
 
+func validateSendRequests(sendReqs []cciptypes.EVM2EVMMessageWithTxMeta, interval cciptypes.CommitStoreInterval) error {
+	if len(sendReqs) == 0 {
+		return fmt.Errorf("could not find any requests in the provided interval %v", interval)
+	}
+
+	gotInterval := cciptypes.CommitStoreInterval{
+		Min: sendReqs[0].SequenceNumber,
+		Max: sendReqs[0].SequenceNumber,
+	}
+
+	for _, req := range sendReqs[1:] {
+		if req.SequenceNumber < gotInterval.Min {
+			gotInterval.Min = req.SequenceNumber
+		}
+		if req.SequenceNumber > gotInterval.Max {
+			gotInterval.Max = req.SequenceNumber
+		}
+	}
+
+	if (gotInterval.Min != interval.Min) || (gotInterval.Max != interval.Max) {
+		return fmt.Errorf("interval %v is not the expected %v", gotInterval, interval)
+	}
+	return nil
+}
+
 func buildExecutionReportForMessages(
 	msgsInRoot []cciptypes.EVM2EVMMessageWithTxMeta,
-	leaves [][32]byte,
 	tree *merklemulti.Tree[[32]byte],
 	commitInterval cciptypes.CommitStoreInterval,
 	observedMessages []ccip.ObservedMessage,
@@ -50,6 +80,10 @@ func buildExecutionReportForMessages(
 			continue
 		}
 		innerIdx := int(observedMessage.SeqNr - commitInterval.Min)
+		if innerIdx >= len(msgsInRoot) || innerIdx < 0 {
+			return cciptypes.ExecReport{}, fmt.Errorf("invalid inneridx SeqNr=%d IntervalMin=%d msgsInRoot=%d",
+				observedMessage.SeqNr, commitInterval.Min, len(msgsInRoot))
+		}
 		messages = append(messages, msgsInRoot[innerIdx].EVM2EVMMessage)
 		offchainTokenData = append(offchainTokenData, observedMessage.TokenData)
 		innerIdxs = append(innerIdxs, innerIdx)

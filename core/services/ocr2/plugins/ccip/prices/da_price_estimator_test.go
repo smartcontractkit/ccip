@@ -438,14 +438,3 @@ func TestDAPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 		})
 	}
 }
-
-func TestDAPriceEstimator_String(t *testing.T) {
-	g := DAGasPriceEstimator{
-		execEstimator:       nil,
-		l1Oracle:            nil,
-		priceEncodingLength: daGasPriceEncodingLength,
-	}
-
-	str := g.String(encodeGasPrice(big.NewInt(1), big.NewInt(2)))
-	assert.Equal(t, "DA Price: 1, Exec Price: 2", str)
-}

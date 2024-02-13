@@ -51,6 +51,8 @@ type TokenAmount struct {
 
 type OnRampReader interface {
 	// GetSendRequestsBetweenSeqNums returns all the finalized message send requests in the provided sequence numbers range (inclusive).
+	// If some requests do not exist in the provided sequence numbers range they will not be part of the response.
+	// It's the responsibility of the caller to validate whether all the requests exist or not.
 	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]EVM2EVMMessageWithTxMeta, error)
 
 	// RouterAddress returns the router address that is configured on the onRamp

@@ -349,10 +349,3 @@ func TestExecPriceEstimator_EstimateMsgCostUSD(t *testing.T) {
 		})
 	}
 }
-
-func TestExecPriceEstimator_String(t *testing.T) {
-	g := ExecGasPriceEstimator{}
-
-	str := g.String(big.NewInt(1))
-	assert.Equal(t, "1", str)
-}
