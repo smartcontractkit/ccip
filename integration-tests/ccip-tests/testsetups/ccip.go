@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
@@ -123,8 +122,7 @@ func (c *CCIPTestConfig) SetNetworkPairs(lggr zerolog.Logger) error {
 		allError = multierr.Append(allError, fmt.Errorf("failed to get networks: %w", err))
 		return allError
 	}
-	log.Info().Msgf("Selected networks: %v", c.SelectedNetworks)
-	log.Info().Msgf("Input networks: %v", inputNetworks)
+
 	networkByChainName := make(map[string]blockchain.EVMNetwork)
 	for i, net := range c.SelectedNetworks {
 		networkByChainName[inputNetworks[i]] = net
@@ -240,14 +238,15 @@ func (c *CCIPTestConfig) FormNetworkPairCombinations() {
 }
 
 func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTestConfig {
-	groupCfg, exists := testconfig.GlobalTestConfig().CCIP.Groups[tType]
+	testCfg := testconfig.GlobalTestConfig()
+	groupCfg, exists := testCfg.CCIP.Groups[tType]
 	if !exists {
 		t.Fatalf("group config for %s does not exist", tType)
 	}
 	ccipTestConfig := &CCIPTestConfig{
 		Test:                t,
-		EnvInput:            testconfig.GlobalTestConfig().CCIP.Env,
-		ContractsInput:      testconfig.GlobalTestConfig().CCIP.Deployments,
+		EnvInput:            testCfg.CCIP.Env,
+		ContractsInput:      testCfg.CCIP.Deployments,
 		TestGroupInput:      groupCfg,
 		GethResourceProfile: GethResourceProfile,
 	}

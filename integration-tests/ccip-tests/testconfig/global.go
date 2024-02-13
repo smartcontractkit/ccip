@@ -280,6 +280,10 @@ func (c *Chainlink) ApplyOverrides(from *Chainlink) {
 			} else {
 				c.Nodes = append(c.Nodes, node)
 			}
+		}
+	}
+	if len(c.Nodes) > 0 {
+		for i := range c.Nodes {
 			c.Nodes[i].Merge(c.Common)
 		}
 	}
@@ -326,6 +330,17 @@ func (c *Chainlink) Validate() error {
 		noOfNodes := pointer.GetInt(c.NoOfNodes)
 		if noOfNodes != len(c.Nodes) {
 			return errors.New("chainlink config is invalid, NoOfNodes and Nodes length mismatch")
+		}
+		for _, node := range c.Nodes {
+			if node.ChainlinkImage == nil {
+				return fmt.Errorf("node %s: chainlink image can't be empty", node.Name)
+			}
+			if err := node.ChainlinkImage.Validate(); err != nil {
+				return fmt.Errorf("node %s: %w", node.Name, err)
+			}
+			if node.DBImage == "" || node.DBTag == "" {
+				return fmt.Errorf("node %s: must provide db image and tag", node.Name)
+			}
 		}
 	}
 	return nil
