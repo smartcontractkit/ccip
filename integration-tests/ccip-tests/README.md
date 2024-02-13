@@ -12,11 +12,12 @@ Please refer to [default.toml](./testconfig/tomls/default.toml) for the list of 
 2. Overriding the default input - If you want to run your test with different test input, you can override the default inputs. For that you need to set an env var `BASE64_TEST_CONFIG_OVERRIDE` containing the base64 encoded TOML file content with updated test input parameters. 
     For example, if you want to override the `Network` input in test and want to run your test on `avalanche testnet` and `arbitrum goerli` network, you need to -
    1. create a TOML file with the following content:
-          ```toml
-         [CCIP]
-         [CCIP.Env]
-         [CCIP.Env.Network]
-         selected_networks= ['AVALANCHE_FUJI', 'ARBITRUM_GOERLI']
+        ```toml
+        [CCIP]
+        [CCIP.Env]
+        [CCIP.Env.Network]
+        selected_networks= ['AVALANCHE_FUJI', 'ARBITRUM_GOERLI']
+        ```
    2. encode it using `base64` command 
    3. set the env var `BASE64_CCIP_CONFIG_OVERRIDE` with the encoded content.
     ```bash
