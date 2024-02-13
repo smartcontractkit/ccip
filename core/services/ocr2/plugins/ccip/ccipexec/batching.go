@@ -25,23 +25,8 @@ func getProofData(
 		return nil, nil, nil, err
 	}
 
-	if len(sendReqs) > 0 {
-		gotInterval := ccipdata.CommitStoreInterval{
-			Min: sendReqs[0].Data.SequenceNumber,
-			Max: sendReqs[0].Data.SequenceNumber,
-		}
-		for _, req := range sendReqs[1:] {
-			if req.Data.SequenceNumber < gotInterval.Min {
-				gotInterval.Min = req.Data.SequenceNumber
-			}
-			if req.Data.SequenceNumber > gotInterval.Max {
-				gotInterval.Max = req.Data.SequenceNumber
-			}
-		}
-		if (gotInterval.Min != interval.Min) || (gotInterval.Max != interval.Max) {
-			return nil, nil, nil, fmt.Errorf(
-				"interval %v is not the expected %v", gotInterval, interval)
-		}
+	if err := validateSendRequests(sendReqs, interval); err != nil {
+		return nil, nil, nil, err
 	}
 
 	leaves = make([][32]byte, 0, len(sendReqs))
@@ -53,6 +38,31 @@ func getProofData(
 		return nil, nil, nil, err
 	}
 	return sendReqs, leaves, tree, nil
+}
+
+func validateSendRequests(sendReqs []ccipdata.Event[internal.EVM2EVMMessage], interval ccipdata.CommitStoreInterval) error {
+	if len(sendReqs) == 0 {
+		return fmt.Errorf("could not find any requests in the provided interval %v", interval)
+	}
+
+	gotInterval := ccipdata.CommitStoreInterval{
+		Min: sendReqs[0].Data.SequenceNumber,
+		Max: sendReqs[0].Data.SequenceNumber,
+	}
+
+	for _, req := range sendReqs[1:] {
+		if req.Data.SequenceNumber < gotInterval.Min {
+			gotInterval.Min = req.Data.SequenceNumber
+		}
+		if req.Data.SequenceNumber > gotInterval.Max {
+			gotInterval.Max = req.Data.SequenceNumber
+		}
+	}
+
+	if (gotInterval.Min != interval.Min) || (gotInterval.Max != interval.Max) {
+		return fmt.Errorf("interval %v is not the expected %v", gotInterval, interval)
+	}
+	return nil
 }
 
 func buildExecutionReportForMessages(
