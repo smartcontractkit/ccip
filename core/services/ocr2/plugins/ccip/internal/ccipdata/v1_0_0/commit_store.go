@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -362,6 +363,7 @@ func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, l
 			Name:      logpoller.FilterName(EXEC_REPORT_ACCEPTS, addr.String()),
 			EventSigs: []common.Hash{eventSig},
 			Addresses: []common.Address{addr},
+			Retention: 1 * time.Hour,
 		},
 	}
 	return &CommitStore{

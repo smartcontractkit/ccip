@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
@@ -159,6 +160,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
 			EventSigs: []common.Hash{eventSig},
 			Addresses: []common.Address{onRampAddress},
+			Retention: 1 * time.Hour,
 		},
 	}
 	return &OnRamp{

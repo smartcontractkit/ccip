@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -248,6 +249,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
 			EventSigs: []common.Hash{CCIPSendRequestEventSig},
 			Addresses: []common.Address{onRampAddress},
+			Retention: 1 * time.Hour,
 		},
 	}
 	return &OnRamp{

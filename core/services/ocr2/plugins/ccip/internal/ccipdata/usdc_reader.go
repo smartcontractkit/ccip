@@ -2,6 +2,7 @@ package ccipdata
 
 import (
 	"context"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -89,6 +90,7 @@ func NewUSDCReader(lggr logger.Logger, transmitter common.Address, lp logpoller.
 		Name:      logpoller.FilterName(MESSAGE_SENT_FILTER_NAME, transmitter.Hex()),
 		EventSigs: []common.Hash{eventSig},
 		Addresses: []common.Address{transmitter},
+		Retention: 1 * time.Hour,
 	}
 	return &USDCReaderImpl{
 		lggr:               lggr,
