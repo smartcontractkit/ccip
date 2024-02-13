@@ -136,7 +136,7 @@ func (s *TokenDataReader) ReadTokenData(ctx context.Context, msg cciptypes.EVM2E
 		return []byte{}, errors.Wrap(err, "failed getting the USDC message body")
 	}
 
-	s.lggr.Infow("Calling attestation API", "messageBodyHash", hexutil.Encode(messageBody[:]), "messageID", hexutil.Encode(msg.MessageId[:]))
+	s.lggr.Infow("Calling attestation API", "messageBodyHash", hexutil.Encode(messageBody[:]), "messageID", hexutil.Encode(msg.MessageID[:]))
 
 	// The attestation API expects the hash of the message body
 	attestationResp, err := s.callAttestationApi(ctx, utils.Keccak256Fixed(messageBody))
@@ -178,7 +178,7 @@ func (s *TokenDataReader) getUSDCMessageBody(ctx context.Context, msg cciptypes.
 	if err != nil {
 		return []byte{}, err
 	}
-	s.lggr.Infow("Got USDC message body", "messageBody", hexutil.Encode(parsedMsgBody), "messageID", hexutil.Encode(msg.MessageId[:]))
+	s.lggr.Infow("Got USDC message body", "messageBody", hexutil.Encode(parsedMsgBody), "messageID", hexutil.Encode(msg.MessageID[:]))
 	return parsedMsgBody, nil
 }
 

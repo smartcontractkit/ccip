@@ -20,7 +20,7 @@ func TestGetMessageIDsAsHexString(t *testing.T) {
 
 		msgs := make([]cciptypes.EVM2EVMMessage, len(hashes))
 		for i := range msgs {
-			msgs[i] = cciptypes.EVM2EVMMessage{MessageId: hashes[i]}
+			msgs[i] = cciptypes.EVM2EVMMessage{MessageID: hashes[i]}
 		}
 
 		messageIDs := GetMessageIDsAsHexString(msgs)

@@ -15,7 +15,7 @@ import (
 func GetMessageIDsAsHexString(messages []cciptypes.EVM2EVMMessage) []string {
 	messageIDs := make([]string, 0, len(messages))
 	for _, m := range messages {
-		messageIDs = append(messageIDs, "0x"+hex.EncodeToString(m.MessageId[:]))
+		messageIDs = append(messageIDs, "0x"+hex.EncodeToString(m.MessageID[:]))
 	}
 	return messageIDs
 }

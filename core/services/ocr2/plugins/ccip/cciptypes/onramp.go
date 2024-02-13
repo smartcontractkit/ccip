@@ -24,7 +24,7 @@ type EVM2EVMMessage struct {
 	SequenceNumber      uint64
 	GasLimit            *big.Int
 	Nonce               uint64
-	MessageId           Hash
+	MessageID           Hash
 	SourceChainSelector uint64
 	Sender              Address
 	Receiver            Address

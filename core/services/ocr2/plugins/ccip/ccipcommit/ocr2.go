@@ -167,7 +167,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	seqNrs := make([]uint64, 0, len(msgRequests))
 	for _, msgReq := range msgRequests {
 		seqNrs = append(seqNrs, msgReq.SequenceNumber)
-		messageIDs = append(messageIDs, msgReq.MessageId)
+		messageIDs = append(messageIDs, msgReq.MessageID)
 	}
 
 	minSeqNr := seqNrs[0]

@@ -191,7 +191,7 @@ func (o *OnRamp) logToMessage(log types.Log) (*cciptypes.EVM2EVMMessage, error) 
 		SequenceNumber:      msg.Message.SequenceNumber,
 		GasLimit:            msg.Message.GasLimit,
 		Nonce:               msg.Message.Nonce,
-		MessageId:           msg.Message.MessageId,
+		MessageID:           msg.Message.MessageId,
 		SourceChainSelector: msg.Message.SourceChainSelector,
 		Sender:              cciptypes.Address(msg.Message.Sender.String()),
 		Receiver:            cciptypes.Address(msg.Message.Receiver.String()),

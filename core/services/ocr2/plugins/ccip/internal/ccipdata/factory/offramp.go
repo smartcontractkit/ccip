@@ -103,7 +103,7 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 func execReportToEthTxMeta(execReport cciptypes.ExecReport) (*txmgr.TxMeta, error) {
 	msgIDs := make([]string, len(execReport.Messages))
 	for i, msg := range execReport.Messages {
-		msgIDs[i] = hexutil.Encode(msg.MessageId[:])
+		msgIDs[i] = hexutil.Encode(msg.MessageID[:])
 	}
 
 	return &txmgr.TxMeta{

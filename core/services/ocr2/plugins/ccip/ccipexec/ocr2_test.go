@@ -251,7 +251,7 @@ func TestExecutionReportingPlugin_ShouldAcceptFinalizedReport(t *testing.T) {
 		Data:           nil,
 		TokenAmounts:   nil,
 		FeeToken:       cciptypes.Address(utils.RandomAddress().String()),
-		MessageId:      [32]byte{},
+		MessageID:      [32]byte{},
 	}
 	report := cciptypes.ExecReport{
 		Messages:          []cciptypes.EVM2EVMMessage{msg},
@@ -295,7 +295,7 @@ func TestExecutionReportingPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 		Data:           nil,
 		TokenAmounts:   nil,
 		FeeToken:       cciptypes.Address(utils.RandomAddress().String()),
-		MessageId:      [32]byte{},
+		MessageID:      [32]byte{},
 	}
 	report := cciptypes.ExecReport{
 		Messages:          []cciptypes.EVM2EVMMessage{msg},
@@ -386,7 +386,7 @@ func TestExecutionReportingPlugin_buildReport(t *testing.T) {
 			Data:                bytes.Repeat([]byte{0}, bytesPerMessage),
 			TokenAmounts:        nil,
 			FeeToken:            cciptypes.Address(utils.RandomAddress().String()),
-			MessageId:           [32]byte{12},
+			MessageID:           [32]byte{12},
 		}
 		sendReqs[i] = cciptypes.EVM2EVMMessageWithTxMeta{EVM2EVMMessage: msg}
 	}
@@ -423,7 +423,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 			Data:           nil,
 			TokenAmounts:   nil,
 			FeeToken:       srcNative,
-			MessageId:      [32]byte{},
+			MessageID:      [32]byte{},
 		},
 		BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 	}
@@ -571,7 +571,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 						GasLimit:       big.NewInt(1),
 						Data:           bytes.Repeat([]byte{'a'}, 1000),
 						FeeToken:       srcNative,
-						MessageId:      [32]byte{},
+						MessageID:      [32]byte{},
 					},
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
@@ -584,7 +584,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 						GasLimit:       big.NewInt(1),
 						Data:           bytes.Repeat([]byte{'a'}, MaxDataLenPerBatch-500), // skipped from batch
 						FeeToken:       srcNative,
-						MessageId:      [32]byte{},
+						MessageID:      [32]byte{},
 					},
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
@@ -597,7 +597,7 @@ func TestExecutionReportingPlugin_buildBatch(t *testing.T) {
 						GasLimit:       big.NewInt(1),
 						Data:           bytes.Repeat([]byte{'a'}, 1000),
 						FeeToken:       srcNative,
-						MessageId:      [32]byte{},
+						MessageID:      [32]byte{},
 					},
 					BlockTimestamp: time.Date(2010, 1, 1, 12, 12, 12, 0, time.UTC),
 				},
@@ -1657,7 +1657,7 @@ func generateExecutionReport(t *testing.T, numMsgs, tokensPerMsg, bytesPerMsg in
 			Data:                bytes.Repeat([]byte{1}, bytesPerMsg),
 			TokenAmounts:        tokenAmounts,
 			FeeToken:            randAddr(),
-			MessageId:           utils.RandomBytes32(),
+			MessageID:           utils.RandomBytes32(),
 		}
 
 		data := []byte(`{"foo": "bar"}`)

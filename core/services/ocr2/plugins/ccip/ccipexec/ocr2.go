@@ -344,7 +344,7 @@ func (r *ExecutionReportingPlugin) buildBatch(
 	availableDataLen := MaxDataLenPerBatch
 	tokenDataRemainingDuration := MaximumAllowedTokenDataWaitTimePerBatch
 	for _, msg := range report.sendRequestsWithMeta {
-		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageId[:]))
+		msgLggr := lggr.With("messageID", hexutil.Encode(msg.MessageID[:]))
 		if msg.Executed {
 			msgLggr.Infow("Skipping message already executed", "seqNr", msg.SequenceNumber)
 			continue

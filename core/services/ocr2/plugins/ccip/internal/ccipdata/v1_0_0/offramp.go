@@ -521,7 +521,7 @@ func encodeExecutionReport(args abi.Arguments, report cciptypes.ExecReport) ([]b
 			FeeTokenAmount:      msg.FeeTokenAmount,
 			Data:                msg.Data,
 			TokenAmounts:        ta,
-			MessageId:           msg.MessageId,
+			MessageId:           msg.MessageID,
 		})
 	}
 
@@ -586,7 +586,7 @@ func DecodeExecReport(args abi.Arguments, report []byte) (cciptypes.ExecReport, 
 			SequenceNumber:      msg.SequenceNumber,
 			GasLimit:            msg.GasLimit,
 			Nonce:               msg.Nonce,
-			MessageId:           msg.MessageId,
+			MessageID:           msg.MessageId,
 			SourceChainSelector: msg.SourceChainSelector,
 			Sender:              cciptypes.Address(msg.Sender.String()),
 			Receiver:            cciptypes.Address(msg.Receiver.String()),
