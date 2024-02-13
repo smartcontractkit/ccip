@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {BaseTest} from "../BaseTest.t.sol";
-import {EVM2EVMOnRamp} from "../../onramp/EVM2EVMOnRamp.sol";
+import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {BurnMintSetup} from "./BurnMintSetup.t.sol";
 import {BurnFromMintTokenPool} from "../../pools/BurnFromMintTokenPool.sol";
