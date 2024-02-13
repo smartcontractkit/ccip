@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 	mathrand "math/rand"
-	"time"
 
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
@@ -68,7 +68,7 @@ func (r *randomRebalancer) ComputeTransfersToBalance(
 		var liqSource *big.Int
 		for _, medianLiq := range liquidities {
 			if medianLiq.Network == randSourceChain {
-				liqSource = medianLiq.Liquidity
+				liqSource = medianLiq.Liquidity.ToInt()
 				break
 			}
 		}
@@ -81,8 +81,7 @@ func (r *randomRebalancer) ComputeTransfersToBalance(
 		transfers = append(transfers, models.ProposedTransfer{
 			From:   randSourceChain,
 			To:     randDestChain,
-			Amount: big.NewInt(amount),
-			Date:   time.Now().UTC(),
+			Amount: ubig.NewI(amount),
 		})
 	}
 	r.lggr.Info("RandomRebalancer: generated random transfers", "transfers", transfers)

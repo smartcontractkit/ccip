@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 )
 
 type NetworkLiquidity struct {
 	Network   NetworkSelector
-	Liquidity *big.Int
+	Liquidity *ubig.Big
 }
 
 func (n NetworkLiquidity) String() string {
@@ -18,7 +20,7 @@ func (n NetworkLiquidity) String() string {
 func NewNetworkLiquidity(chain NetworkSelector, liq *big.Int) NetworkLiquidity {
 	return NetworkLiquidity{
 		Network:   chain,
-		Liquidity: liq,
+		Liquidity: ubig.New(liq),
 	}
 }
 
@@ -37,6 +39,7 @@ func NewObservation(liqPerChain []NetworkLiquidity, resolvedTransfers []Transfer
 	return Observation{
 		LiquidityPerChain: liqPerChain,
 		PendingTransfers:  pendingTransfers,
+		ResolvedTransfers: resolvedTransfers,
 		Edges:             edges,
 	}
 }
@@ -79,6 +82,7 @@ func NewOutcome(
 ) Outcome {
 	return Outcome{
 		ProposedTransfers: proposedTransfers,
+		ResolvedTransfers: resolvedTransfers,
 		PendingTransfers:  pendingTransfers,
 	}
 }

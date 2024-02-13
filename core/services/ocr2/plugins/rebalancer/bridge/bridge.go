@@ -121,11 +121,14 @@ func (f *factory) NewBridge(source, dest models.NetworkSelector) (Bridge, error)
 }
 
 func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error) {
+	f.lggr.Debugw("Initializing bridge", "source", source, "dest", dest)
+
 	var bridge Bridge
 	var err error
 
 	switch source {
 	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector):
+		fallthrough
 	case models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector):
 		// source: arbitrum l2 -> dest: ethereum l1
 		// only dest that is supported is eth mainnet if source == arb mainnet
@@ -168,6 +171,7 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			l1Deps.ethClient,                         // l1 eth client
 		)
 	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector):
+		fallthrough
 	case models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector):
 		// source: Ethereum L1 -> dest: Arbitrum L2
 		// only dest that is supported is arbitrum mainnet if source == eth mainnet
@@ -207,8 +211,11 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			l2Deps.lp,        // l2 log poller
 		)
 	case models.NetworkSelector(chainsel.GETH_TESTNET.Selector):
+		fallthrough
 	case models.NetworkSelector(chainsel.TEST_90000001.Selector):
+		fallthrough
 	case models.NetworkSelector(chainsel.TEST_90000002.Selector):
+		fallthrough
 	case models.NetworkSelector(chainsel.TEST_90000003.Selector):
 		// these chains are only ever used for tests
 		// in tests we only ever deploy the MockL1Bridge adapter
@@ -245,6 +252,8 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			destDeps.ethClient,
 			f.lggr,
 		)
+	default:
+		return nil, fmt.Errorf("unsupported source chain selector: %d", source)
 	}
 
 	if err != nil {

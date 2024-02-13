@@ -8,6 +8,7 @@ import (
 
 	"github.com/test-go/testify/require"
 
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
@@ -44,12 +45,38 @@ func TestMarshalReportMetadata(t *testing.T) {
 	})
 
 	t.Run("marshal onchain", func(t *testing.T) {
+		bridgeData1 := testutils.Random32Byte()
+		bridgeData2 := testutils.Random32Byte()
 		rm := models.Report{
 			NetworkID:               1,
 			LiquidityManagerAddress: models.Address(testutils.NewAddress()),
 			Transfers: []models.Transfer{
-				models.NewTransfer(1, 2, big.NewInt(3), time.Now().UTC(), []byte{}), // send from 1 to 2
-				models.NewTransfer(3, 1, big.NewInt(3), time.Now().UTC(), []byte{}), // receive from 3 to 1
+				// send instruction
+				{
+					From:               1,
+					To:                 2,
+					Amount:             ubig.NewI(3),
+					Sender:             models.Address(testutils.NewAddress()),
+					Receiver:           models.Address(testutils.NewAddress()),
+					LocalTokenAddress:  models.Address(testutils.NewAddress()),
+					RemoteTokenAddress: models.Address(testutils.NewAddress()),
+					Date:               time.Now().UTC(),
+					BridgeData:         bridgeData1[:],
+					NativeBridgeFee:    ubig.NewI(4),
+				},
+				// receive instruction
+				{
+					From:               3,
+					To:                 1,
+					Amount:             ubig.NewI(5),
+					Sender:             models.Address(testutils.NewAddress()),
+					Receiver:           models.Address(testutils.NewAddress()),
+					LocalTokenAddress:  models.Address(testutils.NewAddress()),
+					RemoteTokenAddress: models.Address(testutils.NewAddress()),
+					Date:               time.Now().UTC(),
+					BridgeData:         bridgeData2[:],
+					NativeBridgeFee:    ubig.NewI(6),
+				},
 			},
 		}
 		instructions, err := rm.ToLiquidityInstructions()
@@ -66,8 +93,10 @@ func TestMarshalReportMetadata(t *testing.T) {
 		require.Equal(t, rm.Transfers[0].Amount, r.Transfers[0].Amount, "marshalled and unmarshalled Transfers should be equal")
 		require.Equal(t, rm.Transfers[0].From, r.Transfers[0].From, "marshalled and unmarshalled Transfers should be equal")
 		require.Equal(t, rm.Transfers[0].To, r.Transfers[0].To, "marshalled and unmarshalled Transfers should be equal")
+		require.Equal(t, rm.Transfers[0].BridgeData, r.Transfers[0].BridgeData, "marshalled and unmarshalled Transfers should be equal")
 		require.Equal(t, rm.Transfers[1].Amount, r.Transfers[1].Amount, "marshalled and unmarshalled Transfers should be equal")
 		require.Equal(t, rm.Transfers[1].From, r.Transfers[1].From, "marshalled and unmarshalled Transfers should be equal")
 		require.Equal(t, rm.Transfers[1].To, r.Transfers[1].To, "marshalled and unmarshalled Transfers should be equal")
+		require.Equal(t, rm.Transfers[1].BridgeData, r.Transfers[1].BridgeData, "marshalled and unmarshalled Transfers should be equal")
 	})
 }

@@ -6,16 +6,18 @@ import (
 	"math/big"
 	"slices"
 
+	"golang.org/x/exp/constraints"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/mock_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
-	"golang.org/x/exp/constraints"
 )
 
 var (
@@ -128,7 +130,7 @@ func (t *testBridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) 
 
 // GetBridgePayloadAndFee implements bridge.Bridge.
 func (t *testBridge) GetBridgePayloadAndFee(ctx context.Context, transfer models.Transfer) ([]byte, *big.Int, error) {
-	payload, err := packUint256(transfer.Amount)
+	payload, err := packUint256(transfer.Amount.ToInt())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to pack bridge data: %w", err)
 	}
@@ -217,7 +219,7 @@ func (t *testBridge) toPendingTransfers(
 				To:                 t.destSelector,
 				Sender:             models.Address(t.sourceAdapter.Address()),
 				Receiver:           t.destRebalancer,
-				Amount:             send.Amount,
+				Amount:             ubig.New(send.Amount),
 				LocalTokenAddress:  models.Address(send.LocalToken),
 				RemoteTokenAddress: models.Address(send.RemoteToken),
 				Date:               lp.BlockTimestamp,

@@ -373,10 +373,7 @@ liquidityManagerAddress = "%s"
 liquidityManagerNetwork = "%d"
 closePluginTimeoutSec = 10
 [pluginConfig.rebalancerConfig]
-type = "random"
-[pluginConfig.rebalancerConfig.randomRebalancerConfig]
-maxNumTransfers = 5
-checkSourceDestEqual = false
+type = "ping-pong"
 `,
 			mainContract.Hex(),
 			kbs[i].ID(),
@@ -687,6 +684,13 @@ func deployContracts(
 			rebalancer:      rebalancer,
 			bridgeAdapter:   bridgeAdapter,
 		}
+
+		t.Log("deployed contracts for chain:", chainID,
+			"weth:", wethAddress.Hex(),
+			"lockReleasePool:", lockReleasePool.Address().Hex(),
+			"rebalancer:", rebalancerAddr.Hex(),
+			"bridgeAdapter:", bridgeAdapterAddress.Hex(),
+		)
 	}
 	return
 }

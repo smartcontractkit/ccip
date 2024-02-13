@@ -9,7 +9,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 )
 
 type Address common.Address
@@ -55,8 +58,7 @@ type NetworkType string
 type ProposedTransfer struct {
 	From   NetworkSelector
 	To     NetworkSelector
-	Amount *big.Int
-	Date   time.Time
+	Amount *ubig.Big
 }
 
 // Transfer is a ProposedTransfer that has had a lot of its information resolved.
@@ -76,14 +78,14 @@ type Transfer struct {
 	// RemoteTokenAddress is the address of the token on the To network.
 	RemoteTokenAddress Address
 	// Amount is the amount of tokens being transferred.
-	Amount *big.Int
+	Amount *ubig.Big
 	// Date is the date when the transfer was initiated.
 	Date time.Time
 	// BridgeData is any additional data that needs to be sent to the bridge
 	// in order to make the transfer succeed.
-	BridgeData []byte
+	BridgeData hexutil.Bytes
 	// NativeBridgeFee is the fee that the bridge charges for the transfer.
-	NativeBridgeFee *big.Int
+	NativeBridgeFee *ubig.Big
 	// todo: consider adding some unique id field
 }
 
@@ -91,7 +93,7 @@ func NewTransfer(from, to NetworkSelector, amount *big.Int, date time.Time, brid
 	return Transfer{
 		From:       from,
 		To:         to,
-		Amount:     amount,
+		Amount:     ubig.New(amount),
 		Date:       date,
 		BridgeData: bridgeData,
 	}
@@ -110,7 +112,17 @@ func (t Transfer) Equals(other Transfer) bool {
 }
 
 func (t Transfer) String() string {
-	return fmt.Sprintf("%v->%v %s", t.From, t.To, t.Amount.String())
+	return fmt.Sprintf("{From: %d, To: %d, Amount: %s, Sender: %s, Receiver: %s, LocalTokenAddress: %s, RemoteTokenAddress: %s, BridgeData: %s, NativeBridgeFee: %s}",
+		t.From,
+		t.To,
+		t.Amount.String(),
+		t.Sender.String(),
+		t.Receiver.String(),
+		t.LocalTokenAddress.String(),
+		t.RemoteTokenAddress.String(),
+		hexutil.Encode(t.BridgeData),
+		t.NativeBridgeFee.String(),
+	)
 }
 
 // PendingTransfer is a Transfer whose status has been resolved.

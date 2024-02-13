@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arb_node_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l2_bridge_adapter"
@@ -329,7 +330,7 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:   l.localSelector,
 				To:     l.remoteSelector,
-				Amount: transfer.Amount,
+				Amount: ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
 					logIndex: int64(transfer.Raw.Index),
@@ -344,7 +345,7 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:   l.localSelector,
 				To:     l.remoteSelector,
-				Amount: transfer.Amount,
+				Amount: ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
 					logIndex: int64(transfer.Raw.Index),

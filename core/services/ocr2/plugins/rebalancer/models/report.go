@@ -10,6 +10,7 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	evmtypes "github.com/smartcontractkit/chainlink/v2/core/chains/evm/types"
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer_report_encoder"
 	"github.com/smartcontractkit/chainlink/v2/core/services/relay"
 )
@@ -112,14 +113,14 @@ func (r Report) ToLiquidityInstructions() (rebalancer_report_encoder.IRebalancer
 	for _, tr := range r.Transfers {
 		if r.NetworkID == tr.From {
 			sendInstructions = append(sendInstructions, rebalancer_report_encoder.IRebalancerSendLiquidityParams{
-				Amount:              tr.Amount,
+				Amount:              tr.Amount.ToInt(),
 				RemoteChainSelector: uint64(tr.To),
 				BridgeData:          tr.BridgeData,
-				NativeBridgeFee:     tr.NativeBridgeFee,
+				NativeBridgeFee:     tr.NativeBridgeFee.ToInt(),
 			})
 		} else if r.NetworkID == tr.To {
 			receiveInstructions = append(receiveInstructions, rebalancer_report_encoder.IRebalancerReceiveLiquidityParams{
-				Amount:              tr.Amount,
+				Amount:              tr.Amount.ToInt(),
 				RemoteChainSelector: uint64(tr.From),
 				BridgeData:          tr.BridgeData,
 			})
@@ -175,9 +176,10 @@ func DecodeReport(networkID NetworkSelector, rebalancerAddress Address, binaryRe
 	out.LiquidityManagerAddress = rebalancerAddress
 	for _, send := range instructions.SendLiquidityParams {
 		out.Transfers = append(out.Transfers, Transfer{
-			From:   networkID,
-			To:     NetworkSelector(send.RemoteChainSelector),
-			Amount: send.Amount,
+			From:       networkID,
+			To:         NetworkSelector(send.RemoteChainSelector),
+			Amount:     ubig.New(send.Amount),
+			BridgeData: send.BridgeData,
 		})
 	}
 
@@ -185,7 +187,7 @@ func DecodeReport(networkID NetworkSelector, rebalancerAddress Address, binaryRe
 		out.Transfers = append(out.Transfers, Transfer{
 			From:       NetworkSelector(recv.RemoteChainSelector),
 			To:         networkID,
-			Amount:     recv.Amount,
+			Amount:     ubig.New(recv.Amount),
 			BridgeData: recv.BridgeData,
 		})
 	}

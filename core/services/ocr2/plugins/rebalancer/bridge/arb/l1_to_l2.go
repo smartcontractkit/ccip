@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/abstract_arbitrum_token_gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arb_node_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_gateway_router"
@@ -326,7 +327,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:   l.localSelector,
 				To:     l.remoteSelector,
-				Amount: transfer.Amount,
+				Amount: ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
 					logIndex: int64(transfer.Raw.Index),
@@ -341,7 +342,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:   l.localSelector,
 				To:     l.remoteSelector,
-				Amount: transfer.Amount,
+				Amount: ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
 					logIndex: int64(transfer.Raw.Index),
@@ -356,7 +357,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:   l.localSelector,
 				To:     l.remoteSelector,
-				Amount: transfer.Amount,
+				Amount: ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
 					logIndex: int64(transfer.Raw.Index),
@@ -541,7 +542,7 @@ func (l *l1ToL2Bridge) parseLiquidityTransferred(lgs []logpoller.Log) ([]*rebala
 }
 
 func (l *l1ToL2Bridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) {
-	// TODO: decode and medianize gasLimit/maxSubmissionCost/maxFeePerGas
+	// TODO: decode and take top n-f index after sorting asc gasLimit/maxSubmissionCost/maxFeePerGas
 	return payloads[0], nil
 }
 
@@ -607,7 +608,7 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 		common.Address(transfer.LocalTokenAddress), // L1 token address
 		l.l1BridgeAdapter.Address(),                // L1 sender address
 		common.Address(transfer.Receiver),          // L2 recipient address
-		transfer.Amount,                            // token amount
+		transfer.Amount.ToInt(),                    // token amount
 		[]byte{},                                   // extra data (unused here)
 	)
 	if err != nil {

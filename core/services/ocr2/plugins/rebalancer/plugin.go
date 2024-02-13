@@ -13,6 +13,7 @@ import (
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"go.uber.org/multierr"
 
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/discoverer"
@@ -99,7 +100,9 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 	p.lggr.Infow("finished observing",
 		"networkLiquidities", networkLiquidities,
 		"pendingTransfers", pendingTransfers,
-		"edges", edges)
+		"edges", edges,
+		"resolvedTransfers", resolvedTransfers,
+	)
 
 	return models.NewObservation(networkLiquidities, resolvedTransfers, pendingTransfers, edges).Encode(), nil
 }
@@ -131,6 +134,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("decode observation: %w", err)
 		}
+		lggr.Debugw("decoded observation", "observation", obs)
 		observations = append(observations, obs)
 	}
 
@@ -162,6 +166,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		"medianLiquidityPerChain", medianLiquidityPerChain,
 		"pendingTransfers", pendingTransfers,
 		"proposedTransfers", proposedTransfers,
+		"resolvedTransfers", resolvedTransfersQuorum,
 	)
 
 	return models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers).Encode(), nil
@@ -193,6 +198,13 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 			)
 		}
 	}
+
+	lggr.Debugw("grouped transfers by source chain",
+		"transfersBySourceNet", transfersBySourceNet,
+		"resolvedTransfers", decodedOutcome.ResolvedTransfers,
+		"pendingTransfers", decodedOutcome.PendingTransfers,
+		"proposedTransfers", decodedOutcome.ProposedTransfers,
+	)
 
 	var reports []ocr3types.ReportWithInfo[models.Report]
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -370,6 +382,11 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 				return nil, fmt.Errorf("init bridge: %w", err)
 			}
 
+			if bridge == nil {
+				p.lggr.Warnw("no bridge found for network pair", "sourceNetwork", networkID, "destNetwork", neighbor)
+				continue
+			}
+
 			localToken, err := p.rebalancerGraph.GetTokenAddress(networkID)
 			if err != nil {
 				return nil, fmt.Errorf("get local token address for %v: %w", networkID, err)
@@ -397,7 +414,7 @@ func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observatio
 	liqObsPerChain := make(map[models.NetworkSelector][]*big.Int)
 	for _, ob := range observations {
 		for _, chainLiq := range ob.LiquidityPerChain {
-			liqObsPerChain[chainLiq.Network] = append(liqObsPerChain[chainLiq.Network], chainLiq.Liquidity)
+			liqObsPerChain[chainLiq.Network] = append(liqObsPerChain[chainLiq.Network], chainLiq.Liquidity.ToInt())
 		}
 	}
 
@@ -468,7 +485,7 @@ func (p *Plugin) computeMedianGraph(
 	}
 
 	for _, medianLiq := range medianLiquidities {
-		if !g.SetLiquidity(medianLiq.Network, medianLiq.Liquidity) {
+		if !g.SetLiquidity(medianLiq.Network, medianLiq.Liquidity.ToInt()) {
 			p.lggr.Errorw("median liquidity on network not found on edges quorum", "net", medianLiq.Network)
 		}
 	}
@@ -480,33 +497,38 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 	// assumption: there shouldn't be more than 1 transfer for a (from, to) pair from a single oracle's observation.
 	// otherwise they can be collapsed into a single transfer.
 	type key struct {
-		from               models.NetworkSelector
-		to                 models.NetworkSelector
-		amountString       string
-		sender             models.Address
-		receiver           models.Address
-		localTokenAddress  models.Address
-		remoteTokenAddress models.Address
+		From               models.NetworkSelector
+		To                 models.NetworkSelector
+		AmountString       string
+		Sender             models.Address
+		Receiver           models.Address
+		LocalTokenAddress  models.Address
+		RemoteTokenAddress models.Address
 	}
 	counts := make(map[key][]models.Transfer)
 	for _, obs := range observations {
+		p.lggr.Debugw("observed transfers", "transfers", obs.ResolvedTransfers)
 		for _, tr := range obs.ResolvedTransfers {
+			p.lggr.Debugw("inserting resolved transfer into mapping", "transfer", tr)
 			k := key{
-				from:               tr.From,
-				to:                 tr.To,
-				amountString:       tr.Amount.String(),
-				sender:             tr.Sender,
-				receiver:           tr.Receiver,
-				localTokenAddress:  tr.LocalTokenAddress,
-				remoteTokenAddress: tr.RemoteTokenAddress,
+				From:               tr.From,
+				To:                 tr.To,
+				AmountString:       tr.Amount.String(),
+				Sender:             tr.Sender,
+				Receiver:           tr.Receiver,
+				LocalTokenAddress:  tr.LocalTokenAddress,
+				RemoteTokenAddress: tr.RemoteTokenAddress,
 			}
 			counts[k] = append(counts[k], tr)
 		}
 	}
 
+	p.lggr.Debugw("resolved transfers counts", "counts", len(counts))
+
 	var quorumTransfers []models.Transfer
 	for k, transfers := range counts {
 		if len(transfers) >= p.f+1 {
+			p.lggr.Debugw("quorum reached on transfer", "transfer", k, "votes", len(transfers))
 			// need to compute the "medianized" bridge payload
 			// only the bridge knows how to do this so we need to delegate it to them
 			// the native bridge fee can also be medianized, no need for the bridge to do that
@@ -516,13 +538,13 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 				datesUnix      []*big.Int
 			)
 			for _, tr := range transfers {
-				bridgeFees = append(bridgeFees, tr.NativeBridgeFee)
+				bridgeFees = append(bridgeFees, tr.NativeBridgeFee.ToInt())
 				bridgePayloads = append(bridgePayloads, tr.BridgeData)
 				datesUnix = append(datesUnix, big.NewInt(tr.Date.Unix()))
 			}
 			medianizedNativeFee := bigIntSortedMiddle(bridgeFees)
 			medianizedDateUnix := bigIntSortedMiddle(datesUnix)
-			bridge, err := p.bridgeFactory.NewBridge(k.from, k.to)
+			bridge, err := p.bridgeFactory.NewBridge(k.From, k.To)
 			if err != nil {
 				return nil, fmt.Errorf("init bridge: %w", err)
 			}
@@ -531,16 +553,16 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 				return nil, fmt.Errorf("quorumized bridge payload: %w", err)
 			}
 			quorumTransfer := models.Transfer{
-				From:               k.from,
-				To:                 k.to,
+				From:               k.From,
+				To:                 k.To,
 				Amount:             transfers[0].Amount,
 				Date:               time.Unix(medianizedDateUnix.Int64(), 0), // medianized, not in the key
 				Sender:             transfers[0].Sender,
 				Receiver:           transfers[0].Receiver,
 				LocalTokenAddress:  transfers[0].LocalTokenAddress,
 				RemoteTokenAddress: transfers[0].RemoteTokenAddress,
-				BridgeData:         quorumizedBridgePayload, // "quorumized", not in the key
-				NativeBridgeFee:    medianizedNativeFee,     // medianized, not in the key
+				BridgeData:         quorumizedBridgePayload,       // "quorumized", not in the key
+				NativeBridgeFee:    ubig.New(medianizedNativeFee), // medianized, not in the key
 			}
 			quorumTransfers = append(quorumTransfers, quorumTransfer)
 		} else {
@@ -553,6 +575,10 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 
 func (p *Plugin) resolveProposedTransfers(ctx context.Context, outcomeCtx ocr3types.OutcomeContext) ([]models.Transfer, error) {
 	p.lggr.Infow("resolving proposed transfers", "seqNr", outcomeCtx.SeqNr, "prevSeqNr", outcomeCtx.SeqNr-1)
+
+	if len(outcomeCtx.PreviousOutcome) == 0 {
+		return nil, nil
+	}
 
 	outcome, err := models.DecodeOutcome(outcomeCtx.PreviousOutcome)
 	if err != nil {
@@ -590,7 +616,6 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, outcomeCtx ocr3ty
 			From:               proposedTransfer.From,
 			To:                 proposedTransfer.To,
 			Amount:             proposedTransfer.Amount,
-			Date:               proposedTransfer.Date,
 			Sender:             fromNetRebalancer,
 			Receiver:           toNetRebalancer,
 			LocalTokenAddress:  fromNetToken,
@@ -604,9 +629,11 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, outcomeCtx ocr3ty
 			return nil, fmt.Errorf("get bridge payload and fee: %w", err)
 		}
 		resolvedTransfer.BridgeData = bridgePayload
-		resolvedTransfer.NativeBridgeFee = bridgeFee
+		resolvedTransfer.NativeBridgeFee = ubig.New(bridgeFee)
 		resolvedTransfers = append(resolvedTransfers, resolvedTransfer)
 	}
+
+	p.lggr.Infow("finished resolving proposed transfers", "resolvedTransfers", resolvedTransfers)
 
 	return resolvedTransfers, nil
 }

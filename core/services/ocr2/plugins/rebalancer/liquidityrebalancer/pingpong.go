@@ -27,7 +27,7 @@ func (p *PingPong) ComputeTransfersToBalance(g graph.Graph, inflightTransfers []
 		// subtract inflight transfers from the balance
 		for _, tr := range inflightTransfers {
 			if tr.From == netSel && tr.Status != models.TransferStatusExecuted {
-				balance = big.NewInt(0).Sub(balance, tr.Amount)
+				balance = big.NewInt(0).Sub(balance, tr.Amount.ToInt())
 			}
 		}
 		if balance.Cmp(big.NewInt(0)) <= 0 {
@@ -59,7 +59,6 @@ func (p *PingPong) ComputeTransfersToBalance(g graph.Graph, inflightTransfers []
 			From:   tr.From,
 			To:     tr.To,
 			Amount: tr.Amount,
-			Date:   tr.Date,
 		}
 	}
 	return results, nil
