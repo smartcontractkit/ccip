@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
-var initError = errors.New("boom")
+var errInit = errors.New("boom")
 
 type dummyService struct {
 	startCallCount int
@@ -58,7 +58,7 @@ func TestLazyInitService_NoStartOnUnrecoverableFailure(t *testing.T) {
 	s := New(func(context.Context) (job.ServiceCtx, error) {
 		tries++
 		close(ch)
-		return nil, Unrecoverable(initError)
+		return nil, Unrecoverable(errInit)
 	})
 	require.NoError(t, s.Start(context.Background()))
 	<-ch
@@ -68,22 +68,22 @@ func TestLazyInitService_NoStartOnUnrecoverableFailure(t *testing.T) {
 
 func TestLazyInitService_RetryOnRecoverableFailure(t *testing.T) {
 	tries := 0
-	var msgs []error
+	var errs []error
 	dummy := newDummyService()
 	s := New(func(context.Context) (job.ServiceCtx, error) {
 		tries++
 		if tries <= 3 {
-			return nil, initError
+			return nil, errInit
 		}
 		return dummy, nil
-	}, WithLogErrorFunc(func(msg error) { msgs = append(msgs, msg) }))
+	}, WithLogErrorFunc(func(msg error) { errs = append(errs, msg) }))
 	require.NoError(t, s.Start(context.Background()))
 	dummy.AwaitCompleteStart()
 	require.NoError(t, s.Close())
 	require.Equal(t, 1, dummy.startCallCount)
 	require.Equal(t, 1, dummy.closeCallCount)
 	require.Equal(t, 4, tries)
-	require.Equal(t, 3, len(msgs))
+	require.Equal(t, 3, len(errs))
 }
 
 func TestLazyInitService_ParentContextCancel(t *testing.T) {
