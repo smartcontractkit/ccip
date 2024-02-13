@@ -3,12 +3,16 @@ pragma solidity 0.8.19;
 
 import {EVM2EVMOnRamp} from "../../onRamp/EVM2EVMOnRamp.sol";
 import {Router} from "../../Router.sol";
+import {TokenPool} from "../../pools/TokenPool.sol";
+import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {PriceRegistry} from "../../PriceRegistry.sol";
 import {PriceRegistrySetup} from "../priceRegistry/PriceRegistry.t.sol";
 import {Internal} from "../../libraries/Internal.sol";
 import {Client} from "../../libraries/Client.sol";
 import {EVM2EVMOnRampHelper} from "../helpers/EVM2EVMOnRampHelper.sol";
-import "../TokenSetup.t.sol";
+import {TokenSetup} from "../TokenSetup.t.sol";
+
+import {IERC20} from "../../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract EVM2EVMOnRampSetup is TokenSetup, PriceRegistrySetup {
   // Duplicate event of the CCIPSendRequested in the IOnRamp

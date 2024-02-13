@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {IPool} from "../../interfaces/pools/IPool.sol";
 
-import "../BaseTest.t.sol";
+import {BaseTest} from "../BaseTest.t.sol";
 import {LockReleaseTokenPool} from "../../pools/LockReleaseTokenPool.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {EVM2EVMOnRamp} from "../../onramp/EVM2EVMOnRamp.sol";

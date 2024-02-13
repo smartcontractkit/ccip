@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import "../BaseTest.t.sol";
+import {BaseTest} from "../BaseTest.t.sol";
 import {TokenPoolHelper} from "../helpers/TokenPoolHelper.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";

@@ -4,8 +4,8 @@ pragma solidity 0.8.19;
 import {IBurnMintERC20} from "../../../shared/token/ERC20/IBurnMintERC20.sol";
 import {IPool} from "../../interfaces/pools/IPool.sol";
 
-import "../BaseTest.t.sol";
-import "../mocks/MockUSDCTransmitter.sol";
+import {BaseTest} from "../BaseTest.t.sol";
+import {MockUSDCTransmitter} from "../mocks/MockUSDCTransmitter.sol";
 import {TokenPool} from "../../pools/TokenPool.sol";
 import {Router} from "../../Router.sol";
 import {RateLimiter} from "../../libraries/RateLimiter.sol";
