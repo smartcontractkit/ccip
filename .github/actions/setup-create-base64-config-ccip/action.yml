@@ -32,7 +32,6 @@ runs:
       env:
         RUN_ID: ${{ inputs.runId }}
         TEST_LOG_COLLECT: ${{ inputs.testLogCollect }}
-        SELECTED_NETWORKS: ${{ inputs.selectedNetworks }}
         CHAINLINK_IMAGE: ${{ inputs.chainlinkImage }}
         CHAINLINK_VERSION: ${{ inputs.chainlinkVersion }}
         LOKI_ENDPOINT: ${{ inputs.lokiEndpoint }}
@@ -53,8 +52,7 @@ runs:
           toml_array_format="${toml_array_format%,}]"
           echo "$toml_array_format"
         }
-        
-        selected_networks=$(convert_to_toml_array "$SELECTED_NETWORKS")      
+             
         log_targets=$(convert_to_toml_array "$LOGSTREAM_LOG_TARGETS")
 
         if [ -n "$TEST_LOG_COLLECT" ]; then
@@ -66,9 +64,6 @@ runs:
         cat << EOF > config.toml
         [CCIP]
         [CCIP.Env]
-        [CCIP.Env.Network]
-        selected_networks=$selected_networks
-        
         [CCIP.Env.Chainlink]
         [CCIP.Env.Chainlink.Common]
         [CCIP.Env.Chainlink.Common.ChainlinkImage]
