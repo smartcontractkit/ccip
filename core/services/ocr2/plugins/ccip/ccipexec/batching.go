@@ -25,8 +25,8 @@ func getProofData(
 		return nil, nil, nil, err
 	}
 
-	if err := validateSendRequests(sendReqs, interval); err != nil {
-		return nil, nil, nil, err
+	if err1 := validateSendRequests(sendReqs, interval); err1 != nil {
+		return nil, nil, nil, err1
 	}
 
 	leaves = make([][32]byte, 0, len(sendReqs))
