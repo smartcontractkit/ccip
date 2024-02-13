@@ -18,6 +18,8 @@ contract BaseTest is Test, StructFactory {
     // Set the sender to OWNER permanently
     vm.startPrank(OWNER);
     deal(OWNER, 1e20);
+    vm.label(OWNER, "Owner");
+    vm.label(STRANGER, "Stranger");
 
     // Set the block time to a constant known value
     vm.warp(BLOCK_TIME);
