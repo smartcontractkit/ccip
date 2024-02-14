@@ -37,6 +37,7 @@ func newPlugin(t *testing.T) (*Plugin, mockDeps) {
 		mockFactory:           lmFactory,
 		mockRebalancer:        rb,
 		mockDiscovererFactory: discovererFactory,
+		mockBridgeFactory:     bridgeFactory,
 	}
 }
 

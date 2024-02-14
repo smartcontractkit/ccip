@@ -9,6 +9,7 @@ import (
 	"golang.org/x/exp/constraints"
 
 	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -315,9 +316,8 @@ func intComparator[T constraints.Integer](a, b T) int {
 		return -1
 	} else if a > b {
 		return 1
-	} else {
-		return 0
 	}
+	return 0
 }
 
 func pack2Uint256(val1, val2 *big.Int) ([]byte, error) {
