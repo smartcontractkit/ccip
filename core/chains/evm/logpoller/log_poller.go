@@ -141,7 +141,7 @@ func NewLogPoller(orm ORM, ec Client, lggr logger.Logger, pollPeriod time.Durati
 		lggr:                     logger.Sugared(logger.Named(lggr, "LogPoller")),
 		replayStart:              make(chan int64),
 		replayComplete:           make(chan error),
-		pollPeriod:               pollPeriod,
+		pollPeriod:               1 * time.Second,
 		finalityDepth:            finalityDepth,
 		useFinalityTag:           useFinalityTag,
 		backfillBatchSize:        backfillBatchSize,
@@ -546,7 +546,7 @@ func (lp *logPoller) run() {
 				lp.lggr.Errorw("Unable to prune old blocks", "err", err)
 			}
 		case <-logPruneTick:
-			logPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 2401)) // = 7^5 avoids common factors with 1000
+			logPruneTick = time.After(utils.WithJitter(lp.pollPeriod * 1500)) // = 7^5 avoids common factors with 1000
 			if err := lp.orm.DeleteExpiredLogs(pg.WithParentCtx(lp.ctx)); err != nil {
 				lp.lggr.Error(err)
 			}
