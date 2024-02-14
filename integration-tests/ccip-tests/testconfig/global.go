@@ -10,7 +10,6 @@ import (
 	"github.com/AlekSi/pointer"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
@@ -160,104 +159,6 @@ type Common struct {
 	Logging   *ctfconfig.LoggingConfig `toml:"Logging"`
 }
 
-func (p *Common) ApplyOverrides(from *Common) error {
-	if from == nil {
-		return nil
-	}
-	if from.EnvUser != "" {
-		p.EnvUser = from.EnvUser
-	}
-	if from.TTL != nil {
-		p.TTL = from.TTL
-	}
-	if from.Network != nil {
-		p.Network = from.Network
-	}
-	if from.Chainlink != nil {
-		if p.Chainlink == nil {
-			p.Chainlink = &Chainlink{}
-		}
-		p.Chainlink.ApplyOverrides(from.Chainlink)
-	}
-	if from.Logging != nil {
-		logBytes, err := toml.Marshal(from.Logging)
-		if err != nil {
-			return err
-		}
-		lggr := zerolog.Logger{}
-		err = ctfconfig.BytesToAnyTomlStruct(lggr, "somefile", "", p.Logging, logBytes)
-		if err != nil {
-			return err
-		}
-	}
-	p.OverrideLoggingConfig(from)
-	return nil
-}
-
-func (p *Common) OverrideLoggingConfig(from *Common) {
-	if from.Logging == nil {
-		return
-	}
-	if p.Logging == nil {
-		p.Logging = from.Logging
-	} else {
-		if from.Logging.Loki != nil {
-			if p.Logging.Loki == nil {
-				p.Logging.Loki = from.Logging.Loki
-			} else {
-				if p.Logging.Loki.Endpoint == nil {
-					p.Logging.Loki.Endpoint = from.Logging.Loki.Endpoint
-				}
-				if p.Logging.Loki.TenantId == nil {
-					p.Logging.Loki.TenantId = from.Logging.Loki.TenantId
-				}
-				if p.Logging.Loki.BasicAuth == nil {
-					p.Logging.Loki.BasicAuth = from.Logging.Loki.BasicAuth
-				}
-				if p.Logging.Loki.BearerToken == nil {
-					p.Logging.Loki.BearerToken = from.Logging.Loki.BearerToken
-				}
-			}
-		}
-		if from.Logging.TestLogCollect != nil {
-			p.Logging.TestLogCollect = from.Logging.TestLogCollect
-		}
-		if from.Logging.RunId != nil {
-			p.Logging.RunId = from.Logging.RunId
-		}
-		if from.Logging.LogStream != nil {
-			if p.Logging.LogStream == nil {
-				p.Logging.LogStream = from.Logging.LogStream
-			} else {
-				if from.Logging.LogStream.LogTargets != nil {
-					p.Logging.LogStream.LogTargets = from.Logging.LogStream.LogTargets
-				}
-				if from.Logging.LogStream.LogProducerTimeout != nil {
-					p.Logging.LogStream.LogProducerTimeout = from.Logging.LogStream.LogProducerTimeout
-				}
-				if from.Logging.LogStream.LogProducerRetryLimit != nil {
-					p.Logging.LogStream.LogProducerRetryLimit = from.Logging.LogStream.LogProducerRetryLimit
-				}
-			}
-		}
-		if from.Logging.Grafana != nil {
-			if p.Logging.Grafana == nil {
-				p.Logging.Grafana = from.Logging.Grafana
-			} else {
-				if from.Logging.Grafana.BaseUrl != nil {
-					p.Logging.Grafana.BaseUrl = from.Logging.Grafana.BaseUrl
-				}
-				if from.Logging.Grafana.DashboardUrl != nil {
-					p.Logging.Grafana.DashboardUrl = from.Logging.Grafana.DashboardUrl
-				}
-				if from.Logging.Grafana.BearerToken != nil {
-					p.Logging.Grafana.BearerToken = from.Logging.Grafana.BearerToken
-				}
-			}
-		}
-	}
-}
-
 func (p *Common) Validate() error {
 	if err := p.Logging.Validate(); err != nil {
 		return fmt.Errorf("error validating logging config %w", err)
@@ -338,53 +239,6 @@ type Chainlink struct {
 	DBArgs     []string `toml:",omitempty"`
 	NoOfNodes  *int     `toml:",omitempty"`
 	Nodes      []*Node  `toml:",omitempty"` // to be mentioned only if diff nodes follow diff configs; not required if all nodes follow CommonConfig
-}
-
-func (c *Chainlink) ApplyOverrides(from *Chainlink) {
-	if from == nil {
-		return
-	}
-	if from.NoOfNodes != nil {
-		c.NoOfNodes = from.NoOfNodes
-	}
-	if from.Common != nil {
-		c.Common.ApplyOverrides(from.Common)
-	}
-	if from.Nodes != nil {
-		for i, node := range from.Nodes {
-			if len(c.Nodes) > i {
-				c.Nodes[i].ApplyOverrides(node)
-			} else {
-				c.Nodes = append(c.Nodes, node)
-			}
-		}
-	}
-	if len(c.Nodes) > 0 {
-		for i := range c.Nodes {
-			c.Nodes[i].Merge(c.Common)
-		}
-	}
-	if from.NodeMemory != "" {
-		c.NodeMemory = from.NodeMemory
-	}
-	if from.NodeCPU != "" {
-		c.NodeCPU = from.NodeCPU
-	}
-	if from.DBMemory != "" {
-		c.DBMemory = from.DBMemory
-	}
-	if from.DBCPU != "" {
-		c.DBCPU = from.DBCPU
-	}
-	if from.DBArgs != nil {
-		c.DBArgs = from.DBArgs
-	}
-	if from.DBCapacity != "" {
-		c.DBCapacity = from.DBCapacity
-	}
-	if from.IsStateful != nil {
-		c.IsStateful = from.IsStateful
-	}
 }
 
 func (c *Chainlink) Validate() error {
@@ -491,63 +345,6 @@ func (n *Node) Merge(from *Node) {
 		for k, v := range from.ChainConfigTOMLByChain {
 			if _, ok := n.ChainConfigTOMLByChain[k]; !ok {
 				n.ChainConfigTOMLByChain[k] = v
-			}
-		}
-	}
-}
-
-func (n *Node) ApplyOverrides(from *Node) {
-	if from == nil {
-		return
-	}
-	if n == nil {
-		return
-	}
-	if from.Name != "" {
-		n.Name = from.Name
-	}
-	if from.ChainlinkImage != nil {
-		if n.ChainlinkImage == nil {
-			n.ChainlinkImage = from.ChainlinkImage
-		} else {
-			if from.ChainlinkImage.Image != nil {
-				n.ChainlinkImage.Image = from.ChainlinkImage.Image
-			}
-			if from.ChainlinkImage.Version != nil {
-				n.ChainlinkImage.Version = from.ChainlinkImage.Version
-			}
-		}
-	}
-	if from.ChainlinkUpgradeImage != nil {
-		if n.ChainlinkUpgradeImage == nil {
-			n.ChainlinkUpgradeImage = from.ChainlinkUpgradeImage
-		} else {
-			if from.ChainlinkUpgradeImage.Image != nil {
-				n.ChainlinkUpgradeImage.Image = from.ChainlinkUpgradeImage.Image
-			}
-			if from.ChainlinkUpgradeImage.Version != nil {
-				n.ChainlinkUpgradeImage.Version = from.ChainlinkUpgradeImage.Version
-			}
-		}
-	}
-	if from.DBImage != "" {
-		n.DBImage = from.DBImage
-	}
-	if from.DBTag != "" {
-		n.DBTag = from.DBTag
-	}
-	if from.BaseConfigTOML != "" {
-		n.BaseConfigTOML = from.BaseConfigTOML
-	}
-	if from.CommonChainConfigTOML != "" {
-		n.CommonChainConfigTOML = from.CommonChainConfigTOML
-	}
-	if from.ChainConfigTOMLByChain != nil {
-		if n.ChainConfigTOMLByChain == nil {
-			n.ChainConfigTOMLByChain = from.ChainConfigTOMLByChain
-		} else {
-			for chainID, cfg := range from.ChainConfigTOMLByChain {
-				n.ChainConfigTOMLByChain[chainID] = cfg
 			}
 		}
 	}
