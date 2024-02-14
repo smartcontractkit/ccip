@@ -338,6 +338,7 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 				BridgeData: readyData[i], // finalization data for withdrawals that are ready
 			},
 			Status: models.TransferStatusReady,
+			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
 		})
 	}
 	for _, transfer := range notReady {
@@ -353,6 +354,7 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 				BridgeData: []byte{}, // No data since its not ready
 			},
 			Status: models.TransferStatusNotReady,
+			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
 		})
 	}
 	return transfers, nil

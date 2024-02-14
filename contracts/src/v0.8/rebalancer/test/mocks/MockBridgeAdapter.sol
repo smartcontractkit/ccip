@@ -16,6 +16,7 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   error InsufficientLiquidity();
 
   IERC20 internal immutable i_token;
+  uint256 internal s_nonce = 1;
 
   constructor(IERC20 token) {
     i_token = token;
@@ -34,7 +35,8 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     address indexed remoteReceiver,
     address remoteToken,
     uint256 amount,
-    bytes bridgeSpecificPayload
+    bytes bridgeSpecificPayload,
+    uint256 nonce
   );
 
   /// @notice Mock event to emit when the rebalancer calls finalizeWithdrawERC20
@@ -49,7 +51,8 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     address indexed localReceiver,
     address indexed localToken,
     uint256 amount,
-    bytes bridgeSpecificPayload
+    bytes bridgeSpecificPayload,
+    uint256 nonce
   );
 
   /// @notice Simply transferFrom msg.sender the tokens that are to be bridged to address(this).
@@ -62,7 +65,7 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   ) external payable override returns (bytes memory) {
     IERC20(localToken).transferFrom(msg.sender, address(this), amount);
 
-    emit MockERC20Sent(msg.sender, localToken, remoteReceiver, remoteToken, amount, bridgeSpecificPayload);
+    emit MockERC20Sent(msg.sender, localToken, remoteReceiver, remoteToken, amount, bridgeSpecificPayload, s_nonce++);
 
     return "";
   }
@@ -92,9 +95,9 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     address localReceiver,
     bytes calldata bridgeSpecificPayload
   ) external {
-    uint256 amount = abi.decode(bridgeSpecificPayload, (uint256));
+    (uint256 amount, uint256 nonce) = abi.decode(bridgeSpecificPayload, (uint256, uint256));
     i_token.safeTransfer(localReceiver, amount);
-    emit MockERC20Finalized(remoteSender, localReceiver, address(i_token), amount, bridgeSpecificPayload);
+    emit MockERC20Finalized(remoteSender, localReceiver, address(i_token), amount, bridgeSpecificPayload, nonce);
   }
 }
 

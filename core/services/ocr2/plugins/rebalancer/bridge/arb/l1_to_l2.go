@@ -335,6 +335,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 				BridgeData: []byte{}, // no finalization data, not ready
 			},
 			Status: models.TransferStatusNotReady,
+			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
 		})
 	}
 	for i, transfer := range ready {
@@ -350,6 +351,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 				BridgeData: readyData[i], // finalization data since its ready
 			},
 			Status: models.TransferStatusReady, // ready == finalized for L1 -> L2 transfers due to auto-finalization by the native bridge
+			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
 		})
 	}
 	for _, transfer := range executed {
@@ -365,6 +367,7 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 				BridgeData: []byte{}, // no finalization data, already executed
 			},
 			Status: models.TransferStatusExecuted,
+			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
 		})
 	}
 	return transfers, nil

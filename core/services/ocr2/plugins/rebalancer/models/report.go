@@ -151,7 +151,8 @@ func (r Report) GetDestinationConfigDigest() ocrtypes.ConfigDigest {
 }
 
 func (r Report) String() string {
-	return fmt.Sprintf("ReportMetadata{Transfers: %v, LiquidityManagerAddress: %s, NetworkID: %d}", r.Transfers, r.LiquidityManagerAddress, r.NetworkID)
+	return fmt.Sprintf("Report{Transfers: %v, RebalancerAddress: %s, NetworkID: %d, ConfigDigest: %s}",
+		r.Transfers, r.LiquidityManagerAddress.String(), r.NetworkID, r.ConfigDigest.Hex())
 }
 
 func DecodeReportMetadata(b []byte) (Report, error) {

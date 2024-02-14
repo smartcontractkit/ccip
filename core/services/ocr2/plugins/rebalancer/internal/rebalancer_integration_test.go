@@ -38,7 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/weth9"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/mock_l2_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/mock_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/cltest/heavyweight"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
@@ -60,7 +60,7 @@ var (
 )
 
 func TestRebalancer_Integration(t *testing.T) {
-	newTestUniverse(t, 3)
+	newTestUniverse(t, 2)
 }
 
 type ocr3Node struct {
@@ -76,7 +76,7 @@ type onchainUniverse struct {
 	wethToken       *weth9.WETH9
 	lockReleasePool *lock_release_token_pool.LockReleaseTokenPool
 	rebalancer      *rebalancer.Rebalancer
-	bridgeAdapter   *mock_l2_bridge_adapter.MockL2BridgeAdapter
+	bridgeAdapter   *mock_l1_bridge_adapter.MockL1BridgeAdapter
 }
 
 func setupNodeOCR3(
@@ -401,19 +401,19 @@ func waitForTransmissions(
 	universes map[int64]onchainUniverse,
 ) {
 	start := uint64(1)
-	transmittedSink := make(chan *rebalancer.RebalancerTransmitted)
-	ltSink := make(chan *rebalancer.RebalancerLiquidityTransferred)
+	erc20FinalizedSink := make(chan *mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized)
+	erc20SentSink := make(chan *mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent)
 	var subs []event.Subscription
 	for _, uni := range universes {
-		sub, err := uni.rebalancer.WatchTransmitted(&bind.WatchOpts{
+		sub, err := uni.bridgeAdapter.WatchMockERC20Finalized(&bind.WatchOpts{
 			Start: &start,
-		}, transmittedSink)
+		}, erc20FinalizedSink, nil, nil, nil)
 		require.NoError(t, err, "failed to create subscription")
 		subs = append(subs, sub)
 
-		sub, err = uni.rebalancer.WatchLiquidityTransferred(&bind.WatchOpts{
+		sub, err = uni.bridgeAdapter.WatchMockERC20Sent(&bind.WatchOpts{
 			Start: &start,
-		}, ltSink, nil, nil, nil)
+		}, erc20SentSink, nil, nil, nil)
 		require.NoError(t, err, "failed to create subscription")
 		subs = append(subs, sub)
 	}
@@ -423,15 +423,23 @@ func waitForTransmissions(
 		}
 	}()
 	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	sentEvents := map[string]struct{}{}
 outer:
 	for {
 		select {
-		case te := <-transmittedSink:
-			t.Log("got transmission event, config digest:", hexutil.Encode(te.ConfigDigest[:]), "seqNr:", te.SequenceNumber)
-			break outer
-		case lt := <-ltSink:
-			t.Log("got liquidity transferred event, from:", lt.FromChainSelector, "to:", lt.ToChainSelector, "amount:", lt.Amount)
-			break outer
+		case sent := <-erc20SentSink:
+			t.Log("got erc20 sent event, amount:", sent.Amount, "tx hash:", sent.Raw.TxHash, "nonce:", sent.Nonce)
+			sentEvents[sent.Nonce.String()] = struct{}{}
+		case fin := <-erc20FinalizedSink:
+			t.Log("got erc20 finalized event, amount:", fin.Amount, "tx hash:", fin.Raw.TxHash, "nonce:", fin.Nonce)
+			if _, exists := sentEvents[fin.Nonce.String()]; exists {
+				t.Logf("got erc20 finalized event for nonce %s, which was sent", fin.Nonce)
+				break outer
+			} else {
+				// bug otherwise
+				t.Fatalf("got erc20 finalized event for nonce %s, which was not sent", fin.Nonce)
+			}
 		case <-ticker.C:
 			t.Log("waiting for transmission or liquidity transferred event")
 		}
@@ -592,7 +600,7 @@ func createChains(t *testing.T, numChains int) (owner *bind.TransactOpts, chains
 
 	chains[mainChainID] = backends.NewSimulatedBackend(core.GenesisAlloc{
 		owner.From: core.GenesisAccount{
-			Balance: assets.Ether(10000).ToInt(),
+			Balance: assets.Ether(10_000).ToInt(),
 		},
 	}, 30e6)
 
@@ -670,10 +678,10 @@ func deployContracts(
 		require.Equal(t, rebalancerAddr, actualRebalancer)
 
 		// deploy the bridge adapter to point to the weth contract address
-		bridgeAdapterAddress, _, _, err := mock_l2_bridge_adapter.DeployMockL2BridgeAdapter(owner, backend)
+		bridgeAdapterAddress, _, _, err := mock_l1_bridge_adapter.DeployMockL1BridgeAdapter(owner, backend, wethAddress)
 		require.NoError(t, err, "failed to deploy mock l1 bridge adapter")
 		backend.Commit()
-		bridgeAdapter, err := mock_l2_bridge_adapter.NewMockL2BridgeAdapter(bridgeAdapterAddress, backend)
+		bridgeAdapter, err := mock_l1_bridge_adapter.NewMockL1BridgeAdapter(bridgeAdapterAddress, backend)
 		require.NoError(t, err)
 
 		universes[chainID] = onchainUniverse{

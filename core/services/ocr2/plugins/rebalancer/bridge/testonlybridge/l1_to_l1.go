@@ -41,8 +41,6 @@ type testBridge struct {
 	sourceClient     client.Client
 	destClient       client.Client
 	lggr             logger.Logger
-	currSourceBlock  int64
-	currDestBlock    int64
 }
 
 func New(
@@ -149,17 +147,8 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
 	}
 
-	if latestSourceBlock.BlockNumber <= t.currSourceBlock && latestDestBlock.BlockNumber <= t.currDestBlock {
-		t.lggr.Debugw("No new blocks since last poll",
-			"latestBlock", latestSourceBlock.BlockNumber,
-			"currSourceBlock", t.currSourceBlock,
-			"latestDestBlock", latestDestBlock.BlockNumber,
-			"currDestBlock", t.currDestBlock)
-		return nil, nil
-	}
-
 	sourceSendLogs, err := t.sourceLogPoller.LogsWithSigs(
-		t.currSourceBlock,
+		1,
 		latestSourceBlock.BlockNumber,
 		[]common.Hash{MockERC20SentTopic},
 		t.sourceAdapter.Address(),
@@ -170,7 +159,7 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 	}
 
 	destFinalizeLogs, err := t.destLogPoller.LogsWithSigs(
-		t.currDestBlock,
+		1,
 		latestDestBlock.BlockNumber,
 		[]common.Hash{MockERC20FinalizedTopic},
 		t.destAdapter.Address(),
@@ -195,9 +184,6 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		return nil, fmt.Errorf("failed to get ready to finalize: %w", err)
 	}
 
-	t.currDestBlock = latestDestBlock.BlockNumber
-	t.currSourceBlock = latestSourceBlock.BlockNumber
-
 	return t.toPendingTransfers(ready, parsedToLP), nil
 }
 
@@ -208,7 +194,7 @@ func (t *testBridge) toPendingTransfers(
 	var transfers []models.PendingTransfer
 	for _, send := range ready {
 		lp := parsedToLP[logKey{txHash: send.Raw.TxHash, logIdx: int64(send.Raw.Index)}]
-		bridgeData, err := packUint256(send.Amount)
+		bridgeData, err := pack2Uint256(send.Amount, send.Nonce)
 		if err != nil {
 			t.lggr.Errorw("failed to pack bridge data", "err", err)
 			continue
@@ -226,8 +212,14 @@ func (t *testBridge) toPendingTransfers(
 				BridgeData:         bridgeData,
 			},
 			Status: models.TransferStatusReady,
+			ID:     fmt.Sprintf("%s-%d", send.Raw.TxHash.Hex(), send.Raw.Index),
 		})
 	}
+
+	if len(transfers) > 0 {
+		t.lggr.Infow("produced pending transfers", "pendingTransfers", transfers)
+	}
+
 	return transfers
 }
 
@@ -235,6 +227,12 @@ func (t *testBridge) getReadyToFinalize(
 	sends []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent,
 	finalizes []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized,
 ) ([]*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent, error) {
+	t.lggr.Debugw("Getting ready to finalize",
+		"sendsLen", len(sends),
+		"finalizesLen", len(finalizes),
+		"sends", sends,
+		"finalizes", finalizes)
+
 	// sort so that we can easily match the events to each other
 	slices.SortFunc(sends, func(a, b *mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent) int {
 		return intComparator(a.Raw.BlockNumber, b.Raw.BlockNumber)
@@ -246,8 +244,14 @@ func (t *testBridge) getReadyToFinalize(
 	// anything that has been mined but has not been already finalized is eligible
 	var ready []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent
 	if len(sends) > len(finalizes) {
-		t.lggr.Infow("New sends, marking ready to finalize", "sends", len(sends), "finalizes", len(finalizes))
 		ready = sends[len(finalizes):]
+		t.lggr.Infow("New sends, marking ready to finalize",
+			"sendsLen", len(sends),
+			"finalizesLen", len(finalizes),
+			"sends", sends,
+			"finalizes", finalizes,
+			"ready", ready,
+			"readyLen", len(ready))
 	} else if len(sends) < len(finalizes) {
 		// should be impossible
 		t.lggr.Criticalw("more finalizes than sends, should be impossible", "sends", len(sends), "finalizes", len(finalizes))
@@ -262,13 +266,13 @@ func (t *testBridge) getReadyToFinalize(
 }
 
 func (t *testBridge) parseFinalizedLogs(logs []logpoller.Log) ([]*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized, error) {
-	parsedFinalizeLogs := make([]*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized, len(logs))
-	for i, log := range logs {
+	var parsedFinalizeLogs []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized
+	for _, log := range logs {
 		finalizeLog, err := t.destAdapter.ParseMockERC20Finalized(log.ToGethLog())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse finalize log: %w", err)
 		}
-		parsedFinalizeLogs[i] = finalizeLog
+		parsedFinalizeLogs = append(parsedFinalizeLogs, finalizeLog)
 	}
 	return parsedFinalizeLogs, nil
 }
@@ -283,7 +287,7 @@ func (t *testBridge) parseSendLogs(logs []logpoller.Log) (
 	map[logKey]logpoller.Log,
 	error,
 ) {
-	parsedSendLogs := make([]*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent, len(logs))
+	var parsedSendLogs []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent
 	parsedToLP := make(map[logKey]logpoller.Log)
 	for _, log := range logs {
 		sendLog, err := t.sourceAdapter.ParseMockERC20Sent(log.ToGethLog())
@@ -314,6 +318,10 @@ func intComparator[T constraints.Integer](a, b T) int {
 	} else {
 		return 0
 	}
+}
+
+func pack2Uint256(val1, val2 *big.Int) ([]byte, error) {
+	return utils.ABIEncode(`[{"type": "uint256"}, {"type": "uint256"}]`, val1, val2)
 }
 
 func packUint256(val *big.Int) ([]byte, error) {

@@ -134,7 +134,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("decode observation: %w", err)
 		}
-		lggr.Debugw("decoded observation", "observation", obs)
+		lggr.Debugw("decoded observation", "observation", obs, "oracleID", encodedObs.Observer)
 		observations = append(observations, obs)
 	}
 
@@ -156,8 +156,13 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		return nil, fmt.Errorf("compute resolved transfers quorum: %w", err)
 	}
 
-	lggr.Infow("computing transfers to reach balance", "pendingTransfers", pendingTransfers, "liquidityGraph", g)
-	proposedTransfers, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, pendingTransfers)
+	lggr.Infow("computing transfers to reach balance",
+		"pendingTransfers", pendingTransfers,
+		"liquidityGraph", g,
+		"resolvedTransfersQuorum", resolvedTransfersQuorum,
+	)
+	inflightTransfers := append(pendingTransfers, toPending(resolvedTransfersQuorum)...)
+	proposedTransfers, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, inflightTransfers)
 	if err != nil {
 		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
 	}
@@ -184,23 +189,27 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
-	// group transfers by source chain
-	// get both resolved and any pending transfers that are ready to finalize or execute onchain.
-	transfersBySourceNet := make(map[models.NetworkSelector][]models.Transfer)
-	for _, resolvedTransfer := range decodedOutcome.ResolvedTransfers {
-		transfersBySourceNet[resolvedTransfer.From] = append(transfersBySourceNet[resolvedTransfer.From], resolvedTransfer)
-	}
-	for _, pendingTransfer := range decodedOutcome.PendingTransfers {
-		if pendingTransfer.Status == models.TransferStatusReady || pendingTransfer.Status == models.TransferStatusFinalized {
-			transfersBySourceNet[pendingTransfer.From] = append(
-				transfersBySourceNet[pendingTransfer.From],
-				pendingTransfer.Transfer,
-			)
+	// get all incoming and outgoing transfers for each network
+	// incoming transfers will need to be finalized
+	// outgoing transfers will need to be executed
+	incomingAndOutgoing := make(map[models.NetworkSelector][]models.Transfer)
+	for _, networkID := range p.rebalancerGraph.GetNetworks() {
+		for _, outgoing := range decodedOutcome.ResolvedTransfers {
+			if outgoing.From == networkID {
+				incomingAndOutgoing[networkID] = append(incomingAndOutgoing[networkID], outgoing)
+			}
+		}
+		for _, incoming := range decodedOutcome.PendingTransfers {
+			if incoming.To == networkID &&
+				(incoming.Status == models.TransferStatusReady ||
+					incoming.Status == models.TransferStatusFinalized) {
+				incomingAndOutgoing[networkID] = append(incomingAndOutgoing[networkID], incoming.Transfer)
+			}
 		}
 	}
 
-	lggr.Debugw("grouped transfers by source chain",
-		"transfersBySourceNet", transfersBySourceNet,
+	lggr.Debugw("got incoming and outgoing transfers",
+		"incomingAndOutgoing", incomingAndOutgoing,
 		"resolvedTransfers", decodedOutcome.ResolvedTransfers,
 		"pendingTransfers", decodedOutcome.PendingTransfers,
 		"proposedTransfers", decodedOutcome.ProposedTransfers,
@@ -209,13 +218,13 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	var reports []ocr3types.ReportWithInfo[models.Report]
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	for sourceNet, transfers := range transfersBySourceNet {
-		lmAddress, err := p.rebalancerGraph.GetRebalancerAddress(sourceNet)
+	for networkID, transfers := range incomingAndOutgoing {
+		lmAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
 		if err != nil {
-			return nil, fmt.Errorf("liquidity manager for %v does not exist", sourceNet)
+			return nil, fmt.Errorf("liquidity manager for %v does not exist", networkID)
 		}
 
-		rebalancer, err := p.liquidityManagerFactory.NewRebalancer(sourceNet, lmAddress)
+		rebalancer, err := p.liquidityManagerFactory.NewRebalancer(networkID, lmAddress)
 		if err != nil {
 			return nil, fmt.Errorf("init liquidity manager: %w", err)
 		}
@@ -226,14 +235,14 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 			return nil, fmt.Errorf("get config digest: %w", err)
 		}
 
-		reportMeta := models.NewReport(transfers, lmAddress, sourceNet, configDigest)
-		encoded, err := reportMeta.OnchainEncode()
+		report := models.NewReport(transfers, lmAddress, networkID, configDigest)
+		encoded, err := report.OnchainEncode()
 		if err != nil {
 			return nil, fmt.Errorf("encode report metadata for onchain usage: %w", err)
 		}
 		reports = append(reports, ocr3types.ReportWithInfo[models.Report]{
 			Report: encoded,
-			Info:   reportMeta,
+			Info:   report,
 		})
 	}
 
@@ -242,14 +251,15 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.Report]) (bool, error) {
-	p.lggr.Infow("in should accept attested report", "seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report))
+	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report))
+	lggr.Infow("in should accept attested report")
 
 	report, instructions, err := models.DecodeReport(p.rootNetwork, p.rootAddress, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("failed to decode report: %w", err)
 	}
 
-	p.lggr.Infow("accepting report",
+	lggr.Infow("accepting report",
 		"transfers", len(report.Transfers),
 		"sendInstructions", instructions.SendLiquidityParams,
 		"receiveInstructions", instructions.ReceiveLiquidityParams)
@@ -259,17 +269,29 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.Report]) (bool, error) {
-	p.lggr.Infow("in should transmit accepted report", "seqNr", seqNr, "reportMeta", r.Info)
+	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report))
+	lggr.Infow("in should transmit accepted report")
 
-	newPendingTransfers := make([]models.PendingTransfer, 0, len(r.Info.Transfers))
-	for _, tr := range r.Info.Transfers {
-		if p.pendingTransfers.ContainsTransfer(tr) {
-			return false, nil
-		}
-		newPendingTransfers = append(newPendingTransfers, models.NewPendingTransfer(tr))
+	report, instructions, err := models.DecodeReport(p.rootNetwork, p.rootAddress, r.Report)
+	if err != nil {
+		return false, fmt.Errorf("failed to decode report: %w", err)
 	}
 
-	p.pendingTransfers.Add(newPendingTransfers)
+	lggr.Infow("should transmit accepted report",
+		"transfers", len(report.Transfers),
+		"sendInstructions", instructions.SendLiquidityParams,
+		"receiveInstructions", instructions.ReceiveLiquidityParams)
+
+	// newPendingTransfers := make([]models.PendingTransfer, 0, len(r.Info.Transfers))
+	// for _, tr := range r.Info.Transfers {
+	// 	if p.pendingTransfers.ContainsTransfer(tr) {
+	// 		return false, nil
+	// 	}
+	// 	newPendingTransfers = append(newPendingTransfers, models.NewPendingTransfer(tr))
+	// }
+
+	// p.pendingTransfers.Add(newPendingTransfers)
+
 	return true, nil
 }
 
@@ -653,4 +675,12 @@ func bigIntSortedMiddle(vals []*big.Int) *big.Int {
 		return valsCopy[i].Cmp(valsCopy[j]) == -1
 	})
 	return valsCopy[len(valsCopy)/2]
+}
+
+func toPending(ts []models.Transfer) []models.PendingTransfer {
+	var pts []models.PendingTransfer
+	for _, t := range ts {
+		pts = append(pts, models.NewPendingTransfer(t))
+	}
+	return pts
 }

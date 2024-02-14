@@ -129,6 +129,7 @@ func (t Transfer) String() string {
 type PendingTransfer struct {
 	Transfer
 	Status TransferStatus
+	ID     string
 }
 
 func (p PendingTransfer) Hash() ([32]byte, error) {
@@ -140,7 +141,7 @@ func (p PendingTransfer) Hash() ([32]byte, error) {
 }
 
 func (p PendingTransfer) String() string {
-	return fmt.Sprintf("PendingTransfer{Transfer: %s, Status: %s}", p.Transfer.String(), p.Status)
+	return fmt.Sprintf("PendingTransfer{ID: %s, Transfer: %s, Status: %s}", p.ID, p.Transfer.String(), p.Status)
 }
 
 func NewPendingTransfer(tr Transfer) PendingTransfer {
