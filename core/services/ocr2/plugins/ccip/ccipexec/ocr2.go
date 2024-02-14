@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcommon"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
@@ -58,6 +59,7 @@ type ExecutionPluginStaticConfig struct {
 	tokenDataWorker          tokendata.Worker
 	destChainSelector        uint64
 	priceRegistryProvider    ccipdataprovider.PriceRegistry
+	tokenPoolBatchedReader   batchreader.TokenPoolBatchedReader
 	metricsCollector         ccip.PluginMetricsCollector
 }
 
@@ -74,11 +76,12 @@ type ExecutionReportingPlugin struct {
 	sourceWrappedNativeToken common.Address
 	onRampReader             ccipdata.OnRampReader
 	// Dest
-	commitStoreReader ccipdata.CommitStoreReader
-	destPriceRegistry ccipdata.PriceRegistryReader
-	destWrappedNative common.Address
-	onchainConfig     ccipdata.ExecOnchainConfig
-	offRampReader     ccipdata.OffRampReader
+	commitStoreReader      ccipdata.CommitStoreReader
+	destPriceRegistry      ccipdata.PriceRegistryReader
+	destWrappedNative      common.Address
+	onchainConfig          ccipdata.ExecOnchainConfig
+	offRampReader          ccipdata.OffRampReader
+	tokenPoolBatchedReader batchreader.TokenPoolBatchedReader
 	// State
 	inflightReports *inflightExecReportsContainer
 	snoozedRoots    cache.SnoozedRoots
@@ -240,7 +243,7 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 
 	dstTokenToPool := make(map[common.Address]common.Address)
 	dstPoolToToken := make(map[common.Address]common.Address)
-	dstPools := make([]common.Address, 0)
+	dstPoolAddresses := make([]common.Address, 0)
 
 	for _, msg := range commitReports {
 		for _, req := range msg.sendRequestsWithMeta {
@@ -268,12 +271,12 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 
 				dstTokenToPool[dstToken] = poolAddress
 				dstPoolToToken[poolAddress] = dstToken
-				dstPools = append(dstPools, poolAddress)
+				dstPoolAddresses = append(dstPoolAddresses, poolAddress)
 			}
 		}
 	}
 
-	rateLimits, err := r.offRampReader.GetTokenPoolsRateLimits(ctx, dstPools)
+	rateLimits, err := r.tokenPoolBatchedReader.GetInboundTokenPoolRateLimits(ctx, dstPoolAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("fetch pool rate limits: %w", err)
 	}
@@ -285,9 +288,9 @@ func (r *ExecutionReportingPlugin) destPoolRateLimits(ctx context.Context, commi
 			continue
 		}
 
-		tokenAddr, exists := dstPoolToToken[dstPools[i]]
+		tokenAddr, exists := dstPoolToToken[dstPoolAddresses[i]]
 		if !exists {
-			return nil, fmt.Errorf("pool to token mapping does not contain %s", dstPools[i])
+			return nil, fmt.Errorf("pool to token mapping does not contain %s", dstPoolAddresses[i])
 		}
 		res[tokenAddr] = rateLimit.Tokens
 	}
@@ -701,14 +704,14 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	}
 	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
-	sendReqsInRoot, leaves, tree, err := getProofData(ctx, r.onRampReader, commitReport.Interval)
+	sendReqsInRoot, _, tree, err := getProofData(ctx, r.onRampReader, commitReport.Interval)
 	if err != nil {
 		return nil, err
 	}
 
 	// cap messages which fits MaxExecutionReportLength (after serialized)
 	capped := sort.Search(len(observedMessages), func(i int) bool {
-		report, err2 := buildExecutionReportForMessages(sendReqsInRoot, leaves, tree, commitReport.Interval, observedMessages[:i+1])
+		report, err2 := buildExecutionReportForMessages(sendReqsInRoot, tree, commitReport.Interval, observedMessages[:i+1])
 		if err2 != nil {
 			r.lggr.Errorw("build execution report", "err", err2)
 			return false
@@ -721,11 +724,8 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 		}
 		return len(encoded) > MaxExecutionReportLength
 	})
-	if err != nil {
-		return nil, err
-	}
 
-	execReport, err := buildExecutionReportForMessages(sendReqsInRoot, leaves, tree, commitReport.Interval, observedMessages[:capped])
+	execReport, err := buildExecutionReportForMessages(sendReqsInRoot, tree, commitReport.Interval, observedMessages[:capped])
 	if err != nil {
 		return nil, err
 	}

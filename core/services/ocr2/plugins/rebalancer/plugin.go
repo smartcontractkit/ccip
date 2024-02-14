@@ -128,6 +128,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 	lggr := p.lggr.With("seqNr", outctx.SeqNr)
 	lggr.Infow("in outcome", "seqNr", outctx.SeqNr, "numObs", len(aos))
 
+	// Gather all the observations.
 	observations := make([]models.Observation, 0, len(aos))
 	for _, encodedObs := range aos {
 		obs, err := models.DecodeObservation(encodedObs.Observation)
@@ -138,6 +139,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		observations = append(observations, obs)
 	}
 
+	// Come to a consensus based on the observations of all the different nodes.
 	medianLiquidityPerChain := p.computeMedianLiquidityPerChain(observations)
 	graphEdges := p.computeGraphEdgesConsensus(observations)
 	pendingTransfers, err := p.computePendingTransfersConsensus(observations)
