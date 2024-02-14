@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal"
@@ -14,17 +15,14 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/merklemulti"
 )
 
-func getProofData(
-	ctx context.Context,
-	sourceReader ccipdata.OnRampReader,
-	interval ccipdata.CommitStoreInterval,
-) (sendReqsInRoot []ccipdata.Event[internal.EVM2EVMMessage], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
+func getProofData(ctx context.Context, lggr logger.Logger, sourceReader ccipdata.OnRampReader, interval ccipdata.CommitStoreInterval) (sendReqsInRoot []ccipdata.Event[internal.EVM2EVMMessage], leaves [][32]byte, tree *merklemulti.Tree[[32]byte], err error) {
 	// We don't need to double-check if logs are finalized because we already checked that in the Commit phase.
 	sendReqs, err := sourceReader.GetSendRequestsBetweenSeqNums(ctx, interval.Min, interval.Max, false)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
+	lggr.Infow("GetSendRequestsBetweenSeqNums - getProofData", "min", interval.Min, "max", interval.Max, "length", len(sendReqs))
 	if err1 := validateSendRequests(sendReqs, interval); err1 != nil {
 		return nil, nil, nil, err1
 	}

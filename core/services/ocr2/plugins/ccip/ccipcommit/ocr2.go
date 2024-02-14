@@ -159,6 +159,7 @@ func (r *CommitReportingPlugin) calculateMinMaxSequenceNumbers(ctx context.Conte
 	if err != nil {
 		return 0, 0, []common.Hash{}, err
 	}
+	lggr.Infow("GetSendRequestsBetweenSeqNums - calcMinMax", "min", nextInflightMin, "max", nextInflightMin+OnRampMessagesScanLimit, "length", len(msgRequests))
 	if len(msgRequests) == 0 {
 		lggr.Infow("No new requests", "minSeqNr", nextInflightMin)
 		return 0, 0, []common.Hash{}, nil
@@ -615,6 +616,8 @@ func (r *CommitReportingPlugin) buildReport(ctx context.Context, lggr logger.Log
 	if err != nil {
 		return ccipdata.CommitStoreReport{}, err
 	}
+	lggr.Infow("GetSendRequestsBetweenSeqNums - Commit", "min", interval.Min, "max", interval.Max, "length", len(sendRequests))
+
 	if len(sendRequests) == 0 {
 		lggr.Warn("No messages found in interval",
 			"minSeqNr", interval.Min,

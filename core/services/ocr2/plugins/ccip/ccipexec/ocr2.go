@@ -628,6 +628,8 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 		if err != nil {
 			return err
 		}
+		r.lggr.Infow("GetSendRequestsBetweenSeqNums - calcMinMax", "min", intervalMin, "max", intervalMax, "length", len(sendReqs))
+
 		sendRequests = sendReqs
 		return nil
 	})
@@ -704,7 +706,7 @@ func (r *ExecutionReportingPlugin) buildReport(ctx context.Context, lggr logger.
 	}
 	lggr.Infow("Building execution report", "observations", observedMessages, "merkleRoot", hexutil.Encode(commitReport.MerkleRoot[:]), "report", commitReport)
 
-	sendReqsInRoot, _, tree, err := getProofData(ctx, r.onRampReader, commitReport.Interval)
+	sendReqsInRoot, _, tree, err := getProofData(ctx, r.lggr, r.onRampReader, commitReport.Interval)
 	if err != nil {
 		return nil, err
 	}
