@@ -156,24 +156,6 @@ func Test_L2ToL1Bridge_GetBridgePayloadAndFee(t *testing.T) {
 	require.Equal(t, big.NewInt(0), fee)
 }
 
-func Test_L2ToL1Bridge_RemoteChainSelector(t *testing.T) {
-	sepoliaSelector := mustGetChainByID(t, sepoliaChainID).Selector
-	bridge := &l2ToL1Bridge{
-		remoteSelector: models.NetworkSelector(sepoliaSelector),
-	}
-	selector := bridge.RemoteChainSelector()
-	require.Equal(t, models.NetworkSelector(sepoliaSelector), selector)
-}
-
-func Test_L2ToL1Bridge_LocalChainSelector(t *testing.T) {
-	arbSelector := mustGetChainByID(t, arbSepolia).Selector
-	bridge := &l2ToL1Bridge{
-		localSelector: models.NetworkSelector(arbSelector),
-	}
-	selector := bridge.LocalChainSelector()
-	require.Equal(t, models.NetworkSelector(arbSelector), selector)
-}
-
 func Test_L2ToL1Bridge_unpackFinalizeInboundTransfer(t *testing.T) {
 	// Example from a real transaction:
 	// https://sepolia.arbiscan.io/tx/0x12012fdc48132435be2821b6f6fa0b7da5acb7872934620d4221efc60bfe0e4d#eventlog
