@@ -79,3 +79,8 @@ func (e *EvmRebalancer) GetTokenAddress(ctx context.Context) (models.Address, er
 	})
 	return models.Address(tokenAddress), err
 }
+
+func (e *EvmRebalancer) GetLatestSequenceNumber(ctx context.Context) (uint64, error) {
+	cdae, err := e.rebalancer.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
+	return cdae.SequenceNumber, err
+}

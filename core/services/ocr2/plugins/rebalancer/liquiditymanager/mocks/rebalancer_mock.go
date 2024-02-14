@@ -96,6 +96,34 @@ func (_m *Rebalancer) GetBalance(ctx context.Context) (*big.Int, error) {
 	return r0, r1
 }
 
+// GetLatestSequenceNumber provides a mock function with given fields: ctx
+func (_m *Rebalancer) GetLatestSequenceNumber(ctx context.Context) (uint64, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetLatestSequenceNumber")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (uint64, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) uint64); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRebalancers provides a mock function with given fields: ctx
 func (_m *Rebalancer) GetRebalancers(ctx context.Context) (map[models.NetworkSelector]models.Address, error) {
 	ret := _m.Called(ctx)

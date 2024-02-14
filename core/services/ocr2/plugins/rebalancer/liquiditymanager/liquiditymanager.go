@@ -27,4 +27,7 @@ type Rebalancer interface {
 
 	// GetTokenAddress returns the token address of the rebalancer.
 	GetTokenAddress(ctx context.Context) (models.Address, error)
+
+	// GetLatestSequenceNumber returns the latest sequence number of the rebalancer.
+	GetLatestSequenceNumber(ctx context.Context) (uint64, error)
 }

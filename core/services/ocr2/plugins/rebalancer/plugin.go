@@ -274,25 +274,33 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64,
 	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report))
 	lggr.Infow("in should transmit accepted report")
 
-	report, instructions, err := models.DecodeReport(p.rootNetwork, p.rootAddress, r.Report)
+	report, instructions, err := models.DecodeReport(r.Info.NetworkID, r.Info.LiquidityManagerAddress, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("failed to decode report: %w", err)
 	}
 
-	lggr.Infow("should transmit accepted report",
+	lggr.Infow("in should transmit accepted report",
 		"transfers", len(report.Transfers),
 		"sendInstructions", instructions.SendLiquidityParams,
 		"receiveInstructions", instructions.ReceiveLiquidityParams)
 
-	// newPendingTransfers := make([]models.PendingTransfer, 0, len(r.Info.Transfers))
-	// for _, tr := range r.Info.Transfers {
-	// 	if p.pendingTransfers.ContainsTransfer(tr) {
-	// 		return false, nil
-	// 	}
-	// 	newPendingTransfers = append(newPendingTransfers, models.NewPendingTransfer(tr))
-	// }
+	rebalancer, err := p.liquidityManagerFactory.NewRebalancer(r.Info.NetworkID, r.Info.LiquidityManagerAddress)
+	if err != nil {
+		return false, fmt.Errorf("init liquidity manager: %w", err)
+	}
 
-	// p.pendingTransfers.Add(newPendingTransfers)
+	// check sequence number to see if its already transmitted onchain
+	latestSeqNr, err := rebalancer.GetLatestSequenceNumber(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get latest sequence number: %w", err)
+	}
+
+	if latestSeqNr >= seqNr {
+		lggr.Debugw("report already transmitted onchain, returning false", "latestSeqNr", latestSeqNr)
+		return false, nil
+	}
+
+	lggr.Infow("transmitting accepted report", "latestSeqNr", latestSeqNr)
 
 	return true, nil
 }
@@ -325,7 +333,6 @@ func (p *Plugin) Close() error {
 	return multierr.Combine(errs...)
 }
 
-// todo: consider placing the graph exploration logic under graph package to keep the plugin logic cleaner
 func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -520,6 +527,7 @@ func (p *Plugin) computeMedianGraph(
 func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observation) ([]models.Transfer, error) {
 	// assumption: there shouldn't be more than 1 transfer for a (from, to) pair from a single oracle's observation.
 	// otherwise they can be collapsed into a single transfer.
+	// TODO: we can check for this in ValidateObservation
 	type key struct {
 		From               models.NetworkSelector
 		To                 models.NetworkSelector
