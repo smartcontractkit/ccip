@@ -28,6 +28,10 @@ Data = """
           "Optimism Mainnet": {
             "on_ramp": "0xC09b72E8128620C40D89649019d995Cc79f030C3",
             "deployed_at": 11111111
+          },
+          "Polygon Mainnet": {
+            "on_ramp": "0x122F05F49e90508F089eE8D0d868d1a4f3E5a809",
+            "deployed_at": 11111111
           }
         },
         "dest_contracts": {
@@ -49,6 +53,11 @@ Data = """
           "Optimism Mainnet": {
             "off_ramp": "0xeeed4D86F3E0e6d32A6Ad29d8De6A0Dc91963A5f",
             "commit_store": "0xbbB563c4d98020b9c0f3Cc34c2C0Ef9676806E35",
+            "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
+          },
+          "Polygon Mainnet": {
+            "off_ramp": "0x9bDA7c8DCda4E39aFeB483cc0B7E3C1f6E0D5AB1",
+            "commit_store": "0x63a0AeaadAe851b990bBD9dc41f5C1B08b32026d",
             "receiver_dapp": "0x1A2A69e3eB1382FE34Bc579AdD5Bae39e31d4A2c"
           }
         }
@@ -363,6 +372,10 @@ Data = """
         "price_registry": "0x30D873664Ba766C983984C7AF9A921ccE36D34e1",
         "wrapped_native": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
         "src_contracts": {
+          "Arbitrum Mainnet" : {
+            "on_ramp": "0xD16D025330Edb91259EEA8ed499daCd39087c295",
+            "deployed_at": 11111111
+          },
           "Avalanche Mainnet": {
             "on_ramp": "0x5FA30697e90eB30954895c45b028F7C0dDD39b12",
             "deployed_at": 11111111
@@ -381,6 +394,11 @@ Data = """
           }
         },
         "dest_contracts": {
+          "Arbitrum Mainnet" : {
+            "off_ramp": "0xa8a9eDa2867c2E0CE0d5ECe273961F1EcC3CC25B",
+            "commit_store": "0xbD4480658dca8496a65046dfD1BDD44EF897Bdb5",
+            "receiver_dapp": "0xAFa2c441a83bBCEDc2E8c5c6f66248aFD8b9af3d"
+          },
           "Avalanche Mainnet": {
             "off_ramp": "0xB9e3680639c9F0C4e0b02FD81C445094426244Ae",
             "commit_store": "0x8c63d4e67f7c4af6FEd2f56A34fB4e01CB807CFF",
@@ -440,10 +458,23 @@ Data = """
 
 """
 
+[CCIP.Env.Network]
+selected_networks = [
+  'ETHEREUM_MAINNET',
+  'ARBITRUM_MAINNET',
+  'BASE_MAINNET',
+  'WEMIX_MAINNET',
+  'OPTIMISM_MAINNET',
+  'POLYGON_MAINNET',
+  'AVALANCHE_MAINNET',
+  'BSC_MAINNET',
+  'KROMA_MAINNET'
+  ]
+
 [CCIP.Groups.load]
 NetworkPairs = [
-  'ETHEREUM_MAINNET,BASE_MAINNET',
   'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
+  'ETHEREUM_MAINNET,BASE_MAINNET',
   'ETHEREUM_MAINNET,WEMIX_MAINNET',
   'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
   'ETHEREUM_MAINNET,POLYGON_MAINNET',
@@ -459,12 +490,15 @@ NetworkPairs = [
   'BASE_MAINNET,OPTIMISM_MAINNET',
   'AVALANCHE_MAINNET,BSC_MAINNET',
   'BASE_MAINNET,BSC_MAINNET',
+  'POLYGON_MAINNET,ARBITRUM_MAINNET',
+  'BSC_MAINNET,ARBITRUM_MAINNET',
+  'ARBITRUM_MAINNET,OPTIMISM_MAINNET'
 ]
 MsgType = 'WithoutToken'
 DestGasLimit = 0
 BiDirectionalLane = true
 PhaseTimeout = '50m'
-TestDuration = '48h'
+TestDuration = '12h'
 ExistingDeployment = true
 RequestPerUnitTime = [1]
 TimeUnit = '1h'
@@ -476,24 +510,26 @@ ExistingEnv = 'mainnet-2.7-ccip1.2'
 [CCIP.Groups.smoke]
 MsgType = 'WithoutToken'
 NetworkPairs = [
-  'ETHEREUM_MAINNET,BASE_MAINNET',
-  'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
-  'ETHEREUM_MAINNET,WEMIX_MAINNET',
-  'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
-  'ETHEREUM_MAINNET,POLYGON_MAINNET',
-  'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
-  'ETHEREUM_MAINNET,BSC_MAINNET',
-  'ARBITRUM_MAINNET,BSC_MAINNET',
-  'ARBITRUM_MAINNET,OPTIMISM_MAINNET',
   'BASE_MAINNET,ARBITRUM_MAINNET',
-  'WEMIX_MAINNET,KROMA_MAINNET',
-  'OPTIMISM_MAINNET,POLYGON_MAINNET',
+  'ETHEREUM_MAINNET,OPTIMISM_MAINNET',
+  'ETHEREUM_MAINNET,AVALANCHE_MAINNET',
+  'ETHEREUM_MAINNET,POLYGON_MAINNET',
   'AVALANCHE_MAINNET,POLYGON_MAINNET',
-  'BSC_MAINNET,POLYGON_MAINNET',
+  'ETHEREUM_MAINNET,BSC_MAINNET',
+  'ETHEREUM_MAINNET,ARBITRUM_MAINNET',
+  'ETHEREUM_MAINNET,BASE_MAINNET',
   'BASE_MAINNET,OPTIMISM_MAINNET',
   'AVALANCHE_MAINNET,BSC_MAINNET',
+  'BSC_MAINNET,POLYGON_MAINNET',
+  'OPTIMISM_MAINNET,POLYGON_MAINNET',
   'BASE_MAINNET,BSC_MAINNET',
+  'ETHEREUM_MAINNET,WEMIX_MAINNET',
+  'WEMIX_MAINNET,KROMA_MAINNET',
+  'POLYGON_MAINNET,ARBITRUM_MAINNET',
+  'ARBITRUM_MAINNET,BSC_MAINNET',
+  'ARBITRUM_MAINNET,OPTIMISM_MAINNET'
 ]
+
 BiDirectionalLane = true
 DestGasLimit = 0
 PhaseTimeout = '50m'
