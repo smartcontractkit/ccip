@@ -49,11 +49,6 @@ func NewPluginFactory(
 
 func (p PluginFactory) buildRebalancer() (liquidityrebalancer.Rebalancer, error) {
 	switch p.config.RebalancerConfig.Type {
-	case models.RebalancerTypeRandom:
-		return liquidityrebalancer.NewRandomRebalancer(
-			p.config.RebalancerConfig.RandomRebalancerConfig.MaxNumTransfers,
-			p.config.RebalancerConfig.RandomRebalancerConfig.CheckSourceDestEqual,
-			p.lggr), nil
 	case models.RebalancerTypePingPong:
 		return liquidityrebalancer.NewPingPong(), nil
 	default:
