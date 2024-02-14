@@ -132,24 +132,6 @@ func (_m *MockGasPriceEstimatorCommit) Median(gasPrices []*big.Int) (*big.Int, e
 	return r0, r1
 }
 
-// String provides a mock function with given fields: p
-func (_m *MockGasPriceEstimatorCommit) String(p *big.Int) string {
-	ret := _m.Called(p)
-
-	if len(ret) == 0 {
-		panic("no return value specified for String")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func(*big.Int) string); ok {
-		r0 = rf(p)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
 // NewMockGasPriceEstimatorCommit creates a new instance of MockGasPriceEstimatorCommit. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockGasPriceEstimatorCommit(t interface {

@@ -318,36 +318,6 @@ func (_m *OffRampReader) GetStaticConfig(ctx context.Context) (cciptypes.OffRamp
 	return r0, r1
 }
 
-// GetTokenPoolsRateLimits provides a mock function with given fields: ctx, poolAddresses
-func (_m *OffRampReader) GetTokenPoolsRateLimits(ctx context.Context, poolAddresses []cciptypes.Address) ([]cciptypes.TokenBucketRateLimit, error) {
-	ret := _m.Called(ctx, poolAddresses)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetTokenPoolsRateLimits")
-	}
-
-	var r0 []cciptypes.TokenBucketRateLimit
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []cciptypes.Address) ([]cciptypes.TokenBucketRateLimit, error)); ok {
-		return rf(ctx, poolAddresses)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, []cciptypes.Address) []cciptypes.TokenBucketRateLimit); ok {
-		r0 = rf(ctx, poolAddresses)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]cciptypes.TokenBucketRateLimit)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, []cciptypes.Address) error); ok {
-		r1 = rf(ctx, poolAddresses)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetTokens provides a mock function with given fields: ctx
 func (_m *OffRampReader) GetTokens(ctx context.Context) (cciptypes.OffRampTokens, error) {
 	ret := _m.Called(ctx)
