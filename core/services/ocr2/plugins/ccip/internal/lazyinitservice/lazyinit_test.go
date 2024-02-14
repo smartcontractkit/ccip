@@ -13,8 +13,8 @@ import (
 
 var errInit = errors.New("boom")
 
-var dummyStartError = errors.New("dummy start error")
-var dummyCloseError = errors.New("dummy close error")
+var errDummyStart = errors.New("dummy start error")
+var errDummyClose = errors.New("dummy close error")
 
 type dummyService struct {
 	startError     error
@@ -152,7 +152,7 @@ func TestLazyInitService_FaultyInitFunction(t *testing.T) {
 
 func TestLazyInitService_ReportStartErrors(t *testing.T) {
 	dummy := newDummyService()
-	dummy.startError = dummyStartError
+	dummy.startError = errDummyStart
 
 	var errs []error
 	var wg sync.WaitGroup
@@ -168,12 +168,12 @@ func TestLazyInitService_ReportStartErrors(t *testing.T) {
 	require.NoError(t, s.Start(context.Background()))
 	wg.Wait()
 	require.Equal(t, 1, len(errs))
-	require.Equal(t, dummyStartError, errs[0])
+	require.Equal(t, errDummyStart, errs[0])
 }
 
 func TestLazyInitService_ReportCloseErrors(t *testing.T) {
 	dummy := newDummyService()
-	dummy.closeError = dummyCloseError
+	dummy.closeError = errDummyClose
 
 	s := New(func(context.Context) (job.ServiceCtx, error) {
 		return dummy, nil
@@ -181,5 +181,5 @@ func TestLazyInitService_ReportCloseErrors(t *testing.T) {
 
 	require.NoError(t, s.Start(context.Background()))
 	dummy.AwaitCompleteStart()
-	require.Equal(t, dummyCloseError, s.Close())
+	require.Equal(t, errDummyClose, s.Close())
 }
