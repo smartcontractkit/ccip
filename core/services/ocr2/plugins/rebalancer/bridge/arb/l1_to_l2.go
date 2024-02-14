@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"go.uber.org/multierr"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
@@ -115,7 +116,7 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("failed to instantiate L1 bridge adapter at %s: %w", l1BridgeAdapterAddress, err)
 	}
 
-	l1FilterName := fmt.Sprintf("ArbitrumL1ToL2Bridge-%s", l1BridgeAdapterAddress.String())
+	l1FilterName := fmt.Sprintf("ArbitrumL1ToL2Bridge-%s-%s-%s", l1BridgeAdapterAddress.String(), localChain.Name, remoteChain.Name)
 	err = l1LogPoller.RegisterFilter(logpoller.Filter{
 		Addresses: []common.Address{l1BridgeAdapterAddress},
 		Name:      l1FilterName,
@@ -156,7 +157,7 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("failed to get counterpart gateway for gateway %s: %w", l1TokenGateway, err)
 	}
 
-	l2FilterName := "ArbitrumL2ToL1Bridge-L2Events"
+	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2Events-%s-%s", localChain.Name, remoteChain.Name)
 	err = l2LogPoller.RegisterFilter(logpoller.Filter{
 		Addresses: []common.Address{
 			l2Gateway,           // emits DepositFinalized
@@ -545,7 +546,7 @@ func (l *l1ToL2Bridge) parseLiquidityTransferred(lgs []logpoller.Log) ([]*rebala
 }
 
 func (l *l1ToL2Bridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) {
-	// TODO: decode and take top n-f index after sorting asc gasLimit/maxSubmissionCost/maxFeePerGas
+	// TODO: decode and take top n-f index after decoding and sorting asc gasLimit/maxSubmissionCost/maxFeePerGas
 	return payloads[0], nil
 }
 
@@ -732,16 +733,10 @@ func (l *l1ToL2Bridge) estimateMaxFeePerGasOnL2(ctx context.Context) (*big.Int, 
 }
 
 func (l *l1ToL2Bridge) Close(ctx context.Context) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (l *l1ToL2Bridge) LocalChainSelector() models.NetworkSelector {
-	return l.localSelector
-}
-
-func (l *l1ToL2Bridge) RemoteChainSelector() models.NetworkSelector {
-	return l.remoteSelector
+	// close log poller filters
+	err := l.l2LogPoller.UnregisterFilter(l.l2FilterName)
+	err2 := l.l1LogPoller.UnregisterFilter(l.l1FilterName)
+	return multierr.Combine(err, err2)
 }
 
 type RetryableData struct {

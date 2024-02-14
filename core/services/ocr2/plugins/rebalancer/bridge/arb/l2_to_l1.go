@@ -204,7 +204,7 @@ func NewL2ToL1Bridge(
 		"l2BridgeAdapter", l2BridgeAdapterAddress,
 		"l1RebalancerAddress", l1RebalancerAddress,
 	)
-	lggr.Infow("successfully initialized arbitrum L2 -> L1 bridge")
+	lggr.Infow("Initialized arbitrum L2 -> L1 bridge")
 
 	// TODO: replay log poller for any missed logs?
 	return &l2ToL1Bridge{
@@ -244,11 +244,6 @@ func (l *l2ToL1Bridge) Close(ctx context.Context) error {
 	err := l.l2LogPoller.UnregisterFilter(l.l2FilterName)
 	err2 := l.l1LogPoller.UnregisterFilter(l.l1FilterName)
 	return multierr.Combine(err, err2)
-}
-
-// RemoteChainSelector implements bridge.Bridge.
-func (l *l2ToL1Bridge) RemoteChainSelector() models.NetworkSelector {
-	return l.remoteSelector
 }
 
 // GetTransfers implements bridge.Bridge.
@@ -696,11 +691,6 @@ func (l *l2ToL1Bridge) parseL2ToL1Transfers(
 		}] = log
 	}
 	return transfers, parsedToLPLog, nil
-}
-
-// LocalChainSelector implements bridge.Bridge.
-func (l *l2ToL1Bridge) LocalChainSelector() models.NetworkSelector {
-	return l.localSelector
 }
 
 type finalizeInboundTransferParams struct {

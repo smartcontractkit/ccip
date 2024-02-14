@@ -43,17 +43,15 @@ type Bridge interface {
 	// Bridge specific payloads for pending transfers are returned by GetTransfers.
 	GetBridgePayloadAndFee(ctx context.Context, transfer models.Transfer) ([]byte, *big.Int, error)
 
+	// QuorumizedBridgePayload returns a single bridge payload given the slice of bridge payloads.
+	// The rebalancer oracles all generate bridge payloads separately, and this function is used to
+	// "collapse" all of them into a single payload in a pure way.
+	// For example, if the bridge payload is a cost parameter, one implementation of this method
+	// could either produce the median of all the costs, or take the maximum cost, or the minimum
+	// cost. The choice of implementation is up to the bridge.
 	QuorumizedBridgePayload(payloads [][]byte) ([]byte, error)
 
 	Close(ctx context.Context) error
-
-	// LocalChainSelector returns the local chain selector of the bridge
-	// This is where tokens are being transferred from
-	LocalChainSelector() models.NetworkSelector
-
-	// RemoteChainSelector returns the destination chain selector of the bridge
-	// This is where tokens are being transferred to
-	RemoteChainSelector() models.NetworkSelector
 }
 
 //go:generate mockery --name Factory --output ./mocks --filename bridge_factory_mock.go --case=underscore

@@ -301,16 +301,6 @@ func (t *testBridge) parseSendLogs(logs []logpoller.Log) (
 	return parsedSendLogs, parsedToLP, nil
 }
 
-// LocalChainSelector implements bridge.Bridge.
-func (t *testBridge) LocalChainSelector() models.NetworkSelector {
-	return t.sourceSelector
-}
-
-// RemoteChainSelector implements bridge.Bridge.
-func (t *testBridge) RemoteChainSelector() models.NetworkSelector {
-	return t.destSelector
-}
-
 func intComparator[T constraints.Integer](a, b T) int {
 	if a < b {
 		return -1
