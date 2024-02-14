@@ -178,6 +178,28 @@ func (p *Common) ApplyOverrides(from *Common) error {
 		}
 		p.Chainlink.ApplyOverrides(from.Chainlink)
 	}
+	if from.Logging != nil {
+		if p.Logging == nil {
+			p.Logging = from.Logging
+		} else {
+			if from.Logging.Loki != nil {
+				p.Logging.Loki = from.Logging.Loki
+			}
+			if from.Logging.TestLogCollect != nil {
+				p.Logging.TestLogCollect = from.Logging.TestLogCollect
+			}
+			if from.Logging.RunId != nil {
+				p.Logging.RunId = from.Logging.RunId
+			}
+			if from.Logging.LogStream != nil {
+				p.Logging.LogStream = from.Logging.LogStream
+			}
+			if from.Logging.Grafana != nil {
+				p.Logging.Grafana = from.Logging.Grafana
+			}
+		}
+
+	}
 	return nil
 }
 
