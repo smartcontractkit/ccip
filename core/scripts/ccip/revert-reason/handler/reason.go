@@ -48,6 +48,21 @@ func (h *BaseHandler) RevertReasonFromTx(txHash string) (string, error) {
 	return DecodeErrorStringFromABI(errorString)
 }
 
+func PrintErrorSelectors() {
+	contractABIs := getAllABIs()
+
+	for _, contractABI := range contractABIs {
+		parsedAbi, err2 := abi.JSON(strings.NewReader(contractABI))
+		if err2 != nil {
+			panic(err2)
+		}
+
+		for errorName, abiError := range parsedAbi.Errors {
+			fmt.Printf("Error: %s, Selector: %s\n", errorName, hex.EncodeToString(abiError.ID.Bytes()[:4]))
+		}
+	}
+}
+
 func DecodeErrorStringFromABI(errorString string) (string, error) {
 	contractABIs := getAllABIs()
 

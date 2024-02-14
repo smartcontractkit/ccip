@@ -23,7 +23,7 @@ import (
 // To configure an RPC endpoint, set the RPC_<chain_id> environment variable to the RPC endpoint.
 // e.g. RPC_420=https://rpc.<chain_id>.com
 const (
-	ErrorCodeString = "0x4e487b710000000000000000000000000000000000000000000000000000000000000032"
+	ErrorCodeString = "eced32bc"
 
 	// The following inputs are only used if ERROR_CODE_STRING is empty
 	// Need a node URL
@@ -35,16 +35,18 @@ const (
 )
 
 func main() {
-	errorString, err := getErrorString()
-	if err != nil {
-		panic(err)
-	}
-	decodedError, err := handler.DecodeErrorStringFromABI(errorString)
-	if err != nil {
-		panic(err)
-	}
+	//errorString, err := getErrorString()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//decodedError, err := handler.DecodeErrorStringFromABI(errorString)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//fmt.Println(decodedError)
 
-	fmt.Println(decodedError)
+	handler.PrintErrorSelectors()
 }
 
 func getErrorString() (string, error) {
