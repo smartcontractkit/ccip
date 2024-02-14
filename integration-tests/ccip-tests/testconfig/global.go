@@ -178,29 +178,72 @@ func (p *Common) ApplyOverrides(from *Common) error {
 		}
 		p.Chainlink.ApplyOverrides(from.Chainlink)
 	}
-	if from.Logging != nil {
-		if p.Logging == nil {
-			p.Logging = from.Logging
-		} else {
-			if from.Logging.Loki != nil {
+	p.OverrideLoggingConfig(from)
+	return nil
+}
+
+func (p *Common) OverrideLoggingConfig(from *Common) {
+	if from.Logging == nil {
+		return
+	}
+	if p.Logging == nil {
+		p.Logging = from.Logging
+	} else {
+		if from.Logging.Loki != nil {
+			if p.Logging.Loki == nil {
 				p.Logging.Loki = from.Logging.Loki
-			}
-			if from.Logging.TestLogCollect != nil {
-				p.Logging.TestLogCollect = from.Logging.TestLogCollect
-			}
-			if from.Logging.RunId != nil {
-				p.Logging.RunId = from.Logging.RunId
-			}
-			if from.Logging.LogStream != nil {
-				p.Logging.LogStream = from.Logging.LogStream
-			}
-			if from.Logging.Grafana != nil {
-				p.Logging.Grafana = from.Logging.Grafana
+			} else {
+				if p.Logging.Loki.Endpoint == nil {
+					p.Logging.Loki.Endpoint = from.Logging.Loki.Endpoint
+				}
+				if p.Logging.Loki.TenantId == nil {
+					p.Logging.Loki.TenantId = from.Logging.Loki.TenantId
+				}
+				if p.Logging.Loki.BasicAuth == nil {
+					p.Logging.Loki.BasicAuth = from.Logging.Loki.BasicAuth
+				}
+				if p.Logging.Loki.BearerToken == nil {
+					p.Logging.Loki.BearerToken = from.Logging.Loki.BearerToken
+				}
 			}
 		}
-
+		if from.Logging.TestLogCollect != nil {
+			p.Logging.TestLogCollect = from.Logging.TestLogCollect
+		}
+		if from.Logging.RunId != nil {
+			p.Logging.RunId = from.Logging.RunId
+		}
+		if from.Logging.LogStream != nil {
+			if p.Logging.LogStream == nil {
+				p.Logging.LogStream = from.Logging.LogStream
+			} else {
+				if from.Logging.LogStream.LogTargets != nil {
+					p.Logging.LogStream.LogTargets = from.Logging.LogStream.LogTargets
+				}
+				if from.Logging.LogStream.LogProducerTimeout != nil {
+					p.Logging.LogStream.LogProducerTimeout = from.Logging.LogStream.LogProducerTimeout
+				}
+				if from.Logging.LogStream.LogProducerRetryLimit != nil {
+					p.Logging.LogStream.LogProducerRetryLimit = from.Logging.LogStream.LogProducerRetryLimit
+				}
+			}
+		}
+		if from.Logging.Grafana != nil {
+			if p.Logging.Grafana == nil {
+				p.Logging.Grafana = from.Logging.Grafana
+			} else {
+				if from.Logging.Grafana.BaseUrl != nil {
+					p.Logging.Grafana.BaseUrl = from.Logging.Grafana.BaseUrl
+				}
+				if from.Logging.Grafana.DashboardUrl != nil {
+					p.Logging.Grafana.DashboardUrl = from.Logging.Grafana.DashboardUrl
+				}
+				if from.Logging.Grafana.BearerToken != nil {
+					p.Logging.Grafana.BearerToken = from.Logging.Grafana.BearerToken
+				}
+			}
+		}
 	}
-	return nil
 }
 
 func (p *Common) Validate() error {
