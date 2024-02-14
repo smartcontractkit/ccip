@@ -262,7 +262,10 @@ func (c *Chainlink) Validate() error {
 		if noOfNodes != len(c.Nodes) {
 			return errors.New("chainlink config is invalid, NoOfNodes and Nodes length mismatch")
 		}
-		for _, node := range c.Nodes {
+		for i := range c.Nodes {
+			// merge common config with node specific config
+			c.Nodes[i].Merge(c.Common)
+			node := c.Nodes[i]
 			if node.ChainlinkImage == nil {
 				return fmt.Errorf("node %s: chainlink image can't be empty", node.Name)
 			}
