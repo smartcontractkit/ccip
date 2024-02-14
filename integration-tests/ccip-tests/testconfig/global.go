@@ -10,6 +10,7 @@ import (
 	"github.com/AlekSi/pointer"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/docker/test_env"
@@ -177,6 +178,17 @@ func (p *Common) ApplyOverrides(from *Common) error {
 			p.Chainlink = &Chainlink{}
 		}
 		p.Chainlink.ApplyOverrides(from.Chainlink)
+	}
+	if from.Logging != nil {
+		logBytes, err := toml.Marshal(from.Logging)
+		if err != nil {
+			return err
+		}
+		lggr := zerolog.Logger{}
+		err = ctfconfig.BytesToAnyTomlStruct(lggr, "somefile", "", p.Logging, logBytes)
+		if err != nil {
+			return err
+		}
 	}
 	p.OverrideLoggingConfig(from)
 	return nil

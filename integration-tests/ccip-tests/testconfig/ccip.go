@@ -1,7 +1,10 @@
 package testconfig
 
 import (
+	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 )
@@ -212,36 +215,52 @@ func (c *CCIP) Validate() error {
 }
 
 func (c *CCIP) ApplyOverrides(fromCfg *CCIP) error {
-	if c.Env == nil {
-		if fromCfg.Env != nil {
-			c.Env = fromCfg.Env
-		}
-	} else {
-		if err := c.Env.ApplyOverrides(fromCfg.Env); err != nil {
-			return err
-		}
+	if fromCfg == nil {
+		return nil
 	}
-	if c.Deployments == nil {
-		if fromCfg.Deployments != nil {
-			c.Deployments = fromCfg.Deployments
-		}
-	} else {
-		if err := c.Deployments.ApplyOverrides(fromCfg.Deployments); err != nil {
-			return err
-		}
+	logBytes, err := toml.Marshal(fromCfg)
+	if err != nil {
+		return err
 	}
-	if len(fromCfg.Groups) != 0 {
-		for name, grp := range fromCfg.Groups {
-			if c.Groups == nil {
-				c.Groups = map[string]*CCIPTestConfig{}
+	lggr := zerolog.Logger{}
+	err = ctfconfig.BytesToAnyTomlStruct(lggr, "somefile", "", c, logBytes)
+	if err != nil {
+		return err
+	}
+	/*
+		if c.Env == nil {
+			if fromCfg.Env != nil {
+				c.Env = fromCfg.Env
 			}
-			if _, ok := c.Groups[name]; !ok {
-				c.Groups[name] = &CCIPTestConfig{}
-			}
-			if err := c.Groups[name].ApplyOverrides(grp); err != nil {
+		} else {
+			if err := c.Env.ApplyOverrides(fromCfg.Env); err != nil {
 				return err
 			}
 		}
-	}
+		if c.Deployments == nil {
+			if fromCfg.Deployments != nil {
+				c.Deployments = fromCfg.Deployments
+			}
+		} else {
+			if err := c.Deployments.ApplyOverrides(fromCfg.Deployments); err != nil {
+				return err
+			}
+		}
+		if len(fromCfg.Groups) != 0 {
+			for name, grp := range fromCfg.Groups {
+				if c.Groups == nil {
+					c.Groups = map[string]*CCIPTestConfig{}
+				}
+				if _, ok := c.Groups[name]; !ok {
+					c.Groups[name] = &CCIPTestConfig{}
+				}
+				if err := c.Groups[name].ApplyOverrides(grp); err != nil {
+					return err
+				}
+			}
+		}
+
+	*/
 	return nil
+
 }
