@@ -11,10 +11,12 @@ import (
 	"fmt"
 	"sync"
 
-	retry "github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v4"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
+
+var ErrNoService = errors.New("LazyInitService: the init function did not return a service")
 
 // An InitFunc represents an expensive blocking computation producing a service.
 // Init functions must respect the context passed as the argument and quit promptly if the context is canceled.
@@ -91,7 +93,7 @@ func (s *LazyInitService) initAndRun(ctx context.Context) {
 		return
 	}
 	if service == nil {
-		s.reportError(errors.New("LazyInitService: the init function did not return a service"))
+		s.reportError(ErrNoService)
 		return
 	}
 	s.initializedService = service

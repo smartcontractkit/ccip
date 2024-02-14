@@ -3,6 +3,7 @@ package lazyinitservice
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/test-go/testify/require"
@@ -12,7 +13,12 @@ import (
 
 var errInit = errors.New("boom")
 
+var dummyStartError = errors.New("dummy start error")
+var dummyCloseError = errors.New("dummy close error")
+
 type dummyService struct {
+	startError     error
+	closeError     error
 	startCallCount int
 	completeStart  chan struct{}
 	closeCallCount int
@@ -31,12 +37,12 @@ func (s *dummyService) AwaitCompleteStart() {
 func (s *dummyService) Start(context.Context) error {
 	s.startCallCount++
 	s.completeStart <- struct{}{}
-	return nil
+	return s.startError
 }
 
 func (s *dummyService) Close() error {
 	s.closeCallCount++
-	return nil
+	return s.closeError
 }
 
 func TestLazyInitService_AsyncInit(t *testing.T) {
@@ -123,4 +129,56 @@ func TestLazyInitService_Restart(t *testing.T) {
 	require.Equal(t, 1, initCount)
 	require.Equal(t, 2, dummy.startCallCount)
 	require.Equal(t, 2, dummy.closeCallCount)
+}
+
+func TestLazyInitService_FaultyInitFunction(t *testing.T) {
+	var errs []error
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	s := New(func(context.Context) (job.ServiceCtx, error) {
+		return nil, nil
+	}, WithLogErrorFunc(func(err error) {
+		defer wg.Done()
+		errs = append(errs, err)
+	}))
+
+	require.NoError(t, s.Start(context.Background()))
+	wg.Wait()
+	require.Equal(t, 1, len(errs))
+	require.Equal(t, ErrNoService, errs[0])
+}
+
+func TestLazyInitService_ReportStartErrors(t *testing.T) {
+	dummy := newDummyService()
+	dummy.startError = dummyStartError
+
+	var errs []error
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	s := New(func(context.Context) (job.ServiceCtx, error) {
+		return dummy, nil
+	}, WithLogErrorFunc(func(err error) {
+		defer wg.Done()
+		errs = append(errs, err)
+	}))
+
+	require.NoError(t, s.Start(context.Background()))
+	wg.Wait()
+	require.Equal(t, 1, len(errs))
+	require.Equal(t, dummyStartError, errs[0])
+}
+
+func TestLazyInitService_ReportCloseErrors(t *testing.T) {
+	dummy := newDummyService()
+	dummy.closeError = dummyCloseError
+
+	s := New(func(context.Context) (job.ServiceCtx, error) {
+		return dummy, nil
+	})
+
+	require.NoError(t, s.Start(context.Background()))
+	dummy.AwaitCompleteStart()
+	require.Equal(t, dummyCloseError, s.Close())
 }
