@@ -59,6 +59,7 @@ func TestLazyInitService_AsyncInit(t *testing.T) {
 }
 
 func TestLazyInitService_NoStartOnUnrecoverableFailure(t *testing.T) {
+	t.Parallel()
 	tries := 0
 	ch := make(chan struct{})
 	s := New(func(context.Context) (job.ServiceCtx, error) {
