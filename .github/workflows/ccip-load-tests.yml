@@ -111,8 +111,6 @@ jobs:
       TEST_LOG_LEVEL: info
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
-      BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
-      TEST_BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
 
     steps:
       - name: Collect Metrics
@@ -132,8 +130,8 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "BASE64_CCIP_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
-            echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
+            echo "BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
+            echo "TEST_BASE64_TEST_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
           fi
       - name: step summary
         shell: bash
@@ -144,7 +142,7 @@ jobs:
           echo "\`${{ env.INPUT_CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "### test input override :link:" >>$GITHUB_STEP_SUMMARY
           echo "$(base64 -d <<< "${{ inputs.base64_test_input }}")" >>$GITHUB_STEP_SUMMARY
-      - name: Prepare Base64 TOML override for CCIP secrets
+      - name: Prepare Base64 TOML override for CCIP secrests
         uses: ./.github/actions/setup-create-base64-config-ccip
         with:
           runId: ${{ github.run_id }}
@@ -244,7 +242,7 @@ jobs:
           echo "$(base64 -d <<< "${{ inputs.base64_test_input }}")" >>$GITHUB_STEP_SUMMARY
           echo "### testing upgrade against release :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ steps.set_env_vars.outputs.last_release }}\`" >>$GITHUB_STEP_SUMMARY
-      - name: Prepare Base64 TOML override for CCIP secrets
+      - name: Prepare Base64 TOML override for CCIP secrests
         uses: ./.github/actions/setup-create-base64-config-ccip
         with:
           runId: ${{ github.run_id }}
