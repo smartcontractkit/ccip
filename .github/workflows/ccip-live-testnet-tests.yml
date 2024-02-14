@@ -1,17 +1,19 @@
 name: CCIP Load Test
 on:
-  push:
-    branches:
-      - ccip-develop
+  schedule:
+    - cron: '0 */12 * * *'
   workflow_dispatch:
     inputs:
       base64_test_input : # base64 encoded toml for test input
         description: 'Base64 encoded toml test input'
         required: false
+      override_toml: # overwrite toml file from integration-tests/ccip-tests/testconfig/override
+        description: 'Base64 encoded toml test input'
+        required: false
 
 # Only run 1 of this workflow at a time per PR
 concurrency:
-  group: load-ccip-tests-chainlink-${{ github.ref }}
+  group: live-testnet-tests
   cancel-in-progress: true
 
 env:
