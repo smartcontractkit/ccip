@@ -15,11 +15,15 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/arm_proxy_contract"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_mint_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/burn_with_from_mint_token_pool"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/commit_store"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/ping_pong_demo"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/usdc_token_pool"
@@ -48,20 +52,133 @@ func (h *BaseHandler) RevertReasonFromTx(txHash string) (string, error) {
 	return DecodeErrorStringFromABI(errorString)
 }
 
-func PrintErrorSelectors() {
-	contractABIs := getAllABIs()
+// =================================================================================================
+// =================================================================================================
+// =================================================================================================
+// =================================================================================================
+// =================================================================================================
+// =================================================================================================
+type ContractPair struct {
+	Name string
+	ABI  string
+}
 
-	for _, contractABI := range contractABIs {
+type ContractError struct {
+	Error    string `json:"error"`
+	Selector string `json:"selector"`
+}
+
+type ContractJSON struct {
+	Contract string          `json:"contract"`
+	Errors   []ContractError `json:"errors"`
+}
+
+func PrintErrorSelectors() {
+	contractNameAndABIs := []ContractPair{
+		{
+			Name: "ARMContract",
+			ABI:  arm_contract.ARMContractABI,
+		},
+		{
+			Name: "CommitStore",
+			ABI:  commit_store.CommitStoreABI,
+		},
+		{
+			Name: "BurnMintTokenPool",
+			ABI:  burn_mint_token_pool.BurnMintTokenPoolABI,
+		},
+		{
+			Name: "BurnFromMintTokenPool",
+			ABI:  burn_from_mint_token_pool.BurnFromMintTokenPoolABI,
+		},
+		{
+			Name: "BurnWithFromMintTokenPool",
+			ABI:  burn_with_from_mint_token_pool.BurnWithFromMintTokenPoolABI,
+		},
+		{
+			Name: "LockReleaseTokenPool",
+			ABI:  lock_release_token_pool.LockReleaseTokenPoolABI,
+		},
+		{
+			Name: "ARM",
+			ABI:  arm_contract.ARMContractABI,
+		},
+		{
+			Name: "ARMProxy",
+			ABI:  arm_proxy_contract.ARMProxyContractABI,
+		},
+		{
+			Name: "EVM2EVMOnRamp",
+			ABI:  evm_2_evm_onramp.EVM2EVMOnRampABI,
+		},
+		{
+			Name: "EVM2EVMOffRamp",
+			ABI:  evm_2_evm_offramp.EVM2EVMOffRampABI,
+		},
+		{
+			Name: "Router",
+			ABI:  router.RouterABI,
+		},
+		{
+			Name: "PriceRegistry",
+			ABI:  price_registry.PriceRegistryABI,
+		},
+		{
+			Name: "PingPongDemo",
+			ABI:  ping_pong_demo.PingPongDemoABI,
+		},
+	}
+
+	jsonResult := []ContractJSON{}
+	for _, contractABIPair := range contractNameAndABIs {
+		contractName := contractABIPair.Name
+		contractABI := contractABIPair.ABI
+
 		parsedAbi, err2 := abi.JSON(strings.NewReader(contractABI))
 		if err2 != nil {
 			panic(err2)
 		}
 
-		for errorName, abiError := range parsedAbi.Errors {
-			fmt.Printf("Error: %s, Selector: %s\n", errorName, hex.EncodeToString(abiError.ID.Bytes()[:4]))
+		curContractJSON := ContractJSON{
+			Contract: contractName,
+			Errors:   []ContractError{},
 		}
+
+		fmt.Printf("============ Contract: %s ============\n", contractName)
+		for errorName, abiError := range parsedAbi.Errors {
+			selector1 := "0x" + hex.EncodeToString(abiError.ID.Bytes()[:4])
+			selector2 := abiError.ID.Hex()[:10]
+			if selector1 != selector2 {
+				panic(fmt.Sprintf("selector mismatch: %s %s", selector1, selector2))
+			}
+			fmt.Printf("Error: %s, Selector: %s\n", errorName, selector1)
+			curContractJSON.Errors = append(curContractJSON.Errors, ContractError{
+				Error:    errorName,
+				Selector: selector1,
+			})
+		}
+		fmt.Println("==================================================")
+		fmt.Println("")
+
+		jsonResult = append(jsonResult, curContractJSON)
 	}
+
+	b, err := json.MarshalIndent(jsonResult, "", "    ")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(b))
+
 }
+
+// =================================================================================================
+// =================================================================================================
+// =================================================================================================
+// =================================================================================================
+// =================================================================================================
+// =================================================================================================
+// =================================================================================================
 
 func DecodeErrorStringFromABI(errorString string) (string, error) {
 	contractABIs := getAllABIs()
