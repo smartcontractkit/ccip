@@ -37,6 +37,8 @@ type OnRampReader interface {
 	// If some requests do not exist in the provided sequence numbers range they will not be part of the response.
 	// It's the responsibility of the caller to validate whether all the requests exist or not.
 	GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, seqNumMax uint64, finalized bool) ([]Event[internal.EVM2EVMMessage], error)
+	GetSendRequestsForSequenceNumbers(ctx context.Context, seqNrs []uint64, finalized bool) ([]Event[internal.EVM2EVMMessage], error)
+
 	// Get router configured in the onRamp
 	RouterAddress() (common.Address, error)
 	Address() (common.Address, error)

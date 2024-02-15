@@ -93,7 +93,9 @@ func (q *queryArgs) withWordIndexMax(wordIndex int) *queryArgs {
 func (q *queryArgs) withWordValue(wordValue common.Hash) *queryArgs {
 	return q.withCustomHashArg("word_value", wordValue)
 }
-
+func (q *queryArgs) withWordValues(wordValues []common.Hash) *queryArgs {
+	return q.withCustomArg("word_values", concatBytes(wordValues))
+}
 func (q *queryArgs) withConfs(confs Confirmations) *queryArgs {
 	return q.withCustomArg("confs", confs)
 }
