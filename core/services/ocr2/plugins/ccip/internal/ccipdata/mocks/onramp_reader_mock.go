@@ -106,6 +106,36 @@ func (_m *OnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNu
 	return r0, r1
 }
 
+// GetSendRequestsForSequenceNumbers provides a mock function with given fields: ctx, seqNrs, finalized
+func (_m *OnRampReader) GetSendRequestsForSequenceNumbers(ctx context.Context, seqNrs []uint64, finalized bool) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
+	ret := _m.Called(ctx, seqNrs, finalized)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSendRequestsForSequenceNumbers")
+	}
+
+	var r0 []ccipdata.Event[internal.EVM2EVMMessage]
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []uint64, bool) ([]ccipdata.Event[internal.EVM2EVMMessage], error)); ok {
+		return rf(ctx, seqNrs, finalized)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []uint64, bool) []ccipdata.Event[internal.EVM2EVMMessage]); ok {
+		r0 = rf(ctx, seqNrs, finalized)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ccipdata.Event[internal.EVM2EVMMessage])
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []uint64, bool) error); ok {
+		r1 = rf(ctx, seqNrs, finalized)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // RouterAddress provides a mock function with given fields:
 func (_m *OnRampReader) RouterAddress() (common.Address, error) {
 	ret := _m.Called()
