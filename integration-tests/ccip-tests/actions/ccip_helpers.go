@@ -1717,6 +1717,9 @@ func (destCCIP *DestCCIPModule) AssertReportBlessed(
 						}
 						// if the value is processed, delete it from the map
 						destCCIP.ReportBlessedWatcher.Delete(CommitReport.MerkleRoot)
+					} else {
+						// if the value is processed, delete it from the map
+						destCCIP.ReportBlessedBySeqNum.Delete(seqNum)
 					}
 					hdr, err := destCCIP.Common.ChainClient.HeaderByNumber(ctx, big.NewInt(int64(vLogs.BlockNumber)))
 					if err == nil {
