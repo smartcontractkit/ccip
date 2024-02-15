@@ -174,11 +174,11 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 	if err != nil {
 		return nil, nil, err
 	}
-	addrs, err := ccipcalc.GenericAddrsToEvm(onRampRouterAddr)
+	routerAddr, err := ccipcalc.GenericAddrToEvm(onRampRouterAddr)
 	if err != nil {
 		return nil, nil, err
 	}
-	sourceRouter, err := router.NewRouter(addrs[0], params.sourceChain.Client())
+	sourceRouter, err := router.NewRouter(routerAddr, params.sourceChain.Client())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -204,7 +204,7 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 			lggr:                  commitLggr,
 			onRampReader:          onRampReader,
 			offRamp:               offRampReader,
-			sourceNative:          cciptypes.Address(sourceNative.String()),
+			sourceNative:          ccipcalc.EvmAddrToGeneric(sourceNative),
 			priceGetter:           priceGetter,
 			sourceChainSelector:   params.commitStoreStaticCfg.SourceChainSelector,
 			destChainSelector:     params.commitStoreStaticCfg.ChainSelector,
@@ -257,7 +257,7 @@ func extractJobSpecParams(jb job.Job, chainSet legacyevm.LegacyChainContainer) (
 
 	return &jobSpecParams{
 		pluginConfig:         pluginConfig,
-		commitStoreAddress:   cciptypes.Address(commitStoreAddress.String()),
+		commitStoreAddress:   ccipcalc.EvmAddrToGeneric(commitStoreAddress),
 		commitStoreStaticCfg: staticConfig,
 		sourceChain:          sourceChain,
 		destChain:            destChain,

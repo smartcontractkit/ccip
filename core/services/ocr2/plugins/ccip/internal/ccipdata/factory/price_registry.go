@@ -29,11 +29,10 @@ func ClosePriceRegistryReader(lggr logger.Logger, versionFinder VersionFinder, p
 func initOrClosePriceRegistryReader(lggr logger.Logger, versionFinder VersionFinder, priceRegistryAddress cciptypes.Address, lp logpoller.LogPoller, cl client.Client, closeReader bool) (ccipdata.PriceRegistryReader, error) {
 	registerFilters := !closeReader
 
-	evmAddrs, err := ccipcalc.GenericAddrsToEvm(priceRegistryAddress)
+	priceRegistryEvmAddr, err := ccipcalc.GenericAddrToEvm(priceRegistryAddress)
 	if err != nil {
 		return nil, err
 	}
-	priceRegistryEvmAddr := evmAddrs[0]
 
 	contractType, version, err := versionFinder.TypeAndVersion(priceRegistryAddress, cl)
 	isV1_0_0 := (err != nil && strings.Contains(err.Error(), "execution reverted")) ||
@@ -59,7 +58,7 @@ func initOrClosePriceRegistryReader(lggr logger.Logger, versionFinder VersionFin
 	}
 	switch version.String() {
 	case ccipdata.V1_2_0:
-		pr, err := v1_2_0.NewPriceRegistry(lggr, evmAddrs[0], lp, cl, registerFilters)
+		pr, err := v1_2_0.NewPriceRegistry(lggr, priceRegistryEvmAddr, lp, cl, registerFilters)
 		if err != nil {
 			return nil, err
 		}

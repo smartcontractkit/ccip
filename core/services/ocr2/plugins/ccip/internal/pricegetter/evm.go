@@ -103,7 +103,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 			batchCallsTokensOrder[aggCfg.ChainID] = append(batchCallsTokensOrder[aggCfg.ChainID], tk)
 		} else if staticCfg, isStatic := d.cfg.StaticPrices[tk]; isStatic {
 			// Fill static prices.
-			prices[cciptypes.Address(tk.String())] = staticCfg.Price
+			prices[ccipcalc.EvmAddrToGeneric(tk)] = staticCfg.Price
 		} else {
 			return nil, fmt.Errorf("no price resolution rule for token %s", tk.Hex())
 		}
@@ -139,7 +139,7 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 
 		for i := range tokensOrder {
 			// Prices are already in wei (10e18) when coming from aggregator, no conversion needed.
-			prices[cciptypes.Address(tokensOrder[i].String())] = latestRounds[i]
+			prices[ccipcalc.EvmAddrToGeneric(tokensOrder[i])] = latestRounds[i]
 		}
 	}
 

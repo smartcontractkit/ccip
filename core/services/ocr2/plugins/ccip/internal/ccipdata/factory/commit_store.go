@@ -38,13 +38,15 @@ func initOrCloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinde
 	if contractType != ccipconfig.CommitStore {
 		return nil, errors.Errorf("expected %v got %v", ccipconfig.CommitStore, contractType)
 	}
+
+	evmAddr, err := ccipcalc.GenericAddrToEvm(address)
+	if err != nil {
+		return nil, err
+	}
+
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0: // Versions are identical
-		evmAddrs, err := ccipcalc.GenericAddrsToEvm(address)
-		if err != nil {
-			return nil, err
-		}
-		cs, err := v1_0_0.NewCommitStore(lggr, evmAddrs[0], ec, lp, estimator)
+		cs, err := v1_0_0.NewCommitStore(lggr, evmAddr, ec, lp, estimator)
 		if err != nil {
 			return nil, err
 		}
@@ -53,11 +55,7 @@ func initOrCloseCommitStoreReader(lggr logger.Logger, versionFinder VersionFinde
 		}
 		return cs, cs.RegisterFilters(pgOpts...)
 	case ccipdata.V1_2_0, ccipdata.V1_4_0:
-		evmAddrs, err := ccipcalc.GenericAddrsToEvm(address)
-		if err != nil {
-			return nil, err
-		}
-		cs, err := v1_2_0.NewCommitStore(lggr, evmAddrs[0], ec, lp, estimator)
+		cs, err := v1_2_0.NewCommitStore(lggr, evmAddr, ec, lp, estimator)
 		if err != nil {
 			return nil, err
 		}

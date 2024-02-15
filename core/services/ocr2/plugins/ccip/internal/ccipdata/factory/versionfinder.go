@@ -22,11 +22,11 @@ func NewEvmVersionFinder() EvmVersionFinder {
 }
 
 func (e EvmVersionFinder) TypeAndVersion(addr cciptypes.Address, client bind.ContractBackend) (config.ContractType, semver.Version, error) {
-	addrs, err := ccipcalc.GenericAddrsToEvm(addr)
+	evmAddr, err := ccipcalc.GenericAddrToEvm(addr)
 	if err != nil {
 		return "", semver.Version{}, err
 	}
-	return config.TypeAndVersion(addrs[0], client)
+	return config.TypeAndVersion(evmAddr, client)
 }
 
 type mockVersionFinder struct {

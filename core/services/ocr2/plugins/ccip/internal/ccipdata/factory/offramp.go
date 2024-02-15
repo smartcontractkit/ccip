@@ -39,13 +39,15 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 	if contractType != ccipconfig.EVM2EVMOffRamp {
 		return nil, errors.Errorf("expected %v got %v", ccipconfig.EVM2EVMOffRamp, contractType)
 	}
+
+	evmAddr, err := ccipcalc.GenericAddrToEvm(addr)
+	if err != nil {
+		return nil, err
+	}
+
 	switch version.String() {
 	case ccipdata.V1_0_0, ccipdata.V1_1_0:
-		evmAddrs, err := ccipcalc.GenericAddrsToEvm(addr)
-		if err != nil {
-			return nil, err
-		}
-		offRamp, err := v1_0_0.NewOffRamp(lggr, evmAddrs[0], destClient, lp, estimator)
+		offRamp, err := v1_0_0.NewOffRamp(lggr, evmAddr, destClient, lp, estimator)
 		if err != nil {
 			return nil, err
 		}
@@ -54,11 +56,7 @@ func initOrCloseOffRampReader(lggr logger.Logger, versionFinder VersionFinder, a
 		}
 		return offRamp, offRamp.RegisterFilters(pgOpts...)
 	case ccipdata.V1_2_0, ccipdata.V1_4_0:
-		evmAddrs, err := ccipcalc.GenericAddrsToEvm(addr)
-		if err != nil {
-			return nil, err
-		}
-		offRamp, err := v1_2_0.NewOffRamp(lggr, evmAddrs[0], destClient, lp, estimator)
+		offRamp, err := v1_2_0.NewOffRamp(lggr, evmAddr, destClient, lp, estimator)
 		if err != nil {
 			return nil, err
 		}

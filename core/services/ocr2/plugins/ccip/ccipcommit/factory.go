@@ -70,11 +70,11 @@ func (rf *CommitReportingPluginFactory) NewReportingPlugin(config types.Reportin
 		return nil, types.ReportingPluginInfo{}, err
 	}
 
-	addrs, err := ccipcalc.GenericAddrsToEvm(destPriceReg)
+	priceRegEvmAddr, err := ccipcalc.GenericAddrToEvm(destPriceReg)
 	if err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
-	if err = rf.UpdateDynamicReaders(addrs[0]); err != nil {
+	if err = rf.UpdateDynamicReaders(priceRegEvmAddr); err != nil {
 		return nil, types.ReportingPluginInfo{}, err
 	}
 

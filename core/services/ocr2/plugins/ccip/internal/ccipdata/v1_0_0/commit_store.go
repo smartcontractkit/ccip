@@ -62,8 +62,8 @@ func (c *CommitStore) GetCommitStoreStaticConfig(ctx context.Context) (cciptypes
 	return cciptypes.CommitStoreStaticConfig{
 		ChainSelector:       legacyConfig.ChainSelector,
 		SourceChainSelector: legacyConfig.SourceChainSelector,
-		OnRamp:              cciptypes.Address(legacyConfig.OnRamp.String()),
-		ArmProxy:            cciptypes.Address(legacyConfig.ArmProxy.String()),
+		OnRamp:              ccipcalc.EvmAddrToGeneric(legacyConfig.OnRamp),
+		ArmProxy:            ccipcalc.EvmAddrToGeneric(legacyConfig.ArmProxy),
 	}, nil
 }
 

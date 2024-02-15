@@ -86,7 +86,7 @@ func TestCommitInflight(t *testing.T) {
 	require.NoError(t, c.add(lggr, cciptypes.CommitStoreReport{
 		TokenPrices: []cciptypes.TokenPrice{
 			{
-				Token: cciptypes.Address(token.String()),
+				Token: ccipcalc.EvmAddrToGeneric(token),
 				Value: big.NewInt(10),
 			},
 		},
@@ -95,12 +95,12 @@ func TestCommitInflight(t *testing.T) {
 	// Apply cache price to existing
 	latestInflightTokenPriceUpdates := c.latestInflightTokenPriceUpdates()
 	require.Equal(t, len(latestInflightTokenPriceUpdates), 1)
-	assert.Equal(t, big.NewInt(10), latestInflightTokenPriceUpdates[cciptypes.Address(token.String())].value)
+	assert.Equal(t, big.NewInt(10), latestInflightTokenPriceUpdates[ccipcalc.EvmAddrToGeneric(token)].value)
 
 	// larger epoch and round overrides existing price update
 	c.inFlightPriceUpdates = append(c.inFlightPriceUpdates, InflightPriceUpdate{
 		tokenPrices: []cciptypes.TokenPrice{
-			{Token: cciptypes.Address(token.String()), Value: big.NewInt(9999)},
+			{Token: ccipcalc.EvmAddrToGeneric(token), Value: big.NewInt(9999)},
 		},
 		gasPrices: []cciptypes.GasPrice{
 			{
@@ -113,7 +113,7 @@ func TestCommitInflight(t *testing.T) {
 	})
 	latestInflightTokenPriceUpdates = c.latestInflightTokenPriceUpdates()
 	require.Equal(t, len(latestInflightTokenPriceUpdates), 1)
-	assert.Equal(t, big.NewInt(9999), latestInflightTokenPriceUpdates[cciptypes.Address(token.String())].value)
+	assert.Equal(t, big.NewInt(9999), latestInflightTokenPriceUpdates[ccipcalc.EvmAddrToGeneric(token)].value)
 	inflightGasUpdates = c.latestInflightGasPriceUpdates()
 	assert.Equal(t, 3, len(inflightGasUpdates))
 	assert.Equal(t, big.NewInt(999), inflightGasUpdates[123].value)

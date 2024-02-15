@@ -189,11 +189,11 @@ func (o *OffRamp) GetExecutionState(ctx context.Context, sequenceNumber uint64) 
 }
 
 func (o *OffRamp) GetSenderNonce(ctx context.Context, sender cciptypes.Address) (uint64, error) {
-	evmAddrs, err := ccipcalc.GenericAddrsToEvm(sender)
+	evmAddr, err := ccipcalc.GenericAddrToEvm(sender)
 	if err != nil {
 		return 0, err
 	}
-	return o.offRampV100.GetSenderNonce(&bind.CallOpts{Context: ctx}, evmAddrs[0])
+	return o.offRampV100.GetSenderNonce(&bind.CallOpts{Context: ctx}, evmAddr)
 }
 
 func (o *OffRamp) CurrentRateLimiterState(ctx context.Context) (cciptypes.TokenBucketRateLimit, error) {

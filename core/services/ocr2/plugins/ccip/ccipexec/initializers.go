@@ -176,11 +176,11 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, errors.Wrap(err, "get onramp dynamic config")
 	}
 
-	addrs, err := ccipcalc.GenericAddrsToEvm(dynamicOnRampConfig.Router)
+	routerAddr, err := ccipcalc.GenericAddrToEvm(dynamicOnRampConfig.Router)
 	if err != nil {
 		return nil, nil, err
 	}
-	sourceRouter, err := router.NewRouter(addrs[0], params.sourceChain.Client())
+	sourceRouter, err := router.NewRouter(routerAddr, params.sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading source router")
 	}
