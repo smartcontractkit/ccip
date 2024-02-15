@@ -177,8 +177,6 @@ jobs:
       TEST_LOG_LEVEL: debug
       DATABASE_URL: postgresql://postgres:node@localhost:5432/chainlink_test?sslmode=disable
       GH_TOKEN: ${{ github.token }}
-      TEST_LOKI_TENANT_ID: ${{ secrets.TEST_LOKI_TENANT_ID }}
-      TEST_LOKI_URL: ${{ secrets.TEST_LOKI_URL }}
     steps:
       - name: Collect Metrics
         id: collect-gha-metrics
