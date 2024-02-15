@@ -2,6 +2,7 @@ package arb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -56,22 +57,30 @@ var (
 )
 
 func init() {
-	// Check that finalizeInboundTransfer is on the token gateway ABI
-	finalizeInboundTransferMethod, ok := arbitrumTokenGatewayABI.Methods["finalizeInboundTransfer"]
-	if !ok {
-		panic("finalizeInboundTransfer not found in ArbitrumTokenGateway ABI")
+	if err := validateFinalizeInboundTransferABI(arbitrumTokenGatewayABI); err != nil {
+		panic(err)
 	}
+}
+
+func validateFinalizeInboundTransferABI(tokenGatewayABI abi.ABI) error {
+	// Check that finalizeInboundTransfer is on the token gateway ABI
+	finalizeInboundTransferMethod, ok := tokenGatewayABI.Methods["finalizeInboundTransfer"]
+	if !ok {
+		return errors.New("finalizeInboundTransfer not found in ArbitrumTokenGateway ABI")
+	}
+
 	// Check that it has the expected signature
 	if len(finalizeInboundTransferMethod.Inputs) != 5 {
-		panic("finalizeInboundTransfer has unexpected number of inputs")
+		return errors.New("finalizeInboundTransfer has unexpected number of inputs")
 	}
 	if finalizeInboundTransferMethod.Inputs[0].Type.String() != "address" ||
 		finalizeInboundTransferMethod.Inputs[1].Type.String() != "address" ||
 		finalizeInboundTransferMethod.Inputs[2].Type.String() != "address" ||
 		finalizeInboundTransferMethod.Inputs[3].Type.String() != "uint256" ||
 		finalizeInboundTransferMethod.Inputs[4].Type.String() != "bytes" {
-		panic("finalizeInboundTransfer has unexpected input type")
+		return errors.New("finalizeInboundTransfer has unexpected input type")
 	}
+	return nil
 }
 
 const (
@@ -82,19 +91,19 @@ type l2ToL1Bridge struct {
 	localSelector       models.NetworkSelector
 	remoteSelector      models.NetworkSelector
 	l1RebalancerAddress common.Address
-	l2BridgeAdapter     *arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapter
-	l1BridgeAdapter     *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapter
+	l2BridgeAdapter     arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterInterface
+	l1BridgeAdapter     arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterInterface
 	l2LogPoller         logpoller.LogPoller
 	l1LogPoller         logpoller.LogPoller
 	l2FilterName        string
 	l1FilterName        string
 	lggr                logger.Logger
 	l2Client            client.Client
-	arbSys              *arbsys.ArbSys
-	l2ArbGateway        *l2_arbitrum_gateway.L2ArbitrumGateway
-	l2ArbMessenger      *l2_arbitrum_messenger.L2ArbitrumMessenger
-	rollupCore          *arbitrum_rollup_core.ArbRollupCore
-	nodeInterface       *arb_node_interface.NodeInterface
+	arbSys              arbsys.ArbSysInterface
+	l2ArbGateway        l2_arbitrum_gateway.L2ArbitrumGatewayInterface
+	l2ArbMessenger      l2_arbitrum_messenger.L2ArbitrumMessengerInterface
+	rollupCore          arbitrum_rollup_core.ArbRollupCoreInterface
+	nodeInterface       arb_node_interface.NodeInterfaceInterface
 }
 
 func NewL2ToL1Bridge(
@@ -128,7 +137,7 @@ func NewL2ToL1Bridge(
 		Retention: DurationMonth,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to register filter for Arbitrum L2 to L1 bridge: %w", err)
+		return nil, fmt.Errorf("register filter for Arbitrum L2 to L1 bridge: %w", err)
 	}
 
 	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-%s-%s", remoteChain.Name, localChain.Name)
@@ -147,22 +156,22 @@ func NewL2ToL1Bridge(
 		Retention: DurationMonth,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to register filter for Arbitrum L1 to L2 bridge: %w", err)
+		return nil, fmt.Errorf("register filter for Arbitrum L1 to L2 bridge: %w", err)
 	}
 
 	l2BridgeAdapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(l2BridgeAdapterAddress, l2Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate Arbitrum L2 bridge adapter: %w", err)
+		return nil, fmt.Errorf("instantiate Arbitrum L2 bridge adapter: %w", err)
 	}
 
 	l1BridgeAdapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(l1BridgeAdapterAddress, l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate Arbitrum L1 bridge adapter: %w", err)
+		return nil, fmt.Errorf("instantiate Arbitrum L1 bridge adapter: %w", err)
 	}
 
 	arbSys, err := arbsys.NewArbSys(ArbSysAddress, l2Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate ArbSys contract: %w", err)
+		return nil, fmt.Errorf("instantiate ArbSys contract: %w", err)
 	}
 
 	// Addresses provided to the below wrappers don't matter,
@@ -172,7 +181,7 @@ func NewL2ToL1Bridge(
 		l2Client,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate L2ArbitrumGateway contract: %w", err)
+		return nil, fmt.Errorf("instantiate L2ArbitrumGateway contract: %w", err)
 	}
 
 	l2ArbMessenger, err := l2_arbitrum_messenger.NewL2ArbitrumMessenger(
@@ -180,19 +189,19 @@ func NewL2ToL1Bridge(
 		l2Client,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate L2ArbitrumMessenger contract: %w", err)
+		return nil, fmt.Errorf("instantiate L2ArbitrumMessenger contract: %w", err)
 	}
 
 	// have to use the correct address here
 	rollupCore, err := arbitrum_rollup_core.NewArbRollupCore(l1RollupAddress, l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate ArbRollupCore contract: %w", err)
+		return nil, fmt.Errorf("instantiate ArbRollupCore contract: %w", err)
 	}
 
 	// and here
 	nodeInterface, err := arb_node_interface.NewNodeInterface(NodeInterfaceAddress, l2Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate NodeInterface contract: %w", err)
+		return nil, fmt.Errorf("instantiate NodeInterface contract: %w", err)
 	}
 
 	lggr = lggr.Named("ArbitrumL2ToL1Bridge").With(
@@ -227,8 +236,8 @@ func NewL2ToL1Bridge(
 	}, nil
 }
 
-func (l *l2ToL1Bridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) {
-	// there's no payload for L2 -> L1 transfers
+func (l *l2ToL1Bridge) QuorumizedBridgePayload(payloads [][]byte, f int) ([]byte, error) {
+	// there's no payload for arbitrum L2 -> L1 transfers
 	return []byte{}, nil
 }
 
@@ -240,10 +249,10 @@ func (l *l2ToL1Bridge) GetBridgePayloadAndFee(ctx context.Context, transfer mode
 
 // Close implements bridge.Bridge.
 func (l *l2ToL1Bridge) Close(ctx context.Context) error {
-	// close log poller filters
-	err := l.l2LogPoller.UnregisterFilter(l.l2FilterName)
-	err2 := l.l1LogPoller.UnregisterFilter(l.l1FilterName)
-	return multierr.Combine(err, err2)
+	return multierr.Combine(
+		l.l2LogPoller.UnregisterFilter(l.l2FilterName),
+		l.l1LogPoller.UnregisterFilter(l.l1FilterName),
+	)
 }
 
 // GetTransfers implements bridge.Bridge.
@@ -264,7 +273,7 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 	)
 	// TODO: check if err is sql.ErrNoRows
 	if err != nil {
-		return nil, fmt.Errorf("failed to get L2 -> L1 transfers from log poller (on L2): %w", err)
+		return nil, fmt.Errorf("get L2 -> L1 transfers from log poller (on L2): %w", err)
 	}
 
 	// get all L2 -> L1 finalizations in the past 14 days
@@ -278,24 +287,24 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 	)
 	// TODO: check if err is sql.ErrNoRows
 	if err != nil {
-		return nil, fmt.Errorf("failed to get L2 -> L1 finalizations from log poller (on L1): %w", err)
+		return nil, fmt.Errorf("get L2 -> L1 finalizations from log poller (on L1): %w", err)
 	}
 
 	parsedL2toL1Transfers, parsedToLP, err := l.parseL2ToL1Transfers(l2ToL1Transfers)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse L2 -> L1 transfers: %w", err)
+		return nil, fmt.Errorf("parse L2 -> L1 transfers: %w", err)
 	}
 
 	parsedL2ToL1Finalizations, err := l.parseL2ToL1Finalizations(l2ToL1Finalizations)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse L2 -> L1 finalizations: %w", err)
+		return nil, fmt.Errorf("parse L2 -> L1 finalizations: %w", err)
 	}
 
 	// filter out the L2 -> L1 transfers that have been finalized onchain already
 	// all the transfers in unfinalizedTransfers are either in the "not-ready" or "ready" state
 	unfinalizedTransfers, err := l.filterOutFinalizedTransfers(parsedL2toL1Transfers, parsedL2ToL1Finalizations)
 	if err != nil {
-		return nil, fmt.Errorf("failed to filter finalized transfers: %w", err)
+		return nil, fmt.Errorf("filter finalized transfers: %w", err)
 	}
 
 	// for the remaining as-of-yet unfinalized transfers, determine if they
@@ -303,7 +312,7 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 	// TODO: edge case: determine finalized but not executed by checking rebalancer's LiquidityTransferred logs
 	ready, readyData, notReady, err := l.partitionReadyTransfers(ctx, unfinalizedTransfers)
 	if err != nil {
-		return nil, fmt.Errorf("failed to partition ready transfers: %w", err)
+		return nil, fmt.Errorf("partition ready transfers: %w", err)
 	}
 
 	return l.toPendingTransfers(ready, readyData, notReady, parsedToLP)
@@ -370,7 +379,7 @@ func (l *l2ToL1Bridge) partitionReadyTransfers(
 		if err != nil {
 			errs = multierr.Append(
 				errs,
-				fmt.Errorf("failed to get finalization data for transfer %s: %w", transfer.Raw.TxHash, err),
+				fmt.Errorf("get finalization data for transfer %s: %w", transfer.Raw.TxHash, err),
 			)
 			continue
 		}
@@ -427,12 +436,16 @@ func (l *l2ToL1Bridge) getFinalizationData(
 	receipt, err := l.l2Client.TransactionReceipt(ctx, transfer.Raw.TxHash)
 	if err != nil {
 		// should be a transient error
-		return nil, false, fmt.Errorf("failed to get transaction receipt: %w", err)
+		return nil, false, fmt.Errorf("get transaction receipt: %w", err)
 	}
 	var (
 		l2ToL1TxLog, withdrawalInitiatedLog, txToL1Log *gethtypes.Log
 	)
 	for _, lg := range receipt.Logs {
+		if len(lg.Topics) <= 0 {
+			l.lggr.Warnw("getFinalizationData: log has no topics, skipping", "txHash", lg.TxHash)
+			continue
+		}
 		if lg.Topics[0] == L2ToL1TxTopic {
 			l2ToL1TxLog = lg
 		} else if lg.Topics[0] == WithdrawalInitiatedTopic {
@@ -447,20 +460,20 @@ func (l *l2ToL1Bridge) getFinalizationData(
 	}
 	l2ToL1Tx, err := l.arbSys.ParseL2ToL1Tx(*l2ToL1TxLog)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to parse L2ToL1Tx log in tx %s: %w", receipt.TxHash, err)
+		return nil, false, fmt.Errorf("parse L2ToL1Tx log in tx %s: %w", receipt.TxHash, err)
 	}
 	withdrawalInitiated, err := l.l2ArbGateway.ParseWithdrawalInitiated(*withdrawalInitiatedLog)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to parse WithdrawalInitiated log in tx %s: %w", receipt.TxHash, err)
+		return nil, false, fmt.Errorf("parse WithdrawalInitiated log in tx %s: %w", receipt.TxHash, err)
 	}
 	txToL1, err := l.l2ArbMessenger.ParseTxToL1(*txToL1Log)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to parse TxToL1 log in tx %s: %w", receipt.TxHash, err)
+		return nil, false, fmt.Errorf("parse TxToL1 log in tx %s: %w", receipt.TxHash, err)
 	}
 	// argument 0: proof
 	arg0Proof, err := l.getProof(ctx, withdrawalInitiated.L2ToL1Id)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to get proof: %w, l2tol1id: %s",
+		return nil, false, fmt.Errorf("get proof: %w, l2tol1id: %s",
 			err, withdrawalInitiated.L2ToL1Id)
 	}
 	if arg0Proof == nil {
@@ -476,7 +489,7 @@ func (l *l2ToL1Bridge) getFinalizationData(
 	// argument 4: l1Block
 	arg4L1Block, err := l.getL1BlockFromRPC(ctx, receipt.TxHash)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to get l1 block for tx (%s) from rpc: %w",
+		return nil, false, fmt.Errorf("get l1 block for tx (%s) from rpc: %w",
 			receipt.TxHash, err)
 	}
 	// argument 5: l2Block
@@ -500,7 +513,7 @@ func (l *l2ToL1Bridge) getFinalizationData(
 		Data:        arg8Data,
 	})
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to pack finalization payload: %w", err)
+		return nil, false, fmt.Errorf("pack finalization payload: %w", err)
 	}
 	// trim the first four bytes (function signature)
 	finalizationPayload = finalizationPayload[4:]
@@ -514,7 +527,7 @@ func (l *l2ToL1Bridge) getL1BlockFromRPC(ctx context.Context, txHash common.Hash
 	response := new(Response)
 	err := l.l2Client.CallContext(ctx, response, "eth_getTransactionReceipt", txHash.Hex())
 	if err != nil {
-		return nil, fmt.Errorf("failed to call eth_getTransactionReceipt with tx hash %s: %w", txHash, err)
+		return nil, fmt.Errorf("call eth_getTransactionReceipt with tx hash %s: %w", txHash, err)
 	}
 	return response.L1BlockNumber.ToInt(), nil
 }
@@ -523,12 +536,12 @@ func (l *l2ToL1Bridge) getProof(ctx context.Context, l2ToL1Id *big.Int) ([][32]b
 	// 1. Get the latest NodeConfirmed event on L1, which indicates the latest node that was confirmed by the rollup.
 	latestNodeConfirmed, err := l.getLatestNodeConfirmed(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest node confirmed: %w", err)
+		return nil, fmt.Errorf("get latest node confirmed: %w", err)
 	}
 	// 2. Call eth_getBlockByHash on L2 specifying the L2 block hash in the NodeConfirmed event.
 	sendCount, err := l.getSendCountForBlock(ctx, latestNodeConfirmed.BlockHash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get send count for block: %w", err)
+		return nil, fmt.Errorf("get send count for block: %w", err)
 	}
 	// 5. Call `constructOutboxProof` on the L2 node interface contract with the `sendCount` as the first argument and `l2ToL1Id` as the second argument.
 	outboxProof, err := l.nodeInterface.ConstructOutboxProof(&bind.CallOpts{
@@ -537,7 +550,7 @@ func (l *l2ToL1Bridge) getProof(ctx context.Context, l2ToL1Id *big.Int) ([][32]b
 	if err != nil {
 		// if there's an error calling constructOutboxProof it means that the
 		// transfer is not yet ready to finalize.
-		l.lggr.Infow("failed to construct outbox proof, transfer not ready to finalize",
+		l.lggr.Infow("construct outbox proof, transfer not ready to finalize",
 			"l2ToL1Id", l2ToL1Id,
 			"sendCount", sendCount,
 			"err", err)
@@ -554,7 +567,7 @@ func (l *l2ToL1Bridge) getSendCountForBlock(ctx context.Context, blockHash [32]b
 	bhHex := hexutil.Encode(blockHash[:])
 	err := l.l2Client.CallContext(ctx, response, "eth_getBlockByHash", bhHex, false)
 	if err != nil {
-		return 0, fmt.Errorf("failed to call eth_getBlockByHash with blockhash %s: %w", bhHex, err)
+		return 0, fmt.Errorf("call eth_getBlockByHash with blockhash %s: %w", bhHex, err)
 	}
 	return response.SendCount.ToInt().Uint64(), nil
 }
@@ -567,12 +580,12 @@ func (l *l2ToL1Bridge) getLatestNodeConfirmed(ctx context.Context) (*arbitrum_ro
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest node confirmed: %w, topic: %s, address: %s", err, NodeConfirmedTopic, l.rollupCore.Address())
+		return nil, fmt.Errorf("get latest node confirmed: %w, topic: %s, address: %s", err, NodeConfirmedTopic, l.rollupCore.Address())
 	}
 
 	parsed, err := l.rollupCore.ParseNodeConfirmed(lg.ToGethLog())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse node confirmed log: %w", err)
+		return nil, fmt.Errorf("parse node confirmed log: %w", err)
 	}
 
 	return parsed, nil
@@ -619,7 +632,7 @@ func (l *l2ToL1Bridge) findMatchingFinalization(
 		finalizeInboundTransferData, err := unpackFinalizeInboundTransfer(l2ToL1Finalization.Payload.Data)
 		if err != nil {
 			// should never happen
-			return false, -1, fmt.Errorf("failed to unpack finalizeInboundTransfer: %w, raw: %s",
+			return false, -1, fmt.Errorf("unpack finalizeInboundTransfer: %w, raw: %s",
 				err, hexutil.Encode(l2ToL1Finalization.Payload.Data))
 		}
 		// We only care about finalizations destined for the rebalancer contract
@@ -634,7 +647,7 @@ func (l *l2ToL1Bridge) findMatchingFinalization(
 		l2ToL1Id, err := unpackUint256(withdrawal.OutboundTransferResult)
 		if err != nil {
 			// should never happen
-			return false, -1, fmt.Errorf("failed to unpack l2 to l1 id from l2 -> l1 transfer event: %w, raw: %s",
+			return false, -1, fmt.Errorf("unpack l2 to l1 id from l2 -> l1 transfer event: %w, raw: %s",
 				err, hexutil.Encode(withdrawal.OutboundTransferResult))
 		}
 
@@ -657,7 +670,7 @@ func (l *l2ToL1Bridge) parseL2ToL1Finalizations(logs []logpoller.Log) ([]*arbitr
 		parsed, err := l.l1BridgeAdapter.ParseArbitrumL2ToL1ERC20Finalized(log.ToGethLog())
 		if err != nil {
 			// should never happen
-			return nil, fmt.Errorf("failed to parse L2 -> L1 finalization log: %w", err)
+			return nil, fmt.Errorf("parse L2 -> L1 finalization log: %w", err)
 		}
 		finalizations[i] = parsed
 	}
@@ -682,7 +695,7 @@ func (l *l2ToL1Bridge) parseL2ToL1Transfers(
 		parsed, err := l.l2BridgeAdapter.ParseArbitrumL2ToL1ERC20Sent(log.ToGethLog())
 		if err != nil {
 			// should never happen
-			return nil, nil, fmt.Errorf("failed to parse L2 -> L1 transfer log: %w", err)
+			return nil, nil, fmt.Errorf("parse L2 -> L1 transfer log: %w", err)
 		}
 		transfers[i] = parsed
 		parsedToLPLog[logKey{
@@ -709,7 +722,7 @@ func unpackFinalizeInboundTransfer(calldata []byte) (finalizeInboundTransferPara
 	// trim first 4 bytes (function signature)
 	ifaces, err := method.Inputs.Unpack(calldata[4:])
 	if err != nil {
-		return finalizeInboundTransferParams{}, fmt.Errorf("failed to unpack finalizeInboundTransfer: %w", err)
+		return finalizeInboundTransferParams{}, fmt.Errorf("unpack finalizeInboundTransfer: %w", err)
 	}
 
 	if len(ifaces) != 5 {
@@ -729,7 +742,7 @@ func unpackFinalizeInboundTransfer(calldata []byte) (finalizeInboundTransferPara
 func unpackUint256(data []byte) (*big.Int, error) {
 	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}]`, data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode uint256: %w", err)
+		return nil, fmt.Errorf("decode uint256: %w", err)
 	}
 	if len(ifaces) != 1 {
 		return nil, fmt.Errorf("expected 1 argument, got %d", len(ifaces))

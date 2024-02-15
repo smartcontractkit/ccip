@@ -580,7 +580,7 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 			if err != nil {
 				return nil, fmt.Errorf("init bridge: %w", err)
 			}
-			quorumizedBridgePayload, err := bridge.QuorumizedBridgePayload(bridgePayloads)
+			quorumizedBridgePayload, err := bridge.QuorumizedBridgePayload(bridgePayloads, p.f)
 			if err != nil {
 				return nil, fmt.Errorf("quorumized bridge payload: %w", err)
 			}

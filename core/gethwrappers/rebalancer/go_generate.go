@@ -24,3 +24,14 @@ package rebalancer
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IArbitrumGatewayRouter/IArbitrumGatewayRouter.abi ../../../contracts/solc/v0.8.19/IArbitrumGatewayRouter/IArbitrumGatewayRouter.bin ArbitrumGatewayRouter arbitrum_gateway_router
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IArbitrumTokenGateway/IArbitrumTokenGateway.abi ../../../contracts/solc/v0.8.19/IArbitrumTokenGateway/IArbitrumTokenGateway.bin ArbitrumTokenGateway arbitrum_token_gateway
 //go:generate go run ../generation/generate/wrap.go ../../../contracts/solc/v0.8.19/IAbstractArbitrumTokenGateway/IAbstractArbitrumTokenGateway.abi ../../../contracts/solc/v0.8.19/IAbstractArbitrumTokenGateway/IAbstractArbitrumTokenGateway.bin AbstractArbitrumTokenGateway abstract_arbitrum_token_gateway
+
+// Generate mocks for tests
+//go:generate mockery --quiet --dir ./generated/arbitrum_l1_bridge_adapter/ --name ArbitrumL1BridgeAdapterInterface --output ./mocks/mock_arbitrum_l1_bridge_adapter --outpkg mock_arbitrum_l1_bridge_adapter --case=underscore
+//go:generate mockery --quiet --dir ./generated/arbitrum_l2_bridge_adapter/ --name ArbitrumL2BridgeAdapterInterface --output ./mocks/mock_arbitrum_l2_bridge_adapter --outpkg mock_arbitrum_l2_bridge_adapter --case=underscore
+//go:generate mockery --quiet --dir ./generated/arbitrum_gateway_router/ --name ArbitrumGatewayRouterInterface --output ./mocks/mock_arbitrum_gateway_router --outpkg mock_arbitrum_gateway_router --case=underscore
+//go:generate mockery --quiet --dir ./generated/arbitrum_inbox/ --name ArbitrumInboxInterface --output ./mocks/mock_arbitrum_inbox --outpkg mock_arbitrum_inbox --case=underscore
+//go:generate mockery --quiet --dir ./generated/l2_arbitrum_gateway/ --name L2ArbitrumGatewayInterface --output ./mocks/mock_l2_arbitrum_gateway --outpkg mock_l2_arbitrum_gateway --case=underscore
+//go:generate mockery --quiet --dir ./generated/arbsys/ --name ArbSysInterface --output ./mocks/mock_arbsys --outpkg mock_arbsys --case=underscore
+//go:generate mockery --quiet --dir ./generated/arb_node_interface/ --name NodeInterfaceInterface --output ./mocks/mock_node_interface --outpkg mock_node_interface --case=underscore
+//go:generate mockery --quiet --dir ./generated/l2_arbitrum_messenger/ --name L2ArbitrumMessengerInterface --output ./mocks/mock_l2_arbitrum_messenger --outpkg mock_l2_arbitrum_messenger --case=underscore
+//go:generate mockery --quiet --dir ./generated/arbitrum_rollup_core/ --name ArbRollupCoreInterface --output ./mocks/mock_arbitrum_rollup_core --outpkg mock_arbitrum_rollup_core --case=underscore

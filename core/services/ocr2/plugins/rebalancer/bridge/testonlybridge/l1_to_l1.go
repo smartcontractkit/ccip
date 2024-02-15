@@ -61,7 +61,7 @@ func New(
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to register filter for source log poller: %w", err)
+		return nil, fmt.Errorf("register filter for source log poller: %w", err)
 	}
 
 	err = destLogPoller.RegisterFilter(logpoller.Filter{
@@ -76,7 +76,7 @@ func New(
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to register filter for dest log poller: %w", err)
+		return nil, fmt.Errorf("register filter for dest log poller: %w", err)
 	}
 
 	lggr = lggr.Named("TestBridge").With(
@@ -91,12 +91,12 @@ func New(
 
 	sourceAdapterWrapper, err := mock_l1_bridge_adapter.NewMockL1BridgeAdapter(common.Address(sourceAdapter), sourceClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create source adapter wrapper: %w", err)
+		return nil, fmt.Errorf("create source adapter wrapper: %w", err)
 	}
 
 	destAdapterWrapper, err := mock_l1_bridge_adapter.NewMockL1BridgeAdapter(common.Address(destAdapter), destClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create dest adapter wrapper: %w", err)
+		return nil, fmt.Errorf("create dest adapter wrapper: %w", err)
 	}
 
 	return &testBridge{
@@ -120,7 +120,7 @@ func (t *testBridge) Close(ctx context.Context) error {
 }
 
 // QuorumizedBridgePayload implements bridge.Bridge.
-func (t *testBridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) {
+func (t *testBridge) QuorumizedBridgePayload(payloads [][]byte, f int) ([]byte, error) {
 	// TODO: implement, should just return Amount and they should all be the same
 	return payloads[0], nil
 }
@@ -129,7 +129,7 @@ func (t *testBridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) 
 func (t *testBridge) GetBridgePayloadAndFee(ctx context.Context, transfer models.Transfer) ([]byte, *big.Int, error) {
 	payload, err := PackSendBridgePayload(transfer.Amount.ToInt())
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to pack bridge data: %w", err)
+		return nil, nil, fmt.Errorf("pack bridge data: %w", err)
 	}
 	return payload, big.NewInt(0), nil
 }
@@ -138,12 +138,12 @@ func (t *testBridge) GetBridgePayloadAndFee(ctx context.Context, transfer models
 func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address, remoteToken models.Address) ([]models.PendingTransfer, error) {
 	latestSourceBlock, err := t.sourceLogPoller.LatestBlock(pg.WithParentCtx(ctx))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest block: %w", err)
+		return nil, fmt.Errorf("get latest block: %w", err)
 	}
 
 	latestDestBlock, err := t.destLogPoller.LatestBlock(pg.WithParentCtx(ctx))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest block: %w", err)
+		return nil, fmt.Errorf("get latest block: %w", err)
 	}
 
 	sourceSendLogs, err := t.sourceLogPoller.LogsWithSigs(
@@ -154,7 +154,7 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get source MockERC20Sent logs: %w", err)
+		return nil, fmt.Errorf("get source MockERC20Sent logs: %w", err)
 	}
 
 	destFinalizeLogs, err := t.destLogPoller.LogsWithSigs(
@@ -165,22 +165,22 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get dest MockERC20Finalized logs: %w", err)
+		return nil, fmt.Errorf("get dest MockERC20Finalized logs: %w", err)
 	}
 
 	parsedSendLogs, parsedToLP, err := t.parseSendLogs(sourceSendLogs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse source send logs: %w", err)
+		return nil, fmt.Errorf("parse source send logs: %w", err)
 	}
 
 	parsedFinalizeLogs, err := t.parseFinalizedLogs(destFinalizeLogs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse dest finalize logs: %w", err)
+		return nil, fmt.Errorf("parse dest finalize logs: %w", err)
 	}
 
 	ready, err := t.getReadyToFinalize(parsedSendLogs, parsedFinalizeLogs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ready to finalize: %w", err)
+		return nil, fmt.Errorf("get ready to finalize: %w", err)
 	}
 
 	return t.toPendingTransfers(ready, parsedToLP), nil
@@ -195,7 +195,7 @@ func (t *testBridge) toPendingTransfers(
 		lp := parsedToLP[logKey{txHash: send.Raw.TxHash, logIdx: int64(send.Raw.Index)}]
 		bridgeData, err := PackFinalizeBridgePayload(send.Amount, send.Nonce)
 		if err != nil {
-			t.lggr.Errorw("failed to pack bridge data", "err", err)
+			t.lggr.Errorw("pack bridge data", "err", err)
 			continue
 		}
 		transfers = append(transfers, models.PendingTransfer{
@@ -268,7 +268,7 @@ func (t *testBridge) parseFinalizedLogs(logs []logpoller.Log) ([]*mock_l1_bridge
 	for _, log := range logs {
 		finalizeLog, err := t.destAdapter.ParseMockERC20Finalized(log.ToGethLog())
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse finalize log: %w", err)
+			return nil, fmt.Errorf("parse finalize log: %w", err)
 		}
 		parsedFinalizeLogs = append(parsedFinalizeLogs, finalizeLog)
 	}
@@ -290,7 +290,7 @@ func (t *testBridge) parseSendLogs(logs []logpoller.Log) (
 	for _, log := range logs {
 		sendLog, err := t.sourceAdapter.ParseMockERC20Sent(log.ToGethLog())
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse send log: %w", err)
+			return nil, nil, fmt.Errorf("parse send log: %w", err)
 		}
 		parsedSendLogs = append(parsedSendLogs, sendLog)
 		parsedToLP[logKey{txHash: log.TxHash, logIdx: log.LogIndex}] = log
@@ -305,7 +305,7 @@ func PackFinalizeBridgePayload(val1, val2 *big.Int) ([]byte, error) {
 func UnpackFinalizeBridgePayload(data []byte) (*big.Int, *big.Int, error) {
 	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}, {"type": "uint256"}]`, data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decode bridge data: %w", err)
+		return nil, nil, fmt.Errorf("decode bridge data: %w", err)
 	}
 	if len(ifaces) != 2 {
 		return nil, nil, fmt.Errorf("expected 2 arguments, got %d", len(ifaces))
@@ -322,7 +322,7 @@ func PackSendBridgePayload(val *big.Int) ([]byte, error) {
 func UnpackSendBridgePayload(data []byte) (*big.Int, error) {
 	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}]`, data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode bridge data: %w", err)
+		return nil, fmt.Errorf("decode bridge data: %w", err)
 	}
 	if len(ifaces) != 1 {
 		return nil, fmt.Errorf("expected 1 argument, got %d", len(ifaces))

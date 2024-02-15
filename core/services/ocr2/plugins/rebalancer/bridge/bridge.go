@@ -49,7 +49,7 @@ type Bridge interface {
 	// For example, if the bridge payload is a cost parameter, one implementation of this method
 	// could either produce the median of all the costs, or take the maximum cost, or the minimum
 	// cost. The choice of implementation is up to the bridge.
-	QuorumizedBridgePayload(payloads [][]byte) ([]byte, error)
+	QuorumizedBridgePayload(payloads [][]byte, f int) ([]byte, error)
 
 	Close(ctx context.Context) error
 }
@@ -125,9 +125,8 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 	var err error
 
 	switch source {
-	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector):
-		fallthrough
-	case models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector):
+	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET_ARBITRUM_1.Selector),
+		models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector):
 		// source: arbitrum l2 -> dest: ethereum l1
 		// only dest that is supported is eth mainnet if source == arb mainnet
 		// only dest that is supported is eth sepolia if source == arb sepolia
@@ -168,9 +167,8 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			l2Deps.ethClient,                         // l2 eth client
 			l1Deps.ethClient,                         // l1 eth client
 		)
-	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector):
-		fallthrough
-	case models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector):
+	case models.NetworkSelector(chainsel.ETHEREUM_MAINNET.Selector),
+		models.NetworkSelector(chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector):
 		// source: Ethereum L1 -> dest: Arbitrum L2
 		// only dest that is supported is arbitrum mainnet if source == eth mainnet
 		// only dest that is supported is arbitrum sepolia if source == eth sepolia
@@ -208,13 +206,10 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			l1Deps.lp,        // l1 log poller
 			l2Deps.lp,        // l2 log poller
 		)
-	case models.NetworkSelector(chainsel.GETH_TESTNET.Selector):
-		fallthrough
-	case models.NetworkSelector(chainsel.TEST_90000001.Selector):
-		fallthrough
-	case models.NetworkSelector(chainsel.TEST_90000002.Selector):
-		fallthrough
-	case models.NetworkSelector(chainsel.TEST_90000003.Selector):
+	case models.NetworkSelector(chainsel.GETH_TESTNET.Selector),
+		models.NetworkSelector(chainsel.TEST_90000001.Selector),
+		models.NetworkSelector(chainsel.TEST_90000002.Selector),
+		models.NetworkSelector(chainsel.TEST_90000003.Selector):
 		// these chains are only ever used for tests
 		// in tests we only ever deploy the MockL1Bridge adapter
 		// so this is an "L1 to L1" bridge setup, but not really

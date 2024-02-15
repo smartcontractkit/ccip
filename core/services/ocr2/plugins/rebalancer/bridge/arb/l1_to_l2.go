@@ -2,12 +2,15 @@ package arb
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -59,12 +62,12 @@ type l1ToL2Bridge struct {
 
 	l1Rebalancer        *rebalancer.Rebalancer
 	l2RebalancerAddress common.Address
-	l1BridgeAdapter     *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapter
+	l1BridgeAdapter     arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterInterface
 
 	// Arbitrum contract wrappers
-	l1GatewayRouter *arbitrum_gateway_router.ArbitrumGatewayRouter
-	l1Inbox         *arbitrum_inbox.ArbitrumInbox
-	l2Gateway       *l2_arbitrum_gateway.L2ArbitrumGateway
+	l1GatewayRouter arbitrum_gateway_router.ArbitrumGatewayRouterInterface
+	l1Inbox         arbitrum_inbox.ArbitrumInboxInterface
+	l2Gateway       l2_arbitrum_gateway.L2ArbitrumGatewayInterface
 
 	l1Client client.Client
 	l2Client client.Client
@@ -103,17 +106,17 @@ func NewL1ToL2Bridge(
 
 	l1GatewayRouter, err := arbitrum_gateway_router.NewArbitrumGatewayRouter(l1GatewayRouterAddress, l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate L1 gateway router at %s: %w", l1GatewayRouterAddress, err)
+		return nil, fmt.Errorf("instantiate L1 gateway router at %s: %w", l1GatewayRouterAddress, err)
 	}
 
 	l1Inbox, err := arbitrum_inbox.NewArbitrumInbox(l1InboxAddress, l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate L1 inbox at %s: %w", l1InboxAddress, err)
+		return nil, fmt.Errorf("instantiate L1 inbox at %s: %w", l1InboxAddress, err)
 	}
 
 	l1BridgeAdapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(l1BridgeAdapterAddress, l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate L1 bridge adapter at %s: %w", l1BridgeAdapterAddress, err)
+		return nil, fmt.Errorf("instantiate L1 bridge adapter at %s: %w", l1BridgeAdapterAddress, err)
 	}
 
 	l1FilterName := fmt.Sprintf("ArbitrumL1ToL2Bridge-%s-%s-%s", l1BridgeAdapterAddress.String(), localChain.Name, remoteChain.Name)
@@ -126,35 +129,35 @@ func NewL1ToL2Bridge(
 		Retention: DurationMonth,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to register L1 log filter: %w", err)
+		return nil, fmt.Errorf("register L1 log filter: %w", err)
 	}
 
 	// figure out which gateway to watch for the token on L2
 	l1Rebalancer, err := rebalancer.NewRebalancer(l1RebalancerAddress, l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate rebalancer at %s: %w", l1RebalancerAddress, err)
+		return nil, fmt.Errorf("instantiate rebalancer at %s: %w", l1RebalancerAddress, err)
 	}
 
 	l1Token, err := l1Rebalancer.ILocalToken(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get local token from rebalancer: %w", err)
+		return nil, fmt.Errorf("get local token from rebalancer: %w", err)
 	}
 
 	// get the gateway on L1 and then it's counterpart gateway on L2
 	// that's the one we need to watch
 	l1TokenGateway, err := l1GatewayRouter.GetGateway(nil, l1Token)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get gateway for token %s: %w", l1Token, err)
+		return nil, fmt.Errorf("get gateway for token %s: %w", l1Token, err)
 	}
 
 	abstractGateway, err := abstract_arbitrum_token_gateway.NewAbstractArbitrumTokenGateway(l1TokenGateway, l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate abstract gateway at %s: %w", l1TokenGateway, err)
+		return nil, fmt.Errorf("instantiate abstract gateway at %s: %w", l1TokenGateway, err)
 	}
 
 	l2Gateway, err := abstractGateway.CounterpartGateway(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get counterpart gateway for gateway %s: %w", l1TokenGateway, err)
+		return nil, fmt.Errorf("get counterpart gateway for gateway %s: %w", l1TokenGateway, err)
 	}
 
 	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2Events-%s-%s", localChain.Name, remoteChain.Name)
@@ -171,12 +174,12 @@ func NewL1ToL2Bridge(
 		Retention: DurationMonth,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to register L2 log filter: %w", err)
+		return nil, fmt.Errorf("register L2 log filter: %w", err)
 	}
 
 	l2GatewayWrapper, err := l2_arbitrum_gateway.NewL2ArbitrumGateway(l2Gateway, l2Client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate l2 arbitrum gateway at %s: %w", l2Gateway, err)
+		return nil, fmt.Errorf("instantiate l2 arbitrum gateway at %s: %w", l2Gateway, err)
 	}
 
 	lggr = lggr.Named("ArbitrumL1ToL2Bridge").With(
@@ -229,9 +232,8 @@ func (l *l1ToL2Bridge) GetTransfers(
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
-	// TODO: check if err is sql.ErrNoRows
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ArbitrumL1ToL2ERC20Sent events from L1 bridge adapter: %w", err)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("get ArbitrumL1ToL2ERC20Sent events from L1 bridge adapter: %w", err)
 	}
 
 	depositFinalizedLogs, err := l.l2LogPoller.IndexedLogsCreatedAfter(
@@ -245,9 +247,8 @@ func (l *l1ToL2Bridge) GetTransfers(
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
-	// TODO: check if err is sql.ErrNoRows
-	if err != nil {
-		return nil, fmt.Errorf("failed to get DepositFinalized events from L2 gateway: %w", err)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("get DepositFinalized events from L2 gateway: %w", err)
 	}
 
 	liquidityTransferredLogs, err := l.l2LogPoller.IndexedLogsCreatedAfter(
@@ -261,8 +262,8 @@ func (l *l1ToL2Bridge) GetTransfers(
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get LiquidityTransferred events from L2 rebalancer: %w", err)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("get LiquidityTransferred events from L2 rebalancer: %w", err)
 	}
 
 	// the log poller SQL queries return logs sorted by block number and log index already
@@ -280,32 +281,32 @@ func (l *l1ToL2Bridge) GetTransfers(
 
 	parsedERC20Sent, parsedToLP, err := l.parseL1ToL2Transfers(erc20SentLogs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse L1 -> L2 transfers: %w", err)
+		return nil, fmt.Errorf("parse L1 -> L2 transfers: %w", err)
 	}
 
 	parsedDepositFinalized, err := l.parseDepositFinalized(depositFinalizedLogs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse DepositFinalized logs: %w", err)
+		return nil, fmt.Errorf("parse DepositFinalized logs: %w", err)
 	}
 
 	parsedLiquidityTransferred, err := l.parseLiquidityTransferred(liquidityTransferredLogs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse LiquidityTransferred logs: %w", err)
+		return nil, fmt.Errorf("parse LiquidityTransferred logs: %w", err)
 	}
 
-	// unfortunately its not easy to match DepositFinalized events with ERC20Sent events
-	// reason being is that arbitrum does not emit any identifying information as part of the DepositFinalized
+	// Unfortunately its not easy to match DepositFinalized events with ERC20Sent events.
+	// Reason being that arbitrum does not emit any identifying information as part of the DepositFinalized
 	// event, such as the l1 to l2 tx id. This is only available as part of the calldata for when the L2 calls
 	// submitRetryable on the ArbRetryableTx precompile.
 	// e.g https://sepolia.arbiscan.io/tx/0xce0d0d7e74f184fa8cb264b6d9aab5ced159faf3d0d9ae54b67fd40ba9d965a7
 	// therefore we're kind of relegated here to doing a simple count check - filter out all of the
 	// ERC20Sent logs destined for the rebalancer on L2 and all the DepositFinalized logs that
 	// pay out to the rebalancer on L2.
-	// this isn't a big deal because we can assume that the earlier ERC20Sent logs on L1
+	// We can _probably_ assume that the earlier ERC20Sent logs on L1
 	// are more likely to be finalizedNotExecuted than later ones.
 	notReady, ready, readyData, executed, err := l.partitionTransfers(localToken, parsedERC20Sent, parsedDepositFinalized, parsedLiquidityTransferred)
 	if err != nil {
-		return nil, fmt.Errorf("failed to partition logs into not-ready, ready, finalized and executed states: %w", err)
+		return nil, fmt.Errorf("partition logs into not-ready, ready, finalized and executed states: %w", err)
 	}
 
 	return l.toPendingTransfers(notReady, ready, readyData, executed, parsedToLP)
@@ -407,7 +408,7 @@ func (l *l1ToL2Bridge) partitionTransfers(
 	// figure out if any of the ready have been executed
 	ready, executed, err = l.filterExecuted(ready, liquidityTransferredLogs)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to filter executed transfers: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("filter executed transfers: %w", err)
 	}
 	// get the readyData
 	// this is just going to be the L1 to L2 tx id that is emitted in the ERC20Sent log itself
@@ -449,12 +450,12 @@ func (l *l1ToL2Bridge) matchingExecutionExists(
 		// decode the bridge specific data, which should be the l1 -> l2 tx id
 		ltL1ToL2TxId, err := unpackUint256(ltLog.BridgeSpecificData)
 		if err != nil {
-			return false, fmt.Errorf("failed to unpack bridge specific data from LiquidityTransferred log: %w, data: %s",
+			return false, fmt.Errorf("unpack bridge specific data from LiquidityTransferred log: %w, data: %s",
 				err, hexutil.Encode(ltLog.BridgeSpecificData))
 		}
 		l1ToL2TxId, err := unpackUint256(readyCandidate.OutboundTransferResult)
 		if err != nil {
-			return false, fmt.Errorf("failed to unpack outbound transfer result from ArbitrumL1ToL2ERC20Sent log: %w, data: %s",
+			return false, fmt.Errorf("unpack outbound transfer result from ArbitrumL1ToL2ERC20Sent log: %w, data: %s",
 				err, hexutil.Encode(readyCandidate.OutboundTransferResult))
 		}
 		if l1ToL2TxId.Cmp(ltL1ToL2TxId) == 0 {
@@ -508,7 +509,7 @@ func (l *l1ToL2Bridge) parseL1ToL2Transfers(lgs []logpoller.Log) (
 		parsed, err := l.l1BridgeAdapter.ParseArbitrumL1ToL2ERC20Sent(lg.ToGethLog())
 		if err != nil {
 			// should never happen
-			return nil, nil, fmt.Errorf("failed to parse L1 -> L2 transfer log: %w", err)
+			return nil, nil, fmt.Errorf("parse L1 -> L2 transfer log: %w", err)
 		}
 		transfers[i] = parsed
 		parsedToLPLog[logKey{
@@ -525,7 +526,7 @@ func (l *l1ToL2Bridge) parseDepositFinalized(lgs []logpoller.Log) ([]*l2_arbitru
 		parsed, err := l.l2Gateway.ParseDepositFinalized(lg.ToGethLog())
 		if err != nil {
 			// should never happen
-			return nil, fmt.Errorf("failed to parse DepositFinalized log: %w", err)
+			return nil, fmt.Errorf("parse DepositFinalized log: %w", err)
 		}
 		finalized[i] = parsed
 	}
@@ -538,16 +539,47 @@ func (l *l1ToL2Bridge) parseLiquidityTransferred(lgs []logpoller.Log) ([]*rebala
 		parsed, err := l.l1Rebalancer.ParseLiquidityTransferred(lg.ToGethLog())
 		if err != nil {
 			// should never happen
-			return nil, fmt.Errorf("failed to parse LiquidityTransferred log: %w", err)
+			return nil, fmt.Errorf("parse LiquidityTransferred log: %w", err)
 		}
 		transferred[i] = parsed
 	}
 	return transferred, nil
 }
 
-func (l *l1ToL2Bridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) {
+func (l *l1ToL2Bridge) QuorumizedBridgePayload(payloads [][]byte, f int) ([]byte, error) {
+	if len(payloads) <= f {
+		return nil, fmt.Errorf("not enough payloads to quorumize, need at least f+1: len(payloads) = %d, f = %d", len(payloads), f)
+	}
 	// TODO: decode and take top n-f index after decoding and sorting asc gasLimit/maxSubmissionCost/maxFeePerGas
-	return payloads[0], nil
+	var (
+		gasLimits          []*big.Int
+		maxSubmissionCosts []*big.Int
+		maxFeePerGases     []*big.Int
+	)
+	for _, payload := range payloads {
+		params, err := UnpackSendBridgePayload(payload)
+		if err != nil {
+			return nil, fmt.Errorf("decode bridge payload: %w", err)
+		}
+		gasLimits = append(gasLimits, params.GasLimit)
+		maxSubmissionCosts = append(maxSubmissionCosts, params.MaxSubmissionCost)
+		maxFeePerGases = append(maxFeePerGases, params.MaxFeePerGas)
+	}
+	slices.SortFunc(gasLimits, func(i, j *big.Int) int {
+		return i.Cmp(j)
+	})
+	slices.SortFunc(maxSubmissionCosts, func(i, j *big.Int) int {
+		return i.Cmp(j)
+	})
+	slices.SortFunc(maxFeePerGases, func(i, j *big.Int) int {
+		return i.Cmp(j)
+	})
+	// return f-th highest gasLimit/maxSubmissionCost/maxFeePerGas
+	return PackSendBridgePayload(
+		gasLimits[len(gasLimits)-f-1],
+		maxSubmissionCosts[len(maxSubmissionCosts)-f-1],
+		maxFeePerGases[len(maxFeePerGases)-f-1],
+	)
 }
 
 // GetBridgePayloadAndFee implements bridge.Bridge
@@ -563,13 +595,13 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 		Context: ctx,
 	}, common.Address(transfer.LocalTokenAddress))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get L1 gateway for local token %s: %w",
+		return nil, nil, fmt.Errorf("get L1 gateway for local token %s: %w",
 			transfer.LocalTokenAddress, err)
 	}
 
 	l1TokenGateway, err := arbitrum_token_gateway.NewArbitrumTokenGateway(l1Gateway, l.l1Client)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to instantiate L1 token gateway at %s: %w",
+		return nil, nil, fmt.Errorf("instantiate L1 token gateway at %s: %w",
 			l1Gateway, err)
 	}
 
@@ -578,7 +610,7 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 	// although it is public, is not accessible via a getter function on the token gateway interface
 	abstractGateway, err := abstract_arbitrum_token_gateway.NewAbstractArbitrumTokenGateway(l1Gateway, l.l1Client)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to instantiate abstract gateway at %s: %w",
+		return nil, nil, fmt.Errorf("instantiate abstract gateway at %s: %w",
 			l1Gateway, err)
 	}
 
@@ -586,7 +618,7 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 		Context: ctx,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get counterpart gateway for L1 gateway %s: %w",
+		return nil, nil, fmt.Errorf("get counterpart gateway for L1 gateway %s: %w",
 			l1Gateway, err)
 	}
 
@@ -616,7 +648,7 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 		[]byte{},                                   // extra data (unused here)
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get finalizeInboundTransfer calldata: %w", err)
+		return nil, nil, fmt.Errorf("get finalizeInboundTransfer calldata: %w", err)
 	}
 	retryableData.Data = finalizeInboundTransferCalldata
 
@@ -631,7 +663,7 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 
 	l1BaseFee, err := l.l1Client.SuggestGasPrice(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get L1 base fee: %w", err)
+		return nil, nil, fmt.Errorf("get L1 base fee: %w", err)
 	}
 
 	return l.estimateAll(ctx, retryableData, l1BaseFee)
@@ -644,17 +676,17 @@ func (l *l1ToL2Bridge) estimateAll(
 ) ([]byte, *big.Int, error) {
 	l2MaxFeePerGas, err := l.estimateMaxFeePerGasOnL2(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to estimate max fee per gas on L2: %w", err)
+		return nil, nil, fmt.Errorf("estimate max fee per gas on L2: %w", err)
 	}
 
 	maxSubmissionFee, err := l.estimateMaxSubmissionFee(ctx, l1BaseFee, len(retryableData.Data))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to estimate max submission fee: %w", err)
+		return nil, nil, fmt.Errorf("estimate max submission fee: %w", err)
 	}
 
 	gasLimit, err := l.estimateRetryableGasLimit(ctx, retryableData)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to estimate retryable gas limit: %w", err)
+		return nil, nil, fmt.Errorf("estimate retryable gas limit: %w", err)
 	}
 
 	deposit := new(big.Int).Mul(gasLimit, l2MaxFeePerGas)
@@ -672,7 +704,7 @@ func (l *l1ToL2Bridge) estimateAll(
 		MaxFeePerGas:      l2MaxFeePerGas,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to pack bridge calldata for bridge adapter: %w", err)
+		return nil, nil, fmt.Errorf("pack bridge calldata for bridge adapter: %w", err)
 	}
 	bridgeCalldata = bridgeCalldata[4:] // remove method id
 	return bridgeCalldata, deposit, nil
@@ -681,7 +713,7 @@ func (l *l1ToL2Bridge) estimateAll(
 func (l *l1ToL2Bridge) estimateRetryableGasLimit(ctx context.Context, rd RetryableData) (*big.Int, error) {
 	packed, err := nodeInterfaceABI.Pack("estimateRetryableTicket",
 		rd.From,
-		assets.Ether(1),
+		assets.Ether(1).ToInt(),
 		rd.To,
 		rd.L2CallValue,
 		rd.ExcessFeeRefundAddr,
@@ -689,7 +721,7 @@ func (l *l1ToL2Bridge) estimateRetryableGasLimit(ctx context.Context, rd Retryab
 		rd.Data,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to pack estimateRetryableTicket call: %w", err)
+		return nil, fmt.Errorf("pack estimateRetryableTicket call: %w", err)
 	}
 
 	gasLimit, err := l.l2Client.EstimateGas(ctx, ethereum.CallMsg{
@@ -715,7 +747,7 @@ func (l *l1ToL2Bridge) estimateMaxSubmissionFee(
 		Context: ctx,
 	}, big.NewInt(int64(dataLength)), l1BaseFee)
 	if err != nil {
-		return nil, fmt.Errorf("failed to calculate retryable submission fee: %w", err)
+		return nil, fmt.Errorf("calculate retryable submission fee: %w", err)
 	}
 
 	submissionFee = submissionFee.Mul(submissionFee, submissionFeeMultiplier)
@@ -725,7 +757,7 @@ func (l *l1ToL2Bridge) estimateMaxSubmissionFee(
 func (l *l1ToL2Bridge) estimateMaxFeePerGasOnL2(ctx context.Context) (*big.Int, error) {
 	l2BaseFee, err := l.l2Client.SuggestGasPrice(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to suggest gas price on L2: %w", err)
+		return nil, fmt.Errorf("suggest gas price on L2: %w", err)
 	}
 
 	l2BaseFee = l2BaseFee.Mul(l2BaseFee, l2BaseFeeMultiplier)
@@ -733,10 +765,10 @@ func (l *l1ToL2Bridge) estimateMaxFeePerGasOnL2(ctx context.Context) (*big.Int, 
 }
 
 func (l *l1ToL2Bridge) Close(ctx context.Context) error {
-	// close log poller filters
-	err := l.l2LogPoller.UnregisterFilter(l.l2FilterName)
-	err2 := l.l1LogPoller.UnregisterFilter(l.l1FilterName)
-	return multierr.Combine(err, err2)
+	return multierr.Combine(
+		l.l2LogPoller.UnregisterFilter(l.l2FilterName),
+		l.l1LogPoller.UnregisterFilter(l.l1FilterName),
+	)
 }
 
 type RetryableData struct {
@@ -762,4 +794,24 @@ type RetryableData struct {
 func toHash(selector models.NetworkSelector) common.Hash {
 	encoded := hexutil.EncodeUint64(uint64(selector))
 	return common.HexToHash(encoded)
+}
+
+func UnpackSendBridgePayload(payload []byte) (out arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterSendERC20Params, err error) {
+	ifaces, err := l1AdapterABI.Methods["exposeSendERC20Params"].Inputs.UnpackValues(payload)
+	if err != nil {
+		return out, fmt.Errorf("unpack bridge payload: %w", err)
+	}
+	if len(ifaces) != 1 {
+		return out, fmt.Errorf("expected 1 value, got %d", len(ifaces))
+	}
+	out = *abi.ConvertType(ifaces[0], new(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterSendERC20Params)).(*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterSendERC20Params)
+	return out, nil
+}
+
+func PackSendBridgePayload(gasLimit, maxSubmissionCost, maxFeePerGas *big.Int) ([]byte, error) {
+	return l1AdapterABI.Methods["exposeSendERC20Params"].Inputs.Pack(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterSendERC20Params{
+		GasLimit:          gasLimit,
+		MaxSubmissionCost: maxSubmissionCost,
+		MaxFeePerGas:      maxFeePerGas,
+	})
 }
