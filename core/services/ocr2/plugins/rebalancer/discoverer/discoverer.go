@@ -82,18 +82,17 @@ func (f *factory) initDiscoverer(selector models.NetworkSelector, rebalancerAddr
 		}
 	}
 
-	f.cachedDiscoverers.Store(mapKey{selector, rebalancerAddress}, d)
+	f.cachedDiscoverers.Store(f.cacheKey(selector, rebalancerAddress), d)
 	return d, nil
 }
 
-type mapKey struct {
-	selector models.NetworkSelector
-	address  models.Address
-}
-
 func (f *factory) getDiscoverer(selector models.NetworkSelector, rebalancerAddress models.Address) (Discoverer, error) {
-	if d, ok := f.cachedDiscoverers.Load(mapKey{selector, rebalancerAddress}); ok {
+	if d, ok := f.cachedDiscoverers.Load(f.cacheKey(selector, rebalancerAddress)); ok {
 		return d.(Discoverer), nil
 	}
 	return nil, ErrNotFound
+}
+
+func (f *factory) cacheKey(selector models.NetworkSelector, rebalancerAddress models.Address) string {
+	return fmt.Sprintf("%d-%s", selector, rebalancerAddress.String())
 }

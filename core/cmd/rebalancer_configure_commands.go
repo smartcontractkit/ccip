@@ -228,7 +228,7 @@ liquidityManagerAddress = "%s"
 liquidityManagerNetwork = "%d"
 closePluginTimeoutSec = 10
 [pluginConfig.rebalancerConfig]
-type = "pingpong"
+type = "ping-pong"
 `
 	lggr.Info("Liquidity manager network:", args.LiquidityManagerNetwork)
 	sp := fmt.Sprintf(RebalancerTemplate,

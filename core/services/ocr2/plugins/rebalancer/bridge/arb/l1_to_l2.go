@@ -147,7 +147,7 @@ func NewL1ToL2Bridge(
 	// that's the one we need to watch
 	l1TokenGateway, err := l1GatewayRouter.GetGateway(nil, l1Token)
 	if err != nil {
-		return nil, fmt.Errorf("get gateway for token %s: %w", l1Token, err)
+		return nil, fmt.Errorf("get gateway for token %s: %w, gateway router: %s", l1Token, err, l1GatewayRouterAddress)
 	}
 
 	abstractGateway, err := abstract_arbitrum_token_gateway.NewAbstractArbitrumTokenGateway(l1TokenGateway, l1Client)

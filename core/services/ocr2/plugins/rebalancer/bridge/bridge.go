@@ -61,10 +61,6 @@ type Factory interface {
 
 type Opt func(c *factory)
 
-type mapKey struct {
-	from, to models.NetworkSelector
-}
-
 type evmDep struct {
 	lp                logpoller.LogPoller
 	ethClient         client.Client
@@ -113,6 +109,7 @@ func (f *factory) NewBridge(source, dest models.NetworkSelector) (Bridge, error)
 
 	bridge, err := f.GetBridge(source, dest)
 	if errors.Is(err, ErrBridgeNotFound) {
+		f.lggr.Infow("Bridge not found, initializing new bridge", "source", source, "dest", dest)
 		return f.initBridge(source, dest)
 	}
 	return bridge, err
@@ -154,11 +151,17 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		if !ok {
 			return nil, fmt.Errorf("bridge adapter not found for dest selector %d in deps for source selector %d", source, dest)
 		}
+		f.lggr.Infow("addresses check",
+			"l1RollupAddress", arb.AllContracts[uint64(dest)]["Rollup"],
+			"l1RebalancerAddress", l1Deps.rebalancerAddress,
+			"l1BridgeAdapter", l1BridgeAdapter,
+			"l2BridgeAdapter", l2BridgeAdapter,
+		)
 		bridge, err = arb.NewL2ToL1Bridge(
 			f.lggr,
 			source,
 			dest,
-			arb.AllContracts[uint64(source)].L1.RollupAddress,
+			arb.AllContracts[uint64(dest)]["Rollup"], // l1 rollup address
 			common.Address(l1Deps.rebalancerAddress), // l1 rebalancer address
 			common.Address(l2BridgeAdapter),          // l2 bridge adapter address
 			common.Address(l1BridgeAdapter),          // l1 bridge adapter address
@@ -192,6 +195,13 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		if !ok {
 			return nil, fmt.Errorf("bridge adapter not found for source selector %d in deps for selector %d", source, dest)
 		}
+		f.lggr.Infow("addresses check",
+			"l1GatewayRouterAddress", arb.AllContracts[uint64(source)]["L1GatewayRouter"],
+			"inboxAddress", arb.AllContracts[uint64(source)]["L1Inbox"],
+			"l1RebalancerAddress", l1Deps.rebalancerAddress,
+			"l2RebalancerAddress", l2Deps.rebalancerAddress,
+			"l1BridgeAdapter", l1BridgeAdapter,
+		)
 		bridge, err = arb.NewL1ToL2Bridge(
 			f.lggr,
 			source,
@@ -199,8 +209,8 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			common.Address(l1Deps.rebalancerAddress), // l1 rebalancer address
 			common.Address(l2Deps.rebalancerAddress), // l2 rebalancer address
 			common.Address(l1BridgeAdapter),          // l1 bridge adapter address
-			arb.AllContracts[uint64(source)].L1.GatewayRouterAddress, // l1 gateway router address
-			arb.AllContracts[uint64(source)].L1.InboxAddress,         // l1 inbox address
+			arb.AllContracts[uint64(source)]["L1GatewayRouter"], // l1 gateway router address
+			arb.AllContracts[uint64(source)]["L1Inbox"],         // l1 inbox address
 			l1Deps.ethClient, // l1 eth client
 			l2Deps.ethClient, // l2 eth client
 			l1Deps.lp,        // l1 log poller
@@ -253,14 +263,12 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 		return nil, err
 	}
 
-	key := mapKey{from: source, to: dest}
-	f.cachedBridges.Store(key, bridge)
+	f.cachedBridges.Store(f.cacheKey(source, dest), bridge)
 	return bridge, nil
 }
 
 func (f *factory) GetBridge(source, dest models.NetworkSelector) (Bridge, error) {
-	key := mapKey{from: source, to: dest}
-	bridge, exists := f.cachedBridges.Load(key)
+	bridge, exists := f.cachedBridges.Load(f.cacheKey(source, dest))
 	if !exists {
 		return nil, ErrBridgeNotFound
 	}
@@ -270,4 +278,8 @@ func (f *factory) GetBridge(source, dest models.NetworkSelector) (Bridge, error)
 		return nil, fmt.Errorf("cached bridge has wrong type: %T", bridge)
 	}
 	return b, nil
+}
+
+func (f *factory) cacheKey(source, dest models.NetworkSelector) string {
+	return fmt.Sprintf("%d-%d", source, dest)
 }

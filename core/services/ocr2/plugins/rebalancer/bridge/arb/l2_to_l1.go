@@ -258,6 +258,7 @@ func (l *l2ToL1Bridge) Close(ctx context.Context) error {
 
 // GetTransfers implements bridge.Bridge.
 func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address, l1Token models.Address) ([]models.PendingTransfer, error) {
+	lggr := l.lggr.With("l2Token", l2Token, "l1Token", l1Token)
 	// get all the L2 -> L1 transfers in the past 14 days for the given l2Token.
 	// that should be enough time to catch all the transfers that were potentially not finalized.
 	// TODO: make more performant. Perhaps filter on more than just one topic here to avoid doing in-memory filtering.
@@ -288,6 +289,11 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("get L2 -> L1 finalizations from log poller (on L1): %w", err)
 	}
+
+	lggr.Infow("Got L2 -> L1 transfers and finalizations",
+		"l2ToL1Transfers", l2ToL1Transfers,
+		"l2ToL1Finalizations", l2ToL1Finalizations,
+	)
 
 	parsedL2toL1Transfers, parsedToLP, err := l.parseL2ToL1Transfers(l2ToL1Transfers)
 	if err != nil {
@@ -404,6 +410,7 @@ func (l *l2ToL1Bridge) getFinalizationData(
 	bool,
 	error,
 ) {
+	l.lggr.Infow("Getting finalization data for transfer", "transfer", transfer)
 	// function executeTransaction(
 	//
 	//	  bytes32[] calldata proof,
@@ -469,6 +476,7 @@ func (l *l2ToL1Bridge) getFinalizationData(
 	if err != nil {
 		return nil, false, fmt.Errorf("parse TxToL1 log in tx %s: %w", receipt.TxHash, err)
 	}
+	l.lggr.Infow("Got logs for transfer, generating args", "l2ToL1Tx", l2ToL1Tx, "withdrawalInitiated", withdrawalInitiated, "txToL1", txToL1)
 	// argument 0: proof
 	arg0Proof, err := l.getProof(ctx, withdrawalInitiated.L2ToL1Id)
 	if err != nil {
@@ -532,6 +540,7 @@ func (l *l2ToL1Bridge) getL1BlockFromRPC(ctx context.Context, txHash common.Hash
 }
 
 func (l *l2ToL1Bridge) getProof(ctx context.Context, l2ToL1Id *big.Int) ([][32]byte, error) {
+	l.lggr.Infow("Getting proof for l2ToL1Id", "l2ToL1Id", l2ToL1Id)
 	// 1. Get the latest NodeConfirmed event on L1, which indicates the latest node that was confirmed by the rollup.
 	latestNodeConfirmed, err := l.getLatestNodeConfirmed(ctx)
 	if err != nil {
@@ -597,11 +606,12 @@ func (l *l2ToL1Bridge) filterOutFinalizedTransfers(
 	[]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
 	error,
 ) {
+	l.lggr.Infow("Filtering out finalized transfers", "transfers", l2ToL1Transfers, "finalizations", l2ToL1Finalizations)
 	var unfinalized []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent
 	for _, l2ToL1Transfer := range l2ToL1Transfers {
 		// We only care about transfers where the recipient is the l1 rebalancer contract
 		if l2ToL1Transfer.Recipient != l.l1RebalancerAddress {
-			l.lggr.Debugw("Ignoring L2 -> L1 transfer not destined for rebalancer", "transfer", l2ToL1Transfer.Raw.TxHash)
+			l.lggr.Infow("Ignoring L2 -> L1 transfer not destined for rebalancer", "transfer", l2ToL1Transfer.Raw.TxHash)
 			continue
 		}
 		foundFinalized, finalizedIdx, err := l.findMatchingFinalization(l2ToL1Transfer, l2ToL1Finalizations)
@@ -609,13 +619,14 @@ func (l *l2ToL1Bridge) filterOutFinalizedTransfers(
 			return nil, fmt.Errorf("unable to find matching finalization (withdrawal tx: %s): %w", l2ToL1Transfer.Raw.TxHash, err)
 		}
 		if foundFinalized {
-			l.lggr.Debugw("Ignoring L2 -> L1 transfer that has been finalized",
+			l.lggr.Infow("Ignoring L2 -> L1 transfer that has been finalized",
 				"transfer", l2ToL1Transfer.Raw.TxHash,
 				"finalization", l2ToL1Finalizations[finalizedIdx].Raw.TxHash)
 			continue
 		}
 		unfinalized = append(unfinalized, l2ToL1Transfer)
 	}
+	l.lggr.Infow("Filtered out finalized transfers", "unfinalized", unfinalized)
 
 	return unfinalized, nil
 }
@@ -624,6 +635,7 @@ func (l *l2ToL1Bridge) findMatchingFinalization(
 	withdrawal *arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
 	finalizations []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized,
 ) (foundFinalized bool, idx int, err error) {
+	l.lggr.Infow("Finding matching finalization", "withdrawal", withdrawal, "finalizations", finalizations)
 	idx = -1
 	for i, l2ToL1Finalization := range finalizations {
 		// the destination address is in the payload data, need to unpack it to figure out
@@ -636,7 +648,7 @@ func (l *l2ToL1Bridge) findMatchingFinalization(
 		}
 		// We only care about finalizations destined for the rebalancer contract
 		if finalizeInboundTransferData.l1Receiver != l.l1RebalancerAddress {
-			l.lggr.Debugw("Ignoring L2 -> L1 finalization not destined for rebalancer", "finalization", l2ToL1Finalization)
+			l.lggr.Infow("Ignoring L2 -> L1 finalization not destined for rebalancer", "finalization", l2ToL1Finalization)
 			continue
 		}
 
@@ -660,10 +672,17 @@ func (l *l2ToL1Bridge) findMatchingFinalization(
 		idx = i
 		break
 	}
+	if foundFinalized {
+		l.lggr.Infow("Found matching finalization", "foundFinalized", foundFinalized, "idx", idx, "withdrawal", withdrawal, "finalizations", finalizations)
+	} else {
+		l.lggr.Infow("No matching finalization", "foundFinalized", foundFinalized, "idx", idx, "withdrawal", withdrawal, "finalizations", finalizations)
+	}
+
 	return foundFinalized, idx, nil
 }
 
 func (l *l2ToL1Bridge) parseL2ToL1Finalizations(logs []logpoller.Log) ([]*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, error) {
+	l.lggr.Infow("Parsing L2 -> L1 finalizations", "logs", logs)
 	finalizations := make([]*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, len(logs))
 	for i, log := range logs {
 		parsed, err := l.l1BridgeAdapter.ParseArbitrumL2ToL1ERC20Finalized(log.ToGethLog())
@@ -673,6 +692,7 @@ func (l *l2ToL1Bridge) parseL2ToL1Finalizations(logs []logpoller.Log) ([]*arbitr
 		}
 		finalizations[i] = parsed
 	}
+	l.lggr.Infow("Parsed L2 -> L1 finalizations", "finalizations", finalizations)
 	return finalizations, nil
 }
 
@@ -688,6 +708,7 @@ func (l *l2ToL1Bridge) parseL2ToL1Transfers(
 	map[logKey]logpoller.Log,
 	error,
 ) {
+	l.lggr.Infow("Parsing L2 -> L1 transfers", "logs", logs)
 	transfers := make([]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent, len(logs))
 	parsedToLPLog := make(map[logKey]logpoller.Log)
 	for i, log := range logs {
@@ -702,6 +723,7 @@ func (l *l2ToL1Bridge) parseL2ToL1Transfers(
 			logIndex: log.LogIndex,
 		}] = log
 	}
+	l.lggr.Infow("Parsed L2 -> L1 transfers", "transfers", transfers)
 	return transfers, parsedToLPLog, nil
 }
 

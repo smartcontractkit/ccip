@@ -71,7 +71,8 @@ func (p *Plugin) Query(_ context.Context, outcomeCtx ocr3types.OutcomeContext) (
 }
 
 func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeContext, _ ocrtypes.Query) (ocrtypes.Observation, error) {
-	p.lggr.Infow("in observation", "seqNr", outcomeCtx.SeqNr)
+	lggr := p.lggr.With("seqNr", outcomeCtx.SeqNr)
+	lggr.Infow("in observation", "seqNr", outcomeCtx.SeqNr)
 
 	if err := p.syncGraphEdges(ctx); err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph edges: %w", err)
@@ -97,7 +98,7 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		return ocrtypes.Observation{}, fmt.Errorf("resolve proposed transfers: %w", err)
 	}
 
-	p.lggr.Infow("finished observing",
+	lggr.Infow("finished observing",
 		"networkLiquidities", networkLiquidities,
 		"pendingTransfers", pendingTransfers,
 		"edges", edges,
@@ -125,8 +126,8 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query ocrtyp
 }
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, aos []ocrtypes.AttributedObservation) (ocr3types.Outcome, error) {
-	lggr := p.lggr.With("seqNr", outctx.SeqNr)
-	lggr.Infow("in outcome", "seqNr", outctx.SeqNr, "numObs", len(aos))
+	lggr := p.lggr.With("seqNr", outctx.SeqNr, "numObservations", len(aos))
+	lggr.Infow("in outcome")
 
 	// Gather all the observations.
 	observations := make([]models.Observation, 0, len(aos))
@@ -184,7 +185,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	defer p.mu.RUnlock()
 
 	lggr := p.lggr.With("seqNr", seqNr)
-	lggr.Infow("in reports", "seqNr", seqNr)
+	lggr.Infow("in reports")
 
 	decodedOutcome, err := models.DecodeOutcome(outcome)
 	if err != nil {
@@ -210,12 +211,13 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		}
 	}
 
-	lggr.Debugw("got incoming and outgoing transfers",
+	lggr = lggr.With(
 		"incomingAndOutgoing", incomingAndOutgoing,
 		"resolvedTransfers", decodedOutcome.ResolvedTransfers,
 		"pendingTransfers", decodedOutcome.PendingTransfers,
 		"proposedTransfers", decodedOutcome.ProposedTransfers,
 	)
+	lggr.Debugw("got incoming and outgoing transfers")
 
 	var reports []ocr3types.ReportWithInfo[models.Report]
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -658,7 +660,9 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, outcomeCtx ocr3ty
 
 		bridgePayload, bridgeFee, err := bridge.GetBridgePayloadAndFee(ctx, resolvedTransfer)
 		if err != nil {
-			return nil, fmt.Errorf("get bridge payload and fee: %w", err)
+			p.lggr.Warnw("failed to get bridge payload and fee", "proposedTransfer", proposedTransfer, "err", err)
+			// return nil, fmt.Errorf("get bridge payload and fee: %w", err)
+			continue
 		}
 		resolvedTransfer.BridgeData = bridgePayload
 		resolvedTransfer.NativeBridgeFee = ubig.New(bridgeFee)
