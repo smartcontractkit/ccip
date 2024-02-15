@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
-	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
 const latestRoundDataMethodName = "latestRoundData"
@@ -116,15 +115,9 @@ func (d *DynamicPriceGetter) TokenPricesUSD(ctx context.Context, tokens []ccipty
 		}
 
 		evmCaller := client.BatchCaller
-		lp := client.LP
-
 		tokensOrder := batchCallsTokensOrder[chainID]
-		latestBlock, err := lp.LatestBlock(pg.WithParentCtx(ctx))
-		if err != nil {
-			return nil, fmt.Errorf("get latest block: %w", err)
-		}
 
-		resultsPerChain, err := evmCaller.BatchCall(ctx, uint64(latestBlock.BlockNumber), batchCalls)
+		resultsPerChain, err := evmCaller.BatchCall(ctx, 0, batchCalls)
 		if err != nil {
 			return nil, fmt.Errorf("batch call: %w", err)
 		}
