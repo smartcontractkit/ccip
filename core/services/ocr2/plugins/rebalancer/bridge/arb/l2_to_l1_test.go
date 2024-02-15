@@ -12,6 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/lib/pq"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/stretchr/testify/mock"
+	"github.com/test-go/testify/require"
+
 	clientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
@@ -24,8 +27,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
-	"github.com/stretchr/testify/mock"
-	"github.com/test-go/testify/require"
 )
 
 const (
