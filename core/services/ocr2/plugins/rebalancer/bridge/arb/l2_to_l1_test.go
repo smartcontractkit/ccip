@@ -1,28 +1,31 @@
 package arb
 
 import (
+	"context"
 	"errors"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/lib/pq"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/stretchr/testify/mock"
-
-	"github.com/test-go/testify/require"
-
 	clientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
+	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	utilsbig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l2_bridge_adapter"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_rollup_core"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/mocks/mock_arbitrum_rollup_core"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
+	"github.com/stretchr/testify/mock"
+	"github.com/test-go/testify/require"
 )
 
 const (
@@ -198,7 +201,7 @@ func Test_L2ToL1Bridge_parseL2ToL1Transfers(t *testing.T) {
 			},
 		}
 		// create the wrapper, doesn't need to connect to anything, just for parsing
-		l2Adapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(common.HexToAddress("0x0"), nil)
+		l2Adapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(utils.ZeroAddress, nil)
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l2BridgeAdapter: l2Adapter,
@@ -234,7 +237,7 @@ func Test_L2ToL1Bridge_parseL2ToL1Transfers(t *testing.T) {
 			},
 		}
 		// create the wrapper, doesn't need to connect to anything, just for parsing
-		l2Adapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(common.HexToAddress("0x0"), nil)
+		l2Adapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(utils.ZeroAddress, nil)
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l2BridgeAdapter: l2Adapter,
@@ -265,7 +268,7 @@ func Test_L2ToL1Bridge_parseL2ToL1Finalizations(t *testing.T) {
 			},
 		}
 		// create the wrapper, doesn't need to connect to anything, just for parsing
-		l1Adapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(common.HexToAddress("0x0"), nil)
+		l1Adapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(utils.ZeroAddress, nil)
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l1BridgeAdapter: l1Adapter,
@@ -292,7 +295,7 @@ func Test_L2ToL1Bridge_parseL2ToL1Finalizations(t *testing.T) {
 			},
 		}
 		// create the wrapper, doesn't need to connect to anything, just for parsing
-		l1Adapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(common.HexToAddress("0x0"), nil)
+		l1Adapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(utils.ZeroAddress, nil)
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l1BridgeAdapter: l1Adapter,
@@ -304,9 +307,9 @@ func Test_L2ToL1Bridge_parseL2ToL1Finalizations(t *testing.T) {
 
 func Test_L2ToL1Bridge_findMatchingFinalization(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		l2Adapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(common.HexToAddress("0x0"), nil)
+		l2Adapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(utils.ZeroAddress, nil)
 		require.NoError(t, err)
-		l1Adapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(common.HexToAddress("0x0"), nil)
+		l1Adapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(utils.ZeroAddress, nil)
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l2BridgeAdapter: l2Adapter,
@@ -388,9 +391,9 @@ func Test_L2ToL1Bridge_findMatchingFinalization(t *testing.T) {
 	})
 
 	t.Run("no matching finalization", func(t *testing.T) {
-		l2Adapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(common.HexToAddress("0x0"), nil)
+		l2Adapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(utils.ZeroAddress, nil)
 		require.NoError(t, err)
-		l1Adapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(common.HexToAddress("0x0"), nil)
+		l1Adapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(utils.ZeroAddress, nil)
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l2BridgeAdapter: l2Adapter,
@@ -473,48 +476,400 @@ func Test_L2ToL1Bridge_findMatchingFinalization(t *testing.T) {
 	})
 }
 
-func Test_L2ToL1Bridge_filterOutFinalizedTransfers(t *testing.T) {
-
+func Test_l2ToL1Bridge_filterOutFinalizedTransfers(t *testing.T) {
+	type fields struct {
+		l1RebalancerAddress common.Address
+	}
+	type args struct {
+		l2ToL1Transfers     []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent
+		l2ToL1Finalizations []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized
+	}
+	var (
+		localToken  = testutils.NewAddress()
+		remoteToken = testutils.NewAddress()
+		recipient   = testutils.NewAddress()
+	)
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent
+		wantErr bool
+	}{
+		{
+			"no unfinalized transfers",
+			fields{
+				l1RebalancerAddress: recipient,
+			},
+			args{
+				l2ToL1Transfers: []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent{
+					genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(100), big.NewInt(1)),
+					genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(200), big.NewInt(2)),
+					genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(300), big.NewInt(3)),
+				},
+				l2ToL1Finalizations: []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized{
+					genL2ToL1FinalizedLog(
+						t,
+						testutils.NewAddress(), // remoteSender
+						recipient,              // localReceiver
+						big.NewInt(100),        // amount
+						finalizeInboundTransferParams{
+							amount:     big.NewInt(100),
+							l1Receiver: recipient,
+						},
+						big.NewInt(1), // tx id
+					),
+					genL2ToL1FinalizedLog(
+						t,
+						testutils.NewAddress(), // remoteSender
+						recipient,              // localReceiver
+						big.NewInt(200),        // amount
+						finalizeInboundTransferParams{
+							amount:     big.NewInt(200),
+							l1Receiver: recipient,
+						},
+						big.NewInt(2), // tx id
+					),
+					genL2ToL1FinalizedLog(
+						t,
+						testutils.NewAddress(), // remoteSender
+						recipient,              // localReceiver
+						big.NewInt(300),        // amount
+						finalizeInboundTransferParams{
+							amount:     big.NewInt(300),
+							l1Receiver: recipient,
+						},
+						big.NewInt(3), // tx id
+					),
+				},
+			},
+			[]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent(nil),
+			false,
+		},
+		{
+			"finalizations not for rebalancer",
+			fields{
+				l1RebalancerAddress: testutils.NewAddress(),
+			},
+			args{
+				l2ToL1Transfers: []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent{
+					genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(100), big.NewInt(1)),
+					genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(200), big.NewInt(2)),
+					genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(300), big.NewInt(3)),
+				},
+				l2ToL1Finalizations: []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized{
+					genL2ToL1FinalizedLog(
+						t,
+						testutils.NewAddress(), // remoteSender
+						recipient,              // localReceiver
+						big.NewInt(100),        // amount
+						finalizeInboundTransferParams{
+							amount:     big.NewInt(100),
+							l1Receiver: recipient,
+						},
+						big.NewInt(1), // tx id
+					),
+					genL2ToL1FinalizedLog(
+						t,
+						testutils.NewAddress(), // remoteSender
+						recipient,              // localReceiver
+						big.NewInt(200),        // amount
+						finalizeInboundTransferParams{
+							amount:     big.NewInt(200),
+							l1Receiver: recipient,
+						},
+						big.NewInt(2), // tx id
+					),
+					genL2ToL1FinalizedLog(
+						t,
+						testutils.NewAddress(), // remoteSender
+						recipient,              // localReceiver
+						big.NewInt(300),        // amount
+						finalizeInboundTransferParams{
+							amount:     big.NewInt(300),
+							l1Receiver: recipient,
+						},
+						big.NewInt(3), // tx id
+					),
+				},
+			},
+			[]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent(nil),
+			false,
+		},
+		{
+			"no unfinalized transfers",
+			fields{
+				l1RebalancerAddress: recipient,
+			},
+			args{
+				l2ToL1Transfers: []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent{
+					genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(100), big.NewInt(1)),
+					genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(200), big.NewInt(2)),
+					genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(300), big.NewInt(3)),
+				},
+				l2ToL1Finalizations: []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized{
+					genL2ToL1FinalizedLog(
+						t,
+						testutils.NewAddress(), // remoteSender
+						recipient,              // localReceiver
+						big.NewInt(100),        // amount
+						finalizeInboundTransferParams{
+							amount:     big.NewInt(100),
+							l1Receiver: recipient,
+						},
+						big.NewInt(1), // tx id
+					),
+					genL2ToL1FinalizedLog(
+						t,
+						testutils.NewAddress(), // remoteSender
+						recipient,              // localReceiver
+						big.NewInt(200),        // amount
+						finalizeInboundTransferParams{
+							amount:     big.NewInt(200),
+							l1Receiver: recipient,
+						},
+						big.NewInt(2), // tx id
+					),
+				},
+			},
+			[]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent{
+				genL2ToL1SentLog(t, localToken, remoteToken, recipient, big.NewInt(300), big.NewInt(3)),
+			},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &l2ToL1Bridge{
+				l1RebalancerAddress: tt.fields.l1RebalancerAddress,
+				lggr:                logger.TestLogger(t),
+			}
+			got, err := l.filterOutFinalizedTransfers(tt.args.l2ToL1Transfers, tt.args.l2ToL1Finalizations)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, got)
+			}
+		})
+	}
 }
 
-func Test_L2ToL1Bridge_getLatestNodeConfirmed(t *testing.T) {
-
-}
-
-func Test_L2ToL1Bridge_getSendCountForBlock(t *testing.T) {
-
-}
-
-func Test_L2ToL1Bridge_getProof(t *testing.T) {
-
-}
-
-func Test_L2ToL1Bridge_getL1BlockFromRPC(t *testing.T) {
-
-}
-
-func Test_L2ToL1Bridge_getFinalizationData(t *testing.T) {
-
-}
-
-func Test_L2ToL1Bridge_partitionReadyTransfers(t *testing.T) {
-
-}
-
-func Test_L2ToL1Bridge_toPendingTransfers(t *testing.T) {
-
-}
-
-func Test_L2ToL1Bridge_GetTransfers(t *testing.T) {
-
-}
-
-func Test_L2ToL1Bridge_unpackUint256(t *testing.T) {
-
+func Test_validateFinalizeInboundTransferABI(t *testing.T) {
+	type args struct {
+		tokenGatewayABI abi.ABI
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			"valid abi",
+			args{
+				tokenGatewayABI: arbitrumTokenGatewayABI,
+			},
+			false,
+		},
+		{
+			"invalid abi",
+			args{
+				tokenGatewayABI: abi.ABI{},
+			},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateFinalizeInboundTransferABI(tt.args.tokenGatewayABI)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
 
 func mustGetChainByID(t *testing.T, id uint64) chainsel.Chain {
 	chain, ok := chainsel.ChainByEvmChainID(id)
 	require.True(t, ok)
 	return chain
+}
+
+func genL2ToL1SentLog(
+	t *testing.T,
+	localToken, remoteToken, recipient common.Address,
+	amount, l2ToL1TxId *big.Int,
+) *arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent {
+	packedOutboundTransferResult, err := packUint256(l2ToL1TxId)
+	require.NoError(t, err)
+	return &arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent{
+		LocalToken:             localToken,
+		RemoteToken:            remoteToken,
+		Recipient:              recipient,
+		Amount:                 amount,
+		OutboundTransferResult: packedOutboundTransferResult,
+	}
+}
+
+func genL2ToL1FinalizedLog(
+	t *testing.T,
+	remoteSender,
+	localReceiver common.Address,
+	amount *big.Int,
+	params finalizeInboundTransferParams,
+	txId *big.Int,
+) *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized {
+	packed, err := arbitrumTokenGatewayABI.Pack(
+		"finalizeInboundTransfer",
+		params.l1Token,
+		params.l2Sender,
+		params.l1Receiver,
+		params.amount,
+		params.data,
+	)
+	require.NoError(t, err)
+	return &arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized{
+		RemoteSender:  remoteSender,
+		LocalReceiver: localReceiver,
+		Amount:        amount,
+		Payload: arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumFinalizationPayload{
+			Data:  packed,
+			Index: txId,
+		},
+	}
+}
+
+func Test_l2ToL1Bridge_getLatestNodeConfirmed(t *testing.T) {
+	type fields struct {
+		l1LogPoller *lpmocks.LogPoller
+		rollupCore  *mock_arbitrum_rollup_core.ArbRollupCoreInterface
+	}
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name       string
+		fields     fields
+		args       args
+		want       *arbitrum_rollup_core.ArbRollupCoreNodeConfirmed
+		wantErr    bool
+		before     func(*testing.T, fields, *arbitrum_rollup_core.ArbRollupCoreNodeConfirmed)
+		assertions func(*testing.T, fields)
+	}{
+		{
+			"log found",
+			fields{
+				l1LogPoller: lpmocks.NewLogPoller(t),
+				rollupCore:  mock_arbitrum_rollup_core.NewArbRollupCoreInterface(t),
+			},
+			args{
+				ctx: testutils.Context(t),
+			},
+			&arbitrum_rollup_core.ArbRollupCoreNodeConfirmed{
+				NodeNum:   1,
+				BlockHash: testutils.Random32Byte(),
+				SendRoot:  testutils.Random32Byte(),
+			},
+			false,
+			func(t *testing.T, f fields, want *arbitrum_rollup_core.ArbRollupCoreNodeConfirmed) {
+				topic1 := common.HexToHash(hexutil.EncodeUint64(want.NodeNum))
+				data, err := utils.ABIEncode(`[{"type": "bytes32"}, {"type": "bytes32"}]`, want.BlockHash, want.SendRoot)
+				require.NoError(t, err)
+				rollupAddress := testutils.NewAddress()
+				f.l1LogPoller.On("LatestLogByEventSigWithConfs", NodeConfirmedTopic, rollupAddress, logpoller.Finalized, mock.Anything).
+					Return(&logpoller.Log{
+						Topics: [][]byte{
+							NodeConfirmedTopic[:],
+							topic1[:],
+						},
+						Data: data,
+					}, nil)
+				f.rollupCore.On("Address").Return(rollupAddress)
+				f.rollupCore.On("ParseNodeConfirmed", mock.Anything).Return(want, nil)
+			},
+			func(t *testing.T, f fields) {
+				f.l1LogPoller.AssertExpectations(t)
+				f.rollupCore.AssertExpectations(t)
+			},
+		},
+		{
+			"log not found",
+			fields{
+				l1LogPoller: lpmocks.NewLogPoller(t),
+				rollupCore:  mock_arbitrum_rollup_core.NewArbRollupCoreInterface(t),
+			},
+			args{
+				ctx: testutils.Context(t),
+			},
+			nil,
+			true,
+			func(t *testing.T, f fields, want *arbitrum_rollup_core.ArbRollupCoreNodeConfirmed) {
+				rollupAddress := testutils.NewAddress()
+				f.l1LogPoller.On("LatestLogByEventSigWithConfs", NodeConfirmedTopic, rollupAddress, logpoller.Finalized, mock.Anything).
+					Return(nil, errors.New("not found"))
+				f.rollupCore.On("Address").Return(rollupAddress)
+			},
+			func(t *testing.T, f fields) {
+				f.l1LogPoller.AssertExpectations(t)
+				f.rollupCore.AssertExpectations(t)
+			},
+		},
+		{
+			"parse error",
+			fields{
+				l1LogPoller: lpmocks.NewLogPoller(t),
+				rollupCore:  mock_arbitrum_rollup_core.NewArbRollupCoreInterface(t),
+			},
+			args{
+				ctx: testutils.Context(t),
+			},
+			&arbitrum_rollup_core.ArbRollupCoreNodeConfirmed{
+				NodeNum:   1,
+				BlockHash: testutils.Random32Byte(),
+				SendRoot:  testutils.Random32Byte(),
+			},
+			true,
+			func(t *testing.T, f fields, want *arbitrum_rollup_core.ArbRollupCoreNodeConfirmed) {
+				topic1 := common.HexToHash(hexutil.EncodeUint64(want.NodeNum))
+				data, err := utils.ABIEncode(`[{"type": "bytes32"}, {"type": "bytes32"}]`, want.BlockHash, want.SendRoot)
+				require.NoError(t, err)
+				rollupAddress := testutils.NewAddress()
+				f.l1LogPoller.On("LatestLogByEventSigWithConfs", NodeConfirmedTopic, rollupAddress, logpoller.Finalized, mock.Anything).
+					Return(&logpoller.Log{
+						Topics: [][]byte{
+							NodeConfirmedTopic[:],
+							topic1[:],
+						},
+						Data: data,
+					}, nil)
+				f.rollupCore.On("Address").Return(rollupAddress)
+				f.rollupCore.On("ParseNodeConfirmed", mock.Anything).Return(nil, errors.New("parse error"))
+			},
+			func(t *testing.T, f fields) {
+				f.l1LogPoller.AssertExpectations(t)
+				f.rollupCore.AssertExpectations(t)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			l := &l2ToL1Bridge{
+				l1LogPoller: tt.fields.l1LogPoller,
+				rollupCore:  tt.fields.rollupCore,
+			}
+			if tt.before != nil {
+				tt.before(t, tt.fields, tt.want)
+				defer tt.assertions(t, tt.fields)
+			}
+			got, err := l.getLatestNodeConfirmed(tt.args.ctx)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, got)
+			}
+		})
+	}
 }

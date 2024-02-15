@@ -2,6 +2,7 @@ package arb
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"math/big"
@@ -177,7 +178,7 @@ func NewL2ToL1Bridge(
 	// Addresses provided to the below wrappers don't matter,
 	// we're just using them to parse the needed logs easily.
 	l2ArbGateway, err := l2_arbitrum_gateway.NewL2ArbitrumGateway(
-		common.HexToAddress("0x0"),
+		utils.ZeroAddress,
 		l2Client,
 	)
 	if err != nil {
@@ -185,7 +186,7 @@ func NewL2ToL1Bridge(
 	}
 
 	l2ArbMessenger, err := l2_arbitrum_messenger.NewL2ArbitrumMessenger(
-		common.HexToAddress("0x0"),
+		utils.ZeroAddress,
 		l2Client,
 	)
 	if err != nil {
@@ -257,9 +258,9 @@ func (l *l2ToL1Bridge) Close(ctx context.Context) error {
 
 // GetTransfers implements bridge.Bridge.
 func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address, l1Token models.Address) ([]models.PendingTransfer, error) {
-	// get all the L2 -> L1 transfers in the past 14 days for the given l2Token
-	// that should be enough time to catch all the transfers
-	// that were potentially not finalized.
+	// get all the L2 -> L1 transfers in the past 14 days for the given l2Token.
+	// that should be enough time to catch all the transfers that were potentially not finalized.
+	// TODO: make more performant. Perhaps filter on more than just one topic here to avoid doing in-memory filtering.
 	l2ToL1Transfers, err := l.l2LogPoller.IndexedLogsCreatedAfter(
 		L2ToL1ERC20SentTopic,
 		l.l2BridgeAdapter.Address(),
@@ -271,8 +272,7 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
-	// TODO: check if err is sql.ErrNoRows
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("get L2 -> L1 transfers from log poller (on L2): %w", err)
 	}
 
@@ -285,8 +285,7 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
 	)
-	// TODO: check if err is sql.ErrNoRows
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("get L2 -> L1 finalizations from log poller (on L1): %w", err)
 	}
 
@@ -749,4 +748,8 @@ func unpackUint256(data []byte) (*big.Int, error) {
 	}
 	ret := *abi.ConvertType(ifaces[0], new(*big.Int)).(**big.Int)
 	return ret, nil
+}
+
+func packUint256(value *big.Int) ([]byte, error) {
+	return utils.ABIEncode(`[{"type": "uint256"}]`, value)
 }
