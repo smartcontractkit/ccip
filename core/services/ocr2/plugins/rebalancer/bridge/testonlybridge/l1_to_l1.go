@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"slices"
 
 	"golang.org/x/exp/constraints"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
@@ -129,7 +129,7 @@ func (t *testBridge) QuorumizedBridgePayload(payloads [][]byte) ([]byte, error) 
 
 // GetBridgePayloadAndFee implements bridge.Bridge.
 func (t *testBridge) GetBridgePayloadAndFee(ctx context.Context, transfer models.Transfer) ([]byte, *big.Int, error) {
-	payload, err := packUint256(transfer.Amount.ToInt())
+	payload, err := PackSendBridgePayload(transfer.Amount.ToInt())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to pack bridge data: %w", err)
 	}
@@ -195,7 +195,7 @@ func (t *testBridge) toPendingTransfers(
 	var transfers []models.PendingTransfer
 	for _, send := range ready {
 		lp := parsedToLP[logKey{txHash: send.Raw.TxHash, logIdx: int64(send.Raw.Index)}]
-		bridgeData, err := pack2Uint256(send.Amount, send.Nonce)
+		bridgeData, err := PackFinalizeBridgePayload(send.Amount, send.Nonce)
 		if err != nil {
 			t.lggr.Errorw("failed to pack bridge data", "err", err)
 			continue
@@ -234,33 +234,32 @@ func (t *testBridge) getReadyToFinalize(
 		"sends", sends,
 		"finalizes", finalizes)
 
-	// sort so that we can easily match the events to each other
-	slices.SortFunc(sends, func(a, b *mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent) int {
-		return intComparator(a.Raw.BlockNumber, b.Raw.BlockNumber)
-	})
-	slices.SortFunc(finalizes, func(a, b *mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized) int {
-		return intComparator(a.Raw.BlockNumber, b.Raw.BlockNumber)
-	})
-
-	// anything that has been mined but has not been already finalized is eligible
+	// find sent events that don't have a matching finalized event
 	var ready []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent
-	if len(sends) > len(finalizes) {
-		ready = sends[len(finalizes):]
-		t.lggr.Infow("New sends, marking ready to finalize",
-			"sendsLen", len(sends),
+	for _, send := range sends {
+		var finalized bool
+		for _, finalize := range finalizes {
+			if send.Nonce.Cmp(finalize.Nonce) == 0 {
+				finalized = true
+				break
+			}
+		}
+		if !finalized {
+			ready = append(ready, send)
+		}
+	}
+
+	if len(ready) > 0 {
+		t.lggr.Infow("found ready to finalize", "sendsLen", len(sends),
 			"finalizesLen", len(finalizes),
 			"sends", sends,
 			"finalizes", finalizes,
-			"ready", ready,
-			"readyLen", len(ready))
-	} else if len(sends) < len(finalizes) {
-		// should be impossible
-		t.lggr.Criticalw("more finalizes than sends, should be impossible", "sends", len(sends), "finalizes", len(finalizes))
-		return nil, fmt.Errorf("more finalizes than sends")
+			"ready", ready)
 	} else {
-		// no new sends
-		t.lggr.Debugw("No new sends", "sends", len(sends), "finalizes", len(finalizes))
-		return nil, nil
+		t.lggr.Debugw("no requests ready to finalize", "sendsLen", len(sends),
+			"finalizesLen", len(finalizes),
+			"sends", sends,
+			"finalizes", finalizes)
 	}
 
 	return ready, nil
@@ -310,10 +309,35 @@ func intComparator[T constraints.Integer](a, b T) int {
 	return 0
 }
 
-func pack2Uint256(val1, val2 *big.Int) ([]byte, error) {
+func PackFinalizeBridgePayload(val1, val2 *big.Int) ([]byte, error) {
 	return utils.ABIEncode(`[{"type": "uint256"}, {"type": "uint256"}]`, val1, val2)
 }
 
-func packUint256(val *big.Int) ([]byte, error) {
+func UnpackFinalizeBridgePayload(data []byte) (*big.Int, *big.Int, error) {
+	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}, {"type": "uint256"}]`, data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode bridge data: %w", err)
+	}
+	if len(ifaces) != 2 {
+		return nil, nil, fmt.Errorf("expected 2 arguments, got %d", len(ifaces))
+	}
+	val1 := *abi.ConvertType(ifaces[0], new(*big.Int)).(**big.Int)
+	val2 := *abi.ConvertType(ifaces[1], new(*big.Int)).(**big.Int)
+	return val1, val2, nil
+}
+
+func PackSendBridgePayload(val *big.Int) ([]byte, error) {
 	return utils.ABIEncode(`[{"type": "uint256"}]`, val)
+}
+
+func UnpackSendBridgePayload(data []byte) (*big.Int, error) {
+	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}]`, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode bridge data: %w", err)
+	}
+	if len(ifaces) != 1 {
+		return nil, fmt.Errorf("expected 1 argument, got %d", len(ifaces))
+	}
+	val := *abi.ConvertType(ifaces[0], new(*big.Int)).(**big.Int)
+	return val, nil
 }
