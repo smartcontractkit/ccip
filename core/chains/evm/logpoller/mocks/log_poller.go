@@ -664,6 +664,43 @@ func (_m *LogPoller) LogsDataWordGreaterThan(eventSig common.Hash, address commo
 	return r0, r1
 }
 
+// LogsDataWordIn provides a mock function with given fields: eventSig, address, wordIndex, wordValues, confs, qopts
+func (_m *LogPoller) LogsDataWordIn(eventSig common.Hash, address common.Address, wordIndex int, wordValues []common.Hash, confs logpoller.Confirmations, qopts ...pg.QOpt) ([]logpoller.Log, error) {
+	_va := make([]interface{}, len(qopts))
+	for _i := range qopts {
+		_va[_i] = qopts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, eventSig, address, wordIndex, wordValues, confs)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogsDataWordIn")
+	}
+
+	var r0 []logpoller.Log
+	var r1 error
+	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, int, []common.Hash, logpoller.Confirmations, ...pg.QOpt) ([]logpoller.Log, error)); ok {
+		return rf(eventSig, address, wordIndex, wordValues, confs, qopts...)
+	}
+	if rf, ok := ret.Get(0).(func(common.Hash, common.Address, int, []common.Hash, logpoller.Confirmations, ...pg.QOpt) []logpoller.Log); ok {
+		r0 = rf(eventSig, address, wordIndex, wordValues, confs, qopts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]logpoller.Log)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(common.Hash, common.Address, int, []common.Hash, logpoller.Confirmations, ...pg.QOpt) error); ok {
+		r1 = rf(eventSig, address, wordIndex, wordValues, confs, qopts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // LogsDataWordRange provides a mock function with given fields: eventSig, address, wordIndex, wordValueMin, wordValueMax, confs, qopts
 func (_m *LogPoller) LogsDataWordRange(eventSig common.Hash, address common.Address, wordIndex int, wordValueMin common.Hash, wordValueMax common.Hash, confs logpoller.Confirmations, qopts ...pg.QOpt) ([]logpoller.Log, error) {
 	_va := make([]interface{}, len(qopts))

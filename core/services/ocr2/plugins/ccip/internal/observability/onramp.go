@@ -44,3 +44,9 @@ func (o ObservedOnRampReader) GetDynamicConfig() (ccipdata.OnRampDynamicConfig, 
 		return o.OnRampReader.GetDynamicConfig()
 	})
 }
+
+func (o ObservedOnRampReader) GetSendRequestsForSequenceNumbers(ctx context.Context, seqNrs []uint64, finalized bool) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
+	return withObservedInteractionAndResults(o.metric, "GetSendRequestsForSequenceNumbers", func() ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
+		return o.OnRampReader.GetSendRequestsForSequenceNumbers(ctx, seqNrs, finalized)
+	})
+}

@@ -53,6 +53,7 @@ type ORM interface {
 	SelectLogsDataWordRange(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin, wordValueMax common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
 	SelectLogsDataWordGreaterThan(address common.Address, eventSig common.Hash, wordIndex int, wordValueMin common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
 	SelectLogsDataWordBetween(address common.Address, eventSig common.Hash, wordIndexMin int, wordIndexMax int, wordValue common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
+	SelectLogsDataWordIn(sig common.Hash, address common.Address, wordIndex int, wordValues []common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error)
 }
 
 type DbORM struct {
@@ -567,6 +568,29 @@ func (o *DbORM) SelectLogsDataWordBetween(address common.Address, eventSig commo
 			ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
 	var logs []Log
 	if err = o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
+		return nil, err
+	}
+	return logs, nil
+}
+
+func (o *DbORM) SelectLogsDataWordIn(eventSig common.Hash, address common.Address, wordIndex int, words []common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error) {
+	args, err := newQueryArgsForEvent(o.chainID, address, eventSig).
+		withWordIndex(wordIndex).
+		withWordValues(words).
+		withConfs(confs).
+		toArgs()
+	if err != nil {
+		return nil, err
+	}
+	query := fmt.Sprintf(`SELECT * FROM evm.logs 
+			WHERE evm_chain_id = :evm_chain_id
+			AND address = :address 
+			AND event_sig = :event_sig
+			AND substring(data from 32*:word_index+1 for 32) IN (:word_values)
+			AND block_number <= %s
+			ORDER BY (block_number, log_index)`, nestedBlockNumberQuery(confs))
+	var logs []Log
+	if err := o.q.WithOpts(qopts...).SelectNamed(&logs, query, args); err != nil {
 		return nil, err
 	}
 	return logs, nil

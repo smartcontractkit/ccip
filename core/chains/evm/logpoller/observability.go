@@ -254,6 +254,12 @@ func (o *ObservedORM) SelectIndexedLogsTopicRange(address common.Address, eventS
 	})
 }
 
+func (o *ObservedORM) SelectLogsDataWordIn(eventSig common.Hash, address common.Address, wordIndex int, wordValues []common.Hash, confs Confirmations, qopts ...pg.QOpt) ([]Log, error) {
+	return withObservedQueryAndResults(o, "SelectLogsDataWordIn", func() ([]Log, error) {
+		return o.ORM.SelectLogsDataWordIn(eventSig, address, wordIndex, wordValues, confs, qopts...)
+	})
+}
+
 func withObservedQueryAndResults[T any](o *ObservedORM, queryName string, query func() ([]T, error)) ([]T, error) {
 	results, err := withObservedQuery(o, queryName, query)
 	if err == nil {

@@ -618,13 +618,20 @@ func (r *ExecutionReportingPlugin) getReportsWithSendRequests(
 		}
 	}
 
+	var intervals []uint64
+	for _, report := range reports {
+		for interval := report.Interval.Min; interval <= report.Interval.Max; interval++ {
+			intervals = append(intervals, interval)
+		}
+	}
+
 	// use errgroup to fetch send request logs and executed sequence numbers in parallel
 	eg := &errgroup.Group{}
 
 	var sendRequests []ccipdata.Event[internal.EVM2EVMMessage]
 	eg.Go(func() error {
 		// We don't need to double-check if logs are finalized because we already checked that in the Commit phase.
-		sendReqs, err := r.onRampReader.GetSendRequestsBetweenSeqNums(ctx, intervalMin, intervalMax, false)
+		sendReqs, err := r.onRampReader.GetSendRequestsForSequenceNumbers(ctx, intervals, false)
 		if err != nil {
 			return err
 		}

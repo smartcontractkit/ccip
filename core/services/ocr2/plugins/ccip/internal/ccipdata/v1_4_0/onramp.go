@@ -221,6 +221,25 @@ func (o *OnRamp) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin, s
 	return ccipdata.ParseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
 }
 
+func (o *OnRamp) GetSendRequestsForSequenceNumbers(ctx context.Context, seqNrs []uint64, finalized bool) ([]ccipdata.Event[internal.EVM2EVMMessage], error) {
+	evmWordSeqNrs := make([]common.Hash, len(seqNrs))
+	for i, seqNr := range seqNrs {
+		evmWordSeqNrs[i] = logpoller.EvmWord(seqNr)
+	}
+
+	logs, err := o.lp.LogsDataWordIn(
+		o.sendRequestedEventSig,
+		o.address,
+		o.sendRequestedSeqNumberWord,
+		evmWordSeqNrs,
+		ccipdata.LogsConfirmations(finalized),
+		pg.WithParentCtx(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return ccipdata.ParseLogs[internal.EVM2EVMMessage](logs, o.lggr, o.logToMessage)
+}
+
 func (o *OnRamp) RouterAddress() (common.Address, error) {
 	config, err := o.onRamp.GetDynamicConfig(nil)
 	if err != nil {
