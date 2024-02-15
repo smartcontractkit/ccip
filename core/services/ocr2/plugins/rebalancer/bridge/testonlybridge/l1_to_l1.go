@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"golang.org/x/exp/constraints"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -298,15 +296,6 @@ func (t *testBridge) parseSendLogs(logs []logpoller.Log) (
 		parsedToLP[logKey{txHash: log.TxHash, logIdx: log.LogIndex}] = log
 	}
 	return parsedSendLogs, parsedToLP, nil
-}
-
-func intComparator[T constraints.Integer](a, b T) int {
-	if a < b {
-		return -1
-	} else if a > b {
-		return 1
-	}
-	return 0
 }
 
 func PackFinalizeBridgePayload(val1, val2 *big.Int) ([]byte, error) {
