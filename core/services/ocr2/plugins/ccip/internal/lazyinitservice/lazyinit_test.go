@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
@@ -51,11 +52,11 @@ func TestLazyInitService_AsyncInit(t *testing.T) {
 	s := New(func(context.Context) (job.ServiceCtx, error) {
 		return dummy, nil
 	})
-	require.NoError(t, s.Start(context.Background()))
+	assert.NoError(t, s.Start(context.Background()))
 	dummy.AwaitCompleteStart()
-	require.NoError(t, s.Close())
-	require.Equal(t, 1, dummy.startCallCount)
-	require.Equal(t, 1, dummy.closeCallCount)
+	assert.NoError(t, s.Close())
+	assert.Equal(t, 1, dummy.startCallCount)
+	assert.Equal(t, 1, dummy.closeCallCount)
 }
 
 func TestLazyInitService_NoStartOnUnrecoverableFailure(t *testing.T) {
@@ -67,10 +68,10 @@ func TestLazyInitService_NoStartOnUnrecoverableFailure(t *testing.T) {
 		close(ch)
 		return nil, Unrecoverable(errInit)
 	})
-	require.NoError(t, s.Start(context.Background()))
+	assert.NoError(t, s.Start(context.Background()))
 	<-ch
-	require.NoError(t, s.Close())
-	require.Equal(t, 1, tries)
+	assert.NoError(t, s.Close())
+	assert.Equal(t, 1, tries)
 }
 
 func TestLazyInitService_RetryOnRecoverableFailure(t *testing.T) {
@@ -84,13 +85,13 @@ func TestLazyInitService_RetryOnRecoverableFailure(t *testing.T) {
 		}
 		return dummy, nil
 	}, WithLogErrorFunc(func(msg error) { errs = append(errs, msg) }))
-	require.NoError(t, s.Start(context.Background()))
+	assert.NoError(t, s.Start(context.Background()))
 	dummy.AwaitCompleteStart()
-	require.NoError(t, s.Close())
-	require.Equal(t, 1, dummy.startCallCount)
-	require.Equal(t, 1, dummy.closeCallCount)
-	require.Equal(t, 4, tries)
-	require.Equal(t, 3, len(errs))
+	assert.NoError(t, s.Close())
+	assert.Equal(t, 1, dummy.startCallCount)
+	assert.Equal(t, 1, dummy.closeCallCount)
+	assert.Equal(t, 4, tries)
+	assert.Equal(t, 3, len(errs))
 }
 
 func TestLazyInitService_ParentContextCancel(t *testing.T) {
@@ -99,13 +100,13 @@ func TestLazyInitService_ParentContextCancel(t *testing.T) {
 		return dummy, nil
 	})
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	require.NoError(t, s.Start(ctx))
+	assert.NoError(t, s.Start(ctx))
 	cancelFunc()
 	dummy.AwaitCompleteStart()
 
-	require.NoError(t, s.Close())
-	require.Equal(t, 1, dummy.startCallCount)
-	require.Equal(t, 1, dummy.closeCallCount)
+	assert.NoError(t, s.Close())
+	assert.Equal(t, 1, dummy.startCallCount)
+	assert.Equal(t, 1, dummy.closeCallCount)
 }
 
 func TestLazyInitService_Restart(t *testing.T) {
@@ -115,21 +116,21 @@ func TestLazyInitService_Restart(t *testing.T) {
 		initCount++
 		return dummy, nil
 	})
-	require.NoError(t, s.Start(context.Background()))
+	assert.NoError(t, s.Start(context.Background()))
 	dummy.AwaitCompleteStart()
-	require.NoError(t, s.Close())
+	assert.NoError(t, s.Close())
 
-	require.Equal(t, 1, initCount)
-	require.Equal(t, 1, dummy.startCallCount)
-	require.Equal(t, 1, dummy.closeCallCount)
+	assert.Equal(t, 1, initCount)
+	assert.Equal(t, 1, dummy.startCallCount)
+	assert.Equal(t, 1, dummy.closeCallCount)
 
-	require.NoError(t, s.Start(context.Background()))
+	assert.NoError(t, s.Start(context.Background()))
 	dummy.AwaitCompleteStart()
-	require.NoError(t, s.Close())
+	assert.NoError(t, s.Close())
 
-	require.Equal(t, 1, initCount)
-	require.Equal(t, 2, dummy.startCallCount)
-	require.Equal(t, 2, dummy.closeCallCount)
+	assert.Equal(t, 1, initCount)
+	assert.Equal(t, 2, dummy.startCallCount)
+	assert.Equal(t, 2, dummy.closeCallCount)
 }
 
 func TestLazyInitService_FaultyInitFunction(t *testing.T) {
@@ -144,10 +145,10 @@ func TestLazyInitService_FaultyInitFunction(t *testing.T) {
 		errs = append(errs, err)
 	}))
 
-	require.NoError(t, s.Start(context.Background()))
+	assert.NoError(t, s.Start(context.Background()))
 	wg.Wait()
 	require.Equal(t, 1, len(errs))
-	require.Equal(t, ErrNoService, errs[0])
+	assert.Equal(t, ErrNoService, errs[0])
 }
 
 func TestLazyInitService_ReportStartErrors(t *testing.T) {
@@ -165,10 +166,10 @@ func TestLazyInitService_ReportStartErrors(t *testing.T) {
 		errs = append(errs, err)
 	}))
 
-	require.NoError(t, s.Start(context.Background()))
+	assert.NoError(t, s.Start(context.Background()))
 	wg.Wait()
-	require.Equal(t, 1, len(errs))
-	require.Equal(t, errDummyStart, errs[0])
+	assert.Equal(t, 1, len(errs))
+	assert.Equal(t, errDummyStart, errs[0])
 }
 
 func TestLazyInitService_ReportCloseErrors(t *testing.T) {
@@ -179,7 +180,7 @@ func TestLazyInitService_ReportCloseErrors(t *testing.T) {
 		return dummy, nil
 	})
 
-	require.NoError(t, s.Start(context.Background()))
+	assert.NoError(t, s.Start(context.Background()))
 	dummy.AwaitCompleteStart()
-	require.Equal(t, errDummyClose, s.Close())
+	assert.Equal(t, errDummyClose, s.Close())
 }
