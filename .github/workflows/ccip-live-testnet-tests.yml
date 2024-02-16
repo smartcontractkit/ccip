@@ -23,7 +23,7 @@ concurrency:
 env:
   CHAINLINK_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink
   CHAINLINK_VERSION: ${{ github.sha}}
-  INPUT_CHAINLINK_TEST_VERSION: ${{ github.sha}}
+  CHAINLINK_TEST_VERSION: ${{ github.sha}}
   ENV_JOB_IMAGE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests:${{ github.sha }}
   INTERNAL_DOCKER_REPO: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com
   AWS_ECR_REPO_PUBLIC_REGISTRY: public.ecr.aws
@@ -31,7 +31,6 @@ env:
 jobs:
   build-chainlink:
     environment: integration
-    if: ${{ inputs.chainlinkImage == '' || inputs.chainlinkVersion == '' }}
     permissions:
       id-token: write
       contents: read
@@ -92,7 +91,7 @@ jobs:
       - name: Build Test Image
         uses: ./.github/actions/build-test-image
         with:
-          tag: ${{ env.INPUT_CHAINLINK_TEST_VERSION }}
+          tag: ${{ env.CHAINLINK_TEST_VERSION }}
           QA_AWS_ROLE_TO_ASSUME: ${{ secrets.QA_AWS_ROLE_TO_ASSUME }}
           QA_AWS_REGION: ${{ secrets.QA_AWS_REGION }}
           QA_AWS_ACCOUNT_NUMBER: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
@@ -119,7 +118,6 @@ jobs:
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
       BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
-      TEST_BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
 
     steps:
       - name: Collect Metrics
@@ -139,12 +137,16 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "BASE64_CCIP_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
-            echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
+            BASE64_CCIP_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_test_input' $GITHUB_EVENT_PATH)
+            echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
+            echo "BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
+            echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
           fi
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ${{ matrix.product.config_path }})" >> $GITHUB_ENV
-            echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/mainnet.toml )" >> $GITHUB_ENV
+            BASE64_CCIP_CONFIG_OVERRIDE=$(jq -c . ./integration-tests/ccip-tests/testconfig/override/mainnet.toml | base64 -w 0)
+            echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
+            echo "BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
+            echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
           fi
       - name: step summary
         shell: bash
@@ -152,9 +154,7 @@ jobs:
           echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.CHAINLINK_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
-          echo "\`${{ env.INPUT_CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "### test input override :link:" >>$GITHUB_STEP_SUMMARY
-          echo "$(base64 -d <<< "${{ inputs.base64_test_input }}")" >>$GITHUB_STEP_SUMMARY
+          echo "\`${{ env.CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
       - name: Prepare Base64 TOML override for CCIP secrets
         uses: ./.github/actions/setup-create-base64-config-ccip
         with:
@@ -216,7 +216,6 @@ jobs:
       REF_NAME: ${{ github.head_ref || github.ref_name }}
       ENV_JOB_IMAGE_BASE: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}.dkr.ecr.${{ secrets.QA_AWS_REGION }}.amazonaws.com/chainlink-ccip-tests
       BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
-      TEST_BASE64_NETWORK_CONFIG: ${{ secrets.BASE64_NETWORK_CONFIG }}
 
     steps:
       - name: Collect Metrics
@@ -226,7 +225,7 @@ jobs:
           org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           hostname: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          this-job-name: CCIP Load Test
+          this-job-name: CCIP Smoke Test
         continue-on-error: true
       - name: Checkout the repo
         uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
@@ -236,8 +235,10 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "BASE64_CCIP_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
-            echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=${{ inputs.base64_test_input }}" >> $GITHUB_ENV
+            BASE64_CCIP_CONFIG_OVERRIDE=$(jq -r '.inputs.base64_test_input' $GITHUB_EVENT_PATH)
+            echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
+            echo "BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
+            echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
           fi
       - name: step summary
         shell: bash
@@ -245,9 +246,7 @@ jobs:
           echo "### chainlink image used for this test run :link:" >>$GITHUB_STEP_SUMMARY
           echo "\`${{ env.CHAINLINK_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
           echo "### chainlink-tests image tag for this test run :ship:" >>$GITHUB_STEP_SUMMARY
-          echo "\`${{ env.INPUT_CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "### test input override :link:" >>$GITHUB_STEP_SUMMARY
-          echo "$(base64 -d <<< "${{ inputs.base64_test_input }}")" >>$GITHUB_STEP_SUMMARY
+          echo "\`${{ env.CHAINLINK_TEST_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
       - name: Prepare Base64 TOML override for CCIP secrets
         uses: ./.github/actions/setup-create-base64-config-ccip
         with:
