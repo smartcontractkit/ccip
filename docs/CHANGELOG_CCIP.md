@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `ccip_number_of_messages_processed` number of messages processed by the Exec when building the OCR2 reports and observations
     - `ccip_sequence_number_counter` latest sequence number that was used for generating Commit Report
     
+- New `DynamicPriceGetter` implementation of `PriceGetter`.
+  - allows for dynamic price fetching from an aggregator contract as well as using static configuration of token prices.
+  - current pipeline implementation is still supported.
+  - only one of the two PriceGetter implementations can be used at a time (specified in the job spec).
+
 ## 1.2.0 - 2023-11-20
 
 ### Added
