@@ -209,6 +209,7 @@ func Test_L2ToL1Bridge_parseL2ToL1Transfers(t *testing.T) {
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l2BridgeAdapter: l2Adapter,
+			lggr:            logger.TestLogger(t),
 		}
 		parsed, parsedToLPLogs, err := bridge.parseL2ToL1Transfers(lgs)
 		require.NoError(t, err)
@@ -245,6 +246,7 @@ func Test_L2ToL1Bridge_parseL2ToL1Transfers(t *testing.T) {
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l2BridgeAdapter: l2Adapter,
+			lggr:            logger.TestLogger(t),
 		}
 		_, _, err = bridge.parseL2ToL1Transfers(lgs)
 		require.Error(t, err)
@@ -276,6 +278,7 @@ func Test_L2ToL1Bridge_parseL2ToL1Finalizations(t *testing.T) {
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l1BridgeAdapter: l1Adapter,
+			lggr:            logger.TestLogger(t),
 		}
 		parsed, err := bridge.parseL2ToL1Finalizations(lgs)
 		require.NoError(t, err)
@@ -303,6 +306,7 @@ func Test_L2ToL1Bridge_parseL2ToL1Finalizations(t *testing.T) {
 		require.NoError(t, err)
 		bridge := &l2ToL1Bridge{
 			l1BridgeAdapter: l1Adapter,
+			lggr:            logger.TestLogger(t),
 		}
 		_, err = bridge.parseL2ToL1Finalizations(lgs)
 		require.Error(t, err)
