@@ -35,7 +35,7 @@ const (
 )
 
 func Test_L2ToL1Bridge_New(t *testing.T) {
-	rollupAddress, l1RebalancerAddress, l2BridgeAdapterAddress, l1BridgeAdapterAddress := testutils.NewAddress(), testutils.NewAddress(), testutils.NewAddress(), testutils.NewAddress()
+	rollupAddress, l1RebalancerAddress, l2RebalancerAddress, l2BridgeAdapterAddress, l1BridgeAdapterAddress := testutils.NewAddress(), testutils.NewAddress(), testutils.NewAddress(), testutils.NewAddress(), testutils.NewAddress()
 
 	t.Run("happy path", func(t *testing.T) {
 		l2LogPoller := lpmocks.NewLogPoller(t)
@@ -83,6 +83,7 @@ func Test_L2ToL1Bridge_New(t *testing.T) {
 			models.NetworkSelector(mustGetChainByID(t, sepoliaChainID).Selector),
 			rollupAddress,
 			l1RebalancerAddress,
+			l2RebalancerAddress,
 			l2BridgeAdapterAddress,
 			l1BridgeAdapterAddress,
 			l2LogPoller,
@@ -113,6 +114,7 @@ func Test_L2ToL1Bridge_New(t *testing.T) {
 			models.NetworkSelector(mustGetChainByID(t, sepoliaChainID).Selector),
 			rollupAddress,
 			l1RebalancerAddress,
+			l2RebalancerAddress,
 			l2BridgeAdapterAddress,
 			l1BridgeAdapterAddress,
 			l2LogPoller,
@@ -141,6 +143,7 @@ func Test_L2ToL1Bridge_New(t *testing.T) {
 			models.NetworkSelector(mustGetChainByID(t, sepoliaChainID).Selector),
 			rollupAddress,
 			l1RebalancerAddress,
+			l2RebalancerAddress,
 			l2BridgeAdapterAddress,
 			l1BridgeAdapterAddress,
 			l2LogPoller,

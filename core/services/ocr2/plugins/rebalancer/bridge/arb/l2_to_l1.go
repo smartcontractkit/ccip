@@ -92,6 +92,7 @@ type l2ToL1Bridge struct {
 	localSelector       models.NetworkSelector
 	remoteSelector      models.NetworkSelector
 	l1RebalancerAddress common.Address
+	l2RebalancerAddress common.Address
 	l2BridgeAdapter     arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterInterface
 	l1BridgeAdapter     arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterInterface
 	l2LogPoller         logpoller.LogPoller
@@ -113,6 +114,7 @@ func NewL2ToL1Bridge(
 	remoteSelector models.NetworkSelector,
 	l1RollupAddress,
 	l1RebalancerAddress,
+	l2RebalancerAddress,
 	l2BridgeAdapterAddress,
 	l1BridgeAdapterAddress common.Address,
 	l2LogPoller,
@@ -227,6 +229,7 @@ func NewL2ToL1Bridge(
 		l2FilterName:        l2FilterName,
 		l1FilterName:        l1FilterName,
 		l1RebalancerAddress: l1RebalancerAddress,
+		l2RebalancerAddress: l2RebalancerAddress,
 		lggr:                lggr,
 		l2Client:            l2Client,
 		arbSys:              arbSys,
@@ -339,9 +342,13 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 	for i, transfer := range ready {
 		transfers = append(transfers, models.PendingTransfer{
 			Transfer: models.Transfer{
-				From:   l.localSelector,
-				To:     l.remoteSelector,
-				Amount: ubig.New(transfer.Amount),
+				From:               l.localSelector,
+				To:                 l.remoteSelector,
+				Sender:             models.Address(l.l2RebalancerAddress), // TODO: should this be in the event as msg.sender?
+				Receiver:           models.Address(transfer.Recipient),
+				LocalTokenAddress:  models.Address(transfer.LocalToken),
+				RemoteTokenAddress: models.Address(transfer.RemoteToken),
+				Amount:             ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
 					logIndex: int64(transfer.Raw.Index),
@@ -355,9 +362,13 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 	for _, transfer := range notReady {
 		transfers = append(transfers, models.PendingTransfer{
 			Transfer: models.Transfer{
-				From:   l.localSelector,
-				To:     l.remoteSelector,
-				Amount: ubig.New(transfer.Amount),
+				From:               l.localSelector,
+				To:                 l.remoteSelector,
+				Sender:             models.Address(l.l2RebalancerAddress), // TODO: should this be in the event as msg.sender?
+				Receiver:           models.Address(transfer.Recipient),
+				LocalTokenAddress:  models.Address(transfer.LocalToken),
+				RemoteTokenAddress: models.Address(transfer.RemoteToken),
+				Amount:             ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
 					logIndex: int64(transfer.Raw.Index),

@@ -220,6 +220,11 @@ func (l *l1ToL2Bridge) GetTransfers(
 	localToken,
 	remoteToken models.Address,
 ) ([]models.PendingTransfer, error) {
+	lggr := l.lggr.With(
+		"localToken", localToken,
+		"remoteToken", remoteToken,
+	)
+	lggr.Info("getting transfers")
 	fromTs := time.Now().Add(-24 * time.Hour) // last day
 	erc20SentLogs, err := l.l1LogPoller.IndexedLogsCreatedAfter(
 		ArbitrumL1ToL2ERC20Sent,
@@ -279,6 +284,12 @@ func (l *l1ToL2Bridge) GetTransfers(
 		return a.BlockTimestamp.Compare(b.BlockTimestamp)
 	})
 
+	lggr.Infow("got logs",
+		"erc20SentLogs", len(erc20SentLogs),
+		"depositFinalizedLogs", len(depositFinalizedLogs),
+		"liquidityTransferredLogs", len(liquidityTransferredLogs),
+	)
+
 	parsedERC20Sent, parsedToLP, err := l.parseL1ToL2Transfers(erc20SentLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse L1 -> L2 transfers: %w", err)
@@ -293,6 +304,12 @@ func (l *l1ToL2Bridge) GetTransfers(
 	if err != nil {
 		return nil, fmt.Errorf("parse LiquidityTransferred logs: %w", err)
 	}
+
+	lggr.Infow("parsed logs",
+		"parsedERC20Sent", len(parsedERC20Sent),
+		"parsedDepositFinalized", len(parsedDepositFinalized),
+		"parsedLiquidityTransferred", len(parsedLiquidityTransferred),
+	)
 
 	// Unfortunately its not easy to match DepositFinalized events with ERC20Sent events.
 	// Reason being that arbitrum does not emit any identifying information as part of the DepositFinalized
@@ -327,9 +344,13 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 	for _, transfer := range notReady {
 		transfers = append(transfers, models.PendingTransfer{
 			Transfer: models.Transfer{
-				From:   l.localSelector,
-				To:     l.remoteSelector,
-				Amount: ubig.New(transfer.Amount),
+				From:               l.localSelector,
+				To:                 l.remoteSelector,
+				Sender:             models.Address(l.l1Rebalancer.Address()),
+				Receiver:           models.Address(transfer.Recipient),
+				LocalTokenAddress:  models.Address(transfer.LocalToken),
+				RemoteTokenAddress: models.Address(transfer.RemoteToken),
+				Amount:             ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
 					logIndex: int64(transfer.Raw.Index),
@@ -343,9 +364,13 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 	for i, transfer := range ready {
 		transfers = append(transfers, models.PendingTransfer{
 			Transfer: models.Transfer{
-				From:   l.localSelector,
-				To:     l.remoteSelector,
-				Amount: ubig.New(transfer.Amount),
+				From:               l.localSelector,
+				To:                 l.remoteSelector,
+				Sender:             models.Address(l.l1Rebalancer.Address()),
+				Receiver:           models.Address(transfer.Recipient),
+				LocalTokenAddress:  models.Address(transfer.LocalToken),
+				RemoteTokenAddress: models.Address(transfer.RemoteToken),
+				Amount:             ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
 					logIndex: int64(transfer.Raw.Index),
@@ -353,22 +378,6 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 				BridgeData: readyData[i], // finalization data since its ready
 			},
 			Status: models.TransferStatusReady, // ready == finalized for L1 -> L2 transfers due to auto-finalization by the native bridge
-			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
-		})
-	}
-	for _, transfer := range executed {
-		transfers = append(transfers, models.PendingTransfer{
-			Transfer: models.Transfer{
-				From:   l.localSelector,
-				To:     l.remoteSelector,
-				Amount: ubig.New(transfer.Amount),
-				Date: parsedToLP[logKey{
-					txHash:   transfer.Raw.TxHash,
-					logIndex: int64(transfer.Raw.Index),
-				}].BlockTimestamp,
-				BridgeData: []byte{}, // no finalization data, already executed
-			},
-			Status: models.TransferStatusExecuted,
 			ID:     fmt.Sprintf("%s-%d", transfer.Raw.TxHash.Hex(), transfer.Raw.Index),
 		})
 	}
@@ -427,14 +436,14 @@ func (l *l1ToL2Bridge) filterExecuted(
 	err error,
 ) {
 	for _, readyCandidate := range readyCandidates {
-		found, err := l.matchingExecutionExists(readyCandidate, liquidityTransferredLogs)
+		exists, err := l.matchingExecutionExists(readyCandidate, liquidityTransferredLogs)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error checking if ready candidate has been executed: %w", err)
 		}
-		if !found {
-			executed = append(executed, readyCandidate)
-		} else {
+		if !exists {
 			ready = append(ready, readyCandidate)
+		} else {
+			executed = append(executed, readyCandidate)
 		}
 	}
 	return

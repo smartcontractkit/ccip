@@ -163,6 +163,7 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			dest,
 			arb.AllContracts[uint64(dest)]["Rollup"], // l1 rollup address
 			common.Address(l1Deps.rebalancerAddress), // l1 rebalancer address
+			common.Address(l2Deps.rebalancerAddress), // l2 rebalancer address
 			common.Address(l2BridgeAdapter),          // l2 bridge adapter address
 			common.Address(l1BridgeAdapter),          // l1 bridge adapter address
 			l2Deps.lp,                                // l2 log poller
