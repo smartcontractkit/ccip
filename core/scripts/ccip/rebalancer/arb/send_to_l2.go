@@ -35,9 +35,18 @@ func SendToL2(
 	l2ChainID uint64,
 	l1BridgeAdapterAddress,
 	l1TokenAddress,
+	l1RefundAddress,
+	l2RefundAddress,
 	l2Recipient common.Address,
 	amount *big.Int,
 ) {
+	if l1RefundAddress == (common.Address{}) {
+		l1RefundAddress = env.Transactors[l1ChainID].From
+	}
+	if l2RefundAddress == (common.Address{}) {
+		l2RefundAddress = l2Recipient
+	}
+
 	// do some basic checks before proceeding
 	l1Token, err := erc20.NewERC20(l1TokenAddress, env.Clients[l1ChainID])
 	helpers.PanicErr(err)
@@ -58,6 +67,8 @@ func SendToL2(
 		l2ChainID,
 		l1GatewayRouter,
 		l1Token.Address(),
+		l1RefundAddress,
+		l2RefundAddress,
 		l2Recipient,
 		l1BridgeAdapterAddress,
 		amount,
@@ -135,33 +146,36 @@ func populateFunctionParams(
 	l2ChainID uint64,
 	l1GatewayRouter *arbitrum_gateway_router.ArbitrumGatewayRouter,
 	l1TokenAddress,
+	l1RefundAddress,
+	l2RefundAddress,
 	l2RecipientAddress,
 	l1BridgeAdapterAddress common.Address,
 	amount *big.Int,
 ) L1ToL2MessageGasParams {
 	l1Client := env.Clients[l1ChainID]
 
-	gatewayToApprove, err := l1GatewayRouter.GetGateway(nil, l1TokenAddress)
+	l1Gateway, err := l1GatewayRouter.GetGateway(nil, l1TokenAddress)
 	helpers.PanicErr(err)
 
 	// get the counterpart gateway on L2 from the L1 gateway
 	// unfortunately we need to instantiate a new wrapper because the counterpartGateway field,
 	// although it is public, is not accessible via a getter function on the token gateway interface
-	abstractGateway, err := abstract_arbitrum_token_gateway.NewAbstractArbitrumTokenGateway(gatewayToApprove, l1Client)
+	abstractGateway, err := abstract_arbitrum_token_gateway.NewAbstractArbitrumTokenGateway(l1Gateway, l1Client)
 	helpers.PanicErr(err)
 	l2Gateway, err := abstractGateway.CounterpartGateway(nil)
 	helpers.PanicErr(err)
 
-	l1TokenGateway, err := arbitrum_token_gateway.NewArbitrumTokenGateway(gatewayToApprove, l1Client)
+	l1TokenGateway, err := arbitrum_token_gateway.NewArbitrumTokenGateway(l1Gateway, l1Client)
 	helpers.PanicErr(err)
 
 	retryableData := RetryableData{
-		From:                gatewayToApprove,
+		From:                l1Gateway,
 		To:                  l2Gateway,
-		ExcessFeeRefundAddr: l2RecipientAddress,
-		CallValueRefundAddr: env.Transactors[l1ChainID].From,
-		// typically just one
-		L2CallValue: big.NewInt(1),
+		ExcessFeeRefundAddr: l2RefundAddress,
+		CallValueRefundAddr: l1RefundAddress,
+		// this is the amount - see the arbitrum SDK.
+		// https://github.com/OffchainLabs/arbitrum-sdk/blob/4c0d43abd5fcc5d219b20bc55e9d0ee152c01309/src/lib/assetBridger/ethBridger.ts#L318
+		L2CallValue: amount,
 		// 3 seems to work, but not sure if it's the best value
 		// you definitely need a non-nil deposit for the NodeInterface call to succeed
 		Deposit: big.NewInt(3),

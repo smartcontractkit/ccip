@@ -627,8 +627,9 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 		To:                  l2Gateway,
 		ExcessFeeRefundAddr: common.Address(transfer.Receiver),
 		CallValueRefundAddr: common.Address(transfer.Sender),
-		// typically just one
-		L2CallValue: big.NewInt(1),
+		// this is the amount - see the arbitrum SDK.
+		// https://github.com/OffchainLabs/arbitrum-sdk/blob/4c0d43abd5fcc5d219b20bc55e9d0ee152c01309/src/lib/assetBridger/ethBridger.ts#L318
+		L2CallValue: transfer.Amount.ToInt(),
 		// 3 seems to work, but not sure if it's the best value
 		// you definitely need a non-nil deposit for the NodeInterface call to succeed
 		Deposit: big.NewInt(3),

@@ -279,11 +279,13 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 
 	// get all L2 -> L1 finalizations in the past 14 days
 	// we can't filter on token since we don't have the token address in the onchain event
+	// Note: we don't filter on finalized because we want to avoid marking a sent tx as
+	// ready to finalize more than once, since that will cause reverts onchain.
 	l2ToL1Finalizations, err := l.l1LogPoller.LogsCreatedAfter(
 		L2toL1ERC20FinalizedTopic,
 		l.l1BridgeAdapter.Address(),
 		time.Now().Add(-DurationMonth/2),
-		logpoller.Finalized,
+		1,
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {

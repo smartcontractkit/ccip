@@ -276,6 +276,8 @@ func main() {
 		amount := cmd.String("amount", "1", "Amount")
 		l2ToAddress := cmd.String("l2-to-address", "", "L2 Address")
 		l1TokenAddress := cmd.String("l1-token-address", "", "L1 Token Address")
+		l1RefundAddress := cmd.String("l1-refund-address", "", "L1 Refund Address")
+		l2RefundAddress := cmd.String("l2-refund-address", "", "L2 Refund Address")
 
 		helpers.ParseArgs(cmd, os.Args[2:],
 			"l1-chain-id", "l2-chain-id", "l1-bridge-adapter-address", "l2-to-address", "l1-token-address")
@@ -287,6 +289,8 @@ func main() {
 			*l2ChainID,
 			common.HexToAddress(*l1BridgeAdapterAddress),
 			common.HexToAddress(*l1TokenAddress),
+			common.HexToAddress(*l1RefundAddress),
+			common.HexToAddress(*l2RefundAddress),
 			common.HexToAddress(*l2ToAddress),
 			decimal.RequireFromString(*amount).BigInt(),
 		)
