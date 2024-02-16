@@ -33,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   This change is not breaking: the config decoder still accepts old field names.
 
+- Minor changes to the Prometheus metrics emitted by plugins
+  - `ccip_unexpired_report_skipped`, `ccip_execution_observation_reports_count`, `ccip_execution_observation_build_duration`, `ccip_execution_build_single_batch`, `ccip_execution_reports_iteration_build_batch`
+    removed, because they didn't introduce any additional value compared to the existing OCR2 metrics.
+  - Some metrics added to track details of the processing
+    - `ccip_unexpired_commit_roots` number of unexpired Commit Roots processed by Exec during the OCR2 iteration
+    - `ccip_number_of_messages_processed` number of messages processed by the Exec when building the OCR2 reports and observations
+    - `ccip_sequence_number_counter` latest sequence number that was used for generating Commit Report
+    
 ## 1.2.0 - 2023-11-20
 
 ### Added
