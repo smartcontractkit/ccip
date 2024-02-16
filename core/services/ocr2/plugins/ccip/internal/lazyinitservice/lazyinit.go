@@ -13,10 +13,13 @@ import (
 
 	"github.com/avast/retry-go/v4"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
-var ErrNoService = errors.New("LazyInitService: the init function did not return a service")
+var ErrNoService = errors.New("the service is permanently unavailable")
+var ErrNotReady = errors.New("the service is not ready yet")
+var ErrClosed = errors.New("the service is closed")
 
 // An InitFunc represents an expensive blocking computation producing a service.
 // Init functions must respect the context passed as the argument and quit promptly if the context is canceled.
@@ -28,6 +31,8 @@ type LogErrorFunc = func(error)
 type Option = func(*LazyInitService)
 
 type LazyInitService struct {
+	// name is the underlying service name.
+	name string
 	// initFunc is the function creating the service.
 	initFunc InitFunc
 	// initComplete guards the initialization process allowing for a graceful shutdown.
@@ -36,8 +41,12 @@ type LazyInitService struct {
 	logErrorFunc LogErrorFunc
 	// cancelFunc is the function canceling the initialization process.
 	cancelFunc context.CancelFunc
+	// mu guards the fields below.
+	mu sync.Mutex
 	// initializedService contains the service the initFunc returns.
 	initializedService job.ServiceCtx
+	// err is the last error reported by the service.
+	lastErr error
 }
 
 // WithLogErrorFunc instructs the service constructor to use the given function for error reporting.
@@ -48,8 +57,9 @@ func WithLogErrorFunc(f LogErrorFunc) Option {
 }
 
 // New creates a new service with the given initialization function.
-func New(f InitFunc, opts ...Option) *LazyInitService {
+func New(name string, f InitFunc, opts ...Option) *LazyInitService {
 	s := &LazyInitService{
+		name:     name,
 		initFunc: f,
 	}
 	for _, opt := range opts {
@@ -60,15 +70,9 @@ func New(f InitFunc, opts ...Option) *LazyInitService {
 
 // Start initiates the underlying service initialization and starts it.
 //
-// Start ignores the given ctx cancellation if the service is not initialized yet.
+// Start ignores the given ctx cancellation.
 // Use Close to stop the initialization process and the service.
 func (s *LazyInitService) Start(ctx context.Context) error {
-	s.initComplete.Wait()
-
-	if s.initializedService != nil {
-		return s.initializedService.Start(ctx)
-	}
-
 	s.initComplete.Add(1)
 
 	// We create a new context because the original context will be cancelled once `Start` returns.
@@ -80,26 +84,32 @@ func (s *LazyInitService) Start(ctx context.Context) error {
 // initAndRun implements the lazy initialization logic.
 func (s *LazyInitService) initAndRun(ctx context.Context) {
 	defer s.initComplete.Done()
+	s.setState(nil, ErrNotReady)
 
 	service, err := retry.DoWithData[job.ServiceCtx](
 		func() (job.ServiceCtx, error) { return s.initFunc(ctx) },
 		retry.Context(ctx),
 		retry.OnRetry(func(n uint, err error) {
+			s.setState(nil, err)
 			s.reportError(fmt.Errorf("initialization attempt %d failed: %w", n, err))
 		}),
 	)
 	if err != nil {
+		s.setState(nil, err)
 		s.reportError(err)
 		return
 	}
 	if service == nil {
+		s.setState(nil, ErrNoService)
 		s.reportError(ErrNoService)
 		return
 	}
-	s.initializedService = service
-	if err = s.initializedService.Start(ctx); err != nil {
+	s.setState(service, ErrNotReady)
+	if err = service.Start(ctx); err != nil {
+		s.setState(service, err)
 		s.reportError(fmt.Errorf("service failed to start: %w", err))
 	}
+	s.setState(service, nil)
 }
 
 // reportError records the given error using the service log error function.
@@ -107,6 +117,20 @@ func (s *LazyInitService) reportError(err error) {
 	if s.logErrorFunc != nil {
 		s.logErrorFunc(err)
 	}
+}
+
+func (s *LazyInitService) setState(service job.ServiceCtx, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.initializedService = service
+	s.lastErr = err
+}
+
+func (s *LazyInitService) getState() (service job.ServiceCtx, lastErr error) {
+	s.mu.Lock()
+	service, lastErr = s.initializedService, s.lastErr
+	s.mu.Unlock()
+	return
 }
 
 // Close implements graceful service shutdown logic.
@@ -118,11 +142,46 @@ func (s *LazyInitService) Close() error {
 	}
 	// Second, wait for the initialization to complete.
 	s.initComplete.Wait()
+
+	service, _ := s.getState()
+
 	// Now, we can close the internal service if it was initialized.
-	if s.initializedService != nil {
-		return s.initializedService.Close()
+	if service != nil {
+		err := service.Close()
+		if err != nil {
+			s.setState(service, err)
+		} else {
+			s.setState(service, ErrClosed)
+		}
+		return err
 	}
 	return nil
+}
+
+func (s *LazyInitService) Ready() error {
+	service, lastErr := s.getState()
+
+	if service != nil {
+		if r, ok := service.(services.HealthReporter); ok {
+			return r.Ready()
+		}
+	}
+	return lastErr
+}
+
+func (s *LazyInitService) HealthReport() map[string]error {
+	service, lastErr := s.getState()
+
+	if service != nil {
+		if r, ok := service.(services.HealthReporter); ok {
+			return r.HealthReport()
+		}
+	}
+	return map[string]error{s.name: lastErr}
+}
+
+func (s *LazyInitService) Name() string {
+	return s.name
 }
 
 // Unrecoverable wraps the given error into an error that signals to the retry mechanism to stop trying.

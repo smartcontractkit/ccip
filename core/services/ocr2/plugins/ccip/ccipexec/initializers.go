@@ -45,7 +45,7 @@ import (
 const numTokenDataWorkers = 5
 
 func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
-	return []job.ServiceCtx{lazyinitservice.New(func(ctx context.Context) (job.ServiceCtx, error) {
+	return []job.ServiceCtx{lazyinitservice.New("CCIPExecService", func(ctx context.Context) (job.ServiceCtx, error) {
 		execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, pg.WithParentCtx(ctx))
 		if err != nil {
 			return nil, err
