@@ -169,7 +169,7 @@ func TestLazyInitService_ReportStartErrors(t *testing.T) {
 	assert.NoError(t, s.Start(context.Background()))
 	wg.Wait()
 	assert.Equal(t, 1, len(errs))
-	assert.Equal(t, errDummyStart, errs[0])
+	assert.ErrorAs(t, errs[0], &errDummyStart)
 }
 
 func TestLazyInitService_ReportCloseErrors(t *testing.T) {

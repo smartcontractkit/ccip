@@ -98,7 +98,7 @@ func (s *LazyInitService) initAndRun(ctx context.Context) {
 	}
 	s.initializedService = service
 	if err = s.initializedService.Start(ctx); err != nil {
-		s.reportError(err)
+		s.reportError(fmt.Errorf("service failed to start: %w", err))
 	}
 }
 
