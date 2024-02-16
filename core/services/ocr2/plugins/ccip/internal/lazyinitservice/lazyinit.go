@@ -72,11 +72,12 @@ func New(name string, f InitFunc, opts ...Option) *LazyInitService {
 //
 // Start ignores the given ctx cancellation.
 // Use Close to stop the initialization process and the service.
-func (s *LazyInitService) Start(ctx context.Context) error {
+func (s *LazyInitService) Start(_ctx context.Context) error {
 	s.initComplete.Add(1)
 
 	// We create a new context because the original context will be cancelled once `Start` returns.
-	ctx, s.cancelFunc = context.WithCancel(context.Background())
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	s.cancelFunc = cancelFunc
 	go s.initAndRun(ctx)
 	return nil
 }
