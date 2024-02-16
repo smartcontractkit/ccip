@@ -102,7 +102,6 @@ func NewConfig() (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode override config: %w", err)
 		}
-		log.Info().Interface("override", override).Msg("Applied overrides")
 	}
 	if override != nil {
 		// apply overrides for all products
