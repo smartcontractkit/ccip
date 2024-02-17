@@ -117,9 +117,9 @@ TestRunName = 'beta-1.4.1'
 
 [CCIP.Groups.smoke]
 MsgType = 'WithoutToken'
-NetworkPairs = ['ARBITRUM_SEPOLIA,SEPOLIA','AVALANCHE_FUJI,POLYGON_MUMBAI']
-PhaseTimeout = '50m'
-BiDirectionalLane = true
+NetworkPairs = ['AVALANCHE_FUJI,POLYGON_MUMBAI']
+PhaseTimeout = '20m'
+BiDirectionalLane = false
 LocalCluster = false
 ExistingDeployment = true
 ReuseContracts = true
