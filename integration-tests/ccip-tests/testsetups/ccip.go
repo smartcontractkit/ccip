@@ -669,11 +669,13 @@ func CCIPDefaultTestSetUp(
 			ccipEnv = &actions.CCIPTestEnv{
 				LocalCluster: local,
 			}
+			namespace = "local-deployment"
 		} else {
 			lggr.Info().Msg("Deploying test environment")
 			// deploy the env if configureCLNode is true
 			k8Env = DeployEnvironments(t, envConfig, testConfig)
 			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
+			namespace = ccipEnv.K8Env.Cfg.Namespace
 		}
 
 		ccipEnv.CLNodeWithKeyReady, _ = errgroup.WithContext(parent)
@@ -681,7 +683,6 @@ func CCIPDefaultTestSetUp(
 		if ccipEnv.K8Env != nil && ccipEnv.K8Env.WillUseRemoteRunner() {
 			return setUpArgs
 		}
-		namespace = ccipEnv.K8Env.Cfg.Namespace
 	} else {
 		// if configureCLNode is false it means we don't need to deploy any additional pods, use a placeholder env to create just the remote runner
 		if value, set := os.LookupEnv(config.EnvVarJobImage); set && value != "" {
