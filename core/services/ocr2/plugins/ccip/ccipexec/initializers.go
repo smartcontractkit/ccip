@@ -158,6 +158,8 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, err
 	}
 
+	lggr.Infow("Initializing exec plugin", "params", params)
+
 	sourceChainID := params.sourceChain.ID().Int64()
 	destChainID := params.destChain.ID().Int64()
 	versionFinder := factory.NewEvmVersionFinder()
