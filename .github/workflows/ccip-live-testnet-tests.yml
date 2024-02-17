@@ -201,7 +201,7 @@ jobs:
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-load-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
-          should_cleanup: "true"
+          should_cleanup: false
 
   ccip-smoke-test:
     name: CCIP smoke Test
@@ -299,4 +299,4 @@ jobs:
           aws_registries: ${{ secrets.QA_AWS_ACCOUNT_NUMBER }}
           cache_key_id: ccip-smoke-${{ env.MOD_CACHE_VERSION }}
           cache_restore_only: "true"
-          should_cleanup: "true"
+          should_cleanup: false
