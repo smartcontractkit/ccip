@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 )
 
 type ContractType string
@@ -39,13 +40,18 @@ func VerifyTypeAndVersion(addr common.Address, client bind.ContractBackend, expe
 }
 
 func TypeAndVersion(addr common.Address, client bind.ContractBackend) (ContractType, semver.Version, error) {
+	var log logger.Logger
+
 	tv, err := type_and_version.NewTypeAndVersionInterface(addr, client)
 	if err != nil {
 		return "", semver.Version{}, err
 	}
+
+	log.Infof("New Type and version interface initiated.... %s", tv.Address().String())
+
 	tvStr, err := tv.TypeAndVersion(nil)
 	if err != nil {
-		return "", semver.Version{}, errors.Errorf("Error while retrieving type and version %v %s", err, addr.String())
+		return "", semver.Version{}, errors.Errorf("Error while retrieving type and version %w %s", err, addr.String())
 	}
 
 	contractType, versionStr, err := ParseTypeAndVersion(tvStr)
