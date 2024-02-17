@@ -45,7 +45,7 @@ func TypeAndVersion(addr common.Address, client bind.ContractBackend) (ContractT
 	}
 	tvStr, err := tv.TypeAndVersion(nil)
 	if err != nil {
-		return "", semver.Version{}, errors.Errorf("Error while retrieving type and version %s", err)
+		return "", semver.Version{}, errors.Errorf("Error while retrieving type and version %v %s", err, addr.String())
 	}
 
 	contractType, versionStr, err := ParseTypeAndVersion(tvStr)
