@@ -44,7 +44,7 @@ import (
 
 const numTokenDataWorkers = 5
 
-func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs) ([]job.ServiceCtx, error) {
 	return []job.ServiceCtx{lazyinitservice.New("CCIPExecService", func(ctx context.Context) (job.ServiceCtx, error) {
 		execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, pg.WithParentCtx(ctx))
 		if err != nil {
@@ -56,7 +56,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 			return nil, lazyinitservice.Unrecoverable(err)
 		}
 		argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPExecution", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
-		argsNoPlugin.Logger = commonlogger.NewOCRWrapper(execPluginConfig.lggr, true, logError)
+		argsNoPlugin.Logger = commonlogger.NewOCRWrapper(execPluginConfig.lggr, true, func(string) {})
 		oracle, err := libocr2.NewOracle(argsNoPlugin)
 		if err != nil {
 			return nil, lazyinitservice.Unrecoverable(err)
@@ -75,7 +75,6 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 		return job.NewServiceAdapter(oracle), nil
 	}, lazyinitservice.WithLogErrorFunc(func(err error) {
 		lggr.Warnw("CCIP execution service initialization failed", "err", err)
-		logError(err.Error())
 	}))}, nil
 }
 

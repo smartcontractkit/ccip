@@ -3,12 +3,20 @@
 // This implementation executes the service initialization lazily on the first Start method invocation.
 // If the initialization fails, the service keeps trying to initialize the underlying service periodically until the first success.
 // The initialization function can indicate that there is no point in retrying using the Unrecoverable error wrapper.
+//
+// # Testing
+//
+// If you want to simulate your service initialization failures, you can define TEST_<service_name>_INIT_FAILURES environment variable.
+// The value of this environment variable should be an integer representing the number of initialization attempts before lazy service calls the real init function.
+// For example, if you want service CCIP_Exec to fail three times before succeeding, set the TEST_CCIP_Exec_INIT_FAILURES env variable to "3".
 package lazyinitservice
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"sync"
 
 	"github.com/avast/retry-go/v4"
@@ -87,8 +95,24 @@ func (s *LazyInitService) initAndRun(ctx context.Context) {
 	defer s.initComplete.Done()
 	s.setState(nil, ErrNotReady)
 
+	initFailures := 0
+	testEnvVar := fmt.Sprintf("TEST_%s_INIT_FAILURES", s.name)
+	if v := os.Getenv(testEnvVar); v != "" {
+		v, err := strconv.Atoi(v)
+		if err != nil {
+			s.reportError(fmt.Errorf("failed to parse %s: %w", testEnvVar, err))
+		}
+		initFailures = v
+	}
+	n := 0
 	service, err := retry.DoWithData[job.ServiceCtx](
-		func() (job.ServiceCtx, error) { return s.initFunc(ctx) },
+		func() (job.ServiceCtx, error) {
+			if n < initFailures {
+				n++
+				return nil, ErrNotReady
+			}
+			return s.initFunc(ctx)
+		},
 		retry.Context(ctx),
 		retry.OnRetry(func(n uint, err error) {
 			s.setState(nil, err)

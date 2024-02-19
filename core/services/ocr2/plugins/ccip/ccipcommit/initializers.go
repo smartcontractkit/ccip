@@ -39,7 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/pipeline"
 )
 
-func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs, logError func(string)) ([]job.ServiceCtx, error) {
+func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs) ([]job.ServiceCtx, error) {
 	return []job.ServiceCtx{lazyinitservice.New("CCIPCommitService", func(ctx context.Context) (job.ServiceCtx, error) {
 		pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, pg.WithParentCtx(ctx))
 		if err != nil {
@@ -51,7 +51,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.Legacy
 			return nil, lazyinitservice.Unrecoverable(err)
 		}
 		argsNoPlugin.ReportingPluginFactory = promwrapper.NewPromFactory(wrappedPluginFactory, "CCIPCommit", jb.OCR2OracleSpec.Relay, big.NewInt(0).SetUint64(destChainID))
-		argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, logError)
+		argsNoPlugin.Logger = commonlogger.NewOCRWrapper(pluginConfig.lggr, true, func(string) {})
 		oracle, err := libocr2.NewOracle(argsNoPlugin)
 		if err != nil {
 			return nil, lazyinitservice.Unrecoverable(err)
@@ -71,7 +71,6 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.Legacy
 		return job.NewServiceAdapter(oracle), nil
 	}, lazyinitservice.WithLogErrorFunc(func(err error) {
 		lggr.Warnw("CCIP commit service initialization failed", "err", err)
-		logError(err.Error())
 	}))}, nil
 }
 
