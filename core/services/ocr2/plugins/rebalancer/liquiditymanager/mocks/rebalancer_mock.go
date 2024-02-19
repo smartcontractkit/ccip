@@ -18,6 +18,26 @@ type Rebalancer struct {
 	mock.Mock
 }
 
+// Address provides a mock function with given fields:
+func (_m *Rebalancer) Address() models.Address {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Address")
+	}
+
+	var r0 models.Address
+	if rf, ok := ret.Get(0).(func() models.Address); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(models.Address)
+		}
+	}
+
+	return r0
+}
+
 // Close provides a mock function with given fields: ctx
 func (_m *Rebalancer) Close(ctx context.Context) error {
 	ret := _m.Called(ctx)
@@ -182,6 +202,24 @@ func (_m *Rebalancer) GetTokenAddress(ctx context.Context) (models.Address, erro
 	}
 
 	return r0, r1
+}
+
+// Network provides a mock function with given fields:
+func (_m *Rebalancer) Network() models.NetworkSelector {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Network")
+	}
+
+	var r0 models.NetworkSelector
+	if rf, ok := ret.Get(0).(func() models.NetworkSelector); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(models.NetworkSelector)
+	}
+
+	return r0
 }
 
 // NewRebalancer creates a new instance of Rebalancer. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
