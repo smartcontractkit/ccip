@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -412,6 +413,7 @@ func NewCommitStore(lggr logger.Logger, addr common.Address, ec client.Client, l
 			Name:      logpoller.FilterName(v1_0_0.EXEC_REPORT_ACCEPTS, addr.String()),
 			EventSigs: []common.Hash{eventSig},
 			Addresses: []common.Address{addr},
+			Retention: ccipdata.CommitExecLogsRetention,
 		},
 	}
 	lggr.Infow("Initializing CommitStore with estimator", "estimator", estimator)

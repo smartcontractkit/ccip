@@ -159,6 +159,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			Name:      logpoller.FilterName(ccipdata.COMMIT_CCIP_SENDS, onRampAddress),
 			EventSigs: []common.Hash{eventSig},
 			Addresses: []common.Address{onRampAddress},
+			Retention: ccipdata.CommitExecLogsRetention,
 		},
 	}
 	return &OnRamp{
