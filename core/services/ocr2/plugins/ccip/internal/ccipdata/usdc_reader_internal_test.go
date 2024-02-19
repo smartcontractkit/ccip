@@ -28,7 +28,7 @@ func TestLogPollerClient_GetLastUSDCMessagePriorToLogIndexInTx(t *testing.T) {
 
 	t.Run("multiple found", func(t *testing.T) {
 		lp := lpmocks.NewLogPoller(t)
-		u := NewUSDCReader(lggr, utils.RandomAddress(), lp)
+		u := NewUSDCReader(lggr, "job_123", utils.RandomAddress(), lp)
 		lp.On("IndexedLogsByTxHash",
 			u.usdcMessageSent,
 			u.transmitterAddress,
@@ -49,7 +49,7 @@ func TestLogPollerClient_GetLastUSDCMessagePriorToLogIndexInTx(t *testing.T) {
 
 	t.Run("none found", func(t *testing.T) {
 		lp := lpmocks.NewLogPoller(t)
-		u := NewUSDCReader(lggr, utils.RandomAddress(), lp)
+		u := NewUSDCReader(lggr, "job_123", utils.RandomAddress(), lp)
 		lp.On("IndexedLogsByTxHash",
 			u.usdcMessageSent,
 			u.transmitterAddress,

@@ -84,10 +84,10 @@ func (u *USDCReaderImpl) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Conte
 	return nil, errors.Errorf("no USDC message found prior to log index %d in tx %s", logIndex, txHash)
 }
 
-func NewUSDCReader(lggr logger.Logger, transmitter common.Address, lp logpoller.LogPoller) *USDCReaderImpl {
+func NewUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller) *USDCReaderImpl {
 	eventSig := utils.Keccak256Fixed([]byte("MessageSent(bytes)"))
 	filter := logpoller.Filter{
-		Name:      logpoller.FilterName(MESSAGE_SENT_FILTER_NAME, transmitter.Hex()),
+		Name:      logpoller.FilterName(MESSAGE_SENT_FILTER_NAME, jobID, transmitter.Hex()),
 		EventSigs: []common.Hash{eventSig},
 		Addresses: []common.Address{transmitter},
 	}
@@ -100,6 +100,6 @@ func NewUSDCReader(lggr logger.Logger, transmitter common.Address, lp logpoller.
 	}
 }
 
-func CloseUSDCReader(lggr logger.Logger, transmitter common.Address, lp logpoller.LogPoller, qopts ...pg.QOpt) error {
-	return NewUSDCReader(lggr, transmitter, lp).Close(qopts...)
+func CloseUSDCReader(lggr logger.Logger, jobID string, transmitter common.Address, lp logpoller.LogPoller, qopts ...pg.QOpt) error {
+	return NewUSDCReader(lggr, jobID, transmitter, lp).Close(qopts...)
 }
