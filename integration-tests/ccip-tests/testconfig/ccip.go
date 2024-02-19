@@ -23,7 +23,7 @@ type CCIPTestConfig struct {
 	TestDuration               *config.Duration   `toml:",omitempty"`
 	LocalCluster               *bool              `toml:",omitempty"`
 	ExistingDeployment         *bool              `toml:",omitempty"`
-	ExistingEnv                string             `toml:",omitempty"`
+	TestRunName                string             `toml:",omitempty"`
 	ReuseContracts             *bool              `toml:",omitempty"`
 	NodeFunding                float64            `toml:",omitempty"`
 	RequestPerUnitTime         []int64            `toml:",omitempty"`
@@ -40,6 +40,7 @@ type CCIPTestConfig struct {
 	MaxNoOfLanes               int                `toml:",omitempty"`
 	ChaosDuration              *config.Duration   `toml:",omitempty"`
 	USDCMockDeployment         *bool              `toml:",omitempty"`
+	TimeoutForPriceUpdate      *config.Duration   `toml:",omitempty"`
 }
 
 func (c *CCIPTestConfig) Validate() error {

@@ -352,7 +352,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	t := o.Cfg.Test
 	var k8Env *environment.Environment
 	ccipEnv := o.Env
-	namespace := o.Cfg.TestGroupInput.ExistingEnv
+	namespace := o.Cfg.TestGroupInput.TestRunName
 	if ccipEnv != nil {
 		k8Env = ccipEnv.K8Env
 		if k8Env != nil {
@@ -587,7 +587,7 @@ func (o *CCIPTestSetUpOutputs) WaitForPriceUpdates(ctx context.Context) {
 			}()
 			err = lane.Source.Common.WaitForPriceUpdates(
 				lane.Logger,
-				30*time.Minute,
+				o.Cfg.TestGroupInput.TimeoutForPriceUpdate.Duration(),
 				lane.Source.DestinationChainId,
 			)
 			if err != nil {
