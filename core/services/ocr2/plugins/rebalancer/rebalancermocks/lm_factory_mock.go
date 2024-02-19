@@ -14,6 +14,36 @@ type Factory struct {
 	mock.Mock
 }
 
+// GetAll provides a mock function with given fields:
+func (_m *Factory) GetAll() ([]liquiditymanager.Rebalancer, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAll")
+	}
+
+	var r0 []liquiditymanager.Rebalancer
+	var r1 error
+	if rf, ok := ret.Get(0).(func() ([]liquiditymanager.Rebalancer, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() []liquiditymanager.Rebalancer); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]liquiditymanager.Rebalancer)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRebalancer provides a mock function with given fields: networkID, address
 func (_m *Factory) GetRebalancer(networkID models.NetworkSelector, address models.Address) (liquiditymanager.Rebalancer, error) {
 	ret := _m.Called(networkID, address)

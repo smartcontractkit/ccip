@@ -33,14 +33,17 @@ type Observation struct {
 	PendingTransfers []PendingTransfer
 	// Edges are the edges of the rebalancer graph.
 	Edges []Edge
+	// ConfigDigests contains the config digests for each chain and rebalancer.
+	ConfigDigests []ConfigDigestWithMeta
 }
 
-func NewObservation(liqPerChain []NetworkLiquidity, resolvedTransfers []Transfer, pendingTransfers []PendingTransfer, edges []Edge) Observation {
+func NewObservation(liqPerChain []NetworkLiquidity, resolvedTransfers []Transfer, pendingTransfers []PendingTransfer, edges []Edge, configDigests []ConfigDigestWithMeta) Observation {
 	return Observation{
 		LiquidityPerChain: liqPerChain,
 		PendingTransfers:  pendingTransfers,
 		ResolvedTransfers: resolvedTransfers,
 		Edges:             edges,
+		ConfigDigests:     configDigests,
 	}
 }
 
@@ -73,17 +76,22 @@ type Outcome struct {
 	// These are transfers that are in one of the TransferStatus states.
 	// Depending on their state they may be ready to execute onchain.
 	PendingTransfers []PendingTransfer
+
+	// ConfigDigests contains the config digests for each chain and rebalancer.
+	ConfigDigests []ConfigDigestWithMeta
 }
 
 func NewOutcome(
 	proposedTransfers []ProposedTransfer,
 	resolvedTransfers []Transfer,
 	pendingTransfers []PendingTransfer,
+	configDigests []ConfigDigestWithMeta,
 ) Outcome {
 	return Outcome{
 		ProposedTransfers: proposedTransfers,
 		ResolvedTransfers: resolvedTransfers,
 		PendingTransfers:  pendingTransfers,
+		ConfigDigests:     configDigests,
 	}
 }
 
@@ -99,4 +107,10 @@ func DecodeOutcome(b []byte) (Outcome, error) {
 	var decodedOutcome Outcome
 	err := json.Unmarshal(b, &decodedOutcome)
 	return decodedOutcome, err
+}
+
+type ConfigDigestWithMeta struct {
+	Digest         ConfigDigest
+	NetworkSel     NetworkSelector
+	RebalancerAddr Address
 }
