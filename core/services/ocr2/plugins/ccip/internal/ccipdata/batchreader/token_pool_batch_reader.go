@@ -7,7 +7,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
@@ -28,7 +27,6 @@ type EVMTokenPoolBatchedReader struct {
 	lggr                logger.Logger
 	remoteChainSelector uint64
 	offRampAddress      common.Address
-	lp                  logpoller.LogPoller
 	evmBatchCaller      rpclib.EvmBatchCaller
 
 	tokenPoolReaders  map[cciptypes.Address]ccipdata.TokenPoolReader
@@ -42,7 +40,7 @@ type TokenPoolBatchedReader interface {
 
 var _ TokenPoolBatchedReader = (*EVMTokenPoolBatchedReader)(nil)
 
-func NewEVMTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64, offRampAddress cciptypes.Address, evmBatchCaller rpclib.EvmBatchCaller, lp logpoller.LogPoller) (*EVMTokenPoolBatchedReader, error) {
+func NewEVMTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64, offRampAddress cciptypes.Address, evmBatchCaller rpclib.EvmBatchCaller) (*EVMTokenPoolBatchedReader, error) {
 	offRampAddrEvm, err := ccipcalc.GenericAddrToEvm(offRampAddress)
 	if err != nil {
 		return nil, err
@@ -52,7 +50,6 @@ func NewEVMTokenPoolBatchedReader(lggr logger.Logger, remoteChainSelector uint64
 		lggr:                lggr,
 		remoteChainSelector: remoteChainSelector,
 		offRampAddress:      offRampAddrEvm,
-		lp:                  lp,
 		evmBatchCaller:      evmBatchCaller,
 		tokenPoolReaders:    make(map[cciptypes.Address]ccipdata.TokenPoolReader),
 	}, nil
@@ -115,7 +112,7 @@ func (br *EVMTokenPoolBatchedReader) loadTokenPoolReaders(ctx context.Context, t
 		return nil
 	}
 
-	typeAndVersions, err := getBatchedTypeAndVersion(ctx, br.lp, br.evmBatchCaller, missingTokens)
+	typeAndVersions, err := getBatchedTypeAndVersion(ctx, br.evmBatchCaller, missingTokens)
 	if err != nil {
 		return err
 	}
@@ -140,7 +137,7 @@ func (br *EVMTokenPoolBatchedReader) loadTokenPoolReaders(ctx context.Context, t
 	return nil
 }
 
-func getBatchedTypeAndVersion(ctx context.Context, lp logpoller.LogPoller, evmBatchCaller rpclib.EvmBatchCaller, poolAddresses []common.Address) ([]string, error) {
+func getBatchedTypeAndVersion(ctx context.Context, evmBatchCaller rpclib.EvmBatchCaller, poolAddresses []common.Address) ([]string, error) {
 	var evmCalls []rpclib.EvmCall
 
 	for _, poolAddress := range poolAddresses {

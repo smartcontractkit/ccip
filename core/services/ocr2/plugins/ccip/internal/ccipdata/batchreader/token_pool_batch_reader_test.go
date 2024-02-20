@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mocks2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
@@ -22,12 +21,11 @@ import (
 func TestTokenPoolFactory(t *testing.T) {
 	lggr := logger.TestLogger(t)
 	offRamp := utils.RandomAddress()
-	lp := mocks2.NewLogPoller(t)
 	ctx := context.Background()
 	remoteChainSelector := uint64(2000)
 	batchCallerMock := rpclibmocks.NewEvmBatchCaller(t)
 
-	tokenPoolBatchReader, err := NewEVMTokenPoolBatchedReader(lggr, remoteChainSelector, ccipcalc.EvmAddrToGeneric(offRamp), batchCallerMock, lp)
+	tokenPoolBatchReader, err := NewEVMTokenPoolBatchedReader(lggr, remoteChainSelector, ccipcalc.EvmAddrToGeneric(offRamp), batchCallerMock)
 	assert.NoError(t, err)
 
 	poolTypes := []string{"BurnMint", "LockRelease"}
