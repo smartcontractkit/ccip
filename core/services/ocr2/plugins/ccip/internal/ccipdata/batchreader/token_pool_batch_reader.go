@@ -2,10 +2,10 @@ package batchreader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/cockroachdb/errors"
 	"github.com/ethereum/go-ethereum/common"
 
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
