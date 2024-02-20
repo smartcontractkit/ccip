@@ -454,6 +454,5 @@ replace (
 
 	// K8s imports are weird
 	k8s.io/api => k8s.io/api v0.25.4
-	k8s.io/api v0.25.4 => k8s.io/api v0.25.11
 	k8s.io/client-go => k8s.io/client-go v0.25.4
 )
