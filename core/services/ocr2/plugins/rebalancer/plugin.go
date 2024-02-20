@@ -99,20 +99,16 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		return ocrtypes.Observation{}, fmt.Errorf("resolve proposed transfers: %w", err)
 	}
 
-	rbs, err := p.liquidityManagerFactory.GetAll()
-	if err != nil {
-		return ocrtypes.Observation{}, fmt.Errorf("get all rebalancers: %w", err)
-	}
-	configDigests := make([]models.ConfigDigestWithMeta, 0, len(rbs))
-	for _, rb := range rbs {
-		configDigest, err := rb.ConfigDigest(ctx)
+	configDigests := make([]models.ConfigDigestWithMeta, 0)
+	for _, net := range p.rebalancerGraph.GetNetworks() {
+		data, err := p.rebalancerGraph.GetData(net)
 		if err != nil {
-			return nil, fmt.Errorf("get rb %d:%s config digest: %w", rb.Network(), rb.Address(), err)
+			return nil, fmt.Errorf("get rb %d data: %w", net, err)
 		}
 		configDigests = append(configDigests, models.ConfigDigestWithMeta{
-			Digest:         models.ConfigDigest{ConfigDigest: configDigest},
-			NetworkSel:     rb.Network(),
-			RebalancerAddr: rb.Address(),
+			Digest:         data.ConfigDigest,
+			NetworkSel:     data.NetworkSelector,
+			RebalancerAddr: data.RebalancerAddress,
 		})
 	}
 

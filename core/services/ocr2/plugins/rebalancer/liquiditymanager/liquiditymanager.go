@@ -30,8 +30,4 @@ type Rebalancer interface {
 
 	// GetLatestSequenceNumber returns the latest sequence number of the rebalancer.
 	GetLatestSequenceNumber(ctx context.Context) (uint64, error)
-
-	Network() models.NetworkSelector
-
-	Address() models.Address
 }

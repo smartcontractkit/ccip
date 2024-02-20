@@ -26,9 +26,6 @@ type Factory interface {
 	// GetRebalancer returns an already initialized (via NewRebalancer) rebalancer instance.
 	// If it does not exist returns ErrNotFound.
 	GetRebalancer(networkID models.NetworkSelector, address models.Address) (Rebalancer, error)
-
-	// GetAll returns all the known rebalancer instances.
-	GetAll() ([]Rebalancer, error)
 }
 
 type evmDep struct {
@@ -107,21 +104,6 @@ func (b *BaseRebalancerFactory) GetRebalancer(networkSel models.NetworkSelector,
 	}
 
 	return rb, nil
-}
-
-func (b *BaseRebalancerFactory) GetAll() ([]Rebalancer, error) {
-	rebalancers := make([]Rebalancer, 0)
-	var err error
-	b.cachedRebalancers.Range(func(key, value any) bool {
-		r, is := value.(Rebalancer)
-		if !is {
-			err = ErrInternalCacheIssue
-			return false
-		}
-		rebalancers = append(rebalancers, r)
-		return true
-	})
-	return rebalancers, err
 }
 
 func (b *BaseRebalancerFactory) cacheKey(networkSel models.NetworkSelector, address models.Address) string {
