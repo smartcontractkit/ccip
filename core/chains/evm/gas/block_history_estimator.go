@@ -886,7 +886,7 @@ func (b *BlockHistoryEstimator) EffectiveGasPrice(block evmtypes.Block, tx evmty
 		effectiveGasPrice := priorityFeePerGas.Add(block.BaseFeePerGas)
 		return effectiveGasPrice
 	default:
-		b.logger.Warnw(fmt.Sprintf("Ignoring unknown transaction type %v", tx.Type), "tx", tx, "block", block)
+		b.logger.Warnw(fmt.Sprintf("Ignoring unknown transaction type %v", tx.Type), "block", block, "tx", tx)
 		return nil
 	}
 }
