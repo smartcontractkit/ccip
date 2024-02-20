@@ -203,8 +203,8 @@ type CCIPTestReporter struct {
 	namespace       string
 	reportFilePath  string
 	duration        time.Duration             // duration is the duration of the test
-	FailedLanes     []string                  `json:"failed_lanes,omitempty"` // FailedLanes is the list of lanes that failed
-	LaneStats       map[string]*CCIPLaneStats `json:"lane_stats"`             // LaneStats is the statistics for each lane
+	FailedLanes     map[string]Phase          `json:"failed_lanes_and_phases,omitempty"` // FailedLanes is the list of lanes that failed and the phase at which it failed
+	LaneStats       map[string]*CCIPLaneStats `json:"lane_stats"`                        // LaneStats is the statistics for each lane
 	mu              *sync.Mutex
 	sendSlackReport bool
 }
@@ -292,11 +292,17 @@ func (r *CCIPTestReporter) WriteReport(folderPath string) error {
 		r.LaneStats[k].Finalize(k)
 		// if E2E for the lane has failed
 		if _, ok := r.LaneStats[k].FailedCountsByPhase[E2E]; ok {
-			r.FailedLanes = append(r.FailedLanes, k)
+			// find the phase at which it failed
+			for phase, count := range r.LaneStats[k].FailedCountsByPhase {
+				if count > 0 && phase != E2E {
+					r.FailedLanes[k] = phase
+					break
+				}
+			}
 		}
 	}
 	if len(r.FailedLanes) > 0 {
-		r.logger.Info().Strs("List of Failed Lanes", r.FailedLanes).Msg("Failed Lanes")
+		r.logger.Info().Interface("List of Failed Lanes", r.FailedLanes).Msg("Failed Lanes")
 	} else {
 		r.logger.Info().Msg("All Lanes Passed")
 	}
@@ -344,9 +350,10 @@ func (r *CCIPTestReporter) SendReport(t *testing.T, namespace string, slackSend 
 
 func NewCCIPTestReporter(t *testing.T, lggr zerolog.Logger) *CCIPTestReporter {
 	return &CCIPTestReporter{
-		LaneStats: make(map[string]*CCIPLaneStats),
-		logger:    lggr,
-		t:         t,
-		mu:        &sync.Mutex{},
+		LaneStats:   make(map[string]*CCIPLaneStats),
+		logger:      lggr,
+		t:           t,
+		mu:          &sync.Mutex{},
+		FailedLanes: make(map[string]Phase),
 	}
 }

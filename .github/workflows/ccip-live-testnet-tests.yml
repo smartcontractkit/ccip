@@ -151,7 +151,7 @@ jobs:
             echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
           fi
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            BASE64_CCIP_CONFIG_OVERRIDE=$(jq -c . ./integration-tests/ccip-tests/testconfig/override/mainnet.toml | base64 -w 0)
+            BASE64_CCIP_CONFIG_OVERRIDE=$(base64 -w 0 -i ./integration-tests/ccip-tests/testconfig/override/mainnet.toml)
             echo ::add-mask::$BASE64_CCIP_CONFIG_OVERRIDE
             echo "BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV
             echo "TEST_BASE64_CCIP_CONFIG_OVERRIDE=$BASE64_CCIP_CONFIG_OVERRIDE" >> $GITHUB_ENV

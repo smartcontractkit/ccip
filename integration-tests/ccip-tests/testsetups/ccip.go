@@ -662,14 +662,14 @@ func CCIPDefaultTestSetUp(
 	envConfig := createEnvironmentConfig(t, envName, testConfig)
 
 	configureCLNode := !testConfig.useExistingDeployment()
-	var namespace string
+	namespace := setUpArgs.Cfg.TestGroupInput.TestRunName
 	if configureCLNode {
 		if testConfig.localCluster() {
 			local, deployCL = DeployLocalCluster(t, testConfig)
 			ccipEnv = &actions.CCIPTestEnv{
 				LocalCluster: local,
 			}
-			namespace = "local-deployment"
+			namespace = "local-docker-deployment"
 		} else {
 			lggr.Info().Msg("Deploying test environment")
 			// deploy the env if configureCLNode is true
