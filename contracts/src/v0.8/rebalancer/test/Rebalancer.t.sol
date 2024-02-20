@@ -19,7 +19,8 @@ contract RebalancerSetup is RebalancerBaseTest {
     uint64 indexed toChainSelector,
     address to,
     uint256 amount,
-    bytes bridgeSpecificPayload
+    bytes bridgeSpecificPayload,
+    bytes bridgeReturnData
   );
 
   Rebalancer internal s_rebalancer;
@@ -62,13 +63,15 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     emit Transfer(address(s_rebalancer), address(s_bridgeAdapter), amount);
 
     vm.expectEmit();
+    bytes memory encodedNonce = abi.encode(uint256(1));
     emit LiquidityTransferred(
       type(uint64).max,
       i_localChainSelector,
       i_remoteChainSelector,
       address(s_rebalancer),
       amount,
-      bytes("")
+      bytes(""),
+      encodedNonce
     );
 
     s_rebalancer.rebalanceLiquidity(i_remoteChainSelector, amount, 0, bytes(""));

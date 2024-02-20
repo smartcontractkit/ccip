@@ -28,28 +28,6 @@ contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
   //  address internal immutable i_l1ERC20Gateway;
   IArbSys internal constant ARB_SYS = IArbSys(address(0x64));
 
-  /// @notice event to track the L2 to L1 transfer offchain
-  /// @dev while this bridge adapter is trustless and anyone can use it,
-  /// @dev its highly unlikely that anyone would prefer it over the official bridge
-  /// @dev contracts. And since the official bridge contracts probably have lots of
-  /// @dev events and logs, we can use this event to track the L2 to L1 transfers
-  /// @dev with less load on the rebalancer oracles.
-  /// @param localToken the token address on L2
-  /// @param remoteToken the token address on L1
-  /// @param recipient the recipient of the tokens on L1
-  /// @param amount the amount of tokens transferred
-  /// @param outboundTransferResult the result of the outbound transfer, which is the unique id used to identify the L2 to L1 tx
-  event ArbitrumL2ToL1ERC20Sent(
-    address indexed localToken,
-    address indexed remoteToken,
-    address indexed recipient,
-    uint256 amount,
-    bytes outboundTransferResult
-  );
-  /// @notice event to track the finalization of the L2 to L1 transfer
-  /// @dev no data to emit since there isn't typically a finalization step for L1 to L2 transfers
-  event ArbitrumL1ToL2ERC20Finalized();
-
   constructor(IL2GatewayRouter l2GatewayRouter) {
     if (address(l2GatewayRouter) == address(0)) {
       revert BridgeAddressCannotBeZero();
@@ -76,8 +54,6 @@ contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
     // No approval needed, the bridge will burn the tokens from this contract.
     bytes memory l2ToL1TxId = i_l2GatewayRouter.outboundTransfer(remoteToken, recipient, amount, bytes(""));
 
-    emit ArbitrumL2ToL1ERC20Sent(localToken, remoteToken, recipient, amount, l2ToL1TxId);
-
     return l2ToL1TxId;
   }
 
@@ -87,7 +63,6 @@ contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
     address /* localReceiver */,
     bytes calldata /* bridgeSpecificPayload */
   ) external {
-    emit ArbitrumL1ToL2ERC20Finalized();
   }
 
   /// @notice There are no fees to bridge back to L1

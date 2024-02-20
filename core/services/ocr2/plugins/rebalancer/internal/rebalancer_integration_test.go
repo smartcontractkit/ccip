@@ -49,6 +49,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/chaintype"
 	"github.com/smartcontractkit/chainlink/v2/core/services/keystore/keys/ocr2key"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge/testonlybridge"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/validate"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocrbootstrap"
 
@@ -402,19 +403,12 @@ func waitForTransmissions(
 	universes map[int64]onchainUniverse,
 ) {
 	start := uint64(1)
-	erc20FinalizedSink := make(chan *mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized)
-	erc20SentSink := make(chan *mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent)
+	liquidityTransferredSink := make(chan *rebalancer.RebalancerLiquidityTransferred)
 	var subs []event.Subscription
 	for _, uni := range universes {
-		sub, err := uni.bridgeAdapter.WatchMockERC20Finalized(&bind.WatchOpts{
+		sub, err := uni.rebalancer.WatchLiquidityTransferred(&bind.WatchOpts{
 			Start: &start,
-		}, erc20FinalizedSink, nil, nil, nil)
-		require.NoError(t, err, "failed to create subscription")
-		subs = append(subs, sub)
-
-		sub, err = uni.bridgeAdapter.WatchMockERC20Sent(&bind.WatchOpts{
-			Start: &start,
-		}, erc20SentSink, nil, nil, nil)
+		}, liquidityTransferredSink, nil, nil, nil)
 		require.NoError(t, err, "failed to create subscription")
 		subs = append(subs, sub)
 	}
@@ -426,20 +420,28 @@ func waitForTransmissions(
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	sentEvents := map[string]struct{}{}
-outer:
 	for {
 		select {
-		case sent := <-erc20SentSink:
-			t.Log("got erc20 sent event, amount:", sent.Amount, "tx hash:", sent.Raw.TxHash, "nonce:", sent.Nonce)
-			sentEvents[sent.Nonce.String()] = struct{}{}
-		case fin := <-erc20FinalizedSink:
-			t.Log("got erc20 finalized event, amount:", fin.Amount, "tx hash:", fin.Raw.TxHash, "nonce:", fin.Nonce)
-			if _, exists := sentEvents[fin.Nonce.String()]; exists {
-				t.Logf("got erc20 finalized event for nonce %s, which was sent", fin.Nonce)
-				break outer
+		case lt := <-liquidityTransferredSink:
+			// determine if it's a send or receive event based on the BridgeReturnData field
+			// if it's a send event, then the BridgeReturnData will not be empty
+			if len(lt.BridgeReturnData) > 0 {
+				// for the test bridges, bridge return data is just a nonce
+				nonce, err := testonlybridge.UnpackBridgeSendReturnData(lt.BridgeReturnData)
+				require.NoError(t, err)
+				t.Log("received send event with nonce:", nonce)
+				sentEvents[lt.Raw.TxHash.String()] = struct{}{}
 			} else {
-				// bug otherwise
-				t.Fatalf("got erc20 finalized event for nonce %s, which was not sent", fin.Nonce)
+				// for the test bridges, the bridge specific data is an amount and a nonce
+				amount, nonce, err := testonlybridge.UnpackFinalizeBridgePayload(lt.BridgeSpecificData)
+				require.NoError(t, err)
+				t.Log("received receive event with amount:", amount, "nonce:", nonce)
+				if _, ok := sentEvents[nonce.String()]; !ok {
+					t.Fatal("received receive event without corresponding send event")
+				} else {
+					t.Log("received corresponding receive event")
+					return
+				}
 			}
 		case <-ticker.C:
 			t.Log("waiting for transmission or liquidity transferred event")

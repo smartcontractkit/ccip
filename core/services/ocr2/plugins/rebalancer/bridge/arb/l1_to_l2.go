@@ -50,9 +50,6 @@ var (
 	DepositFinalizedTopic     = l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{}.Topic()
 	LiquidityTransferredTopic = rebalancer.RebalancerLiquidityTransferred{}.Topic()
 
-	// Events emitted on L1
-	ArbitrumL1ToL2ERC20Sent = arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent{}.Topic()
-
 	nodeInterfaceABI = abihelpers.MustParseABI(arb_node_interface.NodeInterfaceMetaData.ABI)
 )
 
@@ -60,7 +57,7 @@ type l1ToL2Bridge struct {
 	localSelector  models.NetworkSelector
 	remoteSelector models.NetworkSelector
 
-	l1Rebalancer        *rebalancer.Rebalancer
+	l1Rebalancer        rebalancer.RebalancerInterface
 	l2RebalancerAddress common.Address
 	l1BridgeAdapter     arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterInterface
 
@@ -87,7 +84,6 @@ func NewL1ToL2Bridge(
 	remoteSelector models.NetworkSelector,
 	l1RebalancerAddress,
 	l2RebalancerAddress,
-	l1BridgeAdapterAddress,
 	l1GatewayRouterAddress,
 	l1InboxAddress common.Address,
 	l1Client,
@@ -114,17 +110,13 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("instantiate L1 inbox at %s: %w", l1InboxAddress, err)
 	}
 
-	l1BridgeAdapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(l1BridgeAdapterAddress, l1Client)
-	if err != nil {
-		return nil, fmt.Errorf("instantiate L1 bridge adapter at %s: %w", l1BridgeAdapterAddress, err)
-	}
-
-	l1FilterName := fmt.Sprintf("ArbitrumL1ToL2Bridge-%s-%s-%s", l1BridgeAdapterAddress.String(), localChain.Name, remoteChain.Name)
+	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-Rebalancer:%s-Local:%s-Remote:%s",
+		l1RebalancerAddress.String(), localChain.Name, remoteChain.Name)
 	err = l1LogPoller.RegisterFilter(logpoller.Filter{
-		Addresses: []common.Address{l1BridgeAdapterAddress},
+		Addresses: []common.Address{l1RebalancerAddress},
 		Name:      l1FilterName,
 		EventSigs: []common.Hash{
-			ArbitrumL1ToL2ERC20Sent,
+			LiquidityTransferredTopic,
 		},
 		Retention: DurationMonth,
 	})
@@ -136,6 +128,16 @@ func NewL1ToL2Bridge(
 	l1Rebalancer, err := rebalancer.NewRebalancer(l1RebalancerAddress, l1Client)
 	if err != nil {
 		return nil, fmt.Errorf("instantiate rebalancer at %s: %w", l1RebalancerAddress, err)
+	}
+
+	xchainRebal, err := l1Rebalancer.GetCrossChainRebalancer(nil, uint64(remoteSelector))
+	if err != nil {
+		return nil, fmt.Errorf("get cross chain rebalancer for remote chain %s: %w", remoteChain.Name, err)
+	}
+
+	l1BridgeAdapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(xchainRebal.LocalBridge, l1Client)
+	if err != nil {
+		return nil, fmt.Errorf("instantiate L1 bridge adapter at %s: %w", xchainRebal.LocalBridge, err)
 	}
 
 	l1Token, err := l1Rebalancer.ILocalToken(nil)
@@ -160,7 +162,8 @@ func NewL1ToL2Bridge(
 		return nil, fmt.Errorf("get counterpart gateway for gateway %s: %w", l1TokenGateway, err)
 	}
 
-	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2Events-%s-%s", localChain.Name, remoteChain.Name)
+	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2-L2Gateway:%s-Rebalancer:%s-Local:%s-Remote:%s",
+		l2Gateway.Hex(), l2RebalancerAddress.Hex(), localChain.Name, remoteChain.Name)
 	err = l2LogPoller.RegisterFilter(logpoller.Filter{
 		Addresses: []common.Address{
 			l2Gateway,           // emits DepositFinalized
@@ -225,13 +228,15 @@ func (l *l1ToL2Bridge) GetTransfers(
 		"remoteToken", remoteToken,
 	)
 	lggr.Info("getting transfers")
+	// TODO: check that l1Rebalancer token matches localToken
+	// TODO: check that l2Rebalancer token matches remoteToken
 	fromTs := time.Now().Add(-24 * time.Hour) // last day
-	erc20SentLogs, err := l.l1LogPoller.IndexedLogsCreatedAfter(
-		ArbitrumL1ToL2ERC20Sent,
-		l.l1BridgeAdapter.Address(),
-		1, // topic index 1: localToken field in event
+	sendLogs, err := l.l1LogPoller.IndexedLogsCreatedAfter(
+		LiquidityTransferredTopic,
+		l.l1Rebalancer.Address(),
+		3, // topic index 3: toChainSelector in event
 		[]common.Hash{
-			common.HexToHash(common.Address(localToken).Hex()),
+			toHash(l.remoteSelector),
 		},
 		fromTs,
 		logpoller.Finalized,
@@ -256,7 +261,7 @@ func (l *l1ToL2Bridge) GetTransfers(
 		return nil, fmt.Errorf("get DepositFinalized events from L2 gateway: %w", err)
 	}
 
-	liquidityTransferredLogs, err := l.l2LogPoller.IndexedLogsCreatedAfter(
+	receiveLogs, err := l.l2LogPoller.IndexedLogsCreatedAfter(
 		LiquidityTransferredTopic,
 		l.l2RebalancerAddress,
 		2, // topic index 2: fromChainSelector
@@ -274,23 +279,23 @@ func (l *l1ToL2Bridge) GetTransfers(
 	// the log poller SQL queries return logs sorted by block number and log index already
 	// however given that this is an implementation detail we sort again here
 	// but based on timestamp
-	slices.SortFunc(erc20SentLogs, func(a, b logpoller.Log) int {
+	slices.SortFunc(sendLogs, func(a, b logpoller.Log) int {
 		return a.BlockTimestamp.Compare(b.BlockTimestamp)
 	})
 	slices.SortFunc(depositFinalizedLogs, func(a, b logpoller.Log) int {
 		return a.BlockTimestamp.Compare(b.BlockTimestamp)
 	})
-	slices.SortFunc(liquidityTransferredLogs, func(a, b logpoller.Log) int {
+	slices.SortFunc(receiveLogs, func(a, b logpoller.Log) int {
 		return a.BlockTimestamp.Compare(b.BlockTimestamp)
 	})
 
 	lggr.Infow("got logs",
-		"erc20SentLogs", len(erc20SentLogs),
+		"sendLogs", len(sendLogs),
 		"depositFinalizedLogs", len(depositFinalizedLogs),
-		"liquidityTransferredLogs", len(liquidityTransferredLogs),
+		"receiveLogs", len(receiveLogs),
 	)
 
-	parsedERC20Sent, parsedToLP, err := l.parseL1ToL2Transfers(erc20SentLogs)
+	parsedSent, parsedToLP, err := parseLiquidityTransferred(l.l1Rebalancer.ParseLiquidityTransferred, sendLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse L1 -> L2 transfers: %w", err)
 	}
@@ -300,15 +305,15 @@ func (l *l1ToL2Bridge) GetTransfers(
 		return nil, fmt.Errorf("parse DepositFinalized logs: %w", err)
 	}
 
-	parsedLiquidityTransferred, err := l.parseLiquidityTransferred(liquidityTransferredLogs)
+	parsedReceived, _, err := parseLiquidityTransferred(l.l1Rebalancer.ParseLiquidityTransferred, receiveLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse LiquidityTransferred logs: %w", err)
 	}
 
 	lggr.Infow("parsed logs",
-		"parsedERC20Sent", len(parsedERC20Sent),
+		"parsedSent", len(parsedSent),
 		"parsedDepositFinalized", len(parsedDepositFinalized),
-		"parsedLiquidityTransferred", len(parsedLiquidityTransferred),
+		"parsedReceived", len(parsedReceived),
 	)
 
 	// Unfortunately its not easy to match DepositFinalized events with ERC20Sent events.
@@ -321,19 +326,19 @@ func (l *l1ToL2Bridge) GetTransfers(
 	// pay out to the rebalancer on L2.
 	// We can _probably_ assume that the earlier ERC20Sent logs on L1
 	// are more likely to be finalizedNotExecuted than later ones.
-	notReady, ready, readyData, executed, err := l.partitionTransfers(localToken, parsedERC20Sent, parsedDepositFinalized, parsedLiquidityTransferred)
+	notReady, ready, readyData, err := l.partitionTransfers(localToken, parsedSent, parsedDepositFinalized, parsedReceived)
 	if err != nil {
 		return nil, fmt.Errorf("partition logs into not-ready, ready, finalized and executed states: %w", err)
 	}
 
-	return l.toPendingTransfers(notReady, ready, readyData, executed, parsedToLP)
+	return l.toPendingTransfers(localToken, remoteToken, notReady, ready, readyData, parsedToLP)
 }
 
 func (l *l1ToL2Bridge) toPendingTransfers(
+	localToken, remoteToken models.Address,
 	notReady,
-	ready []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
+	ready []*rebalancer.RebalancerLiquidityTransferred,
 	readyData [][]byte,
-	executed []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
 	parsedToLP map[logKey]logpoller.Log,
 ) ([]models.PendingTransfer, error) {
 	if len(ready) != len(readyData) {
@@ -347,9 +352,9 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 				From:               l.localSelector,
 				To:                 l.remoteSelector,
 				Sender:             models.Address(l.l1Rebalancer.Address()),
-				Receiver:           models.Address(transfer.Recipient),
-				LocalTokenAddress:  models.Address(transfer.LocalToken),
-				RemoteTokenAddress: models.Address(transfer.RemoteToken),
+				Receiver:           models.Address(l.l2RebalancerAddress),
+				LocalTokenAddress:  localToken,
+				RemoteTokenAddress: remoteToken,
 				Amount:             ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
@@ -367,9 +372,9 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 				From:               l.localSelector,
 				To:                 l.remoteSelector,
 				Sender:             models.Address(l.l1Rebalancer.Address()),
-				Receiver:           models.Address(transfer.Recipient),
-				LocalTokenAddress:  models.Address(transfer.LocalToken),
-				RemoteTokenAddress: models.Address(transfer.RemoteToken),
+				Receiver:           models.Address(l.l1Rebalancer.Address()),
+				LocalTokenAddress:  localToken,
+				RemoteTokenAddress: remoteToken,
 				Amount:             ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
@@ -387,63 +392,59 @@ func (l *l1ToL2Bridge) toPendingTransfers(
 // precondition: the input logs are already sorted in time-ascending order
 func (l *l1ToL2Bridge) partitionTransfers(
 	localToken models.Address,
-	erc20SentLogs []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
+	sentLogs []*rebalancer.RebalancerLiquidityTransferred,
 	depositFinalizedLogs []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized,
-	liquidityTransferredLogs []*rebalancer.RebalancerLiquidityTransferred,
+	receivedLogs []*rebalancer.RebalancerLiquidityTransferred,
 ) (
 	notReady,
-	ready []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
+	ready []*rebalancer.RebalancerLiquidityTransferred,
 	readyData [][]byte,
-	executed []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
 	err error,
 ) {
-	effectiveERC20Sent, effectiveDepositFinalized := l.getEffectiveEvents(localToken, erc20SentLogs, depositFinalizedLogs)
+	effectiveDepositFinalized := l.getEffectiveEvents(localToken, depositFinalizedLogs)
 	// determine ready and not ready first
-	if len(effectiveERC20Sent) > len(effectiveDepositFinalized) {
+	if len(sentLogs) > len(effectiveDepositFinalized) {
 		// more sent than have been finalized
-		for i := len(effectiveERC20Sent) - len(effectiveDepositFinalized) + 1; i < len(effectiveERC20Sent); i++ {
-			notReady = append(notReady, effectiveERC20Sent[i])
+		for i := len(sentLogs) - len(effectiveDepositFinalized) + 1; i < len(sentLogs); i++ {
+			notReady = append(notReady, sentLogs[i])
 		}
-		for i := 0; i < (len(effectiveERC20Sent) - len(effectiveDepositFinalized)); i++ {
-			ready = append(ready, effectiveERC20Sent[i])
+		for i := 0; i < (len(sentLogs) - len(effectiveDepositFinalized)); i++ {
+			ready = append(ready, sentLogs[i])
 		}
-	} else if len(effectiveERC20Sent) < len(effectiveDepositFinalized) {
+	} else if len(sentLogs) < len(effectiveDepositFinalized) {
 		// more finalized than have been sent - should be impossible
-		return nil, nil, nil, nil, fmt.Errorf("got more finalized logs than sent - should be impossible: len(sent) = %d, len(finalized) = %d",
-			len(effectiveERC20Sent), len(effectiveDepositFinalized))
+		return nil, nil, nil, fmt.Errorf("got more finalized logs than sent - should be impossible: len(sent) = %d, len(finalized) = %d",
+			len(sentLogs), len(effectiveDepositFinalized))
 	} else {
-		ready = effectiveERC20Sent
+		ready = sentLogs
 	}
 	// figure out if any of the ready have been executed
-	ready, executed, err = l.filterExecuted(ready, liquidityTransferredLogs)
+	ready, err = l.filterExecuted(ready, receivedLogs)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("filter executed transfers: %w", err)
+		return nil, nil, nil, fmt.Errorf("filter executed transfers: %w", err)
 	}
 	// get the readyData
-	// this is just going to be the L1 to L2 tx id that is emitted in the ERC20Sent log itself
+	// this is just going to be the L1 to L2 tx id that is emitted in the L1 LiquidityTransferred.bridgeReturnData field.
 	for _, r := range ready {
-		readyData = append(readyData, r.OutboundTransferResult)
+		readyData = append(readyData, r.BridgeReturnData)
 	}
 	return
 }
 
 func (l *l1ToL2Bridge) filterExecuted(
-	readyCandidates []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
+	readyCandidates []*rebalancer.RebalancerLiquidityTransferred,
 	liquidityTransferredLogs []*rebalancer.RebalancerLiquidityTransferred,
 ) (
-	ready,
-	executed []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
+	ready []*rebalancer.RebalancerLiquidityTransferred,
 	err error,
 ) {
 	for _, readyCandidate := range readyCandidates {
 		exists, err := l.matchingExecutionExists(readyCandidate, liquidityTransferredLogs)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error checking if ready candidate has been executed: %w", err)
+			return nil, fmt.Errorf("error checking if ready candidate has been executed: %w", err)
 		}
 		if !exists {
 			ready = append(ready, readyCandidate)
-		} else {
-			executed = append(executed, readyCandidate)
 		}
 	}
 	return
@@ -452,22 +453,22 @@ func (l *l1ToL2Bridge) filterExecuted(
 // TODO: might be able to optimize this
 // map[l2ToL1TxId]bool and check if the l2ToL1TxId exists in the map
 func (l *l1ToL2Bridge) matchingExecutionExists(
-	readyCandidate *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
+	readyCandidate *rebalancer.RebalancerLiquidityTransferred,
 	liquidityTransferredLogs []*rebalancer.RebalancerLiquidityTransferred,
 ) (bool, error) {
 	for _, ltLog := range liquidityTransferredLogs {
 		// decode the bridge specific data, which should be the l1 -> l2 tx id
-		ltL1ToL2TxId, err := unpackUint256(ltLog.BridgeSpecificData)
+		recvL1ToL2TxId, err := unpackUint256(ltLog.BridgeSpecificData)
 		if err != nil {
 			return false, fmt.Errorf("unpack bridge specific data from LiquidityTransferred log: %w, data: %s",
 				err, hexutil.Encode(ltLog.BridgeSpecificData))
 		}
-		l1ToL2TxId, err := unpackUint256(readyCandidate.OutboundTransferResult)
+		sendL1ToL2TxId, err := unpackUint256(readyCandidate.BridgeSpecificData)
 		if err != nil {
 			return false, fmt.Errorf("unpack outbound transfer result from ArbitrumL1ToL2ERC20Sent log: %w, data: %s",
-				err, hexutil.Encode(readyCandidate.OutboundTransferResult))
+				err, hexutil.Encode(readyCandidate.BridgeSpecificData))
 		}
-		if l1ToL2TxId.Cmp(ltL1ToL2TxId) == 0 {
+		if sendL1ToL2TxId.Cmp(recvL1ToL2TxId) == 0 {
 			return true, nil
 		}
 	}
@@ -476,21 +477,10 @@ func (l *l1ToL2Bridge) matchingExecutionExists(
 
 func (l *l1ToL2Bridge) getEffectiveEvents(
 	localToken models.Address,
-	erc20SentLogs []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
 	depositFinalizedLogs []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized,
 ) (
-	effectiveERC20Sent []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
 	effectiveDepositFinalized []*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized,
 ) {
-	// filter out ERC20Sent logs not destined for the rebalancer on L2
-	// TODO: ideally this would be done in the log poller query but no such query exists
-	// at the moment.
-	for _, erc20Sent := range erc20SentLogs {
-		if erc20Sent.Recipient == l.l2RebalancerAddress {
-			effectiveERC20Sent = append(effectiveERC20Sent, erc20Sent)
-		}
-	}
-
 	// filter out DepositFinalized logs not coming from the l1 bridge adapter
 	// and not matching the localToken provided.
 	// in theory anyone can bridge any token to the rebalancer on L2 from L1
@@ -507,28 +497,6 @@ func (l *l1ToL2Bridge) getEffectiveEvents(
 	return
 }
 
-func (l *l1ToL2Bridge) parseL1ToL2Transfers(lgs []logpoller.Log) (
-	[]*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent,
-	map[logKey]logpoller.Log,
-	error,
-) {
-	transfers := make([]*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent, len(lgs))
-	parsedToLPLog := make(map[logKey]logpoller.Log)
-	for i, lg := range lgs {
-		parsed, err := l.l1BridgeAdapter.ParseArbitrumL1ToL2ERC20Sent(lg.ToGethLog())
-		if err != nil {
-			// should never happen
-			return nil, nil, fmt.Errorf("parse L1 -> L2 transfer log: %w", err)
-		}
-		transfers[i] = parsed
-		parsedToLPLog[logKey{
-			txHash:   lg.TxHash,
-			logIndex: lg.LogIndex,
-		}] = lg
-	}
-	return transfers, parsedToLPLog, nil
-}
-
 func (l *l1ToL2Bridge) parseDepositFinalized(lgs []logpoller.Log) ([]*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized, error) {
 	finalized := make([]*l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized, len(lgs))
 	for i, lg := range lgs {
@@ -540,19 +508,6 @@ func (l *l1ToL2Bridge) parseDepositFinalized(lgs []logpoller.Log) ([]*l2_arbitru
 		finalized[i] = parsed
 	}
 	return finalized, nil
-}
-
-func (l *l1ToL2Bridge) parseLiquidityTransferred(lgs []logpoller.Log) ([]*rebalancer.RebalancerLiquidityTransferred, error) {
-	transferred := make([]*rebalancer.RebalancerLiquidityTransferred, len(lgs))
-	for i, lg := range lgs {
-		parsed, err := l.l1Rebalancer.ParseLiquidityTransferred(lg.ToGethLog())
-		if err != nil {
-			// should never happen
-			return nil, fmt.Errorf("parse LiquidityTransferred log: %w", err)
-		}
-		transferred[i] = parsed
-	}
-	return transferred, nil
 }
 
 func (l *l1ToL2Bridge) QuorumizedBridgePayload(payloads [][]byte, f int) ([]byte, error) {

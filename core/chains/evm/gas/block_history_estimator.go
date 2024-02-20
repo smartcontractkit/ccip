@@ -777,7 +777,7 @@ func (b *BlockHistoryEstimator) getPricesFromBlocks(blocks []evmtypes.Block, eip
 				if gp != nil {
 					gasPrices = append(gasPrices, gp)
 				} else {
-					b.logger.Warnw("Unable to get gas price for tx", "tx", tx, "block", block)
+					b.logger.Debugw("Unable to get gas price for tx", "tx", tx)
 					continue
 				}
 				if eip1559 {
@@ -785,7 +785,7 @@ func (b *BlockHistoryEstimator) getPricesFromBlocks(blocks []evmtypes.Block, eip
 					if tc != nil {
 						tipCaps = append(tipCaps, tc)
 					} else {
-						b.logger.Warnw("Unable to get tip cap for tx", "tx", tx, "block", block)
+						b.logger.Debugw("Unable to get tip cap for tx", "tx", tx)
 						continue
 					}
 				}
@@ -886,7 +886,7 @@ func (b *BlockHistoryEstimator) EffectiveGasPrice(block evmtypes.Block, tx evmty
 		effectiveGasPrice := priorityFeePerGas.Add(block.BaseFeePerGas)
 		return effectiveGasPrice
 	default:
-		b.logger.Warnw(fmt.Sprintf("Ignoring unknown transaction type %v", tx.Type), "block", block, "tx", tx)
+		b.logger.Debugw(fmt.Sprintf("Ignoring unknown transaction type %v", tx.Type), "tx", tx)
 		return nil
 	}
 }
@@ -909,7 +909,7 @@ func (b *BlockHistoryEstimator) EffectiveTipCap(block evmtypes.Block, tx evmtype
 		}
 		return effectiveTipCap
 	default:
-		b.logger.Warnw(fmt.Sprintf("Ignoring unknown transaction type %v", tx.Type), "block", block, "tx", tx)
+		b.logger.Debugw(fmt.Sprintf("Ignoring unknown transaction type %v", tx.Type), "block", block, "tx", tx)
 		return nil
 	}
 }

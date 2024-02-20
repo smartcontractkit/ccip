@@ -11,10 +11,6 @@ import (
 
 	common "github.com/ethereum/go-ethereum/common"
 
-	event "github.com/ethereum/go-ethereum/event"
-
-	generated "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated"
-
 	mock "github.com/stretchr/testify/mock"
 
 	types "github.com/ethereum/go-ethereum/core/types"
@@ -79,66 +75,6 @@ func (_m *ArbitrumL1BridgeAdapterInterface) ExposeSendERC20Params(opts *bind.Cal
 	}
 
 	return r0
-}
-
-// FilterArbitrumL1ToL2ERC20Sent provides a mock function with given fields: opts, localToken, remoteToken, recipient
-func (_m *ArbitrumL1BridgeAdapterInterface) FilterArbitrumL1ToL2ERC20Sent(opts *bind.FilterOpts, localToken []common.Address, remoteToken []common.Address, recipient []common.Address) (*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20SentIterator, error) {
-	ret := _m.Called(opts, localToken, remoteToken, recipient)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FilterArbitrumL1ToL2ERC20Sent")
-	}
-
-	var r0 *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20SentIterator
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address, []common.Address, []common.Address) (*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20SentIterator, error)); ok {
-		return rf(opts, localToken, remoteToken, recipient)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address, []common.Address, []common.Address) *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20SentIterator); ok {
-		r0 = rf(opts, localToken, remoteToken, recipient)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20SentIterator)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.FilterOpts, []common.Address, []common.Address, []common.Address) error); ok {
-		r1 = rf(opts, localToken, remoteToken, recipient)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// FilterArbitrumL2ToL1ERC20Finalized provides a mock function with given fields: opts, remoteSender, localReceiver
-func (_m *ArbitrumL1BridgeAdapterInterface) FilterArbitrumL2ToL1ERC20Finalized(opts *bind.FilterOpts, remoteSender []common.Address, localReceiver []common.Address) (*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20FinalizedIterator, error) {
-	ret := _m.Called(opts, remoteSender, localReceiver)
-
-	if len(ret) == 0 {
-		panic("no return value specified for FilterArbitrumL2ToL1ERC20Finalized")
-	}
-
-	var r0 *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20FinalizedIterator
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address, []common.Address) (*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20FinalizedIterator, error)); ok {
-		return rf(opts, remoteSender, localReceiver)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.FilterOpts, []common.Address, []common.Address) *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20FinalizedIterator); ok {
-		r0 = rf(opts, remoteSender, localReceiver)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20FinalizedIterator)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.FilterOpts, []common.Address, []common.Address) error); ok {
-		r1 = rf(opts, remoteSender, localReceiver)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // FinalizeWithdrawERC20 provides a mock function with given fields: opts, arg0, arg1, arbitrumFinalizationPayload
@@ -231,96 +167,6 @@ func (_m *ArbitrumL1BridgeAdapterInterface) GetL2Token(opts *bind.CallOpts, l1To
 	return r0, r1
 }
 
-// ParseArbitrumL1ToL2ERC20Sent provides a mock function with given fields: log
-func (_m *ArbitrumL1BridgeAdapterInterface) ParseArbitrumL1ToL2ERC20Sent(log types.Log) (*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent, error) {
-	ret := _m.Called(log)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ParseArbitrumL1ToL2ERC20Sent")
-	}
-
-	var r0 *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent
-	var r1 error
-	if rf, ok := ret.Get(0).(func(types.Log) (*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent, error)); ok {
-		return rf(log)
-	}
-	if rf, ok := ret.Get(0).(func(types.Log) *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent); ok {
-		r0 = rf(log)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
-		r1 = rf(log)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ParseArbitrumL2ToL1ERC20Finalized provides a mock function with given fields: log
-func (_m *ArbitrumL1BridgeAdapterInterface) ParseArbitrumL2ToL1ERC20Finalized(log types.Log) (*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, error) {
-	ret := _m.Called(log)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ParseArbitrumL2ToL1ERC20Finalized")
-	}
-
-	var r0 *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized
-	var r1 error
-	if rf, ok := ret.Get(0).(func(types.Log) (*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, error)); ok {
-		return rf(log)
-	}
-	if rf, ok := ret.Get(0).(func(types.Log) *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized); ok {
-		r0 = rf(log)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
-		r1 = rf(log)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// ParseLog provides a mock function with given fields: log
-func (_m *ArbitrumL1BridgeAdapterInterface) ParseLog(log types.Log) (generated.AbigenLog, error) {
-	ret := _m.Called(log)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ParseLog")
-	}
-
-	var r0 generated.AbigenLog
-	var r1 error
-	if rf, ok := ret.Get(0).(func(types.Log) (generated.AbigenLog, error)); ok {
-		return rf(log)
-	}
-	if rf, ok := ret.Get(0).(func(types.Log) generated.AbigenLog); ok {
-		r0 = rf(log)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(generated.AbigenLog)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(types.Log) error); ok {
-		r1 = rf(log)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // SendERC20 provides a mock function with given fields: opts, localToken, arg1, recipient, amount, bridgeSpecificPayload
 func (_m *ArbitrumL1BridgeAdapterInterface) SendERC20(opts *bind.TransactOpts, localToken common.Address, arg1 common.Address, recipient common.Address, amount *big.Int, bridgeSpecificPayload []byte) (*types.Transaction, error) {
 	ret := _m.Called(opts, localToken, arg1, recipient, amount, bridgeSpecificPayload)
@@ -344,66 +190,6 @@ func (_m *ArbitrumL1BridgeAdapterInterface) SendERC20(opts *bind.TransactOpts, l
 
 	if rf, ok := ret.Get(1).(func(*bind.TransactOpts, common.Address, common.Address, common.Address, *big.Int, []byte) error); ok {
 		r1 = rf(opts, localToken, arg1, recipient, amount, bridgeSpecificPayload)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// WatchArbitrumL1ToL2ERC20Sent provides a mock function with given fields: opts, sink, localToken, remoteToken, recipient
-func (_m *ArbitrumL1BridgeAdapterInterface) WatchArbitrumL1ToL2ERC20Sent(opts *bind.WatchOpts, sink chan<- *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent, localToken []common.Address, remoteToken []common.Address, recipient []common.Address) (event.Subscription, error) {
-	ret := _m.Called(opts, sink, localToken, remoteToken, recipient)
-
-	if len(ret) == 0 {
-		panic("no return value specified for WatchArbitrumL1ToL2ERC20Sent")
-	}
-
-	var r0 event.Subscription
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent, []common.Address, []common.Address, []common.Address) (event.Subscription, error)); ok {
-		return rf(opts, sink, localToken, remoteToken, recipient)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent, []common.Address, []common.Address, []common.Address) event.Subscription); ok {
-		r0 = rf(opts, sink, localToken, remoteToken, recipient)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(event.Subscription)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL1ToL2ERC20Sent, []common.Address, []common.Address, []common.Address) error); ok {
-		r1 = rf(opts, sink, localToken, remoteToken, recipient)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// WatchArbitrumL2ToL1ERC20Finalized provides a mock function with given fields: opts, sink, remoteSender, localReceiver
-func (_m *ArbitrumL1BridgeAdapterInterface) WatchArbitrumL2ToL1ERC20Finalized(opts *bind.WatchOpts, sink chan<- *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, remoteSender []common.Address, localReceiver []common.Address) (event.Subscription, error) {
-	ret := _m.Called(opts, sink, remoteSender, localReceiver)
-
-	if len(ret) == 0 {
-		panic("no return value specified for WatchArbitrumL2ToL1ERC20Finalized")
-	}
-
-	var r0 event.Subscription
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, []common.Address, []common.Address) (event.Subscription, error)); ok {
-		return rf(opts, sink, remoteSender, localReceiver)
-	}
-	if rf, ok := ret.Get(0).(func(*bind.WatchOpts, chan<- *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, []common.Address, []common.Address) event.Subscription); ok {
-		r0 = rf(opts, sink, remoteSender, localReceiver)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(event.Subscription)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(*bind.WatchOpts, chan<- *arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, []common.Address, []common.Address) error); ok {
-		r1 = rf(opts, sink, remoteSender, localReceiver)
 	} else {
 		r1 = ret.Error(1)
 	}

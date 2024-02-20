@@ -164,8 +164,6 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			arb.AllContracts[uint64(dest)]["Rollup"], // l1 rollup address
 			common.Address(l1Deps.rebalancerAddress), // l1 rebalancer address
 			common.Address(l2Deps.rebalancerAddress), // l2 rebalancer address
-			common.Address(l2BridgeAdapter),          // l2 bridge adapter address
-			common.Address(l1BridgeAdapter),          // l1 bridge adapter address
 			l2Deps.lp,                                // l2 log poller
 			l1Deps.lp,                                // l1 log poller
 			l2Deps.ethClient,                         // l2 eth client
@@ -209,7 +207,6 @@ func (f *factory) initBridge(source, dest models.NetworkSelector) (Bridge, error
 			dest,
 			common.Address(l1Deps.rebalancerAddress), // l1 rebalancer address
 			common.Address(l2Deps.rebalancerAddress), // l2 rebalancer address
-			common.Address(l1BridgeAdapter),          // l1 bridge adapter address
 			arb.AllContracts[uint64(source)]["L1GatewayRouter"], // l1 gateway router address
 			arb.AllContracts[uint64(source)]["L1Inbox"],         // l1 inbox address
 			l1Deps.ethClient, // l1 eth client

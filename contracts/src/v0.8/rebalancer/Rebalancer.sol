@@ -35,7 +35,8 @@ contract Rebalancer is IRebalancer, OCR3Base {
     uint64 indexed toChainSelector,
     address to,
     uint256 amount,
-    bytes bridgeSpecificData
+    bytes bridgeSpecificData,
+    bytes bridgeReturnData
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
@@ -156,7 +157,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
     s_localLiquidityContainer.withdrawLiquidity(tokenAmount);
     i_localToken.approve(address(remoteLiqManager.localBridge), tokenAmount);
 
-    remoteLiqManager.localBridge.sendERC20{value: nativeBridgeFee}(
+    bytes memory bridgeReturnData = remoteLiqManager.localBridge.sendERC20{value: nativeBridgeFee}(
       address(i_localToken),
       remoteLiqManager.remoteToken,
       remoteLiqManager.remoteRebalancer,
@@ -170,7 +171,8 @@ contract Rebalancer is IRebalancer, OCR3Base {
       chainSelector,
       remoteLiqManager.remoteRebalancer,
       tokenAmount,
-      bridgeSpecificPayload
+      bridgeSpecificPayload,
+      bridgeReturnData
     );
   }
 
@@ -204,9 +206,10 @@ contract Rebalancer is IRebalancer, OCR3Base {
       ocrSeqNum,
       remoteChainSelector,
       i_localChainSelector,
-      address(s_localLiquidityContainer),
+      address(this),
       amount,
-      bridgeSpecificPayload
+      bridgeSpecificPayload,
+      bytes("") // no bridge return data when receiving
     );
   }
 

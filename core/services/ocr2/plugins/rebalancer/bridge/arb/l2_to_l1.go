@@ -22,12 +22,11 @@ import (
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arb_node_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l2_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_rollup_core"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_token_gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbsys"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_messenger"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
@@ -35,11 +34,6 @@ import (
 )
 
 var (
-	// Event emitted by the L2 bridge adapter
-	L2ToL1ERC20SentTopic = arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent{}.Topic()
-	// Event emitted by the L1 bridge adapter
-	L2toL1ERC20FinalizedTopic = arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized{}.Topic()
-
 	// Arbitrum events emitted on L1
 	NodeConfirmedTopic = arbitrum_rollup_core.ArbRollupCoreNodeConfirmed{}.Topic()
 
@@ -53,59 +47,29 @@ var (
 	NodeInterfaceAddress = common.HexToAddress("0x00000000000000000000000000000000000000c8")
 	ArbSysAddress        = common.HexToAddress("0x0000000000000000000000000000000000000064")
 
-	arbitrumTokenGatewayABI = abihelpers.MustParseABI(arbitrum_token_gateway.ArbitrumTokenGatewayMetaData.ABI)
-	l1AdapterABI            = abihelpers.MustParseABI(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.ABI)
+	l1AdapterABI = abihelpers.MustParseABI(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.ABI)
 )
-
-func init() {
-	if err := validateFinalizeInboundTransferABI(arbitrumTokenGatewayABI); err != nil {
-		panic(err)
-	}
-}
-
-func validateFinalizeInboundTransferABI(tokenGatewayABI abi.ABI) error {
-	// Check that finalizeInboundTransfer is on the token gateway ABI
-	finalizeInboundTransferMethod, ok := tokenGatewayABI.Methods["finalizeInboundTransfer"]
-	if !ok {
-		return errors.New("finalizeInboundTransfer not found in ArbitrumTokenGateway ABI")
-	}
-
-	// Check that it has the expected signature
-	if len(finalizeInboundTransferMethod.Inputs) != 5 {
-		return errors.New("finalizeInboundTransfer has unexpected number of inputs")
-	}
-	if finalizeInboundTransferMethod.Inputs[0].Type.String() != "address" ||
-		finalizeInboundTransferMethod.Inputs[1].Type.String() != "address" ||
-		finalizeInboundTransferMethod.Inputs[2].Type.String() != "address" ||
-		finalizeInboundTransferMethod.Inputs[3].Type.String() != "uint256" ||
-		finalizeInboundTransferMethod.Inputs[4].Type.String() != "bytes" {
-		return errors.New("finalizeInboundTransfer has unexpected input type")
-	}
-	return nil
-}
 
 const (
 	DurationMonth = 720 * time.Hour
 )
 
 type l2ToL1Bridge struct {
-	localSelector       models.NetworkSelector
-	remoteSelector      models.NetworkSelector
-	l1RebalancerAddress common.Address
-	l2RebalancerAddress common.Address
-	l2BridgeAdapter     arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterInterface
-	l1BridgeAdapter     arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterInterface
-	l2LogPoller         logpoller.LogPoller
-	l1LogPoller         logpoller.LogPoller
-	l2FilterName        string
-	l1FilterName        string
-	lggr                logger.Logger
-	l2Client            client.Client
-	arbSys              arbsys.ArbSysInterface
-	l2ArbGateway        l2_arbitrum_gateway.L2ArbitrumGatewayInterface
-	l2ArbMessenger      l2_arbitrum_messenger.L2ArbitrumMessengerInterface
-	rollupCore          arbitrum_rollup_core.ArbRollupCoreInterface
-	nodeInterface       arb_node_interface.NodeInterfaceInterface
+	localSelector  models.NetworkSelector
+	remoteSelector models.NetworkSelector
+	l1Rebalancer   rebalancer.RebalancerInterface
+	l2Rebalancer   rebalancer.RebalancerInterface
+	l2LogPoller    logpoller.LogPoller
+	l1LogPoller    logpoller.LogPoller
+	l2FilterName   string
+	l1FilterName   string
+	lggr           logger.Logger
+	l2Client       client.Client
+	arbSys         arbsys.ArbSysInterface
+	l2ArbGateway   l2_arbitrum_gateway.L2ArbitrumGatewayInterface
+	l2ArbMessenger l2_arbitrum_messenger.L2ArbitrumMessengerInterface
+	rollupCore     arbitrum_rollup_core.ArbRollupCoreInterface
+	nodeInterface  arb_node_interface.NodeInterfaceInterface
 }
 
 func NewL2ToL1Bridge(
@@ -114,9 +78,7 @@ func NewL2ToL1Bridge(
 	remoteSelector models.NetworkSelector,
 	l1RollupAddress,
 	l1RebalancerAddress,
-	l2RebalancerAddress,
-	l2BridgeAdapterAddress,
-	l1BridgeAdapterAddress common.Address,
+	l2RebalancerAddress common.Address,
 	l2LogPoller,
 	l1LogPoller logpoller.LogPoller,
 	l2Client,
@@ -130,31 +92,31 @@ func NewL2ToL1Bridge(
 	if !ok {
 		return nil, fmt.Errorf("unknown chain selector for remote chain: %d", remoteSelector)
 	}
-	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2-%s-%s", localChain.Name, remoteChain.Name)
+	l2FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L2-Rebalancer:%s-Local:%s-Remote:%s",
+		l2RebalancerAddress.Hex(), localChain.Name, remoteChain.Name)
 	err := l2LogPoller.RegisterFilter(logpoller.Filter{
 		Name: l2FilterName,
 		EventSigs: []common.Hash{
-			L2ToL1ERC20SentTopic,
+			LiquidityTransferredTopic,
 		},
-		Addresses: []common.Address{l2BridgeAdapterAddress},
+		Addresses: []common.Address{l2RebalancerAddress},
 		Retention: DurationMonth,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("register filter for Arbitrum L2 to L1 bridge: %w", err)
 	}
 
-	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-%s-%s", remoteChain.Name, localChain.Name)
+	l1FilterName := fmt.Sprintf("ArbitrumL2ToL1Bridge-L1-Rollup:%s-Rebalancer:%s-Local:%s-Remote:%s",
+		l1RollupAddress.Hex(), l1RebalancerAddress.Hex(), localChain.Name, remoteChain.Name)
 	err = l1LogPoller.RegisterFilter(logpoller.Filter{
 		Name: l1FilterName,
 		EventSigs: []common.Hash{
-			L2toL1ERC20FinalizedTopic, // emitted by l1 bridge adapter
 			NodeConfirmedTopic,        // emitted by rollup
 			LiquidityTransferredTopic, // emitted by rebalancer
 		},
 		Addresses: []common.Address{
-			l1BridgeAdapterAddress, // to get erc20 finalized logs
-			l1RollupAddress,        // to get node confirmed logs
-			l1RebalancerAddress,    // to get LiquidityTransferred logs
+			l1RollupAddress,     // to get node confirmed logs
+			l1RebalancerAddress, // to get LiquidityTransferred logs
 		},
 		Retention: DurationMonth,
 	})
@@ -162,14 +124,24 @@ func NewL2ToL1Bridge(
 		return nil, fmt.Errorf("register filter for Arbitrum L1 to L2 bridge: %w", err)
 	}
 
-	l2BridgeAdapter, err := arbitrum_l2_bridge_adapter.NewArbitrumL2BridgeAdapter(l2BridgeAdapterAddress, l2Client)
+	l1Rebalancer, err := rebalancer.NewRebalancer(l1RebalancerAddress, l1Client)
 	if err != nil {
-		return nil, fmt.Errorf("instantiate Arbitrum L2 bridge adapter: %w", err)
+		return nil, fmt.Errorf("instantiate L1 rebalancer: %w", err)
 	}
 
-	l1BridgeAdapter, err := arbitrum_l1_bridge_adapter.NewArbitrumL1BridgeAdapter(l1BridgeAdapterAddress, l1Client)
+	l1XchainRebal, err := l1Rebalancer.GetCrossChainRebalancer(nil, uint64(localSelector))
 	if err != nil {
-		return nil, fmt.Errorf("instantiate Arbitrum L1 bridge adapter: %w", err)
+		return nil, fmt.Errorf("get L1->L2 bridge adapter address: %w", err)
+	}
+
+	l2Rebalancer, err := rebalancer.NewRebalancer(l2RebalancerAddress, l2Client)
+	if err != nil {
+		return nil, fmt.Errorf("instantiate L2 rebalancer: %w", err)
+	}
+
+	l2XchainRebal, err := l2Rebalancer.GetCrossChainRebalancer(nil, uint64(remoteSelector))
+	if err != nil {
+		return nil, fmt.Errorf("get L2->L1 bridge adapter address: %w", err)
 	}
 
 	arbSys, err := arbsys.NewArbSys(ArbSysAddress, l2Client)
@@ -212,31 +184,31 @@ func NewL2ToL1Bridge(
 		"remoteSelector", remoteSelector,
 		"localChainID", localChain.EvmChainID,
 		"remoteChainID", remoteChain.EvmChainID,
-		"l1BridgeAdapter", l1BridgeAdapterAddress,
-		"l2BridgeAdapter", l2BridgeAdapterAddress,
-		"l1RebalancerAddress", l1RebalancerAddress,
+		"localChainName", localChain.Name,
+		"remoteChainName", remoteChain.Name,
+		"l1BridgeAdapter", l1XchainRebal.LocalBridge,
+		"l2BridgeAdapter", l2XchainRebal.LocalBridge,
+		"l1Rebalancer", l1RebalancerAddress,
 	)
 	lggr.Infow("Initialized arbitrum L2 -> L1 bridge")
 
 	// TODO: replay log poller for any missed logs?
 	return &l2ToL1Bridge{
-		localSelector:       localSelector,
-		remoteSelector:      remoteSelector,
-		l2BridgeAdapter:     l2BridgeAdapter,
-		l1BridgeAdapter:     l1BridgeAdapter,
-		l2LogPoller:         l2LogPoller,
-		l1LogPoller:         l1LogPoller,
-		l2FilterName:        l2FilterName,
-		l1FilterName:        l1FilterName,
-		l1RebalancerAddress: l1RebalancerAddress,
-		l2RebalancerAddress: l2RebalancerAddress,
-		lggr:                lggr,
-		l2Client:            l2Client,
-		arbSys:              arbSys,
-		l2ArbGateway:        l2ArbGateway,
-		l2ArbMessenger:      l2ArbMessenger,
-		rollupCore:          rollupCore,
-		nodeInterface:       nodeInterface,
+		localSelector:  localSelector,
+		remoteSelector: remoteSelector,
+		l2LogPoller:    l2LogPoller,
+		l1LogPoller:    l1LogPoller,
+		l2FilterName:   l2FilterName,
+		l1FilterName:   l1FilterName,
+		l1Rebalancer:   l1Rebalancer,
+		l2Rebalancer:   l2Rebalancer,
+		lggr:           lggr,
+		l2Client:       l2Client,
+		arbSys:         arbSys,
+		l2ArbGateway:   l2ArbGateway,
+		l2ArbMessenger: l2ArbMessenger,
+		rollupCore:     rollupCore,
+		nodeInterface:  nodeInterface,
 	}, nil
 }
 
@@ -260,17 +232,17 @@ func (l *l2ToL1Bridge) Close(ctx context.Context) error {
 }
 
 // GetTransfers implements bridge.Bridge.
-func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address, l1Token models.Address) ([]models.PendingTransfer, error) {
-	lggr := l.lggr.With("l2Token", l2Token, "l1Token", l1Token)
+func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, localToken models.Address, remoteToken models.Address) ([]models.PendingTransfer, error) {
+	lggr := l.lggr.With("l2Token", localToken, "l1Token", remoteToken)
 	// get all the L2 -> L1 transfers in the past 14 days for the given l2Token.
 	// that should be enough time to catch all the transfers that were potentially not finalized.
 	// TODO: make more performant. Perhaps filter on more than just one topic here to avoid doing in-memory filtering.
-	l2ToL1Transfers, err := l.l2LogPoller.IndexedLogsCreatedAfter(
-		L2ToL1ERC20SentTopic,
-		l.l2BridgeAdapter.Address(),
-		1, // topic index
+	sendLogs, err := l.l2LogPoller.IndexedLogsCreatedAfter(
+		LiquidityTransferredTopic,
+		l.l2Rebalancer.Address(),
+		3, // topic index 3: toChainSelector in event
 		[]common.Hash{
-			common.HexToHash(l2Token.String()),
+			toHash(l.remoteSelector),
 		},
 		time.Now().Add(-DurationMonth/2),
 		logpoller.Finalized,
@@ -284,9 +256,9 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 	// we can't filter on token since we don't have the token address in the onchain event
 	// Note: we don't filter on finalized because we want to avoid marking a sent tx as
 	// ready to finalize more than once, since that will cause reverts onchain.
-	l2ToL1Finalizations, err := l.l1LogPoller.LogsCreatedAfter(
-		L2toL1ERC20FinalizedTopic,
-		l.l1BridgeAdapter.Address(),
+	receiveLogs, err := l.l1LogPoller.LogsCreatedAfter(
+		LiquidityTransferredTopic,
+		l.l1Rebalancer.Address(),
 		time.Now().Add(-DurationMonth/2),
 		1,
 		pg.WithParentCtx(ctx),
@@ -296,42 +268,36 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, l2Token models.Address,
 	}
 
 	lggr.Infow("Got L2 -> L1 transfers and finalizations",
-		"l2ToL1Transfers", l2ToL1Transfers,
-		"l2ToL1Finalizations", l2ToL1Finalizations,
+		"l2ToL1Transfers", sendLogs,
+		"l2ToL1Finalizations", receiveLogs,
 	)
 
-	parsedL2toL1Transfers, parsedToLP, err := l.parseL2ToL1Transfers(l2ToL1Transfers)
+	parsedSent, parsedToLP, err := parseLiquidityTransferred(l.l1Rebalancer.ParseLiquidityTransferred, sendLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse L2 -> L1 transfers: %w", err)
 	}
 
-	parsedL2ToL1Finalizations, err := l.parseL2ToL1Finalizations(l2ToL1Finalizations)
+	parsedReceived, _, err := parseLiquidityTransferred(l.l1Rebalancer.ParseLiquidityTransferred, receiveLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse L2 -> L1 finalizations: %w", err)
-	}
-
-	// filter out the L2 -> L1 transfers that have been finalized onchain already
-	// all the transfers in unfinalizedTransfers are either in the "not-ready" or "ready" state
-	unfinalizedTransfers, err := l.filterOutFinalizedTransfers(parsedL2toL1Transfers, parsedL2ToL1Finalizations)
-	if err != nil {
-		return nil, fmt.Errorf("filter finalized transfers: %w", err)
 	}
 
 	// for the remaining as-of-yet unfinalized transfers, determine if they
 	// are ready to finalize
 	// TODO: edge case: determine finalized but not executed by checking rebalancer's LiquidityTransferred logs
-	ready, readyData, notReady, err := l.partitionReadyTransfers(ctx, unfinalizedTransfers)
+	ready, readyData, notReady, err := l.partitionReadyTransfers(ctx, parsedSent, parsedReceived)
 	if err != nil {
 		return nil, fmt.Errorf("partition ready transfers: %w", err)
 	}
 
-	return l.toPendingTransfers(ready, readyData, notReady, parsedToLP)
+	return l.toPendingTransfers(localToken, remoteToken, ready, readyData, notReady, parsedToLP)
 }
 
 func (l *l2ToL1Bridge) toPendingTransfers(
-	ready []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
+	localToken, remoteToken models.Address,
+	ready []*rebalancer.RebalancerLiquidityTransferred,
 	readyData [][]byte,
-	notReady []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
+	notReady []*rebalancer.RebalancerLiquidityTransferred,
 	parsedToLP map[logKey]logpoller.Log,
 ) ([]models.PendingTransfer, error) {
 	if len(ready) != len(readyData) {
@@ -344,10 +310,10 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:               l.localSelector,
 				To:                 l.remoteSelector,
-				Sender:             models.Address(l.l2RebalancerAddress), // TODO: should this be in the event as msg.sender?
-				Receiver:           models.Address(transfer.Recipient),
-				LocalTokenAddress:  models.Address(transfer.LocalToken),
-				RemoteTokenAddress: models.Address(transfer.RemoteToken),
+				Sender:             models.Address(l.l2Rebalancer.Address()),
+				Receiver:           models.Address(l.l1Rebalancer.Address()),
+				LocalTokenAddress:  localToken,
+				RemoteTokenAddress: remoteToken,
 				Amount:             ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
@@ -364,10 +330,10 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 			Transfer: models.Transfer{
 				From:               l.localSelector,
 				To:                 l.remoteSelector,
-				Sender:             models.Address(l.l2RebalancerAddress), // TODO: should this be in the event as msg.sender?
-				Receiver:           models.Address(transfer.Recipient),
-				LocalTokenAddress:  models.Address(transfer.LocalToken),
-				RemoteTokenAddress: models.Address(transfer.RemoteToken),
+				Sender:             models.Address(l.l2Rebalancer.Address()),
+				Receiver:           models.Address(l.l1Rebalancer.Address()),
+				LocalTokenAddress:  localToken,
+				RemoteTokenAddress: remoteToken,
 				Amount:             ubig.New(transfer.Amount),
 				Date: parsedToLP[logKey{
 					txHash:   transfer.Raw.TxHash,
@@ -384,13 +350,19 @@ func (l *l2ToL1Bridge) toPendingTransfers(
 
 func (l *l2ToL1Bridge) partitionReadyTransfers(
 	ctx context.Context,
-	unfinalized []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
+	sentLogs,
+	receivedLogs []*rebalancer.RebalancerLiquidityTransferred,
 ) (
-	ready []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
+	ready []*rebalancer.RebalancerLiquidityTransferred,
 	readyDatas [][]byte,
-	notReady []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
+	notReady []*rebalancer.RebalancerLiquidityTransferred,
 	err error,
 ) {
+	unfinalized, err := l.filterUnfinalizedTransfers(sentLogs, receivedLogs)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("filter unfinalized transfers: %w", err)
+	}
+
 	var errs error
 	for _, transfer := range unfinalized {
 		readyData, readyToFinalize, err := l.getFinalizationData(ctx, transfer)
@@ -415,43 +387,40 @@ func (l *l2ToL1Bridge) partitionReadyTransfers(
 	return
 }
 
+func (l *l2ToL1Bridge) filterUnfinalizedTransfers(sentLogs, receivedLogs []*rebalancer.RebalancerLiquidityTransferred) ([]*rebalancer.RebalancerLiquidityTransferred, error) {
+	var unfinalized []*rebalancer.RebalancerLiquidityTransferred
+	for _, sent := range sentLogs {
+		var found bool
+		for _, recv := range receivedLogs {
+			finalizationPayload, err := unpackFinalizationPayload(recv.BridgeSpecificData)
+			if err != nil {
+				return nil, fmt.Errorf("unpack finalization payload (bridgeSpecificData) from recv event: %w", err)
+			}
+			l2ToL1Id, err := unpackUint256(sent.BridgeReturnData)
+			if err != nil {
+				return nil, fmt.Errorf("unpack l2ToL1TxId (bridgeReturnData) from send event: %w", err)
+			}
+			if finalizationPayload.Index.Cmp(l2ToL1Id) == 0 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			unfinalized = append(unfinalized, sent)
+		}
+	}
+	return unfinalized, nil
+}
+
 func (l *l2ToL1Bridge) getFinalizationData(
 	ctx context.Context,
-	transfer *arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
+	transfer *rebalancer.RebalancerLiquidityTransferred,
 ) (
 	[]byte,
 	bool,
 	error,
 ) {
 	l.lggr.Infow("Getting finalization data for transfer", "transfer", transfer)
-	// function executeTransaction(
-	//
-	//	  bytes32[] calldata proof,
-	//	  uint256 index,
-	//	  address l2Sender,
-	//	  address to,
-	//	  uint256 l2Block,
-	//	  uint256 l1Block,
-	//	  uint256 l2Timestamp,
-	//	  uint256 value,
-	//	  bytes calldata data
-	//	) external;
-	//
-	// Arg 0: proof. This takes multiple steps:
-	// 1. Get the latest NodeConfirmed event on L1, which indicates the latest node that was confirmed by the rollup.
-	// 2. Call eth_getBlockByHash on L2 specifying the L2 block hash in the NodeConfirmed event.
-	// 3. Get the `sendCount` field from the response.
-	// 4. Get the `l2ToL1Id` field from the `WithdrawalInitiated` log from the L2 withdrawal tx.
-	// 5. Call `constructOutboxProof` on the L2 node interface contract with the `sendCount` as the first argument and `l2ToL1Id` as the second argument.
-	// Arg 1: index. Fetch the index from the TxToL1 log in the L2 tx.
-	// Arg 2: l2Sender. Fetch the source of the WithdrawalInitiated log in the L2 tx.
-	// Arg 3: to. Fetch the `to` field of the WithdrawalInitiated log in the L2 tx.
-	// Arg 4: l1Block. Fetch the `l1BlockNumber` field of the JSON-RPC response to eth_getTransactionReceipt
-	// passing in the L2 tx hash as the param.
-	// Arg 5: l2Block. This is the l2 block number in which the withdrawal tx was included.
-	// Arg 6: l2Timestamp. Get the `timestamp` field from the L2ToL1Tx event emitted by ArbSys (0x64).
-	// Arg 7: value. Fetch the `value` field from the WithdrawalInitiated log in the L2 tx.
-	// Arg 8: data. Fetch the `data` field from the TxToL1 log in the L2 tx.
 	receipt, err := l.l2Client.TransactionReceipt(ctx, transfer.Raw.TxHash)
 	if err != nil {
 		// should be a transient error
@@ -612,179 +581,30 @@ func (l *l2ToL1Bridge) getLatestNodeConfirmed(ctx context.Context) (*arbitrum_ro
 	return parsed, nil
 }
 
-func (l *l2ToL1Bridge) filterOutFinalizedTransfers(
-	l2ToL1Transfers []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
-	l2ToL1Finalizations []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized,
-) (
-	[]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
-	error,
-) {
-	l.lggr.Infow("Filtering out finalized transfers", "transfers", l2ToL1Transfers, "finalizations", l2ToL1Finalizations)
-	var unfinalized []*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent
-	for _, l2ToL1Transfer := range l2ToL1Transfers {
-		// We only care about transfers where the recipient is the l1 rebalancer contract
-		if l2ToL1Transfer.Recipient != l.l1RebalancerAddress {
-			l.lggr.Infow("Ignoring L2 -> L1 transfer not destined for rebalancer", "transfer", l2ToL1Transfer.Raw.TxHash)
-			continue
-		}
-		foundFinalized, finalizedIdx, err := l.findMatchingFinalization(l2ToL1Transfer, l2ToL1Finalizations)
-		if err != nil {
-			return nil, fmt.Errorf("unable to find matching finalization (withdrawal tx: %s): %w", l2ToL1Transfer.Raw.TxHash, err)
-		}
-		if foundFinalized {
-			l.lggr.Infow("Ignoring L2 -> L1 transfer that has been finalized",
-				"transfer", l2ToL1Transfer.Raw.TxHash,
-				"finalization", l2ToL1Finalizations[finalizedIdx].Raw.TxHash)
-			continue
-		}
-		unfinalized = append(unfinalized, l2ToL1Transfer)
-	}
-	l.lggr.Infow("Filtered out finalized transfers", "unfinalized", unfinalized)
-
-	return unfinalized, nil
-}
-
-func (l *l2ToL1Bridge) findMatchingFinalization(
-	withdrawal *arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
-	finalizations []*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized,
-) (foundFinalized bool, idx int, err error) {
-	l.lggr.Infow("Finding matching finalization", "withdrawal", withdrawal, "finalizations", finalizations)
-	idx = -1
-	for i, l2ToL1Finalization := range finalizations {
-		// the destination address is in the payload data, need to unpack it to figure out
-		// who it went to.
-		finalizeInboundTransferData, err := unpackFinalizeInboundTransfer(l2ToL1Finalization.Payload.Data)
-		if err != nil {
-			// should never happen
-			return false, -1, fmt.Errorf("unpack finalizeInboundTransfer: %w, raw: %s",
-				err, hexutil.Encode(l2ToL1Finalization.Payload.Data))
-		}
-		// We only care about finalizations destined for the rebalancer contract
-		if finalizeInboundTransferData.l1Receiver != l.l1RebalancerAddress {
-			l.lggr.Infow("Ignoring L2 -> L1 finalization not destined for rebalancer", "finalization", l2ToL1Finalization)
-			continue
-		}
-
-		// decode the bridge specific data in the l2 to l1 event and extract the l2 to l1 ID
-		// this ID is a unique identifier - it is emitted on L2 and passed into executeTransaction
-		// when finalizing on L1. We can use it to match the withdrawal to the finalization.
-		l2ToL1Id, err := unpackUint256(withdrawal.OutboundTransferResult)
-		if err != nil {
-			// should never happen
-			return false, -1, fmt.Errorf("unpack l2 to l1 id from l2 -> l1 transfer event: %w, raw: %s",
-				err, hexutil.Encode(withdrawal.OutboundTransferResult))
-		}
-
-		if l2ToL1Id.Cmp(l2ToL1Finalization.Payload.Index) != 0 {
-			// This finalization is not for this transfer
-			continue
-		}
-
-		// finalization is for this transfer
-		foundFinalized = true
-		idx = i
-		break
-	}
-	if foundFinalized {
-		l.lggr.Infow("Found matching finalization", "foundFinalized", foundFinalized, "idx", idx, "withdrawal", withdrawal, "finalizations", finalizations)
-	} else {
-		l.lggr.Infow("No matching finalization", "foundFinalized", foundFinalized, "idx", idx, "withdrawal", withdrawal, "finalizations", finalizations)
-	}
-
-	return foundFinalized, idx, nil
-}
-
-func (l *l2ToL1Bridge) parseL2ToL1Finalizations(logs []logpoller.Log) ([]*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, error) {
-	l.lggr.Infow("Parsing L2 -> L1 finalizations", "logs", logs)
-	finalizations := make([]*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumL2ToL1ERC20Finalized, len(logs))
-	for i, log := range logs {
-		parsed, err := l.l1BridgeAdapter.ParseArbitrumL2ToL1ERC20Finalized(log.ToGethLog())
-		if err != nil {
-			// should never happen
-			return nil, fmt.Errorf("parse L2 -> L1 finalization log: %w", err)
-		}
-		finalizations[i] = parsed
-	}
-	l.lggr.Infow("Parsed L2 -> L1 finalizations", "finalizations", finalizations)
-	return finalizations, nil
-}
-
-type logKey struct {
-	txHash   common.Hash
-	logIndex int64
-}
-
-func (l *l2ToL1Bridge) parseL2ToL1Transfers(
-	logs []logpoller.Log,
-) (
-	[]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent,
-	map[logKey]logpoller.Log,
-	error,
-) {
-	l.lggr.Infow("Parsing L2 -> L1 transfers", "logs", logs)
-	transfers := make([]*arbitrum_l2_bridge_adapter.ArbitrumL2BridgeAdapterArbitrumL2ToL1ERC20Sent, len(logs))
-	parsedToLPLog := make(map[logKey]logpoller.Log)
-	for i, log := range logs {
-		parsed, err := l.l2BridgeAdapter.ParseArbitrumL2ToL1ERC20Sent(log.ToGethLog())
-		if err != nil {
-			// should never happen
-			return nil, nil, fmt.Errorf("parse L2 -> L1 transfer log: %w", err)
-		}
-		transfers[i] = parsed
-		parsedToLPLog[logKey{
-			txHash:   log.TxHash,
-			logIndex: log.LogIndex,
-		}] = log
-	}
-	l.lggr.Infow("Parsed L2 -> L1 transfers", "transfers", transfers)
-	return transfers, parsedToLPLog, nil
-}
-
-type finalizeInboundTransferParams struct {
-	l1Token    common.Address
-	l2Sender   common.Address
-	l1Receiver common.Address
-	amount     *big.Int
-	data       []byte
-}
-
-func unpackFinalizeInboundTransfer(calldata []byte) (finalizeInboundTransferParams, error) {
-	method, ok := arbitrumTokenGatewayABI.Methods["finalizeInboundTransfer"]
+func unpackFinalizationPayload(calldata []byte) (*arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumFinalizationPayload, error) {
+	method, ok := l1AdapterABI.Methods["exposeArbitrumFinalizationPayload"]
 	if !ok {
-		return finalizeInboundTransferParams{}, fmt.Errorf("finalizeInboundTransfer not found in ArbitrumTokenGateway ABI")
+		return nil, fmt.Errorf("exposeArbitrumFinalizationPayload not found in ArbitrumL1BridgeAdapter ABI")
 	}
-	// trim first 4 bytes (function signature)
-	ifaces, err := method.Inputs.Unpack(calldata[4:])
+
+	ifaces, err := method.Inputs.Unpack(calldata)
 	if err != nil {
-		return finalizeInboundTransferParams{}, fmt.Errorf("unpack finalizeInboundTransfer: %w", err)
+		return nil, fmt.Errorf("unpack exposeArbitrumFinalizationPayload: %w", err)
 	}
 
-	if len(ifaces) != 5 {
-		return finalizeInboundTransferParams{}, fmt.Errorf("expected 5 arguments, got %d", len(ifaces))
+	if len(ifaces) != 9 {
+		return nil, fmt.Errorf("expected 9 arguments, got %d", len(ifaces))
 	}
 
-	var params finalizeInboundTransferParams
-	params.l1Token = *abi.ConvertType(ifaces[0], new(common.Address)).(*common.Address)
-	params.l2Sender = *abi.ConvertType(ifaces[1], new(common.Address)).(*common.Address)
-	params.l1Receiver = *abi.ConvertType(ifaces[2], new(common.Address)).(*common.Address)
-	params.amount = *abi.ConvertType(ifaces[3], new(*big.Int)).(**big.Int)
-	params.data = *abi.ConvertType(ifaces[4], new([]byte)).(*[]byte)
-
-	return params, nil
-}
-
-func unpackUint256(data []byte) (*big.Int, error) {
-	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}]`, data)
-	if err != nil {
-		return nil, fmt.Errorf("decode uint256: %w", err)
-	}
-	if len(ifaces) != 1 {
-		return nil, fmt.Errorf("expected 1 argument, got %d", len(ifaces))
-	}
-	ret := *abi.ConvertType(ifaces[0], new(*big.Int)).(**big.Int)
-	return ret, nil
-}
-
-func packUint256(value *big.Int) ([]byte, error) {
-	return utils.ABIEncode(`[{"type": "uint256"}]`, value)
+	return &arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumFinalizationPayload{
+		Proof:       *abi.ConvertType(ifaces[0], new([][32]byte)).(*[][32]byte),
+		Index:       *abi.ConvertType(ifaces[1], new(*big.Int)).(**big.Int),
+		L2Sender:    *abi.ConvertType(ifaces[2], new(common.Address)).(*common.Address),
+		To:          *abi.ConvertType(ifaces[3], new(common.Address)).(*common.Address),
+		L1Block:     *abi.ConvertType(ifaces[4], new(*big.Int)).(**big.Int),
+		L2Block:     *abi.ConvertType(ifaces[5], new(*big.Int)).(**big.Int),
+		L2Timestamp: *abi.ConvertType(ifaces[6], new(*big.Int)).(**big.Int),
+		Value:       *abi.ConvertType(ifaces[7], new(*big.Int)).(**big.Int),
+		Data:        *abi.ConvertType(ifaces[8], new([]byte)).(*[]byte),
+	}, nil
 }

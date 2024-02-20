@@ -86,7 +86,7 @@ func main() {
 		deltaRound := cmd.Duration("delta-round", 2*time.Second, "delta round")
 		deltaGrace := cmd.Duration("delta-grace", 20*time.Second, "delta grace")
 		deltaCertifiedCommitRequest := cmd.Duration("delta-certified-commit-request", 10*time.Second, "delta certified commit request")
-		deltaStage := cmd.Duration("delta-stage", 20*time.Second, "delta stage")
+		deltaStage := cmd.Duration("delta-stage", 40*time.Second, "delta stage")
 		rMax := cmd.Uint64("r-max", 3, "r max")
 		maxDurationQuery := cmd.Duration("max-duration-query", 50*time.Millisecond, "max duration query")
 		maxDurationObservation := cmd.Duration("max-duration-observation", 1*time.Minute, "max duration observation")

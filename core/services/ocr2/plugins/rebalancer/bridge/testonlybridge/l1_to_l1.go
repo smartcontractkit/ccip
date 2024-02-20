@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	gethtypes "github.com/ethereum/go-ethereum/core/types"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -20,10 +21,6 @@ import (
 )
 
 var (
-	// Emitted on the source
-	MockERC20SentTopic = mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent{}.Topic()
-	// Emitted on the destination
-	MockERC20FinalizedTopic = mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized{}.Topic()
 	// Emitted on both source and destination
 	LiquidityTransferredTopic = rebalancer.RebalancerLiquidityTransferred{}.Topic()
 )
@@ -31,8 +28,8 @@ var (
 type testBridge struct {
 	sourceSelector   models.NetworkSelector
 	destSelector     models.NetworkSelector
-	sourceRebalancer models.Address
-	destRebalancer   models.Address
+	sourceRebalancer rebalancer.RebalancerInterface
+	destRebalancer   rebalancer.RebalancerInterface
 	sourceAdapter    *mock_l1_bridge_adapter.MockL1BridgeAdapter
 	destAdapter      *mock_l1_bridge_adapter.MockL1BridgeAdapter
 	sourceLogPoller  logpoller.LogPoller
@@ -44,20 +41,18 @@ type testBridge struct {
 
 func New(
 	sourceSelector, destSelector models.NetworkSelector,
-	sourceRebalancer, destRebalancer, sourceAdapter, destAdapter models.Address,
+	sourceRebalancerAddress, destRebalancerAddress, sourceAdapter, destAdapter models.Address,
 	sourceLogPoller, destLogPoller logpoller.LogPoller,
 	sourceClient, destClient client.Client,
 	lggr logger.Logger,
 ) (*testBridge, error) {
 	err := sourceLogPoller.RegisterFilter(logpoller.Filter{
-		Name: logpoller.FilterName("MockERC20Sent", sourceSelector),
+		Name: logpoller.FilterName("L1-LiquidityTransferred", sourceSelector),
 		EventSigs: []common.Hash{
-			MockERC20SentTopic,
 			LiquidityTransferredTopic,
 		},
 		Addresses: []common.Address{
-			common.Address(sourceAdapter),
-			common.Address(sourceRebalancer),
+			common.Address(sourceRebalancerAddress),
 		},
 	})
 	if err != nil {
@@ -65,14 +60,12 @@ func New(
 	}
 
 	err = destLogPoller.RegisterFilter(logpoller.Filter{
-		Name: logpoller.FilterName("MockERC20Finalized", destSelector),
+		Name: logpoller.FilterName("L2-LiquidityTransferred", destSelector),
 		EventSigs: []common.Hash{
-			MockERC20FinalizedTopic,
 			LiquidityTransferredTopic,
 		},
 		Addresses: []common.Address{
-			common.Address(destAdapter),
-			common.Address(destRebalancer),
+			common.Address(destRebalancerAddress),
 		},
 	})
 	if err != nil {
@@ -82,8 +75,8 @@ func New(
 	lggr = lggr.Named("TestBridge").With(
 		"sourceSelector", sourceSelector,
 		"destSelector", destSelector,
-		"sourceRebalancer", sourceRebalancer,
-		"destRebalancer", destRebalancer,
+		"sourceRebalancer", sourceRebalancerAddress,
+		"destRebalancer", destRebalancerAddress,
 		"sourceAdapter", sourceAdapter,
 		"destAdapter", destAdapter,
 	)
@@ -97,6 +90,16 @@ func New(
 	destAdapterWrapper, err := mock_l1_bridge_adapter.NewMockL1BridgeAdapter(common.Address(destAdapter), destClient)
 	if err != nil {
 		return nil, fmt.Errorf("create dest adapter wrapper: %w", err)
+	}
+
+	sourceRebalancer, err := rebalancer.NewRebalancer(common.Address(sourceRebalancerAddress), sourceClient)
+	if err != nil {
+		return nil, fmt.Errorf("create source rebalancer: %w", err)
+	}
+
+	destRebalancer, err := rebalancer.NewRebalancer(common.Address(destRebalancerAddress), destClient)
+	if err != nil {
+		return nil, fmt.Errorf("create dest rebalancer: %w", err)
 	}
 
 	return &testBridge{
@@ -127,11 +130,7 @@ func (t *testBridge) QuorumizedBridgePayload(payloads [][]byte, f int) ([]byte, 
 
 // GetBridgePayloadAndFee implements bridge.Bridge.
 func (t *testBridge) GetBridgePayloadAndFee(ctx context.Context, transfer models.Transfer) ([]byte, *big.Int, error) {
-	payload, err := PackSendBridgePayload(transfer.Amount.ToInt())
-	if err != nil {
-		return nil, nil, fmt.Errorf("pack bridge data: %w", err)
-	}
-	return payload, big.NewInt(0), nil
+	return []byte{}, big.NewInt(0), nil
 }
 
 // GetTransfers implements bridge.Bridge.
@@ -146,34 +145,34 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		return nil, fmt.Errorf("get latest block: %w", err)
 	}
 
-	sourceSendLogs, err := t.sourceLogPoller.LogsWithSigs(
+	sendLogs, err := t.sourceLogPoller.LogsWithSigs(
 		1,
 		latestSourceBlock.BlockNumber,
-		[]common.Hash{MockERC20SentTopic},
-		t.sourceAdapter.Address(),
+		[]common.Hash{LiquidityTransferredTopic},
+		t.sourceRebalancer.Address(),
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("get source MockERC20Sent logs: %w", err)
+		return nil, fmt.Errorf("get source LiquidityTransferred logs: %w", err)
 	}
 
-	destFinalizeLogs, err := t.destLogPoller.LogsWithSigs(
+	receiveLogs, err := t.destLogPoller.LogsWithSigs(
 		1,
 		latestDestBlock.BlockNumber,
-		[]common.Hash{MockERC20FinalizedTopic},
-		t.destAdapter.Address(),
+		[]common.Hash{LiquidityTransferredTopic},
+		t.destRebalancer.Address(),
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("get dest MockERC20Finalized logs: %w", err)
+		return nil, fmt.Errorf("get dest LiquidityTransferred logs: %w", err)
 	}
 
-	parsedSendLogs, parsedToLP, err := t.parseSendLogs(sourceSendLogs)
+	parsedSendLogs, parsedToLP, err := parseLiquidityTransferred(t.sourceRebalancer.ParseLiquidityTransferred, sendLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse source send logs: %w", err)
 	}
 
-	parsedFinalizeLogs, err := t.parseFinalizedLogs(destFinalizeLogs)
+	parsedFinalizeLogs, _, err := parseLiquidityTransferred(t.destRebalancer.ParseLiquidityTransferred, receiveLogs)
 	if err != nil {
 		return nil, fmt.Errorf("parse dest finalize logs: %w", err)
 	}
@@ -183,17 +182,23 @@ func (t *testBridge) GetTransfers(ctx context.Context, localToken models.Address
 		return nil, fmt.Errorf("get ready to finalize: %w", err)
 	}
 
-	return t.toPendingTransfers(ready, parsedToLP), nil
+	return t.toPendingTransfers(localToken, remoteToken, ready, parsedToLP), nil
 }
 
 func (t *testBridge) toPendingTransfers(
-	ready []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent,
+	localToken, remoteToken models.Address,
+	ready []*rebalancer.RebalancerLiquidityTransferred,
 	parsedToLP map[logKey]logpoller.Log,
 ) []models.PendingTransfer {
 	var transfers []models.PendingTransfer
 	for _, send := range ready {
-		lp := parsedToLP[logKey{txHash: send.Raw.TxHash, logIdx: int64(send.Raw.Index)}]
-		bridgeData, err := PackFinalizeBridgePayload(send.Amount, send.Nonce)
+		lp := parsedToLP[logKey{txHash: send.Raw.TxHash, logIndex: int64(send.Raw.Index)}]
+		sendNonce, err := UnpackBridgeSendReturnData(send.BridgeReturnData)
+		if err != nil {
+			t.lggr.Errorw("unpack send bridge data", "err", err)
+			continue
+		}
+		bridgeData, err := PackFinalizeBridgePayload(send.Amount, sendNonce)
 		if err != nil {
 			t.lggr.Errorw("pack bridge data", "err", err)
 			continue
@@ -203,10 +208,10 @@ func (t *testBridge) toPendingTransfers(
 				From:               t.sourceSelector,
 				To:                 t.destSelector,
 				Sender:             models.Address(t.sourceAdapter.Address()),
-				Receiver:           t.destRebalancer,
+				Receiver:           models.Address(t.destRebalancer.Address()),
 				Amount:             ubig.New(send.Amount),
-				LocalTokenAddress:  models.Address(send.LocalToken),
-				RemoteTokenAddress: models.Address(send.RemoteToken),
+				LocalTokenAddress:  localToken,
+				RemoteTokenAddress: remoteToken,
 				Date:               lp.BlockTimestamp,
 				BridgeData:         bridgeData,
 			},
@@ -223,9 +228,9 @@ func (t *testBridge) toPendingTransfers(
 }
 
 func (t *testBridge) getReadyToFinalize(
-	sends []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent,
-	finalizes []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized,
-) ([]*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent, error) {
+	sends []*rebalancer.RebalancerLiquidityTransferred,
+	finalizes []*rebalancer.RebalancerLiquidityTransferred,
+) ([]*rebalancer.RebalancerLiquidityTransferred, error) {
 	t.lggr.Debugw("Getting ready to finalize",
 		"sendsLen", len(sends),
 		"finalizesLen", len(finalizes),
@@ -233,11 +238,19 @@ func (t *testBridge) getReadyToFinalize(
 		"finalizes", finalizes)
 
 	// find sent events that don't have a matching finalized event
-	var ready []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent
+	var ready []*rebalancer.RebalancerLiquidityTransferred
 	for _, send := range sends {
 		var finalized bool
 		for _, finalize := range finalizes {
-			if send.Nonce.Cmp(finalize.Nonce) == 0 {
+			sendNonce, err := UnpackBridgeSendReturnData(send.BridgeReturnData)
+			if err != nil {
+				return nil, fmt.Errorf("unpack send bridge data: %w", err)
+			}
+			_, finalizeNonce, err := UnpackFinalizeBridgePayload(finalize.BridgeSpecificData)
+			if err != nil {
+				return nil, fmt.Errorf("unpack finalize bridge data: %w", err)
+			}
+			if sendNonce.Cmp(finalizeNonce) == 0 {
 				finalized = true
 				break
 			}
@@ -263,43 +276,8 @@ func (t *testBridge) getReadyToFinalize(
 	return ready, nil
 }
 
-func (t *testBridge) parseFinalizedLogs(logs []logpoller.Log) ([]*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized, error) {
-	var parsedFinalizeLogs []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Finalized
-	for _, log := range logs {
-		finalizeLog, err := t.destAdapter.ParseMockERC20Finalized(log.ToGethLog())
-		if err != nil {
-			return nil, fmt.Errorf("parse finalize log: %w", err)
-		}
-		parsedFinalizeLogs = append(parsedFinalizeLogs, finalizeLog)
-	}
-	return parsedFinalizeLogs, nil
-}
-
-type logKey struct {
-	txHash common.Hash
-	logIdx int64
-}
-
-func (t *testBridge) parseSendLogs(logs []logpoller.Log) (
-	[]*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent,
-	map[logKey]logpoller.Log,
-	error,
-) {
-	var parsedSendLogs []*mock_l1_bridge_adapter.MockL1BridgeAdapterMockERC20Sent
-	parsedToLP := make(map[logKey]logpoller.Log)
-	for _, log := range logs {
-		sendLog, err := t.sourceAdapter.ParseMockERC20Sent(log.ToGethLog())
-		if err != nil {
-			return nil, nil, fmt.Errorf("parse send log: %w", err)
-		}
-		parsedSendLogs = append(parsedSendLogs, sendLog)
-		parsedToLP[logKey{txHash: log.TxHash, logIdx: log.LogIndex}] = log
-	}
-	return parsedSendLogs, parsedToLP, nil
-}
-
-func PackFinalizeBridgePayload(val1, val2 *big.Int) ([]byte, error) {
-	return utils.ABIEncode(`[{"type": "uint256"}, {"type": "uint256"}]`, val1, val2)
+func PackFinalizeBridgePayload(amount, nonce *big.Int) ([]byte, error) {
+	return utils.ABIEncode(`[{"type": "uint256"}, {"type": "uint256"}]`, amount, nonce)
 }
 
 func UnpackFinalizeBridgePayload(data []byte) (*big.Int, *big.Int, error) {
@@ -315,11 +293,7 @@ func UnpackFinalizeBridgePayload(data []byte) (*big.Int, *big.Int, error) {
 	return val1, val2, nil
 }
 
-func PackSendBridgePayload(val *big.Int) ([]byte, error) {
-	return utils.ABIEncode(`[{"type": "uint256"}]`, val)
-}
-
-func UnpackSendBridgePayload(data []byte) (*big.Int, error) {
+func UnpackBridgeSendReturnData(data []byte) (*big.Int, error) {
 	ifaces, err := utils.ABIDecode(`[{"type": "uint256"}]`, data)
 	if err != nil {
 		return nil, fmt.Errorf("decode bridge data: %w", err)
@@ -329,4 +303,27 @@ func UnpackSendBridgePayload(data []byte) (*big.Int, error) {
 	}
 	val := *abi.ConvertType(ifaces[0], new(*big.Int)).(**big.Int)
 	return val, nil
+}
+
+type logKey struct {
+	txHash   common.Hash
+	logIndex int64
+}
+
+func parseLiquidityTransferred(parseFunc func(gethtypes.Log) (*rebalancer.RebalancerLiquidityTransferred, error), lgs []logpoller.Log) ([]*rebalancer.RebalancerLiquidityTransferred, map[logKey]logpoller.Log, error) {
+	transferred := make([]*rebalancer.RebalancerLiquidityTransferred, len(lgs))
+	toLP := make(map[logKey]logpoller.Log)
+	for i, lg := range lgs {
+		parsed, err := parseFunc(lg.ToGethLog())
+		if err != nil {
+			// should never happen
+			return nil, nil, fmt.Errorf("parse LiquidityTransferred log: %w", err)
+		}
+		transferred[i] = parsed
+		toLP[logKey{
+			txHash:   lg.TxHash,
+			logIndex: lg.LogIndex,
+		}] = lg
+	}
+	return transferred, toLP, nil
 }

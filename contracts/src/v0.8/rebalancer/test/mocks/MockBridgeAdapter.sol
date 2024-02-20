@@ -22,39 +22,6 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     i_token = token;
   }
 
-  /// @notice Mock event to emit when sendERC20 is called on this bridge adapter
-  /// @param caller The address that called sendERC20 (usually the rebalancer contract)
-  /// @param localToken The address of the token on the local chain
-  /// @param remoteToken The address of the token on the remote chain
-  /// @param remoteReceiver The address that will receive the tokens on the remote chain (usually the remote rebalancer)
-  /// @param amount The amount of tokens to be bridged
-  /// @param bridgeSpecificPayload The payload that was passed to sendERC20
-  event MockERC20Sent(
-    address indexed caller,
-    address indexed localToken,
-    address indexed remoteReceiver,
-    address remoteToken,
-    uint256 amount,
-    bytes bridgeSpecificPayload,
-    uint256 nonce
-  );
-
-  /// @notice Mock event to emit when the rebalancer calls finalizeWithdrawERC20
-  /// @param remoteSender The address that initiated the send on the remote chain
-  /// @param localReceiver The address that will receive the tokens on the local chain (usually the local rebalancer)
-  /// @param localToken The address of the token on the local chain
-  /// @param amount The amount of tokens to being bridged
-  /// @param bridgeSpecificPayload The payload that was passed to finalizeWithdrawERC20,
-  ///        will be an abi-encoded amount determined offchain (uint256).
-  event MockERC20Finalized(
-    address indexed remoteSender,
-    address indexed localReceiver,
-    address indexed localToken,
-    uint256 amount,
-    bytes bridgeSpecificPayload,
-    uint256 nonce
-  );
-
   /// @notice Simply transferFrom msg.sender the tokens that are to be bridged to address(this).
   function sendERC20(
     address localToken,
@@ -64,10 +31,8 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     bytes calldata bridgeSpecificPayload
   ) external payable override returns (bytes memory) {
     IERC20(localToken).transferFrom(msg.sender, address(this), amount);
-
-    emit MockERC20Sent(msg.sender, localToken, remoteReceiver, remoteToken, amount, bridgeSpecificPayload, s_nonce++);
-
-    return "";
+    bytes memory encodedNonce = abi.encode(s_nonce++);
+    return encodedNonce;
   }
 
   function getBridgeFeeInNative() external pure returns (uint256) {
@@ -95,9 +60,8 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     address localReceiver,
     bytes calldata bridgeSpecificPayload
   ) external {
-    (uint256 amount, uint256 nonce) = abi.decode(bridgeSpecificPayload, (uint256, uint256));
+    (uint256 amount, ) = abi.decode(bridgeSpecificPayload, (uint256, uint256));
     i_token.safeTransfer(localReceiver, amount);
-    emit MockERC20Finalized(remoteSender, localReceiver, address(i_token), amount, bridgeSpecificPayload, nonce);
   }
 }
 

@@ -118,7 +118,7 @@ func TestMarshalReportMetadata(t *testing.T) {
 		require.Equal(t, uint64(3379446385462418246), instructions.SendLiquidityParams[0].RemoteChainSelector)
 		require.Equal(t, assets.Ether(5).ToInt(), instructions.SendLiquidityParams[0].Amount)
 		require.Equal(t, big.NewInt(0).String(), instructions.SendLiquidityParams[0].NativeBridgeFee.String())
-		amount, err := testonlybridge.UnpackSendBridgePayload(instructions.SendLiquidityParams[0].BridgeData)
+		amount, err := testonlybridge.UnpackBridgeSendReturnData(instructions.SendLiquidityParams[0].BridgeData)
 		require.NoError(t, err)
 		require.Equal(t, assets.Ether(5).ToInt().String(), amount.String())
 
