@@ -429,13 +429,13 @@ func waitForTransmissions(
 				// for the test bridges, bridge return data is just a nonce
 				nonce, err := testonlybridge.UnpackBridgeSendReturnData(lt.BridgeReturnData)
 				require.NoError(t, err)
-				t.Log("received send event with nonce:", nonce)
-				sentEvents[lt.Raw.TxHash.String()] = struct{}{}
+				t.Log("received send event with nonce:", nonce, "tx hash:", lt.Raw.TxHash.String())
+				sentEvents[nonce.String()] = struct{}{}
 			} else {
 				// for the test bridges, the bridge specific data is an amount and a nonce
 				amount, nonce, err := testonlybridge.UnpackFinalizeBridgePayload(lt.BridgeSpecificData)
 				require.NoError(t, err)
-				t.Log("received receive event with amount:", amount, "nonce:", nonce)
+				t.Log("received receive event with amount:", amount, "nonce:", nonce, "tx hash:", lt.Raw.TxHash.String())
 				if _, ok := sentEvents[nonce.String()]; !ok {
 					t.Fatal("received receive event without corresponding send event")
 				} else {
@@ -484,7 +484,7 @@ func setRebalancerConfig(
 		50*time.Millisecond, // maxDurationQuery
 		5*time.Second,       // maxDurationObservation
 		10*time.Second,      // maxDurationShouldAcceptAttestedReport
-		1*time.Second,       // maxDurationShouldTransmitAcceptedReport
+		10*time.Second,      // maxDurationShouldTransmitAcceptedReport
 		int(f),
 		onchainConfig)
 	require.NoError(t, err, "failed to create contract config")

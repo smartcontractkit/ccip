@@ -62,8 +62,7 @@ contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
     address /* remoteSender */,
     address /* localReceiver */,
     bytes calldata /* bridgeSpecificPayload */
-  ) external {
-  }
+  ) external {}
 
   /// @notice There are no fees to bridge back to L1
   function getBridgeFeeInNative() external pure returns (uint256) {

@@ -25,10 +25,10 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   /// @notice Simply transferFrom msg.sender the tokens that are to be bridged to address(this).
   function sendERC20(
     address localToken,
-    address remoteToken,
-    address remoteReceiver,
+    address /* remoteToken */,
+    address /* remoteReceiver */,
     uint256 amount,
-    bytes calldata bridgeSpecificPayload
+    bytes calldata /* bridgeSpecificPayload */
   ) external payable override returns (bytes memory) {
     IERC20(localToken).transferFrom(msg.sender, address(this), amount);
     bytes memory encodedNonce = abi.encode(s_nonce++);
@@ -56,7 +56,7 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   /// @dev Note that this means that this bridge adapter will need to have some tokens,
   /// @dev however this is ok in a test environment since we will have infinite tokens.
   function finalizeWithdrawERC20(
-    address remoteSender,
+    address /* remoteSender */,
     address localReceiver,
     bytes calldata bridgeSpecificPayload
   ) external {

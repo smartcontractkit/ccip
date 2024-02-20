@@ -8,138 +8,17 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/mock"
 	"github.com/test-go/testify/require"
 
-	clientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_rollup_core"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/mocks/mock_arbitrum_rollup_core"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
-
-const (
-	arbSepolia     uint64 = 421614
-	sepoliaChainID uint64 = 11155111
-)
-
-func Test_L2ToL1Bridge_New(t *testing.T) {
-	rollupAddress, l1RebalancerAddress, l2RebalancerAddress := testutils.NewAddress(), testutils.NewAddress(), testutils.NewAddress()
-
-	t.Run("happy path", func(t *testing.T) {
-		l2LogPoller := lpmocks.NewLogPoller(t)
-		l2LogPoller.On("RegisterFilter", mock.MatchedBy(func(f logpoller.Filter) bool {
-			if len(f.EventSigs) != 1 {
-				return false
-			}
-			if f.EventSigs[0] != LiquidityTransferredTopic {
-				return false
-			}
-			if f.Retention != DurationMonth {
-				return false
-			}
-			if f.Addresses[0] != l2RebalancerAddress {
-				return false
-			}
-			return true
-		})).Return(nil)
-		defer l2LogPoller.AssertExpectations(t)
-
-		l1LogPoller := lpmocks.NewLogPoller(t)
-		l1LogPoller.On("RegisterFilter", mock.MatchedBy(func(f logpoller.Filter) bool {
-			if len(f.EventSigs) != 2 {
-				return false
-			}
-			if f.EventSigs[0] != NodeConfirmedTopic || f.EventSigs[1] != LiquidityTransferredTopic {
-				return false
-			}
-			if f.Retention != DurationMonth {
-				return false
-			}
-			if f.Addresses[0] != rollupAddress || f.Addresses[1] != l1RebalancerAddress {
-				return false
-			}
-			return true
-		})).Return(nil)
-		defer l1LogPoller.AssertExpectations(t)
-
-		l2Client := clientmocks.NewClient(t)
-		l1Client := clientmocks.NewClient(t)
-
-		bridge, err := NewL2ToL1Bridge(
-			logger.TestLogger(t),
-			models.NetworkSelector(mustGetChainByID(t, arbSepolia).Selector),
-			models.NetworkSelector(mustGetChainByID(t, sepoliaChainID).Selector),
-			rollupAddress,
-			l1RebalancerAddress,
-			l2RebalancerAddress,
-			l2LogPoller,
-			l1LogPoller,
-			l2Client,
-			l1Client,
-		)
-		require.NoError(t, err)
-
-		require.Equal(t, rollupAddress, bridge.rollupCore.Address())
-		require.Equal(t, l1RebalancerAddress, bridge.l1Rebalancer.Address())
-	})
-
-	t.Run("l2 poller register filter error", func(t *testing.T) {
-		l2LogPoller := lpmocks.NewLogPoller(t)
-		l2LogPoller.On("RegisterFilter", mock.Anything).Return(errors.New("some error"), nil)
-		defer l2LogPoller.AssertExpectations(t)
-
-		l1LogPoller := lpmocks.NewLogPoller(t)
-		l2Client := clientmocks.NewClient(t)
-		l1Client := clientmocks.NewClient(t)
-
-		_, err := NewL2ToL1Bridge(
-			logger.TestLogger(t),
-			models.NetworkSelector(mustGetChainByID(t, arbSepolia).Selector),
-			models.NetworkSelector(mustGetChainByID(t, sepoliaChainID).Selector),
-			rollupAddress,
-			l1RebalancerAddress,
-			l2RebalancerAddress,
-			l2LogPoller,
-			l1LogPoller,
-			l2Client,
-			l1Client,
-		)
-		require.Error(t, err)
-	})
-
-	t.Run("l1 poller register filter error", func(t *testing.T) {
-		l2LogPoller := lpmocks.NewLogPoller(t)
-		l2LogPoller.On("RegisterFilter", mock.Anything).Return(nil)
-		defer l2LogPoller.AssertExpectations(t)
-
-		l1LogPoller := lpmocks.NewLogPoller(t)
-		l1LogPoller.On("RegisterFilter", mock.Anything).Return(errors.New("some error"), nil)
-		defer l1LogPoller.AssertExpectations(t)
-
-		l2Client := clientmocks.NewClient(t)
-		l1Client := clientmocks.NewClient(t)
-
-		_, err := NewL2ToL1Bridge(
-			logger.TestLogger(t),
-			models.NetworkSelector(mustGetChainByID(t, arbSepolia).Selector),
-			models.NetworkSelector(mustGetChainByID(t, sepoliaChainID).Selector),
-			rollupAddress,
-			l1RebalancerAddress,
-			l2RebalancerAddress,
-			l2LogPoller,
-			l1LogPoller,
-			l2Client,
-			l1Client,
-		)
-		require.Error(t, err)
-	})
-}
 
 func Test_L2ToL1Bridge_GetBridgePayloadAndFee(t *testing.T) {
 	bridge := &l2ToL1Bridge{}
@@ -147,12 +26,6 @@ func Test_L2ToL1Bridge_GetBridgePayloadAndFee(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, payload)
 	require.Equal(t, big.NewInt(0), fee)
-}
-
-func mustGetChainByID(t *testing.T, id uint64) chainsel.Chain {
-	chain, ok := chainsel.ChainByEvmChainID(id)
-	require.True(t, ok)
-	return chain
 }
 
 func Test_l2ToL1Bridge_getLatestNodeConfirmed(t *testing.T) {

@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 
-import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 import {IRebalancer} from "../interfaces/IRebalancer.sol";
 
 import {LockReleaseTokenPool} from "../../ccip/pools/LockReleaseTokenPool.sol";
 import {Rebalancer} from "../Rebalancer.sol";
 import {MockL1BridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 import {RebalancerBaseTest} from "./RebalancerBaseTest.t.sol";
-
-import {ERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
-import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 contract RebalancerSetup is RebalancerBaseTest {
   event LiquidityTransferred(
