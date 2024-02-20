@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"go.uber.org/multierr"
@@ -98,6 +99,19 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		return ocrtypes.Observation{}, fmt.Errorf("resolve proposed transfers: %w", err)
 	}
 
+	configDigests := make([]models.ConfigDigestWithMeta, 0)
+	for _, net := range p.rebalancerGraph.GetNetworks() {
+		data, err := p.rebalancerGraph.GetData(net)
+		if err != nil {
+			return nil, fmt.Errorf("get rb %d data: %w", net, err)
+		}
+		configDigests = append(configDigests, models.ConfigDigestWithMeta{
+			Digest:         data.ConfigDigest,
+			NetworkSel:     data.NetworkSelector,
+			RebalancerAddr: data.RebalancerAddress,
+		})
+	}
+
 	lggr.Infow("finished observing",
 		"networkLiquidities", networkLiquidities,
 		"pendingTransfers", pendingTransfers,
@@ -105,7 +119,7 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		"resolvedTransfers", resolvedTransfers,
 	)
 
-	return models.NewObservation(networkLiquidities, resolvedTransfers, pendingTransfers, edges).Encode(), nil
+	return models.NewObservation(networkLiquidities, resolvedTransfers, pendingTransfers, edges, configDigests).Encode(), nil
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
@@ -147,6 +161,10 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("compute pending transfers consensus: %w", err)
 	}
+	configDigests, err := p.computeConfigDigestsConsensus(observations)
+	if err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("compute config digests consensus: %w", err)
+	}
 
 	// Compute a new graph with the median liquidities and the edges of the quorum of nodes.
 	g, err := p.computeMedianGraph(graphEdges, medianLiquidityPerChain)
@@ -177,7 +195,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		"resolvedTransfers", resolvedTransfersQuorum,
 	)
 
-	return models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers).Encode(), nil
+	return models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers, configDigests).Encode(), nil
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.Report], error) {
@@ -219,24 +237,31 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	)
 	lggr.Debugw("got incoming and outgoing transfers")
 
+	configDigestsMap := map[models.NetworkSelector]map[models.Address]types.ConfigDigest{}
+	for _, cd := range decodedOutcome.ConfigDigests {
+		_, found := configDigestsMap[cd.NetworkSel]
+		if found {
+			return nil, fmt.Errorf("found duplicate config digest for %v", cd.NetworkSel)
+		}
+		configDigestsMap[cd.NetworkSel] = map[models.Address]types.ConfigDigest{
+			cd.RebalancerAddr: cd.Digest.ConfigDigest,
+		}
+	}
+
 	var reports []ocr3types.ReportWithInfo[models.Report]
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
 	for networkID, transfers := range incomingAndOutgoing {
 		lmAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
 		if err != nil {
 			return nil, fmt.Errorf("liquidity manager for %v does not exist", networkID)
 		}
 
-		rebalancer, err := p.liquidityManagerFactory.NewRebalancer(networkID, lmAddress)
-		if err != nil {
-			return nil, fmt.Errorf("init liquidity manager: %w", err)
+		configDigests, found := configDigestsMap[networkID]
+		if !found {
+			return nil, fmt.Errorf("cannot find config digest for %v", networkID)
 		}
-
-		// TODO: consider caching the config digest or including it in the outcome?
-		configDigest, err := rebalancer.ConfigDigest(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("get config digest: %w", err)
+		configDigest, found := configDigests[lmAddress]
+		if !found {
+			return nil, fmt.Errorf("cannot find config digest for %v:%s", networkID, lmAddress)
 		}
 
 		report := models.NewReport(transfers, lmAddress, networkID, configDigest)
@@ -488,6 +513,36 @@ func (p *Plugin) computePendingTransfersConsensus(observations []models.Observat
 	}
 
 	return quorumEvents, nil
+}
+
+func (p *Plugin) computeConfigDigestsConsensus(observations []models.Observation) ([]models.ConfigDigestWithMeta, error) {
+	key := func(meta models.ConfigDigestWithMeta) string {
+		return fmt.Sprintf("%d-%s-%s", meta.NetworkSel, meta.RebalancerAddr, meta.Digest.Hex())
+	}
+	counts := make(map[string]int)
+	cds := make(map[string]models.ConfigDigestWithMeta)
+	for _, obs := range observations {
+		for _, cd := range obs.ConfigDigests {
+			k := key(cd)
+			counts[k]++
+			if counts[k] == 1 {
+				cds[k] = cd
+			}
+		}
+	}
+
+	var quorumCds []models.ConfigDigestWithMeta
+	for k, count := range counts {
+		if count >= p.f+1 {
+			cd, exists := cds[k]
+			if !exists {
+				return nil, fmt.Errorf("internal issue, config digest by key %s not found", k)
+			}
+			quorumCds = append(quorumCds, cd)
+		}
+	}
+
+	return quorumCds, nil
 }
 
 func (p *Plugin) computeGraphEdgesConsensus(observations []models.Observation) []models.Edge {

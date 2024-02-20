@@ -62,11 +62,19 @@ func (e *evmDiscoverer) Discover(ctx context.Context) (graph.Graph, error) {
 				RemoteTokenAddress:        models.Address(v.RemoteToken),
 			}
 		}
+
+		configDigestAndEpoch, err := rebal.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return graph.Data{}, nil, fmt.Errorf("latest config digest and epoch: %w", err)
+		}
+
 		return graph.Data{
 			Liquidity:         liquidity,
 			TokenAddress:      models.Address(token),
 			RebalancerAddress: rebalancerAddress,
 			XChainRebalancers: xchainRebalancerData,
+			ConfigDigest:      models.ConfigDigest{ConfigDigest: configDigestAndEpoch.ConfigDigest},
+			NetworkSelector:   selector,
 		}, neighbors, nil
 	}
 

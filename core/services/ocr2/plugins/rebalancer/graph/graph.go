@@ -34,6 +34,10 @@ type Graph interface {
 
 	GetXChainRebalancerData(n models.NetworkSelector) (map[models.NetworkSelector]XChainRebalancerData, error)
 
+	// GetData returns the data of the provided network.
+	// TODO: remove redundant methods, e.g. GetLiquidity can be replaced with GetData
+	GetData(n models.NetworkSelector) (Data, error)
+
 	// AddConnection adds a new directed graph edge.
 	AddConnection(from, to models.NetworkSelector) error
 
@@ -81,6 +85,8 @@ type Data struct {
 	TokenAddress      models.Address
 	RebalancerAddress models.Address
 	XChainRebalancers map[models.NetworkSelector]XChainRebalancerData
+	ConfigDigest      models.ConfigDigest
+	NetworkSelector   models.NetworkSelector
 }
 
 type gph struct {
@@ -145,6 +151,8 @@ func (g *gph) SetLiquidity(n models.NetworkSelector, liquidity *big.Int) bool {
 		Liquidity:         liquidity,
 		TokenAddress:      prev.TokenAddress,
 		RebalancerAddress: prev.RebalancerAddress,
+		ConfigDigest:      prev.ConfigDigest,
+		NetworkSelector:   prev.NetworkSelector,
 	}
 	return true
 }
@@ -163,6 +171,17 @@ func (g *gph) GetLiquidity(n models.NetworkSelector) (*big.Int, error) {
 	}
 
 	return w.Liquidity, nil
+}
+
+func (g *gph) GetData(n models.NetworkSelector) (Data, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	data, exists := g.data[n]
+	if !exists {
+		return Data{}, fmt.Errorf("network %d not found", n)
+	}
+	return data, nil
 }
 
 func (g *gph) GetTokenAddress(n models.NetworkSelector) (models.Address, error) {
