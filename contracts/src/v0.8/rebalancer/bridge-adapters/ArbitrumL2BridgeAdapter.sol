@@ -71,17 +71,14 @@ contract ArbitrumL2BridgeAdapter is IBridgeAdapter {
 
     IERC20(localToken).safeTransferFrom(msg.sender, address(this), amount);
 
-    // TODO: handle return data bombs?
-    // NOTE: the data returned is the unique id of the L2 to L1 transfer
+    // the data returned is the unique id of the L2 to L1 transfer
     // see https://github.com/OffchainLabs/token-bridge-contracts/blob/bf9ad3d7f25c0eaf0a5f89eec7a0a370833cea16/contracts/tokenbridge/arbitrum/gateway/L2ArbitrumGateway.sol#L169-L191
-    // so we can probably cap the return data to 256 bits, e.g using https://github.com/nomad-xyz/ExcessivelySafeCall
-    // TODO: should we decode res here or offchain?
     // No approval needed, the bridge will burn the tokens from this contract.
-    bytes memory res = i_l2GatewayRouter.outboundTransfer(remoteToken, recipient, amount, bytes(""));
+    bytes memory l2ToL1TxId = i_l2GatewayRouter.outboundTransfer(remoteToken, recipient, amount, bytes(""));
 
-    emit ArbitrumL2ToL1ERC20Sent(localToken, remoteToken, recipient, amount, res);
+    emit ArbitrumL2ToL1ERC20Sent(localToken, remoteToken, recipient, amount, l2ToL1TxId);
 
-    return res;
+    return l2ToL1TxId;
   }
 
   /// @notice No-op since L1 -> L2 transfers do not need finalization.

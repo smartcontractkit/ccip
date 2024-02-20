@@ -128,10 +128,8 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
     // The router will route the call to the gateway that we approved
     // above. The gateway will then transfer the tokens to the L2.
     // outboundTransferCustomRefund will return the abi encoded inbox sequence number
-    // which is 256 bits, so we can cap the return data to 256 bits, e.g using https://github.com/nomad-xyz/ExcessivelySafeCall
-    // TODO: return data bombs?
-    // TODO: decode the return data here or offchain?
-    bytes memory res = i_l1GatewayRouter.outboundTransferCustomRefund{value: msg.value}(
+    // which is 256 bits, so we can cap the return data to 256 bits.
+    bytes memory inboxSequenceNumber = i_l1GatewayRouter.outboundTransferCustomRefund{value: msg.value}(
       localToken,
       recipient,
       recipient,
@@ -141,9 +139,9 @@ contract ArbitrumL1BridgeAdapter is IBridgeAdapter {
       abi.encode(params.maxSubmissionCost, bytes(""))
     );
 
-    emit ArbitrumL1ToL2ERC20Sent(localToken, localToken, recipient, ++s_nonce, amount, res);
+    emit ArbitrumL1ToL2ERC20Sent(localToken, localToken, recipient, ++s_nonce, amount, inboxSequenceNumber);
 
-    return res;
+    return inboxSequenceNumber;
   }
 
   /// @dev This function is so that we can easily abi-encode the arbitrum-specific

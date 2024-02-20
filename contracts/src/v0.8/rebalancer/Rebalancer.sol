@@ -35,7 +35,6 @@ contract Rebalancer is IRebalancer, OCR3Base {
     uint64 indexed toChainSelector,
     address to,
     uint256 amount,
-    uint256 bridgeFeePaid,
     bytes bridgeSpecificData
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
@@ -171,7 +170,6 @@ contract Rebalancer is IRebalancer, OCR3Base {
       chainSelector,
       remoteLiqManager.remoteRebalancer,
       tokenAmount,
-      nativeBridgeFee,
       bridgeSpecificPayload
     );
   }
@@ -208,7 +206,6 @@ contract Rebalancer is IRebalancer, OCR3Base {
       i_localChainSelector,
       address(s_localLiquidityContainer),
       amount,
-      0, // bridgeFeePaid
       bridgeSpecificPayload
     );
   }
