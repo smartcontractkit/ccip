@@ -84,11 +84,3 @@ func (e *EvmRebalancer) GetLatestSequenceNumber(ctx context.Context) (uint64, er
 	cdae, err := e.rebalancer.LatestConfigDigestAndEpoch(&bind.CallOpts{Context: ctx})
 	return cdae.SequenceNumber, err
 }
-
-func (e *EvmRebalancer) Network() models.NetworkSelector {
-	return e.networkSel
-}
-
-func (e *EvmRebalancer) Address() models.Address {
-	return models.Address(e.addr)
-}
