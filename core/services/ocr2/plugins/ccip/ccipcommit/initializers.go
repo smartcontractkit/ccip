@@ -40,7 +40,7 @@ import (
 )
 
 func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, pr pipeline.Runner, argsNoPlugin libocr2.OCR2OracleArgs) ([]job.ServiceCtx, error) {
-	return []job.ServiceCtx{lazyinitservice.New("CCIPCommitService", func(ctx context.Context) (job.ServiceCtx, error) {
+	return []job.ServiceCtx{lazyinitservice.New(lggr, "CCIPCommitService", func(ctx context.Context) (job.ServiceCtx, error) {
 		pluginConfig, backfillArgs, err := jobSpecToCommitPluginConfig(lggr, jb, pr, chainSet, pg.WithParentCtx(ctx))
 		if err != nil {
 			return nil, err
@@ -69,9 +69,7 @@ func NewCommitServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.Legacy
 			), nil
 		}
 		return job.NewServiceAdapter(oracle), nil
-	}, lazyinitservice.WithLogErrorFunc(func(err error) {
-		lggr.Warnw("CCIP commit service initialization failed", "err", err)
-	}))}, nil
+	})}, nil
 }
 
 func CommitReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (func(report []byte) (*txmgr.TxMeta, error), error) {

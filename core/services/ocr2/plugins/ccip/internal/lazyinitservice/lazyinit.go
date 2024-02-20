@@ -22,6 +22,7 @@ import (
 	"github.com/avast/retry-go/v4"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
@@ -41,6 +42,8 @@ type Option = func(*LazyInitService)
 type LazyInitService struct {
 	// name is the underlying service name.
 	name string
+	// lggr is the logger for the service.
+	lggr logger.Logger
 	// initFunc is the function creating the service.
 	initFunc InitFunc
 	// initComplete guards the initialization process allowing for a graceful shutdown.
@@ -65,9 +68,10 @@ func WithLogErrorFunc(f LogErrorFunc) Option {
 }
 
 // New creates a new service with the given initialization function.
-func New(name string, f InitFunc, opts ...Option) *LazyInitService {
+func New(lggr logger.Logger, name string, f InitFunc, opts ...Option) *LazyInitService {
 	s := &LazyInitService{
 		name:     name,
+		lggr:     lggr,
 		initFunc: f,
 	}
 	for _, opt := range opts {
@@ -98,11 +102,12 @@ func (s *LazyInitService) initAndRun(ctx context.Context) {
 	initFailures := 0
 	testEnvVar := fmt.Sprintf("TEST_%s_INIT_FAILURES", s.name)
 	if v := os.Getenv(testEnvVar); v != "" {
-		v, err := strconv.Atoi(v)
+		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			s.reportError(fmt.Errorf("failed to parse %s: %w", testEnvVar, err))
+			s.lggr.Warnw("failed to parse environment variable", "service", s.name, "var", testEnvVar, "value", v, "err", err)
+			s.reportError(fmt.Errorf("failed to parse env var %s value %s: %w", testEnvVar, v, err))
 		}
-		initFailures = v
+		initFailures = parsed
 	}
 	n := 0
 	service, err := retry.DoWithData[job.ServiceCtx](
@@ -116,24 +121,29 @@ func (s *LazyInitService) initAndRun(ctx context.Context) {
 		retry.Context(ctx),
 		retry.OnRetry(func(n uint, err error) {
 			s.setState(nil, err)
+			s.lggr.Warnw("service initialization failed", "service", s.name, "attempt", n, "err", err)
 			s.reportError(fmt.Errorf("initialization attempt %d failed: %w", n, err))
 		}),
 	)
 	if err != nil {
 		s.setState(nil, err)
+		s.lggr.Errorw("service initialization failed", "service", s.name, "err", err)
 		s.reportError(err)
 		return
 	}
 	if service == nil {
 		s.setState(nil, ErrNoService)
+		s.lggr.Errorw("service init function returned nil", "service", s.name)
 		s.reportError(ErrNoService)
 		return
 	}
 	s.setState(service, ErrNotReady)
 	if err = service.Start(ctx); err != nil {
 		s.setState(service, err)
+		s.lggr.Errorw("service failed to start", "service", s.name, "err", err)
 		s.reportError(fmt.Errorf("service failed to start: %w", err))
 	}
+	s.lggr.Infow("service started", "service", s.name)
 	s.setState(service, nil)
 }
 
@@ -160,6 +170,7 @@ func (s *LazyInitService) getState() (service job.ServiceCtx, lastErr error) {
 
 // Close implements graceful service shutdown logic.
 func (s *LazyInitService) Close() error {
+	s.lggr.Infow("closing service", "service", s.name)
 	// First, cancel the context to break the initialization retry loop.
 	if s.cancelFunc != nil {
 		s.cancelFunc()
@@ -174,8 +185,10 @@ func (s *LazyInitService) Close() error {
 	if service != nil {
 		err := service.Close()
 		if err != nil {
+			s.lggr.Warnw("service failed to close", "service", s.name)
 			s.setState(service, err)
 		} else {
+			s.lggr.Infow("service closed", "service", s.name)
 			s.setState(service, ErrClosed)
 		}
 		return err
@@ -199,7 +212,9 @@ func (s *LazyInitService) HealthReport() map[string]error {
 
 	if service != nil {
 		if r, ok := service.(services.HealthReporter); ok {
-			return r.HealthReport()
+			report := r.HealthReport()
+			report[s.name] = lastErr
+			return report
 		}
 	}
 	return map[string]error{s.name: lastErr}

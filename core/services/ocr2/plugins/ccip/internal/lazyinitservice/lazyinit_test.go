@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"
 
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/job"
 )
 
@@ -49,7 +50,7 @@ func (s *dummyService) Close() error {
 func TestLazyInitService_AsyncInit(t *testing.T) {
 	dummy := newDummyService()
 
-	s := New("dummy", func(context.Context) (job.ServiceCtx, error) {
+	s := New(logger.NullLogger, "dummy", func(context.Context) (job.ServiceCtx, error) {
 		return dummy, nil
 	})
 	assert.Equal(t, "dummy", s.Name())
@@ -66,7 +67,7 @@ func TestLazyInitService_NoStartOnUnrecoverableFailure(t *testing.T) {
 	t.Parallel()
 	tries := 0
 	ch := make(chan struct{})
-	s := New("dummy", func(context.Context) (job.ServiceCtx, error) {
+	s := New(logger.NullLogger, "dummy", func(context.Context) (job.ServiceCtx, error) {
 		tries++
 		close(ch)
 		return nil, Unrecoverable(errInit)
@@ -82,7 +83,7 @@ func TestLazyInitService_RetryOnRecoverableFailure(t *testing.T) {
 	tries := 0
 	var errs []error
 	dummy := newDummyService()
-	s := New("dummy", func(context.Context) (job.ServiceCtx, error) {
+	s := New(logger.NullLogger, "dummy", func(context.Context) (job.ServiceCtx, error) {
 		tries++
 		if tries <= 3 {
 			return nil, errInit
@@ -100,7 +101,7 @@ func TestLazyInitService_RetryOnRecoverableFailure(t *testing.T) {
 
 func TestLazyInitService_ParentContextCancel(t *testing.T) {
 	dummy := newDummyService()
-	s := New("dummy", func(context.Context) (job.ServiceCtx, error) {
+	s := New(logger.NullLogger, "dummy", func(context.Context) (job.ServiceCtx, error) {
 		return dummy, nil
 	})
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -118,7 +119,7 @@ func TestLazyInitService_FaultyInitFunction(t *testing.T) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	s := New("dummy", func(context.Context) (job.ServiceCtx, error) {
+	s := New(logger.NullLogger, "dummy", func(context.Context) (job.ServiceCtx, error) {
 		return nil, nil
 	}, WithLogErrorFunc(func(err error) {
 		defer wg.Done()
@@ -139,7 +140,7 @@ func TestLazyInitService_ReportStartErrors(t *testing.T) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	s := New("dummy", func(context.Context) (job.ServiceCtx, error) {
+	s := New(logger.NullLogger, "dummy", func(context.Context) (job.ServiceCtx, error) {
 		return dummy, nil
 	}, WithLogErrorFunc(func(err error) {
 		defer wg.Done()
@@ -156,7 +157,7 @@ func TestLazyInitService_ReportCloseErrors(t *testing.T) {
 	dummy := newDummyService()
 	dummy.closeError = errDummyClose
 
-	s := New("dummy", func(context.Context) (job.ServiceCtx, error) {
+	s := New(logger.NullLogger, "dummy", func(context.Context) (job.ServiceCtx, error) {
 		return dummy, nil
 	})
 

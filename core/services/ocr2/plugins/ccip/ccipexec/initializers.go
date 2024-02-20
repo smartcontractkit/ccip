@@ -45,7 +45,7 @@ import (
 const numTokenDataWorkers = 5
 
 func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.LegacyChainContainer, new bool, argsNoPlugin libocr2.OCR2OracleArgs) ([]job.ServiceCtx, error) {
-	return []job.ServiceCtx{lazyinitservice.New("CCIPExecService", func(ctx context.Context) (job.ServiceCtx, error) {
+	return []job.ServiceCtx{lazyinitservice.New(lggr, "CCIPExecService", func(ctx context.Context) (job.ServiceCtx, error) {
 		execPluginConfig, backfillArgs, err := jobSpecToExecPluginConfig(ctx, lggr, jb, chainSet, pg.WithParentCtx(ctx))
 		if err != nil {
 			return nil, err
@@ -73,9 +73,7 @@ func NewExecutionServices(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 			), nil
 		}
 		return job.NewServiceAdapter(oracle), nil
-	}, lazyinitservice.WithLogErrorFunc(func(err error) {
-		lggr.Warnw("CCIP execution service initialization failed", "err", err)
-	}))}, nil
+	})}, nil
 }
 
 // UnregisterExecPluginLpFilters unregisters all the registered filters for both source and dest chains.
