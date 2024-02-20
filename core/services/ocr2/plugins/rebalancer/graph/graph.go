@@ -174,6 +174,9 @@ func (g *gph) GetLiquidity(n models.NetworkSelector) (*big.Int, error) {
 }
 
 func (g *gph) GetData(n models.NetworkSelector) (Data, error) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
 	data, exists := g.data[n]
 	if !exists {
 		return Data{}, fmt.Errorf("network %d not found", n)
