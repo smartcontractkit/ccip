@@ -19,7 +19,6 @@ contract RebalancerSetup is RebalancerBaseTest {
     uint64 indexed toChainSelector,
     address to,
     uint256 amount,
-    uint256 nativeBridgeFee,
     bytes bridgeSpecificPayload
   );
 
@@ -69,7 +68,6 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       i_remoteChainSelector,
       address(s_rebalancer),
       amount,
-      0,
       bytes("")
     );
 
