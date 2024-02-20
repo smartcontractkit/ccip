@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cockroachdb/errors"
 	"github.com/ethereum/go-ethereum/common"
 
 	type_and_version "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/type_and_version_interface_wrapper"
@@ -88,7 +89,18 @@ func (br *EVMTokenPoolBatchedReader) GetInboundTokenPoolRateLimits(ctx context.C
 		}
 	}
 
-	return batchCallLatestBlockNumber[cciptypes.TokenBucketRateLimit](ctx, br.evmBatchCaller, evmCalls)
+	results, err := br.evmBatchCaller.BatchCall(ctx, 0, evmCalls)
+	if err != nil {
+		return nil, fmt.Errorf("batch call limit: %w", err)
+	}
+
+	resultsParsed, err := rpclib.ParseOutputs[cciptypes.TokenBucketRateLimit](results, func(d rpclib.DataAndErr) (cciptypes.TokenBucketRateLimit, error) {
+		return rpclib.ParseOutput[cciptypes.TokenBucketRateLimit](d, 0)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("parse outputs: %w", err)
+	}
+	return resultsParsed, nil
 }
 
 // loadTokenPoolReaders loads the token pools into the factory's cache
@@ -149,17 +161,23 @@ func getBatchedTypeAndVersion(ctx context.Context, evmBatchCaller rpclib.EvmBatc
 		))
 	}
 
-	return batchCallLatestBlockNumber[string](ctx, evmBatchCaller, evmCalls)
-}
-
-func batchCallLatestBlockNumber[T any](ctx context.Context, evmBatchCaller rpclib.EvmBatchCaller, evmCalls []rpclib.EvmCall) ([]T, error) {
 	results, err := evmBatchCaller.BatchCall(ctx, 0, evmCalls)
 	if err != nil {
 		return nil, fmt.Errorf("batch call limit: %w", err)
 	}
 
-	result, err := rpclib.ParseOutputs[T](results, func(d rpclib.DataAndErr) (T, error) {
-		return rpclib.ParseOutput[T](d, 0)
+	result, err := rpclib.ParseOutputs[string](results, func(d rpclib.DataAndErr) (string, error) {
+		tAndV, err := rpclib.ParseOutput[string](d, 0)
+		if err != nil {
+			if errors.Is(err, rpclib.ErrEmptyOutput) {
+				// typeAndVersion method do not exist for 1.0 pools. We are going to get an ErrEmptyOutput in that case.
+				tAndV = "BurnMint " + ccipdata.V1_0_0
+			} else {
+				return "", err
+			}
+		}
+
+		return tAndV, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("parse outputs: %w", err)
