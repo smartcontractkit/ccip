@@ -172,9 +172,8 @@ func getBatchedTypeAndVersion(ctx context.Context, evmBatchCaller rpclib.EvmBatc
 			if errors.Is(err1, rpclib.ErrEmptyOutput) {
 				// typeAndVersion method do not exist for 1.0 pools. We are going to get an ErrEmptyOutput in that case.
 				return "LegacyPool " + ccipdata.V1_0_0, nil
-			} else {
-				return "", err1
 			}
+			return "", err1
 		}
 
 		return tAndV, nil
