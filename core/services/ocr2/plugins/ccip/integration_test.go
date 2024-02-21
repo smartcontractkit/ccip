@@ -130,12 +130,22 @@ func TestIntegration_CCIP(t *testing.T) {
 				})
 				require.NoError(t, err2)
 
+				ccipTH.Source.User.Value = tokenAmount
+				_, err2 = ccipTH.Source.WrappedNative.Deposit(ccipTH.Source.User)
+				require.NoError(t, err2)
+				ccipTH.Source.Chain.Commit()
+				ccipTH.Source.User.Value = nil
+
 				msg := router.ClientEVM2AnyMessage{
 					Receiver: testhelpers.MustEncodeAddress(t, ccipTH.Dest.Receivers[0].Receiver.Address()),
 					Data:     []byte("hello"),
 					TokenAmounts: []router.ClientEVMTokenAmount{
 						{
 							Token:  ccipTH.Source.LinkToken.Address(),
+							Amount: tokenAmount,
+						},
+						{
+							Token:  ccipTH.Source.WrappedNative.Address(),
 							Amount: tokenAmount,
 						},
 					},
@@ -150,6 +160,10 @@ func TestIntegration_CCIP(t *testing.T) {
 				_, err2 = ccipTH.Source.LinkToken.Approve(ccipTH.Source.User, ccipTH.Source.Router.Address(), new(big.Int).Add(fee, tokenAmount))
 				require.NoError(t, err2)
 				ccipTH.Source.Chain.Commit()
+				_, err2 = ccipTH.Source.WrappedNative.Approve(ccipTH.Source.User, ccipTH.Source.Router.Address(), tokenAmount)
+				require.NoError(t, err2)
+				ccipTH.Source.Chain.Commit()
+
 				ccipTH.SendRequest(t, msg)
 				// Should eventually see this executed.
 				ccipTH.AllNodesHaveReqSeqNum(t, currentSeqNum)
@@ -163,7 +177,6 @@ func TestIntegration_CCIP(t *testing.T) {
 				// 1) The total pool input == total pool output
 				// 2) Pool flow equals tokens sent
 				// 3) Sent tokens arrive at the receiver
-
 				ccipTH.AssertBalances(t, []testhelpers.BalanceAssertion{
 					{
 						Name:     testhelpers.SourcePool,

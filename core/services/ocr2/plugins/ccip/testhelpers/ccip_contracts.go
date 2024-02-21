@@ -1027,13 +1027,13 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	sourceChain.Commit()
 
-	destWeth9addr, _, _, err := weth9.DeployWETH9(destUser, destChain)
+	destWethaddr, _, _, err := weth9.DeployWETH9(destUser, destChain)
 	require.NoError(t, err)
-	destWrapped, err := weth9.NewWETH9(destWeth9addr, destChain)
+	destWrapped, err := weth9.NewWETH9(destWethaddr, destChain)
 	require.NoError(t, err)
 
 	// Create dest router
-	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, destWeth9addr, armProxyDestAddress)
+	destRouterAddress, _, _, err := router.DeployRouter(destUser, destChain, destWethaddr, armProxyDestAddress)
 	require.NoError(t, err)
 	destChain.Commit()
 	destRouter, err := router.NewRouter(destRouterAddress, destChain)
@@ -1075,13 +1075,25 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	destWrappedPoolAddress, _, _, err := lock_release_token_pool_1_0_0.DeployLockReleaseTokenPool(
 		destUser,
 		destChain,
-		destWeth9addr,
+		destWethaddr,
 		[]common.Address{},
 		armProxyDestAddress,
 	)
 	require.NoError(t, err)
 	destWrappedPool, err := lock_release_token_pool_1_0_0.NewLockReleaseTokenPool(destWrappedPoolAddress, destChain)
 	require.NoError(t, err)
+
+	poolFloatValue := big.NewInt(1e18)
+
+	destUser.Value = poolFloatValue
+	_, err = destWrapped.Deposit(destUser)
+	require.NoError(t, err)
+	destChain.Commit()
+	destUser.Value = nil
+
+	_, err = destWrapped.Transfer(destUser, destWrappedPool.Address(), poolFloatValue)
+	require.NoError(t, err)
+	destChain.Commit()
 
 	// Deploy and configure ge offramp.
 	destPricesAddress, _, _, err := price_registry.DeployPriceRegistry(

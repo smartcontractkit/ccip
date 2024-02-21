@@ -2,7 +2,6 @@ package batchreader
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -169,10 +168,10 @@ func getBatchedTypeAndVersion(ctx context.Context, evmBatchCaller rpclib.EvmBatc
 	result, err := rpclib.ParseOutputs[string](results, func(d rpclib.DataAndErr) (string, error) {
 		tAndV, err1 := rpclib.ParseOutput[string](d, 0)
 		if err1 != nil {
-			if errors.Is(err1, rpclib.ErrEmptyOutput) {
-				// typeAndVersion method do not exist for 1.0 pools. We are going to get an ErrEmptyOutput in that case.
-				return "LegacyPool " + ccipdata.V1_0_0, nil
-			}
+			//if errors.Is(err1, rpclib.ErrEmptyOutput) {
+			// typeAndVersion method do not exist for 1.0 pools. We are going to get an ErrEmptyOutput in that case.
+			return "LegacyPool " + ccipdata.V1_0_0, nil
+			//}
 			return "", err1
 		}
 
