@@ -33,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_onramp_1_2_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/lock_release_token_pool_1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/maybe_revert_message_receiver"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/mock_arm_contract"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/price_registry"
@@ -184,7 +185,7 @@ type Common struct {
 	CustomPool        *custom_token_pool.CustomTokenPool
 	CustomToken       *link_token_interface.LinkToken
 	WrappedNative     *weth9.WETH9
-	WrappedNativePool *lock_release_token_pool.LockReleaseTokenPool
+	WrappedNativePool *lock_release_token_pool_1_0_0.LockReleaseTokenPool
 	ARM               *mock_arm_contract.MockARMContract
 	ARMProxy          *arm_proxy_contract.ARMProxyContract
 	PriceRegistry     *price_registry.PriceRegistry
@@ -889,19 +890,17 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	sourceChain.Commit()
 
-	sourceWeth9PoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+	sourceWeth9PoolAddress, _, _, err := lock_release_token_pool_1_0_0.DeployLockReleaseTokenPool(
 		sourceUser,
 		sourceChain,
 		sourceWeth9addr,
 		[]common.Address{},
 		armProxySourceAddress,
-		true,
-		sourceRouterAddress,
 	)
 	require.NoError(t, err)
 	sourceChain.Commit()
 
-	sourceWeth9Pool, err := lock_release_token_pool.NewLockReleaseTokenPool(sourceWeth9PoolAddress, sourceChain)
+	sourceWeth9Pool, err := lock_release_token_pool_1_0_0.NewLockReleaseTokenPool(sourceWeth9PoolAddress, sourceChain)
 	require.NoError(t, err)
 
 	sourcePoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
@@ -1055,21 +1054,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		}},
 	)
 	require.NoError(t, err)
-	_, err = sourceWeth9Pool.ApplyChainUpdates(sourceUser,
-		[]lock_release_token_pool.TokenPoolChainUpdate{{
-			RemoteChainSelector: destChainSelector,
-			Allowed:             true,
-			OutboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
-				IsEnabled: true,
-				Capacity:  HundredLink,
-				Rate:      big.NewInt(1e18),
-			},
-			InboundRateLimiterConfig: lock_release_token_pool.RateLimiterConfig{
+	_, err = sourceWeth9Pool.ApplyRampUpdates(sourceUser,
+		[]lock_release_token_pool_1_0_0.TokenPoolRampUpdate{{Ramp: onRampAddress, Allowed: true,
+			RateLimiterConfig: lock_release_token_pool_1_0_0.RateLimiterConfig{
 				IsEnabled: true,
 				Capacity:  HundredLink,
 				Rate:      big.NewInt(1e18),
 			},
 		}},
+		[]lock_release_token_pool_1_0_0.TokenPoolRampUpdate{},
 	)
 	require.NoError(t, err)
 	sourceChain.Commit()
@@ -1122,17 +1115,15 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 	destChain.Commit()
 
-	destWrappedPoolAddress, _, _, err := lock_release_token_pool.DeployLockReleaseTokenPool(
+	destWrappedPoolAddress, _, _, err := lock_release_token_pool_1_0_0.DeployLockReleaseTokenPool(
 		destUser,
 		destChain,
 		destWeth9addr,
 		[]common.Address{},
 		armProxyDestAddress,
-		true,
-		destRouterAddress,
 	)
 	require.NoError(t, err)
-	destWrappedPool, err := lock_release_token_pool.NewLockReleaseTokenPool(destWrappedPoolAddress, destChain)
+	destWrappedPool, err := lock_release_token_pool_1_0_0.NewLockReleaseTokenPool(destWrappedPoolAddress, destChain)
 	require.NoError(t, err)
 
 	// Deploy and configure ge offramp.
