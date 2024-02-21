@@ -25,6 +25,7 @@ contract RebalancerSetup is RebalancerBaseTest {
     bytes reason
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
+  event LiquidityRemoved(address indexed provider, uint256 indexed amount);
   error NonceAlreadyUsed(uint256 nonce);
 
   Rebalancer internal s_rebalancer;
@@ -190,11 +191,13 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     // deal some L2 tokens to the remote token pool so that we can withdraw it when we rebalance.
     deal(address(s_l2Token), address(remotePool), amount);
 
-    vm.expectEmit();
     uint256 nonce = 1;
     uint64 maxSeqNum = type(uint64).max;
     bytes memory bridgeSendReturnData = abi.encode(nonce);
     bytes memory bridgeSpecificPayload = bytes("");
+    vm.expectEmit();
+    emit LiquidityRemoved(address(remoteRebalancer), amount);
+    vm.expectEmit();
     emit LiquidityTransferred(
       maxSeqNum,
       i_remoteChainSelector,
@@ -220,19 +223,21 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     assertEq(s_l1Token.balanceOf(address(s_bridgeAdapter)), 0, "bridgeAdapter balance");
 
     // try to finalize on L1 again
-    vm.expectEmit();
     bytes memory revertData = abi.encodeWithSelector(NonceAlreadyUsed.selector, nonce);
+    vm.expectEmit();
     emit FinalizationFailed(maxSeqNum, i_remoteChainSelector, finalizationData, revertData);
+    vm.expectEmit();
+    emit LiquidityAdded(address(s_rebalancer), amount);
+    vm.expectEmit();
     emit LiquidityTransferred(
       maxSeqNum,
       i_remoteChainSelector,
       i_localChainSelector,
       address(s_rebalancer),
       amount,
-      bridgeSpecificPayload,
-      bridgeSendReturnData
+      finalizationData,
+      bytes("")
     );
-    emit LiquidityAdded(address(s_rebalancer), amount);
     s_rebalancer.receiveLiquidity(i_remoteChainSelector, amount, finalizationData);
 
     // available balance on the rebalancer has been injected into the token pool.
