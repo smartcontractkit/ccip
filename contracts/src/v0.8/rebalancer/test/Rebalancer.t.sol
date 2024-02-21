@@ -149,7 +149,13 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     // note we use the L1 bridge adapter because it has the reverting logic
     // when finalization is already done.
     MockL1BridgeAdapter remoteBridgeAdapter = new MockL1BridgeAdapter(s_l2Token);
-    LockReleaseTokenPool remotePool = new LockReleaseTokenPool(s_l2Token, new address[](0), address(1), true, address(123));
+    LockReleaseTokenPool remotePool = new LockReleaseTokenPool(
+      s_l2Token,
+      new address[](0),
+      address(1),
+      true,
+      address(123)
+    );
     Rebalancer remoteRebalancer = new Rebalancer(s_l2Token, i_remoteChainSelector, remotePool);
 
     // set rebalancer role on the pool.
@@ -177,7 +183,6 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     });
 
     remoteRebalancer.setCrossChainRebalancer(args);
-
 
     // deal some L1 tokens to the L1 bridge adapter so that it can send them to the rebalancer
     // when the withdrawal gets finalized.
@@ -216,16 +221,8 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
 
     // try to finalize on L1 again
     vm.expectEmit();
-    bytes memory revertData = abi.encodeWithSelector(
-      NonceAlreadyUsed.selector,
-      nonce
-    );
-    emit FinalizationFailed(
-      maxSeqNum,
-      i_remoteChainSelector,
-      finalizationData,
-      revertData
-    );
+    bytes memory revertData = abi.encodeWithSelector(NonceAlreadyUsed.selector, nonce);
+    emit FinalizationFailed(maxSeqNum, i_remoteChainSelector, finalizationData, revertData);
     emit LiquidityTransferred(
       maxSeqNum,
       i_remoteChainSelector,
@@ -235,10 +232,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       bridgeSpecificPayload,
       bridgeSendReturnData
     );
-    emit LiquidityAdded(
-      address(s_rebalancer),
-      amount
-    );
+    emit LiquidityAdded(address(s_rebalancer), amount);
     s_rebalancer.receiveLiquidity(i_remoteChainSelector, amount, finalizationData);
 
     // available balance on the rebalancer has been injected into the token pool.
