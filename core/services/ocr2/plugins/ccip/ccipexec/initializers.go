@@ -11,13 +11,14 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	chainselectors "github.com/smartcontractkit/chain-selectors"
 	libocr2 "github.com/smartcontractkit/libocr/offchainreporting2plus"
 	"go.uber.org/multierr"
 
 	commonlogger "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/txmgr"
@@ -98,7 +99,7 @@ func UnregisterExecPluginLpFilters(ctx context.Context, lggr logger.Logger, jb j
 			if usdcDisabled := params.pluginConfig.USDCConfig.AttestationAPI == ""; usdcDisabled {
 				return nil
 			}
-			return ccipdata.CloseUSDCReader(lggr, params.pluginConfig.USDCConfig.SourceMessageTransmitterAddress, params.sourceChain.LogPoller(), qopts...)
+			return ccipdata.CloseUSDCReader(lggr, jobIDToString(jb.ID), params.pluginConfig.USDCConfig.SourceMessageTransmitterAddress, params.sourceChain.LogPoller(), qopts...)
 		},
 	}
 
@@ -117,8 +118,8 @@ func ExecReportToEthTxMeta(typ ccipconfig.ContractType, ver semver.Version) (fun
 	return factory.ExecReportToEthTxMeta(typ, ver)
 }
 
-func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller, qopts ...pg.QOpt) (map[common.Address]tokendata.Reader, error) {
-	tokenDataProviders := make(map[common.Address]tokendata.Reader)
+func initTokenDataProviders(lggr logger.Logger, jobID string, pluginConfig ccipconfig.ExecutionPluginJobSpecConfig, sourceLP logpoller.LogPoller, qopts ...pg.QOpt) (map[cciptypes.Address]tokendata.Reader, error) {
+	tokenDataProviders := make(map[cciptypes.Address]tokendata.Reader)
 
 	// init usdc token data provider
 	if pluginConfig.USDCConfig.AttestationAPI != "" {
@@ -133,18 +134,18 @@ func initTokenDataProviders(lggr logger.Logger, pluginConfig ccipconfig.Executio
 			return nil, errors.Wrap(err, "failed to parse USDC attestation API")
 		}
 
-		usdcReader := ccipdata.NewUSDCReader(lggr, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceLP)
-
-		if err := usdcReader.RegisterFilters(qopts...); err != nil {
-			return nil, err
+		usdcReader, err := ccipdata.NewUSDCReader(lggr, jobID, pluginConfig.USDCConfig.SourceMessageTransmitterAddress, sourceLP, true)
+		if err != nil {
+			return nil, errors.Wrap(err, "new usdc reader")
 		}
 
-		tokenDataProviders[pluginConfig.USDCConfig.SourceTokenAddress] = usdc.NewUSDCTokenDataReader(
-			lggr,
-			usdcReader,
-			attestationURI,
-			pluginConfig.USDCConfig.AttestationAPITimeoutSeconds,
-		)
+		tokenDataProviders[cciptypes.Address(pluginConfig.USDCConfig.SourceTokenAddress.String())] =
+			usdc.NewUSDCTokenDataReader(
+				lggr,
+				usdcReader,
+				attestationURI,
+				pluginConfig.USDCConfig.AttestationAPITimeoutSeconds,
+			)
 	}
 
 	return tokenDataProviders, nil
@@ -174,7 +175,11 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, errors.Wrap(err, "get onramp dynamic config")
 	}
 
-	sourceRouter, err := router.NewRouter(dynamicOnRampConfig.Router, params.sourceChain.Client())
+	routerAddr, err := ccipcalc.GenericAddrToEvm(dynamicOnRampConfig.Router)
+	if err != nil {
+		return nil, nil, err
+	}
+	sourceRouter, err := router.NewRouter(routerAddr, params.sourceChain.Client())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed loading source router")
 	}
@@ -194,7 +199,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 		return nil, nil, errors.Wrap(err, "could not load commitStoreReader reader")
 	}
 
-	tokenDataProviders, err := initTokenDataProviders(lggr, params.pluginConfig, params.sourceChain.LogPoller(), qopts...)
+	tokenDataProviders, err := initTokenDataProviders(lggr, jobIDToString(jb.ID), params.pluginConfig, params.sourceChain.LogPoller(), qopts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could not get token data providers")
 	}
@@ -225,16 +230,21 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 
 	batchCaller := rpclib.NewDynamicLimitedBatchCaller(lggr, params.destChain.Client(), rpclib.DefaultRpcBatchSizeLimit, rpclib.DefaultRpcBatchBackOffMultiplier)
 
+	tokenPoolBatchedReader, err := batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offRampReader.Address(), batchCaller)
+	if err != nil {
+		return nil, nil, fmt.Errorf("new token pool batched reader: %w", err)
+	}
+
 	return &ExecutionPluginStaticConfig{
 			lggr:                     execLggr,
 			onRampReader:             onRampReader,
 			commitStoreReader:        commitStoreReader,
 			offRampReader:            offRampReader,
 			sourcePriceRegistry:      sourcePriceRegistry,
-			sourceWrappedNativeToken: sourceWrappedNative,
+			sourceWrappedNativeToken: cciptypes.Address(sourceWrappedNative.String()),
 			destChainSelector:        destChainSelector,
 			priceRegistryProvider:    ccipdataprovider.NewEvmPriceRegistry(params.destChain.LogPoller(), params.destChain.Client(), execLggr, ccip.ExecPluginLabel),
-			tokenPoolBatchedReader:   batchreader.NewEVMTokenPoolBatchedReader(execLggr, sourceChainSelector, offRampReader.Address(), batchCaller),
+			tokenPoolBatchedReader:   tokenPoolBatchedReader,
 			tokenDataWorker: tokendata.NewBackgroundWorker(
 				ctx,
 				tokenDataProviders,
@@ -253,7 +263,7 @@ func jobSpecToExecPluginConfig(ctx context.Context, lggr logger.Logger, jb job.J
 
 type jobSpecParams struct {
 	pluginConfig  ccipconfig.ExecutionPluginJobSpecConfig
-	offRampConfig ccipdata.OffRampStaticConfig
+	offRampConfig cciptypes.OffRampStaticConfig
 	offRampReader ccipdata.OffRampReader
 	sourceChain   legacyevm.Chain
 	destChain     legacyevm.Chain
@@ -276,7 +286,7 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 	}
 
 	versionFinder := factory.NewEvmVersionFinder()
-	offRampAddress := common.HexToAddress(spec.ContractID)
+	offRampAddress := ccipcalc.HexToAddress(spec.ContractID)
 	offRampReader, err := factory.NewOffRampReader(lggr, versionFinder, offRampAddress, destChain.Client(), destChain.LogPoller(), destChain.GasEstimator(), registerFilters, qopts...)
 	if err != nil {
 		return nil, errors.Wrap(err, "create offRampReader")
@@ -304,4 +314,8 @@ func extractJobSpecParams(lggr logger.Logger, jb job.Job, chainSet legacyevm.Leg
 		sourceChain:   sourceChain,
 		destChain:     destChain,
 	}, nil
+}
+
+func jobIDToString(id int32) string {
+	return fmt.Sprintf("job_%d", id)
 }

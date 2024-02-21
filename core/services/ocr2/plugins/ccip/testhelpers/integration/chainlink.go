@@ -35,6 +35,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/loop"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/mailbox"
 
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	v2 "github.com/smartcontractkit/chainlink/v2/core/chains/evm/config/toml"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -553,8 +555,10 @@ func (c *CCIPIntegrationTestHarness) CreatePricesPipeline(t *testing.T) (string,
 		_, err := w.Write([]byte(`{"UsdPerETH": "1700000000000000000000"}`))
 		require.NoError(t, err)
 	}))
-	wrapped, err1 := c.Source.Router.GetWrappedNative(nil)
-	require.NoError(t, err1)
+	sourceWrappedNative, err := c.Source.Router.GetWrappedNative(nil)
+	require.NoError(t, err)
+	destWrappedNative, err := c.Dest.Router.GetWrappedNative(nil)
+	require.NoError(t, err)
 	tokenPricesUSDPipeline := fmt.Sprintf(`
 // Price 1
 link [type=http method=GET url="%s"];
@@ -563,8 +567,8 @@ link->link_parse;
 eth [type=http method=GET url="%s"];
 eth_parse [type=jsonparse path="UsdPerETH"];
 eth->eth_parse;
-merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse)}"];`,
-		linkUSD.URL, ethUSD.URL, c.Dest.LinkToken.Address(), wrapped)
+merge [type=merge left="{}" right="{\\\"%s\\\":$(link_parse), \\\"%s\\\":$(eth_parse), \\\"%s\\\":$(eth_parse)}"];`,
+		linkUSD.URL, ethUSD.URL, c.Dest.LinkToken.Address(), sourceWrappedNative, destWrappedNative)
 
 	return tokenPricesUSDPipeline, linkUSD, ethUSD
 }
@@ -781,7 +785,7 @@ func (c *CCIPIntegrationTestHarness) EventuallyExecutionStateChangedToSuccess(t 
 		it, err := offRamp.FilterExecutionStateChanged(&bind.FilterOpts{Start: blockNum}, seqNum, [][32]byte{})
 		require.NoError(t, err)
 		for it.Next() {
-			if ccipdata.MessageExecutionState(it.Event.State) == ccipdata.ExecutionStateSuccess {
+			if cciptypes.MessageExecutionState(it.Event.State) == cciptypes.ExecutionStateSuccess {
 				t.Logf("ExecutionStateChanged event found for seqNum %d", it.Event.SequenceNumber)
 				return true
 			}

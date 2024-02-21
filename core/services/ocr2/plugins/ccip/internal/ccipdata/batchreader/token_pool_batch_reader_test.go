@@ -2,16 +2,18 @@ package batchreader
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
@@ -24,11 +26,12 @@ func TestTokenPoolFactory(t *testing.T) {
 	remoteChainSelector := uint64(2000)
 	batchCallerMock := rpclibmocks.NewEvmBatchCaller(t)
 
-	tokenPoolBatchReader := NewEVMTokenPoolBatchedReader(lggr, remoteChainSelector, offRamp, batchCallerMock)
+	tokenPoolBatchReader, err := NewEVMTokenPoolBatchedReader(lggr, remoteChainSelector, ccipcalc.EvmAddrToGeneric(offRamp), batchCallerMock)
+	assert.NoError(t, err)
 
 	poolTypes := []string{"BurnMint", "LockRelease"}
 
-	rateLimits := ccipdata.TokenBucketRateLimit{
+	rateLimits := cciptypes.TokenBucketRateLimit{
 		Tokens:      big.NewInt(333333),
 		LastUpdated: 33,
 		IsEnabled:   true,
@@ -37,16 +40,23 @@ func TestTokenPoolFactory(t *testing.T) {
 	}
 
 	for _, versionStr := range []string{ccipdata.V1_0_0, ccipdata.V1_1_0, ccipdata.V1_2_0, ccipdata.V1_4_0} {
-		gotRateLimits, err := tokenPoolBatchReader.GetInboundTokenPoolRateLimits(ctx, []common.Address{})
+		gotRateLimits, err := tokenPoolBatchReader.GetInboundTokenPoolRateLimits(ctx, []cciptypes.Address{})
 		require.NoError(t, err)
 		assert.Empty(t, gotRateLimits)
 
 		var batchCallResult []rpclib.DataAndErr
 		for _, poolType := range poolTypes {
-			batchCallResult = append(batchCallResult, rpclib.DataAndErr{
-				Outputs: []any{poolType + " " + versionStr},
-				Err:     nil,
-			})
+			if versionStr == ccipdata.V1_0_0 {
+				// simulating the behaviour for 1.0.0 pools where typeAndVersion method does not exist
+				batchCallResult = append(batchCallResult, rpclib.DataAndErr{
+					Err: fmt.Errorf("unpack result: %w", rpclib.ErrEmptyOutput),
+				})
+			} else {
+				batchCallResult = append(batchCallResult, rpclib.DataAndErr{
+					Outputs: []any{poolType + " " + versionStr},
+					Err:     nil,
+				})
+			}
 		}
 
 		batchCallerMock.On("BatchCall", ctx, uint64(0), mock.Anything).Return(batchCallResult, nil).Once()
@@ -58,10 +68,10 @@ func TestTokenPoolFactory(t *testing.T) {
 			Err:     nil,
 		}}, nil).Once()
 
-		var poolAddresses []common.Address
+		var poolAddresses []cciptypes.Address
 
 		for i := 0; i < len(poolTypes); i++ {
-			poolAddresses = append(poolAddresses, utils.RandomAddress())
+			poolAddresses = append(poolAddresses, ccipcalc.EvmAddrToGeneric(utils.RandomAddress()))
 		}
 
 		gotRateLimits, err = tokenPoolBatchReader.GetInboundTokenPoolRateLimits(ctx, poolAddresses)
