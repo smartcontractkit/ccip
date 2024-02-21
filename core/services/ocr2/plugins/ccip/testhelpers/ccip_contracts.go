@@ -53,15 +53,15 @@ import (
 
 var (
 	// Source
-	SourcePool   = "source pool"
-	SourcePrices = "source prices"
-	OnRamp       = "onramp"
-	OnRampNative = "onramp-native"
-	SourceRouter = "source router"
+	SourcePool          = "source Link pool"
+	SourcePriceRegistry = "source PriceRegistry"
+	OnRamp              = "onramp"
+	OnRampNative        = "onramp-native"
+	SourceRouter        = "source router"
 
 	// Dest
 	OffRamp  = "offramp"
-	DestPool = "dest pool"
+	DestPool = "dest Link pool"
 
 	Receiver            = "receiver"
 	Sender              = "sender"
@@ -181,7 +181,7 @@ type Common struct {
 	User              *bind.TransactOpts
 	Chain             *backends.SimulatedBackend
 	LinkToken         *link_token_interface.LinkToken
-	Pool              *lock_release_token_pool.LockReleaseTokenPool
+	LinkTokenPool     *lock_release_token_pool.LockReleaseTokenPool
 	CustomPool        *custom_token_pool.CustomTokenPool
 	CustomToken       *link_token_interface.LinkToken
 	WrappedNative     *weth9.WETH9
@@ -254,8 +254,8 @@ func (c *CCIPContracts) DeployNewOffRamp(t *testing.T) {
 			PrevOffRamp:         prevOffRamp,
 			ArmProxy:            c.Dest.ARMProxy.Address(),
 		},
-		[]common.Address{c.Source.LinkToken.Address()}, // source tokens
-		[]common.Address{c.Dest.Pool.Address()},        // pools
+		[]common.Address{c.Source.LinkToken.Address()},   // source tokens
+		[]common.Address{c.Dest.LinkTokenPool.Address()}, // pools
 		evm_2_evm_offramp.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  LinkUSDValue(100),
@@ -328,7 +328,7 @@ func (c *CCIPContracts) DeployNewOnRamp(t *testing.T) {
 		[]evm_2_evm_onramp.InternalPoolUpdate{
 			{
 				Token: c.Source.LinkToken.Address(),
-				Pool:  c.Source.Pool.Address(),
+				Pool:  c.Source.LinkTokenPool.Address(),
 			},
 		},
 		evm_2_evm_onramp.RateLimiterConfig{
@@ -1166,6 +1166,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	require.NoError(t, err)
 
 	_, err = destWrappedPool.ApplyRampUpdates(destUser,
+		[]lock_release_token_pool_1_0_0.TokenPoolRampUpdate{},
 		[]lock_release_token_pool_1_0_0.TokenPoolRampUpdate{{
 			Ramp:    offRampAddress,
 			Allowed: true,
@@ -1175,7 +1176,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 				Rate:      big.NewInt(1e18),
 			},
 		}},
-		[]lock_release_token_pool_1_0_0.TokenPoolRampUpdate{},
 	)
 	require.NoError(t, err)
 
@@ -1210,7 +1210,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			User:              sourceUser,
 			Chain:             sourceChain,
 			LinkToken:         sourceLinkToken,
-			Pool:              sourcePool,
+			LinkTokenPool:     sourcePool,
 			CustomPool:        nil,
 			CustomToken:       sourceCustomToken,
 			ARM:               sourceARM,
@@ -1229,7 +1229,7 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			User:              destUser,
 			Chain:             destChain,
 			LinkToken:         destLinkToken,
-			Pool:              destPool,
+			LinkTokenPool:     destPool,
 			CustomPool:        nil,
 			CustomToken:       destCustomToken,
 			ARM:               destARM,
@@ -1271,7 +1271,7 @@ func (c *CCIPContracts) AssertExecState(t *testing.T, log logpoller.Log, state M
 	executionStateChanged, err := offRamp.ParseExecutionStateChanged(log.ToGethLog())
 	require.NoError(t, err)
 	if MessageExecutionState(executionStateChanged.State) != state {
-		t.Log("Execution failed")
+		t.Log("Execution failed", hexutil.Encode(executionStateChanged.ReturnData))
 		t.Fail()
 	}
 }

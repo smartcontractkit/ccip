@@ -117,15 +117,15 @@ func TestIntegration_CCIP(t *testing.T) {
 				require.NoError(t, err2)
 
 				sourceBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
-					{Name: testhelpers.SourcePool, Addr: ccipTH.Source.Pool.Address(), Getter: ccipTH.GetSourceLinkBalance},
+					{Name: testhelpers.SourcePool, Addr: ccipTH.Source.LinkTokenPool.Address(), Getter: ccipTH.GetSourceLinkBalance},
 					{Name: testhelpers.OnRamp, Addr: ccipTH.Source.OnRamp.Address(), Getter: ccipTH.GetSourceLinkBalance},
 					{Name: testhelpers.SourceRouter, Addr: ccipTH.Source.Router.Address(), Getter: ccipTH.GetSourceLinkBalance},
-					{Name: testhelpers.SourcePrices, Addr: ccipTH.Source.PriceRegistry.Address(), Getter: ccipTH.GetSourceLinkBalance},
+					{Name: testhelpers.SourcePriceRegistry, Addr: ccipTH.Source.PriceRegistry.Address(), Getter: ccipTH.GetSourceLinkBalance},
 				})
 				require.NoError(t, err2)
 				destBalances, err2 := testhelpers.GetBalances(t, []testhelpers.BalanceReq{
 					{Name: testhelpers.Receiver, Addr: ccipTH.Dest.Receivers[0].Receiver.Address(), Getter: ccipTH.GetDestLinkBalance},
-					{Name: testhelpers.DestPool, Addr: ccipTH.Dest.Pool.Address(), Getter: ccipTH.GetDestLinkBalance},
+					{Name: testhelpers.DestPool, Addr: ccipTH.Dest.LinkTokenPool.Address(), Getter: ccipTH.GetDestLinkBalance},
 					{Name: testhelpers.OffRamp, Addr: ccipTH.Dest.OffRamp.Address(), Getter: ccipTH.GetDestLinkBalance},
 				})
 				require.NoError(t, err2)
@@ -180,21 +180,21 @@ func TestIntegration_CCIP(t *testing.T) {
 				ccipTH.AssertBalances(t, []testhelpers.BalanceAssertion{
 					{
 						Name:     testhelpers.SourcePool,
-						Address:  ccipTH.Source.Pool.Address(),
+						Address:  ccipTH.Source.LinkTokenPool.Address(),
 						Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePool], tokenAmount.String()).String(),
 						Getter:   ccipTH.GetSourceLinkBalance,
 					},
 					{
-						Name:     testhelpers.SourcePrices,
+						Name:     testhelpers.SourcePriceRegistry,
 						Address:  ccipTH.Source.PriceRegistry.Address(),
-						Expected: sourceBalances[testhelpers.SourcePrices].String(),
+						Expected: sourceBalances[testhelpers.SourcePriceRegistry].String(),
 						Getter:   ccipTH.GetSourceLinkBalance,
 					},
 					{
 						// Fees end up in the onramp.
 						Name:     testhelpers.OnRamp,
 						Address:  ccipTH.Source.OnRamp.Address(),
-						Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePrices], fee.String()).String(),
+						Expected: testhelpers.MustAddBigInt(sourceBalances[testhelpers.SourcePriceRegistry], fee.String()).String(),
 						Getter:   ccipTH.GetSourceLinkBalance,
 					},
 					{
@@ -203,8 +203,6 @@ func TestIntegration_CCIP(t *testing.T) {
 						Expected: sourceBalances[testhelpers.SourceRouter].String(),
 						Getter:   ccipTH.GetSourceLinkBalance,
 					},
-				})
-				ccipTH.AssertBalances(t, []testhelpers.BalanceAssertion{
 					{
 						Name:     testhelpers.Receiver,
 						Address:  ccipTH.Dest.Receivers[0].Receiver.Address(),
@@ -213,7 +211,7 @@ func TestIntegration_CCIP(t *testing.T) {
 					},
 					{
 						Name:     testhelpers.DestPool,
-						Address:  ccipTH.Dest.Pool.Address(),
+						Address:  ccipTH.Dest.LinkTokenPool.Address(),
 						Expected: testhelpers.MustSubBigInt(destBalances[testhelpers.DestPool], tokenAmount.String()).String(),
 						Getter:   ccipTH.GetDestLinkBalance,
 					},
