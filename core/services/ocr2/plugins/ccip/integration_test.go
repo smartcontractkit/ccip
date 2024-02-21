@@ -93,6 +93,10 @@ func TestIntegration_CCIP(t *testing.T) {
 							ChainID:                   ccipTH.Dest.ChainID,
 							AggregatorContractAddress: aggDstLnkAddr,
 						},
+						ccipTH.Dest.WrappedNative.Address(): {
+							ChainID:                   ccipTH.Dest.ChainID,
+							AggregatorContractAddress: aggDstLnkAddr,
+						},
 					},
 					StaticPrices: map[common.Address]config.StaticPriceConfig{},
 				}
