@@ -416,6 +416,31 @@ func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 	c.Dest.Chain.Commit()
 	c.Dest.PriceRegistry, err = price_registry.NewPriceRegistry(destPricesAddress, c.Dest.Chain)
 	require.NoError(t, err)
+
+	priceUpdates := price_registry.InternalPriceUpdates{
+		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
+			{
+				SourceToken: c.Dest.LinkToken.Address(),
+				UsdPerToken: big.NewInt(8e18), // 8usd
+			},
+			{
+				SourceToken: c.Dest.WrappedNative.Address(),
+				UsdPerToken: big.NewInt(1e18), // 1usd
+			},
+		},
+		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
+			{
+				DestChainSelector: c.Source.ChainSelector,
+				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+			},
+		},
+	}
+	_, err = c.Dest.PriceRegistry.UpdatePrices(c.Dest.User, priceUpdates)
+	require.NoError(t, err)
+
+	c.Source.Chain.Commit()
+	c.Dest.Chain.Commit()
+
 	t.Logf("New Price Registry deployed at %s", destPricesAddress.String())
 }
 
