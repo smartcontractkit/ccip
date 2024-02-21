@@ -1212,6 +1212,21 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 		}},
 	)
 	require.NoError(t, err)
+
+	_, err = destWrappedPool.ApplyRampUpdates(destUser,
+		[]lock_release_token_pool_1_0_0.TokenPoolRampUpdate{{
+			Ramp:    offRampAddress,
+			Allowed: true,
+			RateLimiterConfig: lock_release_token_pool_1_0_0.RateLimiterConfig{
+				IsEnabled: true,
+				Capacity:  HundredLink,
+				Rate:      big.NewInt(1e18),
+			},
+		}},
+		[]lock_release_token_pool_1_0_0.TokenPoolRampUpdate{},
+	)
+	require.NoError(t, err)
+
 	destChain.Commit()
 	_, err = destPriceRegistry.ApplyPriceUpdatersUpdates(destUser, []common.Address{commitStoreAddress}, []common.Address{})
 	require.NoError(t, err)
