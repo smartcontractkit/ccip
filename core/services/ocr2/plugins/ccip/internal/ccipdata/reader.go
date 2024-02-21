@@ -25,7 +25,7 @@ const (
 	// Commit still can reach to older logs in case of outage. For instance, in case of RMN curse on chain,
 	// we might have logs waiting in OnRamp to be committed first. In case of outage taking day days we still would
 	// be able to bring back processing without replaying any events from chain.
-	CommitExecLogsRetention = 21 * 24 * time.Hour // 21 days
+	CommitExecLogsRetention = 30 * 24 * time.Hour // 30 days
 	// CacheEvictionLogsRetention defines the duration for which logs used for caching on-chain data are kept.
 	// Restarting node clears the cache entirely and rebuilds it from scratch by fetching data from chain,
 	// so we don't need to keep these logs for very long. All events relying on cache.NewLogpollerEventsBased should use this retention.
