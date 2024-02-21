@@ -417,30 +417,6 @@ func (c *CCIPContracts) DeployNewPriceRegistry(t *testing.T) {
 	c.Dest.PriceRegistry, err = price_registry.NewPriceRegistry(destPricesAddress, c.Dest.Chain)
 	require.NoError(t, err)
 	t.Logf("New Price Registry deployed at %s", destPricesAddress.String())
-
-	priceUpdates := price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: c.Dest.LinkToken.Address(),
-				UsdPerToken: big.NewInt(8e18), // 8usd
-			},
-			{
-				SourceToken: c.Dest.WrappedNative.Address(),
-				UsdPerToken: big.NewInt(1e18), // 1usd
-			},
-		},
-		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
-			{
-				DestChainSelector: c.Source.ChainSelector,
-				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-			},
-		},
-	}
-	_, err = c.Dest.PriceRegistry.UpdatePrices(c.Dest.User, priceUpdates)
-	require.NoError(t, err)
-
-	c.Source.Chain.Commit()
-	c.Dest.Chain.Commit()
 }
 
 func (c *CCIPContracts) SetNopsOnRamp(t *testing.T, nopsAndWeights []evm_2_evm_onramp.EVM2EVMOnRampNopAndWeight) {
@@ -692,25 +668,21 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		return [20]byte{}, nil, err
 	}
 
-	// native token is used as fee token
+	//native token is used as fee token
 	_, err = c.Source.PriceRegistry.UpdatePrices(c.Source.User, price_registry.InternalPriceUpdates{
 		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 			{
-				SourceToken: wrappedNativeAddress,
-				UsdPerToken: big.NewInt(1e18), // 1usd
+				SourceToken: sourceTokenAddress,
+				UsdPerToken: big.NewInt(5),
 			},
 		},
-		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
-			{
-				DestChainSelector: c.Dest.ChainSelector,
-				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9,
-			},
-		},
+		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{},
 	})
 	if err != nil {
 		return [20]byte{}, nil, err
 	}
 	c.Source.Chain.Commit()
+
 	_, err = c.Source.PriceRegistry.ApplyFeeTokensUpdates(c.Source.User, []common.Address{wrappedNativeAddress}, nil)
 	if err != nil {
 		return [20]byte{}, nil, err
@@ -728,48 +700,10 @@ func (c *CCIPContracts) SetupLockAndMintTokenPool(
 		return [20]byte{}, nil, err
 	}
 
-	_, err = c.Source.PriceRegistry.UpdatePrices(c.Source.User, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: sourceTokenAddress,
-				UsdPerToken: big.NewInt(5),
-			},
-		},
-		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
-			{
-				DestChainSelector: c.Source.ChainSelector,
-				UsdPerUnitGas:     big.NewInt(0),
-			},
-		},
-	})
-	if err != nil {
-		return [20]byte{}, nil, err
-	}
-	c.Source.Chain.Commit()
-
 	_, err = c.Dest.OffRamp.ApplyPoolUpdates(c.Dest.User, nil, []evm_2_evm_offramp.InternalPoolUpdate{
 		{
 			Token: sourceTokenAddress,
 			Pool:  destPoolAddress,
-		},
-	})
-	if err != nil {
-		return [20]byte{}, nil, err
-	}
-	c.Dest.Chain.Commit()
-
-	_, err = c.Dest.PriceRegistry.UpdatePrices(c.Dest.User, price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{
-				SourceToken: destPoolAddress,
-				UsdPerToken: big.NewInt(5),
-			},
-		},
-		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
-			{
-				DestChainSelector: 0,
-				UsdPerUnitGas:     big.NewInt(0),
-			},
 		},
 	})
 	if err != nil {
@@ -944,26 +878,24 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	srcPriceRegistry, err := price_registry.NewPriceRegistry(sourcePricesAddress, sourceChain)
 	require.NoError(t, err)
 
-	prices := price_registry.InternalPriceUpdates{
+	_, err = srcPriceRegistry.UpdatePrices(sourceUser, price_registry.InternalPriceUpdates{
 		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
 			{
 				SourceToken: sourceLinkTokenAddress,
-				UsdPerToken: big.NewInt(8e18), // 8usd
+				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(20)),
 			},
 			{
 				SourceToken: sourceWeth9addr,
-				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2)), // TODO make this 2000USD and once we figure out the fee and exec cost discrepancy
+				UsdPerToken: new(big.Int).Mul(big.NewInt(1e18), big.NewInt(2000)),
 			},
 		},
 		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
 			{
 				DestChainSelector: destChainSelector,
-				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
+				UsdPerUnitGas:     big.NewInt(20000e9),
 			},
 		},
-	}
-
-	_, err = srcPriceRegistry.UpdatePrices(sourceUser, prices)
+	})
 	require.NoError(t, err)
 
 	onRampAddress, _, _, err := evm_2_evm_onramp.DeployEVM2EVMOnRamp(
@@ -1136,23 +1068,6 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 	)
 	require.NoError(t, err)
 	destPriceRegistry, err := price_registry.NewPriceRegistry(destPricesAddress, destChain)
-	require.NoError(t, err)
-
-	destPrices := price_registry.InternalPriceUpdates{
-		TokenPriceUpdates: []price_registry.InternalTokenPriceUpdate{
-			{SourceToken: destLinkTokenAddress, UsdPerToken: big.NewInt(8e18)},   // 8usd
-			{SourceToken: destCustomTokenAddress, UsdPerToken: big.NewInt(5e18)}, // 5usd
-			{SourceToken: destWeth9addr, UsdPerToken: big.NewInt(2e18)},          // 2usd
-		},
-		GasPriceUpdates: []price_registry.InternalGasPriceUpdate{
-			{
-				DestChainSelector: sourceChainSelector,
-				UsdPerUnitGas:     big.NewInt(2000e9), // $2000 per eth * 1gwei = 2000e9
-			},
-		},
-	}
-
-	_, err = destPriceRegistry.UpdatePrices(destUser, destPrices)
 	require.NoError(t, err)
 
 	// Deploy commit store.
