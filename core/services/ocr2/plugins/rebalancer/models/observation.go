@@ -31,17 +31,20 @@ type Observation struct {
 	ResolvedTransfers []Transfer
 	// PendingTransfers are transfers that are in one of the TransferStatus states.
 	PendingTransfers []PendingTransfer
+	// InflightTransfers are transfers that are currently inflight to be executed onchain.
+	InflightTransfers []Transfer
 	// Edges are the edges of the rebalancer graph.
 	Edges []Edge
 	// ConfigDigests contains the config digests for each chain and rebalancer.
 	ConfigDigests []ConfigDigestWithMeta
 }
 
-func NewObservation(liqPerChain []NetworkLiquidity, resolvedTransfers []Transfer, pendingTransfers []PendingTransfer, edges []Edge, configDigests []ConfigDigestWithMeta) Observation {
+func NewObservation(liqPerChain []NetworkLiquidity, resolvedTransfers []Transfer, pendingTransfers []PendingTransfer, inflightTransfers []Transfer, edges []Edge, configDigests []ConfigDigestWithMeta) Observation {
 	return Observation{
 		LiquidityPerChain: liqPerChain,
 		PendingTransfers:  pendingTransfers,
 		ResolvedTransfers: resolvedTransfers,
+		InflightTransfers: inflightTransfers,
 		Edges:             edges,
 		ConfigDigests:     configDigests,
 	}
@@ -77,6 +80,9 @@ type Outcome struct {
 	// Depending on their state they may be ready to execute onchain.
 	PendingTransfers []PendingTransfer
 
+	// These are transfers that are currently inflight to be executed onchain.
+	InflightTransfers []Transfer
+
 	// ConfigDigests contains the config digests for each chain and rebalancer.
 	ConfigDigests []ConfigDigestWithMeta
 }
@@ -85,12 +91,14 @@ func NewOutcome(
 	proposedTransfers []ProposedTransfer,
 	resolvedTransfers []Transfer,
 	pendingTransfers []PendingTransfer,
+	inflightTransfers []Transfer,
 	configDigests []ConfigDigestWithMeta,
 ) Outcome {
 	return Outcome{
 		ProposedTransfers: proposedTransfers,
 		ResolvedTransfers: resolvedTransfers,
 		PendingTransfers:  pendingTransfers,
+		InflightTransfers: inflightTransfers,
 		ConfigDigests:     configDigests,
 	}
 }

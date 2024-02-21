@@ -24,6 +24,10 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
+const (
+	cacheExpiryTime = 1 * time.Minute
+)
+
 type Plugin struct {
 	f                       int
 	rootNetwork             models.NetworkSelector
@@ -35,6 +39,7 @@ type Plugin struct {
 	mu                      sync.RWMutex
 	rebalancerGraph         graph.Graph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
+	inflightCache           InflightCache
 	lggr                    logger.Logger
 }
 
@@ -61,6 +66,7 @@ func NewPlugin(
 		liquidityRebalancer:     liquidityRebalancer,
 		lggr:                    lggr,
 		mu:                      sync.RWMutex{},
+		inflightCache:           NewInflightCache(cacheExpiryTime),
 	}
 }
 
@@ -72,6 +78,10 @@ func (p *Plugin) Query(_ context.Context, outcomeCtx ocr3types.OutcomeContext) (
 func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeContext, _ ocrtypes.Query) (ocrtypes.Observation, error) {
 	lggr := p.lggr.With("seqNr", outcomeCtx.SeqNr, "phase", "Observation")
 	lggr.Infow("in observation", "seqNr", outcomeCtx.SeqNr)
+
+	p.inflightCache.Expire(lggr)
+
+	inflight := p.inflightCache.Get()
 
 	if err := p.syncGraphEdges(ctx); err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph edges: %w", err)
@@ -115,9 +125,10 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		"pendingTransfers", pendingTransfers,
 		"edges", edges,
 		"resolvedTransfers", resolvedTransfers,
+		"inflight", inflight,
 	)
 
-	return models.NewObservation(networkLiquidities, resolvedTransfers, pendingTransfers, edges, configDigests).Encode(), nil
+	return models.NewObservation(networkLiquidities, resolvedTransfers, pendingTransfers, inflight, edges, configDigests).Encode(), nil
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
@@ -153,27 +164,36 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 	}
 
 	// Come to a consensus based on the observations of all the different nodes.
-	medianLiquidityPerChain := p.computeMedianLiquidityPerChain(observations)
-	graphEdges := p.computeGraphEdgesConsensus(observations)
-	pendingTransfers, err := p.computePendingTransfersConsensus(observations)
+	medianLiquidityPerChain := computeMedianLiquidityPerChain(observations)
+	graphEdges := computeGraphEdgesConsensus(observations, p.f)
+
+	pendingTransfers, err := computePendingTransfersConsensus(observations, p.f)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("compute pending transfers consensus: %w", err)
 	}
-	configDigests, err := p.computeConfigDigestsConsensus(observations)
+
+	configDigests, err := computeConfigDigestsConsensus(observations, p.f)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("compute config digests consensus: %w", err)
 	}
 
 	// Compute a new graph with the median liquidities and the edges of the quorum of nodes.
-	g, err := p.computeMedianGraph(graphEdges, medianLiquidityPerChain)
+	g, err := computeMedianGraph(lggr, graphEdges, medianLiquidityPerChain)
 	if err != nil {
 		return nil, fmt.Errorf("compute median graph: %w", err)
 	}
 
-	resolvedTransfersQuorum, err := p.computeResolvedTransfersQuorum(observations)
+	resolvedTransfersQuorum, err := computeResolvedTransfersQuorum(lggr, observations, p.f, p.bridgeFactory)
 	if err != nil {
 		return nil, fmt.Errorf("compute resolved transfers quorum: %w", err)
 	}
+
+	inflightQuorum, err := computeInflightTransfersQuorum(lggr, observations, p.f)
+	if err != nil {
+		return nil, fmt.Errorf("compute inflight transfers quorum: %w", err)
+	}
+
+	pendingTransfers = removeInflightTransfers(lggr, pendingTransfers, inflightQuorum)
 
 	lggr.Infow("computing transfers to reach balance",
 		"pendingTransfers", pendingTransfers,
@@ -181,17 +201,19 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		"resolvedTransfersQuorum", resolvedTransfersQuorum,
 	)
 	inflightTransfers := append(pendingTransfers, toPending(resolvedTransfersQuorum)...)
+	inflightTransfers = append(inflightTransfers, toPending(inflightQuorum)...)
 	proposedTransfers, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, inflightTransfers)
 	if err != nil {
 		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
 	}
 
-	outcome := models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers, configDigests).Encode()
+	outcome := models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers, inflightQuorum, configDigests).Encode()
 	lggr.Infow("finished computing outcome",
 		"medianLiquidityPerChain", medianLiquidityPerChain,
 		"pendingTransfers", pendingTransfers,
 		"proposedTransfers", proposedTransfers,
 		"resolvedTransfers", resolvedTransfersQuorum,
+		"inflightTransfers", inflightTransfers,
 		"outcomeEncoded", outcome,
 	)
 
@@ -310,7 +332,8 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 		"transfers", len(report.Transfers),
 		"sendInstructions", instructions.SendLiquidityParams,
 		"receiveInstructions", instructions.ReceiveLiquidityParams)
-	// todo: check if reportMeta.transfers are valid
+
+	p.inflightCache.Add(lggr, report.Transfers)
 
 	return true, nil
 }
@@ -541,205 +564,6 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 	}
 
 	return pendingTransfers, nil
-}
-
-func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observation) []models.NetworkLiquidity {
-	liqObsPerChain := make(map[models.NetworkSelector][]*big.Int)
-	for _, ob := range observations {
-		for _, chainLiq := range ob.LiquidityPerChain {
-			liqObsPerChain[chainLiq.Network] = append(liqObsPerChain[chainLiq.Network], chainLiq.Liquidity.ToInt())
-		}
-	}
-
-	medians := make([]models.NetworkLiquidity, 0, len(liqObsPerChain))
-	for chainID, liqs := range liqObsPerChain {
-		medians = append(medians, models.NewNetworkLiquidity(chainID, bigIntSortedMiddle(liqs)))
-	}
-	// sort by network id for deterministic results
-	sort.Slice(medians, func(i, j int) bool {
-		return medians[i].Network < medians[j].Network
-	})
-	return medians
-}
-
-func (p *Plugin) computePendingTransfersConsensus(observations []models.Observation) ([]models.PendingTransfer, error) {
-	eventFromHash := make(map[[32]byte]models.PendingTransfer)
-	counts := make(map[[32]byte]int)
-	for _, obs := range observations {
-		for _, tr := range obs.PendingTransfers {
-			h, err := tr.Hash()
-			if err != nil {
-				return nil, fmt.Errorf("hash %v: %w", tr, err)
-			}
-			counts[h]++
-			eventFromHash[h] = tr
-		}
-	}
-
-	var quorumEvents []models.PendingTransfer
-	for h, count := range counts {
-		if count >= p.f+1 {
-			ev, exists := eventFromHash[h]
-			if !exists {
-				return nil, fmt.Errorf("internal issue, event from hash %v not found", h)
-			}
-			quorumEvents = append(quorumEvents, ev)
-		}
-	}
-
-	return quorumEvents, nil
-}
-
-func (p *Plugin) computeConfigDigestsConsensus(observations []models.Observation) ([]models.ConfigDigestWithMeta, error) {
-	key := func(meta models.ConfigDigestWithMeta) string {
-		return fmt.Sprintf("%d-%s-%s", meta.NetworkSel, meta.RebalancerAddr, meta.Digest.Hex())
-	}
-	counts := make(map[string]int)
-	cds := make(map[string]models.ConfigDigestWithMeta)
-	for _, obs := range observations {
-		for _, cd := range obs.ConfigDigests {
-			k := key(cd)
-			counts[k]++
-			if counts[k] == 1 {
-				cds[k] = cd
-			}
-		}
-	}
-
-	var quorumCds []models.ConfigDigestWithMeta
-	for k, count := range counts {
-		if count >= p.f+1 {
-			cd, exists := cds[k]
-			if !exists {
-				return nil, fmt.Errorf("internal issue, config digest by key %s not found", k)
-			}
-			quorumCds = append(quorumCds, cd)
-		}
-	}
-
-	// sort by network id for deterministic results
-	sort.Slice(quorumCds, func(i, j int) bool {
-		return quorumCds[i].NetworkSel < quorumCds[j].NetworkSel
-	})
-
-	return quorumCds, nil
-}
-
-func (p *Plugin) computeGraphEdgesConsensus(observations []models.Observation) []models.Edge {
-	counts := make(map[models.Edge]int)
-	for _, obs := range observations {
-		for _, edge := range obs.Edges {
-			counts[edge]++
-		}
-	}
-
-	var quorumEdges []models.Edge
-	for edge, count := range counts {
-		if count >= p.f+1 {
-			quorumEdges = append(quorumEdges, edge)
-		}
-	}
-
-	return quorumEdges
-}
-
-// computeMedianGraph computes a graph with the provided median liquidities per chain and edges that quorum agreed on.
-func (p *Plugin) computeMedianGraph(
-	edges []models.Edge, medianLiquidities []models.NetworkLiquidity) (graph.Graph, error) {
-
-	g, err := graph.NewGraphFromEdges(edges)
-	if err != nil {
-		return nil, fmt.Errorf("new graph from edges: %w", err)
-	}
-
-	for _, medianLiq := range medianLiquidities {
-		if !g.SetLiquidity(medianLiq.Network, medianLiq.Liquidity.ToInt()) {
-			p.lggr.Errorw("median liquidity on network not found on edges quorum", "net", medianLiq.Network)
-		}
-	}
-
-	return g, nil
-}
-
-func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observation) ([]models.Transfer, error) {
-	// assumption: there shouldn't be more than 1 transfer for a (from, to) pair from a single oracle's observation.
-	// otherwise they can be collapsed into a single transfer.
-	// TODO: we can check for this in ValidateObservation
-	type key struct {
-		From               models.NetworkSelector
-		To                 models.NetworkSelector
-		AmountString       string
-		Sender             models.Address
-		Receiver           models.Address
-		LocalTokenAddress  models.Address
-		RemoteTokenAddress models.Address
-	}
-	counts := make(map[key][]models.Transfer)
-	for _, obs := range observations {
-		p.lggr.Debugw("observed transfers", "transfers", obs.ResolvedTransfers)
-		for _, tr := range obs.ResolvedTransfers {
-			p.lggr.Debugw("inserting resolved transfer into mapping", "transfer", tr)
-			k := key{
-				From:               tr.From,
-				To:                 tr.To,
-				AmountString:       tr.Amount.String(),
-				Sender:             tr.Sender,
-				Receiver:           tr.Receiver,
-				LocalTokenAddress:  tr.LocalTokenAddress,
-				RemoteTokenAddress: tr.RemoteTokenAddress,
-			}
-			counts[k] = append(counts[k], tr)
-		}
-	}
-
-	p.lggr.Debugw("resolved transfers counts", "counts", len(counts))
-
-	var quorumTransfers []models.Transfer
-	for k, transfers := range counts {
-		if len(transfers) >= p.f+1 {
-			p.lggr.Debugw("quorum reached on transfer", "transfer", k, "votes", len(transfers))
-			// need to compute the "medianized" bridge payload
-			// only the bridge knows how to do this so we need to delegate it to them
-			// the native bridge fee can also be medianized, no need for the bridge to do that
-			var (
-				bridgeFees     []*big.Int
-				bridgePayloads [][]byte
-				datesUnix      []*big.Int
-			)
-			for _, tr := range transfers {
-				bridgeFees = append(bridgeFees, tr.NativeBridgeFee.ToInt())
-				bridgePayloads = append(bridgePayloads, tr.BridgeData)
-				datesUnix = append(datesUnix, big.NewInt(tr.Date.Unix()))
-			}
-			medianizedNativeFee := bigIntSortedMiddle(bridgeFees)
-			medianizedDateUnix := bigIntSortedMiddle(datesUnix)
-			bridge, err := p.bridgeFactory.NewBridge(k.From, k.To)
-			if err != nil {
-				return nil, fmt.Errorf("init bridge: %w", err)
-			}
-			quorumizedBridgePayload, err := bridge.QuorumizedBridgePayload(bridgePayloads, p.f)
-			if err != nil {
-				return nil, fmt.Errorf("quorumized bridge payload: %w", err)
-			}
-			quorumTransfer := models.Transfer{
-				From:               k.From,
-				To:                 k.To,
-				Amount:             transfers[0].Amount,
-				Date:               time.Unix(medianizedDateUnix.Int64(), 0), // medianized, not in the key
-				Sender:             transfers[0].Sender,
-				Receiver:           transfers[0].Receiver,
-				LocalTokenAddress:  transfers[0].LocalTokenAddress,
-				RemoteTokenAddress: transfers[0].RemoteTokenAddress,
-				BridgeData:         quorumizedBridgePayload,       // "quorumized", not in the key
-				NativeBridgeFee:    ubig.New(medianizedNativeFee), // medianized, not in the key
-			}
-			quorumTransfers = append(quorumTransfers, quorumTransfer)
-		} else {
-			p.lggr.Debugw("dropping transfer, not enough votes on it", "transfer", k, "votes", len(transfers))
-		}
-	}
-
-	return quorumTransfers, nil
 }
 
 func (p *Plugin) resolveProposedTransfers(ctx context.Context, outcomeCtx ocr3types.OutcomeContext) ([]models.Transfer, error) {
