@@ -143,7 +143,11 @@ contract Rebalancer is IRebalancer, OCR3Base {
   /// @notice Finalizes liquidity from another chain.
   /// @dev This function is a public version of the internal _receiveLiquidity function.
   /// to allow the owner to also initiate a finalization when needed.
-  function receiveLiquidity(uint64 remoteChainSelector, uint256 amount, bytes calldata bridgeSpecificPayload) external {
+  function receiveLiquidity(
+    uint64 remoteChainSelector,
+    uint256 amount,
+    bytes calldata bridgeSpecificPayload
+  ) external onlyOwner {
     _receiveLiquidity(remoteChainSelector, amount, bridgeSpecificPayload, type(uint64).max);
   }
 
