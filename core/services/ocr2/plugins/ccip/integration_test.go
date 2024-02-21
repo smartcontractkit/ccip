@@ -58,7 +58,6 @@ func TestIntegration_CCIP(t *testing.T) {
 				tokenPricesUSDPipeline = testPricePipeline
 			} else {
 				// Set up a test price getter.
-
 				// Set up the aggregators here to avoid modifying ccipTH.
 				aggSrcNatAddr, _, aggSrcNat, err := mock_v3_aggregator_contract.DeployMockV3AggregatorContract(ccipTH.Source.User, ccipTH.Source.Chain, 18, big.NewInt(2e18))
 				require.NoError(t, err)

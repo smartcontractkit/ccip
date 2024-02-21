@@ -1184,8 +1184,8 @@ func SetupCCIPContracts(t *testing.T, sourceChainID, sourceChainSelector, destCh
 			PrevOffRamp:         common.HexToAddress(""),
 			ArmProxy:            armProxyDestAddress,
 		},
-		[]common.Address{sourceLinkTokenAddress},
-		[]common.Address{destPoolAddress},
+		[]common.Address{sourceLinkTokenAddress, sourceWeth9addr},
+		[]common.Address{destPoolAddress, destWrappedPool.Address()},
 		evm_2_evm_offramp.RateLimiterConfig{
 			IsEnabled: true,
 			Capacity:  LinkUSDValue(100),
