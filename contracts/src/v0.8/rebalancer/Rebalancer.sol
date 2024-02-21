@@ -45,12 +45,6 @@ contract Rebalancer is IRebalancer, OCR3Base {
     uint64 indexed ocrSeqNum,
     uint64 indexed remoteChainSelector,
     bytes bridgeSpecificData,
-    string reason
-  );
-  event RawFinalizationFailed(
-    uint64 indexed ocrSeqNum,
-    uint64 indexed remoteChainSelector,
-    bytes bridgeSpecificData,
     bytes reason
   );
 
@@ -146,6 +140,17 @@ contract Rebalancer is IRebalancer, OCR3Base {
     _rebalanceLiquidity(chainSelector, amount, nativeBridgeFee, type(uint64).max, bridgeSpecificPayload);
   }
 
+  /// @notice Finalizes liquidity from another chain.
+  /// @dev This function is a public version of the internal _receiveLiquidity function.
+  /// to allow the owner to also initiate a finalization when needed.
+  function receiveLiquidity(
+    uint64 remoteChainSelector,
+    uint256 amount,
+    bytes calldata bridgeSpecificPayload
+  ) external {
+    _receiveLiquidity(remoteChainSelector, amount, bridgeSpecificPayload, type(uint64).max);
+  }
+
   /// @notice Transfers liquidity to another chain.
   /// @dev Called by both the owner and the DON.
   function _rebalanceLiquidity(
@@ -210,14 +215,12 @@ contract Rebalancer is IRebalancer, OCR3Base {
       )
     {
       // successfully finalized the withdrawal
-    } catch Error(string memory reason) {
+    } catch (bytes memory lowLevelData) {
       // failed to finalize the withdrawal.
       // this could mean that the withdrawal was already finalized
       // or that the withdrawal failed.
       // we assume the former and continue
-      emit FinalizationFailed(ocrSeqNum, remoteChainSelector, bridgeSpecificPayload, reason);
-    } catch (bytes memory lowLevelData) {
-      emit RawFinalizationFailed(ocrSeqNum, remoteChainSelector, bridgeSpecificPayload, lowLevelData);
+      emit FinalizationFailed(ocrSeqNum, remoteChainSelector, bridgeSpecificPayload, lowLevelData);
     }
 
     // inject liquidity into the liquidity container
