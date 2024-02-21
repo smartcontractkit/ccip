@@ -14,9 +14,11 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
   using SafeERC20 for IERC20;
 
   error InsufficientLiquidity();
+  error NonceAlreadyUsed(uint256 nonce);
 
   IERC20 internal immutable i_token;
   uint256 internal s_nonce = 1;
+  mapping(uint256 => bool) internal s_nonceUsed;
 
   constructor(IERC20 token) {
     i_token = token;
@@ -60,7 +62,9 @@ contract MockL1BridgeAdapter is IBridgeAdapter, ILiquidityContainer {
     address localReceiver,
     bytes calldata bridgeSpecificPayload
   ) external {
-    (uint256 amount, ) = abi.decode(bridgeSpecificPayload, (uint256, uint256));
+    (uint256 amount, uint256 nonce) = abi.decode(bridgeSpecificPayload, (uint256, uint256));
+    if (s_nonceUsed[nonce]) revert NonceAlreadyUsed(nonce);
+    s_nonceUsed[nonce] = true;
     i_token.safeTransfer(localReceiver, amount);
   }
 }

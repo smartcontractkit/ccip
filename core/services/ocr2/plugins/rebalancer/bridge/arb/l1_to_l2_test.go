@@ -71,9 +71,9 @@ func Test_l1ToL2Bridge_QuorumizedBridgePayload(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				unpackedGot, err := UnpackSendBridgePayload(got)
+				unpackedGot, err := UnpackL1ToL2SendBridgePayload(got)
 				require.NoError(t, err)
-				unpackedExpected, err := UnpackSendBridgePayload(tt.want)
+				unpackedExpected, err := UnpackL1ToL2SendBridgePayload(tt.want)
 				require.NoError(t, err)
 				require.Equal(t, unpackedExpected.GasLimit, unpackedGot.GasLimit)
 				require.Equal(t, unpackedExpected.MaxSubmissionCost, unpackedGot.MaxSubmissionCost)
@@ -85,7 +85,7 @@ func Test_l1ToL2Bridge_QuorumizedBridgePayload(t *testing.T) {
 }
 
 func mustPackSendPayload(t *testing.T, gasLimit, maxSubmissionCost, maxFeePerGas *big.Int) []byte {
-	packed, err := PackSendBridgePayload(gasLimit, maxSubmissionCost, maxFeePerGas)
+	packed, err := PackL1ToL2SendBridgePayload(gasLimit, maxSubmissionCost, maxFeePerGas)
 	require.NoError(t, err)
 	return packed
 }

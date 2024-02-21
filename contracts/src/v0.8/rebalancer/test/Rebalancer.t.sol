@@ -118,10 +118,15 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     assertEq(s_l1Token.balanceOf(address(mockRemoteBridgeAdapter)), amount);
     assertEq(s_l1Token.allowance(address(s_rebalancer), address(s_bridgeAdapter)), 0);
 
-    mockRemoteRebalancer.rebalanceLiquidity(i_localChainSelector, amount, 0, bytes(""));
+    // attach a bridge fee and see the relevant adapter's ether balance change.
+    // the bridge fee is sent along with the sendERC20 call.
+    uint256 bridgeFee = 123;
+    vm.deal(address(mockRemoteRebalancer), bridgeFee);
+    mockRemoteRebalancer.rebalanceLiquidity(i_localChainSelector, amount, bridgeFee, bytes(""));
 
     assertEq(s_l1Token.balanceOf(address(s_bridgeAdapter)), amount);
     assertEq(s_l1Token.balanceOf(address(mockRemoteBridgeAdapter)), 0);
+    assertEq(address(s_bridgeAdapter).balance, bridgeFee);
 
     // Assert partial rebalancing works correctly
     s_rebalancer.rebalanceLiquidity(i_remoteChainSelector, amount / 2, 0, bytes(""));

@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/abstract_arbitrum_token_gateway"
-	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arb_node_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_gateway_router"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_inbox"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
@@ -31,51 +30,26 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_gateway"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
 )
 
-var (
-	// Multipliers to ensure our L1 -> L2 tx goes through
-	// These values match the arbitrum SDK
-	// TODO: should these be configurable?
-	l2BaseFeeMultiplier     = big.NewInt(3)
-	submissionFeeMultiplier = big.NewInt(4)
-
-	// Important events we're going to track
-	// Since the deposit finalized topic is emitted from any L2 gateway,
-	// we won't be able to specify addresses in the log poller filters.
-	// These are emitted on L2
-	DepositFinalizedTopic     = l2_arbitrum_gateway.L2ArbitrumGatewayDepositFinalized{}.Topic()
-	LiquidityTransferredTopic = rebalancer.RebalancerLiquidityTransferred{}.Topic()
-
-	nodeInterfaceABI = abihelpers.MustParseABI(arb_node_interface.NodeInterfaceMetaData.ABI)
-)
-
 type l1ToL2Bridge struct {
-	localSelector  models.NetworkSelector
-	remoteSelector models.NetworkSelector
-
+	localSelector       models.NetworkSelector
+	remoteSelector      models.NetworkSelector
 	l1Rebalancer        rebalancer.RebalancerInterface
 	l2RebalancerAddress common.Address
 	l1BridgeAdapter     arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterInterface
-
-	// Arbitrum contract wrappers
-	l1GatewayRouter arbitrum_gateway_router.ArbitrumGatewayRouterInterface
-	l1Inbox         arbitrum_inbox.ArbitrumInboxInterface
-	l2Gateway       l2_arbitrum_gateway.L2ArbitrumGatewayInterface
-
-	l1Client client.Client
-	l2Client client.Client
-
-	l1LogPoller logpoller.LogPoller
-	l2LogPoller logpoller.LogPoller
-
-	l1FilterName string
-	l2FilterName string
-
-	lggr logger.Logger
+	l1GatewayRouter     arbitrum_gateway_router.ArbitrumGatewayRouterInterface
+	l1Inbox             arbitrum_inbox.ArbitrumInboxInterface
+	l2Gateway           l2_arbitrum_gateway.L2ArbitrumGatewayInterface
+	l1Client            client.Client
+	l2Client            client.Client
+	l1LogPoller         logpoller.LogPoller
+	l2LogPoller         logpoller.LogPoller
+	l1FilterName        string
+	l2FilterName        string
+	lggr                logger.Logger
 }
 
 func NewL1ToL2Bridge(
@@ -243,7 +217,7 @@ func (l *l1ToL2Bridge) GetTransfers(
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("get ArbitrumL1ToL2ERC20Sent events from L1 bridge adapter: %w", err)
+		return nil, fmt.Errorf("get LiquidityTransferred events from L1 rebalancer: %w", err)
 	}
 
 	depositFinalizedLogs, err := l.l2LogPoller.IndexedLogsCreatedAfter(
@@ -276,9 +250,6 @@ func (l *l1ToL2Bridge) GetTransfers(
 		return nil, fmt.Errorf("get LiquidityTransferred events from L2 rebalancer: %w", err)
 	}
 
-	// the log poller SQL queries return logs sorted by block number and log index already
-	// however given that this is an implementation detail we sort again here
-	// but based on timestamp
 	slices.SortFunc(sendLogs, func(a, b logpoller.Log) int {
 		return a.BlockTimestamp.Compare(b.BlockTimestamp)
 	})
@@ -316,19 +287,19 @@ func (l *l1ToL2Bridge) GetTransfers(
 		"parsedReceived", len(parsedReceived),
 	)
 
-	// Unfortunately its not easy to match DepositFinalized events with ERC20Sent events.
+	// Unfortunately its not easy to match DepositFinalized events with LiquidityTransferred events.
 	// Reason being that arbitrum does not emit any identifying information as part of the DepositFinalized
 	// event, such as the l1 to l2 tx id. This is only available as part of the calldata for when the L2 calls
 	// submitRetryable on the ArbRetryableTx precompile.
 	// e.g https://sepolia.arbiscan.io/tx/0xce0d0d7e74f184fa8cb264b6d9aab5ced159faf3d0d9ae54b67fd40ba9d965a7
 	// therefore we're kind of relegated here to doing a simple count check - filter out all of the
-	// ERC20Sent logs destined for the rebalancer on L2 and all the DepositFinalized logs that
+	// LiquidityTransferred logs destined for the rebalancer on L2 and all the DepositFinalized logs that
 	// pay out to the rebalancer on L2.
-	// We can _probably_ assume that the earlier ERC20Sent logs on L1
+	// We can _probably_ assume that the earlier LiquidityTransferred logs on L1
 	// are more likely to be finalizedNotExecuted than later ones.
 	notReady, ready, readyData, err := l.partitionTransfers(localToken, parsedSent, parsedDepositFinalized, parsedReceived)
 	if err != nil {
-		return nil, fmt.Errorf("partition logs into not-ready, ready, finalized and executed states: %w", err)
+		return nil, fmt.Errorf("partition logs into not-ready and ready states: %w", err)
 	}
 
 	return l.toPendingTransfers(localToken, remoteToken, notReady, ready, readyData, parsedToLP)
@@ -465,7 +436,7 @@ func (l *l1ToL2Bridge) matchingExecutionExists(
 		}
 		sendL1ToL2TxId, err := unpackUint256(readyCandidate.BridgeSpecificData)
 		if err != nil {
-			return false, fmt.Errorf("unpack outbound transfer result from ArbitrumL1ToL2ERC20Sent log: %w, data: %s",
+			return false, fmt.Errorf("unpack outbound transfer result from LiquidityTransferred log: %w, data: %s",
 				err, hexutil.Encode(readyCandidate.BridgeSpecificData))
 		}
 		if sendL1ToL2TxId.Cmp(recvL1ToL2TxId) == 0 {
@@ -521,7 +492,7 @@ func (l *l1ToL2Bridge) QuorumizedBridgePayload(payloads [][]byte, f int) ([]byte
 		maxFeePerGases     []*big.Int
 	)
 	for _, payload := range payloads {
-		params, err := UnpackSendBridgePayload(payload)
+		params, err := UnpackL1ToL2SendBridgePayload(payload)
 		if err != nil {
 			return nil, fmt.Errorf("decode bridge payload: %w", err)
 		}
@@ -539,7 +510,7 @@ func (l *l1ToL2Bridge) QuorumizedBridgePayload(payloads [][]byte, f int) ([]byte
 		return i.Cmp(j)
 	})
 	// return f-th highest gasLimit/maxSubmissionCost/maxFeePerGas
-	return PackSendBridgePayload(
+	return PackL1ToL2SendBridgePayload(
 		gasLimits[len(gasLimits)-f-1],
 		maxSubmissionCosts[len(maxSubmissionCosts)-f-1],
 		maxFeePerGases[len(maxFeePerGases)-f-1],
@@ -555,6 +526,8 @@ func (l *l1ToL2Bridge) GetBridgePayloadAndFee(
 	ctx context.Context,
 	transfer models.Transfer,
 ) ([]byte, *big.Int, error) {
+	// TODO: can this information be cached in the struct?
+	// we already do this stuff in New() so it's unclear if we need to do this everytime.
 	l1Gateway, err := l.l1GatewayRouter.GetGateway(&bind.CallOpts{
 		Context: ctx,
 	}, common.Address(transfer.LocalTokenAddress))
@@ -663,15 +636,11 @@ func (l *l1ToL2Bridge) estimateAll(
 		"l2MaxFeePerGas", l2MaxFeePerGas,
 		"deposit", deposit)
 
-	bridgeCalldata, err := l1AdapterABI.Pack("exposeSendERC20Params", arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterSendERC20Params{
-		GasLimit:          gasLimit,
-		MaxSubmissionCost: maxSubmissionFee,
-		MaxFeePerGas:      l2MaxFeePerGas,
-	})
+	bridgeCalldata, err := PackL1ToL2SendBridgePayload(gasLimit, maxSubmissionFee, l2MaxFeePerGas)
 	if err != nil {
 		return nil, nil, fmt.Errorf("pack bridge calldata for bridge adapter: %w", err)
 	}
-	bridgeCalldata = bridgeCalldata[4:] // remove method id
+
 	return bridgeCalldata, deposit, nil
 }
 
@@ -756,12 +725,7 @@ type RetryableData struct {
 	Data []byte
 }
 
-func toHash(selector models.NetworkSelector) common.Hash {
-	encoded := hexutil.EncodeUint64(uint64(selector))
-	return common.HexToHash(encoded)
-}
-
-func UnpackSendBridgePayload(payload []byte) (out arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterSendERC20Params, err error) {
+func UnpackL1ToL2SendBridgePayload(payload []byte) (out arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterSendERC20Params, err error) {
 	ifaces, err := l1AdapterABI.Methods["exposeSendERC20Params"].Inputs.UnpackValues(payload)
 	if err != nil {
 		return out, fmt.Errorf("unpack bridge payload: %w", err)
@@ -773,7 +737,7 @@ func UnpackSendBridgePayload(payload []byte) (out arbitrum_l1_bridge_adapter.Arb
 	return out, nil
 }
 
-func PackSendBridgePayload(gasLimit, maxSubmissionCost, maxFeePerGas *big.Int) ([]byte, error) {
+func PackL1ToL2SendBridgePayload(gasLimit, maxSubmissionCost, maxFeePerGas *big.Int) ([]byte, error) {
 	return l1AdapterABI.Methods["exposeSendERC20Params"].Inputs.Pack(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterSendERC20Params{
 		GasLimit:          gasLimit,
 		MaxSubmissionCost: maxSubmissionCost,

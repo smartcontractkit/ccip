@@ -189,13 +189,18 @@ contract Rebalancer is IRebalancer, OCR3Base {
     }
 
     // finalize the withdrawal through the bridge adapter
-    // TODO: handle edge case where withdrawal is done already
-    // maybe just try/catch is enough?
-    remoteRebalancer.localBridge.finalizeWithdrawERC20(
+    try remoteRebalancer.localBridge.finalizeWithdrawERC20(
       remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
       address(this), // localReceiver: us
       bridgeSpecificPayload
-    );
+    ) {
+      // successfully finalized the withdrawal
+    } catch {
+      // failed to finalize the withdrawal.
+      // this could mean that the withdrawal was already finalized
+      // or that the withdrawal failed.
+      // we assume the former and continue
+    }
 
     // inject liquidity into the liquidity container
     // approve and liquidity container should transferFrom

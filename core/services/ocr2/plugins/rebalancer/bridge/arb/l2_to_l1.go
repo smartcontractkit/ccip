@@ -28,30 +28,8 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/l2_arbitrum_messenger"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 	"github.com/smartcontractkit/chainlink/v2/core/services/pg"
-)
-
-var (
-	// Arbitrum events emitted on L1
-	NodeConfirmedTopic = arbitrum_rollup_core.ArbRollupCoreNodeConfirmed{}.Topic()
-
-	// Arbitrum events emitted on L2
-	TxToL1Topic              = l2_arbitrum_messenger.L2ArbitrumMessengerTxToL1{}.Topic()
-	WithdrawalInitiatedTopic = l2_arbitrum_gateway.L2ArbitrumGatewayWithdrawalInitiated{}.Topic()
-	L2ToL1TxTopic            = arbsys.ArbSysL2ToL1Tx{}.Topic()
-
-	// Important addresses on L2
-	// These are precompiles so their addresses will never change
-	NodeInterfaceAddress = common.HexToAddress("0x00000000000000000000000000000000000000c8")
-	ArbSysAddress        = common.HexToAddress("0x0000000000000000000000000000000000000064")
-
-	l1AdapterABI = abihelpers.MustParseABI(arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterMetaData.ABI)
-)
-
-const (
-	DurationMonth = 720 * time.Hour
 )
 
 type l2ToL1Bridge struct {
@@ -253,12 +231,15 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, localToken models.Addre
 	}
 
 	// get all L2 -> L1 finalizations in the past 14 days
-	// we can't filter on token since we don't have the token address in the onchain event
 	// Note: we don't filter on finalized because we want to avoid marking a sent tx as
 	// ready to finalize more than once, since that will cause reverts onchain.
-	receiveLogs, err := l.l1LogPoller.LogsCreatedAfter(
+	receiveLogs, err := l.l1LogPoller.IndexedLogsCreatedAfter(
 		LiquidityTransferredTopic,
 		l.l1Rebalancer.Address(),
+		2, // topic index 2: fromChainSelector in event
+		[]common.Hash{
+			toHash(l.localSelector),
+		},
 		time.Now().Add(-DurationMonth/2),
 		1,
 		pg.WithParentCtx(ctx),
@@ -282,9 +263,6 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, localToken models.Addre
 		return nil, fmt.Errorf("parse L2 -> L1 finalizations: %w", err)
 	}
 
-	// for the remaining as-of-yet unfinalized transfers, determine if they
-	// are ready to finalize
-	// TODO: edge case: determine finalized but not executed by checking rebalancer's LiquidityTransferred logs
 	ready, readyData, notReady, err := l.partitionReadyTransfers(ctx, parsedSent, parsedReceived)
 	if err != nil {
 		return nil, fmt.Errorf("partition ready transfers: %w", err)
