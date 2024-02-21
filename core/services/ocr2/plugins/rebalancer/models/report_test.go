@@ -34,8 +34,8 @@ func TestMarshalReportMetadata(t *testing.T) {
 			Transfers: []models.Transfer{
 				models.NewTransfer(1, 2, big.NewInt(3), time.Now().UTC(), []byte{}),
 			},
-			LiquidityManagerAddress: models.Address(testutils.NewAddress()),
-			NetworkID:               1,
+			RebalancerAddress: models.Address(testutils.NewAddress()),
+			NetworkID:         1,
 			ConfigDigest: models.ConfigDigest{
 				ConfigDigest: testutils.Random32Byte(),
 			},
@@ -52,8 +52,8 @@ func TestMarshalReportMetadata(t *testing.T) {
 		bridgeData1 := testutils.Random32Byte()
 		bridgeData2 := testutils.Random32Byte()
 		rm := models.Report{
-			NetworkID:               1,
-			LiquidityManagerAddress: models.Address(testutils.NewAddress()),
+			NetworkID:         1,
+			RebalancerAddress: models.Address(testutils.NewAddress()),
 			Transfers: []models.Transfer{
 				// send instruction
 				{
@@ -89,11 +89,11 @@ func TestMarshalReportMetadata(t *testing.T) {
 		encoded, err := rm.OnchainEncode()
 		require.NoError(t, err, "failed to encode ReportMetadata")
 
-		r, decodedInstructions, err := models.DecodeReport(rm.NetworkID, rm.LiquidityManagerAddress, encoded)
+		r, decodedInstructions, err := models.DecodeReport(rm.NetworkID, rm.RebalancerAddress, encoded)
 		require.NoError(t, err, "failed to unmarshal ReportMetadata")
 		require.Equal(t, instructions, decodedInstructions, "marshalled and unmarshalled instructions should be equal")
 		require.Equal(t, rm.NetworkID, r.NetworkID, "marshalled and unmarshalled NetworkID should be equal")
-		require.Equal(t, rm.LiquidityManagerAddress, r.LiquidityManagerAddress, "marshalled and unmarshalled LiquidityManagerAddress should be equal")
+		require.Equal(t, rm.RebalancerAddress, r.RebalancerAddress, "marshalled and unmarshalled LiquidityManagerAddress should be equal")
 		require.Equal(t, rm.Transfers[0].Amount, r.Transfers[0].Amount, "marshalled and unmarshalled Transfers should be equal")
 		require.Equal(t, rm.Transfers[0].From, r.Transfers[0].From, "marshalled and unmarshalled Transfers should be equal")
 		require.Equal(t, rm.Transfers[0].To, r.Transfers[0].To, "marshalled and unmarshalled Transfers should be equal")

@@ -213,7 +213,7 @@ func (l *l1ToL2Bridge) GetTransfers(
 			toHash(l.remoteSelector),
 		},
 		fromTs,
-		logpoller.Finalized,
+		1,
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -243,7 +243,7 @@ func (l *l1ToL2Bridge) GetTransfers(
 			toHash(l.localSelector),
 		},
 		fromTs,
-		logpoller.Finalized,
+		1,
 		pg.WithParentCtx(ctx),
 	)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -404,13 +404,13 @@ func (l *l1ToL2Bridge) partitionTransfers(
 
 func (l *l1ToL2Bridge) filterExecuted(
 	readyCandidates []*rebalancer.RebalancerLiquidityTransferred,
-	liquidityTransferredLogs []*rebalancer.RebalancerLiquidityTransferred,
+	receivedLogs []*rebalancer.RebalancerLiquidityTransferred,
 ) (
 	ready []*rebalancer.RebalancerLiquidityTransferred,
 	err error,
 ) {
 	for _, readyCandidate := range readyCandidates {
-		exists, err := l.matchingExecutionExists(readyCandidate, liquidityTransferredLogs)
+		exists, err := l.matchingExecutionExists(readyCandidate, receivedLogs)
 		if err != nil {
 			return nil, fmt.Errorf("error checking if ready candidate has been executed: %w", err)
 		}
@@ -425,19 +425,20 @@ func (l *l1ToL2Bridge) filterExecuted(
 // map[l2ToL1TxId]bool and check if the l2ToL1TxId exists in the map
 func (l *l1ToL2Bridge) matchingExecutionExists(
 	readyCandidate *rebalancer.RebalancerLiquidityTransferred,
-	liquidityTransferredLogs []*rebalancer.RebalancerLiquidityTransferred,
+	receivedLogs []*rebalancer.RebalancerLiquidityTransferred,
 ) (bool, error) {
-	for _, ltLog := range liquidityTransferredLogs {
+	for _, recv := range receivedLogs {
 		// decode the bridge specific data, which should be the l1 -> l2 tx id
-		recvL1ToL2TxId, err := unpackUint256(ltLog.BridgeSpecificData)
+		recvL1ToL2TxId, err := unpackUint256(recv.BridgeSpecificData)
 		if err != nil {
 			return false, fmt.Errorf("unpack bridge specific data from LiquidityTransferred log: %w, data: %s",
-				err, hexutil.Encode(ltLog.BridgeSpecificData))
+				err, hexutil.Encode(recv.BridgeSpecificData))
 		}
-		sendL1ToL2TxId, err := unpackUint256(readyCandidate.BridgeSpecificData)
+		// decode the bridge return data, which should be the l1 -> l2 tx id
+		sendL1ToL2TxId, err := unpackUint256(readyCandidate.BridgeReturnData)
 		if err != nil {
 			return false, fmt.Errorf("unpack outbound transfer result from LiquidityTransferred log: %w, data: %s",
-				err, hexutil.Encode(readyCandidate.BridgeSpecificData))
+				err, hexutil.Encode(readyCandidate.BridgeReturnData))
 		}
 		if sendL1ToL2TxId.Cmp(recvL1ToL2TxId) == 0 {
 			return true, nil

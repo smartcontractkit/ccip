@@ -35,7 +35,6 @@ type Plugin struct {
 	mu                      sync.RWMutex
 	rebalancerGraph         graph.Graph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
-	pendingTransfers        *PendingTransfersCache
 	lggr                    logger.Logger
 }
 
@@ -60,7 +59,6 @@ func NewPlugin(
 		bridgeFactory:           bridgeFactory,
 		rebalancerGraph:         graph.NewGraph(),
 		liquidityRebalancer:     liquidityRebalancer,
-		pendingTransfers:        NewPendingTransfersCache(),
 		lggr:                    lggr,
 		mu:                      sync.RWMutex{},
 	}
@@ -72,7 +70,7 @@ func (p *Plugin) Query(_ context.Context, outcomeCtx ocr3types.OutcomeContext) (
 }
 
 func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeContext, _ ocrtypes.Query) (ocrtypes.Observation, error) {
-	lggr := p.lggr.With("seqNr", outcomeCtx.SeqNr)
+	lggr := p.lggr.With("seqNr", outcomeCtx.SeqNr, "phase", "Observation")
 	lggr.Infow("in observation", "seqNr", outcomeCtx.SeqNr)
 
 	if err := p.syncGraphEdges(ctx); err != nil {
@@ -123,7 +121,7 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
-	p.lggr.Infow("in validate observation", "seqNr", outctx.SeqNr)
+	p.lggr.Infow("in validate observation", "seqNr", outctx.SeqNr, "phase", "ValidateObservation")
 
 	_, err := models.DecodeObservation(ao.Observation)
 	if err != nil {
@@ -140,7 +138,7 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query ocrtyp
 }
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, aos []ocrtypes.AttributedObservation) (ocr3types.Outcome, error) {
-	lggr := p.lggr.With("seqNr", outctx.SeqNr, "numObservations", len(aos))
+	lggr := p.lggr.With("seqNr", outctx.SeqNr, "numObservations", len(aos), "phase", "Outcome")
 	lggr.Infow("in outcome")
 
 	// Gather all the observations.
@@ -188,21 +186,23 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
 	}
 
+	outcome := models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers, configDigests).Encode()
 	lggr.Infow("finished computing outcome",
 		"medianLiquidityPerChain", medianLiquidityPerChain,
 		"pendingTransfers", pendingTransfers,
 		"proposedTransfers", proposedTransfers,
 		"resolvedTransfers", resolvedTransfersQuorum,
+		"outcomeEncoded", outcome,
 	)
 
-	return models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers, configDigests).Encode(), nil
+	return outcome, nil
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.Report], error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	lggr := p.lggr.With("seqNr", seqNr)
+	lggr := p.lggr.With("seqNr", seqNr, "phase", "Reports")
 	lggr.Infow("in reports")
 
 	decodedOutcome, err := models.DecodeOutcome(outcome)
@@ -235,7 +235,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		"pendingTransfers", decodedOutcome.PendingTransfers,
 		"proposedTransfers", decodedOutcome.ProposedTransfers,
 	)
-	lggr.Debugw("got incoming and outgoing transfers")
+	lggr.Infow("got incoming and outgoing transfers")
 
 	configDigestsMap := map[models.NetworkSelector]map[models.Address]types.ConfigDigest{}
 	for _, cd := range decodedOutcome.ConfigDigests {
@@ -280,15 +280,33 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.Report]) (bool, error) {
-	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report))
+	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report), "phase", "ShouldAcceptAttestedReport")
 	lggr.Infow("in should accept attested report")
 
-	report, instructions, err := models.DecodeReport(p.rootNetwork, p.rootAddress, r.Report)
+	report, instructions, err := models.DecodeReport(r.Info.NetworkID, r.Info.RebalancerAddress, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("failed to decode report: %w", err)
 	}
 
-	lggr.Infow("accepting report",
+	lggr = lggr.With(
+		"networkSelector", report.NetworkID,
+		"rebalancerAddress", report.RebalancerAddress,
+		"transfers", len(report.Transfers),
+	)
+	lggr.Infow("decoded report")
+
+	// report with no instructions should not be transmitted.
+	if len(report.Transfers) == 0 {
+		lggr.Infow("report has no transfers, returning false")
+		return false, nil
+	}
+
+	if p.isStaleReport(ctx, lggr, seqNr, report.NetworkID, report.RebalancerAddress, report.Transfers) {
+		lggr.Infow("report is stale, returning false")
+		return false, nil
+	}
+
+	lggr.Infow("report is not stale, accepting",
 		"transfers", len(report.Transfers),
 		"sendInstructions", instructions.SendLiquidityParams,
 		"receiveInstructions", instructions.ReceiveLiquidityParams)
@@ -298,38 +316,96 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.Report]) (bool, error) {
-	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report))
+	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report), "phase", "ShouldTransmitAcceptedReport")
 	lggr.Infow("in should transmit accepted report")
 
-	report, instructions, err := models.DecodeReport(r.Info.NetworkID, r.Info.LiquidityManagerAddress, r.Report)
+	report, instructions, err := models.DecodeReport(r.Info.NetworkID, r.Info.RebalancerAddress, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("failed to decode report: %w", err)
 	}
 
-	lggr.Infow("in should transmit accepted report",
-		"transfers", len(report.Transfers),
+	lggr = lggr.With(
+		"networkSelector", report.NetworkID,
+		"rebalancerAddress", report.RebalancerAddress,
+		"transfers", len(report.Transfers))
+	lggr.Infow("decoded report",
 		"sendInstructions", instructions.SendLiquidityParams,
 		"receiveInstructions", instructions.ReceiveLiquidityParams)
 
-	rebalancer, err := p.liquidityManagerFactory.NewRebalancer(r.Info.NetworkID, r.Info.LiquidityManagerAddress)
-	if err != nil {
-		return false, fmt.Errorf("init liquidity manager: %w", err)
-	}
-
-	// check sequence number to see if its already transmitted onchain
-	latestSeqNr, err := rebalancer.GetLatestSequenceNumber(ctx)
-	if err != nil {
-		return false, fmt.Errorf("get latest sequence number: %w", err)
-	}
-
-	if latestSeqNr >= seqNr {
-		lggr.Debugw("report already transmitted onchain, returning false", "latestSeqNr", latestSeqNr)
+	// report with no instructions should not be transmitted.
+	if len(report.Transfers) == 0 {
+		lggr.Infow("report has no transfers, returning false")
 		return false, nil
 	}
 
-	lggr.Infow("transmitting accepted report", "latestSeqNr", latestSeqNr)
+	if p.isStaleReport(ctx, lggr, seqNr, report.NetworkID, report.RebalancerAddress, report.Transfers) {
+		lggr.Infow("report is stale, returning false")
+		return false, nil
+	}
+
+	lggr.Infow("report is not stale, transmitting")
 
 	return true, nil
+}
+
+func (p *Plugin) isStaleReport(
+	ctx context.Context,
+	lggr logger.Logger,
+	seqNr uint64,
+	networkID models.NetworkSelector,
+	rebalancerAddress models.Address,
+	transfers []models.Transfer,
+) bool {
+	// check sequence number to see if its already transmitted onchain.
+	rebalancer, err := p.liquidityManagerFactory.NewRebalancer(networkID, rebalancerAddress)
+	if err != nil {
+		lggr.Warnw("failed to get rebalancer", "err", err)
+		return true
+	}
+
+	onchainSeqNr, err := rebalancer.GetLatestSequenceNumber(ctx)
+	if err != nil {
+		lggr.Warnw("failed to get latest sequence number", "err", err)
+		return true
+	}
+
+	if onchainSeqNr >= seqNr {
+		lggr.Infow("report already transmitted onchain, report is stale, should not be transmitted", "onchainSeqNr", onchainSeqNr)
+		return true
+	}
+
+	lggr.Infow("onchain sequence number < current", "onchainSeqNr", onchainSeqNr)
+
+	// check that the instructions will not cause failures onchain.
+	// e.g send instructions when there is not enough liquidity.
+	currentBalance, err := rebalancer.GetBalance(ctx)
+	if err != nil {
+		lggr.Warnw("failed to get balance", "err", err)
+		return true
+	}
+
+	lggr.Infow("checking if there is enough balance onchain to send", "currentBalance", currentBalance.String())
+
+	for _, transfer := range transfers {
+		if transfer.From != networkID {
+			continue
+		}
+
+		if currentBalance.Cmp(transfer.Amount.ToInt()) < 0 {
+			lggr.Warnw("not enough balance onchain to send", "amount", transfer.Amount, "remaining", currentBalance.String())
+			return true
+		}
+		currentBalance = currentBalance.Sub(currentBalance, transfer.Amount.ToInt())
+	}
+
+	if currentBalance.Cmp(big.NewInt(0)) < 0 {
+		lggr.Warnw("not enough balance onchain to send", "remaining", currentBalance.String())
+		return true
+	}
+
+	lggr.Infow("enough balance onchain to send", "currentBalance", currentBalance.String())
+
+	return false
 }
 
 func (p *Plugin) Close() error {
@@ -464,7 +540,6 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTran
 		}
 	}
 
-	p.pendingTransfers.Add(pendingTransfers)
 	return pendingTransfers, nil
 }
 
@@ -541,6 +616,11 @@ func (p *Plugin) computeConfigDigestsConsensus(observations []models.Observation
 			quorumCds = append(quorumCds, cd)
 		}
 	}
+
+	// sort by network id for deterministic results
+	sort.Slice(quorumCds, func(i, j int) bool {
+		return quorumCds[i].NetworkSel < quorumCds[j].NetworkSel
+	})
 
 	return quorumCds, nil
 }

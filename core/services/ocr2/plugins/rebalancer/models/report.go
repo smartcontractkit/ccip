@@ -62,8 +62,8 @@ func (c ConfigDigest) ToOCRConfigDigest() ocrtypes.ConfigDigest {
 }
 
 type Report struct {
-	Transfers               []Transfer
-	LiquidityManagerAddress Address
+	Transfers         []Transfer
+	RebalancerAddress Address
 
 	// NetworkID is the network ID that this report is going to be posted to
 	NetworkID NetworkSelector
@@ -74,9 +74,9 @@ type Report struct {
 
 func NewReport(transfers []Transfer, lmAddr Address, networkID NetworkSelector, configDigest ocrtypes.ConfigDigest) Report {
 	return Report{
-		Transfers:               transfers,
-		LiquidityManagerAddress: lmAddr,
-		NetworkID:               networkID,
+		Transfers:         transfers,
+		RebalancerAddress: lmAddr,
+		NetworkID:         networkID,
 		ConfigDigest: ConfigDigest{
 			ConfigDigest: configDigest,
 		},
@@ -152,7 +152,7 @@ func (r Report) GetDestinationConfigDigest() ocrtypes.ConfigDigest {
 
 func (r Report) String() string {
 	return fmt.Sprintf("Report{Transfers: %v, RebalancerAddress: %s, NetworkID: %d, ConfigDigest: %s}",
-		r.Transfers, r.LiquidityManagerAddress.String(), r.NetworkID, r.ConfigDigest.Hex())
+		r.Transfers, r.RebalancerAddress.String(), r.NetworkID, r.ConfigDigest.Hex())
 }
 
 func DecodeReportMetadata(b []byte) (Report, error) {
@@ -174,7 +174,7 @@ func DecodeReport(networkID NetworkSelector, rebalancerAddress Address, binaryRe
 
 	var out Report
 	out.NetworkID = networkID
-	out.LiquidityManagerAddress = rebalancerAddress
+	out.RebalancerAddress = rebalancerAddress
 	for _, send := range instructions.SendLiquidityParams {
 		out.Transfers = append(out.Transfers, Transfer{
 			From:       networkID,
