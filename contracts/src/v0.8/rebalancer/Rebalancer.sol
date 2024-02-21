@@ -41,6 +41,19 @@ contract Rebalancer is IRebalancer, OCR3Base {
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
 
+  event FinalizationFailed(
+    uint64 indexed ocrSeqNum,
+    uint64 indexed remoteChainSelector,
+    bytes bridgeSpecificData,
+    string reason
+  );
+  event RawFinalizationFailed(
+    uint64 indexed ocrSeqNum,
+    uint64 indexed remoteChainSelector,
+    bytes bridgeSpecificData,
+    bytes reason
+  );
+
   struct CrossChainRebalancer {
     address remoteRebalancer;
     IBridgeAdapter localBridge;
@@ -189,17 +202,22 @@ contract Rebalancer is IRebalancer, OCR3Base {
     }
 
     // finalize the withdrawal through the bridge adapter
-    try remoteRebalancer.localBridge.finalizeWithdrawERC20(
-      remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
-      address(this), // localReceiver: us
-      bridgeSpecificPayload
-    ) {
+    try
+      remoteRebalancer.localBridge.finalizeWithdrawERC20(
+        remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
+        address(this), // localReceiver: us
+        bridgeSpecificPayload
+      )
+    {
       // successfully finalized the withdrawal
-    } catch {
+    } catch Error(string memory reason) {
       // failed to finalize the withdrawal.
       // this could mean that the withdrawal was already finalized
       // or that the withdrawal failed.
       // we assume the former and continue
+      emit FinalizationFailed(ocrSeqNum, remoteChainSelector, bridgeSpecificPayload, reason);
+    } catch (bytes memory lowLevelData) {
+      emit RawFinalizationFailed(ocrSeqNum, remoteChainSelector, bridgeSpecificPayload, lowLevelData);
     }
 
     // inject liquidity into the liquidity container
