@@ -71,6 +71,34 @@ func (_m *OnRampReader) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error
 	return r0, r1
 }
 
+// GetPriceRegistry provides a mock function with given fields:
+func (_m *OnRampReader) GetPriceRegistry() (cciptypes.Address, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPriceRegistry")
+	}
+
+	var r0 cciptypes.Address
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (cciptypes.Address, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() cciptypes.Address); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(cciptypes.Address)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetSendRequestsBetweenSeqNums provides a mock function with given fields: ctx, seqNumMin, seqNumMax, finalized
 func (_m *OnRampReader) GetSendRequestsBetweenSeqNums(ctx context.Context, seqNumMin uint64, seqNumMax uint64, finalized bool) ([]cciptypes.EVM2EVMMessageWithTxMeta, error) {
 	ret := _m.Called(ctx, seqNumMin, seqNumMax, finalized)

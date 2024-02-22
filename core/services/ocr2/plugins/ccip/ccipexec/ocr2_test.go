@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader"
 	tokenpoolbatchedmocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/batchreader/mocks"
+	ccipdataprovidermocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/ccipdataprovider/mocks"
 	ccipdatamocks "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_2_0"
@@ -149,6 +150,8 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			mockOnRampReader := ccipdatamocks.NewOnRampReader(t)
 			mockOnRampReader.On("GetSendRequestsBetweenSeqNums", ctx, mock.Anything, mock.Anything, false).
 				Return(tc.sendRequests, nil).Maybe()
+			sourcePriceRegistryAddress := cciptypes.Address(utils.RandomAddress().String())
+			mockOnRampReader.On("GetPriceRegistry").Return(sourcePriceRegistryAddress, nil).Maybe()
 			p.onRampReader = mockOnRampReader
 
 			mockGasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
@@ -161,12 +164,15 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			destPriceRegReader.On("Address").Return(cciptypes.Address(utils.RandomAddress().String())).Maybe()
 			destPriceRegReader.On("GetFeeTokens", ctx).Return([]cciptypes.Address{}, nil).Maybe()
 			sourcePriceRegReader := ccipdatamocks.NewPriceRegistryReader(t)
-			sourcePriceRegReader.On("Address").Return(cciptypes.Address(utils.RandomAddress().String())).Maybe()
+			sourcePriceRegReader.On("Address").Return(sourcePriceRegistryAddress).Maybe()
 			sourcePriceRegReader.On("GetFeeTokens", ctx).Return([]cciptypes.Address{}, nil).Maybe()
 			sourcePriceRegReader.On("GetTokenPrices", ctx, mock.Anything).Return(
 				[]cciptypes.TokenPriceUpdate{{TokenPrice: cciptypes.TokenPrice{Token: ccipcalc.HexToAddress("0x1"), Value: big.NewInt(123)}, TimestampUnixSec: big.NewInt(time.Now().Unix())}}, nil).Maybe()
 			p.destPriceRegistry = destPriceRegReader
-			p.sourcePriceRegistry = sourcePriceRegReader
+
+			mockOnRampPriceRegistryProvider := ccipdataprovidermocks.NewPriceRegistry(t)
+			mockOnRampPriceRegistryProvider.On("NewPriceRegistryReader", ctx, sourcePriceRegistryAddress).Return(sourcePriceRegReader, nil).Maybe()
+			p.sourcePriceRegistryProvider = mockOnRampPriceRegistryProvider
 
 			p.snoozedRoots = cache.NewSnoozedRoots(time.Minute, time.Minute)
 
@@ -1817,6 +1823,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 			sourcePriceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
+			sourcePriceRegistryProvider := ccipdataprovidermocks.NewPriceRegistry(t)
 
 			offrampReader.On("CurrentRateLimiterState", ctx).Return(cciptypes.TokenBucketRateLimit{}, nil).Maybe()
 			offrampReader.On("GetSourceToDestTokensMapping", ctx).Return(map[cciptypes.Address]cciptypes.Address{}, nil).Maybe()
@@ -1829,12 +1836,13 @@ func Test_prepareTokenExecData(t *testing.T) {
 			destPriceRegistry.On("GetTokenPrices", ctx, mock.Anything).Return(tt.destPrices, nil).Maybe()
 
 			reportingPlugin := ExecutionReportingPlugin{
-				offRampReader:            offrampReader,
-				sourcePriceRegistry:      sourcePriceRegistry,
-				destPriceRegistry:        destPriceRegistry,
-				gasPriceEstimator:        gasPriceEstimator,
-				sourceWrappedNativeToken: weth,
-				destWrappedNative:        wavax,
+				offRampReader: offrampReader,
+				//sourcePriceRegistry:      sourcePriceRegistry,
+				sourcePriceRegistryProvider: sourcePriceRegistryProvider,
+				destPriceRegistry:           destPriceRegistry,
+				gasPriceEstimator:           gasPriceEstimator,
+				sourceWrappedNativeToken:    weth,
+				destWrappedNative:           wavax,
 			}
 
 			tokenData, err := reportingPlugin.prepareTokenExecData(ctx)
