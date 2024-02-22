@@ -9,11 +9,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
-	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/generated/aggregator_v3_interface"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/rpclib/rpclibmocks"
@@ -64,9 +63,9 @@ func TestDynamicPriceGetter(t *testing.T) {
 			require.NoError(t, err)
 			ctx := testutils.Context(t)
 			// Build list of tokens to query.
-			tokens := make([]common.Address, 0, len(test.param.expectedTokenPrices))
+			tokens := make([]cciptypes.Address, 0, len(test.param.expectedTokenPrices))
 			for tk := range test.param.expectedTokenPrices {
-				tokens = append(tokens, tk)
+				tokens = append(tokens, cciptypes.Address(tk.String()))
 			}
 			prices, err := pg.TokenPricesUSD(ctx, tokens)
 			if test.param.priceResolutionErrorExpected {
@@ -78,7 +77,7 @@ func TestDynamicPriceGetter(t *testing.T) {
 			assert.True(t, len(prices) >= len(test.param.expectedTokenPrices))
 			// Check prices are matching expected result.
 			for tk, expectedPrice := range test.param.expectedTokenPrices {
-				assert.Equal(t, expectedPrice, *prices[tk])
+				assert.Equal(t, expectedPrice, *prices[cciptypes.Address(tk.String())])
 			}
 		})
 	}
@@ -342,13 +341,12 @@ func testParamNoAggregatorForToken(t *testing.T) testParameters {
 func mockClientFromRound(t *testing.T, round aggregator_v3_interface.LatestRoundData) DynamicPriceGetterClient {
 	return DynamicPriceGetterClient{
 		BatchCaller: mockCallerFromRound(t, round),
-		LP:          mockLPFromRound(t, round),
 	}
 }
 
 func mockCallerFromRound(t *testing.T, round aggregator_v3_interface.LatestRoundData) *rpclibmocks.EvmBatchCaller {
 	caller := rpclibmocks.NewEvmBatchCaller(t)
-	caller.On("BatchCall", mock.Anything, round.RoundId.Uint64(), mock.Anything).Return(
+	caller.On("BatchCall", mock.Anything, uint64(0), mock.Anything).Return(
 		[]rpclib.DataAndErr{
 			{
 				Outputs: []any{round.RoundId, round.Answer, round.StartedAt, round.UpdatedAt, round.AnsweredInRound},
@@ -357,13 +355,4 @@ func mockCallerFromRound(t *testing.T, round aggregator_v3_interface.LatestRound
 		nil,
 	).Maybe()
 	return caller
-}
-
-func mockLPFromRound(t *testing.T, round aggregator_v3_interface.LatestRoundData) *lpmocks.LogPoller {
-	lp := lpmocks.NewLogPoller(t)
-	lp.On("LatestBlock", mock.Anything).Return(
-		logpoller.LogPollerBlock{
-			BlockNumber: int64(round.RoundId.Uint64()),
-		}, nil).Maybe()
-	return lp
 }
