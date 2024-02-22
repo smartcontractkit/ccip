@@ -1819,23 +1819,30 @@ func Test_prepareTokenExecData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			onrampReader := ccipdatamocks.NewOnRampReader(t)
 			offrampReader := ccipdatamocks.NewOffRampReader(t)
 			sourcePriceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			destPriceRegistry := ccipdatamocks.NewPriceRegistryReader(t)
 			gasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
 			sourcePriceRegistryProvider := ccipdataprovidermocks.NewPriceRegistry(t)
 
+			sourcePriceRegistryAddress := cciptypes.Address(utils.RandomAddress().String())
+			onrampReader.On("GetPriceRegistry").Return(sourcePriceRegistryAddress, nil).Maybe()
 			offrampReader.On("CurrentRateLimiterState", ctx).Return(cciptypes.TokenBucketRateLimit{}, nil).Maybe()
 			offrampReader.On("GetSourceToDestTokensMapping", ctx).Return(map[cciptypes.Address]cciptypes.Address{}, nil).Maybe()
 			gasPriceEstimator.On("GetGasPrice", ctx).Return(big.NewInt(1e9), nil).Maybe()
 
 			offrampReader.On("GetTokens", ctx).Return(cciptypes.OffRampTokens{DestinationTokens: tt.destTokens}, tt.destTokensErr).Maybe()
+			sourcePriceRegistry.On("Address").Return(sourcePriceRegistryAddress, nil).Maybe()
 			sourcePriceRegistry.On("GetFeeTokens", ctx).Return(tt.sourceFeeTokens, tt.sourceFeeTokensErr).Maybe()
 			sourcePriceRegistry.On("GetTokenPrices", ctx, mock.Anything).Return(tt.sourcePrices, nil).Maybe()
 			destPriceRegistry.On("GetFeeTokens", ctx).Return(tt.destFeeTokens, tt.destFeeTokensErr).Maybe()
 			destPriceRegistry.On("GetTokenPrices", ctx, mock.Anything).Return(tt.destPrices, nil).Maybe()
 
+			sourcePriceRegistryProvider.On("NewPriceRegistryReader", ctx, sourcePriceRegistryAddress).Return(sourcePriceRegistry, nil).Maybe()
+
 			reportingPlugin := ExecutionReportingPlugin{
+				onRampReader:  onrampReader,
 				offRampReader: offrampReader,
 				//sourcePriceRegistry:      sourcePriceRegistry,
 				sourcePriceRegistryProvider: sourcePriceRegistryProvider,
