@@ -49,11 +49,11 @@ var (
 )
 
 type ExecutionPluginStaticConfig struct {
-	lggr                     logger.Logger
-	onRampReader             ccipdata.OnRampReader
-	offRampReader            ccipdata.OffRampReader
-	commitStoreReader        ccipdata.CommitStoreReader
-	sourcePriceRegistry      ccipdata.PriceRegistryReader
+	lggr              logger.Logger
+	onRampReader      ccipdata.OnRampReader
+	offRampReader     ccipdata.OffRampReader
+	commitStoreReader ccipdata.CommitStoreReader
+	//sourcePriceRegistry      ccipdata.PriceRegistryReader
 	sourceWrappedNativeToken cciptypes.Address
 	tokenDataWorker          tokendata.Worker
 	destChainSelector        uint64

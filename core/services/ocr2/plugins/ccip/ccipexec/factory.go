@@ -72,12 +72,12 @@ func (rf *ExecutionReportingPluginFactory) NewReportingPlugin(config types.Repor
 	offchainConfig := rf.config.offRampReader.OffchainConfig()
 
 	return &ExecutionReportingPlugin{
-			F:                        config.F,
-			lggr:                     rf.config.lggr.Named("ExecutionReportingPlugin"),
-			offchainConfig:           offchainConfig,
-			tokenDataWorker:          rf.config.tokenDataWorker,
-			gasPriceEstimator:        rf.config.offRampReader.GasPriceEstimator(),
-			sourcePriceRegistry:      rf.config.sourcePriceRegistry,
+			F:                 config.F,
+			lggr:              rf.config.lggr.Named("ExecutionReportingPlugin"),
+			offchainConfig:    offchainConfig,
+			tokenDataWorker:   rf.config.tokenDataWorker,
+			gasPriceEstimator: rf.config.offRampReader.GasPriceEstimator(),
+			//sourcePriceRegistry:      rf.config.sourcePriceRegistry,
 			sourceWrappedNativeToken: rf.config.sourceWrappedNativeToken,
 			onRampReader:             rf.config.onRampReader,
 			commitStoreReader:        rf.config.commitStoreReader,
