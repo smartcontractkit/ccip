@@ -61,4 +61,9 @@ type OnRampReader interface {
 	Address() (Address, error)
 
 	GetDynamicConfig() (OnRampDynamicConfig, error)
+
+	//GetFeeTokenPrices(tokens []string) (map[Address]*big.Int, error)
+
+	// GetPriceRegistry returns the address of the current price registry configured on the onRamp.
+	GetPriceRegistry() (Address, error)
 }

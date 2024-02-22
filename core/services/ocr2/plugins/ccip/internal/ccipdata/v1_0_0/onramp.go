@@ -135,6 +135,14 @@ func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 	}, nil
 }
 
+func (o *OnRamp) GetPriceRegistry() (cciptypes.Address, error) {
+	c, err := o.GetDynamicConfig()
+	if err != nil {
+		return "", err
+	}
+	return c.PriceRegistry, nil
+}
+
 func (o *OnRamp) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
 	return nil, errors.New("USDC not supported in < 1.2.0")
 }

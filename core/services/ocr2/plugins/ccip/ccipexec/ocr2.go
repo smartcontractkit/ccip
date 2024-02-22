@@ -49,17 +49,17 @@ var (
 )
 
 type ExecutionPluginStaticConfig struct {
-	lggr              logger.Logger
-	onRampReader      ccipdata.OnRampReader
-	offRampReader     ccipdata.OffRampReader
-	commitStoreReader ccipdata.CommitStoreReader
-	//sourcePriceRegistry      ccipdata.PriceRegistryReader
-	sourceWrappedNativeToken cciptypes.Address
-	tokenDataWorker          tokendata.Worker
-	destChainSelector        uint64
-	priceRegistryProvider    ccipdataprovider.PriceRegistry
-	tokenPoolBatchedReader   batchreader.TokenPoolBatchedReader
-	metricsCollector         ccip.PluginMetricsCollector
+	lggr                        logger.Logger
+	onRampReader                ccipdata.OnRampReader
+	offRampReader               ccipdata.OffRampReader
+	commitStoreReader           ccipdata.CommitStoreReader
+	sourcePriceRegistryProvider ccipdataprovider.PriceRegistry
+	sourceWrappedNativeToken    cciptypes.Address
+	tokenDataWorker             tokendata.Worker
+	destChainSelector           uint64
+	priceRegistryProvider       ccipdataprovider.PriceRegistry // destination price registry provider.
+	tokenPoolBatchedReader      batchreader.TokenPoolBatchedReader
+	metricsCollector            ccip.PluginMetricsCollector
 }
 
 type ExecutionReportingPlugin struct {
@@ -70,10 +70,10 @@ type ExecutionReportingPlugin struct {
 	tokenDataWorker  tokendata.Worker
 	metricsCollector ccip.PluginMetricsCollector
 	// Source
-	gasPriceEstimator        prices.GasPriceEstimatorExec
-	sourcePriceRegistry      ccipdata.PriceRegistryReader
-	sourceWrappedNativeToken cciptypes.Address
-	onRampReader             ccipdata.OnRampReader
+	gasPriceEstimator           prices.GasPriceEstimatorExec
+	sourcePriceRegistryProvider ccipdataprovider.PriceRegistry
+	sourceWrappedNativeToken    cciptypes.Address
+	onRampReader                ccipdata.OnRampReader
 	// Dest
 
 	commitStoreReader      ccipdata.CommitStoreReader
@@ -1039,13 +1039,24 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 		return execTokenData{}, err
 	}
 
-	sourceFeeTokens, err := r.sourcePriceRegistry.GetFeeTokens(ctx)
+	// Build a price registry reader from the current price registry on the onRamp.
+	// This is required since the price registry address on the onRamp can change over time.
+	priceRegistryAddress, err := r.onRampReader.GetPriceRegistry()
+	if err != nil {
+		return execTokenData{}, fmt.Errorf("getting price registry from onramp: %w", err)
+	}
+	sourcePriceRegistry, err := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
+	if err != nil {
+		return execTokenData{}, err
+	}
+
+	sourceFeeTokens, err := sourcePriceRegistry.GetFeeTokens(ctx)
 	if err != nil {
 		return execTokenData{}, fmt.Errorf("get source fee tokens: %w", err)
 	}
 	sourceTokensPrices, err := getTokensPrices(
 		ctx,
-		r.sourcePriceRegistry,
+		sourcePriceRegistry,
 		ccipcommon.FlattenUniqueSlice(
 			sourceFeeTokens,
 			[]cciptypes.Address{r.sourceWrappedNativeToken},
