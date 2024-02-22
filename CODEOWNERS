@@ -80,7 +80,6 @@ core/scripts/gateway @bolekk @pinebit
 /contracts/**/*automation* @smartcontractkit/keepers
 /contracts/gas-snapshots/automation.gas-snapshot @smartcontractkit/keepers
 /contracts/**/ccip/ @rensr @matyang @makramkd
-/contracts/**/rebalancer/ @rensr @matyang @makramkd
 /contracts/**/*Functions* @smartcontractkit/functions
 
 /contracts/src/v0.8/functions @smartcontractkit/functions
