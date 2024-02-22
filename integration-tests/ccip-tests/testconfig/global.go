@@ -20,6 +20,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
+
+	"github.com/smartcontractkit/ccip/integration-tests/client"
 )
 
 const (
@@ -148,11 +150,13 @@ func NewConfig() (*Config, error) {
 // Common is the generic config struct which can be used with product specific configs.
 // It contains generic DON and networks config which can be applied to all product based tests.
 type Common struct {
-	EnvUser   string                   `toml:",omitempty"`
-	TTL       *config.Duration         `toml:",omitempty"`
-	Chainlink *Chainlink               `toml:",omitempty"`
-	Network   *ctfconfig.NetworkConfig `toml:",omitempty"`
-	Logging   *ctfconfig.LoggingConfig `toml:"Logging"`
+	EnvUser           string                   `toml:",omitempty"`
+	TTL               *config.Duration         `toml:",omitempty"`
+	ExistingCLCluster *CLCluster               `toml:",omitempty"`
+	Mockserver        *string                  `toml:",omitempty"`
+	NewCLCluster      *ChainlinkDeployment     `toml:",omitempty"`
+	Network           *ctfconfig.NetworkConfig `toml:",omitempty"`
+	Logging           *ctfconfig.LoggingConfig `toml:"Logging"`
 }
 
 func (p *Common) Validate() error {
@@ -171,7 +175,23 @@ func (p *Common) Validate() error {
 	if err := p.Network.Validate(); err != nil {
 		return fmt.Errorf("error validating networks config %w", err)
 	}
-	return p.Chainlink.Validate()
+	if p.NewCLCluster == nil && p.ExistingCLCluster == nil {
+		return errors.New("no chainlink or existing cluster specified")
+	}
+	if p.NewCLCluster != nil {
+		if p.ExistingCLCluster != nil {
+			return fmt.Errorf("both new and existing chainlink cluster specified")
+		}
+		if err := p.NewCLCluster.Validate(); err != nil {
+			return fmt.Errorf("error validating chainlink config %w", err)
+		}
+	}
+	if p.ExistingCLCluster != nil {
+		if err := p.ExistingCLCluster.Validate(); err != nil {
+			return fmt.Errorf("error validating existing chainlink cluster config %w", err)
+		}
+	}
+	return nil
 }
 
 func (p *Common) EVMNetworks() ([]blockchain.EVMNetwork, []string, error) {
@@ -187,7 +207,7 @@ func (p *Common) GetLoggingConfig() *ctfconfig.LoggingConfig {
 }
 
 func (p *Common) GetChainlinkImageConfig() *ctfconfig.ChainlinkImageConfig {
-	return p.Chainlink.Common.ChainlinkImage
+	return p.NewCLCluster.Common.ChainlinkImage
 }
 
 func (p *Common) GetPyroscopeConfig() *ctfconfig.PyroscopeConfig {
@@ -225,7 +245,37 @@ func (p *Common) GetGrafanaDashboardURL() (string, error) {
 	return url, nil
 }
 
-type Chainlink struct {
+type CLCluster struct {
+	NoOfNodes   *int                     `toml:",omitempty"`
+	NodeConfigs []client.ChainlinkConfig `toml:",omitempty"`
+}
+
+func (c *CLCluster) Validate() error {
+	if c.NoOfNodes == nil || len(c.NodeConfigs) == 0 {
+		return fmt.Errorf("no chainlink nodes specified")
+	}
+	if *c.NoOfNodes != len(c.NodeConfigs) {
+		return fmt.Errorf("number of nodes %d does not match number of node configs %d", *c.NoOfNodes, len(c.NodeConfigs))
+	}
+	for i, nodeConfig := range c.NodeConfigs {
+		if nodeConfig.URL == "" {
+			return fmt.Errorf("node %d url not specified", i+1)
+		}
+		if nodeConfig.Password == "" {
+			return fmt.Errorf("node %d password not specified", i+1)
+		}
+		if nodeConfig.Email == "" {
+			return fmt.Errorf("node %d email not specified", i+1)
+		}
+		if nodeConfig.InternalIP == "" {
+			return fmt.Errorf("node %d internal ip not specified", i+1)
+		}
+	}
+
+	return nil
+}
+
+type ChainlinkDeployment struct {
 	Common     *Node    `toml:",omitempty"`
 	NodeMemory string   `toml:",omitempty"`
 	NodeCPU    string   `toml:",omitempty"`
@@ -238,7 +288,7 @@ type Chainlink struct {
 	Nodes      []*Node  `toml:",omitempty"` // to be mentioned only if diff nodes follow diff configs; not required if all nodes follow CommonConfig
 }
 
-func (c *Chainlink) Validate() error {
+func (c *ChainlinkDeployment) Validate() error {
 	if c.Common == nil {
 		return errors.New("common config can't be empty")
 	}
@@ -275,6 +325,9 @@ func (c *Chainlink) Validate() error {
 		}
 	}
 	return nil
+}
+
+type CRIBNode struct {
 }
 
 type Node struct {
