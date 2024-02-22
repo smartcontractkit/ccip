@@ -314,7 +314,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
 
   /// @notice Sets a list of cross chain liquidity managers.
   /// @dev Will update the list of supported dest chains if the chain is new.
-  function setCrossChainRebalancer(CrossChainRebalancerArgs[] calldata crossChainRebalancers) external onlyOwner {
+  function setCrossChainRebalancers(CrossChainRebalancerArgs[] calldata crossChainRebalancers) external onlyOwner {
     for (uint256 i = 0; i < crossChainRebalancers.length; ++i) {
       _setCrossChainRebalancer(crossChainRebalancers[i]);
     }

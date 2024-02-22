@@ -127,7 +127,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       remoteChainSelector: i_remoteChainSelector,
       enabled: true
     });
-    s_rebalancer.setCrossChainRebalancer(args);
+    s_rebalancer.setCrossChainRebalancers(args);
 
     vm.expectEmit();
     emit Transfer(address(s_lockReleaseTokenPool), address(s_rebalancer), amount);
@@ -178,7 +178,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       enabled: true
     });
 
-    s_rebalancer.setCrossChainRebalancer(args);
+    s_rebalancer.setCrossChainRebalancers(args);
 
     args[0] = IRebalancer.CrossChainRebalancerArgs({
       remoteRebalancer: address(s_rebalancer),
@@ -188,7 +188,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       enabled: true
     });
 
-    mockRemoteRebalancer.setCrossChainRebalancer(args);
+    mockRemoteRebalancer.setCrossChainRebalancers(args);
 
     deal(address(s_l1Token), address(s_bridgeAdapter), amount);
 
@@ -243,7 +243,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       enabled: true
     });
 
-    s_rebalancer.setCrossChainRebalancer(args);
+    s_rebalancer.setCrossChainRebalancers(args);
 
     // set up the cross chain rebalancer on "L2".
     args[0] = IRebalancer.CrossChainRebalancerArgs({
@@ -254,7 +254,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
       enabled: true
     });
 
-    remoteRebalancer.setCrossChainRebalancer(args);
+    remoteRebalancer.setCrossChainRebalancers(args);
 
     // deal some L1 tokens to the L1 bridge adapter so that it can send them to the rebalancer
     // when the withdrawal gets finalized.
@@ -370,7 +370,7 @@ contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
       args[0].enabled
     );
 
-    s_rebalancer.setCrossChainRebalancer(args);
+    s_rebalancer.setCrossChainRebalancers(args);
 
     assertEq(s_rebalancer.getCrossChainRebalancer(remoteChainSelector).remoteRebalancer, newRebalancer);
 
@@ -455,7 +455,7 @@ contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
     vm.expectRevert("Only callable by owner");
 
     // Test the entrypoint that takes a list
-    s_rebalancer.setCrossChainRebalancer(new Rebalancer.CrossChainRebalancerArgs[](0));
+    s_rebalancer.setCrossChainRebalancers(new Rebalancer.CrossChainRebalancerArgs[](0));
 
     vm.expectRevert("Only callable by owner");
 
