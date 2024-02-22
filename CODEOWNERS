@@ -80,6 +80,7 @@ core/scripts/gateway @bolekk @pinebit
 /contracts/**/*automation* @smartcontractkit/keepers
 /contracts/gas-snapshots/automation.gas-snapshot @smartcontractkit/keepers
 /contracts/**/ccip/ @rensr @matyang @makramkd
+/contracts/**/rebalancer/ @rensr @matyang @makramkd
 /contracts/**/*Functions* @smartcontractkit/functions
 
 /contracts/src/v0.8/functions @smartcontractkit/functions
@@ -147,7 +148,8 @@ flake.lock @smartcontractkit/prodsec-public
 
 # CCIP override
 /core/ @smartcontractkit/ccip
-/contracts/ @rensr @matyang @connorwstein
+/contracts/ @rensr @matyang @makramkd
+/core/services/ocr2/plugins/rebalancer @rensr @dimkouv @makramkd
 /.github/ @rensr @connorwstein @smartcontractkit/test-tooling-team @jasonmci
 
 # CCIP ARM
