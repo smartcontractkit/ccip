@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -11,13 +12,16 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/test-go/testify/require"
 
+	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	lpmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_l1_bridge_adapter"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/arbitrum_rollup_core"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/generated/rebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/rebalancer/mocks/mock_arbitrum_rollup_core"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
+	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
@@ -214,6 +218,14 @@ func Test_unpackFinalizationPayload(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"invalid calldata",
+			args{
+				calldata: []byte{0x01, 0x02, 0x03},
+			},
+			arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumFinalizationPayload{},
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -223,6 +235,295 @@ func Test_unpackFinalizationPayload(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
+func Test_filterUnfinalizedTransfers(t *testing.T) {
+	type args struct {
+		sentLogs     []*rebalancer.RebalancerLiquidityTransferred
+		receivedLogs []*rebalancer.RebalancerLiquidityTransferred
+	}
+	var (
+		l1Rebalancer = testutils.NewAddress()
+	)
+	tests := []struct {
+		name    string
+		args    args
+		want    []*rebalancer.RebalancerLiquidityTransferred
+		wantErr bool
+	}{
+		{
+			"no sent or received",
+			args{
+				sentLogs:     nil,
+				receivedLogs: nil,
+			},
+			nil,
+			false,
+		},
+		{
+			"some sent no received",
+			args{
+				sentLogs: []*rebalancer.RebalancerLiquidityTransferred{
+					{
+						OcrSeqNum:          1,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 l1Rebalancer,
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: []byte{},
+						BridgeReturnData:   []byte{},
+					},
+					{
+						OcrSeqNum:          2,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 l1Rebalancer,
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: []byte{},
+						BridgeReturnData:   []byte{},
+					},
+				},
+				receivedLogs: nil,
+			},
+			[]*rebalancer.RebalancerLiquidityTransferred{
+				{
+					OcrSeqNum:          1,
+					FromChainSelector:  10,
+					ToChainSelector:    20,
+					To:                 l1Rebalancer,
+					Amount:             big.NewInt(100),
+					BridgeSpecificData: []byte{},
+					BridgeReturnData:   []byte{},
+				},
+				{
+					OcrSeqNum:          2,
+					FromChainSelector:  10,
+					ToChainSelector:    20,
+					To:                 l1Rebalancer,
+					Amount:             big.NewInt(100),
+					BridgeSpecificData: []byte{},
+					BridgeReturnData:   []byte{},
+				},
+			},
+			false,
+		},
+		{
+			"some sent some received don't match",
+			args{
+				sentLogs: []*rebalancer.RebalancerLiquidityTransferred{
+					{
+						OcrSeqNum:          1,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 l1Rebalancer,
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: []byte{},
+						BridgeReturnData:   mustPackReturnData(t, big.NewInt(3)),
+					},
+					{
+						OcrSeqNum:          2,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 l1Rebalancer,
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: []byte{},
+						BridgeReturnData:   mustPackReturnData(t, big.NewInt(4)),
+					},
+				},
+				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{
+					{
+						OcrSeqNum:          1,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 testutils.NewAddress(),
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: mustPackFinalizationPayload(t, big.NewInt(1)),
+						BridgeReturnData:   []byte{},
+					},
+					{
+						OcrSeqNum:          2,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 testutils.NewAddress(),
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: mustPackFinalizationPayload(t, big.NewInt(2)),
+						BridgeReturnData:   []byte{},
+					},
+				},
+			},
+			[]*rebalancer.RebalancerLiquidityTransferred{
+				{
+					OcrSeqNum:          1,
+					FromChainSelector:  10,
+					ToChainSelector:    20,
+					To:                 l1Rebalancer,
+					Amount:             big.NewInt(100),
+					BridgeSpecificData: []byte{},
+					BridgeReturnData:   mustPackReturnData(t, big.NewInt(3)),
+				},
+				{
+					OcrSeqNum:          2,
+					FromChainSelector:  10,
+					ToChainSelector:    20,
+					To:                 l1Rebalancer,
+					Amount:             big.NewInt(100),
+					BridgeSpecificData: []byte{},
+					BridgeReturnData:   mustPackReturnData(t, big.NewInt(4)),
+				},
+			},
+			false,
+		},
+		{
+			"some sent some received match",
+			args{
+				sentLogs: []*rebalancer.RebalancerLiquidityTransferred{
+					{
+						OcrSeqNum:          1,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 l1Rebalancer,
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: []byte{},
+						BridgeReturnData:   mustPackReturnData(t, big.NewInt(3)),
+					},
+					{
+						OcrSeqNum:          2,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 l1Rebalancer,
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: []byte{},
+						BridgeReturnData:   mustPackReturnData(t, big.NewInt(4)),
+					},
+					{
+						OcrSeqNum:          3,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 l1Rebalancer,
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: []byte{},
+						BridgeReturnData:   mustPackReturnData(t, big.NewInt(5)),
+					},
+				},
+				receivedLogs: []*rebalancer.RebalancerLiquidityTransferred{
+					{
+						OcrSeqNum:          1,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 testutils.NewAddress(),
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: mustPackFinalizationPayload(t, big.NewInt(1)),
+						BridgeReturnData:   []byte{},
+					},
+					{
+						OcrSeqNum:          2,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 testutils.NewAddress(),
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: mustPackFinalizationPayload(t, big.NewInt(2)),
+						BridgeReturnData:   []byte{},
+					},
+					{
+						OcrSeqNum:          3,
+						FromChainSelector:  10,
+						ToChainSelector:    20,
+						To:                 testutils.NewAddress(),
+						Amount:             big.NewInt(100),
+						BridgeSpecificData: mustPackFinalizationPayload(t, big.NewInt(3)),
+						BridgeReturnData:   []byte{},
+					},
+				},
+			},
+			[]*rebalancer.RebalancerLiquidityTransferred{
+				{
+					OcrSeqNum:          2,
+					FromChainSelector:  10,
+					ToChainSelector:    20,
+					To:                 l1Rebalancer,
+					Amount:             big.NewInt(100),
+					BridgeSpecificData: []byte{},
+					BridgeReturnData:   mustPackReturnData(t, big.NewInt(4)),
+				},
+				{
+					OcrSeqNum:          3,
+					FromChainSelector:  10,
+					ToChainSelector:    20,
+					To:                 l1Rebalancer,
+					Amount:             big.NewInt(100),
+					BridgeSpecificData: []byte{},
+					BridgeReturnData:   mustPackReturnData(t, big.NewInt(5)),
+				},
+			},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := filterUnfinalizedTransfers(tt.args.sentLogs, tt.args.receivedLogs)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
+func mustPackFinalizationPayload(t *testing.T, finalizationIndex *big.Int) []byte {
+	payload := arbitrum_l1_bridge_adapter.ArbitrumL1BridgeAdapterArbitrumFinalizationPayload{
+		Proof:       make([][32]byte, 1),
+		L2Sender:    testutils.NewAddress(),
+		To:          testutils.NewAddress(),
+		L2Block:     big.NewInt(100),
+		L1Block:     big.NewInt(100),
+		L2Timestamp: big.NewInt(2000),
+		Value:       big.NewInt(0),
+		Data:        []byte{},
+		// only thing that matters for detecting finalization
+		Index: finalizationIndex,
+	}
+	packed, err := l1AdapterABI.Methods["exposeArbitrumFinalizationPayload"].Inputs.Pack(payload)
+	require.NoError(t, err)
+	return packed
+}
+
+func TestNewL2ToL1Bridge(t *testing.T) {
+	type args struct {
+		lggr                logger.Logger
+		localSelector       models.NetworkSelector
+		remoteSelector      models.NetworkSelector
+		l1RollupAddress     common.Address
+		l1RebalancerAddress common.Address
+		l2RebalancerAddress common.Address
+		l2LogPoller         *lpmocks.LogPoller
+		l1LogPoller         *lpmocks.LogPoller
+		l2Client            *evmclientmocks.Client
+		l1Client            *evmclientmocks.Client
+	}
+	tests := []struct {
+		name       string
+		args       args
+		want       *l2ToL1Bridge
+		wantErr    bool
+		before     func(*testing.T, args)
+		assertions func(*testing.T, args)
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewL2ToL1Bridge(tt.args.lggr, tt.args.localSelector, tt.args.remoteSelector, tt.args.l1RollupAddress, tt.args.l1RebalancerAddress, tt.args.l2RebalancerAddress, tt.args.l2LogPoller, tt.args.l1LogPoller, tt.args.l2Client, tt.args.l1Client)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewL2ToL1Bridge() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewL2ToL1Bridge() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -336,7 +336,7 @@ func (l *l2ToL1Bridge) partitionReadyTransfers(
 	notReady []*rebalancer.RebalancerLiquidityTransferred,
 	err error,
 ) {
-	unfinalized, err := l.filterUnfinalizedTransfers(sentLogs, receivedLogs)
+	unfinalized, err := filterUnfinalizedTransfers(sentLogs, receivedLogs)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("filter unfinalized transfers: %w", err)
 	}
@@ -365,7 +365,7 @@ func (l *l2ToL1Bridge) partitionReadyTransfers(
 	return
 }
 
-func (l *l2ToL1Bridge) filterUnfinalizedTransfers(sentLogs, receivedLogs []*rebalancer.RebalancerLiquidityTransferred) ([]*rebalancer.RebalancerLiquidityTransferred, error) {
+func filterUnfinalizedTransfers(sentLogs, receivedLogs []*rebalancer.RebalancerLiquidityTransferred) ([]*rebalancer.RebalancerLiquidityTransferred, error) {
 	var unfinalized []*rebalancer.RebalancerLiquidityTransferred
 	for _, sent := range sentLogs {
 		var found bool
