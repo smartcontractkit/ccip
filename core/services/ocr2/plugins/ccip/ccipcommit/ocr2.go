@@ -448,7 +448,7 @@ func validateObservations(ctx context.Context, lggr logger.Logger, destTokens []
 				skipObservation = true
 			}
 			if !slices.Contains(destTokens, token) {
-				lggr.Warnw("Unsupported token in observed TokenPricesUSD", "token", token)
+				lggr.Warnw("Unsupported token in observed TokenPricesUSD", "token", token, "destTokens", destTokens)
 				skipObservation = true
 			}
 		}
