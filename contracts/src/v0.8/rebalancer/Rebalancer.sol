@@ -40,6 +40,14 @@ contract Rebalancer is IRebalancer, OCR3Base {
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
+  event LiquidityContainerSet(address indexed newLiquidityContainer);
+  event CrossChainRebalancerSet(
+    uint64 indexed remoteChainSelector,
+    IBridgeAdapter localBridge,
+    address remoteToken,
+    address remoteRebalancer,
+    bool enabled
+  );
 
   event FinalizationFailed(
     uint64 indexed ocrSeqNum,
@@ -55,7 +63,6 @@ contract Rebalancer is IRebalancer, OCR3Base {
     bool enabled;
   }
 
-  // solhint-disable-next-line chainlink-solidity/all-caps-constant-storage-variables
   string public constant override typeAndVersion = "Rebalancer 1.0.0-dev";
 
   /// @notice The token that this pool manages liquidity for.
@@ -303,13 +310,17 @@ contract Rebalancer is IRebalancer, OCR3Base {
   /// @dev Will update the list of supported dest chains if the chain is new.
   function setCrossChainRebalancer(CrossChainRebalancerArgs[] calldata crossChainRebalancers) external onlyOwner {
     for (uint256 i = 0; i < crossChainRebalancers.length; ++i) {
-      setCrossChainRebalancer(crossChainRebalancers[i]);
+      _setCrossChainRebalancer(crossChainRebalancers[i]);
     }
+  }
+
+  function setCrossChainRebalancer(CrossChainRebalancerArgs calldata crossChainLiqManager) external onlyOwner {
+    _setCrossChainRebalancer(crossChainLiqManager);
   }
 
   /// @notice Sets a single cross chain liquidity manager.
   /// @dev Will update the list of supported dest chains if the chain is new.
-  function setCrossChainRebalancer(CrossChainRebalancerArgs calldata crossChainLiqManager) public onlyOwner {
+  function _setCrossChainRebalancer(CrossChainRebalancerArgs calldata crossChainLiqManager) internal {
     if (crossChainLiqManager.remoteChainSelector == 0) {
       revert ZeroChainSelector();
     }
@@ -333,6 +344,14 @@ contract Rebalancer is IRebalancer, OCR3Base {
       remoteToken: crossChainLiqManager.remoteToken,
       enabled: crossChainLiqManager.enabled
     });
+
+    emit CrossChainRebalancerSet(
+      crossChainLiqManager.remoteChainSelector,
+      crossChainLiqManager.localBridge,
+      crossChainLiqManager.remoteToken,
+      crossChainLiqManager.remoteRebalancer,
+      crossChainLiqManager.enabled
+    );
   }
 
   /// @notice Gets the local liquidity container.
@@ -344,5 +363,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
   /// @dev Only the owner can call this function.
   function setLocalLiquidityContainer(ILiquidityContainer localLiquidityContainer) external onlyOwner {
     s_localLiquidityContainer = localLiquidityContainer;
+
+    emit LiquidityContainerSet(address(localLiquidityContainer));
   }
 }

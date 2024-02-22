@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {IRebalancer} from "../interfaces/IRebalancer.sol";
+import {IBridgeAdapter} from "../interfaces/IBridge.sol";
 
 import {LockReleaseTokenPool} from "../../ccip/pools/LockReleaseTokenPool.sol";
 import {Rebalancer} from "../Rebalancer.sol";
@@ -26,6 +27,7 @@ contract RebalancerSetup is RebalancerBaseTest {
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed provider, uint256 indexed amount);
+
   error NonceAlreadyUsed(uint256 nonce);
 
   Rebalancer internal s_rebalancer;
@@ -262,5 +264,170 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
     vm.expectRevert(abi.encodeWithSelector(Rebalancer.InvalidRemoteChain.selector, i_remoteChainSelector));
 
     s_rebalancer.rebalanceLiquidity(i_remoteChainSelector, amount, 0, bytes(""));
+  }
+}
+
+contract Rebalancer_setCrossChainRebalancer is RebalancerSetup {
+  event CrossChainRebalancerSet(
+    uint64 indexed remoteChainSelector,
+    IBridgeAdapter localBridge,
+    address remoteToken,
+    address remoteRebalancer,
+    bool enabled
+  );
+
+  function test_setCrossChainRebalancerSuccess() external {
+    address newRebalancer = address(23892423);
+    uint64 remoteChainSelector = 12301293;
+
+    uint64[] memory supportedChains = s_rebalancer.getSupportedDestChains();
+    assertEq(supportedChains.length, 0);
+
+    Rebalancer.CrossChainRebalancerArgs[] memory args = new Rebalancer.CrossChainRebalancerArgs[](1);
+    args[0] = IRebalancer.CrossChainRebalancerArgs({
+      remoteRebalancer: newRebalancer,
+      localBridge: s_bridgeAdapter,
+      remoteToken: address(190490124908),
+      remoteChainSelector: remoteChainSelector,
+      enabled: true
+    });
+
+    vm.expectEmit();
+    emit CrossChainRebalancerSet(
+      remoteChainSelector,
+      args[0].localBridge,
+      args[0].remoteToken,
+      newRebalancer,
+      args[0].enabled
+    );
+
+    s_rebalancer.setCrossChainRebalancer(args);
+
+    assertEq(s_rebalancer.getCrossChainRebalancer(remoteChainSelector).remoteRebalancer, newRebalancer);
+
+    Rebalancer.CrossChainRebalancerArgs[] memory got = s_rebalancer.getAllCrossChainRebalancers();
+    assertEq(got.length, 1);
+    assertEq(got[0].remoteRebalancer, args[0].remoteRebalancer);
+    assertEq(address(got[0].localBridge), address(args[0].localBridge));
+    assertEq(got[0].remoteToken, args[0].remoteToken);
+    assertEq(got[0].remoteChainSelector, args[0].remoteChainSelector);
+    assertEq(got[0].enabled, args[0].enabled);
+
+    supportedChains = s_rebalancer.getSupportedDestChains();
+    assertEq(supportedChains.length, 1);
+    assertEq(supportedChains[0], remoteChainSelector);
+
+    address anotherRebalancer = address(123);
+    args[0].remoteRebalancer = anotherRebalancer;
+
+    vm.expectEmit();
+    emit CrossChainRebalancerSet(
+      remoteChainSelector,
+      args[0].localBridge,
+      args[0].remoteToken,
+      anotherRebalancer,
+      args[0].enabled
+    );
+
+    s_rebalancer.setCrossChainRebalancer(args[0]);
+
+    assertEq(s_rebalancer.getCrossChainRebalancer(remoteChainSelector).remoteRebalancer, anotherRebalancer);
+
+    supportedChains = s_rebalancer.getSupportedDestChains();
+    assertEq(supportedChains.length, 1);
+    assertEq(supportedChains[0], remoteChainSelector);
+  }
+
+  function test_ZeroChainSelectorReverts() external {
+    Rebalancer.CrossChainRebalancerArgs memory arg = IRebalancer.CrossChainRebalancerArgs({
+      remoteRebalancer: address(9),
+      localBridge: s_bridgeAdapter,
+      remoteToken: address(190490124908),
+      remoteChainSelector: 0,
+      enabled: true
+    });
+
+    vm.expectRevert(Rebalancer.ZeroChainSelector.selector);
+
+    s_rebalancer.setCrossChainRebalancer(arg);
+  }
+
+  function test_ZeroAddressReverts() external {
+    Rebalancer.CrossChainRebalancerArgs memory arg = IRebalancer.CrossChainRebalancerArgs({
+      remoteRebalancer: address(0),
+      localBridge: s_bridgeAdapter,
+      remoteToken: address(190490124908),
+      remoteChainSelector: 123,
+      enabled: true
+    });
+
+    vm.expectRevert(Rebalancer.ZeroAddress.selector);
+
+    s_rebalancer.setCrossChainRebalancer(arg);
+
+    arg.remoteRebalancer = address(9);
+    arg.localBridge = IBridgeAdapter(address(0));
+
+    vm.expectRevert(Rebalancer.ZeroAddress.selector);
+
+    s_rebalancer.setCrossChainRebalancer(arg);
+
+    arg.localBridge = s_bridgeAdapter;
+    arg.remoteToken = address(0);
+
+    vm.expectRevert(Rebalancer.ZeroAddress.selector);
+
+    s_rebalancer.setCrossChainRebalancer(arg);
+  }
+
+  function test_OnlyOwnerReverts() external {
+    vm.stopPrank();
+
+    vm.expectRevert("Only callable by owner");
+
+    // Test the entrypoint that takes a list
+    s_rebalancer.setCrossChainRebalancer(new Rebalancer.CrossChainRebalancerArgs[](0));
+
+    vm.expectRevert("Only callable by owner");
+
+    // Test the entrypoint that takes a single item
+    s_rebalancer.setCrossChainRebalancer(
+      IRebalancer.CrossChainRebalancerArgs({
+        remoteRebalancer: address(9),
+        localBridge: s_bridgeAdapter,
+        remoteToken: address(190490124908),
+        remoteChainSelector: 124,
+        enabled: true
+      })
+    );
+  }
+}
+
+contract Rebalancer_setLocalLiquidityContainer is RebalancerSetup {
+  event LiquidityContainerSet(address indexed newLiquidityContainer);
+
+  function test_setLocalLiquidityContainerSuccess() external {
+    LockReleaseTokenPool newPool = new LockReleaseTokenPool(
+      s_l1Token,
+      new address[](0),
+      address(1),
+      true,
+      address(123)
+    );
+
+    vm.expectEmit();
+    emit LiquidityContainerSet(address(newPool));
+
+    s_rebalancer.setLocalLiquidityContainer(newPool);
+
+    assertEq(s_rebalancer.getLocalLiquidityContainer(), address(newPool));
+  }
+
+  function test_OnlyOwnerReverts() external {
+    vm.stopPrank();
+
+    vm.expectRevert("Only callable by owner");
+
+    s_rebalancer.setLocalLiquidityContainer(LockReleaseTokenPool(address(1)));
   }
 }
