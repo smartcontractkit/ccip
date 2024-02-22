@@ -953,6 +953,7 @@ func TestCommitReportingPlugin_calculatePriceUpdates(t *testing.T) {
 					GasPriceHeartBeat:      tc.gasPriceHeartBeat.Duration(),
 					TokenPriceHeartBeat:    tc.tokenPriceHeartBeat.Duration(),
 					TokenPriceDeviationPPB: tc.tokenPriceDeviationPPB,
+					PriceReportingEnabled:  true,
 				},
 				gasPriceEstimator: estimator,
 				F:                 tc.f,

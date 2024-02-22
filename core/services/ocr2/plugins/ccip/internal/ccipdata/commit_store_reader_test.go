@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/assets"
 	evmclientmocks "github.com/smartcontractkit/chainlink/v2/core/chains/evm/client/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
@@ -201,6 +202,7 @@ func TestCommitStoreReaders(t *testing.T) {
 		TokenPriceDeviationPPB: 1e6,
 		TokenPriceHeartBeat:    1 * time.Hour,
 		InflightCacheExpiry:    3 * time.Hour,
+		PriceReportingEnabled:  true,
 	}
 	maxGas := uint64(1e9)
 	offchainConfig, err := ccipconfig.EncodeOffchainConfig[v1_0_0.CommitOffchainConfig](v1_0_0.CommitOffchainConfig{

@@ -66,6 +66,7 @@ type CommitOffchainConfig struct {
 	TokenPriceDeviationPPB uint32
 	TokenPriceHeartBeat    time.Duration
 	InflightCacheExpiry    time.Duration
+	PriceReportingEnabled  bool
 }
 
 type CommitStoreStaticConfig struct {
