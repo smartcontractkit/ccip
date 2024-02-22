@@ -26,6 +26,9 @@ contract RebalancerSetup is RebalancerBaseTest {
     bytes bridgeSpecificData,
     bytes reason
   );
+  event LiquidityAddedToContainer(address indexed provider, uint256 indexed amount);
+  event LiquidityRemovedFromContainer(address indexed remover, uint256 indexed amount);
+  // Liquidity container event
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
   event LiquidityRemoved(address indexed remover, uint256 indexed amount);
 
@@ -57,7 +60,7 @@ contract Rebalancer_addLiquidity is RebalancerSetup {
     s_l1Token.approve(address(s_rebalancer), amount);
 
     vm.expectEmit();
-    emit LiquidityAdded(caller, amount);
+    emit LiquidityAddedToContainer(caller, amount);
 
     s_rebalancer.addLiquidity(amount);
 
@@ -71,7 +74,7 @@ contract Rebalancer_removeLiquidity is RebalancerSetup {
     deal(address(s_l1Token), address(s_lockReleaseTokenPool), amount);
 
     vm.expectEmit();
-    emit LiquidityRemoved(OWNER, amount);
+    emit LiquidityRemovedFromContainer(OWNER, amount);
 
     s_rebalancer.removeLiquidity(amount);
 

@@ -39,8 +39,8 @@ contract Rebalancer is IRebalancer, OCR3Base {
     bytes bridgeSpecificData,
     bytes bridgeReturnData
   );
-  event LiquidityAdded(address indexed provider, uint256 indexed amount);
-  event LiquidityRemoved(address indexed remover, uint256 indexed amount);
+  event LiquidityAddedToContainer(address indexed provider, uint256 indexed amount);
+  event LiquidityRemovedFromContainer(address indexed remover, uint256 indexed amount);
   event LiquidityContainerSet(address indexed newLiquidityContainer);
   event CrossChainRebalancerSet(
     uint64 indexed remoteChainSelector,
@@ -119,7 +119,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
     i_localToken.approve(address(s_localLiquidityContainer), amount);
     s_localLiquidityContainer.provideLiquidity(amount);
 
-    emit LiquidityAdded(msg.sender, amount);
+    emit LiquidityAddedToContainer(msg.sender, amount);
   }
 
   /// @notice Removes liquidity from the system and sends it to the caller, so the owner.
@@ -133,7 +133,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
     s_localLiquidityContainer.withdrawLiquidity(amount);
     i_localToken.safeTransfer(msg.sender, amount);
 
-    emit LiquidityRemoved(msg.sender, amount);
+    emit LiquidityRemovedFromContainer(msg.sender, amount);
   }
 
   /// @notice Transfers liquidity to another chain.
@@ -251,10 +251,11 @@ contract Rebalancer is IRebalancer, OCR3Base {
     IRebalancer.LiquidityInstructions memory instructions = abi.decode(report, (IRebalancer.LiquidityInstructions));
 
     uint256 sendInstructions = instructions.sendLiquidityParams.length;
+    uint256 receiveInstructions = instructions.receiveLiquidityParams.length;
 
     // There should always be instructions to send or receive, if not, the report is invalid
     // and we revert to save the gas of the signature validation of OCR.
-    if (sendInstructions == 0) {
+    if (sendInstructions == 0 && receiveInstructions == 0) {
       revert EmptyReport();
     }
 
@@ -268,7 +269,6 @@ contract Rebalancer is IRebalancer, OCR3Base {
       );
     }
 
-    uint256 receiveInstructions = instructions.receiveLiquidityParams.length;
     for (uint256 i = 0; i < receiveInstructions; ++i) {
       _receiveLiquidity(
         instructions.receiveLiquidityParams[i].remoteChainSelector,
