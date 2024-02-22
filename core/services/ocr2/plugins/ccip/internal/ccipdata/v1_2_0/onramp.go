@@ -170,6 +170,14 @@ func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 	}, nil
 }
 
+func (o *OnRamp) GetPriceRegistry() (cciptypes.Address, error) {
+	c, err := o.GetDynamicConfig()
+	if err != nil {
+		return "", err
+	}
+	return c.PriceRegistry, nil
+}
+
 func (o *OnRamp) logToMessage(log types.Log) (*cciptypes.EVM2EVMMessage, error) {
 	msg, err := o.onRamp.ParseCCIPSendRequested(log)
 	if err != nil {
