@@ -28,6 +28,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
   error InvalidRemoteChain(uint64 chainSelector);
   error ZeroChainSelector();
   error InsufficientLiquidity(uint256 requested, uint256 available);
+  error EmptyReport();
 
   event LiquidityTransferred(
     uint64 indexed ocrSeqNum,
@@ -217,7 +218,7 @@ contract Rebalancer is IRebalancer, OCR3Base {
     try
       remoteRebalancer.localBridge.finalizeWithdrawERC20(
         remoteRebalancer.remoteRebalancer, // remoteSender: the remote rebalancer
-        address(this), // localReceiver: us
+        address(this), // localReceiver: this contract
         bridgeSpecificPayload
       )
     {
@@ -250,6 +251,13 @@ contract Rebalancer is IRebalancer, OCR3Base {
     IRebalancer.LiquidityInstructions memory instructions = abi.decode(report, (IRebalancer.LiquidityInstructions));
 
     uint256 sendInstructions = instructions.sendLiquidityParams.length;
+
+    // There should always be instructions to send or receive, if not, the report is invalid
+    // and we revert to save the gas of the signature validation of OCR.
+    if (sendInstructions == 0) {
+      revert EmptyReport();
+    }
+
     for (uint256 i = 0; i < sendInstructions; ++i) {
       _rebalanceLiquidity(
         instructions.sendLiquidityParams[i].remoteChainSelector,
@@ -269,8 +277,6 @@ contract Rebalancer is IRebalancer, OCR3Base {
         ocrSeqNum
       );
     }
-
-    // todo emit?
   }
 
   // ================================================================

@@ -8,6 +8,7 @@ import {LockReleaseTokenPool} from "../../ccip/pools/LockReleaseTokenPool.sol";
 import {Rebalancer} from "../Rebalancer.sol";
 import {MockL1BridgeAdapter} from "./mocks/MockBridgeAdapter.sol";
 import {RebalancerBaseTest} from "./RebalancerBaseTest.t.sol";
+import {RebalancerHelper} from "./helpers/RebalancerHelper.sol";
 
 contract RebalancerSetup is RebalancerBaseTest {
   event LiquidityTransferred(
@@ -26,11 +27,11 @@ contract RebalancerSetup is RebalancerBaseTest {
     bytes reason
   );
   event LiquidityAdded(address indexed provider, uint256 indexed amount);
-  event LiquidityRemoved(address indexed provider, uint256 indexed amount);
+  event LiquidityRemoved(address indexed remover, uint256 indexed amount);
 
   error NonceAlreadyUsed(uint256 nonce);
 
-  Rebalancer internal s_rebalancer;
+  RebalancerHelper internal s_rebalancer;
   LockReleaseTokenPool internal s_lockReleaseTokenPool;
   MockL1BridgeAdapter internal s_bridgeAdapter;
 
@@ -39,9 +40,74 @@ contract RebalancerSetup is RebalancerBaseTest {
 
     s_bridgeAdapter = new MockL1BridgeAdapter(s_l1Token);
     s_lockReleaseTokenPool = new LockReleaseTokenPool(s_l1Token, new address[](0), address(1), true, address(123));
-    s_rebalancer = new Rebalancer(s_l1Token, i_localChainSelector, s_lockReleaseTokenPool);
+    s_rebalancer = new RebalancerHelper(s_l1Token, i_localChainSelector, s_lockReleaseTokenPool);
 
     s_lockReleaseTokenPool.setRebalancer(address(s_rebalancer));
+  }
+}
+
+contract Rebalancer_addLiquidity is RebalancerSetup {
+  function test_addLiquiditySuccess() external {
+    address caller = STRANGER;
+    vm.startPrank(caller);
+
+    uint256 amount = 12345679;
+    deal(address(s_l1Token), caller, amount);
+
+    s_l1Token.approve(address(s_rebalancer), amount);
+
+    vm.expectEmit();
+    emit LiquidityAdded(caller, amount);
+
+    s_rebalancer.addLiquidity(amount);
+
+    assertEq(s_l1Token.balanceOf(address(s_lockReleaseTokenPool)), amount);
+  }
+}
+
+contract Rebalancer_removeLiquidity is RebalancerSetup {
+  function test_removeLiquiditySuccess() external {
+    uint256 amount = 12345679;
+    deal(address(s_l1Token), address(s_lockReleaseTokenPool), amount);
+
+    vm.expectEmit();
+    emit LiquidityRemoved(OWNER, amount);
+
+    s_rebalancer.removeLiquidity(amount);
+
+    assertEq(s_l1Token.balanceOf(address(s_rebalancer)), 0);
+  }
+
+  function test_InsufficientLiquidityReverts() external {
+    uint256 balance = 923;
+    uint256 requested = balance + 1;
+
+    deal(address(s_l1Token), address(s_lockReleaseTokenPool), balance);
+
+    vm.expectRevert(abi.encodeWithSelector(Rebalancer.InsufficientLiquidity.selector, requested, balance));
+
+    s_rebalancer.removeLiquidity(requested);
+  }
+
+  function test_OnlyOwnerReverts() external {
+    vm.stopPrank();
+
+    vm.expectRevert("Only callable by owner");
+
+    s_rebalancer.removeLiquidity(123);
+  }
+}
+
+contract Rebalancer__report is RebalancerSetup {
+  function test_EmptyReportReverts() external {
+    IRebalancer.LiquidityInstructions memory instructions = IRebalancer.LiquidityInstructions({
+      sendLiquidityParams: new IRebalancer.SendLiquidityParams[](0),
+      receiveLiquidityParams: new IRebalancer.ReceiveLiquidityParams[](0)
+    });
+
+    vm.expectRevert(Rebalancer.EmptyReport.selector);
+
+    s_rebalancer.report(abi.encode(instructions), 123);
   }
 }
 
@@ -95,7 +161,7 @@ contract Rebalancer_rebalanceLiquidity is RebalancerSetup {
   function test_rebalanceBetweenPoolsSuccess() external {
     uint256 amount = 12345670;
 
-    s_rebalancer = new Rebalancer(s_l1Token, i_localChainSelector, s_bridgeAdapter);
+    s_rebalancer = new RebalancerHelper(s_l1Token, i_localChainSelector, s_bridgeAdapter);
 
     MockL1BridgeAdapter mockRemoteBridgeAdapter = new MockL1BridgeAdapter(s_l1Token);
     Rebalancer mockRemoteRebalancer = new Rebalancer(s_l1Token, i_remoteChainSelector, mockRemoteBridgeAdapter);
