@@ -1842,9 +1842,9 @@ func Test_prepareTokenExecData(t *testing.T) {
 			sourcePriceRegistryProvider.On("NewPriceRegistryReader", ctx, sourcePriceRegistryAddress).Return(sourcePriceRegistry, nil).Maybe()
 
 			reportingPlugin := ExecutionReportingPlugin{
-				onRampReader:  onrampReader,
-				offRampReader: offrampReader,
-				//sourcePriceRegistry:      sourcePriceRegistry,
+				onRampReader:                onrampReader,
+				offRampReader:               offrampReader,
+				SourcePriceRegistry:         nil, // will be updated at first use.
 				sourcePriceRegistryProvider: sourcePriceRegistryProvider,
 				destPriceRegistry:           destPriceRegistry,
 				gasPriceEstimator:           gasPriceEstimator,
