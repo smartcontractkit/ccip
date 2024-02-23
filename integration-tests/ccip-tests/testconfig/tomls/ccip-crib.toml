@@ -1,4 +1,72 @@
 [CCIP]
+[CCIP.Deployments]
+Data = """
+{
+  "lane_configs": {
+    "geth_1337": {
+      "is_mock_arm": true,
+      "fee_token": "0x40a42Baf86Fc821f972Ad2aC878729063CeEF403",
+      "bridge_tokens": [
+        "0xde2Bd2ffEA002b8E84ADeA96e5976aF664115E2c",
+        "0xD49a0e9A4CD5979aE36840f542D2d7f02C4817Be"
+      ],
+      "bridge_tokens_pools": [
+        "0xc582Bc0317dbb0908203541971a358c44b1F3766",
+        "0x74Cf9087AD26D541930BaC724B7ab21bA8F00a27"
+      ],
+      "arm": "0x6C2d83262fF84cBaDb3e416D527403135D757892",
+      "router": "0x0ed64d01D0B4B655E410EF1441dD677B695639E7",
+      "price_registry": "0x26B862f640357268Bd2d9E95bc81553a2Aa81D7E",
+      "wrapped_native": "0xFD6F7A6a5c21A3f503EBaE7a473639974379c351",
+      "multicall": "0x0000000000000000000000000000000000000000",
+      "src_contracts": {
+        "geth_2337": {
+          "on_ramp": "0xB06c856C8eaBd1d8321b687E188204C1018BC4E5",
+          "deployed_at": 1798
+        }
+      },
+      "dest_contracts": {
+        "geth_2337": {
+          "off_ramp": "0x1780bCf4103D3F501463AD3414c7f4b654bb7aFd",
+          "commit_store": "0x02df3a3F960393F5B349E40A599FEda91a7cc1A7",
+          "receiver_dapp": "0x8F4ec854Dd12F1fe79500a1f53D0cbB30f9b6134"
+        }
+      }
+    },
+    "geth_2337": {
+      "is_mock_arm": true,
+      "fee_token": "0x58AA941Ba0568DF0886B6eC41233cFe94bF32178",
+      "bridge_tokens": [
+        "0x5C3A8b1E8273F52EF64D70CEAB437AA6f7092f65",
+        "0xd5C9Febf02791Bd2AE746FAF9e51Ea4Af25Ad2cb"
+      ],
+      "bridge_tokens_pools": [
+        "0x07F1599D3fCEC400eFf2528f29fD4f00E9A61062",
+        "0x87Ce66A0E46924a164E967159EDc7A2E45AF926A"
+      ],
+      "arm": "0x8896Dce0E60a706244553ADA1aAc5CDCc40a0428",
+      "router": "0x61B626A562d39439Ab60fCbF19678Dac036D1209",
+      "price_registry": "0x6D1366b16EAafbB328432894981F71CE55b0FDF8",
+      "wrapped_native": "0x2575d6D30767149c99589cce743656fA3866ca2e",
+      "multicall": "0x0000000000000000000000000000000000000000",
+      "src_contracts": {
+        "geth_1337": {
+          "on_ramp": "0xf9FFCCdb71D68eeBa284e6b8cbF35146f018C9b9",
+          "deployed_at": 1795
+        }
+      },
+      "dest_contracts": {
+        "geth_1337": {
+          "off_ramp": "0x181522bb19Ae83E9984c469f67DAe5602F0BC3de",
+          "commit_store": "0x2d0adf1795389d6fB7d231ea5D282F1b19be5495",
+          "receiver_dapp": "0xC7981C4AB397E174964C0A927a4dE71143A09708"
+        }
+      }
+    }
+  }
+}
+"""
+
 [CCIP.Env]
 Mockserver = 'http://127.1.27.12:1080'
 
@@ -81,6 +149,7 @@ InternalIP = 'app-node-6'
 [CCIP.Groups.smoke]
 LocalCluster = false
 TestRunName = 'crib-ani-smoke'
+ExistingDeployment = true
 
 [CCIP.Groups.load]
 LocalCluster = false
@@ -89,3 +158,4 @@ TimeUnit = '1s'
 TestDuration = '20m'
 RequestPerUnitTime = [1]
 NodeFunding = 100.0
+ExistingDeployment = true
