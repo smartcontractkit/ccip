@@ -913,7 +913,7 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 				require.NoError(t, o.Reporter.SendReport(t, namespace, false), "Aggregating and sending report shouldn't fail")
 				return
 			}
-			if pointer.GetBool(testConfig.TestGroupInput.KeepEnvAlive) {
+			if pointer.GetBool(testConfig.TestGroupInput.KeepEnvAlive) || testConfig.ExistingCLCluster() {
 				require.NoError(t, o.Reporter.SendReport(t, namespace, true), "Aggregating and sending report shouldn't fail")
 				return
 			}

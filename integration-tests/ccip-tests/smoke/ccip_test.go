@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/AlekSi/pointer"
-	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-testing-framework/logging"
@@ -24,15 +23,6 @@ import (
 type testDefinition struct {
 	testName string
 	lane     *actions.CCIPLane
-}
-
-func TestMockServer(t *testing.T) {
-	mockserver := ctfClient.NewMockserverClient(&ctfClient.MockserverConfig{
-		LocalURL:   "http://127.1.27.3:1080",
-		ClusterURL: "http://127.1.27.3:1080",
-	})
-	err := mockserver.SetAnyValueResponse("nc/.*", "100")
-	require.NoError(t, err)
 }
 
 func TestSmokeCCIPForBidirectionalLane(t *testing.T) {
