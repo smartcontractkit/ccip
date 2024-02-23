@@ -799,6 +799,37 @@ func (r *rpcClient) CallContract(ctx context.Context, msg interface{}, blockNumb
 	return
 }
 
+func (r *rpcClient) PendingCallContract(ctx context.Context, msg interface{}) (val []byte, err error) {
+	ctx, cancel, ws, http, err := r.makeLiveQueryCtxAndSafeGetClients(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer cancel()
+	lggr := r.newRqLggr().With("callMsg", msg)
+	message := msg.(ethereum.CallMsg)
+
+	lggr.Debug("RPC call: evmclient.Client#PendingCallContract")
+	start := time.Now()
+	var hex hexutil.Bytes
+	if http != nil {
+		err = http.rpc.CallContext(ctx, &hex, "eth_call", toCallArg(message), "pending")
+		err = r.wrapHTTP(err)
+	} else {
+		err = ws.rpc.CallContext(ctx, &hex, "eth_call", toCallArg(message), "pending")
+		err = r.wrapWS(err)
+	}
+	if err == nil {
+		val = hex
+	}
+	duration := time.Since(start)
+
+	r.logResult(lggr, err, duration, r.getRPCDomain(), "PendingCallContract",
+		"val", val,
+	)
+
+	return
+}
+
 // COPIED FROM go-ethereum/ethclient/gethclient - must be kept up to date!
 func toBlockNumArg(number *big.Int) string {
 	if number == nil {
