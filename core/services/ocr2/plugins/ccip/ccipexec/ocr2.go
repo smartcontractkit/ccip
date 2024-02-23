@@ -71,6 +71,7 @@ type ExecutionReportingPlugin struct {
 	metricsCollector ccip.PluginMetricsCollector
 	// Source
 	gasPriceEstimator           prices.GasPriceEstimatorExec
+	SourcePriceRegistry         ccipdata.PriceRegistryReader
 	sourcePriceRegistryProvider ccipdataprovider.PriceRegistry
 	sourceWrappedNativeToken    cciptypes.Address
 	onRampReader                ccipdata.OnRampReader
@@ -1045,18 +1046,25 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 	if err != nil {
 		return execTokenData{}, fmt.Errorf("getting price registry from onramp: %w", err)
 	}
-	sourcePriceRegistry, err := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
-	if err != nil {
-		return execTokenData{}, err
+	if r.sourcePriceRegistryProvider == nil {
+		return execTokenData{}, fmt.Errorf("sourcePriceRegistryProvider is nil")
+	}
+	if r.SourcePriceRegistry == nil || priceRegistryAddress != r.SourcePriceRegistry.Address() {
+		// Price registry address changed, updating source price registry.
+		sourcePriceRegistry, err1 := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
+		if err1 != nil {
+			return execTokenData{}, err1
+		}
+		r.SourcePriceRegistry = sourcePriceRegistry
 	}
 
-	sourceFeeTokens, err := sourcePriceRegistry.GetFeeTokens(ctx)
+	sourceFeeTokens, err := r.SourcePriceRegistry.GetFeeTokens(ctx)
 	if err != nil {
 		return execTokenData{}, fmt.Errorf("get source fee tokens: %w", err)
 	}
 	sourceTokensPrices, err := getTokensPrices(
 		ctx,
-		sourcePriceRegistry,
+		r.SourcePriceRegistry,
 		ccipcommon.FlattenUniqueSlice(
 			sourceFeeTokens,
 			[]cciptypes.Address{r.sourceWrappedNativeToken},
