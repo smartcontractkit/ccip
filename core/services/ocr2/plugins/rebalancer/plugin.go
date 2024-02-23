@@ -75,13 +75,17 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 	lggr := p.lggr.With("seqNr", outcomeCtx.SeqNr)
 	lggr.Infow("in observation", "seqNr", outcomeCtx.SeqNr)
 
-	if err := p.syncGraphEdges(ctx); err != nil {
+	if err := p.syncGraph(ctx); err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph edges: %w", err)
 	}
 
-	networkLiquidities, err := p.syncGraphBalances(ctx)
-	if err != nil {
-		return ocrtypes.Observation{}, fmt.Errorf("sync graph balances: %w", err)
+	networkLiquidities := make([]models.NetworkLiquidity, 0)
+	for _, net := range p.rebalancerGraph.GetNetworks() {
+		liq, err := p.rebalancerGraph.GetLiquidity(net)
+		if err != nil {
+			return ocrtypes.Observation{}, err
+		}
+		networkLiquidities = append(networkLiquidities, models.NewNetworkLiquidity(net, liq))
 	}
 
 	pendingTransfers, err := p.loadPendingTransfers(ctx)
@@ -237,15 +241,13 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	)
 	lggr.Debugw("got incoming and outgoing transfers")
 
-	configDigestsMap := map[models.NetworkSelector]map[models.Address]types.ConfigDigest{}
+	configDigestsMap := map[models.NetworkSelector]types.ConfigDigest{}
 	for _, cd := range decodedOutcome.ConfigDigests {
 		_, found := configDigestsMap[cd.NetworkSel]
 		if found {
 			return nil, fmt.Errorf("found duplicate config digest for %v", cd.NetworkSel)
 		}
-		configDigestsMap[cd.NetworkSel] = map[models.Address]types.ConfigDigest{
-			cd.RebalancerAddr: cd.Digest.ConfigDigest,
-		}
+		configDigestsMap[cd.NetworkSel] = cd.Digest.ConfigDigest
 	}
 
 	var reports []ocr3types.ReportWithInfo[models.Report]
@@ -255,13 +257,9 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 			return nil, fmt.Errorf("liquidity manager for %v does not exist", networkID)
 		}
 
-		configDigests, found := configDigestsMap[networkID]
+		configDigest, found := configDigestsMap[networkID]
 		if !found {
 			return nil, fmt.Errorf("cannot find config digest for %v", networkID)
-		}
-		configDigest, found := configDigests[lmAddress]
-		if !found {
-			return nil, fmt.Errorf("cannot find config digest for %v:%s", networkID, lmAddress)
 		}
 
 		report := models.NewReport(transfers, lmAddress, networkID, configDigest)
@@ -360,7 +358,7 @@ func (p *Plugin) Close() error {
 	return multierr.Combine(errs...)
 }
 
-func (p *Plugin) syncGraphEdges(ctx context.Context) error {
+func (p *Plugin) syncGraph(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -385,41 +383,12 @@ func (p *Plugin) syncGraphEdges(ctx context.Context) error {
 	return nil
 }
 
-func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidity, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	networks := p.rebalancerGraph.GetNetworks()
-	p.lggr.Infow("syncing graph balances", "networks", networks)
-
-	networkLiquidities := make([]models.NetworkLiquidity, 0, len(networks))
-	for _, networkID := range networks {
-		lmAddr, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
-		if err != nil {
-			return nil, fmt.Errorf("liquidity manager for network %v was not found", networkID)
-		}
-
-		lm, err := p.liquidityManagerFactory.NewRebalancer(networkID, lmAddr)
-		if err != nil {
-			return nil, fmt.Errorf("init liquidity manager: %w", err)
-		}
-
-		balance, err := lm.GetBalance(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("get %v balance: %w", networkID, err)
-		}
-
-		p.rebalancerGraph.SetLiquidity(networkID, balance)
-		networkLiquidities = append(networkLiquidities, models.NewNetworkLiquidity(networkID, balance))
-	}
-
-	return networkLiquidities, nil
-}
-
 func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
 	p.lggr.Infow("loading pending transfers")
 
 	pendingTransfers := make([]models.PendingTransfer, 0)
+
+	// todo: change with p.rebalancerGraph.GetEdges()
 	for _, networkID := range p.rebalancerGraph.GetNetworks() {
 		neighbors, ok := p.rebalancerGraph.GetNeighbors(networkID)
 		if !ok {
@@ -517,7 +486,7 @@ func (p *Plugin) computePendingTransfersConsensus(observations []models.Observat
 
 func (p *Plugin) computeConfigDigestsConsensus(observations []models.Observation) ([]models.ConfigDigestWithMeta, error) {
 	key := func(meta models.ConfigDigestWithMeta) string {
-		return fmt.Sprintf("%d-%s-%s", meta.NetworkSel, meta.RebalancerAddr, meta.Digest.Hex())
+		return fmt.Sprintf("%d-%s", meta.NetworkSel, meta.Digest.Hex())
 	}
 	counts := make(map[string]int)
 	cds := make(map[string]models.ConfigDigestWithMeta)
