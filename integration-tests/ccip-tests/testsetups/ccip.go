@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	ctfClient "github.com/smartcontractkit/chainlink-testing-framework/client"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 	"go.uber.org/multierr"
@@ -838,6 +839,12 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 		} else {
 			// if there is already a cluster, use the existing cluster to connect to the nodes
 			ccipEnv = &actions.CCIPTestEnv{}
+			mockserverURL := pointer.GetString(testConfig.EnvInput.Mockserver)
+			require.NotEmpty(t, mockserverURL, "mockserver URL cannot be nil")
+			ccipEnv.MockServer = ctfClient.NewMockserverClient(&ctfClient.MockserverConfig{
+				LocalURL:   mockserverURL,
+				ClusterURL: mockserverURL,
+			})
 		}
 		ccipEnv.CLNodeWithKeyReady, _ = errgroup.WithContext(parent)
 		o.Env = ccipEnv
@@ -858,28 +865,6 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	}
 
 	o.Cfg.TestGroupInput.SetTestRunName(namespace)
-	if configureCLNode {
-		ccipEnv.CLNodeWithKeyReady.Go(func() error {
-			if !o.Cfg.ExistingCLCluster() {
-				if ccipEnv.LocalCluster != nil {
-					err = deployCL()
-					if err != nil {
-						return err
-					}
-				}
-				err = ccipEnv.ConnectToDeployedNodes()
-				if err != nil {
-					return fmt.Errorf("error connecting to chainlink nodes: %w", err)
-				}
-			} else {
-				err = ccipEnv.ConnectToExistingNodes(o.Cfg.EnvInput)
-				if err != nil {
-					return fmt.Errorf("error deploying and connecting to chainlink nodes: %w", err)
-				}
-			}
-			return ccipEnv.SetUpNodeKeysAndFund(lggr, big.NewFloat(testConfig.TestGroupInput.NodeFunding), chains)
-		})
-	}
 	chainByChainID := make(map[int64]blockchain.EVMClient)
 	if pointer.GetBool(testConfig.TestGroupInput.LocalCluster) {
 		require.NotNil(t, ccipEnv.LocalCluster, "Local cluster shouldn't be nil")
@@ -905,6 +890,29 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 			chainByChainID[n.ChainID] = ec
 		}
 	}
+	if configureCLNode {
+		ccipEnv.CLNodeWithKeyReady.Go(func() error {
+			if !o.Cfg.ExistingCLCluster() {
+				if ccipEnv.LocalCluster != nil {
+					err = deployCL()
+					if err != nil {
+						return err
+					}
+				}
+				err = ccipEnv.ConnectToDeployedNodes()
+				if err != nil {
+					return fmt.Errorf("error connecting to chainlink nodes: %w", err)
+				}
+			} else {
+				err = ccipEnv.ConnectToExistingNodes(o.Cfg.EnvInput)
+				if err != nil {
+					return fmt.Errorf("error deploying and connecting to chainlink nodes: %w", err)
+				}
+			}
+			return ccipEnv.SetUpNodeKeysAndFund(lggr, big.NewFloat(testConfig.TestGroupInput.NodeFunding), chains)
+		})
+	}
+
 	t.Cleanup(func() {
 		if configureCLNode {
 			if ccipEnv.LocalCluster != nil {

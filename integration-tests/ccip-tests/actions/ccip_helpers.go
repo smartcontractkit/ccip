@@ -2907,10 +2907,7 @@ func (c *CCIPTestEnv) ConnectToExistingNodes(envConfig *testconfig.Common) error
 	}
 	noOfNodes := pointer.GetInt(envConfig.ExistingCLCluster.NoOfNodes)
 	namespace := pointer.GetString(envConfig.ExistingCLCluster.Name)
-	mockserverURL := pointer.GetString(envConfig.Mockserver)
-	if mockserverURL == "" {
-		return fmt.Errorf("mockserver url is empty")
-	}
+
 	for i := 0; i < noOfNodes; i++ {
 		cfg := envConfig.ExistingCLCluster.NodeConfigs[i]
 		if cfg == nil {
@@ -2925,10 +2922,6 @@ func (c *CCIPTestEnv) ConnectToExistingNodes(envConfig *testconfig.Common) error
 		c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
 	}
 
-	c.MockServer = ctfClient.NewMockserverClient(&ctfClient.MockserverConfig{
-		LocalURL:   mockserverURL,
-		ClusterURL: mockserverURL,
-	})
 	return nil
 }
 
