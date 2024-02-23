@@ -6,6 +6,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+
 	ctfK8config "github.com/smartcontractkit/chainlink-testing-framework/k8s/config"
 
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
