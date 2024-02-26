@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -190,6 +191,7 @@ type JSONCommitOffchainConfig struct {
 	MaxGasPrice              uint64
 	SourceMaxGasPrice        uint64
 	InflightCacheExpiry      config.Duration
+	PriceReportingDisabled   bool
 }
 
 func (c JSONCommitOffchainConfig) Validate() error {
@@ -251,6 +253,7 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 		offchainConfigParsed.TokenPriceDeviationPPB,
 		offchainConfigParsed.TokenPriceHeartBeat.Duration(),
 		offchainConfigParsed.InflightCacheExpiry.Duration(),
+		offchainConfigParsed.PriceReportingDisabled,
 	)
 	c.configMu.Unlock()
 

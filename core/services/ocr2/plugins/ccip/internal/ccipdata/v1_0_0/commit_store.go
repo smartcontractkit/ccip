@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -182,12 +183,13 @@ func (c *CommitStore) GasPriceEstimator() cciptypes.GasPriceEstimatorCommit {
 
 // CommitOffchainConfig is a legacy version of CommitOffchainConfig, used for CommitStore version 1.0.0 and 1.1.0
 type CommitOffchainConfig struct {
-	SourceFinalityDepth   uint32
-	DestFinalityDepth     uint32
-	FeeUpdateHeartBeat    config.Duration
-	FeeUpdateDeviationPPB uint32
-	MaxGasPrice           uint64
-	InflightCacheExpiry   config.Duration
+	SourceFinalityDepth    uint32
+	DestFinalityDepth      uint32
+	FeeUpdateHeartBeat     config.Duration
+	FeeUpdateDeviationPPB  uint32
+	MaxGasPrice            uint64
+	InflightCacheExpiry    config.Duration
+	PriceReportingDisabled bool
 }
 
 func (c CommitOffchainConfig) Validate() error {
@@ -233,7 +235,8 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 		offchainConfigV1.FeeUpdateHeartBeat.Duration(),
 		offchainConfigV1.FeeUpdateDeviationPPB,
 		offchainConfigV1.FeeUpdateHeartBeat.Duration(),
-		offchainConfigV1.InflightCacheExpiry.Duration())
+		offchainConfigV1.InflightCacheExpiry.Duration(),
+		offchainConfigV1.PriceReportingDisabled)
 	c.configMu.Unlock()
 	c.lggr.Infow("ChangeConfig",
 		"offchainConfig", offchainConfigV1,

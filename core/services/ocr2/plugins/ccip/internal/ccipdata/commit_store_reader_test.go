@@ -202,7 +202,7 @@ func TestCommitStoreReaders(t *testing.T) {
 		TokenPriceDeviationPPB: 1e6,
 		TokenPriceHeartBeat:    1 * time.Hour,
 		InflightCacheExpiry:    3 * time.Hour,
-		PriceReportingEnabled:  true,
+		PriceReportingDisabled: false,
 	}
 	maxGas := uint64(1e9)
 	offchainConfig, err := ccipconfig.EncodeOffchainConfig[v1_0_0.CommitOffchainConfig](v1_0_0.CommitOffchainConfig{
