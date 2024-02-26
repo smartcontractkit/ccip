@@ -45,7 +45,7 @@ abstract contract CCIPReceiver is IAny2EVMMessageReceiver, IERC165 {
 
   /// @notice Return the current router
   /// @return CCIP router address
-  function getRouter() public view returns (address) {
+  function getRouter() public virtual view returns (address) {
     return address(i_ccipRouter);
   }
 
