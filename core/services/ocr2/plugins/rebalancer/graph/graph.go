@@ -65,8 +65,8 @@ type Graph interface {
 func NewGraphFromEdges(edges []models.Edge) (Graph, error) {
 	g := NewGraph()
 	for _, edge := range edges {
-		g.AddNetwork(edge.Source, Data{})
-		g.AddNetwork(edge.Dest, Data{})
+		g.AddNetwork(edge.Source, Data{NetworkSelector: edge.Source})
+		g.AddNetwork(edge.Dest, Data{NetworkSelector: edge.Dest})
 		if err := g.AddConnection(edge.Source, edge.Dest); err != nil {
 			return nil, fmt.Errorf("add connection %d -> %d: %w", edge.Source, edge.Dest, err)
 		}
