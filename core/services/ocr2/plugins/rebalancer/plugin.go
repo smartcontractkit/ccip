@@ -34,7 +34,6 @@ type Plugin struct {
 	mu                      sync.RWMutex
 	rebalancerGraph         graph.Graph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
-	pendingTransfers        *PendingTransfersCache
 	lggr                    logger.Logger
 }
 
@@ -59,7 +58,6 @@ func NewPlugin(
 		bridgeFactory:           bridgeFactory,
 		rebalancerGraph:         graph.NewGraph(),
 		liquidityRebalancer:     liquidityRebalancer,
-		pendingTransfers:        NewPendingTransfersCache(),
 		lggr:                    lggr,
 		mu:                      sync.RWMutex{},
 	}
@@ -390,12 +388,6 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 		return nil, fmt.Errorf("get edges: %w", err)
 	}
 	for _, edge := range edges {
-		// todo: figure out what to do with this
-		// dateToStartLookingFrom := time.Now().Add(-10 * 24 * time.Hour)
-
-		// if mostRecentTransfer, exists := p.pendingTransfers.LatestNetworkTransfer(networkID); exists {
-		// 	dateToStartLookingFrom = mostRecentTransfer.Date
-		// }
 		bridge, err := p.bridgeFactory.NewBridge(edge.Source, edge.Dest)
 		if err != nil {
 			return nil, fmt.Errorf("init bridge: %w", err)
@@ -424,7 +416,6 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
 	}
 
-	p.pendingTransfers.Add(pendingTransfers)
 	return pendingTransfers, nil
 }
 
