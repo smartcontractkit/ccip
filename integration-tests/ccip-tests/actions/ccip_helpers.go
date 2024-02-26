@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AlekSi/pointer"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -39,6 +40,7 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/actions"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/contracts/laneconfig"
+	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testconfig"
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 	"github.com/smartcontractkit/chainlink/integration-tests/client"
 	"github.com/smartcontractkit/chainlink/integration-tests/docker/test_env"
@@ -2899,7 +2901,38 @@ func (c *CCIPTestEnv) ChaosLabelForCLNodes(t *testing.T) {
 	}
 }
 
-func (c *CCIPTestEnv) ConnectToNodes() error {
+func (c *CCIPTestEnv) ConnectToExistingNodes(envConfig *testconfig.Common) error {
+	if envConfig.ExistingCLCluster == nil {
+		return fmt.Errorf("existing cluster is nil")
+	}
+	noOfNodes := pointer.GetInt(envConfig.ExistingCLCluster.NoOfNodes)
+	namespace := pointer.GetString(envConfig.ExistingCLCluster.Name)
+	mockserverURL := pointer.GetString(envConfig.Mockserver)
+	if mockserverURL == "" {
+		return fmt.Errorf("mockserver url is empty")
+	}
+	for i := 0; i < noOfNodes; i++ {
+		cfg := envConfig.ExistingCLCluster.NodeConfigs[i]
+		if cfg == nil {
+			return fmt.Errorf("node %d config is nil", i+1)
+		}
+		clClient, err := client.NewChainlinkK8sClient(cfg, cfg.InternalIP, namespace)
+		if err != nil {
+			return fmt.Errorf("failed to create chainlink client: %w for node %d config %v", err, i+1, cfg)
+		}
+		clClient.ChainlinkClient.WithRetryCount(3)
+		c.CLNodes = append(c.CLNodes, clClient)
+		c.nodeMutexes = append(c.nodeMutexes, &sync.Mutex{})
+	}
+
+	c.MockServer = ctfClient.NewMockserverClient(&ctfClient.MockserverConfig{
+		LocalURL:   mockserverURL,
+		ClusterURL: mockserverURL,
+	})
+	return nil
+}
+
+func (c *CCIPTestEnv) ConnectToDeployedNodes() error {
 	if c.LocalCluster != nil {
 		// for local cluster, fetch the values from the local cluster
 		for _, chainlinkNode := range c.LocalCluster.ClCluster.Nodes {
@@ -3156,7 +3189,7 @@ func SetMockServerWithUSDCAttestation(
 	if mockserver != nil {
 		err := mockserver.SetAnyValueResponse(fmt.Sprintf("%s/.*", path), response)
 		if err != nil {
-			return fmt.Errorf("failed to set mockserver value: %w", err)
+			return fmt.Errorf("failed to set mockserver value: %w URL = %s", err, fmt.Sprintf("%s/%s/.*", mockserver.LocalURL(), path))
 		}
 	}
 	return nil
@@ -3191,7 +3224,7 @@ func SetMockserverWithTokenPriceValue(
 			if mockserver != nil {
 				err := mockserver.SetAnyValuePath(fmt.Sprintf("/%s.*", path), tokenValue)
 				if err != nil {
-					log.Fatal().Err(err).Msg("failed to set mockserver value")
+					log.Fatal().Err(err).Str("URL", fmt.Sprintf("%s/%s/.*", mockserver.LocalURL(), path)).Msg("failed to set mockserver value")
 					return
 				}
 			}

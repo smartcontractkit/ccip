@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
 	ctfconfig "github.com/smartcontractkit/chainlink-testing-framework/config"
 
-	"github.com/smartcontractkit/ccip/integration-tests/client"
+	"github.com/smartcontractkit/chainlink/integration-tests/client"
 )
 
 const (
@@ -152,9 +152,9 @@ func NewConfig() (*Config, error) {
 type Common struct {
 	EnvUser           string                   `toml:",omitempty"`
 	TTL               *config.Duration         `toml:",omitempty"`
-	ExistingCLCluster *CLCluster               `toml:",omitempty"`
+	ExistingCLCluster *CLCluster               `toml:",omitempty"` // ExistingCLCluster is the existing chainlink cluster to use, if specified it will be used instead of creating a new one
 	Mockserver        *string                  `toml:",omitempty"`
-	NewCLCluster      *ChainlinkDeployment     `toml:",omitempty"`
+	NewCLCluster      *ChainlinkDeployment     `toml:",omitempty"` // NewCLCluster is the new chainlink cluster to create, if specified along with ExistingCLCluster this will be ignored
 	Network           *ctfconfig.NetworkConfig `toml:",omitempty"`
 	Logging           *ctfconfig.LoggingConfig `toml:"Logging"`
 }
@@ -168,6 +168,7 @@ func (p *Common) Validate() error {
 	}
 	// read the default network config, if specified
 	p.Network.UpperCaseNetworkNames()
+	p.Network.OverrideURLsAndKeysFromEVMNetwork()
 	err := p.Network.Default()
 	if err != nil {
 		return fmt.Errorf("error reading default network config %w", err)
@@ -178,24 +179,28 @@ func (p *Common) Validate() error {
 	if p.NewCLCluster == nil && p.ExistingCLCluster == nil {
 		return errors.New("no chainlink or existing cluster specified")
 	}
-	if p.NewCLCluster != nil {
-		if p.ExistingCLCluster != nil {
-			return fmt.Errorf("both new and existing chainlink cluster specified")
-		}
-		if err := p.NewCLCluster.Validate(); err != nil {
-			return fmt.Errorf("error validating chainlink config %w", err)
-		}
-	}
+
 	if p.ExistingCLCluster != nil {
 		if err := p.ExistingCLCluster.Validate(); err != nil {
 			return fmt.Errorf("error validating existing chainlink cluster config %w", err)
+		}
+		if p.Mockserver == nil {
+			return errors.New("no mockserver specified for existing chainlink cluster")
+		}
+		log.Warn().Msg("Using existing chainlink cluster, overriding new chainlink cluster config if specified")
+		p.NewCLCluster = nil
+	} else {
+		if p.NewCLCluster != nil {
+			if err := p.NewCLCluster.Validate(); err != nil {
+				return fmt.Errorf("error validating chainlink config %w", err)
+			}
 		}
 	}
 	return nil
 }
 
 func (p *Common) EVMNetworks() ([]blockchain.EVMNetwork, []string, error) {
-	evmNetworks := networks.MustSetNetworks(*p.Network)
+	evmNetworks := networks.MustGetSelectedNetworkConfig(p.Network)
 	if len(p.Network.SelectedNetworks) != len(evmNetworks) {
 		return nil, p.Network.SelectedNetworks, fmt.Errorf("selected networks %v do not match evm networks %v", p.Network.SelectedNetworks, evmNetworks)
 	}
@@ -246,8 +251,9 @@ func (p *Common) GetGrafanaDashboardURL() (string, error) {
 }
 
 type CLCluster struct {
-	NoOfNodes   *int                     `toml:",omitempty"`
-	NodeConfigs []client.ChainlinkConfig `toml:",omitempty"`
+	Name        *string                   `toml:",omitempty"`
+	NoOfNodes   *int                      `toml:",omitempty"`
+	NodeConfigs []*client.ChainlinkConfig `toml:",omitempty"`
 }
 
 func (c *CLCluster) Validate() error {

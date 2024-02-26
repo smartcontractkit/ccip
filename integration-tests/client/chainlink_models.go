@@ -20,10 +20,10 @@ type EIServiceConfig struct {
 
 // ChainlinkConfig represents the variables needed to connect to a Chainlink node
 type ChainlinkConfig struct {
-	URL         string         `toml:"url"`
-	Email       string         `toml:"email"`
-	Password    string         `toml:"password"`
-	InternalIP  string         `toml:"internal_ip"`
+	URL         string         `toml:",omitempty"`
+	Email       string         `toml:",omitempty"`
+	Password    string         `toml:",omitempty"`
+	InternalIP  string         `toml:",omitempty"`
 	HTTPTimeout *time.Duration `toml:"-"`
 }
 

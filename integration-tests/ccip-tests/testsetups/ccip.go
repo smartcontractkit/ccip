@@ -78,6 +78,10 @@ func (c *CCIPTestConfig) localCluster() bool {
 	return pointer.GetBool(c.TestGroupInput.LocalCluster)
 }
 
+func (c *CCIPTestConfig) ExistingCLCluster() bool {
+	return c.EnvInput.ExistingCLCluster != nil
+}
+
 func (c *CCIPTestConfig) AddPairToNetworkList(networkA, networkB blockchain.EVMNetwork) {
 	if c.AllNetworks == nil {
 		c.AllNetworks = make(map[string]blockchain.EVMNetwork)
@@ -811,21 +815,30 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 
 	configureCLNode := !testConfig.useExistingDeployment()
 	namespace := o.Cfg.TestGroupInput.TestRunName
+	require.False(t, testConfig.localCluster() && testConfig.ExistingCLCluster(),
+		"local cluster and existing cluster cannot be true at the same time")
 	if configureCLNode {
-		if testConfig.localCluster() {
-			local, deployCL = DeployLocalCluster(t, testConfig)
-			ccipEnv = &actions.CCIPTestEnv{
-				LocalCluster: local,
+		// if it's a new deployment, deploy the env
+		if !testConfig.ExistingCLCluster() {
+			// if it's a local cluster, deploy the local cluster in docker
+			if testConfig.localCluster() {
+				local, deployCL = DeployLocalCluster(t, testConfig)
+				ccipEnv = &actions.CCIPTestEnv{
+					LocalCluster: local,
+				}
+				namespace = "local-docker-deployment"
+			} else {
+				// Otherwise, deploy the k8s env
+				lggr.Info().Msg("Deploying test environment")
+				// deploy the env if configureCLNode is true
+				k8Env = DeployEnvironments(t, envConfig, testConfig)
+				ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
+				namespace = ccipEnv.K8Env.Cfg.Namespace
 			}
-			namespace = "local-docker-deployment"
 		} else {
-			lggr.Info().Msg("Deploying test environment")
-			// deploy the env if configureCLNode is true
-			k8Env = DeployEnvironments(t, envConfig, testConfig)
-			ccipEnv = &actions.CCIPTestEnv{K8Env: k8Env}
-			namespace = ccipEnv.K8Env.Cfg.Namespace
+			// if there is already a cluster, use the existing cluster to connect to the nodes
+			ccipEnv = &actions.CCIPTestEnv{}
 		}
-
 		ccipEnv.CLNodeWithKeyReady, _ = errgroup.WithContext(parent)
 		o.Env = ccipEnv
 		if ccipEnv.K8Env != nil && ccipEnv.K8Env.WillUseRemoteRunner() {
@@ -847,15 +860,22 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	o.Cfg.TestGroupInput.SetTestRunName(namespace)
 	if configureCLNode {
 		ccipEnv.CLNodeWithKeyReady.Go(func() error {
-			if ccipEnv.LocalCluster != nil {
-				err = deployCL()
-				if err != nil {
-					return err
+			if !o.Cfg.ExistingCLCluster() {
+				if ccipEnv.LocalCluster != nil {
+					err = deployCL()
+					if err != nil {
+						return err
+					}
 				}
-			}
-			err = ccipEnv.ConnectToNodes()
-			if err != nil {
-				return fmt.Errorf("error connecting to chainlink nodes: %w", err)
+				err = ccipEnv.ConnectToDeployedNodes()
+				if err != nil {
+					return fmt.Errorf("error connecting to chainlink nodes: %w", err)
+				}
+			} else {
+				err = ccipEnv.ConnectToExistingNodes(o.Cfg.EnvInput)
+				if err != nil {
+					return fmt.Errorf("error deploying and connecting to chainlink nodes: %w", err)
+				}
 			}
 			return ccipEnv.SetUpNodeKeysAndFund(lggr, big.NewFloat(testConfig.TestGroupInput.NodeFunding), chains)
 		})
