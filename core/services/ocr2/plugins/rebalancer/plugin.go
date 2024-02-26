@@ -109,9 +109,8 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 			return nil, fmt.Errorf("get rb %d data: %w", net, err)
 		}
 		configDigests = append(configDigests, models.ConfigDigestWithMeta{
-			Digest:         data.ConfigDigest,
-			NetworkSel:     data.NetworkSelector,
-			RebalancerAddr: data.RebalancerAddress,
+			Digest:     data.ConfigDigest,
+			NetworkSel: data.NetworkSelector,
 		})
 	}
 
@@ -387,49 +386,43 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 
 	pendingTransfers := make([]models.PendingTransfer, 0)
 
-	// todo: change with p.rebalancerGraph.GetEdges()
-	for _, networkID := range p.rebalancerGraph.GetNetworks() {
-		neighbors, ok := p.rebalancerGraph.GetNeighbors(networkID)
-		if !ok {
-			lggr.Warnw("no neighbors found for network", "network", networkID)
-			continue
-		}
-
+	edges, err := p.rebalancerGraph.GetEdges()
+	if err != nil {
+		return nil, fmt.Errorf("get edges: %w", err)
+	}
+	for _, edge := range edges {
 		// todo: figure out what to do with this
 		// dateToStartLookingFrom := time.Now().Add(-10 * 24 * time.Hour)
 
 		// if mostRecentTransfer, exists := p.pendingTransfers.LatestNetworkTransfer(networkID); exists {
 		// 	dateToStartLookingFrom = mostRecentTransfer.Date
 		// }
-
-		for _, neighbor := range neighbors {
-			bridge, err := p.bridgeFactory.NewBridge(networkID, neighbor)
-			if err != nil {
-				return nil, fmt.Errorf("init bridge: %w", err)
-			}
-
-			if bridge == nil {
-				lggr.Warnw("no bridge found for network pair", "sourceNetwork", networkID, "destNetwork", neighbor)
-				continue
-			}
-
-			localToken, err := p.rebalancerGraph.GetTokenAddress(networkID)
-			if err != nil {
-				return nil, fmt.Errorf("get local token address for %v: %w", networkID, err)
-			}
-			remoteToken, err := p.rebalancerGraph.GetTokenAddress(neighbor)
-			if err != nil {
-				return nil, fmt.Errorf("get remote token address for %v: %w", neighbor, err)
-			}
-
-			netPendingTransfers, err := bridge.GetTransfers(ctx, localToken, remoteToken)
-			if err != nil {
-				return nil, fmt.Errorf("get pending transfers: %w", err)
-			}
-
-			lggr.Infow("loaded pending transfers for network", "network", networkID, "pendingTransfers", netPendingTransfers)
-			pendingTransfers = append(pendingTransfers, netPendingTransfers...)
+		bridge, err := p.bridgeFactory.NewBridge(edge.Source, edge.Dest)
+		if err != nil {
+			return nil, fmt.Errorf("init bridge: %w", err)
 		}
+
+		if bridge == nil {
+			lggr.Warnw("no bridge found for network pair", "sourceNetwork", edge.Source, "destNetwork", edge.Dest)
+			continue
+		}
+
+		localToken, err := p.rebalancerGraph.GetTokenAddress(edge.Source)
+		if err != nil {
+			return nil, fmt.Errorf("get local token address for %v: %w", edge.Source, err)
+		}
+		remoteToken, err := p.rebalancerGraph.GetTokenAddress(edge.Dest)
+		if err != nil {
+			return nil, fmt.Errorf("get remote token address for %v: %w", edge.Dest, err)
+		}
+
+		netPendingTransfers, err := bridge.GetTransfers(ctx, localToken, remoteToken)
+		if err != nil {
+			return nil, fmt.Errorf("get pending transfers: %w", err)
+		}
+
+		lggr.Infow("loaded pending transfers for network", "network", edge.Source, "pendingTransfers", netPendingTransfers)
+		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
 	}
 
 	p.pendingTransfers.Add(pendingTransfers)
