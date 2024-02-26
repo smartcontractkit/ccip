@@ -50,7 +50,7 @@ func (l *LoadArgs) SetReportParams() {
 	}
 	// add one of the source and destination network to the grafana query params
 	if len(l.TestSetupArgs.Lanes) > 0 {
-		qParams = append(qParams, fmt.Sprintf("source_chain=%s", l.TestSetupArgs.Lanes[0].ForwardLane.SourceNetworkName)
+		qParams = append(qParams, fmt.Sprintf("source_chain=%s", l.TestSetupArgs.Lanes[0].ForwardLane.SourceNetworkName))
 		qParams = append(qParams, fmt.Sprintf("dest_chain=%s", l.TestSetupArgs.Lanes[0].ForwardLane.DestNetworkName))
 	}
 	err := l.TestSetupArgs.Reporter.AddToGrafanaDashboardQueryParams(qParams...)
