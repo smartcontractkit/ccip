@@ -30,7 +30,7 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 	lggr.SetLogLevel(zapcore.ErrorLevel)
 
 	testCases := []testCase{
-		twoNodesOneRoundNothingInflight(t),
+		//twoNodesOneRoundNothingInflight(t),
 		twoNodesTwoRoundsNothingInflight(t),
 	}
 

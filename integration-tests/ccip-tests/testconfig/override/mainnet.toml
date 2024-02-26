@@ -637,6 +637,9 @@ Data = """
 }
 """
 
+[CCIP.Env]
+TTL = '8h'
+
 [CCIP.Env.Network]
 selected_networks = [
   'ETHEREUM_MAINNET',
@@ -684,7 +687,7 @@ NetworkPairs = [
 MsgType = 'WithoutToken'
 DestGasLimit = 0
 BiDirectionalLane = true
-PhaseTimeout = '50m'
+PhaseTimeout = '20m'
 TestDuration = '5h'
 ExistingDeployment = true
 RequestPerUnitTime = [1]
@@ -729,7 +732,7 @@ NetworkPairs = [
 ]
 BiDirectionalLane = true
 DestGasLimit = 0
-PhaseTimeout = '50m'
+PhaseTimeout = '20m'
 LocalCluster = false
 ExistingDeployment = true
 ReuseContracts = true
