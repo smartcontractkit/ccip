@@ -254,7 +254,7 @@ func NewCCIPTestConfig(t *testing.T, lggr zerolog.Logger, tType string) *CCIPTes
 			t.Fatal("loki config is required to be set for load test")
 		}
 		if testCfg.CCIP.Env.Logging == nil || testCfg.CCIP.Env.Logging.Grafana == nil {
-			t.Fatal("grafana config is required to be set for load test")
+			t.Fatal("grafana config is required for load test")
 		}
 	}
 	ccipTestConfig := &CCIPTestConfig{
