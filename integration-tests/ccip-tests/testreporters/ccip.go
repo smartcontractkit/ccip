@@ -328,7 +328,7 @@ func (r *CCIPTestReporter) SendSlackNotification(t *testing.T, slackClient *slac
 			return fmt.Errorf("error formatting grafana dashboard URL: %w", err)
 		}
 		msgTexts = append(msgTexts, fmt.Sprintf(
-			"\nTest Run Completed \nNotifying <@%s>\n<%s|Grafana Dashboard>",
+			"\nTest Run Completed \nNotifying <@%s>\n<%s|CCIP Long Running Tests Dashboard>",
 			testreporters.SlackUserID, r.grafanaURL))
 	}
 
