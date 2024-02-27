@@ -84,10 +84,10 @@ func Test_discover(t *testing.T) {
 				g.AddNetwork(1, graph.Data{Liquidity: big.NewInt(100)})
 				g.AddNetwork(2, graph.Data{Liquidity: big.NewInt(200)})
 				g.AddNetwork(3, graph.Data{Liquidity: big.NewInt(300)})
-				g.AddConnection(1, 2)
-				g.AddConnection(1, 3)
-				g.AddConnection(2, 1)
-				g.AddConnection(3, 1)
+				require.NoError(t, g.AddConnection(1, 2))
+				require.NoError(t, g.AddConnection(1, 3))
+				require.NoError(t, g.AddConnection(2, 1))
+				require.NoError(t, g.AddConnection(3, 1))
 				return g
 			},
 			false,
@@ -180,17 +180,17 @@ func Test_discover(t *testing.T) {
 				g.AddNetwork(2, graph.Data{Liquidity: big.NewInt(200)})
 				g.AddNetwork(3, graph.Data{Liquidity: big.NewInt(300)})
 				g.AddNetwork(4, graph.Data{Liquidity: big.NewInt(400)})
-				g.AddConnection(1, 2)
-				g.AddConnection(1, 3)
-				g.AddConnection(1, 4)
-				g.AddConnection(2, 1)
-				g.AddConnection(2, 4)
-				g.AddConnection(3, 1)
-				g.AddConnection(3, 2)
-				g.AddConnection(3, 4)
-				g.AddConnection(4, 1)
-				g.AddConnection(4, 2)
-				g.AddConnection(4, 3)
+				require.NoError(t, g.AddConnection(1, 2))
+				require.NoError(t, g.AddConnection(1, 3))
+				require.NoError(t, g.AddConnection(1, 4))
+				require.NoError(t, g.AddConnection(2, 1))
+				require.NoError(t, g.AddConnection(2, 4))
+				require.NoError(t, g.AddConnection(3, 1))
+				require.NoError(t, g.AddConnection(3, 2))
+				require.NoError(t, g.AddConnection(3, 4))
+				require.NoError(t, g.AddConnection(4, 1))
+				require.NoError(t, g.AddConnection(4, 2))
+				require.NoError(t, g.AddConnection(4, 3))
 				return g
 			},
 			false,
