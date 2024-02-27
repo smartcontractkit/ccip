@@ -46,12 +46,12 @@ type LoadArgs struct {
 func (l *LoadArgs) SetReportParams() {
 	var qParams []string
 	for k, v := range l.Labels {
-		qParams = append(qParams, fmt.Sprintf("%s=%s", k, v))
+		qParams = append(qParams, fmt.Sprintf("var-%s=%s", k, v))
 	}
 	// add one of the source and destination network to the grafana query params
 	if len(l.TestSetupArgs.Lanes) > 0 {
-		qParams = append(qParams, fmt.Sprintf("source_chain=%s", l.TestSetupArgs.Lanes[0].ForwardLane.SourceNetworkName))
-		qParams = append(qParams, fmt.Sprintf("dest_chain=%s", l.TestSetupArgs.Lanes[0].ForwardLane.DestNetworkName))
+		qParams = append(qParams, fmt.Sprintf("var-source_chain=%s", l.TestSetupArgs.Lanes[0].ForwardLane.SourceNetworkName))
+		qParams = append(qParams, fmt.Sprintf("var-dest_chain=%s", l.TestSetupArgs.Lanes[0].ForwardLane.DestNetworkName))
 	}
 	err := l.TestSetupArgs.Reporter.AddToGrafanaDashboardQueryParams(qParams...)
 	require.NoError(l.t, err, "failed to set grafana query params")

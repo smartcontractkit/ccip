@@ -238,7 +238,7 @@ func (r *CCIPTestReporter) CompleteGrafanaDashboardURL() error {
 	err = r.AddToGrafanaDashboardQueryParams(
 		fmt.Sprintf("from=%d", r.startTime),
 		fmt.Sprintf("to=%d", r.endTime),
-		fmt.Sprintf("namespace=%s", r.namespace))
+		fmt.Sprintf("var-remote_runner=%s", r.namespace))
 	if err != nil {
 		return err
 	}
@@ -328,7 +328,7 @@ func (r *CCIPTestReporter) SendSlackNotification(t *testing.T, slackClient *slac
 			return fmt.Errorf("error formatting grafana dashboard URL: %w", err)
 		}
 		msgTexts = append(msgTexts, fmt.Sprintf(
-			"\nTest Run Completed \nNotifying <@%s>\nGrafana Dashboard: %s",
+			"\nTest Run Completed \nNotifying <@%s>\n<%s|Grafana Dashboard>",
 			testreporters.SlackUserID, r.grafanaURL))
 	}
 
