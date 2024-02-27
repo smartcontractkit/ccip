@@ -277,7 +277,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 	sendLogs, err = l.l1LogPoller.IndexedLogsCreatedAfter(
 		LiquidityTransferredTopic,
 		l.l1Rebalancer.Address(),
-		3, // topic index 3: toChainSelector in event
+		LiquidityTransferredToChainSelectorTopicIndex,
 		[]common.Hash{
 			toHash(l.remoteSelector),
 		},
@@ -292,7 +292,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 	depositFinalizedLogs, err = l.l2LogPoller.IndexedLogsCreatedAfter(
 		DepositFinalizedTopic,
 		l.l2Gateway.Address(),
-		3, // topic index 3: to address of deposit on L2
+		DepositFinalizedToAddressTopicIndex,
 		[]common.Hash{
 			common.HexToHash(l.l2RebalancerAddress.Hex()),
 		},
@@ -307,7 +307,7 @@ func (l *l1ToL2Bridge) getLogs(ctx context.Context, fromTs time.Time) (sendLogs 
 	receiveLogs, err = l.l2LogPoller.IndexedLogsCreatedAfter(
 		LiquidityTransferredTopic,
 		l.l2RebalancerAddress,
-		2, // topic index 2: fromChainSelector
+		LiquidityTransferredFromChainSelectorTopicIndex,
 		[]common.Hash{
 			toHash(l.localSelector),
 		},
