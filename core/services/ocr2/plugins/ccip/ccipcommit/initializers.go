@@ -113,7 +113,12 @@ func jobSpecToCommitPluginConfig(lggr logger.Logger, jb job.Job, pr pipeline.Run
 		return nil, nil, err
 	}
 
-	lggr.Infow("Initializing commit plugin", "params", params)
+	lggr.Infow("Initializing commit plugin",
+		"CommitStore", params.commitStoreAddress,
+		"OnRamp", params.commitStoreStaticCfg.OnRamp,
+		"ArmProxy", params.commitStoreStaticCfg.ArmProxy,
+		"SourceChainSelector", params.commitStoreStaticCfg.SourceChainSelector,
+		"DestChainSelector", params.commitStoreStaticCfg.ChainSelector)
 
 	versionFinder := factory.NewEvmVersionFinder()
 	commitStoreReader, err := factory.NewCommitStoreReader(lggr, versionFinder, params.commitStoreAddress, params.destChain.Client(), params.destChain.LogPoller(), params.sourceChain.GasEstimator(), qopts...)
