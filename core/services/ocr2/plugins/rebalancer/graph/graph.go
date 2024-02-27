@@ -3,6 +3,7 @@ package graph
 import (
 	"fmt"
 	"math/big"
+	"reflect"
 	"sort"
 	"sync"
 
@@ -103,6 +104,7 @@ func (d Data) Equals(other Data) bool {
 	return d.Liquidity.Cmp(other.Liquidity) == 0 &&
 		d.TokenAddress == other.TokenAddress &&
 		d.RebalancerAddress == other.RebalancerAddress &&
+		reflect.DeepEqual(d.XChainRebalancers, other.XChainRebalancers) &&
 		d.ConfigDigest == other.ConfigDigest &&
 		d.NetworkSelector == other.NetworkSelector
 }

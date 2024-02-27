@@ -5,9 +5,10 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
+	"github.com/test-go/testify/require"
+
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
-	"github.com/test-go/testify/require"
 )
 
 func TestNewFactory(t *testing.T) {
@@ -80,5 +81,14 @@ func Test_factory_NewDiscoverer(t *testing.T) {
 		require.Equal(t, want, got)
 		_, ok := f.cachedDiscoverers.Load(f.cacheKey(network, models.Address{}))
 		require.True(t, ok)
+	})
+
+	t.Run("network doesn't exist", func(t *testing.T) {
+		network := models.NetworkSelector(chainsel.TEST_90000001.Selector)
+		f := NewFactory(logger.TestLogger(t), WithEvmDep(network, nil))
+
+		otherNetwork := models.NetworkSelector(chainsel.TEST_90000002.Selector)
+		_, err := f.NewDiscoverer(otherNetwork, models.Address{})
+		require.Error(t, err)
 	})
 }
