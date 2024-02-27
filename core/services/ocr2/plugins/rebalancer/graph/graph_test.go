@@ -482,7 +482,7 @@ func TestData_Equals(t *testing.T) {
 	}
 }
 
-func Test_gph_Equals(t *testing.T) {
+func TestGraph_Equals(t *testing.T) {
 	type fields struct {
 		genGraph func() graph.Graph
 	}
@@ -566,7 +566,7 @@ func Test_gph_Equals(t *testing.T) {
 					g.AddNetwork(models.NetworkSelector(2), graph.Data{
 						Liquidity: big.NewInt(200),
 					})
-					g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(2))
+					require.NoError(t, g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(2)))
 					return g
 				},
 			},
@@ -579,7 +579,7 @@ func Test_gph_Equals(t *testing.T) {
 					g.AddNetwork(models.NetworkSelector(2), graph.Data{
 						Liquidity: big.NewInt(200),
 					})
-					g.AddConnection(models.NetworkSelector(2), models.NetworkSelector(1)) // reverse connection
+					require.NoError(t, g.AddConnection(models.NetworkSelector(2), models.NetworkSelector(1))) // reverse connection
 					return g
 				}(),
 			},
@@ -599,9 +599,9 @@ func Test_gph_Equals(t *testing.T) {
 					g.AddNetwork(models.NetworkSelector(3), graph.Data{
 						Liquidity: big.NewInt(300),
 					})
-					g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(2))
-					g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(3))
-					g.AddConnection(models.NetworkSelector(2), models.NetworkSelector(3))
+					require.NoError(t, g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(2)))
+					require.NoError(t, g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(3)))
+					require.NoError(t, g.AddConnection(models.NetworkSelector(2), models.NetworkSelector(3)))
 					return g
 				},
 			},
@@ -617,9 +617,9 @@ func Test_gph_Equals(t *testing.T) {
 					g.AddNetwork(models.NetworkSelector(3), graph.Data{
 						Liquidity: big.NewInt(300),
 					})
-					g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(2))
-					g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(3))
-					g.AddConnection(models.NetworkSelector(2), models.NetworkSelector(3))
+					require.NoError(t, g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(2)))
+					require.NoError(t, g.AddConnection(models.NetworkSelector(1), models.NetworkSelector(3)))
+					require.NoError(t, g.AddConnection(models.NetworkSelector(2), models.NetworkSelector(3)))
 					return g
 				}(),
 			},
