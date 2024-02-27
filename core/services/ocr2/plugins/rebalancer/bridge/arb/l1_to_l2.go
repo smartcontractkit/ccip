@@ -204,6 +204,8 @@ func (l *l1ToL2Bridge) GetTransfers(
 	lggr.Info("getting transfers")
 	// TODO: check that l1Rebalancer token matches localToken
 	// TODO: check that l2Rebalancer token matches remoteToken
+	// TODO: this should not be hardcoded here
+	// TODO: heavy query warning
 	fromTs := time.Now().Add(-24 * time.Hour) // last day
 	sendLogs, err := l.l1LogPoller.IndexedLogsCreatedAfter(
 		LiquidityTransferredTopic,
