@@ -204,10 +204,10 @@ func TestPlugin_Observation(t *testing.T) {
 
 			// loadPendingTransfers && resolveProposedTransfers
 			for sourceDest, bridgeFn := range tc.bridges {
-				br, err := bridgeFn(t)
+				br, err2 := bridgeFn(t)
 				p.bridgeFactory.
 					On("NewBridge", sourceDest[0], sourceDest[1]).
-					Return(br, err)
+					Return(br, err2)
 			}
 
 			// run the observation

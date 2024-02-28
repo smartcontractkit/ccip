@@ -50,9 +50,9 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (transmitted, notAccepted
 
 	attributedObservations := make([]types.AttributedObservation, len(r.nodes))
 	for i, n := range r.nodes {
-		obs, err := n.Observation(ctx, outcomeCtx, q)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("%s: %w", err, ErrObservation)
+		obs, err2 := n.Observation(ctx, outcomeCtx, q)
+		if err2 != nil {
+			return nil, nil, nil, nil, fmt.Errorf("%s: %w", err2, ErrObservation)
 		}
 
 		attrObs := types.AttributedObservation{Observation: obs, Observer: 0}
