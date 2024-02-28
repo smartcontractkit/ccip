@@ -64,6 +64,11 @@ func PendingTransfersConsensus(observations []models.Observation, f int) ([]mode
 		}
 	}
 
+	// sort by network id for deterministic results
+	sort.Slice(quorumEvents, func(i, j int) bool {
+		return quorumEvents[i].From < quorumEvents[j].From
+	})
+
 	return quorumEvents, nil
 }
 
@@ -163,6 +168,11 @@ func GraphEdgesConsensus(observations []models.Observation, f int) ([]models.Edg
 			quorumEdges = append(quorumEdges, edge)
 		}
 	}
+
+	// sort by network id for deterministic results
+	sort.Slice(quorumEdges, func(i, j int) bool {
+		return quorumEdges[i].Source < quorumEdges[j].Source
+	})
 
 	return quorumEdges, nil
 }
