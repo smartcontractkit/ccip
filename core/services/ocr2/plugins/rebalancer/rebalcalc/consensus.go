@@ -53,7 +53,7 @@ func PendingTransfersConsensus(observations []models.Observation, f int) ([]mode
 		}
 	}
 
-	var quorumEvents []models.PendingTransfer
+	quorumEvents := make([]models.PendingTransfer, 0, len(counts))
 	for h, count := range counts {
 		if count >= f+1 {
 			ev, exists := eventFromHash[h]
@@ -85,7 +85,7 @@ func InflightTransfersConsensus(observations []models.Observation, f int) ([]mod
 		}
 	}
 
-	var quorumEvents []models.Transfer
+	quorumEvents := make([]models.Transfer, 0, len(counts))
 	for h, count := range counts {
 		if count >= f+1 {
 			ev, exists := transferFromKey[h]
@@ -95,6 +95,11 @@ func InflightTransfersConsensus(observations []models.Observation, f int) ([]mod
 			quorumEvents = append(quorumEvents, ev)
 		}
 	}
+
+	// sort by network id for deterministic results
+	sort.Slice(quorumEvents, func(i, j int) bool {
+		return quorumEvents[i].From < quorumEvents[j].From
+	})
 
 	return quorumEvents, nil
 }
@@ -120,7 +125,7 @@ func ConfigDigestsConsensus(observations []models.Observation, f int) ([]models.
 		}
 	}
 
-	var quorumCds []models.ConfigDigestWithMeta
+	quorumCds := make([]models.ConfigDigestWithMeta, 0, len(counts))
 	for k, count := range counts {
 		if count >= f+1 {
 			cd, exists := cds[k]

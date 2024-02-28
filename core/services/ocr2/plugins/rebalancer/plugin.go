@@ -37,6 +37,7 @@ type Plugin struct {
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	inflight                inflight.Container
 	lggr                    logger.Logger
+	reportCodec             liquiditymanager.ReportCodec
 }
 
 func NewPlugin(
@@ -48,6 +49,7 @@ func NewPlugin(
 	discovererFactory discoverer.Factory,
 	bridgeFactory bridge.Factory,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
+	reportCodec liquiditymanager.ReportCodec,
 	lggr logger.Logger,
 ) *Plugin {
 	return &Plugin{
@@ -61,6 +63,7 @@ func NewPlugin(
 		rebalancerGraph:         graph.NewGraph(),
 		liquidityRebalancer:     liquidityRebalancer,
 		inflight:                inflight.New(lggr),
+		reportCodec:             reportCodec,
 		lggr:                    lggr,
 		mu:                      sync.RWMutex{},
 	}
@@ -290,7 +293,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		}
 
 		report := models.NewReport(transfers, rebalancerAddress, networkID, configDigest)
-		encoded, err := report.OnchainEncode()
+		encoded, err := p.reportCodec.Encode(report)
 		if err != nil {
 			return nil, fmt.Errorf("encode report metadata for onchain usage: %w", err)
 		}
@@ -308,9 +311,14 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportLen", len(r.Report), "phase", "ShouldAcceptAttestedReport")
 	lggr.Infow("in should accept attested report")
 
-	report, instructions, err := models.DecodeReport(r.Info.NetworkID, r.Info.LiquidityManagerAddress, r.Report)
+	report, instructions, err := p.reportCodec.Decode(r.Info.NetworkID, r.Info.LiquidityManagerAddress, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("failed to decode report: %w", err)
+	}
+
+	if len(report.Transfers) == 0 {
+		lggr.Infow("report has no transfers, should not be transmitted")
+		return false, nil
 	}
 
 	stale := p.isStaleReport(ctx, lggr, seqNr, r.Info.NetworkID, r.Info.LiquidityManagerAddress, report.Transfers)
@@ -339,9 +347,14 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64,
 	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportLen", len(r.Report), "phase", "ShouldTransmitAcceptedReport")
 	lggr.Infow("in should transmit accepted report")
 
-	report, instructions, err := models.DecodeReport(r.Info.NetworkID, r.Info.LiquidityManagerAddress, r.Report)
+	report, instructions, err := p.reportCodec.Decode(r.Info.NetworkID, r.Info.LiquidityManagerAddress, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("failed to decode report: %w", err)
+	}
+
+	if len(report.Transfers) == 0 {
+		lggr.Infow("report has no transfers, should not be transmitted")
+		return false, nil
 	}
 
 	lggr.Infow("in should transmit accepted report",
@@ -437,22 +450,26 @@ func (p *Plugin) Close() error {
 
 	var errs []error
 	for _, networkID := range p.rebalancerGraph.GetNetworks() {
+		p.lggr.Infow("closing rebalancer network", "network", networkID)
+
 		rebalancerAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("get rebalancer address for %v: %w", networkID, err))
+			errs = append(errs, fmt.Errorf("get rebalancer address for %d: %w", networkID, err))
 			continue
 		}
 
 		rb, err := p.liquidityManagerFactory.GetRebalancer(networkID, rebalancerAddress)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("get rebalancer (%d, %v): %w", networkID, rebalancerAddress, err))
+			errs = append(errs, fmt.Errorf("get rebalancer (%d, %s): %w", networkID, rebalancerAddress.String(), err))
 			continue
 		}
 
 		if err := rb.Close(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("close rebalancer (%d, %v): %w", networkID, rebalancerAddress, err))
+			errs = append(errs, fmt.Errorf("close rebalancer (%d, %s): %w", networkID, rebalancerAddress.String(), err))
 			continue
 		}
+
+		p.lggr.Infow("finished closing rebalancer network", "network", networkID, "rebalancer", rebalancerAddress.String())
 	}
 
 	return multierr.Combine(errs...)
@@ -574,7 +591,7 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 
 	p.lggr.Debugw("resolved transfers counts", "counts", len(counts))
 
-	var quorumTransfers []models.Transfer
+	quorumTransfers := make([]models.Transfer, 0)
 	for k, transfers := range counts {
 		if len(transfers) >= p.f+1 {
 			p.lggr.Debugw("quorum reached on transfer", "transfer", k, "votes", len(transfers))
@@ -589,7 +606,7 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 			for _, tr := range transfers {
 				bridgeFees = append(bridgeFees, tr.NativeBridgeFee.ToInt())
 				bridgePayloads = append(bridgePayloads, tr.BridgeData)
-				datesUnix = append(datesUnix, big.NewInt(tr.Date.Unix()))
+				datesUnix = append(datesUnix, big.NewInt(tr.Date.UTC().Unix()))
 			}
 			medianizedNativeFee := rebalcalc.BigIntSortedMiddle(bridgeFees)
 			medianizedDateUnix := rebalcalc.BigIntSortedMiddle(datesUnix)
@@ -605,7 +622,7 @@ func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observatio
 				From:               k.From,
 				To:                 k.To,
 				Amount:             transfers[0].Amount,
-				Date:               time.Unix(medianizedDateUnix.Int64(), 0), // medianized, not in the key
+				Date:               time.Unix(medianizedDateUnix.Int64(), 0).In(time.UTC), // medianized, not in the key
 				Sender:             transfers[0].Sender,
 				Receiver:           transfers[0].Receiver,
 				LocalTokenAddress:  transfers[0].LocalTokenAddress,
@@ -626,7 +643,7 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 	lggr.Infow("resolving proposed transfers", "prevSeqNr", outcomeCtx.SeqNr-1)
 
 	if len(outcomeCtx.PreviousOutcome) == 0 {
-		return nil, nil
+		return []models.Transfer{}, nil
 	}
 
 	outcome, err := models.DecodeOutcome(outcomeCtx.PreviousOutcome)
@@ -634,7 +651,7 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
 	}
 
-	var resolvedTransfers []models.Transfer
+	resolvedTransfers := make([]models.Transfer, 0, len(outcome.ProposedTransfers))
 	for _, proposedTransfer := range outcome.ProposedTransfers {
 		bridge, err := p.bridgeFactory.NewBridge(proposedTransfer.From, proposedTransfer.To)
 		if err != nil {
