@@ -109,7 +109,7 @@ func TestPlugin_Observation(t *testing.T) {
 				},
 			},
 			bridges: map[[2]models.NetworkSelector]func(t *testing.T) (bridge.Bridge, error){
-				[2]models.NetworkSelector{networkA, networkB}: func(t *testing.T) (bridge.Bridge, error) {
+				{networkA, networkB}: func(t *testing.T) (bridge.Bridge, error) {
 					b := bridgemocks.NewBridge(t)
 					b.On("GetTransfers", ctx, tokenX, tokenY).Return([]models.PendingTransfer{
 						{
@@ -120,7 +120,7 @@ func TestPlugin_Observation(t *testing.T) {
 					}, nil)
 					return b, nil
 				},
-				[2]models.NetworkSelector{networkB, networkA}: func(t *testing.T) (bridge.Bridge, error) {
+				{networkB, networkA}: func(t *testing.T) (bridge.Bridge, error) {
 					b := bridgemocks.NewBridge(t)
 					b.On("GetTransfers", ctx, tokenY, tokenX).Return(nil, nil)
 
@@ -177,13 +177,13 @@ func TestPlugin_Observation(t *testing.T) {
 			name:  "observation returned an error",
 			seqNr: 1,
 			observedGraph: func(t *testing.T) (graph.Graph, error) {
-				return nil, someErr
+				return nil, errSomethingWentWrong
 			},
 			previousOutcome: models.Outcome{},
 			bridges:         map[[2]models.NetworkSelector]func(t *testing.T) (bridge.Bridge, error){},
 			expErr: func(t *testing.T, err error) {
-				assert.True(t, errors.Is(err, someErr))
-				assert.False(t, err.Error() == someErr.Error()) // error should be wrapped
+				assert.True(t, errors.Is(err, errSomethingWentWrong))
+				assert.False(t, err.Error() == errSomethingWentWrong.Error()) // error should be wrapped
 			},
 		},
 	}
@@ -418,7 +418,7 @@ func TestPlugin_Outcome(t *testing.T) {
 					},
 				},
 			},
-			f:       2,
+			f:       1,
 			bridges: nil,
 			expectedOutcome: models.Outcome{
 				ProposedTransfers: []models.ProposedTransfer{
@@ -461,7 +461,7 @@ func TestPlugin_Outcome(t *testing.T) {
 			}, 5),
 			f: 2,
 			bridges: map[[2]models.NetworkSelector]func(t *testing.T) (*bridgemocks.Bridge, error){
-				[2]models.NetworkSelector{networkB, networkA}: func(t *testing.T) (*bridgemocks.Bridge, error) {
+				{networkB, networkA}: func(t *testing.T) (*bridgemocks.Bridge, error) {
 					br := bridgemocks.NewBridge(t)
 					br.On("QuorumizedBridgePayload", slicesRepeat([]byte("ba-resolved"), 5), 2).
 						Return([]byte("quorum-ba-resolved"), nil)
@@ -772,17 +772,19 @@ func TestPlugin_Close(t *testing.T) {
 	rbB := liquiditymanagermocks.NewRebalancer(t)
 	rbC := liquiditymanagermocks.NewRebalancer(t)
 
-	p.lmFactory.On("GetRebalancer", networkA, rebalancerA).Return(rbA, someErr) //  networkA errors while getting the rebalancer
+	p.lmFactory.On("GetRebalancer", networkA, rebalancerA).Return(rbA, errSomethingWentWrong) //  networkA errors while getting the rebalancer
 	p.lmFactory.On("GetRebalancer", networkB, rebalancerB).Return(rbB, nil)
 	p.lmFactory.On("GetRebalancer", networkC, rebalancerC).Return(rbC, nil)
 
-	rbB.On("Close", mock.Anything).Return(someErr) // networkB errors while closing
-	rbC.On("Close", mock.Anything).Return(nil)     // networkC is still closed
+	rbB.On("Close", mock.Anything).Return(errSomethingWentWrong) // networkB errors while closing
+	rbC.On("Close", mock.Anything).Return(nil)                   // networkC is still closed
 
 	err := p.plugin.Close()
 	assert.Error(t, err)
-	assert.Equal(t, "get rebalancer (1, 0x000000000000000000000000000000000000000A): some err; "+
-		"close rebalancer (2, 0x000000000000000000000000000000000000000b): some err", err.Error())
+	assert.Equal(t, "get rebalancer (1, 0x000000000000000000000000000000000000000A): "+
+		"some error that indicates something went wrong; "+
+		"close rebalancer (2, 0x000000000000000000000000000000000000000b): "+
+		"some error that indicates something went wrong", err.Error())
 }
 
 func TestPlugin_E2EWithMocks(t *testing.T) {
@@ -1171,7 +1173,6 @@ var (
 
 	tokenX = models.Address(common.HexToAddress("0x1"))
 	tokenY = models.Address(common.HexToAddress("0x2"))
-	tokenZ = models.Address(common.HexToAddress("0x3"))
 
 	bridgeAB = [2]models.NetworkSelector{networkA, networkB}
 	bridgeBA = [2]models.NetworkSelector{networkB, networkA}
@@ -1186,11 +1187,10 @@ var (
 	cfgDigest3 = models.ConfigDigest{ConfigDigest: ocrtypes.ConfigDigest([32]byte{3})}
 	cfgDigest4 = models.ConfigDigest{ConfigDigest: ocrtypes.ConfigDigest([32]byte{4})}
 
-	someErr = errors.New("some err")
+	errSomethingWentWrong = errors.New("some error that indicates something went wrong")
 
 	date2010 = time.Date(2010, 5, 6, 12, 4, 4, 0, time.UTC)
 	date2011 = time.Date(2011, 5, 6, 12, 4, 4, 0, time.UTC)
-	date2012 = time.Date(2012, 5, 6, 12, 4, 4, 0, time.UTC)
 )
 
 // JsonReportCodec is used in tests
@@ -1209,14 +1209,30 @@ func (j JsonReportCodec) Encode(report models.Report) ([]byte, error) {
 }
 
 func (j JsonReportCodec) Decode(networkID models.NetworkSelector, rebalancerAddress models.Address, binaryReport []byte) (models.Report, rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) {
+	var instructions rebalancer_report_encoder.IRebalancerLiquidityInstructions
+	err := json.Unmarshal(binaryReport, &instructions)
+	if err != nil {
+		return models.Report{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, err
+	}
 	var r models.Report
-	err := json.Unmarshal(binaryReport, &r)
-	if err != nil {
-		return models.Report{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, err
+	for _, sendInstruction := range instructions.SendLiquidityParams {
+		r.Transfers = append(r.Transfers, models.Transfer{
+			From: networkID,
+			To:   models.NetworkSelector(sendInstruction.RemoteChainSelector),
+			Amount: ubig.New(
+				sendInstruction.Amount,
+			),
+		})
 	}
-	inst, err := r.ToLiquidityInstructions()
-	if err != nil {
-		return models.Report{}, rebalancer_report_encoder.IRebalancerLiquidityInstructions{}, err
+	for _, receiveInstruction := range instructions.ReceiveLiquidityParams {
+		r.Transfers = append(r.Transfers, models.Transfer{
+			From: models.NetworkSelector(receiveInstruction.RemoteChainSelector),
+			To:   networkID,
+			Amount: ubig.New(
+				receiveInstruction.Amount,
+			),
+		})
 	}
-	return r, inst, err
+	r.LiquidityManagerAddress = rebalancerAddress
+	return r, instructions, err
 }

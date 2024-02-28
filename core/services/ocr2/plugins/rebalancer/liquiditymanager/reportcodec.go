@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
-type ReportCodec interface {
+type OnchainReportCodec interface {
 	Encode(models.Report) ([]byte, error)
 	Decode(networkID models.NetworkSelector, rebalancerAddress models.Address, binaryReport []byte) (models.Report, rebalancer_report_encoder.IRebalancerLiquidityInstructions, error) // todo: we should not use gethwrapper types
 }

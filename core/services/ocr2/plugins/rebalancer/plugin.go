@@ -36,7 +36,7 @@ type Plugin struct {
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	pendingTransfers        *PendingTransfersCache
 	lggr                    logger.Logger
-	reportCodec             liquiditymanager.ReportCodec
+	reportCodec             liquiditymanager.OnchainReportCodec
 }
 
 func NewPlugin(
@@ -48,7 +48,7 @@ func NewPlugin(
 	discovererFactory discoverer.Factory,
 	bridgeFactory bridge.Factory,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
-	reportCodec liquiditymanager.ReportCodec,
+	reportCodec liquiditymanager.OnchainReportCodec,
 	lggr logger.Logger,
 ) *Plugin {
 	return &Plugin{
@@ -146,8 +146,6 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query ocrtyp
 }
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, aos []ocrtypes.AttributedObservation) (ocr3types.Outcome, error) {
-	// todo: should we validate if len(observations) > f ?
-
 	lggr := p.lggr.With("seqNr", outctx.SeqNr, "numObservations", len(aos), "phase", "Outcome")
 	lggr.Infow("in outcome")
 

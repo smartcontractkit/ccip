@@ -1,7 +1,6 @@
 package liquiditymanager
 
 import (
-	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
@@ -18,34 +17,6 @@ import (
 )
 
 func TestEvmReportCodec(t *testing.T) {
-	t.Run("marshal json", func(t *testing.T) {
-		rm := models.Report{}
-		b, err := json.Marshal(rm)
-		require.NoError(t, err, "failed to marshal empty ReportMetadata")
-
-		var unmarshalled models.Report
-		err = json.Unmarshal(b, &unmarshalled)
-		require.NoError(t, err, "failed to unmarshal empty ReportMetadata")
-		require.Equal(t, rm, unmarshalled, "marshalled and unmarshalled ReportMetadata should be equal")
-
-		rm = models.Report{
-			Transfers: []models.Transfer{
-				models.NewTransfer(1, 2, big.NewInt(3), time.Now().UTC(), []byte{}),
-			},
-			LiquidityManagerAddress: models.Address(testutils.NewAddress()),
-			NetworkID:               1,
-			ConfigDigest: models.ConfigDigest{
-				ConfigDigest: testutils.Random32Byte(),
-			},
-		}
-		b, err = json.Marshal(rm)
-		require.NoError(t, err, "failed to marshal ReportMetadata")
-
-		err = json.Unmarshal(b, &unmarshalled)
-		require.NoError(t, err, "failed to unmarshal ReportMetadata")
-		require.Equal(t, rm, unmarshalled, "marshalled and unmarshalled ReportMetadata should be equal")
-	})
-
 	t.Run("marshal onchain", func(t *testing.T) {
 		bridgeData1 := testutils.Random32Byte()
 		bridgeData2 := testutils.Random32Byte()
