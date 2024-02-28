@@ -2,6 +2,7 @@ package inflight
 
 import (
 	"context"
+	"sort"
 	"sync"
 
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -80,6 +81,12 @@ func (i *inflight) GetAll(ctx context.Context) []models.Transfer {
 	for k := range i.items {
 		transfers = append(transfers, i.items[k])
 	}
+
+	// Sort the transfers so that they are always in the same order.
+	sort.Slice(transfers, func(i, j int) bool {
+		return transfers[i].From < transfers[j].From
+	})
+
 	return transfers
 }
 
