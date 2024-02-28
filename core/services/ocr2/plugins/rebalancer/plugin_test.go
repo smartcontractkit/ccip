@@ -555,6 +555,7 @@ func TestPlugin_Outcome(t *testing.T) {
 					{Source: networkB, Dest: networkC},
 					{Source: networkC, Dest: networkA},
 					{Source: networkD, Dest: networkC},
+					{Source: networkC, Dest: networkD},
 				},
 				ConfigDigests: []models.ConfigDigestWithMeta{
 					{NetworkSel: networkA, Digest: cfgDigest1},
@@ -587,9 +588,9 @@ func TestPlugin_Outcome(t *testing.T) {
 			expectedOutcome: models.Outcome{
 				ProposedTransfers: []models.ProposedTransfer{
 					{
-						From:   networkD,
-						To:     networkC,
-						Amount: ubig.New(big.NewInt(4000)),
+						From:   networkC,
+						To:     networkD,
+						Amount: ubig.New(big.NewInt(2766)),
 					},
 				},
 				ResolvedTransfers: []models.Transfer{

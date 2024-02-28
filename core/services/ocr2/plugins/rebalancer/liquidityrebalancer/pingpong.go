@@ -75,7 +75,7 @@ func (p *PingPong) eligibleNeighbors(g graph.Graph, netSel models.NetworkSelecto
 
 	targetNeighbors := make([]models.NetworkSelector, 0, len(allNeighbors))
 	for _, neighborNetSel := range allNeighbors {
-		if !g.HasConnection(neighborNetSel, netSel) && !g.HasConnection(netSel, neighborNetSel) {
+		if !g.HasConnection(neighborNetSel, netSel) {
 			continue
 		}
 		if p.isInflightBidirectionally(netSel, neighborNetSel, inflight) {
