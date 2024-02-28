@@ -540,6 +540,76 @@ func TestPlugin_Outcome(t *testing.T) {
 			},
 			expErr: nil,
 		},
+		{
+			name: "inflight transfers and pending transfers",
+			observations: slicesRepeat[models.Observation](models.Observation{
+				LiquidityPerChain: []models.NetworkLiquidity{
+					{Network: networkA, Liquidity: ubig.New(big.NewInt(1000))},
+					{Network: networkB, Liquidity: ubig.New(big.NewInt(2000))},
+					{Network: networkC, Liquidity: ubig.New(big.NewInt(3000))},
+					{Network: networkD, Liquidity: ubig.New(big.NewInt(4000))},
+				},
+				Edges: []models.Edge{
+					{Source: networkA, Dest: networkB},
+					{Source: networkB, Dest: networkA},
+					{Source: networkB, Dest: networkC},
+					{Source: networkC, Dest: networkA},
+					{Source: networkD, Dest: networkC},
+				},
+				ConfigDigests: []models.ConfigDigestWithMeta{
+					{NetworkSel: networkA, Digest: cfgDigest1},
+					{NetworkSel: networkB, Digest: cfgDigest2},
+					{NetworkSel: networkC, Digest: cfgDigest3},
+					{NetworkSel: networkD, Digest: cfgDigest4},
+				},
+				PendingTransfers: []models.PendingTransfer{
+					{
+						Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), date2010, []byte("abc")), // pending from A -> B
+						Status:   models.TransferStatusReady,
+					},
+				},
+				InflightTransfers: []models.Transfer{
+					models.NewTransfer(networkB, networkC, big.NewInt(1000), date2010, []byte("abc")), // inflight from B -> C
+				},
+				ResolvedTransfers: []models.Transfer{
+					models.NewTransfer(networkC, networkA, big.NewInt(234), date2011, []byte("ba-resolved")),
+				},
+			}, 5),
+			f: 2,
+			bridges: map[[2]models.NetworkSelector]func(t *testing.T) (*bridgemocks.Bridge, error){
+				{networkC, networkA}: func(t *testing.T) (*bridgemocks.Bridge, error) {
+					br := bridgemocks.NewBridge(t)
+					br.On("QuorumizedBridgePayload", slicesRepeat([]byte("ba-resolved"), 5), 2).
+						Return([]byte("quorum-ba-resolved"), nil)
+					return br, nil
+				},
+			},
+			expectedOutcome: models.Outcome{
+				ProposedTransfers: []models.ProposedTransfer{
+					{
+						From:   networkD,
+						To:     networkC,
+						Amount: ubig.New(big.NewInt(4000)),
+					},
+				},
+				ResolvedTransfers: []models.Transfer{
+					models.NewTransfer(networkC, networkA, big.NewInt(234), date2011, []byte("quorum-ba-resolved")),
+				},
+				PendingTransfers: []models.PendingTransfer{
+					{
+						Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), date2010, []byte("abc")),
+						Status:   models.TransferStatusReady,
+					},
+				},
+				ConfigDigests: []models.ConfigDigestWithMeta{
+					{NetworkSel: networkA, Digest: cfgDigest1},
+					{NetworkSel: networkB, Digest: cfgDigest2},
+					{NetworkSel: networkC, Digest: cfgDigest3},
+					{NetworkSel: networkD, Digest: cfgDigest4},
+				},
+			},
+			expErr: nil,
+		},
 	}
 
 	lggr := logger.TestLogger(t)
@@ -847,42 +917,61 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 
 func TestPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 	testCases := []struct {
-		name         string
-		report       models.Report
-		reportSeqNr  uint64
-		onChainSeqNr uint64
-		expRes       bool
-		expErr       bool
+		name           string
+		report         models.Report
+		reportSeqNr    uint64
+		onChainSeqNr   uint64
+		onchainBalance *big.Int
+		expRes         bool
+		expErr         bool
 	}{
 		{
 			name: "a valid report that should be transmitted",
 			report: models.Report{
 				Transfers: []models.Transfer{
-					{From: networkA, To: networkB},
+					{From: networkA, To: networkB, Amount: ubig.New(big.NewInt(1000))},
 				},
 				LiquidityManagerAddress: rebalancerA,
 				NetworkID:               networkA,
 				ConfigDigest:            cfgDigest1,
 			},
-			reportSeqNr:  11,
-			onChainSeqNr: 10,
-			expRes:       true,
-			expErr:       false,
+			reportSeqNr:    11,
+			onChainSeqNr:   10,
+			onchainBalance: big.NewInt(1000),
+			expRes:         true,
+			expErr:         false,
 		},
 		{
 			name: "report will not get transmitted since the seq num matches the on chain",
 			report: models.Report{
 				Transfers: []models.Transfer{
-					{From: networkA, To: networkB},
+					{From: networkA, To: networkB, Amount: ubig.New(big.NewInt(1000))},
 				},
 				LiquidityManagerAddress: rebalancerA,
 				NetworkID:               networkA,
 				ConfigDigest:            cfgDigest1,
 			},
-			reportSeqNr:  11,
-			onChainSeqNr: 11,
-			expRes:       false,
-			expErr:       false,
+			reportSeqNr:    11,
+			onChainSeqNr:   11,
+			onchainBalance: big.NewInt(1000),
+			expRes:         false,
+			expErr:         false,
+		},
+		{
+			name: "report will not get transmitted since the on chain balance is not enough",
+			report: models.Report{
+				Transfers: []models.Transfer{
+					{From: networkA, To: networkB, Amount: ubig.New(big.NewInt(1000))},
+				},
+				LiquidityManagerAddress: rebalancerA,
+				NetworkID:               networkA,
+				ConfigDigest:            cfgDigest1,
+			},
+			reportSeqNr:    11,
+			onChainSeqNr:   10,
+			onchainBalance: big.NewInt(900),
+			expRes:         false,
+			expErr:         false,
 		},
 	}
 
@@ -899,6 +988,15 @@ func TestPlugin_ShouldTransmitAcceptedReport(t *testing.T) {
 			rb.
 				On("GetLatestSequenceNumber", ctx).
 				Return(tc.onChainSeqNr, nil)
+
+			// will only get called if onchain sequence number is less than the report sequence number
+			rb.
+				On("GetBalance", mock.Anything).
+				Return(tc.onchainBalance, nil).
+				Maybe()
+
+			defer p.lmFactory.AssertExpectations(t)
+			defer rb.AssertExpectations(t)
 
 			encodedReport, err := p.plugin.reportCodec.Encode(tc.report)
 			assert.NoError(t, err)

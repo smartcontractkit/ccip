@@ -362,23 +362,13 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64,
 		"sendInstructions", instructions.SendLiquidityParams,
 		"receiveInstructions", instructions.ReceiveLiquidityParams)
 
-	rebalancer, err := p.liquidityManagerFactory.NewRebalancer(r.Info.NetworkID, r.Info.LiquidityManagerAddress)
-	if err != nil {
-		return false, fmt.Errorf("init liquidity manager: %w", err)
-	}
-
-	// check sequence number to see if its already transmitted onchain
-	latestSeqNr, err := rebalancer.GetLatestSequenceNumber(ctx)
-	if err != nil {
-		return false, fmt.Errorf("get latest sequence number: %w", err)
-	}
-
-	if latestSeqNr >= seqNr {
-		lggr.Debugw("report already transmitted onchain, returning false", "latestSeqNr", latestSeqNr)
+	stale := p.isStaleReport(ctx, lggr, seqNr, r.Info.NetworkID, r.Info.LiquidityManagerAddress, report.Transfers)
+	if stale {
+		lggr.Infow("report is stale, should not be accepted")
 		return false, nil
 	}
 
-	lggr.Infow("transmitting accepted report", "latestSeqNr", latestSeqNr)
+	lggr.Infow("transmitting accepted report")
 
 	return true, nil
 }
