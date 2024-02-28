@@ -34,7 +34,6 @@ type Plugin struct {
 	mu                      sync.RWMutex
 	rebalancerGraph         graph.Graph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
-	pendingTransfers        *PendingTransfersCache
 	lggr                    logger.Logger
 	reportCodec             liquiditymanager.OnchainReportCodec
 }
@@ -61,7 +60,6 @@ func NewPlugin(
 		bridgeFactory:           bridgeFactory,
 		rebalancerGraph:         graph.NewGraph(),
 		liquidityRebalancer:     liquidityRebalancer,
-		pendingTransfers:        NewPendingTransfersCache(),
 		reportCodec:             reportCodec,
 		lggr:                    lggr,
 		mu:                      sync.RWMutex{},
@@ -393,18 +391,11 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 	p.lggr.Infow("loading pending transfers")
 
 	pendingTransfers := make([]models.PendingTransfer, 0)
-
 	edges, err := p.rebalancerGraph.GetEdges()
 	if err != nil {
 		return nil, fmt.Errorf("get edges: %w", err)
 	}
 	for _, edge := range edges {
-		// todo: figure out what to do with this
-		// dateToStartLookingFrom := time.Now().Add(-10 * 24 * time.Hour)
-
-		// if mostRecentTransfer, exists := p.pendingTransfers.LatestNetworkTransfer(networkID); exists {
-		// 	dateToStartLookingFrom = mostRecentTransfer.Date
-		// }
 		bridge, err := p.bridgeFactory.NewBridge(edge.Source, edge.Dest)
 		if err != nil {
 			return nil, fmt.Errorf("init bridge: %w", err)
@@ -434,7 +425,6 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 	}
 
 	// todo: why do we add this here? it's not used anywhere
-	p.pendingTransfers.Add(pendingTransfers)
 	return pendingTransfers, nil
 }
 
