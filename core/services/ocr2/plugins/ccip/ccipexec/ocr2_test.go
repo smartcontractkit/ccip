@@ -151,7 +151,7 @@ func TestExecutionReportingPlugin_Observation(t *testing.T) {
 			mockOnRampReader.On("GetSendRequestsBetweenSeqNums", ctx, mock.Anything, mock.Anything, false).
 				Return(tc.sendRequests, nil).Maybe()
 			sourcePriceRegistryAddress := cciptypes.Address(utils.RandomAddress().String())
-			mockOnRampReader.On("GetPriceRegistry").Return(sourcePriceRegistryAddress, nil).Maybe()
+			mockOnRampReader.On("GetPriceRegistry", ctx).Return(sourcePriceRegistryAddress, nil).Maybe()
 			p.onRampReader = mockOnRampReader
 
 			mockGasPriceEstimator := prices.NewMockGasPriceEstimatorExec(t)
@@ -1827,7 +1827,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 			sourcePriceRegistryProvider := ccipdataprovidermocks.NewPriceRegistry(t)
 
 			sourcePriceRegistryAddress := cciptypes.Address(utils.RandomAddress().String())
-			onrampReader.On("GetPriceRegistry").Return(sourcePriceRegistryAddress, nil).Maybe()
+			onrampReader.On("GetPriceRegistry", ctx).Return(sourcePriceRegistryAddress, nil).Maybe()
 			offrampReader.On("CurrentRateLimiterState", ctx).Return(cciptypes.TokenBucketRateLimit{}, nil).Maybe()
 			offrampReader.On("GetSourceToDestTokensMapping", ctx).Return(map[cciptypes.Address]cciptypes.Address{}, nil).Maybe()
 			gasPriceEstimator.On("GetGasPrice", ctx).Return(big.NewInt(1e9), nil).Maybe()

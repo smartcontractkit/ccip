@@ -1046,7 +1046,7 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 
 	// Build a price registry reader from the current price registry on the onRamp.
 	// This is required since the price registry address on the onRamp can change over time.
-	priceRegistryAddress, err := r.onRampReader.GetPriceRegistry()
+	priceRegistryAddress, err := r.onRampReader.GetPriceRegistry(ctx)
 	if err != nil {
 		return execTokenData{}, fmt.Errorf("getting price registry from onramp: %w", err)
 	}

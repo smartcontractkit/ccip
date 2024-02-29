@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/abihelpers"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/cciptypes"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/hashlib"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/logpollerutil"
@@ -107,6 +108,7 @@ type OnRamp struct {
 	sendRequestedEventSig      common.Hash
 	sendRequestedSeqNumberWord int
 	filters                    []logpoller.Filter
+	cachedPriceRegistryAddress cache.AutoSync[cciptypes.Address]
 }
 
 func (o *OnRamp) Address() (cciptypes.Address, error) {
@@ -135,12 +137,14 @@ func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 	}, nil
 }
 
-func (o *OnRamp) GetPriceRegistry() (cciptypes.Address, error) {
-	c, err := o.GetDynamicConfig()
-	if err != nil {
-		return "", err
-	}
-	return c.PriceRegistry, nil
+func (o *OnRamp) GetPriceRegistry(ctx context.Context) (cciptypes.Address, error) {
+	return o.cachedPriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
+		c, err := o.GetDynamicConfig()
+		if err != nil {
+			return "", err
+		}
+		return c.PriceRegistry, nil
+	})
 }
 
 func (o *OnRamp) GetLastUSDCMessagePriorToLogIndexInTx(ctx context.Context, logIndex int64, txHash common.Hash) ([]byte, error) {
@@ -168,6 +172,11 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			EventSigs: []common.Hash{eventSig},
 			Addresses: []common.Address{onRampAddress},
 		},
+		{
+			Name:      logpoller.FilterName("Dynamic config changed", onRampAddress),
+			EventSigs: []common.Hash{abihelpers.MustGetEventID("ConfigSet", onRampABI)},
+			Addresses: []common.Address{onRampAddress},
+		},
 	}
 	return &OnRamp{
 		lggr:       lggr,
@@ -180,6 +189,11 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 		// offset || sourceChainID || seqNum || ...
 		sendRequestedSeqNumberWord: 2,
 		sendRequestedEventSig:      eventSig,
+		cachedPriceRegistryAddress: cache.NewLogpollerEventsBased[cciptypes.Address](
+			sourceLP,
+			[]common.Hash{abihelpers.MustGetEventID("ConfigSet", onRampABI)},
+			onRampAddress,
+		),
 	}, nil
 }
 

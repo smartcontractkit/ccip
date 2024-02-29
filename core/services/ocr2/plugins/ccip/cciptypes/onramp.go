@@ -63,5 +63,5 @@ type OnRampReader interface {
 	GetDynamicConfig() (OnRampDynamicConfig, error)
 
 	// GetPriceRegistry returns the address of the current price registry configured on the onRamp.
-	GetPriceRegistry() (Address, error)
+	GetPriceRegistry(ctx context.Context) (Address, error)
 }
