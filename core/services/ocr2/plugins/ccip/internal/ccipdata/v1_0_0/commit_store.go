@@ -187,7 +187,6 @@ type CommitOffchainConfig struct {
 	DestFinalityDepth      uint32
 	FeeUpdateHeartBeat     config.Duration
 	FeeUpdateDeviationPPB  uint32
-	MaxGasPrice            uint64
 	InflightCacheExpiry    config.Duration
 	PriceReportingDisabled bool
 }
@@ -204,9 +203,6 @@ func (c CommitOffchainConfig) Validate() error {
 	}
 	if c.FeeUpdateDeviationPPB == 0 {
 		return errors.New("must set FeeUpdateDeviationPPB")
-	}
-	if c.MaxGasPrice == 0 {
-		return errors.New("must set MaxGasPrice")
 	}
 	if c.InflightCacheExpiry.Duration() == 0 {
 		return errors.New("must set InflightCacheExpiry")
@@ -226,10 +222,11 @@ func (c *CommitStore) ChangeConfig(onchainConfig []byte, offchainConfig []byte) 
 		return "", err
 	}
 	c.configMu.Lock()
-	c.gasPriceEstimator = prices.NewExecGasPriceEstimator(
-		c.estimator,
-		big.NewInt(int64(offchainConfigV1.MaxGasPrice)),
-		int64(offchainConfigV1.FeeUpdateDeviationPPB))
+	// MATT TODO
+	//c.gasPriceEstimator = prices.NewExecGasPriceEstimator(
+	//	c.estimator,
+	//	big.NewInt(int64(offchainConfigV1.MaxGasPrice)),
+	//	int64(offchainConfigV1.FeeUpdateDeviationPPB))
 	c.offchainConfig = ccipdata.NewCommitOffchainConfig(
 		offchainConfigV1.FeeUpdateDeviationPPB,
 		offchainConfigV1.FeeUpdateHeartBeat.Duration(),

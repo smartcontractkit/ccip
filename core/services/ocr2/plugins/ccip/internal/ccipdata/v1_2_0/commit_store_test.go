@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -61,7 +62,6 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 	validConfig := JSONCommitOffchainConfig{
 		SourceFinalityDepth:      3,
 		DestFinalityDepth:        4,
-		MaxGasPrice:              200e9,
 		GasPriceHeartBeat:        *config.MustNewDuration(1 * time.Minute),
 		DAGasPriceDeviationPPB:   10,
 		ExecGasPriceDeviationPPB: 11,
@@ -87,28 +87,6 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 				c.SourceFinalityDepth = 0
 				c.DestFinalityDepth = 0
 			}),
-		},
-		{
-			name: "can set the SourceMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
-				c.MaxGasPrice = 0
-				c.SourceMaxGasPrice = 200e9
-			}),
-		},
-		{
-			name: "must set SourceMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
-				c.MaxGasPrice = 0
-				c.SourceMaxGasPrice = 0
-			}),
-			errPattern: "SourceMaxGasPrice",
-		},
-		{
-			name: "cannot set both MaxGasPrice and SourceMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *JSONCommitOffchainConfig) {
-				c.SourceMaxGasPrice = c.MaxGasPrice
-			}),
-			errPattern: "MaxGasPrice and SourceMaxGasPrice",
 		},
 		{
 			name: "must set GasPriceHeartBeat",
@@ -161,26 +139,4 @@ func TestCommitStoreV120ffchainConfigEncoding(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCommitStoreV120ComputesGasPrice(t *testing.T) {
-	validConfig := JSONCommitOffchainConfig{
-		SourceFinalityDepth:      3,
-		DestFinalityDepth:        4,
-		MaxGasPrice:              200e9,
-		GasPriceHeartBeat:        *config.MustNewDuration(1 * time.Minute),
-		DAGasPriceDeviationPPB:   10,
-		ExecGasPriceDeviationPPB: 11,
-		TokenPriceHeartBeat:      *config.MustNewDuration(2 * time.Minute),
-		TokenPriceDeviationPPB:   12,
-		InflightCacheExpiry:      *config.MustNewDuration(3 * time.Minute),
-	}
-
-	require.NoError(t, validConfig.Validate())
-	require.Equal(t, uint64(200e9), validConfig.ComputeSourceMaxGasPrice())
-
-	validConfig.MaxGasPrice = 0
-	validConfig.SourceMaxGasPrice = 250e9
-	require.NoError(t, validConfig.Validate())
-	require.Equal(t, uint64(250e9), validConfig.ComputeSourceMaxGasPrice())
 }

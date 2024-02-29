@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	ccipconfig "github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/config"
 )
 
@@ -23,7 +24,6 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 		DestFinalityDepth:           3,
 		BatchGasLimit:               5_000_000,
 		RelativeBoostPerWaitHour:    0.07,
-		MaxGasPrice:                 200e9,
 		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
 	}
@@ -43,28 +43,6 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 				c.SourceFinalityDepth = 0
 				c.DestFinalityDepth = 0
 			}),
-		},
-		{
-			name: "can set the DestMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
-				c.MaxGasPrice = 0
-				c.DestMaxGasPrice = 200e9
-			}),
-		},
-		{
-			name: "must set DestMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
-				c.MaxGasPrice = 0
-				c.DestMaxGasPrice = 0
-			}),
-			errPattern: "DestMaxGasPrice",
-		},
-		{
-			name: "cannot set both MaxGasPrice and DestMaxGasPrice",
-			want: modifyCopy(validConfig, func(c *JSONExecOffchainConfig) {
-				c.DestMaxGasPrice = c.MaxGasPrice
-			}),
-			errPattern: "MaxGasPrice and DestMaxGasPrice",
 		},
 		{
 			name: "must set BatchGasLimit",
@@ -119,26 +97,6 @@ func TestExecOffchainConfig120_Encoding(t *testing.T) {
 	}
 }
 
-func TestExecOffchainConfig120_MaxGasPrice(t *testing.T) {
-	config := JSONExecOffchainConfig{
-		SourceFinalityDepth:         3,
-		DestOptimisticConfirmations: 6,
-		DestFinalityDepth:           3,
-		BatchGasLimit:               5_000_000,
-		RelativeBoostPerWaitHour:    0.07,
-		MaxGasPrice:                 200e9,
-		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
-		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
-	}
-	require.NoError(t, config.Validate())
-	require.Equal(t, uint64(200e9), config.ComputeDestMaxGasPrice())
-
-	config.MaxGasPrice = 0
-	config.DestMaxGasPrice = 250e9
-	require.NoError(t, config.Validate())
-	require.Equal(t, uint64(250e9), config.ComputeDestMaxGasPrice())
-}
-
 func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
 	t.Parallel()
 	decoded, err := ccipconfig.DecodeOffchainConfig[JSONExecOffchainConfig]([]byte(`{
@@ -154,7 +112,6 @@ func TestExecOffchainConfig120_ParseRawJson(t *testing.T) {
 		DestOptimisticConfirmations: 6,
 		BatchGasLimit:               5_000_000,
 		RelativeBoostPerWaitHour:    0.07,
-		MaxGasPrice:                 200e9,
 		InflightCacheExpiry:         *config.MustNewDuration(64 * time.Second),
 		RootSnoozeTime:              *config.MustNewDuration(128 * time.Minute),
 	}, decoded)

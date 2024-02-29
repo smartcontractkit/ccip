@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/config"
+
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/client"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/gas"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
@@ -24,7 +25,6 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipcalc"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/internal/ccipdata/v1_0_0"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/prices"
 )
 
 var (
@@ -95,23 +95,10 @@ type JSONExecOffchainConfig struct {
 	BatchGasLimit uint32
 	// See [ccipdata.ExecOffchainConfig.RelativeBoostPerWaitHour]
 	RelativeBoostPerWaitHour float64
-	// Same as [DestMaxGasPrice].
-	//
-	// Deprecated: use [DestMaxGasPrice] instead.
-	MaxGasPrice uint64
-	// DestMaxGasPrice is the max gas price in the native currency (e.g., wei/gas) that a node will pay for executing a transaction on the destination chain.
-	DestMaxGasPrice uint64
 	// See [ccipdata.ExecOffchainConfig.InflightCacheExpiry]
 	InflightCacheExpiry config.Duration
 	// See [ccipdata.ExecOffchainConfig.RootSnoozeTime]
 	RootSnoozeTime config.Duration
-}
-
-func (c JSONExecOffchainConfig) ComputeDestMaxGasPrice() uint64 {
-	if c.DestMaxGasPrice != 0 {
-		return c.DestMaxGasPrice
-	}
-	return c.MaxGasPrice
 }
 
 func (c JSONExecOffchainConfig) Validate() error {
@@ -123,14 +110,6 @@ func (c JSONExecOffchainConfig) Validate() error {
 	}
 	if c.RelativeBoostPerWaitHour == 0 {
 		return errors.New("must set RelativeBoostPerWaitHour")
-	}
-	if c.DestMaxGasPrice == 0 {
-		if c.MaxGasPrice == 0 {
-			return errors.New("must set DestMaxGasPrice")
-		}
-	}
-	if c.MaxGasPrice != 0 && c.DestMaxGasPrice != 0 {
-		return errors.New("cannot set both MaxGasPrice and DestMaxGasPrice")
 	}
 	if c.InflightCacheExpiry.Duration() == 0 {
 		return errors.New("must set InflightCacheExpiry")
@@ -189,7 +168,8 @@ func (o *OffRamp) ChangeConfig(onchainConfigBytes []byte, offchainConfigBytes []
 		RootSnoozeTime:              offchainConfigParsed.RootSnoozeTime,
 	}
 	onchainConfig := cciptypes.ExecOnchainConfig{PermissionLessExecutionThresholdSeconds: time.Second * time.Duration(onchainConfigParsed.PermissionLessExecutionThresholdSeconds)}
-	priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, big.NewInt(int64(offchainConfigParsed.ComputeDestMaxGasPrice())), 0, 0)
+	// MATT TODO
+	//priceEstimator := prices.NewDAGasPriceEstimator(o.Estimator, big.NewInt(int64(offchainConfigParsed.ComputeDestMaxGasPrice())), 0, 0)
 
 	o.UpdateDynamicConfig(onchainConfig, offchainConfig, priceEstimator)
 
