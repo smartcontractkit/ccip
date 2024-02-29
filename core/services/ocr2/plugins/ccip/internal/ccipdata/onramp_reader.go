@@ -12,7 +12,8 @@ type LeafHasherInterface[H hashlib.Hash] interface {
 }
 
 const (
-	COMMIT_CCIP_SENDS = "Commit ccip sends"
+	COMMIT_CCIP_SENDS      = "Commit ccip sends"
+	DYNAMIC_CONFIG_CHANGED = "Dynamic config changed"
 )
 
 //go:generate mockery --quiet --name OnRampReader --filename onramp_reader_mock.go --case=underscore

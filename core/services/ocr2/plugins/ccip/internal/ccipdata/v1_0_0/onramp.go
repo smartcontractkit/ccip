@@ -173,7 +173,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 			Addresses: []common.Address{onRampAddress},
 		},
 		{
-			Name:      logpoller.FilterName("Dynamic config changed", onRampAddress),
+			Name:      logpoller.FilterName(ccipdata.DYNAMIC_CONFIG_CHANGED, onRampAddress),
 			EventSigs: []common.Hash{abihelpers.MustGetEventID("ConfigSet", onRampABI)},
 			Addresses: []common.Address{onRampAddress},
 		},
