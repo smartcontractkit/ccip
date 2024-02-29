@@ -218,10 +218,12 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, localToken models.Addre
 	sendLogs, err := l.l2LogPoller.IndexedLogsCreatedAfter(
 		LiquidityTransferredTopic,
 		l.l2Rebalancer.Address(),
-		3, // topic index 3: toChainSelector in event
+		LiquidityTransferredToChainSelectorTopicIndex,
 		[]common.Hash{
 			toHash(l.remoteSelector),
 		},
+		// todo: this should not be hardcoded
+		// todo: heavy query warning
 		time.Now().Add(-DurationMonth/2),
 		logpoller.Finalized,
 		pg.WithParentCtx(ctx),
@@ -236,7 +238,7 @@ func (l *l2ToL1Bridge) GetTransfers(ctx context.Context, localToken models.Addre
 	receiveLogs, err := l.l1LogPoller.IndexedLogsCreatedAfter(
 		LiquidityTransferredTopic,
 		l.l1Rebalancer.Address(),
-		2, // topic index 2: fromChainSelector in event
+		LiquidityTransferredFromChainSelectorTopicIndex,
 		[]common.Hash{
 			toHash(l.localSelector),
 		},
