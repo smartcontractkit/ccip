@@ -180,13 +180,13 @@ func TestPlugin_Observation(t *testing.T) {
 			name:  "observation returned an error",
 			seqNr: 1,
 			observedGraph: func(t *testing.T) (graph.Graph, error) {
-				return nil, errSome
+				return nil, errSomethingWentWrong
 			},
 			previousOutcome: models.Outcome{},
 			bridges:         map[[2]models.NetworkSelector]func(t *testing.T) (bridge.Bridge, error){},
 			expErr: func(t *testing.T, err error) {
-				assert.True(t, errors.Is(err, errSome))
-				assert.False(t, err.Error() == errSome.Error()) // error should be wrapped
+				assert.True(t, errors.Is(err, errSomethingWentWrong))
+				assert.False(t, err.Error() == errSomethingWentWrong.Error()) // error should be wrapped
 			},
 		},
 	}
@@ -207,10 +207,10 @@ func TestPlugin_Observation(t *testing.T) {
 
 			// loadPendingTransfers && resolveProposedTransfers
 			for sourceDest, bridgeFn := range tc.bridges {
-				br, err := bridgeFn(t)
+				br, err2 := bridgeFn(t)
 				p.bridgeFactory.
 					On("NewBridge", sourceDest[0], sourceDest[1]).
-					Return(br, err)
+					Return(br, err2)
 			}
 
 			// run the observation
@@ -1030,21 +1030,23 @@ func TestPlugin_Close(t *testing.T) {
 	rbB := liquiditymanagermocks.NewRebalancer(t)
 	rbC := liquiditymanagermocks.NewRebalancer(t)
 
-	p.lmFactory.On("GetRebalancer", networkA, rebalancerA).Return(rbA, errSome) //  networkA errors while getting the rebalancer
+	p.lmFactory.On("GetRebalancer", networkA, rebalancerA).Return(rbA, errSomethingWentWrong) //  networkA errors while getting the rebalancer
 	p.lmFactory.On("GetRebalancer", networkB, rebalancerB).Return(rbB, nil)
 	p.lmFactory.On("GetRebalancer", networkC, rebalancerC).Return(rbC, nil)
 
-	rbB.On("Close", mock.Anything).Return(errSome) // networkB errors while closing
-	rbC.On("Close", mock.Anything).Return(nil)     // networkC is still closed
+	rbB.On("Close", mock.Anything).Return(errSomethingWentWrong) // networkB errors while closing
+	rbC.On("Close", mock.Anything).Return(nil)                   // networkC is still closed
 
 	err := p.plugin.Close()
 	assert.Error(t, err)
-	assert.Equal(t, "get rebalancer (1, 0x000000000000000000000000000000000000000A): some err; "+
-		"close rebalancer (2, 0x000000000000000000000000000000000000000b): some err", err.Error())
+	assert.Equal(t, "get rebalancer (1, 0x000000000000000000000000000000000000000A): "+
+		"some error that indicates something went wrong; "+
+		"close rebalancer (2, 0x000000000000000000000000000000000000000b): "+
+		"some error that indicates something went wrong", err.Error())
 }
 
 func TestPlugin_E2EWithMocks(t *testing.T) {
-	t.Skip() // TODO: fix
+	t.Skip()
 	ctx := testutils.Context(t)
 	lggr := logger.TestLogger(t)
 	lggr.SetLogLevel(zapcore.ErrorLevel)
@@ -1444,7 +1446,7 @@ var (
 	cfgDigest3 = models.ConfigDigest{ConfigDigest: ocrtypes.ConfigDigest([32]byte{3})}
 	cfgDigest4 = models.ConfigDigest{ConfigDigest: ocrtypes.ConfigDigest([32]byte{4})}
 
-	errSome = errors.New("some err")
+	errSomethingWentWrong = errors.New("some error that indicates something went wrong")
 
 	date2010 = time.Date(2010, 5, 6, 12, 4, 4, 0, time.UTC)
 	date2011 = time.Date(2011, 5, 6, 12, 4, 4, 0, time.UTC)

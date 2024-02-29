@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 
@@ -37,7 +38,7 @@ type Plugin struct {
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
 	inflight                inflight.Container
 	lggr                    logger.Logger
-	reportCodec             liquiditymanager.ReportCodec
+	reportCodec             liquiditymanager.OnchainReportCodec
 }
 
 func NewPlugin(
@@ -49,7 +50,7 @@ func NewPlugin(
 	discovererFactory discoverer.Factory,
 	bridgeFactory bridge.Factory,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
-	reportCodec liquiditymanager.ReportCodec,
+	reportCodec liquiditymanager.OnchainReportCodec,
 	lggr logger.Logger,
 ) *Plugin {
 	return &Plugin{
@@ -141,6 +142,7 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
+	// todo: improve logging - including duration of each phase, etc.
 	p.lggr.Infow("in validate observation", "seqNr", outctx.SeqNr, "phase", "ValidateObservation")
 
 	_, err := models.DecodeObservation(ao.Observation)
@@ -248,18 +250,15 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	// incoming transfers will need to be finalized
 	// outgoing transfers will need to be executed
 	incomingAndOutgoing := make(map[models.NetworkSelector][]models.Transfer)
-	for _, networkID := range p.rebalancerGraph.GetNetworks() {
-		for _, outgoing := range decodedOutcome.ResolvedTransfers {
-			if outgoing.From == networkID {
-				incomingAndOutgoing[networkID] = append(incomingAndOutgoing[networkID], outgoing)
-			}
-		}
-		for _, incoming := range decodedOutcome.PendingTransfers {
-			if incoming.To == networkID &&
-				(incoming.Status == models.TransferStatusReady ||
-					incoming.Status == models.TransferStatusFinalized) {
-				incomingAndOutgoing[networkID] = append(incomingAndOutgoing[networkID], incoming.Transfer)
-			}
+
+	for _, outgoing := range decodedOutcome.ResolvedTransfers {
+		incomingAndOutgoing[outgoing.From] = append(incomingAndOutgoing[outgoing.From], outgoing)
+	}
+
+	for _, incoming := range decodedOutcome.PendingTransfers {
+		if incoming.Status == models.TransferStatusReady ||
+			incoming.Status == models.TransferStatusFinalized {
+			incomingAndOutgoing[incoming.To] = append(incomingAndOutgoing[incoming.To], incoming.Transfer)
 		}
 	}
 
@@ -282,6 +281,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 
 	var reports []ocr3types.ReportWithInfo[models.Report]
 	for networkID, transfers := range incomingAndOutgoing {
+		// todo: we shouldn't use plugin state
 		rebalancerAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
 		if err != nil {
 			return nil, fmt.Errorf("liquidity manager for %v does not exist", networkID)
@@ -302,6 +302,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 			Info:   report,
 		})
 	}
+	sort.Slice(reports, func(i, j int) bool { return reports[i].Info.NetworkID < reports[j].Info.NetworkID })
 
 	lggr.Infow("generated reports", "numReports", len(reports))
 	return reports, nil
@@ -469,15 +470,16 @@ func (p *Plugin) syncGraph(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// todo: if there wasn't any change to the graph stop earlier
 	p.lggr.Infow("syncing graph edges")
 
+	// todo: discoverer factory is not required we can pass a discoverer instance to the plugin
 	p.lggr.Infow("discovering rebalancers")
 	discoverer, err := p.discovererFactory.NewDiscoverer(p.rootNetwork, p.rootAddress)
 	if err != nil {
 		return fmt.Errorf("init discoverer: %w", err)
 	}
 
+	// todo: discoverer should immediately return without making any rpc calls if there wasn't any change
 	g, err := discoverer.Discover(ctx)
 	if err != nil {
 		return fmt.Errorf("discovering rebalancers: %w", err)
@@ -527,6 +529,7 @@ func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) (
 		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
 	}
 
+	// todo: why do we add this here? it's not used anywhere
 	return pendingTransfers, nil
 }
 
@@ -541,7 +544,7 @@ func (p *Plugin) computeMedianGraph(
 
 	for _, medianLiq := range medianLiquidities {
 		if !g.SetLiquidity(medianLiq.Network, medianLiq.Liquidity.ToInt()) {
-			p.lggr.Errorw("median liquidity on network not found on edges quorum", "net", medianLiq.Network)
+			p.lggr.Debugw("median liquidity on network not found on edges quorum", "net", medianLiq.Network)
 		}
 	}
 

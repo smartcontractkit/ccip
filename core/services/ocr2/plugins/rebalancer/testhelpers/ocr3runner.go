@@ -33,28 +33,30 @@ func NewOCR3Runner[RI any](nodes []ocr3types.ReportingPlugin[RI]) *OCR3Runner[RI
 	}
 }
 
+// RunRound will run some basic steps of an OCR3 flow.
+// This is not a full OCR3 round but only the bare minimum.
 func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (transmitted, notAccepted, notTransmitted []ocr3types.ReportWithInfo[RI], outcome []byte, err error) {
 	r.round++
 	seqNr := uint64(r.round)
 
-	masterNode := r.selectMasterNode()
+	leaderNode := r.selectLeader()
 
 	outcomeCtx := ocr3types.OutcomeContext{SeqNr: seqNr, PreviousOutcome: r.previousOutcome}
 
-	q, err := masterNode.Query(ctx, outcomeCtx)
+	q, err := leaderNode.Query(ctx, outcomeCtx)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("%s: %w", err, ErrQuery)
 	}
 
 	attributedObservations := make([]types.AttributedObservation, len(r.nodes))
 	for i, n := range r.nodes {
-		obs, err := n.Observation(ctx, outcomeCtx, q)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("%s: %w", err, ErrObservation)
+		obs, err2 := n.Observation(ctx, outcomeCtx, q)
+		if err2 != nil {
+			return nil, nil, nil, nil, fmt.Errorf("%s: %w", err2, ErrObservation)
 		}
 
 		attrObs := types.AttributedObservation{Observation: obs, Observer: 0}
-		err = masterNode.ValidateObservation(outcomeCtx, q, attrObs)
+		err = leaderNode.ValidateObservation(outcomeCtx, q, attrObs)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("%s: %w", err, ErrValidateObservation)
 		}
@@ -62,13 +64,14 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (transmitted, notAccepted
 		attributedObservations[i] = attrObs
 	}
 
-	outcome, err = masterNode.Outcome(outcomeCtx, q, attributedObservations)
+	// todo: run the outcome phase on all nodes and make sure their results are equal.
+	outcome, err = leaderNode.Outcome(outcomeCtx, q, attributedObservations)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("%s: %w", err, ErrOutcome)
 	}
 	r.previousOutcome = outcome
 
-	reportsWithInfo, err := masterNode.Reports(seqNr, outcome)
+	reportsWithInfo, err := leaderNode.Reports(seqNr, outcome)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("%s: %w", err, ErrReports)
 	}
@@ -78,7 +81,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (transmitted, notAccepted
 	notTransmitted = make([]ocr3types.ReportWithInfo[RI], 0)
 
 	for _, report := range reportsWithInfo {
-		shouldAccept, err := masterNode.ShouldAcceptAttestedReport(ctx, seqNr, report)
+		shouldAccept, err := leaderNode.ShouldAcceptAttestedReport(ctx, seqNr, report)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("%s: %w", err, ErrShouldAcceptAttestedReport)
 		}
@@ -87,7 +90,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (transmitted, notAccepted
 			continue
 		}
 
-		shouldTransmit, err := masterNode.ShouldTransmitAcceptedReport(ctx, seqNr, report)
+		shouldTransmit, err := leaderNode.ShouldTransmitAcceptedReport(ctx, seqNr, report)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("%s: %w", err, ErrShouldTransmitAcceptedReport)
 		}
@@ -102,7 +105,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (transmitted, notAccepted
 	return transmitted, notAccepted, notTransmitted, outcome, nil // reports transmitted on-chain
 }
 
-func (r *OCR3Runner[RI]) selectMasterNode() ocr3types.ReportingPlugin[RI] {
+func (r *OCR3Runner[RI]) selectLeader() ocr3types.ReportingPlugin[RI] {
 	numNodes := len(r.nodes)
 	if numNodes == 0 {
 		return nil
