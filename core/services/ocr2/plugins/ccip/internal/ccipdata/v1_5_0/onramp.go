@@ -135,16 +135,16 @@ var _ ccipdata.OnRampReader = &OnRamp{}
 // Significant change in 1.2:
 // - CCIPSendRequested event signature has changed
 type OnRamp struct {
-	onRamp                     *evm_2_evm_onramp.EVM2EVMOnRamp
-	address                    common.Address
-	lggr                       logger.Logger
-	lp                         logpoller.LogPoller
-	leafHasher                 ccipdata.LeafHasherInterface[[32]byte]
-	client                     client.Client
-	sendRequestedEventSig      common.Hash
-	sendRequestedSeqNumberWord int
-	filters                    []logpoller.Filter
-	cachedPriceRegistryAddress cache.AutoSync[cciptypes.Address]
+	onRamp                           *evm_2_evm_onramp.EVM2EVMOnRamp
+	address                          common.Address
+	lggr                             logger.Logger
+	lp                               logpoller.LogPoller
+	leafHasher                       ccipdata.LeafHasherInterface[[32]byte]
+	client                           client.Client
+	sendRequestedEventSig            common.Hash
+	sendRequestedSeqNumberWord       int
+	filters                          []logpoller.Filter
+	cachedOnRampPriceRegistryAddress cache.AutoSync[cciptypes.Address]
 }
 
 func (o *OnRamp) Address() (cciptypes.Address, error) {
@@ -174,7 +174,7 @@ func (o *OnRamp) GetDynamicConfig() (cciptypes.OnRampDynamicConfig, error) {
 }
 
 func (o *OnRamp) GetPriceRegistry(ctx context.Context) (cciptypes.Address, error) {
-	return o.cachedPriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
+	return o.cachedOnRampPriceRegistryAddress.Get(ctx, func(ctx context.Context) (cciptypes.Address, error) {
 		c, err := o.GetDynamicConfig()
 		if err != nil {
 			return "", err
@@ -292,7 +292,7 @@ func NewOnRamp(lggr logger.Logger, sourceSelector, destSelector uint64, onRampAd
 		address:                    onRampAddress,
 		sendRequestedSeqNumberWord: CCIPSendRequestSeqNumIndex,
 		sendRequestedEventSig:      CCIPSendRequestEventSig,
-		cachedPriceRegistryAddress: cache.NewLogpollerEventsBased[cciptypes.Address](
+		cachedOnRampPriceRegistryAddress: cache.NewLogpollerEventsBased[cciptypes.Address](
 			sourceLP,
 			[]common.Hash{abihelpers.MustGetEventID("ConfigSet", onRampABI)},
 			onRampAddress,
