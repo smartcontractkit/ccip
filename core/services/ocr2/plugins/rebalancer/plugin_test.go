@@ -1151,7 +1151,8 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 
 			for numRound, round := range tc.rounds {
 				for i, n := range nodes {
-					t.Logf(">>> running round: %d", numRound+1)
+					n.resetMocks(t)
+
 					// the node will first discover the graph, let's mock the observed graph
 					discoverer := discoverermocks.NewDiscoverer(t)
 					n.discovererFactory.
@@ -1177,8 +1178,14 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 								pendingTransfers = append(pendingTransfers, tr)
 							}
 						}
+
+						localToken, err := round.discoveredGraphPerNode[i]().GetTokenAddress(edge.Source)
+						require.NoError(t, err)
+						remoteToken, err := round.discoveredGraphPerNode[i]().GetTokenAddress(edge.Dest)
+						require.NoError(t, err)
+
 						br.
-							On("GetTransfers", mock.Anything, mock.Anything, mock.Anything).
+							On("GetTransfers", mock.Anything, localToken, remoteToken).
 							Return(pendingTransfers, nil).Maybe()
 
 						br.
@@ -1197,11 +1204,11 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 						rb.On("GetBalance", mock.Anything).Return(func(context.Context) (*big.Int, error) {
 							return new(big.Int).Set(data.liquidity), nil
 						}).Maybe()
-						t.Log(">>> mocked rebalancer calls", net, "seq num", data.seqNr, "liquidity", data.liquidity)
 						n.rbFactory.On("NewRebalancer", net, mock.Anything).Return(rb, nil).Maybe()
 					}
 				}
 
+				t.Logf(">>> running round: %d", numRound+1)
 				roundResult, err := ocr3Runner.RunRound(ctx)
 				if round.expErr {
 					require.Error(t, err)
@@ -1236,7 +1243,7 @@ func twoNodesFourRounds(t *testing.T) testCase {
 	})
 	g.AddNetwork(networkB, graph.Data{
 		Liquidity:         big.NewInt(2000),
-		TokenAddress:      tokenX,
+		TokenAddress:      tokenY,
 		RebalancerAddress: rebalancerB,
 		XChainRebalancers: nil,
 		NetworkSelector:   networkB,
@@ -1370,22 +1377,69 @@ func twoNodesFourRounds(t *testing.T) testCase {
 					func() graph.Graph { return g },
 				},
 				pendingTransfersPerNode: [][]models.PendingTransfer{{
-					{Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil), Status: models.TransferStatusNotReady},
+					{
+						Transfer: models.Transfer{
+							From:               networkA,
+							To:                 networkB,
+							Amount:             ubig.NewI(1000),
+							LocalTokenAddress:  tokenX,
+							RemoteTokenAddress: tokenY,
+						},
+						Status: models.TransferStatusNotReady,
+					},
 				}, {
-					{Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil), Status: models.TransferStatusNotReady},
+					{
+						Transfer: models.Transfer{
+							From:               networkA,
+							To:                 networkB,
+							Amount:             ubig.NewI(1000),
+							LocalTokenAddress:  tokenX,
+							RemoteTokenAddress: tokenY,
+						},
+						Status: models.TransferStatusNotReady,
+					},
 				}, {
-					{Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil), Status: models.TransferStatusNotReady},
+					{
+						Transfer: models.Transfer{
+							From:               networkA,
+							To:                 networkB,
+							Amount:             ubig.NewI(1000),
+							LocalTokenAddress:  tokenX,
+							RemoteTokenAddress: tokenY,
+						},
+						Status: models.TransferStatusNotReady,
+					},
 				}, {
-					{Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil), Status: models.TransferStatusNotReady},
+					{
+						Transfer: models.Transfer{
+							From:               networkA,
+							To:                 networkB,
+							Amount:             ubig.NewI(1000),
+							LocalTokenAddress:  tokenX,
+							RemoteTokenAddress: tokenY,
+						},
+						Status: models.TransferStatusNotReady,
+					},
 				}},
-				inflightPerNode:   [][]models.Transfer{},
+				inflightPerNode:   [][]models.Transfer{{}, {}, {}, {}}, // no longer inflight
 				expTransmitted:    []ocr3types.ReportWithInfo[models.Report]{},
 				expNotTransmitted: []ocr3types.ReportWithInfo[models.Report]{},
 				expNotAccepted:    []ocr3types.ReportWithInfo[models.Report]{},
 				expOutcome: models.NewOutcome(
 					[]models.ProposedTransfer{},
 					nil,
-					nil,
+					[]models.PendingTransfer{
+						{
+							Transfer: models.Transfer{
+								From:               networkA,
+								To:                 networkB,
+								Amount:             ubig.NewI(1000),
+								LocalTokenAddress:  tokenX,
+								RemoteTokenAddress: tokenY,
+							},
+							Status: models.TransferStatusNotReady,
+						},
+					},
 					[]models.ConfigDigestWithMeta{{Digest: cfgDigest1, NetworkSel: networkA}, {Digest: cfgDigest2, NetworkSel: networkB}}),
 				dataPerRebalancer: map[models.NetworkSelector]perRebalancerData{
 					networkA: {
@@ -1499,6 +1553,25 @@ type node struct {
 	bridgeFactory     *bridgemocks.Factory
 	rebalancers       map[models.NetworkSelector]*liquiditymanagermocks.Rebalancer
 	bridges           map[[2]models.NetworkSelector]*bridgemocks.Bridge
+}
+
+func (n *node) resetMocks(t *testing.T) {
+	lmFactory := rebalancermocks.NewFactory(t)
+	discovererFactory := discoverermocks.NewFactory(t)
+	bridgeFactory := bridgemocks.NewFactory(t)
+	bridgeMocks := make(map[[2]models.NetworkSelector]*bridgemocks.Bridge)
+	for _, b := range bridges {
+		bridgeMocks[b] = bridgemocks.NewBridge(t)
+	}
+
+	n.bridgeFactory = bridgeFactory
+	n.discovererFactory = discovererFactory
+	n.rbFactory = lmFactory
+	n.bridges = bridgeMocks
+
+	n.plugin.bridgeFactory = bridgeFactory
+	n.plugin.discovererFactory = discovererFactory
+	n.plugin.liquidityManagerFactory = lmFactory
 }
 
 func newNode(t *testing.T, lggr logger.Logger, f int) node {

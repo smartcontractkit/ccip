@@ -4,11 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_inflight_Add(t *testing.T) {
@@ -201,7 +202,7 @@ func Test_inflight_GetAll(t *testing.T) {
 			args{
 				testutils.Context(t),
 			},
-			nil,
+			[]models.Transfer{},
 		},
 		{
 			"not empty",
@@ -234,6 +235,35 @@ func Test_inflight_GetAll(t *testing.T) {
 				lggr:  tt.fields.lggr,
 			}
 			got := i.GetAll(tt.args.ctx)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_inflight_IsInflight(t *testing.T) {
+	type fields struct {
+		items map[mapKey]models.Transfer
+		lggr  logger.Logger
+	}
+	type args struct {
+		ctx context.Context
+		t   models.Transfer
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			i := &inflight{
+				items: tt.fields.items,
+				lggr:  tt.fields.lggr,
+			}
+			got := i.IsInflight(tt.args.ctx, tt.args.t)
 			require.Equal(t, tt.want, got)
 		})
 	}
