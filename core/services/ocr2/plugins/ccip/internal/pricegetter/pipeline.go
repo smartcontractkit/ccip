@@ -67,7 +67,7 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 		return nil, errors.Errorf("expected map output of price pipeline, got %T", finalResult.Values[0])
 	}
 
-	providedTokensSet := mapset.NewSet[cciptypes.Address](tokens...)
+	providedTokensSet := mapset.NewSet(tokens...)
 	tokenPrices := make(map[cciptypes.Address]*big.Int)
 	for tokenAddressStr, rawPrice := range prices {
 		tokenAddressStr := ccipcalc.HexToAddress(tokenAddressStr)
@@ -76,8 +76,8 @@ func (d *PipelineGetter) TokenPricesUSD(ctx context.Context, tokens []cciptypes.
 			return nil, err
 		}
 
-		if providedTokensSet.Contains(cciptypes.Address(tokenAddressStr)) {
-			tokenPrices[cciptypes.Address(tokenAddressStr)] = castedPrice
+		if providedTokensSet.Contains(tokenAddressStr) {
+			tokenPrices[tokenAddressStr] = castedPrice
 		}
 	}
 
