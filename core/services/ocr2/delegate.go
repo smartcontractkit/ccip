@@ -475,9 +475,9 @@ func (d *Delegate) ServicesForSpec(jb job.Job, qopts ...pg.QOpt) ([]job.ServiceC
 		return d.newServicesGenericPlugin(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, ocrLogger)
 
 	case types.CCIPCommit:
-		return d.newServicesCCIPCommit(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
+		return d.newServicesCCIPCommit(lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID)
 	case types.CCIPExecution:
-		return d.newServicesCCIPExecution(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID, qopts...)
+		return d.newServicesCCIPExecution(lggr, jb, bootstrapPeers, kb, ocrDB, lc, transmitterID)
 	case "rebalancer": // TODO: add constant to chainlink-common
 		return d.newServicesRebalancer(ctx, lggr, jb, bootstrapPeers, kb, ocrDB, lc, qopts...)
 	default:
@@ -1502,7 +1502,7 @@ func (d *Delegate) newServicesOCR2Functions(
 	return append([]job.ServiceCtx{functionsProvider, thresholdProvider, s4Provider}, functionsServices...), nil
 }
 
-func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+func (d *Delegate) newServicesCCIPCommit(lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	if spec.Relay != relay.EVM {
 		return nil, errors.New("Non evm chains are not supported for CCIP commit")
@@ -1549,13 +1549,10 @@ func (d *Delegate) newServicesCCIPCommit(ctx context.Context, lggr logger.Sugare
 		OffchainKeyring:        kb,
 		OnchainKeyring:         kb,
 	}
-	logError := func(msg string) {
-		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
-	}
-	return ccipcommit.NewCommitServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin, logError, qopts...)
+	return ccipcommit.NewCommitServices(lggr, jb, d.legacyChains, d.isNewlyCreatedJob, d.pipelineRunner, oracleArgsNoPlugin)
 }
 
-func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
+func (d *Delegate) newServicesCCIPExecution(lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, transmitterID string) ([]job.ServiceCtx, error) {
 	spec := jb.OCR2OracleSpec
 	if spec.Relay != relay.EVM {
 		return nil, errors.New("Non evm chains are not supported for CCIP execution")
@@ -1601,10 +1598,7 @@ func (d *Delegate) newServicesCCIPExecution(ctx context.Context, lggr logger.Sug
 		OffchainKeyring:        kb,
 		OnchainKeyring:         kb,
 	}
-	logError := func(msg string) {
-		lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")
-	}
-	return ccipexec.NewExecutionServices(ctx, lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin, logError, qopts...)
+	return ccipexec.NewExecutionServices(lggr, jb, d.legacyChains, d.isNewlyCreatedJob, oracleArgsNoPlugin)
 }
 
 func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.SugaredLogger, jb job.Job, bootstrapPeers []commontypes.BootstrapperLocator, kb ocr2key.KeyBundle, ocrDB *db, lc ocrtypes.LocalConfig, qopts ...pg.QOpt) ([]job.ServiceCtx, error) {
@@ -1636,11 +1630,17 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer provider: %w", err)
 	}
-	factory, err := rebalancer.NewPluginFactory(lggr, spec.PluginConfig.Bytes(), rebalancerProvider.LiquidityManagerFactory())
+	factory, err := rebalancer.NewPluginFactory(
+		lggr,
+		spec.PluginConfig.Bytes(),
+		rebalancerProvider.LiquidityManagerFactory(),
+		rebalancerProvider.DiscovererFactory(),
+		rebalancerProvider.BridgeFactory(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rebalancer plugin factory: %w", err)
 	}
-	oracleArgsNoPlugin := libocr2.OCR3OracleArgs[rebalancermodels.ReportMetadata]{
+	oracleArgsNoPlugin := libocr2.OCR3OracleArgs[rebalancermodels.Report]{
 		BinaryNetworkEndpointFactory: d.peerWrapper.Peer2,
 		V2Bootstrappers:              bootstrapPeers,
 		ContractTransmitter:          rebalancerProvider.ContractTransmitterOCR3(),
@@ -1655,7 +1655,7 @@ func (d *Delegate) newServicesRebalancer(ctx context.Context, lggr logger.Sugare
 		),
 		OffchainConfigDigester: rebalancerProvider.OffchainConfigDigester(),
 		OffchainKeyring:        kb,
-		OnchainKeyring:         ocr3impls.NewOnchainKeyring[rebalancermodels.ReportMetadata](kb, lggr),
+		OnchainKeyring:         ocr3impls.NewOnchainKeyring[rebalancermodels.Report](kb, lggr),
 		ReportingPluginFactory: factory,
 		Logger: commonlogger.NewOCRWrapper(lggr.Named("RebalancerOracle"), d.cfg.OCR2().TraceLogging(), func(msg string) {
 			lggr.ErrorIf(d.jobORM.RecordError(jb.ID, msg), "unable to record error")

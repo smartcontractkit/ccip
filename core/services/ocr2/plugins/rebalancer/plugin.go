@@ -8,13 +8,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/smartcontractkit/libocr/offchainreporting2/types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"go.uber.org/multierr"
 
+	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
-	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditygraph"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/bridge"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/discoverer"
+	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/graph"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquiditymanager"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/liquidityrebalancer"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
@@ -25,39 +28,39 @@ type Plugin struct {
 	rootNetwork             models.NetworkSelector
 	rootAddress             models.Address
 	closePluginTimeout      time.Duration
-	liquidityManagers       *liquiditymanager.Registry
 	liquidityManagerFactory liquiditymanager.Factory
+	discovererFactory       discoverer.Factory
+	bridgeFactory           bridge.Factory
 	mu                      sync.RWMutex
-	liquidityGraph          liquiditygraph.LiquidityGraph
+	rebalancerGraph         graph.Graph
 	liquidityRebalancer     liquidityrebalancer.Rebalancer
-	pendingTransfers        *PendingTransfersCache
 	lggr                    logger.Logger
+	reportCodec             liquiditymanager.OnchainReportCodec
 }
 
 func NewPlugin(
 	f int,
 	closePluginTimeout time.Duration,
-	liquidityManagerNetwork models.NetworkSelector,
-	liquidityManagerAddress models.Address,
+	rootNetwork models.NetworkSelector,
+	rootAddress models.Address,
 	liquidityManagerFactory liquiditymanager.Factory,
-	liquidityGraph liquiditygraph.LiquidityGraph,
+	discovererFactory discoverer.Factory,
+	bridgeFactory bridge.Factory,
 	liquidityRebalancer liquidityrebalancer.Rebalancer,
+	reportCodec liquiditymanager.OnchainReportCodec,
 	lggr logger.Logger,
 ) *Plugin {
-
-	liquidityManagers := liquiditymanager.NewRegistry()
-	liquidityManagers.Add(liquidityManagerNetwork, liquidityManagerAddress)
-
 	return &Plugin{
 		f:                       f,
-		rootNetwork:             liquidityManagerNetwork,
-		rootAddress:             liquidityManagerAddress,
+		rootNetwork:             rootNetwork,
+		rootAddress:             rootAddress,
 		closePluginTimeout:      closePluginTimeout,
-		liquidityManagers:       liquidityManagers,
 		liquidityManagerFactory: liquidityManagerFactory,
-		liquidityGraph:          liquidityGraph,
+		discovererFactory:       discovererFactory,
+		bridgeFactory:           bridgeFactory,
+		rebalancerGraph:         graph.NewGraph(),
 		liquidityRebalancer:     liquidityRebalancer,
-		pendingTransfers:        NewPendingTransfersCache(),
+		reportCodec:             reportCodec,
 		lggr:                    lggr,
 		mu:                      sync.RWMutex{},
 	}
@@ -69,37 +72,62 @@ func (p *Plugin) Query(_ context.Context, outcomeCtx ocr3types.OutcomeContext) (
 }
 
 func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeContext, _ ocrtypes.Query) (ocrtypes.Observation, error) {
-	p.lggr.Infow("in observation", "seqNr", outcomeCtx.SeqNr)
+	lggr := p.lggr.With("seqNr", outcomeCtx.SeqNr, "phase", "Observation")
+	lggr.Infow("in observation", "seqNr", outcomeCtx.SeqNr)
 
-	if err := p.syncGraphEdges(ctx); err != nil {
+	if err := p.syncGraph(ctx); err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("sync graph edges: %w", err)
 	}
 
-	networkLiquidities, err := p.syncGraphBalances(ctx)
-	if err != nil {
-		return ocrtypes.Observation{}, fmt.Errorf("sync graph balances: %w", err)
+	networkLiquidities := make([]models.NetworkLiquidity, 0)
+	for _, net := range p.rebalancerGraph.GetNetworks() {
+		liq, err := p.rebalancerGraph.GetLiquidity(net)
+		if err != nil {
+			return ocrtypes.Observation{}, err
+		}
+		networkLiquidities = append(networkLiquidities, models.NewNetworkLiquidity(net, liq))
 	}
 
-	pendingTransfers, err := p.loadPendingTransfers(ctx)
+	pendingTransfers, err := p.loadPendingTransfers(ctx, lggr)
 	if err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("load pending transfers: %w", err)
 	}
 
-	edges, err := p.liquidityGraph.GetEdges()
+	edges, err := p.rebalancerGraph.GetEdges()
 	if err != nil {
 		return ocrtypes.Observation{}, fmt.Errorf("get edges: %w", err)
 	}
 
-	p.lggr.Infow("finished observing",
+	resolvedTransfers, err := p.resolveProposedTransfers(ctx, lggr, outcomeCtx)
+	if err != nil {
+		return ocrtypes.Observation{}, fmt.Errorf("resolve proposed transfers: %w", err)
+	}
+
+	configDigests := make([]models.ConfigDigestWithMeta, 0)
+	for _, net := range p.rebalancerGraph.GetNetworks() {
+		data, err := p.rebalancerGraph.GetData(net)
+		if err != nil {
+			return nil, fmt.Errorf("get rb %d data: %w", net, err)
+		}
+		configDigests = append(configDigests, models.ConfigDigestWithMeta{
+			Digest:     data.ConfigDigest,
+			NetworkSel: data.NetworkSelector,
+		})
+	}
+
+	lggr.Infow("finished observing",
 		"networkLiquidities", networkLiquidities,
 		"pendingTransfers", pendingTransfers,
-		"edges", edges)
+		"edges", edges,
+		"resolvedTransfers", resolvedTransfers,
+	)
 
-	return models.NewObservation(networkLiquidities, pendingTransfers, edges).Encode(), nil
+	return models.NewObservation(networkLiquidities, resolvedTransfers, pendingTransfers, edges, configDigests).Encode(), nil
 }
 
 func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, query ocrtypes.Query, ao ocrtypes.AttributedObservation) error {
-	p.lggr.Infow("in validate observation", "seqNr", outctx.SeqNr)
+	// todo: improve logging - including duration of each phase, etc.
+	p.lggr.Infow("in validate observation", "seqNr", outctx.SeqNr, "phase", "ValidateObservation")
 
 	_, err := models.DecodeObservation(ao.Observation)
 	if err != nil {
@@ -116,8 +144,8 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query ocrtyp
 }
 
 func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, aos []ocrtypes.AttributedObservation) (ocr3types.Outcome, error) {
-	lggr := p.lggr.With("seqNr", outctx.SeqNr)
-	lggr.Infow("in outcome", "seqNr", outctx.SeqNr, "numObs", len(aos))
+	lggr := p.lggr.With("seqNr", outctx.SeqNr, "numObservations", len(aos), "phase", "Outcome")
+	lggr.Infow("in outcome")
 
 	// Gather all the observations.
 	observations := make([]models.Observation, 0, len(aos))
@@ -126,6 +154,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("decode observation: %w", err)
 		}
+		lggr.Debugw("decoded observation from oracle", "observation", obs, "oracleID", encodedObs.Observer)
 		observations = append(observations, obs)
 	}
 
@@ -136,6 +165,10 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("compute pending transfers consensus: %w", err)
 	}
+	configDigests, err := p.computeConfigDigestsConsensus(observations)
+	if err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("compute config digests consensus: %w", err)
+	}
 
 	// Compute a new graph with the median liquidities and the edges of the quorum of nodes.
 	g, err := p.computeMedianGraph(graphEdges, medianLiquidityPerChain)
@@ -143,81 +176,116 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		return nil, fmt.Errorf("compute median graph: %w", err)
 	}
 
-	lggr.Infow("computing transfers to reach balance", "pendingTransfers", pendingTransfers, "liquidityGraph", g)
-	transfersToReachBalance, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, pendingTransfers)
+	resolvedTransfersQuorum, err := p.computeResolvedTransfersQuorum(observations)
+	if err != nil {
+		return nil, fmt.Errorf("compute resolved transfers quorum: %w", err)
+	}
+
+	lggr.Infow("computing transfers to reach balance",
+		"pendingTransfers", pendingTransfers,
+		"liquidityGraph", g,
+		"resolvedTransfersQuorum", resolvedTransfersQuorum,
+	)
+	inflightTransfers := append(pendingTransfers, toPending(resolvedTransfersQuorum)...)
+	proposedTransfers, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, inflightTransfers)
 	if err != nil {
 		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
 	}
 
-	lggr.Infow("finished computing outcome", "medianLiquidityPerChain",
-		medianLiquidityPerChain, "pendingTransfers", pendingTransfers)
-	return models.NewOutcome(transfersToReachBalance, pendingTransfers).Encode(), nil
+	lggr.Infow("finished computing outcome",
+		"medianLiquidityPerChain", medianLiquidityPerChain,
+		"pendingTransfers", pendingTransfers,
+		"proposedTransfers", proposedTransfers,
+		"resolvedTransfers", resolvedTransfersQuorum,
+	)
+
+	return models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers, configDigests).Encode(), nil
 }
 
-func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.ReportMetadata], error) {
+func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.Report], error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	lggr := p.lggr.With("seqNr", seqNr)
-	lggr.Infow("in reports", "seqNr", seqNr)
+	lggr := p.lggr.With("seqNr", seqNr, "phase", "Reports")
+	lggr.Infow("in reports")
 
 	decodedOutcome, err := models.DecodeOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
-	// group transfers by source chain
-	transfersBySourceNet := make(map[models.NetworkSelector][]models.Transfer)
-	for _, tr := range decodedOutcome.TransfersToReachBalance {
-		transfersBySourceNet[tr.From] = append(transfersBySourceNet[tr.From], tr)
+	// get all incoming and outgoing transfers for each network
+	// incoming transfers will need to be finalized
+	// outgoing transfers will need to be executed
+	incomingAndOutgoing := make(map[models.NetworkSelector][]models.Transfer)
+
+	for _, outgoing := range decodedOutcome.ResolvedTransfers {
+		incomingAndOutgoing[outgoing.From] = append(incomingAndOutgoing[outgoing.From], outgoing)
 	}
 
-	lggr.Infow("finished computing transfers to reach balance", "transfersBySourceNet", transfersBySourceNet)
-
-	var reports []ocr3types.ReportWithInfo[models.ReportMetadata]
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	for sourceNet, transfers := range transfersBySourceNet {
-		lmAddress, exists := p.liquidityManagers.Get(sourceNet)
-		if !exists {
-			return nil, fmt.Errorf("liquidity manager for %v does not exist", sourceNet)
+	for _, incoming := range decodedOutcome.PendingTransfers {
+		if incoming.Status == models.TransferStatusReady ||
+			incoming.Status == models.TransferStatusFinalized {
+			incomingAndOutgoing[incoming.To] = append(incomingAndOutgoing[incoming.To], incoming.Transfer)
 		}
+	}
 
-		rebalancer, err := p.liquidityManagerFactory.NewRebalancer(sourceNet, lmAddress)
+	lggr = lggr.With(
+		"incomingAndOutgoing", incomingAndOutgoing,
+		"resolvedTransfers", decodedOutcome.ResolvedTransfers,
+		"pendingTransfers", decodedOutcome.PendingTransfers,
+		"proposedTransfers", decodedOutcome.ProposedTransfers,
+	)
+	lggr.Debugw("generated incoming and outgoing transfers")
+
+	configDigestsMap := map[models.NetworkSelector]types.ConfigDigest{}
+	for _, cd := range decodedOutcome.ConfigDigests {
+		_, found := configDigestsMap[cd.NetworkSel]
+		if found {
+			return nil, fmt.Errorf("found duplicate config digest for %v", cd.NetworkSel)
+		}
+		configDigestsMap[cd.NetworkSel] = cd.Digest.ConfigDigest
+	}
+
+	var reports []ocr3types.ReportWithInfo[models.Report]
+	for networkID, transfers := range incomingAndOutgoing {
+		// todo: we shouldn't use plugin state
+		rebalancerAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
 		if err != nil {
-			return nil, fmt.Errorf("init liquidity manager: %w", err)
+			return nil, fmt.Errorf("liquidity manager for %v does not exist", networkID)
 		}
 
-		// TODO: consider caching the config digest or including it in the outcome?
-		configDigest, err := rebalancer.ConfigDigest(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("get config digest: %w", err)
+		configDigest, found := configDigestsMap[networkID]
+		if !found {
+			return nil, fmt.Errorf("cannot find config digest for %v", networkID)
 		}
 
-		reportMeta := models.NewReportMetadata(transfers, lmAddress, sourceNet, configDigest)
-		encoded, err := reportMeta.OnchainEncode()
+		report := models.NewReport(transfers, rebalancerAddress, networkID, configDigest)
+		encoded, err := p.reportCodec.Encode(report)
 		if err != nil {
 			return nil, fmt.Errorf("encode report metadata for onchain usage: %w", err)
 		}
-		reports = append(reports, ocr3types.ReportWithInfo[models.ReportMetadata]{
+		reports = append(reports, ocr3types.ReportWithInfo[models.Report]{
 			Report: encoded,
-			Info:   reportMeta,
+			Info:   report,
 		})
 	}
+	sort.Slice(reports, func(i, j int) bool { return reports[i].Info.NetworkID < reports[j].Info.NetworkID })
 
 	lggr.Infow("generated reports", "numReports", len(reports))
 	return reports, nil
 }
 
-func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
-	p.lggr.Infow("in should accept attested report", "seqNr", seqNr, "reportMeta", r.Info, "reportHex", hexutil.Encode(r.Report), "reportLen", len(r.Report))
+func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.Report]) (bool, error) {
+	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportLen", len(r.Report), "phase", "ShouldAcceptAttestedReport")
+	lggr.Infow("in should accept attested report")
 
-	report, instructions, err := models.DecodeReport(p.rootNetwork, p.rootAddress, r.Report)
+	report, instructions, err := p.reportCodec.Decode(r.Info.NetworkID, r.Info.LiquidityManagerAddress, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("failed to decode report: %w", err)
 	}
 
-	p.lggr.Infow("accepting report",
+	lggr.Infow("accepting report",
 		"transfers", len(report.Transfers),
 		"sendInstructions", instructions.SendLiquidityParams,
 		"receiveInstructions", instructions.ReceiveLiquidityParams)
@@ -226,18 +294,38 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 	return true, nil
 }
 
-func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.ReportMetadata]) (bool, error) {
-	p.lggr.Infow("in should transmit accepted report", "seqNr", seqNr, "reportMeta", r.Info)
+func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[models.Report]) (bool, error) {
+	lggr := p.lggr.With("seqNr", seqNr, "reportMeta", r.Info, "reportLen", len(r.Report), "phase", "ShouldTransmitAcceptedReport")
+	lggr.Infow("in should transmit accepted report")
 
-	newPendingTransfers := make([]models.PendingTransfer, 0, len(r.Info.Transfers))
-	for _, tr := range r.Info.Transfers {
-		if p.pendingTransfers.ContainsTransfer(tr) {
-			return false, nil
-		}
-		newPendingTransfers = append(newPendingTransfers, models.NewPendingTransfer(tr))
+	report, instructions, err := p.reportCodec.Decode(r.Info.NetworkID, r.Info.LiquidityManagerAddress, r.Report)
+	if err != nil {
+		return false, fmt.Errorf("failed to decode report: %w", err)
 	}
 
-	p.pendingTransfers.Add(newPendingTransfers)
+	lggr.Infow("in should transmit accepted report",
+		"transfers", len(report.Transfers),
+		"sendInstructions", instructions.SendLiquidityParams,
+		"receiveInstructions", instructions.ReceiveLiquidityParams)
+
+	// todo: work on plugin wording - rebalancer / lm / etc...
+	rebalancer, err := p.liquidityManagerFactory.NewRebalancer(r.Info.NetworkID, r.Info.LiquidityManagerAddress)
+	if err != nil {
+		return false, fmt.Errorf("init rebalancer: %w", err)
+	}
+
+	// check sequence number to see if its already transmitted onchain
+	latestSeqNr, err := rebalancer.GetLatestSequenceNumber(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get latest sequence number: %w", err)
+	}
+
+	if latestSeqNr >= seqNr {
+		lggr.Debugw("report already transmitted onchain, returning false", "latestSeqNr", latestSeqNr)
+		return false, nil
+	}
+
+	lggr.Infow("transmitting accepted report", "latestSeqNr", latestSeqNr)
 	return true, nil
 }
 
@@ -247,116 +335,96 @@ func (p *Plugin) Close() error {
 	defer cf()
 
 	var errs []error
-	for networkID, lmAddr := range p.liquidityManagers.GetAll() {
-		rb, err := p.liquidityManagerFactory.GetRebalancer(networkID, lmAddr)
+	for _, networkID := range p.rebalancerGraph.GetNetworks() {
+		p.lggr.Infow("closing rebalancer network", "network", networkID)
+
+		rebalancerAddress, err := p.rebalancerGraph.GetRebalancerAddress(networkID)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("get rebalancer (%d, %v): %w", networkID, lmAddr, err))
+			errs = append(errs, fmt.Errorf("get rebalancer address for %d: %w", networkID, err))
+			continue
+		}
+
+		rb, err := p.liquidityManagerFactory.GetRebalancer(networkID, rebalancerAddress)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("get rebalancer (%d, %s): %w", networkID, rebalancerAddress.String(), err))
 			continue
 		}
 
 		if err := rb.Close(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("close rebalancer (%d, %v): %w", networkID, lmAddr, err))
+			errs = append(errs, fmt.Errorf("close rebalancer (%d, %s): %w", networkID, rebalancerAddress.String(), err))
 			continue
 		}
+
+		p.lggr.Infow("finished closing rebalancer network", "network", networkID, "rebalancer", rebalancerAddress.String())
 	}
 
 	return multierr.Combine(errs...)
 }
 
-// todo: consider placing the graph exploration logic under graph package to keep the plugin logic cleaner
-func (p *Plugin) syncGraphEdges(ctx context.Context) error {
+func (p *Plugin) syncGraph(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// todo: if there wasn't any change to the graph stop earlier
 	p.lggr.Infow("syncing graph edges")
 
-	p.lggr.Infow("getting root LM", "rootNetwork", p.rootNetwork)
-	rootLM, exists := p.liquidityManagers.Get(p.rootNetwork)
-	if !exists {
-		p.lggr.Infow("failed to get root LM")
-		return fmt.Errorf("root lm %v not found", p.rootNetwork)
-	}
-
-	p.lggr.Infow("init root LM", "rootLMAddress", rootLM)
-	lm, err := p.liquidityManagerFactory.NewRebalancer(p.rootNetwork, rootLM)
+	// todo: discoverer factory is not required we can pass a discoverer instance to the plugin
+	p.lggr.Infow("discovering rebalancers")
+	discoverer, err := p.discovererFactory.NewDiscoverer(p.rootNetwork, p.rootAddress)
 	if err != nil {
-		p.lggr.Infow("failed to init root LM", "rootLMAddress", rootLM)
-		return fmt.Errorf("init liquidity manager: %w", err)
+		return fmt.Errorf("init discoverer: %w", err)
 	}
 
-	p.lggr.Infow("discovering LMs")
-	lms, g, err := lm.Discover(ctx, p.liquidityManagerFactory)
+	// todo: discoverer should immediately return without making any rpc calls if there wasn't any change
+	g, err := discoverer.Discover(ctx)
 	if err != nil {
-		p.lggr.Infow("Failed to discover LMs")
-		return fmt.Errorf("discover lms: %w", err)
+		return fmt.Errorf("discovering rebalancers: %w", err)
 	}
 
-	p.liquidityGraph = g
-	p.liquidityManagers = lms
+	p.rebalancerGraph = g
 
-	p.lggr.Infow("finished syncing graph edges", "graph", g.String(), "lms", lms.String())
+	p.lggr.Infow("finished syncing graph edges", "graph", g.String())
 
 	return nil
 }
 
-func (p *Plugin) syncGraphBalances(ctx context.Context) ([]models.NetworkLiquidity, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	networks := p.liquidityGraph.GetNetworks()
-	p.lggr.Infow("syncing graph balances", "networks", networks)
-
-	networkLiquidities := make([]models.NetworkLiquidity, 0, len(networks))
-	for _, networkID := range networks {
-		lmAddr, exists := p.liquidityManagers.Get(networkID)
-		if !exists {
-			return nil, fmt.Errorf("liquidity manager for network %v was not found", networkID)
-		}
-
-		lm, err := p.liquidityManagerFactory.NewRebalancer(networkID, lmAddr)
-		if err != nil {
-			return nil, fmt.Errorf("init liquidity manager: %w", err)
-		}
-
-		balance, err := lm.GetBalance(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("get %v balance: %w", networkID, err)
-		}
-
-		p.liquidityGraph.SetLiquidity(networkID, balance)
-		networkLiquidities = append(networkLiquidities, models.NewNetworkLiquidity(networkID, balance))
-	}
-
-	return networkLiquidities, nil
-}
-
-func (p *Plugin) loadPendingTransfers(ctx context.Context) ([]models.PendingTransfer, error) {
+func (p *Plugin) loadPendingTransfers(ctx context.Context, lggr logger.Logger) ([]models.PendingTransfer, error) {
 	p.lggr.Infow("loading pending transfers")
 
 	pendingTransfers := make([]models.PendingTransfer, 0)
-	for networkID, lmAddress := range p.liquidityManagers.GetAll() {
-		lm, err := p.liquidityManagerFactory.NewRebalancer(networkID, lmAddress)
+	edges, err := p.rebalancerGraph.GetEdges()
+	if err != nil {
+		return nil, fmt.Errorf("get edges: %w", err)
+	}
+	for _, edge := range edges {
+		bridge, err := p.bridgeFactory.NewBridge(edge.Source, edge.Dest)
 		if err != nil {
-			return nil, fmt.Errorf("init liquidity manager: %w", err)
+			return nil, fmt.Errorf("init bridge: %w", err)
 		}
 
-		// todo: place in config and set a proper value
-		dateToStartLookingFrom := time.Now().Add(-10 * 24 * time.Hour)
-
-		if mostRecentTransfer, exists := p.pendingTransfers.LatestNetworkTransfer(networkID); exists {
-			dateToStartLookingFrom = mostRecentTransfer.Date
+		if bridge == nil {
+			lggr.Warnw("no bridge found for network pair", "sourceNetwork", edge.Source, "destNetwork", edge.Dest)
+			continue
 		}
 
-		netPendingTransfers, err := lm.GetPendingTransfers(ctx, dateToStartLookingFrom)
+		localToken, err := p.rebalancerGraph.GetTokenAddress(edge.Source)
 		if err != nil {
-			return nil, fmt.Errorf("get pending %v transfers: %w", networkID, err)
+			return nil, fmt.Errorf("get local token address for %v: %w", edge.Source, err)
+		}
+		remoteToken, err := p.rebalancerGraph.GetTokenAddress(edge.Dest)
+		if err != nil {
+			return nil, fmt.Errorf("get remote token address for %v: %w", edge.Dest, err)
 		}
 
+		netPendingTransfers, err := bridge.GetTransfers(ctx, localToken, remoteToken)
+		if err != nil {
+			return nil, fmt.Errorf("get pending transfers: %w", err)
+		}
+
+		lggr.Infow("loaded pending transfers for network", "network", edge.Source, "pendingTransfers", netPendingTransfers)
 		pendingTransfers = append(pendingTransfers, netPendingTransfers...)
 	}
 
-	p.pendingTransfers.Add(pendingTransfers)
+	// todo: why do we add this here? it's not used anywhere
 	return pendingTransfers, nil
 }
 
@@ -364,7 +432,7 @@ func (p *Plugin) computeMedianLiquidityPerChain(observations []models.Observatio
 	liqObsPerChain := make(map[models.NetworkSelector][]*big.Int)
 	for _, ob := range observations {
 		for _, chainLiq := range ob.LiquidityPerChain {
-			liqObsPerChain[chainLiq.Network] = append(liqObsPerChain[chainLiq.Network], chainLiq.Liquidity)
+			liqObsPerChain[chainLiq.Network] = append(liqObsPerChain[chainLiq.Network], chainLiq.Liquidity.ToInt())
 		}
 	}
 
@@ -393,7 +461,7 @@ func (p *Plugin) computePendingTransfersConsensus(observations []models.Observat
 		}
 	}
 
-	var quorumEvents []models.PendingTransfer
+	quorumEvents := make([]models.PendingTransfer, 0, len(counts))
 	for h, count := range counts {
 		if count >= p.f+1 {
 			ev, exists := eventFromHash[h]
@@ -405,6 +473,41 @@ func (p *Plugin) computePendingTransfersConsensus(observations []models.Observat
 	}
 
 	return quorumEvents, nil
+}
+
+func (p *Plugin) computeConfigDigestsConsensus(observations []models.Observation) ([]models.ConfigDigestWithMeta, error) {
+	key := func(meta models.ConfigDigestWithMeta) string {
+		return fmt.Sprintf("%d-%s", meta.NetworkSel, meta.Digest.Hex())
+	}
+	counts := make(map[string]int)
+	cds := make(map[string]models.ConfigDigestWithMeta)
+	for _, obs := range observations {
+		for _, cd := range obs.ConfigDigests {
+			k := key(cd)
+			counts[k]++
+			if counts[k] == 1 {
+				cds[k] = cd
+			}
+		}
+	}
+
+	quorumCds := make([]models.ConfigDigestWithMeta, 0, len(counts))
+	for k, count := range counts {
+		if count >= p.f+1 {
+			cd, exists := cds[k]
+			if !exists {
+				return nil, fmt.Errorf("internal issue, config digest by key %s not found", k)
+			}
+			quorumCds = append(quorumCds, cd)
+		}
+	}
+
+	// sort by network id for deterministic results
+	sort.Slice(quorumCds, func(i, j int) bool {
+		return quorumCds[i].NetworkSel < quorumCds[j].NetworkSel
+	})
+
+	return quorumCds, nil
 }
 
 func (p *Plugin) computeGraphEdgesConsensus(observations []models.Observation) []models.Edge {
@@ -427,20 +530,167 @@ func (p *Plugin) computeGraphEdgesConsensus(observations []models.Observation) [
 
 // computeMedianGraph computes a graph with the provided median liquidities per chain and edges that quorum agreed on.
 func (p *Plugin) computeMedianGraph(
-	edges []models.Edge, medianLiquidities []models.NetworkLiquidity) (liquiditygraph.LiquidityGraph, error) {
+	edges []models.Edge, medianLiquidities []models.NetworkLiquidity) (graph.Graph, error) {
 
-	g, err := liquiditygraph.NewGraphFromEdges(edges)
+	g, err := graph.NewGraphFromEdges(edges)
 	if err != nil {
 		return nil, fmt.Errorf("new graph from edges: %w", err)
 	}
 
 	for _, medianLiq := range medianLiquidities {
-		if !g.SetLiquidity(medianLiq.Network, medianLiq.Liquidity) {
-			p.lggr.Errorw("median liquidity on network not found on edges quorum", "net", medianLiq.Network)
+		if !g.SetLiquidity(medianLiq.Network, medianLiq.Liquidity.ToInt()) {
+			p.lggr.Debugw("median liquidity on network not found on edges quorum", "net", medianLiq.Network)
 		}
 	}
 
 	return g, nil
+}
+
+func (p *Plugin) computeResolvedTransfersQuorum(observations []models.Observation) ([]models.Transfer, error) {
+	// assumption: there shouldn't be more than 1 transfer for a (from, to) pair from a single oracle's observation.
+	// otherwise they can be collapsed into a single transfer.
+	// TODO: we can check for this in ValidateObservation
+	type key struct {
+		From               models.NetworkSelector
+		To                 models.NetworkSelector
+		AmountString       string
+		Sender             models.Address
+		Receiver           models.Address
+		LocalTokenAddress  models.Address
+		RemoteTokenAddress models.Address
+	}
+	counts := make(map[key][]models.Transfer)
+	for _, obs := range observations {
+		p.lggr.Debugw("observed transfers", "transfers", obs.ResolvedTransfers)
+		for _, tr := range obs.ResolvedTransfers {
+			p.lggr.Debugw("inserting resolved transfer into mapping", "transfer", tr)
+			k := key{
+				From:               tr.From,
+				To:                 tr.To,
+				AmountString:       tr.Amount.String(),
+				Sender:             tr.Sender,
+				Receiver:           tr.Receiver,
+				LocalTokenAddress:  tr.LocalTokenAddress,
+				RemoteTokenAddress: tr.RemoteTokenAddress,
+			}
+			counts[k] = append(counts[k], tr)
+		}
+	}
+
+	p.lggr.Debugw("resolved transfers counts", "counts", len(counts))
+
+	quorumTransfers := make([]models.Transfer, 0)
+	for k, transfers := range counts {
+		if len(transfers) >= p.f+1 {
+			p.lggr.Debugw("quorum reached on transfer", "transfer", k, "votes", len(transfers))
+			// need to compute the "medianized" bridge payload
+			// only the bridge knows how to do this so we need to delegate it to them
+			// the native bridge fee can also be medianized, no need for the bridge to do that
+			var (
+				bridgeFees     []*big.Int
+				bridgePayloads [][]byte
+				datesUnix      []*big.Int
+			)
+			for _, tr := range transfers {
+				bridgeFees = append(bridgeFees, tr.NativeBridgeFee.ToInt())
+				bridgePayloads = append(bridgePayloads, tr.BridgeData)
+				datesUnix = append(datesUnix, big.NewInt(tr.Date.UTC().Unix()))
+			}
+			medianizedNativeFee := bigIntSortedMiddle(bridgeFees)
+			medianizedDateUnix := bigIntSortedMiddle(datesUnix)
+			bridge, err := p.bridgeFactory.NewBridge(k.From, k.To)
+			if err != nil {
+				return nil, fmt.Errorf("init bridge: %w", err)
+			}
+			quorumizedBridgePayload, err := bridge.QuorumizedBridgePayload(bridgePayloads, p.f)
+			if err != nil {
+				return nil, fmt.Errorf("quorumized bridge payload: %w", err)
+			}
+			quorumTransfer := models.Transfer{
+				From:               k.From,
+				To:                 k.To,
+				Amount:             transfers[0].Amount,
+				Date:               time.Unix(medianizedDateUnix.Int64(), 0).In(time.UTC), // medianized, not in the key
+				Sender:             transfers[0].Sender,
+				Receiver:           transfers[0].Receiver,
+				LocalTokenAddress:  transfers[0].LocalTokenAddress,
+				RemoteTokenAddress: transfers[0].RemoteTokenAddress,
+				BridgeData:         quorumizedBridgePayload,       // "quorumized", not in the key
+				NativeBridgeFee:    ubig.New(medianizedNativeFee), // medianized, not in the key
+			}
+			quorumTransfers = append(quorumTransfers, quorumTransfer)
+		} else {
+			p.lggr.Debugw("dropping transfer, not enough votes on it", "transfer", k, "votes", len(transfers))
+		}
+	}
+
+	return quorumTransfers, nil
+}
+
+func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logger, outcomeCtx ocr3types.OutcomeContext) ([]models.Transfer, error) {
+	lggr.Infow("resolving proposed transfers", "prevSeqNr", outcomeCtx.SeqNr-1)
+
+	if len(outcomeCtx.PreviousOutcome) == 0 {
+		return []models.Transfer{}, nil
+	}
+
+	outcome, err := models.DecodeOutcome(outcomeCtx.PreviousOutcome)
+	if err != nil {
+		return nil, fmt.Errorf("decode previous outcome: %w", err)
+	}
+
+	resolvedTransfers := make([]models.Transfer, 0, len(outcome.ProposedTransfers))
+	for _, proposedTransfer := range outcome.ProposedTransfers {
+		bridge, err := p.bridgeFactory.NewBridge(proposedTransfer.From, proposedTransfer.To)
+		if err != nil {
+			return nil, fmt.Errorf("init bridge: %w", err)
+		}
+
+		fromNetRebalancer, err := p.rebalancerGraph.GetRebalancerAddress(proposedTransfer.From)
+		if err != nil {
+			return nil, fmt.Errorf("get rebalancer address for %v: %w", proposedTransfer.From, err)
+		}
+
+		fromNetToken, err := p.rebalancerGraph.GetTokenAddress(proposedTransfer.From)
+		if err != nil {
+			return nil, fmt.Errorf("get token address for %v: %w", proposedTransfer.From, err)
+		}
+
+		toNetRebalancer, err := p.rebalancerGraph.GetRebalancerAddress(proposedTransfer.To)
+		if err != nil {
+			return nil, fmt.Errorf("get rebalancer address for %v: %w", proposedTransfer.To, err)
+		}
+
+		toNetToken, err := p.rebalancerGraph.GetTokenAddress(proposedTransfer.To)
+		if err != nil {
+			return nil, fmt.Errorf("get token address for %v: %w", proposedTransfer.To, err)
+		}
+
+		resolvedTransfer := models.Transfer{
+			From:               proposedTransfer.From,
+			To:                 proposedTransfer.To,
+			Amount:             proposedTransfer.Amount,
+			Sender:             fromNetRebalancer,
+			Receiver:           toNetRebalancer,
+			LocalTokenAddress:  fromNetToken,
+			RemoteTokenAddress: toNetToken,
+			// BridgeData: nil, // will be filled in below
+			// NativeBridgeFee: big.NewInt(0), // will be filled in below
+		}
+
+		bridgePayload, bridgeFee, err := bridge.GetBridgePayloadAndFee(ctx, resolvedTransfer)
+		if err != nil {
+			lggr.Warnw("failed to get bridge payload and fee", "proposedTransfer", proposedTransfer, "err", err)
+			continue
+		}
+		resolvedTransfer.BridgeData = bridgePayload
+		resolvedTransfer.NativeBridgeFee = ubig.New(bridgeFee)
+		resolvedTransfers = append(resolvedTransfers, resolvedTransfer)
+	}
+
+	lggr.Infow("finished resolving proposed transfers", "resolvedTransfers", resolvedTransfers)
+
+	return resolvedTransfers, nil
 }
 
 // bigIntSortedMiddle returns the middle number after sorting the provided numbers. nil is returned if the provided slice is empty.
@@ -458,4 +708,12 @@ func bigIntSortedMiddle(vals []*big.Int) *big.Int {
 		return valsCopy[i].Cmp(valsCopy[j]) == -1
 	})
 	return valsCopy[len(valsCopy)/2]
+}
+
+func toPending(ts []models.Transfer) []models.PendingTransfer {
+	var pts []models.PendingTransfer
+	for _, t := range ts {
+		pts = append(pts, models.NewPendingTransfer(t))
+	}
+	return pts
 }
