@@ -3,9 +3,11 @@ package v1_0_0
 import (
 	"fmt"
 	"math/rand"
+	"slices"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -14,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/logpoller/mocks"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
+	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/evm_2_evm_offramp_1_0_0"
 	mock_contracts "github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/mocks/v1_0_0"
 	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
 	"github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -153,4 +156,82 @@ func generateTokensAndOutputs(nbTokens uint) ([]common.Address, []common.Address
 		}
 	}
 	return srcTks, dstTks, outputs
+}
+
+func Test_LogsAreProperlyMarkedAsFinalized(t *testing.T) {
+	inputLogs := []struct {
+		sequenceNumber uint64
+		blockNumber    int64
+	}{
+		{10, 2},
+		{11, 3},
+		{12, 5},
+		{14, 7},
+	}
+
+	tests := []struct {
+		name                        string
+		lastFinalizedBlock          uint64
+		expectedFinalizedSequenceNr []uint64
+	}{
+		{
+			"all logs are finalized",
+			10,
+			[]uint64{10, 11, 12, 14},
+		},
+		{
+			"some logs are finalized",
+			5,
+			[]uint64{10, 11, 12},
+		},
+		{
+			"no logs are finalized",
+			1,
+			[]uint64{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lp := mocks.NewLogPoller(t)
+			lp.On("LatestBlock", mock.Anything).
+				Return(logpoller.LogPollerBlock{FinalizedBlockNumber: int64(tt.lastFinalizedBlock)}, nil)
+
+			lpLogs := make([]logpoller.Log, len(inputLogs))
+			gethLogs := make([]types.Log, len(inputLogs))
+			for i, log := range inputLogs {
+				lpLogs[i] = logpoller.Log{
+					BlockNumber: log.blockNumber,
+				}
+				gethLogs[i] = lpLogs[i].ToGethLog()
+			}
+
+			lp.On("IndexedLogsTopicRange", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Return(lpLogs, nil)
+
+			mockOffRamp := mock_contracts.NewEVM2EVMOffRampInterface(t)
+			for i := 0; i < len(inputLogs); i++ {
+				mockOffRamp.On("ParseExecutionStateChanged", gethLogs[i]).
+					Return(&evm_2_evm_offramp_1_0_0.EVM2EVMOffRampExecutionStateChanged{
+						SequenceNumber: inputLogs[i].sequenceNumber,
+						Raw:            gethLogs[i],
+					}, nil)
+			}
+
+			offRamp := OffRamp{
+				lp:          lp,
+				Logger:      logger.TestLogger(t),
+				offRampV100: mockOffRamp,
+			}
+
+			logs, err := offRamp.GetExecutionStateChangesBetweenSeqNums(testutils.Context(t), 0, 100, 0)
+			require.NoError(t, err)
+			assert.Len(t, logs, len(inputLogs))
+
+			for i, log := range logs {
+				assert.Equal(t, inputLogs[i].sequenceNumber, log.SequenceNumber)
+				assert.Equal(t, slices.Contains(tt.expectedFinalizedSequenceNr, log.SequenceNumber), log.Finalized)
+			}
+		})
+	}
 }

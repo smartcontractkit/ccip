@@ -451,7 +451,7 @@ func (o *OffRamp) GetExecutionStateChangesBetweenSeqNums(ctx context.Context, se
 
 			return &cciptypes.ExecutionStateChanged{
 				SequenceNumber: sc.SequenceNumber,
-				Finalized:      sc.Raw.BlockNumber <= uint64(latestBlock.FinalizedBlockNumber),
+				Finalized:      sc.Raw.BlockNumber >= uint64(latestBlock.FinalizedBlockNumber),
 			}, nil
 		},
 	)
