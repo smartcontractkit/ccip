@@ -1844,7 +1844,7 @@ func Test_prepareTokenExecData(t *testing.T) {
 			reportingPlugin := ExecutionReportingPlugin{
 				onRampReader:                onrampReader,
 				offRampReader:               offrampReader,
-				SourcePriceRegistry:         nil, // will be updated at first use.
+				sourcePriceRegistry:         nil, // will be updated at first use.
 				sourcePriceRegistryProvider: sourcePriceRegistryProvider,
 				destPriceRegistry:           destPriceRegistry,
 				gasPriceEstimator:           gasPriceEstimator,

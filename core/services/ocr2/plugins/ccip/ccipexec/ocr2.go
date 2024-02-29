@@ -71,7 +71,7 @@ type ExecutionReportingPlugin struct {
 	metricsCollector ccip.PluginMetricsCollector
 	// Source
 	gasPriceEstimator           prices.GasPriceEstimatorExec
-	SourcePriceRegistry         ccipdata.PriceRegistryReader
+	sourcePriceRegistry         ccipdata.PriceRegistryReader
 	sourcePriceRegistryProvider ccipdataprovider.PriceRegistry
 	sourceWrappedNativeToken    cciptypes.Address
 	onRampReader                ccipdata.OnRampReader
@@ -953,7 +953,7 @@ func inflightAggregates(
 // price values are USD per 1e18 of smallest token denomination, in base units 1e18 (e.g. 5$ = 5e18 USD per 1e18 units).
 // this function is used for price registry of both source and destination chains.
 func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryReader, tokens []cciptypes.Address) (map[cciptypes.Address]*big.Int, error) {
-	prices := make(map[cciptypes.Address]*big.Int)
+	tokenPrices := make(map[cciptypes.Address]*big.Int)
 
 	fetchedPrices, err := priceRegistry.GetTokenPrices(ctx, tokens)
 	if err != nil {
@@ -972,16 +972,16 @@ func getTokensPrices(ctx context.Context, priceRegistry ccipdata.PriceRegistryRe
 		}
 
 		// price registry should not report different price for the same token
-		price, exists := prices[token]
+		price, exists := tokenPrices[token]
 		if exists && fetchedPrices[i].Value.Cmp(price) != 0 {
 			return nil, fmt.Errorf("price registry reported different prices (%s and %s) for the same token %s",
 				fetchedPrices[i].Value, price, token)
 		}
 
-		prices[token] = fetchedPrices[i].Value
+		tokenPrices[token] = fetchedPrices[i].Value
 	}
 
-	return prices, nil
+	return tokenPrices, nil
 }
 
 func (r *ExecutionReportingPlugin) getUnexpiredCommitReports(
@@ -1049,22 +1049,29 @@ func (r *ExecutionReportingPlugin) prepareTokenExecData(ctx context.Context) (ex
 	if r.sourcePriceRegistryProvider == nil {
 		return execTokenData{}, fmt.Errorf("sourcePriceRegistryProvider is nil")
 	}
-	if r.SourcePriceRegistry == nil || priceRegistryAddress != r.SourcePriceRegistry.Address() {
+	if r.sourcePriceRegistry == nil || priceRegistryAddress != r.sourcePriceRegistry.Address() {
 		// Price registry address changed, updating source price registry.
 		sourcePriceRegistry, err1 := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
 		if err1 != nil {
 			return execTokenData{}, err1
 		}
-		r.SourcePriceRegistry = sourcePriceRegistry
+		oldPriceRegistry := r.sourcePriceRegistry
+		r.sourcePriceRegistry = sourcePriceRegistry
+		// Close the old price registry
+		if oldPriceRegistry != nil {
+			if err1 := oldPriceRegistry.Close(); err1 != nil {
+				r.lggr.Warnw("failed to close old price registry", "err", err1)
+			}
+		}
 	}
 
-	sourceFeeTokens, err := r.SourcePriceRegistry.GetFeeTokens(ctx)
+	sourceFeeTokens, err := r.sourcePriceRegistry.GetFeeTokens(ctx)
 	if err != nil {
 		return execTokenData{}, fmt.Errorf("get source fee tokens: %w", err)
 	}
 	sourceTokensPrices, err := getTokensPrices(
 		ctx,
-		r.SourcePriceRegistry,
+		r.sourcePriceRegistry,
 		ccipcommon.FlattenUniqueSlice(
 			sourceFeeTokens,
 			[]cciptypes.Address{r.sourceWrappedNativeToken},
