@@ -328,12 +328,17 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 		return false, nil
 	}
 
-	// check if any of the transfers in the report are in-flight
+	// check if any of the transfers in the report are in-flight.
 	for _, transfer := range report.Transfers {
 		if p.inflight.IsInflight(ctx, transfer) {
 			lggr.Infow("transfer is in-flight, should not be accepted", "transfer", transfer)
 			return false, nil
 		}
+	}
+
+	// add the transfers to the inflight container since none of them are inflight already.
+	for _, transfer := range report.Transfers {
+		p.inflight.Add(ctx, transfer)
 	}
 
 	lggr.Infow("accepting report",

@@ -16,7 +16,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/test-go/testify/require"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
@@ -55,6 +55,7 @@ func TestPlugin_Observation(t *testing.T) {
 		name            string
 		seqNr           uint64
 		observedGraph   func(t *testing.T) (graph.Graph, error)
+		inflight        func(t *testing.T, p *pluginWithMocks)
 		previousOutcome models.Outcome
 		bridges         map[[2]models.NetworkSelector]func(t *testing.T) (bridge.Bridge, error)
 		expObservation  models.Observation
@@ -72,7 +73,7 @@ func TestPlugin_Observation(t *testing.T) {
 				[]models.NetworkLiquidity{},
 				[]models.Transfer{},
 				[]models.PendingTransfer{},
-				nil,
+				[]models.Transfer{},
 				[]models.Edge{},
 				[]models.ConfigDigestWithMeta{},
 			),
@@ -164,7 +165,7 @@ func TestPlugin_Observation(t *testing.T) {
 						ID:       "some-id",
 					},
 				},
-				nil,
+				[]models.Transfer{},
 				[]models.Edge{
 					models.NewEdge(networkA, networkB),
 					models.NewEdge(networkB, networkA),
@@ -188,6 +189,82 @@ func TestPlugin_Observation(t *testing.T) {
 				assert.True(t, errors.Is(err, errSomethingWentWrong))
 				assert.False(t, err.Error() == errSomethingWentWrong.Error()) // error should be wrapped
 			},
+		},
+		{
+			name:  "inflight transfers are correctly expired when they become pending",
+			seqNr: 10,
+			observedGraph: func(t *testing.T) (graph.Graph, error) {
+				g := graph.NewGraph()
+				g.AddNetwork(networkA, graph.Data{
+					Liquidity:         big.NewInt(1000),
+					TokenAddress:      tokenX,
+					RebalancerAddress: rebalancerA,
+					NetworkSelector:   networkA,
+					ConfigDigest:      cfgDigest1,
+				})
+				g.AddNetwork(networkB, graph.Data{
+					Liquidity:         big.NewInt(2000),
+					TokenAddress:      tokenY,
+					RebalancerAddress: rebalancerB,
+					NetworkSelector:   networkB,
+					ConfigDigest:      cfgDigest2,
+				})
+				assert.NoError(t, g.AddConnection(networkA, networkB))
+				assert.NoError(t, g.AddConnection(networkB, networkA))
+				return g, nil
+			},
+			previousOutcome: models.Outcome{},
+			bridges: map[[2]models.NetworkSelector]func(t *testing.T) (bridge.Bridge, error){
+				{networkA, networkB}: func(t *testing.T) (bridge.Bridge, error) {
+					b := bridgemocks.NewBridge(t)
+					b.On("GetTransfers", ctx, tokenX, tokenY).Return([]models.PendingTransfer{}, nil)
+					return b, nil
+				},
+				{networkB, networkA}: func(t *testing.T) (bridge.Bridge, error) {
+					b := bridgemocks.NewBridge(t)
+					b.On("GetTransfers", ctx, tokenY, tokenX).Return([]models.PendingTransfer{
+						{
+							Transfer: models.NewTransfer(networkB, networkA, big.NewInt(200), time.Time{}, []byte("abc")),
+							Status:   models.TransferStatusReady,
+							ID:       "some-id",
+						},
+					}, nil)
+					return b, nil
+				},
+			},
+			inflight: func(t *testing.T, p *pluginWithMocks) {
+				// A -> B transfer will be returned as pending,
+				// but was previously inflight.
+				p.plugin.inflight.Add(testutils.Context(t), models.Transfer{
+					From:   networkB,
+					To:     networkA,
+					Amount: ubig.New(big.NewInt(200)),
+				})
+			},
+			expObservation: models.NewObservation(
+				[]models.NetworkLiquidity{
+					{Network: networkA, Liquidity: ubig.New(big.NewInt(1000))},
+					{Network: networkB, Liquidity: ubig.New(big.NewInt(2000))},
+				},
+				[]models.Transfer{},
+				[]models.PendingTransfer{
+					{
+						Transfer: models.NewTransfer(networkB, networkA, big.NewInt(200), time.Time{}, []byte("abc")),
+						Status:   models.TransferStatusReady,
+						ID:       "some-id",
+					},
+				},
+				[]models.Transfer{},
+				[]models.Edge{
+					models.NewEdge(networkA, networkB),
+					models.NewEdge(networkB, networkA),
+				},
+				[]models.ConfigDigestWithMeta{
+					{Digest: cfgDigest1, NetworkSel: networkA},
+					{Digest: cfgDigest2, NetworkSel: networkB},
+				},
+			),
+			expErr: nil,
 		},
 	}
 
@@ -827,6 +904,8 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 			},
 			assertions: func(t *testing.T, p *pluginWithMocks) {
 				p.lmFactory.AssertExpectations(t)
+				inflight := p.plugin.inflight.GetAll(testutils.Context(t))
+				require.Len(t, inflight, 1)
 			},
 			expRes: true,
 			expErr: false,
@@ -857,6 +936,8 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 			},
 			assertions: func(t *testing.T, p *pluginWithMocks) {
 				p.lmFactory.AssertExpectations(t)
+				inflight := p.plugin.inflight.GetAll(testutils.Context(t))
+				require.Len(t, inflight, 0)
 			},
 			expRes: false,
 			expErr: false,
@@ -889,6 +970,8 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 			},
 			assertions: func(t *testing.T, p *pluginWithMocks) {
 				p.lmFactory.AssertExpectations(t)
+				inflight := p.plugin.inflight.GetAll(testutils.Context(t))
+				require.Len(t, inflight, 0)
 			},
 			expRes: false,
 			expErr: false,
@@ -1046,7 +1129,6 @@ func TestPlugin_Close(t *testing.T) {
 }
 
 func TestPlugin_E2EWithMocks(t *testing.T) {
-	t.Skip()
 	ctx := testutils.Context(t)
 	lggr := logger.TestLogger(t)
 	lggr.SetLogLevel(zapcore.ErrorLevel)
@@ -1069,7 +1151,7 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 
 			for numRound, round := range tc.rounds {
 				for i, n := range nodes {
-					t.Logf(">>> running round: %d", numRound)
+					t.Logf(">>> running round: %d", numRound+1)
 					// the node will first discover the graph, let's mock the observed graph
 					discoverer := discoverermocks.NewDiscoverer(t)
 					n.discovererFactory.
@@ -1083,10 +1165,10 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 					// let's mock the pending transfers
 					observedGraph := round.discoveredGraphPerNode[i]()
 					edges, err := observedGraph.GetEdges()
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					for _, edge := range edges {
 						br, ok := n.bridges[[2]models.NetworkSelector{edge.Source, edge.Dest}]
-						assert.True(t, ok, "the test case is wrong, bridge is not defined %d->%d", edge.Source, edge.Dest)
+						require.True(t, ok, "the test case is wrong, bridge is not defined %d->%d", edge.Source, edge.Dest)
 						n.bridgeFactory.On("NewBridge", edge.Source, edge.Dest).Return(br, nil).Maybe()
 
 						pendingTransfers := make([]models.PendingTransfer, 0)
@@ -1108,23 +1190,35 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 							Return(nil, nil).Maybe()
 					}
 
-					for net, seqNum := range round.seqNumPerRebalancer {
+					for net, data := range round.dataPerRebalancer {
 						rb, exists := n.rebalancers[net]
-						assert.True(t, exists, "test case is wrong, seq num of rebalancer is not defined")
-						rb.On("GetLatestSequenceNumber", mock.Anything).Return(seqNum, nil).Maybe()
+						require.True(t, exists, "test case is wrong, seq num of rebalancer is not defined")
+						rb.On("GetLatestSequenceNumber", mock.Anything).Return(data.seqNr, nil).Maybe()
+						rb.On("GetBalance", mock.Anything).Return(func(context.Context) (*big.Int, error) {
+							return new(big.Int).Set(data.liquidity), nil
+						}).Maybe()
+						t.Log(">>> mocked rebalancer calls", net, "seq num", data.seqNr, "liquidity", data.liquidity)
 						n.rbFactory.On("NewRebalancer", net, mock.Anything).Return(rb, nil).Maybe()
 					}
 				}
 
-				transmitted, notAccepted, notTransmitted, outcome, err := ocr3Runner.RunRound(ctx)
+				roundResult, err := ocr3Runner.RunRound(ctx)
 				if round.expErr {
-					assert.Error(t, err)
+					require.Error(t, err)
 					continue
 				}
-				assertOutcomeEqual(t, round.expOutcome, outcome)
-				assertReportsSlicesEqual(t, round.expTransmitted, transmitted)
-				assertReportsSlicesEqual(t, round.expNotAccepted, notAccepted)
-				assertReportsSlicesEqual(t, round.expNotTransmitted, notTransmitted)
+
+				inflights := make([][]models.Transfer, 0, len(nodes))
+				for _, n := range nodes {
+					all := n.plugin.inflight.GetAll(testutils.Context(t))
+					inflights = append(inflights, all)
+				}
+
+				assertOutcomeEqual(t, round.expOutcome, roundResult.Outcome)
+				assertReportsSlicesEqual(t, round.expTransmitted, roundResult.Transmitted)
+				assertReportsSlicesEqual(t, round.expNotAccepted, roundResult.NotAccepted)
+				assertReportsSlicesEqual(t, round.expNotTransmitted, roundResult.NotTransmitted)
+				require.Equal(t, round.inflightPerNode, inflights)
 			}
 		})
 	}
@@ -1148,20 +1242,24 @@ func twoNodesFourRounds(t *testing.T) testCase {
 		NetworkSelector:   networkB,
 		ConfigDigest:      cfgDigest2,
 	})
-	assert.NoError(t, g.AddConnection(networkA, networkB))
-	assert.NoError(t, g.AddConnection(networkB, networkA))
+	require.NoError(t, g.AddConnection(networkA, networkB))
+	require.NoError(t, g.AddConnection(networkB, networkA))
 
 	return testCase{
-		name:     "two nodes four rounds nothing inflight",
-		numNodes: 2,
+		name:     "four nodes four rounds",
+		numNodes: 4,
 		f:        1,
 		rounds: []roundData{
-			{ // round 1 - new transfers to reach balance in the outcome
+			{
+				// round 1 - new transfers to reach balance are generated in the outcome.
 				discoveredGraphPerNode: []func() graph.Graph{
 					func() graph.Graph { return g },
 					func() graph.Graph { return g },
+					func() graph.Graph { return g },
+					func() graph.Graph { return g },
 				},
-				pendingTransfersPerNode: [][]models.PendingTransfer{{}, {}},
+				pendingTransfersPerNode: [][]models.PendingTransfer{{}, {}, {}, {}},
+				inflightPerNode:         [][]models.Transfer{{}, {}, {}, {}},
 				expTransmitted:          []ocr3types.ReportWithInfo[models.Report]{},
 				expNotTransmitted:       []ocr3types.ReportWithInfo[models.Report]{},
 				expNotAccepted:          []ocr3types.ReportWithInfo[models.Report]{},
@@ -1172,17 +1270,33 @@ func twoNodesFourRounds(t *testing.T) testCase {
 					nil,
 					nil,
 					[]models.ConfigDigestWithMeta{{Digest: cfgDigest1, NetworkSel: networkA}, {Digest: cfgDigest2, NetworkSel: networkB}}),
-				seqNumPerRebalancer: map[models.NetworkSelector]uint64{
-					networkA: 1,
-					networkB: 2,
+				dataPerRebalancer: map[models.NetworkSelector]perRebalancerData{
+					networkA: {
+						seqNr:     1,
+						liquidity: big.NewInt(1000),
+					},
+					networkB: {
+						seqNr:     2,
+						liquidity: big.NewInt(2000),
+					},
 				},
 			},
-			{ // round 2 - the transfers of the previous outcome are included in the report
+			{
+				// round 2 - the transfers of the previous outcome are included in the report.
+				// they are also marked as in-flight.
 				discoveredGraphPerNode: []func() graph.Graph{
 					func() graph.Graph { return g },
 					func() graph.Graph { return g },
+					func() graph.Graph { return g },
+					func() graph.Graph { return g },
 				},
-				pendingTransfersPerNode: [][]models.PendingTransfer{{}, {}},
+				pendingTransfersPerNode: [][]models.PendingTransfer{{}, {}, {}, {}},
+				inflightPerNode: [][]models.Transfer{
+					{models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil)},
+					{models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil)},
+					{models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil)},
+					{models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil)},
+				},
 				expTransmitted: []ocr3types.ReportWithInfo[models.Report]{
 					{
 						Info: models.Report{
@@ -1200,32 +1314,88 @@ func twoNodesFourRounds(t *testing.T) testCase {
 					[]models.Transfer{{From: networkA, To: networkB, Amount: ubig.New(big.NewInt(1000))}},
 					nil,
 					[]models.ConfigDigestWithMeta{{Digest: cfgDigest1, NetworkSel: networkA}, {Digest: cfgDigest2, NetworkSel: networkB}}),
-				seqNumPerRebalancer: map[models.NetworkSelector]uint64{
-					networkA: 1,
-					networkB: 2,
+				dataPerRebalancer: map[models.NetworkSelector]perRebalancerData{
+					networkA: {
+						seqNr:     1,
+						liquidity: big.NewInt(1000),
+					},
+					networkB: {
+						seqNr:     2,
+						liquidity: big.NewInt(2000),
+					},
 				},
 			},
-			{ // round 3 - nothing new
+			{
+				// round 3 - the transfer is in flight.
+				// no new transfers should be generated.
 				discoveredGraphPerNode: []func() graph.Graph{
 					func() graph.Graph { return g },
 					func() graph.Graph { return g },
+					func() graph.Graph { return g },
+					func() graph.Graph { return g },
 				},
-				pendingTransfersPerNode: [][]models.PendingTransfer{{}, {}},
-				expTransmitted:          []ocr3types.ReportWithInfo[models.Report]{},
-				expNotTransmitted:       []ocr3types.ReportWithInfo[models.Report]{},
-				expNotAccepted:          []ocr3types.ReportWithInfo[models.Report]{},
+				pendingTransfersPerNode: [][]models.PendingTransfer{{}, {}, {}, {}},
+				inflightPerNode: [][]models.Transfer{
+					{models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil)},
+					{models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil)},
+					{models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil)},
+					{models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil)},
+				},
+				expTransmitted:    []ocr3types.ReportWithInfo[models.Report]{},
+				expNotTransmitted: []ocr3types.ReportWithInfo[models.Report]{},
+				expNotAccepted:    []ocr3types.ReportWithInfo[models.Report]{},
 				expOutcome: models.NewOutcome(
-					[]models.ProposedTransfer{
-						// TODO: this slice should be empty for this test to pass.
-						// right now the plugin will propose the same transfer again because it's missing an inflight cache.
-						{From: networkA, To: networkB, Amount: ubig.New(big.NewInt(1000))},
-					},
+					[]models.ProposedTransfer{},
 					nil,
 					nil,
 					[]models.ConfigDigestWithMeta{{Digest: cfgDigest1, NetworkSel: networkA}, {Digest: cfgDigest2, NetworkSel: networkB}}),
-				seqNumPerRebalancer: map[models.NetworkSelector]uint64{
-					networkA: 2,
-					networkB: 3,
+				dataPerRebalancer: map[models.NetworkSelector]perRebalancerData{
+					networkA: {
+						seqNr:     1,
+						liquidity: big.NewInt(1000),
+					},
+					networkB: {
+						seqNr:     2,
+						liquidity: big.NewInt(2000),
+					},
+				},
+			},
+			{
+				// round 4 - the transfer becomes pending, and should no longer
+				// be in flight. no new transfers should be generated still.
+				discoveredGraphPerNode: []func() graph.Graph{
+					func() graph.Graph { return g },
+					func() graph.Graph { return g },
+					func() graph.Graph { return g },
+					func() graph.Graph { return g },
+				},
+				pendingTransfersPerNode: [][]models.PendingTransfer{{
+					{Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil), Status: models.TransferStatusNotReady},
+				}, {
+					{Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil), Status: models.TransferStatusNotReady},
+				}, {
+					{Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil), Status: models.TransferStatusNotReady},
+				}, {
+					{Transfer: models.NewTransfer(networkA, networkB, big.NewInt(1000), time.Time{}, nil), Status: models.TransferStatusNotReady},
+				}},
+				inflightPerNode:   [][]models.Transfer{},
+				expTransmitted:    []ocr3types.ReportWithInfo[models.Report]{},
+				expNotTransmitted: []ocr3types.ReportWithInfo[models.Report]{},
+				expNotAccepted:    []ocr3types.ReportWithInfo[models.Report]{},
+				expOutcome: models.NewOutcome(
+					[]models.ProposedTransfer{},
+					nil,
+					nil,
+					[]models.ConfigDigestWithMeta{{Digest: cfgDigest1, NetworkSel: networkA}, {Digest: cfgDigest2, NetworkSel: networkB}}),
+				dataPerRebalancer: map[models.NetworkSelector]perRebalancerData{
+					networkA: {
+						seqNr:     2,             // report posted on networkA, sequence number is incremented.
+						liquidity: big.NewInt(0), // liquidity updated on A, and is pending to B.
+					},
+					networkB: {
+						seqNr:     2,
+						liquidity: big.NewInt(2000),
+					},
 				},
 			},
 		},
@@ -1233,7 +1403,7 @@ func twoNodesFourRounds(t *testing.T) testCase {
 }
 
 func assertReportsSlicesEqual(t *testing.T, r1, r2 []ocr3types.ReportWithInfo[models.Report]) {
-	assert.Equal(t, len(r1), len(r2))
+	require.Equal(t, len(r1), len(r2))
 	for i := range r1 {
 		assertReportsEqual(t, r1[i], r2[i])
 	}
@@ -1241,44 +1411,44 @@ func assertReportsSlicesEqual(t *testing.T, r1, r2 []ocr3types.ReportWithInfo[mo
 
 func assertReportsEqual(t *testing.T, r1, r2 ocr3types.ReportWithInfo[models.Report]) {
 	assertTransfersEqual(t, r1.Info.Transfers, r2.Info.Transfers)
-	assert.Equal(t, r1.Info.NetworkID, r2.Info.NetworkID)
-	assert.Equal(t, r1.Info.LiquidityManagerAddress, r2.Info.LiquidityManagerAddress)
-	assert.Equal(t, r1.Info.ConfigDigest.Hex(), r2.Info.ConfigDigest.Hex())
+	require.Equal(t, r1.Info.NetworkID, r2.Info.NetworkID)
+	require.Equal(t, r1.Info.LiquidityManagerAddress, r2.Info.LiquidityManagerAddress)
+	require.Equal(t, r1.Info.ConfigDigest.Hex(), r2.Info.ConfigDigest.Hex())
 }
 
 func assertTransfersEqual(t *testing.T, a, b []models.Transfer) {
-	assert.Equal(t, len(a), len(b))
+	require.Equal(t, len(a), len(b))
 	for i := range a {
-		assert.Equal(t, a[i].From, b[i].From)
-		assert.Equal(t, a[i].To, b[i].To)
-		assert.Equal(t, a[i].Amount, b[i].Amount)
+		require.Equal(t, a[i].From, b[i].From)
+		require.Equal(t, a[i].To, b[i].To)
+		require.Equal(t, a[i].Amount, b[i].Amount)
 	}
 }
 
 func assertPendingTransfersEqual(t *testing.T, a, b []models.PendingTransfer) {
-	assert.Equal(t, len(a), len(b))
+	require.Equal(t, len(a), len(b))
 	for i := range a {
-		assert.Equal(t, a[i].From, b[i].From)
-		assert.Equal(t, a[i].To, b[i].To)
-		assert.Equal(t, a[i].Amount, b[i].Amount)
+		require.Equal(t, a[i].From, b[i].From)
+		require.Equal(t, a[i].To, b[i].To)
+		require.Equal(t, a[i].Amount, b[i].Amount)
 	}
 }
 
 func assertProposedTransfersEqual(t *testing.T, a, b []models.ProposedTransfer) {
-	assert.Equal(t, len(a), len(b))
+	require.Equal(t, len(a), len(b))
 	for i := range a {
-		assert.Equal(t, a[i].From, b[i].From)
-		assert.Equal(t, a[i].To, b[i].To)
-		assert.Equal(t, a[i].Amount, b[i].Amount)
+		require.Equal(t, a[i].From, b[i].From)
+		require.Equal(t, a[i].To, b[i].To)
+		require.Equal(t, a[i].Amount, b[i].Amount)
 	}
 }
 
 func assertOutcomeEqual(t *testing.T, exp models.Outcome, got []byte) {
 	decodedOutcome := models.Outcome{}
 	err := json.Unmarshal(got, &decodedOutcome)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, exp.ConfigDigests, decodedOutcome.ConfigDigests)
+	require.Equal(t, exp.ConfigDigests, decodedOutcome.ConfigDigests)
 	assertTransfersEqual(t, exp.ResolvedTransfers, decodedOutcome.ResolvedTransfers)
 	assertPendingTransfersEqual(t, exp.PendingTransfers, decodedOutcome.PendingTransfers)
 	assertProposedTransfersEqual(t, exp.ProposedTransfers, decodedOutcome.ProposedTransfers)
@@ -1292,23 +1462,30 @@ type testCase struct {
 }
 
 func (tc *testCase) validate(t *testing.T) {
-	assert.Positive(t, len(tc.rounds))
-	assert.Positive(t, tc.numNodes)
-	assert.NotEmpty(t, tc.name)
+	require.Positive(t, len(tc.rounds))
+	require.Positive(t, tc.numNodes)
+	require.NotEmpty(t, tc.name)
 
 	for _, r := range tc.rounds {
-		assert.Equal(t, len(r.discoveredGraphPerNode), tc.numNodes, "you should define discovered graph per node")
-		assert.Equal(t, len(r.pendingTransfersPerNode), tc.numNodes, "you should define pending transfers per node")
-		assert.Positive(t, len(r.seqNumPerRebalancer), "you should define the seq nums of the rebalancers")
+		require.Equal(t, len(r.discoveredGraphPerNode), tc.numNodes, "you should define discovered graph per node")
+		require.Equal(t, len(r.pendingTransfersPerNode), tc.numNodes, "you should define pending transfers per node")
+		require.Positive(t, len(r.dataPerRebalancer), "you should define the seq nums of the rebalancers")
+		require.Positive(t, len(r.dataPerRebalancer), "you should define the data of the rebalancers")
 	}
+}
+
+type perRebalancerData struct {
+	seqNr     uint64
+	liquidity *big.Int
 }
 
 type roundData struct {
 	discoveredGraphPerNode  []func() graph.Graph
 	pendingTransfersPerNode [][]models.PendingTransfer
-	seqNumPerRebalancer     map[models.NetworkSelector]uint64
+	dataPerRebalancer       map[models.NetworkSelector]perRebalancerData
 	expOutcome              models.Outcome
 
+	inflightPerNode   [][]models.Transfer
 	expTransmitted    []ocr3types.ReportWithInfo[models.Report]
 	expNotAccepted    []ocr3types.ReportWithInfo[models.Report]
 	expNotTransmitted []ocr3types.ReportWithInfo[models.Report]

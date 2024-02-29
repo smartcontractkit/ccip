@@ -77,7 +77,7 @@ func (i *inflight) GetAll(ctx context.Context) []models.Transfer {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
-	var transfers []models.Transfer
+	transfers := make([]models.Transfer, 0, len(i.items))
 	for k := range i.items {
 		transfers = append(transfers, i.items[k])
 	}
