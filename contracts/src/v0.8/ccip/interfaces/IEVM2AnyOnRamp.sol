@@ -14,9 +14,4 @@ interface IEVM2AnyOnRamp is IEVM2AnyOnRampClient {
   /// @param sender The sender to get the nonce for
   /// @return nonce The next nonce for the sender
   function getSenderNonce(address sender) external view returns (uint64 nonce);
-
-  /// @notice Adds and removed token pools.
-  /// @param removes The tokens and pools to be removed
-  /// @param adds The tokens and pools to be added.
-  function applyPoolUpdates(Internal.PoolUpdate[] memory removes, Internal.PoolUpdate[] memory adds) external;
 }

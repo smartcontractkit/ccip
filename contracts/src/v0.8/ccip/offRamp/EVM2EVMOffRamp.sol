@@ -118,10 +118,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   // DYNAMIC CONFIG
   DynamicConfig internal s_dynamicConfig;
-  /// @dev source token => token pool
-  EnumerableMapAddresses.AddressToAddressMap private s_poolsBySourceToken;
-  /// @dev dest token => token pool
-  EnumerableMapAddresses.AddressToAddressMap private s_poolsByDestToken;
 
   // STATE
   /// @dev The expected nonce for a given sender.
@@ -136,11 +132,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
 
   constructor(
     StaticConfig memory staticConfig,
-    IERC20[] memory sourceTokens,
-    IPool[] memory pools,
     RateLimiter.Config memory rateLimiterConfig
   ) OCR2BaseNoChecks() AggregateRateLimiter(rateLimiterConfig) {
-    if (sourceTokens.length != pools.length) revert InvalidTokenPoolConfig();
     if (staticConfig.onRamp == address(0) || staticConfig.commitStore == address(0)) revert ZeroAddressNotAllowed();
     // Ensures we can never deploy a new offRamp that points to a commitStore that
     // already has roots committed.
@@ -154,13 +147,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
     i_armProxy = staticConfig.armProxy;
 
     i_metadataHash = _metadataHash(Internal.EVM_2_EVM_MESSAGE_HASH);
-
-    // Set new tokens and pools
-    for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      s_poolsBySourceToken.set(address(sourceTokens[i]), address(pools[i]));
-      s_poolsByDestToken.set(address(pools[i].getToken()), address(pools[i]));
-      emit PoolAdded(address(sourceTokens[i]), address(pools[i]));
-    }
   }
 
   // ================================================================
@@ -501,91 +487,6 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   // │                      Tokens and pools                        │
   // ================================================================
 
-  /// @notice Get all supported source tokens
-  /// @return sourceTokens of supported source tokens
-  function getSupportedTokens() external view returns (IERC20[] memory sourceTokens) {
-    sourceTokens = new IERC20[](s_poolsBySourceToken.length());
-    for (uint256 i = 0; i < sourceTokens.length; ++i) {
-      (address token, ) = s_poolsBySourceToken.at(i);
-      sourceTokens[i] = IERC20(token);
-    }
-    return sourceTokens;
-  }
-
-  /// @notice Get a token pool by its source token
-  /// @param sourceToken token
-  /// @return Token Pool
-  function getPoolBySourceToken(IERC20 sourceToken) public view returns (IPool) {
-    (bool success, address pool) = s_poolsBySourceToken.tryGet(address(sourceToken));
-    if (!success) revert UnsupportedToken(sourceToken);
-    return IPool(pool);
-  }
-
-  /// @notice Get the destination token from the pool based on a given source token.
-  /// @param sourceToken The source token
-  /// @return the destination token
-  function getDestinationToken(IERC20 sourceToken) external view returns (IERC20) {
-    return getPoolBySourceToken(sourceToken).getToken();
-  }
-
-  /// @notice Get a token pool by its dest token
-  /// @param destToken token
-  /// @return Token Pool
-  function getPoolByDestToken(IERC20 destToken) external view returns (IPool) {
-    (bool success, address pool) = s_poolsByDestToken.tryGet(address(destToken));
-    if (!success) revert UnsupportedToken(destToken);
-    return IPool(pool);
-  }
-
-  /// @notice Get all configured destination tokens
-  /// @return destTokens Array of configured destination tokens
-  function getDestinationTokens() external view returns (IERC20[] memory destTokens) {
-    destTokens = new IERC20[](s_poolsByDestToken.length());
-    for (uint256 i = 0; i < destTokens.length; ++i) {
-      (address token, ) = s_poolsByDestToken.at(i);
-      destTokens[i] = IERC20(token);
-    }
-    return destTokens;
-  }
-
-  /// @notice Adds and removed token pools.
-  /// @param removes The tokens and pools to be removed
-  /// @param adds The tokens and pools to be added.
-  function applyPoolUpdates(
-    Internal.PoolUpdate[] calldata removes,
-    Internal.PoolUpdate[] calldata adds
-  ) external onlyOwner {
-    for (uint256 i = 0; i < removes.length; ++i) {
-      address token = removes[i].token;
-      address pool = removes[i].pool;
-
-      // Check if the pool exists
-      if (!s_poolsBySourceToken.contains(token)) revert PoolDoesNotExist();
-      // Sanity check
-      if (s_poolsBySourceToken.get(token) != pool) revert TokenPoolMismatch();
-
-      s_poolsBySourceToken.remove(token);
-      s_poolsByDestToken.remove(address(IPool(pool).getToken()));
-
-      emit PoolRemoved(token, pool);
-    }
-
-    for (uint256 i = 0; i < adds.length; ++i) {
-      address token = adds[i].token;
-      address pool = adds[i].pool;
-
-      if (token == address(0) || pool == address(0)) revert InvalidTokenPoolConfig();
-      // Check if the pool is already set
-      if (s_poolsBySourceToken.contains(token)) revert PoolAlreadyAdded();
-
-      // Set the s_pools with new config values
-      s_poolsBySourceToken.set(token, pool);
-      s_poolsByDestToken.set(address(IPool(pool).getToken()), pool);
-
-      emit PoolAdded(token, pool);
-    }
-  }
-
   /// @notice Uses pools to release or mint a number of different tokens to a receiver address.
   /// @param sourceTokenAmounts List of tokens and amount values to be released/minted.
   /// @param originalSender The message sender.
@@ -604,7 +505,8 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
   ) internal returns (Client.EVMTokenAmount[] memory) {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](sourceTokenAmounts.length);
     for (uint256 i = 0; i < sourceTokenAmounts.length; ++i) {
-      IPool pool = getPoolBySourceToken(IERC20(sourceTokenAmounts[i].token));
+      Internal.TokenDataPayload memory extraTokenData = abi.decode(sourceTokenData[i], (Internal.TokenDataPayload));
+      IPool pool = IPool(extraTokenData.destinationPool);
       uint256 sourceTokenAmount = sourceTokenAmounts[i].amount;
 
       // Call the pool with exact gas to increase resistance against malicious tokens or token pools.
@@ -617,7 +519,7 @@ contract EVM2EVMOffRamp is IAny2EVMOffRamp, AggregateRateLimiter, ITypeAndVersio
           receiver,
           sourceTokenAmount,
           i_sourceChainSelector,
-          abi.encode(sourceTokenData[i], offchainTokenData[i])
+          abi.encode(extraTokenData.extraData, offchainTokenData[i])
         ),
         address(pool),
         s_dynamicConfig.maxPoolReleaseOrMintGas,

@@ -52,6 +52,11 @@ library Internal {
     address pool; // The token pool address
   }
 
+  struct TokenDataPayload {
+    address destinationPool;
+    bytes extraData;
+  }
+
   /// @notice Report that is submitted by the execution DON at the execution phase.
   /// @dev RMN depends on this struct, if changing, please notify the RMN maintainers.
   struct ExecutionReport {

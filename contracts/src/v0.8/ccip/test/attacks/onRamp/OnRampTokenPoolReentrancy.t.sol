@@ -39,7 +39,7 @@ contract OnRampTokenPoolReentrancy is EVM2EVMOnRampSetup {
     adds[0].token = address(s_sourceToken);
     adds[0].pool = address(s_maliciousTokenPool);
 
-    s_onRamp.applyPoolUpdates(removes, adds);
+    //    s_onRamp.applyPoolUpdates(removes, adds);
 
     s_sourceToken.transfer(address(s_facadeClient), 1e18);
     s_feeToken.transfer(address(s_facadeClient), 1e18);

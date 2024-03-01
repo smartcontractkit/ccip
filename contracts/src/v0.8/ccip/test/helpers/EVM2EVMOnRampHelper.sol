@@ -17,7 +17,6 @@ contract EVM2EVMOnRampHelper is EVM2EVMOnRamp, IgnoreContractSize {
     EVM2EVMOnRamp(
       staticConfig,
       dynamicConfig,
-      tokensAndPools,
       rateLimiterConfig,
       feeTokenConfigs,
       tokenTransferFeeConfigArgs,

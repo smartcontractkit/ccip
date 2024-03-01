@@ -97,7 +97,11 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](numberOfTokens);
 
     for (uint256 i = 0; i < numberOfTokens; ++i) {
-      IPool pool = s_offRamp.getPoolBySourceToken(IERC20(original.tokenAmounts[i].token));
+      Internal.TokenDataPayload memory extraTokenData = abi.decode(
+        original.sourceTokenData[i],
+        (Internal.TokenDataPayload)
+      );
+      IPool pool = IPool(extraTokenData.destinationPool);
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = original.tokenAmounts[i].amount;
     }

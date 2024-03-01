@@ -10,7 +10,7 @@ contract EVM2EVMOffRampHelper is EVM2EVMOffRamp, IgnoreContractSize {
     IERC20[] memory sourceTokens,
     IPool[] memory pools,
     RateLimiter.Config memory rateLimiterConfig
-  ) EVM2EVMOffRamp(staticConfig, sourceTokens, pools, rateLimiterConfig) {}
+  ) EVM2EVMOffRamp(staticConfig, rateLimiterConfig) {}
 
   function setExecutionStateHelper(uint64 sequenceNumber, Internal.MessageExecutionState state) public {
     _setExecutionState(sequenceNumber, state);
