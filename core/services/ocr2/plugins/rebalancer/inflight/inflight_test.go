@@ -255,7 +255,44 @@ func Test_inflight_IsInflight(t *testing.T) {
 		args   args
 		want   bool
 	}{
-		// TODO: Add test cases.
+		{
+			"not inflight",
+			fields{
+				items: map[mapKey]models.Transfer{},
+				lggr:  logger.TestLogger(t),
+			},
+			args{
+				testutils.Context(t),
+				models.Transfer{
+					From:   1,
+					To:     2,
+					Amount: ubig.NewI(1),
+				},
+			},
+			false,
+		},
+		{
+			"inflight",
+			fields{
+				items: map[mapKey]models.Transfer{
+					{From: 1, To: 2, Amount: "1"}: {
+						From:   1,
+						To:     2,
+						Amount: ubig.NewI(1),
+					},
+				},
+				lggr: logger.TestLogger(t),
+			},
+			args{
+				testutils.Context(t),
+				models.Transfer{
+					From:   1,
+					To:     2,
+					Amount: ubig.NewI(1),
+				},
+			},
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
