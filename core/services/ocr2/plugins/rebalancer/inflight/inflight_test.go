@@ -3,9 +3,10 @@ package inflight
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_inflight_Add(t *testing.T) {
