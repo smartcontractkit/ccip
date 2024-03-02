@@ -147,6 +147,18 @@ type CCIPCommon struct {
 	priceUpdateSubs    []event.Subscription
 }
 
+// FreeUpUnusedSpace sets nil to various elements of ccipModule which are only used
+// during lane set up and not used for rest of the test duration
+// this is called mainly by load test to keep the memory usage minimum for high number of lanes
+func (ccipModule *CCIPCommon) FreeUpUnusedSpace() {
+	ccipModule.PriceAggregators = nil
+	ccipModule.BridgeTokenPools = []*contracts.TokenPool{}
+	ccipModule.gasUpdateWatcher = nil
+	ccipModule.gasUpdateWatcherMu = nil
+	ccipModule.TokenMessenger = nil
+	ccipModule.PriceRegistry = nil
+}
+
 func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
 	for _, sub := range ccipModule.priceUpdateSubs {
 		sub.Unsubscribe()
