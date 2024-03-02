@@ -333,9 +333,6 @@ func (c *ChainlinkDeployment) Validate() error {
 	return nil
 }
 
-type CRIBNode struct {
-}
-
 type Node struct {
 	Name                   string                          `toml:",omitempty"`
 	ChainlinkImage         *ctfconfig.ChainlinkImageConfig `toml:"ChainlinkImage"`
