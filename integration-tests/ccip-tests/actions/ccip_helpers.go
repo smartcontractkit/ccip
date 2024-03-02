@@ -1988,27 +1988,24 @@ func CCIPRequestFromTxHash(txHash common.Hash, chainClient blockchain.EVMClient)
 }
 
 type CCIPLane struct {
-	Test                    *testing.T
-	Logger                  zerolog.Logger
-	SourceNetworkName       string
-	DestNetworkName         string
-	SourceChain             blockchain.EVMClient
-	DestChain               blockchain.EVMClient
-	Source                  *SourceCCIPModule
-	Dest                    *DestCCIPModule
-	TestEnv                 *CCIPTestEnv
-	NumberOfReq             int
-	Reports                 *testreporters.CCIPLaneStats
-	Balance                 *BalanceSheet
-	StartBlockOnSource      uint64
-	StartBlockOnDestination uint64
-	SentReqs                map[common.Hash][]CCIPRequest
-	TotalFee                *big.Int // total fee for all the requests. Used for balance validation.
-	ValidationTimeout       time.Duration
-	Context                 context.Context
-	SrcNetworkLaneCfg       *laneconfig.LaneConfig
-	DstNetworkLaneCfg       *laneconfig.LaneConfig
-	Subscriptions           []event.Subscription
+	Test              *testing.T
+	Logger            zerolog.Logger
+	SourceNetworkName string
+	DestNetworkName   string
+	SourceChain       blockchain.EVMClient
+	DestChain         blockchain.EVMClient
+	Source            *SourceCCIPModule
+	Dest              *DestCCIPModule
+	NumberOfReq       int
+	Reports           *testreporters.CCIPLaneStats
+	Balance           *BalanceSheet
+	SentReqs          map[common.Hash][]CCIPRequest
+	TotalFee          *big.Int // total fee for all the requests. Used for balance validation.
+	ValidationTimeout time.Duration
+	Context           context.Context
+	SrcNetworkLaneCfg *laneconfig.LaneConfig
+	DstNetworkLaneCfg *laneconfig.LaneConfig
+	Subscriptions     []event.Subscription
 }
 
 func (lane *CCIPLane) TokenPricesConfig() (string, error) {
@@ -2111,10 +2108,6 @@ func (lane *CCIPLane) RecordStateBeforeTransfer() {
 	lane.Balance.RecordBalance(bal)
 
 	// save the current block numbers to use in various filter log requests
-	lane.StartBlockOnSource, err = lane.Source.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(lane.Test, err, "Getting current block should be successful in source chain")
-	lane.StartBlockOnDestination, err = lane.Dest.Common.ChainClient.LatestBlockNumber(context.Background())
-	require.NoError(lane.Test, err, "Getting current block should be successful in dest chain")
 	lane.TotalFee = big.NewInt(0)
 	lane.NumberOfReq = 0
 	lane.SentReqs = make(map[common.Hash][]CCIPRequest)
@@ -2568,7 +2561,7 @@ func (lane *CCIPLane) CleanUp(clearFees bool) error {
 // DeployNewCCIPLane sets up a lane and initiates lane.Source and lane.Destination
 // If configureCLNodes is true it sets up jobs and contract config for the lane
 func (lane *CCIPLane) DeployNewCCIPLane(
-	numOfCommitNodes int,
+	env *CCIPTestEnv,
 	commitAndExecOnSameDON bool,
 	sourceCommon *CCIPCommon,
 	destCommon *CCIPCommon,
@@ -2579,7 +2572,6 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	withPipeline bool,
 ) (*laneconfig.LaneConfig, *laneconfig.LaneConfig, error) {
 	var err error
-	env := lane.TestEnv
 	sourceChainClient := lane.SourceChain
 	destChainClient := lane.DestChain
 
@@ -2656,32 +2648,16 @@ func (lane *CCIPLane) DeployNewCCIPLane(
 	if !exists {
 		return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("could not find CL nodes for %s", lane.Dest.Common.ChainClient.GetChainID().String())
 	}
-
-	// first node is the bootstrapper
 	bootstrapCommit := clNodes[0]
 	var bootstrapExec *client.CLNodesWithKeys
-	var execNodes []*client.CLNodesWithKeys
-	commitNodes := clNodes[1:]
-	env.commitNodeStartIndex = 2
-	env.execNodeStartIndex = 2
-	env.numOfCommitNodes = numOfCommitNodes
-	env.numOfExecNodes = numOfCommitNodes
+	commitNodes := clNodes[env.CommitNodeStartIndex : env.CommitNodeStartIndex+env.NumOfCommitNodes]
+	execNodes := clNodes[env.ExecNodeStartIndex : env.ExecNodeStartIndex+env.NumOfExecNodes]
 	if !commitAndExecOnSameDON {
 		if len(clNodes) < 11 {
 			return lane.SrcNetworkLaneCfg, lane.DstNetworkLaneCfg, fmt.Errorf("not enough CL nodes for separate commit and execution nodes")
 		}
 		bootstrapExec = clNodes[1] // for a set-up of different commit and execution nodes second node is the bootstrapper for execution nodes
-		commitNodes = clNodes[2 : 2+numOfCommitNodes]
-		execNodes = clNodes[2+numOfCommitNodes:]
-		env.commitNodeStartIndex = 3
-		env.execNodeStartIndex = 3 + numOfCommitNodes
-		env.numOfCommitNodes = len(commitNodes)
-		env.numOfExecNodes = len(execNodes)
-	} else {
-		execNodes = commitNodes
 	}
-	env.numOfAllowedFaultyExec = (len(execNodes) - 1) / 3
-	env.numOfAllowedFaultyCommit = (len(commitNodes) - 1) / 3
 
 	// save the current block numbers. If there is a delay between job start up and ocr config set up, the jobs will
 	// replay the log polling from these mentioned block number. The dest block number should ideally be the block number on which
@@ -2981,12 +2957,12 @@ type CCIPTestEnv struct {
 	CLNodesWithKeys          map[string][]*client.CLNodesWithKeys // key - network chain-id
 	CLNodes                  []*client.ChainlinkK8sClient
 	nodeMutexes              []*sync.Mutex
-	execNodeStartIndex       int
-	commitNodeStartIndex     int
-	numOfAllowedFaultyCommit int
-	numOfAllowedFaultyExec   int
-	numOfCommitNodes         int
-	numOfExecNodes           int
+	ExecNodeStartIndex       int
+	CommitNodeStartIndex     int
+	NumOfAllowedFaultyCommit int
+	NumOfAllowedFaultyExec   int
+	NumOfCommitNodes         int
+	NumOfExecNodes           int
 	K8Env                    *environment.Environment
 	CLNodeWithKeyReady       *errgroup.Group // denotes if keys are created in chainlink node and ready to be used for job creation
 }
@@ -3016,43 +2992,45 @@ func (c *CCIPTestEnv) ChaosLabelForAllGeth(t *testing.T, gethNetworksLabels []st
 }
 
 func (c *CCIPTestEnv) ChaosLabelForCLNodes(t *testing.T) {
-	allowedFaulty := c.numOfAllowedFaultyCommit
-	for i := c.commitNodeStartIndex; i < len(c.CLNodes); i++ {
+	allowedFaulty := c.NumOfAllowedFaultyCommit
+	commitStartInstance := c.CommitNodeStartIndex + 1
+	execStartInstance := c.ExecNodeStartIndex + 1
+	for i := commitStartInstance; i < len(c.CLNodes); i++ {
 		labelSelector := map[string]string{
 			"app":      "chainlink-0",
 			"instance": fmt.Sprintf("node-%d", i),
 		}
-		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+allowedFaulty+1 {
+		if i >= commitStartInstance && i < commitStartInstance+allowedFaulty+1 {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommitAndExecFaultyPlus)
 			require.NoError(t, err)
 		}
-		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+allowedFaulty {
+		if i >= commitStartInstance && i < commitStartInstance+allowedFaulty {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommitAndExecFaulty)
 			require.NoError(t, err)
 		}
 
 		// commit node starts from index 2
-		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfCommitNodes {
+		if i >= commitStartInstance && i < commitStartInstance+c.NumOfCommitNodes {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommit)
 			require.NoError(t, err)
 		}
-		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfAllowedFaultyCommit+1 {
+		if i >= commitStartInstance && i < commitStartInstance+c.NumOfAllowedFaultyCommit+1 {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommitFaultyPlus)
 			require.NoError(t, err)
 		}
-		if i >= c.commitNodeStartIndex && i < c.commitNodeStartIndex+c.numOfAllowedFaultyCommit {
+		if i >= commitStartInstance && i < commitStartInstance+c.NumOfAllowedFaultyCommit {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupCommitFaulty)
 			require.NoError(t, err)
 		}
-		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfExecNodes {
+		if i >= execStartInstance && i < execStartInstance+c.NumOfExecNodes {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecution)
 			require.NoError(t, err)
 		}
-		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfAllowedFaultyExec+1 {
+		if i >= execStartInstance && i < execStartInstance+c.NumOfAllowedFaultyExec+1 {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecutionFaultyPlus)
 			require.NoError(t, err)
 		}
-		if i >= c.execNodeStartIndex && i < c.execNodeStartIndex+c.numOfAllowedFaultyExec {
+		if i >= execStartInstance && i < execStartInstance+c.NumOfAllowedFaultyExec {
 			err := c.K8Env.Client.LabelChaosGroupByLabels(c.K8Env.Cfg.Namespace, labelSelector, ChaosGroupExecutionFaulty)
 			require.NoError(t, err)
 		}

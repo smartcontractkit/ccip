@@ -354,7 +354,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	networkA, networkB blockchain.EVMNetwork,
 	chainClientA, chainClientB blockchain.EVMClient,
 	transferAmounts []*big.Int,
-	numOfCommitNodes int,
 	commitAndExecOnSameDON, bidirectional bool,
 ) error {
 	var allErrors atomic.Error
@@ -391,7 +390,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 
 	ccipLaneA2B := &actions.CCIPLane{
 		Test:              t,
-		TestEnv:           ccipEnv,
 		SourceChain:       sourceChainClientA2B,
 		DestChain:         destChainClientA2B,
 		SourceNetworkName: actions.NetworkName(networkA.Name),
@@ -443,7 +441,6 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 
 		ccipLaneB2A = &actions.CCIPLane{
 			Test:              t,
-			TestEnv:           ccipEnv,
 			SourceNetworkName: actions.NetworkName(networkB.Name),
 			DestNetworkName:   actions.NetworkName(networkA.Name),
 			SourceChain:       sourceChainClientB2A,
@@ -487,7 +484,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 
 	setUpFuncs.Go(func() error {
 		lggr.Info().Msgf("Setting up lane %s to %s", networkA.Name, networkB.Name)
-		srcConfig, destConfig, err := ccipLaneA2B.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkACmn, networkBCmn,
+		srcConfig, destConfig, err := ccipLaneA2B.DeployNewCCIPLane(o.Env, commitAndExecOnSameDON, networkACmn, networkBCmn,
 			transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp, withPipeline)
 		if err != nil {
 			allErrors.Store(multierr.Append(allErrors.Load(), fmt.Errorf("deploying lane %s to %s; err - %w", networkA.Name, networkB.Name, errors.WithStack(err))))
@@ -511,7 +508,7 @@ func (o *CCIPTestSetUpOutputs) AddLanesForNetworkPair(
 	setUpFuncs.Go(func() error {
 		if bidirectional {
 			lggr.Info().Msgf("Setting up lane %s to %s", networkB.Name, networkA.Name)
-			srcConfig, destConfig, err := ccipLaneB2A.DeployNewCCIPLane(numOfCommitNodes, commitAndExecOnSameDON, networkBCmn, networkACmn,
+			srcConfig, destConfig, err := ccipLaneB2A.DeployNewCCIPLane(o.Env, commitAndExecOnSameDON, networkBCmn, networkACmn,
 				transferAmounts, o.BootstrapAdded, configureCLNode, o.JobAddGrp, withPipeline)
 			if err != nil {
 				lggr.Error().Err(err).Msgf("error deploying lane %s to %s", networkB.Name, networkA.Name)
@@ -746,7 +743,6 @@ func CCIPDefaultTestSetUp(
 			return setUpArgs.AddLanesForNetworkPair(
 				lggr, n.NetworkA, n.NetworkB,
 				chainByChainID[n.NetworkA.ChainID], chainByChainID[n.NetworkB.ChainID], transferAmounts,
-				testConfig.TestGroupInput.NoOfCommitNodes,
 				pointer.GetBool(testConfig.TestGroupInput.CommitAndExecuteOnSameDON),
 				pointer.GetBool(testConfig.TestGroupInput.BiDirectionalLane),
 			)
@@ -889,6 +885,7 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 	}
 	if configureCLNode {
 		ccipEnv.CLNodeWithKeyReady.Go(func() error {
+			var totalNodes int
 			if !o.Cfg.ExistingCLCluster() {
 				if ccipEnv.LocalCluster != nil {
 					err = deployCL()
@@ -900,13 +897,41 @@ func (o *CCIPTestSetUpOutputs) CreateEnvironment(
 				if err != nil {
 					return fmt.Errorf("error connecting to chainlink nodes: %w", err)
 				}
+				totalNodes = pointer.GetInt(testConfig.EnvInput.NewCLCluster.NoOfNodes)
 			} else {
+				totalNodes = pointer.GetInt(testConfig.EnvInput.ExistingCLCluster.NoOfNodes)
 				err = ccipEnv.ConnectToExistingNodes(o.Cfg.EnvInput)
 				if err != nil {
 					return fmt.Errorf("error deploying and connecting to chainlink nodes: %w", err)
 				}
 			}
-			return ccipEnv.SetUpNodeKeysAndFund(lggr, big.NewFloat(testConfig.TestGroupInput.NodeFunding), chains)
+			err = ccipEnv.SetUpNodeKeysAndFund(lggr, big.NewFloat(testConfig.TestGroupInput.NodeFunding), chains)
+			if err != nil {
+				return fmt.Errorf("error setting up nodes and keys %w", err)
+			}
+			// first node is the bootstrapper
+			ccipEnv.CommitNodeStartIndex = 1
+			ccipEnv.ExecNodeStartIndex = 1
+			ccipEnv.NumOfCommitNodes = testConfig.TestGroupInput.NoOfCommitNodes
+			ccipEnv.NumOfExecNodes = ccipEnv.NumOfCommitNodes
+			if !pointer.GetBool(testConfig.TestGroupInput.CommitAndExecuteOnSameDON) {
+				if len(ccipEnv.CLNodesWithKeys) < 11 {
+					return fmt.Errorf("not enough CL nodes for separate commit and execution nodes")
+				}
+				if testConfig.TestGroupInput.NoOfCommitNodes >= totalNodes {
+					return fmt.Errorf("number of commit nodes can not be greater than total number of nodes in DON")
+				}
+				// first two nodes are reserved for bootstrap commit and bootstrap exec
+				ccipEnv.CommitNodeStartIndex = 2
+				ccipEnv.ExecNodeStartIndex = 2 + testConfig.TestGroupInput.NoOfCommitNodes
+				ccipEnv.NumOfExecNodes = totalNodes - (2 + testConfig.TestGroupInput.NoOfCommitNodes)
+				if ccipEnv.NumOfExecNodes < 4 {
+					return fmt.Errorf("insufficient number of exec nodes")
+				}
+			}
+			ccipEnv.NumOfAllowedFaultyExec = (ccipEnv.NumOfExecNodes - 1) / 3
+			ccipEnv.NumOfAllowedFaultyCommit = (ccipEnv.NumOfAllowedFaultyCommit - 1) / 3
+			return nil
 		})
 	}
 

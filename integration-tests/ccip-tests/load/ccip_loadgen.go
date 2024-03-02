@@ -43,6 +43,9 @@ type CCIPE2ELoad struct {
 }
 
 func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, noOfReq int64) *CCIPE2ELoad {
+	// to avoid holding extra data
+	lane.SrcNetworkLaneCfg = nil
+	lane.DstNetworkLaneCfg = nil
 	return &CCIPE2ELoad{
 		t:                         t,
 		Lane:                      lane,
@@ -160,7 +163,7 @@ func (c *CCIPE2ELoad) Call(_ *wasp.Generator) *wasp.Response {
 	msgSerialNo := stats.ReqNo
 	lggr := c.Lane.Logger.With().Int64("msg Number", stats.ReqNo).Logger()
 
-	defer c.Lane.Reports.UpdatePhaseStatsForReq(stats)
+	//defer c.Lane.Reports.UpdatePhaseStatsForReq(stats)
 	feeToken := sourceCCIP.Common.FeeToken.EthAddress
 	// initiate the transfer
 	lggr.Debug().Str("triggeredAt", time.Now().GoString()).Msg("triggering transfer")
