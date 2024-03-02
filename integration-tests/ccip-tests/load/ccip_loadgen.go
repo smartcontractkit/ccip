@@ -21,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-testing-framework/blockchain"
 
+	"github.com/smartcontractkit/ccip/integration-tests/ccip-tests/contracts"
 	"github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils"
 	"github.com/smartcontractkit/chainlink/v2/core/gethwrappers/ccip/generated/router"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/ccip/testhelpers"
@@ -130,6 +131,10 @@ func (c *CCIPE2ELoad) BeforeAllCall(msgType string, gasLimit *big.Int) {
 
 	sourceCCIP.Common.ChainClient.ParallelTransactions(false)
 	destCCIP.Common.ChainClient.ParallelTransactions(false)
+	// delete all pools as we don't need it anymore
+	// this is just to free up memory space for scalability tests with high number of token and pools
+	sourceCCIP.Common.BridgeTokenPools = []*contracts.TokenPool{}
+	destCCIP.Common.BridgeTokenPools = []*contracts.TokenPool{}
 	// close all header subscriptions for dest chains
 	queuedEvents := destCCIP.Common.ChainClient.GetHeaderSubscriptions()
 	for subName := range queuedEvents {
