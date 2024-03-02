@@ -63,7 +63,7 @@ func NewPlugin(
 		bridgeFactory:           bridgeFactory,
 		rebalancerGraph:         graph.NewGraph(),
 		liquidityRebalancer:     liquidityRebalancer,
-		inflight:                inflight.New(lggr),
+		inflight:                inflight.New(),
 		reportCodec:             reportCodec,
 		lggr:                    lggr,
 		mu:                      sync.RWMutex{},
@@ -97,8 +97,8 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		return ocrtypes.Observation{}, fmt.Errorf("load pending transfers: %w", err)
 	}
 
-	p.inflight.Expire(ctx, pendingTransfers)
-	inflightTransfers := p.inflight.GetAll(ctx)
+	numExpired := p.inflight.Expire(pendingTransfers)
+	inflightTransfers := p.inflight.GetAll()
 
 	edges, err := p.rebalancerGraph.GetEdges()
 	if err != nil {
@@ -128,6 +128,7 @@ func (p *Plugin) Observation(ctx context.Context, outcomeCtx ocr3types.OutcomeCo
 		"edges", edges,
 		"resolvedTransfers", resolvedTransfers,
 		"inflightTransfers", inflightTransfers,
+		"numExpired", numExpired,
 	)
 
 	encodedObservation := models.NewObservation(
@@ -330,7 +331,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 
 	// check if any of the transfers in the report are in-flight.
 	for _, transfer := range report.Transfers {
-		if p.inflight.IsInflight(ctx, transfer) {
+		if p.inflight.IsInflight(transfer) {
 			lggr.Infow("transfer is in-flight, should not be accepted", "transfer", transfer)
 			return false, nil
 		}
@@ -338,7 +339,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 
 	// add the transfers to the inflight container since none of them are inflight already.
 	for _, transfer := range report.Transfers {
-		p.inflight.Add(ctx, transfer)
+		p.inflight.Add(transfer)
 	}
 
 	lggr.Infow("accepting report",

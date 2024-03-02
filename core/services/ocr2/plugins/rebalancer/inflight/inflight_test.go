@@ -1,25 +1,19 @@
 package inflight
 
 import (
-	"context"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	ubig "github.com/smartcontractkit/chainlink/v2/core/chains/evm/utils/big"
-	"github.com/smartcontractkit/chainlink/v2/core/internal/testutils"
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_inflight_Add(t *testing.T) {
 	type fields struct {
-		items map[mapKey]models.Transfer
-		lggr  logger.Logger
+		items map[transferID]models.Transfer
 	}
 	type args struct {
-		ctx context.Context
-		t   models.Transfer
+		t models.Transfer
 	}
 	tests := []struct {
 		name      string
@@ -30,11 +24,9 @@ func Test_inflight_Add(t *testing.T) {
 		{
 			"transfer not in map",
 			fields{
-				items: map[mapKey]models.Transfer{},
-				lggr:  logger.TestLogger(t),
+				items: map[transferID]models.Transfer{},
 			},
 			args{
-				testutils.Context(t),
 				models.Transfer{
 					From:   1,
 					To:     2,
@@ -42,7 +34,7 @@ func Test_inflight_Add(t *testing.T) {
 				},
 			},
 			func(t *testing.T, i *inflight) {
-				item, ok := i.items[mapKey{From: 1, To: 2, Amount: "1"}]
+				item, ok := i.transfers[transferID{From: 1, To: 2, Amount: "1"}]
 				require.True(t, ok)
 				require.Equal(t, models.Transfer{
 					From:   1,
@@ -54,17 +46,15 @@ func Test_inflight_Add(t *testing.T) {
 		{
 			"transfer in map",
 			fields{
-				items: map[mapKey]models.Transfer{
+				items: map[transferID]models.Transfer{
 					{From: 1, To: 2, Amount: "1"}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
 					},
 				},
-				lggr: logger.TestLogger(t),
 			},
 			args{
-				testutils.Context(t),
 				models.Transfer{
 					From:   1,
 					To:     2,
@@ -72,8 +62,8 @@ func Test_inflight_Add(t *testing.T) {
 				},
 			},
 			func(t *testing.T, i *inflight) {
-				require.Len(t, i.items, 1)
-				item, ok := i.items[mapKey{From: 1, To: 2, Amount: "1"}]
+				require.Len(t, i.transfers, 1)
+				item, ok := i.transfers[transferID{From: 1, To: 2, Amount: "1"}]
 				require.True(t, ok)
 				require.Equal(t, models.Transfer{
 					From:   1,
@@ -86,10 +76,9 @@ func Test_inflight_Add(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := &inflight{
-				items: tt.fields.items,
-				lggr:  tt.fields.lggr,
+				transfers: tt.fields.items,
 			}
-			i.Add(tt.args.ctx, tt.args.t)
+			i.Add(tt.args.t)
 			tt.assertion(t, i)
 		})
 	}
@@ -97,11 +86,9 @@ func Test_inflight_Add(t *testing.T) {
 
 func Test_inflight_Expire(t *testing.T) {
 	type fields struct {
-		items map[mapKey]models.Transfer
-		lggr  logger.Logger
+		items map[transferID]models.Transfer
 	}
 	type args struct {
-		ctx     context.Context
 		pending []models.PendingTransfer
 	}
 	tests := []struct {
@@ -114,40 +101,36 @@ func Test_inflight_Expire(t *testing.T) {
 		{
 			"no pending transfers",
 			fields{
-				items: map[mapKey]models.Transfer{
+				items: map[transferID]models.Transfer{
 					{From: 1, To: 2, Amount: "1"}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
 					},
 				},
-				lggr: logger.TestLogger(t),
 			},
 			args{
-				testutils.Context(t),
 				[]models.PendingTransfer{},
 			},
 			func(t *testing.T, i *inflight) {
-				require.Len(t, i.items, 1)
+				require.Len(t, i.transfers, 1)
 			},
 			func(t *testing.T, i *inflight) {
-				require.Len(t, i.items, 1)
+				require.Len(t, i.transfers, 1)
 			},
 		},
 		{
 			"pending transfer",
 			fields{
-				items: map[mapKey]models.Transfer{
+				items: map[transferID]models.Transfer{
 					{From: 1, To: 2, Amount: "1"}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
 					},
 				},
-				lggr: logger.TestLogger(t),
 			},
 			args{
-				testutils.Context(t),
 				[]models.PendingTransfer{
 					{
 						Transfer: models.Transfer{
@@ -159,21 +142,20 @@ func Test_inflight_Expire(t *testing.T) {
 				},
 			},
 			func(t *testing.T, i *inflight) {
-				require.Len(t, i.items, 1)
+				require.Len(t, i.transfers, 1)
 			},
 			func(t *testing.T, i *inflight) {
-				require.Len(t, i.items, 0)
+				require.Len(t, i.transfers, 0)
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := &inflight{
-				items: tt.fields.items,
-				lggr:  tt.fields.lggr,
+				transfers: tt.fields.items,
 			}
 			tt.before(t, i)
-			i.Expire(tt.args.ctx, tt.args.pending)
+			i.Expire(tt.args.pending)
 			tt.assertion(t, i)
 		})
 	}
@@ -181,43 +163,30 @@ func Test_inflight_Expire(t *testing.T) {
 
 func Test_inflight_GetAll(t *testing.T) {
 	type fields struct {
-		items map[mapKey]models.Transfer
-		lggr  logger.Logger
-	}
-	type args struct {
-		ctx context.Context
+		items map[transferID]models.Transfer
 	}
 	tests := []struct {
 		name   string
 		fields fields
-		args   args
 		want   []models.Transfer
 	}{
 		{
 			"empty",
 			fields{
-				items: map[mapKey]models.Transfer{},
-				lggr:  logger.TestLogger(t),
-			},
-			args{
-				testutils.Context(t),
+				items: map[transferID]models.Transfer{},
 			},
 			[]models.Transfer{},
 		},
 		{
 			"not empty",
 			fields{
-				items: map[mapKey]models.Transfer{
+				items: map[transferID]models.Transfer{
 					{From: 1, To: 2, Amount: "1"}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
 					},
 				},
-				lggr: logger.TestLogger(t),
-			},
-			args{
-				testutils.Context(t),
 			},
 			[]models.Transfer{
 				{
@@ -227,14 +196,42 @@ func Test_inflight_GetAll(t *testing.T) {
 				},
 			},
 		},
+		{
+			"multiple",
+			fields{
+				items: map[transferID]models.Transfer{
+					{From: 1, To: 2, Amount: "1"}: {
+						From:   1,
+						To:     2,
+						Amount: ubig.NewI(1),
+					},
+					{From: 2, To: 3, Amount: "2"}: {
+						From:   2,
+						To:     3,
+						Amount: ubig.NewI(2),
+					},
+				},
+			},
+			[]models.Transfer{
+				{
+					From:   1,
+					To:     2,
+					Amount: ubig.NewI(1),
+				},
+				{
+					From:   2,
+					To:     3,
+					Amount: ubig.NewI(2),
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := &inflight{
-				items: tt.fields.items,
-				lggr:  tt.fields.lggr,
+				transfers: tt.fields.items,
 			}
-			got := i.GetAll(tt.args.ctx)
+			got := i.GetAll()
 			require.Equal(t, tt.want, got)
 		})
 	}
@@ -242,12 +239,10 @@ func Test_inflight_GetAll(t *testing.T) {
 
 func Test_inflight_IsInflight(t *testing.T) {
 	type fields struct {
-		items map[mapKey]models.Transfer
-		lggr  logger.Logger
+		items map[transferID]models.Transfer
 	}
 	type args struct {
-		ctx context.Context
-		t   models.Transfer
+		t models.Transfer
 	}
 	tests := []struct {
 		name   string
@@ -258,11 +253,9 @@ func Test_inflight_IsInflight(t *testing.T) {
 		{
 			"not inflight",
 			fields{
-				items: map[mapKey]models.Transfer{},
-				lggr:  logger.TestLogger(t),
+				items: map[transferID]models.Transfer{},
 			},
 			args{
-				testutils.Context(t),
 				models.Transfer{
 					From:   1,
 					To:     2,
@@ -274,17 +267,15 @@ func Test_inflight_IsInflight(t *testing.T) {
 		{
 			"inflight",
 			fields{
-				items: map[mapKey]models.Transfer{
+				items: map[transferID]models.Transfer{
 					{From: 1, To: 2, Amount: "1"}: {
 						From:   1,
 						To:     2,
 						Amount: ubig.NewI(1),
 					},
 				},
-				lggr: logger.TestLogger(t),
 			},
 			args{
-				testutils.Context(t),
 				models.Transfer{
 					From:   1,
 					To:     2,
@@ -297,11 +288,30 @@ func Test_inflight_IsInflight(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			i := &inflight{
-				items: tt.fields.items,
-				lggr:  tt.fields.lggr,
+				transfers: tt.fields.items,
 			}
-			got := i.IsInflight(tt.args.ctx, tt.args.t)
+			got := i.IsInflight(tt.args.t)
 			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestNew(t *testing.T) {
+	tests := []struct {
+		name string
+		want *inflight
+	}{
+		{
+			"basic",
+			&inflight{
+				transfers: map[transferID]models.Transfer{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := New()
+			require.Equal(t, tt.want.transfers, got.transfers)
 		})
 	}
 }

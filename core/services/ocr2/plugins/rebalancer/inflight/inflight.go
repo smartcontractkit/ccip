@@ -1,85 +1,82 @@
 package inflight
 
 import (
-	"context"
 	"sort"
 	"sync"
 
-	"github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/chainlink/v2/core/services/ocr2/plugins/rebalancer/models"
 )
 
+// Container stores transfers that are in-flight.
+// Transfers are expired when they are confirmed on-chain.
 type Container interface {
 	// Add adds a transfer to the inflight container.
-	Add(ctx context.Context, t models.Transfer)
+	Add(t models.Transfer)
 	// Expire removes any transfers from the inflight container that are in the pending list.
-	Expire(ctx context.Context, pending []models.PendingTransfer)
+	Expire(pending []models.PendingTransfer) (numExpired int)
 	// GetAll returns all transfers in the inflight container.
-	GetAll(ctx context.Context) []models.Transfer
+	GetAll() []models.Transfer
 	// IsInflight returns true if the transfer is in the inflight container.
-	IsInflight(ctx context.Context, t models.Transfer) bool
+	IsInflight(t models.Transfer) bool
 }
 
-type mapKey struct {
+// transferID uniquely identifies a transfer for a short period of time.
+type transferID struct {
 	From   models.NetworkSelector
 	To     models.NetworkSelector
 	Amount string
 }
 
 type inflight struct {
-	items map[mapKey]models.Transfer
-	mu    sync.RWMutex
-	lggr  logger.Logger
+	transfers map[transferID]models.Transfer
+	mu        sync.RWMutex
 }
 
-func New(lggr logger.Logger) Container {
+func New() *inflight {
 	return &inflight{
-		items: make(map[mapKey]models.Transfer),
-		lggr:  lggr,
+		transfers: make(map[transferID]models.Transfer),
 	}
 }
 
-func (i *inflight) Add(ctx context.Context, t models.Transfer) {
+func (i *inflight) Add(t models.Transfer) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	i.items[mapKey{
+	i.transfers[transferID{
 		From:   t.From,
 		To:     t.To,
 		Amount: t.Amount.String(),
 	}] = t
 }
 
-func (i *inflight) Expire(ctx context.Context, pending []models.PendingTransfer) {
+func (i *inflight) Expire(pending []models.PendingTransfer) int {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
 	var numExpired int
 	for _, p := range pending {
-		k := mapKey{
+		k := transferID{
 			From:   p.From,
 			To:     p.To,
 			Amount: p.Amount.String(),
 		}
-		_, ok := i.items[k]
+		_, ok := i.transfers[k]
 		if ok {
 			numExpired++
-			delete(i.items, k)
+			delete(i.transfers, k)
 		}
 	}
 
-	if numExpired > 0 {
-		i.lggr.Debugw("Expired inflight transfers", "numExpired", numExpired)
-	}
+	return numExpired
 }
 
-func (i *inflight) GetAll(ctx context.Context) []models.Transfer {
+func (i *inflight) GetAll() []models.Transfer {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
-	transfers := make([]models.Transfer, 0, len(i.items))
-	for k := range i.items {
-		transfers = append(transfers, i.items[k])
+	transfers := make([]models.Transfer, 0, len(i.transfers))
+	for k := range i.transfers {
+		transfers = append(transfers, i.transfers[k])
 	}
 
 	// Sort the transfers so that they are always in the same order.
@@ -90,11 +87,11 @@ func (i *inflight) GetAll(ctx context.Context) []models.Transfer {
 	return transfers
 }
 
-func (i *inflight) IsInflight(ctx context.Context, t models.Transfer) bool {
+func (i *inflight) IsInflight(t models.Transfer) bool {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
-	_, ok := i.items[mapKey{
+	_, ok := i.transfers[transferID{
 		From:   t.From,
 		To:     t.To,
 		Amount: t.Amount.String(),

@@ -235,7 +235,7 @@ func TestPlugin_Observation(t *testing.T) {
 			inflight: func(t *testing.T, p *pluginWithMocks) {
 				// A -> B transfer will be returned as pending,
 				// but was previously inflight.
-				p.plugin.inflight.Add(testutils.Context(t), models.Transfer{
+				p.plugin.inflight.Add(models.Transfer{
 					From:   networkB,
 					To:     networkA,
 					Amount: ubig.New(big.NewInt(200)),
@@ -904,7 +904,7 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 			},
 			assertions: func(t *testing.T, p *pluginWithMocks) {
 				p.lmFactory.AssertExpectations(t)
-				inflight := p.plugin.inflight.GetAll(testutils.Context(t))
+				inflight := p.plugin.inflight.GetAll()
 				require.Len(t, inflight, 1)
 			},
 			expRes: true,
@@ -936,7 +936,7 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 			},
 			assertions: func(t *testing.T, p *pluginWithMocks) {
 				p.lmFactory.AssertExpectations(t)
-				inflight := p.plugin.inflight.GetAll(testutils.Context(t))
+				inflight := p.plugin.inflight.GetAll()
 				require.Len(t, inflight, 0)
 			},
 			expRes: false,
@@ -970,7 +970,7 @@ func TestPlugin_ShouldAcceptAttestedReport(t *testing.T) {
 			},
 			assertions: func(t *testing.T, p *pluginWithMocks) {
 				p.lmFactory.AssertExpectations(t)
-				inflight := p.plugin.inflight.GetAll(testutils.Context(t))
+				inflight := p.plugin.inflight.GetAll()
 				require.Len(t, inflight, 0)
 			},
 			expRes: false,
@@ -1217,7 +1217,7 @@ func TestPlugin_E2EWithMocks(t *testing.T) {
 
 				inflights := make([][]models.Transfer, 0, len(nodes))
 				for _, n := range nodes {
-					all := n.plugin.inflight.GetAll(testutils.Context(t))
+					all := n.plugin.inflight.GetAll()
 					inflights = append(inflights, all)
 				}
 
