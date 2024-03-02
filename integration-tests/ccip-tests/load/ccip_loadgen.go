@@ -29,9 +29,18 @@ import (
 	"github.com/smartcontractkit/chainlink/integration-tests/ccip-tests/testreporters"
 )
 
+type CCIPLaneOptimized struct {
+	Logger            zerolog.Logger
+	SourceNetworkName string
+	DestNetworkName   string
+	Source            *actions.SourceCCIPModule
+	Dest              *actions.DestCCIPModule
+	Reports           *testreporters.CCIPLaneStats
+}
+
 type CCIPE2ELoad struct {
 	t                         *testing.T
-	Lane                      *actions.CCIPLane
+	Lane                      *CCIPLaneOptimized
 	NoOfReq                   int64         // approx no of Request fired
 	CurrentMsgSerialNo        *atomic.Int64 // current msg serial number in the load sequence
 	CallTimeOut               time.Duration // max time to wait for various on-chain events
@@ -44,11 +53,17 @@ type CCIPE2ELoad struct {
 
 func NewCCIPLoad(t *testing.T, lane *actions.CCIPLane, timeout time.Duration, noOfReq int64) *CCIPE2ELoad {
 	// to avoid holding extra data
-	lane.SrcNetworkLaneCfg = nil
-	lane.DstNetworkLaneCfg = nil
+	loadLane := &CCIPLaneOptimized{
+		Logger:            lane.Logger,
+		SourceNetworkName: lane.SourceNetworkName,
+		DestNetworkName:   lane.DestNetworkName,
+		Source:            lane.Source,
+		Dest:              lane.Dest,
+		Reports:           lane.Reports,
+	}
 	return &CCIPE2ELoad{
 		t:                         t,
-		Lane:                      lane,
+		Lane:                      loadLane,
 		CurrentMsgSerialNo:        atomic.NewInt64(1),
 		CallTimeOut:               timeout,
 		NoOfReq:                   noOfReq,
