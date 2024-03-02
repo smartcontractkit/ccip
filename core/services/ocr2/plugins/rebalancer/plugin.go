@@ -323,9 +323,9 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 		return false, nil
 	}
 
-	stale := p.isStaleReport(ctx, lggr, seqNr, r.Info)
-	if stale {
-		lggr.Infow("report is stale, should not be accepted")
+	staleErr := p.stalenessValidation(ctx, lggr, seqNr, r.Info)
+	if staleErr != nil {
+		lggr.Infow("report is stale, should not be accepted", "staleErr", staleErr)
 		return false, nil
 	}
 
@@ -369,9 +369,9 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64,
 		"sendInstructions", instructions.SendLiquidityParams,
 		"receiveInstructions", instructions.ReceiveLiquidityParams)
 
-	stale := p.isStaleReport(ctx, lggr, seqNr, r.Info)
-	if stale {
-		lggr.Infow("report is stale, should not be accepted")
+	staleErr := p.stalenessValidation(ctx, lggr, seqNr, r.Info)
+	if staleErr != nil {
+		lggr.Infow("report is stale, should not be transmitted", "staleErr", staleErr)
 		return false, nil
 	}
 
@@ -380,41 +380,40 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64,
 	return true, nil
 }
 
-func (p *Plugin) isStaleReport(
+// validateReportStaleness performs various checks on the report to determine whether or not it is stale.
+// A stale report should not be transmitted on-chain.
+func (p *Plugin) stalenessValidation(
 	ctx context.Context,
 	lggr logger.Logger,
 	seqNr uint64,
 	report models.Report,
-) bool {
+) error {
 	// check sequence number to see if its already transmitted onchain.
 	rebalancer, err := p.liquidityManagerFactory.NewRebalancer(report.NetworkID, report.LiquidityManagerAddress)
 	if err != nil {
-		lggr.Warnw("failed to get rebalancer", "err", err)
-		return true
+		return fmt.Errorf("get rebalancer: %w", err)
 	}
 
 	onchainSeqNr, err := rebalancer.GetLatestSequenceNumber(ctx)
 	if err != nil {
-		lggr.Warnw("failed to get latest sequence number", "err", err)
-		return true
+		return fmt.Errorf("get latest sequence number: %w", err)
 	}
 
 	if onchainSeqNr >= seqNr {
-		lggr.Infow("report already transmitted onchain, report is stale, should not be transmitted", "onchainSeqNr", onchainSeqNr)
-		return true
+		return fmt.Errorf("report already transmitted onchain, report seqNr: %d, onchain seqNr: %d", seqNr, onchainSeqNr)
 	}
 
-	lggr.Infow("onchain sequence number < current", "onchainSeqNr", onchainSeqNr)
+	lggr.Debugw("onchain sequence number < current", "onchainSeqNr", onchainSeqNr)
 
 	// check that the instructions will not cause failures onchain.
 	// e.g send instructions when there is not enough liquidity.
 	currentBalance, err := rebalancer.GetBalance(ctx)
 	if err != nil {
 		lggr.Warnw("failed to get balance", "err", err)
-		return true
+		return fmt.Errorf("get rebalancer liquidity: %w", err)
 	}
 
-	lggr.Infow("checking if there is enough balance onchain to send", "currentBalance", currentBalance.String())
+	lggr.Debugw("checking if there is enough balance onchain to send", "currentBalance", currentBalance.String())
 
 	for _, transfer := range report.Transfers {
 		if transfer.From != report.NetworkID {
@@ -422,20 +421,18 @@ func (p *Plugin) isStaleReport(
 		}
 
 		if currentBalance.Cmp(transfer.Amount.ToInt()) < 0 {
-			lggr.Warnw("not enough balance onchain to send", "amount", transfer.Amount, "remaining", currentBalance.String())
-			return true
+			return fmt.Errorf("not enough balance onchain to send, amount: %s, remaining: %s", transfer.Amount.String(), currentBalance.String())
 		}
 		currentBalance = currentBalance.Sub(currentBalance, transfer.Amount.ToInt())
 	}
 
 	if currentBalance.Cmp(big.NewInt(0)) < 0 {
-		lggr.Warnw("not enough balance onchain to send", "remaining", currentBalance.String())
-		return true
+		return fmt.Errorf("not enough balance onchain to send, remaining: %s", currentBalance.String())
 	}
 
-	lggr.Infow("enough balance onchain to send", "currentBalance", currentBalance.String())
+	lggr.Debugw("enough balance onchain to send", "currentBalance", currentBalance.String())
 
-	return false
+	return nil
 }
 
 func (p *Plugin) Close() error {
