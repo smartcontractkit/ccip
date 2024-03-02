@@ -318,12 +318,12 @@ func (p *Plugin) ShouldAcceptAttestedReport(ctx context.Context, seqNr uint64, r
 		return false, fmt.Errorf("failed to decode report: %w", err)
 	}
 
-	if len(report.Transfers) == 0 {
+	if report.IsEmpty() {
 		lggr.Infow("report has no transfers, should not be transmitted")
 		return false, nil
 	}
 
-	stale := p.isStaleReport(ctx, lggr, seqNr, r.Info.NetworkID, r.Info.LiquidityManagerAddress, report.Transfers)
+	stale := p.isStaleReport(ctx, lggr, seqNr, r.Info)
 	if stale {
 		lggr.Infow("report is stale, should not be accepted")
 		return false, nil
@@ -359,7 +359,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64,
 		return false, fmt.Errorf("failed to decode report: %w", err)
 	}
 
-	if len(report.Transfers) == 0 {
+	if report.IsEmpty() {
 		lggr.Infow("report has no transfers, should not be transmitted")
 		return false, nil
 	}
@@ -369,7 +369,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(ctx context.Context, seqNr uint64,
 		"sendInstructions", instructions.SendLiquidityParams,
 		"receiveInstructions", instructions.ReceiveLiquidityParams)
 
-	stale := p.isStaleReport(ctx, lggr, seqNr, r.Info.NetworkID, r.Info.LiquidityManagerAddress, report.Transfers)
+	stale := p.isStaleReport(ctx, lggr, seqNr, r.Info)
 	if stale {
 		lggr.Infow("report is stale, should not be accepted")
 		return false, nil
@@ -384,12 +384,10 @@ func (p *Plugin) isStaleReport(
 	ctx context.Context,
 	lggr logger.Logger,
 	seqNr uint64,
-	networkID models.NetworkSelector,
-	rebalancerAddress models.Address,
-	transfers []models.Transfer,
+	report models.Report,
 ) bool {
 	// check sequence number to see if its already transmitted onchain.
-	rebalancer, err := p.liquidityManagerFactory.NewRebalancer(networkID, rebalancerAddress)
+	rebalancer, err := p.liquidityManagerFactory.NewRebalancer(report.NetworkID, report.LiquidityManagerAddress)
 	if err != nil {
 		lggr.Warnw("failed to get rebalancer", "err", err)
 		return true
@@ -418,8 +416,8 @@ func (p *Plugin) isStaleReport(
 
 	lggr.Infow("checking if there is enough balance onchain to send", "currentBalance", currentBalance.String())
 
-	for _, transfer := range transfers {
-		if transfer.From != networkID {
+	for _, transfer := range report.Transfers {
+		if transfer.From != report.NetworkID {
 			continue
 		}
 
