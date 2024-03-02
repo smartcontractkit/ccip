@@ -151,6 +151,8 @@ func (ccipModule *CCIPCommon) StopWatchingPriceUpdates() {
 	for _, sub := range ccipModule.priceUpdateSubs {
 		sub.Unsubscribe()
 	}
+	ccipModule.gasUpdateWatcher = nil
+	ccipModule.gasUpdateWatcherMu = nil
 }
 
 func (ccipModule *CCIPCommon) UnvoteToCurseARM() error {
@@ -487,6 +489,7 @@ func (ccipModule *CCIPCommon) WaitForPriceUpdates(
 					Uint64("dest chain", destChainId).
 					Str("source chain", ccipModule.ChainClient.GetNetworkName()).
 					Msg("Price updated")
+
 				return nil
 			}
 		case <-ctx.Done():
