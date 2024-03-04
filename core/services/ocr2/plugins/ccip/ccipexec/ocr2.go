@@ -1108,9 +1108,6 @@ func (r *ExecutionReportingPlugin) ensurePriceRegistrySynchronization(ctx contex
 	if err != nil {
 		return fmt.Errorf("getting price registry from onramp: %w", err)
 	}
-	if r.sourcePriceRegistryProvider == nil {
-		panic("sourcePriceRegistryProvider is not initialized")
-	}
 	if r.sourcePriceRegistry == nil || priceRegistryAddress != r.sourcePriceRegistry.Address() {
 		// Price registry address changed or not initialized yet, updating source price registry.
 		sourcePriceRegistry, err1 := r.sourcePriceRegistryProvider.NewPriceRegistryReader(ctx, priceRegistryAddress)
