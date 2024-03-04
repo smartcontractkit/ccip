@@ -334,7 +334,9 @@ contract EVM2EVMOnRamp is IEVM2AnyOnRamp, ILinkAvailable, AggregateRateLimiter, 
       // This prevents gas bomb attacks on the NOPs. We use destBytesOverhead as a proxy to cap the number of bytes we accept.
       // As destBytesOverhead accounts for tokenData + offchainData, this caps the worst case abuse to the number of bytes reserved for offchainData.
       // It therefore fully mitigates gas bombs for most tokens, as most tokens don't use offchainData.
-      if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead)
+
+      // TODO hack: +500 to account for the addresses sent
+      if (tokenData.length > s_tokenTransferFeeConfig[tokenAndAmount.token].destBytesOverhead + 500)
         revert SourceTokenDataTooLarge(tokenAndAmount.token);
 
       newMessage.sourceTokenData[i] = tokenData;

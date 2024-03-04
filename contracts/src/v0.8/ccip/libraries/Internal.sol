@@ -52,8 +52,10 @@ library Internal {
     address pool; // The token pool address
   }
 
+  // TODO should be bytes or bytes32, for non-evm compatibility
   struct TokenDataPayload {
-    address destinationPool;
+    address sourcePoolAddress;
+    address destPoolAddress;
     bytes extraData;
   }
 

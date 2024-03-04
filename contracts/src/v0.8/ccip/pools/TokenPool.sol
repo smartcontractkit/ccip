@@ -7,6 +7,7 @@ import {IRouter} from "../interfaces/IRouter.sol";
 
 import {OwnerIsCreator} from "../../shared/access/OwnerIsCreator.sol";
 import {RateLimiter} from "../libraries/RateLimiter.sol";
+import {Internal} from "../libraries/Internal.sol";
 
 import {IERC20} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "../../vendor/openzeppelin-solidity/v4.8.3/contracts/utils/introspection/IERC165.sol";
@@ -28,6 +29,7 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   error ChainNotAllowed(uint64 remoteChainSelector);
   error BadARMSignal();
   error ChainAlreadyExists(uint64 chainSelector);
+  error InvalidSourcePoolAddress(address sourcePoolAddress);
 
   event Locked(address indexed sender, uint256 amount);
   event Burned(address indexed sender, uint256 amount);
@@ -125,6 +127,34 @@ abstract contract TokenPool is IPool, OwnerIsCreator, IERC165 {
   /// @inheritdoc IERC165
   function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
     return interfaceId == type(IPool).interfaceId || interfaceId == type(IERC165).interfaceId;
+  }
+
+  function _getLockOrBurnReturnData(
+    uint64 destChainSelector,
+    bytes memory arbitraryPayload
+  ) internal view returns (bytes memory) {
+    return
+      abi.encode(
+        Internal.TokenDataPayload({
+          sourcePoolAddress: address(this),
+          destPoolAddress: s_remoteChainConfigs[destChainSelector].remotePoolAddress,
+          extraData: arbitraryPayload
+        })
+      );
+  }
+
+  function _validateSourceCaller(
+    uint64 remoteChainSelector,
+    bytes memory extraData
+  ) internal view returns (bytes memory tokenDatPayload, bytes memory offchnTokenData) {
+    (bytes memory sourceDataBytes, bytes memory offchainTokenData) = abi.decode(extraData, (bytes, bytes));
+    Internal.TokenDataPayload memory sourceData = abi.decode(sourceDataBytes, (Internal.TokenDataPayload));
+    // Validate is the sending pool is allowed
+    if (sourceData.sourcePoolAddress != s_remoteChainConfigs[remoteChainSelector].remotePoolAddress) {
+      revert InvalidSourcePoolAddress(sourceData.sourcePoolAddress);
+    }
+
+    return (sourceData.extraData, offchainTokenData);
   }
 
   // ================================================================

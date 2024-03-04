@@ -48,18 +48,6 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
     s_reverting_receiver = new MaybeRevertMessageReceiver(true);
 
     deployOffRamp(s_mockCommitStore, s_destRouter, address(0));
-
-    TokenPool.ChainUpdate[] memory offRamps = new TokenPool.ChainUpdate[](1);
-    offRamps[0] = TokenPool.ChainUpdate({
-      remoteChainSelector: SOURCE_CHAIN_SELECTOR,
-      remotePoolAddress: s_sourceTokenPool,
-      allowed: true,
-      outboundRateLimiterConfig: getOutboundRateLimiterConfig(),
-      inboundRateLimiterConfig: getInboundRateLimiterConfig()
-    });
-
-    LockReleaseTokenPool(address(s_destPools[0])).applyChainUpdates(offRamps);
-    LockReleaseTokenPool(address(s_destPools[1])).applyChainUpdates(offRamps);
   }
 
   function deployOffRamp(ICommitStore commitStore, Router router, address prevOffRamp) internal {
@@ -103,7 +91,7 @@ contract EVM2EVMOffRampSetup is TokenSetup, PriceRegistrySetup, OCR2BaseSetup {
         original.sourceTokenData[i],
         (Internal.TokenDataPayload)
       );
-      IPool pool = IPool(extraTokenData.destinationPool);
+      IPool pool = IPool(extraTokenData.destPoolAddress);
       destTokenAmounts[i].token = address(pool.getToken());
       destTokenAmounts[i].amount = original.tokenAmounts[i].amount;
     }
