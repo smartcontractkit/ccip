@@ -218,9 +218,7 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 		"resolvedTransfersQuorum", resolvedTransfersQuorum,
 		"inflightTransfers", inflightTransfers,
 	)
-	allInflight := append(pendingTransfers, toPending(resolvedTransfersQuorum)...)
-	allInflight = append(allInflight, toPending(inflightTransfers)...)
-	proposedTransfers, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, allInflight)
+	proposedTransfers, err := p.liquidityRebalancer.ComputeTransfersToBalance(g, combinedUnexecutedTransfers(pendingTransfers, resolvedTransfersQuorum, inflightTransfers))
 	if err != nil {
 		return nil, fmt.Errorf("compute transfers to reach balance: %w", err)
 	}
@@ -233,6 +231,24 @@ func (p *Plugin) Outcome(outctx ocr3types.OutcomeContext, query ocrtypes.Query, 
 	)
 
 	return models.NewOutcome(proposedTransfers, resolvedTransfersQuorum, pendingTransfers, configDigests).Encode(), nil
+}
+
+func combinedUnexecutedTransfers(
+	pendingTransfers []models.PendingTransfer,
+	resolvedTransfersQuorum []models.Transfer,
+	inflightTransfers []models.Transfer,
+) []liquidityrebalancer.UnexecutedTransfer {
+	unexecuted := make([]liquidityrebalancer.UnexecutedTransfer, 0, len(pendingTransfers)+len(resolvedTransfersQuorum)+len(inflightTransfers))
+	for _, pendingTransfer := range pendingTransfers {
+		unexecuted = append(unexecuted, pendingTransfer)
+	}
+	for _, resolvedTransfer := range resolvedTransfersQuorum {
+		unexecuted = append(unexecuted, resolvedTransfer)
+	}
+	for _, inflightTransfer := range inflightTransfers {
+		unexecuted = append(unexecuted, inflightTransfer)
+	}
+	return unexecuted
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[models.Report], error) {
@@ -697,12 +713,4 @@ func (p *Plugin) resolveProposedTransfers(ctx context.Context, lggr logger.Logge
 	lggr.Infow("finished resolving proposed transfers", "resolvedTransfers", resolvedTransfers)
 
 	return resolvedTransfers, nil
-}
-
-func toPending(ts []models.Transfer) []models.PendingTransfer {
-	var pts []models.PendingTransfer
-	for _, t := range ts {
-		pts = append(pts, models.NewPendingTransfer(t))
-	}
-	return pts
 }
